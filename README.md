@@ -13,16 +13,16 @@ Now create the workspace
 source /opt/ros/kinetic/setup.bash         	# start using ROS kinetic
 mkdir -p ~/giskardpy_ws/src                 # create directory for workspace
 cd ~/giskardpy_ws                           # go to workspace directory
-catkin init                               	# init workspace
-cd src                                    	# go to source directory of workspace
-wstool init                               	# init rosinstall
+catkin init                                 # init workspace
+cd src                                      # go to source directory of workspace
+wstool init                                 # init rosinstall
 wstool merge https://raw.githubusercontent.com/SemRoCo/giskardpy/master/rosinstall/catkin.rosinstall
                                            	# update rosinstall file
-wstool update                              	# pull source repositories
-rosdep install --ignore-src --from-paths .	# install dependencies available through apt
-cd ..                                      	# go to workspace directory
-catkin build 							   	# build packages
-source ~/giskardpy_ws/devel/setup.bash 	    # source new overlay
+wstool update                               # pull source repositories
+rosdep install --ignore-src --from-paths .  # install dependencies available through apt
+cd ..                                       # go to workspace directory
+catkin build                                # build packages
+source ~/giskardpy_ws/devel/setup.bash      # source new overlay
 ```
 
 ### Tests

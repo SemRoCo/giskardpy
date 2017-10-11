@@ -15,6 +15,10 @@ mkdir -p ~/giskardpy_ws/src                 # create directory for workspace
 cd ~/giskardpy_ws                           # go to workspace directory
 catkin init                               	# init workspace
 cd src                                    	# go to source directory of workspace
+wstool init                               	# init rosinstall
+wstool merge https://raw.githubusercontent.com/SemRoCo/giskardpy/master/rosinstall/catkin.rosinstall
+                                           	# update rosinstall file
+wstool update                              	# pull source repositories
 rosdep install --ignore-src --from-paths .	# install dependencies available through apt
 cd ..                                      	# go to workspace directory
 catkin build 							   	# build packages

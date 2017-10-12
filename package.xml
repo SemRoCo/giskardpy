@@ -43,6 +43,8 @@
 
   <run_depend>python-numpy</run_depend>
   <run_depend>cython</run_depend>
+  <run_depend>ros_kinetic_urdfdom_py</run_depend>
+  <run_depend>qpoases</run_depend>
 
   <test_depend>rosunit</test_depend>
 

@@ -1,11 +1,11 @@
-from sympy.vector import *
-
-giskard_base_Frame = CoordSys3D('N')
-unitX = giskard_base_Frame.i
-unitY = giskard_base_Frame.j
-unitZ = giskard_base_Frame.k
-
-def vec3(x, y, z):
-    return unitX * x + unitY * y + unitZ * z
+from sympy import ImmutableMatrix
+from sympy import Matrix
 
 
+def Vector(x,y,z):
+    return ImmutableMatrix([x,y,z])
+
+
+unitX = Vector(1,0,0)
+unitY = Vector(0,1,0)
+unitZ = Vector(0,0,1)

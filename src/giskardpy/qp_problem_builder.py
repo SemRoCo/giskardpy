@@ -1,11 +1,20 @@
 import numpy as np
 from sympy import *
 
+def printSPMatrix(matrix):
+    out = ''
+    for y in range(matrix.rows):
+        out += '| '
+        for x in range(matrix.cols):
+           out += '{:>10.10}'.format(str(matrix[y * matrix.cols + x])) + ', '
+        out += ' |\n'
+    print(out)
+
 class QPProblemBuilder(object):
     def __init__(self, controllables_lower, controllables_upper, controllables_weights,
                        softs_lower, softs_upper, softs_weight, softs_expressions,
                        hards_lower, hards_upper, hards_expressions, observables, controllables):
-        super(QPProblemBuilder, self).__init__(self)
+        super(QPProblemBuilder, self).__init__()
 
         # Controllable constraint expressions
         if len(controllables_lower) != len(controllables_upper) or len(controllables_lower) != len(controllables_weights):
@@ -32,9 +41,9 @@ class QPProblemBuilder(object):
         self.hard_lower_bounds         = hards_lower
         self.hard_upper_bounds         = hards_upper
 
-        self.np_H  = np.zeros(self.num_weights(), self.num_weights())
-        self.np_A  = np.block([[np.zeros(self.num_hard_constraints(), self.num_hard_constraints()), np.zeros(self.num_soft_constraints(), self.num_hard_constraints())],
-                            [np.zeros(self.num_hard_constraints(), self.num_soft_constraints()), np.identity(self.num_soft_constraints())]])
+        self.np_H  = np.zeros((self.num_weights(), self.num_weights()))
+        self.np_A  = np.bmat([[np.zeros((self.num_hard_constraints(), self.num_controllables())), np.zeros((self.num_hard_constraints(), self.num_soft_constraints()))],
+                            [np.zeros((self.num_soft_constraints(), self.num_controllables())), np.identity(self.num_soft_constraints())]])
 
         self.np_g   = np.zeros(self.num_weights())
         self.np_lb  = np.zeros(self.num_weights())
@@ -53,7 +62,7 @@ class QPProblemBuilder(object):
         H_diagonal = controllables_weights + softs_weight
         self.H = zeros(len(H_diagonal))
         for x in range(len(H_diagonal)):
-            self.H[x*(len(H_diagonal + 1))] = H_diagonal[x]
+            self.H[x*(len(H_diagonal) + 1)] = H_diagonal[x]
 
         Awidth = self.num_weights()
         Aheight = self.num_constraints()
@@ -63,39 +72,50 @@ class QPProblemBuilder(object):
         for hidx in range(len(hards_expressions)):
             hx = hards_expressions[hidx]
             for cidx in range(num_c):
-                cname = self.c_obs_names[cidx]
-                if cname in hx.free_symbols:
-                    self.A[hidx * Awidth + cidx] = diff(hx, cname, 1)
+                csym = Symbol(self.c_obs_names[cidx])
+                if csym in hx.free_symbols:
+                    self.A[hidx * Awidth + cidx] = diff(hx, csym, 1)
 
         # Fill the rest of A with soft constraint derivatives
         AsoftOffset = len(hards_expressions)
         for sidx in range(len(softs_expressions)):
             sx = softs_expressions[sidx]
             for cidx in range(num_c):
-                cname = self.c_obs_names[cidx]
-                if cname in hx.free_symbols:
-                    self.A[(AsoftOffset + sidx) * Awidth + cidx] = diff(sx, cname, 1)
+                csym = Symbol(self.c_obs_names[cidx])
+                if csym in sx.free_symbols:
+                    self.A[(AsoftOffset + sidx) * Awidth + cidx] = diff(sx, csym, 1)
 
             # Fill the soft constriaint's weight columns with an identity matrix
             self.A[AsoftOffset * Awidth + num_c + (Awidth + 1) * sidx] = 1
 
         # Construct symbolic lower bound vectors
-        self.lb = Matrix(controllables_lower + ([-1e+9] * self.num_soft_constraints()))
-        self.ub = Matrix(controllables_upper + ([1e+9] * self.num_soft_constraints()))
+        self.lb = Array(controllables_lower + ([-1e+9] * self.num_soft_constraints()))
+        self.ub = Array(controllables_upper + ([1e+9] * self.num_soft_constraints()))
 
         # Construct symbolic upper bound vectors
-        self.lbA = Matrix(hards_lower + softs_lower)
-        self.ubA = Matrix(hards_upper + softs_upper)
+        self.lbA = Array(hards_lower + softs_lower)
+        self.ubA = Array(hards_upper + softs_upper)
 
 
 
     def update(self, obs_dict):
-        self.np_H   = np.array(self.H.subs( obs_dict ).tolist(), dtype=float)
-        self.np_A   = np.array(self.A.subs( obs_dict ).tolist(), dtype=float)
-        self.np_lb  = np.array(self.lb.subs( obs_dict ).tolist(), dtype=float)
-        self.np_ub  = np.array(self.ub.subs( obs_dict ).tolist(), dtype=float)
-        self.np_lbA = np.array(self.lbA.subs( obs_dict ).tolist(), dtype=float)
-        self.np_ubA = np.array(self.ubA.subs( obs_dict ).tolist(), dtype=float)
+        nextArray = 'H'
+        try:
+            self.np_H   = np.array(self.H.subs( obs_dict ).tolist(), dtype=float)
+            nextArray = 'A'
+            self.np_A   = np.array(self.A.subs( obs_dict ).tolist(), dtype=float)
+            nextArray = 'lb'
+            self.np_lb  = np.array(self.lb.subs( obs_dict ).tolist(), dtype=float)
+            nextArray = 'ub'
+            self.np_ub  = np.array(self.ub.subs( obs_dict ).tolist(), dtype=float)
+            nextArray = 'lbA'
+            self.np_lbA = np.array(self.lbA.subs( obs_dict ).tolist(), dtype=float)
+            nextArray = 'ubA'
+            self.np_ubA = np.array(self.ubA.subs( obs_dict ).tolist(), dtype=float)
+        except Exception as e:
+            print('An exception occurred during update of numpy matrix ' + nextArray + ': ' + str(e))
+            self.printInternals()
+            raise Exception('An exception occurred during update of numpy matrices ' + nextArray + ': ' + str(e))
 
     def num_controllables(self):
         return len(self.controllable_weights)
@@ -112,14 +132,25 @@ class QPProblemBuilder(object):
     def num_weights(self):
         return self.num_soft_constraints() + self.num_controllables()
 
-    def get_H(self):
-        return self.np_H
-
     def printInternals(self):
+        print('H: ')
+        printSPMatrix(self.H)
+        print('A: ')
+        printSPMatrix(self.A)
+        print('lb: ')
+        print(self.lb)
+        print('ub: ')
+        print(self.ub)
+        print('lbA: ')
+        print(self.lbA)
+        print('ubA: ')
+        print(self.ubA)
+
+    def printNPInternals(self):
         print('H:\n' + str(self.np_H))
         print('g:'   + str(self.np_g.transpose()))
         print('A:\n' + str(self.np_A))
-        print('lb:\n' + str(self.np_lb.transpose()))
-        print('ub:\n' + str(self.np_ub.transpose()))
-        print('lbA:\n' + str(self.np_lbA.transpose()))
-        print('ubA:\n' + str(self.np_ubA.transpose()))
+        print('lb: ' + str(self.np_lb.transpose()))
+        print('ub: ' + str(self.np_ub.transpose()))
+        print('lbA: ' + str(self.np_lbA.transpose()))
+        print('ubA: ' + str(self.np_ubA.transpose()))

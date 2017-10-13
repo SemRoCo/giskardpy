@@ -1,34 +1,36 @@
 from giskardpy.qp_problem_builder import QPProblemBuilder
-from giskardpy.sympy_wrappers import vec3
+from giskardpy.sympy_wrappers import Vector
 from sympy import *
 import numpy as np
 
 from qpoases import PySQProblem as SQProblem
 from qpoases import PyOptions as Options
 from qpoases import PyPrintLevel as PrintLevel
+from qpoases import PyReturnValue as qpReturnValue
+
 
 class ControllableConstraint(object):
     def __init__(self, lower, upper, weight, joint):
-        self.lower  = lower
-        self.upper  = upper
-        self.weight = weight
+        self.lower  = sympify(lower)
+        self.upper  = sympify(upper)
+        self.weight = sympify(weight)
         self.joint  = joint
 
 
 class SoftConstraint(object):
     def __init__(self, lower, upper, weight, expression, name):
-        self.lower  = lower
-        self.upper  = upper
-        self.weight = weight
-        self.expression = expression
+        self.lower  = sympify(lower)
+        self.upper  = sympify(upper)
+        self.weight = sympify(weight)
+        self.expression = sympify(expression)
         self.name   = name
 
 
 class HardConstraint(object):
     def __init__(self, lower, upper, expression, name=''):
-        self.lower = lower
-        self.upper = upper
-        self.expression = expression
+        self.lower = sympify(lower)
+        self.upper = sympify(upper)
+        self.expression = sympify(expression)
         self.name  = name
 
 
@@ -42,7 +44,7 @@ class ControllerInput(object):
 
 
 class JointInput(ControllerInput):
-    def __init__(self, name, controller, expression):
+    def __init__(self, name, controller):
         super(JointInput, self).__init__(name, controller)
         self.expression = Symbol(name)
         self.setValue(0)
@@ -56,7 +58,7 @@ class JointInput(ControllerInput):
 
 
 class ScalarInput(ControllerInput):
-    def __init__(self, name, controller, expression):
+    def __init__(self, name, controller):
         super(ScalarInput, self).__init__(name, controller)
         self.expression = Symbol(name)
         self.setValue(0)
@@ -69,9 +71,9 @@ class ScalarInput(ControllerInput):
 
 
 class VectorInput(ControllerInput):
-    def __init__(self, name, controller, expression):
+    def __init__(self, name, controller):
         super(VectorInput, self).__init__(name, controller)
-        self.expression = vec3(Symbol(name + ':X'), Symbol(name + ':Y'), Symbol(name + ':Z'))
+        self.expression = Vector(Symbol(name + ':X'), Symbol(name + ':Y'), Symbol(name + ':Z'))
         self.setValue([0,0,0])
 
     def setValue(self, value):
@@ -84,9 +86,9 @@ class VectorInput(ControllerInput):
             if not isinstance(x, int) and not isinstance(x, float):
                 raise Exception("Value at index " + str(n) + " of type '" + str(type(x)) + "' which can not be used to as vector component.")
 
-        self.controller.state[self.name + ':X'] = value
-        self.controller.state[self.name + ':Y'] = value
-        self.controller.state[self.name + ':Z'] = value
+        self.controller.state[self.name + ':X'] = value[0]
+        self.controller.state[self.name + ':Y'] = value[1]
+        self.controller.state[self.name + ':Z'] = value[2]
 
 
 class QPController(object):
@@ -99,6 +101,13 @@ class QPController(object):
         self.xdot_full = None
         self.xdot_control = None
         self.xdot_slack = None
+
+    def printState(self):
+        msg =  '-- State -------\n'
+        for k, v in self.state.iteritems():
+            msg += str(k) + ': ' + str(v) + '\n'
+        msg += '----------------'
+        print(msg)
 
 
     def scalarInput(self, name):
@@ -177,29 +186,30 @@ class QPController(object):
         symbols = set()
 
         for c in controllables:
-            if c.name in cont_names:
+            if c.joint in cont_names:
                 raise Exception("Redefinition of controllable constraint for joint '" + c.name + "'")
             symbols = symbols.union(c.lower.free_symbols).union(c.upper.free_symbols).union(c.weight.free_symbols)
             cont_lower.append(c.lower)
             cont_upper.append(c.upper)
             cont_weight.append(c.weight)
-            cont_names.append(c.name)
+            cont_names.append(c.joint)
 
         for s in softConstraints:
-            symbols = symbols.union(s.lower).union(s.upper).union(s.weight).union(s.expression)
+            symbols = symbols.union(s.lower.free_symbols).union(s.upper.free_symbols).union(s.weight.free_symbols).union(s.expression.free_symbols)
             soft_lower.append(s.lower)
             soft_upper.append(s.upper)
             soft_weight.append(s.weight)
             soft_expression.append(s.expression)
 
         for h in hardConstraints:
-            symbols = symbols.union(h.lower).union(h.upper).union(h.expression)
+            symbols = symbols.union(h.lower.free_symbols).union(h.upper.free_symbols).union(h.expression.free_symbols)
             hard_lower.append(h.lower)
             hard_upper.append(h.upper)
             hard_expression.append(h.expression)
 
         for s in symbols:
-            if s not in self.state:
+            if str(s) not in self.state:
+                self.printState()
                 raise Exception("Symbol '" + str(s) + "' is a part of the controller's expressions but not of its state.")
 
 
@@ -223,9 +233,8 @@ class QPController(object):
                                       self.qpBuilder.np_lb, self.qpBuilder.np_ub,
                                       self.qpBuilder.np_lbA,self.qpBuilder.np_ubA, nWSR)
 
-        if success != qpoases.SUCCESSFUL_RETURN:
-            print("Failed to initialize QP-problem. ERROR:")
-            print(qpoases.MessageHandling.getErrorCodeMessage(success))
+        if success != qpReturnValue.SUCCESSFUL_RETURN:
+            print("Failed to initialize QP-problem. ERROR: " + str(success))
             self.qpBuilder.printInternals()
             print("nWSR: " + str(nWSR))
             return False
@@ -249,7 +258,7 @@ class QPController(object):
                                           self.qpBuilder.np_lb, self.qpBuilder.np_ub,
                                           self.qpBuilder.np_lbA,self.qpBuilder.np_ubA, nWSR)
 
-        if success != qpoases.SUCCESSFUL_RETURN:
+        if success != qpReturnValue.SUCCESSFUL_RETURN:
             return False
 
         self.qpProblem.getPrimalSolution(self.xdot_full)

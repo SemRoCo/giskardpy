@@ -1,9 +1,12 @@
 from collections import namedtuple, OrderedDict
 
 from urdf_parser_py.urdf import URDF
-import sympy as sp
+from giskardpy.sympy_wrappers import *
+from sympy.vector import *
+from sympy import *
 
-Joint = namedtuple('Joint', ['symbol', 'velocity_limit', 'lower', 'upper'])
+
+Joint = namedtuple('Joint', ['symbol', 'velocity_limit', 'lower', 'upper', 'limitless'])
 
 
 class Robot(object):
@@ -15,6 +18,7 @@ class Robot(object):
         # TODO loop over joints and fill lists
         self.observables = []
         self.joints_observables = []
+        self.frames = {}
 
         # hard stuff
         self.lbA = []  # hard lb
@@ -40,14 +44,36 @@ class Robot(object):
         :return: dict{str, sympy.Symbol}, with symbols for all joints in chain
         """
 
-        for joint_name in self.urdf_robot.get_chain(root_link, tip_link, True, False, False):
+        jointsAndLinks = self.urdf_robot.get_chain(root_link, tip_link, True, True, True)
+        parentFrame = self.frames[root_link]
+        for i in range(1, len(jointsAndLinks), 2):
+            joint_name = jointsAndLinks[i]
+            link_name = jointsAndLinks[i+1]
             joint = self.urdf_robot.joint_map[joint_name]
-            self.joints[joint_name] = Joint(sp.Symbol(joint_name),
-                                            joint.limit.velocity,
-                                            joint.limit.lower,
-                                            joint.limit.upper)
 
-    def load_from_urdf(self, urdf_robot, root_link, tip_links):
+            if joint_name not in self.joints:
+                if joint.type == 'revolute' or joint.type == 'continuous':
+                    self.joints[joint_name] = Joint(Symbol(joint_name),
+                                                  joint.limit.velocity,
+                                                  joint.limit.lower,
+                                                  joint.limit.upper,
+                                                  joint.type == 'continuous')
+                    self.frames[link_name] = frame(parentFrame, link_name, AxisOrienter(Symbol(joint_name), vec3(joint.axis)), joint.origin.xyz)
+                elif joint.type == 'prismatic':
+                    self.joints[joint_name] = Joint(Symbol(joint_name),
+                                                    joint.limit.velocity,
+                                                    joint.limit.lower,
+                                                    joint.limit.upper,
+                                                    False)
+                    self.frames[link_name] = frame(parentFrame, link_name, joint.origin.rpy, vec3(joint.origin.xyz) + vec3(joint.axis) * Symbol(joint_name))
+                elif joint.type == 'fixed':
+                    self.frames[link_name] = frame(parentFrame, link_name, joint.origin.rpy, joint.origin.xyz)
+                else:
+                    raise Exception('Joint type "' + joint.type + '" is not supported by urdf parser.')
+            parentFrame = self.frames[link_name]
+
+
+    def load_from_urdf(self, urdf_robot, root_link, tip_links, odom=odom):
         """
         Returns a dict with joint names as keys and sympy symbols
         as values for all 1-dof movable robot joints in URDF between
@@ -59,6 +85,14 @@ class Robot(object):
         :return: dict{str, sympy.Symbol}, with symbols for all joints in tree
         """
         self.urdf_robot = urdf_robot
+
+        if odom is None:
+            root_frame = CoordSys3D(root_link)
+        else:
+            root_frame = odom.locate_new(root_link, vec3(0,0,0))
+
+        self.frames[root_link] = root_frame
+
         for tip_link in tip_links:
             self.add_chain_joints(root_link, tip_link)
 
@@ -67,12 +101,13 @@ class Robot(object):
             self.joints_observables.append(joint_symbol)
 
             # hard constraints
-            lbA = joint.lower - joint_symbol
-            ubA = joint.upper - joint_symbol
-            hard_expression = joint_symbol
-            self.lbA.append(lbA)
-            self.ubA.append(ubA)
-            self.hard_expressions.append(hard_expression)
+            if not joint.limitless:
+                lbA = joint.lower - joint_symbol
+                ubA = joint.upper - joint_symbol
+                hard_expression = joint_symbol
+                self.lbA.append(lbA)
+                self.ubA.append(ubA)
+                self.hard_expressions.append(hard_expression)
             # control constraints
             lb = -joint.velocity_limit
             ub = joint.velocity_limit

@@ -34,7 +34,7 @@ def check_qpoaes(x_start,
         [0., 0., 1., 0., 0., 1.],
     ])
     g = np.zeros(6)
-    inf3x = np.ones(3) * np.inf
+    inf3x = np.ones(3) * 10e6
     lb = np.concatenate((control_constraints_l, -inf3x))
     ub = np.concatenate((control_constraints_u, inf3x))
     lbA = np.concatenate((hard_constraints_l - x_start, x_goal - x_start))

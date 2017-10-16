@@ -58,8 +58,8 @@ if __name__ == '__main__':
         controller.qpBuilder.printInternals()
         exit(-1)
 
-    # simulate 4 seconds of movement
-    for x in range(200):
+    # simulate 12 seconds of movement
+    for x in range(600):
         controller.update(nWSR)
 
         command = controller.getCommand()

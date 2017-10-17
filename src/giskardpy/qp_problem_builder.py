@@ -57,14 +57,18 @@ class QProblemBuilder(object):
         # hard part
         A_hard = sp.Matrix(hard_expressions)
         A_hard = A_hard.jacobian(self.robot_observables)
-        zeros3x3 = sp.zeros(*A_hard.shape)
-        A_hard = zeros3x3.col_insert(0, A_hard)
+        zerosHxS = sp.zeros(A_hard.shape[0], len(soft_expressions))
+        A_hard = zerosHxS.col_insert(0, A_hard)
+
+        print(A_hard)
 
         # soft part
         A_soft = sp.Matrix(soft_expressions)
-        A_soft = A_soft.jacobian(self.controller_observables)
+        A_soft = A_soft.jacobian(self.robot_observables)
         identity3x3 = sp.eye(A_soft.shape[0])
+        print(A_soft)
         A_soft = identity3x3.col_insert(0, A_soft)
+
 
         # final A
         self.A = A_soft.row_insert(0, A_hard)

@@ -1,8 +1,11 @@
+from collections import namedtuple
+
 import sympy as sp
 import numpy as np
 
 from giskardpy.qp_problem_builder import QProblemBuilder
 from giskardpy.robot import Robot
+
 
 
 class Controller(object):

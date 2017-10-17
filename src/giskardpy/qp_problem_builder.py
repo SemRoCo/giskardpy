@@ -1,4 +1,4 @@
-from collections import OrderedDict
+from collections import OrderedDict, namedtuple
 
 import numpy as np
 import sympy as sp
@@ -6,11 +6,14 @@ import sympy as sp
 from giskardpy.qp_solver import QPSolver
 
 
+SoftConstraint = namedtuple('SoftConstraint', ['lower', 'upper', 'weight', 'expression'])
+HardConstraint = namedtuple('HardConstraint', ['lower', 'upper', 'expression'])
+JointConstraint = namedtuple('JointConstraint', ['lower', 'upper', 'weight', 'joint_name'])
+
 class QProblemBuilder(object):
     def __init__(self, controller):
         self.controller = controller
-
-        self.observables = sp.Matrix(self.controller.get_observables())
+        # self.observables = sp.Matrix(self.controller.get_observables())
 
         self.H = sp.diag(*self.controller.get_weights())
 

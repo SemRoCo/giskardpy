@@ -12,11 +12,11 @@ class TestQPOasesInstallation(unittest.TestCase):
         x_goal = np.array([.7, .8, .9])
         x_start = np.array([.5, 1.05, .35])
 
-        hard_constraints_l = np.array([1.1, 1.3, 1.5])
+        hard_constraints_l = np.array([-1.1, -1.3, -1.5])
         hard_constraints_u = np.array([1.2, 1.4, 1.6])
 
         control_constraints_l = np.array([-.1, -.3, -.5])
-        control_constraints_u = np.array([.2, .4, .6])
+        control_constraints_u = np.array([.1, .3, .5])
 
         w_joints = np.ones(3) * .9
         w_tasks = np.ones(3) * 42

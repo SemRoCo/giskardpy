@@ -27,8 +27,8 @@ def frame(parent, name, rot, loc):
             raise Exception('If rotation is supplied as a list, it should contain exactly three elements.')
     else:
         rotation = rot
+    return parent.orient_new(name, (rotation,), location=location)
 
-    return parent.orient_new(name, rotation, location=location)
 
 unitX = odom.i
 unitY = odom.j

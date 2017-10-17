@@ -1,10 +1,11 @@
 from collections import namedtuple, OrderedDict
 
-from urdf_parser_py.urdf import URDF
+from urdf_parser_py.urdf import URDF, JointCalibration
+
+from giskardpy.qp_problem_builder import HardConstraint, JointConstraint
 from giskardpy.sympy_wrappers import *
 from sympy.vector import *
 from sympy import *
-
 
 Joint = namedtuple('Joint', ['symbol', 'velocity_limit', 'lower', 'upper', 'limitless'])
 
@@ -13,24 +14,24 @@ class Robot(object):
     def __init__(self, weights):
         self.urdf_robot = None
         self.joints = OrderedDict()
-        # TODO: fk function for each end effector
 
-        # TODO loop over joints and fill lists
         self.observables = []
         self.joints_observables = []
         self.frames = {}
+        self.hard_constraints = OrderedDict()
+        self.joint_constraints = OrderedDict()
 
         # hard stuff
-        self.lbA = []  # hard lb
-        self.ubA = []  # hard ub
-        self.hard_expressions = []
+        # self.lbA = []  # hard lb
+        # self.ubA = []  # hard ub
+        # self.hard_expressions = []
 
         # controllable stuff
-        self.lb = []  # joint lb
-        self.ub = []  # joint ub
+        # self.lb = []  # joint lb
+        # self.ub = []  # joint ub
         self.weights = weights
 
-    def get_updates(self):
+    def update_observables(self):
         return {}
 
     def add_chain_joints(self, root_link, tip_link):
@@ -48,30 +49,31 @@ class Robot(object):
         parentFrame = self.frames[root_link]
         for i in range(1, len(jointsAndLinks), 2):
             joint_name = jointsAndLinks[i]
-            link_name = jointsAndLinks[i+1]
+            link_name = jointsAndLinks[i + 1]
             joint = self.urdf_robot.joint_map[joint_name]
 
             if joint_name not in self.joints:
                 if joint.type == 'revolute' or joint.type == 'continuous':
                     self.joints[joint_name] = Joint(Symbol(joint_name),
-                                                  joint.limit.velocity,
-                                                  joint.limit.lower,
-                                                  joint.limit.upper,
-                                                  joint.type == 'continuous')
-                    self.frames[link_name] = frame(parentFrame, link_name, AxisOrienter(Symbol(joint_name), vec3(joint.axis)), joint.origin.xyz)
+                                                    joint.limit.velocity,
+                                                    joint.limit.lower,
+                                                    joint.limit.upper,
+                                                    joint.type == 'continuous')
+                    self.frames[link_name] = frame(parentFrame, link_name,
+                                                   AxisOrienter(Symbol(joint_name), vec3(joint.axis)), joint.origin.xyz)
                 elif joint.type == 'prismatic':
                     self.joints[joint_name] = Joint(Symbol(joint_name),
                                                     joint.limit.velocity,
                                                     joint.limit.lower,
                                                     joint.limit.upper,
                                                     False)
-                    self.frames[link_name] = frame(parentFrame, link_name, joint.origin.rpy, vec3(joint.origin.xyz) + vec3(joint.axis) * Symbol(joint_name))
+                    self.frames[link_name] = frame(parentFrame, link_name, joint.origin.rpy,
+                                                   vec3(joint.origin.xyz) + vec3(joint.axis) * Symbol(joint_name))
                 elif joint.type == 'fixed':
                     self.frames[link_name] = frame(parentFrame, link_name, joint.origin.rpy, joint.origin.xyz)
                 else:
                     raise Exception('Joint type "' + joint.type + '" is not supported by urdf parser.')
             parentFrame = self.frames[link_name]
-
 
     def load_from_urdf(self, urdf_robot, root_link, tip_links, odom=odom):
         """
@@ -89,30 +91,25 @@ class Robot(object):
         if odom is None:
             root_frame = CoordSys3D(root_link)
         else:
-            root_frame = odom.locate_new(root_link, odom.origin)
+            root_frame = odom.locate_new(root_link, vec3(0, 0, 0))
 
         self.frames[root_link] = root_frame
 
         for tip_link in tip_links:
             self.add_chain_joints(root_link, tip_link)
 
-        for joint_name, joint in self.joints.items():
+        for i, (joint_name, joint) in enumerate(self.joints.items()):
             joint_symbol = joint.symbol
             self.joints_observables.append(joint_symbol)
 
-            # hard constraints
             if not joint.limitless:
-                lbA = joint.lower - joint_symbol
-                ubA = joint.upper - joint_symbol
-                hard_expression = joint_symbol
-                self.lbA.append(lbA)
-                self.ubA.append(ubA)
-                self.hard_expressions.append(hard_expression)
-            # control constraints
-            lb = -joint.velocity_limit
-            ub = joint.velocity_limit
-            self.lb.append(lb)
-            self.ub.append(ub)
+                self.hard_constraints[joint_name] = HardConstraint(lower=joint.lower - joint_symbol,
+                                                                   upper=joint.upper - joint_symbol,
+                                                                   expression=joint_symbol)
+
+            self.joint_constraints[joint_name] = JointConstraint(lower=-joint.velocity_limit,
+                                                                 upper=joint.velocity_limit,
+                                                                 weight=self.weights[i])
 
         self.observables += self.joints_observables
 

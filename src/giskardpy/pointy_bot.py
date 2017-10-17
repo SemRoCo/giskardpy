@@ -10,7 +10,7 @@ class PointyBot(Robot):
     def set_joint_state(self, joint_state):
         self.joint_state = joint_state
 
-    def get_updates(self):
+    def update_observables(self):
         return self.joint_state
 
     def __str__(self):

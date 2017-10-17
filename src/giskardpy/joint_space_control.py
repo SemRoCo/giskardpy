@@ -22,7 +22,7 @@ class JointSpaceControl(Controller):
     def set_goal(self, goal_dict):
         self.goal = goal_dict
 
-    def get_updates(self):
-        updates = deepcopy(self.robot.get_updates())
+    def update_observables(self):
+        updates = deepcopy(self.robot.update_observables())
         updates.update(self.goal)
         return updates

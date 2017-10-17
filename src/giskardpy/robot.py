@@ -26,7 +26,7 @@ class Robot(object):
         self.ub = []  # joint ub
         self.weights = weights
 
-    def get_updates(self):
+    def update_observables(self):
         return {}
 
     def add_chain_joints(self, root_link, tip_link):

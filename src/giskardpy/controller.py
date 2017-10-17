@@ -1,5 +1,7 @@
 import sympy as sp
 import numpy as np
+
+from giskardpy.qp_problem_builder import QProblemBuilder
 from giskardpy.robot import Robot
 
 
@@ -19,12 +21,14 @@ class Controller(object):
         self._lbA = []  # soft lb
         self._ubA = []  # soft ub
 
+        # self.qp_problem_builder = QProblemBuilder()
+
     def set_goal(self, goal_dict):
         pass
 
-    def get_updates(self):
+    def update_observables(self):
         updates = {}
-        robot_updates = self.robot.get_updates()
+        robot_updates = self.robot.update_observables()
         updates.update(robot_updates)
         return updates
 

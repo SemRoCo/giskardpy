@@ -1,5 +1,9 @@
+from collections import OrderedDict
+
 import numpy as np
 import sympy as sp
+
+from giskardpy.qp_solver import QPSolver
 
 
 class QProblemBuilder(object):
@@ -25,7 +29,7 @@ class QProblemBuilder(object):
         # soft part
         A_soft = sp.Matrix(self.controller.get_soft_expressions())
         A_soft = A_soft.jacobian(self.controller.get_controller_observables())
-        identity3x3 = sp.eye(3)
+        identity3x3 = sp.eye(A_soft.shape[0])
         A_soft = identity3x3.col_insert(0, A_soft)
 
         # final A
@@ -34,8 +38,10 @@ class QProblemBuilder(object):
         self.lbA = sp.Matrix(self.controller.get_lbA())
         self.ubA = sp.Matrix(self.controller.get_ubA())
 
+        self.qp_solver = QPSolver(self.get_problem_dimensions())
+
     def get_problem_dimensions(self):
-        return len(self.controller.get_weights()), len(self.get_lb())
+        return len(self.controller.get_weights()), len(self.lb)
 
     def get_num_controllables(self):
         return self.controller.get_num_controllables()
@@ -43,14 +49,21 @@ class QProblemBuilder(object):
     def get_num_soft_constraints(self):
         return len(self.controller.get_soft_expressions())
 
-    def update(self):
-        updates_dict = self.controller.get_updates()
-        self.update_H(updates_dict)
-        self.update_lb(updates_dict)
-        self.update_ub(updates_dict)
-        self.update_lbA(updates_dict)
-        self.update_ubA(updates_dict)
-        self.update_A(updates_dict)
+    def update_observables(self):
+        updates_dict = self.controller.update_observables()
+        self.np_H = self.update_expression_matrix(self.H, updates_dict)
+        self.np_A = self.update_expression_matrix(self.A, updates_dict)
+        self.np_lb = self.update_expression_vector(self.lb, updates_dict)
+        self.np_ub = self.update_expression_vector(self.ub, updates_dict)
+        self.np_lbA = self.update_expression_vector(self.lbA, updates_dict)
+        self.np_ubA = self.update_expression_vector(self.ubA, updates_dict)
+
+        xdot_full = self.qp_solver.solve(self.np_H, self.np_g, self.np_A,
+                                         self.np_lb, self.np_ub, self.np_lbA, self.np_ubA)
+        cmd_dict = OrderedDict()
+        for j, (joint_name, joint_position) in enumerate(self.controller.robot.update_observables().items()):
+            cmd_dict[joint_name] = joint_position + xdot_full[j]
+        return cmd_dict
 
     def update_expression_matrix(self, matrix, updates_dict):
         m_sub = matrix.subs(updates_dict)
@@ -59,42 +72,3 @@ class QProblemBuilder(object):
     def update_expression_vector(self, vector, updates_dict):
         np_v = self.update_expression_matrix(vector, updates_dict)
         return np_v.reshape(len(np_v))
-
-    def update_H(self, updates_dict):
-        self.np_H = self.update_expression_matrix(self.H, updates_dict)
-
-    def get_H(self):
-        return self.np_H
-
-    def update_A(self, updates_dict):
-        self.np_A = self.update_expression_matrix(self.A, updates_dict)
-
-    def get_A(self):
-        return self.np_A
-
-    def update_lb(self, updates_dict):
-        self.np_lb = self.update_expression_vector(self.lb, updates_dict)
-
-    def get_lb(self):
-        return self.np_lb
-
-    def update_ub(self, updates_dict):
-        self.np_ub = self.update_expression_vector(self.ub, updates_dict)
-
-    def get_ub(self):
-        return self.np_ub
-
-    def update_lbA(self, updates_dict):
-        self.np_lbA = self.update_expression_vector(self.lbA, updates_dict)
-
-    def get_lbA(self):
-        return self.np_lbA
-
-    def update_ubA(self, updates_dict):
-        self.np_ubA = self.update_expression_vector(self.ubA, updates_dict)
-
-    def get_ubA(self):
-        return self.np_ubA
-
-    def get_g(self):
-        return self.np_g

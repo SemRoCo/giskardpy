@@ -12,7 +12,7 @@ class QPController(object):
         self.qpBuilder = QProblemBuilder(self.controller)
 
     def start(self, nWSR):
-        self.qpBuilder.update()
+        self.qpBuilder.update_observables()
         self.qpProblem = qpoases.PySQProblem(*self.qpBuilder.get_problem_dimensions())
         options = qpoases.PyOptions()
         options.printLevel = qpoases.PyPrintLevel.NONE
@@ -32,7 +32,7 @@ class QPController(object):
         return True
 
     def update(self, nWSR):
-        self.qpBuilder.update()
+        self.qpBuilder.update_observables()
         if self.xdot_control is None:
             raise Exception("Attempted to update controller without starting it first.")
 

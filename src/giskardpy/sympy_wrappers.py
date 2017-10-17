@@ -1,4 +1,5 @@
 from sympy.vector import *
+from sympy import Symbol
 
 odom = CoordSys3D('odom')
 
@@ -22,13 +23,31 @@ def frame(parent, name, rot, loc):
 
     if isinstance(rot, list):
         if len(rot) == 3:
-            rotation = BodyOrienter(rpy[0], rpy[1], rpy[2], 'XYZ')
+            rotation = BodyOrienter(rot[0], rot[1], rot[2], 'XYZ')
         else:
             raise Exception('If rotation is supplied as a list, it should contain exactly three elements.')
     else:
         rotation = rot
     return parent.orient_new(name, (rotation,), location=location)
 
+def inputVec3(name, observables):
+    x = Symbol(name + '/x')
+    y = Symbol(name + '/y')
+    z = Symbol(name + '/z')
+    observables.append(x)
+    observables.append(y)
+    observables.append(z)
+    return vec3(x, y, z)
+
+def expandVec3Input(name, goal_dict):
+    if name in goal_dict:
+        if isinstance(goal_dict[name], list) or isinstance(goal_dict[name], tuple):
+            vList = goal_dict[name]
+            goal_dict[name + '/x'] = vList[0]
+            goal_dict[name + '/y'] = vList[1]
+            goal_dict[name + '/z'] = vList[2]
+
+    return goal_dict
 
 unitX = odom.i
 unitY = odom.j

@@ -11,7 +11,7 @@ Joint = namedtuple('Joint', ['symbol', 'velocity_limit', 'lower', 'upper', 'limi
 
 
 class Robot(object):
-    def __init__(self, weights):
+    def __init__(self):
         self.urdf_robot = None
         self.joints = OrderedDict()
 
@@ -29,7 +29,6 @@ class Robot(object):
         # controllable stuff
         # self.lb = []  # joint lb
         # self.ub = []  # joint ub
-        self.weights = weights
 
     def update_observables(self):
         return {}
@@ -109,9 +108,27 @@ class Robot(object):
 
             self.joint_constraints[joint_name] = JointConstraint(lower=-joint.velocity_limit,
                                                                  upper=joint.velocity_limit,
-                                                                 weight=self.weights[i])
+                                                                 weight=1)
 
         self.observables += self.joints_observables
+
+
+    def set_joint_weight(self, joint_name, weight):
+        if joint_name in self.joint_constraints:
+            old_constraint = self.joint_constraints[joint_name]
+            self.joint_constraints[joint_name] = JointConstraint(lower=old_constraint.lower,
+                                                                 upper=old_constraint.upper,
+                                                                 weight=weight)
+        else:
+            for j, c in self.joint_constraints.iteritems():
+                print(j + ': ' + str(c))
+
+            raise Exception('Robot does not have controllable constraint for joint "' + joint_name + '"')
+
+    def get_joint_weight(self, joint_name):
+        if joint_name in self.joint_constraints:
+            return self.joint_constraints[joint_name].weight
+        raise Exception('Robot does not have controllable constraint for joint "' + joint_name + '"')
 
     def load_from_urdf_path(self, urdf_path, root_link, tip_links):
         return self.load_from_urdf(URDF.from_xml_file(urdf_path), root_link, tip_links)

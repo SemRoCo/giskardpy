@@ -28,12 +28,13 @@ class TestQPController(unittest.TestCase):
         controller.set_goal(goal_dict)
 
     def test_qpbuilder_1(self):
+        big = 1e9
         robot_weight = .9
         r = PointyBot(robot_weight)
         control_weight = 42
         c = JointSpaceControl(r, control_weight)
 
-        qpbuilder = QProblemBuilder(c)
+        qpbuilder = c.qp_problem_builder
 
         start = np.array([.5, 1.05, .35])
         goal = np.array([.7, .8, .9])
@@ -41,7 +42,7 @@ class TestQPController(unittest.TestCase):
         self.set_robot_js(r, start)
         self.set_controller_goal(c, goal)
 
-        qpbuilder.update_observables()
+        c.update_observables()
         A = qpbuilder.np_A
         expected_A = np.array([[1, 0, 0, 0, 0, 0],
                                [0, 1, 0, 0, 0, 0],
@@ -61,11 +62,11 @@ class TestQPController(unittest.TestCase):
         np.testing.assert_array_almost_equal(H, expected_H)
 
         lb = qpbuilder.np_lb
-        expected_lb = np.array([-0.1, -.3, -.5, -10e6, -10e6, -10e6])
+        expected_lb = np.array([-0.1, -.3, -.5, -big, -big, -big])
         np.testing.assert_array_equal(lb, expected_lb)
 
         ub = qpbuilder.np_ub
-        expected_ub = np.array([0.1, .3, .5, 10e6, 10e6, 10e6])
+        expected_ub = np.array([0.1, .3, .5, big, big, big])
         np.testing.assert_array_equal(ub, expected_ub)
 
         lbA = qpbuilder.np_lbA
@@ -81,7 +82,6 @@ class TestQPController(unittest.TestCase):
     def test_jointcontroller_1(self):
         r = PointyBot(.9)
         c = JointSpaceControl(r, 42)
-        bob = QProblemBuilder(c)
 
         start = np.array([.5, 1.05, .35])
         goal = np.array([.7, .8, .9])
@@ -90,16 +90,18 @@ class TestQPController(unittest.TestCase):
         self.set_controller_goal(c, goal)
 
         for i in range(20):
-            cmd_dict = bob.update_observables()
+            cmd_dict = c.update_observables()
             self.assertIsNotNone(cmd_dict)
-            r.set_joint_state(cmd_dict)
+            next_state = OrderedDict()
+            for j, (joint_name, joint_change) in enumerate(cmd_dict.items()):
+                next_state[joint_name] = r.joint_state[joint_name] + joint_change
+            r.set_joint_state(next_state)
             print('iteration #{}: {}'.format(i + 1, r))
         np.testing.assert_array_almost_equal(goal, r.update_observables().values())
 
     def test_jointcontroller_2(self):
         r = PointyBot(weight=.01, urdf='pointy_adrian.urdf')
-        c = JointSpaceControl(r, weights=1)
-        bob = QProblemBuilder(c)
+        c = JointSpaceControl(r, weight=1)
 
         start = np.array([0, -1., .5])
         goal = np.array([1, 1, -1])
@@ -108,9 +110,12 @@ class TestQPController(unittest.TestCase):
         self.set_controller_goal(c, goal)
 
         for i in range(20):
-            cmd_dict = bob.update_observables()
+            cmd_dict = c.update_observables()
             self.assertIsNotNone(cmd_dict)
-            r.set_joint_state(cmd_dict)
+            next_state = OrderedDict()
+            for j, (joint_name, joint_change) in enumerate(cmd_dict.items()):
+                next_state[joint_name] = r.joint_state[joint_name] + joint_change
+            r.set_joint_state(next_state)
             print('iteration #{}: {}'.format(i + 1, r))
         np.testing.assert_array_almost_equal(goal, r.update_observables().values())
 

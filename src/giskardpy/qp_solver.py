@@ -6,12 +6,12 @@ from qpoases import PyReturnValue
 class QPSolver(object):
     RETURN_VALUE_DICT = dict([(value, name) for name, value in vars(PyReturnValue).iteritems()])
 
-    def __init__(self, dimensions):
-        self.qpProblem = qpoases.PySQProblem(*dimensions)
+    def __init__(self, dim_a, dim_b):
+        self.qpProblem = qpoases.PySQProblem(dim_a, dim_b)
         options = qpoases.PyOptions()
         options.printLevel = qpoases.PyPrintLevel.NONE
         self.qpProblem.setOptions(options)
-        self.xdot_full = np.zeros(dimensions[0])
+        self.xdot_full = np.zeros(dim_a)
 
         self.started = False
 

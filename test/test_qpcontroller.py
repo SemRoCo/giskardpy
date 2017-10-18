@@ -9,7 +9,6 @@ from giskardpy.pointy_bot import PointyBot
 from giskardpy.joint_space_control import JointSpaceControl
 from giskardpy.qp_problem_builder import QProblemBuilder
 from giskardpy.robot import Robot
-from giskardpy.urdf_import import tree_joints_from_urdf_object
 
 PKG = 'giskardpy'
 

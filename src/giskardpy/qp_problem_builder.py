@@ -14,15 +14,12 @@ JointConstraint = namedtuple('JointConstraint', ['lower', 'upper', 'weight'])
 class QProblemBuilder(object):
     BACKEND = 'Cython'
 
-    def __init__(self, joint_constraints_dict, hard_constraints_dict, soft_constraints_dict,
-                 controller_observables, robot_observables):
+    def __init__(self, joint_constraints_dict, hard_constraints_dict, soft_constraints_dict):
         self.joint_constraints_dict = joint_constraints_dict
         self.hard_constraints_dict = hard_constraints_dict
         self.soft_constraints_dict = soft_constraints_dict
-        self.controller_observables = controller_observables
-        self.controller_observables_strs = [str(x) for x in controller_observables]
-        self.robot_observables = robot_observables
-        self.robot_observables_strs = [str(x) for x in robot_observables]
+        self.controlled_joints = sp.sympify(self.joint_constraints_dict.keys())
+        self.controlled_joints_strs = [str(x) for x in self.controlled_joints]
         self.make_sympy_matrices()
 
         self.qp_solver = QPSolver(self.H.shape[0], len(self.lbA))
@@ -35,7 +32,8 @@ class QProblemBuilder(object):
         ubA = []
         soft_expressions = []
         hard_expressions = []
-        for c in self.joint_constraints_dict.values():
+        for jn in self.controlled_joints:
+            c = self.joint_constraints_dict[str(jn)]
             weights.append(c.weight)
             lb.append(c.lower)
             ub.append(c.upper)
@@ -61,13 +59,13 @@ class QProblemBuilder(object):
         # make A
         # hard part
         A_hard = sp.Matrix(hard_expressions)
-        A_hard = A_hard.jacobian(self.robot_observables)
+        A_hard = A_hard.jacobian(self.controlled_joints)
         zerosHxS = sp.zeros(A_hard.shape[0], len(soft_expressions))
         A_hard = zerosHxS.col_insert(0, A_hard)
 
         # soft part
         A_soft = sp.Matrix(soft_expressions)
-        A_soft = A_soft.jacobian(self.robot_observables)
+        A_soft = A_soft.jacobian(self.controlled_joints)
         identity3x3 = sp.eye(A_soft.shape[0])
         A_soft = identity3x3.col_insert(0, A_soft)
 
@@ -113,7 +111,7 @@ class QProblemBuilder(object):
                                          self.np_lb, self.np_ub, self.np_lbA, self.np_ubA)
         if xdot_full is None:
             return None
-        return OrderedDict((observable, xdot_full[i]) for i, observable in enumerate(self.robot_observables_strs))
+        return OrderedDict((observable, xdot_full[i]) for i, observable in enumerate(self.controlled_joints_strs))
 
     # @profile
     def update_cython_expression_matrix(self, matrix, argument_names, updates_dict):

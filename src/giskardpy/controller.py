@@ -28,9 +28,7 @@ class Controller(object):
 
         self.qp_problem_builder = QProblemBuilder(self.robot.joint_constraints,
                                                   self.robot.hard_constraints,
-                                                  self.soft_constraints,
-                                                  self.get_controller_observables(),
-                                                  self.get_robot_observables())
+                                                  self.soft_constraints)
 
     def set_goal(self, goal_dict):
         """

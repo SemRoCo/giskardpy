@@ -17,13 +17,13 @@ class TestQPController(unittest.TestCase):
     def set_robot_js(self, robot, next_state):
         next_state_dict = OrderedDict()
         for i, joint_symbol in enumerate(robot.joints_observables):
-            next_state_dict[joint_symbol] = next_state[i]
+            next_state_dict[str(joint_symbol)] = next_state[i]
         robot.set_joint_state(next_state_dict)
 
     def set_controller_goal(self, controller, goal):
         goal_dict = OrderedDict()
         for i, goal_symbol in enumerate(controller.get_controller_observables()):
-            goal_dict[goal_symbol] = goal[i]
+            goal_dict[str(goal_symbol)] = goal[i]
         controller.set_goal(goal_dict)
 
     def test_qpbuilder_1(self):

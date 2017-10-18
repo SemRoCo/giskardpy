@@ -18,7 +18,13 @@ class Controller(object):
         self.soft_constraints = OrderedDict()
         self.controllable_constraints = OrderedDict()
 
-        self.make_constraints(robot)
+        self.build_builder()
+
+    def make_constraints(self, robot):
+        pass
+
+    def build_builder(self):
+        self.make_constraints(self.robot)
 
         self.qp_problem_builder = QProblemBuilder(self.robot.joint_constraints,
                                                   self.robot.hard_constraints,
@@ -26,13 +32,17 @@ class Controller(object):
                                                   self.get_controller_observables(),
                                                   self.get_robot_observables())
 
-    def make_constraints(self, robot):
-        pass
-
     def set_goal(self, goal_dict):
+        """
+        :param goal_dict: dict{str -> float}
+        """
         pass
 
     def update_observables(self, updates=None):
+        """
+        :param updates: dict{str->float} observable name to it value
+        :return: dict{str->float} joint name to vel command
+        """
         if updates is None:
             updates = {}
         robot_updates = self.robot.update_observables()

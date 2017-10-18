@@ -105,7 +105,7 @@ class QProblemBuilder(object):
             cmd_dict[joint_name] = xdot_full[j]
         return cmd_dict
 
-    @profile
+    # @profile
     def update_observables_cython(self, observables_update):
         self.np_H = self.update_cython_expression_matrix(self.aH, self.H.free_symbols, observables_update)
         self.np_A = self.update_cython_expression_matrix(self.aA, self.A.free_symbols, observables_update)

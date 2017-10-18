@@ -58,23 +58,22 @@ class Robot(object):
                                                     joint.limit.lower,
                                                     joint.limit.upper,
                                                     joint.type == 'continuous')
-                    self.frames[link_name] = frame(parentFrame, link_name,
-                                                   AxisOrienter(Symbol(joint_name), vec3(joint.axis)), joint.origin.xyz)
+                    self.frames[link_name] = parentFrame * frame3((joint.axis, -Symbol(joint_name)), joint.origin.xyz)
                 elif joint.type == 'prismatic':
                     self.joints[joint_name] = Joint(Symbol(joint_name),
                                                     joint.limit.velocity,
                                                     joint.limit.lower,
                                                     joint.limit.upper,
                                                     False)
-                    self.frames[link_name] = frame(parentFrame, link_name, joint.origin.rpy,
-                                                   vec3(joint.origin.xyz) + vec3(joint.axis) * Symbol(joint_name))
+                    self.frames[link_name] = parentFrame * frame3(joint.origin.rpy, point3(joint.origin.xyz) + vec3(joint.axis) * Symbol(joint_name))
                 elif joint.type == 'fixed':
-                    self.frames[link_name] = frame(parentFrame, link_name, joint.origin.rpy, joint.origin.xyz)
+                    self.frames[link_name] = parentFrame * frame3(joint.origin.rpy, joint.origin.xyz)
                 else:
                     raise Exception('Joint type "' + joint.type + '" is not supported by urdf parser.')
             parentFrame = self.frames[link_name]
 
-    def load_from_urdf(self, urdf_robot, root_link, tip_links, odom=odom):
+
+    def load_from_urdf(self, urdf_robot, root_link, tip_links, root_frame=frame3([0,0,0], [0,0,0])):
         """
         Returns a dict with joint names as keys and sympy symbols
         as values for all 1-dof movable robot joints in URDF between
@@ -86,11 +85,6 @@ class Robot(object):
         :return: dict{str, sympy.Symbol}, with symbols for all joints in tree
         """
         self.urdf_robot = urdf_robot
-
-        if odom is None:
-            root_frame = CoordSys3D(root_link)
-        else:
-            root_frame = odom.locate_new(root_link, vec3(0, 0, 0))
 
         self.frames[root_link] = root_frame
 

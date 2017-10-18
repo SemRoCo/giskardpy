@@ -37,7 +37,8 @@ class Controller(object):
             updates = {}
         robot_updates = self.robot.update_observables()
         updates.update(robot_updates)
-        return self.qp_problem_builder.update_observables(updates)
+        return self.qp_problem_builder.update_observables_cython(updates)
+        # return self.qp_problem_builder.update_observables(updates)
 
     def get_hard_expressions(self):
         return self.robot.hard_expressions

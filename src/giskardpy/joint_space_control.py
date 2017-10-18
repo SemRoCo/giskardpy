@@ -19,7 +19,7 @@ class JointSpaceControl(Controller):
             self.soft_constraints['soft_{}'.format(i)] = SoftConstraint(lower=goal - joint_symbol,
                                                                         upper=goal - joint_symbol,
                                                                         weight=self.weight,
-                                                                        expression=goal)
+                                                                        expression=joint_symbol)
 
     def set_goal(self, goal_dict):
         self.goal = goal_dict

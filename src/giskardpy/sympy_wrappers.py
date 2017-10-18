@@ -3,6 +3,8 @@ from sympy import Symbol
 
 odom = CoordSys3D('odom')
 
+pathSeparator = '__'
+
 def vec3(*args, **kwds):
     frame = odom
     if 'frame' in kwds:
@@ -31,9 +33,9 @@ def frame(parent, name, rot, loc):
     return parent.orient_new(name, (rotation,), location=location)
 
 def inputVec3(name, observables):
-    x = Symbol(name + '_x')
-    y = Symbol(name + '_y')
-    z = Symbol(name + '_z')
+    x = Symbol(name + pathSeparator + 'x')
+    y = Symbol(name + pathSeparator + 'y')
+    z = Symbol(name + pathSeparator + 'z')
     observables.append(x)
     observables.append(y)
     observables.append(z)
@@ -43,9 +45,9 @@ def expandVec3Input(name, goal_dict):
     if name in goal_dict:
         if isinstance(goal_dict[name], list) or isinstance(goal_dict[name], tuple):
             vList = goal_dict[name]
-            goal_dict[name + '_x'] = vList[0]
-            goal_dict[name + '_y'] = vList[1]
-            goal_dict[name + '_z'] = vList[2]
+            goal_dict[name + pathSeparator + 'x'] = vList[0]
+            goal_dict[name + pathSeparator + 'y'] = vList[1]
+            goal_dict[name + pathSeparator + 'z'] = vList[2]
 
     return goal_dict
 

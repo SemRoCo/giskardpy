@@ -4,8 +4,8 @@ from urdf_parser_py.urdf import URDF, JointCalibration
 
 from giskardpy.qp_problem_builder import HardConstraint, JointConstraint
 from giskardpy.sympy_wrappers import *
-from sympy.vector import *
-from sympy import *
+import sympy.vector as spv
+import sympy as sp
 
 Joint = namedtuple('Joint', ['symbol', 'velocity_limit', 'lower', 'upper', 'limitless'])
 
@@ -53,27 +53,27 @@ class Robot(object):
 
             if joint_name not in self.joints:
                 if joint.type == 'revolute' or joint.type == 'continuous':
-                    self.joints[joint_name] = Joint(Symbol(joint_name),
+                    self.joints[joint_name] = Joint(sp.Symbol(joint_name),
                                                     joint.limit.velocity,
                                                     joint.limit.lower,
                                                     joint.limit.upper,
                                                     joint.type == 'continuous')
-                    self.frames[link_name] = parentFrame * frame3((joint.axis, -Symbol(joint_name)), joint.origin.xyz)
+                    self.frames[link_name] = parentFrame * frame3_aa(vec3(*joint.axis), -sp.Symbol(joint_name), point3(*joint.origin.xyz))
                 elif joint.type == 'prismatic':
-                    self.joints[joint_name] = Joint(Symbol(joint_name),
+                    self.joints[joint_name] = Joint(sp.Symbol(joint_name),
                                                     joint.limit.velocity,
                                                     joint.limit.lower,
                                                     joint.limit.upper,
                                                     False)
-                    self.frames[link_name] = parentFrame * frame3(joint.origin.rpy, point3(joint.origin.xyz) + vec3(joint.axis) * Symbol(joint_name))
+                    self.frames[link_name] = parentFrame * frame3_rpy(*joint.origin.rpy, loc=point3(*joint.origin.xyz) + vec3(*joint.axis) * sp.Symbol(joint_name))
                 elif joint.type == 'fixed':
-                    self.frames[link_name] = parentFrame * frame3(joint.origin.rpy, joint.origin.xyz)
+                    self.frames[link_name] = parentFrame * frame3_rpy(*joint.origin.rpy, loc=point3(*joint.origin.xyz))
                 else:
                     raise Exception('Joint type "' + joint.type + '" is not supported by urdf parser.')
             parentFrame = self.frames[link_name]
 
 
-    def load_from_urdf(self, urdf_robot, root_link, tip_links, root_frame=frame3([0,0,0], [0,0,0])):
+    def load_from_urdf(self, urdf_robot, root_link, tip_links, root_frame=sp.eye(4)):
         """
         Returns a dict with joint names as keys and sympy symbols
         as values for all 1-dof movable robot joints in URDF between

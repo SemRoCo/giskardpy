@@ -12,10 +12,10 @@ class EEFPositionControl(Controller):
         self.goal_expr = inputPoint3('goal_pos', self._observables)
         dist = norm(posOf(robot.eef) - self.goal_expr)
         print(robot.eef)
-        self.soft_constraints['align eef position'] = SoftConstraint(lower=-dist,
-                                                                     upper=-dist,
-                                                                     weight=self.weight,
-                                                                     expression=dist)
+        self._soft_constraints['align eef position'] = SoftConstraint(lower=-dist,
+                                                                      upper=-dist,
+                                                                      weight=self.weight,
+                                                                      expression=dist)
 
     def set_goal(self, goal_pos):
         self.goal['goal_pos'] = goal_pos

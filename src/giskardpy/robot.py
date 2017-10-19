@@ -1,11 +1,11 @@
 from collections import namedtuple, OrderedDict
 
-from urdf_parser_py.urdf import URDF, JointCalibration
+from tf.transformations import quaternion_from_matrix
+from urdf_parser_py.urdf import URDF
 
 from giskardpy.qp_problem_builder import HardConstraint, JointConstraint
 from giskardpy.sympy_wrappers import *
-from sympy.vector import *
-from sympy import *
+import numpy as np
 
 Joint = namedtuple('Joint', ['symbol', 'velocity_limit', 'lower', 'upper', 'limitless'])
 
@@ -21,14 +21,7 @@ class Robot(object):
         self.hard_constraints = OrderedDict()
         self.joint_constraints = OrderedDict()
 
-        # hard stuff
-        # self.lbA = []  # hard lb
-        # self.ubA = []  # hard ub
-        # self.hard_expressions = []
-
-        # controllable stuff
-        # self.lb = []  # joint lb
-        # self.ub = []  # joint ub
+        self.joint_state = {}
 
     def update_observables(self):
         return {}
@@ -65,15 +58,16 @@ class Robot(object):
                                                     joint.limit.lower,
                                                     joint.limit.upper,
                                                     False)
-                    self.frames[link_name] = parentFrame * frame3(joint.origin.rpy, point3(joint.origin.xyz) + vec3(joint.axis) * Symbol(joint_name))
+                    self.frames[link_name] = parentFrame * frame3(joint.origin.rpy,
+                                                                  point3(joint.origin.xyz) + vec3(joint.axis) * Symbol(
+                                                                      joint_name))
                 elif joint.type == 'fixed':
                     self.frames[link_name] = parentFrame * frame3(joint.origin.rpy, joint.origin.xyz)
                 else:
                     raise Exception('Joint type "' + joint.type + '" is not supported by urdf parser.')
             parentFrame = self.frames[link_name]
 
-
-    def load_from_urdf(self, urdf_robot, root_link, tip_links, root_frame=frame3([0,0,0], [0,0,0])):
+    def load_from_urdf(self, urdf_robot, root_link, tip_links, root_frame=frame3([0, 0, 0], [0, 0, 0])):
         """
         Returns a dict with joint names as keys and sympy symbols
         as values for all 1-dof movable robot joints in URDF between
@@ -87,6 +81,7 @@ class Robot(object):
         self.urdf_robot = urdf_robot
 
         self.frames[root_link] = root_frame
+        self.end_effectors = tip_links
 
         for tip_link in tip_links:
             self.add_chain_joints(root_link, tip_link)
@@ -106,6 +101,15 @@ class Robot(object):
 
         self.observables += self.joints_observables
 
+    def get_eef_position(self):
+        eef = {}
+        for end_effector in self.end_effectors:
+            evaled_frame = self.frames[end_effector].subs(self.joint_state)
+            eef_pos = np.array(posOf(evaled_frame).tolist(), dtype=float)[:-1].reshape(3)
+            eef_rot = np.array(rotOf(evaled_frame).tolist(), dtype=float)
+            eef_rot = quaternion_from_matrix(eef_rot)
+            eef[end_effector] = eef_pos, eef_rot
+        return eef
 
     def set_joint_weight(self, joint_name, weight):
         if joint_name in self.joint_constraints:

@@ -50,9 +50,9 @@ class TestController(unittest.TestCase):
                       'joint_z': start[2]}
 
         goal = np.array([.7, .8, .9])
-        goal_dict = {'joint_x_goal': goal[0],
-                     'joint_y_goal': goal[1],
-                     'joint_z_goal': goal[2]}
+        goal_dict = {'joint_x': goal[0],
+                     'joint_y': goal[1],
+                     'joint_z': goal[2]}
 
         r.update_observables(start_dict)
         c.set_goal(goal_dict)

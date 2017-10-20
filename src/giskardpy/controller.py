@@ -9,14 +9,13 @@ class Controller(object):
         self._state = OrderedDict()  # e.g. goal
         self._soft_constraints = OrderedDict()
 
+        self.make_constraints(self.robot)
         self.build_builder()
 
     def make_constraints(self, robot):
         pass
 
     def build_builder(self):
-        self.make_constraints(self.robot)
-
         self.qp_problem_builder = QProblemBuilder(self.robot.joint_constraints,
                                                   self.robot.hard_constraints,
                                                   self._soft_constraints)
@@ -31,3 +30,6 @@ class Controller(object):
     def get_next_command(self):
         self._state.update(self.robot.get_state())
         return self.qp_problem_builder.update_observables(self._state)
+
+    def add_frame_input(self, name):
+        pass

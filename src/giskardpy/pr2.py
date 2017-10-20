@@ -9,18 +9,6 @@ class PR2(Robot):
         for joint_name in self.joint_constraints:
             self.set_joint_weight(joint_name, 0.01)
 
-        self.joint_state = {}
-
-    def set_joint_state(self, joint_state_dict):
-        self.joint_state = joint_state_dict
-
-    def update_observables(self):
-        return self.joint_state
-
-    def __str__(self):
-        return "PR2's state:\n {}".format(
-            '\n'.join('{}:{:.3f}'.format(joint_name, value) for joint_name, value in self.joint_state.items()))
-
     def hacky_urdf_parser_fix(self, urdf_path):
         fixed_urdf = ''
         delete = False

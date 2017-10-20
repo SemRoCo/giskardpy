@@ -10,12 +10,6 @@ PKG = 'giskardpy'
 
 
 class TestQPBuilder(unittest.TestCase):
-    def set_robot_js(self, robot, next_state):
-        next_state_dict = OrderedDict()
-        for i, joint_symbol in enumerate(robot.joints_observables):
-            next_state_dict[str(joint_symbol)] = next_state[i]
-        robot.set_joint_state(next_state_dict)
-
     def test_qpbuilder_1(self):
         big = 1e9
         robot_weight = .9
@@ -35,10 +29,10 @@ class TestQPBuilder(unittest.TestCase):
                 'joint_y_goal': goal_array[1],
                 'joint_z_goal': goal_array[2]}
 
-        self.set_robot_js(r, start)
+        r.update_observables(start_dict)
         c.set_goal(goal)
 
-        c.update_observables()
+        c.get_next_command()
         A = qpbuilder.np_A
         expected_A = np.array([[1, 0, 0, 0, 0, 0],
                                [0, 1, 0, 0, 0, 0],

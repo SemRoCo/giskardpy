@@ -37,7 +37,7 @@ class TestController(unittest.TestCase):
             'r_wrist_roll_joint': 1.90604009753,
         }
 
-        pr2.update_observables(js)
+        pr2.set_joint_state(js)
         return pr2
 
     def test_jointcontroller_1(self):
@@ -54,7 +54,7 @@ class TestController(unittest.TestCase):
                      'joint_y': goal[1],
                      'joint_z': goal[2]}
 
-        r.update_observables(start_dict)
+        r.set_joint_state(start_dict)
         c.set_goal(goal_dict)
 
         for i in range(20):
@@ -64,9 +64,10 @@ class TestController(unittest.TestCase):
             robot_state = r.get_state()
             for j, (joint_name, joint_change) in enumerate(cmd_dict.items()):
                 next_state[joint_name] = robot_state[joint_name] + joint_change
-            r.update_observables(next_state)
+            r.set_joint_state(next_state)
             print('iteration #{}: {}'.format(i + 1, r))
-        np.testing.assert_array_almost_equal(goal, r.get_state().values())
+        for k, v in goal_dict.items():
+            self.assertAlmostEqual(v, r.get_state()[k])
 
     def test_jointcontroller_2(self):
         r = PointyBot(weight=.01, urdf='pointy_adrian.urdf')
@@ -77,11 +78,11 @@ class TestController(unittest.TestCase):
                       'joint_y': start[1],
                       'joint_z': start[2]}
         goal = np.array([1, 1, -1])
-        goal_dict = {'joint_x_goal': goal[0],
-                     'joint_y_goal': goal[1],
-                     'joint_z_goal': goal[2]}
+        goal_dict = {'joint_x': goal[0],
+                     'joint_y': goal[1],
+                     'joint_z': goal[2]}
 
-        r.update_observables(start_dict)
+        r.set_joint_state(start_dict)
         c.set_goal(goal_dict)
 
         for i in range(20):
@@ -91,9 +92,10 @@ class TestController(unittest.TestCase):
             robot_state = r.get_state()
             for j, (joint_name, joint_change) in enumerate(cmd_dict.items()):
                 next_state[joint_name] = robot_state[joint_name] + joint_change
-            r.update_observables(next_state)
+            r.set_joint_state(next_state)
             print('iteration #{}: {}'.format(i + 1, r))
-        np.testing.assert_array_almost_equal(goal, r.get_state().values())
+        for k, v in goal_dict.items():
+            self.assertAlmostEqual(v, r.get_state()[k])
 
     def test_default_pr2(self):
         pr2 = self.default_pr2()
@@ -113,7 +115,7 @@ class TestController(unittest.TestCase):
                   'l_wrist_roll_joint', 'r_elbow_flex_joint', 'r_forearm_roll_joint', 'r_shoulder_lift_joint',
                   'r_shoulder_pan_joint', 'r_upper_arm_roll_joint', 'r_wrist_flex_joint', 'r_wrist_roll_joint']
         goal = [0.0] * len(joints)
-        goal_dict = {'{}_goal'.format(joint): goal[i] for i,joint in enumerate(joints)}
+        goal_dict = {joint: goal[i] for i, joint in enumerate(joints)}
         c.set_goal(goal_dict)
 
         for i in range(30):
@@ -123,14 +125,11 @@ class TestController(unittest.TestCase):
             robot_state = r.get_state()
             for j, (joint_name, joint_change) in enumerate(cmd_dict.items()):
                 next_state[joint_name] = robot_state[joint_name] + joint_change
-            r.update_observables(next_state)
+            r.set_joint_state(next_state)
             print('iteration #{}: {}'.format(i + 1, r))
-        np.testing.assert_array_almost_equal(goal, r.get_state().values())
 
-        # def test_eef_controller_pr2_1(self):
-        #     pr2 = self.default_pr2()
-        #     eef_controller = EEFPositionControl(pr2)
-        #     eef_controller.set_goal()
+        for k, v in goal_dict.items():
+            self.assertAlmostEqual(v, r.get_state()[k])
 
 
 if __name__ == '__main__':

@@ -107,6 +107,7 @@ class Robot(object):
             joint_symbol = self.joint_states_input.to_symbol(joint_name)
             weight_symbol = self.weight_input.to_symbol(joint_name)
             self._state[joint_name] = None
+            self._state[self.weight_input.to_str_symbol(joint_name)] = 1
 
             if not joint.limitless:
                 self.hard_constraints[joint_name] = HardConstraint(lower=joint.lower - joint_symbol,

@@ -113,6 +113,8 @@ class QProblemBuilder(object):
 
     def update_expression_matrix(self, matrix, argument_names, updates_dict):
         args = self.filter_observables(argument_names, updates_dict)
+        if len(args) == 1:
+            return matrix(args.values()[0])
         return matrix(**args)
 
     def update_expression_vector(self, vector, argument_names, updates_dict):

@@ -6,8 +6,8 @@ class PR2(Robot):
         super(PR2, self).__init__()
         urdf = self.hacky_urdf_parser_fix(urdf_path)
         self.load_from_urdf_string(urdf, 'base_link', ['l_gripper_tool_frame', 'r_gripper_tool_frame'])
-        for joint_name in self.joint_constraints:
-            self.set_joint_weight(joint_name, 0.01)
+        for joint_name in self.weight_input.get_float_names():
+            self.set_joint_weight(joint_name, .1)
 
     def hacky_urdf_parser_fix(self, urdf_path):
         fixed_urdf = ''

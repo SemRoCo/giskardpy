@@ -3,6 +3,7 @@ from collections import namedtuple, OrderedDict
 from tf.transformations import quaternion_from_matrix
 from urdf_parser_py.urdf import URDF
 
+from giskardpy.input_system import ControllerInputArray
 from giskardpy.qp_problem_builder import HardConstraint, JointConstraint
 from giskardpy.sympy_wrappers import *
 import sympy.vector as spv
@@ -28,8 +29,17 @@ class Robot(object):
     def get_joint_names(self):
         return self._joints.keys()
 
-    def update_observables(self, updates):
+    def _update_observables(self, updates):
         self._state.update(updates)
+
+    def set_joint_state(self, new_joint_state):
+        self._update_observables(self.joint_states_input.get_update_dict(**new_joint_state))
+
+    def set_joint_weight(self, joint_name, weight):
+        self._update_observables(self.weight_input.get_update_dict(**{joint_name: weight}))
+
+    def get_joint_state_input(self):
+        return self.joint_states_input
 
     def add_chain_joints(self, root_link, tip_link):
         """
@@ -90,8 +100,12 @@ class Robot(object):
         for tip_link in tip_links:
             self.add_chain_joints(root_link, tip_link)
 
+        self.joint_states_input = ControllerInputArray(self.get_joint_names())
+        self.weight_input = ControllerInputArray(self.get_joint_names(), suffix='cc_weight')
+
         for i, (joint_name, joint) in enumerate(self._joints.items()):
-            joint_symbol = joint.symbol
+            joint_symbol = self.joint_states_input.to_symbol(joint_name)
+            weight_symbol = self.weight_input.to_symbol(joint_name)
             self._state[joint_name] = None
 
             if not joint.limitless:
@@ -101,7 +115,7 @@ class Robot(object):
 
             self.joint_constraints[joint_name] = JointConstraint(lower=-joint.velocity_limit,
                                                                  upper=joint.velocity_limit,
-                                                                 weight=1)
+                                                                 weight=weight_symbol)
 
     def get_eef_position(self):
         eef = {}
@@ -113,30 +127,16 @@ class Robot(object):
             eef[end_effector] = eef_pos, eef_rot
         return eef
 
-    def set_joint_weight(self, joint_name, weight):
-        if joint_name in self.joint_constraints:
-            old_constraint = self.joint_constraints[joint_name]
-            self.joint_constraints[joint_name] = JointConstraint(lower=old_constraint.lower,
-                                                                 upper=old_constraint.upper,
-                                                                 weight=weight)
-        else:
-            for j, c in self.joint_constraints.iteritems():
-                print(j + ': ' + str(c))
-
-            raise Exception('Robot does not have controllable constraint for joint "' + joint_name + '"')
-
-    def get_joint_weight(self, joint_name):
-        if joint_name in self.joint_constraints:
-            return self.joint_constraints[joint_name].weight
-        raise Exception('Robot does not have controllable constraint for joint "' + joint_name + '"')
-
     def load_from_urdf_path(self, urdf_path, root_link, tip_links):
         return self.load_from_urdf(URDF.from_xml_file(urdf_path), root_link, tip_links)
 
     def load_from_urdf_string(self, urdf_strg, root_link, tip_links):
         return self.load_from_urdf(URDF.from_xml_string(urdf_strg), root_link, tip_links)
 
+    def get_name(self):
+        return self.__class__.__name__
+
     def __str__(self):
-        return "{}'s state:\n{}".format(self.__class__.__name__,
+        return "{}'s state:\n{}".format(self.get_name(),
                                         '\n'.join('{}:{:.3f}'.format(joint_name, value) for joint_name, value in
                                                   self.get_state().items()))

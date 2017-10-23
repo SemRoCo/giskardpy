@@ -29,7 +29,7 @@ class TestQPBuilder(unittest.TestCase):
                 'joint_y_goal': goal_array[1],
                 'joint_z_goal': goal_array[2]}
 
-        r.update_observables(start_dict)
+        r._update_observables(start_dict)
         c.set_goal(goal)
 
         c.get_next_command()

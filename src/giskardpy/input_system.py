@@ -39,7 +39,7 @@ class ControllerInputArray(object):
 
 
 class ScalarInput(ControllerInputArray):
-    def __init__(self, prefix, suffix='goal'):
+    def __init__(self, prefix, suffix=''):
         super(ScalarInput, self).__init__(['v'], prefix, suffix)
 
     def get_update_dict(self, v):
@@ -53,7 +53,7 @@ class ScalarInput(ControllerInputArray):
 
 
 class Point3(ControllerInputArray):
-    def __init__(self, prefix, suffix='goal'):
+    def __init__(self, prefix, suffix=''):
         super(Point3, self).__init__(['x', 'y', 'z'], prefix, suffix)
 
     def get_update_dict(self, x, y, z):
@@ -70,3 +70,51 @@ class Point3(ControllerInputArray):
 
     def get_expression(self):
         return point3(*self._symbol_map.values())
+
+
+class Vec3(ControllerInputArray):
+    def __init__(self, prefix, suffix=''):
+        super(Vec3, self).__init__(['x', 'y', 'z'], prefix, suffix)
+
+    def get_expression(self):
+        return vec3(*self._symbol_map.values())
+
+
+class Quaternion(ControllerInputArray):
+    def __init__(self, prefix, suffix=''):
+        super(Quaternion, self).__init__(['x', 'y', 'z', 'w'], prefix, suffix)
+
+    def get_update_dict(self, x, y, z, w):
+        return super(Quaternion, self).get_update_dict(x, y, z, w)
+
+    def get_x(self):
+        return self._symbol_map['x']
+
+    def get_y(self):
+        return self._symbol_map['y']
+
+    def get_z(self):
+        return self._symbol_map['z']
+
+    def get_w(self):
+        return self._symbol_map['w']
+
+    def get_expression(self):
+        return rotation3_quaternion(*self._symbol_map.values())
+
+
+class Frame3(ControllerInputArray):
+    def __init__(self, prefix, suffix=''):
+        super(Frame3, self).__init__(['qx', 'qy', 'qz', 'qw', 'x', 'y', 'z'], prefix, suffix)
+
+    def get_update_dict(self, qx, qy, qz, qw, x, y, z):
+        return super(Quaternion, self).get_update_dict(qx, qy, qz, qw, x, y, z)
+
+    def get_expression(self):
+        return frame3_quaternion(*(self._symbol_map.values()[:4] + [point3(self._symbol_map.values()[4:])]))
+
+    def get_position(self):
+        return point3(*self._symbol_map.values()[4:])
+
+    def get_rotation(self):
+        return rotation3_quaternion(*self._symbol_map.values()[:4])

@@ -1,28 +1,18 @@
-from copy import deepcopy
-
+from giskardpy.contraint_templates import minimize_array
 from giskardpy.controller import Controller
-import sympy as sp
-import numpy as np
-
-from giskardpy.qp_problem_builder import SoftConstraint
 
 
 class JointSpaceControl(Controller):
-    def __init__(self, robot, weight=42):
+    def __init__(self, robot, weight=1):
         self.weight = weight
+        self.joint_to_goal = {}
         super(JointSpaceControl, self).__init__(robot)
 
     def make_constraints(self, robot):
-        for i, joint_symbol in enumerate(robot.joints_observables):
-            goal = sp.Symbol('{}_goal'.format(joint_symbol))
-            self._observables.append(goal)
-            self.soft_constraints['soft_{}'.format(i)] = SoftConstraint(lower=goal - joint_symbol,
-                                                                        upper=goal - joint_symbol,
-                                                                        weight=self.weight,
-                                                                        expression=joint_symbol)
+        for joint, goal, weight, sc in zip(robot.get_joint_names(), *minimize_array(robot.get_joint_names())):
+            self._soft_constraints[goal] = sc
+            self._state[weight] = self.weight
+            self.joint_to_goal[joint] = goal
 
     def set_goal(self, goal_dict):
-        self.goal = goal_dict
-
-    def update_observables(self, updates=None):
-        return super(JointSpaceControl, self).update_observables(self.goal)
+        self.update_observables({self.joint_to_goal[k]: v for k,v in goal_dict.items()})

@@ -1,8 +1,4 @@
-from collections import namedtuple, OrderedDict
-
-import sympy as sp
-import numpy as np
-
+from collections import OrderedDict
 from giskardpy.qp_problem_builder import QProblemBuilder
 from giskardpy.robot import Robot
 from giskardpy.sympy_wrappers import *
@@ -114,7 +110,6 @@ class FrameInput(ControllerInput):
 
 class Controller(object):
     def __init__(self, robot):
-        # TODO: replace
         self.robot = robot
 
         #TODO: fill in child class
@@ -122,8 +117,11 @@ class Controller(object):
         self.soft_constraints = OrderedDict()
         self.controllable_constraints = OrderedDict()
         self.inputs = {}
-        self.state  = {}
 
+        self._state = OrderedDict()  # e.g. goal
+        self._soft_constraints = OrderedDict()
+
+        self.make_constraints(self.robot)
         self.build_builder()
 
     def make_constraints(self, robot):
@@ -131,31 +129,25 @@ class Controller(object):
 
     def build_builder(self):
         self.make_constraints(self.robot)
-
         self.qp_problem_builder = QProblemBuilder(self.controllable_constraints,
                                                   self.robot.hard_constraints,
-                                                  self.soft_constraints)
+                                                  self._soft_constraints)
 
-    def set_goal(self, goal_dict):
-        """
-        :param goal_dict: dict{str -> float}
-        """
-        pass
-
-    def update_observables(self, updates=None):
+    def update_observables(self, updates):
         """
         :param updates: dict{str->float} observable name to it value
         :return: dict{str->float} joint name to vel command
         """
         if updates is None:
             updates = {}
-        robot_updates = self.robot.update_observables()
-        self.state.update(robot_updates)
-        return self.qp_problem_builder.update_observables_cython(self.state)
+        self._state.update(updates)
         # return self.qp_problem_builder.update_observables(updates)
 
-    def get_hard_expressions(self):
-        return self.robot.hard_expressions
+
+    def get_next_command(self):
+        self._state.update(self.robot.get_state())
+        return self.qp_problem_builder.update_observables(self._state)
+
 
     def get_observables(self):
         return self.get_robot_observables() + self.get_controller_observables()
@@ -170,13 +162,13 @@ class Controller(object):
         if name in self.inputs:
             out = self.inputs[name]
             if isinstance(out, cls):
-                return out.expression
+                return out
             else:
                 raise Exception("Can't add input '{}' of type '{}' as that name is already taken by an input of type '{}'.".format(name, str(cls), str(type(out))))
         else:
             out = cls(name)
             self.inputs[name] = out
-            return out.expression
+            return out
 
     def add_scalar_input(self, name):
         return self.add_input(name, ScalarInput)
@@ -194,3 +186,4 @@ class Controller(object):
         if not name in self.inputs:
             raise Exception('Input "{}" does not exist.'.format(name))
         self.inputs[name].update_observables(self.state, *args)
+

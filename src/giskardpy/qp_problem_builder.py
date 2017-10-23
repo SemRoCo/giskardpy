@@ -2,7 +2,7 @@ from collections import OrderedDict, namedtuple
 
 import numpy as np
 import sympy as sp
-from sympy.utilities.autowrap import ufuncify, autowrap
+from sympy.utilities.autowrap import autowrap
 
 from giskardpy.qp_solver import QPSolver
 
@@ -18,8 +18,8 @@ class QProblemBuilder(object):
         self.joint_constraints_dict = joint_constraints_dict
         self.hard_constraints_dict = hard_constraints_dict
         self.soft_constraints_dict = soft_constraints_dict
-        self.controlled_joints = sp.sympify(self.joint_constraints_dict.keys())
-        self.controlled_joints_strs = [str(x) for x in self.controlled_joints]
+        self.controlled_joints_strs = list(self.joint_constraints_dict.keys())
+        self.controlled_joints = sp.sympify(self.controlled_joints_strs)
         self.make_sympy_matrices()
 
         self.qp_solver = QPSolver(self.H.shape[0], len(self.lbA))
@@ -75,37 +75,35 @@ class QProblemBuilder(object):
         self.lbA = sp.Matrix(lbA)
         self.ubA = sp.Matrix(ubA)
 
-        self.aH = autowrap(self.H, args=list(self.H.free_symbols), backend=self.BACKEND)
+        self.cython_H = autowrap(self.H, args=list(self.H.free_symbols), backend=self.BACKEND)
         self.H_symbols = [str(x) for x in self.H.free_symbols]
 
-        self.aA = autowrap(self.A, args=list(self.A.free_symbols), backend=self.BACKEND)
+        self.cython_A = autowrap(self.A, args=list(self.A.free_symbols), backend=self.BACKEND)
         self.A_symbols = [str(x) for x in self.A.free_symbols]
 
-        self.alb = autowrap(self.lb, args=list(self.lb.free_symbols), backend=self.BACKEND)
+        self.cython_lb = autowrap(self.lb, args=list(self.lb.free_symbols), backend=self.BACKEND)
         self.lb_symbols = [str(x) for x in self.lb.free_symbols]
 
-        self.aub = autowrap(self.ub, args=list(self.ub.free_symbols), backend=self.BACKEND)
+        self.cython_ub = autowrap(self.ub, args=list(self.ub.free_symbols), backend=self.BACKEND)
         self.ub_symbols = [str(x) for x in self.ub.free_symbols]
 
-        self.albA = autowrap(self.lbA, args=list(self.lbA.free_symbols), backend=self.BACKEND)
+        self.cython_lbA = autowrap(self.lbA, args=list(self.lbA.free_symbols), backend=self.BACKEND)
         self.lbA_symbols = [str(x) for x in self.lbA.free_symbols]
 
-        self.aubA = autowrap(self.ubA, args=list(self.ubA.free_symbols), backend=self.BACKEND)
+        self.cython_ubA = autowrap(self.ubA, args=list(self.ubA.free_symbols), backend=self.BACKEND)
         self.ubA_symbols = [str(x) for x in self.ubA.free_symbols]
 
 
-    # @profile
-    def transfrom_observable_matrix(self, argument_names, observables_update):
+    def filter_observables(self, argument_names, observables_update):
         return {str(k): observables_update[k] for k in argument_names}
 
-    # @profile
-    def update_observables_cython(self, observables_update):
-        self.np_H = self.update_cython_expression_matrix(self.aH, self.H_symbols, observables_update)
-        self.np_A = self.update_cython_expression_matrix(self.aA, self.A_symbols, observables_update)
-        self.np_lb = self.update_cython_expression_vector(self.alb, self.lb_symbols, observables_update)
-        self.np_ub = self.update_cython_expression_vector(self.aub, self.ub_symbols, observables_update)
-        self.np_lbA = self.update_cython_expression_vector(self.albA, self.lbA_symbols, observables_update)
-        self.np_ubA = self.update_cython_expression_vector(self.aubA, self.ubA_symbols, observables_update)
+    def update_observables(self, observables_update):
+        self.np_H = self.update_expression_matrix(self.cython_H, self.H_symbols, observables_update)
+        self.np_A = self.update_expression_matrix(self.cython_A, self.A_symbols, observables_update)
+        self.np_lb = self.update_expression_vector(self.cython_lb, self.lb_symbols, observables_update)
+        self.np_ub = self.update_expression_vector(self.cython_ub, self.ub_symbols, observables_update)
+        self.np_lbA = self.update_expression_vector(self.cython_lbA, self.lbA_symbols, observables_update)
+        self.np_ubA = self.update_expression_vector(self.cython_ubA, self.ubA_symbols, observables_update)
 
         xdot_full = self.qp_solver.solve(self.np_H, self.np_g, self.np_A,
                                          self.np_lb, self.np_ub, self.np_lbA, self.np_ubA)
@@ -113,13 +111,10 @@ class QProblemBuilder(object):
             return None
         return OrderedDict((observable, xdot_full[i]) for i, observable in enumerate(self.controlled_joints_strs))
 
-    # @profile
-    def update_cython_expression_matrix(self, matrix, argument_names, updates_dict):
-        args = self.transfrom_observable_matrix(argument_names, updates_dict)
-        m_sub = matrix(**args)
-        return m_sub
+    def update_expression_matrix(self, matrix, argument_names, updates_dict):
+        args = self.filter_observables(argument_names, updates_dict)
+        return matrix(**args)
 
-    # @profile
-    def update_cython_expression_vector(self, vector, argument_names, updates_dict):
-        np_v = self.update_cython_expression_matrix(vector, argument_names, updates_dict)
+    def update_expression_vector(self, vector, argument_names, updates_dict):
+        np_v = self.update_expression_matrix(vector, argument_names, updates_dict)
         return np_v.reshape(len(np_v))

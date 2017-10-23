@@ -59,5 +59,14 @@ class Point3(ControllerInputArray):
     def get_update_dict(self, x, y, z):
         return super(Point3, self).get_update_dict(x, y, z)
 
+    def get_x(self):
+        return self._symbol_map['x']
+
+    def get_y(self):
+        return self._symbol_map['y']
+
+    def get_z(self):
+        return self._symbol_map['z']
+
     def get_expression(self):
         return point3(*self._symbol_map.values())

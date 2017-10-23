@@ -108,7 +108,7 @@ class Frame3(ControllerInputArray):
         super(Frame3, self).__init__(['qx', 'qy', 'qz', 'qw', 'x', 'y', 'z'], prefix, suffix)
 
     def get_update_dict(self, qx, qy, qz, qw, x, y, z):
-        return super(Quaternion, self).get_update_dict(qx, qy, qz, qw, x, y, z)
+        return super(Frame3, self).get_update_dict(qx, qy, qz, qw, x, y, z)
 
     def get_expression(self):
         return frame3_quaternion(*(self._symbol_map.values()[:4] + [point3(self._symbol_map.values()[4:])]))

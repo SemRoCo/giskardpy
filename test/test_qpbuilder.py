@@ -25,9 +25,9 @@ class TestQPBuilder(unittest.TestCase):
                       'joint_z': start[2]}
 
         goal_array = np.array([.7,.8,.9])
-        goal = {'joint_x_goal': goal_array[0],
-                'joint_y_goal': goal_array[1],
-                'joint_z_goal': goal_array[2]}
+        goal = {'joint_x__goal': goal_array[0],
+                'joint_y__goal': goal_array[1],
+                'joint_z__goal': goal_array[2]}
 
         r._update_observables(start_dict)
         c.set_goal(goal)

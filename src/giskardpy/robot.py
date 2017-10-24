@@ -6,6 +6,7 @@ from urdf_parser_py.urdf import URDF
 from giskardpy.input_system import ControllerInputArray
 from giskardpy.qp_problem_builder import HardConstraint, JointConstraint
 from giskardpy.sympy_wrappers import *
+import sympy.vector as spv
 import numpy as np
 import sympy as sp
 
@@ -61,27 +62,24 @@ class Robot(object):
             if joint_name not in self._joints:
                 if joint.type == 'revolute' or joint.type == 'continuous':
                     self._joints[joint_name] = Joint(sp.Symbol(joint_name),
-                                                     joint.limit.velocity,
-                                                     joint.limit.lower,
-                                                     joint.limit.upper,
-                                                     joint.type == 'continuous')
-                    self.frames[link_name] = parentFrame * frame3_axis_angle(vec3(*joint.axis),
-                                                                             -sp.Symbol(joint_name),
-                                                                             point3(*joint.origin.xyz))
+                                                    joint.limit.velocity,
+                                                    joint.limit.lower,
+                                                    joint.limit.upper,
+                                                    joint.type == 'continuous')
+                    self.frames[link_name] = parentFrame * frame3_axis_angle(vec3(*joint.axis), -sp.Symbol(joint_name), point3(*joint.origin.xyz))
                 elif joint.type == 'prismatic':
                     self._joints[joint_name] = Joint(sp.Symbol(joint_name),
-                                                     joint.limit.velocity,
-                                                     joint.limit.lower,
-                                                     joint.limit.upper,
-                                                     False)
-                    self.frames[link_name] = parentFrame * frame3_rpy(*joint.origin.rpy,
-                                                                      loc=point3(*joint.origin.xyz) +
-                                                                          vec3(*joint.axis) * sp.Symbol(joint_name))
+                                                    joint.limit.velocity,
+                                                    joint.limit.lower,
+                                                    joint.limit.upper,
+                                                    False)
+                    self.frames[link_name] = parentFrame * frame3_rpy(*joint.origin.rpy, loc=point3(*joint.origin.xyz) + vec3(*joint.axis) * sp.Symbol(joint_name))
                 elif joint.type == 'fixed':
                     self.frames[link_name] = parentFrame * frame3_rpy(*joint.origin.rpy, loc=point3(*joint.origin.xyz))
                 else:
                     raise Exception('Joint type "' + joint.type + '" is not supported by urdf parser.')
             parentFrame = self.frames[link_name]
+
 
     def load_from_urdf(self, urdf_robot, root_link, tip_links, root_frame=sp.eye(4)):
         """
@@ -109,6 +107,7 @@ class Robot(object):
             joint_symbol = self.joint_states_input.to_symbol(joint_name)
             weight_symbol = self.weight_input.to_symbol(joint_name)
             self._state[joint_name] = None
+            self._state[self.weight_input.to_str_symbol(joint_name)] = 1
 
             if not joint.limitless:
                 self.hard_constraints[joint_name] = HardConstraint(lower=joint.lower - joint_symbol,

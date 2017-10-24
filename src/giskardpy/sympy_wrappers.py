@@ -38,7 +38,7 @@ def rotation3_axis_angle(axis, angle):
 
 
 def rotation3_quaternion(q1, q2, q3, q4):
-    return sp.diag(spv.QuaternionOrienter(q1, q2, q3, q4), 1)
+    return sp.diag(spv.QuaternionOrienter(q1, q2, q3, q4).rotation_matrix(), 1)
 
 
 def frame3_axis_angle(axis, angle, loc):

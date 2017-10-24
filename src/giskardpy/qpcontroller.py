@@ -4,7 +4,7 @@ from giskardpy.robot import Robot
 from giskardpy.sympy_wrappers import *
 
 
-class Controller(object):
+class QPController(object):
     def __init__(self, robot):
         self.robot = robot
 
@@ -40,5 +40,6 @@ class Controller(object):
         self.__state.update(updates)
 
     def get_next_command(self):
+        #TODO add dt parameter and return next state + cmds instead of only cmds
         self.__state.update(self.robot.get_state())
         return self.qp_problem_builder.update_observables(self.__state)

@@ -1,12 +1,12 @@
 from collections import OrderedDict
 
 from giskardpy.input_system import ControllerInputArray
-from giskardpy.controller import Controller
+from giskardpy.qpcontroller import QPController
 from giskardpy.qp_problem_builder import SoftConstraint
 import sympy as sp
 
 
-class JointSpaceControl(Controller):
+class JointSpaceControl(QPController):
     def __init__(self, robot, weight=1):
         self.weight = weight
         super(JointSpaceControl, self).__init__(robot)

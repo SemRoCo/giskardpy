@@ -1,9 +1,9 @@
-from giskardpy.controller import Controller
+from giskardpy.qpcontroller import QPController
 from giskardpy.sympy_wrappers import *
 from giskardpy.qp_problem_builder import SoftConstraint
 from giskardpy.input_system import Point3Input
 
-class EEFPositionControl(Controller):
+class EEFPositionControl(QPController):
     def __init__(self, robot, weight=1):
         self.weight = weight
         super(EEFPositionControl, self).__init__(robot)

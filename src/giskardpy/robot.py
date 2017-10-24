@@ -14,6 +14,7 @@ Joint = namedtuple('Joint', ['symbol', 'velocity_limit', 'lower', 'upper', 'limi
 
 
 class Robot(object):
+    #TODO add joint vel to internal state
     def __init__(self):
         self.urdf_robot = None
         self._joints = OrderedDict()

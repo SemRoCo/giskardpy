@@ -5,9 +5,9 @@ from giskardpy.sympy_wrappers import *
 
 
 class QPController(object):
+    #TODO add superclass that does not assume that qp stuff is used
     def __init__(self, robot):
         self.robot = robot
-
         self.__state = OrderedDict()  # e.g. goal
         self._controllable_constraints = OrderedDict()
         self._hard_constraints = OrderedDict()

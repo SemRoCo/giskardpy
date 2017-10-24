@@ -2,7 +2,7 @@ from collections import OrderedDict
 
 import sympy as sp
 
-from giskardpy.sympy_wrappers import point3, vec3, frame3_quaternion
+from giskardpy.sympy_wrappers import point3, vec3, frame3_quaternion, rotation3_quaternion
 
 
 class ControllerInputArray(object):
@@ -18,9 +18,9 @@ class ControllerInputArray(object):
         else:
             self._suffix = '{}{}'.format(self.separator, suffix)
 
-        self._symbol_map = OrderedDict({fn: sp.Symbol('{}{}{}'.format(self._prefix, fn, self._suffix))
-                                        for fn in float_names})
-        self._str_map = OrderedDict({k: str(v) for k, v in self._symbol_map.items()})
+        self._symbol_map = OrderedDict((fn, sp.Symbol('{}{}{}'.format(self._prefix, fn, self._suffix)))
+                                        for fn in float_names)
+        self._str_map = OrderedDict((k, str(v)) for k, v in self._symbol_map.items())
 
     def to_symbol(self, float_name):
         return self._symbol_map[float_name]
@@ -52,12 +52,12 @@ class ScalarInput(ControllerInputArray):
         return self._str_map['v']
 
 
-class Point3(ControllerInputArray):
+class Point3Input(ControllerInputArray):
     def __init__(self, prefix, suffix=''):
-        super(Point3, self).__init__(['x', 'y', 'z'], prefix, suffix)
+        super(Point3Input, self).__init__(['x', 'y', 'z'], prefix, suffix)
 
     def get_update_dict(self, x, y, z):
-        return super(Point3, self).get_update_dict(x=x, y=y, z=z)
+        return super(Point3Input, self).get_update_dict(x=x, y=y, z=z)
 
     def get_x(self):
         return self._symbol_map['x']
@@ -72,9 +72,9 @@ class Point3(ControllerInputArray):
         return point3(*self._symbol_map.values())
 
 
-class Vec3(Point3):
+class Vec3Input(Point3Input):
     def __init__(self, prefix, suffix=''):
-        super(Vec3, self).__init__(prefix, suffix)
+        super(Vec3Input, self).__init__(prefix, suffix)
 
     def get_expression(self):
         return vec3(*self._symbol_map.values())

@@ -1,7 +1,7 @@
 from giskardpy.controller import Controller
 from giskardpy.sympy_wrappers import *
 from giskardpy.qp_problem_builder import SoftConstraint
-from giskardpy.input_system import Point3
+from giskardpy.input_system import Point3Input
 
 class EEFPositionControl(Controller):
     def __init__(self, robot, weight=1):
@@ -9,7 +9,7 @@ class EEFPositionControl(Controller):
         super(EEFPositionControl, self).__init__(robot)
 
     def make_constraints(self, robot):
-        self.goal_input = Point3('eef', 'goal')
+        self.goal_input = Point3Input('eef', 'goal')
         self.goal_expr = self.goal_input.get_expression()
         dist = norm(pos_of(robot.eef) - self.goal_expr)
         print(robot.eef)

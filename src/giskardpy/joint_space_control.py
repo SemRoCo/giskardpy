@@ -3,7 +3,7 @@ from collections import OrderedDict
 from giskardpy.input_system import ControllerInputArray
 from giskardpy.controller import Controller
 from giskardpy.qp_problem_builder import SoftConstraint
-import sympy as sp
+import symengine as sp
 
 
 class JointSpaceControl(Controller):

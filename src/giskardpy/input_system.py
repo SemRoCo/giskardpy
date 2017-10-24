@@ -1,6 +1,6 @@
 from collections import OrderedDict
 
-import sympy as sp
+import symengine as sp
 
 from giskardpy.sympy_wrappers import point3, vec3, frame3_quaternion
 

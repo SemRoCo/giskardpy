@@ -1,8 +1,8 @@
 from collections import OrderedDict, namedtuple
 
 import numpy as np
-import sympy as sp
-from sympy.utilities.autowrap import autowrap
+import symengine as sp
+#from sympy.utilities.autowrap import autowrap
 
 from giskardpy.qp_solver import QPSolver
 
@@ -75,22 +75,22 @@ class QProblemBuilder(object):
         self.lbA = sp.Matrix(lbA)
         self.ubA = sp.Matrix(ubA)
 
-        self.cython_H = autowrap(self.H, args=list(self.H.free_symbols), backend=self.BACKEND)
+        self.cython_H = self.H #autowrap(self.H, args=list(self.H.free_symbols), backend=self.BACKEND)
         self.H_symbols = [str(x) for x in self.H.free_symbols]
 
-        self.cython_A = autowrap(self.A, args=list(self.A.free_symbols), backend=self.BACKEND)
+        self.cython_A = self.A #autowrap(self.A, args=list(self.A.free_symbols), backend=self.BACKEND)
         self.A_symbols = [str(x) for x in self.A.free_symbols]
 
-        self.cython_lb = autowrap(self.lb, args=list(self.lb.free_symbols), backend=self.BACKEND)
+        self.cython_lb = self.lb #autowrap(self.lb, args=list(self.lb.free_symbols), backend=self.BACKEND)
         self.lb_symbols = [str(x) for x in self.lb.free_symbols]
 
-        self.cython_ub = autowrap(self.ub, args=list(self.ub.free_symbols), backend=self.BACKEND)
+        self.cython_ub = self.ub #autowrap(self.ub, args=list(self.ub.free_symbols), backend=self.BACKEND)
         self.ub_symbols = [str(x) for x in self.ub.free_symbols]
 
-        self.cython_lbA = autowrap(self.lbA, args=list(self.lbA.free_symbols), backend=self.BACKEND)
+        self.cython_lbA = self.lbA #autowrap(self.lbA, args=list(self.lbA.free_symbols), backend=self.BACKEND)
         self.lbA_symbols = [str(x) for x in self.lbA.free_symbols]
 
-        self.cython_ubA = autowrap(self.ubA, args=list(self.ubA.free_symbols), backend=self.BACKEND)
+        self.cython_ubA = self.ubA #autowrap(self.ubA, args=list(self.ubA.free_symbols), backend=self.BACKEND)
         self.ubA_symbols = [str(x) for x in self.ubA.free_symbols]
 
 

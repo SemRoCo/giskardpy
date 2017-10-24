@@ -1,7 +1,5 @@
-import sympy.vector as spv
-import sympy as sp
-
-ODOM = spv.CoordSys3D('ODOM')
+#import sympy.vector as spv
+import symengine as sp
 
 pathSeparator = '__'
 
@@ -25,20 +23,52 @@ def norm(v):
 
 
 def translation3(point):
-    return sp.eye(3).row_insert(3, sp.Matrix([[0] * 3])).col_insert(3, point)
+    return sp.eye(3).row_insert(3, sp.Matrix([[0] * 3])).row_join(point)
 
 
 def rotation3_rpy(r, p, y):
-    return sp.diag(spv.BodyOrienter(r, p, y, 'XYZ').rotation_matrix(), 1)
+    """ Conversion of roll, pitch, yaw to 4x4 rotation matrix according to:
+        http://planning.cs.uiuc.edu/node102.html
+    """
+    ca = sp.cos(y)
+    sa = sp.sin(y)
+    cb = sp.cos(p)
+    sb = sp.sin(p)
+    cg = sp.cos(r)
+    sg = sp.sin(r)
+    return sp.Matrix([[ca*cb, ca*sb*sg - sa*cg, ca*sb*cg + sa*sg, 0],
+                      [sa*cb, sa*sb*sg + ca*cg, sa*sb*cg - ca*sg, 0],
+                      [  -sb,            cb*sg,            cb*cg, 0],
+                      [    0,                0,                0, 1]])
 
 
 def rotation3_axis_angle(axis, angle):
-    return sp.diag(
-        spv.AxisOrienter(angle, axis[0] * ODOM.i + axis[1] * ODOM.j + axis[2] * ODOM.k).rotation_matrix(ODOM), 1)
+    """ Conversion of unit axis and angle to 4x4 rotation matrix according to:
+        http://www.euclideanspace.com/maths/geometry/rotations/conversions/angleToMatrix/index.htm
+    """
+    c = sp.cos(angle)
+    s = sp.sin(angle)
+    t = 1 - c
+    x = axis[0]
+    y = axis[1]
+    z = axis[2]
+    return sp.Matrix([[t*x*x +   c, t*x*y - z*s, t*x*z + y*s, 0],
+                      [t*x*y + z*s, t*y*y +   c, t*y*z - x*s, 0],
+                      [t*x*z - y*s, t*y*z + x*s, t*z*z +   c, 0],
+                      [          0,           0,           0, 1]])
 
 
-def rotation3_quaternion(q1, q2, q3, q4):
-    return sp.diag(spv.QuaternionOrienter(q1, q2, q3, q4).rotation_matrix(), 1)
+def rotation3_quaternion(qr, qi, qj, qk):
+    """ Unit quaternion to 4x4 rotation matrix according to:
+        https://en.wikipedia.org/wiki/Quaternions_and_spatial_rotation
+    """
+    qi_sq = qi**2
+    qj_sq = qj**2
+    qk_sq = qk**2
+    return sp.Matrix([[1 - 2*(qj_sq + qk_sq),     2*(qi*qj - qk*qr),     2*(qi*qk + qj*qr), 0],
+                      [    2*(qi*qj + qk*qr), 1 - 2*(qi_sq + qk_sq),     2*(qj*qk - qi*qr), 0],
+                      [    2*(qi*qk - qj*qr),     2*(qj*qk + qi*qr), 1 - 2*(qi_sq + qj_sq), 0],
+                      [                    0,                     0,                     0, 1]])
 
 
 def frame3_axis_angle(axis, angle, loc):

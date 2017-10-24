@@ -8,7 +8,7 @@ from giskardpy.qp_problem_builder import HardConstraint, JointConstraint
 from giskardpy.sympy_wrappers import *
 import sympy.vector as spv
 import numpy as np
-import sympy as sp
+import symengine as sp
 
 Joint = namedtuple('Joint', ['symbol', 'velocity_limit', 'lower', 'upper', 'limitless'])
 

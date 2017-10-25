@@ -21,9 +21,16 @@ def norm(v):
     else:
         return sp.sqrt(v[0] ** 2 + v[1] ** 2 + v[2] ** 2)
 
+def dot(a, b):
+    return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+
+def cross(a, b):
+    return sp.Matrix([a[1] * b[2] - a[2] * b[1],
+                      a[2] * b[0] - a[0] * b[2],
+                      a[0] * b[1] - a[1] * b[0]])
 
 def translation3(point):
-    return sp.eye(3).row_insert(3, sp.Matrix([[0] * 3])).row_join(point)
+    return sp.eye(3).col_join(sp.Matrix([[0] * 3])).row_join(point)
 
 
 def rotation3_rpy(r, p, y):
@@ -84,7 +91,7 @@ def frame3_quaternion(q1, q2, q3, q4, loc):
 
 
 def pos_of(frame):
-    return frame.col(3)
+    return frame[:4, 3:]
 
 def rot_of(frame):
     return sp.diag(frame[:3, :3], 1)

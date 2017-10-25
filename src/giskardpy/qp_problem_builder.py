@@ -19,7 +19,7 @@ class QProblemBuilder(object):
         self.hard_constraints_dict = hard_constraints_dict
         self.soft_constraints_dict = soft_constraints_dict
         self.controlled_joints_strs = list(self.joint_constraints_dict.keys())
-        self.controlled_joints = sp.sympify(self.controlled_joints_strs)
+        self.controlled_joints = [sp.Symbol(n) for n in self.controlled_joints_strs]
         self.make_sympy_matrices()
 
         self.qp_solver = QPSolver(self.H.shape[0], len(self.lbA))
@@ -58,19 +58,20 @@ class QProblemBuilder(object):
 
         # make A
         # hard part
+        M_controlled_joints = sp.Matrix(self.controlled_joints)
         A_hard = sp.Matrix(hard_expressions)
-        A_hard = A_hard.jacobian(self.controlled_joints)
+        A_hard = A_hard.jacobian(M_controlled_joints)
         zerosHxS = sp.zeros(A_hard.shape[0], len(soft_expressions))
-        A_hard = zerosHxS.col_insert(0, A_hard)
+        A_hard = A_hard.row_join(zerosHxS)
 
         # soft part
         A_soft = sp.Matrix(soft_expressions)
-        A_soft = A_soft.jacobian(self.controlled_joints)
+        A_soft = A_soft.jacobian(M_controlled_joints)
         identity3x3 = sp.eye(A_soft.shape[0])
-        A_soft = identity3x3.col_insert(0, A_soft)
+        A_soft = A_soft.row_join(identity3x3)
 
         # final A
-        self.A = A_soft.row_insert(0, A_hard)
+        self.A = A_hard.col_join(A_soft)
 
         self.lbA = sp.Matrix(lbA)
         self.ubA = sp.Matrix(ubA)
@@ -113,9 +114,9 @@ class QProblemBuilder(object):
 
     def update_expression_matrix(self, matrix, argument_names, updates_dict):
         args = self.filter_observables(argument_names, updates_dict)
-        if len(args) == 1:
-            return matrix(args.values()[0])
-        return matrix(**args)
+        #if len(args) == 1:
+        #    return matrix.subs(args.values()[0])
+        return np.array(matrix.subs(args).tolist(), dtype=float).reshape(matrix.shape)
 
     def update_expression_vector(self, vector, argument_names, updates_dict):
         np_v = self.update_expression_matrix(vector, argument_names, updates_dict)

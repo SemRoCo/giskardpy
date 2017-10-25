@@ -1,17 +1,13 @@
 #!/usr/bin/env python
 import unittest
 from collections import OrderedDict
+from time import time
 
-import sympy as sp
-from urdf_parser_py.urdf import URDF
 import numpy as np
 
-from giskardpy.eef_position_controller import EEFPositionControl
 from giskardpy.pointy_bot import PointyBot
 from giskardpy.joint_space_control import JointSpaceControl
 from giskardpy.pr2 import PR2
-from giskardpy.qp_problem_builder import QProblemBuilder
-from giskardpy.robot import Robot
 
 PKG = 'giskardpy'
 
@@ -108,6 +104,7 @@ class TestController(unittest.TestCase):
                                              decimal=3)
 
     def test_joint_controller_pr2(self):
+        t = time()
         r = self.default_pr2()
         c = JointSpaceControl(r, weight=1)
         joints = ['torso_lift_joint', 'l_elbow_flex_joint', 'l_forearm_roll_joint',
@@ -117,24 +114,28 @@ class TestController(unittest.TestCase):
         goal = [0.0] * len(joints)
         goal_dict = {joint: goal[i] for i, joint in enumerate(joints)}
         c.set_goal(goal_dict)
-
+        print('time spent on init: {}'.format(time()-t))
+        ts = []
         for i in range(30):
+            t = time()
             cmd_dict = c.get_next_command()
+            ts.append(time()-t)
             self.assertIsNotNone(cmd_dict)
             next_state = OrderedDict()
             robot_state = r.get_state()
             for j, (joint_name, joint_change) in enumerate(cmd_dict.items()):
                 next_state[joint_name] = robot_state[joint_name] + joint_change
             r.set_joint_state(next_state)
-            print('iteration #{}: {}'.format(i + 1, r))
-
+        print('time spent per get_next_command: {}'.format(np.mean(ts)))
         for k, v in goal_dict.items():
             self.assertAlmostEqual(v, r.get_state()[k])
 
 
 if __name__ == '__main__':
-    import rosunit
+    # import rosunit
 
-    rosunit.unitrun(package=PKG,
-                    test_name='TestController',
-                    test=TestController)
+    # rosunit.unitrun(package=PKG,
+    #                 test_name='TestController',
+    #                 test=TestController)
+    a = TestController()
+    a.test_joint_controller_pr2()

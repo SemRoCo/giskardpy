@@ -1,5 +1,6 @@
 from collections import OrderedDict
-from giskardpy.qp_problem_builder import QProblemBuilder
+# from giskardpy.qp_problem_builder import QProblemBuilder
+from giskardpy.qp_problem_builder_symengine import QProblemBuilder
 from giskardpy.robot import Robot
 from giskardpy.sympy_wrappers import *
 

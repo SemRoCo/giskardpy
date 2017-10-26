@@ -108,7 +108,7 @@ class TestController(unittest.TestCase):
         c.set_goal(goal_dict)
         print('time spent on init: {}'.format(time() - t))
         ts = []
-        for i in range(30):
+        for i in range(40):
             t = time()
             cmd_dict = c.get_next_command()
             ts.append(time() - t)
@@ -120,7 +120,7 @@ class TestController(unittest.TestCase):
             r.set_joint_state(next_state)
         print('time spent per get_next_command: {}'.format(np.mean(ts)))
         for k, v in goal_dict.items():
-            self.assertAlmostEqual(v, r.get_state()[k])
+            self.assertAlmostEqual(v, r.get_state()[k], places=5)
 
     def test_eef_controller_pointy(self):
         r = PointyBot(1)

@@ -66,7 +66,7 @@ class Robot(object):
                                                     joint.limit.lower,
                                                     joint.limit.upper,
                                                     joint.type == 'continuous')
-                    self.frames[link_name] = parentFrame * frame3_axis_angle(vec3(*joint.axis), -sp.Symbol(joint_name), point3(*joint.origin.xyz))
+                    self.frames[link_name] = parentFrame * frame3_axis_angle(vec3(*joint.axis), sp.Symbol(joint_name), point3(*joint.origin.xyz))
                 elif joint.type == 'prismatic':
                     self._joints[joint_name] = Joint(sp.Symbol(joint_name),
                                                     joint.limit.velocity,

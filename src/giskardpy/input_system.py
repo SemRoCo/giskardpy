@@ -69,7 +69,7 @@ class Point3(ControllerInputArray):
         return self._symbol_map['z']
 
     def get_expression(self):
-        return point3(*self._symbol_map.values())
+        return point3(self.get_x(), self.get_y(), self.get_z())
 
 
 class Vec3(Point3):
@@ -100,7 +100,7 @@ class Quaternion(ControllerInputArray):
         return self._symbol_map['w']
 
     def get_expression(self):
-        return rotation3_quaternion(*self._symbol_map.values())
+        return rotation3_quaternion(self.get_x(), self.get_y(), self.get_z(), self.get_w())
 
 
 class Frame3(ControllerInputArray):
@@ -111,10 +111,17 @@ class Frame3(ControllerInputArray):
         return super(Frame3, self).get_update_dict(qx=qx, qy=qy, qz=qz, qw=qw, x=x, y=y, z=z)
 
     def get_expression(self):
-        return frame3_quaternion(*(self._symbol_map.values()[:4] + [point3(*self._symbol_map.values()[4:])]))
+        return frame3_quaternion(self._symbol_map['qx'],
+                                 self._symbol_map['qy'],
+                                 self._symbol_map['qz'],
+                                 self._symbol_map['qw'],
+                                 point3(self._symbol_map['x'], self._symbol_map['y'], self._symbol_map['z']))
 
     def get_position(self):
-        return point3(*self._symbol_map.values()[4:])
+        return point3(self._symbol_map['x'], self._symbol_map['y'], self._symbol_map['z'])
 
     def get_rotation(self):
-        return rotation3_quaternion(*self._symbol_map.values()[:4])
+        return rotation3_quaternion(self._symbol_map['qx'],
+                                    self._symbol_map['qy'],
+                                    self._symbol_map['qz'],
+                                    self._symbol_map['qw'])

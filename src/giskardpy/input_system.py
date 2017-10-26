@@ -77,7 +77,7 @@ class Vec3(Point3):
         super(Vec3, self).__init__(prefix, suffix)
 
     def get_expression(self):
-        return vec3(*self._symbol_map.values())
+        return vec3(self.get_x(), self.get_y(), self.get_z())
 
 
 class Quaternion(ControllerInputArray):

@@ -47,9 +47,12 @@ class TestDiffRuntimeBug(unittest.TestCase):
     def setUp(self):
         self.obj_input = ProbabilisticObjectInput('object')
         self.robot = Fetch()
+        t = time()
         self.cga = self.cylinder_grasp_affordance(self.robot.gripper, self.obj_input)
+        print('cga time {}'.format(time()-t))
         self.s_dict = {'soft_constraint': SoftConstraint(-1, 1, 1, self.cga)}
 
+    @profile
     def cylinder_grasp_affordance(self, gripper, obj_input):
         frame = obj_input.get_frame()
         shape = obj_input.get_dimensions()

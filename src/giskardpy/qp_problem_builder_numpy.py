@@ -25,6 +25,7 @@ class QProblemBuilder(object):
 
         self.qp_solver = QPSolver(self.H.shape[0], len(self.lbA))
 
+    @profile
     def make_sympy_matrices(self):
         weights = []
         lb = []

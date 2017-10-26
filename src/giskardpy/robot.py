@@ -1,5 +1,6 @@
 from collections import namedtuple, OrderedDict
 
+from sympy.utilities.lambdify import lambdify
 from tf.transformations import quaternion_from_matrix
 from urdf_parser_py.urdf import URDF
 
@@ -107,7 +108,7 @@ class Robot(object):
         for i, (joint_name, joint) in enumerate(self._joints.items()):
             joint_symbol = self.joint_states_input.to_symbol(joint_name)
             weight_symbol = self.weight_input.to_symbol(joint_name)
-            self._state[joint_name] = None
+            self._state[joint_name] = 0
             self._state[self.weight_input.to_str_symbol(joint_name)] = 1
 
             if not joint.limitless:
@@ -118,15 +119,25 @@ class Robot(object):
             self.joint_constraints[joint_name] = JointConstraint(lower=-joint.velocity_limit,
                                                                  upper=joint.velocity_limit,
                                                                  weight=weight_symbol)
+        self.make_np_frames()
+
+    def make_np_frames(self):
+        self.fast_frames = []
+        for f, expression in self.frames.items():
+            self.fast_frames.append((f, lambdify(list(expression.free_symbols), expression, dummify=False)))
+        self.fast_frames = OrderedDict(self.fast_frames)
 
     def get_eef_position(self):
         eef = {}
         for end_effector in self.end_effectors:
-            evaled_frame = self.frames[end_effector].subs(self._state)
-            eef_pos = np.array(pos_of(evaled_frame).tolist(), dtype=float)[:-1].reshape(3)
-            eef_rot = np.array(rot_of(evaled_frame).tolist(), dtype=float)
-            eef_rot = quaternion_from_matrix(eef_rot)
-            eef[end_effector] = eef_pos, eef_rot
+            eef_joints = self.frames[end_effector].free_symbols
+            eef_joint_symbols = [self.get_joint_state_input().to_str_symbol(str(x)) for x in eef_joints]
+            js = {k: self.get_state()[k] for k in eef_joint_symbols}
+            evaled_frame = self.fast_frames[end_effector](**js)
+            # eef_pos = np.array(pos_of(evaled_frame).tolist(), dtype=float)[:-1].reshape(3)
+            # eef_rot = np.array(rot_of(evaled_frame).tolist(), dtype=float)
+            # eef_rot = quaternion_from_matrix(eef_rot)
+            eef[end_effector] = np.array(evaled_frame.tolist(), dtype=float).reshape(evaled_frame.shape)
         return eef
 
     def load_from_urdf_path(self, urdf_path, root_link, tip_links):

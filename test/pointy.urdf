@@ -7,7 +7,7 @@
   
   <link name="base_link"/>
 
-  <joint name="joint_x" type="revolute">
+  <joint name="joint_x" type="prismatic">
     <parent link="base_link"/>
     <child link="link1"/>
     <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0"/>
@@ -17,7 +17,7 @@
 
   <link name="link1"/>
 
-  <joint name="joint_y" type="revolute">
+  <joint name="joint_y" type="prismatic">
     <parent link="link1"/>
     <child link="link2"/>
     <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0"/>
@@ -27,7 +27,7 @@
 
   <link name="link2"/>
 
-  <joint name="joint_z" type="revolute">
+  <joint name="joint_z" type="prismatic">
     <parent link="link2"/>
     <child link="eef"/>
     <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0"/>

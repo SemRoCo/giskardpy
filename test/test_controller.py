@@ -5,6 +5,7 @@ from time import time
 
 import numpy as np
 
+from giskardpy.eef_position_controller import EEFPositionControl
 from giskardpy.pointy_bot import PointyBot
 from giskardpy.joint_space_control import JointSpaceControl
 from giskardpy.pr2 import PR2
@@ -66,17 +67,17 @@ class TestController(unittest.TestCase):
             self.assertAlmostEqual(v, r.get_state()[k])
 
     def test_jointcontroller_2(self):
-        r = PointyBot(weight=.01, urdf='pointy_adrian.urdf')
+        r = PointyBot(weight=.01, urdf='2d_base_bot.urdf')
         c = JointSpaceControl(r, weight=1)
 
         start = np.array([0, -1., .5])
         start_dict = {'joint_x': start[0],
                       'joint_y': start[1],
-                      'joint_z': start[2]}
+                      'rot_z': start[2]}
         goal = np.array([1, 1, -1])
         goal_dict = {'joint_x': goal[0],
                      'joint_y': goal[1],
-                     'joint_z': goal[2]}
+                     'rot_z': goal[2]}
 
         r.set_joint_state(start_dict)
         c.set_goal(goal_dict)
@@ -93,16 +94,7 @@ class TestController(unittest.TestCase):
         for k, v in goal_dict.items():
             self.assertAlmostEqual(v, r.get_state()[k])
 
-    def test_default_pr2(self):
-        pr2 = self.default_pr2()
-        eef_pose = pr2.get_eef_position()
-        np.testing.assert_array_almost_equal(eef_pose['l_gripper_tool_frame'][0], [0.641, 0.054, 1.173], decimal=3)
-        np.testing.assert_array_almost_equal(eef_pose['l_gripper_tool_frame'][1], [-0.673, 0.731, 0.090, -0.059],
-                                             decimal=3)
-        np.testing.assert_array_almost_equal(eef_pose['r_gripper_tool_frame'][0], [0.450, -0.297, 0.940], decimal=3)
-        np.testing.assert_array_almost_equal(eef_pose['r_gripper_tool_frame'][1], [-0.192, 0.004, 0.718, 0.669],
-                                             decimal=3)
-
+    # @profile
     def test_joint_controller_pr2(self):
         t = time()
         r = self.default_pr2()
@@ -114,12 +106,12 @@ class TestController(unittest.TestCase):
         goal = [0.0] * len(joints)
         goal_dict = {joint: goal[i] for i, joint in enumerate(joints)}
         c.set_goal(goal_dict)
-        print('time spent on init: {}'.format(time()-t))
+        print('time spent on init: {}'.format(time() - t))
         ts = []
         for i in range(30):
             t = time()
             cmd_dict = c.get_next_command()
-            ts.append(time()-t)
+            ts.append(time() - t)
             self.assertIsNotNone(cmd_dict)
             next_state = OrderedDict()
             robot_state = r.get_state()
@@ -130,12 +122,78 @@ class TestController(unittest.TestCase):
         for k, v in goal_dict.items():
             self.assertAlmostEqual(v, r.get_state()[k])
 
+    def test_eef_controller_pointy(self):
+        r = PointyBot(1)
+        c = EEFPositionControl(r)
+
+        start = np.array([0, -1., .5])
+        start_dict = {'joint_x': start[0],
+                      'joint_y': start[1],
+                      'joint_z': start[2]}
+        goal = {'eef': [1, 1, .1]}
+
+        r.set_joint_state(start_dict)
+        c.set_goal(goal)
+
+        for i in range(30):
+            cmd_dict = c.get_next_command()
+            self.assertIsNotNone(cmd_dict)
+            next_state = OrderedDict()
+            robot_state = r.get_state()
+            for j, (joint_name, joint_change) in enumerate(cmd_dict.items()):
+                next_state[joint_name] = robot_state[joint_name] + joint_change
+            r.set_joint_state(next_state)
+            print('iteration #{}: {}'.format(i + 1, r.get_eef_position()['eef'][:3, 3]))
+        np.testing.assert_array_almost_equal(r.get_eef_position()['eef'][:3, 3], goal['eef'])
+
+    def test_eef_controller_base_bot(self):
+        r = PointyBot(1, urdf='2d_base_bot.urdf')
+        c = EEFPositionControl(r)
+
+        start = np.array([0, -1., 0])
+        start_dict = {'joint_x': start[0],
+                      'joint_y': start[1],
+                      'rot_z': start[2]}
+        goal = {'eef': [1, 1, 0]}
+
+        r.set_joint_state(start_dict)
+        c.set_goal(goal)
+
+        for i in range(30):
+            cmd_dict = c.get_next_command()
+            self.assertIsNotNone(cmd_dict)
+            next_state = OrderedDict()
+            robot_state = r.get_state()
+            for j, (joint_name, joint_change) in enumerate(cmd_dict.items()):
+                next_state[joint_name] = robot_state[joint_name] + joint_change
+            r.set_joint_state(next_state)
+            print('iteration #{}: {}'.format(i + 1, r.get_eef_position()['eef'][:3, 3]))
+        np.testing.assert_array_almost_equal(r.get_eef_position()['eef'][:3, 3], goal['eef'])
+
+    # @profile
+    def test_eef_controller_pr2(self):
+        r = self.default_pr2()
+        c = EEFPositionControl(r)
+
+        goal = {'l_gripper_tool_frame': [.68, 0.01, 1.19]}
+
+        c.set_goal(goal)
+
+        for i in range(50):
+            cmd_dict = c.get_next_command()
+            self.assertIsNotNone(cmd_dict)
+            next_state = OrderedDict()
+            robot_state = r.get_state()
+            for j, (joint_name, joint_change) in enumerate(cmd_dict.items()):
+                next_state[joint_name] = robot_state[joint_name] + joint_change
+            r.set_joint_state(next_state)
+            # print('iteration #{}: {}'.format(i + 1, r.get_eef_position()['l_gripper_tool_frame'][:3, 3]))
+        # np.testing.assert_array_almost_equal(r.get_eef_position()['l_gripper_tool_frame'][:3, 3], goal['l_gripper_tool_frame'])
+
 
 if __name__ == '__main__':
-    # import rosunit
+    import rosunit
 
-    # rosunit.unitrun(package=PKG,
-    #                 test_name='TestController',
-    #                 test=TestController)
-    a = TestController()
-    a.test_joint_controller_pr2()
+    rosunit.unitrun(package=PKG,
+                    test_name='TestController',
+                    test=TestController)

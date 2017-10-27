@@ -103,12 +103,12 @@ class Quaternion(ControllerInputArray):
         return rotation3_quaternion(*self._symbol_map.values())
 
 
-class Frame3(ControllerInputArray):
+class FrameInput(ControllerInputArray):
     def __init__(self, prefix, suffix=''):
-        super(Frame3, self).__init__(['qx', 'qy', 'qz', 'qw', 'x', 'y', 'z'], prefix, suffix)
+        super(FrameInput, self).__init__(['qx', 'qy', 'qz', 'qw', 'x', 'y', 'z'], prefix, suffix)
 
     def get_update_dict(self, qx, qy, qz, qw, x, y, z):
-        return super(Frame3, self).get_update_dict(qx=qx, qy=qy, qz=qz, qw=qw, x=x, y=y, z=z)
+        return super(FrameInput, self).get_update_dict(qx=qx, qy=qy, qz=qz, qw=qw, x=x, y=y, z=z)
 
     def get_expression(self):
         return frame3_quaternion(*(self._symbol_map.values()[:4] + [point3(*self._symbol_map.values()[4:])]))

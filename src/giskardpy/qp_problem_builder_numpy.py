@@ -103,6 +103,8 @@ class QProblemBuilder(object):
     def update_observables(self, observables_update):
         self.np_H = self.update_expression_matrix(self.cython_H, self.H_symbols, observables_update)
         self.np_A = self.update_expression_matrix(self.cython_A, self.A_symbols, observables_update)
+        # for i in range(5):
+        #     print(self.A[i,:])
         self.np_lb = self.update_expression_vector(self.cython_lb, self.lb_symbols, observables_update)
         self.np_ub = self.update_expression_vector(self.cython_ub, self.ub_symbols, observables_update)
         self.np_lbA = self.update_expression_vector(self.cython_lbA, self.lbA_symbols, observables_update)

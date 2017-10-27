@@ -140,6 +140,19 @@ class Robot(object):
             eef[end_effector] = np.array(evaled_frame.tolist(), dtype=float).reshape(evaled_frame.shape)
         return eef
 
+    def get_eef_position2(self):
+        eef = {}
+        for end_effector in self.end_effectors:
+            eef_joints = self.frames[end_effector].free_symbols
+            eef_joint_symbols = [self.get_joint_state_input().to_str_symbol(str(x)) for x in eef_joints]
+            js = {k: self.get_state()[k] for k in eef_joint_symbols}
+            evaled_frame = self.fast_frames[end_effector](**js)
+            eef_pos = evaled_frame[:3,3]
+            eef_rot = np.array(rot_of(evaled_frame).tolist(), dtype=float)
+            eef_rot = quaternion_from_matrix(eef_rot.T)
+            eef[end_effector] = np.concatenate((eef_rot, eef_pos))
+        return eef
+
     def load_from_urdf_path(self, urdf_path, root_link, tip_links):
         return self.load_from_urdf(URDF.from_xml_file(urdf_path), root_link, tip_links)
 

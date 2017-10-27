@@ -21,8 +21,9 @@ class EEFPositionControl(QPController):
     def make_constraints(self, robot):
         for eef in robot.end_effectors:
             eef_frame = robot.frames[eef]
-            self.goal_expr = self.goal_eef[eef].get_expression()
-            dist = norm(pos_of(eef_frame) - self.goal_expr)
+            goal_expr = self.goal_eef[eef].get_expression()
+            # dist = norm(sp.Add(pos_of(eef_frame), - goal_expr, evaluate=False))
+            dist = norm(pos_of(eef_frame) - goal_expr)
             self._soft_constraints['align {} position'.format(eef)] = SoftConstraint(lower=-dist,
                                                                          upper=-dist,
                                                                          weight=self.goal_weights[eef].get_expression(),

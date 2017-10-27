@@ -5,6 +5,7 @@ from time import time
 
 import numpy as np
 
+from giskardpy.cartesian_controller import CartesianController
 from giskardpy.eef_position_controller import EEFPositionControl
 from giskardpy.pointy_bot import PointyBot
 from giskardpy.joint_space_control import JointSpaceControl
@@ -172,6 +173,7 @@ class TestController(unittest.TestCase):
 
     # @profile
     def test_eef_controller_pr2(self):
+
         r = self.default_pr2()
         c = EEFPositionControl(r)
 
@@ -179,7 +181,7 @@ class TestController(unittest.TestCase):
 
         c.set_goal(goal)
 
-        for i in range(50):
+        for i in range(100):
             cmd_dict = c.get_next_command()
             self.assertIsNotNone(cmd_dict)
             next_state = OrderedDict()
@@ -188,7 +190,55 @@ class TestController(unittest.TestCase):
                 next_state[joint_name] = robot_state[joint_name] + joint_change
             r.set_joint_state(next_state)
             # print('iteration #{}: {}'.format(i + 1, r.get_eef_position()['l_gripper_tool_frame'][:3, 3]))
-        # np.testing.assert_array_almost_equal(r.get_eef_position()['l_gripper_tool_frame'][:3, 3], goal['l_gripper_tool_frame'])
+        np.testing.assert_array_almost_equal(r.get_eef_position()['l_gripper_tool_frame'][:3, 3],
+                                             goal['l_gripper_tool_frame'], decimal=4)
+
+    def test_cart_controller_base_bot(self):
+        r = PointyBot(1, urdf='2d_base_bot.urdf')
+        c = CartesianController(r)
+
+        start = np.array([0, -1., 0])
+        start_dict = {'joint_x': start[0],
+                      'joint_y': start[1],
+                      'rot_z': start[2]}
+        # goal = {'eef': [0.,  0.,  0.,  1, -1, 1.1, 0]}
+        # goal = {'eef': [0., 0., -0.09983342, 0.99500417, -1, 1.1, 0]}
+        goal = {'eef': [0., 0., 0.52268723, 0.85252452, -1, 1.1, 0]}
+
+        r.set_joint_state(start_dict)
+        c.set_goal(goal)
+
+        for i in range(20):
+            cmd_dict = c.get_next_command()
+            self.assertIsNotNone(cmd_dict)
+            next_state = OrderedDict()
+            robot_state = r.get_state()
+            for j, (joint_name, joint_change) in enumerate(cmd_dict.items()):
+                next_state[joint_name] = robot_state[joint_name] + joint_change
+            r.set_joint_state(next_state)
+            print('iteration #{}: {}'.format(i + 1, r.get_eef_position2()['eef']))
+        np.testing.assert_array_almost_equal(r.get_eef_position2()['eef'],
+                                             goal['eef'], decimal=4)
+
+    def test_cart_controller_pr2(self):
+        r = self.default_pr2()
+        c = CartesianController(r)
+
+        goal = {'l_gripper_tool_frame': [-0.0339, -0.1344, -0.0228,  0.9901, .68, 0.01, 1.19]}
+
+        c.set_goal(goal)
+
+        for i in range(200):
+            cmd_dict = c.get_next_command()
+            self.assertIsNotNone(cmd_dict)
+            next_state = OrderedDict()
+            robot_state = r.get_state()
+            for j, (joint_name, joint_change) in enumerate(cmd_dict.items()):
+                next_state[joint_name] = robot_state[joint_name] + joint_change
+            r.set_joint_state(next_state)
+        print('iteration #{}: {}'.format(i + 1, r.get_eef_position2()['l_gripper_tool_frame']))
+        np.testing.assert_array_almost_equal(r.get_eef_position2()['l_gripper_tool_frame'],
+                                             goal['l_gripper_tool_frame'], decimal=3)
 
 
 if __name__ == '__main__':

@@ -22,7 +22,7 @@ class CartesianController(QPController):
             self.goal_eef[eef] = FrameInput(prefix=eef, suffix='goal')
             self.goal_weights[eef] = ScalarInput(prefix=eef, suffix='sc_w')
 
-    @profile
+    # @profile
     def make_constraints(self, robot):
         for eef in robot.end_effectors:
             eef_frame = robot.frames[eef]

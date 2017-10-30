@@ -221,7 +221,7 @@ class TestController(unittest.TestCase):
         np.testing.assert_array_almost_equal(r.get_eef_position2()['eef'],
                                              goal['eef'], decimal=4)
 
-    @profile
+    # @profile
     def test_cart_controller_pr2(self):
         r = self.default_pr2()
         c = CartesianController(r)

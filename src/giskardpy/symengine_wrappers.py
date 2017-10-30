@@ -4,10 +4,10 @@ import numpy as np
 
 pathSeparator = '__'
 
-@profile
+# @profile
 def speed_up(function, parameters):
     str_params = [str(x) for x in parameters]
-    @profile
+    # @profile
     def f(**kwargs):
         filtered_kwargs = {str(k): kwargs[k] for k in str_params}
         return np.array(function.subs(filtered_kwargs).tolist(), dtype=float).reshape(function.shape)

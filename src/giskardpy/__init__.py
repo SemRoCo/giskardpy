@@ -1,6 +1,6 @@
-USE_SYMENGINE = False
-# USE_SYMENGINE = True
+# USE_SYMENGINE = False
+USE_SYMENGINE = True
 
-BACKEND = None
+# BACKEND = None
 # BACKEND = 'cython'
-# BACKEND = 'numpy'
+BACKEND = 'numpy'

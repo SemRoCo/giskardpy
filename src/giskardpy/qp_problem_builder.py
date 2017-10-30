@@ -28,7 +28,7 @@ class QProblemBuilder(object):
 
         self.qp_solver = QPSolver(self.H.shape[0], len(self.lbA))
 
-    @profile
+    # @profile
     def make_sympy_matrices(self):
         weights = []
         lb = []
@@ -93,7 +93,7 @@ class QProblemBuilder(object):
 
         self.cython_ubA = spw.speed_up(self.ubA, self.ubA.free_symbols)
 
-    @profile
+    # @profile
     def update_observables(self, observables_update):
         self.np_H = self.cython_H(**observables_update)
         self.np_A = self.cython_A(**observables_update)

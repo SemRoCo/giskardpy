@@ -195,6 +195,7 @@ class TestController(unittest.TestCase):
 
     def test_cart_controller_base_bot(self):
         r = PointyBot(1, urdf='2d_base_bot.urdf')
+
         c = CartesianController(r)
 
         start = np.array([0, -1., 0])
@@ -220,6 +221,7 @@ class TestController(unittest.TestCase):
         np.testing.assert_array_almost_equal(r.get_eef_position2()['eef'],
                                              goal['eef'], decimal=4)
 
+    @profile
     def test_cart_controller_pr2(self):
         r = self.default_pr2()
         c = CartesianController(r)

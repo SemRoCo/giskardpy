@@ -100,6 +100,7 @@ class QProblemBuilder(object):
     def filter_observables(self, argument_names, observables_update):
         return {str(k): observables_update[k] for k in argument_names}
 
+    # @profile
     def update_observables(self, observables_update):
         self.np_H = self.update_expression_matrix(self.cython_H, self.H_symbols, observables_update)
         self.np_A = self.update_expression_matrix(self.cython_A, self.A_symbols, observables_update)
@@ -116,6 +117,7 @@ class QProblemBuilder(object):
             return None
         return OrderedDict((observable, xdot_full[i]) for i, observable in enumerate(self.controlled_joints_strs))
 
+    # @profile
     def update_expression_matrix(self, matrix, argument_names, updates_dict):
         args = self.filter_observables(argument_names, updates_dict)
         if len(args) == 1:

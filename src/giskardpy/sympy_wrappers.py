@@ -1,9 +1,37 @@
 import sympy.vector as spv
 import sympy as sp
+from sympy.utilities.autowrap import autowrap
+from sympy.utilities.lambdify import lambdify
+import numpy as np
+from sympy import Matrix, Symbol, eye, sympify, diag, zeros
+
+from giskardpy import BACKEND
 
 ODOM = spv.CoordSys3D('ODOM')
 
 pathSeparator = '__'
+
+
+@profile
+def speed_up(function, parameters):
+    str_params = [str(x) for x in parameters]
+    if BACKEND is None:
+        @profile
+        def f(**kwargs):
+            return np.array(function.subs(kwargs).tolist(), dtype=float).reshape(function.shape)
+
+        return f
+    else:
+        if BACKEND == 'numpy':
+            fast_f = lambdify(list(parameters), function, dummify=False)
+        elif BACKEND == 'cython':
+            fast_f = autowrap(function, args=list(parameters), backend='Cython')
+        @profile
+        def f(**kwargs):
+            filtered_kwargs = {str(k): kwargs[k] for k in str_params}
+            return fast_f(**filtered_kwargs).astype(float)
+
+        return f
 
 
 def vec3(x, y, z):
@@ -24,10 +52,6 @@ def norm(v):
     for x in v:
         r += x ** 2
     return sp.sqrt(r)
-    # if v.rows == 2:
-    #     return sp.sqrt(v[0] ** 2 + v[1] ** 2)
-    # else:
-    #     return sp.sqrt(v[0] ** 2 + v[1] ** 2 + v[2] ** 2)
 
 
 def translation3(point):

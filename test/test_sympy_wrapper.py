@@ -2,20 +2,27 @@ import unittest
 from collections import OrderedDict
 
 import numpy as np
+
+import PyKDL
 from tf.transformations import quaternion_matrix, quaternion_about_axis, quaternion_from_euler
 
+from giskardpy import USE_SYMENGINE
 from giskardpy.pointy_bot import PointyBot
 from giskardpy.joint_space_control import JointSpaceControl
-from giskardpy.sympy_wrappers import rotation3_quaternion, rotation3_axis_angle, rotation3_rpy
-import sympy as sp
+
+if USE_SYMENGINE:
+    import giskardpy.symengine_wrappers as spw
+else:
+    import giskardpy.sympy_wrappers as spw
 
 PKG = 'giskardpy'
 
 
 class TestSympyWrapper(unittest.TestCase):
     def test_1(self):
-        q = sp.Matrix([0., 0., 0.14943813, 0.98877108])
-        r1 = rotation3_quaternion(*q)
+        q = spw.Matrix([0., 0., 0.14943813, 0.98877108])
+        r1 = spw.rotation3_quaternion(*q)
+        r1 = np.asarray(r1.tolist()).reshape(r1.shape)
 
         r_goal = quaternion_matrix(q).T
         np.testing.assert_array_almost_equal(r1, r_goal)
@@ -23,18 +30,31 @@ class TestSympyWrapper(unittest.TestCase):
     def test_2(self):
         angle = .42
         axis = [0, 0, 1]
-        r1 = rotation3_axis_angle(axis, angle)
+        r1 = spw.rotation3_axis_angle(axis, angle)
+        r1 = np.asarray(r1.tolist()).reshape(r1.shape)
 
         r_goal = quaternion_matrix(quaternion_about_axis(angle, axis)).T
         np.testing.assert_array_almost_equal(r1, r_goal)
 
     def test_3(self):
+        # r, p, y = 0,0,np.pi/2
+        # r, p, y = 0,np.pi/2,0
+        # r, p, y = np.pi/2,0,0
         # r, p, y = 0,np.pi/2,np.pi/2
         r, p, y = .2, .7, -.3
 
-        r1 = rotation3_rpy(r,p,y)
-        r_goal = quaternion_matrix(quaternion_from_euler(r,p,y, axes='rxyz')).T
+        r1 = spw.rotation3_rpy(r, p, y)
+        r1 = np.asarray(r1.tolist()).reshape(r1.shape)[:3,:3]
+
+        r_goal = quaternion_matrix(quaternion_from_euler(r, p, y, axes='rxyz')).T[:3,:3]
+
+        r_goal2 = PyKDL.Rotation.EulerZYX(r, p, y)
+        r_goal2 = np.array([[r_goal2[0, 0], r_goal2[0, 1], r_goal2[0, 2]],
+                            [r_goal2[1, 0], r_goal2[1, 1], r_goal2[1, 2]],
+                            [r_goal2[2, 0], r_goal2[2, 1], r_goal2[2, 2]]])
         np.testing.assert_array_almost_equal(r1, r_goal)
+        # np.testing.assert_array_almost_equal(r_goal, r_goal2)
+        # np.testing.assert_array_almost_equal(r1, r_goal2)
 
 
 if __name__ == '__main__':

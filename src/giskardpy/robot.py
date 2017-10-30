@@ -1,21 +1,23 @@
 from collections import namedtuple, OrderedDict
 
-from sympy.utilities.lambdify import lambdify
 from tf.transformations import quaternion_from_matrix
 from urdf_parser_py.urdf import URDF
 
+from giskardpy import USE_SYMENGINE
 from giskardpy.input_system import ControllerInputArray
 from giskardpy.qp_problem_builder import HardConstraint, JointConstraint
-from giskardpy.sympy_wrappers import *
-import sympy.vector as spv
 import numpy as np
-import sympy as sp
+
+if USE_SYMENGINE:
+    import giskardpy.symengine_wrappers as spw
+else:
+    import giskardpy.sympy_wrappers as spw
 
 Joint = namedtuple('Joint', ['symbol', 'velocity_limit', 'lower', 'upper', 'limitless'])
 
 
 class Robot(object):
-    #TODO add joint vel to internal state
+    # TODO add joint vel to internal state
     def __init__(self):
         self.urdf_robot = None
         self._joints = OrderedDict()
@@ -43,6 +45,7 @@ class Robot(object):
     def get_joint_state_input(self):
         return self.joint_states_input
 
+    @profile
     def add_chain_joints(self, root_link, tip_link):
         """
         Returns a dict with joint names as keys and sympy symbols
@@ -63,27 +66,33 @@ class Robot(object):
 
             if joint_name not in self._joints:
                 if joint.type == 'revolute' or joint.type == 'continuous':
-                    self._joints[joint_name] = Joint(sp.Symbol(joint_name),
-                                                    joint.limit.velocity,
-                                                    joint.limit.lower,
-                                                    joint.limit.upper,
-                                                    joint.type == 'continuous')
-                    self.frames[link_name] = parentFrame * frame3_axis_angle(vec3(*joint.axis), -sp.Symbol(joint_name), point3(*joint.origin.xyz))
+                    self._joints[joint_name] = Joint(spw.Symbol(joint_name),
+                                                     joint.limit.velocity,
+                                                     joint.limit.lower,
+                                                     joint.limit.upper,
+                                                     joint.type == 'continuous')
+                    self.frames[link_name] = parentFrame * spw.frame3_axis_angle(spw.vec3(*joint.axis),
+                                                                                 -spw.Symbol(joint_name),
+                                                                                 spw.point3(*joint.origin.xyz))
+
                 elif joint.type == 'prismatic':
-                    self._joints[joint_name] = Joint(sp.Symbol(joint_name),
-                                                    joint.limit.velocity,
-                                                    joint.limit.lower,
-                                                    joint.limit.upper,
-                                                    False)
-                    self.frames[link_name] = parentFrame * frame3_rpy(*joint.origin.rpy, loc=point3(*joint.origin.xyz) + vec3(*joint.axis) * sp.Symbol(joint_name))
+                    self._joints[joint_name] = Joint(spw.Symbol(joint_name),
+                                                     joint.limit.velocity,
+                                                     joint.limit.lower,
+                                                     joint.limit.upper,
+                                                     False)
+                    self.frames[link_name] = parentFrame * spw.frame3_rpy(*joint.origin.rpy,
+                                                                          loc=spw.point3(*joint.origin.xyz) + spw.vec3(
+                                                                              *joint.axis) * spw.Symbol(joint_name))
                 elif joint.type == 'fixed':
-                    self.frames[link_name] = parentFrame * frame3_rpy(*joint.origin.rpy, loc=point3(*joint.origin.xyz))
+                    self.frames[link_name] = parentFrame * spw.frame3_rpy(*joint.origin.rpy,
+                                                                          loc=spw.point3(*joint.origin.xyz))
                 else:
                     raise Exception('Joint type "' + joint.type + '" is not supported by urdf parser.')
             parentFrame = self.frames[link_name]
 
-
-    def load_from_urdf(self, urdf_robot, root_link, tip_links, root_frame=sp.eye(4)):
+    @profile
+    def load_from_urdf(self, urdf_robot, root_link, tip_links, root_frame=None):
         """
         Returns a dict with joint names as keys and sympy symbols
         as values for all 1-dof movable robot joints in URDF between
@@ -96,7 +105,7 @@ class Robot(object):
         """
         self.urdf_robot = urdf_robot
 
-        self.frames[root_link] = root_frame
+        self.frames[root_link] = root_frame if root_frame is not None else spw.eye(4)
         self.end_effectors = tip_links
 
         for tip_link in tip_links:
@@ -121,10 +130,11 @@ class Robot(object):
                                                                  weight=weight_symbol)
         self.make_np_frames()
 
+    @profile
     def make_np_frames(self):
         self.fast_frames = []
         for f, expression in self.frames.items():
-            self.fast_frames.append((f, lambdify(list(expression.free_symbols), expression, dummify=False)))
+            self.fast_frames.append((f, spw.speed_up(expression, list(expression.free_symbols))))
         self.fast_frames = OrderedDict(self.fast_frames)
 
     def get_eef_position(self):
@@ -147,8 +157,10 @@ class Robot(object):
             eef_joint_symbols = [self.get_joint_state_input().to_str_symbol(str(x)) for x in eef_joints]
             js = {k: self.get_state()[k] for k in eef_joint_symbols}
             evaled_frame = self.fast_frames[end_effector](**js)
-            eef_pos = evaled_frame[:3,3]
-            eef_rot = np.array(rot_of(evaled_frame).tolist(), dtype=float)
+            eef_pos = evaled_frame[:3, 3]
+            eef_rot = evaled_frame[:4, :3]
+            eef_rot = np.hstack((eef_rot, np.zeros((4, 1))))
+            eef_rot[3, 3] = 1
             eef_rot = quaternion_from_matrix(eef_rot.T)
             eef[end_effector] = np.concatenate((eef_rot, eef_pos))
         return eef

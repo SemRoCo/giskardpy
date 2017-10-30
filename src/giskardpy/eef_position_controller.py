@@ -1,8 +1,12 @@
+from giskardpy import USE_SYMENGINE
 from giskardpy.qpcontroller import QPController
-from giskardpy.sympy_wrappers import *
 from giskardpy.qp_problem_builder import SoftConstraint
 from giskardpy.input_system import Point3Input, ControllerInputArray, ScalarInput
 
+if USE_SYMENGINE:
+    import giskardpy.symengine_wrappers as spw
+else:
+    import giskardpy.sympy_wrappers as spw
 
 class EEFPositionControl(QPController):
     def __init__(self, robot, weight=1):
@@ -23,7 +27,7 @@ class EEFPositionControl(QPController):
             eef_frame = robot.frames[eef]
             goal_expr = self.goal_eef[eef].get_expression()
             # dist = norm(sp.Add(pos_of(eef_frame), - goal_expr, evaluate=False))
-            dist = norm(pos_of(eef_frame) - goal_expr)
+            dist = spw.norm(spw.pos_of(eef_frame) - goal_expr)
             self._soft_constraints['align {} position'.format(eef)] = SoftConstraint(lower=-dist,
                                                                          upper=-dist,
                                                                          weight=self.goal_weights[eef].get_expression(),

@@ -1,13 +1,18 @@
+from giskardpy import USE_SYMENGINE
 from giskardpy.qpcontroller import QPController
-from giskardpy.sympy_wrappers import *
 from giskardpy.qp_problem_builder import SoftConstraint
 from giskardpy.input_system import Point3Input, ControllerInputArray, ScalarInput, FrameInput
 
+if USE_SYMENGINE:
+    import giskardpy.symengine_wrappers as spw
+else:
+    import giskardpy.sympy_wrappers as spw
+
 
 class CartesianController(QPController):
-    def __init__(self, robot, weight=1):
+    def __init__(self, robot, builder_backend=None, weight=1):
         self.weight = weight
-        super(CartesianController, self).__init__(robot)
+        super(CartesianController, self).__init__(robot, builder_backend)
 
     # @profile
     def add_inputs(self, robot):
@@ -17,22 +22,18 @@ class CartesianController(QPController):
             self.goal_eef[eef] = FrameInput(prefix=eef, suffix='goal')
             self.goal_weights[eef] = ScalarInput(prefix=eef, suffix='sc_w')
 
-    # @profile
+    @profile
     def make_constraints(self, robot):
         for eef in robot.end_effectors:
             eef_frame = robot.frames[eef]
             goal_pos = self.goal_eef[eef].get_position()
-            dist = norm(pos_of(eef_frame) - goal_pos)
+            dist = spw.norm(spw.pos_of(eef_frame) - goal_pos)
 
             goal_rot = self.goal_eef[eef].get_rotation()
 
-            eef_r = rot_of(eef_frame)[:3,:3].reshape(9,1)
+            eef_r = spw.rot_of(eef_frame)[:3,:3].reshape(9,1)
             goal_r = goal_rot[:3,:3].reshape(9,1)
-            dist_r = norm(eef_r-goal_r)
-            #
-            # eef_r = rot_of(eef_frame)[:3,:3]#.reshape(9,1)
-            # goal_r = rot_of(goal_rot)[:3,:3].T#.reshape(9,1)
-            # dist_r = sp.acos((sp.trace(goal_r.T*eef_r)-1)/2)
+            dist_r = spw.norm(eef_r-goal_r)
 
             self._soft_constraints['align {} position'.format(eef)] = SoftConstraint(lower=-dist,
                                                                                      upper=-dist,

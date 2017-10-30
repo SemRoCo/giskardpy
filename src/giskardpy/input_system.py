@@ -1,9 +1,10 @@
 from collections import OrderedDict
 
-import sympy as sp
-
-from giskardpy.sympy_wrappers import point3, vec3, frame3_quaternion, rotation3_quaternion
-
+from giskardpy import USE_SYMENGINE
+if USE_SYMENGINE:
+    import giskardpy.symengine_wrappers as spw
+else:
+    import giskardpy.sympy_wrappers as spw
 
 class ControllerInputArray(object):
     separator = '__'
@@ -18,7 +19,7 @@ class ControllerInputArray(object):
         else:
             self._suffix = '{}{}'.format(self.separator, suffix)
 
-        self._symbol_map = OrderedDict((fn, sp.Symbol('{}{}{}'.format(self._prefix, fn, self._suffix)))
+        self._symbol_map = OrderedDict((fn, spw.Symbol(('{}{}{}'.format(self._prefix, fn, self._suffix))))
                                         for fn in float_names)
         self._str_map = OrderedDict((k, str(v)) for k, v in self._symbol_map.items())
 
@@ -35,7 +36,7 @@ class ControllerInputArray(object):
         return {self._str_map[k]: v for k, v in kwargs.items() if k in self._symbol_map}
 
     def get_expression(self):
-        return sp.Matrix([sp.Symbol(x) for x in self._symbol_map.values()])
+        return spw.Matrix([spw.Symbol(x) for x in self._symbol_map.values()])
 
 
 class ScalarInput(ControllerInputArray):
@@ -69,7 +70,7 @@ class Point3Input(ControllerInputArray):
         return self._symbol_map['z']
 
     def get_expression(self):
-        return point3(*self._symbol_map.values())
+        return spw.point3(*self._symbol_map.values())
 
 
 class Vec3Input(Point3Input):
@@ -77,7 +78,7 @@ class Vec3Input(Point3Input):
         super(Vec3Input, self).__init__(prefix, suffix)
 
     def get_expression(self):
-        return vec3(*self._symbol_map.values())
+        return spw.vec3(*self._symbol_map.values())
 
 
 class Quaternion(ControllerInputArray):
@@ -100,7 +101,7 @@ class Quaternion(ControllerInputArray):
         return self._symbol_map['w']
 
     def get_expression(self):
-        return rotation3_quaternion(*self._symbol_map.values())
+        return spw.rotation3_quaternion(*self._symbol_map.values())
 
 
 class FrameInput(ControllerInputArray):
@@ -111,10 +112,10 @@ class FrameInput(ControllerInputArray):
         return super(FrameInput, self).get_update_dict(qx=qx, qy=qy, qz=qz, qw=qw, x=x, y=y, z=z)
 
     def get_expression(self):
-        return frame3_quaternion(*(self._symbol_map.values()[:4] + [point3(*self._symbol_map.values()[4:])]))
+        return spw.frame3_quaternion(*(self._symbol_map.values()[:4] + [spw.point3(*self._symbol_map.values()[4:])]))
 
     def get_position(self):
-        return point3(*self._symbol_map.values()[4:])
+        return spw.point3(*self._symbol_map.values()[4:])
 
     def get_rotation(self):
-        return rotation3_quaternion(*self._symbol_map.values()[:4])
+        return spw.rotation3_quaternion(*self._symbol_map.values()[:4])

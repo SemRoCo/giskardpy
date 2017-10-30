@@ -116,11 +116,12 @@ class QProblemBuilder(object):
 
     # @profile
     def update_expression_matrix(self, matrix, argument_names, updates_dict):
-        # args = self.filter_observables(argument_names, updates_dict)
+        args = self.filter_observables(argument_names, updates_dict)
         #if len(args) == 1:
         #    return matrix.subs(args.values()[0])
         # return np.array(matrix.subs(args).tolist(), dtype=float).reshape(matrix.shape)
-        return np.array(matrix.subs(updates_dict).tolist(), dtype=float).reshape(matrix.shape)
+        # return np.array(matrix.subs(args).tolist(), dtype=float).reshape(matrix.shape)
+        return np.array(matrix.subs(args).tolist(), dtype=float).reshape(matrix.shape)
 
     def update_expression_vector(self, vector, argument_names, updates_dict):
         np_v = self.update_expression_matrix(vector, argument_names, updates_dict)

@@ -1,6 +1,7 @@
 from collections import OrderedDict, namedtuple
 
 import numpy as np
+from time import time
 
 from giskardpy import USE_SYMENGINE
 
@@ -71,7 +72,9 @@ class QProblemBuilder(object):
 
         # soft part
         A_soft = spw.Matrix(soft_expressions)
+        t = time()
         A_soft = A_soft.jacobian(M_controlled_joints)
+        print('jacobian took {}'.format(time() - t))
         identity = spw.eye(A_soft.shape[0])
         A_soft = A_soft.row_join(identity)
 
@@ -81,6 +84,7 @@ class QProblemBuilder(object):
         self.lbA = spw.Matrix(lbA)
         self.ubA = spw.Matrix(ubA)
 
+        t = time()
         self.cython_H = spw.speed_up(self.H, self.H.free_symbols)
 
         self.cython_A = spw.speed_up(self.A, self.A.free_symbols)
@@ -92,6 +96,7 @@ class QProblemBuilder(object):
         self.cython_lbA = spw.speed_up(self.lbA, self.lbA.free_symbols)
 
         self.cython_ubA = spw.speed_up(self.ubA, self.ubA.free_symbols)
+        print('autowrap took {}'.format(time() - t))
 
     # @profile
     def update_observables(self, observables_update):

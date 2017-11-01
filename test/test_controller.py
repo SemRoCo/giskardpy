@@ -5,7 +5,10 @@ from time import time
 
 import numpy as np
 
+from tf.transformations import quaternion_inverse, quaternion_multiply
+
 from giskardpy.cartesian_controller import CartesianController
+from giskardpy.eef_dist_controller import EEFDiffController
 from giskardpy.eef_position_controller import EEFPositionControl
 from giskardpy.pointy_bot import PointyBot
 from giskardpy.joint_space_control import JointSpaceControl
@@ -230,7 +233,7 @@ class TestController(unittest.TestCase):
 
         c.set_goal(goal)
 
-        for i in range(200):
+        for i in range(100):
             cmd_dict = c.get_next_command()
             self.assertIsNotNone(cmd_dict)
             next_state = OrderedDict()
@@ -242,6 +245,38 @@ class TestController(unittest.TestCase):
         np.testing.assert_array_almost_equal(r.get_eef_position2()['l_gripper_tool_frame'],
                                              goal['l_gripper_tool_frame'], decimal=3)
 
+    # @profile
+    def test_diff_controller_pr2(self):
+        t = time()
+        r = self.default_pr2()
+        c = EEFDiffController(r)
+        print('init took {}'.format(time() - t))
+        goal = [0,0,1,0, 0,0,0.1]
+        q_goal = goal[:4]
+        p_goal = goal[4:]
+
+        c.set_goal(goal)
+
+        ts = []
+        for i in range(100):
+            t = time()
+            cmd_dict = c.get_next_command()
+            ts.append(time()-t)
+            self.assertIsNotNone(cmd_dict)
+            next_state = OrderedDict()
+            robot_state = r.get_state()
+            for j, (joint_name, joint_change) in enumerate(cmd_dict.items()):
+                next_state[joint_name] = robot_state[joint_name] + joint_change
+            r.set_joint_state(next_state)
+        eef_pose = r.get_eef_position2()['l_gripper_tool_frame']
+        q1 = eef_pose[:4]
+        p1 = eef_pose[4:]
+        eef_pose = r.get_eef_position2()['r_gripper_tool_frame']
+        q2 = eef_pose[:4]
+        p2 = eef_pose[4:]
+        np.testing.assert_array_almost_equal(p1 - p2, p_goal)
+        np.testing.assert_array_almost_equal(quaternion_multiply(q1, quaternion_inverse(q2)), q_goal)
+        print('next cmd took {}'.format(np.mean(ts)))
 
 if __name__ == '__main__':
     import rosunit

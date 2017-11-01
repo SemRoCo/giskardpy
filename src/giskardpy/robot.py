@@ -1,4 +1,5 @@
 from collections import namedtuple, OrderedDict
+from time import time
 
 from tf.transformations import quaternion_from_matrix
 from urdf_parser_py.urdf import URDF
@@ -107,9 +108,10 @@ class Robot(object):
 
         self.frames[root_link] = root_frame if root_frame is not None else spw.eye(4)
         self.end_effectors = tip_links
-
+        t = time()
         for tip_link in tip_links:
             self.add_chain_joints(root_link, tip_link)
+        print('add chain joints took {}'.format(time() - t))
 
         self.joint_states_input = ControllerInputArray(self.get_joint_names())
         self.weight_input = ControllerInputArray(self.get_joint_names(), suffix='cc_weight')

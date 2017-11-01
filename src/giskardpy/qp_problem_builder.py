@@ -1,8 +1,9 @@
 from collections import OrderedDict, namedtuple
 
 import numpy as np
-import symengine as sp
 #from sympy.utilities.autowrap import autowrap
+import symengine as sp
+from time import clock
 
 from giskardpy.qp_solver import QPSolver
 
@@ -11,7 +12,23 @@ HardConstraint = namedtuple('HardConstraint', ['lower', 'upper', 'expression'])
 JointConstraint = namedtuple('JointConstraint', ['lower', 'upper', 'weight'])
 
 
+def pretty_matrix_format_str(col_names, row_names, min_col_width=10):
+    w_first_col = max(*[len(n) for n in row_names])
+    widths = [max(min_col_width, len(c)) for c in col_names]
+
+    out = ''.join([(' ' * w_first_col)] + ['  {:>{:d}}'.format(n, w) for n, w in zip(col_names, widths)])
+    for y in range(len(row_names)):
+        out += '\n{:>{:d}}'.format(row_names[y], w_first_col)
+        out += ''.join([', {}:>{:d}.5{}'.format('{', w, '}') for w in widths])
+
+    return out
+
+def format_matrix(matrix, mat_str):
+    return mat_str.format(*matrix.reshape(1, matrix.shape[0] * matrix.shape[1]).tolist()[0])
+
+
 class QProblemBuilder(object):
+
     BACKEND = 'Cython'
 
     def __init__(self, joint_constraints_dict, hard_constraints_dict, soft_constraints_dict):
@@ -23,6 +40,7 @@ class QProblemBuilder(object):
         self.make_sympy_matrices()
 
         self.qp_solver = QPSolver(self.H.shape[0], len(self.lbA))
+
 
     def make_sympy_matrices(self):
         weights = []
@@ -94,6 +112,11 @@ class QProblemBuilder(object):
         self.cython_ubA = self.ubA #autowrap(self.ubA, args=list(self.ubA.free_symbols), backend=self.BACKEND)
         self.ubA_symbols = [str(x) for x in self.ubA.free_symbols]
 
+        # Strings for printing
+        col_names = self.controlled_joints_strs + ['slack'] * len(soft_expressions)
+        row_names = self.hard_constraints_dict.keys() + self.soft_constraints_dict.keys()
+
+        self.str_A = pretty_matrix_format_str(col_names, row_names)
 
     def filter_observables(self, argument_names, observables_update):
         return {str(k): observables_update[k] for k in argument_names}
@@ -112,12 +135,19 @@ class QProblemBuilder(object):
             return None
         return OrderedDict((observable, xdot_full[i]) for i, observable in enumerate(self.controlled_joints_strs))
 
+
     def update_expression_matrix(self, matrix, argument_names, updates_dict):
         args = self.filter_observables(argument_names, updates_dict)
-        #if len(args) == 1:
-        #    return matrix.subs(args.values()[0])
-        return np.array(matrix.subs(args).tolist(), dtype=float).reshape(matrix.shape)
+        try:
+            return np.array(matrix.subs(args).tolist(), dtype=float).reshape(matrix.shape)
+        except Exception as e:
+            print(matrix.subs(args))
+            raise e
+
 
     def update_expression_vector(self, vector, argument_names, updates_dict):
         np_v = self.update_expression_matrix(vector, argument_names, updates_dict)
         return np_v.reshape(len(np_v))
+
+    def print_jacobian(self):
+        print('Matrix A: \n{}'.format(format_matrix(self.np_A, self.str_A)))

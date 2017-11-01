@@ -6,6 +6,8 @@ if USE_SYMENGINE:
 else:
     import giskardpy.sympy_wrappers as spw
 
+
+
 class ControllerInputArray(object):
     separator = '__'
 
@@ -102,7 +104,6 @@ class Quaternion(ControllerInputArray):
 
     def get_expression(self):
         return spw.rotation3_quaternion(*self._symbol_map.values())
-
 
 class FrameInput(ControllerInputArray):
     def __init__(self, prefix, suffix=''):

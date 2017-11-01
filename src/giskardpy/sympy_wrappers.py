@@ -12,11 +12,11 @@ ODOM = spv.CoordSys3D('ODOM')
 pathSeparator = '__'
 
 
-@profile
+#@profile
 def speed_up(function, parameters):
     str_params = [str(x) for x in parameters]
     if BACKEND is None:
-        @profile
+        #@profile
         def f(**kwargs):
             return np.array(function.subs(kwargs).tolist(), dtype=float).reshape(function.shape)
 
@@ -26,7 +26,7 @@ def speed_up(function, parameters):
             fast_f = lambdify(list(parameters), function, dummify=False)
         elif BACKEND == 'cython':
             fast_f = autowrap(function, args=list(parameters), backend='Cython')
-        @profile
+        #@profile
         def f(**kwargs):
             filtered_kwargs = {str(k): kwargs[k] for k in str_params}
             return fast_f(**filtered_kwargs).astype(float)
@@ -64,11 +64,11 @@ def rotation3_rpy(r, p, y):
 
 def rotation3_axis_angle(axis, angle):
     return sp.diag(spv.AxisOrienter(angle,
-                                    axis[0] * ODOM.i + axis[1] * ODOM.j + axis[2] * ODOM.k).rotation_matrix(ODOM), 1)
+                                    axis[0] * ODOM.i + axis[1] * ODOM.j + axis[2] * ODOM.k).rotation_matrix(ODOM), 1).T
 
 
 def rotation3_quaternion(x, y, z, w):
-    return sp.diag(spv.QuaternionOrienter(w, x, y, z).rotation_matrix(), 1)
+    return sp.diag(spv.QuaternionOrienter(w, x, y, z).rotation_matrix(), 1).T
 
 
 def frame3_axis_angle(axis, angle, loc):

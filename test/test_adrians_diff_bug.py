@@ -62,19 +62,19 @@ class TestDiffRuntimeBug(unittest.TestCase):
         gripper_x = gripper.frame.col(0)
         gripper_z = gripper.frame.col(2)
         gripper_pos = pos_of(gripper.frame)
-        c_to_g = sp.Add(gripper_pos, - cylinder_pos, evaluate=False)
+        c_to_g = gripper_pos - cylinder_pos
 
-        zz_align = sp.Abs(gripper_z.dot(cylinder_z), evaluate=False)
+        zz_align = sp.Abs(gripper_z.dot(cylinder_z))
         xz_align = gripper_x.dot(cylinder_z)
         dist_z = cylinder_z.dot(c_to_g)
         border_z = (shape[2] - gripper.height) * 0.5
         cap_dist_normalized_signed = dist_z / border_z
-        cap_dist_normalized = sp.Abs(cap_dist_normalized_signed, evaluate=False)
+        cap_dist_normalized = sp.Abs(cap_dist_normalized_signed)
 
-        cap_top_grasp = 1 - sp.Max(-xz_align * sp.Min(cap_dist_normalized_signed, 1), 0, evaluate=False)
-        cap_bottom_grasp = 1 - sp.Min(xz_align * sp.Max(cap_dist_normalized_signed, -1), 0, evaluate=False)
+        cap_top_grasp = 1 - sp.Max(-xz_align * sp.Min(cap_dist_normalized_signed, 1), 0)
+        cap_bottom_grasp = 1 - sp.Min(xz_align * sp.Max(cap_dist_normalized_signed, -1), 0)
 
-        dist_z_center_normalized = sp.Max(1 - cap_dist_normalized, 0, evaluate=False)
+        dist_z_center_normalized = sp.Max(1 - cap_dist_normalized, 0)
         dist_ax = sp.sqrt(frame.col(0).dot(c_to_g) ** 2 + frame.col(1).dot(c_to_g) ** 2)
 
         center_grasp = (1 - dist_z_center_normalized - dist_ax) * zz_align
@@ -94,6 +94,6 @@ class TestDiffRuntimeBug(unittest.TestCase):
 if __name__ == '__main__':
     import rosunit
 
-    rosunit.unitrun(package=PKG,
-                    test_name='TestDiffRuntimeBug',
-                    test=TestDiffRuntimeBug)
+    # rosunit.unitrun(package=PKG,
+    #                 test_name='TestDiffRuntimeBug',
+    #                 test=TestDiffRuntimeBug)

@@ -45,7 +45,7 @@ class Robot(object):
     def get_joint_state_input(self):
         return self.joint_states_input
 
-    @profile
+    #@profile
     def add_chain_joints(self, root_link, tip_link):
         """
         Returns a dict with joint names as keys and sympy symbols
@@ -72,9 +72,8 @@ class Robot(object):
                                                      joint.limit.upper,
                                                      joint.type == 'continuous')
                     self.frames[link_name] = parentFrame * spw.frame3_axis_angle(spw.vec3(*joint.axis),
-                                                                                 -spw.Symbol(joint_name),
+                                                                                 spw.Symbol(joint_name),
                                                                                  spw.point3(*joint.origin.xyz))
-
                 elif joint.type == 'prismatic':
                     self._joints[joint_name] = Joint(spw.Symbol(joint_name),
                                                      joint.limit.velocity,
@@ -91,7 +90,7 @@ class Robot(object):
                     raise Exception('Joint type "' + joint.type + '" is not supported by urdf parser.')
             parentFrame = self.frames[link_name]
 
-    @profile
+    # @profile
     def load_from_urdf(self, urdf_robot, root_link, tip_links, root_frame=None):
         """
         Returns a dict with joint names as keys and sympy symbols
@@ -130,7 +129,7 @@ class Robot(object):
                                                                  weight=weight_symbol)
         self.make_np_frames()
 
-    @profile
+    # @profile
     def make_np_frames(self):
         self.fast_frames = []
         for f, expression in self.frames.items():

@@ -10,7 +10,7 @@ def vec3(x, y, z):
 unitX = vec3(1, 0, 0)
 unitY = vec3(0, 1, 0)
 unitZ = vec3(0, 0, 1)
-
+pi = 3.14159265359
 
 def point3(x, y, z):
     return sp.Matrix([x, y, z, 1])
@@ -27,7 +27,7 @@ def dot(a, b):
 def cross(a, b):
     return sp.Matrix([a[1] * b[2] - a[2] * b[1],
                       a[2] * b[0] - a[0] * b[2],
-                      a[0] * b[1] - a[1] * b[0]])
+                      a[0] * b[1] - a[1] * b[0], 0])
 
 def translation3(point):
     return sp.eye(3).col_join(sp.Matrix([[0] * 3])).row_join(point)

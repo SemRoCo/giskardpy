@@ -130,7 +130,9 @@ class Robot(object):
             self.joint_constraints[joint_name] = JointConstraint(lower=-joint.velocity_limit,
                                                                  upper=joint.velocity_limit,
                                                                  weight=weight_symbol)
+        t = time()
         self.make_np_frames()
+        print('make np frame took {}'.format(time() - t))
 
     # @profile
     def make_np_frames(self):
@@ -149,7 +151,7 @@ class Robot(object):
             # eef_pos = np.array(pos_of(evaled_frame).tolist(), dtype=float)[:-1].reshape(3)
             # eef_rot = np.array(rot_of(evaled_frame).tolist(), dtype=float)
             # eef_rot = quaternion_from_matrix(eef_rot)
-            eef[end_effector] = np.array(evaled_frame.tolist(), dtype=float).reshape(evaled_frame.shape)
+            eef[end_effector] = spw.Matrix(evaled_frame.tolist())
         return eef
 
     def get_eef_position2(self):

@@ -6,11 +6,9 @@ import numpy as np
 from sympy import Matrix, Symbol, eye, sympify, diag, zeros
 
 from giskardpy import BACKEND
+import symengine as se
 
 ODOM = spv.CoordSys3D('ODOM')
-
-pathSeparator = '__'
-
 
 # @profile
 def speed_up(function, parameters):
@@ -33,6 +31,8 @@ def speed_up(function, parameters):
 
         return f
 
+def cross(v1,v2):
+    return v1[:3,:].cross(v2[:3,:])
 
 def vec3(x, y, z):
     return sp.Matrix([x, y, z, 0])

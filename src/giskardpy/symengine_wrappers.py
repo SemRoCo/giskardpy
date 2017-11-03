@@ -22,9 +22,9 @@ def speed_up(function, parameters):
             return np.array(function.subs(filtered_kwargs).tolist(), dtype=float).reshape(function.shape)
     else:
 
-        if BACKEND == 'numpy':
+        if BACKEND == 'numpy' or BACKEND == 'lambda':
             fast_f = lambdify(list(parameters), function, backend='lambda')
-        elif BACKEND == 'cython':
+        elif BACKEND == 'cython' or BACKEND == 'llvm':
             fast_f = lambdify(list(parameters), function, backend='llvm')
 
         # @profile

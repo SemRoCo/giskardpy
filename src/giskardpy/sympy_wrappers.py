@@ -6,9 +6,11 @@ import numpy as np
 from sympy import Matrix, Symbol, eye, sympify, diag, zeros
 
 from giskardpy import BACKEND
+import symengine as se
 
 ODOM = spv.CoordSys3D('ODOM')
 
+<<<<<<< HEAD
 pathSeparator = '__'
 
 
@@ -17,6 +19,7 @@ def speed_up(function, parameters):
     str_params = [str(x) for x in parameters]
     if BACKEND is None:
         #@profile
+
         def f(**kwargs):
             return np.array(function.subs(kwargs).tolist(), dtype=float).reshape(function.shape)
 
@@ -26,13 +29,16 @@ def speed_up(function, parameters):
             fast_f = lambdify(list(parameters), function, dummify=False)
         elif BACKEND == 'cython':
             fast_f = autowrap(function, args=list(parameters), backend='Cython')
-        #@profile
+
+        # @profile
         def f(**kwargs):
             filtered_kwargs = {str(k): kwargs[k] for k in str_params}
             return fast_f(**filtered_kwargs).astype(float)
 
         return f
 
+def cross(v1,v2):
+    return v1[:3,:].cross(v2[:3,:])
 
 def vec3(x, y, z):
     return sp.Matrix([x, y, z, 0])

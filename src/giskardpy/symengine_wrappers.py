@@ -1,19 +1,46 @@
 import symengine as sp
-from symengine import Matrix, Symbol, eye, sympify, diag, zeros
+from symengine import Matrix, Symbol, eye, sympify, diag, zeros, lambdify
 import numpy as np
+import sympy as sp2
+
+from giskardpy import BACKEND
 
 pathSeparator = '__'
 
-# @profile
+
 def speed_up(function, parameters):
     str_params = [str(x) for x in parameters]
-    # @profile
-    def f(**kwargs):
-        filtered_kwargs = {str(k): kwargs[k] for k in str_params}
-        return np.array(function.subs(filtered_kwargs).tolist(), dtype=float).reshape(function.shape)
+    if len(parameters) == 0:
+        constant_result = np.array(function).astype(float).reshape(function.shape)
+        def f(**kwargs):
+            return constant_result
+    elif BACKEND is None:
+        # @profile
+        def f(**kwargs):
+            filtered_kwargs = {str(k): kwargs[k] for k in str_params}
+            return np.array(function.subs(filtered_kwargs).tolist(), dtype=float).reshape(function.shape)
+    else:
+
+        if BACKEND == 'numpy' or BACKEND == 'lambda':
+            fast_f = lambdify(list(parameters), function, backend='lambda')
+        elif BACKEND == 'cython' or BACKEND == 'llvm':
+            fast_f = lambdify(list(parameters), function, backend='llvm')
+
+        # @profile
+        def f(**kwargs):
+            filtered_args = [kwargs[k] for k in str_params]
+            return np.nan_to_num(np.asarray(fast_f(*filtered_args)).reshape(function.shape))
 
     return f
 
+
+def cross(u, v):
+    return sp.Matrix([u[1] * v[2] - u[2] * v[1],
+                      u[2] * v[0] - u[0] * v[2],
+                      u[0] * v[1] - u[1] * v[0]])
+
+# def cross(u,v):
+#     return u.cross(v)
 
 def vec3(x, y, z):
     return sp.Matrix([x, y, z, 0])
@@ -39,12 +66,15 @@ def dot(a, b):
     return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
 
 
+<<<<<<< HEAD
 def cross(a, b):
     return sp.Matrix([a[1] * b[2] - a[2] * b[1],
                       a[2] * b[0] - a[0] * b[2],
                       a[0] * b[1] - a[1] * b[0], 0])
 
 
+=======
+>>>>>>> simon
 def translation3(point):
     return sp.eye(3).col_join(sp.Matrix([[0] * 3])).row_join(point)
 
@@ -65,7 +95,8 @@ def rotation3_rpy(roll, pitch, yaw):
                     [-sp.sin(yaw), sp.cos(yaw), 0, 0],
                     [0, 0, 1, 0],
                     [0, 0, 0, 1]])
-    return (rz*ry*rx)
+    return (rz * ry * rx)
+
 
 def rotation3_axis_angle(axis, angle):
     """ Conversion of unit axis and angle to 4x4 rotation matrix according to:

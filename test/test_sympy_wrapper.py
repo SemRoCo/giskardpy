@@ -37,10 +37,6 @@ class TestSympyWrapper(unittest.TestCase):
         np.testing.assert_array_almost_equal(r1, r_goal)
 
     def test_3(self):
-        # r, p, y = 0,0,np.pi/2
-        # r, p, y = 0,np.pi/2,0
-        # r, p, y = np.pi/2,0,0
-        # r, p, y = 0,np.pi/2,np.pi/2
         r, p, y = .2, .7, -.3
 
         r1 = spw.rotation3_rpy(r, p, y)
@@ -48,13 +44,7 @@ class TestSympyWrapper(unittest.TestCase):
 
         r_goal = quaternion_matrix(quaternion_from_euler(r, p, y, axes='rxyz')).T[:3,:3]
 
-        r_goal2 = PyKDL.Rotation.EulerZYX(r, p, y)
-        r_goal2 = np.array([[r_goal2[0, 0], r_goal2[0, 1], r_goal2[0, 2]],
-                            [r_goal2[1, 0], r_goal2[1, 1], r_goal2[1, 2]],
-                            [r_goal2[2, 0], r_goal2[2, 1], r_goal2[2, 2]]])
         np.testing.assert_array_almost_equal(r1, r_goal)
-        # np.testing.assert_array_almost_equal(r_goal, r_goal2)
-        # np.testing.assert_array_almost_equal(r1, r_goal2)
 
 
 if __name__ == '__main__':

@@ -1,7 +1,7 @@
 from collections import OrderedDict, namedtuple
 
 import numpy as np
-#from sympy.utilities.autowrap import autowrap
+from time import time
 
 from giskardpy import USE_SYMENGINE
 
@@ -16,6 +16,7 @@ HardConstraint = namedtuple('HardConstraint', ['lower', 'upper', 'expression'])
 JointConstraint = namedtuple('JointConstraint', ['lower', 'upper', 'weight'])
 
 BIG_NUMBER = 1e9
+
 
 def pretty_matrix_format_str(col_names, row_names, min_col_width=10):
     w_first_col = max(*[len(n) for n in row_names])
@@ -87,7 +88,9 @@ class QProblemBuilder(object):
 
         # soft part
         A_soft = spw.Matrix(soft_expressions)
+        t = time()
         A_soft = A_soft.jacobian(M_controlled_joints)
+        print('jacobian took {}'.format(time() - t))
         identity = spw.eye(A_soft.shape[0])
         A_soft = A_soft.row_join(identity)
 
@@ -97,6 +100,7 @@ class QProblemBuilder(object):
         self.lbA = spw.Matrix(lbA)
         self.ubA = spw.Matrix(ubA)
 
+        t = time()
         self.cython_H = spw.speed_up(self.H, self.H.free_symbols)
 
         self.cython_A = spw.speed_up(self.A, self.A.free_symbols)
@@ -108,6 +112,7 @@ class QProblemBuilder(object):
         self.cython_lbA = spw.speed_up(self.lbA, self.lbA.free_symbols)
 
         self.cython_ubA = spw.speed_up(self.ubA, self.ubA.free_symbols)
+        print('autowrap took {}'.format(time() - t))
 
         # Strings for printing
         col_names = self.controlled_joints_strs + ['slack'] * len(soft_expressions)
@@ -129,18 +134,6 @@ class QProblemBuilder(object):
         if xdot_full is None:
             return None
         return OrderedDict((observable, xdot_full[i]) for i, observable in enumerate(self.controlled_joints_strs))
-
-    def update_expression_matrix(self, matrix, argument_names, updates_dict):
-        args = self.filter_observables(argument_names, updates_dict)
-        try:
-            return np.array(matrix.subs(args).tolist(), dtype=float).reshape(matrix.shape)
-        except Exception as e:
-            print(matrix.subs(args))
-            raise e
-
-    def update_expression_vector(self, vector, argument_names, updates_dict):
-        np_v = self.update_expression_matrix(vector, argument_names, updates_dict)
-        return np_v.reshape(len(np_v))
 
     def print_jacobian(self):
         print('Matrix A: \n{}'.format(format_matrix(self.np_A, self.str_A)))

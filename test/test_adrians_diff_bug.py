@@ -5,8 +5,6 @@ from time import time
 from giskardpy.fetch import Fetch
 from giskardpy.input_system import ScalarInput, FrameInput, Vec3Input, ControllerInputArray
 from giskardpy.qp_problem_builder import QProblemBuilder as CythonProblemBuilder
-from giskardpy.qp_problem_builder_numpy import QProblemBuilder as NumpyProblemBuilder
-from giskardpy.qp_problem_builder_symengine import QProblemBuilder as SymengineProblemBuilder
 from giskardpy.qp_problem_builder import SoftConstraint
 from giskardpy.sympy_wrappers import *
 import sympy as sp
@@ -83,12 +81,6 @@ class TestDiffRuntimeBug(unittest.TestCase):
 
     def test_differentiation_speed_cython(self):
         cy_builder = CythonProblemBuilder(self.robot.joint_constraints, self.robot.hard_constraints, self.s_dict)
-
-    def test_differentiation_speed_numpy(self):
-        np_builder = NumpyProblemBuilder(self.robot.joint_constraints, self.robot.hard_constraints, self.s_dict)
-
-    def test_differentiation_speed_symengine(self):
-        se_builder = SymengineProblemBuilder(self.robot.joint_constraints, self.robot.hard_constraints, self.s_dict)
 
 
 if __name__ == '__main__':

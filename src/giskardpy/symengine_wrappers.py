@@ -116,6 +116,15 @@ def frame3_quaternion(q1, q2, q3, q4, loc):
     return translation3(loc) * rotation3_quaternion(q1, q2, q3, q4)
 
 
+def x_col(frame):
+    return frame[:4, :1]
+
+def y_col(frame):
+    return frame[:4, 1:2]
+
+def z_col(frame):
+    return frame[:4, 2:3]
+
 def pos_of(frame):
     return frame[:4, 3:]
 

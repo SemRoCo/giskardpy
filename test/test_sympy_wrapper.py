@@ -24,7 +24,7 @@ class TestSympyWrapper(unittest.TestCase):
         r1 = spw.rotation3_quaternion(*q)
         r1 = np.asarray(r1.tolist()).reshape(r1.shape)
 
-        r_goal = quaternion_matrix(q).T
+        r_goal = quaternion_matrix(q)
         np.testing.assert_array_almost_equal(r1, r_goal)
 
     def test_2(self):
@@ -33,7 +33,7 @@ class TestSympyWrapper(unittest.TestCase):
         r1 = spw.rotation3_axis_angle(axis, angle)
         r1 = np.asarray(r1.tolist()).reshape(r1.shape)
 
-        r_goal = quaternion_matrix(quaternion_about_axis(angle, axis)).T
+        r_goal = quaternion_matrix(quaternion_about_axis(angle, axis))
         np.testing.assert_array_almost_equal(r1, r_goal)
 
     def test_3(self):

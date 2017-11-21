@@ -4,14 +4,15 @@ def hacky_urdf_parser_fix(urdf_path):
     fixed_urdf = ''
     delete = False
     black_list = ['transmission']
+    black_open = ['<{}'.format(x) for x in black_list]
+    black_close = ['</{}'.format(x) for x in black_list]
     with open(urdf_path, 'r') as urdf:
         for line in urdf.readlines():
-            if len([x for x in black_list if x in line]) > 0:
-                if not delete:
-                    delete = True
-                else:
-                    delete = False
-                    continue
+            if len([x for x in black_open if x in line]) > 0:
+                delete = True
+            if len([x for x in black_close if x in line]) > 0:
+                delete = False
+                continue
             if not delete:
                 fixed_urdf += line
     return fixed_urdf

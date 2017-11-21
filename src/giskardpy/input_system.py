@@ -112,7 +112,7 @@ class FrameInput(ControllerInputArray):
         return super(FrameInput, self).get_update_dict(qx=qx, qy=qy, qz=qz, qw=qw, x=x, y=y, z=z)
 
     def get_expression(self):
-        return spw.frame3_quaternion(*(self._symbol_map.values()[:4] + [spw.point3(*self._symbol_map.values()[4:])]))
+        return spw.frame3_quaternion(*(self._symbol_map.values()[:4] + [self._symbol_map.values()[4:]]))
 
     def get_position(self):
         return spw.point3(*self._symbol_map.values()[4:])

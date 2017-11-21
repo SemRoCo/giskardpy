@@ -19,7 +19,9 @@ Joint = namedtuple('Joint', ['symbol', 'velocity_limit', 'lower', 'upper', 'limi
 
 class Robot(object):
     # TODO add joint vel to internal state
-    def __init__(self):
+    def __init__(self, default_joint_value=0.0, default_joint_weight=1.0):
+        self.default_joint_value = default_joint_value
+        self.default_joint_weight = default_joint_weight
         self.urdf_robot = None
         self._joints = OrderedDict()
 
@@ -66,30 +68,26 @@ class Robot(object):
             joint = self.urdf_robot.joint_map[joint_name]
 
             if joint_name not in self._joints:
-                if joint.type == 'revolute' or joint.type == 'continuous':
+                if joint.type in ['fixed', 'revolute', 'continuous', 'prismatic']:
+                    self.frames[link_name] = parentFrame
+                    self.frames[link_name] *= spw.translation3(*joint.origin.xyz)
+                    self.frames[link_name] *= spw.rotation3_rpy(*joint.origin.rpy)
+                else:
+                    raise Exception('Joint type "{}" is not supported by urdf parser.'.format(joint.type))
+
+                if joint.type != 'fixed':
                     self._joints[joint_name] = Joint(spw.Symbol(joint_name),
                                                      joint.limit.velocity,
                                                      joint.limit.lower,
                                                      joint.limit.upper,
                                                      joint.type == 'continuous')
-                    self.frames[link_name] = parentFrame * spw.frame3_axis_angle(spw.vec3(*joint.axis),
-                                                                                 -spw.Symbol(joint_name),
-                                                                                 spw.point3(*joint.origin.xyz))
+
+                if joint.type == 'revolute' or joint.type == 'continuous':
+                    self.frames[link_name] *= spw.rotation3_axis_angle(spw.vec3(*joint.axis), spw.Symbol(joint_name))
 
                 elif joint.type == 'prismatic':
-                    self._joints[joint_name] = Joint(spw.Symbol(joint_name),
-                                                     joint.limit.velocity,
-                                                     joint.limit.lower,
-                                                     joint.limit.upper,
-                                                     False)
-                    self.frames[link_name] = parentFrame * spw.frame3_rpy(*joint.origin.rpy,
-                                                                          loc=spw.point3(*joint.origin.xyz) + spw.vec3(
-                                                                              *joint.axis) * spw.Symbol(joint_name))
-                elif joint.type == 'fixed':
-                    self.frames[link_name] = parentFrame * spw.frame3_rpy(*joint.origin.rpy,
-                                                                          loc=spw.point3(*joint.origin.xyz))
-                else:
-                    raise Exception('Joint type "' + joint.type + '" is not supported by urdf parser.')
+                    self.frames[link_name] *= spw.translation3(*(spw.point3(*joint.axis) * spw.Symbol(joint_name))[:3])
+
             parentFrame = self.frames[link_name]
 
     # @profile
@@ -119,8 +117,8 @@ class Robot(object):
         for i, (joint_name, joint) in enumerate(self._joints.items()):
             joint_symbol = self.joint_states_input.to_symbol(joint_name)
             weight_symbol = self.weight_input.to_symbol(joint_name)
-            self._state[joint_name] = 0
-            self._state[self.weight_input.to_str_symbol(joint_name)] = 1
+            self._state[joint_name] = self.default_joint_value
+            self._state[self.weight_input.to_str_symbol(joint_name)] = self.default_joint_weight
 
             if not joint.limitless:
                 self.hard_constraints[joint_name] = HardConstraint(lower=joint.lower - joint_symbol,
@@ -155,18 +153,15 @@ class Robot(object):
         return eef
 
     def get_eef_position2(self):
-        eef = {}
-        for end_effector in self.end_effectors:
-            eef_joints = self.frames[end_effector].free_symbols
-            eef_joint_symbols = [self.get_joint_state_input().to_str_symbol(str(x)) for x in eef_joints]
-            js = {k: self.get_state()[k] for k in eef_joint_symbols}
-            evaled_frame = self.fast_frames[end_effector](**js)
+        eef = self.get_eef_position()
+        for eef_name, pose in eef.items():
+            evaled_frame = np.array(pose).astype(float)
             eef_pos = evaled_frame[:3, 3]
             eef_rot = evaled_frame[:4, :3]
             eef_rot = np.hstack((eef_rot, np.zeros((4, 1))))
             eef_rot[3, 3] = 1
-            eef_rot = quaternion_from_matrix(eef_rot.T)
-            eef[end_effector] = np.concatenate((eef_rot, eef_pos))
+            eef_rot = quaternion_from_matrix(eef_rot)
+            eef[eef_name] = np.concatenate((eef_rot, eef_pos))
         return eef
 
     def load_from_urdf_path(self, urdf_path, root_link, tip_links):

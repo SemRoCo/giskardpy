@@ -28,6 +28,7 @@ class JointSpaceControl(QPController):
             default_weights[joint_name] = self.weight
 
         self.update_observables(self.goal_weights.get_update_dict(**default_weights))
+        self.set_goal({x:0 for x in robot.get_joint_names()})
         super(JointSpaceControl, self).make_constraints(robot)
         print('make constraints took {}'.format(time() - t))
 

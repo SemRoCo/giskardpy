@@ -3,7 +3,7 @@ from collections import OrderedDict, namedtuple
 import numpy as np
 from time import time
 
-from giskardpy import USE_SYMENGINE
+from giskardpy import USE_SYMENGINE, BACKEND
 
 if USE_SYMENGINE:
     import giskardpy.symengine_wrappers as spw
@@ -85,17 +85,17 @@ class QProblemBuilder(object):
         self.ubA = spw.Matrix(ubA)
 
         t = time()
-        self.cython_H = spw.speed_up(self.H, self.H.free_symbols)
+        self.cython_H = spw.speed_up(self.H, self.H.free_symbols, backend=BACKEND)
 
-        self.cython_A = spw.speed_up(self.A, self.A.free_symbols)
+        self.cython_A = spw.speed_up(self.A, self.A.free_symbols, backend=BACKEND)
 
-        self.cython_lb = spw.speed_up(self.lb, self.lb.free_symbols)
+        self.cython_lb = spw.speed_up(self.lb, self.lb.free_symbols, backend=BACKEND)
 
-        self.cython_ub = spw.speed_up(self.ub, self.ub.free_symbols)
+        self.cython_ub = spw.speed_up(self.ub, self.ub.free_symbols, backend=BACKEND)
 
-        self.cython_lbA = spw.speed_up(self.lbA, self.lbA.free_symbols)
+        self.cython_lbA = spw.speed_up(self.lbA, self.lbA.free_symbols, backend=BACKEND)
 
-        self.cython_ubA = spw.speed_up(self.ubA, self.ubA.free_symbols)
+        self.cython_ubA = spw.speed_up(self.ubA, self.ubA.free_symbols, backend=BACKEND)
         print('autowrap took {}'.format(time() - t))
 
     # @profile

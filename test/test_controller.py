@@ -8,12 +8,15 @@ import numpy as np
 from tf.transformations import quaternion_inverse, quaternion_multiply
 
 from giskardpy.cartesian_controller import CartesianController
+from giskardpy.cartesian_controller_old import CartesianControllerOld
 from giskardpy.cartesian_line_controller import CartesianLineController
+from giskardpy.donbot import DonBot
 from giskardpy.eef_dist_controller import EEFDiffController
 from giskardpy.eef_position_controller import EEFPositionControl
 from giskardpy.pointy_bot import PointyBot
 from giskardpy.joint_space_control import JointSpaceControl
 from giskardpy.pr2 import PR2
+from giskardpy.symengine_wrappers import trace, rotation_distance
 
 PKG = 'giskardpy'
 
@@ -22,21 +25,21 @@ class TestController(unittest.TestCase):
     def default_pr2(self):
         pr2 = PR2()
         js = {
-            'torso_lift_joint': 0.300026266574,
-            'l_elbow_flex_joint': -1.00213547438,
-            'l_forearm_roll_joint': 0.834058592757,
-            'l_shoulder_lift_joint': 0.103903217692,
-            'l_shoulder_pan_joint': 0.3688738798,
-            'l_upper_arm_roll_joint': 0.730572260662,
-            'l_wrist_flex_joint': -1.34841376457,
-            'l_wrist_roll_joint': 7.00870758722,
-            'r_elbow_flex_joint': -1.64225215677,
-            'r_forearm_roll_joint': 5.26860285279,
-            'r_shoulder_lift_joint': 0.573400943385,
-            'r_shoulder_pan_joint': -0.976376687461,
-            'r_upper_arm_roll_joint': -0.954544248502,
-            'r_wrist_flex_joint': -1.50746408471,
-            'r_wrist_roll_joint': 1.90604009753,
+            'torso_lift_joint': 0.0,
+            'l_elbow_flex_joint': 0.0,
+            'l_forearm_roll_joint': 0.0,
+            'l_shoulder_lift_joint': 0.0,
+            'l_shoulder_pan_joint': 0.0,
+            'l_upper_arm_roll_joint': 0.0,
+            'l_wrist_flex_joint': 0.0,
+            'l_wrist_roll_joint': 0.0,
+            'r_elbow_flex_joint': 0.0,
+            'r_forearm_roll_joint': 0.0,
+            'r_shoulder_lift_joint': 0.0,
+            'r_shoulder_pan_joint': 0.0,
+            'r_upper_arm_roll_joint': 0.0,
+            'r_wrist_flex_joint': 0.0,
+            'r_wrist_roll_joint': 0.0,
         }
 
         pr2.set_joint_state(js)
@@ -85,6 +88,31 @@ class TestController(unittest.TestCase):
                      'rot_z': goal[2]}
 
         r.set_joint_state(start_dict)
+        c.set_goal(goal_dict)
+
+        for i in range(20):
+            cmd_dict = c.get_next_command()
+            self.assertIsNotNone(cmd_dict)
+            next_state = OrderedDict()
+            robot_state = r.get_state()
+            for j, (joint_name, joint_change) in enumerate(cmd_dict.items()):
+                next_state[joint_name] = robot_state[joint_name] + joint_change
+            r.set_joint_state(next_state)
+            print('iteration #{}: {}'.format(i + 1, r))
+        for k, v in goal_dict.items():
+            self.assertAlmostEqual(v, r.get_state()[k])
+
+    def test_jointcontroller_donbot(self):
+        r = DonBot(weight=.01)
+        c = JointSpaceControl(r, weight=1)
+
+        goal_dict = {'ur5_shoulder_pan_joint': 0.2,
+                     'ur5_shoulder_lift_joint': 0.2,
+                     'ur5_elbow_joint': 0.2,
+                     'ur5_wrist_1_joint': 0.2,
+                     'ur5_wrist_2_joint': 0.2,
+                     'ur5_wrist_3_joint': 0.2,}
+
         c.set_goal(goal_dict)
 
         for i in range(20):
@@ -186,7 +214,7 @@ class TestController(unittest.TestCase):
 
         c.set_goal(goal)
 
-        for i in range(100):
+        for i in range(200):
             cmd_dict = c.get_next_command()
             self.assertIsNotNone(cmd_dict)
             next_state = OrderedDict()
@@ -230,15 +258,21 @@ class TestController(unittest.TestCase):
     def test_cart_controller_pr2(self):
         t = time()
         r = self.default_pr2()
-        c = CartesianController(r)
+        c = CartesianControllerOld(r, gain=1)
+        # c = CartesianController(r, gain=1)
+        eef = 'l_gripper_tool_frame'
         print('init took {}'.format(time() - t))
 
-        goal = {'l_gripper_tool_frame': [-0.0339, -0.1344, -0.0228,  0.9901, .68, 0.01, 1.19]}
+        # goal = {'l_gripper_tool_frame': [-0.0339, -0.1344, -0.0228,  0.9901, .68, 0.01, 1.19]}
+        goal = {eef: [0,0,0,1, .9, 0.2, 0.6]}
+
+        goal_rotation = np.eye(3)
 
         c.set_goal(goal)
 
         ts = []
-        for i in range(200):
+        print('iteration #{}: {}'.format(-1, r.get_eef_position2()[eef]))
+        for i in range(1000):
             t = time()
             cmd_dict = c.get_next_command()
             ts.append(time() - t)
@@ -248,9 +282,46 @@ class TestController(unittest.TestCase):
             for j, (joint_name, joint_change) in enumerate(cmd_dict.items()):
                 next_state[joint_name] = robot_state[joint_name] + joint_change
             r.set_joint_state(next_state)
-        print('iteration #{}: {}'.format(i + 1, r.get_eef_position2()['l_gripper_tool_frame']))
-        np.testing.assert_array_almost_equal(r.get_eef_position2()['l_gripper_tool_frame'],
-                                             goal['l_gripper_tool_frame'], decimal=3)
+
+
+        # current_pose = np.array(r.get_eef_position()[eef]).astype(float)
+        # current_rotation = current_pose[:3,:3]
+        # print(current_rotation)
+        # print(np.arccos(-rotation_distance(goal_rotation, current_rotation)+1))
+
+        print('iteration #{}: {}'.format(i + 1, r.get_eef_position2()[eef]))
+        np.testing.assert_array_almost_equal(r.get_eef_position2()[eef],
+                                             goal[eef], decimal=1)
+        print('next cmd took {} mean'.format(np.mean(ts)))
+        print('next cmd took {} std'.format(np.std(ts)))
+
+    def test_cart_controller_donbot(self):
+        t = time()
+        r = DonBot(1)
+        # c = CartesianController(r)
+        c = CartesianControllerOld(r, gain=1)
+        eef = 'gripper_tool_frame'
+        print('init took {}'.format(time() - t))
+
+        goal = {eef: [0.5, 0.5, 0.5, -0.5, .5, 0.25, 0.7]}
+
+        c.set_goal(goal)
+        print('iteration #{}: {}'.format(-1, r.get_eef_position2()[eef]))
+
+        ts = []
+        for i in range(1000):
+            t = time()
+            cmd_dict = c.get_next_command()
+            ts.append(time() - t)
+            self.assertIsNotNone(cmd_dict)
+            next_state = OrderedDict()
+            robot_state = r.get_state()
+            for j, (joint_name, joint_change) in enumerate(cmd_dict.items()):
+                next_state[joint_name] = robot_state[joint_name] + joint_change
+            r.set_joint_state(next_state)
+        print('iteration #{}: {}'.format(i + 1, r.get_eef_position2()[eef]))
+        np.testing.assert_array_almost_equal(r.get_eef_position2()[eef],
+                                             goal[eef], decimal=2)
         print('next cmd took {} mean'.format(np.mean(ts)))
         print('next cmd took {} std'.format(np.std(ts)))
 
@@ -260,7 +331,7 @@ class TestController(unittest.TestCase):
         c = CartesianLineController(r)
         print('init took {}'.format(time() - t))
 
-        goal = {'l_gripper_tool_frame': [-0.0339, -0.1344, -0.0228,  0.9901, .7, 0.01, 1.25]}
+        goal = {'l_gripper_tool_frame': [0,0,0,1, .9, 0.2, 0.6]}
 
         c.set_goal(goal)
 
@@ -288,7 +359,7 @@ class TestController(unittest.TestCase):
 
         print('iteration #{}: {}'.format(i + 1, r.get_eef_position2()['l_gripper_tool_frame']))
         np.testing.assert_array_almost_equal(r.get_eef_position2()['l_gripper_tool_frame'],
-                                             goal['l_gripper_tool_frame'], decimal=3)
+                                             goal['l_gripper_tool_frame'], decimal=2)
         print('next cmd took {} mean'.format(np.mean(ts)))
         print('next cmd took {} std'.format(np.std(ts)))
 

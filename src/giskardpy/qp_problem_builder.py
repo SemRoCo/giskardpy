@@ -122,11 +122,17 @@ class QProblemBuilder(object):
 
     # @profile
     def update_observables(self, observables_update):
+#        print('Evaluating H')
         self.np_H = self.cython_H(**observables_update)
+#        print('Evaluating A')
         self.np_A = self.cython_A(**observables_update)
+#        print('Evaluating ctrl lb')
         self.np_lb = self.cython_lb(**observables_update).reshape(self.lb.shape[0])
+        #print('Evaluating ctrl ub')
         self.np_ub = self.cython_ub(**observables_update).reshape(self.ub.shape[0])
+        #print('Evaluating A lb')
         self.np_lbA = self.cython_lbA(**observables_update).reshape(self.lbA.shape[0])
+        #print('Evaluating A ub')
         self.np_ubA = self.cython_ubA(**observables_update).reshape(self.ubA.shape[0])
 
         xdot_full = self.qp_solver.solve(self.np_H, self.np_g, self.np_A,
@@ -135,5 +141,8 @@ class QProblemBuilder(object):
             return None
         return OrderedDict((observable, xdot_full[i]) for i, observable in enumerate(self.controlled_joints_strs))
 
+    def str_jacobian(self):
+        return format_matrix(self.np_A, self.str_A)
+
     def print_jacobian(self):
-        print('Matrix A: \n{}'.format(format_matrix(self.np_A, self.str_A)))
+        print('Matrix A: \n{}'.format(self.str_jacobian()))

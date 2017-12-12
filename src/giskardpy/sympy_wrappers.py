@@ -10,7 +10,6 @@ import symengine as se
 
 ODOM = spv.CoordSys3D('ODOM')
 
-<<<<<<< HEAD
 pathSeparator = '__'
 
 

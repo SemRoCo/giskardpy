@@ -4,14 +4,22 @@ from collections import OrderedDict, namedtuple
 from time import time
 from giskardpy.fetch import Fetch
 from giskardpy.input_system import ScalarInput, FrameInput, Vec3Input, ControllerInputArray
-from giskardpy.qp_problem_builder import QProblemBuilder as CythonProblemBuilder
+from giskardpy.qp_problem_builder import QProblemBuilder
 from giskardpy.qp_problem_builder import SoftConstraint
-from giskardpy.sympy_wrappers import *
-import sympy as sp
+from giskardpy.symengine_wrappers import *
+import symengine as sp
 
 PKG = 'giskardpy'
 
 Object = namedtuple('Object', ['frame', 'dimensions', 'pclass', 'ppos', 'prot'])
+
+def saturate(x, low=0, high=1):
+    breadth_scale = 6 / high - low
+    return 1 / (1 + sp.exp(-2* ( x * breadth_scale + low - 3)))
+
+def tip_at_one(x):
+    return -4*x**2 + 8 * x - 3
+
 
 class ProbabilisticObjectInput(object):
     def __init__(self, name):
@@ -50,42 +58,43 @@ class TestDiffRuntimeBug(unittest.TestCase):
         print('cga time {}'.format(time()-t))
         self.s_dict = {'soft_constraint': SoftConstraint(-1, 1, 1, self.cga)}
 
-    # @profile
+    @profile
     def cylinder_grasp_affordance(self, gripper, obj_input):
         frame = obj_input.get_frame()
         shape = obj_input.get_dimensions()
-        cylinder_z = frame.col(2)
+        cylinder_z = z_col(frame)
         cylinder_pos = pos_of(frame)
 
-        gripper_x = gripper.frame.col(0)
-        gripper_z = gripper.frame.col(2)
+        gripper_x = x_col(gripper.frame)
+        gripper_z = z_col(gripper.frame)
         gripper_pos = pos_of(gripper.frame)
         c_to_g = gripper_pos - cylinder_pos
 
-        zz_align = sp.Abs(gripper_z.dot(cylinder_z))
-        xz_align = gripper_x.dot(cylinder_z)
-        dist_z = cylinder_z.dot(c_to_g)
+        zz_align = abs(dot(gripper_z, cylinder_z))
+        xz_align = dot(gripper_x, cylinder_z)
+        dist_z = dot(cylinder_z, c_to_g)
         border_z = (shape[2] - gripper.height) * 0.5
         cap_dist_normalized_signed = dist_z / border_z
-        cap_dist_normalized = sp.Abs(cap_dist_normalized_signed)
+        cap_dist_normalized = abs(cap_dist_normalized_signed)
 
-        cap_top_grasp = 1 - sp.Max(-xz_align * sp.Min(cap_dist_normalized_signed, 1), 0)
-        cap_bottom_grasp = 1 - sp.Min(xz_align * sp.Max(cap_dist_normalized_signed, -1), 0)
+        cap_grasp = tip_at_one(-xz_align * cap_dist_normalized_signed)
 
-        dist_z_center_normalized = sp.Max(1 - cap_dist_normalized, 0)
-        dist_ax = sp.sqrt(frame.col(0).dot(c_to_g) ** 2 + frame.col(1).dot(c_to_g) ** 2)
+        dist_z_center_normalized = -saturate(cap_dist_normalized)
+        dist_ax = sp.sqrt(dot(x_col(frame), c_to_g) ** 2 + dot(y_col(frame), c_to_g) ** 2)
 
         center_grasp = (1 - dist_z_center_normalized - dist_ax) * zz_align
 
-        return sp.Max(center_grasp, cap_top_grasp, cap_bottom_grasp) * obj_input.get_class_probability()
+        return max(center_grasp, cap_grasp) * obj_input.get_class_probability()
 
+
+    @profile
     def test_differentiation_speed_cython(self):
-        cy_builder = CythonProblemBuilder(self.robot.joint_constraints, self.robot.hard_constraints, self.s_dict)
+        builder = QProblemBuilder(self.robot.joint_constraints, self.robot.hard_constraints, self.s_dict)
 
 
 if __name__ == '__main__':
     import rosunit
 
-    # rosunit.unitrun(package=PKG,
-    #                 test_name='TestDiffRuntimeBug',
-    #                 test=TestDiffRuntimeBug)
+    rosunit.unitrun(package=PKG,
+                    test_name='TestDiffRuntimeBug',
+                    test=TestDiffRuntimeBug)

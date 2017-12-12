@@ -34,13 +34,22 @@ def speed_up(function, parameters):
     return f
 
 
-def cross(u, v):
-    return sp.Matrix([u[1] * v[2] - u[2] * v[1],
-                      u[2] * v[0] - u[0] * v[2],
-                      u[0] * v[1] - u[1] * v[0]])
+def abs(x):
+    return sp.sqrt(x**2)
 
-# def cross(u,v):
-#     return u.cross(v)
+def max(*args):
+    if len(args) == 1:
+        return args[0]
+    elif len(args) > 1:
+        return ((args[0] + max(*args[1:])) + abs(args[0] - max(*args[1:]))) / 2
+    return 0
+
+def min(*args):
+    if len(args) == 1:
+        return args[0]
+    elif len(args) > 1:
+        return ((args[0] + min(args[1:])) - abs(args[0] - min(args[1:]))) / 2
+    return 0
 
 def vec3(x, y, z):
     return sp.Matrix([x, y, z, 0])
@@ -57,8 +66,8 @@ def point3(x, y, z):
 
 def norm(v):
     r = 0
-    for x in v:
-        r += x ** 2
+    for x in range(len(v) - 1):
+        r += v[x] ** 2
     return sp.sqrt(r)
 
 
@@ -66,15 +75,12 @@ def dot(a, b):
     return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
 
 
-<<<<<<< HEAD
 def cross(a, b):
     return sp.Matrix([a[1] * b[2] - a[2] * b[1],
                       a[2] * b[0] - a[0] * b[2],
                       a[0] * b[1] - a[1] * b[0], 0])
 
 
-=======
->>>>>>> simon
 def translation3(point):
     return sp.eye(3).col_join(sp.Matrix([[0] * 3])).row_join(point)
 

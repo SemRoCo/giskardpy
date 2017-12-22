@@ -16,6 +16,7 @@ from giskardpy.eef_position_controller import EEFPositionControl
 from giskardpy.pointy_bot import PointyBot
 from giskardpy.joint_space_control import JointSpaceControl
 from giskardpy.pr2 import PR2
+from giskardpy.robot import Robot
 from giskardpy.symengine_wrappers import trace, rotation_distance
 
 PKG = 'giskardpy'
@@ -257,7 +258,9 @@ class TestController(unittest.TestCase):
     # @profile
     def test_cart_controller_pr2(self):
         t = time()
-        r = self.default_pr2()
+        # r = self.default_pr2()
+        r = PR2()
+        # r = Robot()
         c = CartesianControllerOld(r, gain=1)
         # c = CartesianController(r, gain=1)
         eef = 'l_gripper_tool_frame'
@@ -291,13 +294,13 @@ class TestController(unittest.TestCase):
 
         print('iteration #{}: {}'.format(i + 1, r.get_eef_position2()[eef]))
         np.testing.assert_array_almost_equal(r.get_eef_position2()[eef],
-                                             goal[eef], decimal=1)
+                                             goal[eef], decimal=2)
         print('next cmd took {} mean'.format(np.mean(ts)))
         print('next cmd took {} std'.format(np.std(ts)))
 
     def test_cart_controller_donbot(self):
         t = time()
-        r = DonBot(1)
+        r = DonBot()
         # c = CartesianController(r)
         c = CartesianControllerOld(r, gain=1)
         eef = 'gripper_tool_frame'

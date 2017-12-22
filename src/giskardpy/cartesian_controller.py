@@ -12,7 +12,7 @@ else:
 
 
 class CartesianController(QPController):
-    def __init__(self, robot, builder_backend=None, weight=1, gain=1, threshold_value=.05):
+    def __init__(self, robot, builder_backend=None, weight=1, gain=3, threshold_value=.05):
         self.weight = weight
         self.default_gain = gain
         self.default_threshold = threshold_value
@@ -74,11 +74,11 @@ class CartesianController(QPController):
                                                                                        weight=self.goal_weights[
                                                                                            eef].get_expression(),
                                                                                        expression=current_position[2])
-            self._soft_constraints['align {} rotation'.format(eef)] = SoftConstraint(lower=-dist_r,
-                                                                                     upper=-dist_r,
-                                                                                     weight=self.goal_weights[
-                                                                                         eef].get_expression(),
-                                                                                     expression=dist_r)
+            # self._soft_constraints['align {} rotation'.format(eef)] = SoftConstraint(lower=-dist_r,
+            #                                                                          upper=-dist_r,
+            #                                                                          weight=self.goal_weights[
+            #                                                                              eef].get_expression(),
+            #                                                                          expression=dist_r)
             self._controllable_constraints = robot.joint_constraints
             self._hard_constraints = robot.hard_constraints
             self.update_observables({self.goal_weights[eef].get_symbol_str(): self.weight})

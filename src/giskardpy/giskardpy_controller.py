@@ -27,147 +27,15 @@ from giskardpy.cartesian_controller import CartesianController
 from giskardpy.cartesian_controller_old import CartesianControllerOld
 from giskardpy.donbot import DonBot
 from giskardpy.joint_space_control import JointSpaceControl
+from giskardpy.pr2 import PR2
+from giskardpy.robot import Robot
 
-
-class InteractiveMarkerGoal(object):
-    def __init__(self):
-        # tf
-        self.tfBuffer = Buffer(rospy.Duration(1))
-        self.tf_listener = TransformListener(self.tfBuffer)
-
-        # marker server
-        self.server = InteractiveMarkerServer("eef_control")
-        self.menu_handler = MenuHandler()
-        int_marker = self.make6DofMarker(InteractiveMarkerControl.MOVE_ROTATE_3D)
-
-        self.server.insert(int_marker, self.processFeedback)
-        self.menu_handler.apply(self.server, int_marker.name)
-
-        self.server.applyChanges()
-
-        # giskard goal client
-        self.client = SimpleActionClient('move', ControllerListAction)
-        self.client.wait_for_server()
-
-
-    def transformPose(self, target_frame, pose, time=None):
-        transform = self.tfBuffer.lookup_transform(target_frame,
-                                                   pose.header.frame_id,
-                                                   pose.header.stamp if time is not None else rospy.Time(0),
-                                                   rospy.Duration(1.0))
-        new_pose = do_transform_pose(pose, transform)
-        return new_pose
-
-    def makeBox(self, msg):
-        marker = Marker()
-
-        marker.type = Marker.SPHERE
-        marker.scale.x = msg.scale * 0.2
-        marker.scale.y = msg.scale * 0.2
-        marker.scale.z = msg.scale * 0.2
-        marker.color.r = 0.5
-        marker.color.g = 0.5
-        marker.color.b = 0.5
-        marker.color.a = 0.5
-
-        return marker
-
-    def makeBoxControl(self, msg):
-        control = InteractiveMarkerControl()
-        control.always_visible = True
-        control.markers.append(self.makeBox(msg))
-        msg.controls.append(control)
-        return control
-
-    def make6DofMarker(self, interaction_mode):
-        int_marker = InteractiveMarker()
-
-        p = PoseStamped()
-        p.header.frame_id = 'gripper_tool_frame'
-        p.pose.orientation.w = 1
-
-        int_marker.header.frame_id = "gripper_tool_frame"
-        int_marker.pose.orientation.w = 1
-        int_marker.pose = self.transformPose('base_footprint', p).pose
-        int_marker.header.frame_id = "base_footprint"
-        int_marker.scale = .2
-
-        int_marker.name = "simple_6dof"
-        int_marker.description = "Simple 6-DOF Control"
-
-        # insert a box
-        self.makeBoxControl(int_marker)
-        int_marker.controls[0].interaction_mode = interaction_mode
-
-        if interaction_mode != InteractiveMarkerControl.NONE:
-            control_modes_dict = {
-                InteractiveMarkerControl.MOVE_3D: "MOVE_3D",
-                InteractiveMarkerControl.ROTATE_3D: "ROTATE_3D",
-                InteractiveMarkerControl.MOVE_ROTATE_3D: "MOVE_ROTATE_3D"}
-            int_marker.name += "_" + control_modes_dict[interaction_mode]
-            int_marker.description = "3D Control"
-            int_marker.description += " + 6-DOF controls"
-            int_marker.description += "\n" + control_modes_dict[interaction_mode]
-
-        control = InteractiveMarkerControl()
-        control.orientation = Quaternion(0, 0, 0, 1)
-        control.name = "rotate_x"
-        control.interaction_mode = InteractiveMarkerControl.ROTATE_AXIS
-        int_marker.controls.append(control)
-
-        control = InteractiveMarkerControl()
-        control.orientation = Quaternion(0, 0, 0, 1)
-        control.name = "move_x"
-        control.interaction_mode = InteractiveMarkerControl.MOVE_AXIS
-        int_marker.controls.append(control)
-
-        control = InteractiveMarkerControl()
-        control.orientation = Quaternion(0, 1, 0, 1)
-        control.name = "rotate_z"
-        control.interaction_mode = InteractiveMarkerControl.ROTATE_AXIS
-        int_marker.controls.append(control)
-
-        control = InteractiveMarkerControl()
-        control.orientation = Quaternion(0, 1, 0, 1)
-        control.name = "move_z"
-        control.interaction_mode = InteractiveMarkerControl.MOVE_AXIS
-        int_marker.controls.append(control)
-
-        control = InteractiveMarkerControl()
-        control.orientation = Quaternion(0, 0, 1, 1)
-        control.name = "rotate_y"
-        control.interaction_mode = InteractiveMarkerControl.ROTATE_AXIS
-        int_marker.controls.append(control)
-
-        control = InteractiveMarkerControl()
-        control.orientation = Quaternion(0, 0, 1, 1)
-        control.name = "move_y"
-        control.interaction_mode = InteractiveMarkerControl.MOVE_AXIS
-        int_marker.controls.append(control)
-
-        return int_marker
-
-    def processFeedback(self, feedback):
-        if feedback.event_type == InteractiveMarkerFeedback.MOUSE_UP:
-            print('interactive goal update')
-            goal = ControllerListGoal()
-            goal.type = ControllerListGoal.STANDARD_CONTROLLER
-            c = Controller()
-            c.type = Controller.TRANSFORM_6D
-            c.goal_pose.header = feedback.header
-            c.goal_pose.pose = feedback.pose
-
-            c.tip_link = 'gripper_tool_frame'
-            goal.controllers.append(c)
-            # self.client.cancel_all_goals()
-            self.client.send_goal(goal)
-        self.server.applyChanges()
 
 
 class RosController(object):
     MAX_ITERATIONS = 10000
 
-    def __init__(self, robot):
+    def __init__(self, robot, cmd_topic):
         # tf
         self.tfBuffer = Buffer(rospy.Duration(1))
         self.tf_listener = TransformListener(self.tfBuffer)
@@ -176,15 +44,23 @@ class RosController(object):
         self._action_name = 'move'
         self.robot = r
         self.joint_controller = JointSpaceControl(self.robot)
-        # self.cartesian_controller = CartesianController(self.robot)
-        self.cartesian_controller = CartesianControllerOld(self.robot)
-        self.cmd_pub = rospy.Publisher('/donbot/commands', JointState, queue_size=100)
+        #TODO set default joint goal
+        self.cartesian_controller = CartesianController(self.robot)
+        # self.cartesian_controller = CartesianControllerOld(self.robot)
+        self.set_default_goals()
+        self.cmd_pub = rospy.Publisher(cmd_topic, JointState, queue_size=100)
         self._as = actionlib.SimpleActionServer(self._action_name, ControllerListAction,
                                                 execute_cb=self.action_server_cb, auto_start=False)
         self._as.start()
         frequency = 100
         self.rate = rospy.Rate(frequency)
+
+        # interactive maker server
+        # self.interactive_marker_server = InteractiveMarkerGoal(robot.root_link, robot.end_effectors)
         print('running')
+
+    def set_default_goals(self):
+        self.cartesian_controller.set_goal(self.robot.get_eef_position2())
 
     def transformPose(self, target_frame, pose, time=None):
         transform = self.tfBuffer.lookup_transform(target_frame,
@@ -205,10 +81,11 @@ class RosController(object):
                 rospy.loginfo('set joint goal')
                 self.joint_controller.set_goal(self.robot.joint_state_msg_to_dict(controller.goal_state))
                 c = self.joint_controller
-            elif controller.type == Controller.TRANSFORM_6D:
+            elif controller.type == Controller.TRANSLATION_3D:
                 rospy.loginfo('set cartesian goal')
                 root_link_goal = self.transformPose('base_footprint', controller.goal_pose)
                 self.cartesian_controller.set_goal({controller.tip_link: self.pose_stamped_to_list(root_link_goal)})
+                print('goal: {}'.format(root_link_goal))
                 c = self.cartesian_controller
             # print(self.robot.get_eef_position2())
 
@@ -220,23 +97,24 @@ class RosController(object):
                     rospy.loginfo('new goal, cancel old one')
                     # self._as.set_aborted(ControllerListResult())
                     self._as.set_preempted(ControllerListResult())
-                    break
+                    return
                 # if not self._as.is_preempt_requested():
                 cmd_dict = c.get_next_command()
                 # print(cmd_dict)
                 for k, v in cmd_dict.iteritems():
                     muh[k].append(v)
                 cmd_msg = self.robot.joint_vel_dict_to_msg(cmd_dict)
-                err = np.linalg.norm(cmd_msg.velocity)
-                if err < 0.005:
+                err = max(cmd_msg.velocity)
+                if err < 0.002:
+                    for k, v in muh.items():
+                        print('{}: avg {}, max {}'.format(k, np.mean(muh[k]), np.max(np.abs(muh[k]))))
+
                     rospy.loginfo('goal reached')
                     success = True
                     break
                 self.cmd_pub.publish(cmd_msg)
 
                 self.rate.sleep()
-            # for k, v in muh.items():
-            #     print('{}: avg {}, max {}'.format(k, np.mean(muh[k]), np.max(np.abs(muh[k]))))
 
 
         if success:
@@ -260,7 +138,9 @@ class RosController(object):
 if __name__ == '__main__':
     rospy.init_node('giskardpy_controller')
 
-    r = DonBot(1, '/home/stelter/giskardpy_ws/src/iai_robots/iai_donbot_description/robots/iai_donbot.urdf')
-    ros_controller = RosController(r)
-    interactive_marker_goal = InteractiveMarkerGoal()
+    robot_description = rospy.get_param('robot_description')
+    # r = PR2(urdf_str=robot_description)
+    # ros_controller = RosController(r, '/pr2/commands')
+    r = DonBot(urdf_str=robot_description)
+    ros_controller = RosController(r, '/donbot/commands')
     rospy.spin()

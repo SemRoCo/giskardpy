@@ -216,3 +216,5 @@ def rotation_distance(rotation_matrix1, rotation_matrix2):
 #     if q[0] < 0.0:
 #         numpy.negative(q, q)
 #     return q
+
+# class MySymbol(Symbol):

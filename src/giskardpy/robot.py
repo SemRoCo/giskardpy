@@ -16,10 +16,27 @@ else:
 
 Joint = namedtuple('Joint', ['symbol', 'velocity_limit', 'lower', 'upper', 'limitless'])
 
+def hacky_urdf_parser_fix(urdf_str):
+    fixed_urdf = ''
+    delete = False
+    black_list = ['transmission']
+    black_open = ['<{}'.format(x) for x in black_list]
+    black_close = ['</{}'.format(x) for x in black_list]
+    for line in urdf_str.split('\n'):
+        if len([x for x in black_open if x in line]) > 0:
+            delete = True
+        if len([x for x in black_close if x in line]) > 0:
+            delete = False
+            continue
+        if not delete:
+            fixed_urdf += line + '\n'
+    return fixed_urdf
 
 class Robot(object):
     # TODO add joint vel to internal state
-    def __init__(self, default_joint_value=0.0, default_joint_weight=1.0):
+    def __init__(self, default_joint_value=0.0, default_joint_weight=1.0, urdf_str=None, root_link='base_footprint',
+                 tip_links=()):
+        self.root_link = None
         self.default_joint_value = default_joint_value
         self.default_joint_weight = default_joint_weight
         self.urdf_robot = None
@@ -29,6 +46,11 @@ class Robot(object):
         self._state = OrderedDict()
         self.hard_constraints = OrderedDict()
         self.joint_constraints = OrderedDict()
+        if urdf_str is not None:
+            urdf = hacky_urdf_parser_fix(urdf_str)
+            self.load_from_urdf_string(urdf, root_link, tip_links)
+            for joint_name in self.weight_input.get_float_names():
+                self.set_joint_weight(joint_name, default_joint_weight)
 
     def get_state(self):
         return self._state
@@ -103,6 +125,7 @@ class Robot(object):
         :return: dict{str, sympy.Symbol}, with symbols for all joints in tree
         """
         self.urdf_robot = urdf_robot
+        self.root_link = root_link
 
         self.frames[root_link] = root_frame if root_frame is not None else spw.eye(4)
         self.end_effectors = tip_links

@@ -52,6 +52,38 @@ class ScalarInput(ControllerInputArray):
     def get_symbol_str(self):
         return self._str_map['v']
 
+class HackInput(ControllerInputArray):
+    def __init__(self, prefix, suffix=''):
+        super(HackInput, self).__init__(['v'], prefix, suffix)
+
+    def update(self, observable_dict):
+        return 1
+
+    def get_update_dict(self, v):
+        return super(HackInput, self).get_update_dict(v=self.update)
+
+    def get_expression(self):
+        return self._symbol_map['v']
+
+    def get_symbol_str(self):
+        return self._str_map['v']
+
+class slerp(ControllerInputArray):
+    def __init__(self, prefix, suffix=''):
+        super(slerp, self).__init__(['v'], prefix, suffix)
+
+    def update(self, observable_dict):
+        return 1
+
+    def get_update_dict(self, v):
+        return super(slerp, self).get_update_dict(v=self.update)
+
+    def get_expression(self):
+        return self._symbol_map['v']
+
+    def get_symbol_str(self):
+        return self._str_map['v']
+
 
 class Point3Input(ControllerInputArray):
     def __init__(self, prefix, suffix=''):

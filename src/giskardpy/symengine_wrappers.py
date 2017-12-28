@@ -2,6 +2,7 @@ import symengine as sp
 from symengine import Matrix, Symbol, eye, sympify, diag, zeros, lambdify #, Abs , Max, Min
 import numpy as np
 import sympy as sp2
+from tf.transformations import quaternion_about_axis
 
 from giskardpy import BACKEND
 
@@ -182,16 +183,31 @@ def rot_of(frame):
 
 
 def trace(matrix):
-    return sum(matrix[i, i] for i in range(matrix.shape[0]))
+    return sum(matrix[i, i] for i in range(3))
 
 
 def rotation_distance(rotation_matrix1, rotation_matrix2):
     difference = rotation_matrix1 * rotation_matrix2.T
     # return -(((trace(difference) - 1)/2)-1)
     v = (trace(difference) - 1) / 2
-    v = Max(-1, v)
-    v = Min(1, v)
+    # v = Max(-1, v)
+    # v = Min(1, v)
     return sp.acos(v)
+
+def matrix_to_axis_angle(rotation_matrix):
+    rm = rotation_matrix
+    angle = (trace(rotation_matrix) - 1) / 2
+    # angle = Max(-1, angle)
+    # angle = Min(1, angle)
+    angle = sp.acos(angle)
+    print(angle)
+    print(angle.evalf())
+    x = rm[2,1] - rm[1,2]/(sp.sqrt((rm[2,1]-rm[1,2])**2 + (rm[0,2]-rm[2,0])**2 + (rm[1,0]-rm[0,1])**2))
+    y = rm[0,2] - rm[2,0]/(sp.sqrt((rm[2,1]-rm[1,2])**2 + (rm[0,2]-rm[2,0])**2 + (rm[1,0]-rm[0,1])**2))
+    z = rm[1,0] - rm[0,1]/(sp.sqrt((rm[2,1]-rm[1,2])**2 + (rm[0,2]-rm[2,0])**2 + (rm[1,0]-rm[0,1])**2))
+    axis = sp.Matrix([x,y,z])
+    # return axis*angle
+    return axis
 
 # def quaternion_from_matrix(M):
 #     # M = numpy.array(matrix, dtype=numpy.float64, copy=False)[:4, :4]

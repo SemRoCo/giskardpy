@@ -1,5 +1,7 @@
 from time import time
 
+from tf.transformations import quaternion_about_axis
+
 from giskardpy import USE_SYMENGINE
 from giskardpy.qpcontroller import QPController
 from giskardpy.qp_problem_builder import SoftConstraint
@@ -12,7 +14,7 @@ else:
 
 
 class CartesianController(QPController):
-    def __init__(self, robot, builder_backend=None, weight=1, gain=3, threshold_value=.05):
+    def __init__(self, robot, builder_backend=None, weight=1, gain=3, threshold_value=.03):
         self.weight = weight
         self.default_gain = gain
         self.default_threshold = threshold_value
@@ -32,6 +34,17 @@ class CartesianController(QPController):
     def make_constraints(self, robot):
         t = time()
         for eef in robot.end_effectors:
+
+            # --------------------------------------------
+            class testmuh(object):
+                def __init__(self, robot):
+                    self.robot = robot
+
+                def __call__(self, observables):
+                    return 5
+            self.get_state()['testmuh'] = testmuh(self.get_robot())
+            # --------------------------------------------
+
             start_pose = robot.get_eef_position2()[eef]
             # start_position = spw.pos_of(start_pose)
 
@@ -49,14 +62,19 @@ class CartesianController(QPController):
             trans_error = spw.norm(trans_error_vector)
             trans_scale = spw.Min(1, self.threshold_value.get_expression() / trans_error)
             trans_scaled_error = trans_scale * trans_error
-            trans_control = trans_error_vector * (self.gain.get_expression() * trans_scale)
+            trans_control = trans_error_vector * (self.gain.get_expression() * trans_scale) * spw.Symbol('testmuh')
 
             # dist = spw.norm(spw.pos_of(current_pose) - goal_position)
             # dist = spw.Min(self.threshold_value.get_expression(), dist)
             # dist *= self.gain.get_expression()
 
             # rot control ----------------------------------------------------------------------------------------------
-            dist_r = spw.norm(current_rotation.reshape(9, 1) - goal_rotation.reshape(9, 1))
+            # dist_r = spw.norm(current_rotation.reshape(9, 1) - goal_rotation.reshape(9, 1))
+            dist_r = spw.rotation_distance(current_rotation, goal_rotation)
+            # dist_r = spw.norm(current_rotation.reshape(9, 1) - goal_rotation.reshape(9, 1))
+            # dist_r_control = spw.Min(dist_r, self.threshold_value.get_expression())
+            dist_r_control = spw.Min(dist_r, 0.05)
+            dist_r_control = dist_r_control * self.gain.get_expression() * 3.
 
 
             self._soft_constraints['align {} x position'.format(eef)] = SoftConstraint(lower=trans_control[0],
@@ -74,11 +92,11 @@ class CartesianController(QPController):
                                                                                        weight=self.goal_weights[
                                                                                            eef].get_expression(),
                                                                                        expression=current_position[2])
-            # self._soft_constraints['align {} rotation'.format(eef)] = SoftConstraint(lower=-dist_r,
-            #                                                                          upper=-dist_r,
-            #                                                                          weight=self.goal_weights[
-            #                                                                              eef].get_expression(),
-            #                                                                          expression=dist_r)
+            self._soft_constraints['align {} rotation'.format(eef)] = SoftConstraint(lower=-dist_r_control,
+                                                                                     upper=-dist_r_control,
+                                                                                     weight=self.goal_weights[
+                                                                                         eef].get_expression()/3,
+                                                                                     expression=dist_r)
             self._controllable_constraints = robot.joint_constraints
             self._hard_constraints = robot.hard_constraints
             self.update_observables({self.goal_weights[eef].get_symbol_str(): self.weight})

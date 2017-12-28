@@ -100,12 +100,18 @@ class QProblemBuilder(object):
 
     # @profile
     def update_observables(self, observables_update):
-        self.np_H = self.cython_H(**observables_update)
-        self.np_A = self.cython_A(**observables_update)
-        self.np_lb = self.cython_lb(**observables_update).reshape(self.lb.shape[0])
-        self.np_ub = self.cython_ub(**observables_update).reshape(self.ub.shape[0])
-        self.np_lbA = self.cython_lbA(**observables_update).reshape(self.lbA.shape[0])
-        self.np_ubA = self.cython_ubA(**observables_update).reshape(self.ubA.shape[0])
+        evaluated_updates = OrderedDict()
+        for k, v in observables_update.items():
+            if not isinstance(v, int) and not isinstance(v, float):
+                evaluated_updates[k] = v(observables_update)
+            else:
+                evaluated_updates[k] = v
+        self.np_H = self.cython_H(**evaluated_updates)
+        self.np_A = self.cython_A(**evaluated_updates)
+        self.np_lb = self.cython_lb(**evaluated_updates).reshape(self.lb.shape[0])
+        self.np_ub = self.cython_ub(**evaluated_updates).reshape(self.ub.shape[0])
+        self.np_lbA = self.cython_lbA(**evaluated_updates).reshape(self.lbA.shape[0])
+        self.np_ubA = self.cython_ubA(**evaluated_updates).reshape(self.ubA.shape[0])
 
         xdot_full = self.qp_solver.solve(self.np_H, self.np_g, self.np_A,
                                          self.np_lb, self.np_ub, self.np_lbA, self.np_ubA)

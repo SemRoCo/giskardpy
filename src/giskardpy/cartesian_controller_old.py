@@ -48,11 +48,11 @@ class CartesianControllerOld(QPController):
             dist_control = spw.Min(dist, self.threshold_value.get_expression())  * self.gain.get_expression()
 
             # rot control ----------------------------------------------------------------------------------------------
-            # dist_r = spw.rotation_distance(current_rotation, goal_rotation)
-            dist_r = spw.norm(current_rotation.reshape(9, 1) - goal_rotation.reshape(9, 1))
+            dist_r = spw.rotation_distance(current_rotation, goal_rotation)
+            # dist_r = spw.norm(current_rotation.reshape(9, 1) - goal_rotation.reshape(9, 1))
             # dist_r_control = spw.Min(dist_r, self.threshold_value.get_expression())
             dist_r_control = spw.Min(dist_r, 0.2)
-            dist_r_control = dist_r_control * self.gain.get_expression()/3.
+            dist_r_control = dist_r_control * self.gain.get_expression()/6.
 
             self._soft_constraints['align {} position'.format(eef)] = SoftConstraint(lower=-dist_control,
                                                                                      upper=-dist_control,

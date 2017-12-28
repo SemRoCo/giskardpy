@@ -2,9 +2,11 @@
 import numpy as np
 import actionlib
 import rospy
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
 
 from actionlib.simple_action_client import SimpleActionClient
+from control_msgs.msg import FollowJointTrajectoryAction, FollowJointTrajectoryActionGoal, FollowJointTrajectoryGoal, \
+    JointTrajectoryControllerState
 from geometry_msgs.msg._Point import Point
 from geometry_msgs.msg._PoseStamped import PoseStamped
 from geometry_msgs.msg._Quaternion import Quaternion
@@ -18,6 +20,7 @@ from sensor_msgs.msg._JointState import JointState
 from tf2_geometry_msgs.tf2_geometry_msgs import do_transform_pose
 from tf2_ros.buffer import Buffer
 from tf2_ros.transform_listener import TransformListener
+from trajectory_msgs.msg import JointTrajectoryPoint
 from visualization_msgs.msg._InteractiveMarker import InteractiveMarker
 from visualization_msgs.msg._InteractiveMarkerControl import InteractiveMarkerControl
 from visualization_msgs.msg._InteractiveMarkerFeedback import InteractiveMarkerFeedback
@@ -35,20 +38,26 @@ from giskardpy.robot import Robot
 class RosController(object):
     MAX_ITERATIONS = 10000
 
-    def __init__(self, robot, cmd_topic):
+    def __init__(self, robot, cmd_topic, mode=1):
+        self.mode = mode
+
         # tf
         self.tfBuffer = Buffer(rospy.Duration(1))
         self.tf_listener = TransformListener(self.tfBuffer)
 
         # action server
-        self._action_name = 'move'
+        self._action_name = 'qp_controller/command'
         self.robot = r
         self.joint_controller = JointSpaceControl(self.robot)
         #TODO set default joint goal
         self.cartesian_controller = CartesianController(self.robot)
         # self.cartesian_controller = CartesianControllerOld(self.robot)
         self.set_default_goals()
-        self.cmd_pub = rospy.Publisher(cmd_topic, JointState, queue_size=100)
+        if self.mode == 0:
+            self.cmd_pub = rospy.Publisher(cmd_topic, JointState, queue_size=100)
+        else:
+            self._ac = actionlib.SimpleActionClient('/whole_body_controller/follow_joint_trajectory', FollowJointTrajectoryAction)
+            self.state_sub = rospy.Subscriber('/whole_body_controller/state', JointTrajectoryControllerState, self.state_cb)
         self._as = actionlib.SimpleActionServer(self._action_name, ControllerListAction,
                                                 execute_cb=self.action_server_cb, auto_start=False)
         self._as.start()
@@ -58,6 +67,9 @@ class RosController(object):
         # interactive maker server
         # self.interactive_marker_server = InteractiveMarkerGoal(robot.root_link, robot.end_effectors)
         print('running')
+
+    def state_cb(self, data):
+        self.state = data
 
     def set_default_goals(self):
         self.cartesian_controller.set_goal(self.robot.get_eef_position2())
@@ -90,31 +102,34 @@ class RosController(object):
             # print(self.robot.get_eef_position2())
 
             #move to goal
-            muh = defaultdict(list)
+            if self.mode == 0:
+                muh = defaultdict(list)
 
-            for i in range(self.MAX_ITERATIONS):
-                if self._as.is_preempt_requested():
-                    rospy.loginfo('new goal, cancel old one')
-                    # self._as.set_aborted(ControllerListResult())
-                    self._as.set_preempted(ControllerListResult())
-                    return
-                # if not self._as.is_preempt_requested():
-                cmd_dict = c.get_next_command()
-                # print(cmd_dict)
-                for k, v in cmd_dict.iteritems():
-                    muh[k].append(v)
-                cmd_msg = self.robot.joint_vel_dict_to_msg(cmd_dict)
-                err = max(cmd_msg.velocity)
-                if err < 0.002:
-                    for k, v in muh.items():
-                        print('{}: avg {}, max {}'.format(k, np.mean(muh[k]), np.max(np.abs(muh[k]))))
+                for i in range(self.MAX_ITERATIONS):
+                    if self._as.is_preempt_requested():
+                        rospy.loginfo('new goal, cancel old one')
+                        # self._as.set_aborted(ControllerListResult())
+                        self._as.set_preempted(ControllerListResult())
+                        return
+                    # if not self._as.is_preempt_requested():
+                    cmd_dict = c.get_next_command()
+                    # print(cmd_dict)
+                    for k, v in cmd_dict.iteritems():
+                        muh[k].append(v)
+                    cmd_msg = self.robot.joint_vel_dict_to_msg(cmd_dict)
+                    err = max(cmd_msg.velocity)
+                    if err < 0.002:
+                        for k, v in muh.items():
+                            print('{}: avg {}, max {}'.format(k, np.mean(muh[k]), np.max(np.abs(muh[k]))))
 
-                    rospy.loginfo('goal reached')
-                    success = True
-                    break
-                self.cmd_pub.publish(cmd_msg)
+                        rospy.loginfo('goal reached')
+                        success = True
+                        break
+                    self.cmd_pub.publish(cmd_msg)
 
-                self.rate.sleep()
+                    self.rate.sleep()
+            else:
+                self.create_trajectory(c)
 
 
         if success:
@@ -131,8 +146,34 @@ class RosController(object):
                 pose_stamped.pose.position.y,
                 pose_stamped.pose.position.z, ]
 
-    def loop(self):
-        pass
+    def create_trajectory(self, controller):
+        goal = FollowJointTrajectoryGoal()
+        goal.trajectory.joint_names = self.state.joint_names
+        simulated_js = OrderedDict()
+        current_js = self.robot.get_joint_state()
+        for j in goal.trajectory.joint_names:
+            if j in current_js:
+                simulated_js[j] = current_js[j]
+            else:
+                simulated_js[j] = 0
+        step_size = 0.1
+        for i in range(self.MAX_ITERATIONS):
+            p = JointTrajectoryPoint()
+            p.time_from_start = rospy.Duration((i+1) * step_size)
+            cmd_dict = controller.get_next_command(simulated_js)
+            for i, j in enumerate(goal.trajectory.joint_names):
+                if j in cmd_dict:
+                    simulated_js[j] += cmd_dict[j]*step_size
+                    p.velocities.append(cmd_dict[j]*step_size)
+                else:
+                    p.velocities.append(0)
+                p.positions.append(simulated_js[j])
+            goal.trajectory.points.append(p)
+            if max(cmd_dict.values()) < 0.001:
+                print('done')
+                break
+        self._ac.send_goal(goal)
+
 
 
 if __name__ == '__main__':

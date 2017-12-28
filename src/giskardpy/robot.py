@@ -55,6 +55,9 @@ class Robot(object):
     def get_state(self):
         return self._state
 
+    def get_joint_state(self):
+        return OrderedDict((k, v) for k, v in self.get_state().items() if k in self.get_joint_names())
+
     def get_joint_names(self):
         return self._joints.keys()
 

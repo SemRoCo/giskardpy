@@ -50,10 +50,10 @@ class CartesianController(QPController):
 
             current_pose = robot.frames[eef]
             current_position = spw.pos_of(current_pose)
-            current_rotation = spw.rot_of(current_pose)[:3, :3]
+            current_rotation = spw.rot_of(current_pose)
 
             goal_position = self.goal_eef[eef].get_position()
-            goal_rotation = self.goal_eef[eef].get_rotation()[:3, :3]
+            goal_rotation = self.goal_eef[eef].get_rotation()
             # goal_r = goal_rotation[:3,:3].reshape(9,1)
 
             # pos control ----------------------------------------------------------------------------------------------
@@ -69,12 +69,14 @@ class CartesianController(QPController):
             # dist *= self.gain.get_expression()
 
             # rot control ----------------------------------------------------------------------------------------------
-            # dist_r = spw.norm(current_rotation.reshape(9, 1) - goal_rotation.reshape(9, 1))
-            dist_r = spw.rotation_distance(current_rotation, goal_rotation)
-            # dist_r = spw.norm(current_rotation.reshape(9, 1) - goal_rotation.reshape(9, 1))
-            # dist_r_control = spw.Min(dist_r, self.threshold_value.get_expression())
-            dist_r_control = spw.Min(dist_r, 0.05)
-            dist_r_control = dist_r_control * self.gain.get_expression() * 3.
+            # dist_r = spw.rotation_distance(current_rotation, goal_rotation)
+            # dist_r_control = spw.Min(dist_r, 0.05)
+            # dist_r_control = dist_r_control * self.gain.get_expression() * 3.
+
+            r_rot_control = 3 * current_rotation * spw.matrix_to_axis_angle(current_rotation.T*goal_rotation)
+            current_rotation_axis_angle = spw.matrix_to_axis_angle(current_rotation)
+
+
 
 
             self._soft_constraints['align {} x position'.format(eef)] = SoftConstraint(lower=trans_control[0],
@@ -92,11 +94,26 @@ class CartesianController(QPController):
                                                                                        weight=self.goal_weights[
                                                                                            eef].get_expression(),
                                                                                        expression=current_position[2])
-            self._soft_constraints['align {} rotation'.format(eef)] = SoftConstraint(lower=-dist_r_control,
-                                                                                     upper=-dist_r_control,
+            # self._soft_constraints['align {} rotation'.format(eef)] = SoftConstraint(lower=-dist_r_control,
+            #                                                                          upper=-dist_r_control,
+            #                                                                          weight=self.goal_weights[
+            #                                                                              eef].get_expression()/3,
+            #                                                                          expression=dist_r)
+            self._soft_constraints['align {} rotation 0'.format(eef)] = SoftConstraint(lower=r_rot_control[0],
+                                                                                     upper=r_rot_control[0],
                                                                                      weight=self.goal_weights[
                                                                                          eef].get_expression()/3,
-                                                                                     expression=dist_r)
+                                                                                     expression=current_rotation_axis_angle[0])
+            self._soft_constraints['align {} rotation 1'.format(eef)] = SoftConstraint(lower=r_rot_control[1],
+                                                                                     upper=r_rot_control[1],
+                                                                                     weight=self.goal_weights[
+                                                                                         eef].get_expression()/3,
+                                                                                     expression=current_rotation_axis_angle[1])
+            self._soft_constraints['align {} rotation 2'.format(eef)] = SoftConstraint(lower=r_rot_control[2],
+                                                                                     upper=r_rot_control[2],
+                                                                                     weight=self.goal_weights[
+                                                                                         eef].get_expression()/3,
+                                                                                     expression=current_rotation_axis_angle[2])
             self._controllable_constraints = robot.joint_constraints
             self._hard_constraints = robot.hard_constraints
             self.update_observables({self.goal_weights[eef].get_symbol_str(): self.weight})

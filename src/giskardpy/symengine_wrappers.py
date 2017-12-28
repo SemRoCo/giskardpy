@@ -200,14 +200,13 @@ def matrix_to_axis_angle(rotation_matrix):
     # angle = Max(-1, angle)
     # angle = Min(1, angle)
     angle = sp.acos(angle)
-    print(angle)
-    print(angle.evalf())
-    x = rm[2,1] - rm[1,2]/(sp.sqrt((rm[2,1]-rm[1,2])**2 + (rm[0,2]-rm[2,0])**2 + (rm[1,0]-rm[0,1])**2))
-    y = rm[0,2] - rm[2,0]/(sp.sqrt((rm[2,1]-rm[1,2])**2 + (rm[0,2]-rm[2,0])**2 + (rm[1,0]-rm[0,1])**2))
-    z = rm[1,0] - rm[0,1]/(sp.sqrt((rm[2,1]-rm[1,2])**2 + (rm[0,2]-rm[2,0])**2 + (rm[1,0]-rm[0,1])**2))
+    # print(angle)
+    # print(angle.evalf())
+    x = (rm[2,1] - rm[1,2])/(sp.sqrt((rm[2,1]-rm[1,2])**2 + (rm[0,2]-rm[2,0])**2 + (rm[1,0]-rm[0,1])**2))
+    y = (rm[0,2] - rm[2,0])/(sp.sqrt((rm[2,1]-rm[1,2])**2 + (rm[0,2]-rm[2,0])**2 + (rm[1,0]-rm[0,1])**2))
+    z = (rm[1,0] - rm[0,1])/(sp.sqrt((rm[2,1]-rm[1,2])**2 + (rm[0,2]-rm[2,0])**2 + (rm[1,0]-rm[0,1])**2))
     axis = sp.Matrix([x,y,z])
-    # return axis*angle
-    return axis
+    return vec3(*(axis*angle))
 
 # def quaternion_from_matrix(M):
 #     # M = numpy.array(matrix, dtype=numpy.float64, copy=False)[:4, :4]

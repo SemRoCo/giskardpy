@@ -56,8 +56,10 @@ class RosController(object):
         if self.mode == 0:
             self.cmd_pub = rospy.Publisher(cmd_topic, JointState, queue_size=100)
         else:
-            self._ac = actionlib.SimpleActionClient('/whole_body_controller/follow_joint_trajectory', FollowJointTrajectoryAction)
-            self.state_sub = rospy.Subscriber('/whole_body_controller/state', JointTrajectoryControllerState, self.state_cb)
+            # self._ac = actionlib.SimpleActionClient('/whole_body_controller/follow_joint_trajectory', FollowJointTrajectoryAction)
+            self._ac = actionlib.SimpleActionClient('/follow_joint_trajectory', FollowJointTrajectoryAction)
+            # self.state_sub = rospy.Subscriber('/whole_body_controller/state', JointTrajectoryControllerState, self.state_cb)
+            self.state_sub = rospy.Subscriber('/fake_state', JointTrajectoryControllerState, self.state_cb)
         self._as = actionlib.SimpleActionServer(self._action_name, ControllerListAction,
                                                 execute_cb=self.action_server_cb, auto_start=False)
         self._as.start()
@@ -157,12 +159,12 @@ class RosController(object):
             else:
                 simulated_js[j] = 0
         step_size = 0.1
-        for i in range(self.MAX_ITERATIONS):
+        for k in range(self.MAX_ITERATIONS):
             p = JointTrajectoryPoint()
-            p.time_from_start = rospy.Duration((i+1) * step_size)
+            p.time_from_start = rospy.Duration((k) * step_size)
             cmd_dict = controller.get_next_command(simulated_js)
             for i, j in enumerate(goal.trajectory.joint_names):
-                if j in cmd_dict:
+                if j in cmd_dict and k != 0:
                     simulated_js[j] += cmd_dict[j]*step_size
                     p.velocities.append(cmd_dict[j]*step_size)
                 else:

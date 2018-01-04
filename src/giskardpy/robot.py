@@ -34,13 +34,14 @@ def hacky_urdf_parser_fix(urdf_str):
 
 class Robot(object):
     # TODO add joint vel to internal state
-    def __init__(self, default_joint_value=0.0, default_joint_weight=1.0, urdf_str=None, root_link='base_footprint',
+    def __init__(self, default_joint_value=0.0, default_joint_weight=0.001, urdf_str=None, root_link='base_footprint',
                  tip_links=()):
         self.root_link = None
         self.default_joint_value = default_joint_value
         self.default_joint_weight = default_joint_weight
         self.urdf_robot = None
         self._joints = OrderedDict()
+        self.default_joint_vel_limit = 0.5
 
         self.frames = {}
         self._state = OrderedDict()
@@ -102,7 +103,7 @@ class Robot(object):
 
                 if joint.type != 'fixed':
                     self._joints[joint_name] = Joint(spw.Symbol(joint_name),
-                                                     joint.limit.velocity,
+                                                     min(joint.limit.velocity, self.default_joint_vel_limit),
                                                      joint.limit.lower,
                                                      joint.limit.upper,
                                                      joint.type == 'continuous')

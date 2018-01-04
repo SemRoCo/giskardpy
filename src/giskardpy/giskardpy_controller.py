@@ -5,8 +5,9 @@ import rospy
 from collections import defaultdict, OrderedDict
 
 from actionlib.simple_action_client import SimpleActionClient
+from actionlib_msgs.msg import GoalStatus
 from control_msgs.msg import FollowJointTrajectoryAction, FollowJointTrajectoryActionGoal, FollowJointTrajectoryGoal, \
-    JointTrajectoryControllerState
+    JointTrajectoryControllerState, FollowJointTrajectoryResult
 from geometry_msgs.msg._Point import Point
 from geometry_msgs.msg._PoseStamped import PoseStamped
 from geometry_msgs.msg._Quaternion import Quaternion
@@ -36,7 +37,7 @@ from giskardpy.robot import Robot
 
 
 class RosController(object):
-    MAX_ITERATIONS = 10000
+    MAX_TRAJECTORY_TIME = 10
 
     def __init__(self, robot, cmd_topic, mode=1):
         self.mode = mode
@@ -47,7 +48,7 @@ class RosController(object):
 
         # action server
         self._action_name = 'qp_controller/command'
-        self.robot = r
+        self.robot = robot
         self.joint_controller = JointSpaceControl(self.robot)
         #TODO set default joint goal
         self.cartesian_controller = CartesianController(self.robot)
@@ -56,15 +57,15 @@ class RosController(object):
         if self.mode == 0:
             self.cmd_pub = rospy.Publisher(cmd_topic, JointState, queue_size=100)
         else:
-            # self._ac = actionlib.SimpleActionClient('/whole_body_controller/follow_joint_trajectory', FollowJointTrajectoryAction)
-            self._ac = actionlib.SimpleActionClient('/follow_joint_trajectory', FollowJointTrajectoryAction)
-            # self.state_sub = rospy.Subscriber('/whole_body_controller/state', JointTrajectoryControllerState, self.state_cb)
-            self.state_sub = rospy.Subscriber('/fake_state', JointTrajectoryControllerState, self.state_cb)
+            self._ac = actionlib.SimpleActionClient('/whole_body_controller/follow_joint_trajectory', FollowJointTrajectoryAction)
+            # self._ac = actionlib.SimpleActionClient('/follow_joint_trajectory', FollowJointTrajectoryAction)
+            self.state_sub = rospy.Subscriber('/whole_body_controller/state', JointTrajectoryControllerState, self.state_cb)
+            # self.state_sub = rospy.Subscriber('/fake_state', JointTrajectoryControllerState, self.state_cb)
         self._as = actionlib.SimpleActionServer(self._action_name, ControllerListAction,
                                                 execute_cb=self.action_server_cb, auto_start=False)
         self._as.start()
-        frequency = 100
-        self.rate = rospy.Rate(frequency)
+        self.frequency = 100
+        self.rate = rospy.Rate(self.frequency)
 
         # interactive maker server
         # self.interactive_marker_server = InteractiveMarkerGoal(robot.root_link, robot.end_effectors)
@@ -99,7 +100,7 @@ class RosController(object):
                 rospy.loginfo('set cartesian goal')
                 root_link_goal = self.transformPose('base_footprint', controller.goal_pose)
                 self.cartesian_controller.set_goal({controller.tip_link: self.pose_stamped_to_list(root_link_goal)})
-                print('goal: {}'.format(root_link_goal))
+                # print('goal: {}'.format(root_link_goal))
                 c = self.cartesian_controller
             # print(self.robot.get_eef_position2())
 
@@ -107,7 +108,7 @@ class RosController(object):
             if self.mode == 0:
                 muh = defaultdict(list)
 
-                for i in range(self.MAX_ITERATIONS):
+                for i in range(self.MAX_TRAJECTORY_TIME):
                     if self._as.is_preempt_requested():
                         rospy.loginfo('new goal, cancel old one')
                         # self._as.set_aborted(ControllerListResult())
@@ -131,11 +132,12 @@ class RosController(object):
 
                     self.rate.sleep()
             else:
-                self.create_trajectory(c)
+                success = self.create_trajectory(c)
 
 
         if success:
             self._as.set_succeeded(ControllerListResult())
+            print('success')
         else:
             self._as.set_aborted(ControllerListResult())
 
@@ -149,7 +151,9 @@ class RosController(object):
                 pose_stamped.pose.position.z, ]
 
     def create_trajectory(self, controller):
+        self._ac.cancel_all_goals()
         goal = FollowJointTrajectoryGoal()
+        # goal.trajectory.header.stamp = rospy.get_rostime() + rospy.Duration(0.5)
         goal.trajectory.joint_names = self.state.joint_names
         simulated_js = OrderedDict()
         current_js = self.robot.get_joint_state()
@@ -158,23 +162,50 @@ class RosController(object):
                 simulated_js[j] = current_js[j]
             else:
                 simulated_js[j] = 0
-        step_size = 0.1
-        for k in range(self.MAX_ITERATIONS):
+        step_size = 1. / self.frequency
+        for k in range(int(self.MAX_TRAJECTORY_TIME/step_size)):
             p = JointTrajectoryPoint()
-            p.time_from_start = rospy.Duration((k) * step_size)
-            cmd_dict = controller.get_next_command(simulated_js)
+            p.time_from_start = rospy.Duration((k+1) * step_size)
+            if k != 0:
+                cmd_dict = controller.get_next_command(simulated_js)
             for i, j in enumerate(goal.trajectory.joint_names):
-                if j in cmd_dict and k != 0:
+                if k > 0 and j in cmd_dict:
                     simulated_js[j] += cmd_dict[j]*step_size
-                    p.velocities.append(cmd_dict[j]*step_size)
+                    p.velocities.append(cmd_dict[j])
                 else:
                     p.velocities.append(0)
+                    pass
                 p.positions.append(simulated_js[j])
             goal.trajectory.points.append(p)
-            if max(cmd_dict.values()) < 0.001:
+            if k > 0 and np.abs(cmd_dict.values()).max() < 0.01:
                 print('done')
                 break
-        self._ac.send_goal(goal)
+        if self._as.is_preempt_requested():
+            rospy.loginfo('new goal, cancel old one')
+            # self._as.set_aborted(ControllerListResult())
+            # self._as.set_preempted(ControllerListResult())
+            self._ac.cancel_all_goals()
+            return False
+        else:
+            print('waiting for {:.3f} sec with {} points'.format(p.time_from_start.to_sec(), len(goal.trajectory.points)))
+            # r = self._ac.send_goal_and_wait(goal, rospy.Duration(10))
+            self._ac.send_goal(goal)
+            t = rospy.get_rostime()
+            while not self._ac.wait_for_result(rospy.Duration(.1)):
+                # print('not done yet')
+                if self._as.is_preempt_requested():
+                    rospy.loginfo('new goal, cancel old one')
+                    # self._as.set_aborted(ControllerListResult())
+                    # self._as.set_preempted(ControllerListResult())
+                    self._ac.cancel_all_goals()
+                    return False
+            print('shit took {:.3f}s'.format((rospy.get_rostime()-t).to_sec()))
+            # if self._ac.wait_for_result(rospy.Duration(10)):
+            r = self._ac.get_result()
+            print('real result {}'.format(r))
+            if r.error_code == FollowJointTrajectoryResult.SUCCESSFUL:
+                return True
+        return False
 
 
 

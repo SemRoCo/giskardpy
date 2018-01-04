@@ -1,5 +1,5 @@
 import symengine as sp
-from symengine import Matrix, Symbol, eye, sympify, diag, zeros, lambdify #, Abs , Max, Min
+from symengine import Matrix, Symbol, eye, sympify, diag, zeros, lambdify, Abs , Max, Min
 import numpy as np
 import sympy as sp2
 from tf.transformations import quaternion_about_axis
@@ -9,15 +9,15 @@ from giskardpy import BACKEND
 pathSeparator = '__'
 
 
-def Abs(x):
+def fake_Abs(x):
     return sp.sqrt(x**2)
 
-def Max(x, y):
-    return ((x + y) + Abs(x - y)) / 2
+def fake_Max(x, y):
+    return ((x + y) + fake_Abs(x - y)) / 2
 
 
-def Min(x, y):
-    return ((x + y) - Abs(x - y)) / 2
+def fake_Min(x, y):
+    return ((x + y) - fake_Abs(x - y)) / 2
 
 
 # @profile
@@ -206,7 +206,7 @@ def matrix_to_axis_angle(rotation_matrix):
     y = (rm[0,2] - rm[2,0])/(sp.sqrt((rm[2,1]-rm[1,2])**2 + (rm[0,2]-rm[2,0])**2 + (rm[1,0]-rm[0,1])**2))
     z = (rm[1,0] - rm[0,1])/(sp.sqrt((rm[2,1]-rm[1,2])**2 + (rm[0,2]-rm[2,0])**2 + (rm[1,0]-rm[0,1])**2))
     axis = sp.Matrix([x,y,z])
-    return vec3(*(axis*angle))
+    return axis, angle
 
 # def quaternion_from_matrix(M):
 #     # M = numpy.array(matrix, dtype=numpy.float64, copy=False)[:4, :4]

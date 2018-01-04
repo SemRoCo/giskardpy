@@ -17,7 +17,7 @@ class QPSolver(object):
 
     def solve(self, H, g, A, lb, ub, lbA, ubA, nWSR=None):
         if nWSR is None:
-            nWSR = np.array([1000])
+            nWSR = np.array([100])
         if not self.started:
             success = self.qpProblem.init(H, g, A, lb, ub, lbA, ubA, nWSR)
             if success != PyReturnValue.SUCCESSFUL_RETURN:

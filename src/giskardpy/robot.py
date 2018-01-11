@@ -21,6 +21,7 @@ class Robot(object):
     # TODO add joint vel to internal state
     def __init__(self):
         self.urdf_robot = None
+        self.urdf_file  = None
         self._joints = OrderedDict()
 
         self.frames = {}
@@ -170,6 +171,7 @@ class Robot(object):
         return eef
 
     def load_from_urdf_path(self, urdf_path, root_link, tip_links):
+        self.urdf_path = urdf_path
         return self.load_from_urdf(URDF.from_xml_file(urdf_path), root_link, tip_links)
 
     def load_from_urdf_string(self, urdf_strg, root_link, tip_links):

@@ -5,3 +5,6 @@ USE_SYMENGINE = True
 # BACKEND = 'cython'
 BACKEND = 'llvm'
 # BACKEND = 'numpy'
+
+def print_wrapper(msg):
+	print(msg)

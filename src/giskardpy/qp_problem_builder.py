@@ -4,6 +4,7 @@ import numpy as np
 from time import time
 
 from giskardpy import USE_SYMENGINE
+from giskardpy import print_wrapper
 
 if USE_SYMENGINE:
     import giskardpy.symengine_wrappers as spw
@@ -34,8 +35,9 @@ def format_matrix(matrix, mat_str):
 
 
 class QProblemBuilder(object):
-    def __init__(self, joint_constraints_dict, hard_constraints_dict, soft_constraints_dict, backend=None):
+    def __init__(self, joint_constraints_dict, hard_constraints_dict, soft_constraints_dict, backend=None, logging=print_wrapper):
         self.backend = backend
+        self.logging = logging
         self.joint_constraints_dict = joint_constraints_dict
         self.hard_constraints_dict = hard_constraints_dict
         self.soft_constraints_dict = soft_constraints_dict
@@ -90,7 +92,7 @@ class QProblemBuilder(object):
         A_soft = spw.Matrix(soft_expressions)
         t = time()
         A_soft = A_soft.jacobian(M_controlled_joints)
-        print('jacobian took {}'.format(time() - t))
+        self.logging('jacobian took {}'.format(time() - t))
         identity = spw.eye(A_soft.shape[0])
         A_soft = A_soft.row_join(identity)
 
@@ -112,7 +114,7 @@ class QProblemBuilder(object):
         self.cython_lbA = spw.speed_up(self.lbA, self.lbA.free_symbols)
 
         self.cython_ubA = spw.speed_up(self.ubA, self.ubA.free_symbols)
-        print('autowrap took {}'.format(time() - t))
+        self.logging('autowrap took {}'.format(time() - t))
 
         # Strings for printing
         col_names = self.controlled_joints_strs + ['slack'] * len(soft_expressions)
@@ -141,8 +143,14 @@ class QProblemBuilder(object):
             return None
         return OrderedDict((observable, xdot_full[i]) for i, observable in enumerate(self.controlled_joints_strs))
 
+    def constraints_met(self, lbThreshold=0.01, ubThreshold=-0.01):
+        for x in range(len(self.np_lbA)):
+            if self.np_lbA[x] > lbThreshold or self.np_ubA[x] < ubThreshold:
+                return False
+        return True
+
     def str_jacobian(self):
         return format_matrix(self.np_A, self.str_A)
 
-    def print_jacobian(self):
-        print('Matrix A: \n{}'.format(self.str_jacobian()))
+    def log_jacobian(self):
+        self.logging('Matrix A: \n{}'.format(self.str_jacobian()))

@@ -1,11 +1,13 @@
 from collections import OrderedDict
 from giskardpy.qp_problem_builder import QProblemBuilder
 from giskardpy.controller import Controller
+from giskardpy import print_wrapper
 
 
 class QPController(Controller):
-    def __init__(self, robot, builder_backend=None):
+    def __init__(self, robot, builder_backend=None, logging=print_wrapper):
         self.builder_backend = builder_backend
+        self.logging = logging
         super(QPController, self).__init__(robot)
 
     def init(self):
@@ -28,7 +30,8 @@ class QPController(Controller):
         self.qp_problem_builder = QProblemBuilder(self._controllable_constraints,
                                                   self._hard_constraints,
                                                   self._soft_constraints,
-                                                  self.builder_backend)
+                                                  self.builder_backend,
+                                                  self.logging)
 
     def get_next_command(self):
         # TODO add dt parameter and return next state + cmds instead of only cmds

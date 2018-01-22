@@ -151,3 +151,6 @@ class FrameInput(ControllerInputArray):
 
     def get_rotation(self):
         return spw.rotation3_quaternion(*self._symbol_map.values()[:4])
+
+    def get_quaternion(self):
+        return spw.Matrix(self._symbol_map.values()[:4])

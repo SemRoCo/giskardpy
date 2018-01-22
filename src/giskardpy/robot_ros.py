@@ -4,10 +4,11 @@ from giskardpy.robot import Robot
 
 
 class RobotRos(Robot):
-    def __init__(self, default_joint_value=0.0, default_joint_weight=0.001, urdf_str=None, root_link='base_footprint',
+    def __init__(self, default_joint_value=0.0, default_joint_weight=0.0001, urdf_str=None, root_link='base_footprint',
                  tip_links=()):
         super(RobotRos, self).__init__(default_joint_value, default_joint_weight, urdf_str, root_link, tip_links)
         self.joint_sub = rospy.Subscriber('joint_states', JointState, self.joint_state_sub, queue_size=100)
+        rospy.sleep(0.1)
 
     def joint_state_sub(self, joint_state):
         self.set_joint_state(self.joint_state_msg_to_dict(joint_state))

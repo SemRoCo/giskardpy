@@ -1,7 +1,7 @@
 from collections import namedtuple, OrderedDict
 from time import time
 
-from tf.transformations import quaternion_from_matrix
+from tf.transformations import quaternion_from_matrix, quaternion_from_euler
 from urdf_parser_py.urdf import URDF
 
 from giskardpy import USE_SYMENGINE
@@ -15,6 +15,7 @@ else:
     import giskardpy.sympy_wrappers as spw
 
 Joint = namedtuple('Joint', ['symbol', 'velocity_limit', 'lower', 'upper', 'limitless'])
+
 
 def hacky_urdf_parser_fix(urdf_str):
     fixed_urdf = ''
@@ -32,9 +33,10 @@ def hacky_urdf_parser_fix(urdf_str):
             fixed_urdf += line + '\n'
     return fixed_urdf
 
+
 class Robot(object):
     # TODO add joint vel to internal state
-    def __init__(self, default_joint_value=0.0, default_joint_weight=0.001, urdf_str=None, root_link='base_footprint',
+    def __init__(self, default_joint_value=0.0, default_joint_weight=0.0001, urdf_str=None, root_link='base_footprint',
                  tip_links=()):
         self.root_link = None
         self.default_joint_value = default_joint_value
@@ -44,6 +46,8 @@ class Robot(object):
         self.default_joint_vel_limit = 0.5
 
         self.frames = {}
+        self.q_rot = {}
+        self.aa_rot = {}
         self._state = OrderedDict()
         self.hard_constraints = OrderedDict()
         self.joint_constraints = OrderedDict()
@@ -88,6 +92,7 @@ class Robot(object):
 
         jointsAndLinks = self.urdf_robot.get_chain(root_link, tip_link, True, True, True)
         parentFrame = self.frames[root_link]
+        parentq = self.q_rot[root_link]
         for i in range(1, len(jointsAndLinks), 2):
             joint_name = jointsAndLinks[i]
             link_name = jointsAndLinks[i + 1]
@@ -96,8 +101,18 @@ class Robot(object):
             if joint_name not in self._joints:
                 if joint.type in ['fixed', 'revolute', 'continuous', 'prismatic']:
                     self.frames[link_name] = parentFrame
+                    self.q_rot[link_name] = parentq
+                    # self.aa_rot[link_name] = parentaa
+
                     self.frames[link_name] *= spw.translation3(*joint.origin.xyz)
                     self.frames[link_name] *= spw.rotation3_rpy(*joint.origin.rpy)
+
+                    q = spw.quaternion_from_rpy(*joint.origin.rpy)
+                    self.q_rot[link_name] = spw.quaternion_multiply(self.q_rot[link_name], q)
+
+                    # axis, angle = spw.axis_angle_from_rpy(*joint.origin.rpy)
+                    # aa = axis * angle
+                    # self.aa_rot[link_name] = spw.quaternion_multiply(self.q_rot[link_name], q)
                 else:
                     raise Exception('Joint type "{}" is not supported by urdf parser.'.format(joint.type))
 
@@ -110,11 +125,16 @@ class Robot(object):
 
                 if joint.type == 'revolute' or joint.type == 'continuous':
                     self.frames[link_name] *= spw.rotation3_axis_angle(spw.vec3(*joint.axis), spw.Symbol(joint_name))
+                    q = spw.quaterntion_from_axis_angle(spw.vec3(*joint.axis), spw.Symbol(joint_name))
+                    self.q_rot[link_name] = spw.quaternion_multiply(self.q_rot[link_name], q)
+
+                    self.aa_rot[link_name] = self.frames[link_name] * (spw.vec3(*joint.axis)*spw.Symbol(joint_name))
 
                 elif joint.type == 'prismatic':
                     self.frames[link_name] *= spw.translation3(*(spw.point3(*joint.axis) * spw.Symbol(joint_name))[:3])
 
             parentFrame = self.frames[link_name]
+            parentq = self.q_rot[link_name]
 
     # @profile
     def load_from_urdf(self, urdf_robot, root_link, tip_links, root_frame=None):
@@ -132,6 +152,10 @@ class Robot(object):
         self.root_link = root_link
 
         self.frames[root_link] = root_frame if root_frame is not None else spw.eye(4)
+        if root_frame is not None:
+            raise NotImplementedError("quaternion from root_frame not implemented")
+        else:
+            self.q_rot[root_link] = spw.Matrix([0, 0, 0, 1])
         self.end_effectors = tip_links
         t = time()
         for tip_link in tip_links:
@@ -190,6 +214,42 @@ class Robot(object):
             eef_rot = quaternion_from_matrix(eef_rot)
             eef[eef_name] = np.concatenate((eef_rot, eef_pos))
         return eef
+
+    def link_fk(self, link):
+        eef_joints = self.frames[link].free_symbols
+        eef_joint_symbols = [self.get_joint_state_input().to_str_symbol(str(x)) for x in eef_joints]
+        js = {k: self.get_state()[k] for k in eef_joint_symbols}
+        evaled_frame = self.fast_frames[link](**js)
+        # eef_pos = np.array(pos_of(evaled_frame).tolist(), dtype=float)[:-1].reshape(3)
+        # eef_rot = np.array(rot_of(evaled_frame).tolist(), dtype=float)
+        # eef_rot = quaternion_from_matrix(eef_rot)
+        return spw.Matrix(evaled_frame.tolist())
+
+    def get_jacobian(self, tip, js_dict):
+        f = self.frames[tip]
+        x = f[0, 3]
+        y = f[1, 3]
+        z = f[2, 3]
+
+        current_rotation = spw.rot_of(f)
+        hack = spw.rotation3_axis_angle([0, 0, 1], 0.001)
+        start_rotation = self.get_eef_position()[tip]
+
+        axis, angle = spw.axis_angle_from_matrix((current_rotation.T * (start_rotation * hack)).T)
+        c_aa = current_rotation[:3, :3] * (axis * angle)
+
+
+        # axis, angle = spw.axis_angle_from_quaternion(self.q_rot[tip])
+        # axis, angle = spw.axis_angle_from_matrix(rot)
+        # axis_angle = axis * angle
+        rx = c_aa[0]
+        ry = c_aa[1]
+        rz = c_aa[2]
+        m = spw.Matrix([x, y, z, rx, ry, rz])
+        j = m.jacobian(spw.Matrix(self.get_joint_names()))
+
+        j_np = np.array(j.subs(js_dict)).astype(float)
+        return j_np
 
     def load_from_urdf_path(self, urdf_path, root_link, tip_links):
         return self.load_from_urdf(URDF.from_xml_file(urdf_path), root_link, tip_links)

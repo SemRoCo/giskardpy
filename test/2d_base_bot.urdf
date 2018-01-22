@@ -17,7 +17,7 @@
 
   <link name="link1"/>
 
-  <joint name="joint_y" type="prismatic">
+  <joint name="joint_y" type="revolute">
     <parent link="link1"/>
     <child link="link2"/>
     <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0"/>

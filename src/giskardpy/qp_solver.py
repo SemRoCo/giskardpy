@@ -4,7 +4,7 @@ from qpoases import PyReturnValue
 
 
 class QPSolver(object):
-    RETURN_VALUE_DICT = dict([(value, name) for name, value in vars(PyReturnValue).iteritems()])
+    RETURN_VALUE_DICT = {value: name for name, value in vars(PyReturnValue).iteritems()}
 
     def __init__(self, dim_a, dim_b):
         self.qpProblem = qpoases.PySQProblem(dim_a, dim_b)
@@ -28,6 +28,7 @@ class QPSolver(object):
             success = self.qpProblem.hotstart(H, g, A, lb, ub, lbA, ubA, nWSR)
             if success != PyReturnValue.SUCCESSFUL_RETURN:
                 print("Failed to hot start QP-problem. ERROR: {}".format(self.RETURN_VALUE_DICT[success]))
+                self.started = False
                 return None
 
         self.qpProblem.getPrimalSolution(self.xdot_full)

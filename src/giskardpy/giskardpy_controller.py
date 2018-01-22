@@ -3,7 +3,7 @@ import numpy as np
 import actionlib
 import rospy
 from collections import defaultdict, OrderedDict
-
+import pylab as plt
 from actionlib.simple_action_client import SimpleActionClient
 from actionlib_msgs.msg import GoalStatus
 from control_msgs.msg import FollowJointTrajectoryAction, FollowJointTrajectoryActionGoal, FollowJointTrajectoryGoal, \
@@ -177,7 +177,7 @@ class RosController(object):
                     pass
                 p.positions.append(simulated_js[j])
             goal.trajectory.points.append(p)
-            if k > 0 and np.abs(cmd_dict.values()).max() < 0.01:
+            if k > 0 and np.abs(cmd_dict.values()).max() < 0.0025:
                 print('done')
                 break
         if self._as.is_preempt_requested():
@@ -189,6 +189,7 @@ class RosController(object):
         else:
             print('waiting for {:.3f} sec with {} points'.format(p.time_from_start.to_sec(), len(goal.trajectory.points)))
             # r = self._ac.send_goal_and_wait(goal, rospy.Duration(10))
+            self.plot_trajectory(goal.trajectory)
             self._ac.send_goal(goal)
             t = rospy.get_rostime()
             while not self._ac.wait_for_result(rospy.Duration(.1)):
@@ -207,7 +208,19 @@ class RosController(object):
                 return True
         return False
 
-
+    def plot_trajectory(self, tj):
+        positions = []
+        velocities = []
+        for point in tj.points:
+            positions.append(point.positions)
+            velocities.append(point.velocities)
+        positions = np.array(positions)
+        velocities = np.array(velocities)
+        # plt.plot(positions-positions.mean(axis=0))
+        # plt.show()
+        # plt.plot(velocities)
+        # plt.show()
+        pass
 
 if __name__ == '__main__':
     rospy.init_node('giskardpy_controller')

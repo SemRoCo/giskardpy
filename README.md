@@ -3,9 +3,18 @@ The core python library of the Giskard framework for constraint- and optimizatio
 
 ## Installation instructions for 16.04/kinetic
 
-First install sympy using pip because python-sympy, which can be installed using apt, is outdated.
+First install symengine + symengine.py
 ```
-sudo pip install sympy
+git clone https://github.com/symengine/symengine.git
+cd symengine
+git checkout 2f5ff9db9ff511ee243438a85ea8e2da2d05af39
+cmake -DWITH_LLVM:BOOL=ON .
+make
+make install
+cd ..
+git clone https://github.com/symengine/symengine.py.git
+cd symengine.py
+sudo python setup.py install
 ```
 
 Now create the workspace

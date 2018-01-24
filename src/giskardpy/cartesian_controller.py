@@ -24,8 +24,8 @@ class CartesianController(QPController):
         self.default_trans_gain = 3
 
         # self.default_rot_threshold = 0.2
-        self.max_rot_speed = 1  # rad/s
-        self.default_rot_gain = 2
+        self.max_rot_speed = 0.5  # rad/s
+        self.default_rot_gain = 3
 
         super(CartesianController, self).__init__(robot, builder_backend)
 
@@ -121,9 +121,10 @@ class CartesianController(QPController):
             axis = current_rotation * spw.vec3(*axis)
             r_rot_control = axis * capped_angle
 
-            hack = spw.rotation3_axis_angle([0,0,1],0.001)
+            hack = spw.rotation3_axis_angle([0,0,1],0.0001)
 
             axis, angle = spw.axis_angle_from_matrix((current_rotation.T * (start_rotation*hack)).T)
+            # axis, angle = spw.axis_angle_from_matrix((current_rotation.T * current_rotation).T)
             c_aa = current_rotation[:3,:3]*(axis*angle)
 
             # c_axis, c_angle = spw.axis_angle_from_matrix(spw.eye(4))

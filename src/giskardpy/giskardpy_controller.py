@@ -29,6 +29,7 @@ from visualization_msgs.msg._Marker import Marker
 
 from giskardpy.cartesian_controller import CartesianController
 from giskardpy.cartesian_controller_old import CartesianControllerOld
+from giskardpy.cartesian_line_controller import CartesianLineController
 from giskardpy.donbot import DonBot
 from giskardpy.joint_space_control import JointSpaceControl
 from giskardpy.pr2 import PR2
@@ -51,7 +52,8 @@ class RosController(object):
         self.robot = robot
         self.joint_controller = JointSpaceControl(self.robot)
         #TODO set default joint goal
-        self.cartesian_controller = CartesianController(self.robot)
+        # self.cartesian_controller = CartesianController(self.robot)
+        self.cartesian_controller = CartesianLineController(self.robot)
         # self.cartesian_controller = CartesianControllerOld(self.robot)
         self.set_default_goals()
         if self.mode == 0:
@@ -120,14 +122,6 @@ class RosController(object):
                     for k, v in cmd_dict.iteritems():
                         muh[k].append(v)
                     cmd_msg = self.robot.joint_vel_dict_to_msg(cmd_dict)
-                    err = max(cmd_msg.velocity)
-                    if err < 0.002:
-                        for k, v in muh.items():
-                            print('{}: avg {}, max {}'.format(k, np.mean(muh[k]), np.max(np.abs(muh[k]))))
-
-                        rospy.loginfo('goal reached')
-                        success = True
-                        break
                     self.cmd_pub.publish(cmd_msg)
 
                     self.rate.sleep()

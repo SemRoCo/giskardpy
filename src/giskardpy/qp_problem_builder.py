@@ -115,6 +115,7 @@ class QProblemBuilder(object):
 
         xdot_full = self.qp_solver.solve(self.np_H, self.np_g, self.np_A,
                                          self.np_lb, self.np_ub, self.np_lbA, self.np_ubA)
+        # print(xdot_full[-7:])
         if xdot_full is None:
             return None
         return OrderedDict((observable, xdot_full[i]) for i, observable in enumerate(self.controlled_joints_strs))

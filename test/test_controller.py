@@ -104,7 +104,7 @@ class TestController(unittest.TestCase):
             self.assertAlmostEqual(v, r.get_state()[k])
 
     def test_jointcontroller_donbot(self):
-        r = DonBot(weight=.01)
+        r = DonBot()
         c = JointSpaceControl(r, weight=1)
 
         goal_dict = {'ur5_shoulder_pan_joint': 0.2,

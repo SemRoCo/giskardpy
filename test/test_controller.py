@@ -13,6 +13,7 @@ from giskardpy.cartesian_line_controller import CartesianLineController
 from giskardpy.donbot import DonBot
 from giskardpy.eef_dist_controller import EEFDiffController
 from giskardpy.eef_position_controller import EEFPositionControl
+from giskardpy.giskardpy_controller import trajectory_rollout
 from giskardpy.pointy_bot import PointyBot
 from giskardpy.joint_space_control import JointSpaceControl
 from giskardpy.pr2 import PR2
@@ -189,7 +190,7 @@ class TestController(unittest.TestCase):
         start_dict = {'joint_x': start[0],
                       'joint_y': start[1],
                       'rot_z': start[2]}
-        goal = {'eef': [1, 1, 0]}
+        goal = {'eef': [1, 0, 0]}
 
         r.set_joint_state(start_dict)
         c.set_goal(goal)
@@ -301,8 +302,7 @@ class TestController(unittest.TestCase):
     def test_cart_controller_donbot(self):
         t = time()
         r = DonBot()
-        # c = CartesianController(r)
-        c = CartesianControllerOld(r, gain=1)
+        c = CartesianController(r)
         eef = 'gripper_tool_frame'
         print('init took {}'.format(time() - t))
 
@@ -311,22 +311,13 @@ class TestController(unittest.TestCase):
         c.set_goal(goal)
         print('iteration #{}: {}'.format(-1, r.get_eef_position2()[eef]))
 
-        ts = []
-        for i in range(1000):
-            t = time()
-            cmd_dict = c.get_next_command()
-            ts.append(time() - t)
-            self.assertIsNotNone(cmd_dict)
-            next_state = OrderedDict()
-            robot_state = r.get_state()
-            for j, (joint_name, joint_change) in enumerate(cmd_dict.items()):
-                next_state[joint_name] = robot_state[joint_name] + joint_change
-            r.set_joint_state(next_state)
-        print('iteration #{}: {}'.format(i + 1, r.get_eef_position2()[eef]))
+        t = time()
+        goal_msg = trajectory_rollout(c, c.get_robot().get_joint_names())
+        print('traj rollout took {}s'.format(time()-t))
+        end_joint_state = goal_msg.trajectory.points[-1]
+        r.set_joint_state(dict(zip(goal_msg.trajectory.joint_names, end_joint_state.positions)))
         np.testing.assert_array_almost_equal(r.get_eef_position2()[eef],
                                              goal[eef], decimal=2)
-        print('next cmd took {} mean'.format(np.mean(ts)))
-        print('next cmd took {} std'.format(np.std(ts)))
 
     def test_cart_line_controller_pr2(self):
         t = time()

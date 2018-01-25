@@ -35,7 +35,36 @@ from giskardpy.joint_space_control import JointSpaceControl
 from giskardpy.pr2 import PR2
 from giskardpy.robot import Robot
 
-
+def trajectory_rollout(controller, joint_names, time_limit=10, frequency=100):
+    goal = FollowJointTrajectoryGoal()
+    # goal.trajectory.header.stamp = rospy.get_rostime() + rospy.Duration(0.5)
+    goal.trajectory.joint_names = joint_names
+    simulated_js = OrderedDict()
+    current_js = controller.get_robot().get_joint_state()
+    for j in goal.trajectory.joint_names:
+        if j in current_js:
+            simulated_js[j] = current_js[j]
+        else:
+            simulated_js[j] = 0
+    step_size = 1. / frequency
+    for k in range(int(time_limit / step_size)):
+        p = JointTrajectoryPoint()
+        p.time_from_start = rospy.Duration((k + 1) * step_size)
+        if k != 0:
+            cmd_dict = controller.get_next_command(simulated_js)
+        for i, j in enumerate(goal.trajectory.joint_names):
+            if k > 0 and j in cmd_dict:
+                simulated_js[j] += cmd_dict[j] * step_size
+                p.velocities.append(cmd_dict[j])
+            else:
+                p.velocities.append(0)
+                pass
+            p.positions.append(simulated_js[j])
+        goal.trajectory.points.append(p)
+        if k > 0 and np.abs(cmd_dict.values()).max() < 0.0025:
+            print('done')
+            break
+    return goal
 
 class RosController(object):
     MAX_TRAJECTORY_TIME = 10
@@ -52,8 +81,8 @@ class RosController(object):
         self.robot = robot
         self.joint_controller = JointSpaceControl(self.robot)
         #TODO set default joint goal
-        # self.cartesian_controller = CartesianController(self.robot)
-        self.cartesian_controller = CartesianLineController(self.robot)
+        self.cartesian_controller = CartesianController(self.robot)
+        # self.cartesian_controller = CartesianLineController(self.robot)
         # self.cartesian_controller = CartesianControllerOld(self.robot)
         self.set_default_goals()
         if self.mode == 0:
@@ -146,34 +175,7 @@ class RosController(object):
 
     def create_trajectory(self, controller):
         self._ac.cancel_all_goals()
-        goal = FollowJointTrajectoryGoal()
-        # goal.trajectory.header.stamp = rospy.get_rostime() + rospy.Duration(0.5)
-        goal.trajectory.joint_names = self.state.joint_names
-        simulated_js = OrderedDict()
-        current_js = self.robot.get_joint_state()
-        for j in goal.trajectory.joint_names:
-            if j in current_js:
-                simulated_js[j] = current_js[j]
-            else:
-                simulated_js[j] = 0
-        step_size = 1. / self.frequency
-        for k in range(int(self.MAX_TRAJECTORY_TIME/step_size)):
-            p = JointTrajectoryPoint()
-            p.time_from_start = rospy.Duration((k+1) * step_size)
-            if k != 0:
-                cmd_dict = controller.get_next_command(simulated_js)
-            for i, j in enumerate(goal.trajectory.joint_names):
-                if k > 0 and j in cmd_dict:
-                    simulated_js[j] += cmd_dict[j]*step_size
-                    p.velocities.append(cmd_dict[j])
-                else:
-                    p.velocities.append(0)
-                    pass
-                p.positions.append(simulated_js[j])
-            goal.trajectory.points.append(p)
-            if k > 0 and np.abs(cmd_dict.values()).max() < 0.0025:
-                print('done')
-                break
+        goal = trajectory_rollout(controller, self.state.joint_names, self.MAX_TRAJECTORY_TIME, self.frequency)
         if self._as.is_preempt_requested():
             rospy.loginfo('new goal, cancel old one')
             # self._as.set_aborted(ControllerListResult())
@@ -181,9 +183,10 @@ class RosController(object):
             self._ac.cancel_all_goals()
             return False
         else:
-            print('waiting for {:.3f} sec with {} points'.format(p.time_from_start.to_sec(), len(goal.trajectory.points)))
+            print('waiting for {:.3f} sec with {} points'.format(goal.trajectory.points[-1].time_from_start.to_sec(),
+                                                                 len(goal.trajectory.points)))
             # r = self._ac.send_goal_and_wait(goal, rospy.Duration(10))
-            self.plot_trajectory(goal.trajectory)
+            # self.plot_trajectory(goal.trajectory)
             self._ac.send_goal(goal)
             t = rospy.get_rostime()
             while not self._ac.wait_for_result(rospy.Duration(.1)):

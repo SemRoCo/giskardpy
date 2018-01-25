@@ -89,10 +89,12 @@ class CartesianLineController(QPController):
 
             axis, angle = spw.axis_angle_from_matrix((current_rotation.T * goal_rotation))
             capped_angle = spw.fake_Min(angle * self.default_rot_gain, self.max_rot_speed)
-            axis = spw.vec3(*axis)
             r_rot_control = axis * capped_angle
 
-            axis, angle = spw.axis_angle_from_matrix((current_rotation.T * goal_rotation).T)
+            hack = spw.rotation3_axis_angle([0, 0, 1], 0.0001)
+
+            axis, angle = spw.axis_angle_from_matrix((current_rotation.T * (start_rotation * hack)).T)
+            # axis, angle = spw.axis_angle_from_matrix((current_rotation.T * current_rotation).T)
             c_aa = (axis * angle)
 
             self._soft_constraints['align {} rotation 0'.format(eef)] = SoftConstraint(

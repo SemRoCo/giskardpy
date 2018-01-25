@@ -3,6 +3,7 @@ from symengine import Matrix, Symbol, eye, sympify, diag, zeros, lambdify, Abs, 
     atan, atan2, nan, sqrt, log
 import numpy as np
 import sympy as sp2
+from symengine.lib.symengine_wrapper import Lambdify
 
 from giskardpy import BACKEND
 
@@ -25,7 +26,10 @@ def fake_Min(x, y):
 def speed_up(function, parameters, backend=None):
     str_params = [str(x) for x in parameters]
     if len(parameters) == 0:
-        constant_result = np.array(function).astype(float).reshape(function.shape)
+        try:
+            constant_result = np.array(function).astype(float).reshape(function.shape)
+        except:
+            return
 
         def f(**kwargs):
             return constant_result
@@ -39,11 +43,11 @@ def speed_up(function, parameters, backend=None):
     else:
 
         try:
-            fast_f = lambdify(list(parameters), function, backend=backend)
+            fast_f = Lambdify(list(parameters), function, backend=backend, cse=True)
         except RuntimeError as e:
             try:
                 print('WARNING RuntimeError: "{}" during lambdify with LLVM backend, fallback to numpy'.format(e))
-                fast_f = lambdify(list(parameters), function, backend='lambda')
+                fast_f = Lambdify(list(parameters), function, backend='lambda', cse=True)
             except RuntimeError as e:
                 print('WARNING RuntimeError: "{}" during lambdify with lambda backend, no speedup possible'.format(e))
 
@@ -55,7 +59,7 @@ def speed_up(function, parameters, backend=None):
 
         def f(**kwargs):
             filtered_args = [kwargs[k] for k in str_params]
-            return np.nan_to_num(np.asarray(fast_f(*filtered_args)).reshape(function.shape))
+            return np.nan_to_num(np.asarray(fast_f(filtered_args)).reshape(function.shape))
 
     return f
 
@@ -65,9 +69,6 @@ def cross(u, v):
                       u[2] * v[0] - u[0] * v[2],
                       u[0] * v[1] - u[1] * v[0]])
 
-
-# def cross(u,v):
-#     return u.cross(v)
 
 def vec3(x, y, z):
     return sp.Matrix([x, y, z, 0])

@@ -63,6 +63,10 @@ class CartesianController(QPController):
             current_rotation = spw.rot_of(current_pose)
             current_quaternion = robot.q_rot[eef]
 
+            current_pose_evaluated = robot.current_frame[eef].get_expression()
+            current_position_evaluated = spw.pos_of(current_pose_evaluated)
+            current_rotation_evaluated = spw.rot_of(current_pose_evaluated)
+
             goal_position = self.goal_eef[eef].get_position()
             goal_rotation = self.goal_eef[eef].get_rotation()
             goal_quaternion = self.goal_eef[eef].get_quaternion()
@@ -113,9 +117,6 @@ class CartesianController(QPController):
 
             # georg style
 
-            # dist_r = spw.rotation_distance(current_rotation, goal_rotation)
-            # dist_r_control = spw.Min(dist_r * self.default_rot_gain, self.max_rot_speed)
-
             axis, angle = spw.axis_angle_from_matrix((current_rotation.T * goal_rotation))
             capped_angle = spw.fake_Min(angle * self.default_rot_gain, self.max_rot_speed)
             axis = axis
@@ -123,24 +124,9 @@ class CartesianController(QPController):
 
             hack = spw.rotation3_axis_angle([0,0,1],0.0001)
 
-            axis, angle = spw.axis_angle_from_matrix((current_rotation.T * (start_rotation*hack)).T)
-            # axis, angle = spw.axis_angle_from_matrix((current_rotation.T * current_rotation).T)
+            axis, angle = spw.axis_angle_from_matrix((current_rotation.T * (current_rotation_evaluated*hack)).T)
             c_aa = (axis*angle)
 
-            # c_axis, c_angle = spw.axis_angle_from_matrix(spw.eye(4))
-            # c_aa = c_axis * c_angle
-            # c_aa = current_rotation * spw.vec3(0,0,0.1)
-
-
-
-            # g_axis, g_angle = spw.axis_angle_from_matrix(goal_rotation)
-            # g_aa = g_axis * g_angle
-            #
-            # r_rot_control = g_aa - c_aa
-
-            # diff_angle = spw.norm(r_rot_control)
-            # capped_angle = spw.fake_Min(diff_angle * self.default_rot_gain, self.max_rot_speed)
-            # r_rot_control = r_rot_control / diff_angle * capped_angle
 
             self._soft_constraints['align {} rotation 0'.format(eef)] = SoftConstraint(
                 lower=r_rot_control[0],
@@ -162,7 +148,7 @@ class CartesianController(QPController):
             self._controllable_constraints = robot.joint_constraints
             self._hard_constraints = robot.hard_constraints
             self.update_observables({self.goal_weights[eef].get_symbol_str(): self.weight})
-            self.set_goal({eef: robot.get_eef_position2()[eef]})
+            self.set_goal({eef: robot.get_eef_position_quaternion()[eef]})
         self.update_observables({self.gain.get_symbol_str(): self.default_gain})
         self.update_observables({self.threshold_value.get_symbol_str(): self.default_threshold})
         print('make constraints took {}'.format(time() - t))
@@ -175,4 +161,4 @@ class CartesianController(QPController):
         """
         for eef, goal_pos in goal.items():
             self.update_observables(self.goal_eef[eef].get_update_dict(*goal_pos))
-            self.update_observables(self.start_eef[eef].get_update_dict(*self.get_robot().get_eef_position2()[eef]))
+            self.update_observables(self.start_eef[eef].get_update_dict(*self.get_robot().get_eef_position_quaternion()[eef]))

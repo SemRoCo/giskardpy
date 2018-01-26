@@ -28,17 +28,19 @@ from visualization_msgs.msg._InteractiveMarkerFeedback import InteractiveMarkerF
 from visualization_msgs.msg._Marker import Marker
 
 from giskardpy.cartesian_controller import CartesianController
-from giskardpy.cartesian_controller_old import CartesianControllerOld
 from giskardpy.cartesian_line_controller import CartesianLineController
 from giskardpy.donbot import DonBot
 from giskardpy.joint_space_control import JointSpaceControl
 from giskardpy.pr2 import PR2
 from giskardpy.robot import Robot
 
-def trajectory_rollout(controller, joint_names, time_limit=10, frequency=100):
+def trajectory_rollout(controller, joint_names, time_limit=10, frequency=100, precision=0.0025):
     goal = FollowJointTrajectoryGoal()
     # goal.trajectory.header.stamp = rospy.get_rostime() + rospy.Duration(0.5)
     goal.trajectory.joint_names = joint_names
+    robot = controller.get_robot()
+    rospy.sleep(1.0)
+    robot.turn_off()
     simulated_js = OrderedDict()
     current_js = controller.get_robot().get_joint_state()
     for j in goal.trajectory.joint_names:
@@ -51,7 +53,8 @@ def trajectory_rollout(controller, joint_names, time_limit=10, frequency=100):
         p = JointTrajectoryPoint()
         p.time_from_start = rospy.Duration((k + 1) * step_size)
         if k != 0:
-            cmd_dict = controller.get_next_command(simulated_js)
+            robot.set_joint_state(simulated_js)
+            cmd_dict = controller.get_next_command()
         for i, j in enumerate(goal.trajectory.joint_names):
             if k > 0 and j in cmd_dict:
                 simulated_js[j] += cmd_dict[j] * step_size
@@ -61,9 +64,10 @@ def trajectory_rollout(controller, joint_names, time_limit=10, frequency=100):
                 pass
             p.positions.append(simulated_js[j])
         goal.trajectory.points.append(p)
-        if k > 0 and np.abs(cmd_dict.values()).max() < 0.0025:
+        if k > 0 and np.abs(cmd_dict.values()).max() < precision:
             print('done')
             break
+    robot.turn_on()
     return goal
 
 class RosController(object):
@@ -106,7 +110,7 @@ class RosController(object):
         self.state = data
 
     def set_default_goals(self):
-        self.cartesian_controller.set_goal(self.robot.get_eef_position2())
+        self.cartesian_controller.set_goal(self.robot.get_eef_position_quaternion())
 
     def transformPose(self, target_frame, pose, time=None):
         transform = self.tfBuffer.lookup_transform(target_frame,
@@ -213,10 +217,10 @@ class RosController(object):
             velocities.append(point.velocities)
         positions = np.array(positions)
         velocities = np.array(velocities)
-        # plt.plot(positions-positions.mean(axis=0))
-        # plt.show()
-        # plt.plot(velocities)
-        # plt.show()
+        plt.plot(positions-positions.mean(axis=0))
+        plt.show()
+        plt.plot(velocities)
+        plt.show()
         pass
 
 if __name__ == '__main__':

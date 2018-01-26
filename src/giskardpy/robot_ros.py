@@ -1,16 +1,23 @@
 import rospy
+from copy import deepcopy
 from sensor_msgs.msg._JointState import JointState
 from giskardpy.robot import Robot
 
 
 class RobotRos(Robot):
-    def __init__(self, default_joint_value=0.0, default_joint_weight=0.0001, urdf_str=None, root_link='base_footprint',
-                 tip_links=()):
-        super(RobotRos, self).__init__(default_joint_value, default_joint_weight, urdf_str, root_link, tip_links)
-        self.joint_sub = rospy.Subscriber('joint_states', JointState, self.joint_state_sub, queue_size=100)
+    def __init__(self, default_joint_value=0.0, default_joint_weight=0.0001, default_joint_velocity=0.5,
+                 urdf_str=None, root_link='base_footprint', tip_links=()):
+        super(RobotRos, self).__init__(default_joint_value, default_joint_weight, default_joint_velocity,
+                                       urdf_str, root_link, tip_links)
+        self.turn_on()
         rospy.sleep(0.1)
 
     def joint_state_sub(self, joint_state):
+        print('cb called------------------------')
+        print('cb called------------------------')
+        print('cb called------------------------')
+        print('cb called------------------------')
+        print('cb called------------------------')
         self.set_joint_state(self.joint_state_msg_to_dict(joint_state))
 
     def joint_state_msg_to_dict(self, joint_state_msg):
@@ -25,3 +32,9 @@ class RobotRos(Robot):
             joint_vel_msg.name.append(joint_name)
             joint_vel_msg.velocity.append(joint_vel)
         return joint_vel_msg
+
+    def turn_off(self):
+        self.joint_sub.unregister()
+
+    def turn_on(self):
+        self.joint_sub = rospy.Subscriber('joint_states', JointState, self.joint_state_sub, queue_size=100)

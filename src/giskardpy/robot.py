@@ -4,8 +4,8 @@ from time import time
 from tf.transformations import quaternion_from_matrix, quaternion_from_euler
 from urdf_parser_py.urdf import URDF
 
-from giskardpy import USE_SYMENGINE
-from giskardpy.input_system import ControllerInputArray
+from giskardpy import USE_SYMENGINE, BACKEND
+from giskardpy.input_system import ControllerInputArray, FrameInput
 from giskardpy.qp_problem_builder import HardConstraint, JointConstraint
 import numpy as np
 
@@ -36,21 +36,24 @@ def hacky_urdf_parser_fix(urdf_str):
 
 class Robot(object):
     # TODO add joint vel to internal state
-    def __init__(self, default_joint_value=0.0, default_joint_weight=0.0001, urdf_str=None, root_link='base_footprint',
-                 tip_links=()):
+    def __init__(self, default_joint_value=0.0, default_joint_weight=0.0001, default_joint_velocity=0.5,
+                 urdf_str=None, root_link='base_footprint', tip_links=()):
         self.root_link = None
         self.default_joint_value = default_joint_value
         self.default_joint_weight = default_joint_weight
         self.urdf_robot = None
         self._joints = OrderedDict()
-        self.default_joint_vel_limit = 0.5
+        self.default_joint_vel_limit = default_joint_velocity
 
         self.frames = {}
+        self.link_joint_symbols = {}
         self.q_rot = {}
         self.aa_rot = {}
         self._state = OrderedDict()
         self.hard_constraints = OrderedDict()
         self.joint_constraints = OrderedDict()
+        self.current_frame = {}
+        self.j = {}
         if urdf_str is not None:
             urdf = hacky_urdf_parser_fix(urdf_str)
             self.load_from_urdf_string(urdf, root_link, tip_links)
@@ -71,12 +74,18 @@ class Robot(object):
 
     def set_joint_state(self, new_joint_state):
         self._update_observables(self.joint_states_input.get_update_dict(**new_joint_state))
+        for link in self.end_effectors:
+            pose = self.link_fk_quaternion(link)
+            self._update_observables(self.current_frame[link].get_update_dict(*pose))
 
     def set_joint_weight(self, joint_name, weight):
         self._update_observables(self.weight_input.get_update_dict(**{joint_name: weight}))
 
     def get_joint_state_input(self):
         return self.joint_states_input
+
+    def get_joint_limits(self, joint_name):
+        return self._joints[joint_name].lower, self._joints[joint_name].upper
 
     # @profile
     def add_chain_joints(self, root_link, tip_link):
@@ -96,6 +105,7 @@ class Robot(object):
         for i in range(1, len(jointsAndLinks), 2):
             joint_name = jointsAndLinks[i]
             link_name = jointsAndLinks[i + 1]
+            self.current_frame[link_name] = FrameInput('current', link_name)
             joint = self.urdf_robot.joint_map[joint_name]
 
             if joint_name not in self._joints:
@@ -152,6 +162,7 @@ class Robot(object):
         self.root_link = root_link
 
         self.frames[root_link] = root_frame if root_frame is not None else spw.eye(4)
+        self.current_frame[root_link] = FrameInput('current', root_link)
         if root_frame is not None:
             raise NotImplementedError("quaternion from root_frame not implemented")
         else:
@@ -187,69 +198,62 @@ class Robot(object):
     def make_np_frames(self):
         self.fast_frames = []
         for f, expression in self.frames.items():
-            self.fast_frames.append((f, spw.speed_up(expression, list(expression.free_symbols))))
+            self.fast_frames.append((f, spw.speed_up(expression, list(expression.free_symbols), backend=BACKEND)))
         self.fast_frames = OrderedDict(self.fast_frames)
 
     def get_eef_position(self):
         eef = {}
         for end_effector in self.end_effectors:
-            eef_joints = self.frames[end_effector].free_symbols
-            eef_joint_symbols = [self.get_joint_state_input().to_str_symbol(str(x)) for x in eef_joints]
-            js = {k: self.get_state()[k] for k in eef_joint_symbols}
-            evaled_frame = self.fast_frames[end_effector](**js)
-            # eef_pos = np.array(pos_of(evaled_frame).tolist(), dtype=float)[:-1].reshape(3)
-            # eef_rot = np.array(rot_of(evaled_frame).tolist(), dtype=float)
-            # eef_rot = quaternion_from_matrix(eef_rot)
-            eef[end_effector] = spw.Matrix(evaled_frame.tolist())
+            eef[end_effector] = self.link_fk(end_effector)
         return eef
 
-    def get_eef_position2(self):
-        eef = self.get_eef_position()
-        for eef_name, pose in eef.items():
-            evaled_frame = np.array(pose).astype(float)
-            eef_pos = evaled_frame[:3, 3]
-            eef_rot = evaled_frame[:4, :3]
-            eef_rot = np.hstack((eef_rot, np.zeros((4, 1))))
-            eef_rot[3, 3] = 1
-            eef_rot = quaternion_from_matrix(eef_rot)
-            eef[eef_name] = np.concatenate((eef_rot, eef_pos))
+    def get_eef_position_quaternion(self):
+        eef = {}
+        for end_effector in self.end_effectors:
+            eef[end_effector] = self.link_fk_quaternion(end_effector)
         return eef
 
     def link_fk(self, link):
-        eef_joints = self.frames[link].free_symbols
+        try:
+            eef_joints = self.link_joint_symbols[link]
+        except KeyError:
+            self.link_joint_symbols[link] = self.frames[link].free_symbols
+            eef_joints = self.link_joint_symbols[link]
         eef_joint_symbols = [self.get_joint_state_input().to_str_symbol(str(x)) for x in eef_joints]
         js = {k: self.get_state()[k] for k in eef_joint_symbols}
         evaled_frame = self.fast_frames[link](**js)
-        # eef_pos = np.array(pos_of(evaled_frame).tolist(), dtype=float)[:-1].reshape(3)
-        # eef_rot = np.array(rot_of(evaled_frame).tolist(), dtype=float)
-        # eef_rot = quaternion_from_matrix(eef_rot)
         return spw.Matrix(evaled_frame.tolist())
 
-    def get_jacobian(self, tip, js_dict):
-        f = self.frames[tip]
-        x = f[0, 3]
-        y = f[1, 3]
-        z = f[2, 3]
+    def link_fk_quaternion(self, link):
+        fk = self.link_fk(link)
+        eef_pos = np.array(spw.pos_of(fk).tolist(), dtype=float)[:-1].reshape(3)
+        eef_rot = quaternion_from_matrix(np.array(fk).astype(float))
+        return np.concatenate((eef_rot, eef_pos))
 
-        current_rotation = spw.rot_of(f)
-        hack = spw.rotation3_axis_angle([0, 0, 1], 0.001)
-        start_rotation = self.get_eef_position()[tip]
+    # @profile
+    def get_jacobian(self, tip):
+        if tip not in self.j:
+            f = self.frames[tip]
+            x = f[0, 3]
+            y = f[1, 3]
+            z = f[2, 3]
 
-        axis, angle = spw.axis_angle_from_matrix((current_rotation.T * (start_rotation * hack)).T)
-        c_aa = current_rotation[:3, :3] * (axis * angle)
+            current_rotation = spw.rot_of(f)
+            hack = spw.rotation3_axis_angle([0, 0, 1], 0.0001)
+            current_pose_evaluated = self.current_frame[tip].get_expression()
+            current_position_evaluated = spw.pos_of(current_pose_evaluated)
+            current_rotation_evaluated = spw.rot_of(current_pose_evaluated)
 
+            axis, angle = spw.axis_angle_from_matrix((current_rotation.T * (current_rotation_evaluated * hack)).T)
+            c_aa = current_rotation[:3, :3] * (axis * angle)
 
-        # axis, angle = spw.axis_angle_from_quaternion(self.q_rot[tip])
-        # axis, angle = spw.axis_angle_from_matrix(rot)
-        # axis_angle = axis * angle
-        rx = c_aa[0]
-        ry = c_aa[1]
-        rz = c_aa[2]
-        m = spw.Matrix([x, y, z, rx, ry, rz])
-        j = m.jacobian(spw.Matrix(self.get_joint_names()))
-
-        j_np = np.array(j.subs(js_dict)).astype(float)
-        return j_np
+            rx = c_aa[0]
+            ry = c_aa[1]
+            rz = c_aa[2]
+            m = spw.Matrix([x, y, z, rx, ry, rz])
+            j = m.jacobian(spw.Matrix(self.get_joint_names()))
+            self.j[tip] = spw.speed_up(j, j.free_symbols, backend=BACKEND)
+        return self.j[tip](**self.get_state())
 
     def load_from_urdf_path(self, urdf_path, root_link, tip_links):
         return self.load_from_urdf(URDF.from_xml_file(urdf_path), root_link, tip_links)

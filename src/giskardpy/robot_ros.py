@@ -13,11 +13,6 @@ class RobotRos(Robot):
         rospy.sleep(0.1)
 
     def joint_state_sub(self, joint_state):
-        print('cb called------------------------')
-        print('cb called------------------------')
-        print('cb called------------------------')
-        print('cb called------------------------')
-        print('cb called------------------------')
         self.set_joint_state(self.joint_state_msg_to_dict(joint_state))
 
     def joint_state_msg_to_dict(self, joint_state_msg):

@@ -10,6 +10,7 @@ import rospy
 from control_msgs.msg import FollowJointTrajectoryAction, JointTrajectoryControllerState, FollowJointTrajectoryGoal
 from copy import deepcopy
 
+from giskardpy.boxy import Boxy
 from giskardpy.cartesian_controller import CartesianController
 from giskardpy.cartesian_line_controller import CartesianLineController
 from giskardpy.donbot import DonBot
@@ -26,6 +27,8 @@ def get_rnd_joint_state(robot):
         ll, ul = robot.get_joint_limits(joint)
         if ll is None:
             return np.random.random() * np.pi * 2
+        ll += 0.02
+        ul -= 0.02
         return (np.random.random() * (abs(ll) + abs(ul))) + ll
 
     js = {joint: f(joint) for joint in robot.get_joint_state().keys()}
@@ -37,6 +40,7 @@ class TestController(unittest.TestCase):
     def sim(self, controller, goal, plot=False, time_limit=10, execute=False):
         controller.set_goal(goal)
         t = time()
+        controller.get_robot().turn_off()
         goal_msg = trajectory_rollout(controller, controller.get_robot().get_joint_names(), precision=0.0025,
                                       time_limit=time_limit, frequency=25)
         print('traj rollout took {}s'.format(time() - t))
@@ -96,9 +100,11 @@ class TestController(unittest.TestCase):
                 self.assertAlmostEqual(v, robot.get_state()[k], places=2,
                                        msg='joint {} failed; expected {}, got {}'.format(k, v, robot.get_state()[k]))
 
-    def check_cartesian_controller_robot(self, controller, plot=False, execute=False, x_range=(-100, 100),
+    def check_cartesian_controller_robot(self, controller, plot=False, execute=False, time_limit=60,
+                                         x_range=(-100, 100),
                                          y_range=(-100, 100),
-                                         z_range=(-100, 100)):
+                                         z_range=(-100, 100),
+                                         reset=False):
         robot = controller.get_robot()
         goals = []
         np.random.seed(23)
@@ -113,12 +119,23 @@ class TestController(unittest.TestCase):
                     min([x[-3] for x in goal.values()]) > x_range[0] and \
                     max([x[-3] for x in goal.values()]) < x_range[1]:
                 goals.append(goal)
+                print('num of goal = {}'.format(len(goals)))
         robot.set_joint_state({joint: 0.0 for joint in robot.get_joint_state()})
+        failed = False
         for goal in goals:
-            self.sim(controller, goal, time_limit=60, plot=plot, execute=execute)
+            if reset:
+                robot.set_joint_state({joint: 0.0 for joint in robot.get_joint_state()})
+            self.sim(controller, goal, time_limit=time_limit, plot=plot, execute=execute)
             for eef, pose in goal.items():
-                np.testing.assert_array_almost_equal(controller.get_robot().get_eef_position_quaternion()[eef], pose,
-                                                     decimal=2)
+                actual_pose = controller.get_robot().get_eef_position_quaternion()[eef]
+                try:
+                    np.testing.assert_array_almost_equal(actual_pose, pose,
+                                                         decimal=2,
+                                                         err_msg='{} at \n{} instead of \n{}'.format(eef, actual_pose, pose))
+                except AssertionError as e:
+                    print(e)
+                    failed = True
+            self.assertTrue(not failed)
 
     def test_jointcontroller_1(self):
         np.random.seed(23)
@@ -140,6 +157,13 @@ class TestController(unittest.TestCase):
         r = PR2(default_joint_velocity=1)
         self.check_jointspace_controller_robot(r)
 
+    def test_joint_controller_boxy(self):
+        np.random.seed(23)
+        r = Boxy(default_joint_velocity=1)
+        self.check_jointspace_controller_robot(r, time_limit=120,
+                                               execute=True
+                                               )
+
     def test_cart_controller_base_bot(self):
         np.random.seed(23)
         r = PointyBot(urdf='2d_base_bot.urdf')
@@ -152,7 +176,26 @@ class TestController(unittest.TestCase):
         robot = PR2(default_joint_velocity=1)
         c = CartesianController(robot)
         print('init took {}'.format(time() - t))
-        self.check_cartesian_controller_robot(c, x_range=(0, 100), z_range=(0.5, 100))
+        self.check_cartesian_controller_robot(c,
+                                              x_range=(0, 0.8),
+                                              # y_range=(-0.4, 0.4),
+                                              z_range=(0.4, 1.4),
+                                              plot=True,
+                                              execute=True,
+                                              reset=True
+                                              )
+
+    def test_cart_controller_boxy(self):
+        np.random.seed(23)
+        t = time()
+        robot = Boxy(default_joint_velocity=1)
+        c = CartesianController(robot)
+        print('init took {}'.format(time() - t)),
+        self.check_cartesian_controller_robot(c, time_limit=120, x_range=(0.3, 100), y_range=(-1, 1), z_range=(0.5, 1.8),
+                                              # reset=True,
+                                              execute=True,
+                                              plot=True
+                                              )
 
     def test_cart_controller_donbot(self):
         np.random.seed(23)

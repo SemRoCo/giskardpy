@@ -8,6 +8,7 @@ from actionlib.simple_action_client import SimpleActionClient
 from actionlib_msgs.msg import GoalStatus
 from control_msgs.msg import FollowJointTrajectoryAction, FollowJointTrajectoryActionGoal, FollowJointTrajectoryGoal, \
     JointTrajectoryControllerState, FollowJointTrajectoryResult
+from geometry_msgs.msg import PoseArray
 from geometry_msgs.msg._Point import Point
 from geometry_msgs.msg._PoseStamped import PoseStamped
 from geometry_msgs.msg._Quaternion import Quaternion
@@ -27,12 +28,15 @@ from visualization_msgs.msg._InteractiveMarkerControl import InteractiveMarkerCo
 from visualization_msgs.msg._InteractiveMarkerFeedback import InteractiveMarkerFeedback
 from visualization_msgs.msg._Marker import Marker
 
+from giskardpy.boxy import Boxy
 from giskardpy.cartesian_controller import CartesianController
 from giskardpy.cartesian_line_controller import CartesianLineController
 from giskardpy.donbot import DonBot
 from giskardpy.joint_space_control import JointSpaceControl
 from giskardpy.pr2 import PR2
 from giskardpy.robot import Robot
+from giskardpy.robot_ros import RobotRos
+
 
 def trajectory_rollout(controller, joint_names, time_limit=10, frequency=100, precision=0.0025):
     goal = FollowJointTrajectoryGoal()
@@ -40,7 +44,7 @@ def trajectory_rollout(controller, joint_names, time_limit=10, frequency=100, pr
     goal.trajectory.joint_names = joint_names
     robot = controller.get_robot()
     rospy.sleep(1.0)
-    robot.turn_off()
+    # robot.turn_off()
     simulated_js = OrderedDict()
     current_js = controller.get_robot().get_joint_state()
     for j in goal.trajectory.joint_names:
@@ -67,7 +71,7 @@ def trajectory_rollout(controller, joint_names, time_limit=10, frequency=100, pr
         if k > 0 and np.abs(cmd_dict.values()).max() < precision:
             print('done')
             break
-    robot.turn_on()
+    # robot.turn_on()
     return goal
 
 class RosController(object):
@@ -98,6 +102,7 @@ class RosController(object):
             # self.state_sub = rospy.Subscriber('/fake_state', JointTrajectoryControllerState, self.state_cb)
         self._as = actionlib.SimpleActionServer(self._action_name, ControllerListAction,
                                                 execute_cb=self.action_server_cb, auto_start=False)
+        self.pose_array_pub = rospy.Publisher('/goals', PoseArray, queue_size=10)
         self._as.start()
         self.frequency = 100
         self.rate = rospy.Rate(self.frequency)
@@ -133,7 +138,7 @@ class RosController(object):
                 c = self.joint_controller
             elif controller.type == Controller.TRANSLATION_3D:
                 rospy.loginfo('set cartesian goal')
-                root_link_goal = self.transformPose('base_footprint', controller.goal_pose)
+                root_link_goal = self.transformPose(controller.root_link, controller.goal_pose)
                 self.cartesian_controller.set_goal({controller.tip_link: self.pose_stamped_to_list(root_link_goal)})
                 # print('goal: {}'.format(root_link_goal))
                 c = self.cartesian_controller
@@ -179,7 +184,9 @@ class RosController(object):
 
     def create_trajectory(self, controller):
         self._ac.cancel_all_goals()
+        controller.get_robot().turn_off()
         goal = trajectory_rollout(controller, self.state.joint_names, self.MAX_TRAJECTORY_TIME, self.frequency)
+        controller.get_robot().turn_on()
         if self._as.is_preempt_requested():
             rospy.loginfo('new goal, cancel old one')
             # self._as.set_aborted(ControllerListResult())
@@ -227,8 +234,7 @@ if __name__ == '__main__':
     rospy.init_node('giskardpy_controller')
 
     robot_description = rospy.get_param('robot_description')
-    # r = PR2(urdf_str=robot_description)
-    # ros_controller = RosController(r, '/pr2/commands')
-    r = DonBot(urdf_str=robot_description)
+    # r = PR2(urdf_str=robot_description, default_joint_velocity=1)
+    r = Boxy(urdf_str=robot_description, default_joint_velocity=1)
     ros_controller = RosController(r, '/donbot/commands')
     rospy.spin()

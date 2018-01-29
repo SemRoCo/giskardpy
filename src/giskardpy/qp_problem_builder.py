@@ -4,6 +4,9 @@ import numpy as np
 from time import time
 
 from giskardpy import USE_SYMENGINE, BACKEND
+from giskardpy.cvxopt_qp_solver import CVXQPSolver
+from giskardpy.osqp_solver import OSQPSolver
+from giskardpy.quadprog_qp_solver import QuadProgQPSolver
 
 if USE_SYMENGINE:
     import giskardpy.symengine_wrappers as spw
@@ -27,7 +30,10 @@ class QProblemBuilder(object):
         self.controlled_joints = [spw.Symbol(n) for n in self.controlled_joints_strs]
         self.make_sympy_matrices()
 
-        self.qp_solver = QPSolver(self.H.shape[0], len(self.lbA))
+        # self.qp_solver = QPSolver(self.H.shape[0], len(self.lbA))
+        self.qp_solver = OSQPSolver(self.H.shape[0], len(self.lbA))
+        # self.qp_solver = CVXQPSolver(self.H.shape[0], len(self.lbA))
+        # self.qp_solver = QuadProgQPSolver(self.H.shape[0], len(self.lbA))
 
     # @profile
     def make_sympy_matrices(self):
@@ -47,7 +53,7 @@ class QProblemBuilder(object):
             lbA.append(c.lower)
             ubA.append(c.upper)
             hard_expressions.append(c.expression)
-        for c in self.soft_constraints_dict.values():
+        for k, c in self.soft_constraints_dict.items():
             weights.append(c.weight)
             lbA.append(c.lower)
             ubA.append(c.upper)

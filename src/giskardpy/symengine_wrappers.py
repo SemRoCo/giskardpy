@@ -1,3 +1,6 @@
+import itertools
+from operator import mul
+
 import symengine as sp
 from symengine import Matrix, Symbol, eye, sympify, diag, zeros, lambdify, Abs, Max, Min, sin, cos, tan, acos, asin, \
     atan, atan2, nan, sqrt, log
@@ -22,7 +25,6 @@ def fake_Min(x, y):
     return ((x + y) - fake_Abs(x - y)) / 2
 
 
-# @profile
 def speed_up(function, parameters, backend=None):
     str_params = [str(x) for x in parameters]
     if len(parameters) == 0:
@@ -33,33 +35,48 @@ def speed_up(function, parameters, backend=None):
 
         def f(**kwargs):
             return constant_result
-    elif backend is None:
-        # @profile
-        def f(**kwargs):
-            filtered_kwargs = {str(k): kwargs[k] for k in str_params}
-            return np.array(function.subs(filtered_kwargs).tolist(), dtype=float).reshape(function.shape)
-    elif backend == 'python':
-        f = function
     else:
-
-        try:
-            fast_f = Lambdify(list(parameters), function, backend=backend, cse=True)
-        except RuntimeError as e:
+        if backend == 'llvm':
             try:
+                fast_f = Lambdify(list(parameters), function, backend=backend, cse=True, real=True)
+            except RuntimeError as e:
                 print('WARNING RuntimeError: "{}" during lambdify with LLVM backend, fallback to numpy'.format(e))
-                fast_f = Lambdify(list(parameters), function, backend='lambda', cse=True)
+                backend = 'lambda'
+        if backend == 'lambda':
+            try:
+                fast_f = Lambdify(list(parameters), function, backend='lambda', cse=True, real=True)
             except RuntimeError as e:
                 print('WARNING RuntimeError: "{}" during lambdify with lambda backend, no speedup possible'.format(e))
+                backend = None
 
-                def f(**kwargs):
-                    filtered_kwargs = {str(k): kwargs[k] for k in str_params}
-                    return np.array(function.subs(filtered_kwargs).tolist(), dtype=float).reshape(function.shape)
-
-                return f
-
-        def f(**kwargs):
-            filtered_args = [kwargs[k] for k in str_params]
-            return np.nan_to_num(np.asarray(fast_f(filtered_args)).reshape(function.shape))
+            # def f(**kwargs):
+            #     filtered_args = [kwargs[k] for k in str_params]
+            #     return np.nan_to_num(np.asarray(fast_f(filtered_args)).reshape(function.shape))
+        if backend in ['llvm', 'lambda']:
+            def f(**kwargs):
+                filtered_args = [kwargs[k] for k in str_params]
+                out = np.empty(len(function))
+                fast_f.unsafe_real(np.array(filtered_args, dtype=np.double), out)
+                return np.nan_to_num(out).reshape(function.shape)
+        elif backend == 'cse':
+            cse, reduced_f = sp.cse(function)
+            def f(**kwargs):
+                filtered_kwargs = {str(k): kwargs[k] for k in str_params}
+                cse_evaled = [(x[0], x[1].subs(filtered_kwargs)) for x in cse]
+                stuff = []
+                for entry in reduced_f:
+                    entry_evaled = entry
+                    for t in reversed(cse_evaled):
+                        entry_evaled = entry_evaled.subs(t[0], t[1])
+                    stuff.append(entry_evaled.subs(filtered_kwargs))
+                return np.array(stuff, dtype=float).reshape(function.shape)
+        elif backend is None:
+            # @profile
+            def f(**kwargs):
+                filtered_kwargs = {str(k): kwargs[k] for k in str_params}
+                return np.array(function.subs(filtered_kwargs).tolist(), dtype=float).reshape(function.shape)
+        if backend == 'python':
+            f = function
 
     return f
 
@@ -121,7 +138,6 @@ def rotation3_rpy(roll, pitch, yaw):
                     [0, 0, 1, 0],
                     [0, 0, 0, 1]])
     return (rz * ry * rx)
-    # return (rx * ry * rz)
 
 
 def rotation3_axis_angle(axis, angle):

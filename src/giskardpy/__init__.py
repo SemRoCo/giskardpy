@@ -2,8 +2,9 @@
 USE_SYMENGINE = True
 
 # BACKEND = None
+# BACKEND = 'cse'
 # BACKEND = 'numpy'
 # BACKEND = 'cython'
 
-BACKEND = 'llvm'
-# BACKEND = 'lambda'
+# BACKEND = 'llvm'
+BACKEND = 'lambda'

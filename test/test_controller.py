@@ -27,8 +27,8 @@ def get_rnd_joint_state(robot):
         ll, ul = robot.get_joint_limits(joint)
         if ll is None:
             return np.random.random() * np.pi * 2
-        ll += 0.02
-        ul -= 0.02
+        # ll += 0.02
+        # ul -= 0.02
         return (np.random.random() * (abs(ll) + abs(ul))) + ll
 
     js = {joint: f(joint) for joint in robot.get_joint_state().keys()}

@@ -30,8 +30,8 @@ class QProblemBuilder(object):
         self.controlled_joints = [spw.Symbol(n) for n in self.controlled_joints_strs]
         self.make_sympy_matrices()
 
-        # self.qp_solver = QPSolver(self.H.shape[0], len(self.lbA))
-        self.qp_solver = OSQPSolver(self.H.shape[0], len(self.lbA))
+        self.qp_solver = QPSolver(self.H.shape[0], len(self.lbA))
+        # self.qp_solver = OSQPSolver(self.H.shape[0], len(self.lbA))
         # self.qp_solver = CVXQPSolver(self.H.shape[0], len(self.lbA))
         # self.qp_solver = QuadProgQPSolver(self.H.shape[0], len(self.lbA))
 

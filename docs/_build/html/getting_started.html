@@ -1,0 +1,619 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Getting Started with GiskardPy &mdash; giskardpy 0.1 documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+        <link rel="index" title="Index"
+              href="genindex.html"/>
+        <link rel="search" title="Search" href="search.html"/>
+    <link rel="top" title="giskardpy 0.1 documentation" href="index.html"/>
+        <link rel="prev" title="Welcome to giskardpy’s documentation!" href="index.html"/> 
+
+  
+  <script src="_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+   
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="index.html" class="icon icon-home"> giskardpy
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                0.1
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Getting Started with GiskardPy</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#installation">Installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#what-is-giskard">What is Giskard?</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#constraint-types">Constraint types</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#let-s-go-to-code">Let&#8217;s Go to Code</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#concepts">Concepts</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#control-flow">Control Flow</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#a-basic-position-controller">A Basic Position Controller</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#the-controller-class">The Controller Class</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#quick-intermission">Quick Intermission...</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#the-node-class">The Node Class</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#finishing-up">Finishing Up</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#run-forrest-run">Run Forrest, Run!</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#last-thoughts">Last Thoughts</a></li>
+</ul>
+</li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">giskardpy</a>
+        
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="index.html">Docs</a> &raquo;</li>
+        
+      <li>Getting Started with GiskardPy</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="_sources/getting_started.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="getting-started-with-giskardpy">
+<h1>Getting Started with GiskardPy<a class="headerlink" href="#getting-started-with-giskardpy" title="Permalink to this headline">¶</a></h1>
+<p>This page is a brief introduction to the Giskard motion library which explains basic concepts and will give a practical example for building a first Giskard controller.</p>
+<div class="section" id="installation">
+<h2>Installation<a class="headerlink" href="#installation" title="Permalink to this headline">¶</a></h2>
+<p>TODO: I&#8217;ll add more detailed instructions later. However you&#8217;ll need <a class="reference external" href="https://github.com/ARoefer/symengine.git">symengine</a>, <a class="reference external" href="https://github.com/ARoefer/symengine.py.git">symengine.py</a> and <a class="reference external" href="https://apt.llvm.org/">llvm-4.0</a> or greater. The first two you can clone from GitHub. I&#8217;d suggest you clone those versions and build them from source as they&#8217;re what I&#8217;m using to write this tutorial.</p>
+<p>This tutorial is using the <a class="reference external" href="https://github.com/suturo16/iai_naive_kinematics_sim">iai_naive_kinematics_sim</a> to simulate robots.</p>
+</div>
+<div class="section" id="what-is-giskard">
+<h2>What is Giskard?<a class="headerlink" href="#what-is-giskard" title="Permalink to this headline">¶</a></h2>
+<p>Giskard is a robotic motion library that expresses motions as constraints on changes made to mathematical expressions. By satisfying the constraints and applying the computed changes to the robot, these constraints iteratively describe a trajectory.</p>
+<p>Great cliff-notes version, but not really helpful. So let&#8217;s look at an example.</p>
+<p>If you&#8217;ve used other motion libraries before, they probably provided functions that allowed you to input a 6-DoF pose as goal for your robot&#8217;s endeffector and then it&#8217;d generate a trajectory to match that goal.
+In Giskard you have to describe the change that you desire to happen to the position and orientation of your robot&#8217;s endeffector.
+A constraint <span class="math">\(C\)</span> is a triple consisting of a lower limit <span class="math">\(lb\)</span>, an upper limit <span class="math">\(ub\)</span> and an expression <span class="math">\(x\)</span>. <span class="math">\(lb\)</span> and <span class="math">\(ub\)</span> limit how much <span class="math">\(x\)</span> can be changed during one iteration. So if <span class="math">\(C = (-1, 1.5, x)\)</span> and <span class="math">\(x = 2\)</span> then the new value for <span class="math">\(x\)</span> will satisfy <span class="math">\(1 \leq x \leq 3.5\)</span>.</p>
+<p>Let&#8217;s look at a simple example that moves two points to the same location using one constraint.
+Let <span class="math">\(E\)</span> be the robot&#8217;s endeffector frame and <span class="math">\(\vec{E_p}\)</span> its position and let <span class="math">\(\vec{G_p}\)</span> be the goal location. Then we can define the following constraint <span class="math">\(C\)</span> that will move <span class="math">\(\vec{E_p}\)</span> to <span class="math">\(\vec{G_p}\)</span>.</p>
+<div class="math">
+\[\begin{split}d &amp;= ||\vec{G_p} - \vec{E_p}|| \\
+C_p &amp;= (-d, -d, d)\end{split}\]</div>
+<p>The constraint demands that <span class="math">\(d\)</span> satisfy <span class="math">\(d-d \leq d \leq d-d\)</span> which is equal to <span class="math">\(0 \leq d \leq 0\)</span>. As a result of satisfying this constraint, the two points <span class="math">\(\vec{E_p}\)</span> and <span class="math">\(\vec{G_p}\)</span> will find themselves at the same location in space.
+We can add two more constraints to align the rotation of the endeffector with the rotation of the goal frame. Let <span class="math">\(\vec{E_x}, \vec{E_z}, \vec{G_x}, \vec{G_z}\)</span> denote the endeffector&#8217;s and goal&#8217;s forward and upward pointing axes, then we can define the following constraints:</p>
+<div class="math">
+\[\begin{split}a_x &amp;= \vec{E_x} \cdot \vec{G_x} \\
+a_z &amp;= \vec{E_z} \cdot \vec{G_z} \\
+C_x &amp;= (1-a_x, 1-a_x, a_x) \\
+C_z &amp;= (1-a_z, 1-a_z, a_z)\end{split}\]</div>
+<p>Here the constraints <span class="math">\(C_x, C_z\)</span> drive the dot products of the axes towards the constant value <span class="math">\(1\)</span>. As a result of satisfying both constraints, the two frames&#8217; rotations are going
+to be aligned.</p>
+<div class="section" id="constraint-types">
+<h3>Constraint types<a class="headerlink" href="#constraint-types" title="Permalink to this headline">¶</a></h3>
+<p>Giskard uses three types of constraints:</p>
+<dl class="docutils">
+<dt>Controllable Constraints</dt>
+<dd>These constraints constrain the changes that the solver will make to joints in order to satisfy the other constraints. They can be modeled as a four-tuple <span class="math">\((lb, ub, c, x)\)</span> where <span class="math">\(c\)</span> denotes the cost of changing <span class="math">\(x\)</span>.</dd>
+<dt>Hard constraints</dt>
+<dd>Hard Constraints are used to enforce hard limits on the generated motion. A typical hard limit are the joint limits of a robot. They are triples of the form that were used in the examples above.</dd>
+</dl>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">If Giskard can&#8217;t satisfy all hard constraints, it will view the posed problem as unsolvable and terminate. So be careful about the hard constraints you impose on your controller.</p>
+</div>
+<dl class="docutils">
+<dt>Soft Constraints</dt>
+<dd>Soft Constraints are used to express the task constraints of a motion which don&#8217;t have to be satisfied necessarily. The goal of aligning <span class="math">\(\vec{E_p}, \vec{G_p}\)</span> would usually be expressed as such a constraint, since it might be possible that <span class="math">\(\vec{E_p}\)</span> can only be moved by <span class="math">\(0.1\)</span> units at a time because of other constraints. Soft constraints can be modeled as another four-tuple <span class="math">\((lb, ub, w, x)\)</span> with <span class="math">\(w\)</span> being a weight that tells Giskard how important this soft constraint is in comparison to others.</dd>
+</dl>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">All constraints have to satisfy <span class="math">\(lb \leq ub\)</span> at all times. Otherwise the posed problem will be seen as unsolvable and Giskard will terminate.</p>
+</div>
+</div>
+</div>
+<div class="section" id="let-s-go-to-code">
+<h2>Let&#8217;s Go to Code<a class="headerlink" href="#let-s-go-to-code" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="concepts">
+<h3>Concepts<a class="headerlink" href="#concepts" title="Permalink to this headline">¶</a></h3>
+<p>After this brief introduction to the basic workings of Giskard, let&#8217;s talk about how to use it in practice. There are two main concepts currently implemented in Giskard:</p>
+<dl class="docutils">
+<dt>Robots</dt>
+<dd>GiskardPy supplies a basic superclass for all robots. It can be found in <code class="code docutils literal"><span class="pre">giskardpy.robot</span></code> and provides functionality for loading a robot from a URDF and generating matching controllable and hard constraints for it.</dd>
+<dt>QPController</dt>
+<dd>The QPController is a basic controller skeleton. It is the interface to the underlying solver system and keeps track of the controller&#8217;s variables and constraints. Custom controllers should be derived from this class.</dd>
+</dl>
+</div>
+<div class="section" id="control-flow">
+<h3>Control Flow<a class="headerlink" href="#control-flow" title="Permalink to this headline">¶</a></h3>
+<div class="figure align-center" id="id1">
+<img alt="Typical Giskard Control Flow" src="_images/Giskard_Control_Flow.png" />
+<p class="caption"><span class="caption-text">A very basic controller setup for a ROS node using a Giskard controller.</span></p>
+</div>
+<p>The figure above depicts the simplest of system setups for running a Giskard controller in a ROS environment. The robot publishes its state on a topic which the controller node subscribes to. Each time it receives a new state, the new state is used to update the values in the controller. Based on the new state, the QPController then computes new commands based on the updated state, which are sent to the robot.
+The changes to joint positions computed by the QPController are sent as desired joint velocities to the robot.</p>
+</div>
+<div class="section" id="a-basic-position-controller">
+<h3>A Basic Position Controller<a class="headerlink" href="#a-basic-position-controller" title="Permalink to this headline">¶</a></h3>
+<p>In this section we&#8217;re going to implement a tiny controller node that will passed the path to a urdf file, the name of an endeffector to control and the x, y, z coordinates of a goal position.</p>
+<p>We will implement a custom controller class that will move the robot&#8217;s endeffector to the given goal location. Additionally we are going to implement a second class that interfaces this controller with the ROS system.</p>
+<div class="section" id="the-controller-class">
+<h4>The Controller Class<a class="headerlink" href="#the-controller-class" title="Permalink to this headline">¶</a></h4>
+<p>To start, let&#8217;s import a couple of things that we&#8217;re going to need for this class.</p>
+<div class="literal-block-wrapper container" id="id2">
+<div class="code-block-caption"><span class="caption-text">Imports for controller class</span><a class="headerlink" href="#id2" title="Permalink to this code">¶</a></div>
+<div class="highlight-python"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">giskardpy.qpcontroller</span> <span class="kn">import</span> <span class="n">QPController</span>
+<span class="kn">from</span> <span class="nn">giskardpy.qp_problem_builder</span> <span class="kn">import</span> <span class="n">SoftConstraint</span>
+<span class="kn">from</span> <span class="nn">giskardpy.input_system</span> <span class="kn">import</span> <span class="o">*</span>
+<span class="kn">from</span> <span class="nn">giskardpy.symengine_wrappers</span> <span class="kn">import</span> <span class="o">*</span>
+</pre></div>
+</div>
+</div>
+<p>The two imports <code class="code docutils literal"><span class="pre">giskardpy.input_system</span></code> and <code class="code docutils literal"><span class="pre">giskardpy.symengine_wrappers</span></code> warrant further explanation.
+The first imports a variety of generators that automatically generate expressions for variable inputs to a controller.
+The second import imports a bunch of wrapper functions that make it easier to use the SymEngine library. Aside from making the use easier, it also overrides a few functions from SymEngine and replaces them with differentiable ones, which is a requirement for the expressions of the constraints in Giskard&#8217;s controllers.</p>
+<p>Let&#8217;s move on to creating our custom class and have it inherit the functionality of <code class="code docutils literal"><span class="pre">QPController</span></code>. Its constructor will accept two arguments: a robot and the name of the endeffector that it&#8217;s supposed to control.</p>
+<div class="literal-block-wrapper container" id="id3">
+<div class="code-block-caption"><span class="caption-text">Custom Controller Header and Constructor</span><a class="headerlink" href="#id3" title="Permalink to this code">¶</a></div>
+<div class="highlight-python"><div class="highlight"><pre><span></span><span class="k">class</span> <span class="nc">MyPositionController</span><span class="p">(</span><span class="n">QPController</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">robot</span><span class="p">,</span> <span class="n">eef_name</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">eef_name</span> <span class="o">=</span> <span class="n">eef_name</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">MyPositionController</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">__init__</span><span class="p">(</span><span class="n">robot</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<p>The most important thing to note about the constructor is the fact that the superclass&#8217; constructor is called at the end of this one, rather than at its beginning. This is done because the super constructor calls all initialization functions.</p>
+<p>Now we&#8217;re going to add an input for a point to our controller. We&#8217;re going to do so by overriding the <code class="code docutils literal"><span class="pre">add_inputs()</span></code> function. Note that even if your controller has no inputs, you still need to override this function because its default implementation throws an exception.</p>
+<div class="literal-block-wrapper container" id="id4">
+<div class="code-block-caption"><span class="caption-text">Override of add_inputs()</span><a class="headerlink" href="#id4" title="Permalink to this code">¶</a></div>
+<div class="highlight-python"><div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">add_inputs</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">robot</span><span class="p">):</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">position_input</span> <span class="o">=</span> <span class="n">Point3Input</span><span class="p">(</span><span class="s1">&#39;goal&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<p>This implementation of <code class="code docutils literal"><span class="pre">add_inputs()</span></code> creates an new input to that represents a point called <em>goal</em>. We&#8217;re going to use this point in our override of the <code class="code docutils literal"><span class="pre">make_constraints()</span></code> function.</p>
+<div class="literal-block-wrapper container" id="id5">
+<div class="code-block-caption"><span class="caption-text">Override of the make_constraints() function</span><a class="headerlink" href="#id5" title="Permalink to this code">¶</a></div>
+<div class="highlight-python"><div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">make_constraints</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">robot</span><span class="p">):</span>
+    <span class="nb">super</span><span class="p">(</span><span class="n">MyPositionController</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">make_constraints</span><span class="p">(</span><span class="n">robot</span><span class="p">)</span>
+
+    <span class="n">d</span> <span class="o">=</span> <span class="n">norm</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">position_input</span><span class="o">.</span><span class="n">get_expression</span><span class="p">()</span> <span class="o">-</span> <span class="n">pos_of</span><span class="p">(</span><span class="n">robot</span><span class="o">.</span><span class="n">frames</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">eef_name</span><span class="p">]))</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_soft_constraints</span><span class="p">[</span><span class="s1">&#39;position constraint&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">SoftConstraint</span><span class="p">(</span><span class="o">-</span><span class="n">d</span><span class="p">,</span> <span class="o">-</span><span class="n">d</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">d</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<p>In this override it is necessary to call the superclass&#8217; implementation, as it automatically adds the controllable constraints and hard constraints defined by the robot. The other two lines just generate the expression from the introduction. Note that <code class="code docutils literal"><span class="pre">norm()</span></code> and <code class="code docutils literal"><span class="pre">pos_of()</span></code> are custom functions provided by the wrapper library. The first computes the magnitude of a vector, the second extracts the translational column from a 4x4 matrix.</p>
+<p>The last thing left to do now is to add a function to the controller, that allows us to set the coordinates of our goal. We&#8217;re going to call it <code class="code docutils literal"><span class="pre">set_goal()</span></code> and are going to pass the x, y, z coordinates as parameters. Each input class has a <code class="code docutils literal"><span class="pre">get_update_dict()</span></code> function that returns a dictionary containing the new values for all the input&#8217;s internal variables. This dictionary can be passed to the QPController&#8217;s <code class="code docutils literal"><span class="pre">update_observables()</span></code> function which uses it to update its internal state.</p>
+<div class="literal-block-wrapper container" id="id6">
+<div class="code-block-caption"><span class="caption-text">Implementation of set_goal()</span><a class="headerlink" href="#id6" title="Permalink to this code">¶</a></div>
+<div class="highlight-python"><div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">set_goal</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">z</span><span class="p">):</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">update_observables</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">position_input</span><span class="o">.</span><span class="n">get_update_dict</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">z</span><span class="p">))</span>
+</pre></div>
+</div>
+</div>
+<p>The completed controller class should now look something like this:</p>
+<div class="literal-block-wrapper container" id="id7">
+<div class="code-block-caption"><span class="caption-text">Completed Controller Class</span><a class="headerlink" href="#id7" title="Permalink to this code">¶</a></div>
+<div class="highlight-python"><div class="highlight"><pre><span></span><span class="k">class</span> <span class="nc">MyPositionController</span><span class="p">(</span><span class="n">QPController</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">robot</span><span class="p">,</span> <span class="n">eef_name</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">eef_name</span> <span class="o">=</span> <span class="n">eef_name</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">MyPositionController</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">__init__</span><span class="p">(</span><span class="n">robot</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">add_inputs</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">robot</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">position_input</span> <span class="o">=</span> <span class="n">Point3Input</span><span class="p">(</span><span class="s1">&#39;goal&#39;</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">make_constraints</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">robot</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">MyPositionController</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">make_constraints</span><span class="p">(</span><span class="n">robot</span><span class="p">)</span>
+
+        <span class="n">d</span> <span class="o">=</span> <span class="n">norm</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">position_input</span><span class="o">.</span><span class="n">get_expression</span><span class="p">()</span> <span class="o">-</span> <span class="n">pos_of</span><span class="p">(</span><span class="n">robot</span><span class="o">.</span><span class="n">frames</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">eef_name</span><span class="p">]))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_soft_constraints</span><span class="p">[</span><span class="s1">&#39;position constraint&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">SoftConstraint</span><span class="p">(</span><span class="o">-</span><span class="n">d</span><span class="p">,</span> <span class="o">-</span><span class="n">d</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">d</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">set_goal</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">z</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">update_observables</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">position_input</span><span class="o">.</span><span class="n">get_update_dict</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">z</span><span class="p">))</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="section" id="quick-intermission">
+<h4>Quick Intermission...<a class="headerlink" href="#quick-intermission" title="Permalink to this headline">¶</a></h4>
+<p>Before we proceed to implementing the node class let&#8217;s briefly talk about an implementation detail:
+GiskardPy uses 4x4 matrices to represent transformations. This means that there is a difference between vectors and points. This also means that some mathematical operations are syntactically possible, but semantically pointless. Just as a reminder, a short list of operations and their results:</p>
+<ul class="simple">
+<li>Point  + Point  -&gt; ?(weird scaled thing)</li>
+<li>Point  - Point  -&gt; Vector</li>
+<li>Point  + Vector -&gt; Point</li>
+<li>Point  - Vector -&gt; Point</li>
+<li>Vector + Point  -&gt; Point</li>
+<li>Vector - Point  -&gt; ?(weird mirror-world point)</li>
+<li>Vector - Vector -&gt; Vector</li>
+<li>Vector + Vector -&gt; Vector</li>
+</ul>
+</div>
+<div class="section" id="the-node-class">
+<h4>The Node Class<a class="headerlink" href="#the-node-class" title="Permalink to this headline">¶</a></h4>
+<p>The node class will be the interface between our Giskard controller and the ROS environment. In its constructor, it will load a robot from a given file path and then pass along the loaded robot and a given endeffector name to a new instance of our controller. After it&#8217;s instantiated, the node will set the controller&#8217;s goal to a given position. Lastly, the constructor will advertise its commands on a topic - in this example <em>simulator/commands</em> - and subscribe to the <em>/joint_states</em> topic to receive state updates from the robot/simulator.</p>
+<div class="literal-block-wrapper container" id="id8">
+<div class="code-block-caption"><span class="caption-text">Controller Node&#8217;s Constructor</span><a class="headerlink" href="#id8" title="Permalink to this code">¶</a></div>
+<div class="highlight-python"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">rospy</span>
+<span class="kn">from</span> <span class="nn">sensor_msgs.msg</span> <span class="kn">import</span> <span class="n">JointState</span>
+<span class="kn">from</span> <span class="nn">giskardpy.robot</span> <span class="kn">import</span> <span class="n">Robot</span>
+
+<span class="k">class</span> <span class="nc">MyPositionControllerNode</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">robot_file</span><span class="p">,</span> <span class="n">eef_name</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">z</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">robot</span> <span class="o">=</span> <span class="n">Robot</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">robot</span><span class="o">.</span><span class="n">load_from_urdf_path</span><span class="p">(</span><span class="n">robot_file</span><span class="p">,</span> <span class="s1">&#39;base_link&#39;</span><span class="p">,</span> <span class="p">[</span><span class="n">eef_name</span><span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">controller</span> <span class="o">=</span> <span class="n">MyPositionController</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">robot</span><span class="p">,</span> <span class="n">eef_name</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">controller</span><span class="o">.</span><span class="n">set_goal</span><span class="p">(</span><span class="n">x</span><span class="p">,</span><span class="n">y</span><span class="p">,</span><span class="n">z</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cmd_pub</span> <span class="o">=</span> <span class="n">rospy</span><span class="o">.</span><span class="n">Publisher</span><span class="p">(</span><span class="s1">&#39;simulator/commands&#39;</span><span class="p">,</span> <span class="n">JointState</span><span class="p">,</span> <span class="n">queue_size</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cmd_sub</span> <span class="o">=</span> <span class="n">rospy</span><span class="o">.</span><span class="n">Subscriber</span><span class="p">(</span><span class="s1">&#39;/joint_states&#39;</span><span class="p">,</span> <span class="n">JointState</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">js_callback</span><span class="p">,</span> <span class="n">queue_size</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<p>The most interesting part of this constructor is the way the robot is loaded. First a blank robot is instantiated, then it is initialized using a urdf file. The loading function needs to be given the name of the root of the kinematic tree and also a list of leaf nodes. It will automatically construct the expressions for all the frames in the tree and will also generate controllable constraints and hard constraints relevant to these frames.
+The given codes assumes that the root is always called <em>base_link</em>.</p>
+<p>Now we need to implement the callback function <code class="code docutils literal"><span class="pre">js_callback()</span></code> referenced by our subscriber. This function will receive a <code class="code docutils literal"><span class="pre">sensor_msgs/JointState</span></code> message, convert it into a dictionary which maps joint names to their respective positions. This dictionary is passed to the robot so it can update its internal state. Then the function will get the next command from the controller. The returned dictionary is then converted into another <code class="code docutils literal"><span class="pre">sensor_msgs/JointState</span></code> message where the dictionary&#8217;s keys become the joints&#8217; names and the dictionary&#8217;s values become their velocities. This message is finally published using the node&#8217;s command publisher.</p>
+<div class="literal-block-wrapper container" id="id9">
+<div class="code-block-caption"><span class="caption-text">Implementation of Joint State Callback</span><a class="headerlink" href="#id9" title="Permalink to this code">¶</a></div>
+<div class="highlight-python"><div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">js_callback</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">joint_state</span><span class="p">):</span>
+    <span class="n">js_dict</span> <span class="o">=</span> <span class="p">{</span><span class="n">joint_state</span><span class="o">.</span><span class="n">name</span><span class="p">[</span><span class="n">x</span><span class="p">]:</span> <span class="n">joint_state</span><span class="o">.</span><span class="n">position</span><span class="p">[</span><span class="n">x</span><span class="p">]</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">joint_state</span><span class="o">.</span><span class="n">name</span><span class="p">))}</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">robot</span><span class="o">.</span><span class="n">set_joint_state</span><span class="p">(</span><span class="n">js_dict</span><span class="p">)</span>
+    <span class="n">cmd</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">controller</span><span class="o">.</span><span class="n">get_next_command</span><span class="p">()</span>
+
+    <span class="n">cmd_msg</span> <span class="o">=</span> <span class="n">JointState</span><span class="p">()</span>
+    <span class="n">cmd_msg</span><span class="o">.</span><span class="n">header</span><span class="o">.</span><span class="n">stamp</span> <span class="o">=</span> <span class="n">rospy</span><span class="o">.</span><span class="n">Time</span><span class="o">.</span><span class="n">now</span><span class="p">()</span>
+    <span class="k">for</span> <span class="n">joint_name</span><span class="p">,</span> <span class="n">velocity</span> <span class="ow">in</span> <span class="n">cmd</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="n">cmd_msg</span><span class="o">.</span><span class="n">name</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">joint_name</span><span class="p">)</span>
+        <span class="n">cmd_msg</span><span class="o">.</span><span class="n">velocity</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">velocity</span><span class="p">)</span>
+        <span class="n">cmd_msg</span><span class="o">.</span><span class="n">position</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+        <span class="n">cmd_msg</span><span class="o">.</span><span class="n">effort</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+
+    <span class="bp">self</span><span class="o">.</span><span class="n">cmd_pub</span><span class="o">.</span><span class="n">publish</span><span class="p">(</span><span class="n">cmd_msg</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<p>The complete class should now look something like this:</p>
+<div class="literal-block-wrapper container" id="id10">
+<div class="code-block-caption"><span class="caption-text">Complete Node Implementation</span><a class="headerlink" href="#id10" title="Permalink to this code">¶</a></div>
+<div class="highlight-python"><div class="highlight"><pre><span></span><span class="k">class</span> <span class="nc">MyPositionControllerNode</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">robot_file</span><span class="p">,</span> <span class="n">eef_name</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">z</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">robot</span> <span class="o">=</span> <span class="n">Robot</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">robot</span><span class="o">.</span><span class="n">load_from_urdf_path</span><span class="p">(</span><span class="n">robot_file</span><span class="p">,</span> <span class="s1">&#39;base_link&#39;</span><span class="p">,</span> <span class="p">[</span><span class="n">eef_name</span><span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">controller</span> <span class="o">=</span> <span class="n">MyPositionController</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">robot</span><span class="p">,</span> <span class="n">eef_name</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">controller</span><span class="o">.</span><span class="n">set_goal</span><span class="p">(</span><span class="n">x</span><span class="p">,</span><span class="n">y</span><span class="p">,</span><span class="n">z</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cmd_pub</span> <span class="o">=</span> <span class="n">rospy</span><span class="o">.</span><span class="n">Publisher</span><span class="p">(</span><span class="s1">&#39;simulator/commands&#39;</span><span class="p">,</span> <span class="n">JointState</span><span class="p">,</span> <span class="n">queue_size</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cmd_sub</span> <span class="o">=</span> <span class="n">rospy</span><span class="o">.</span><span class="n">Subscriber</span><span class="p">(</span><span class="s1">&#39;/joint_states&#39;</span><span class="p">,</span> <span class="n">JointState</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">js_callback</span><span class="p">,</span> <span class="n">queue_size</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">js_callback</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">joint_state</span><span class="p">):</span>
+        <span class="n">js_dict</span> <span class="o">=</span> <span class="p">{</span><span class="n">joint_state</span><span class="o">.</span><span class="n">name</span><span class="p">[</span><span class="n">x</span><span class="p">]:</span> <span class="n">joint_state</span><span class="o">.</span><span class="n">position</span><span class="p">[</span><span class="n">x</span><span class="p">]</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">joint_state</span><span class="o">.</span><span class="n">name</span><span class="p">))}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">robot</span><span class="o">.</span><span class="n">set_joint_state</span><span class="p">(</span><span class="n">js_dict</span><span class="p">)</span>
+        <span class="n">cmd</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">controller</span><span class="o">.</span><span class="n">get_next_command</span><span class="p">()</span>
+
+        <span class="n">cmd_msg</span> <span class="o">=</span> <span class="n">JointState</span><span class="p">()</span>
+        <span class="n">cmd_msg</span><span class="o">.</span><span class="n">header</span><span class="o">.</span><span class="n">stamp</span> <span class="o">=</span> <span class="n">rospy</span><span class="o">.</span><span class="n">Time</span><span class="o">.</span><span class="n">now</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">joint_name</span><span class="p">,</span> <span class="n">velocity</span> <span class="ow">in</span> <span class="n">cmd</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">cmd_msg</span><span class="o">.</span><span class="n">name</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">joint_name</span><span class="p">)</span>
+            <span class="n">cmd_msg</span><span class="o">.</span><span class="n">velocity</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">velocity</span><span class="p">)</span>
+            <span class="n">cmd_msg</span><span class="o">.</span><span class="n">position</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+            <span class="n">cmd_msg</span><span class="o">.</span><span class="n">effort</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">cmd_pub</span><span class="o">.</span><span class="n">publish</span><span class="p">(</span><span class="n">cmd_msg</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="section" id="finishing-up">
+<h4>Finishing Up<a class="headerlink" href="#finishing-up" title="Permalink to this headline">¶</a></h4>
+<p>All that&#8217;s left to do now, is providing a small main function to that initializes the ROS node, passes the command-line arguments to our node implementation and stops the process from dying prematurely. This would be one possible implementation:</p>
+<div class="literal-block-wrapper container" id="id11">
+<div class="code-block-caption"><span class="caption-text">Main Function Implementation</span><a class="headerlink" href="#id11" title="Permalink to this code">¶</a></div>
+<div class="highlight-python"><div class="highlight"><pre><span></span><span class="k">if</span> <span class="n">__name__</span> <span class="o">==</span> <span class="s1">&#39;__main__&#39;</span><span class="p">:</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">6</span><span class="p">:</span>
+        <span class="k">print</span><span class="p">(</span><span class="s1">&#39;Please provide: &lt;urdf file&gt; &lt;endeffector name&gt; &lt;goal x&gt; &lt;goal y&gt; &lt;goal z&gt;&#39;</span><span class="p">)</span>
+        <span class="nb">exit</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+
+    <span class="n">rospy</span><span class="o">.</span><span class="n">init_node</span><span class="p">(</span><span class="s1">&#39;basic_eef_position_controller&#39;</span><span class="p">)</span>
+
+    <span class="n">node</span> <span class="o">=</span> <span class="n">MyPositionControllerNode</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="nb">float</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">[</span><span class="mi">3</span><span class="p">]),</span> <span class="nb">float</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">[</span><span class="mi">4</span><span class="p">]),</span> <span class="nb">float</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">[</span><span class="mi">5</span><span class="p">]))</span>
+
+    <span class="n">rospy</span><span class="o">.</span><span class="n">spin</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<p>The final code should look something like this:</p>
+<div class="literal-block-wrapper container" id="id12">
+<div class="code-block-caption"><span class="caption-text">Final Code</span><a class="headerlink" href="#id12" title="Permalink to this code">¶</a></div>
+<div class="highlight-python"><div class="highlight"><pre><span></span><span class="ch">#!/usr/bin/env python</span>
+<span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">import</span> <span class="nn">rospy</span>
+<span class="kn">from</span> <span class="nn">sensor_msgs.msg</span> <span class="kn">import</span> <span class="n">JointState</span>
+
+<span class="kn">from</span> <span class="nn">giskardpy.robot</span> <span class="kn">import</span> <span class="n">Robot</span>
+<span class="kn">from</span> <span class="nn">giskardpy.qpcontroller</span> <span class="kn">import</span> <span class="n">QPController</span>
+<span class="kn">from</span> <span class="nn">giskardpy.qp_problem_builder</span> <span class="kn">import</span> <span class="n">SoftConstraint</span>
+<span class="kn">from</span> <span class="nn">giskardpy.input_system</span> <span class="kn">import</span> <span class="o">*</span>
+<span class="kn">from</span> <span class="nn">giskardpy.symengine_wrappers</span> <span class="kn">import</span> <span class="o">*</span>
+
+<span class="k">class</span> <span class="nc">MyPositionController</span><span class="p">(</span><span class="n">QPController</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">robot</span><span class="p">,</span> <span class="n">eef_name</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">eef_name</span> <span class="o">=</span> <span class="n">eef_name</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">MyPositionController</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">__init__</span><span class="p">(</span><span class="n">robot</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">add_inputs</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">robot</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">position_input</span> <span class="o">=</span> <span class="n">Point3Input</span><span class="p">(</span><span class="s1">&#39;goal&#39;</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">make_constraints</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">robot</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">MyPositionController</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">make_constraints</span><span class="p">(</span><span class="n">robot</span><span class="p">)</span>
+
+        <span class="n">d</span> <span class="o">=</span> <span class="n">norm</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">position_input</span><span class="o">.</span><span class="n">get_expression</span><span class="p">()</span> <span class="o">-</span> <span class="n">pos_of</span><span class="p">(</span><span class="n">robot</span><span class="o">.</span><span class="n">frames</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">eef_name</span><span class="p">]))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_soft_constraints</span><span class="p">[</span><span class="s1">&#39;position constraint&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">SoftConstraint</span><span class="p">(</span><span class="o">-</span><span class="n">d</span><span class="p">,</span> <span class="o">-</span><span class="n">d</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">d</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">set_goal</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">z</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">update_observables</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">position_input</span><span class="o">.</span><span class="n">get_update_dict</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">z</span><span class="p">))</span>
+
+
+<span class="k">class</span> <span class="nc">MyPositionControllerNode</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">robot_file</span><span class="p">,</span> <span class="n">eef_name</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">z</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">robot</span> <span class="o">=</span> <span class="n">Robot</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">robot</span><span class="o">.</span><span class="n">load_from_urdf_path</span><span class="p">(</span><span class="n">robot_file</span><span class="p">,</span> <span class="s1">&#39;base_link&#39;</span><span class="p">,</span> <span class="p">[</span><span class="n">eef_name</span><span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">controller</span> <span class="o">=</span> <span class="n">MyPositionController</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">robot</span><span class="p">,</span> <span class="n">eef_name</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">controller</span><span class="o">.</span><span class="n">set_goal</span><span class="p">(</span><span class="n">x</span><span class="p">,</span><span class="n">y</span><span class="p">,</span><span class="n">z</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cmd_pub</span> <span class="o">=</span> <span class="n">rospy</span><span class="o">.</span><span class="n">Publisher</span><span class="p">(</span><span class="s1">&#39;simulator/commands&#39;</span><span class="p">,</span> <span class="n">JointState</span><span class="p">,</span> <span class="n">queue_size</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cmd_sub</span> <span class="o">=</span> <span class="n">rospy</span><span class="o">.</span><span class="n">Subscriber</span><span class="p">(</span><span class="s1">&#39;/joint_states&#39;</span><span class="p">,</span> <span class="n">JointState</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">js_callback</span><span class="p">,</span> <span class="n">queue_size</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">js_callback</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">joint_state</span><span class="p">):</span>
+        <span class="n">js_dict</span> <span class="o">=</span> <span class="p">{</span><span class="n">joint_state</span><span class="o">.</span><span class="n">name</span><span class="p">[</span><span class="n">x</span><span class="p">]:</span> <span class="n">joint_state</span><span class="o">.</span><span class="n">position</span><span class="p">[</span><span class="n">x</span><span class="p">]</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">joint_state</span><span class="o">.</span><span class="n">name</span><span class="p">))}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">robot</span><span class="o">.</span><span class="n">set_joint_state</span><span class="p">(</span><span class="n">js_dict</span><span class="p">)</span>
+        <span class="n">cmd</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">controller</span><span class="o">.</span><span class="n">get_next_command</span><span class="p">()</span>
+
+        <span class="n">cmd_msg</span> <span class="o">=</span> <span class="n">JointState</span><span class="p">()</span>
+        <span class="n">cmd_msg</span><span class="o">.</span><span class="n">header</span><span class="o">.</span><span class="n">stamp</span> <span class="o">=</span> <span class="n">rospy</span><span class="o">.</span><span class="n">Time</span><span class="o">.</span><span class="n">now</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">joint_name</span><span class="p">,</span> <span class="n">velocity</span> <span class="ow">in</span> <span class="n">cmd</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">cmd_msg</span><span class="o">.</span><span class="n">name</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">joint_name</span><span class="p">)</span>
+            <span class="n">cmd_msg</span><span class="o">.</span><span class="n">velocity</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">velocity</span><span class="p">)</span>
+            <span class="n">cmd_msg</span><span class="o">.</span><span class="n">position</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+            <span class="n">cmd_msg</span><span class="o">.</span><span class="n">effort</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">cmd_pub</span><span class="o">.</span><span class="n">publish</span><span class="p">(</span><span class="n">cmd_msg</span><span class="p">)</span>
+
+
+<span class="k">if</span> <span class="n">__name__</span> <span class="o">==</span> <span class="s1">&#39;__main__&#39;</span><span class="p">:</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">6</span><span class="p">:</span>
+        <span class="k">print</span><span class="p">(</span><span class="s1">&#39;Please provide: &lt;urdf file&gt; &lt;endeffector name&gt; &lt;goal x&gt; &lt;goal y&gt; &lt;goal z&gt;&#39;</span><span class="p">)</span>
+        <span class="nb">exit</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+
+    <span class="n">rospy</span><span class="o">.</span><span class="n">init_node</span><span class="p">(</span><span class="s1">&#39;basic_eef_position_controller&#39;</span><span class="p">)</span>
+
+    <span class="n">node</span> <span class="o">=</span> <span class="n">MyPositionControllerNode</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="nb">float</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">[</span><span class="mi">3</span><span class="p">]),</span> <span class="nb">float</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">[</span><span class="mi">4</span><span class="p">]),</span> <span class="nb">float</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">[</span><span class="mi">5</span><span class="p">]))</span>
+
+    <span class="n">rospy</span><span class="o">.</span><span class="n">spin</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<p>Don&#8217;t forget to mark your file as executable using <code class="code docutils literal"><span class="pre">chmod</span> <span class="pre">+x</span></code>.</p>
+</div>
+<div class="section" id="run-forrest-run">
+<h4>Run Forrest, Run!<a class="headerlink" href="#run-forrest-run" title="Permalink to this headline">¶</a></h4>
+<p>Last thing to do now is run the controller. We can use the lightweight <em>iai_naive_kinematics_sim</em> to simulate a robot locally.To simulate a <em>Fetch</em> robot, you can clone the <a class="reference external" href="https://github.com/ARoefer/fetch_giskard.git">fetch_giskard repository</a>. Its not necessary to build it successfully, but if you do want to you&#8217;ll need the <em>robot_controllers</em> package. You can install it using apt:</p>
+<div class="highlight-bash"><div class="highlight"><pre><span></span>sudo apt-get install ros-indigo-robot-controllers
+</pre></div>
+</div>
+<p>Additionally you will need the <em>fetch_description</em> package:</p>
+<div class="highlight-bash"><div class="highlight"><pre><span></span>sudo apt-get install ros-indigo-fetch-description
+</pre></div>
+</div>
+<p>Once you got all the dependencies and have started a <em>roscore</em>, you can launch the simulator using:</p>
+<div class="highlight-bash"><div class="highlight"><pre><span></span>roslaunch fetch_giskard fetch_sim.launch
+</pre></div>
+</div>
+<p>Fire up RVIZ and add a new robot model display. You should be seeing something like this:</p>
+<div class="figure align-center" id="id13">
+<img alt="Initial Posture of the Simulated Fetch" src="_images/rviz_sim.png" />
+<p class="caption"><span class="caption-text">RVIZ display of initial robot configuration</span></p>
+</div>
+<p>Now all thats left to do is run your node. Like this for example:</p>
+<div class="literal-block-wrapper container" id="id14">
+<div class="code-block-caption"><span class="caption-text">Example run of the controller</span><a class="headerlink" href="#id14" title="Permalink to this code">¶</a></div>
+<div class="highlight-bash"><div class="highlight"><pre><span></span>roscd fetch_giskard
+rosrun your_package your_node.py robots/fetch.urdf gripper_link 0.8 0.3 1
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="section" id="last-thoughts">
+<h2>Last Thoughts<a class="headerlink" href="#last-thoughts" title="Permalink to this headline">¶</a></h2>
+<p>Hopefully this tutorial helped you to better understand the Giskard workflow.
+As a next step I&#8217;d recommend familiarizing yourself with the functions provided by <code class="code docutils literal"><span class="pre">giskardpy.symengine_wrappers</span></code> and <code class="code docutils literal"><span class="pre">giskardpy.input_system</span></code>. As an exercise you could try to implement a the constraints for rotational alignment from the introduction.
+When you need more complex functions like <em>sin</em> don&#8217;t forget to use the SymEngine implementation by importing <code class="code docutils literal"><span class="pre">symengine</span></code>.
+If you want to import all functions from SymEngine by doing <code class="code docutils literal"><span class="pre">from</span> <span class="pre">symengine</span> <span class="pre">import</span> <span class="pre">*</span></code> don&#8217;t forget to import the SymEngine wrappers afterwards, as they override some of the functionality.</p>
+</div>
+</div>
+
+
+           </div>
+           <div class="articleComments">
+            
+           </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+      
+        <a href="index.html" class="btn btn-neutral" title="Welcome to giskardpy’s documentation!" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2018, Georg Bartels, Adrian Röfer, Simon Stelter.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'./',
+            VERSION:'0.1',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true,
+            SOURCELINK_SUFFIX: ''
+        };
+    </script>
+      <script type="text/javascript" src="_static/jquery.js"></script>
+      <script type="text/javascript" src="_static/underscore.js"></script>
+      <script type="text/javascript" src="_static/doctools.js"></script>
+      <script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>

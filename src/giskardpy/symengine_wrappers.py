@@ -24,7 +24,7 @@ def speed_up(function, parameters):
         if BACKEND == 'numpy' or BACKEND == 'lambda':
             fast_f = lambdify(list(parameters), function, backend='lambda')
         elif BACKEND == 'cython' or BACKEND == 'llvm':
-            fast_f = lambdify(list(parameters), function, backend='llvm')
+            fast_f = lambdify(list(parameters), function, backend='llvm', real=True)
 
         # @profile
         def f(**kwargs):
@@ -48,7 +48,7 @@ def min(*args):
     if len(args) == 1:
         return args[0]
     elif len(args) > 1:
-        return ((args[0] + min(args[1:])) - abs(args[0] - min(args[1:]))) / 2
+        return ((args[0] + min(*args[1:])) - abs(args[0] - min(*args[1:]))) / 2
     return 0
 
 def vec3(x, y, z):

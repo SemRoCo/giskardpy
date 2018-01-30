@@ -43,6 +43,7 @@ class QProblemBuilder(object):
         self.soft_constraints_dict = soft_constraints_dict
         self.controlled_joints_strs = list(self.joint_constraints_dict.keys())
         self.controlled_joints = [spw.Symbol(n) for n in self.controlled_joints_strs]
+        self.soft_constraint_indices = {}
         self.make_sympy_matrices()
 
         self.qp_solver = QPSolver(self.H.shape[0], len(self.lbA))
@@ -65,7 +66,8 @@ class QProblemBuilder(object):
             lbA.append(c.lower)
             ubA.append(c.upper)
             hard_expressions.append(c.expression)
-        for c in self.soft_constraints_dict.values():
+        for scname, c in self.soft_constraints_dict.items():
+            self.soft_constraint_indices[scname] = len(lbA)
             weights.append(c.weight)
             lbA.append(c.lower)
             ubA.append(c.upper)
@@ -103,17 +105,36 @@ class QProblemBuilder(object):
         self.ubA = spw.Matrix(ubA)
 
         t = time()
-        self.cython_H = spw.speed_up(self.H, self.H.free_symbols)
+        try:
+            self.cython_H = spw.speed_up(self.H, self.H.free_symbols)
+        except Exception as e:
+            raise Exception('Error while wrapping weight matrix! Error: {}\n'.format(e))
 
-        self.cython_A = spw.speed_up(self.A, self.A.free_symbols)
+        try:
+            self.cython_A = spw.speed_up(self.A, self.A.free_symbols)
+        except Exception as e:
+            raise Exception('Error while wrapping jacobian! Error: {}\n'.format(e))
 
-        self.cython_lb = spw.speed_up(self.lb, self.lb.free_symbols)
+        try:
+            self.cython_lb = spw.speed_up(self.lb, self.lb.free_symbols)
+        except Exception as e:
+            raise Exception('Error while wrapping lower bounds! Error: {}\n'.format(e))
 
-        self.cython_ub = spw.speed_up(self.ub, self.ub.free_symbols)
+        try:
+            self.cython_ub = spw.speed_up(self.ub, self.ub.free_symbols)
+        except Exception as e:
+            raise Exception('Error while wrapping upper bounds! Error: {}\n'.format(e))
 
-        self.cython_lbA = spw.speed_up(self.lbA, self.lbA.free_symbols)
+        try:
+            self.cython_lbA = spw.speed_up(self.lbA, self.lbA.free_symbols)
+        except Exception as e:
+            raise Exception('Error while wrapping jacobian lower bounds! Error: {}\n'.format(e))
 
-        self.cython_ubA = spw.speed_up(self.ubA, self.ubA.free_symbols)
+        try:
+            self.cython_ubA = spw.speed_up(self.ubA, self.ubA.free_symbols)
+        except Exception as e:
+            raise Exception('Error while wrapping jacobian upper bounds! Error: {}\n'.format(e))
+
         self.logging('autowrap took {}'.format(time() - t))
 
         # Strings for printing
@@ -143,10 +164,16 @@ class QProblemBuilder(object):
             return None
         return OrderedDict((observable, xdot_full[i]) for i, observable in enumerate(self.controlled_joints_strs))
 
-    def constraints_met(self, lbThreshold=0.01, ubThreshold=-0.01):
-        for x in range(len(self.np_lbA)):
-            if self.np_lbA[x] > lbThreshold or self.np_ubA[x] < ubThreshold:
-                return False
+    def constraints_met(self, lbThreshold=0.01, ubThreshold=-0.01, names=None):
+        if names == None:
+            for x in range(len(self.np_lbA)):
+                if self.np_lbA[x] > lbThreshold or self.np_ubA[x] < ubThreshold:
+                    return False
+        else:
+            for name in names:
+                x = self.soft_constraint_indices[name]
+                if self.np_lbA[x] > lbThreshold or self.np_ubA[x] < ubThreshold:
+                    return False
         return True
 
     def str_jacobian(self):

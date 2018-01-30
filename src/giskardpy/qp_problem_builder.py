@@ -90,19 +90,15 @@ class QProblemBuilder(object):
         self.lbA = spw.Matrix(lbA)
         self.ubA = spw.Matrix(ubA)
 
+        self.big_ass_M_A = self.A.row_join(self.lbA).row_join(self.ubA)
+        self.big_ass_M_H = self.H.row_join(self.lb).row_join(self.ub)
+        self.big_ass_M = self.big_ass_M_A.col_join(self.big_ass_M_H)
+
         t = time()
-        self.cython_H = spw.speed_up(self.H, self.H.free_symbols, backend=BACKEND)
+        self.cython_big_ass_M = spw.speed_up(self.big_ass_M, self.big_ass_M.free_symbols, backend=BACKEND)
 
-        self.cython_A = spw.speed_up(self.A, self.A.free_symbols, backend=BACKEND)
-
-        self.cython_lb = spw.speed_up(self.lb, self.lb.free_symbols, backend=BACKEND)
-
-        self.cython_ub = spw.speed_up(self.ub, self.ub.free_symbols, backend=BACKEND)
-
-        self.cython_lbA = spw.speed_up(self.lbA, self.lbA.free_symbols, backend=BACKEND)
-
-        self.cython_ubA = spw.speed_up(self.ubA, self.ubA.free_symbols, backend=BACKEND)
         print('autowrap took {}'.format(time() - t))
+        # raise Exception()
 
     # @profile
     def update_observables(self, observables_update):
@@ -112,12 +108,13 @@ class QProblemBuilder(object):
                 evaluated_updates[k] = v(observables_update)
             else:
                 evaluated_updates[k] = v
-        self.np_H = self.cython_H(**evaluated_updates)
-        self.np_A = self.cython_A(**evaluated_updates)
-        self.np_lb = self.cython_lb(**evaluated_updates).reshape(self.lb.shape[0])
-        self.np_ub = self.cython_ub(**evaluated_updates).reshape(self.ub.shape[0])
-        self.np_lbA = self.cython_lbA(**evaluated_updates).reshape(self.lbA.shape[0])
-        self.np_ubA = self.cython_ubA(**evaluated_updates).reshape(self.ubA.shape[0])
+        self.np_big_ass_M = self.cython_big_ass_M(**evaluated_updates)
+        self.np_H = np.array(self.np_big_ass_M[self.A.shape[0]:,:-2])
+        self.np_A = np.array(self.np_big_ass_M[:self.A.shape[0],:self.A.shape[1]])
+        self.np_lb = np.array(self.np_big_ass_M[self.A.shape[0]:,-2])
+        self.np_ub = np.array(self.np_big_ass_M[self.A.shape[0]:,-1])
+        self.np_lbA = np.array(self.np_big_ass_M[:self.A.shape[0],-2])
+        self.np_ubA = np.array(self.np_big_ass_M[:self.A.shape[0],-1])
 
         xdot_full = self.qp_solver.solve(self.np_H, self.np_g, self.np_A,
                                          self.np_lb, self.np_ub, self.np_lbA, self.np_ubA)

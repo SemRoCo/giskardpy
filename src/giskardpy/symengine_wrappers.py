@@ -25,6 +25,7 @@ def fake_Min(x, y):
     return ((x + y) - fake_Abs(x - y)) / 2
 
 
+# @profile
 def speed_up(function, parameters, backend=None):
     str_params = [str(x) for x in parameters]
     if len(parameters) == 0:
@@ -60,6 +61,7 @@ def speed_up(function, parameters, backend=None):
                 return np.nan_to_num(out).reshape(function.shape)
         elif backend == 'cse':
             cse, reduced_f = sp.cse(function)
+            # @profile
             def f(**kwargs):
                 filtered_kwargs = {str(k): kwargs[k] for k in str_params}
                 cse_evaled = [(x[0], x[1].subs(filtered_kwargs)) for x in cse]

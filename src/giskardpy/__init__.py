@@ -6,5 +6,5 @@ USE_SYMENGINE = True
 # BACKEND = 'numpy'
 # BACKEND = 'cython'
 
-# BACKEND = 'llvm'
-BACKEND = 'lambda'
+BACKEND = 'llvm'
+# BACKEND = 'lambda'

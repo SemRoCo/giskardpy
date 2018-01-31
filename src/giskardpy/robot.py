@@ -64,7 +64,7 @@ class Robot(object):
         return self._state
 
     def get_joint_state(self):
-        return OrderedDict((k, v) for k, v in self.get_state().items() if k in self.get_joint_names())
+        return OrderedDict((k, self.get_state()[k]) for k in self.get_joint_names())
 
     def get_joint_names(self):
         return self._joints.keys()
@@ -72,10 +72,14 @@ class Robot(object):
     def _update_observables(self, updates):
         self._state.update(updates)
 
+    # @profile
     def set_joint_state(self, new_joint_state):
         self._update_observables(self.joint_states_input.get_update_dict(**new_joint_state))
-        for link in self.end_effectors:
-            pose = self.link_fk_quaternion(link)
+        fks = self.all_fks(self.get_joint_state())
+        for link, fk in fks.items():
+            position = fk[:3,3:].T[0]
+            quaternion = quaternion_from_matrix(fk).T
+            pose = np.concatenate((quaternion, position))
             self._update_observables(self.current_frame[link].get_update_dict(*pose))
 
     def set_joint_weight(self, joint_name, weight):
@@ -196,10 +200,25 @@ class Robot(object):
 
     # @profile
     def make_np_frames(self):
-        self.fast_frames = []
+        fast_frames = None
+        idxs = []
         for f, expression in self.frames.items():
-            self.fast_frames.append((f, spw.speed_up(expression, list(expression.free_symbols), backend=BACKEND)))
-        self.fast_frames = OrderedDict(self.fast_frames)
+            if fast_frames is None:
+                fast_frames = expression
+            else:
+                fast_frames = fast_frames.col_join(expression)
+            idxs.append((f,(len(idxs)*4,(len(idxs)+1)*4)))
+        fast_frames = spw.speed_up(fast_frames, fast_frames.free_symbols, backend=BACKEND)
+        idxs = OrderedDict(idxs)
+        # @profile
+        def fk(js, link):
+            return fast_frames(**js)[idxs[link][0]:idxs[link][1],:]
+        self.fk = fk
+        # @profile
+        def all_fks(js):
+            fks = fast_frames(**js)
+            return {link: fks[i1:i2,:] for (link, (i1, i2)) in idxs.items()}
+        self.all_fks = all_fks
 
     def get_eef_position(self):
         eef = {}
@@ -213,26 +232,21 @@ class Robot(object):
             eef[end_effector] = self.link_fk_quaternion(end_effector)
         return eef
 
+    # @profile
     def link_fk(self, link):
-        try:
-            eef_joints = self.link_joint_symbols[link]
-        except KeyError:
-            self.link_joint_symbols[link] = self.frames[link].free_symbols
-            eef_joints = self.link_joint_symbols[link]
-        eef_joint_symbols = [self.get_joint_state_input().to_str_symbol(str(x)) for x in eef_joints]
-        js = {k: self.get_state()[k] for k in eef_joint_symbols}
-        evaled_frame = self.fast_frames[link](**js)
-        return spw.Matrix(evaled_frame.tolist())
+        evaled_frame = self.fk(self.get_joint_state(), link)
+        return evaled_frame
 
     def link_fk_quaternion(self, link):
         fk = self.link_fk(link)
-        eef_pos = np.array(spw.pos_of(fk).tolist(), dtype=float)[:-1].reshape(3)
-        eef_rot = quaternion_from_matrix(np.array(fk).astype(float))
+        eef_pos = fk[:3,3:].T[0]
+        eef_rot = quaternion_from_matrix(fk).T
         return np.concatenate((eef_rot, eef_pos))
 
     # @profile
     def get_jacobian(self, tip):
         if tip not in self.j:
+            print('creating jacobian for {}'.format(tip))
             f = self.frames[tip]
             x = f[0, 3]
             y = f[1, 3]
@@ -253,7 +267,11 @@ class Robot(object):
             m = spw.Matrix([x, y, z, rx, ry, rz])
             j = m.jacobian(spw.Matrix(self.get_joint_names()))
             self.j[tip] = spw.speed_up(j, j.free_symbols, backend=BACKEND)
+            print('done')
         return self.j[tip](**self.get_state())
+
+    def make_fk_and_jacobian(self):
+        pass
 
     def load_from_urdf_path(self, urdf_path, root_link, tip_links):
         return self.load_from_urdf(URDF.from_xml_file(urdf_path), root_link, tip_links)

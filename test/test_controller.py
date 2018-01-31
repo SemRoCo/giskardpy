@@ -108,7 +108,7 @@ class TestController(unittest.TestCase):
         robot = controller.get_robot()
         goals = []
         np.random.seed(23)
-        while len(goals) < 10:
+        while len(goals) < 3:
             goal_dict = get_rnd_joint_state(robot)
             robot.set_joint_state(goal_dict)
             goal = robot.get_eef_position_quaternion()

@@ -90,24 +90,48 @@ class QProblemBuilder(object):
         self.lbA = spw.Matrix(lbA)
         self.ubA = spw.Matrix(ubA)
 
-        self.big_ass_M_A = self.A.row_join(self.lbA).row_join(self.ubA)
-        self.big_ass_M_H = self.H.row_join(self.lb).row_join(self.ub)
-        self.big_ass_M = self.big_ass_M_A.col_join(self.big_ass_M_H)
+        big_ass_M_A = self.A.row_join(self.lbA).row_join(self.ubA)
+        big_ass_M_H = self.H.row_join(self.lb).row_join(self.ub)
+        self.big_ass_M = big_ass_M_A.col_join(big_ass_M_H)
 
         t = time()
         self.cython_big_ass_M = spw.speed_up(self.big_ass_M, self.big_ass_M.free_symbols, backend=BACKEND)
+        # self.big_ass_list = self.H.reshape(len(self.H),1)\
+        #     .col_join(self.A.reshape(len(self.A),1))\
+        #     .col_join(self.lb).col_join(self.ub)\
+        #     .col_join(self.lbA).col_join(self.ubA)
+        # self.cython_list = spw.speed_up(self.big_ass_list.T, self.big_ass_list.free_symbols, backend=BACKEND)
 
         print('autowrap took {}'.format(time() - t))
         # raise Exception()
 
     # @profile
     def update_observables(self, observables_update):
-        evaluated_updates = OrderedDict()
-        for k, v in observables_update.items():
-            if not isinstance(v, int) and not isinstance(v, float):
-                evaluated_updates[k] = v(observables_update)
-            else:
-                evaluated_updates[k] = v
+        # evaluated_updates = OrderedDict()
+        # for k, v in observables_update.items():
+        #     if not isinstance(v, int) and not isinstance(v, float):
+        #         evaluated_updates[k] = v(observables_update)
+        #     else:
+        #         evaluated_updates[k] = v
+        evaluated_updates = observables_update
+
+        # self.np_big_ass_list = self.cython_list(**evaluated_updates)
+        # i1 = len(self.H)
+        # self.np_H = self.np_big_ass_list[0, 0:i1].reshape(self.H.shape)
+        # i2 = i1 + len(self.A)
+        # self.np_A = self.np_big_ass_list[0, i1:i2].reshape(self.A.shape)
+        # i1 = i2
+        # i2 += len(self.lb)
+        # self.np_lb = self.np_big_ass_list[0, i1:i2]
+        # i1 = i2
+        # i2 += len(self.ub)
+        # self.np_ub = self.np_big_ass_list[0, i1:i2]
+        # i1 = i2
+        # i2 += len(self.lbA)
+        # self.np_lbA = self.np_big_ass_list[0, i1:i2]
+        # i1 = i2
+        # self.np_ubA = self.np_big_ass_list[0, i1:]
+
         self.np_big_ass_M = self.cython_big_ass_M(**evaluated_updates)
         self.np_H = np.array(self.np_big_ass_M[self.A.shape[0]:,:-2])
         self.np_A = np.array(self.np_big_ass_M[:self.A.shape[0],:self.A.shape[1]])

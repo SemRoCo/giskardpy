@@ -2,18 +2,15 @@
 import unittest
 from collections import OrderedDict
 from simplejson import OrderedDict
-from time import time
 
 import PyKDL
 import numpy as np
 
-from tf.transformations import quaternion_from_matrix, quaternion_multiply, quaternion_about_axis
 from urdf_parser_py.urdf import URDF
 
 from giskardpy import USE_SYMENGINE
 from giskardpy.donbot import DonBot
 from giskardpy.pointy_bot import PointyBot
-from giskardpy.joint_space_control import JointSpaceControl
 from giskardpy.pr2 import PR2
 from giskardpy.robot import hacky_urdf_parser_fix
 from kdl_parser import kdl_tree_from_urdf_model
@@ -37,14 +34,23 @@ def get_rnd_joint_state(robot):
     js = {joint: f(joint) for joint in robot.get_joint_state().keys()}
     return js
 
+def make_kdls(urdf, start, end):
+    if urdf[-5:] == '.urdf':
+        with open(urdf, 'r') as file:
+            urdf = file.read()
+    r = URDF.from_xml_string(hacky_urdf_parser_fix(urdf))
+    tree = kdl_tree_from_urdf_model(r)
+    chain = tree.getChain(start, end)
+    kdls = {}
+    for i in range(chain.getNrOfSegments()):
+        link = str(chain.getSegment(i).getName())
+        kdls[link] = KDL(tree, start, link)
+    return kdls
+
 class KDL(object):
-    def __init__(self, urdf, start, end):
-        if urdf[-5:] == '.urdf':
-            with open(urdf, 'r') as file:
-                urdf = file.read()
-        r = URDF.from_xml_string(hacky_urdf_parser_fix(urdf))
-        tree = kdl_tree_from_urdf_model(r)
-        self.chain = tree.getChain(start, end)
+    def __init__(self, tree, start, end):
+        self.end = end
+        self.chain = tree.getChain(start, self.end)
         self.fksolver = PyKDL.ChainFkSolverPos_recursive(self.chain)
         self.jac_solver = PyKDL.ChainJntToJacSolver(self.chain)
         self.jacobian = PyKDL.Jacobian(self.chain.getNrOfJoints())
@@ -58,13 +64,15 @@ class KDL(object):
                 joints.append(str(joint.getName()))
         return joints
 
-    def get_tip_nr(self, tip):
+    def get_tip_nr(self, tip=None):
+        if tip is None:
+            tip = self.end
         for i in range(self.chain.getNrOfSegments()):
             link_name = str(self.chain.getSegment(i).getName())
             if link_name == tip:
                 return i
 
-    def fk(self, js_dict, tip):
+    def fk(self, js_dict, tip=None):
         js = [js_dict[j] for j in self.joints]
         seg_nr = self.get_tip_nr(tip)
         f = PyKDL.Frame()
@@ -74,7 +82,7 @@ class KDL(object):
         self.fksolver.JntToCart(joint_array, f, seg_nr+1)
         return f
 
-    def fk_np(self, js_dict, tip):
+    def fk_np(self, js_dict, tip=None):
         f = self.fk(js_dict, tip)
         r = [[f.M[0, 0], f.M[0, 1], f.M[0, 2], f.p[0]],
              [f.M[1, 0], f.M[1, 1], f.M[1, 2], f.p[1]],
@@ -109,86 +117,79 @@ class TestFK(unittest.TestCase):
         robot.set_joint_state(r)
 
 
-    def compare_fk_jacobian_chain(self, robot, robot_kdl, js):
-        for i in range(robot_kdl.chain.getNrOfSegments()):
-            tip = str(robot_kdl.chain.getSegment(i).getName())
+    def compare_fk_jacobian_chain(self, robot, robot_kdls, js):
+        for tip, robot_kdl in robot_kdls.items():
             robot.set_joint_state(js)
             eef_pose = robot.link_fk(tip)
-            kdl_pose = robot_kdl.fk_np(js, tip)
+            kdl_pose = robot_kdl.fk_np(js)
             np.testing.assert_array_almost_equal(eef_pose, kdl_pose)
             kdl_pose[0,3]=0
             kdl_pose[1,3]=0
             kdl_pose[2,3]=0
             tip_q = np.array(spw.quaternion_make_unique(robot.q_rot[tip]).subs(js).T).astype(float)[0]
             self.assertTrue(tip_q[-1]>=0)
-            kdl_q = robot_kdl.fk(js, tip).M.GetQuaternion()
+            kdl_q = robot_kdl.fk(js).M.GetQuaternion()
             try:
                 np.testing.assert_array_almost_equal(tip_q, kdl_q)
             except AssertionError as e:
                 np.testing.assert_array_almost_equal(-tip_q, kdl_q)
 
 
-            kdl_aa = robot_kdl.fk(js, tip).M.GetRot()
+            kdl_aa = robot_kdl.fk(js).M.GetRot()
             spw_axis, spw_angle = spw.axis_angle_from_matrix(eef_pose)
             spw_aa = spw_axis*spw_angle
             if spw.nan not in spw_aa:
                 np.testing.assert_array_almost_equal([x for x in kdl_aa], np.array(spw_aa).T[0].astype(float))
 
-            if i == robot_kdl.chain.getNrOfSegments()-1:
-                kdl_jacobian = robot_kdl.get_jacobian(js)
-                sp_jacobian = robot.get_jacobian(tip)
-                sp_jacobian = sp_jacobian[:,np.abs(sp_jacobian).sum(axis=0)!=0]
-                np.testing.assert_array_almost_equal(kdl_jacobian, sp_jacobian, decimal=3)
+            kdl_jacobian = robot_kdl.get_jacobian(js)
+            sp_jacobian = robot.get_jacobian(tip)
+            sp_jacobian = sp_jacobian[:,np.abs(sp_jacobian).sum(axis=0)!=0]
+            np.testing.assert_array_almost_equal(kdl_jacobian, sp_jacobian, decimal=3)
 
 
     def test_default_pr2(self):
-
-        left_arm = KDL('pr2.urdf', 'base_link', 'l_gripper_tool_frame')
-        right_arm = KDL('pr2.urdf', 'base_link', 'r_gripper_tool_frame')
+        kdls = {}
+        kdls.update(make_kdls('pr2.urdf', 'base_link', 'l_gripper_tool_frame'))
+        kdls.update(make_kdls('pr2.urdf', 'base_link', 'r_gripper_tool_frame'))
         r = PR2()
         for i in range(20):
             js = get_rnd_joint_state(r)
-            self.compare_fk_jacobian_chain(r, left_arm, js)
-            self.compare_fk_jacobian_chain(r, right_arm, js)
+            self.compare_fk_jacobian_chain(r, kdls, js)
 
 
     def test_pointy(self):
-        eef = 'eef'
-        r_kdl = KDL('pointy.urdf', 'base_link', eef)
+        kdls = make_kdls('pointy.urdf', 'base_link', 'eef')
         r = PointyBot()
 
         for i in range(20):
             js = get_rnd_joint_state(r)
-            self.compare_fk_jacobian_chain(r, r_kdl, js)
+            self.compare_fk_jacobian_chain(r, kdls, js)
 
     def test_base(self):
-        eef = 'eef'
-        r_kdl = KDL('2d_base_bot.urdf', 'base_link', eef)
+        kdls = make_kdls('2d_base_bot.urdf', 'base_link', 'eef')
         r = PointyBot(urdf='2d_base_bot.urdf')
 
         for i in range(20):
             js = get_rnd_joint_state(r)
-            self.compare_fk_jacobian_chain(r, r_kdl, js)
+            self.compare_fk_jacobian_chain(r, kdls, js)
 
     def test_donbot(self):
-        eef = 'gripper_tool_frame'
-        r_kdl = KDL('iai_donbot.urdf', 'base_footprint', eef)
+        kdls = make_kdls('iai_donbot.urdf', 'base_footprint', 'gripper_tool_frame')
         r = DonBot(urdf_path='iai_donbot.urdf')
 
         for i in range(20):
             print(i)
             js = get_rnd_joint_state(r)
-            self.compare_fk_jacobian_chain(r, r_kdl, js)
+            self.compare_fk_jacobian_chain(r, kdls, js)
 
 
     def test_fixed(self):
-        eef = 'eef'
-        r_kdl = KDL('fixed.urdf', 'base_link', eef)
-        r = PointyBot(urdf='fixed.urdf', tip=eef)
+        kdls = make_kdls('fixed.urdf', 'base_link', 'eef')
+        r = PointyBot(urdf='fixed.urdf', tip='eef')
 
         for i in range(20):
             js = get_rnd_joint_state(r)
-            self.compare_fk_jacobian_chain(r, r_kdl, js)
+            self.compare_fk_jacobian_chain(r, kdls, js)
 
 if __name__ == '__main__':
     import rosunit

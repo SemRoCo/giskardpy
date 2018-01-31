@@ -1,7 +1,6 @@
 import symengine as sp
 from symengine import Matrix, Symbol, eye, sympify, diag, zeros, lambdify
 import numpy as np
-import sympy as sp2
 
 from giskardpy import BACKEND
 

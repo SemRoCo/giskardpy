@@ -148,7 +148,7 @@ class CartesianController(QPController):
             self._controllable_constraints = robot.joint_constraints
             self._hard_constraints = robot.hard_constraints
             self.update_observables({self.goal_weights[eef].get_symbol_str(): self.weight})
-            self.set_goal({eef: robot.get_eef_position_quaternion()[eef]})
+            self.set_goal({eef: robot.link_fk_quaternion(eef)})
         self.update_observables({self.gain.get_symbol_str(): self.default_gain})
         self.update_observables({self.threshold_value.get_symbol_str(): self.default_threshold})
         print('make constraints took {}'.format(time() - t))
@@ -161,4 +161,4 @@ class CartesianController(QPController):
         """
         for eef, goal_pos in goal.items():
             self.update_observables(self.goal_eef[eef].get_update_dict(*goal_pos))
-            self.update_observables(self.start_eef[eef].get_update_dict(*self.get_robot().get_eef_position_quaternion()[eef]))
+            self.update_observables(self.start_eef[eef].get_update_dict(*self.get_robot().link_fk_quaternion(eef)))

@@ -220,18 +220,6 @@ class Robot(object):
             return {link: fks[i1:i2,:] for (link, (i1, i2)) in idxs.items()}
         self.all_fks = all_fks
 
-    def get_eef_position(self):
-        eef = {}
-        for end_effector in self.end_effectors:
-            eef[end_effector] = self.link_fk(end_effector)
-        return eef
-
-    def get_eef_position_quaternion(self):
-        eef = {}
-        for end_effector in self.end_effectors:
-            eef[end_effector] = self.link_fk_quaternion(end_effector)
-        return eef
-
     # @profile
     def link_fk(self, link):
         evaled_frame = self.fk(self.get_joint_state(), link)

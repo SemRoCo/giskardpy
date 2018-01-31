@@ -111,7 +111,7 @@ class TestController(unittest.TestCase):
         while len(goals) < 3:
             goal_dict = get_rnd_joint_state(robot)
             robot.set_joint_state(goal_dict)
-            goal = robot.get_eef_position_quaternion()
+            goal = {link: robot.link_fk_quaternion(link) for link in robot.end_effectors}
             if min([x[-1] for x in goal.values()]) > z_range[0] and \
                     max([x[-1] for x in goal.values()]) < z_range[1] and \
                     min([x[-2] for x in goal.values()]) > y_range[0] and \
@@ -127,7 +127,7 @@ class TestController(unittest.TestCase):
                 robot.set_joint_state({joint: 0.0 for joint in robot.get_joint_state()})
             self.sim(controller, goal, time_limit=time_limit, plot=plot, execute=execute)
             for eef, pose in goal.items():
-                actual_pose = controller.get_robot().get_eef_position_quaternion()[eef]
+                actual_pose = controller.get_robot().link_fk_quaternion(eef)
                 try:
                     np.testing.assert_array_almost_equal(actual_pose, pose,
                                                          decimal=2,

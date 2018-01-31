@@ -176,6 +176,7 @@ class TestFK(unittest.TestCase):
         r = DonBot(urdf_path='iai_donbot.urdf')
 
         for i in range(20):
+            print(i)
             js = get_rnd_joint_state(r)
             self.compare_fk_jacobian_chain(r, r_kdl, js)
 

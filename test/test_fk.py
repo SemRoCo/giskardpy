@@ -147,7 +147,7 @@ class TestFK(unittest.TestCase):
             np.testing.assert_array_almost_equal(kdl_jacobian, sp_jacobian, decimal=3)
 
 
-    def test_default_pr2(self):
+    def test_pr2(self):
         kdls = {}
         kdls.update(make_kdls('pr2.urdf', 'base_link', 'l_gripper_tool_frame'))
         kdls.update(make_kdls('pr2.urdf', 'base_link', 'r_gripper_tool_frame'))
@@ -177,7 +177,7 @@ class TestFK(unittest.TestCase):
         kdls = make_kdls('iai_donbot.urdf', 'base_footprint', 'gripper_tool_frame')
         r = DonBot(urdf_path='iai_donbot.urdf')
 
-        for i in range(20):
+        for i in range(3):
             print(i)
             js = get_rnd_joint_state(r)
             self.compare_fk_jacobian_chain(r, kdls, js)

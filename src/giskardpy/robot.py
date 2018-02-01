@@ -1,5 +1,6 @@
 from collections import namedtuple, OrderedDict
 from time import time
+from warnings import warn
 
 from tf.transformations import quaternion_from_matrix, quaternion_from_euler
 from urdf_parser_py.urdf import URDF
@@ -45,7 +46,7 @@ class Robot(object):
         self._joints = OrderedDict()
         self.default_joint_vel_limit = default_joint_velocity
 
-        self.frames = {}
+        self.frames = OrderedDict()
         self.link_joint_symbols = {}
         self.q_rot = {}
         self.aa_rot = {}
@@ -110,6 +111,8 @@ class Robot(object):
             joint_name = jointsAndLinks[i]
             link_name = jointsAndLinks[i + 1]
             self.current_frame[link_name] = FrameInput('current', link_name)
+            # we need this line in order to have every symbol in our state
+            self._update_observables(self.current_frame[link_name].get_update_dict(0,0,0,1,0,0,0))
             joint = self.urdf_robot.joint_map[joint_name]
 
             if joint_name not in self._joints:
@@ -118,8 +121,8 @@ class Robot(object):
                     self.q_rot[link_name] = parentq
                     # self.aa_rot[link_name] = parentaa
 
-                    self.frames[link_name] *= spw.translation3(*joint.origin.xyz)
-                    self.frames[link_name] *= spw.rotation3_rpy(*joint.origin.rpy)
+                    self.frames[link_name] *= spw.translation3(*joint.origin.xyz)*spw.rotation3_rpy(*joint.origin.rpy)
+                    # self.frames[link_name] *= spw.rotation3_rpy(*joint.origin.rpy)
 
                     q = spw.quaternion_from_rpy(*joint.origin.rpy)
                     self.q_rot[link_name] = spw.quaternion_multiply(self.q_rot[link_name], q)
@@ -208,7 +211,9 @@ class Robot(object):
             else:
                 fast_frames = fast_frames.col_join(expression)
             idxs.append((f,(len(idxs)*4,(len(idxs)+1)*4)))
-        fast_frames = spw.speed_up(fast_frames, fast_frames.free_symbols, backend=BACKEND)
+        cse = spw.sp.cse(fast_frames)
+        free_symbols = fast_frames.free_symbols
+        fast_frames = spw.speed_up(fast_frames, free_symbols, backend='lambda')
         idxs = OrderedDict(idxs)
         # @profile
         def fk(js, link):
@@ -219,6 +224,7 @@ class Robot(object):
             fks = fast_frames(**js)
             return {link: fks[i1:i2,:] for (link, (i1, i2)) in idxs.items()}
         self.all_fks = all_fks
+        # self.make_jacobian()
 
     # @profile
     def link_fk(self, link):
@@ -230,6 +236,7 @@ class Robot(object):
         eef_pos = fk[:3,3:].T[0]
         eef_rot = quaternion_from_matrix(fk).T
         return np.concatenate((eef_rot, eef_pos))
+
 
     # @profile
     def get_jacobian(self, tip):
@@ -243,7 +250,6 @@ class Robot(object):
             current_rotation = spw.rot_of(f)
             hack = spw.rotation3_axis_angle([0, 0, 1], 0.0001)
             current_pose_evaluated = self.current_frame[tip].get_expression()
-            current_position_evaluated = spw.pos_of(current_pose_evaluated)
             current_rotation_evaluated = spw.rot_of(current_pose_evaluated)
 
             axis, angle = spw.axis_angle_from_matrix((current_rotation.T * (current_rotation_evaluated * hack)).T)
@@ -254,9 +260,54 @@ class Robot(object):
             rz = c_aa[2]
             m = spw.Matrix([x, y, z, rx, ry, rz])
             j = m.jacobian(spw.Matrix(self.get_joint_names()))
-            self.j[tip] = spw.speed_up(j, j.free_symbols, backend=BACKEND)
+            cse = spw.sp.cse(j)
+            free_symbols = [spw.Symbol(x) for x in self.get_state().keys()]
+            self.j[tip] = spw.speed_up(j, free_symbols, backend=BACKEND)
             print('done')
+        # warn('sum '+str(self.nr_cses), DeprecationWarning)
         return self.j[tip](**self.get_state())
+
+    # @profile
+    def make_jacobian(self):
+        jacobians = None
+        idxs = []
+        for tip in self.frames:
+            f = self.frames[tip]
+            x = f[0, 3]
+            y = f[1, 3]
+            z = f[2, 3]
+
+            current_rotation = spw.rot_of(f)
+            hack = spw.rotation3_axis_angle([0, 0, 1], 0.0001)
+            current_pose_evaluated = self.current_frame[tip].get_expression()
+            current_rotation_evaluated = spw.rot_of(current_pose_evaluated)
+
+            axis, angle = spw.axis_angle_from_matrix((current_rotation.T * (current_rotation_evaluated * hack)).T)
+            c_aa = current_rotation[:3, :3] * (axis * angle)
+
+            rx = c_aa[0]
+            ry = c_aa[1]
+            rz = c_aa[2]
+            m = spw.Matrix([x, y, z, rx, ry, rz])
+            if jacobians is None:
+                jacobians = m.jacobian(spw.Matrix(self.get_joint_names()))
+            else:
+                jacobians = jacobians.col_join(m.jacobian(spw.Matrix(self.get_joint_names())))
+            idxs.append((tip, (len(idxs) * 6, (len(idxs) + 1) * 6)))
+        cse = spw.sp.cse(jacobians)
+        # ssss = jacobians.free_symbols
+        # warn('free_symbols 1 '+str(ssss), DeprecationWarning)
+        ssss2 = set([spw.Symbol(x) for x in self.get_state().keys()])
+        # warn('diff '+str(ssss2.difference(jacobians.free_symbols)))
+        fast_jacobians = spw.speed_up(jacobians, ssss2, backend=BACKEND)
+        idxs = OrderedDict(idxs)
+
+        # @profile
+        # def f(link):
+        #     return fast_jacobians(**self.get_state())[idxs[link][0]:idxs[link][1], :]
+
+        # self.get_jacobian = f
+
 
     def make_fk_and_jacobian(self):
         pass

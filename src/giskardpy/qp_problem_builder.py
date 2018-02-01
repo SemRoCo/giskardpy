@@ -95,7 +95,9 @@ class QProblemBuilder(object):
         self.big_ass_M = big_ass_M_A.col_join(big_ass_M_H)
 
         t = time()
-        self.cython_big_ass_M = spw.speed_up(self.big_ass_M, self.big_ass_M.free_symbols, backend=BACKEND)
+        cse = spw.sp.cse(self.big_ass_M)
+        free_symbols = self.big_ass_M.free_symbols
+        self.cython_big_ass_M = spw.speed_up(self.big_ass_M, free_symbols, backend=BACKEND)
         # self.big_ass_list = self.H.reshape(len(self.H),1)\
         #     .col_join(self.A.reshape(len(self.A),1))\
         #     .col_join(self.lb).col_join(self.ub)\

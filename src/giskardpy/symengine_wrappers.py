@@ -1,5 +1,6 @@
 import itertools
 from operator import mul
+from warnings import warn
 
 import symengine as sp
 from symengine import Matrix, Symbol, eye, sympify, diag, zeros, lambdify, Abs, Max, Min, sin, cos, tan, acos, asin, \
@@ -39,15 +40,18 @@ def speed_up(function, parameters, backend=None):
     else:
         if backend == 'llvm':
             try:
+                cse = sp.cse(function)
                 fast_f = Lambdify(list(parameters), function, backend=backend, cse=True, real=True)
             except RuntimeError as e:
-                print('WARNING RuntimeError: "{}" during lambdify with LLVM backend, fallback to numpy'.format(e))
+                warn('WARNING RuntimeError: "{}" during lambdify with LLVM backend, fallback to numpy'.format(e),
+                     RuntimeWarning)
                 backend = 'lambda'
         if backend == 'lambda':
             try:
                 fast_f = Lambdify(list(parameters), function, backend='lambda', cse=True, real=True)
             except RuntimeError as e:
-                print('WARNING RuntimeError: "{}" during lambdify with lambda backend, no speedup possible'.format(e))
+                warn('WARNING RuntimeError: "{}" during lambdify with lambda backend, no speedup possible'.format(e),
+                     RuntimeWarning)
                 backend = None
 
             # def f(**kwargs):
@@ -61,6 +65,7 @@ def speed_up(function, parameters, backend=None):
                 return np.nan_to_num(out).reshape(function.shape)
         elif backend == 'cse':
             cse, reduced_f = sp.cse(function)
+
             # @profile
             def f(**kwargs):
                 filtered_kwargs = {str(k): kwargs[k] for k in str_params}

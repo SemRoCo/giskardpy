@@ -7,6 +7,8 @@ class PR2(RobotRos):
             with open(urdf_path, 'r') as file:
                 urdf_str = file.read()
         super(PR2, self).__init__(urdf_str=urdf_str, root_link='base_link',
-                                  tip_links=['l_gripper_tool_frame', 'r_gripper_tool_frame', 'head_mount_kinect_rgb_link'],
+                                  tip_links=['r_gripper_tool_frame', 'l_gripper_tool_frame',
+                                             # 'head_mount_kinect_rgb_link'
+                                             ],
                                   default_joint_velocity=default_joint_velocity)
 

@@ -83,7 +83,6 @@ def axis_angle_from_matrix(rotation_matrix):
     return axis, angle
 
 
-@profile
 def jacobian(fk, js):
     current_pose_evaluated = fk.subs(js)
     x = fk[0, 3]

@@ -5,23 +5,14 @@ from symengine import Symbol as S
 
 
 def right_arm_fk():
-    torso_lift_joint = se.Symbol('torso_lift_joint')
-    r_shoulder_pan_joint = se.Symbol('r_shoulder_pan_joint')
-    r_shoulder_lift_joint = se.Symbol('r_shoulder_lift_joint')
-    r_upper_arm_roll_joint = se.Symbol('r_upper_arm_roll_joint')
-    r_elbow_flex_joint = se.Symbol('r_elbow_flex_joint')
-    r_forearm_roll_joint = se.Symbol('r_forearm_roll_joint')
-    r_wrist_flex_joint = se.Symbol('r_wrist_flex_joint')
-    r_wrist_roll_joint = se.Symbol('r_wrist_roll_joint')
-
-    joint_state = {torso_lift_joint: 0,
-                   r_shoulder_pan_joint: 0,
-                   r_shoulder_lift_joint: 0,
-                   r_upper_arm_roll_joint: 0,
-                   r_elbow_flex_joint: 0,
-                   r_forearm_roll_joint: 0,
-                   r_wrist_flex_joint: 0,
-                   r_wrist_roll_joint: 0}
+    torso_lift_joint = S('torso_lift_joint')
+    r_shoulder_pan_joint = S('r_shoulder_pan_joint')
+    r_shoulder_lift_joint = S('r_shoulder_lift_joint')
+    r_upper_arm_roll_joint = S('r_upper_arm_roll_joint')
+    r_elbow_flex_joint = S('r_elbow_flex_joint')
+    r_forearm_roll_joint = S('r_forearm_roll_joint')
+    r_wrist_flex_joint = S('r_wrist_flex_joint')
+    r_wrist_roll_joint = S('r_wrist_roll_joint')
 
     world_to_base_link = se.eye(4)
     base_link_to_torso_lift_link = M([[1.0, 0, 0, -0.05],
@@ -64,10 +55,9 @@ def right_arm_fk():
                               [0, 0, 1.0, 0],
                               [0, 0, 0, 1]])
 
-    return (world_to_base_link * base_link_to_torso_lift_link * r_shoulder_pan_link * r_shoulder_lift_link * \
+    return world_to_base_link * base_link_to_torso_lift_link * r_shoulder_pan_link * r_shoulder_lift_link * \
             r_upper_arm_roll_link * r_upper_arm_link * r_elbow_flex_link * r_forearm_roll_link * r_forearm_roll_link * \
-            r_forearm_link * r_wrist_flex_link * r_wrist_roll_link * r_gripper_palm_link * r_gripper_tool_frame,
-            joint_state)
+            r_forearm_link * r_wrist_flex_link * r_wrist_roll_link * r_gripper_palm_link * r_gripper_tool_frame
 
 
 def axis_angle_from_matrix(rotation_matrix):
@@ -102,11 +92,13 @@ def jacobian(fk, js):
     m = M([x, y, z, rx, ry, rz])
 
     slow_jacobian = m.jacobian(M(js.keys()))
+    return slow_jacobian
+
+def make_fast(slow_jacobian):
     free_symbols = list(slow_jacobian.free_symbols)
 
     fast_jacobian = se.Lambdify(free_symbols, slow_jacobian, real=True, cse=False, backend='llvm')
 
-    se.cse(slow_jacobian)
     fast_jacobian_cse = se.Lambdify(free_symbols, slow_jacobian, real=True, cse=True, backend='llvm')
 
     subs = [js[x] for x in free_symbols]
@@ -116,7 +108,8 @@ def jacobian(fk, js):
 
 
 if __name__ == '__main__':
-    fk, js = right_arm_fk()
+    fk = right_arm_fk()
+    # some random joint state
     js = {S('torso_lift_joint'): 0.17070830166937445,
           S('r_elbow_flex_joint'): -1.808187398260726,
           S('r_shoulder_lift_joint'): 0.9460061920661217,
@@ -124,7 +117,7 @@ if __name__ == '__main__':
           S('r_shoulder_pan_joint'): 0.5554896480472835,
           S('r_forearm_roll_joint'): 4.311660523426189,
           S('r_wrist_roll_joint'): 2.465788739206398,
-          S('r_wrist_flex_joint'): -1.8156365372418775,
-          }
+          S('r_wrist_flex_joint'): -1.8156365372418775}
+    slow_jacobian = jacobian(fk, js)
     for i in range(10):
-        jacobian(fk, js)
+        make_fast(slow_jacobian)

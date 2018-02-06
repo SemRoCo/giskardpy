@@ -56,8 +56,8 @@ def right_arm_fk():
                               [0, 0, 0, 1]])
 
     return world_to_base_link * base_link_to_torso_lift_link * r_shoulder_pan_link * r_shoulder_lift_link * \
-            r_upper_arm_roll_link * r_upper_arm_link * r_elbow_flex_link * r_forearm_roll_link * r_forearm_roll_link * \
-            r_forearm_link * r_wrist_flex_link * r_wrist_roll_link * r_gripper_palm_link * r_gripper_tool_frame
+           r_upper_arm_roll_link * r_upper_arm_link * r_elbow_flex_link * r_forearm_roll_link * r_forearm_roll_link * \
+           r_forearm_link * r_wrist_flex_link * r_wrist_roll_link * r_gripper_palm_link * r_gripper_tool_frame
 
 
 def axis_angle_from_matrix(rotation_matrix):
@@ -82,7 +82,11 @@ def jacobian(fk, js):
     current_rotation = fk[:3, :3]
     current_rotation_evaluated = current_pose_evaluated[:3, :3]
 
-    axis, angle = axis_angle_from_matrix((current_rotation.T * current_rotation_evaluated).T)
+    # multiply with a slight rotation around z axis to prevent devision by zero
+    epsilon = M([[0.999999995, -9.99999998333333e-05, 0],
+                 [9.99999998333333e-05, 0.999999995, 0],
+                 [0, 0, 1.0]])
+    axis, angle = axis_angle_from_matrix((current_rotation.T * (current_rotation_evaluated )).T)
     c_aa = current_rotation[:3, :3] * (axis * angle)
 
     rx = c_aa[0]
@@ -105,6 +109,7 @@ def make_fast(slow_jacobian):
     slow_jacobian.subs(js)
     fast_jacobian(subs)
     fast_jacobian_cse(subs)
+    se.cse(slow_jacobian)
 
 
 if __name__ == '__main__':

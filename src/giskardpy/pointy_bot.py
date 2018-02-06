@@ -1,9 +1,7 @@
-from giskardpy.robot import Robot
+from giskardpy.robot_ros import RobotRos
 
 
-class PointyBot(Robot):
-    def __init__(self, weight, urdf='pointy.urdf'):
+class PointyBot(RobotRos):
+    def __init__(self, urdf='pointy.urdf', tip='eef'):
         super(PointyBot, self).__init__()
-        self.load_from_urdf_path(urdf, 'base_link', ['eef'])
-        for joint_name in self.weight_input.get_float_names():
-            self.set_joint_weight(joint_name, weight)
+        self.load_from_urdf_path(urdf, 'base_link', [tip])

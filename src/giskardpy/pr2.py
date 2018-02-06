@@ -1,26 +1,14 @@
 from giskardpy.robot import Robot
+from giskardpy.robot_ros import RobotRos
 
-def hacky_urdf_parser_fix(urdf_path):
-    fixed_urdf = ''
-    delete = False
-    black_list = ['transmission']
-    with open(urdf_path, 'r') as urdf:
-        for line in urdf.readlines():
-            if len([x for x in black_list if x in line]) > 0:
-                if not delete:
-                    delete = True
-                else:
-                    delete = False
-                    continue
-            if not delete:
-                fixed_urdf += line
-    return fixed_urdf
-
-class PR2(Robot):
-    def __init__(self, urdf_path='pr2.urdf'):
-        super(PR2, self).__init__()
-        urdf = hacky_urdf_parser_fix(urdf_path)
-        self.load_from_urdf_string(urdf, 'base_link', ['l_gripper_tool_frame', 'r_gripper_tool_frame'])
-        for joint_name in self.weight_input.get_float_names():
-            self.set_joint_weight(joint_name, 1)
+class PR2(RobotRos):
+    def __init__(self, default_joint_velocity=0.5, urdf_path='pr2.urdf', urdf_str=None):
+        if urdf_str is None:
+            with open(urdf_path, 'r') as file:
+                urdf_str = file.read()
+        super(PR2, self).__init__(urdf_str=urdf_str, root_link='base_link',
+                                  tip_links=['r_gripper_tool_frame', 'l_gripper_tool_frame',
+                                             # 'head_mount_kinect_rgb_link'
+                                             ],
+                                  default_joint_velocity=default_joint_velocity)
 

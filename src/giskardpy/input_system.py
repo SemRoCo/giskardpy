@@ -52,6 +52,38 @@ class ScalarInput(ControllerInputArray):
     def get_symbol_str(self):
         return self._str_map['v']
 
+class HackInput(ControllerInputArray):
+    def __init__(self, prefix, suffix=''):
+        super(HackInput, self).__init__(['v'], prefix, suffix)
+
+    def update(self, observable_dict):
+        return 1
+
+    def get_update_dict(self, v):
+        return super(HackInput, self).get_update_dict(v=self.update)
+
+    def get_expression(self):
+        return self._symbol_map['v']
+
+    def get_symbol_str(self):
+        return self._str_map['v']
+
+class slerp(ControllerInputArray):
+    def __init__(self, prefix, suffix=''):
+        super(slerp, self).__init__(['v'], prefix, suffix)
+
+    def update(self, observable_dict):
+        return 1
+
+    def get_update_dict(self, v):
+        return super(slerp, self).get_update_dict(v=self.update)
+
+    def get_expression(self):
+        return self._symbol_map['v']
+
+    def get_symbol_str(self):
+        return self._str_map['v']
+
 
 class Point3Input(ControllerInputArray):
     def __init__(self, prefix, suffix=''):
@@ -112,10 +144,13 @@ class FrameInput(ControllerInputArray):
         return super(FrameInput, self).get_update_dict(qx=qx, qy=qy, qz=qz, qw=qw, x=x, y=y, z=z)
 
     def get_expression(self):
-        return spw.frame3_quaternion(*(self._symbol_map.values()[:4] + [spw.point3(*self._symbol_map.values()[4:])]))
+        return spw.frame3_quaternion(*(self._symbol_map.values()[:4] + [self._symbol_map.values()[4:]]))
 
     def get_position(self):
         return spw.point3(*self._symbol_map.values()[4:])
 
     def get_rotation(self):
         return spw.rotation3_quaternion(*self._symbol_map.values()[:4])
+
+    def get_quaternion(self):
+        return spw.Matrix(self._symbol_map.values()[:4])

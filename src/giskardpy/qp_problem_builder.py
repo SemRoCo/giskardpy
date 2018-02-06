@@ -3,7 +3,10 @@ from collections import OrderedDict, namedtuple
 import numpy as np
 from time import time
 
-from giskardpy import USE_SYMENGINE
+from giskardpy import USE_SYMENGINE, BACKEND
+from giskardpy.cvxopt_qp_solver import CVXQPSolver
+from giskardpy.osqp_solver import OSQPSolver
+from giskardpy.quadprog_qp_solver import QuadProgQPSolver
 
 if USE_SYMENGINE:
     import giskardpy.symengine_wrappers as spw
@@ -28,6 +31,9 @@ class QProblemBuilder(object):
         self.make_sympy_matrices()
 
         self.qp_solver = QPSolver(self.H.shape[0], len(self.lbA))
+        # self.qp_solver = OSQPSolver(self.H.shape[0], len(self.lbA))
+        # self.qp_solver = CVXQPSolver(self.H.shape[0], len(self.lbA))
+        # self.qp_solver = QuadProgQPSolver(self.H.shape[0], len(self.lbA))
 
     # @profile
     def make_sympy_matrices(self):
@@ -47,7 +53,7 @@ class QProblemBuilder(object):
             lbA.append(c.lower)
             ubA.append(c.upper)
             hard_expressions.append(c.expression)
-        for c in self.soft_constraints_dict.values():
+        for k, c in self.soft_constraints_dict.items():
             weights.append(c.weight)
             lbA.append(c.lower)
             ubA.append(c.upper)
@@ -84,31 +90,61 @@ class QProblemBuilder(object):
         self.lbA = spw.Matrix(lbA)
         self.ubA = spw.Matrix(ubA)
 
+        big_ass_M_A = self.A.row_join(self.lbA).row_join(self.ubA)
+        big_ass_M_H = self.H.row_join(self.lb).row_join(self.ub)
+        self.big_ass_M = big_ass_M_A.col_join(big_ass_M_H)
+
         t = time()
-        self.cython_H = spw.speed_up(self.H, self.H.free_symbols)
+        cse = spw.sp.cse(self.big_ass_M)
+        free_symbols = self.big_ass_M.free_symbols
+        self.cython_big_ass_M = spw.speed_up(self.big_ass_M, free_symbols, backend=BACKEND)
+        # self.big_ass_list = self.H.reshape(len(self.H),1)\
+        #     .col_join(self.A.reshape(len(self.A),1))\
+        #     .col_join(self.lb).col_join(self.ub)\
+        #     .col_join(self.lbA).col_join(self.ubA)
+        # self.cython_list = spw.speed_up(self.big_ass_list.T, self.big_ass_list.free_symbols, backend=BACKEND)
 
-        self.cython_A = spw.speed_up(self.A, self.A.free_symbols)
-
-        self.cython_lb = spw.speed_up(self.lb, self.lb.free_symbols)
-
-        self.cython_ub = spw.speed_up(self.ub, self.ub.free_symbols)
-
-        self.cython_lbA = spw.speed_up(self.lbA, self.lbA.free_symbols)
-
-        self.cython_ubA = spw.speed_up(self.ubA, self.ubA.free_symbols)
         print('autowrap took {}'.format(time() - t))
+        # raise Exception()
 
     # @profile
     def update_observables(self, observables_update):
-        self.np_H = self.cython_H(**observables_update)
-        self.np_A = self.cython_A(**observables_update)
-        self.np_lb = self.cython_lb(**observables_update).reshape(self.lb.shape[0])
-        self.np_ub = self.cython_ub(**observables_update).reshape(self.ub.shape[0])
-        self.np_lbA = self.cython_lbA(**observables_update).reshape(self.lbA.shape[0])
-        self.np_ubA = self.cython_ubA(**observables_update).reshape(self.ubA.shape[0])
+        # evaluated_updates = OrderedDict()
+        # for k, v in observables_update.items():
+        #     if not isinstance(v, int) and not isinstance(v, float):
+        #         evaluated_updates[k] = v(observables_update)
+        #     else:
+        #         evaluated_updates[k] = v
+        evaluated_updates = observables_update
+
+        # self.np_big_ass_list = self.cython_list(**evaluated_updates)
+        # i1 = len(self.H)
+        # self.np_H = self.np_big_ass_list[0, 0:i1].reshape(self.H.shape)
+        # i2 = i1 + len(self.A)
+        # self.np_A = self.np_big_ass_list[0, i1:i2].reshape(self.A.shape)
+        # i1 = i2
+        # i2 += len(self.lb)
+        # self.np_lb = self.np_big_ass_list[0, i1:i2]
+        # i1 = i2
+        # i2 += len(self.ub)
+        # self.np_ub = self.np_big_ass_list[0, i1:i2]
+        # i1 = i2
+        # i2 += len(self.lbA)
+        # self.np_lbA = self.np_big_ass_list[0, i1:i2]
+        # i1 = i2
+        # self.np_ubA = self.np_big_ass_list[0, i1:]
+
+        self.np_big_ass_M = self.cython_big_ass_M(**evaluated_updates)
+        self.np_H = np.array(self.np_big_ass_M[self.A.shape[0]:,:-2])
+        self.np_A = np.array(self.np_big_ass_M[:self.A.shape[0],:self.A.shape[1]])
+        self.np_lb = np.array(self.np_big_ass_M[self.A.shape[0]:,-2])
+        self.np_ub = np.array(self.np_big_ass_M[self.A.shape[0]:,-1])
+        self.np_lbA = np.array(self.np_big_ass_M[:self.A.shape[0],-2])
+        self.np_ubA = np.array(self.np_big_ass_M[:self.A.shape[0],-1])
 
         xdot_full = self.qp_solver.solve(self.np_H, self.np_g, self.np_A,
                                          self.np_lb, self.np_ub, self.np_lbA, self.np_ubA)
+        # print(xdot_full[-7:])
         if xdot_full is None:
             return None
         return OrderedDict((observable, xdot_full[i]) for i, observable in enumerate(self.controlled_joints_strs))

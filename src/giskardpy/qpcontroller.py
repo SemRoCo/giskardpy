@@ -30,7 +30,9 @@ class QPController(Controller):
                                                   self._soft_constraints,
                                                   self.builder_backend)
 
-    def get_next_command(self):
+    def get_next_command(self, overrides=None):
         # TODO add dt parameter and return next state + cmds instead of only cmds
         self.update_observables(self.get_robot().get_state())
+        if overrides is not None:
+            self.update_observables(overrides)
         return self.qp_problem_builder.update_observables(self.get_state())

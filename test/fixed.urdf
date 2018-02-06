@@ -7,13 +7,11 @@
   
   <link name="base_link"/>
 
-  <joint name="joint_x" type="prismatic">
+  <joint name="joint_x" type="fixed">
     <parent link="base_link"/>
     <child link="link1"/>
-    <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0"/>
-    <axis xyz="1 0 0"/>
-    <limit effort="1.0" lower="-3" upper="3" velocity=".5"/>
-  </joint>
+    <origin rpy="1.57079632679 0.0 0.0" xyz="0.0 1.0 0.0"/>
+  </joint>`
 
   <link name="link1"/>
 
@@ -22,17 +20,15 @@
     <child link="link2"/>
     <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0"/>
     <axis xyz="0 1 0"/>
-    <limit effort="1.0" lower="-3" upper="3" velocity=".5"/>
+    <limit effort="1.0" lower="-1.3" upper="1.4" velocity=".3"/>
   </joint>
 
   <link name="link2"/>
 
-  <joint name="rot_z" type="continuous">
+  <joint name="joint_z" type="fixed">
     <parent link="link2"/>
     <child link="eef"/>
-    <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0"/>
-    <axis xyz="0 0 1"/>
-    <limit effort="1.0" velocity=".5"/>
+    <origin rpy="1.57079632679 1.57079632679 1.57079632679" xyz="1.0 1.0 0.0"/>
   </joint>
 
   <link name="eef"/>

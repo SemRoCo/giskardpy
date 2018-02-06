@@ -115,7 +115,8 @@ class RosController(object):
         self.state = data
 
     def set_default_goals(self):
-        self.cartesian_controller.set_goal(self.robot.get_eef_position_quaternion())
+        for eef in self.robot.end_effectors:
+            self.cartesian_controller.set_goal({eef: self.robot.link_fk_quaternion(eef)})
 
     def transformPose(self, target_frame, pose, time=None):
         transform = self.tfBuffer.lookup_transform(target_frame,
@@ -235,6 +236,7 @@ if __name__ == '__main__':
 
     robot_description = rospy.get_param('robot_description')
     # r = PR2(urdf_str=robot_description, default_joint_velocity=1)
-    r = Boxy(urdf_str=robot_description, default_joint_velocity=1)
+    # r = Boxy(urdf_str=robot_description, default_joint_velocity=1)
+    r = DonBot(urdf_str=robot_description, default_joint_velocity=1)
     ros_controller = RosController(r, '/donbot/commands')
     rospy.spin()

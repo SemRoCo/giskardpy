@@ -141,7 +141,9 @@ class QProblemBuilder(object):
         col_names = self.controlled_joints_strs + ['slack'] * len(soft_expressions)
         row_names = self.hard_constraints_dict.keys() + self.soft_constraints_dict.keys()
 
-        self.str_A = pretty_matrix_format_str(col_names, row_names)
+        self.str_A  = pretty_matrix_format_str(col_names, row_names)
+        self.str_b  = pretty_matrix_format_str(['lb',   'ub'], self.controlled_joints_strs + self.soft_constraints_dict.keys())
+        self.str_bA = pretty_matrix_format_str(['lbA', 'ubA'], self.hard_constraints_dict.keys() + self.soft_constraints_dict.keys())
 
     # @profile
     def update_observables(self, observables_update):
@@ -179,5 +181,23 @@ class QProblemBuilder(object):
     def str_jacobian(self):
         return format_matrix(self.np_A, self.str_A)
 
+    def str_lb_ub(self):
+        return format_matrix(np.concatenate((self.np_lb.reshape(len(self.np_lb), 1),
+                                             self.np_ub.reshape(len(self.np_ub), 1)), axis=1), self.str_b)
+
+    def str_lbA_ubA(self):
+        return format_matrix(np.concatenate((self.np_lbA.reshape(len(self.np_lbA), 1),
+                                             self.np_ubA.reshape(len(self.np_lbA), 1)), axis=1), self.str_bA)
+
     def log_jacobian(self):
         self.logging('Matrix A: \n{}'.format(self.str_jacobian()))
+
+    def log_lb_ub(self):
+        self.logging('Matrix lb, ub: \n{}'.format(self.str_lb_ub()))
+
+    def log_lbA_ubA(self):
+        self.logging('Matrix lbA, ubA: \n{}'.format(self.str_lbA_ubA()))
+
+    def reset_solver(self):
+        self.qp_solver = QPSolver(self.H.shape[0], len(self.lbA))
+

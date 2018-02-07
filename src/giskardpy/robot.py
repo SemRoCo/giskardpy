@@ -16,7 +16,7 @@ else:
 
 Joint = namedtuple('Joint', ['symbol', 'velocity_limit', 'lower', 'upper', 'limitless'])
 Gripper = namedtuple('Gripper', ['name', 'pose', 'opening', 'height', 'max_opening', 'link_name'])
-
+Camera = namedtuple('Camera', ['name', 'pose', 'hfov', 'near', 'far'])
 
 class Robot(object):
     # TODO add joint vel to internal state

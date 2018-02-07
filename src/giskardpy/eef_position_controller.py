@@ -35,7 +35,7 @@ class EEFPositionControl(QPController):
             self._controllable_constraints = robot.joint_constraints
             self._hard_constraints = robot.hard_constraints
             self.update_observables({self.goal_weights[eef].get_symbol_str(): self.weight})
-            self.set_goal({eef: robot.get_eef_position()[eef][:3, 3]})
+            self.set_goal([0,0,0])
 
     def set_goal(self, goal):
         """
@@ -43,5 +43,5 @@ class EEFPositionControl(QPController):
         :param goal_pos:
         :return:
         """
-        for eef, goal_pos in goal.items():
-            self.update_observables(self.goal_eef[eef].get_update_dict(*goal_pos))
+        #for eef, goal_pos in goal.items():
+        self.update_observables(self.goal_eef['gripper_link'].get_update_dict(*goal))

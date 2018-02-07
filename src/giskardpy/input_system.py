@@ -105,12 +105,12 @@ class Quaternion(ControllerInputArray):
     def get_expression(self):
         return spw.rotation3_quaternion(*self._symbol_map.values())
 
-class FrameInput(ControllerInputArray):
+class FrameInputQuat(ControllerInputArray):
     def __init__(self, prefix, suffix=''):
-        super(FrameInput, self).__init__(['qx', 'qy', 'qz', 'qw', 'x', 'y', 'z'], prefix, suffix)
+        super(FrameInputQuat, self).__init__(['qx', 'qy', 'qz', 'qw', 'x', 'y', 'z'], prefix, suffix)
 
     def get_update_dict(self, qx, qy, qz, qw, x, y, z):
-        return super(FrameInput, self).get_update_dict(qx=qx, qy=qy, qz=qz, qw=qw, x=x, y=y, z=z)
+        return super(FrameInputQuat, self).get_update_dict(qx=qx, qy=qy, qz=qz, qw=qw, x=x, y=y, z=z)
 
     def get_expression(self):
         return spw.frame3_quaternion(*(self._symbol_map.values()[:4] + [spw.point3(*self._symbol_map.values()[4:])]))
@@ -120,3 +120,20 @@ class FrameInput(ControllerInputArray):
 
     def get_rotation(self):
         return spw.rotation3_quaternion(*self._symbol_map.values()[:4])
+
+
+class FrameInputRPY(ControllerInputArray):
+    def __init__(self, prefix, suffix=''):
+        super(FrameInputRPY, self).__init__(['rr', 'rp', 'ry', 'x', 'y', 'z'], prefix, suffix)
+
+    def get_update_dict(self, rr, rp, ry, x, y, z):
+        return super(FrameInputRPY, self).get_update_dict(rr=rr, rp=rp, ry=ry, x=x, y=y, z=z)
+
+    def get_expression(self):
+        return spw.frame3_rpy(*(self._symbol_map.values()[:3] + [spw.point3(*self._symbol_map.values()[3:])]))
+
+    def get_position(self):
+        return spw.point3(*self._symbol_map.values()[3:])
+
+    def get_rotation(self):
+        return spw.rotation3_rpy(*self._symbol_map.values()[:3])

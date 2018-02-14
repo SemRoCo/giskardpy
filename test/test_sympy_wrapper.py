@@ -13,10 +13,7 @@ from giskardpy.pointy_bot import PointyBot
 from giskardpy.joint_space_control import JointSpaceControl
 from numpy import pi
 
-if USE_SYMENGINE:
-    import giskardpy.symengine_wrappers as spw
-else:
-    import giskardpy.sympy_wrappers as spw
+import giskardpy.symengine_wrappers as spw
 
 PKG = 'giskardpy'
 

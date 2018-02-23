@@ -1,5 +1,9 @@
 class World(object):
+    def __init__(self):
+        self.state = {}
+
     def spawn_urdf_robot(self, urdf_string, robot_name, base_pose, init_joint_state):
+        #TODO no inity joint state/ base pose, have this in separate methods because you don't always want to set it
         raise NotImplementedError('Please implement spawn_urdf_robot in World.')
 
     def set_joint_state(self, robot_name, joint_state):

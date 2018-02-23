@@ -8,7 +8,7 @@ class DataBus(object):
     def _get_member(self, identifier,  member):
         if isinstance(identifier, dict):
             return identifier[member]
-        elif isinstance(identifier, list):
+        elif isinstance(identifier, list) or (isinstance(identifier, tuple) and member.isdigit()):
             return identifier[int(member)]
         else:
             return getattr(identifier, member)
@@ -26,19 +26,24 @@ class DataBus(object):
         namespace = identifier_parts[0]
         if namespace not in self._data:
             if len(identifier_parts) > 1:
-                raise Exception('')
+                raise KeyError('Can not access member of unknown namespace')
             else:
                 self._data[namespace] = value
         else:
             result = self._data[namespace]
             for member in identifier_parts[1:-1]:
                 result = self._get_member(result, member)
-            if isinstance(result, dict):
-                result[identifier_parts[-1]] = value
-            elif isinstance(result, list):
-                result[int(identifier_parts[-1])] = value
+            if len(identifier_parts) > 1:
+                member = identifier_parts[-1]
+                if isinstance(result, dict):
+                    result[member] = value
+                elif isinstance(result, list):
+                    result[int(member)] = value
+                else:
+                    setattr(result, member, value)
             else:
-                setattr(result, identifier_parts[-1], value)
+                self._data[namespace] = value
+
 
 
 

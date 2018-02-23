@@ -5,7 +5,8 @@ import rospy
 class ROSApplication(object):
     def __init__(self, process_manager):
         self.process_manager = process_manager
-        self.timer = rospy.Timer(rospy.Duration(rospy.get_param("loop_period")), self.callback)
+        self.process_manager.start()
+        self.timer = rospy.Timer(rospy.Duration(rospy.get_param("loop_period", 1.0)), self.callback)
 
     def callback(self, time_event):
         self.process_manager.update()

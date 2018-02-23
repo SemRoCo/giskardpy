@@ -13,3 +13,6 @@ class InputPlugin(Plugin):
     def get_readings(self):
         raise NotImplementedError('Please implement the get_readings method of this plugin.')
 
+class OutputPlugin(Plugin):
+    def update(self, databus):
+        raise NotImplementedError('Please implement the update method of this plugin.')

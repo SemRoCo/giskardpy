@@ -6,9 +6,15 @@ from giskardpy.databus import DataBus
 PKG = 'giskardpy'
 
 
-class TestSympyWrapper(unittest.TestCase):
+class TestDataBus(unittest.TestCase):
     def test_set1(self):
         db = DataBus()
+        db.set_data('asdf', 2)
+        self.assertEqual(db.get_data('asdf'), 2)
+
+    def test_set2(self):
+        db = DataBus()
+        db.set_data('asdf', 2)
         db.set_data('asdf', 2)
         self.assertEqual(db.get_data('asdf'), 2)
 
@@ -73,8 +79,15 @@ class TestSympyWrapper(unittest.TestCase):
         self.assertEqual(db.get_data('asdf/ba'), 2)
         self.assertEqual(db.get_data('asdf/lulu'), 1337)
 
-    def test_lis1(self):
+    def test_list1(self):
         l = range(10)
+        db = DataBus()
+        db.set_data('asdf', l)
+        for i in l:
+            self.assertEqual(db.get_data('asdf/{}'.format(i)), i)
+
+    def test_tuple1(self):
+        l = (0,1,2,3,4)
         db = DataBus()
         db.set_data('asdf', l)
         for i in l:
@@ -100,4 +113,4 @@ if __name__ == '__main__':
 
     rosunit.unitrun(package=PKG,
                     test_name='TestDataBus',
-                    test=TestSympyWrapper)
+                    test=TestDataBus)

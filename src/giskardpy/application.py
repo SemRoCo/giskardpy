@@ -1,20 +1,20 @@
+import traceback
+
 import rospy
 
-class Application(object):
-    def __init__(self):
+class ROSApplication(object):
+    def __init__(self, process_manager):
+        self.process_manager = process_manager
         self.timer = rospy.Timer(rospy.Duration(rospy.get_param("loop_period")), self.callback)
-        # TODO: construct ProcessManager
-        # TODO: register Plugins
 
     def callback(self, time_event):
-        pass
-        # TODO: call ProcessManager
+        self.process_manager.update()
 
     def run(self):
-        # TODO: start Plugins
-        # TODO: catch stop exception
         try:
+            self.process_manager.start()
             rospy.spin()
         except Exception as e:
-            pass
-            # TODO: stop all Plugins
+            traceback.print_exc()
+        finally:
+            self.process_manager.stop()

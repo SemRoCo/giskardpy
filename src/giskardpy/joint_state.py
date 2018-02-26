@@ -4,10 +4,10 @@ from multiprocessing import Lock
 from copy import deepcopy
 from sensor_msgs.msg import JointState
 
-from giskardpy.plugin import InputPlugin
+from giskardpy.plugin import IOPlugin
 
 
-class JointStateInput(InputPlugin):
+class JointStateInput(IOPlugin):
     def __init__(self):
         super(JointStateInput, self).__init__()
         self.js = None
@@ -26,3 +26,6 @@ class JointStateInput(InputPlugin):
 
     def stop(self):
         self.joint_state_sub.unregister()
+
+    def update(self, databus):
+        pass

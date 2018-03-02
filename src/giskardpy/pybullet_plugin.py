@@ -17,7 +17,7 @@ class PyBullet(IOPlugin):
         self.world.activate_viewer()
         #TODO get robot description from databus
         urdf = rospy.get_param('robot_description')
-        self.world.spawn_urdf_robot(urdf, self.robot_name)
+        self.world.spawn_urdf_str_robot(self.robot_name, urdf)
 
     def stop(self):
         self.world.deactivate_viewer()

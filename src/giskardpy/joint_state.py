@@ -5,6 +5,7 @@ from copy import deepcopy
 from sensor_msgs.msg import JointState
 
 from giskardpy.plugin import IOPlugin
+from giskardpy.trajectory import MultiJointState, SingleJointState
 
 
 class JointStateInput(IOPlugin):
@@ -19,7 +20,15 @@ class JointStateInput(IOPlugin):
 
     def get_readings(self):
         with self.lock:
-            return {'js': deepcopy(self.js)}
+            mjs = MultiJointState()
+            for i, joint_name in enumerate(self.js.name):
+                sjs = SingleJointState()
+                sjs.name = joint_name
+                sjs.position = self.js.position[i]
+                sjs.velocity = self.js.velocity[i]
+                sjs.effort = self.js.effort[i]
+                mjs.set(sjs)
+        return {'js': mjs}
 
     def start(self):
         self.joint_state_sub = rospy.Subscriber('joint_states', JointState, self.cb)

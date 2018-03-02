@@ -16,5 +16,4 @@ if __name__ == '__main__':
     process_manager.register_plugin('c', pb)
 
     app = ROSApplication(process_manager)
-
-    rospy.spin()
+    app.run()

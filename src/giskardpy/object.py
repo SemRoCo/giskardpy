@@ -1,23 +1,26 @@
-from urdf_parser_py import urdf
-
 from giskardpy.trajectory import Transform
 from lxml import etree
 import PyKDL as kdl # TODO: get rid of this dependency
 
+from trajectory import Point, Quaternion
+
+
 class ColorRgba(object):
-    r = 1.0
-    g = 1.0
-    b = 1.0
-    a = 1.0
+    def __init__(self, r=1.0, g=1.0, b=1.0, a=1.0):
+        self.r = r
+        self.g = g
+        self.b = b
+        self.a = a
 
 
 class InertiaMatrix(object):
-    ixx = 0.0  # TODO 1?
-    ixy = 0.0
-    ixz = 0.0
-    iyy = 0.0  # TODO 1?
-    iyz = 0.0
-    izz = 0.0  # TODO 1?
+    def __init__(self, ixx=0.0, ixy=0.0, ixz=0.0, iyy=0.0, iyz=0.0, izz=0.0):
+        self.ixx = ixx
+        self.ixy = ixy
+        self.ixz = ixz
+        self.iyy = iyy
+        self.iyz = iyz
+        self.izz = izz
 
 
 class GeometricShape(object):
@@ -25,55 +28,65 @@ class GeometricShape(object):
 
 
 class BoxShape(GeometricShape):
-    x = 0.0
-    y = 0.0
-    z = 0.0
+    def __init__(self, x=0.0, y=0.0, z=0.0):
+        self.x = x
+        self.y = y
+        self.z = z
 
 
 class CylinderShape(GeometricShape):
-    radius = 0.0
-    length = 0.0
+    def __init__(self, radius=0.0, length=0.0):
+        self.radius = radius
+        self.length = length
 
 
 class SphereShape(GeometricShape):
-    radius = 0.0
+    def __init__(self, radius=0.0):
+        self.radius = radius
 
 
 class MeshShape(GeometricShape):
-    filename = ''
-    scale = [1.0, 1.0, 1.0]
+    def __init__(self, filename='', scale=[1.0, 1.0, 1.0]):
+        self.filename = filename
+        self.scale = scale
 
 
 class InertialProperty(object):
-    origin = Transform()
-    mass = 0.0
-    inertia = InertiaMatrix()
+    def __init__(self, origin=Transform(), mass=0.0, inertia=InertiaMatrix()):
+        self.origin = origin
+        self.mass = mass
+        self.inertia = inertia
 
 
 class MaterialProperty(object):
-    name = ''
-    color = ColorRgba()
-    texture_filename = ''
+    def __init__(self, name='', color=ColorRgba(), texture_filename=''):
+        self.name = name
+        self.color = color
+        self.texture_filename = texture_filename
 
 
 class VisualProperty(object):
-    name = ''
-    origin = Transform()
-    geometry = None
-    material = None
+    def __init__(self, name='', origin=Transform(), geometry=None, material=None):
+        self.name = name
+        self.origin = origin
+        self.geometry = geometry
+        self.material = material
 
 
 class CollisionProperty(object):
-    name = ''
-    origin = Transform()
-    geometry = None
+    def __init__(self, name='', origin=Transform(), geometry=None):
+        self.name = name
+        self.origin = origin
+        self.geometry = geometry
 
 
 class WorldObject(object):
-    name = ''
-    inertial_props = InertialProperty()
-    visual_props = []
-    collision_props = []
+    def __init__(self, name='', inertial_props=InertialProperty(), visual_props=[], collision_props=[]):
+        self.name = name
+        self.inertial_props = inertial_props
+        self.visual_props = visual_props
+        self.collision_props = collision_props
+
 
 def to_urdf_xml(urdf_object):
     if isinstance(urdf_object, WorldObject):
@@ -90,17 +103,21 @@ def to_urdf_xml(urdf_object):
         mass = etree.Element('mass', value=str(urdf_object.mass))
         root.append(mass)
     elif isinstance(urdf_object, VisualProperty):
-        root = etree.Element('visual', name=urdf_object.name)
+        if urdf_object.name:
+            root = etree.Element('visual', name=urdf_object.name)
+        else:
+            root = etree.Element('visual')
         root.append(to_urdf_xml(urdf_object.origin))
         root.append(to_urdf_xml(urdf_object.geometry))
-        root.append(to_urdf_xml(urdf_object.material))
+        if urdf_object.material:
+            root.append(to_urdf_xml(urdf_object.material))
     elif isinstance(urdf_object, CollisionProperty):
         root = etree.Element('collision', name=urdf_object.name)
         root.append(to_urdf_xml(urdf_object.origin))
         root.append(to_urdf_xml(urdf_object.geometry))
     elif isinstance(urdf_object, Transform):
         r = kdl.Rotation.Quaternion(urdf_object.rotation.x, urdf_object.rotation.y,
-                                urdf_object.rotation.z,urdf_object.rotation.w)
+                                    urdf_object.rotation.z,urdf_object.rotation.w)
         rpy = r.GetRPY()
         rpy_string = '{} {} {}'.format(rpy[0], rpy[1], rpy[2])
         xyz_string = '{} {} {}'.format(urdf_object.translation.x, urdf_object.translation.y, urdf_object.translation.z)
@@ -138,5 +155,14 @@ def to_urdf_xml(urdf_object):
             root.append(tex)
     return root
 
+
 def to_urdf_string(urdf_object):
     return etree.tostring(to_urdf_xml(urdf_object))
+
+
+# TODO: turns these examples into a unit-test
+print to_urdf_string(Transform(translation=Point(1.1, 2.2, 3.3)))
+print to_urdf_string(Transform(rotation=Quaternion(0.707, 0.0, 0.707, 0.0)))
+print to_urdf_string(MeshShape(filename='foo.bar', scale=[0.1, 0.2, 0.3]))
+print to_urdf_string(MaterialProperty(name='Red', color=ColorRgba(0.9, 0.0, 0.0, 1.0)))
+print to_urdf_string(WorldObject(name='my_box', visual_props=[VisualProperty(geometry=BoxShape(0.5, 1.5, 2.5))]))

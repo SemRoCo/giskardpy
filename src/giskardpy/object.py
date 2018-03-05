@@ -1,23 +1,17 @@
+from urdf_parser_py import urdf
+
 from giskardpy.trajectory import Transform
+from lxml import etree
+import PyKDL as kdl # TODO: get rid of this dependency
 
-
-class URDFSerializationInterface(object):
-    #TODO init that sets the function parameters
-    def to_xml_string(self):
-        pass
-
-    def from_xml_string(self, xml_string):
-        pass
-
-
-class ColorRgba(URDFSerializationInterface):
+class ColorRgba(object):
     r = 1.0
     g = 1.0
     b = 1.0
     a = 1.0
 
 
-class InertiaMatrix(URDFSerializationInterface):
+class InertiaMatrix(object):
     ixx = 0.0  # TODO 1?
     ixy = 0.0
     ixz = 0.0
@@ -26,7 +20,7 @@ class InertiaMatrix(URDFSerializationInterface):
     izz = 0.0  # TODO 1?
 
 
-class GeometricShape(URDFSerializationInterface):
+class GeometricShape(object):
     pass
 
 
@@ -50,33 +44,99 @@ class MeshShape(GeometricShape):
     scale = [1.0, 1.0, 1.0]
 
 
-class InertialProperty(URDFSerializationInterface):
+class InertialProperty(object):
     origin = Transform()
     mass = 0.0
     inertia = InertiaMatrix()
 
 
-class MaterialProperty(URDFSerializationInterface):
+class MaterialProperty(object):
     name = ''
     color = ColorRgba()
     texture_filename = ''
 
 
-class VisualProperty(URDFSerializationInterface):
+class VisualProperty(object):
     name = ''
     origin = Transform()
     geometry = None
     material = None
 
 
-class CollisionProperty(URDFSerializationInterface):
+class CollisionProperty(object):
     name = ''
     origin = Transform()
     geometry = None
 
 
-class WorldObject(URDFSerializationInterface):
+class WorldObject(object):
     name = ''
     inertial_props = InertialProperty()
     visual_props = []
     collision_props = []
+
+def to_urdf_xml(urdf_object):
+    if isinstance(urdf_object, WorldObject):
+        root = etree.Element('robot', name=urdf_object.name)
+        root.append(to_urdf_xml(urdf_object.inertial_props))
+        for visual in urdf_object.visual_props:
+            root.append(to_urdf_xml(visual))
+        for collision in urdf_object.collision_props:
+            root.append(to_urdf_xml(collision))
+    elif isinstance(urdf_object, InertialProperty):
+        root = etree.Element('inertial')
+        root.append(to_urdf_xml(urdf_object.origin))
+        root.append(to_urdf_xml(urdf_object.inertia))
+        mass = etree.Element('mass', value=str(urdf_object.mass))
+        root.append(mass)
+    elif isinstance(urdf_object, VisualProperty):
+        root = etree.Element('visual', name=urdf_object.name)
+        root.append(to_urdf_xml(urdf_object.origin))
+        root.append(to_urdf_xml(urdf_object.geometry))
+        root.append(to_urdf_xml(urdf_object.material))
+    elif isinstance(urdf_object, CollisionProperty):
+        root = etree.Element('collision', name=urdf_object.name)
+        root.append(to_urdf_xml(urdf_object.origin))
+        root.append(to_urdf_xml(urdf_object.geometry))
+    elif isinstance(urdf_object, Transform):
+        r = kdl.Rotation.Quaternion(urdf_object.rotation.x, urdf_object.rotation.y,
+                                urdf_object.rotation.z,urdf_object.rotation.w)
+        rpy = r.GetRPY()
+        rpy_string = '{} {} {}'.format(rpy[0], rpy[1], rpy[2])
+        xyz_string = '{} {} {}'.format(urdf_object.translation.x, urdf_object.translation.y, urdf_object.translation.z)
+        root = etree.Element('origin', xyz=xyz_string, rpy=rpy_string)
+    elif isinstance(urdf_object, InertiaMatrix):
+        root = etree.Element('inertia', ixx=str(urdf_object.ixx), ixy=str(urdf_object.ixy), ixz=str(urdf_object.ixz),
+                             iyy=str(urdf_object.iyy), iyz=str(urdf_object.iyz), izz=str(urdf_object.izz))
+    elif isinstance(urdf_object, BoxShape):
+        root = etree.Element('geometry')
+        size_string = '{} {} {}'.format(urdf_object.x, urdf_object.y, urdf_object.z)
+        box = etree.Element('box', size=size_string)
+        root.append(box)
+    elif isinstance(urdf_object, CylinderShape):
+        root = etree.Element('geometry')
+        cyl = etree.Element('cylinder', radius=str(urdf_object.radius), length=str(urdf_object.length))
+        root.append(cyl)
+    elif isinstance(urdf_object, SphereShape):
+        root = etree.Element('geometry')
+        sphere = etree.Element('sphere', radius=str(urdf_object.radius))
+        root.append(sphere)
+    elif isinstance(urdf_object, MeshShape):
+        root = etree.Element('geometry')
+        scale_string = '{} {} {}'.format(urdf_object.scale[0], urdf_object.scale[1], urdf_object.scale[2])
+        mesh = etree.Element('mesh', scale=scale_string, filename=urdf_object.filename)
+        root.append(mesh)
+    elif isinstance(urdf_object, MaterialProperty):
+        root = etree.Element('material', name=urdf_object.name)
+        if urdf_object.color:
+            color_string = '{} {} {} {}'.format(str(urdf_object.color.r), str(urdf_object.color.g),
+                                                str(urdf_object.color.b), str(urdf_object.color.a))
+            color = etree.Element('color', rgba=color_string)
+            root.append(color)
+        if urdf_object.texture_filename:
+            tex =etree.Element('texture', filename=urdf_object.texture_filename)
+            root.append(tex)
+    return root
+
+def to_urdf_string(urdf_object):
+    return etree.tostring(to_urdf_xml(urdf_object))

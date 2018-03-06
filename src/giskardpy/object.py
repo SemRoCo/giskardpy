@@ -81,7 +81,7 @@ class CollisionProperty(object):
 
 
 class WorldObject(object):
-    def __init__(self, name='', inertial_props=InertialProperty(), visual_props=[], collision_props=[]):
+    def __init__(self, name='', inertial_props=None, visual_props=[], collision_props=[]):
         self.name = name
         self.inertial_props = inertial_props
         self.visual_props = visual_props
@@ -91,7 +91,8 @@ class WorldObject(object):
 def to_urdf_xml(urdf_object):
     if isinstance(urdf_object, WorldObject):
         root = etree.Element('robot', name=urdf_object.name)
-        root.append(to_urdf_xml(urdf_object.inertial_props))
+        if urdf_object.inertial_props:
+            root.append(to_urdf_xml(urdf_object.inertial_props))
         for visual in urdf_object.visual_props:
             root.append(to_urdf_xml(visual))
         for collision in urdf_object.collision_props:
@@ -158,11 +159,3 @@ def to_urdf_xml(urdf_object):
 
 def to_urdf_string(urdf_object):
     return etree.tostring(to_urdf_xml(urdf_object))
-
-
-# TODO: turns these examples into a unit-test
-print to_urdf_string(Transform(translation=Point(1.1, 2.2, 3.3)))
-print to_urdf_string(Transform(rotation=Quaternion(0.707, 0.0, 0.707, 0.0)))
-print to_urdf_string(MeshShape(filename='foo.bar', scale=[0.1, 0.2, 0.3]))
-print to_urdf_string(MaterialProperty(name='Red', color=ColorRgba(0.9, 0.0, 0.0, 1.0)))
-print to_urdf_string(WorldObject(name='my_box', visual_props=[VisualProperty(geometry=BoxShape(0.5, 1.5, 2.5))]))

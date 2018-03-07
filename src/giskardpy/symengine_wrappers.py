@@ -11,8 +11,7 @@ from symengine.lib.symengine_wrapper import Lambdify
 
 from giskardpy import BACKEND
 
-pathSeparator = '__'
-
+pathSeparator = '_'
 
 def fake_Abs(x):
     return sp.sqrt(x ** 2)
@@ -130,7 +129,7 @@ def rotation3_rpy(roll, pitch, yaw):
     """ Conversion of roll, pitch, yaw to 4x4 rotation matrix according to:
         https://github.com/orocos/orocos_kinematics_dynamics/blob/master/orocos_kdl/src/frames.cpp#L167
     """
-    # return sp.Matrix(quaternion_matrix(quaternion_from_euler(roll, pitch, yaw, axes='rxyz')).T.tolist())
+    # TODO don't split this into 3 matrices
 
     rx = sp.Matrix([[1, 0, 0, 0],
                     [0, sp.cos(roll), -sp.sin(roll), 0],

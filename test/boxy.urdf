@@ -440,28 +440,7 @@
     </collision>
   </link>
   <!-- Joints at the end of the target, to allow any orientation -->
-  <joint name="head1" type="continuous">
-    <parent link="neck_look_target"/>
-    <child link="neck_look_target_2"/>
-    <origin rpy="0 0 0" xyz="0 0 0"/>
-    <axis xyz="0 0 1"/>
-  </joint>
-  <joint name="head2" type="continuous">
-    <parent link="neck_look_target_2"/>
-    <child link="neck_look_target_3"/>
-    <origin rpy="0 0 0" xyz="0 0 0"/>
-    <axis xyz="0 1 0"/>
-  </joint>
-  <joint name="head3" type="continuous">
-    <parent link="neck_look_target_3"/>
-    <child link="neck_look_target_4"/>
-    <origin rpy="0 0 0" xyz="0 0 0"/>
-    <axis xyz="1 0 0"/>
-  </joint>
-  <link name="neck_look_target_2"/>
-  <link name="neck_look_target_3"/>
-  <link name="neck_look_target_4"/>
-  <!-- /NEW NECK ASSEMBLY -->
+
   <!-- OLD NEW ASSEMBLY -->
   <!-- JOINT to connect the base with the pw070 -->
   <!--joint name="head_joint" type="fixed">

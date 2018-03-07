@@ -18,19 +18,15 @@ class DataBus(object):
     def get_data(self, key):
         identifier_parts = key.split(self.separator)
         namespace = identifier_parts[0]
-        result = self._data[namespace]
+        result = self._data.get(namespace)
         for member in identifier_parts[1:]:
             result = self._get_member(result, member)
         return result
 
     def get_expr(self, key):
-        value = self.get_data(key)
-        if isinstance(value, float) or isinstance(value, int):
-            if key not in self.used_keys:
-                self.used_keys.append(key)
-            return se.Symbol(key.replace(self.separator, self.expr_separator))
-        else:
-            raise TypeError('only float/int key allowed in sympy expression')
+        if key not in self.used_keys:
+            self.used_keys.append(key)
+        return se.Symbol(key.replace(self.separator, self.expr_separator))
 
     def get_expr_values(self):
         return {self.get_expr(key): self.get_data(key) for key in self.used_keys}

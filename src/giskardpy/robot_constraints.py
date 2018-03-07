@@ -1,0 +1,159 @@
+from collections import namedtuple, OrderedDict, defaultdict
+import numpy as np
+import symengine_wrappers as spw
+from urdf_parser_py.urdf import URDF
+
+from giskardpy.qp_problem_builder import HardConstraint, JointConstraint
+
+Joint = namedtuple('Joint', ['symbol', 'velocity_limit', 'lower', 'upper', 'type', 'frame'])
+
+
+def hacky_urdf_parser_fix(urdf_str):
+    fixed_urdf = ''
+    delete = False
+    black_list = ['transmission']
+    black_open = ['<{}'.format(x) for x in black_list]
+    black_close = ['</{}'.format(x) for x in black_list]
+    for line in urdf_str.split('\n'):
+        if len([x for x in black_open if x in line]) > 0:
+            delete = True
+        if len([x for x in black_close if x in line]) > 0:
+            delete = False
+            continue
+        if not delete:
+            fixed_urdf += line + '\n'
+    return fixed_urdf
+
+
+class Robot(object):
+    def __init__(self, urdf, joint_symbol_map=None):
+        self.default_joint_vel_limit = 0.25
+        self.default_weight = 0.0001
+        self.fks = {}
+        if joint_symbol_map is None:
+            self.joint_symbol_map = self._default_joint_symbol_map()
+        else:
+            self.joint_symbol_map = joint_symbol_map
+        if urdf.endswith('.urdf'):
+            self._load_from_urdf_file(urdf)
+        else:
+            self._load_from_urdf_string(urdf)
+
+    def _default_joint_symbol_map(self):
+        # TODO find less ugly solution
+        class keydefaultdict(defaultdict):
+            def __missing__(self, key):
+                if self.default_factory is None:
+                    raise KeyError(key)
+                else:
+                    ret = self[key] = self.default_factory(key)
+                    return ret
+        return keydefaultdict(lambda key: spw.Symbol(key))
+
+    def _load_from_urdf_string(self, urdf_str):
+        return self._load_from_urdf(URDF.from_xml_string(hacky_urdf_parser_fix(urdf_str)))
+
+    def _load_from_urdf_file(self, urdf_file):
+        with open(urdf_file, 'r') as f:
+            urdf_string = f.read()
+        return self._load_from_urdf_string(urdf_string)
+
+    def _load_from_urdf(self, urdf_robot):
+        self._urdf_robot = urdf_robot
+        self._create_sym_frames()
+        self._create_constraints()
+
+    def _create_sym_frames(self):
+        self._joints = {}
+        for joint_name, joint in self._urdf_robot.joint_map.items():
+            # TODO use a dict here?
+            joint_symbol = None
+            if joint.type in ['revolute', 'continuous', 'prismatic']:
+                if joint.mimic is None:
+                    joint_symbol = self.joint_symbol_map[joint_name]
+                else:
+                    multiplier = 1 if joint.mimic.multiplier is None else joint.mimic.multiplier
+                    offset = 0 if joint.mimic.offset is None else joint.mimic.offset
+                    mimic = self.joint_symbol_map[joint.mimic.joint] * multiplier + offset
+
+            if joint.type in ['fixed', 'revolute', 'continuous', 'prismatic']:
+                if joint.origin is not None:
+                    joint_frame = spw.translation3(*joint.origin.xyz) * spw.rotation3_rpy(*joint.origin.rpy)
+                else:
+                    joint_frame = spw.eye(4)
+            else:
+                raise Exception('Joint type "{}" is not supported by urdf parser.'.format(joint.type))
+
+            if joint.type == 'revolute' or joint.type == 'continuous':
+                if joint.mimic is None:
+                    joint_frame *= spw.rotation3_axis_angle(spw.vec3(*joint.axis), joint_symbol)
+                else:
+                    joint_frame *= spw.rotation3_axis_angle(spw.vec3(*joint.axis), mimic)
+
+            elif joint.type == 'prismatic':
+                if joint.mimic is None:
+                    joint_frame *= spw.translation3(*(spw.point3(*joint.axis) * joint_symbol)[:3])
+                else:
+                    joint_frame *= spw.translation3(*(spw.point3(*joint.axis) * mimic)[:3])
+
+            # TODO simplify here?
+            if joint.limit is not None:
+                vel_limit = min(joint.limit.velocity, self.default_joint_vel_limit)
+            else:
+                vel_limit = None
+            self._joints[joint_name] = Joint(joint_symbol,
+                                             vel_limit,
+                                             joint.limit.lower if joint.limit is not None else None,
+                                             joint.limit.upper if joint.limit is not None else None,
+                                             joint.type,
+                                             joint_frame)
+
+    def get_fk_expression(self, root_link, tip_link):
+        if (root_link, tip_link) not in self.fks:
+            jointsAndLinks = self._urdf_robot.get_chain(root_link, tip_link, True, True, True)
+            fk = spw.eye(4)
+            for i in range(1, len(jointsAndLinks), 2):
+                joint_name = jointsAndLinks[i]
+                fk *= self._joints[joint_name].frame
+            self.fks[root_link, tip_link] = fk
+        return self.fks[root_link, tip_link]
+
+    def get_joint_to_symbols(self):
+        joint_symbols = OrderedDict()
+        for joint_name, joint in self._joints.items():
+            if joint.symbol is not None:
+                joint_symbols[joint_name] = joint.symbol
+        return joint_symbols
+
+    def get_joint_names(self):
+        return [k for k, v in self._joints.items() if v.symbol is not None]
+
+    def get_rnd_joint_state(self):
+        js = {}
+
+        def f(lower_limit, upper_limit):
+            if lower_limit is None:
+                return np.random.random() * np.pi * 2
+            lower_limit = max(lower_limit, -10)
+            upper_limit = min(upper_limit, 10)
+            return (np.random.random() * (upper_limit - lower_limit)) + lower_limit
+
+        for joint_name, joint in self._joints.items():
+            if joint.symbol is not None:
+                js[str(joint.symbol)] = f(joint.lower, joint.upper)
+        return js
+
+    def _create_constraints(self):
+        # TODO add weights
+        self.hard_constraints = {}
+        self.joint_constraints = {}
+        for i, (joint_name, joint) in enumerate(self._joints.items()):
+            if joint.symbol is not None:
+                if joint.lower is not None and joint.upper is not None:
+                    self.hard_constraints[joint_name] = HardConstraint(lower=joint.lower - joint.symbol,
+                                                                       upper=joint.upper - joint.symbol,
+                                                                       expression=joint.symbol)
+                if joint.velocity_limit is not None:
+                    self.joint_constraints[joint_name] = JointConstraint(lower=-joint.velocity_limit,
+                                                                         upper=joint.velocity_limit,
+                                                                         weight=self.default_weight)

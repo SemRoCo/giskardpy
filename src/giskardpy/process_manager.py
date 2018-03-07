@@ -16,7 +16,7 @@ class ProcessManager(object):
 
     def start(self):
         for plugin in self._plugins.values():
-            plugin.start()
+            plugin.start(self._data_bus)
 
     def stop(self):
         for plugin in self._plugins.values():
@@ -24,7 +24,7 @@ class ProcessManager(object):
 
     def update(self):
         for plugin in self._plugins.values():
-            plugin.update(self._data_bus)
+            plugin.update()
             for identifier, value in plugin.get_readings().items():
                 self._data_bus.set_data(identifier, value)
 

@@ -15,13 +15,13 @@ JointConstraint = namedtuple('JointConstraint', ['lower', 'upper', 'weight'])
 BIG_NUMBER = 1e9
 
 class QProblemBuilder(object):
-    def __init__(self, joint_constraints_dict, hard_constraints_dict, soft_constraints_dict, backend=None):
+    def __init__(self, joint_constraints_dict, hard_constraints_dict, soft_constraints_dict, controlled_joint_symbols, backend=None):
         self.backend = backend
         self.joint_constraints_dict = joint_constraints_dict
         self.hard_constraints_dict = hard_constraints_dict
         self.soft_constraints_dict = soft_constraints_dict
-        self.controlled_joints_strs = list(self.joint_constraints_dict.keys())
-        self.controlled_joints = [spw.Symbol(n) for n in self.controlled_joints_strs]
+        self.controlled_joints = controlled_joint_symbols
+        self.controlled_joints_strs = [str(x) for x in self.controlled_joints]
         self.make_sympy_matrices()
 
         self.qp_solver = QPSolver(self.H.shape[0], len(self.lbA))
@@ -34,8 +34,7 @@ class QProblemBuilder(object):
         ubA = []
         soft_expressions = []
         hard_expressions = []
-        for jn in self.controlled_joints:
-            c = self.joint_constraints_dict[str(jn)]
+        for c in self.joint_constraints_dict.values():
             weights.append(c.weight)
             lb.append(c.lower)
             ub.append(c.upper)

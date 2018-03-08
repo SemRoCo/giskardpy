@@ -26,18 +26,28 @@ def hacky_urdf_parser_fix(urdf_str):
 
 
 class Robot(object):
-    def __init__(self, urdf, joint_symbol_map=None):
+    def __init__(self, urdf):
         self.default_joint_vel_limit = 0.25
         self.default_weight = 0.0001
         self.fks = {}
-        if joint_symbol_map is None:
-            self.joint_symbol_map = self._default_joint_symbol_map()
-        else:
-            self.joint_symbol_map = joint_symbol_map
+        self.joint_symbol_map = self._default_joint_symbol_map()
         if urdf.endswith('.urdf'):
             self._load_from_urdf_file(urdf)
         else:
             self._load_from_urdf_string(urdf)
+
+    def set_joint_symbol_map(self, joint_symbol_map=None):
+        if joint_symbol_map is not None:
+            self.joint_symbol_map = joint_symbol_map
+            for joint_name, joint in self._joints.items():
+                if joint.symbol is not None:
+                    self._joints[joint_name] = Joint(self.joint_symbol_map[joint_name],
+                                                     joint.velocity_limit,
+                                                     joint.lower,
+                                                     joint.upper,
+                                                     joint.type,
+                                                     joint.frame.subs(self.joint_symbol_map))
+            self._create_constraints()
 
     def _default_joint_symbol_map(self):
         # TODO find less ugly solution
@@ -119,11 +129,7 @@ class Robot(object):
         return self.fks[root_link, tip_link]
 
     def get_joint_to_symbols(self):
-        joint_symbols = OrderedDict()
-        for joint_name, joint in self._joints.items():
-            if joint.symbol is not None:
-                joint_symbols[joint_name] = joint.symbol
-        return joint_symbols
+        return self.joint_symbol_map
 
     def get_joint_names(self):
         return [k for k, v in self._joints.items() if v.symbol is not None]
@@ -145,8 +151,8 @@ class Robot(object):
 
     def _create_constraints(self):
         # TODO add weights
-        self.hard_constraints = {}
-        self.joint_constraints = {}
+        self.hard_constraints = OrderedDict()
+        self.joint_constraints = OrderedDict()
         for i, (joint_name, joint) in enumerate(self._joints.items()):
             if joint.symbol is not None:
                 if joint.lower is not None and joint.upper is not None:

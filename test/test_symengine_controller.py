@@ -98,21 +98,21 @@ class TestSymengineController(unittest.TestCase):
     def test_joint_controller_pointy1(self):
         r = Robot('pointy.urdf')
         jc = JointController('pointy.urdf')
-        m = jc.default_goal_symbol_map()
-        jc.init(m)
+        jc.init()
+        gsm = jc.get_goal_symbol_map()
         goal = {}
         for i in range(20):
             for joint_name, joint_value in r.get_rnd_joint_state().items():
-                goal[str(m[joint_name])] = joint_value
+                goal[str(gsm[joint_name])] = joint_value
             end_state = trajectory_rollout(jc, goal)
             for joint_name in end_state:
-                self.assertEqual(goal[str(m[joint_name])], end_state[joint_name])
+                self.assertEqual(goal[str(gsm[joint_name])], end_state[joint_name])
 
     def test_joint_controller_donbot1(self):
         r = Robot('iai_donbot.urdf')
         jc = JointController('iai_donbot.urdf')
-        m = jc.default_goal_symbol_map()
-        jc.init(m)
+        jc.init()
+        m = jc.get_goal_symbol_map()
         goal = {}
         for i in range(20):
             for joint_name, joint_value in r.get_rnd_joint_state().items():
@@ -125,8 +125,8 @@ class TestSymengineController(unittest.TestCase):
     def test_joint_controller_2d_base_bot1(self):
         r = Robot('2d_base_bot.urdf')
         jc = JointController('2d_base_bot.urdf')
-        m = jc.default_goal_symbol_map()
-        jc.init(m)
+        jc.init()
+        m = jc._default_goal_symbol_map()
         goal = {}
         for i in range(20):
             for joint_name, joint_value in r.get_rnd_joint_state().items():
@@ -139,8 +139,8 @@ class TestSymengineController(unittest.TestCase):
     def test_joint_controller_boxy1(self):
         r = Robot('boxy.urdf')
         jc = JointController('boxy.urdf')
-        m = jc.default_goal_symbol_map()
-        jc.init(m)
+        jc.init()
+        m = jc.get_goal_symbol_map()
         goal = {}
         for i in range(20):
             for joint_name, joint_value in r.get_rnd_joint_state().items():
@@ -154,8 +154,8 @@ class TestSymengineController(unittest.TestCase):
         # TODO fix
         r = Robot('pr2.urdf')
         jc = JointController('pr2.urdf')
-        m = jc.default_goal_symbol_map()
-        jc.init(m)
+        jc.init()
+        m = jc.get_goal_symbol_map()
         goal = {}
         for i in range(20):
             for joint_name, joint_value in r.get_rnd_joint_state().items():

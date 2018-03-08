@@ -8,6 +8,9 @@ class SingleJointState(object):
         self.velocity = velocity
         self.effort = effort
 
+    def __str__(self):
+        return '{}: {}, {}, {}'.format(self.name, self.position, self.velocity, self.effort)
+
 
 class MultiJointState(object):
     #TODO emulate dict?

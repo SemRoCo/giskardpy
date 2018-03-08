@@ -29,7 +29,7 @@ class DataBus(object):
         return se.Symbol(key.replace(self.separator, self.expr_separator))
 
     def get_expr_values(self):
-        return {self.get_expr(key): self.get_data(key) for key in self.used_keys}
+        return {str(self.get_expr(key)): self.get_data(key) for key in self.used_keys}
 
     def set_data(self, key, value):
         identifier_parts = key.split(self.separator)

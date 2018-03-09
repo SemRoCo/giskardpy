@@ -13,6 +13,7 @@ from giskardpy import BACKEND
 
 pathSeparator = '_'
 
+
 def fake_Abs(x):
     return sp.sqrt(x ** 2)
 
@@ -190,8 +191,8 @@ def frame3_rpy(r, p, y, loc):
     return translation3(*loc) * rotation3_rpy(r, p, y)
 
 
-def frame3_quaternion(q1, q2, q3, q4, loc):
-    return translation3(*loc) * rotation3_quaternion(q1, q2, q3, q4)
+def frame3_quaternion(x, y, z, qx, qy, qz, qw):
+    return translation3(x, y, z) * rotation3_quaternion(qx, qy, qz, qw)
 
 
 def pos_of(frame):

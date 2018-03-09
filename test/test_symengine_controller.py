@@ -15,7 +15,7 @@ np.random.seed(23)
 
 def trajectory_rollout(controller, goal, time_limit=10, frequency=100, precision=0.0025):
     current_js = OrderedDict()
-    for joint_name in controller.robot.get_joint_to_symbols():
+    for joint_name in controller.robot.joint_states_input.joint_map:
         current_js[joint_name] = 0.0
     state = OrderedDict()
     state.update(current_js)
@@ -99,14 +99,13 @@ class TestSymengineController(unittest.TestCase):
         r = Robot('pointy.urdf')
         jc = JointController('pointy.urdf')
         jc.init()
-        gsm = jc.get_goal_symbol_map()
         goal = {}
         for i in range(20):
             for joint_name, joint_value in r.get_rnd_joint_state().items():
-                goal[str(gsm[joint_name])] = joint_value
+                goal[str(jc.goal_joint_states.joint_map[joint_name])] = joint_value
             end_state = trajectory_rollout(jc, goal)
             for joint_name in end_state:
-                self.assertEqual(goal[str(gsm[joint_name])], end_state[joint_name])
+                self.assertEqual(goal[str(jc.goal_joint_states.joint_map[joint_name])], end_state[joint_name])
 
     def test_joint_controller_donbot1(self):
         r = Robot('iai_donbot.urdf')
@@ -126,7 +125,7 @@ class TestSymengineController(unittest.TestCase):
         r = Robot('2d_base_bot.urdf')
         jc = JointController('2d_base_bot.urdf')
         jc.init()
-        m = jc._default_goal_symbol_map()
+        m = jc._set_default_goal_joint_states()
         goal = {}
         for i in range(20):
             for joint_name, joint_value in r.get_rnd_joint_state().items():

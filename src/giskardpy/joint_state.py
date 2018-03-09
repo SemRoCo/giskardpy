@@ -10,9 +10,9 @@ from giskardpy.plugin import IOPlugin
 from giskardpy.trajectory import MultiJointState, SingleJointState
 
 
-class JointStateInput(IOPlugin):
+class JointStatePlugin(IOPlugin):
     def __init__(self):
-        super(JointStateInput, self).__init__()
+        super(JointStatePlugin, self).__init__()
         self.js = None
         self.lock = Lock() #TODO not sure if locks are really neccessary
 
@@ -34,7 +34,7 @@ class JointStateInput(IOPlugin):
 
     def start(self, databus):
         self.joint_state_sub = rospy.Subscriber('joint_states', JointState, self.cb)
-        super(JointStateInput, self).start(databus)
+        super(JointStatePlugin, self).start(databus)
 
     def stop(self):
         self.joint_state_sub.unregister()

@@ -16,11 +16,15 @@ class DataBus(object):
             return getattr(identifier, member)
 
     def get_data(self, key):
+        # TODO deal with unused identifiers
         identifier_parts = key.split(self.separator)
         namespace = identifier_parts[0]
         result = self._data.get(namespace)
         for member in identifier_parts[1:]:
-            result = self._get_member(result, member)
+            try:
+                result = self._get_member(result, member)
+            except AttributeError:
+                result = 0
         return result
 
     def get_expr(self, key):
@@ -36,7 +40,7 @@ class DataBus(object):
         namespace = identifier_parts[0]
         if namespace not in self._data:
             if len(identifier_parts) > 1:
-                raise KeyError('Can not access member of unknown namespace')
+                raise KeyError('Can not access member of unknown namespace: {}'.format(key))
             else:
                 self._data[namespace] = value
         else:

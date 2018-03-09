@@ -6,46 +6,56 @@ import rospy
 from control_msgs.msg import FollowJointTrajectoryAction, FollowJointTrajectoryResult
 from geometry_msgs.msg import PoseArray
 from giskard_msgs.msg import ControllerListAction, ControllerListGoal, Controller, ControllerListResult
-from multiprocessing import Lock, Semaphore, Queue
+from multiprocessing import Queue
 
 from giskardpy.plugin import IOPlugin
-from giskardpy.trajectory import SingleJointState
+from giskardpy.trajectory import SingleJointState, Transform, Point, Quaternion
 
 
 class ActionServer(IOPlugin):
-    def get_readings(self):
-        try:
-            joint_goal = self.get_readings_lock.get_nowait()
-        except Empty:
-            joint_goal = None
-        if joint_goal is not None:
-            pass
-        update = {self.joint_goal_identifier: joint_goal,
-                  self.solution_identifier: None}
-        return update
-
-    def update(self):
-        goal_solution = self.databus.get_data(self.solution_identifier)
-        if goal_solution is not None:
-            self.joint_goal = None
-            self.update_lock.put(goal_solution)
-
-    def start(self, databus):
-        return super(ActionServer, self).start(databus)
-
-    def stop(self):
-        pass
-
     def __init__(self):
-        self.solution_identifier = 'solution'
-        self.joint_goal_identifier = 'goal'
+        self.joint_solution_identifier = 'joint_solution'
+        self.cartesian_solution_identifier = 'cartesian_solution'
+        self.joint_goal_identifier = 'joint_goal'
+        self.cartesian_goal_identifier = 'cartesian_goal'
         self.joint_goal = None
         self.goal_solution = None
         self.get_readings_lock = Queue(1)
-
         self.update_lock = Queue(1)
+
+        super(ActionServer, self).__init__()
+
+    def get_readings(self):
+        try:
+            goal = self.get_readings_lock.get_nowait()
+            if isinstance(goal, Transform):
+                cartesian_goal = goal
+                joint_goal = None
+            else:
+                cartesian_goal = None
+                joint_goal = goal
+        except Empty:
+            cartesian_goal = None
+            joint_goal = None
+        update = {self.joint_goal_identifier: joint_goal,
+                  self.cartesian_goal_identifier: cartesian_goal,
+                  self.joint_solution_identifier: None,
+                  self.cartesian_solution_identifier: None}
+        return update
+
+    def update(self):
+        goal_solution = self.databus.get_data(self.joint_solution_identifier)
+        if goal_solution is not None:
+            self.update_lock.put(goal_solution)
+        goal_solution = self.databus.get_data(self.cartesian_solution_identifier)
+        if goal_solution is not None:
+            self.update_lock.put(goal_solution)
+
+    def start(self, databus):
+        super(ActionServer, self).start(databus)
         # action server
         self._action_name = 'qp_controller/command'
+        # TODO remove whole body controller and use remapping
         self._ac = actionlib.SimpleActionClient('/whole_body_controller/follow_joint_trajectory',
                                                 FollowJointTrajectoryAction)
         # self._ac = actionlib.SimpleActionClient('/follow_joint_trajectory', FollowJointTrajectoryAction)
@@ -56,11 +66,12 @@ class ActionServer(IOPlugin):
                                                 execute_cb=self.action_server_cb, auto_start=False)
         self.pose_array_pub = rospy.Publisher('/goals', PoseArray, queue_size=10)
         self._as.start()
-        self.frequency = 100
-        self.rate = rospy.Rate(self.frequency)
 
         print('running')
-        super(ActionServer, self).__init__()
+
+    def stop(self):
+        # TODO figure out how to stop this shit
+        pass
 
     def action_server_cb(self, goal):
         self.cb_get_readings_part(goal)
@@ -71,6 +82,7 @@ class ActionServer(IOPlugin):
         if goal.type != ControllerListGoal.STANDARD_CONTROLLER:
             rospy.logerr('only standard controller supported')
         else:
+            # TODO add goal for each controller
             controller = goal.controllers[0]
             if controller.type == Controller.JOINT:
                 rospy.loginfo('its a joint goal')
@@ -83,7 +95,16 @@ class ActionServer(IOPlugin):
                     mjs[joint_name] = sjs
                 self.get_readings_lock.put(mjs)
             elif controller.type == Controller.TRANSLATION_3D:
-                raise NotImplementedError('cartesian goals not supported')
+                rospy.loginfo('its a cart goal')
+                trans_goal = Point(controller.goal_pose.pose.position.x,
+                                   controller.goal_pose.pose.position.y,
+                                   controller.goal_pose.pose.position.z)
+                rot_goal = Quaternion(controller.goal_pose.pose.orientation.x,
+                                      controller.goal_pose.pose.orientation.y,
+                                      controller.goal_pose.pose.orientation.z,
+                                      controller.goal_pose.pose.orientation.w)
+                goal = Transform(trans_goal, rot_goal)
+                self.get_readings_lock.put(goal)
 
     def cb_update_part(self):
         solution = self.update_lock.get()

@@ -3,6 +3,7 @@ import numpy as np
 import symengine_wrappers as spw
 from urdf_parser_py.urdf import URDF
 
+from giskardpy.input_system import JointStatesInput
 from giskardpy.qp_problem_builder import HardConstraint, JointConstraint
 
 Joint = namedtuple('Joint', ['symbol', 'velocity_limit', 'lower', 'upper', 'type', 'frame'])
@@ -30,35 +31,10 @@ class Robot(object):
         self.default_joint_vel_limit = 0.25
         self.default_weight = 0.0001
         self.fks = {}
-        self.joint_symbol_map = self._default_joint_symbol_map()
         if urdf.endswith('.urdf'):
             self._load_from_urdf_file(urdf)
         else:
             self._load_from_urdf_string(urdf)
-
-    def set_joint_symbol_map(self, joint_symbol_map=None):
-        if joint_symbol_map is not None:
-            self.joint_symbol_map = joint_symbol_map
-            for joint_name, joint in self._joints.items():
-                if joint.symbol is not None:
-                    self._joints[joint_name] = Joint(self.joint_symbol_map[joint_name],
-                                                     joint.velocity_limit,
-                                                     joint.lower,
-                                                     joint.upper,
-                                                     joint.type,
-                                                     joint.frame.subs(self.joint_symbol_map))
-            self._create_constraints()
-
-    def _default_joint_symbol_map(self):
-        # TODO find less ugly solution
-        class keydefaultdict(defaultdict):
-            def __missing__(self, key):
-                if self.default_factory is None:
-                    raise KeyError(key)
-                else:
-                    ret = self[key] = self.default_factory(key)
-                    return ret
-        return keydefaultdict(lambda key: spw.Symbol(key))
 
     def _load_from_urdf_string(self, urdf_str):
         return self._load_from_urdf(URDF.from_xml_string(hacky_urdf_parser_fix(urdf_str)))
@@ -73,18 +49,35 @@ class Robot(object):
         self._create_sym_frames()
         self._create_constraints()
 
+    def set_joint_symbol_map(self, joint_states_input=None):
+        if joint_states_input is not None:
+            self.joint_states_input = joint_states_input
+            for joint_name, joint in self._joints.items():
+                if joint.symbol is not None:
+                    self._joints[joint_name] = Joint(self.joint_states_input.joint_map[joint_name],
+                                                     joint.velocity_limit,
+                                                     joint.lower,
+                                                     joint.upper,
+                                                     joint.type,
+                                                     joint.frame.subs(self.joint_states_input.joint_map))
+            self._create_constraints()
+
+
     def _create_sym_frames(self):
         self._joints = {}
+        joint_map = {}
         for joint_name, joint in self._urdf_robot.joint_map.items():
             # TODO use a dict here?
             joint_symbol = None
             if joint.type in ['revolute', 'continuous', 'prismatic']:
                 if joint.mimic is None:
-                    joint_symbol = self.joint_symbol_map[joint_name]
+                    joint_map[joint_name] = spw.Symbol(joint_name)
+                    joint_symbol = joint_map[joint_name]
                 else:
+                    joint_map[joint.mimic.joint] = spw.Symbol(joint_name)
                     multiplier = 1 if joint.mimic.multiplier is None else joint.mimic.multiplier
                     offset = 0 if joint.mimic.offset is None else joint.mimic.offset
-                    mimic = self.joint_symbol_map[joint.mimic.joint] * multiplier + offset
+                    mimic = joint_map[joint.mimic.joint] * multiplier + offset
 
             if joint.type in ['fixed', 'revolute', 'continuous', 'prismatic']:
                 if joint.origin is not None:
@@ -117,6 +110,22 @@ class Robot(object):
                                              joint.limit.upper if joint.limit is not None else None,
                                              joint.type,
                                              joint_frame)
+        self.joint_states_input = JointStatesInput(joint_map)
+
+    def _create_constraints(self):
+        # TODO add weights
+        self.hard_constraints = OrderedDict()
+        self.joint_constraints = OrderedDict()
+        for i, (joint_name, joint) in enumerate(self._joints.items()):
+            if joint.symbol is not None:
+                if joint.lower is not None and joint.upper is not None:
+                    self.hard_constraints[joint_name] = HardConstraint(lower=joint.lower - joint.symbol,
+                                                                       upper=joint.upper - joint.symbol,
+                                                                       expression=joint.symbol)
+                if joint.velocity_limit is not None:
+                    self.joint_constraints[joint_name] = JointConstraint(lower=-joint.velocity_limit,
+                                                                         upper=joint.velocity_limit,
+                                                                         weight=self.default_weight)
 
     def get_fk_expression(self, root_link, tip_link):
         if (root_link, tip_link) not in self.fks:
@@ -128,8 +137,8 @@ class Robot(object):
             self.fks[root_link, tip_link] = fk
         return self.fks[root_link, tip_link]
 
-    def get_joint_to_symbols(self):
-        return self.joint_symbol_map
+    def get_joint_symbol_map(self):
+        return self.joint_states_input
 
     def get_joint_names(self):
         return [k for k, v in self._joints.items() if v.symbol is not None]
@@ -148,18 +157,3 @@ class Robot(object):
             if joint.symbol is not None:
                 js[str(joint.symbol)] = f(joint.lower, joint.upper)
         return js
-
-    def _create_constraints(self):
-        # TODO add weights
-        self.hard_constraints = OrderedDict()
-        self.joint_constraints = OrderedDict()
-        for i, (joint_name, joint) in enumerate(self._joints.items()):
-            if joint.symbol is not None:
-                if joint.lower is not None and joint.upper is not None:
-                    self.hard_constraints[joint_name] = HardConstraint(lower=joint.lower - joint.symbol,
-                                                                       upper=joint.upper - joint.symbol,
-                                                                       expression=joint.symbol)
-                if joint.velocity_limit is not None:
-                    self.joint_constraints[joint_name] = JointConstraint(lower=-joint.velocity_limit,
-                                                                         upper=joint.velocity_limit,
-                                                                         weight=self.default_weight)

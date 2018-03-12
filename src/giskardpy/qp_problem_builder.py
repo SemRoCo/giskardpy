@@ -84,7 +84,6 @@ class QProblemBuilder(object):
         self.big_ass_M = big_ass_M_A.col_join(big_ass_M_H)
 
         t = time()
-        cse = spw.sp.cse(self.big_ass_M)
         free_symbols = self.big_ass_M.free_symbols
         self.cython_big_ass_M = spw.speed_up(self.big_ass_M, free_symbols, backend=BACKEND)
 

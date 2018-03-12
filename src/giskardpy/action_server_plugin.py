@@ -47,9 +47,12 @@ class ActionServer(IOPlugin):
         goal_solution = self.databus.get_data(self.joint_solution_identifier)
         if goal_solution is not None:
             self.update_lock.put(goal_solution)
+            self.update_lock.get()
+
         goal_solution = self.databus.get_data(self.cartesian_solution_identifier)
         if goal_solution is not None:
             self.update_lock.put(goal_solution)
+            self.update_lock.get()
 
     def start(self, databus):
         super(ActionServer, self).start(databus)
@@ -105,6 +108,7 @@ class ActionServer(IOPlugin):
                                       controller.goal_pose.pose.orientation.w)
                 goal = Transform(trans_goal, rot_goal)
                 self.get_readings_lock.put(goal)
+        rospy.loginfo('received goal done')
 
     def cb_update_part(self):
         solution = self.update_lock.get()
@@ -133,3 +137,5 @@ class ActionServer(IOPlugin):
             print('success')
         else:
             self._as.set_aborted(ControllerListResult())
+        rospy.loginfo('done solution ready')
+        self.update_lock.put(None)

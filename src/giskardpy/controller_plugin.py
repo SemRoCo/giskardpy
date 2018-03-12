@@ -59,7 +59,7 @@ class ControllerPlugin(IOPlugin):
                 p.positions.append(simulated_js[j].position)
             goal.trajectory.points.append(p)
             if k > 0 and np.abs(cmd_dict.values()).max() < precision:
-                print('done')
+                # print('done')
                 break
         # self.plot_trajectory(goal.trajectory)
         return goal

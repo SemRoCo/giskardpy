@@ -23,6 +23,7 @@ class ProcessManager(object):
             plugin.stop()
 
     def update(self):
+        # print('update ---------------------')
         for plugin in self._plugins.values():
             plugin.update()
             for identifier, value in plugin.get_readings().items():

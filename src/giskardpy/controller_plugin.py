@@ -1,5 +1,7 @@
 from collections import OrderedDict
 import pylab as plt
+from copy import copy
+
 import rospy
 from control_msgs.msg import FollowJointTrajectoryGoal
 import numpy as np
@@ -14,69 +16,36 @@ from giskardpy.symengine_controller import JointController, CartesianController
 class ControllerPlugin(IOPlugin):
     def __init__(self):
         self._joint_states_identifier = 'js'
-        self._solution_identifier = 'solution'
-        self._solution = None
         self._goal_identifier = 'goal'
+        self._next_cmd_identifier = 'motor'
         self._controller = None
         super(ControllerPlugin, self).__init__()
 
     def get_readings(self):
-        updates = {self._solution_identifier: self._solution,
-                   self._goal_identifier: None}
-        self._solution = None
-        return updates
+        if len(self.next_cmd) > 0:
+            updates = {self._next_cmd_identifier: self.next_cmd}
+            return updates
+        return {}
 
     def update(self):
-        if self.databus.get_data(self._goal_identifier) is not None:
-            self._solution = self.trajectory_rollout()
+        if self.god_map.get_data(self._goal_identifier) is not None:
+            next_cmd = self._controller.get_cmd(self.god_map.get_expr_values())
+            self.next_cmd.update(next_cmd)
 
-    def start(self, databus):
-        super(ControllerPlugin, self).start(databus)
+    def start(self, god_map):
+        self.next_cmd = {}
+        super(ControllerPlugin, self).start(god_map)
 
     def stop(self):
         pass
 
-    def trajectory_rollout(self, time_limit=10, frequency=100, precision=0.0025):
-        # TODO sanity checks
-        goal = FollowJointTrajectoryGoal()
-        goal.trajectory.joint_names = self._controller.robot.get_joint_names()
-        simulated_js = self.databus.get_data(self._joint_states_identifier)
+    def copy(self):
+        return copy(self)
 
-        step_size = 1. / frequency
-        for k in range(int(time_limit / step_size)):
-            p = JointTrajectoryPoint()
-            p.time_from_start = rospy.Duration((k + 1) * step_size)
-            if k != 0:
-                cmd_dict = self._controller.get_cmd(self.databus.get_expr_values())
-            for i, j in enumerate(goal.trajectory.joint_names):
-                j2 = str(self._controller.robot.joint_states_input.joint_map[j])
-                if k > 0 and j2 in cmd_dict:
-                    simulated_js[j].position += cmd_dict[j2] * step_size
-                    p.velocities.append(cmd_dict[j2])
-                else:
-                    p.velocities.append(0)
-                    pass
-                p.positions.append(simulated_js[j].position)
-            goal.trajectory.points.append(p)
-            if k > 0 and np.abs(cmd_dict.values()).max() < precision:
-                # print('done')
-                break
-        # self.plot_trajectory(goal.trajectory)
-        return goal
-
-    def plot_trajectory(self, tj):
-        positions = []
-        velocities = []
-        for point in tj.points:
-            positions.append(point.positions)
-            velocities.append(point.velocities)
-        positions = np.array(positions)
-        velocities = np.array(velocities)
-        plt.plot(positions - positions.mean(axis=0))
-        plt.show()
-        plt.plot(velocities)
-        plt.show()
-        pass
+    def __copy__(self):
+        cp = self.__class__()
+        cp._controller = self._controller
+        return cp
 
 
 class JointControllerPlugin(ControllerPlugin):
@@ -85,20 +54,20 @@ class JointControllerPlugin(ControllerPlugin):
         self._goal_identifier = 'joint_goal'
         self._solution_identifier = 'joint_solution'
 
-    def start(self, databus):
-        super(JointControllerPlugin, self).start(databus)
-        urdf = rospy.get_param('robot_description')
-        self._controller = JointController(urdf)
-        goal_symbol_map = {}
-        joint_symbol_map = {}
-        for joint_name in self._controller.robot.get_joint_names():
-            goal_symbol_map[joint_name] = self.databus.get_expr('{}/{}/position'.format(self._goal_identifier,
-                                                                                        joint_name))
-            joint_symbol_map[joint_name] = self.databus.get_expr(
-                '{}/{}/position'.format(self._joint_states_identifier,
-                                        joint_name))
-
-        self._controller.init(JointStatesInput(joint_symbol_map), JointStatesInput(goal_symbol_map))
+    def start(self, god_map):
+        super(JointControllerPlugin, self).start(god_map)
+        if self._controller is None:
+            urdf = rospy.get_param('robot_description')
+            self._controller = JointController(urdf)
+            current_joints = JointStatesInput.prefix_constructor(self.god_map.get_expr,
+                                                                 self._controller.robot.get_joint_names(),
+                                                                 self._joint_states_identifier,
+                                                                 'position')
+            goal_joints = JointStatesInput.prefix_constructor(self.god_map.get_expr,
+                                                              self._controller.robot.get_joint_names(),
+                                                              self._goal_identifier,
+                                                              'position')
+            self._controller.init(current_joints, goal_joints)
 
 
 class CartesianControllerPlugin(ControllerPlugin):
@@ -107,36 +76,25 @@ class CartesianControllerPlugin(ControllerPlugin):
         self._goal_identifier = 'cartesian_goal'
         self._solution_identifier = 'cartesian_solution'
 
-    def start(self, databus):
-        super(CartesianControllerPlugin, self).start(databus)
-        root = 'base_footprint'
-        tip = 'gripper_tool_frame'
+    def start(self, god_map):
+        super(CartesianControllerPlugin, self).start(god_map)
+        if self._controller is None:
+            root = 'base_footprint'
+            tip = 'gripper_tool_frame'
 
-        urdf = rospy.get_param('robot_description')
-        self._controller = CartesianController(urdf)
-        joint_symbol_map = {}
-        for joint_name in self._controller.robot.get_joint_names():
-            joint_symbol_map[joint_name] = self.databus.get_expr('{}/{}/position'.format(self._joint_states_identifier,
-                                                                                         joint_name))
-        trans_prefix = '{}/translation'.format(self._goal_identifier)
-        rot_prefix = '{}/rotation'.format(self._goal_identifier)
-        goal_input = FrameInput(self.databus.get_expr('{}/x'.format(trans_prefix)),
-                                self.databus.get_expr('{}/y'.format(trans_prefix)),
-                                self.databus.get_expr('{}/z'.format(trans_prefix)),
-                                self.databus.get_expr('{}/x'.format(rot_prefix)),
-                                self.databus.get_expr('{}/y'.format(rot_prefix)),
-                                self.databus.get_expr('{}/z'.format(rot_prefix)),
-                                self.databus.get_expr('{}/w'.format(rot_prefix)))
+            urdf = rospy.get_param('robot_description')
+            self._controller = CartesianController(urdf)
+            current_joints = JointStatesInput.prefix_constructor(self.god_map.get_expr,
+                                                                 self._controller.robot.get_joint_names(),
+                                                                 self._joint_states_identifier,
+                                                                 'position')
+            trans_prefix = '{}/translation'.format(self._goal_identifier)
+            rot_prefix = '{}/rotation'.format(self._goal_identifier)
+            goal_input = FrameInput.prefix_constructor(trans_prefix, rot_prefix, self.god_map.get_expr)
 
-        trans_prefix = 'fk_{}/pose/position'.format(tip)
-        rot_prefix = 'fk_{}/pose/orientation'.format(tip)
-        start_input = FrameInput(self.databus.get_expr('{}/x'.format(trans_prefix)),
-                                 self.databus.get_expr('{}/y'.format(trans_prefix)),
-                                 self.databus.get_expr('{}/z'.format(trans_prefix)),
-                                 self.databus.get_expr('{}/x'.format(rot_prefix)),
-                                 self.databus.get_expr('{}/y'.format(rot_prefix)),
-                                 self.databus.get_expr('{}/z'.format(rot_prefix)),
-                                 self.databus.get_expr('{}/w'.format(rot_prefix)))
+            trans_prefix = 'fk_{}/pose/position'.format(tip)
+            rot_prefix = 'fk_{}/pose/orientation'.format(tip)
+            current_input = FrameInput.prefix_constructor(trans_prefix, rot_prefix, self.god_map.get_expr)
 
-        self._controller.init(root, tip, goal_pose=goal_input, start_pose=start_input,
-                              current_joints=JointStatesInput(joint_symbol_map))
+            self._controller.init(root, tip, goal_pose=goal_input, current_evaluated=current_input,
+                                  current_joints=current_joints)

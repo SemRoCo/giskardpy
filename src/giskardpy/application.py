@@ -11,9 +11,9 @@ class ROSApplication(object):
 
     def run(self):
         try:
-            self.process_manager.start()
-            self.timer = rospy.Timer(rospy.Duration(rospy.get_param("loop_period", 0.1)), self.callback)
-            rospy.spin()
+            self.process_manager.start_loop()
+            # self.timer = rospy.Timer(rospy.Duration(rospy.get_param("loop_period", 0.1)), self.callback)
+            # rospy.spin()
         except Exception as e:
             traceback.print_exc()
         finally:

@@ -19,7 +19,15 @@ class Controller(object):
                                                   controlled_joints)
 
     def get_cmd(self, substitutions):
-        return self.qp_problem_builder.get_cmd(substitutions)
+        next_cmd = self.qp_problem_builder.get_cmd(substitutions)
+        real_next_cmd = {}
+        for joint_name in self.robot.get_joint_names():
+            joint_expr = str(self.robot.joint_states_input.joint_map[joint_name])
+            if joint_expr in next_cmd:
+                real_next_cmd[joint_name] = next_cmd[joint_expr]
+            # else:
+            #     real_next_cmd[joint_name] = 0
+        return real_next_cmd
 
 
 class JointController(Controller):
@@ -100,8 +108,7 @@ class CartesianController(Controller):
                                             'current_evaled_qz',
                                             'current_evaled_qw')
 
-    def init(self, root, tip, current_joints=None, start_pose=None, goal_pose=None, current_pose=None,
-             current_evaluated=None):
+    def init(self, root, tip, current_joints=None, start_pose=None, goal_pose=None, current_evaluated=None):
         """
         :param current_joints: InputArray
         :param joint_goals: InputArray
@@ -139,8 +146,8 @@ class CartesianController(Controller):
         current_position = spw.pos_of(current_pose)
         current_rotation = spw.rot_of(current_pose)
 
-        current_evaluated_position = spw.pos_of(start_pose)
-        current_evaluated_rotation = spw.rot_of(start_pose)
+        current_evaluated_position = spw.pos_of(current_evaluated)
+        current_evaluated_rotation = spw.rot_of(current_evaluated)
 
         goal_position = spw.pos_of(goal_pose)
         goal_rotation = spw.rot_of(goal_pose)

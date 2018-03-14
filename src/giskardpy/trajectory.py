@@ -88,3 +88,12 @@ class Trajectory(object):
         if len(self._points) > 0 and self._points.keys()[-1] > time:
             raise KeyError("Cannot append a trajectory point that is before the current end time of the trajectory.")
         self._points[time] = point
+
+    def items(self):
+        return self._points.items()
+
+    def keys(self):
+        return self._points.keys()
+
+    def values(self):
+        return self._points.values()

@@ -1,7 +1,7 @@
 import unittest
 from collections import namedtuple
 
-from giskardpy.databus import DataBus
+from giskardpy.god_map import GodMap
 from giskardpy.pybullet_world import PyBulletWorld
 import pybullet as p
 

@@ -65,6 +65,7 @@ class Test(object):
 
         for i, joint_name in enumerate(self.joint_names):
             controller.goal_state.name.append(joint_name)
+            # controller.goal_state.position.append(0)
             controller.goal_state.position.append(np.random.random())
 
         controller.p_gain = 3
@@ -74,6 +75,9 @@ class Test(object):
 
         self.client.send_goal(goal)
         result = self.client.wait_for_result(rospy.Duration(10))
+        final_js = rospy.wait_for_message('/whole_body_controller/state', JointTrajectoryControllerState)
+        for i, joint_name in enumerate(self.joint_names):
+            print('{} exp:{} | real:{}'.format(joint_name, final_js.actual.positions[i], controller.goal_state.position[i]))
         print('finished in 10s?: {}'.format(result))
 
 

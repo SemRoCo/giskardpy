@@ -14,10 +14,35 @@ class JointStatesInput(InputArray):
             self.joint_map[k] = sw.Symbol(str(v))
         super(JointStatesInput, self).__init__(**joint_map)
 
+    @classmethod
+    def prefix_constructor(cls, f, joints, prefix='', suffix=''):
+        joint_map = {}
+        for joint_name in joints:
+            if prefix != '':
+                prefix2 = '{}/'.format(prefix)
+            else:
+                prefix2 = ''
+            if suffix != '':
+                suffix2 = '/{}'.format(suffix)
+            else:
+                suffix2 = ''
+            joint_map[joint_name] = f('{}{}{}'.format(prefix2, joint_name, suffix2))
+        return cls(joint_map)
+
 
 class FrameInput(InputArray):
     def __init__(self, x='', y='', z='', qx='', qy='', qz='', qw=''):
         super(FrameInput, self).__init__(x=x, y=y, z=z, qx=qx, qy=qy, qz=qz, qw=qw)
+
+    @classmethod
+    def prefix_constructor(self, point_prefix, orientation_prefix, f):
+        return self(x=f('{}/x'.format(point_prefix)),
+                    y=f('{}/y'.format(point_prefix)),
+                    z=f('{}/z'.format(point_prefix)),
+                    qx=f('{}/x'.format(orientation_prefix)),
+                    qy=f('{}/y'.format(orientation_prefix)),
+                    qz=f('{}/z'.format(orientation_prefix)),
+                    qw=f('{}/w'.format(orientation_prefix)))
 
     def get_frame(self):
         return sw.frame3_quaternion(self.x, self.y, self.z, self.qx, self.qy, self.qz, self.qw)

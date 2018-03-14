@@ -3,7 +3,7 @@ from collections import OrderedDict
 
 from giskardpy.input_system import JointStatesInput, FrameInput
 from giskardpy.qp_problem_builder import QProblemBuilder, SoftConstraint
-from giskardpy.robot_constraints import Robot
+from giskardpy.symengine_robot import Robot
 
 
 class Controller(object):
@@ -25,8 +25,6 @@ class Controller(object):
             joint_expr = str(self.robot.joint_states_input.joint_map[joint_name])
             if joint_expr in next_cmd:
                 real_next_cmd[joint_name] = next_cmd[joint_expr]
-            # else:
-            #     real_next_cmd[joint_name] = 0
         return real_next_cmd
 
 
@@ -86,13 +84,6 @@ class CartesianController(Controller):
         self.default_rot_gain = 3
 
     def _set_default_inputs(self):
-        self.start_pose = FrameInput('start_x',
-                                     'start_y',
-                                     'start_z',
-                                     'start_qx',
-                                     'start_qy',
-                                     'start_qz',
-                                     'start_qw')
         self.goal_pose = FrameInput('goal_x',
                                     'goal_y',
                                     'goal_z',
@@ -108,7 +99,7 @@ class CartesianController(Controller):
                                             'current_evaled_qz',
                                             'current_evaled_qw')
 
-    def init(self, root, tip, current_joints=None, start_pose=None, goal_pose=None, current_evaluated=None):
+    def init(self, root, tip, current_joints=None, goal_pose=None, current_evaluated=None):
         """
         :param current_joints: InputArray
         :param joint_goals: InputArray
@@ -116,32 +107,26 @@ class CartesianController(Controller):
 
         # TODO add chain
         self.robot.set_joint_symbol_map(current_joints)
-        if start_pose is not None:
-            self.start_pose = start_pose
         if goal_pose is not None:
             self.goal_pose = goal_pose
         if current_evaluated is not None:
             self.current_evaluated = current_evaluated
 
-        self._soft_constraints = self.make_soft_constraints(self.start_pose.get_frame(),
-                                                            self.goal_pose.get_frame(),
+        self._soft_constraints = self.make_soft_constraints(self.goal_pose.get_frame(),
                                                             self.robot.get_fk_expression(root, tip),
                                                             self.current_evaluated.get_frame())
         super(CartesianController, self).init()
 
-    def make_soft_constraints(self, start_pose, goal_pose, current_pose, current_evaluated, weights=(1, 1, 1, 1, 1, 1)):
+    def make_soft_constraints(self, goal_pose, current_pose, current_evaluated, weights=(1, 1, 1, 1, 1, 1)):
         """
         :param start_pose: FrameInput
         :param goal_pose: FrameInput
         :param current_pose:
         :param current_evaluated: FrameInput
-        :param weights:
+        :param weights: TODO
         :return:
         """
         soft_constraints = {}
-
-        start_position = spw.pos_of(start_pose)
-        start_rotation = spw.rot_of(start_pose)
 
         current_position = spw.pos_of(current_pose)
         current_rotation = spw.rot_of(current_pose)

@@ -4,7 +4,7 @@ from collections import OrderedDict
 import PyKDL
 from urdf_parser_py.urdf import URDF
 
-from giskardpy.robot_constraints import Robot, hacky_urdf_parser_fix
+from giskardpy.symengine_robot import Robot, hacky_urdf_parser_fix
 from giskardpy.symengine_controller import JointController
 from kdl_parser import kdl_tree_from_urdf_model
 import numpy as np

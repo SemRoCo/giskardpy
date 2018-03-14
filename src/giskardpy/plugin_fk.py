@@ -5,7 +5,7 @@ from tf.transformations import quaternion_from_matrix
 import symengine_wrappers as sw
 from giskardpy.input_system import JointStatesInput
 from giskardpy.plugin import Plugin
-from giskardpy.robot_constraints import Robot
+from giskardpy.symengine_robot import Robot
 
 
 class FKPlugin(Plugin):

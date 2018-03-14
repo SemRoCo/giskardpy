@@ -1,9 +1,9 @@
 import rospy
 
 from giskardpy.application import ROSApplication
-from giskardpy.joint_state import JointStatePlugin
+from giskardpy.plugin_joint_state import JointStatePlugin
 from giskardpy.process_manager import ProcessManager
-from giskardpy.pybullet_plugin import PyBullet
+from giskardpy.plugin_pybullet import PyBullet
 
 if __name__ == '__main__':
     rospy.init_node('muh')

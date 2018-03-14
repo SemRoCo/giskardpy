@@ -1,6 +1,4 @@
 import copy
-from collections import deque
-
 import symengine as se
 from copy import copy
 

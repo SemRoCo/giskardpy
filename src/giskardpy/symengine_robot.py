@@ -1,4 +1,4 @@
-from collections import namedtuple, OrderedDict, defaultdict
+from collections import namedtuple, OrderedDict
 import numpy as np
 import symengine_wrappers as spw
 from urdf_parser_py.urdf import URDF

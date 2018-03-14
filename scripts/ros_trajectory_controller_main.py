@@ -1,10 +1,10 @@
 import rospy
 
-from giskardpy.action_server_plugin import ActionServer
+from giskardpy.plugin_action_server import ActionServer
 from giskardpy.application import ROSApplication
-from giskardpy.controller_plugin import JointControllerPlugin, CartesianControllerPlugin
-from giskardpy.fk_plugin import FKPlugin
-from giskardpy.joint_state import JointStatePlugin
+from giskardpy.plugin_instantaneous_controller import JointControllerPlugin, CartesianControllerPlugin
+from giskardpy.plugin_fk import FKPlugin
+from giskardpy.plugin_joint_state import JointStatePlugin
 from giskardpy.process_manager import ProcessManager
 
 if __name__ == '__main__':

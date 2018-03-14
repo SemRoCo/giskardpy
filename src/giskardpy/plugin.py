@@ -1,8 +1,4 @@
-from copy import deepcopy
-
-
 class Plugin(object):
-    # TODO do we even need normal plugins?
     def start(self, god_map):
         self.god_map = god_map
 
@@ -19,13 +15,8 @@ class Plugin(object):
         pass
 
     def copy(self):
-        """
-        create copy for parallel universe. make sure to have no links to real robot
-        """
-        return deepcopy(self)
+        return self.__class__()
 
-class IOPlugin(Plugin):
-    # TODO merge update and get_readings?
     def get_readings(self):
         return {}
 

@@ -7,11 +7,11 @@ from multiprocessing import Lock, Queue
 from copy import deepcopy
 from sensor_msgs.msg import JointState
 
-from giskardpy.plugin import IOPlugin
+from giskardpy.plugin import Plugin
 from giskardpy.trajectory import MultiJointState, SingleJointState
 
 
-class JointStatePlugin(IOPlugin):
+class JointStatePlugin(Plugin):
     def __init__(self):
         super(JointStatePlugin, self).__init__()
         self.js = None
@@ -53,7 +53,7 @@ class JointStatePlugin(IOPlugin):
         return KinematicSimPlugin()
 
 
-class KinematicSimPlugin(IOPlugin):
+class KinematicSimPlugin(Plugin):
     def __init__(self):
         self.js_identifier = 'js'
         self.next_cmd_identifier = 'motor'

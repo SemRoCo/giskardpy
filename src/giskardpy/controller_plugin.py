@@ -9,11 +9,11 @@ import numpy as np
 from trajectory_msgs.msg import JointTrajectoryPoint
 
 from giskardpy.input_system import JointStatesInput, FrameInput
-from giskardpy.plugin import IOPlugin
+from giskardpy.plugin import Plugin
 from giskardpy.symengine_controller import JointController, CartesianController
 
 
-class ControllerPlugin(IOPlugin):
+class ControllerPlugin(Plugin):
     def __init__(self):
         self._joint_states_identifier = 'js'
         self._goal_identifier = 'goal'

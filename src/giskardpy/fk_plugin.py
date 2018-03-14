@@ -4,11 +4,11 @@ from tf.transformations import quaternion_from_matrix
 
 import symengine_wrappers as sw
 from giskardpy.input_system import JointStatesInput
-from giskardpy.plugin import IOPlugin
+from giskardpy.plugin import Plugin
 from giskardpy.robot_constraints import Robot
 
 
-class FKPlugin(IOPlugin):
+class FKPlugin(Plugin):
     def __init__(self, root, tip):
         self.root = root
         self.tip = tip
@@ -43,4 +43,7 @@ class FKPlugin(IOPlugin):
 
     def stop(self):
         pass
+
+    def copy(self):
+        return self
 

@@ -1,10 +1,10 @@
 import rospy
 
-from giskardpy.plugin import IOPlugin
+from giskardpy.plugin import Plugin
 from giskardpy.pybullet_world import PyBulletWorld
 
 
-class PyBullet(IOPlugin):
+class PyBullet(Plugin):
     def get_readings(self):
         print(self.world.check_collision())
         return super(PyBullet, self).get_readings()

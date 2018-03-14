@@ -1,8 +1,5 @@
 from collections import OrderedDict
-
-import rospy
-from copy import deepcopy, copy
-
+from copy import copy
 from giskardpy.god_map import GodMap
 from giskardpy.exceptions import NameConflictException
 
@@ -20,8 +17,8 @@ class ProcessManager(object):
     def start_loop(self):
         for plugin in self._plugins.values():
             plugin.start(self._god_map)
-        while not rospy.is_shutdown() and self.update():
-            # rospy.sleep(0.5)
+        while self.update():
+            # TODO make sure this can be properly killed
             pass
 
     def stop(self):
@@ -37,13 +34,11 @@ class ProcessManager(object):
             if plugin.create_parallel_universe():
                 print('creating new parallel universe')
                 parallel_universe = ProcessManager(initial_state=self._god_map)
-                for name, plugin in self._plugins.items():
-                    parallel_universe.register_plugin(name, plugin.copy())
+                for n, p in self._plugins.items():
+                    parallel_universe.register_plugin(n, p.copy())
                 parallel_universe.start_loop()
                 parallel_universe.stop()
-                for plugin_name2, plugin2 in self._plugins.items():
-                    # TODO might be enough to call this on plugin instead of all of them
-                    plugin2.post_mortem_analysis(parallel_universe.get_god_map())
+                plugin.post_mortem_analysis(parallel_universe.get_god_map())
             for identifier, value in plugin.get_readings().items():
                 self._god_map.set_data(identifier, value)
             if plugin.end_parallel_universe():

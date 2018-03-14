@@ -12,11 +12,11 @@ from multiprocessing import Queue
 
 from trajectory_msgs.msg import JointTrajectoryPoint
 
-from giskardpy.plugin import IOPlugin
+from giskardpy.plugin import Plugin
 from giskardpy.trajectory import SingleJointState, Transform, Point, Quaternion, Trajectory
 
 
-class ActionServer(IOPlugin):
+class ActionServer(Plugin):
     def __init__(self):
         self.joint_goal_identifier = 'joint_goal'
         self.cartesian_goal_identifier = 'cartesian_goal'
@@ -169,7 +169,7 @@ class ActionServer(IOPlugin):
         self.update_lock.put(None)
 
 
-class LogTrajectory(IOPlugin):
+class LogTrajectory(Plugin):
     def __init__(self):
         self.trajectory_identifier = 'traj'
         self.joint_state_identifier = 'js'
@@ -200,9 +200,6 @@ class LogTrajectory(IOPlugin):
 
     def end_parallel_universe(self):
         return self.stop_universe
-
-    def copy(self):
-        return deepcopy(self)
 
     def plot_trajectory(self, tj):
         positions = []

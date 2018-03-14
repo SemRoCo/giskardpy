@@ -1,7 +1,7 @@
-from giskardpy.plugin import IOPlugin
+from giskardpy.plugin import Plugin
 
 
-class PrintJointState(IOPlugin):
+class PrintJointState(Plugin):
     def __init__(self):
         self.js_identifier = 'js/position/0'
 

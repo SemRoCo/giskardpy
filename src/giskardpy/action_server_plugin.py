@@ -137,7 +137,6 @@ class ActionServer(IOPlugin):
                                       controller.goal_pose.pose.orientation.w)
                 goal = Transform(trans_goal, rot_goal)
                 self.get_readings_lock.put(goal)
-        rospy.loginfo('received goal done')
 
     def cb_update_part(self):
         solution = self.update_lock.get()
@@ -166,7 +165,7 @@ class ActionServer(IOPlugin):
             print('success')
         else:
             self._as.set_aborted(ControllerListResult())
-        rospy.loginfo('done solution ready')
+        rospy.loginfo('finished movement')
         self.update_lock.put(None)
 
 

@@ -23,11 +23,11 @@ class JointStatePlugin(IOPlugin):
             self.lock.get_nowait()
         except Empty:
             pass
+        # print('updated js to {}'.format(data))
         self.lock.put(data)
 
     def get_readings(self):
         # TODO probably bug when we dont have a joint state before first get readings call
-
         js = self.lock.get()
         mjs = OrderedDict()
         for i, joint_name in enumerate(js.name):
@@ -40,7 +40,7 @@ class JointStatePlugin(IOPlugin):
         return {'js': mjs}
 
     def start(self, god_map):
-        self.joint_state_sub = rospy.Subscriber('joint_states', JointState, self.cb)
+        self.joint_state_sub = rospy.Subscriber('joint_states', JointState, self.cb, queue_size=1)
         super(JointStatePlugin, self).start(god_map)
 
     def stop(self):

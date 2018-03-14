@@ -34,7 +34,7 @@ class FKPlugin(Plugin):
         urdf = rospy.get_param('robot_description')
         self.robot = Robot(urdf)
         current_joints = JointStatesInput.prefix_constructor(self.god_map.get_expr,
-                                                             self.robot.get_joint_names(),
+                                                             self.robot.get_chain_joints(self.root, self.tip),
                                                              self._joint_states_identifier,
                                                              'position')
         self.robot.set_joint_symbol_map(current_joints)

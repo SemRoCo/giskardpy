@@ -52,7 +52,8 @@ class Robot(object):
     def set_joint_symbol_map(self, joint_states_input=None):
         if joint_states_input is not None:
             self.joint_states_input = joint_states_input
-            for joint_name, joint in self._joints.items():
+            for joint_name, joint_symbol in joint_states_input.joint_map.items():
+                joint = self._joints[joint_name]
                 if joint.symbol is not None:
                     self._joints[joint_name] = Joint(self.joint_states_input.joint_map[joint_name],
                                                      joint.velocity_limit,
@@ -61,7 +62,6 @@ class Robot(object):
                                                      joint.type,
                                                      joint.frame.subs(self.joint_states_input.joint_map))
             self._create_constraints()
-
 
     def _create_sym_frames(self):
         self._joints = {}
@@ -136,6 +136,12 @@ class Robot(object):
                 fk *= self._joints[joint_name].frame
             self.fks[root_link, tip_link] = fk
         return self.fks[root_link, tip_link]
+
+    def get_chain_joints(self, root, tip):
+        return self._urdf_robot.get_chain(root, tip, True, False, False)
+
+    def get_chain_joint_symbols(self, root, tip):
+        return [self.joint_states_input.joint_map[k] for k in self.get_chain_joints(root, tip)]
 
     def get_joint_symbol_map(self):
         return self.joint_states_input

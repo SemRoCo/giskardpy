@@ -4,7 +4,8 @@ from collections import OrderedDict
 import pylab as plt
 import actionlib
 import rospy
-from control_msgs.msg import FollowJointTrajectoryAction, FollowJointTrajectoryResult, FollowJointTrajectoryGoal
+from control_msgs.msg import FollowJointTrajectoryAction, FollowJointTrajectoryResult, FollowJointTrajectoryGoal, \
+    JointTrajectoryControllerState
 from copy import deepcopy
 from geometry_msgs.msg import PoseArray
 from giskard_msgs.msg import ControllerListAction, ControllerListGoal, Controller, ControllerListResult
@@ -41,13 +42,12 @@ class ActionServer(Plugin):
     def post_mortem_analysis(self, god_map):
         trajectory = god_map.get_data(self.trajectory_identifier)
         js = god_map.get_data(self.js_identifier)
-        # TODO find better way to get joints
         goal = FollowJointTrajectoryGoal()
-        goal.trajectory.joint_names = js.keys()
+        goal.trajectory.joint_names = self.controller_joints
         for time, traj_point in trajectory.items():
             p = JointTrajectoryPoint()
             p.time_from_start = rospy.Duration(time)
-            for joint_name in js:
+            for joint_name in self.controller_joints:
                 if joint_name in traj_point:
                     p.positions.append(traj_point[joint_name].position)
                     p.velocities.append(traj_point[joint_name].velocity)
@@ -96,7 +96,7 @@ class ActionServer(Plugin):
         # self.state_sub = rospy.Subscriber('/fake_state', JointTrajectoryControllerState, self.state_cb)
         self._as = actionlib.SimpleActionServer(self._action_name, ControllerListAction,
                                                 execute_cb=self.action_server_cb, auto_start=False)
-        self.pose_array_pub = rospy.Publisher('/goals', PoseArray, queue_size=10)
+        self.controller_joints = rospy.wait_for_message('/whole_body_controller/state', JointTrajectoryControllerState).joint_names
         self._as.start()
 
         print('running')
@@ -127,6 +127,7 @@ class ActionServer(Plugin):
                     mjs[joint_name] = sjs
                 self.get_readings_lock.put(mjs)
             elif controller.type == Controller.TRANSLATION_3D:
+                # TODO don't ignore root and tip
                 rospy.loginfo('its a cart goal')
                 trans_goal = Point(controller.goal_pose.pose.position.x,
                                    controller.goal_pose.pose.position.y,
@@ -189,6 +190,7 @@ class LogTrajectory(Plugin):
         self.trajectory.set(time, current_js)
         if (time >= 1 and np.abs([v.velocity for v in current_js.values()]).max() < self.precision) or time >= 10:
             print('done')
+            # self.plot_trajectory(self.trajectory)
             self.stop_universe = True
 
     def start(self, god_map):
@@ -204,9 +206,9 @@ class LogTrajectory(Plugin):
     def plot_trajectory(self, tj):
         positions = []
         velocities = []
-        for point in tj.points:
-            positions.append(point.positions)
-            velocities.append(point.velocities)
+        for time, point in tj.items():
+            positions.append([v.position for v in point.values()])
+            velocities.append([v.velocity for v in point.values()])
         positions = np.array(positions)
         velocities = np.array(velocities)
         plt.plot(positions - positions.mean(axis=0))

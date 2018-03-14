@@ -63,8 +63,11 @@ class KinematicSimPlugin(Plugin):
         super(KinematicSimPlugin, self).__init__()
 
     def get_readings(self):
-        return {self.js_identifier: self.next_js,
-                self.time_identifier: self.time}
+        # TODO we might always want to update time and js
+        if self.next_js is not None:
+            return {self.js_identifier: self.next_js,
+                    self.time_identifier: self.time}
+        return {}
 
     def update(self):
         self.time += self.frequency
@@ -80,6 +83,7 @@ class KinematicSimPlugin(Plugin):
                 self.next_js[joint_name] = SingleJointState(sjs.name, sjs.position + cmd * self.frequency, velocity=cmd)
 
     def start(self, god_map):
+        self.next_js = None
         super(KinematicSimPlugin, self).start(god_map)
 
     def stop(self):

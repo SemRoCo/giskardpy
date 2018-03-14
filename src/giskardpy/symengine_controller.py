@@ -12,16 +12,24 @@ class Controller(object):
         self.robot = Robot(urdf)
 
     def init(self, *args, **kwargs):
-        controlled_joints = list(self.robot.joint_states_input.joint_map.values())
-        self.qp_problem_builder = QProblemBuilder(self.robot.joint_constraints,
-                                                  self.robot.hard_constraints,
+        controlled_joint_symbols = self.get_controlled_joint_symbols()
+        controlled_joints = self.get_controlled_joints()
+        self.qp_problem_builder = QProblemBuilder({k: self.robot.joint_constraints[k] for k in controlled_joints},
+                                                  {k: self.robot.hard_constraints[k] for k in controlled_joints if
+                                                   k in self.robot.hard_constraints},
                                                   self._soft_constraints,
-                                                  controlled_joints)
+                                                  controlled_joint_symbols)
+
+    def get_controlled_joints(self):
+        return list(self.robot.joint_states_input.joint_map.keys())
+
+    def get_controlled_joint_symbols(self):
+        return list(self.robot.joint_states_input.joint_map.values())
 
     def get_cmd(self, substitutions):
         next_cmd = self.qp_problem_builder.get_cmd(substitutions)
         real_next_cmd = {}
-        for joint_name in self.robot.get_joint_names():
+        for joint_name in self.get_controlled_joints():
             joint_expr = str(self.robot.joint_states_input.joint_map[joint_name])
             if joint_expr in next_cmd:
                 real_next_cmd[joint_name] = next_cmd[joint_expr]
@@ -104,7 +112,8 @@ class CartesianController(Controller):
         :param current_joints: InputArray
         :param joint_goals: InputArray
         """
-
+        self.root = root
+        self.tip = tip
         # TODO add chain
         self.robot.set_joint_symbol_map(current_joints)
         if goal_pose is not None:
@@ -116,6 +125,9 @@ class CartesianController(Controller):
                                                             self.robot.get_fk_expression(root, tip),
                                                             self.current_evaluated.get_frame())
         super(CartesianController, self).init()
+
+    def get_controlled_joint_symbols(self):
+        return self.robot.get_chain_joint_symbols(self.root, self.tip)
 
     def make_soft_constraints(self, goal_pose, current_pose, current_evaluated, weights=(1, 1, 1, 1, 1, 1)):
         """

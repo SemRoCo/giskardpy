@@ -71,30 +71,34 @@ class JointControllerPlugin(ControllerPlugin):
 
 
 class CartesianControllerPlugin(ControllerPlugin):
-    def __init__(self):
+    def __init__(self, root, tip):
         super(CartesianControllerPlugin, self).__init__()
+        self.root = root
+        self.tip = tip
         self._goal_identifier = 'cartesian_goal'
         self._solution_identifier = 'cartesian_solution'
 
     def start(self, god_map):
         super(CartesianControllerPlugin, self).start(god_map)
         if self._controller is None:
-            root = 'base_footprint'
-            tip = 'gripper_tool_frame'
-
             urdf = rospy.get_param('robot_description')
             self._controller = CartesianController(urdf)
             current_joints = JointStatesInput.prefix_constructor(self.god_map.get_expr,
-                                                                 self._controller.robot.get_joint_names(),
+                                                                 self._controller.robot.get_chain_joints(self.root, self.tip),
                                                                  self._joint_states_identifier,
                                                                  'position')
             trans_prefix = '{}/translation'.format(self._goal_identifier)
             rot_prefix = '{}/rotation'.format(self._goal_identifier)
             goal_input = FrameInput.prefix_constructor(trans_prefix, rot_prefix, self.god_map.get_expr)
 
-            trans_prefix = 'fk_{}/pose/position'.format(tip)
-            rot_prefix = 'fk_{}/pose/orientation'.format(tip)
+            trans_prefix = 'fk_{}/pose/position'.format(self.tip)
+            rot_prefix = 'fk_{}/pose/orientation'.format(self.tip)
             current_input = FrameInput.prefix_constructor(trans_prefix, rot_prefix, self.god_map.get_expr)
 
-            self._controller.init(root, tip, goal_pose=goal_input, current_evaluated=current_input,
+            self._controller.init(self.root, self.tip, goal_pose=goal_input, current_evaluated=current_input,
                                   current_joints=current_joints)
+
+    def __copy__(self):
+        cp = self.__class__(self.root, self.tip)
+        cp._controller = self._controller
+        return cp

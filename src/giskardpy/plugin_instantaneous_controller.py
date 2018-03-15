@@ -1,23 +1,15 @@
-from collections import OrderedDict
-import pylab as plt
 from copy import copy
-
 import rospy
-from control_msgs.msg import FollowJointTrajectoryGoal
-import numpy as np
-
-from trajectory_msgs.msg import JointTrajectoryPoint
-
 from giskardpy.input_system import JointStatesInput, FrameInput
 from giskardpy.plugin import Plugin
 from giskardpy.symengine_controller import JointController, CartesianController
 
 
 class ControllerPlugin(Plugin):
-    def __init__(self):
-        self._joint_states_identifier = 'js'
-        self._goal_identifier = 'goal'
-        self._next_cmd_identifier = 'motor'
+    def __init__(self, js_identifier='js', goal_identifier='goal', next_cmd_identifier='motor'):
+        self._joint_states_identifier = js_identifier
+        self._goal_identifier = goal_identifier
+        self._next_cmd_identifier = next_cmd_identifier
         self._controller = None
         super(ControllerPlugin, self).__init__()
 
@@ -39,7 +31,7 @@ class ControllerPlugin(Plugin):
     def stop(self):
         pass
 
-    def copy(self):
+    def get_replacement_parallel_universe(self):
         return copy(self)
 
     def __copy__(self):
@@ -49,10 +41,10 @@ class ControllerPlugin(Plugin):
 
 
 class JointControllerPlugin(ControllerPlugin):
-    def __init__(self):
-        super(JointControllerPlugin, self).__init__()
-        self._goal_identifier = 'joint_goal'
-        self._solution_identifier = 'joint_solution'
+    def __init__(self, js_identifier='js', goal_identifier='joint_goal', next_cmd_identifier='motor'):
+        super(JointControllerPlugin, self).__init__(js_identifier=js_identifier,
+                                                    goal_identifier=goal_identifier,
+                                                    next_cmd_identifier=next_cmd_identifier)
 
     def start(self, god_map):
         super(JointControllerPlugin, self).start(god_map)
@@ -71,12 +63,14 @@ class JointControllerPlugin(ControllerPlugin):
 
 
 class CartesianControllerPlugin(ControllerPlugin):
-    def __init__(self, root, tip):
-        super(CartesianControllerPlugin, self).__init__()
+    def __init__(self, root, tip, js_identifier='js', fk_identifier='fk', goal_identifier='cartesian_goal',
+                 next_cmd_identifier='motor'):
+        self.fk_identifier = fk_identifier
         self.root = root
         self.tip = tip
-        self._goal_identifier = 'cartesian_goal'
-        self._solution_identifier = 'cartesian_solution'
+        super(CartesianControllerPlugin, self).__init__(js_identifier=js_identifier,
+                                                        goal_identifier=goal_identifier,
+                                                        next_cmd_identifier=next_cmd_identifier)
 
     def start(self, god_map):
         super(CartesianControllerPlugin, self).start(god_map)
@@ -84,15 +78,16 @@ class CartesianControllerPlugin(ControllerPlugin):
             urdf = rospy.get_param('robot_description')
             self._controller = CartesianController(urdf)
             current_joints = JointStatesInput.prefix_constructor(self.god_map.get_expr,
-                                                                 self._controller.robot.get_chain_joints(self.root, self.tip),
+                                                                 self._controller.robot.get_chain_joints(self.root,
+                                                                                                         self.tip),
                                                                  self._joint_states_identifier,
                                                                  'position')
             trans_prefix = '{}/translation'.format(self._goal_identifier)
             rot_prefix = '{}/rotation'.format(self._goal_identifier)
             goal_input = FrameInput.prefix_constructor(trans_prefix, rot_prefix, self.god_map.get_expr)
 
-            trans_prefix = 'fk_{}/pose/position'.format(self.tip)
-            rot_prefix = 'fk_{}/pose/orientation'.format(self.tip)
+            trans_prefix = '{}/pose/position'.format(self.fk_identifier)
+            rot_prefix = '{}/pose/orientation'.format(self.fk_identifier)
             current_input = FrameInput.prefix_constructor(trans_prefix, rot_prefix, self.god_map.get_expr)
 
             self._controller.init(self.root, self.tip, goal_pose=goal_input, current_evaluated=current_input,

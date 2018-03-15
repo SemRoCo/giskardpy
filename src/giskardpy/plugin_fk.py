@@ -9,22 +9,23 @@ from giskardpy.symengine_robot import Robot
 
 
 class FKPlugin(Plugin):
-    def __init__(self, root, tip):
+    def __init__(self, root, tip, js_identifier='js', fk_identifier='fk'):
         self.root = root
         self.tip = tip
-        self._joint_states_identifier = 'js'
+        self._joint_states_identifier = js_identifier
+        self.fk_identifier = fk_identifier
         super(FKPlugin, self).__init__()
 
     def get_readings(self):
         fk = self.fk(**self.god_map.get_expr_values())
         p = PoseStamped()
         p.header.frame_id = self.tip
-        p.pose.position.x = sw.pos_of(fk)[0,0]
-        p.pose.position.y = sw.pos_of(fk)[1,0]
-        p.pose.position.z = sw.pos_of(fk)[2,0]
+        p.pose.position.x = sw.pos_of(fk)[0, 0]
+        p.pose.position.y = sw.pos_of(fk)[1, 0]
+        p.pose.position.z = sw.pos_of(fk)[2, 0]
         orientation = quaternion_from_matrix(fk)
         p.pose.orientation = Quaternion(*orientation)
-        return {'fk_{}'.format(self.tip): p}
+        return {self.fk_identifier: p}
 
     def update(self):
         super(FKPlugin, self).update()
@@ -44,6 +45,5 @@ class FKPlugin(Plugin):
     def stop(self):
         pass
 
-    def copy(self):
+    def get_replacement_parallel_universe(self):
         return self
-

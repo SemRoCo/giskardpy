@@ -55,7 +55,7 @@ class PyBulletRobot(object):
             self.ignored_collisions[link_a, link_b] = True
             self.ignored_collisions[link_b, link_a] = True
 
-    def check_self_collision(self, d=0.01):
+    def check_self_collision(self, d=0.001):
         contact_infos = [ContactInfo(*x) for x in p.getClosestPoints(self.id, self.id, d)]
         distances = {}
         for ci in contact_infos:
@@ -63,7 +63,7 @@ class PyBulletRobot(object):
             link_b = self.joint_id_to_info[ci.link_index_b].link_name
             if ci.link_index_a != ci.link_index_b and not self.ignored_collisions[link_a, link_b] and \
                     (link_b, link_a) not in distances:
-                distances[link_a, link_b] = ci.contact_distance
+                distances[link_a, link_b] = ci
         return distances
 
     def get_joint_states(self):

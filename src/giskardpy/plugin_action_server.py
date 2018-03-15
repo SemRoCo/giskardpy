@@ -6,8 +6,6 @@ import actionlib
 import rospy
 from control_msgs.msg import FollowJointTrajectoryAction, FollowJointTrajectoryResult, FollowJointTrajectoryGoal, \
     JointTrajectoryControllerState
-from copy import deepcopy
-from geometry_msgs.msg import PoseArray
 from giskard_msgs.msg import ControllerListAction, ControllerListGoal, Controller, ControllerListResult
 from multiprocessing import Queue
 
@@ -18,11 +16,15 @@ from giskardpy.trajectory import SingleJointState, Transform, Point, Quaternion,
 
 
 class ActionServer(Plugin):
-    def __init__(self):
-        self.joint_goal_identifier = 'joint_goal'
-        self.cartesian_goal_identifier = 'cartesian_goal'
-        self.trajectory_identifier = 'traj'
-        self.js_identifier = 'js'
+    # TODO find a better name for this
+    def __init__(self, js_identifier='js', trajectory_identifier='traj', cartesian_goal_identifier='cartesian_goal',
+                 joint_goal_identifier='joint_goal', time_identifier='time', collision_identifier='collision'):
+        self.joint_goal_identifier = joint_goal_identifier
+        self.cartesian_goal_identifier = cartesian_goal_identifier
+        self.trajectory_identifier = trajectory_identifier
+        self.js_identifier = js_identifier
+        self.time_identifier = time_identifier
+        self.collision_identifier = collision_identifier
 
         self.joint_goal = None
         self.goal_solution = None
@@ -40,26 +42,28 @@ class ActionServer(Plugin):
         return super(ActionServer, self).end_parallel_universe()
 
     def post_mortem_analysis(self, god_map):
-        trajectory = god_map.get_data(self.trajectory_identifier)
-        js = god_map.get_data(self.js_identifier)
-        goal = FollowJointTrajectoryGoal()
-        goal.trajectory.joint_names = self.controller_joints
-        for time, traj_point in trajectory.items():
-            p = JointTrajectoryPoint()
-            p.time_from_start = rospy.Duration(time)
-            for joint_name in self.controller_joints:
-                if joint_name in traj_point:
-                    p.positions.append(traj_point[joint_name].position)
-                    p.velocities.append(traj_point[joint_name].velocity)
-                else:
-                    p.positions.append(js[joint_name].position)
-                    p.velocities.append(js[joint_name].velocity)
-            goal.trajectory.points.append(p)
-        self.update_lock.put(goal)
+        collisions = god_map.get_data(self.collision_identifier)
+        if len(collisions) == 0 or collisions is None:
+            trajectory = god_map.get_data(self.trajectory_identifier)
+            js = god_map.get_data(self.js_identifier)
+            goal = FollowJointTrajectoryGoal()
+            goal.trajectory.joint_names = self.controller_joints
+            for time, traj_point in trajectory.items():
+                p = JointTrajectoryPoint()
+                p.time_from_start = rospy.Duration(time)
+                for joint_name in self.controller_joints:
+                    if joint_name in traj_point:
+                        p.positions.append(traj_point[joint_name].position)
+                        p.velocities.append(traj_point[joint_name].velocity)
+                    else:
+                        p.positions.append(js[joint_name].position)
+                        p.velocities.append(js[joint_name].velocity)
+                goal.trajectory.points.append(p)
+            self.update_lock.put(goal)
+        else:
+            print('collision during rollout!!!!!!!!!!!!!!!!!!!')
+            self.update_lock.put(None)
         self.update_lock.get()
-
-    def copy(self):
-        return LogTrajectory()
 
     def get_readings(self):
         try:
@@ -96,7 +100,8 @@ class ActionServer(Plugin):
         # self.state_sub = rospy.Subscriber('/fake_state', JointTrajectoryControllerState, self.state_cb)
         self._as = actionlib.SimpleActionServer(self._action_name, ControllerListAction,
                                                 execute_cb=self.action_server_cb, auto_start=False)
-        self.controller_joints = rospy.wait_for_message('/whole_body_controller/state', JointTrajectoryControllerState).joint_names
+        self.controller_joints = rospy.wait_for_message('/whole_body_controller/state',
+                                                        JointTrajectoryControllerState).joint_names
         self._as.start()
 
         print('running')
@@ -143,23 +148,25 @@ class ActionServer(Plugin):
         solution = self.update_lock.get()
         rospy.loginfo('solution ready')
         success = False
-
-        print('waiting for {:.3f} sec with {} points'.format(
-            solution.trajectory.points[-1].time_from_start.to_sec(),
-            len(solution.trajectory.points)))
-        self._ac.send_goal(solution)
-        t = rospy.get_rostime()
-        while not self._ac.wait_for_result(rospy.Duration(.1)):
-            if self._as.is_preempt_requested():
-                rospy.loginfo('new goal, cancel old one')
-                self._ac.cancel_all_goals()
-                break
+        if solution is not None:
+            print('waiting for {:.3f} sec with {} points'.format(
+                solution.trajectory.points[-1].time_from_start.to_sec(),
+                len(solution.trajectory.points)))
+            self._ac.send_goal(solution)
+            t = rospy.get_rostime()
+            while not self._ac.wait_for_result(rospy.Duration(.1)):
+                if self._as.is_preempt_requested():
+                    rospy.loginfo('new goal, cancel old one')
+                    self._ac.cancel_all_goals()
+                    break
+            else:
+                print('shit took {:.3f}s'.format((rospy.get_rostime() - t).to_sec()))
+                r = self._ac.get_result()
+                print('real result {}'.format(r))
+                if r.error_code == FollowJointTrajectoryResult.SUCCESSFUL:
+                    success = True
         else:
-            print('shit took {:.3f}s'.format((rospy.get_rostime() - t).to_sec()))
-            r = self._ac.get_result()
-            print('real result {}'.format(r))
-            if r.error_code == FollowJointTrajectoryResult.SUCCESSFUL:
-                success = True
+            print('no solution found')
 
         if success:
             self._as.set_succeeded(ControllerListResult())
@@ -169,12 +176,17 @@ class ActionServer(Plugin):
         rospy.loginfo('finished movement')
         self.update_lock.put(None)
 
+    def get_replacement_parallel_universe(self):
+        return LogTrajectory(trajectory_identifier=self.trajectory_identifier,
+                             joint_state_identifier=self.js_identifier,
+                             time_identifier=self.time_identifier)
+
 
 class LogTrajectory(Plugin):
-    def __init__(self):
-        self.trajectory_identifier = 'traj'
-        self.joint_state_identifier = 'js'
-        self.time_identifier = 'time'
+    def __init__(self, trajectory_identifier='traj', joint_state_identifier='js', time_identifier='time'):
+        self.trajectory_identifier = trajectory_identifier
+        self.joint_state_identifier = joint_state_identifier
+        self.time_identifier = time_identifier
         self.precision = 0.0025
         super(LogTrajectory, self).__init__()
 

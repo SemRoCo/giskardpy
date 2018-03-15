@@ -2,9 +2,8 @@ from Queue import Empty
 from collections import OrderedDict
 
 import rospy
-from multiprocessing import Lock, Queue
+from multiprocessing import Queue
 
-from copy import deepcopy
 from sensor_msgs.msg import JointState
 
 from giskardpy.plugin import Plugin
@@ -12,22 +11,23 @@ from giskardpy.trajectory import MultiJointState, SingleJointState
 
 
 class JointStatePlugin(Plugin):
-    def __init__(self):
+    # TODO implement chain
+    def __init__(self, js_identifier='js', time_identifier='time', next_cmd_identifier='motor'):
         super(JointStatePlugin, self).__init__()
+        self.js_identifier = js_identifier
+        self.time_identifier = time_identifier
+        self.next_cmd_identifier = next_cmd_identifier
         self.js = None
         self.lock = Queue(maxsize=1)
 
     def cb(self, data):
-        # TODO might still be buggy
         try:
             self.lock.get_nowait()
         except Empty:
             pass
-        # print('updated js to {}'.format(data))
         self.lock.put(data)
 
     def get_readings(self):
-        # TODO probably bug when we dont have a joint state before first get readings call
         js = self.lock.get()
         mjs = OrderedDict()
         for i, joint_name in enumerate(js.name):
@@ -37,7 +37,7 @@ class JointStatePlugin(Plugin):
             sjs.velocity = js.velocity[i]
             sjs.effort = js.effort[i]
             mjs[joint_name] = sjs
-        return {'js': mjs}
+        return {self.js_identifier: mjs}
 
     def start(self, god_map):
         self.joint_state_sub = rospy.Subscriber('joint_states', JointState, self.cb, queue_size=1)
@@ -49,25 +49,26 @@ class JointStatePlugin(Plugin):
     def update(self):
         pass
 
-    def copy(self):
-        return KinematicSimPlugin()
+    def get_replacement_parallel_universe(self):
+        return KinematicSimPlugin(js_identifier=self.js_identifier, next_cmd_identifier=self.next_cmd_identifier,
+                                  time_identifier=self.time_identifier)
 
 
 class KinematicSimPlugin(Plugin):
-    def __init__(self):
-        self.js_identifier = 'js'
-        self.next_cmd_identifier = 'motor'
-        self.time_identifier = 'time'
+    def __init__(self, js_identifier='js', next_cmd_identifier='motor', time_identifier='time'):
+        self.js_identifier = js_identifier
+        self.next_cmd_identifier = next_cmd_identifier
+        self.time_identifier = time_identifier
         self.frequency = 0.1
         self.time = -self.frequency
         super(KinematicSimPlugin, self).__init__()
 
     def get_readings(self):
-        # TODO we might always want to update time and js
+        updates = {}
         if self.next_js is not None:
-            return {self.js_identifier: self.next_js,
-                    self.time_identifier: self.time}
-        return {}
+            updates[self.js_identifier] = self.next_js
+        updates[self.time_identifier] = self.time
+        return updates
 
     def update(self):
         self.time += self.frequency
@@ -95,5 +96,5 @@ class KinematicSimPlugin(Plugin):
     def end_parallel_universe(self):
         return super(KinematicSimPlugin, self).end_parallel_universe()
 
-    def copy(self):
+    def get_replacement_parallel_universe(self):
         return self

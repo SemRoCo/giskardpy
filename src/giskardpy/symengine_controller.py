@@ -1,7 +1,7 @@
-import symengine_wrappers as spw
+import symengine_wrappers as sw
 from collections import OrderedDict
 
-from giskardpy.input_system import JointStatesInput, FrameInput
+from giskardpy.input_system import JointStatesInput, FrameInput, Point3Input
 from giskardpy.qp_problem_builder import QProblemBuilder, SoftConstraint
 from giskardpy.symengine_robot import Robot
 
@@ -10,6 +10,9 @@ class Controller(object):
     def __init__(self, urdf):
         self._soft_constraints = OrderedDict()
         self.robot = Robot(urdf)
+
+    def add_constraints(self, soft_constraints):
+        self._soft_constraints.update(soft_constraints)
 
     def init(self, *args, **kwargs):
         controlled_joint_symbols = self.get_controlled_joint_symbols()
@@ -46,7 +49,7 @@ class JointController(Controller):
     def _set_default_goal_joint_states(self):
         m = OrderedDict()
         for joint_name in self.robot.joint_states_input.joint_map:
-            m[joint_name] = spw.Symbol('goal_{}'.format(joint_name))
+            m[joint_name] = sw.Symbol('goal_{}'.format(joint_name))
         self.goal_joint_states = JointStatesInput(m)
 
     def init(self, current_joints=None, joint_goals=None):
@@ -80,115 +83,78 @@ class JointController(Controller):
         return soft_constraints
 
 
-class CartesianController(Controller):
-    def __init__(self, urdf):
-        super(CartesianController, self).__init__(urdf)
-        # TODO use symbol for weight
-        self.default_weight = 1
-        self._set_default_inputs()
-        self.default_trans_gain = 3
-        self.max_trans_speed = 0.3
-        self.max_rot_speed = 0.5  # rad/s
-        self.default_rot_gain = 3
+# TODO
+# def get_controlled_joint_symbols(self):
+#     return self.robot.get_chain_joint_symbols(self.root, self.tip)
+def position_conv(goal_position, current_position, weights=(1, 1, 1), trans_gain=3, max_trans_speed=0.3):
+    soft_constraints = {}
 
-    def _set_default_inputs(self):
-        self.goal_pose = FrameInput('goal_x',
-                                    'goal_y',
-                                    'goal_z',
-                                    'goal_qx',
-                                    'goal_qy',
-                                    'goal_qz',
-                                    'goal_qw')
-        self.current_evaluated = FrameInput('current_evaled_x',
-                                            'current_evaled_y',
-                                            'current_evaled_z',
-                                            'current_evaled_qx',
-                                            'current_evaled_qy',
-                                            'current_evaled_qz',
-                                            'current_evaled_qw')
+    # position control
+    trans_error_vector = goal_position - current_position
+    trans_error = sw.norm(trans_error_vector)
+    trans_scale = sw.fake_Min(trans_error * trans_gain, max_trans_speed)
+    trans_control = trans_error_vector / trans_error * trans_scale
 
-    def init(self, root, tip, current_joints=None, goal_pose=None, current_evaluated=None):
-        """
-        :param current_joints: InputArray
-        :param joint_goals: InputArray
-        """
-        self.root = root
-        self.tip = tip
-        # TODO add chain
-        self.robot.set_joint_symbol_map(current_joints)
-        if goal_pose is not None:
-            self.goal_pose = goal_pose
-        if current_evaluated is not None:
-            self.current_evaluated = current_evaluated
+    soft_constraints['align {} x position'.format(0)] = SoftConstraint(lower=trans_control[0],
+                                                                       upper=trans_control[0],
+                                                                       weight=weights[0],
+                                                                       expression=current_position[0])
+    soft_constraints['align {} y position'.format(0)] = SoftConstraint(lower=trans_control[1],
+                                                                       upper=trans_control[1],
+                                                                       weight=weights[1],
+                                                                       expression=current_position[1])
+    soft_constraints['align {} z position'.format(0)] = SoftConstraint(lower=trans_control[2],
+                                                                       upper=trans_control[2],
+                                                                       weight=weights[2],
+                                                                       expression=current_position[2])
 
-        self._soft_constraints = self.make_soft_constraints(self.goal_pose.get_frame(),
-                                                            self.robot.get_fk_expression(root, tip),
-                                                            self.current_evaluated.get_frame())
-        super(CartesianController, self).init()
 
-    def get_controlled_joint_symbols(self):
-        return self.robot.get_chain_joint_symbols(self.root, self.tip)
+    return soft_constraints
 
-    def make_soft_constraints(self, goal_pose, current_pose, current_evaluated, weights=(1, 1, 1, 1, 1, 1)):
-        """
-        :param start_pose: FrameInput
-        :param goal_pose: FrameInput
-        :param current_pose:
-        :param current_evaluated: FrameInput
-        :param weights: TODO
-        :return:
-        """
-        soft_constraints = {}
+def rotation_conv(goal_rotation, current_rotation, current_evaluated_rotation, weights=(1, 1, 1),
+                  rot_gain=3, max_rot_speed=0.5):
+    soft_constraints = {}
+    axis, angle = sw.axis_angle_from_matrix((current_rotation.T * goal_rotation))
+    capped_angle = sw.fake_Min(angle * rot_gain, max_rot_speed)
+    axis = axis
+    r_rot_control = axis * capped_angle
 
-        current_position = spw.pos_of(current_pose)
-        current_rotation = spw.rot_of(current_pose)
+    hack = sw.rotation3_axis_angle([0, 0, 1], 0.0001)
 
-        current_evaluated_position = spw.pos_of(current_evaluated)
-        current_evaluated_rotation = spw.rot_of(current_evaluated)
+    axis, angle = sw.axis_angle_from_matrix((current_rotation.T * (current_evaluated_rotation * hack)).T)
+    c_aa = (axis * angle)
 
-        goal_position = spw.pos_of(goal_pose)
-        goal_rotation = spw.rot_of(goal_pose)
+    soft_constraints['align {} rotation 0'.format(0)] = SoftConstraint(lower=r_rot_control[0],
+                                                                       upper=r_rot_control[0],
+                                                                       weight=weights[0],
+                                                                       expression=c_aa[0])
+    soft_constraints['align {} rotation 1'.format(0)] = SoftConstraint(lower=r_rot_control[1],
+                                                                       upper=r_rot_control[1],
+                                                                       weight=weights[1],
+                                                                       expression=c_aa[1])
+    soft_constraints['align {} rotation 2'.format(0)] = SoftConstraint(lower=r_rot_control[2],
+                                                                       upper=r_rot_control[2],
+                                                                       weight=weights[2],
+                                                                       expression=c_aa[2])
+    return soft_constraints
 
-        # position control
-        trans_error_vector = goal_position - current_position
-        trans_error = spw.norm(trans_error_vector)
-        trans_scale = spw.fake_Min(trans_error * self.default_trans_gain, self.max_trans_speed)
-        trans_control = trans_error_vector / trans_error * trans_scale
+def link_to_any_avoidance(link_name, current_pose, current_pose_eval, point_on_link, other_point, upper_limit=1e9,
+                          weight=(100,100,100)):
+    soft_constraints = {}
+    name = '{} to any collision'.format(link_name)
 
-        soft_constraints['align {} x position'.format(0)] = SoftConstraint(lower=trans_control[0],
-                                                                           upper=trans_control[0],
-                                                                           weight=weights[0],
-                                                                           expression=current_position[0])
-        soft_constraints['align {} y position'.format(0)] = SoftConstraint(lower=trans_control[1],
-                                                                           upper=trans_control[1],
-                                                                           weight=weights[1],
-                                                                           expression=current_position[1])
-        soft_constraints['align {} z position'.format(0)] = SoftConstraint(lower=trans_control[2],
-                                                                           upper=trans_control[2],
-                                                                           weight=weights[2],
-                                                                           expression=current_position[2])
-
-        axis, angle = spw.axis_angle_from_matrix((current_rotation.T * goal_rotation))
-        capped_angle = spw.fake_Min(angle * self.default_rot_gain, self.max_rot_speed)
-        axis = axis
-        r_rot_control = axis * capped_angle
-
-        hack = spw.rotation3_axis_angle([0, 0, 1], 0.0001)
-
-        axis, angle = spw.axis_angle_from_matrix((current_rotation.T * (current_evaluated_rotation * hack)).T)
-        c_aa = (axis * angle)
-
-        soft_constraints['align {} rotation 0'.format(0)] = SoftConstraint(lower=r_rot_control[0],
-                                                                           upper=r_rot_control[0],
-                                                                           weight=weights[3],
-                                                                           expression=c_aa[0])
-        soft_constraints['align {} rotation 1'.format(0)] = SoftConstraint(lower=r_rot_control[1],
-                                                                           upper=r_rot_control[1],
-                                                                           weight=weights[4],
-                                                                           expression=c_aa[1])
-        soft_constraints['align {} rotation 2'.format(0)] = SoftConstraint(lower=r_rot_control[2],
-                                                                           upper=r_rot_control[2],
-                                                                           weight=weights[5],
-                                                                           expression=c_aa[2])
-
-        return soft_constraints
+    controllable_distance = (current_pose * sw.inverse_frame(current_pose_eval) * point_on_link) - other_point
+    lower_limit = controllable_distance / sw.norm(controllable_distance)
+    soft_constraints['{} x'.format(name)] = SoftConstraint(lower=lower_limit[0],
+                                                                           upper=upper_limit,
+                                                                           weight=weight[0],
+                                                                           expression=controllable_distance[0])
+    soft_constraints['{} y'.format(name)] = SoftConstraint(lower=lower_limit[1],
+                                                                           upper=upper_limit,
+                                                                           weight=weight[1],
+                                                                           expression=controllable_distance[1])
+    soft_constraints['{} z'.format(name)] = SoftConstraint(lower=lower_limit[2],
+                                                                           upper=upper_limit,
+                                                                           weight=weight[2],
+                                                                           expression=controllable_distance[2])
+    return soft_constraints

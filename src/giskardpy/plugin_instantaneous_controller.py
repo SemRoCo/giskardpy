@@ -2,8 +2,8 @@ from copy import copy
 import rospy
 from giskardpy.input_system import JointStatesInput, FrameInput
 from giskardpy.plugin import Plugin
-from giskardpy.symengine_controller import JointController, CartesianController
-
+from giskardpy.symengine_controller import JointController, Controller, position_conv, rotation_conv
+import symengine_wrappers as sw
 
 class ControllerPlugin(Plugin):
     def __init__(self, js_identifier='js', goal_identifier='goal', next_cmd_identifier='motor'):
@@ -76,7 +76,8 @@ class CartesianControllerPlugin(ControllerPlugin):
         super(CartesianControllerPlugin, self).start(god_map)
         if self._controller is None:
             urdf = rospy.get_param('robot_description')
-            self._controller = CartesianController(urdf)
+            self._controller = Controller(urdf)
+            robot = self._controller.robot
             current_joints = JointStatesInput.prefix_constructor(self.god_map.get_expr,
                                                                  self._controller.robot.get_chain_joints(self.root,
                                                                                                          self.tip),
@@ -85,6 +86,47 @@ class CartesianControllerPlugin(ControllerPlugin):
             trans_prefix = '{}/translation'.format(self._goal_identifier)
             rot_prefix = '{}/rotation'.format(self._goal_identifier)
             goal_input = FrameInput.prefix_constructor(trans_prefix, rot_prefix, self.god_map.get_expr)
+
+            trans_prefix = '{}/pose/position'.format(self.fk_identifier)
+            rot_prefix = '{}/pose/orientation'.format(self.fk_identifier)
+            current_input = FrameInput.prefix_constructor(trans_prefix, rot_prefix, self.god_map.get_expr)
+
+            robot.set_joint_symbol_map(current_joints)
+            self._controller.add_constraints(position_conv(goal_input.get_position(),
+                                                           sw.pos_of(robot.get_fk_expression(self.root, self.tip))))
+            self._controller.add_constraints(rotation_conv(goal_input.get_rotation(),
+                                                           sw.rot_of(robot.get_fk_expression(self.root, self.tip)),
+                                                           current_input.get_rotation()))
+
+            self._controller.init()
+
+    def __copy__(self):
+        cp = self.__class__(self.root, self.tip)
+        cp._controller = self._controller
+        return cp
+
+
+class CartesianBulletControllerPlugin(ControllerPlugin):
+    def __init__(self, root, tip, js_identifier='js', fk_identifier='fk', goal_identifier='cartesian_goal',
+                 next_cmd_identifier='motor', collision_identifier='collision'):
+        self.fk_identifier = fk_identifier
+        self.collision_identifier = collision_identifier
+        self.root = root
+        self.tip = tip
+        super(CartesianBulletControllerPlugin, self).__init__(js_identifier=js_identifier,
+                                                              goal_identifier=goal_identifier,
+                                                              next_cmd_identifier=next_cmd_identifier)
+
+    def start(self, god_map):
+        super(CartesianBulletControllerPlugin, self).start(god_map)
+        if self._controller is None:
+            urdf = rospy.get_param('robot_description')
+            self._controller = CartesianController(urdf)
+            current_joints = JointStatesInput.prefix_constructor(self.god_map.get_expr,
+                                                                 self._controller.robot.get_chain_joints(self.root,
+                                                                                                         self.tip),
+                                                                 self._joint_states_identifier,
+                                                                 'position')
 
             trans_prefix = '{}/pose/position'.format(self.fk_identifier)
             rot_prefix = '{}/pose/orientation'.format(self.fk_identifier)

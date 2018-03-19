@@ -29,6 +29,17 @@ class JointStatesInput(InputArray):
             joint_map[joint_name] = f('{}{}{}'.format(prefix2, joint_name, suffix2))
         return cls(joint_map)
 
+class Point3Input(InputArray):
+    def __init__(self, x='', y='', z=''):
+        super(Point3Input, self).__init__(x=x, y=y, z=z)
+
+    def get_expression(self):
+        return sw.point3(self.x, self.y, self.z)
+
+class Vector3Input(Point3Input):
+    def get_expression(self):
+        return sw.vector3(self.x, self.y, self.z)
+
 
 class FrameInput(InputArray):
     def __init__(self, x='', y='', z='', qx='', qy='', qz='', qw=''):

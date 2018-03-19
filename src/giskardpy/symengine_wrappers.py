@@ -3,6 +3,7 @@ from operator import mul
 from warnings import warn
 
 import symengine as sp
+from copy import deepcopy
 from symengine import Matrix, Symbol, eye, sympify, diag, zeros, lambdify, Abs, Max, Min, sin, cos, tan, acos, asin, \
     atan, atan2, nan, sqrt, log
 import numpy as np
@@ -94,13 +95,13 @@ def cross(u, v):
                       u[0] * v[1] - u[1] * v[0]])
 
 
-def vec3(x, y, z):
+def vector3(x, y, z):
     return sp.Matrix([x, y, z, 0])
 
 
-unitX = vec3(1, 0, 0)
-unitY = vec3(0, 1, 0)
-unitZ = vec3(0, 0, 1)
+unitX = vector3(1, 0, 0)
+unitY = vector3(0, 1, 0)
+unitZ = vector3(0, 0, 1)
 
 
 def point3(x, y, z):
@@ -194,6 +195,12 @@ def frame3_rpy(r, p, y, loc):
 def frame3_quaternion(x, y, z, qx, qy, qz, qw):
     return translation3(x, y, z) * rotation3_quaternion(qx, qy, qz, qw)
 
+
+def inverse_frame(frame):
+    inv = sp.eye(4)
+    inv[:3,:3] = frame[:3,:3]
+    inv[3,:3] = -inv[:3,:3]*frame[3,:3]
+    return inv
 
 def pos_of(frame):
     return frame[:4, 3:]

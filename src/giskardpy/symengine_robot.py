@@ -89,9 +89,9 @@ class Robot(object):
 
             if joint.type == 'revolute' or joint.type == 'continuous':
                 if joint.mimic is None:
-                    joint_frame *= spw.rotation3_axis_angle(spw.vec3(*joint.axis), joint_symbol)
+                    joint_frame *= spw.rotation3_axis_angle(spw.vector3(*joint.axis), joint_symbol)
                 else:
-                    joint_frame *= spw.rotation3_axis_angle(spw.vec3(*joint.axis), mimic)
+                    joint_frame *= spw.rotation3_axis_angle(spw.vector3(*joint.axis), mimic)
 
             elif joint.type == 'prismatic':
                 if joint.mimic is None:

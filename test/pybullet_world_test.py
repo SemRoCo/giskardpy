@@ -1,5 +1,5 @@
 import unittest
-from collections import namedtuple
+from collections import namedtuple, OrderedDict
 
 from giskardpy.god_map import GodMap
 from giskardpy.pybullet_world import PyBulletWorld
@@ -13,7 +13,7 @@ PKG = 'giskardpy'
 class TestPyBulletWorld(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.w = PyBulletWorld()
+        cls.w = PyBulletWorld(False)
         cls.w.activate_viewer()
         cls.w.clear_world()
         super(TestPyBulletWorld, cls).setUpClass()
@@ -57,12 +57,12 @@ class TestPyBulletWorld(unittest.TestCase):
               ('fr_caster_rotation_joint', 0.0),
               ('bl_caster_rotation_joint', 0.0),
               ('br_caster_rotation_joint', 0.0)]
-        mjs = MultiJointState()
+        mjs = OrderedDict()
         for joint_name, joint_position in js:
             sjs = SingleJointState()
             sjs.name = joint_name
             sjs.position = joint_position
-            mjs.set(sjs)
+            mjs[joint_name] = sjs
         return mjs
 
     def tearDown(self):
@@ -94,13 +94,17 @@ class TestPyBulletWorld(unittest.TestCase):
 
     def test_collision_detection1(self):
         self.w.spawn_urdf_file_robot('pr2', 'pr2.urdf')
-        self.assertEqual(len(self.w.check_collision()), 0)
+        r = self.w.get_robot('pr2')
+        self.w.set_joint_state('pr2', r.get_zero_joint_state())
+        self.assertEqual(0, len(self.w.check_collision()))
 
     def test_collision_detection2(self):
         self.w.spawn_urdf_file_robot('pr2', 'pr2.urdf')
         mjs = self.get_pr2_collision_js()
         self.w.set_joint_state('pr2', mjs)
-        self.assertEqual(len(self.w.check_collision()), 4)
+        collisions = self.w.check_collision()
+        collisions = [x for x in collisions.values() if x.contact_distance < 0.05]
+        self.assertEqual(8, len(collisions))
 
     def test_list_objects1(self):
         self.w.spawn_object_from_urdf('plane', 'plane.urdf')

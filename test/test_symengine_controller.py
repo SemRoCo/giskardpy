@@ -8,6 +8,7 @@ from giskardpy.symengine_robot import Robot, hacky_urdf_parser_fix
 from giskardpy.symengine_controller import JointController
 from kdl_parser import kdl_tree_from_urdf_model
 import numpy as np
+import giskardpy.symengine_wrappers as sw
 
 PKG = 'giskardpy'
 
@@ -62,6 +63,14 @@ class KDL(object):
                  [0, 0, 0, 1], ]
             return np.array(r)
 
+        def fk_np_inv(self, js_dict):
+            f = self.fk(js_dict).Inverse()
+            r = [[f.M[0, 0], f.M[0, 1], f.M[0, 2], f.p[0]],
+                 [f.M[1, 0], f.M[1, 1], f.M[1, 2], f.p[1]],
+                 [f.M[2, 0], f.M[2, 1], f.M[2, 2], f.p[2]],
+                 [0, 0, 0, 1], ]
+            return np.array(r)
+
     def __init__(self, urdf):
         if urdf.endswith('.urdf'):
             with open(urdf, 'r') as file:
@@ -94,6 +103,7 @@ class TestSymengineController(unittest.TestCase):
                 kdl_fk = kdl_r.fk_np(js)
                 symengine_fk = r.get_fk_expression(root, tip).subs(js)
                 np.testing.assert_array_almost_equal(kdl_fk, symengine_fk, decimal=3)
+                np.testing.assert_array_almost_equal(kdl_r.fk_np_inv(js), sw.inverse_frame(symengine_fk), decimal=3)
 
     def test_joint_controller_pointy1(self):
         r = Robot('pointy.urdf')

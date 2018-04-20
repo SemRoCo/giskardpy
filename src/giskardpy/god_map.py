@@ -19,6 +19,12 @@ class GodMap(object):
         return god_map_copy
 
     def _get_member(self, identifier,  member):
+        if identifier is None:
+            raise AttributeError()
+        if ',' in member:
+            member = member.replace('(','')
+            member = member.replace(')','')
+            member = tuple(member.split(','))
         if isinstance(identifier, dict):
             return identifier[member]
         elif isinstance(identifier, list) or (isinstance(identifier, tuple) and member.isdigit()):
@@ -36,6 +42,8 @@ class GodMap(object):
                 result = self._get_member(result, member)
             except AttributeError:
                 result = 0
+            except TypeError:
+                pass
         return result
 
     def get_expr(self, key):

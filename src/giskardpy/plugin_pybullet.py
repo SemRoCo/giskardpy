@@ -1,5 +1,7 @@
 import rospy
-from copy import deepcopy
+from copy import deepcopy, copy
+
+from collections import defaultdict
 from geometry_msgs.msg import Point, Vector3
 from std_msgs.msg import ColorRGBA
 from visualization_msgs.msg import MarkerArray, Marker
@@ -9,18 +11,27 @@ from giskardpy.pybullet_world import PyBulletWorld
 
 
 class PyBulletPlugin(Plugin):
-    def __init__(self, js_identifier='js', collision_identifier='collision'):
+    def __init__(self, js_identifier='js', collision_identifier='collision', closest_point_identifier='cpi'):
         self.js_identifier = js_identifier
         self.collision_identifier = collision_identifier
+        self.closest_point_identifier = closest_point_identifier
         self.robot_name = 'pr2'
         self.world = PyBulletWorld()
         self.started = False
         super(PyBulletPlugin, self).__init__()
 
+    # @profile
     def get_readings(self):
         collisions = self.world.check_collision()
-        self.make_collision_markers(collisions)
-        return {self.collision_identifier: collisions}
+        # self.make_collision_markers(collisions)
+        closest_point = {}
+        for (link1, link2), collision_info in collisions.items():
+            if link1 in closest_point:
+                closest_point[link1] = min(closest_point[link1], collision_info, key=lambda x: x.contact_distance)
+            else:
+                closest_point[link1] = collision_info
+        return {self.collision_identifier: collisions,
+                self.closest_point_identifier: closest_point}
 
     def update(self):
         js = self.god_map.get_data(self.js_identifier)
@@ -43,23 +54,38 @@ class PyBulletPlugin(Plugin):
     def get_replacement_parallel_universe(self):
         return self
 
+    def default_marker(self, position, i):
+        m = Marker()
+        m.header.frame_id = 'base_footprint'
+        m.action = Marker.ADD
+        m.type = Marker.SPHERE
+        m.pose.position = Point(*position)
+        m.id = i
+        m.ns = 'pybullet collisions'
+        m.scale = Vector3(0.03, 0.03, 0.03)
+        m.color = ColorRGBA(1, 0, 0, 1)
+        return m
+
+    # @profile
     def make_collision_markers(self, collisions):
         ma = MarkerArray()
         if len(collisions) > 0:
-            for i, ((link1, link2), collision_info) in enumerate(collisions.items()):
-                m = Marker()
-                m.header.frame_id = 'base_footprint'
-                m.action = Marker.ADD
-                m.type = Marker.SPHERE
-                m.pose.position = Point(*collision_info.position_on_a)
-                m.id = i
-                m.ns = 'pybullet collisions'
-                m.scale = Vector3(0.03,0.03,0.03)
-                m.color = ColorRGBA(1,0,0,1)
-                ma.markers.append(m)
-                m = deepcopy(m)
-                m.pose.position = Point(*collision_info.position_on_b)
-                ma.markers.append(m)
+            ma.markers.extend([self.default_marker(collision_info.position_on_a, i) for i, collision_info in enumerate(collisions.values())])
+            ma.markers.extend([self.default_marker(collision_info.position_on_b, i) for i, collision_info in enumerate(collisions.values())])
+            # for i, ((link1, link2), collision_info) in enumerate(collisions.items()):
+            #     m = Marker()
+            #     m.header.frame_id = 'base_footprint'
+            #     m.action = Marker.ADD
+            #     m.type = Marker.SPHERE
+            #     m.pose.position = Point(*collision_info.position_on_a)
+            #     m.id = i
+            #     m.ns = 'pybullet collisions'
+            #     m.scale = Vector3(0.03,0.03,0.03)
+            #     m.color = ColorRGBA(1,0,0,1)
+            #     ma.markers.append(m)
+            #     m = copy(m)
+            #     m.pose.position = Point(*collision_info.position_on_b)
+            #     ma.markers.append(m)
         else:
             m = Marker()
             m.action = Marker.DELETEALL

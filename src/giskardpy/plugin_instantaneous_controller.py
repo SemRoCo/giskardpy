@@ -1,9 +1,11 @@
 from copy import copy
 import rospy
-from giskardpy.input_system import JointStatesInput, FrameInput
+from giskardpy.input_system import JointStatesInput, FrameInput, Point3Input
 from giskardpy.plugin import Plugin
-from giskardpy.symengine_controller import JointController, Controller, position_conv, rotation_conv
+from giskardpy.symengine_controller import JointController, Controller, position_conv, rotation_conv, \
+    link_to_any_avoidance
 import symengine_wrappers as sw
+
 
 class ControllerPlugin(Plugin):
     def __init__(self, js_identifier='js', goal_identifier='goal', next_cmd_identifier='motor'):
@@ -108,9 +110,10 @@ class CartesianControllerPlugin(ControllerPlugin):
 
 class CartesianBulletControllerPlugin(ControllerPlugin):
     def __init__(self, root, tip, js_identifier='js', fk_identifier='fk', goal_identifier='cartesian_goal',
-                 next_cmd_identifier='motor', collision_identifier='collision'):
+                 next_cmd_identifier='motor', collision_identifier='collision', closest_point_identifier='cpi'):
         self.fk_identifier = fk_identifier
         self.collision_identifier = collision_identifier
+        self.closest_point_identifier = closest_point_identifier
         self.root = root
         self.tip = tip
         super(CartesianBulletControllerPlugin, self).__init__(js_identifier=js_identifier,
@@ -121,19 +124,46 @@ class CartesianBulletControllerPlugin(ControllerPlugin):
         super(CartesianBulletControllerPlugin, self).start(god_map)
         if self._controller is None:
             urdf = rospy.get_param('robot_description')
-            self._controller = CartesianController(urdf)
+            self._controller = Controller(urdf)
+            robot = self._controller.robot
             current_joints = JointStatesInput.prefix_constructor(self.god_map.get_expr,
-                                                                 self._controller.robot.get_chain_joints(self.root,
-                                                                                                         self.tip),
+                                                                 self._controller.robot.get_joint_names(),
                                                                  self._joint_states_identifier,
                                                                  'position')
+            trans_prefix = '{}/translation'.format(self._goal_identifier)
+            rot_prefix = '{}/rotation'.format(self._goal_identifier)
+            goal_input = FrameInput.prefix_constructor(trans_prefix, rot_prefix, self.god_map.get_expr)
 
             trans_prefix = '{}/pose/position'.format(self.fk_identifier)
             rot_prefix = '{}/pose/orientation'.format(self.fk_identifier)
             current_input = FrameInput.prefix_constructor(trans_prefix, rot_prefix, self.god_map.get_expr)
 
-            self._controller.init(self.root, self.tip, goal_pose=goal_input, current_evaluated=current_input,
-                                  current_joints=current_joints)
+            # link1 = 'gripper_base_link'
+            # link1 = 'gripper_finger_left_link'
+            # link2 = 'plate'
+            # link2 = 'base_link'
+            link1 = 'l_forearm_link'
+            link2 = 'r_forearm_link'
+
+            point_on_link_input = Point3Input.position_on_a_constructor(self.god_map.get_expr,
+                                                                        '{}/{},{}'.format(self.collision_identifier,
+                                                                                          link1, link2))
+            other_point_input = Point3Input.position_on_b_constructor(self.god_map.get_expr,
+                                                                      '{}/{},{}'.format(self.collision_identifier,
+                                                                                        link1, link2))
+
+            robot.set_joint_symbol_map(current_joints)
+            self._controller.add_constraints(position_conv(goal_input.get_position(),
+                                                           sw.pos_of(robot.get_fk_expression(self.root, self.tip))))
+            self._controller.add_constraints(rotation_conv(goal_input.get_rotation(),
+                                                           sw.rot_of(robot.get_fk_expression(self.root, self.tip)),
+                                                           current_input.get_rotation()))
+            self._controller.add_constraints(link_to_any_avoidance(link1,
+                                                                   robot.get_fk_expression(self.root, link1),
+                                                                   current_input.get_frame(),
+                                                                   point_on_link_input.get_expression(),
+                                                                   other_point_input.get_expression()))
+            self._controller.init(controlled_joints=robot.get_chain_joints(self.root, self.tip))
 
     def __copy__(self):
         cp = self.__class__(self.root, self.tip)

@@ -1,10 +1,16 @@
 import pybullet as p
 import rospkg
 from collections import namedtuple, OrderedDict, defaultdict
+from itertools import combinations
+from pybullet import JOINT_REVOLUTE, JOINT_PRISMATIC, JOINT_PLANAR, JOINT_SPHERICAL
 
 import pybullet_data
+from numpy.random.mtrand import seed
 
 from giskardpy.trajectory import MultiJointState, SingleJointState
+import numpy as np
+
+from giskardpy.utils import keydefaultdict
 
 JointInfo = namedtuple('JointInfo', ['joint_index', 'joint_name', 'joint_type', 'q_index', 'u_index', 'flags',
                                      'joint_damping', 'joint_friction', 'joint_lower_limit', 'joint_upper_limit',
@@ -40,31 +46,52 @@ class PyBulletRobot(object):
         for joint_name, singe_joint_state in multi_joint_state.items():
             p.resetJointState(self.id, self.joint_name_to_info[joint_name].joint_index, singe_joint_state.position)
 
+    # def make_default_distances(self):
+    #     self.last_distances = {}
+    #     for ((joint_name_a, joint_info_a), (joint_name_b, joint_info_b)) in combinations(
+    #             self.joint_name_to_info.items(), 2):
+    #         link_a = joint_info_a.link_name
+    #         link_b = joint_info_b.link_name
+    #         key = tuple(sorted((link_a, link_b)))
+    #         self.last_distances[key] = ContactInfo(-1, joint_info_a.joint_index,
+    #                                                joint_info_b.joint_index,
+    #                                                None, None, [0, 0, 0], [0, 0, 0], None, 1e9, None)
+
     def init_js_info(self):
+        self.joint_id_map = {}
+        self.link_id_map = {}
         self.joint_name_to_info = OrderedDict()
         self.joint_id_to_info = OrderedDict()
-        self.ignored_collisions = defaultdict(bool)
-        self.joint_name_to_info['base'] = JointInfo(*([-1, 'base'] + [None] * 15))
-        self.joint_id_to_info[-1] = JointInfo(*([-1, 'base'] + [None] * 15))
+        # self.ignored_collisions = defaultdict(bool)
+        self.joint_name_to_info['base'] = JointInfo(*([-1, 'base'] + [None] * 10 + ['base'] + [None] * 4))
+        self.joint_id_to_info[-1] = JointInfo(*([-1, 'base'] + [None] * 10 + ['base'] + [None] * 4))
+        self.link_id_map[-1] = 'base'
+        self.link_id_map['base'] = -1
         for joint_index in range(p.getNumJoints(self.id)):
             joint_info = JointInfo(*p.getJointInfo(self.id, joint_index))
             self.joint_name_to_info[joint_info.joint_name] = joint_info
             self.joint_id_to_info[joint_info.joint_index] = joint_info
-        initial_distances = self.check_self_collision(0.05)
-        for (link_a, link_b) in initial_distances:
-            self.ignored_collisions[link_a, link_b] = True
-            self.ignored_collisions[link_b, link_a] = True
+            self.joint_id_map[joint_index] = joint_info.joint_name
+            self.joint_id_map[joint_info.joint_name] = joint_index
+            self.link_id_map[joint_info.link_name] = joint_index
+            self.link_id_map[joint_index] = joint_info.link_name
+        self.generate_self_collision_matrix()
 
-    def check_self_collision(self, d=0.001):
-        contact_infos = [ContactInfo(*x) for x in p.getClosestPoints(self.id, self.id, d)]
-        distances = {}
-        for ci in contact_infos:
-            link_a = self.joint_id_to_info[ci.link_index_a].link_name
-            link_b = self.joint_id_to_info[ci.link_index_b].link_name
-            if ci.link_index_a != ci.link_index_b and not self.ignored_collisions[link_a, link_b] and \
-                    (link_b, link_a) not in distances:
-                distances[link_a, link_b] = ci
-        return distances
+    # @profile
+    def check_self_collision(self, d=0.05, whitelist=None):
+        if whitelist is None:
+            whitelist = self.sometimes
+        o = (0, 0, 0)
+        contact_infos = keydefaultdict(lambda k: ContactInfo(None, self.id, self.id, k[0], k[1], o, o, o, 1e9, 0))
+        contact_infos.update({(self.joint_id_to_info[link_a], self.joint_id_to_info[link_b]): ContactInfo(*x)
+                              for (link_a, link_b) in whitelist for x in p.getClosestPoints(self.id, self.id, d, link_a, link_b)})
+        contact_infos.update({(link_b, link_a): ContactInfo(ci.contact_flag, ci.body_unique_id_a, ci.body_unique_id_b,
+                                                            ci.link_index_b, ci.link_index_a, ci.position_on_b,
+                                                            ci.position_on_a,
+                                                            [-x for x in ci.contact_normal_on_b], ci.contact_distance,
+                                                            ci.normal_force)
+                              for (link_a, link_b), ci in contact_infos.items()})
+        return contact_infos
 
     def get_joint_states(self):
         mjs = MultiJointState()
@@ -76,9 +103,79 @@ class PyBulletRobot(object):
                 mjs.set(sjs)
         return mjs
 
+    def generate_self_collision_matrix(self, d=0.05, num_rnd_tries=200):
+        seed(1337)
+        always = set()
+        self.all = set(combinations(self.joint_id_to_info.keys(), 2))
+        for link_a, link_b in self.all:
+            if self.joint_id_to_info[link_a].parent_index == link_b or \
+                    self.joint_id_to_info[link_b].parent_index == link_a:
+                always.add((link_a, link_b))
+        rest = self.all.difference(always)
+        always = always.union(self.muh(rest, d, self.get_zero_joint_state()))
+        rest = rest.difference(always)
+        sometimes = self.muh(rest, d, self.get_min_joint_state())
+        rest = rest.difference(sometimes)
+        sometimes2 = self.muh(rest, d, self.get_max_joint_state())
+        rest = rest.difference(sometimes2)
+        sometimes = sometimes.union(sometimes2)
+        for i in range(num_rnd_tries):
+            sometimes2 = self.muh(rest, d, self.get_rnd_joint_state())
+            if len(sometimes2) > 0:
+                rest = rest.difference(sometimes2)
+                sometimes = sometimes.union(sometimes2)
+        self.sometimes = sometimes
+        self.never = rest
+
+    def muh(self, test_links, d, js):
+        # self.link_id_map[link_a]=='torso_lift_link' and self.link_id_map[link_b]=='head_tilt_link'
+        self.set_joint_state(js)
+        sometimes = set()
+        for link_a, link_b in test_links:
+            contacts = p.getClosestPoints(self.id, self.id, d, link_a, link_b)
+            for contact in contacts:
+                sometimes.add((link_a, link_b))
+        return sometimes
+
+    def get_zero_joint_state(self):
+        return self.generate_joint_state(lambda x: 0)
+
+    def get_max_joint_state(self):
+        return self.generate_joint_state(lambda x: x.joint_upper_limit)
+
+    def get_min_joint_state(self):
+        return self.generate_joint_state(lambda x: x.joint_lower_limit)
+
+    def get_rnd_joint_state(self):
+        def f(joint_info):
+            lower_limit = joint_info.joint_lower_limit
+            upper_limit = joint_info.joint_upper_limit
+            if lower_limit is None:
+                return np.random.random() * np.pi * 2
+            lower_limit = max(lower_limit, -10)
+            upper_limit = min(upper_limit, 10)
+            return (np.random.random() * (upper_limit - lower_limit)) + lower_limit
+
+        return self.generate_joint_state(f)
+
+    def generate_joint_state(self, f):
+        """
+        :param f: lambda joint_info: float
+        :return:
+        """
+        js = {}
+        for joint_name, joint_info in self.joint_name_to_info.items():
+            if joint_info.joint_type in [JOINT_REVOLUTE, JOINT_PRISMATIC, JOINT_PLANAR, JOINT_SPHERICAL]:
+                sjs = SingleJointState()
+                sjs.name = joint_name
+                sjs.position = f(joint_info)
+                js[joint_name] = sjs
+        return js
+
 
 class PyBulletWorld(object):
-    def __init__(self):
+    def __init__(self, gui=False):
+        self.gui = gui
         self._objects = {}
         self._robots = {}
 
@@ -94,6 +191,9 @@ class PyBulletWorld(object):
 
     def get_robot_list(self):
         return list(self._robots.keys())
+
+    def get_robot(self, name):
+        return self._robots[name]
 
     def set_joint_state(self, robot_name, joint_state):
         """
@@ -129,16 +229,22 @@ class PyBulletWorld(object):
         pass
 
     def check_collision(self):
-        collisions = {}
+        collisions = None
         for robot in self._robots.values():
-            collisions.update(robot.check_self_collision())
+            if collisions is None:
+                collisions = robot.check_self_collision()
+            else:
+                collisions.update(robot.check_self_collision())
         return collisions
 
     def check_trajectory_collision(self):
         pass
 
     def activate_viewer(self):
-        self.physicsClient = p.connect(p.GUI)  # or p.DIRECT for non-graphical version
+        if self.gui:
+            self.physicsClient = p.connect(p.GUI)  # or p.DIRECT for non-graphical version
+        else:
+            self.physicsClient = p.connect(p.DIRECT)  # or p.DIRECT for non-graphical version
         p.setAdditionalSearchPath(pybullet_data.getDataPath())  # optionally
         print(pybullet_data.getDataPath())
         p.setGravity(0, 0, -9.8)

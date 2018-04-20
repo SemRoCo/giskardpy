@@ -79,6 +79,13 @@ class TestDataBus(unittest.TestCase):
         self.assertEqual(db.get_data('asdf/ba'), 2)
         self.assertEqual(db.get_data('asdf/lulu'), 1337)
 
+    def test_dict3(self):
+        d = {('a','b'): 42}
+        db = GodMap()
+        db.set_data('asdf', d)
+        self.assertEqual(db.get_data('asdf/a,b'), 42)
+        self.assertEqual(db.get_data('asdf/(a,b)'), 42)
+
     def test_list1(self):
         l = range(10)
         db = GodMap()

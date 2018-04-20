@@ -52,15 +52,17 @@ class Robot(object):
     def set_joint_symbol_map(self, joint_states_input=None):
         if joint_states_input is not None:
             self.joint_states_input = joint_states_input
-            for joint_name, joint_symbol in joint_states_input.joint_map.items():
-                joint = self._joints[joint_name]
-                if joint.symbol is not None:
-                    self._joints[joint_name] = Joint(self.joint_states_input.joint_map[joint_name],
-                                                     joint.velocity_limit,
-                                                     joint.lower,
-                                                     joint.upper,
-                                                     joint.type,
-                                                     joint.frame.subs(self.joint_states_input.joint_map))
+            for joint_name, joint in self._joints.items():
+            # for joint_name, joint_symbol in joint_states_input.joint_map.items():
+                new_symbol = None
+                if joint.symbol is not None and joint_name in self.joint_states_input.joint_map:
+                    new_symbol = self.joint_states_input.joint_map[joint_name]
+                self._joints[joint_name] = Joint(new_symbol,
+                                                 joint.velocity_limit,
+                                                 joint.lower,
+                                                 joint.upper,
+                                                 joint.type,
+                                                 joint.frame.subs(self.joint_states_input.joint_map))
             self._create_constraints()
 
     def _create_sym_frames(self):
@@ -74,7 +76,7 @@ class Robot(object):
                     joint_map[joint_name] = spw.Symbol(joint_name)
                     joint_symbol = joint_map[joint_name]
                 else:
-                    joint_map[joint.mimic.joint] = spw.Symbol(joint_name)
+                    joint_map[joint.mimic.joint] = spw.Symbol(joint.mimic.joint)
                     multiplier = 1 if joint.mimic.multiplier is None else joint.mimic.multiplier
                     offset = 0 if joint.mimic.offset is None else joint.mimic.offset
                     mimic = joint_map[joint.mimic.joint] * multiplier + offset

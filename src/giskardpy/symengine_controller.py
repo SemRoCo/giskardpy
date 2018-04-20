@@ -14,9 +14,12 @@ class Controller(object):
     def add_constraints(self, soft_constraints):
         self._soft_constraints.update(soft_constraints)
 
-    def init(self, *args, **kwargs):
-        controlled_joint_symbols = self.get_controlled_joint_symbols()
-        controlled_joints = self.get_controlled_joints()
+    def init(self, controlled_joints=None):
+        if controlled_joints is None:
+            controlled_joint_symbols = self.get_controlled_joint_symbols()
+            controlled_joints = self.get_controlled_joints()
+        else:
+            controlled_joint_symbols = [self.robot.get_joint_symbol_map().joint_map[x] for x in controlled_joints]
         self.qp_problem_builder = QProblemBuilder({k: self.robot.joint_constraints[k] for k in controlled_joints},
                                                   {k: self.robot.hard_constraints[k] for k in controlled_joints if
                                                    k in self.robot.hard_constraints},
@@ -108,8 +111,8 @@ def position_conv(goal_position, current_position, weights=(1, 1, 1), trans_gain
                                                                        weight=weights[2],
                                                                        expression=current_position[2])
 
-
     return soft_constraints
+
 
 def rotation_conv(goal_rotation, current_rotation, current_evaluated_rotation, weights=(1, 1, 1),
                   rot_gain=3, max_rot_speed=0.5):
@@ -138,23 +141,30 @@ def rotation_conv(goal_rotation, current_rotation, current_evaluated_rotation, w
                                                                        expression=c_aa[2])
     return soft_constraints
 
-def link_to_any_avoidance(link_name, current_pose, current_pose_eval, point_on_link, other_point, upper_limit=1e9,
-                          weight=(100,100,100)):
+
+def link_to_any_avoidance(link_name, current_pose, current_pose_eval, point_on_link, other_point, lower_limit=0.03,
+                          upper_limit=1e9, weight=(100, 10, 10)):
     soft_constraints = {}
     name = '{} to any collision'.format(link_name)
 
-    controllable_distance = (current_pose * sw.inverse_frame(current_pose_eval) * point_on_link) - other_point
-    lower_limit = controllable_distance / sw.norm(controllable_distance)
-    soft_constraints['{} x'.format(name)] = SoftConstraint(lower=lower_limit[0],
-                                                                           upper=upper_limit,
-                                                                           weight=weight[0],
-                                                                           expression=controllable_distance[0])
-    soft_constraints['{} y'.format(name)] = SoftConstraint(lower=lower_limit[1],
-                                                                           upper=upper_limit,
-                                                                           weight=weight[1],
-                                                                           expression=controllable_distance[1])
-    soft_constraints['{} z'.format(name)] = SoftConstraint(lower=lower_limit[2],
-                                                                           upper=upper_limit,
-                                                                           weight=weight[2],
-                                                                           expression=controllable_distance[2])
+    dist = sw.euclidean_distance((current_pose * sw.inverse_frame(current_pose_eval) * point_on_link), other_point)
+    soft_constraints['{} x'.format(name)] = SoftConstraint(lower=lower_limit - dist,
+                                                           upper=upper_limit,
+                                                           weight=weight[0],
+                                                           expression=dist)
+
+    # controllable_distance = (current_pose * sw.inverse_frame(current_pose_eval) * point_on_link) - other_point
+    # lower_limit = controllable_distance / sw.norm(controllable_distance) * lower_limit
+    # soft_constraints['{} x'.format(name)] = SoftConstraint(lower=lower_limit[0],
+    #                                                        upper=upper_limit,
+    #                                                        weight=weight[0],
+    #                                                        expression=controllable_distance[0])
+    # soft_constraints['{} y'.format(name)] = SoftConstraint(lower=lower_limit[1],
+    #                                                        upper=upper_limit,
+    #                                                        weight=weight[1],
+    #                                                        expression=controllable_distance[1])
+    # soft_constraints['{} z'.format(name)] = SoftConstraint(lower=lower_limit[2],
+    #                                                        upper=upper_limit,
+    #                                                        weight=weight[2],
+    #                                                        expression=controllable_distance[2])
     return soft_constraints

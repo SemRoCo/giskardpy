@@ -198,8 +198,8 @@ def frame3_quaternion(x, y, z, qx, qy, qz, qw):
 
 def inverse_frame(frame):
     inv = sp.eye(4)
-    inv[:3,:3] = frame[:3,:3]
-    inv[3,:3] = -inv[:3,:3]*frame[3,:3]
+    inv[:3,:3] = frame[:3,:3].T
+    inv[:3,3] = -inv[:3,:3]*frame[:3,3]
     return inv
 
 def pos_of(frame):
@@ -321,3 +321,6 @@ def quaternion_make_unique(q):
 
 def cosine_distance(q1, q2):
     return 1 - (q1.T * q2)[0]
+
+def euclidean_distance(v1, v2):
+    return norm(v1-v2)

@@ -1,5 +1,9 @@
 from collections import OrderedDict
 from copy import copy
+from time import sleep
+
+import rospy
+
 from giskardpy.god_map import GodMap
 from giskardpy.exceptions import NameConflictException
 
@@ -17,9 +21,9 @@ class ProcessManager(object):
     def start_loop(self):
         for plugin in self._plugins.values():
             plugin.start(self._god_map)
-        while self.update():
+        while self.update() and not rospy.is_shutdown() :
             # TODO make sure this can be properly killed
-            pass
+            sleep(1)
 
     def stop(self):
         for plugin in self._plugins.values():

@@ -43,7 +43,11 @@ class ActionServer(Plugin):
 
     def post_mortem_analysis(self, god_map):
         collisions = god_map.get_data(self.collision_identifier)
-        if len(collisions) == 0 or collisions is None:
+        in_collision = False
+        if collisions is not None:
+            for (l1, l2), collision_info in collisions.items():
+                in_collision = in_collision or collision_info.contact_distance < 0.0
+        if not in_collision:
             trajectory = god_map.get_data(self.trajectory_identifier)
             js = god_map.get_data(self.js_identifier)
             goal = FollowJointTrajectoryGoal()

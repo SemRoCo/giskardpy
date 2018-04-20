@@ -28,3 +28,10 @@ class Plugin(object):
 
     def get_replacement_parallel_universe(self):
         return self.__class__()
+
+class PluginContainer(Plugin):
+    def __init__(self, replacement):
+        self.replacement = replacement
+
+    def get_replacement_parallel_universe(self):
+        return self.replacement

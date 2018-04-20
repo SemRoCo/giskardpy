@@ -92,16 +92,15 @@ class QProblemBuilder(object):
     def get_cmd(self, observables_update):
         evaluated_updates = observables_update
 
-        self.np_big_ass_M = self.cython_big_ass_M(**evaluated_updates)
-        self.np_H = np.array(self.np_big_ass_M[self.A.shape[0]:,:-2])
-        self.np_A = np.array(self.np_big_ass_M[:self.A.shape[0],:self.A.shape[1]])
-        self.np_lb = np.array(self.np_big_ass_M[self.A.shape[0]:,-2])
-        self.np_ub = np.array(self.np_big_ass_M[self.A.shape[0]:,-1])
-        self.np_lbA = np.array(self.np_big_ass_M[:self.A.shape[0],-2])
-        self.np_ubA = np.array(self.np_big_ass_M[:self.A.shape[0],-1])
+        np_big_ass_M = self.cython_big_ass_M(**evaluated_updates)
+        np_H = np.array(np_big_ass_M[self.A.shape[0]:,:-2])
+        np_A = np.array(np_big_ass_M[:self.A.shape[0],:self.A.shape[1]])
+        np_lb = np.array(np_big_ass_M[self.A.shape[0]:,-2])
+        np_ub = np.array(np_big_ass_M[self.A.shape[0]:,-1])
+        np_lbA = np.array(np_big_ass_M[:self.A.shape[0],-2])
+        np_ubA = np.array(np_big_ass_M[:self.A.shape[0],-1])
 
-        xdot_full = self.qp_solver.solve(self.np_H, self.np_g, self.np_A,
-                                         self.np_lb, self.np_ub, self.np_lbA, self.np_ubA)
+        xdot_full = self.qp_solver.solve(np_H, self.np_g, np_A, np_lb, np_ub, np_lbA, np_ubA)
         if xdot_full is None:
             return None
         return OrderedDict((observable, xdot_full[i]) for i, observable in enumerate(self.controlled_joints_strs))

@@ -46,18 +46,8 @@ class PyBulletRobot(object):
         for joint_name, singe_joint_state in multi_joint_state.items():
             p.resetJointState(self.id, self.joint_name_to_info[joint_name].joint_index, singe_joint_state.position)
 
-    # def make_default_distances(self):
-    #     self.last_distances = {}
-    #     for ((joint_name_a, joint_info_a), (joint_name_b, joint_info_b)) in combinations(
-    #             self.joint_name_to_info.items(), 2):
-    #         link_a = joint_info_a.link_name
-    #         link_b = joint_info_b.link_name
-    #         key = tuple(sorted((link_a, link_b)))
-    #         self.last_distances[key] = ContactInfo(-1, joint_info_a.joint_index,
-    #                                                joint_info_b.joint_index,
-    #                                                None, None, [0, 0, 0], [0, 0, 0], None, 1e9, None)
-
     def init_js_info(self):
+        #TODO computational expansive
         self.joint_id_map = {}
         self.link_id_map = {}
         self.joint_name_to_info = OrderedDict()

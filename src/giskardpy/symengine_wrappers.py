@@ -28,7 +28,7 @@ def fake_Min(x, y):
 
 
 # @profile
-def speed_up(function, parameters, backend=None):
+def speed_up(function, parameters, backend='llvm'):
     str_params = [str(x) for x in parameters]
     if len(parameters) == 0:
         try:

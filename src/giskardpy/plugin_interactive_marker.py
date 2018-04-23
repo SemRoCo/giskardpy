@@ -26,7 +26,6 @@ class InteractiveMarkerPlugin(Plugin):
         self.tf = TfWrapper()
         self.started = False
 
-
     def start(self, god_map):
         if not self.started:
             # giskard goal client

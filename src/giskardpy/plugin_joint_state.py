@@ -1,8 +1,8 @@
-from Queue import Empty
+from Queue import Empty, Queue
 from collections import OrderedDict
 
 import rospy
-from multiprocessing import Queue
+# from multiprocessing import Queue
 
 from sensor_msgs.msg import JointState
 
@@ -28,16 +28,19 @@ class JointStatePlugin(Plugin):
         self.lock.put(data)
 
     def get_readings(self):
-        js = self.lock.get()
-        mjs = OrderedDict()
-        for i, joint_name in enumerate(js.name):
-            sjs = SingleJointState()
-            sjs.name = joint_name
-            sjs.position = js.position[i]
-            sjs.velocity = js.velocity[i]
-            sjs.effort = js.effort[i]
-            mjs[joint_name] = sjs
-        return {self.js_identifier: mjs}
+        try:
+            js = self.lock.get_nowait()
+            self.mjs = OrderedDict()
+            for i, joint_name in enumerate(js.name):
+                sjs = SingleJointState()
+                sjs.name = joint_name
+                sjs.position = js.position[i]
+                sjs.velocity = js.velocity[i]
+                sjs.effort = js.effort[i]
+                self.mjs[joint_name] = sjs
+        except Empty:
+            pass
+        return {self.js_identifier: self.mjs}
 
     def start(self, god_map):
         self.joint_state_sub = rospy.Subscriber('joint_states', JointState, self.cb, queue_size=1)

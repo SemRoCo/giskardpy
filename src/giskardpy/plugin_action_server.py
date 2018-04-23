@@ -1,5 +1,5 @@
 import numpy as np
-from Queue import Empty
+from Queue import Empty, Queue
 from collections import OrderedDict
 import pylab as plt
 import actionlib
@@ -7,7 +7,6 @@ import rospy
 from control_msgs.msg import FollowJointTrajectoryAction, FollowJointTrajectoryResult, FollowJointTrajectoryGoal, \
     JointTrajectoryControllerState
 from giskard_msgs.msg import ControllerListAction, ControllerListGoal, Controller, ControllerListResult
-from multiprocessing import Queue
 
 from trajectory_msgs.msg import JointTrajectoryPoint
 
@@ -67,7 +66,7 @@ class ActionServer(Plugin):
         else:
             print('collision during rollout!!!!!!!!!!!!!!!!!!!')
             self.update_lock.put(None)
-        self.update_lock.get()
+        self.update_lock.join()
 
     def get_readings(self):
         try:
@@ -178,7 +177,7 @@ class ActionServer(Plugin):
         else:
             self._as.set_aborted(ControllerListResult())
         rospy.loginfo('finished movement')
-        self.update_lock.put(None)
+        self.update_lock.task_done()
 
     def get_replacement_parallel_universe(self):
         return LogTrajectory(trajectory_identifier=self.trajectory_identifier,

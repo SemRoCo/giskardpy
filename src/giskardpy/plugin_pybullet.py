@@ -20,7 +20,6 @@ class PyBulletPlugin(Plugin):
         self.started = False
         super(PyBulletPlugin, self).__init__()
 
-    # @profile
     def get_readings(self):
         collisions = self.world.check_collision()
         # self.make_collision_markers(collisions)

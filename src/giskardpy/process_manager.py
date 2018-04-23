@@ -23,7 +23,8 @@ class ProcessManager(object):
             plugin.start(self._god_map)
         while self.update() and not rospy.is_shutdown() :
             # TODO make sure this can be properly killed
-            sleep(1)
+            # rospy.sleep(0.0001)
+            pass
 
     def stop(self):
         for plugin in self._plugins.values():

@@ -59,7 +59,8 @@ class GodMap(object):
         return self.expr_to_key[str(expr)]
 
     def get_expr_values(self):
-        return {str(self.get_expr(key)): self.get_data(key) for key in self.key_to_expr}
+        #TODO potential speedup by only updating entries that have changed
+        return {expr: self.get_data(key) for expr, key in self.expr_to_key.items()}
 
     def set_data(self, key, value):
         identifier_parts = key.split(self.separator)

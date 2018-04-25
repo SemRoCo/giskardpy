@@ -39,6 +39,9 @@ class Point(object):
         self.y = y
         self.z = z
 
+    def __str__(self):
+        return 'x:{:.3f} y:{:.3f} z:{:.3f}'.format(self.x, self.y, self.z)
+
 
 class Quaternion(object):
     def __init__(self, x=0.0, y=0.0, z=0.0, w=1.0):
@@ -47,11 +50,17 @@ class Quaternion(object):
         self.z = z
         self.w = w
 
+    def __str__(self):
+        return 'x:{:.3f} y:{:.3f} z:{:.3f} w:{:.3f}'.format(self.x, self.y, self.z, self.w)
+
 
 class Transform(object):
     def __init__(self, translation=Point(), rotation=Quaternion()):
         self.translation = translation
         self.rotation = rotation
+
+    def __str__(self):
+        return 't:{} r:{}'.format(self.translation, self.rotation)
 
 
 class Stamped(object):

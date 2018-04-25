@@ -22,7 +22,7 @@ class PyBulletPlugin(Plugin):
 
     def get_readings(self):
         collisions = self.world.check_collision()
-        # self.make_collision_markers(collisions)
+        self.make_collision_markers(collisions)
         closest_point = {}
         for (link1, link2), collision_info in collisions.items():
             if link1 in closest_point:

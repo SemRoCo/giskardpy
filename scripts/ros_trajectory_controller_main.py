@@ -16,14 +16,15 @@ if __name__ == '__main__':
 
     # root = 'base_footprint'
     # tip = 'gripper_tool_frame'
-    root = 'base_link'
-    tip = 'r_gripper_tool_frame'
+    roots = ['base_link', 'base_link']
+    tips = ['r_gripper_tool_frame', 'l_gripper_tool_frame']
+    fk_identifier = 'fk'
+    # cartesian_goal_identifiers = ['cartesian_goal_r_gripper_tool_frame', 'cartesian_goal_l_gripper_tool_frame']
+    cartesian_goal_identifier = 'cartesian_goal'
 
     js_identifier = 'js'
-    fk_identifier = 'fk'
-    trajectory_identifier = 'traj'
-    cartesian_goal_identifier = 'cartesian_goal'
     joint_goal_identifier = 'joint_goal'
+    trajectory_identifier = 'traj'
     time_identifier = 'time'
     next_cmd_identifier = 'motor'
     collision_identifier = 'collision'
@@ -36,7 +37,7 @@ if __name__ == '__main__':
     #                                             closest_point_identifier=closest_point_identifier))
     pm.register_plugin('bullet', PluginContainer(PyBulletPlugin(js_identifier=js_identifier, collision_identifier=collision_identifier,
                                                 closest_point_identifier=closest_point_identifier)))
-    pm.register_plugin('fk', FKPlugin(root, tip, js_identifier=js_identifier, fk_identifier=fk_identifier))
+    pm.register_plugin('fk', FKPlugin(roots, tips, js_identifier=js_identifier, fk_identifier=fk_identifier))
     pm.register_plugin('action server', ActionServer(js_identifier=js_identifier,
                                                      trajectory_identifier=trajectory_identifier,
                                                      cartesian_goal_identifier=cartesian_goal_identifier,
@@ -44,19 +45,22 @@ if __name__ == '__main__':
     # pm.register_plugin('joint controller', JointControllerPlugin(js_identifier=js_identifier,
     #                                                              goal_identifier=joint_goal_identifier,
     #                                                              next_cmd_identifier=next_cmd_identifier))
-    # pm.register_plugin('cartesian controller', CartesianControllerPlugin(root, tip,
+    # pm.register_plugin('cartesian controller', CartesianControllerPlugin(roots, tips,
     #                                                                      fk_identifier=fk_identifier,
     #                                                                      goal_identifier=cartesian_goal_identifier,
     #                                                                      js_identifier=js_identifier,
     #                                                                      next_cmd_identifier=next_cmd_identifier))
-    pm.register_plugin('cart bullet controller', CartesianBulletControllerPlugin(root, tip,
+    pm.register_plugin('cart bullet controller', CartesianBulletControllerPlugin(roots, tips,
                                                                                  fk_identifier=fk_identifier,
                                                                                  goal_identifier=cartesian_goal_identifier,
                                                                                  js_identifier=js_identifier,
                                                                                  next_cmd_identifier=next_cmd_identifier,
                                                                                  collision_identifier=collision_identifier,
                                                                                  closest_point_identifier=closest_point_identifier))
-    pm.register_plugin('interactive marker', InteractiveMarkerPlugin(root, [tip]))
+    pm.register_plugin('interactive marker', InteractiveMarkerPlugin(roots, tips))
 
     app = ROSApplication(pm)
     app.run()
+
+
+    #TODO LINK ROOT TIPS AND SHIT

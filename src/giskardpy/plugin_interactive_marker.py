@@ -1,4 +1,6 @@
 import numpy as np
+from collections import defaultdict
+
 import rospy
 from actionlib.simple_action_client import SimpleActionClient
 from geometry_msgs.msg._PoseStamped import PoseStamped
@@ -18,9 +20,9 @@ from giskardpy.tfwrapper import TfWrapper
 
 
 class InteractiveMarkerPlugin(Plugin):
-    def __init__(self, root_link, tip_links, suffix=''):
-        self.root_link = root_link
-        self.tip_links = tip_links
+    def __init__(self, roots, tips, suffix=''):
+        self.roots = roots
+        self.tips = tips
         self.suffix = suffix
         # tf
         self.tf = TfWrapper()
@@ -36,9 +38,11 @@ class InteractiveMarkerPlugin(Plugin):
             self.server = InteractiveMarkerServer("eef_control{}".format(self.suffix))
             self.menu_handler = MenuHandler()
 
-            for tip_link in self.tip_links:
-                int_marker = self.make6DofMarker(InteractiveMarkerControl.MOVE_ROTATE_3D, self.root_link, tip_link)
-                self.server.insert(int_marker, self.process_feedback(self.server, self.client, self.root_link, tip_link))
+            all_goals = {}
+
+            for root, tip in zip(self.roots, self.tips):
+                int_marker = self.make6DofMarker(InteractiveMarkerControl.MOVE_ROTATE_3D, root, tip)
+                self.server.insert(int_marker, self.process_feedback(self.server, self.client, root, tip, all_goals))
                 self.menu_handler.apply(self.server, int_marker.name)
 
             self.server.applyChanges()
@@ -66,8 +70,8 @@ class InteractiveMarkerPlugin(Plugin):
         return control
 
     def make6DofMarker(self, interaction_mode, root_link, tip_link):
-        def normed_q(x,y,z,w):
-            return np.array([x,y,z,w])/np.linalg.norm([x,y,z,w])
+        def normed_q(x, y, z, w):
+            return np.array([x, y, z, w]) / np.linalg.norm([x, y, z, w])
 
         int_marker = InteractiveMarker()
 
@@ -107,25 +111,25 @@ class InteractiveMarkerPlugin(Plugin):
         int_marker.controls.append(control)
 
         control = InteractiveMarkerControl()
-        control.orientation = Quaternion(*normed_q(0,1,0,1))
+        control.orientation = Quaternion(*normed_q(0, 1, 0, 1))
         control.name = "rotate_z"
         control.interaction_mode = InteractiveMarkerControl.ROTATE_AXIS
         int_marker.controls.append(control)
 
         control = InteractiveMarkerControl()
-        control.orientation = Quaternion(*normed_q(0,1,0,1))
+        control.orientation = Quaternion(*normed_q(0, 1, 0, 1))
         control.name = "move_z"
         control.interaction_mode = InteractiveMarkerControl.MOVE_AXIS
         int_marker.controls.append(control)
 
         control = InteractiveMarkerControl()
-        control.orientation = Quaternion(*normed_q(0,0,1,1))
+        control.orientation = Quaternion(*normed_q(0, 0, 1, 1))
         control.name = "rotate_y"
         control.interaction_mode = InteractiveMarkerControl.ROTATE_AXIS
         int_marker.controls.append(control)
 
         control = InteractiveMarkerControl()
-        control.orientation = Quaternion(*normed_q(0,0,1,1))
+        control.orientation = Quaternion(*normed_q(0, 0, 1, 1))
         control.name = "move_y"
         control.interaction_mode = InteractiveMarkerControl.MOVE_AXIS
         int_marker.controls.append(control)
@@ -133,49 +137,68 @@ class InteractiveMarkerPlugin(Plugin):
         return int_marker
 
     class process_feedback(object):
-        def __init__(self, i_server, client, root_link, tip_link):
+        def __init__(self, i_server, client, root_link, tip_link, all_goals):
             self.i_server = i_server
             self.client = client
             self.tip_link = tip_link
             self.root_link = root_link
+            self.all_goals = all_goals
+            self.tf = TfWrapper()
+            eef_pose = self.tf.lookup_transform(self.root_link, self.tip_link)
+            self.all_goals[self.root_link, self.tip_link] = []
+            self.all_goals[self.root_link, self.tip_link].append(self.make_translation_controller(self.root_link,
+                                                                                                  eef_pose.pose))
+            self.all_goals[self.root_link, self.tip_link].append(self.make_rotation_controller(self.root_link,
+                                                                                               eef_pose.pose))
 
         def __call__(self, feedback):
             if feedback.event_type == InteractiveMarkerFeedback.MOUSE_UP:
-                print('interactive goal update')
-                goal = ControllerListGoal()
-                goal.type = ControllerListGoal.STANDARD_CONTROLLER
+                self.all_goals[self.root_link, self.tip_link] = []
+                print('got interactive goal update')
                 # translation
-                controller = Controller()
-                controller.type = Controller.TRANSLATION_3D
-                controller.tip_link = self.tip_link
-                controller.root_link = self.root_link
-
-                controller.goal_pose.header = feedback.header
-                controller.goal_pose.pose = feedback.pose
-
-                controller.p_gain = 3
-                controller.enable_error_threshold = True
-                controller.threshold_value = 0.05
-                controller.weight = 1.0
-                goal.controllers.append(controller)
+                controller = self.make_translation_controller(feedback.header.frame_id,
+                                                              feedback.pose)
+                self.all_goals[self.root_link, self.tip_link].append(controller)
 
                 # rotation
-                controller = Controller()
-                controller.type = Controller.ROTATION_3D
-                controller.tip_link = self.tip_link
-                controller.root_link = self.root_link
-
-                controller.goal_pose.header = feedback.header
-                controller.goal_pose.pose = feedback.pose
-
-                controller.p_gain = 3
-                controller.enable_error_threshold = True
-                controller.threshold_value = 0.2
-                controller.weight = 1.0
-                goal.controllers.append(controller)
-
-                self.client.send_goal(goal)
+                controller = self.make_rotation_controller(feedback.header.frame_id,
+                                                           feedback.pose)
+                self.all_goals[self.root_link, self.tip_link].append(controller)
+                self.send_all_goals()
             self.i_server.applyChanges()
+
+        def make_translation_controller(self, frame_id, pose):
+            controller = self.make_controller(frame_id, pose)
+            controller.type = Controller.TRANSLATION_3D
+            controller.p_gain = 3
+            controller.enable_error_threshold = True
+            controller.threshold_value = 0.05
+            controller.weight = 1.0
+            return controller
+
+        def make_rotation_controller(self, frame_id, pose):
+            controller = self.make_controller(frame_id, pose)
+            controller.type = Controller.ROTATION_3D
+            controller.p_gain = 3
+            controller.enable_error_threshold = True
+            controller.threshold_value = 0.2
+            controller.weight = 1.0
+            return controller
+
+        def make_controller(self, frame_id, pose):
+            controller = Controller()
+            controller.tip_link = self.tip_link
+            controller.root_link = self.root_link
+            controller.goal_pose.header.frame_id = frame_id
+            controller.goal_pose.pose = pose
+            return controller
+
+        def send_all_goals(self):
+            goal = ControllerListGoal()
+            goal.type = ControllerListGoal.STANDARD_CONTROLLER
+            for g in self.all_goals.values():
+                goal.controllers.extend(g)
+            self.client.send_goal(goal)
 
     def get_replacement_parallel_universe(self):
         return self

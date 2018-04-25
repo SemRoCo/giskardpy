@@ -11,12 +11,13 @@ from giskard_msgs.msg import ControllerListAction, ControllerListGoal, Controlle
 from trajectory_msgs.msg import JointTrajectoryPoint
 
 from giskardpy.plugin import Plugin
+from giskardpy.tfwrapper import TfWrapper
 from giskardpy.trajectory import SingleJointState, Transform, Point, Quaternion, Trajectory
 
 
 class ActionServer(Plugin):
     # TODO find a better name for this
-    def __init__(self, js_identifier='js', trajectory_identifier='traj', cartesian_goal_identifier='cartesian_goal',
+    def __init__(self, cartesian_goal_identifier='cartesian_goal', js_identifier='js', trajectory_identifier='traj',
                  joint_goal_identifier='joint_goal', time_identifier='time', collision_identifier='collision'):
         self.joint_goal_identifier = joint_goal_identifier
         self.cartesian_goal_identifier = cartesian_goal_identifier
@@ -25,6 +26,7 @@ class ActionServer(Plugin):
         self.time_identifier = time_identifier
         self.collision_identifier = collision_identifier
 
+        self.tf = TfWrapper()
         self.joint_goal = None
         self.goal_solution = None
         self.get_readings_lock = Queue(1)
@@ -69,21 +71,42 @@ class ActionServer(Plugin):
         self.update_lock.join()
 
     def get_readings(self):
+        #TODO can't handle joint and cart goal at the same time
+        #TODO set default goals
+        cartesian_goals = None
+        joint_goal = None
         try:
             goal = self.get_readings_lock.get_nowait()
-            if isinstance(goal, Transform):
+            for controller in goal.controllers:
                 self.new_universe = True
-                cartesian_goal = goal
-                joint_goal = None
-            else:
-                self.new_universe = True
-                cartesian_goal = None
-                joint_goal = goal
+                if controller.type == Controller.JOINT:
+                    rospy.loginfo('got joint goal')
+                    joint_goal = OrderedDict()
+                    for i, joint_name in enumerate(controller.goal_state.name):
+                        sjs = SingleJointState(joint_name,
+                                               controller.goal_state.position[i],
+                                               0,
+                                               0)
+                        joint_goal[joint_name] = sjs
+                elif controller.type == Controller.TRANSLATION_3D:
+                    if cartesian_goals is None:
+                        cartesian_goals = {}
+                    rospy.loginfo('got cart goal')
+                    root = controller.root_link
+                    tip = controller.tip_link
+                    controller.goal_pose = self.tf.transform_pose(root, controller.goal_pose)
+                    trans_goal = Point(controller.goal_pose.pose.position.x,
+                                       controller.goal_pose.pose.position.y,
+                                       controller.goal_pose.pose.position.z)
+                    rot_goal = Quaternion(controller.goal_pose.pose.orientation.x,
+                                          controller.goal_pose.pose.orientation.y,
+                                          controller.goal_pose.pose.orientation.z,
+                                          controller.goal_pose.pose.orientation.w)
+                    cartesian_goals[root, tip] = Transform(trans_goal, rot_goal)
         except Empty:
-            cartesian_goal = None
-            joint_goal = None
+            pass
         update = {self.joint_goal_identifier: joint_goal,
-                  self.cartesian_goal_identifier: cartesian_goal}
+                  self.cartesian_goal_identifier: cartesian_goals}
         return update
 
     def update(self):
@@ -123,29 +146,8 @@ class ActionServer(Plugin):
             rospy.logerr('only standard controller supported')
         else:
             # TODO add goal for each controller
-            controller = goal.controllers[0]
-            if controller.type == Controller.JOINT:
-                rospy.loginfo('its a joint goal')
-                mjs = OrderedDict()
-                for i, joint_name in enumerate(controller.goal_state.name):
-                    sjs = SingleJointState(joint_name,
-                                           controller.goal_state.position[i],
-                                           0,
-                                           0)
-                    mjs[joint_name] = sjs
-                self.get_readings_lock.put(mjs)
-            elif controller.type == Controller.TRANSLATION_3D:
-                # TODO don't ignore root and tip
-                rospy.loginfo('its a cart goal')
-                trans_goal = Point(controller.goal_pose.pose.position.x,
-                                   controller.goal_pose.pose.position.y,
-                                   controller.goal_pose.pose.position.z)
-                rot_goal = Quaternion(controller.goal_pose.pose.orientation.x,
-                                      controller.goal_pose.pose.orientation.y,
-                                      controller.goal_pose.pose.orientation.z,
-                                      controller.goal_pose.pose.orientation.w)
-                goal = Transform(trans_goal, rot_goal)
-                self.get_readings_lock.put(goal)
+            self.get_readings_lock.put(goal)
+
 
     def cb_update_part(self):
         solution = self.update_lock.get()

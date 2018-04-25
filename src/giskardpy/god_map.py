@@ -1,4 +1,6 @@
 import copy
+import traceback
+
 import symengine as se
 from copy import copy
 
@@ -44,6 +46,9 @@ class GodMap(object):
                 result = 0
             except TypeError:
                 pass
+            except KeyError as e:
+                traceback.print_exc()
+                raise KeyError(key)
         return result
 
     def get_expr(self, key):

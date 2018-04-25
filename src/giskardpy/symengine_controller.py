@@ -89,7 +89,7 @@ class JointController(Controller):
 # TODO
 # def get_controlled_joint_symbols(self):
 #     return self.robot.get_chain_joint_symbols(self.root, self.tip)
-def position_conv(goal_position, current_position, weights=(1, 1, 1), trans_gain=3, max_trans_speed=0.3):
+def position_conv(goal_position, current_position, weights=(1, 1, 1), trans_gain=3, max_trans_speed=0.3, ns=''):
     soft_constraints = {}
 
     # position control
@@ -98,15 +98,15 @@ def position_conv(goal_position, current_position, weights=(1, 1, 1), trans_gain
     trans_scale = sw.fake_Min(trans_error * trans_gain, max_trans_speed)
     trans_control = trans_error_vector / trans_error * trans_scale
 
-    soft_constraints['align {} x position'.format(0)] = SoftConstraint(lower=trans_control[0],
+    soft_constraints['align {} x position'.format(ns)] = SoftConstraint(lower=trans_control[0],
                                                                        upper=trans_control[0],
                                                                        weight=weights[0],
                                                                        expression=current_position[0])
-    soft_constraints['align {} y position'.format(0)] = SoftConstraint(lower=trans_control[1],
+    soft_constraints['align {} y position'.format(ns)] = SoftConstraint(lower=trans_control[1],
                                                                        upper=trans_control[1],
                                                                        weight=weights[1],
                                                                        expression=current_position[1])
-    soft_constraints['align {} z position'.format(0)] = SoftConstraint(lower=trans_control[2],
+    soft_constraints['align {} z position'.format(ns)] = SoftConstraint(lower=trans_control[2],
                                                                        upper=trans_control[2],
                                                                        weight=weights[2],
                                                                        expression=current_position[2])
@@ -115,7 +115,7 @@ def position_conv(goal_position, current_position, weights=(1, 1, 1), trans_gain
 
 
 def rotation_conv(goal_rotation, current_rotation, current_evaluated_rotation, weights=(1, 1, 1),
-                  rot_gain=3, max_rot_speed=0.5):
+                  rot_gain=3, max_rot_speed=0.5, ns=''):
     soft_constraints = {}
     axis, angle = sw.axis_angle_from_matrix((current_rotation.T * goal_rotation))
     capped_angle = sw.fake_Min(angle * rot_gain, max_rot_speed)
@@ -127,15 +127,15 @@ def rotation_conv(goal_rotation, current_rotation, current_evaluated_rotation, w
     axis, angle = sw.axis_angle_from_matrix((current_rotation.T * (current_evaluated_rotation * hack)).T)
     c_aa = (axis * angle)
 
-    soft_constraints['align {} rotation 0'.format(0)] = SoftConstraint(lower=r_rot_control[0],
+    soft_constraints['align {} rotation 0'.format(ns)] = SoftConstraint(lower=r_rot_control[0],
                                                                        upper=r_rot_control[0],
                                                                        weight=weights[0],
                                                                        expression=c_aa[0])
-    soft_constraints['align {} rotation 1'.format(0)] = SoftConstraint(lower=r_rot_control[1],
+    soft_constraints['align {} rotation 1'.format(ns)] = SoftConstraint(lower=r_rot_control[1],
                                                                        upper=r_rot_control[1],
                                                                        weight=weights[1],
                                                                        expression=c_aa[1])
-    soft_constraints['align {} rotation 2'.format(0)] = SoftConstraint(lower=r_rot_control[2],
+    soft_constraints['align {} rotation 2'.format(ns)] = SoftConstraint(lower=r_rot_control[2],
                                                                        upper=r_rot_control[2],
                                                                        weight=weights[2],
                                                                        expression=c_aa[2])

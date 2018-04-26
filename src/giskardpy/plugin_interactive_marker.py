@@ -24,6 +24,7 @@ class InteractiveMarkerPlugin(Plugin):
         self.roots = roots
         self.tips = tips
         self.suffix = suffix
+        self.marker_scale = 0.15
         # tf
         self.tf = TfWrapper()
         self.started = False
@@ -48,13 +49,13 @@ class InteractiveMarkerPlugin(Plugin):
             self.server.applyChanges()
             self.started = True
 
-    def makeBox(self, msg):
+    def makeSphere(self, msg):
         marker = Marker()
 
         marker.type = Marker.SPHERE
-        marker.scale.x = msg.scale * 0.2
-        marker.scale.y = msg.scale * 0.2
-        marker.scale.z = msg.scale * 0.2
+        marker.scale.x = msg.scale * self.marker_scale
+        marker.scale.y = msg.scale * self.marker_scale
+        marker.scale.z = msg.scale * self.marker_scale
         marker.color.r = 0.5
         marker.color.g = 0.5
         marker.color.b = 0.5
@@ -65,7 +66,7 @@ class InteractiveMarkerPlugin(Plugin):
     def makeBoxControl(self, msg):
         control = InteractiveMarkerControl()
         control.always_visible = True
-        control.markers.append(self.makeBox(msg))
+        control.markers.append(self.makeSphere(msg))
         msg.controls.append(control)
         return control
 
@@ -83,7 +84,7 @@ class InteractiveMarkerPlugin(Plugin):
         int_marker.pose.orientation.w = 1
         int_marker.pose = self.tf.transform_pose(root_link, p).pose
         int_marker.header.frame_id = root_link
-        int_marker.scale = .2
+        int_marker.scale = self.marker_scale
 
         int_marker.name = "eef_{}_to_{}".format(root_link, tip_link)
 

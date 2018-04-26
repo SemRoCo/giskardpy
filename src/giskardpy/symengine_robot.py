@@ -142,6 +142,9 @@ class Robot(object):
     def get_chain_joints(self, root, tip):
         return self._urdf_robot.get_chain(root, tip, True, False, False)
 
+    def get_chain_links(self, root, tip):
+        return self._urdf_robot.get_chain(root, tip, False, True, False)
+
     def get_chain_joint_symbols(self, root, tip):
         return [self.joint_states_input.joint_map[k] for k in self.get_chain_joints(root, tip)]
 
@@ -150,6 +153,27 @@ class Robot(object):
 
     def get_joint_names(self):
         return [k for k, v in self._joints.items() if v.symbol is not None]
+
+    def get_link_tree(self, root, tip):
+        chain_joints = self._urdf_robot.get_chain(root, tip, True, False, False)
+        first_non_fixed = False
+        for joint in chain_joints:
+            joint_info = self._urdf_robot.joint_map[joint]
+            if joint_info.type != 'fixed':
+                if first_non_fixed:
+                    return self.__get_link_tree2(joint_info.child)
+                first_non_fixed = True
+
+    def __get_link_tree2(self, root, add=True):
+        if root not in self._urdf_robot.child_map:
+            return []
+        links = []
+        if add and self._urdf_robot.link_map[root].collision is not None:
+            links.append(root)
+        for children in self._urdf_robot.child_map[root]:
+            joint, link = children
+            links.extend(self.__get_link_tree2(link))
+        return links
 
     def get_rnd_joint_state(self):
         js = {}

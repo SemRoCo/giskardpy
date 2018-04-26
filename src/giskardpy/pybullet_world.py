@@ -102,22 +102,22 @@ class PyBulletRobot(object):
                     self.joint_id_to_info[link_b].parent_index == link_a:
                 always.add((link_a, link_b))
         rest = self.all.difference(always)
-        always = always.union(self.muh(rest, d, self.get_zero_joint_state()))
+        always = always.union(self._check_all_collisions(rest, d, self.get_zero_joint_state()))
         rest = rest.difference(always)
-        sometimes = self.muh(rest, d, self.get_min_joint_state())
+        sometimes = self._check_all_collisions(rest, d, self.get_min_joint_state())
         rest = rest.difference(sometimes)
-        sometimes2 = self.muh(rest, d, self.get_max_joint_state())
+        sometimes2 = self._check_all_collisions(rest, d, self.get_max_joint_state())
         rest = rest.difference(sometimes2)
         sometimes = sometimes.union(sometimes2)
         for i in range(num_rnd_tries):
-            sometimes2 = self.muh(rest, d, self.get_rnd_joint_state())
+            sometimes2 = self._check_all_collisions(rest, d, self.get_rnd_joint_state())
             if len(sometimes2) > 0:
                 rest = rest.difference(sometimes2)
                 sometimes = sometimes.union(sometimes2)
         self.sometimes = sometimes
         self.never = rest
 
-    def muh(self, test_links, d, js):
+    def _check_all_collisions(self, test_links, d, js):
         # self.link_id_map[link_a]=='torso_lift_link' and self.link_id_map[link_b]=='head_tilt_link'
         self.set_joint_state(js)
         sometimes = set()

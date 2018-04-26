@@ -141,20 +141,11 @@ class CartesianBulletControllerPlugin(ControllerPlugin):
                                                                  'position')
             robot.set_joint_symbol_map(current_joints)
 
-            link1 = 'gripper_gripper_left_link'
-            # link2 = 'plate'
-            link2 = 'base_link'
+            # link1 = 'gripper_gripper_left_link'
             # link1 = 'r_gripper_palm_link'
-            # link2 = 'l_gripper_palm_link'
-
-            point_on_link_input = Point3Input.position_on_a_constructor(self.god_map.get_expr,
-                                                                        '{}/{},{}'.format(self.collision_identifier,
-                                                                                          link1, link2))
-            other_point_input = Point3Input.position_on_b_constructor(self.god_map.get_expr,
-                                                                      '{}/{},{}'.format(self.collision_identifier,
-                                                                                        link1, link2))
 
 
+            added_links = set()
             for root, tip in zip(self.roots, self.tips):
 
                 trans_prefix = '{}/{},{}/translation'.format(self._goal_identifier, root, tip)
@@ -172,15 +163,29 @@ class CartesianBulletControllerPlugin(ControllerPlugin):
                                                                sw.rot_of(robot.get_fk_expression(root, tip)),
                                                                current_input.get_rotation(),
                                                                ns='{}/{}'.format(root, tip)))
-            # FIXME
-            trans_prefix = '{}/{},{}/pose/position'.format(self.fk_identifier, root, link1)
-            rot_prefix = '{}/{},{}/pose/orientation'.format(self.fk_identifier, root, link1)
-            current_input = FrameInput.prefix_constructor(trans_prefix, rot_prefix, self.god_map.get_expr)
-            self._controller.add_constraints(link_to_any_avoidance(link1,
-                                                                   robot.get_fk_expression(root, link1),
-                                                                   current_input.get_frame(),
-                                                                   point_on_link_input.get_expression(),
-                                                                   other_point_input.get_expression()))
+
+            # for link1 in ['r_gripper_r_finger_link', 'l_gripper_r_finger_link',
+            #               'r_gripper_l_finger_link', 'l_gripper_l_finger_link']:
+                for link1 in robot.get_link_tree(root, tip):
+                    if link1 not in added_links:
+                        print(link1)
+                        added_links.add(link1)
+                        point_on_link_input = Point3Input.position_on_a_constructor(self.god_map.get_expr,
+                                                                                    '{}/{}'.format(
+                                                                                        self.closest_point_identifier,
+                                                                                        link1))
+                        other_point_input = Point3Input.position_on_b_constructor(self.god_map.get_expr,
+                                                                                  '{}/{}'.format(
+                                                                                      self.closest_point_identifier,
+                                                                                      link1))
+                        trans_prefix = '{}/{},{}/pose/position'.format(self.fk_identifier, root, link1)
+                        rot_prefix = '{}/{},{}/pose/orientation'.format(self.fk_identifier, root, link1)
+                        current_input = FrameInput.prefix_constructor(trans_prefix, rot_prefix, self.god_map.get_expr)
+                        self._controller.add_constraints(link_to_any_avoidance(link1,
+                                                                               robot.get_fk_expression(root, link1),
+                                                                               current_input.get_frame(),
+                                                                               point_on_link_input.get_expression(),
+                                                                               other_point_input.get_expression()))
 
             joint_names = set()
             for root, tip in zip(self.roots, self.tips):

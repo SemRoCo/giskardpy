@@ -36,18 +36,6 @@ class FKPlugin(Plugin):
             p.pose.orientation = Quaternion(*orientation)
             return p
         fks = keydefaultdict(on_demand_fk_evaluated)
-            # fks = {}
-        # exprs = self.god_map.get_expr_values()
-        # for root, tip in zip(self.roots, self.tips):
-        #     fk = self.fk[root, tip](**exprs)
-        #     p = PoseStamped()
-        #     p.header.frame_id = tip
-        #     p.pose.position.x = sw.pos_of(fk)[0, 0]
-        #     p.pose.position.y = sw.pos_of(fk)[1, 0]
-        #     p.pose.position.z = sw.pos_of(fk)[2, 0]
-        #     orientation = quaternion_from_matrix(fk)
-        #     p.pose.orientation = Quaternion(*orientation)
-        #     fks[root, tip] = p
         return {self.fk_identifier: fks}
 
     def update(self):
@@ -58,9 +46,10 @@ class FKPlugin(Plugin):
         if self.fk is None:
             urdf = rospy.get_param('robot_description')
             self.robot = Robot(urdf)
-            joint_names = []
-            for root, tip in zip(self.roots, self.tips):
-                joint_names.extend(self.robot.get_chain_joints(root, tip))
+            # joint_names = []
+            # for root, tip in zip(self.roots, self.tips):
+            #     joint_names.extend(self.robot.get_chain_joints(root, tip))
+            joint_names = self.robot.get_joint_names()
             current_joints = JointStatesInput.prefix_constructor(self.god_map.get_expr,
                                                                  joint_names,
                                                                  self._joint_states_identifier,
@@ -73,9 +62,6 @@ class FKPlugin(Plugin):
                 return sw.speed_up(fk, fk.free_symbols, backend=BACKEND)
 
             self.fk = keydefaultdict(on_demand_fk)
-            # for root, tip in zip(self.roots, self.tips):
-            #     fk = self.robot.get_fk_expression(root, tip)
-            #     self.fk[root, tip] = sw.speed_up(fk, fk.free_symbols, backend=BACKEND)
 
     def stop(self):
         pass

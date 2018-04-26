@@ -80,15 +80,13 @@ class CartesianControllerPlugin(ControllerPlugin):
             urdf = rospy.get_param('robot_description')
             self._controller = Controller(urdf)
             robot = self._controller.robot
-            joint_names = []
-            for root, tip in zip(self.roots, self.tips):
-                joint_names.extend(self._controller.robot.get_chain_joints(root, tip))
             current_joints = JointStatesInput.prefix_constructor(self.god_map.get_expr,
-                                                                 joint_names,
+                                                                 robot.get_joint_names(),
                                                                  self._joint_states_identifier,
                                                                  'position')
 
             robot.set_joint_symbol_map(current_joints)
+
             for root, tip in zip(self.roots, self.tips):
                 trans_prefix = '{}/{},{}/translation'.format(self._goal_identifier, root, tip)
                 rot_prefix = '{}/{},{}/rotation'.format(self._goal_identifier, root, tip)
@@ -106,7 +104,10 @@ class CartesianControllerPlugin(ControllerPlugin):
                                                                current_input.get_rotation(),
                                                                ns='{}/{}'.format(root, tip)))
 
-            self._controller.init()
+            joint_names = set()
+            for root, tip in zip(self.roots, self.tips):
+                joint_names.update(self._controller.robot.get_chain_joints(root, tip))
+            self._controller.init(controlled_joints=joint_names)
 
     def __copy__(self):
         # TODO potential bug, should pass identifier
@@ -133,20 +134,18 @@ class CartesianBulletControllerPlugin(ControllerPlugin):
             urdf = rospy.get_param('robot_description')
             self._controller = Controller(urdf)
             robot = self._controller.robot
-            joint_names = []
-            for root, tip in zip(self.roots, self.tips):
-                joint_names.extend(self._controller.robot.get_chain_joints(root, tip))
+
             current_joints = JointStatesInput.prefix_constructor(self.god_map.get_expr,
-                                                                 joint_names,
+                                                                 robot.get_joint_names(),
                                                                  self._joint_states_identifier,
                                                                  'position')
+            robot.set_joint_symbol_map(current_joints)
 
-            # link1 = 'gripper_base_link'
-            # link1 = 'gripper_finger_left_link'
+            link1 = 'gripper_gripper_left_link'
             # link2 = 'plate'
-            # link2 = 'base_link'
-            link1 = 'r_gripper_palm_link'
-            link2 = 'l_gripper_palm_link'
+            link2 = 'base_link'
+            # link1 = 'r_gripper_palm_link'
+            # link2 = 'l_gripper_palm_link'
 
             point_on_link_input = Point3Input.position_on_a_constructor(self.god_map.get_expr,
                                                                         '{}/{},{}'.format(self.collision_identifier,
@@ -155,7 +154,6 @@ class CartesianBulletControllerPlugin(ControllerPlugin):
                                                                       '{}/{},{}'.format(self.collision_identifier,
                                                                                         link1, link2))
 
-            robot.set_joint_symbol_map(current_joints)
 
             for root, tip in zip(self.roots, self.tips):
 
@@ -175,15 +173,19 @@ class CartesianBulletControllerPlugin(ControllerPlugin):
                                                                current_input.get_rotation(),
                                                                ns='{}/{}'.format(root, tip)))
             # FIXME
-            trans_prefix = '{}/{},{}/pose/position'.format(self.fk_identifier, root, 'r_gripper_palm_link')
-            rot_prefix = '{}/{},{}/pose/orientation'.format(self.fk_identifier, root, 'r_gripper_palm_link')
+            trans_prefix = '{}/{},{}/pose/position'.format(self.fk_identifier, root, link1)
+            rot_prefix = '{}/{},{}/pose/orientation'.format(self.fk_identifier, root, link1)
             current_input = FrameInput.prefix_constructor(trans_prefix, rot_prefix, self.god_map.get_expr)
             self._controller.add_constraints(link_to_any_avoidance(link1,
                                                                    robot.get_fk_expression(root, link1),
                                                                    current_input.get_frame(),
                                                                    point_on_link_input.get_expression(),
                                                                    other_point_input.get_expression()))
-            self._controller.init()
+
+            joint_names = set()
+            for root, tip in zip(self.roots, self.tips):
+                joint_names.update(self._controller.robot.get_chain_joints(root, tip))
+            self._controller.init(controlled_joints=joint_names)
 
     def __copy__(self):
         cp = self.__class__(self.roots, self.tips)

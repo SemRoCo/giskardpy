@@ -1,6 +1,6 @@
 from collections import OrderedDict
 from copy import copy
-from time import sleep
+from time import sleep, time
 
 import rospy
 
@@ -46,8 +46,10 @@ class ProcessManager(object):
                 parallel_universe = ProcessManager(initial_state=self._god_map)
                 for n, p in self._plugins.items():
                     parallel_universe.register_plugin(n, p.get_replacement_parallel_universe())
+                t = time()
                 parallel_universe.start_loop()
                 parallel_universe.stop()
+                rospy.loginfo('parallel universe existed for {}s'.format(time()-t))
                 plugin.post_mortem_analysis(parallel_universe.get_god_map())
         return True
 

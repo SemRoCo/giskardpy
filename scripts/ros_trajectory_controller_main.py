@@ -14,10 +14,10 @@ from giskardpy.process_manager import ProcessManager
 if __name__ == '__main__':
     rospy.init_node('muh')
 
-    # root = 'base_footprint'
-    # tip = 'gripper_tool_frame'
-    roots = ['base_link', 'base_link']
-    tips = ['r_gripper_tool_frame', 'l_gripper_tool_frame']
+    roots = ['base_footprint']
+    tips = ['gripper_tool_frame']
+    # roots = ['base_link', 'base_link']
+    # tips = ['r_gripper_tool_frame', 'l_gripper_tool_frame']
     fk_identifier = 'fk'
     cartesian_goal_identifier = 'cartesian_goal'
 

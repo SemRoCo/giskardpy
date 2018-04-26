@@ -16,6 +16,9 @@ BIG_NUMBER = 1e9
 
 class QProblemBuilder(object):
     def __init__(self, joint_constraints_dict, hard_constraints_dict, soft_constraints_dict, controlled_joint_symbols, backend=None):
+        assert(not len(controlled_joint_symbols) > len(joint_constraints_dict))
+        assert(not len(controlled_joint_symbols) < len(joint_constraints_dict))
+        assert(len(hard_constraints_dict) <= len(controlled_joint_symbols))
         self.backend = backend
         self.joint_constraints_dict = joint_constraints_dict
         self.hard_constraints_dict = hard_constraints_dict

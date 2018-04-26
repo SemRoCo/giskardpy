@@ -7,6 +7,7 @@ from giskardpy import BACKEND
 from giskardpy.input_system import JointStatesInput
 from giskardpy.plugin import Plugin
 from giskardpy.symengine_robot import Robot
+from giskardpy.utils import keydefaultdict
 
 
 class FKPlugin(Plugin):
@@ -18,13 +19,13 @@ class FKPlugin(Plugin):
         self.tips = tips
         self._joint_states_identifier = js_identifier
         self.fk_identifier = fk_identifier
-        self.fk = {}
+        self.fk = None
         super(FKPlugin, self).__init__()
 
     def get_readings(self):
-        fks = {}
         exprs = self.god_map.get_expr_values()
-        for root, tip in zip(self.roots, self.tips):
+        def on_demand_fk_evaluated(key):
+            root, tip = key
             fk = self.fk[root, tip](**exprs)
             p = PoseStamped()
             p.header.frame_id = tip
@@ -33,7 +34,20 @@ class FKPlugin(Plugin):
             p.pose.position.z = sw.pos_of(fk)[2, 0]
             orientation = quaternion_from_matrix(fk)
             p.pose.orientation = Quaternion(*orientation)
-            fks[root, tip] = p
+            return p
+        fks = keydefaultdict(on_demand_fk_evaluated)
+            # fks = {}
+        # exprs = self.god_map.get_expr_values()
+        # for root, tip in zip(self.roots, self.tips):
+        #     fk = self.fk[root, tip](**exprs)
+        #     p = PoseStamped()
+        #     p.header.frame_id = tip
+        #     p.pose.position.x = sw.pos_of(fk)[0, 0]
+        #     p.pose.position.y = sw.pos_of(fk)[1, 0]
+        #     p.pose.position.z = sw.pos_of(fk)[2, 0]
+        #     orientation = quaternion_from_matrix(fk)
+        #     p.pose.orientation = Quaternion(*orientation)
+        #     fks[root, tip] = p
         return {self.fk_identifier: fks}
 
     def update(self):
@@ -41,7 +55,7 @@ class FKPlugin(Plugin):
 
     def start(self, god_map):
         super(FKPlugin, self).start(god_map)
-        if len(self.fk) == 0:
+        if self.fk is None:
             urdf = rospy.get_param('robot_description')
             self.robot = Robot(urdf)
             joint_names = []
@@ -53,9 +67,15 @@ class FKPlugin(Plugin):
                                                                  'position')
             self.robot.set_joint_symbol_map(current_joints)
 
-            for root, tip in zip(self.roots, self.tips):
+            def on_demand_fk(key):
+                root, tip = key
                 fk = self.robot.get_fk_expression(root, tip)
-                self.fk[root, tip] = sw.speed_up(fk, fk.free_symbols, backend=BACKEND)
+                return sw.speed_up(fk, fk.free_symbols, backend=BACKEND)
+
+            self.fk = keydefaultdict(on_demand_fk)
+            # for root, tip in zip(self.roots, self.tips):
+            #     fk = self.robot.get_fk_expression(root, tip)
+            #     self.fk[root, tip] = sw.speed_up(fk, fk.free_symbols, backend=BACKEND)
 
     def stop(self):
         pass

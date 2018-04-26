@@ -36,6 +36,11 @@ class ProcessManager(object):
     def update(self):
         for plugin_name, plugin in self._plugins.items():
             plugin.update()
+            if plugin.end_parallel_universe():
+                print('destroying parallel universe')
+                return False
+            for identifier, value in plugin.get_readings().items():
+                self._god_map.set_data(identifier, value)
             if plugin.create_parallel_universe():
                 print('creating new parallel universe')
                 parallel_universe = ProcessManager(initial_state=self._god_map)
@@ -44,11 +49,6 @@ class ProcessManager(object):
                 parallel_universe.start_loop()
                 parallel_universe.stop()
                 plugin.post_mortem_analysis(parallel_universe.get_god_map())
-            for identifier, value in plugin.get_readings().items():
-                self._god_map.set_data(identifier, value)
-            if plugin.end_parallel_universe():
-                print('destroying parallel universe')
-                return False
         return True
 
 

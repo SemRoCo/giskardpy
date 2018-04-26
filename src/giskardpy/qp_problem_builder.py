@@ -99,8 +99,10 @@ class QProblemBuilder(object):
         np_ub = np.array(np_big_ass_M[self.A.shape[0]:,-1])
         np_lbA = np.array(np_big_ass_M[:self.A.shape[0],-2])
         np_ubA = np.array(np_big_ass_M[:self.A.shape[0],-1])
-
+        # print(np_lbA[-1])
         xdot_full = self.qp_solver.solve(np_H, self.np_g, np_A, np_lb, np_ub, np_lbA, np_ubA)
+        # print(xdot_full[-1])
+        # print('-----------------')
         if xdot_full is None:
             return None
         return OrderedDict((observable, xdot_full[i]) for i, observable in enumerate(self.controlled_joints_strs))

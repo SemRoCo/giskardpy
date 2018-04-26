@@ -68,12 +68,12 @@ class PyBulletRobot(object):
         self.generate_self_collision_matrix()
 
     # @profile
-    def check_self_collision(self, d=0.05, whitelist=None):
+    def check_self_collision(self, d=0.5, whitelist=None):
         if whitelist is None:
             whitelist = self.sometimes
         o = (0, 0, 0)
         contact_infos = keydefaultdict(lambda k: ContactInfo(None, self.id, self.id, k[0], k[1], o, o, o, 1e9, 0))
-        contact_infos.update({(self.joint_id_to_info[link_a], self.joint_id_to_info[link_b]): ContactInfo(*x)
+        contact_infos.update({(self.link_id_map[link_a], self.link_id_map[link_b]): ContactInfo(*x)
                               for (link_a, link_b) in whitelist for x in p.getClosestPoints(self.id, self.id, d, link_a, link_b)})
         contact_infos.update({(link_b, link_a): ContactInfo(ci.contact_flag, ci.body_unique_id_a, ci.body_unique_id_b,
                                                             ci.link_index_b, ci.link_index_a, ci.position_on_b,

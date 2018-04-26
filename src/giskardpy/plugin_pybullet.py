@@ -69,9 +69,16 @@ class PyBulletPlugin(Plugin):
     def make_collision_markers(self, collisions):
         ma = MarkerArray()
         if len(collisions) > 0:
-            ma.markers.extend([self.default_marker(collision_info.position_on_a, i) for i, collision_info in enumerate(collisions.values())])
-            ma.markers.extend([self.default_marker(collision_info.position_on_b, i) for i, collision_info in enumerate(collisions.values())])
-            # for i, ((link1, link2), collision_info) in enumerate(collisions.items()):
+            # TODO visualize only specific contacts
+            i = 0
+            for ((link1, link2), collision_info) in collisions.items():
+                if link1 == 'l_gripper_palm_link' and link2 == 'r_gripper_palm_link' or \
+                    link2 == 'l_gripper_palm_link' and link1 == 'r_gripper_palm_link':
+                    ma.markers.append(self.default_marker(collision_info.position_on_a, i))
+                    ma.markers.append(self.default_marker(collision_info.position_on_b, -i))
+                    i += 1
+                # ma.markers.extend([self.default_marker(collision_info.position_on_a, i) for i, collision_info in enumerate(collisions.values())])
+                # ma.markers.extend([self.default_marker(collision_info.position_on_b, i) for i, collision_info in enumerate(collisions.values())])
             #     m = Marker()
             #     m.header.frame_id = 'base_footprint'
             #     m.action = Marker.ADD

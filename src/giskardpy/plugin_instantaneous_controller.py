@@ -145,8 +145,8 @@ class CartesianBulletControllerPlugin(ControllerPlugin):
             # link1 = 'gripper_finger_left_link'
             # link2 = 'plate'
             # link2 = 'base_link'
-            link1 = 'l_gripper_palm_link'
-            link2 = 'r_gripper_palm_link'
+            link1 = 'r_gripper_palm_link'
+            link2 = 'l_gripper_palm_link'
 
             point_on_link_input = Point3Input.position_on_a_constructor(self.god_map.get_expr,
                                                                         '{}/{},{}'.format(self.collision_identifier,
@@ -175,8 +175,8 @@ class CartesianBulletControllerPlugin(ControllerPlugin):
                                                                current_input.get_rotation(),
                                                                ns='{}/{}'.format(root, tip)))
             # FIXME
-            trans_prefix = '{}/{},{}/pose/position'.format(self.fk_identifier, root, 'l_gripper_tool_frame')
-            rot_prefix = '{}/{},{}/pose/orientation'.format(self.fk_identifier, root, 'l_gripper_tool_frame')
+            trans_prefix = '{}/{},{}/pose/position'.format(self.fk_identifier, root, 'r_gripper_palm_link')
+            rot_prefix = '{}/{},{}/pose/orientation'.format(self.fk_identifier, root, 'r_gripper_palm_link')
             current_input = FrameInput.prefix_constructor(trans_prefix, rot_prefix, self.god_map.get_expr)
             self._controller.add_constraints(link_to_any_avoidance(link1,
                                                                    robot.get_fk_expression(root, link1),

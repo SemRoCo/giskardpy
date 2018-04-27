@@ -1,10 +1,8 @@
 import rospy
-from copy import deepcopy, copy
 
-from collections import defaultdict
 from geometry_msgs.msg import Point, Vector3
 from std_msgs.msg import ColorRGBA
-from visualization_msgs.msg import MarkerArray, Marker
+from visualization_msgs.msg import Marker
 
 from giskardpy.plugin import Plugin
 from giskardpy.pybullet_world import PyBulletWorld, ContactInfo

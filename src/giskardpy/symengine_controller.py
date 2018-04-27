@@ -1,7 +1,7 @@
 import symengine_wrappers as sw
 from collections import OrderedDict
 
-from giskardpy.input_system import JointStatesInput, FrameInput, Point3Input
+from giskardpy.input_system import JointStatesInput
 from giskardpy.qp_problem_builder import QProblemBuilder, SoftConstraint
 from giskardpy.symengine_robot import Robot
 
@@ -14,7 +14,7 @@ class Controller(object):
     def add_constraints(self, soft_constraints):
         self._soft_constraints.update(soft_constraints)
 
-    def init(self, controlled_joints=None):
+    def init(self, controlled_joints=None, free_symbols=None):
         if controlled_joints is None:
             controlled_joint_symbols = self.get_controlled_joint_symbols()
             controlled_joints = self.get_controlled_joints()
@@ -24,7 +24,8 @@ class Controller(object):
                                                   {k: self.robot.hard_constraints[k] for k in controlled_joints if
                                                    k in self.robot.hard_constraints},
                                                   self._soft_constraints,
-                                                  controlled_joint_symbols)
+                                                  controlled_joint_symbols,
+                                                  free_symbols)
 
     def get_controlled_joints(self):
         return list(self.robot.joint_states_input.joint_map.keys())
@@ -43,6 +44,7 @@ class Controller(object):
 
 
 class JointController(Controller):
+    # TODO outdated this should be a class
     def __init__(self, urdf):
         super(JointController, self).__init__(urdf)
         # TODO use symbol for weight
@@ -86,9 +88,6 @@ class JointController(Controller):
         return soft_constraints
 
 
-# TODO
-# def get_controlled_joint_symbols(self):
-#     return self.robot.get_chain_joint_symbols(self.root, self.tip)
 def position_conv(goal_position, current_position, weights=(1, 1, 1), trans_gain=3, max_trans_speed=0.3, ns=''):
     soft_constraints = {}
 
@@ -119,7 +118,6 @@ def rotation_conv(goal_rotation, current_rotation, current_evaluated_rotation, w
     soft_constraints = {}
     axis, angle = sw.axis_angle_from_matrix((current_rotation.T * goal_rotation))
     capped_angle = sw.fake_Min(angle * rot_gain, max_rot_speed)
-    axis = axis
     r_rot_control = axis * capped_angle
 
     hack = sw.rotation3_axis_angle([0, 0, 1], 0.0001)
@@ -142,7 +140,7 @@ def rotation_conv(goal_rotation, current_rotation, current_evaluated_rotation, w
     return soft_constraints
 
 
-def link_to_any_avoidance(link_name, current_pose, current_pose_eval, point_on_link, other_point, lower_limit=0.02,
+def link_to_any_avoidance(link_name, current_pose, current_pose_eval, point_on_link, other_point, lower_limit=0.05,
                           upper_limit=1e9, weight=10000):
     soft_constraints = {}
     name = '{} to any collision'.format(link_name)

@@ -8,8 +8,8 @@ from giskardpy.qp_problem_builder import HardConstraint, JointConstraint
 
 Joint = namedtuple('Joint', ['symbol', 'velocity_limit', 'lower', 'upper', 'type', 'frame'])
 
-
 def hacky_urdf_parser_fix(urdf_str):
+    # TODO this function is inefficient but the tested urdf's aren't big enough for it to be a problem
     fixed_urdf = ''
     delete = False
     black_list = ['transmission']
@@ -62,6 +62,7 @@ class Robot(object):
                                                  joint.lower,
                                                  joint.upper,
                                                  joint.type,
+                                                 # TODO this line is relatively slow
                                                  joint.frame.subs(self.joint_states_input.joint_map))
             self._create_constraints()
 

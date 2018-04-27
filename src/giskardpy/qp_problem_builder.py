@@ -15,10 +15,12 @@ JointConstraint = namedtuple('JointConstraint', ['lower', 'upper', 'weight'])
 BIG_NUMBER = 1e9
 
 class QProblemBuilder(object):
-    def __init__(self, joint_constraints_dict, hard_constraints_dict, soft_constraints_dict, controlled_joint_symbols, backend=None):
+    def __init__(self, joint_constraints_dict, hard_constraints_dict, soft_constraints_dict, controlled_joint_symbols,
+                 free_symbols=None, backend=None):
         assert(not len(controlled_joint_symbols) > len(joint_constraints_dict))
         assert(not len(controlled_joint_symbols) < len(joint_constraints_dict))
         assert(len(hard_constraints_dict) <= len(controlled_joint_symbols))
+        self.free_symbols = free_symbols
         self.backend = backend
         self.joint_constraints_dict = joint_constraints_dict
         self.hard_constraints_dict = hard_constraints_dict
@@ -30,6 +32,7 @@ class QProblemBuilder(object):
         self.qp_solver = QPSolver(self.H.shape[0], len(self.lbA))
 
     def make_sympy_matrices(self):
+        # TODO cpu intensive
         weights = []
         lb = []
         ub = []
@@ -87,8 +90,9 @@ class QProblemBuilder(object):
         self.big_ass_M = big_ass_M_A.col_join(big_ass_M_H)
 
         t = time()
-        free_symbols = self.big_ass_M.free_symbols
-        self.cython_big_ass_M = spw.speed_up(self.big_ass_M, free_symbols, backend=BACKEND)
+        if self.free_symbols is None:
+            self.free_symbols = self.big_ass_M.free_symbols
+        self.cython_big_ass_M = spw.speed_up(self.big_ass_M, self.free_symbols, backend=BACKEND)
 
         print('autowrap took {}'.format(time() - t))
 

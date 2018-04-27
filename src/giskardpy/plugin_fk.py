@@ -46,9 +46,6 @@ class FKPlugin(Plugin):
         if self.fk is None:
             urdf = rospy.get_param('robot_description')
             self.robot = Robot(urdf)
-            # joint_names = []
-            # for root, tip in zip(self.roots, self.tips):
-            #     joint_names.extend(self.robot.get_chain_joints(root, tip))
             joint_names = self.robot.get_joint_names()
             current_joints = JointStatesInput.prefix_constructor(self.god_map.get_expr,
                                                                  joint_names,
@@ -56,10 +53,12 @@ class FKPlugin(Plugin):
                                                                  'position')
             self.robot.set_joint_symbol_map(current_joints)
 
+            free_symbols = self.god_map.get_free_symbols()
             def on_demand_fk(key):
+                # TODO possible speed up by merging fks into one matrix
                 root, tip = key
                 fk = self.robot.get_fk_expression(root, tip)
-                return sw.speed_up(fk, fk.free_symbols, backend=BACKEND)
+                return sw.speed_up(fk, free_symbols, backend=BACKEND)
 
             self.fk = keydefaultdict(on_demand_fk)
 

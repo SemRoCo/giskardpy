@@ -47,7 +47,6 @@ class PyBulletRobot(object):
             p.resetJointState(self.id, self.joint_name_to_info[joint_name].joint_index, singe_joint_state.position)
 
     def init_js_info(self):
-        #TODO computational expansive
         self.joint_id_map = {}
         self.link_id_map = {}
         self.joint_name_to_info = OrderedDict()
@@ -67,7 +66,6 @@ class PyBulletRobot(object):
             self.link_id_map[joint_index] = joint_info.link_name
         self.generate_self_collision_matrix()
 
-    # @profile
     def check_self_collision(self, d=0.5, whitelist=None):
         if whitelist is None:
             whitelist = self.sometimes
@@ -94,6 +92,7 @@ class PyBulletRobot(object):
         return mjs
 
     def generate_self_collision_matrix(self, d=0.05, num_rnd_tries=200):
+        # TODO computational expansive because of too many collision checks
         seed(1337)
         always = set()
         self.all = set(combinations(self.joint_id_to_info.keys(), 2))
@@ -118,12 +117,10 @@ class PyBulletRobot(object):
         self.never = rest
 
     def _check_all_collisions(self, test_links, d, js):
-        # self.link_id_map[link_a]=='torso_lift_link' and self.link_id_map[link_b]=='head_tilt_link'
         self.set_joint_state(js)
         sometimes = set()
         for link_a, link_b in test_links:
-            contacts = p.getClosestPoints(self.id, self.id, d, link_a, link_b)
-            for contact in contacts:
+            if len(p.getClosestPoints(self.id, self.id, d, link_a, link_b)) > 0:
                 sometimes.add((link_a, link_b))
         return sometimes
 

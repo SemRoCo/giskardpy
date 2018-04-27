@@ -106,3 +106,24 @@ class Trajectory(object):
 
     def values(self):
         return self._points.values()
+
+class CartGoal(object):
+    def __init__(self):
+        self.translation = None
+        self.rotation = None
+        self.root = None
+        self.tip = None
+
+class TransGoal(object):
+    def __init__(self):
+        self.p_gain = None
+        self.max_speed = None
+        self.point = None
+        self.weight = None
+
+class RotGoal(object):
+    def __init__(self):
+        self.weight = None
+        self.max_speed = None
+        self.p_gain = None
+        self.rotation = None

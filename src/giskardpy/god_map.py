@@ -67,6 +67,9 @@ class GodMap(object):
         #TODO potential speedup by only updating entries that have changed
         return {expr: self.get_data(key) for expr, key in self.expr_to_key.items()}
 
+    def get_free_symbols(self):
+        return self.key_to_expr.values()
+
     def set_data(self, key, value):
         identifier_parts = key.split(self.separator)
         namespace = identifier_parts[0]

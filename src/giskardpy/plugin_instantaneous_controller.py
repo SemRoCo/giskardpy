@@ -141,10 +141,6 @@ class CartesianBulletControllerPlugin(ControllerPlugin):
                                                                  'position')
             robot.set_joint_symbol_map(current_joints)
 
-            # link1 = 'gripper_gripper_left_link'
-            # link1 = 'r_gripper_palm_link'
-
-
             added_links = set()
             for root, tip in zip(self.roots, self.tips):
 
@@ -187,7 +183,7 @@ class CartesianBulletControllerPlugin(ControllerPlugin):
             joint_names = set()
             for root, tip in zip(self.roots, self.tips):
                 joint_names.update(self._controller.robot.get_chain_joints(root, tip))
-            self._controller.init(controlled_joints=joint_names)
+            self._controller.init(controlled_joints=joint_names, free_symbols=self.god_map.get_free_symbols())
 
     def __copy__(self):
         cp = self.__class__(self.roots, self.tips)

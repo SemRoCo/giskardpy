@@ -164,11 +164,8 @@ class CartesianBulletControllerPlugin(ControllerPlugin):
                                                                current_input.get_rotation(),
                                                                ns='{}/{}'.format(root, tip)))
 
-            # for link1 in ['r_gripper_r_finger_link', 'l_gripper_r_finger_link',
-            #               'r_gripper_l_finger_link', 'l_gripper_l_finger_link']:
                 for link1 in robot.get_link_tree(root, tip):
                     if link1 not in added_links:
-                        print(link1)
                         added_links.add(link1)
                         point_on_link_input = Point3Input.position_on_a_constructor(self.god_map.get_expr,
                                                                                     '{}/{}'.format(

@@ -58,6 +58,3 @@ if __name__ == '__main__':
 
     app = ROSApplication(pm)
     app.run()
-
-
-    #TODO LINK ROOT TIPS AND SHIT

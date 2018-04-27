@@ -55,18 +55,6 @@ class PyBulletPlugin(Plugin):
     def get_replacement_parallel_universe(self):
         return self
 
-    def default_marker(self, a, b, i):
-        m = Marker()
-        m.header.frame_id = 'base_footprint'
-        m.action = Marker.ADD
-        m.type = Marker.SPHERE
-        m.pose.position = Point(*position)
-        m.id = i
-        m.ns = 'pybullet collisions'
-        m.scale = Vector3(0.03, 0.03, 0.03)
-        m.color = ColorRGBA(1, 0, 0, 1)
-        return m
-
     # @profile
     def make_collision_markers(self, collisions):
         m = Marker()
@@ -95,5 +83,5 @@ class PyBulletPlugin(Plugin):
             m = Marker()
             m.action = Marker.DELETEALL
         self.collision_pub.publish(m)
-        rospy.sleep(0.05)
+        # rospy.sleep(0.05)
 

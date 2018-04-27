@@ -142,15 +142,15 @@ def rotation_conv(goal_rotation, current_rotation, current_evaluated_rotation, w
     return soft_constraints
 
 
-def link_to_any_avoidance(link_name, current_pose, current_pose_eval, point_on_link, other_point, lower_limit=0.05,
-                          upper_limit=1e9, weight=(10000, 10, 10)):
+def link_to_any_avoidance(link_name, current_pose, current_pose_eval, point_on_link, other_point, lower_limit=0.02,
+                          upper_limit=1e9, weight=10000):
     soft_constraints = {}
     name = '{} to any collision'.format(link_name)
 
     dist = sw.euclidean_distance((current_pose * sw.inverse_frame(current_pose_eval) * point_on_link), other_point)
     soft_constraints['{} x'.format(name)] = SoftConstraint(lower=lower_limit - dist,
                                                            upper=upper_limit,
-                                                           weight=weight[0],
+                                                           weight=weight,
                                                            expression=dist)
 
     return soft_constraints

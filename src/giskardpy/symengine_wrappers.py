@@ -3,6 +3,7 @@ from operator import mul
 from warnings import warn
 
 import symengine as sp
+from copy import deepcopy
 from symengine import Matrix, Symbol, eye, sympify, diag, zeros, lambdify, Abs, Max, Min, sin, cos, tan, acos, asin, \
     atan, atan2, nan, sqrt, log
 import numpy as np
@@ -11,7 +12,7 @@ from symengine.lib.symengine_wrapper import Lambdify
 
 from giskardpy import BACKEND
 
-pathSeparator = '__'
+pathSeparator = '_'
 
 
 def fake_Abs(x):
@@ -27,7 +28,7 @@ def fake_Min(x, y):
 
 
 # @profile
-def speed_up(function, parameters, backend=None):
+def speed_up(function, parameters, backend='llvm'):
     str_params = [str(x) for x in parameters]
     if len(parameters) == 0:
         try:
@@ -94,13 +95,13 @@ def cross(u, v):
                       u[0] * v[1] - u[1] * v[0]])
 
 
-def vec3(x, y, z):
+def vector3(x, y, z):
     return sp.Matrix([x, y, z, 0])
 
 
-unitX = vec3(1, 0, 0)
-unitY = vec3(0, 1, 0)
-unitZ = vec3(0, 0, 1)
+unitX = vector3(1, 0, 0)
+unitY = vector3(0, 1, 0)
+unitZ = vector3(0, 0, 1)
 
 
 def point3(x, y, z):
@@ -130,7 +131,7 @@ def rotation3_rpy(roll, pitch, yaw):
     """ Conversion of roll, pitch, yaw to 4x4 rotation matrix according to:
         https://github.com/orocos/orocos_kinematics_dynamics/blob/master/orocos_kdl/src/frames.cpp#L167
     """
-    # return sp.Matrix(quaternion_matrix(quaternion_from_euler(roll, pitch, yaw, axes='rxyz')).T.tolist())
+    # TODO don't split this into 3 matrices
 
     rx = sp.Matrix([[1, 0, 0, 0],
                     [0, sp.cos(roll), -sp.sin(roll), 0],
@@ -191,9 +192,15 @@ def frame3_rpy(r, p, y, loc):
     return translation3(*loc) * rotation3_rpy(r, p, y)
 
 
-def frame3_quaternion(q1, q2, q3, q4, loc):
-    return translation3(*loc) * rotation3_quaternion(q1, q2, q3, q4)
+def frame3_quaternion(x, y, z, qx, qy, qz, qw):
+    return translation3(x, y, z) * rotation3_quaternion(qx, qy, qz, qw)
 
+
+def inverse_frame(frame):
+    inv = sp.eye(4)
+    inv[:3,:3] = frame[:3,:3].T
+    inv[:3,3] = -inv[:3,:3]*frame[:3,3]
+    return inv
 
 def pos_of(frame):
     return frame[:4, 3:]
@@ -314,3 +321,6 @@ def quaternion_make_unique(q):
 
 def cosine_distance(q1, q2):
     return 1 - (q1.T * q2)[0]
+
+def euclidean_distance(v1, v2):
+    return norm(v1-v2)

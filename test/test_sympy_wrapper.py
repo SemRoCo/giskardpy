@@ -8,9 +8,6 @@ import itertools
 from tf.transformations import quaternion_matrix, quaternion_about_axis, quaternion_from_euler, euler_matrix, \
     rotation_matrix, quaternion_multiply, quaternion_conjugate, random_quaternion
 
-from giskardpy import USE_SYMENGINE
-from giskardpy.pointy_bot import PointyBot
-from giskardpy.joint_space_control import JointSpaceControl
 from numpy import pi
 
 import giskardpy.symengine_wrappers as spw

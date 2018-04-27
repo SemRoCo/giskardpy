@@ -53,9 +53,9 @@ class InteractiveMarkerPlugin(Plugin):
         marker = Marker()
 
         marker.type = Marker.SPHERE
-        marker.scale.x = msg.scale * self.marker_scale
-        marker.scale.y = msg.scale * self.marker_scale
-        marker.scale.z = msg.scale * self.marker_scale
+        marker.scale.x = msg.scale * self.marker_scale*2
+        marker.scale.y = msg.scale * self.marker_scale*2
+        marker.scale.z = msg.scale * self.marker_scale*2
         marker.color.r = 0.5
         marker.color.g = 0.5
         marker.color.b = 0.5

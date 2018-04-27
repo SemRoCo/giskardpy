@@ -51,6 +51,9 @@ class ProcessManager(object):
                 parallel_universe.stop()
                 rospy.loginfo('parallel universe existed for {}s'.format(time()-t))
                 plugin.post_mortem_analysis(parallel_universe.get_god_map())
+                # TODO different function for get readings after end of universe
+                for identifier, value in plugin.get_readings().items():
+                    self._god_map.set_data(identifier, value)
         return True
 
 

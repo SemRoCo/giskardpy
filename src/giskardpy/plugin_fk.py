@@ -41,29 +41,27 @@ class FKPlugin(Plugin):
     def update(self):
         super(FKPlugin, self).update()
 
-    def start(self, god_map):
-        super(FKPlugin, self).start(god_map)
-        if self.fk is None:
-            urdf = rospy.get_param('robot_description')
-            self.robot = Robot(urdf)
-            joint_names = self.robot.get_joint_names()
-            current_joints = JointStatesInput.prefix_constructor(self.god_map.get_expr,
-                                                                 joint_names,
-                                                                 self._joint_states_identifier,
-                                                                 'position')
-            self.robot.set_joint_symbol_map(current_joints)
+    def start_once(self):
+        urdf = rospy.get_param('robot_description')
+        self.robot = Robot(urdf)
+        joint_names = self.robot.get_joint_names()
+        current_joints = JointStatesInput.prefix_constructor(self.god_map.get_expr,
+                                                             joint_names,
+                                                             self._joint_states_identifier,
+                                                             'position')
+        self.robot.set_joint_symbol_map(current_joints)
 
-            free_symbols = self.god_map.get_free_symbols()
-            def on_demand_fk(key):
-                # TODO possible speed up by merging fks into one matrix
-                root, tip = key
-                fk = self.robot.get_fk_expression(root, tip)
-                return sw.speed_up(fk, free_symbols, backend=BACKEND)
+        free_symbols = self.god_map.get_free_symbols()
+        def on_demand_fk(key):
+            # TODO possible speed up by merging fks into one matrix
+            root, tip = key
+            fk = self.robot.get_fk_expression(root, tip)
+            return sw.speed_up(fk, free_symbols, backend=BACKEND)
 
-            self.fk = keydefaultdict(on_demand_fk)
+        self.fk = keydefaultdict(on_demand_fk)
 
     def stop(self):
         pass
 
-    def get_replacement_parallel_universe(self):
+    def copy(self):
         return self

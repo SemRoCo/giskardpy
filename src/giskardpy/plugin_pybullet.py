@@ -16,7 +16,6 @@ class PyBulletPlugin(Plugin):
         self.closest_point_identifier = closest_point_identifier
         self.robot_name = 'pr2'
         self.world = PyBulletWorld()
-        self.started = False
         super(PyBulletPlugin, self).__init__()
 
     def get_readings(self):
@@ -36,21 +35,18 @@ class PyBulletPlugin(Plugin):
         js = self.god_map.get_data(self.js_identifier)
         self.world.set_joint_state(self.robot_name, js)
 
-    def start(self, god_map):
-        super(PyBulletPlugin, self).start(god_map)
-        if not self.started:
-            self.collision_pub = rospy.Publisher('visualization_marker', Marker, queue_size=1)
-            self.world.activate_viewer()
-            #TODO get robot description from databus
-            urdf = rospy.get_param('robot_description')
-            self.world.spawn_urdf_str_robot(self.robot_name, urdf)
-            self.started = True
+    def start_once(self):
+        self.collision_pub = rospy.Publisher('visualization_marker', Marker, queue_size=1)
+        self.world.activate_viewer()
+        #TODO get robot description from databus
+        urdf = rospy.get_param('robot_description')
+        self.world.spawn_urdf_str_robot(self.robot_name, urdf)
 
     def stop(self):
         pass
         # self.world.deactivate_viewer()
 
-    def get_replacement_parallel_universe(self):
+    def copy(self):
         return self
 
     # @profile

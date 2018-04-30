@@ -45,7 +45,7 @@ class ProcessManager(object):
                 print('creating new parallel universe')
                 parallel_universe = ProcessManager(initial_state=self._god_map)
                 for n, p in self._plugins.items():
-                    parallel_universe.register_plugin(n, p.get_replacement_parallel_universe())
+                    parallel_universe.register_plugin(n, p.get_replacement())
                 t = time()
                 parallel_universe.start_loop()
                 parallel_universe.stop()

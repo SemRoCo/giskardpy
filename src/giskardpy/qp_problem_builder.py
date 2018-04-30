@@ -16,12 +16,11 @@ BIG_NUMBER = 1e9
 
 class QProblemBuilder(object):
     def __init__(self, joint_constraints_dict, hard_constraints_dict, soft_constraints_dict, controlled_joint_symbols,
-                 free_symbols=None, backend=None):
+                 free_symbols=None):
         assert(not len(controlled_joint_symbols) > len(joint_constraints_dict))
         assert(not len(controlled_joint_symbols) < len(joint_constraints_dict))
         assert(len(hard_constraints_dict) <= len(controlled_joint_symbols))
         self.free_symbols = free_symbols
-        self.backend = backend
         self.joint_constraints_dict = joint_constraints_dict
         self.hard_constraints_dict = hard_constraints_dict
         self.soft_constraints_dict = soft_constraints_dict
@@ -87,6 +86,7 @@ class QProblemBuilder(object):
 
         big_ass_M_A = self.A.row_join(self.lbA).row_join(self.ubA)
         big_ass_M_H = self.H.row_join(self.lb).row_join(self.ub)
+        # putting everything into one big matrix to take full advantage of cse in speed_up()
         self.big_ass_M = big_ass_M_A.col_join(big_ass_M_H)
 
         t = time()
@@ -96,10 +96,15 @@ class QProblemBuilder(object):
 
         print('autowrap took {}'.format(time() - t))
 
-    def get_cmd(self, observables_update):
-        evaluated_updates = observables_update
+    def get_cmd(self, substitutions):
+        """
 
-        np_big_ass_M = self.cython_big_ass_M(**evaluated_updates)
+        :param substitutions: symbol -> value
+        :type dict
+        :return: joint name -> joint command
+        :type dict
+        """
+        np_big_ass_M = self.cython_big_ass_M(**substitutions)
         np_H = np.array(np_big_ass_M[self.A.shape[0]:,:-2])
         np_A = np.array(np_big_ass_M[:self.A.shape[0],:self.A.shape[1]])
         np_lb = np.array(np_big_ass_M[self.A.shape[0]:,-2])

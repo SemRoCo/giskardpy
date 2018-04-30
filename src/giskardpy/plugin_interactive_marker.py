@@ -29,25 +29,23 @@ class InteractiveMarkerPlugin(Plugin):
         self.tf = TfWrapper()
         self.started = False
 
-    def start(self, god_map):
-        if not self.started:
-            # giskard goal client
-            self.client = SimpleActionClient('qp_controller/command', ControllerListAction)
-            self.client.wait_for_server()
+    def start_once(self):
+        # giskard goal client
+        self.client = SimpleActionClient('qp_controller/command', ControllerListAction)
+        self.client.wait_for_server()
 
-            # marker server
-            self.server = InteractiveMarkerServer("eef_control{}".format(self.suffix))
-            self.menu_handler = MenuHandler()
+        # marker server
+        self.server = InteractiveMarkerServer("eef_control{}".format(self.suffix))
+        self.menu_handler = MenuHandler()
 
-            all_goals = {}
+        all_goals = {}
 
-            for root, tip in zip(self.roots, self.tips):
-                int_marker = self.make6DofMarker(InteractiveMarkerControl.MOVE_ROTATE_3D, root, tip)
-                self.server.insert(int_marker, self.process_feedback(self.server, self.client, root, tip, all_goals))
-                self.menu_handler.apply(self.server, int_marker.name)
+        for root, tip in zip(self.roots, self.tips):
+            int_marker = self.make6DofMarker(InteractiveMarkerControl.MOVE_ROTATE_3D, root, tip)
+            self.server.insert(int_marker, self.process_feedback(self.server, self.client, root, tip, all_goals))
+            self.menu_handler.apply(self.server, int_marker.name)
 
-            self.server.applyChanges()
-            self.started = True
+        self.server.applyChanges()
 
     def makeSphere(self, msg):
         marker = Marker()
@@ -201,5 +199,5 @@ class InteractiveMarkerPlugin(Plugin):
                 goal.controllers.extend(g)
             self.client.send_goal(goal)
 
-    def get_replacement_parallel_universe(self):
+    def copy(self):
         return self

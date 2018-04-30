@@ -112,8 +112,7 @@ class ActionServer(Plugin):
     def update(self):
         pass
 
-    def start(self, god_map):
-        super(ActionServer, self).start(god_map)
+    def start_once(self):
         self.new_universe = False
         # action server
         self._action_name = 'qp_controller/command'
@@ -181,10 +180,14 @@ class ActionServer(Plugin):
         rospy.loginfo('finished movement')
         self.update_lock.task_done()
 
-    def get_replacement_parallel_universe(self):
+    def copy(self):
         return LogTrajectory(trajectory_identifier=self.trajectory_identifier,
                              joint_state_identifier=self.js_identifier,
                              time_identifier=self.time_identifier)
+
+    def __del__(self):
+        # TODO find a way to cancel all goal when giskard is killed
+        self._ac.cancel_all_goals()
 
 
 class LogTrajectory(Plugin):
@@ -210,9 +213,8 @@ class LogTrajectory(Plugin):
             # self.plot_trajectory(self.trajectory)
             self.stop_universe = True
 
-    def start(self, god_map):
+    def start_always(self):
         self.stop_universe = False
-        super(LogTrajectory, self).start(god_map)
 
     def stop(self):
         pass

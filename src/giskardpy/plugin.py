@@ -1,6 +1,19 @@
 class Plugin(object):
+    def __init__(self):
+        self.started = False
+
     def start(self, god_map):
         self.god_map = god_map
+        self.start_always()
+        if not self.started:
+            self.start_once()
+            self.started = True
+
+    def start_once(self):
+        pass
+
+    def start_always(self):
+        pass
 
     def stop(self):
         # TODO 2 stops? 1 for main loop, 1 for parallel shit
@@ -26,12 +39,30 @@ class Plugin(object):
     def get_readings(self):
         return {}
 
-    def get_replacement_parallel_universe(self):
-        return self.__class__()
+    def get_replacement(self):
+        c = self.copy()
+        c.started = self.started
+        return c
+
+    def copy(self):
+        c = self.__class__()
+        return c
+
+
 
 class PluginContainer(Plugin):
-    def __init__(self, replacement):
+    def __init__(self, replacement, call_start=True):
         self.replacement = replacement
+        self.call_init = call_start
+        super(PluginContainer, self).__init__()
 
-    def get_replacement_parallel_universe(self):
+    def copy(self):
         return self.replacement
+
+    def start(self, god_map):
+        if self.call_init:
+            self.replacement.start(god_map)
+
+    def get_replacement(self):
+        c = self.copy()
+        return c

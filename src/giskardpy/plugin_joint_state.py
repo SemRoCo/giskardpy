@@ -2,12 +2,11 @@ from Queue import Empty, Queue
 from collections import OrderedDict
 
 import rospy
-# from multiprocessing import Queue
 
 from sensor_msgs.msg import JointState
 
 from giskardpy.plugin import Plugin
-from giskardpy.trajectory import MultiJointState, SingleJointState
+from giskardpy.trajectory import SingleJointState
 
 
 class JointStatePlugin(Plugin):
@@ -42,9 +41,8 @@ class JointStatePlugin(Plugin):
             pass
         return {self.js_identifier: self.mjs}
 
-    def start(self, god_map):
+    def start_always(self):
         self.joint_state_sub = rospy.Subscriber('joint_states', JointState, self.cb, queue_size=1)
-        super(JointStatePlugin, self).start(god_map)
 
     def stop(self):
         self.joint_state_sub.unregister()
@@ -52,7 +50,7 @@ class JointStatePlugin(Plugin):
     def update(self):
         pass
 
-    def get_replacement_parallel_universe(self):
+    def copy(self):
         return KinematicSimPlugin(js_identifier=self.js_identifier, next_cmd_identifier=self.next_cmd_identifier,
                                   time_identifier=self.time_identifier)
 
@@ -86,9 +84,8 @@ class KinematicSimPlugin(Plugin):
                     cmd = 0.0
                 self.next_js[joint_name] = SingleJointState(sjs.name, sjs.position + cmd * self.frequency, velocity=cmd)
 
-    def start(self, god_map):
+    def start_always(self):
         self.next_js = None
-        super(KinematicSimPlugin, self).start(god_map)
 
     def stop(self):
         pass
@@ -99,5 +96,5 @@ class KinematicSimPlugin(Plugin):
     def end_parallel_universe(self):
         return super(KinematicSimPlugin, self).end_parallel_universe()
 
-    def get_replacement_parallel_universe(self):
+    def copy(self):
         return self

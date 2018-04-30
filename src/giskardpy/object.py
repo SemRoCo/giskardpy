@@ -46,7 +46,7 @@ class SphereShape(GeometricShape):
 
 
 class MeshShape(GeometricShape):
-    def __init__(self, filename='', scale=[1.0, 1.0, 1.0]):
+    def __init__(self, filename='', scale=(1.0, 1.0, 1.0)):
         self.filename = filename
         self.scale = scale
 
@@ -81,7 +81,7 @@ class CollisionProperty(object):
 
 
 class WorldObject(object):
-    def __init__(self, name='', inertial_props=None, visual_props=[], collision_props=[]):
+    def __init__(self, name='', inertial_props=None, visual_props=(), collision_props=()):
         self.name = name
         self.inertial_props = inertial_props
         self.visual_props = visual_props
@@ -118,7 +118,7 @@ def to_urdf_xml(urdf_object):
         root.append(to_urdf_xml(urdf_object.geometry))
     elif isinstance(urdf_object, Transform):
         r = kdl.Rotation.Quaternion(urdf_object.rotation.x, urdf_object.rotation.y,
-                                    urdf_object.rotation.z,urdf_object.rotation.w)
+                                    urdf_object.rotation.z, urdf_object.rotation.w)
         rpy = r.GetRPY()
         rpy_string = '{} {} {}'.format(rpy[0], rpy[1], rpy[2])
         xyz_string = '{} {} {}'.format(urdf_object.translation.x, urdf_object.translation.y, urdf_object.translation.z)

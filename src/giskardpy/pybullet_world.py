@@ -22,9 +22,10 @@ ContactInfo = namedtuple('ContactInfo', ['contact_flag', 'body_unique_id_a', 'bo
                                          'contact_distance', 'normal_force'])
 
 
-def replace_paths(urdf_str):
+def replace_paths(urdf_str, name):
     rospack = rospkg.RosPack()
-    with open('/tmp/robot.urdf', 'w') as o:
+    new_path = '/tmp/{}.urdf'.format(name)
+    with open(new_path, 'w') as o:
         for line in urdf_str.split('\n'):
             if 'package://' in line:
                 package_name = line.split('package://', 1)[-1].split('/', 1)[0]
@@ -32,14 +33,15 @@ def replace_paths(urdf_str):
                 o.write(line.replace(package_name, real_path))
             else:
                 o.write(line)
+    return new_path
 
 
 class PyBulletRobot(object):
     def __init__(self, name, urdf_string, base_position=(0, 0, 0), base_orientation=(0, 0, 0, 1)):
         self.name = name
-        replace_paths(urdf_string)
-        self.id = p.loadURDF('/tmp/robot.urdf', base_position, base_orientation,
+        self.id = p.loadURDF(replace_paths(urdf_string, name), base_position, base_orientation,
                              flags=p.URDF_USE_SELF_COLLISION_EXCLUDE_PARENT)
+        self.sometimes = set()
         self.init_js_info()
 
     def set_joint_state(self, multi_joint_state):
@@ -203,6 +205,12 @@ class PyBulletWorld(object):
         self._objects[name] = p.loadURDF(urdf)
         self._activate_rendering()
 
+    def spawn_object_from_urdf_str(self, name, urdf_str):
+        self._deactivate_rendering()
+        urdf_str = replace_paths(urdf_str, name)
+        self._objects[name] = p.loadURDF(urdf_str)
+        self._activate_rendering()
+
     def get_object_list(self):
         return list(self._objects.keys())
 
@@ -215,13 +223,19 @@ class PyBulletWorld(object):
     def release_object(self):
         pass
 
-    def check_collision(self):
-        collisions = None
-        for robot in self._robots.values():
-            if collisions is None:
-                collisions = robot.check_self_collision()
-            else:
-                collisions.update(robot.check_self_collision())
+    def check_collision(self, self_collision=True):
+        o = (0, 0, 0)
+        collisions = keydefaultdict(lambda k: ContactInfo(None, self.id, self.id, k[0], k[1], o, o, o, 1e9, 0))
+        if self_collision:
+            for robot in self._robots.values():
+                if collisions is None:
+                    collisions = robot.check_self_collision()
+                else:
+                    collisions.update(robot.check_self_collision())
+        # for object in self._objects.values():
+        #     for robot in self._robots.values():
+        #         for link in robot.sometimes:
+        #             p.getClosestPoints(self.robot.id, object, d, link_a, link_b)
         return collisions
 
     def check_trajectory_collision(self):

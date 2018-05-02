@@ -12,6 +12,7 @@ class ProcessManager(object):
     def __init__(self, initial_state=None):
         self._plugins = OrderedDict()
         self._god_map = GodMap() if initial_state is None else copy(initial_state)
+        self.original_universe = initial_state is None
 
     def register_plugin(self, name, plugin):
         if name in self._plugins:
@@ -21,10 +22,10 @@ class ProcessManager(object):
     def start_loop(self):
         for plugin in self._plugins.values():
             plugin.start(self._god_map)
-        while self.update() and not rospy.is_shutdown() :
-            # TODO make sure this can be properly killed
-            # rospy.sleep(0.0001)
-            pass
+        while self.update() and not rospy.is_shutdown():
+            # TODO make sure this can be properly killed without rospy dependency
+            if self.original_universe:
+                rospy.sleep(0.1)
 
     def stop(self):
         for plugin in self._plugins.values():
@@ -51,7 +52,7 @@ class ProcessManager(object):
                 parallel_universe.stop()
                 rospy.loginfo('parallel universe existed for {}s'.format(time()-t))
                 plugin.post_mortem_analysis(parallel_universe.get_god_map())
-                # TODO different function for get readings after end of universe
+                # TODO different function for get readings after end of universe?
                 for identifier, value in plugin.get_readings().items():
                     self._god_map.set_data(identifier, value)
         return True

@@ -1,3 +1,5 @@
+from visualization_msgs.msg import MarkerArray, Marker
+
 from giskardpy.trajectory import Transform
 from lxml import etree
 import PyKDL as kdl # TODO: get rid of this dependency
@@ -91,12 +93,14 @@ class WorldObject(object):
 def to_urdf_xml(urdf_object):
     if isinstance(urdf_object, WorldObject):
         root = etree.Element('robot', name=urdf_object.name)
+        link = etree.Element('link', name='{}Link'.format(urdf_object.name))
         if urdf_object.inertial_props:
-            root.append(to_urdf_xml(urdf_object.inertial_props))
+            link.append(to_urdf_xml(urdf_object.inertial_props))
         for visual in urdf_object.visual_props:
-            root.append(to_urdf_xml(visual))
+            link.append(to_urdf_xml(visual))
         for collision in urdf_object.collision_props:
-            root.append(to_urdf_xml(collision))
+            link.append(to_urdf_xml(collision))
+        root.append(link)
     elif isinstance(urdf_object, InertialProperty):
         root = etree.Element('inertial')
         root.append(to_urdf_xml(urdf_object.origin))
@@ -159,3 +163,30 @@ def to_urdf_xml(urdf_object):
 
 def to_urdf_string(urdf_object):
     return etree.tostring(to_urdf_xml(urdf_object))
+
+def to_marker(urdf_object):
+    ma = MarkerArray()
+    for visual_property in urdf_object.visual_props:
+        m = Marker()
+        m.color.r = 0
+        m.color.g = 1
+        m.color.b = 0
+        m.color.a = 0.8
+        m.ns = 'bullet/{}'.format(urdf_object.name)
+        m.action = Marker.ADD
+        m.id = 1337
+        m.header.frame_id = 'map'
+        m.pose.position.x = visual_property.origin.translation.x
+        m.pose.position.y = visual_property.origin.translation.y
+        m.pose.position.z = visual_property.origin.translation.z
+        m.pose.orientation.x = visual_property.origin.rotation.x
+        m.pose.orientation.y = visual_property.origin.rotation.y
+        m.pose.orientation.z = visual_property.origin.rotation.z
+        m.pose.orientation.w = visual_property.origin.rotation.w
+        if isinstance(visual_property.geometry, BoxShape):
+            m.type = Marker.CUBE
+            m.scale.x = visual_property.geometry.x
+            m.scale.y = visual_property.geometry.y
+            m.scale.z = visual_property.geometry.z
+        ma.markers.append(m)
+    return ma

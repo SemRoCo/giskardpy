@@ -35,4 +35,4 @@ class TestObjectUrdfGen(unittest.TestCase):
     def test_obj_with_box_visual(self):
         my_obj = WorldObject(name='my_box', visual_props=[VisualProperty(geometry=BoxShape(0.5, 1.5, 2.5))])
         urdf_string = to_urdf_string(my_obj)
-        self.assertEqual(urdf_string, '<robot name="my_box"><visual><origin rpy="0.0 -0.0 0.0" xyz="0.0 0.0 0.0"/><geometry><box size="0.5 1.5 2.5"/></geometry></visual></robot>')
+        self.assertEqual(urdf_string, '<robot name="my_box"><link name="my_boxLink"><visual><origin rpy="0.0 -0.0 0.0" xyz="0.0 0.0 0.0"/><geometry><box size="0.5 1.5 2.5"/></geometry></visual></link></robot>')

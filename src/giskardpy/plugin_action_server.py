@@ -9,6 +9,7 @@ from control_msgs.msg import FollowJointTrajectoryAction, FollowJointTrajectoryR
 from giskard_msgs.msg import ControllerListAction, ControllerListGoal, Controller, ControllerListResult
 
 from trajectory_msgs.msg import JointTrajectoryPoint
+from visualization_msgs.msg import MarkerArray
 
 from giskardpy.plugin import Plugin
 from giskardpy.tfwrapper import TfWrapper
@@ -186,7 +187,7 @@ class ActionServer(Plugin):
                              time_identifier=self.time_identifier)
 
     def __del__(self):
-        # TODO find a way to cancel all goal when giskard is killed
+        # TODO find a way to cancel all goals when giskard is killed
         self._ac.cancel_all_goals()
 
 

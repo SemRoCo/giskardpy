@@ -12,6 +12,7 @@ from giskard_msgs.msg._ControllerListAction import ControllerListAction
 from giskard_msgs.msg._ControllerListGoal import ControllerListGoal
 from interactive_markers.interactive_marker_server import InteractiveMarkerServer
 from interactive_markers.menu_handler import MenuHandler
+from tf.transformations import quaternion_multiply, quaternion_about_axis, quaternion_conjugate
 from visualization_msgs.msg import MarkerArray
 from visualization_msgs.msg._InteractiveMarker import InteractiveMarker
 from visualization_msgs.msg._InteractiveMarkerControl import InteractiveMarkerControl
@@ -22,6 +23,20 @@ from giskardpy.plugin import Plugin
 from giskardpy.tfwrapper import TfWrapper
 
 MARKER_SCALE = 0.15
+
+def qv_mult(q1, v1):
+    """
+    Transforms a vector by a quaternion
+    :param q1: Quaternion
+    :type q1: list
+    :param v1: vector
+    :type v1: list
+    :return: transformed vector
+    :type: list
+    """
+    q = q1
+    v = [v1[0], v1[1], v1[2], 0]
+    return quaternion_multiply(quaternion_multiply(q, v), quaternion_conjugate(q))[:-1]
 
 class InteractiveMarkerPlugin(Plugin):
     def __init__(self, roots, tips, suffix=''):
@@ -170,22 +185,35 @@ class InteractiveMarkerPlugin(Plugin):
                 self.send_all_goals()
                 self.pub_goal_marker(feedback.header, feedback.pose)
                 self.reset_goal()
-            self.i_server.setPose(self.marker_name, Pose())
+                self.i_server.setPose(self.marker_name, Pose())
             self.i_server.applyChanges()
 
         def pub_goal_marker(self, header, pose):
+            """
+            :param header:
+            :type header: std_msgs.msg._Header.Header
+            :param pose:
+            :type pose: Pose
+            """
             ma = MarkerArray()
             m = Marker()
             m.action = Marker.ADD
             m.type = Marker.CYLINDER
             m.header = header
+            old_q = [pose.orientation.x,
+                     pose.orientation.y,
+                     pose.orientation.z,
+                     pose.orientation.w]
             # x
             m.pose = deepcopy(pose)
             m.scale.x = 0.05 * MARKER_SCALE
             m.scale.y = 0.05 * MARKER_SCALE
             m.scale.z = MARKER_SCALE
-            m.pose.position.x += m.scale.z / 2
-            m.pose.orientation = Quaternion(0.0, 0.70710678, 0.0 , 0.70710678)
+            muh = qv_mult(old_q, [m.scale.z / 2, 0, 0])
+            m.pose.position.x += muh[0]
+            m.pose.position.y += muh[1]
+            m.pose.position.z += muh[2]
+            m.pose.orientation = Quaternion(*quaternion_multiply(old_q, quaternion_about_axis(np.pi / 2, [0, 1, 0])))
             m.color.r = 1
             m.color.g = 0
             m.color.b = 0
@@ -196,8 +224,11 @@ class InteractiveMarkerPlugin(Plugin):
             # y
             m = deepcopy(m)
             m.pose = deepcopy(pose)
-            m.pose.position.y += m.scale.z / 2
-            m.pose.orientation = Quaternion(-0.70710678, -0.0, -0.0, 0.70710678)
+            muh = qv_mult(old_q, [0, m.scale.z / 2, 0])
+            m.pose.position.x += muh[0]
+            m.pose.position.y += muh[1]
+            m.pose.position.z += muh[2]
+            m.pose.orientation = Quaternion(*quaternion_multiply(old_q, quaternion_about_axis(-np.pi / 2, [1, 0, 0])))
             m.color.r = 0
             m.color.g = 1
             m.color.b = 0
@@ -208,8 +239,10 @@ class InteractiveMarkerPlugin(Plugin):
             # z
             m = deepcopy(m)
             m.pose = deepcopy(pose)
-            m.pose.position.z += m.scale.z / 2
-            m.pose.orientation = Quaternion(0, 0, 0, 1)
+            muh = qv_mult(old_q, [0,0,m.scale.z / 2])
+            m.pose.position.x += muh[0]
+            m.pose.position.y += muh[1]
+            m.pose.position.z += muh[2]
             m.color.r = 0
             m.color.g = 0
             m.color.b = 1

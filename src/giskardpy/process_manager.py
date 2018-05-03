@@ -48,7 +48,10 @@ class ProcessManager(object):
                 for n, p in self._plugins.items():
                     parallel_universe.register_plugin(n, p.get_replacement())
                 t = time()
-                parallel_universe.start_loop()
+                try:
+                    parallel_universe.start_loop()
+                except:
+                    print('parallel universe died')
                 parallel_universe.stop()
                 rospy.loginfo('parallel universe existed for {}s'.format(time()-t))
                 plugin.post_mortem_analysis(parallel_universe.get_god_map())

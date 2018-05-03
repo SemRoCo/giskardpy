@@ -35,6 +35,8 @@ class Controller(object):
 
     def get_cmd(self, substitutions):
         next_cmd = self.qp_problem_builder.get_cmd(substitutions)
+        if next_cmd is None:
+            pass
         real_next_cmd = {}
         for joint_name in self.get_controlled_joints():
             joint_expr = str(self.robot.joint_states_input.joint_map[joint_name])

@@ -231,8 +231,10 @@ class LogTrajectory(Plugin):
             velocities.append([v.velocity for v in point.values()])
         positions = np.array(positions)
         velocities = np.array(velocities)
+        plt.title('position')
         plt.plot(positions - positions.mean(axis=0))
         plt.show()
+        plt.title('velocity')
         plt.plot(velocities)
         plt.show()
         pass

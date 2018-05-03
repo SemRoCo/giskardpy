@@ -22,7 +22,7 @@ class PyBulletPlugin(Plugin):
         self.robot_name = 'pr2'
         self.world = PyBulletWorld(gui=gui)
         self.srv = rospy.Service('kitchen', Trigger, self.cb)
-        self.marker_pub = rospy.Publisher('visualization_marker_array', MarkerArray)
+        self.marker_pub = rospy.Publisher('visualization_marker_array', MarkerArray, queue_size=10)
         super(PyBulletPlugin, self).__init__()
 
     def cb(self, trigger):

@@ -22,11 +22,18 @@ ContactInfo = namedtuple('ContactInfo', ['contact_flag', 'body_unique_id_a', 'bo
                                          'contact_distance', 'normal_force'])
 
 
-def replace_paths(urdf_str, name):
+def replace_paths(urdf, name):
     rospack = rospkg.RosPack()
     new_path = '/tmp/{}.urdf'.format(name)
     with open(new_path, 'w') as o:
-        for line in urdf_str.split('\n'):
+        if urdf.endswith('.urdf'):
+            try:
+                # TODO find cleaner solution
+                with open(urdf, 'r') as f:
+                    urdf = f.read()
+            except IOError:
+                return urdf
+        for line in urdf.split('\n'):
             if 'package://' in line:
                 package_name = line.split('package://', 1)[-1].split('/', 1)[0]
                 real_path = rospack.get_path(package_name)
@@ -53,7 +60,6 @@ class PyBulletRobot(object):
         self.link_id_map = {}
         self.joint_name_to_info = OrderedDict()
         self.joint_id_to_info = OrderedDict()
-        # self.ignored_collisions = defaultdict(bool)
         self.joint_name_to_info['base'] = JointInfo(*([-1, 'base'] + [None] * 10 + ['base'] + [None] * 4))
         self.joint_id_to_info[-1] = JointInfo(*([-1, 'base'] + [None] * 10 + ['base'] + [None] * 4))
         self.link_id_map[-1] = 'base'
@@ -161,6 +167,9 @@ class PyBulletRobot(object):
                 js[joint_name] = sjs
         return js
 
+    def __str__(self):
+        return '{}/{}'.format(self.name, self.id)
+
 
 class PyBulletWorld(object):
     def __init__(self, gui=False):
@@ -200,42 +209,57 @@ class PyBulletWorld(object):
     def delete_robot(self, robot_name):
         p.removeBody(self._robots[robot_name].id)
 
-    def spawn_object_from_urdf(self, name, urdf):
+    def spawn_object_from_urdf(self, name, urdf_file, base_position=(0, 0, 0), base_orientation=(0, 0, 0, 1)):
         self._deactivate_rendering()
-        self._objects[name] = p.loadURDF(urdf)
+        self._objects[name] = PyBulletRobot(name, urdf_file, base_position, base_orientation)
         self._activate_rendering()
 
-    def spawn_object_from_urdf_str(self, name, urdf_str):
+    def spawn_object_from_urdf_str(self, name, urdf_str, base_position=(0, 0, 0), base_orientation=(0, 0, 0, 1)):
         self._deactivate_rendering()
-        urdf_str = replace_paths(urdf_str, name)
-        self._objects[name] = p.loadURDF(urdf_str)
+        self._objects[name] = PyBulletRobot(name, urdf_str, base_position, base_orientation)
         self._activate_rendering()
 
     def get_object_list(self):
         return list(self._objects.keys())
 
     def delete_object(self, object_name):
+        """
+        :param object_name:
+        :type object_name: str
+        """
         p.removeBody(self._objects[object_name])
 
     def attach_object(self):
+        # use pybullet constraints
         pass
 
     def release_object(self):
         pass
 
-    def check_collision(self, self_collision=True):
+    def check_collision(self, d=0.05, self_collision=True):
+        """
+        :param d:
+        :type d: float
+        :param self_collision:
+        :type self_collision: bool
+        :return:
+        :rtype: dict
+        """
         o = (0, 0, 0)
         collisions = keydefaultdict(lambda k: ContactInfo(None, self.id, self.id, k[0], k[1], o, o, o, 1e9, 0))
         if self_collision:
-            for robot in self._robots.values():
+            for robot in self._robots.values(): # type: PyBulletRobot
                 if collisions is None:
-                    collisions = robot.check_self_collision()
+                    collisions = robot.check_self_collision(d)
                 else:
-                    collisions.update(robot.check_self_collision())
-        # for object in self._objects.values():
-        #     for robot in self._robots.values():
-        #         for link in robot.sometimes:
-        #             p.getClosestPoints(self.robot.id, object, d, link_a, link_b)
+                    collisions.update(robot.check_self_collision(d))
+        for robot in self._robots.values():
+            for robot_link in robot.joint_id_to_info.keys():
+                for object in self._objects.values():
+                    for object_link in object.joint_id_to_info.keys():
+                        collisions.update({(robot.link_id_map[robot_link], object.link_id_map[object_link]):
+                                               ContactInfo(*x) for x in
+                                           p.getClosestPoints(robot.id, object.id, d, robot_link, object_link)})
         return collisions
 
     def check_trajectory_collision(self):

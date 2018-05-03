@@ -40,6 +40,14 @@ def qv_mult(q1, v1):
 
 class InteractiveMarkerPlugin(Plugin):
     def __init__(self, roots, tips, suffix=''):
+        """
+        :param roots:
+        :type roots: list
+        :param tips:
+        :type tips: list
+        :param suffix:
+        :type suffix: str
+        """
         self.roots = roots
         self.tips = tips
         self.suffix = suffix
@@ -152,6 +160,20 @@ class InteractiveMarkerPlugin(Plugin):
 
     class process_feedback(object):
         def __init__(self, i_server, marker_name, client, root_link, tip_link, all_goals):
+            """
+            :param i_server:
+            :type i_server: InteractiveMarkerServer
+            :param marker_name:
+            :type marker_name: str
+            :param client:
+            :type client: SimpleActionClient
+            :param root_link:
+            :type root_link: str
+            :param tip_link:
+            :type tip_link: str
+            :param all_goals:
+            :type all_goals: dict
+            """
             self.i_server = i_server
             self.marker_name = marker_name
             self.client = client
@@ -253,6 +275,14 @@ class InteractiveMarkerPlugin(Plugin):
             self.marker_pub.publish(ma)
 
         def make_translation_controller(self, frame_id, pose):
+            """
+            :param frame_id:
+            :type frame_id: str
+            :param pose:
+            :type pose: Pose
+            :return:
+            :rtype: giskard_msgs.msg._Controller.Controller
+            """
             controller = self.make_controller(frame_id, pose)
             controller.type = Controller.TRANSLATION_3D
             controller.p_gain = 3

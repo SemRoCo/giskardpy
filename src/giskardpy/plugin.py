@@ -3,6 +3,11 @@ class Plugin(object):
         self.started = False
 
     def start(self, god_map):
+        """
+        :param god_map:
+        :type god_map: giskardpy.god_map.GodMap
+        :return:
+        """
         self.god_map = god_map
         self.start_always()
         if not self.started:
@@ -37,14 +42,26 @@ class Plugin(object):
         pass
 
     def get_readings(self):
+        """
+        :return:
+        :rtype: dict
+        """
         return {}
 
     def get_replacement(self):
+        """
+        :return:
+        :rtype: Plugin
+        """
         c = self.copy()
         c.started = self.started
         return c
 
     def copy(self):
+        """
+        :return:
+        :rtype: Plugin
+        """
         c = self.__class__()
         return c
 
@@ -52,6 +69,12 @@ class Plugin(object):
 
 class PluginContainer(Plugin):
     def __init__(self, replacement, call_start=True):
+        """
+        :param replacement:
+        :type replacement: Plugin
+        :param call_start:
+        :type call_start: bool
+        """
         self.replacement = replacement
         self.call_init = call_start
         super(PluginContainer, self).__init__()

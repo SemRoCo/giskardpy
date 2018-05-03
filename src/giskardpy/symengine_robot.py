@@ -156,8 +156,9 @@ class Robot(object):
         return [k for k, v in self._joints.items() if v.symbol is not None]
 
     def get_link_tree(self, root, tip):
+        # TODO which links of a chain do we want to add?
         chain_joints = self._urdf_robot.get_chain(root, tip, True, False, False)
-        first_non_fixed = False
+        first_non_fixed = True
         for joint in chain_joints:
             joint_info = self._urdf_robot.joint_map[joint]
             if joint_info.type != 'fixed':
@@ -165,11 +166,11 @@ class Robot(object):
                     return self.__get_link_tree2(joint_info.child)
                 first_non_fixed = True
 
-    def __get_link_tree2(self, root, add=True):
+    def __get_link_tree2(self, root):
         if root not in self._urdf_robot.child_map:
             return []
         links = []
-        if add and self._urdf_robot.link_map[root].collision is not None:
+        if self._urdf_robot.link_map[root].collision is not None:
             links.append(root)
         for children in self._urdf_robot.child_map[root]:
             joint, link = children

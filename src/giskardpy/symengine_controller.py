@@ -46,7 +46,7 @@ class Controller(object):
 
 
 class JointController(Controller):
-    # TODO outdated this should be a class
+    # TODO outdated this should be a function
     def __init__(self, urdf):
         super(JointController, self).__init__(urdf)
         # TODO use symbol for weight

@@ -38,7 +38,7 @@ if __name__ == '__main__':
                                                      time_identifier=time_identifier))
     pm.register_plugin('bullet', PluginContainer(
         PyBulletPlugin(js_identifier=js_identifier, collision_identifier=collision_identifier,
-                       closest_point_identifier=closest_point_identifier, gui=True)))
+                       closest_point_identifier=closest_point_identifier, gui=True, marker=True)))
     pm.register_plugin('fk', FKPlugin(roots, tips, js_identifier=js_identifier, fk_identifier=fk_identifier))
     # pm.register_plugin('joint controller', JointControllerPlugin(js_identifier=js_identifier,
     #                                                              goal_identifier=joint_goal_identifier,

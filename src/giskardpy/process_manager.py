@@ -1,3 +1,4 @@
+import traceback
 from collections import OrderedDict
 from copy import copy
 from time import sleep, time
@@ -51,6 +52,7 @@ class ProcessManager(object):
                 try:
                     parallel_universe.start_loop()
                 except:
+                    traceback.print_exc()
                     print('parallel universe died')
                 parallel_universe.stop()
                 rospy.loginfo('parallel universe existed for {}s'.format(time()-t))

@@ -91,6 +91,12 @@ class WorldObject(object):
 
 
 def to_urdf_xml(urdf_object):
+    """
+    :param urdf_object:
+    :type urdf_object: Union[WorldObject, InertialProperty]
+    :return:
+    :rtype: lxml.etree.Element
+    """
     if isinstance(urdf_object, WorldObject):
         root = etree.Element('robot', name=urdf_object.name)
         link = etree.Element('link', name='{}Link'.format(urdf_object.name))
@@ -162,6 +168,12 @@ def to_urdf_xml(urdf_object):
 
 
 def to_urdf_string(urdf_object):
+    """
+    :param urdf_object:
+    :type urdf_object: WorldObject
+    :return:
+    :rtype: str
+    """
     return etree.tostring(to_urdf_xml(urdf_object))
 
 def to_marker(urdf_object):

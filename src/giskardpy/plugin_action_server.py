@@ -193,6 +193,7 @@ class ActionServer(Plugin):
 
 class LogTrajectory(Plugin):
     def __init__(self, trajectory_identifier='traj', joint_state_identifier='js', time_identifier='time'):
+
         self.trajectory_identifier = trajectory_identifier
         self.joint_state_identifier = joint_state_identifier
         self.time_identifier = time_identifier

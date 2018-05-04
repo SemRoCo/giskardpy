@@ -4,10 +4,11 @@ import rospy
 
 from geometry_msgs.msg import Point, Vector3
 from std_msgs.msg import ColorRGBA
-from std_srvs.srv import Trigger, TriggerResponse
+from std_srvs.srv import Trigger, TriggerResponse, SetBool, SetBoolResponse
 from visualization_msgs.msg import Marker, MarkerArray
 
-from giskardpy.object import WorldObject, to_urdf_string, VisualProperty, BoxShape, CollisionProperty, to_marker
+from giskardpy.object import WorldObject, to_urdf_string, VisualProperty, BoxShape, CollisionProperty, to_marker, \
+    MeshShape
 from giskardpy.plugin import Plugin
 from giskardpy.pybullet_world import PyBulletWorld, ContactInfo
 import giskardpy.trajectory as g
@@ -25,13 +26,40 @@ class PyBulletPlugin(Plugin):
         self.world = PyBulletWorld(gui=gui)
         self.srv = rospy.Service('kitchen', Trigger, self.cb)
         self.marker_pub = rospy.Publisher('visualization_marker_array', MarkerArray, queue_size=10)
+        self.viz_gui = rospy.Service('~enable_gui', SetBool, self.enable_gui_cb)
+        self.viz_gui = rospy.Service('~enable_marker', SetBool, self.enable_marker_cb)
         super(PyBulletPlugin, self).__init__()
+
+    def enable_marker_cb(self, setbool):
+        """
+        :param setbool:
+        :type setbool: std_srvs.srv._SetBool.SetBoolRequest
+        :return:
+        :rtype: SetBoolResponse
+        """
+        self.marker = setbool.data
+        return SetBoolResponse()
+
+    def enable_gui_cb(self, setbool):
+        """
+        :param setbool:
+        :type setbool: std_srvs.srv._SetBool.SetBoolRequest
+        :return:
+        :rtype: SetBoolResponse
+        """
+        if setbool.data:
+            self.world.deactivate_viewer()
+            self.world.muh(True)
+        else:
+            self.world.deactivate_viewer()
+            self.world.muh(False)
+        return SetBoolResponse()
 
     def cb(self, trigger):
         rospy.loginfo('loading kitchen')
-        # self.world.spawn_object_from_urdf('kitchen', '{}/urdf/IAI_kitchen.urdf'.format(RosPack().get_path('iai_kitchen')))
-        self.world.spawn_object_from_urdf('shelf', '{}/urdf/shelves.urdf'.format(RosPack().get_path('iai_shelves')),
-                                          [1.3,1,0])
+        # self.world.spawn_object_from_urdf('kitchen', '{}/urdf/muh.urdf'.format(RosPack().get_path('iai_kitchen')))
+        # self.world.spawn_object_from_urdf('shelf', '{}/urdf/shelves.urdf'.format(RosPack().get_path('iai_shelves')),
+        #                                   [1.3,1,0])
         # my_obj = WorldObject(name='my_box',
         #                      visual_props=[VisualProperty(geometry=BoxShape(0.5, 1.5, 1.5),
         #                                                   origin=g.Transform(g.Point(.8,0,0),
@@ -39,9 +67,16 @@ class PyBulletPlugin(Plugin):
         #                      collision_props=[CollisionProperty(geometry=BoxShape(0.5, 1.5, 1.5),
         #                                                         origin=g.Transform(g.Point(.8, 0, 0),
         #                                                                            g.Quaternion(0, 0, 0, 1)))])
-        # urdf_string = to_urdf_string(my_obj)
-        # self.world.spawn_object_from_urdf_str('box', urdf_string)
-        # self.marker_pub.publish(to_marker(my_obj))
+        my_obj = WorldObject(name='my_sink',
+                             visual_props=[VisualProperty(geometry=MeshShape('package://iai_kitchen/meshes/misc/Sink2.dae'),
+                                                          origin=g.Transform(g.Point(.8,0,.6),
+                                                                             g.Quaternion(0,0,0,1)))],
+                             collision_props=[CollisionProperty(geometry=MeshShape('package://iai_kitchen/meshes/misc/Sink2.dae'),
+                                                                origin=g.Transform(g.Point(.8, 0, .6),
+                                                                                   g.Quaternion(0, 0, 0, 1)))])
+        urdf_string = to_urdf_string(my_obj)
+        self.world.spawn_object_from_urdf_str('box', urdf_string)
+        self.marker_pub.publish(to_marker(my_obj))
         rospy.sleep(0.2)
         return TriggerResponse()
 

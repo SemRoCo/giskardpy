@@ -200,5 +200,12 @@ def to_marker(urdf_object):
             m.scale.x = visual_property.geometry.x
             m.scale.y = visual_property.geometry.y
             m.scale.z = visual_property.geometry.z
+        if isinstance(visual_property.geometry, MeshShape):
+            m.type = Marker.MESH_RESOURCE
+            m.mesh_resource = visual_property.geometry.filename
+            m.scale.x = visual_property.geometry.scale[0]
+            m.scale.y = visual_property.geometry.scale[1]
+            m.scale.z = visual_property.geometry.scale[2]
+            m.mesh_use_embedded_materials = True
         ma.markers.append(m)
     return ma

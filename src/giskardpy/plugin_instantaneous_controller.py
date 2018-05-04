@@ -112,6 +112,18 @@ class CartesianControllerPlugin(ControllerPlugin):
 class CartesianBulletControllerPlugin(ControllerPlugin):
     def __init__(self, roots, tips, js_identifier='js', fk_identifier='fk', goal_identifier='cartesian_goal',
                  next_cmd_identifier='motor', collision_identifier='collision', closest_point_identifier='cpi'):
+        """
+        :param roots:
+        :type roots: list
+        :param tips:
+        :type tips: list
+        :param js_identifier:
+        :param fk_identifier:
+        :param goal_identifier:
+        :param next_cmd_identifier:
+        :param collision_identifier:
+        :param closest_point_identifier:
+        """
         self._fk_identifier = fk_identifier
         self._collision_identifier = collision_identifier
         self._closest_point_identifier = closest_point_identifier

@@ -178,9 +178,9 @@ class PyBulletWorld(object):
         self._robots = {}
 
     def spawn_urdf_str_robot(self, robot_name, urdf_string, base_position=(0, 0, 0), base_orientation=(0, 0, 0, 1)):
-        self._deactivate_rendering()
+        self.deactivate_rendering()
         self._robots[robot_name] = PyBulletRobot(robot_name, urdf_string, base_position, base_orientation)
-        self._activate_rendering()
+        self.activate_rendering()
 
     def spawn_urdf_file_robot(self, robot_name, urdf_file, base_position=(0, 0, 0), base_orientation=(0, 0, 0, 1)):
         with open(urdf_file, 'r') as f:
@@ -210,14 +210,15 @@ class PyBulletWorld(object):
         p.removeBody(self._robots[robot_name].id)
 
     def spawn_object_from_urdf(self, name, urdf_file, base_position=(0, 0, 0), base_orientation=(0, 0, 0, 1)):
-        self._deactivate_rendering()
+        print('loading {}'.format(urdf_file))
+        self.deactivate_rendering()
         self._objects[name] = PyBulletRobot(name, urdf_file, base_position, base_orientation)
-        self._activate_rendering()
+        self.activate_rendering()
 
     def spawn_object_from_urdf_str(self, name, urdf_str, base_position=(0, 0, 0), base_orientation=(0, 0, 0, 1)):
-        self._deactivate_rendering()
+        self.deactivate_rendering()
         self._objects[name] = PyBulletRobot(name, urdf_str, base_position, base_orientation)
-        self._activate_rendering()
+        self.activate_rendering()
 
     def get_object_list(self):
         return list(self._objects.keys())
@@ -282,10 +283,16 @@ class PyBulletWorld(object):
     def deactivate_viewer(self):
         p.disconnect()
 
-    def _deactivate_rendering(self):
+    def muh(self, gui=True):
+        if gui:
+            p.connect(p.GUI)
+        else:
+            p.connect(p.DIRECT)
+
+    def deactivate_rendering(self):
         p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 0)
         p.configureDebugVisualizer(p.COV_ENABLE_TINY_RENDERER, 0)
         p.configureDebugVisualizer(p.COV_ENABLE_GUI, 0)
 
-    def _activate_rendering(self):
+    def activate_rendering(self):
         p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 1)

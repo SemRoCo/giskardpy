@@ -313,6 +313,7 @@ class InteractiveMarkerPlugin(Plugin):
             goal.type = ControllerListGoal.STANDARD_CONTROLLER
             for g in self.all_goals.values():
                 goal.controllers.extend(g)
+            # print(goal)
             self.client.send_goal(goal)
 
     def copy(self):

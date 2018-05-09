@@ -272,7 +272,7 @@ class PyBulletWorld(object):
         else:
             self.physicsClient = p.connect(p.DIRECT)  # or p.DIRECT for non-graphical version
         p.setAdditionalSearchPath(pybullet_data.getDataPath())  # optionally
-        print(pybullet_data.getDataPath())
+        # print(pybullet_data.getDataPath())
         p.setGravity(0, 0, -9.8)
         self.spawn_object_from_urdf('plane', 'plane.urdf')
 

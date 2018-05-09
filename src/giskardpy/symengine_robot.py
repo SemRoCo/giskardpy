@@ -125,10 +125,13 @@ class Robot(object):
                     self.hard_constraints[joint_name] = HardConstraint(lower=joint.lower - joint.symbol,
                                                                        upper=joint.upper - joint.symbol,
                                                                        expression=joint.symbol)
-                if joint.velocity_limit is not None:
-                    self.joint_constraints[joint_name] = JointConstraint(lower=-joint.velocity_limit,
-                                                                         upper=joint.velocity_limit,
-                                                                         weight=self.default_weight)
+                if joint.velocity_limit is None:
+                    vel_limit = self.default_joint_vel_limit
+                else:
+                    vel_limit = min(joint.velocity_limit, self.default_joint_vel_limit)
+                self.joint_constraints[joint_name] = JointConstraint(lower=-vel_limit,
+                                                                     upper=vel_limit,
+                                                                     weight=self.default_weight)
 
     def get_fk_expression(self, root_link, tip_link):
         if (root_link, tip_link) not in self.fks:

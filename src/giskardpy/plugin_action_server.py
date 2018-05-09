@@ -1,6 +1,6 @@
 import numpy as np
 from Queue import Empty, Queue
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 import pylab as plt
 import actionlib
 import rospy
@@ -72,15 +72,15 @@ class ActionServer(Plugin):
         self.update_lock.join()
 
     def get_readings(self):
-        #TODO can't handle joint and cart goal at the same time
-        #TODO set default goals
-        cartesian_goals = None
-        joint_goal = None
+        goals = None
         try:
             goal = self.get_readings_lock.get_nowait()
+            rospy.loginfo('got goal')
             for controller in goal.controllers:
                 self.new_universe = True
                 if controller.type == Controller.JOINT:
+                    # TODO implement me
+                    raise NotImplementedError()
                     rospy.loginfo('got joint goal')
                     joint_goal = OrderedDict()
                     for i, joint_name in enumerate(controller.goal_state.name):
@@ -89,25 +89,17 @@ class ActionServer(Plugin):
                                                0,
                                                0)
                         joint_goal[joint_name] = sjs
-                elif controller.type == Controller.TRANSLATION_3D:
-                    if cartesian_goals is None:
-                        cartesian_goals = {}
-                    rospy.loginfo('got cart goal')
+                elif controller.type in [Controller.TRANSLATION_3D, Controller.ROTATION_3D]:
+                    key = str(controller.type)
+                    if goals is None:
+                        goals = defaultdict(dict)
                     root = controller.root_link
                     tip = controller.tip_link
                     controller.goal_pose = self.tf.transform_pose(root, controller.goal_pose)
-                    trans_goal = Point(controller.goal_pose.pose.position.x,
-                                       controller.goal_pose.pose.position.y,
-                                       controller.goal_pose.pose.position.z)
-                    rot_goal = Quaternion(controller.goal_pose.pose.orientation.x,
-                                          controller.goal_pose.pose.orientation.y,
-                                          controller.goal_pose.pose.orientation.z,
-                                          controller.goal_pose.pose.orientation.w)
-                    cartesian_goals[root, tip] = Transform(trans_goal, rot_goal)
+                    goals[key][root, tip] = controller
         except Empty:
             pass
-        update = {self.joint_goal_identifier: joint_goal,
-                  self.cartesian_goal_identifier: cartesian_goals}
+        update = {self.cartesian_goal_identifier: goals}
         return update
 
     def update(self):

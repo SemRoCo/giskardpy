@@ -48,7 +48,6 @@ class PyBulletPlugin(Plugin):
         :rtype: SetBoolResponse
         """
         if setbool.data:
-            self.world.deactivate_viewer()
             self.world.muh(True)
         else:
             self.world.deactivate_viewer()

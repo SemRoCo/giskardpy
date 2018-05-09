@@ -17,6 +17,7 @@ class JointStatePlugin(Plugin):
         self.time_identifier = time_identifier
         self.next_cmd_identifier = next_cmd_identifier
         self.js = None
+        self.mjs = None
         self.lock = Queue(maxsize=1)
 
     def cb(self, data):
@@ -28,7 +29,10 @@ class JointStatePlugin(Plugin):
 
     def get_readings(self):
         try:
-            js = self.lock.get_nowait()
+            if self.mjs is None:
+                js = self.lock.get_nowait()
+            else:
+                js = self.lock.get_nowait()
             self.mjs = OrderedDict()
             for i, joint_name in enumerate(js.name):
                 sjs = SingleJointState()

@@ -23,6 +23,10 @@ class ProcessManager(object):
     def start_loop(self):
         for plugin in self._plugins.values():
             plugin.start(self._god_map)
+            # TODO is it really a good idea to call get_readings here?
+            # for identifier, value in plugin.get_readings().items():
+            #     self._god_map.set_data(identifier, value)
+        print('init complete')
         while self.update() and not rospy.is_shutdown():
             # TODO make sure this can be properly killed without rospy dependency
             if self.original_universe:

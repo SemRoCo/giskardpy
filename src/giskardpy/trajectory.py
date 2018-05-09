@@ -107,12 +107,21 @@ class Trajectory(object):
     def values(self):
         return self._points.values()
 
-class CartGoal(object):
+class ControllerMsg(object):
     def __init__(self):
-        self.translation = None
-        self.rotation = None
-        self.root = None
-        self.tip = None
+        self.type = 0
+        self.root_link = ''
+        self.tip_link = ''
+        self.p_gain = 0
+        self.weight = 0
+        self.enable_error_threshold = True
+        self.threshold_value = 0
+        self.goal_pose = None
+        self.goal_state = None
+
+    def __hash__(self):
+        return '{}{}{}'.format(self.root_link, self.tip_link, self.type).__hash__()
+
 
 class TransGoal(object):
     def __init__(self):

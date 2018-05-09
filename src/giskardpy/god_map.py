@@ -12,6 +12,7 @@ class GodMap(object):
         self.expr_separator = '_'
         self.key_to_expr = {}
         self.expr_to_key = {}
+        self.default_value = 0
 
     def __copy__(self):
         god_map_copy = GodMap()
@@ -43,12 +44,14 @@ class GodMap(object):
             try:
                 result = self._get_member(result, member)
             except AttributeError:
-                result = 0
+                result = self.default_value
             except TypeError:
                 pass
             except KeyError as e:
-                traceback.print_exc()
-                raise KeyError(key)
+                # TODO is this really a good idea?
+                # traceback.print_exc()
+                # raise KeyError(key)
+                result = self.default_value
         return result
 
     def get_expr(self, key):

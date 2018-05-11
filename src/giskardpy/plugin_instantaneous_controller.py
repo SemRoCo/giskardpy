@@ -38,22 +38,21 @@ class CartesianBulletControllerPlugin(Plugin):
         self._controller = None
         self.known_constraints = set()
         self.controlled_joints = set()
+        self.controller_updated = False
         super(CartesianBulletControllerPlugin, self).__init__()
 
     def update(self):
         if self.god_map.get_data(self._goal_identifier) is not None:
-            # TODO create new controller
             # TODO set joint goals
+
+            # update controlled joints
             new_controlled_joints = self.god_map.get_data(self.controlled_joints_identifier)
             if len(set(new_controlled_joints).difference(self.controlled_joints)) != 0:
                 self._controller.set_controlled_joints(new_controlled_joints)
             self.controlled_joints = new_controlled_joints
-            self.modify_controller()
-            asd = self.god_map.get_data(self._goal_identifier)
-            asd[str(Controller.JOINT)] = keydefaultdict(lambda k: {'weight': 0,
-                                                                   'position': self.god_map.get_data(
-                                                                       [self._joint_states_identifier, k, 'position'])})
-            self.god_map.set_data(self._goal_identifier, asd)
+
+            if not self.controller_updated:
+                self.modify_controller()
 
             next_cmd = self._controller.get_cmd(self.god_map.get_expr_values())
             self.next_cmd.update(next_cmd)
@@ -82,10 +81,10 @@ class CartesianBulletControllerPlugin(Plugin):
         robot.set_joint_symbol_map(current_joints)
 
     def modify_controller(self):
-        change = False
-
+        new_chain = False
+        robot = self._controller.robot
+        hold_joints = set(self.controlled_joints)
         if not self._controller.is_initialized():
-            robot = self._controller.robot
 
             controllable_links = set()
             for joint_name in self.controlled_joints:
@@ -116,23 +115,44 @@ class CartesianBulletControllerPlugin(Plugin):
 
         for (root, tip), value in self.god_map.get_data([self._goal_identifier, Controller.TRANSLATION_3D]).items():
             key = '{}/{},{}'.format(Controller.TRANSLATION_3D, root, tip)
+            hold_joints.difference_update(robot.get_chain_joints(root, tip))
             if key not in self.known_constraints:
                 self.known_constraints.add(key)
                 self.soft_constraints.update(self.controller_msg_to_constraint(root, tip, Controller.TRANSLATION_3D))
-                change = True
+                new_chain = True
+            self.god_map.set_data([self._goal_identifier, Controller.TRANSLATION_3D, ','.join([root, tip]), 'weight'], 1)
         for (root, tip), value in self.god_map.get_data([self._goal_identifier, Controller.ROTATION_3D]).items():
             key = '{}/{},{}'.format(Controller.ROTATION_3D, root, tip)
+            hold_joints.difference_update(robot.get_chain_joints(root, tip))
             if key not in self.known_constraints:
                 self.known_constraints.add(key)
                 self.soft_constraints.update(self.controller_msg_to_constraint(root, tip, Controller.ROTATION_3D))
-                change = True
+                new_chain = True
+            self.god_map.set_data([self._goal_identifier, Controller.ROTATION_3D, ','.join([root, tip]), 'weight'], 1)
 
-        if change or self._controller is None:
+        # TODO handle joint controller
+
+        # set weight of unused joints to 0
+        # TODO this breaks the rule of not modifying the god map inside of a plugin
+        joint_goal = self.god_map.get_data([self._goal_identifier, Controller.JOINT])
+        for joint_name in self.controlled_joints:
+            if joint_name not in joint_goal:
+                joint_goal[joint_name] = {'weight': 0,
+                                          'position': self.god_map.get_data([self._joint_states_identifier,
+                                                                             joint_name,
+                                                                             'position'])}
+                if joint_name in hold_joints:
+                    joint_goal[joint_name]['weight'] = 1
+
+        self.god_map.set_data([self._goal_identifier, Controller.JOINT], joint_goal)
+
+        if new_chain or self._controller is None:
             # TODO prevent this from being called too often
-            # TODO turn off old constraints by adding new symbol
+            # TODO turn off old constraints by setting weight to 0
             # TODO sanity checking
 
             self._controller.init(self.soft_constraints, self.god_map.get_free_symbols())
+        self.controller_updated = True
 
     def controller_msg_to_constraint(self, root, tip, type):
         """
@@ -152,14 +172,17 @@ class CartesianBulletControllerPlugin(Plugin):
         trans_prefix = '{}/{},{}/pose/position'.format(self._fk_identifier, root, tip)
         rot_prefix = '{}/{},{}/pose/orientation'.format(self._fk_identifier, root, tip)
         current_input = FrameInput.prefix_constructor(trans_prefix, rot_prefix, self.god_map.get_expr)
+        weight = self.god_map.get_expr([self._goal_identifier, str(type), ','.join([root, tip]), 'weight'])
         if type == Controller.TRANSLATION_3D:
             return position_conv(goal_input.get_position(),
                                  sw.pos_of(robot.get_fk_expression(root, tip)),
+                                 weights=weight,
                                  ns='{}/{}'.format(root, tip))
         elif type == Controller.ROTATION_3D:
             return rotation_conv(goal_input.get_rotation(),
                                  sw.rot_of(robot.get_fk_expression(root, tip)),
                                  current_input.get_rotation(),
+                                 weights=weight,
                                  ns='{}/{}'.format(root, tip))
 
         return {}

@@ -79,7 +79,11 @@ class GodMap(object):
         return self.key_to_expr.values()
 
     def set_data(self, key, value):
-        identifier_parts = key.split(self.separator)
+        if isinstance(key, str):
+            identifier_parts = key.split(self.separator)
+        else:
+            # TODO handle tuple
+            identifier_parts = [str(x) for x in key]
         namespace = identifier_parts[0]
         if namespace not in self._data:
             if len(identifier_parts) > 1:

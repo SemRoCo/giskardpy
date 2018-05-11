@@ -193,6 +193,7 @@ class InteractiveMarkerPlugin(Plugin):
 
         def __call__(self, feedback):
             if feedback.event_type == InteractiveMarkerFeedback.MOUSE_UP:
+                self.all_goals = defaultdict(list)
                 self.all_goals[self.root_link, self.tip_link] = []
                 print('got interactive goal update')
                 # translation

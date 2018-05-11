@@ -19,8 +19,9 @@ from giskardpy.trajectory import SingleJointState, Transform, Point, Quaternion,
 class ActionServerPlugin(Plugin):
     # TODO find a better name for this
     def __init__(self, cartesian_goal_identifier, js_identifier, trajectory_identifier, time_identifier,
-                 collision_identifier):
+                 collision_identifier, controlled_joints_identifier):
         self.cartesian_goal_identifier = cartesian_goal_identifier
+        self.controlled_joints_identifier = controlled_joints_identifier
         self.trajectory_identifier = trajectory_identifier
         self.js_identifier = js_identifier
         self.time_identifier = time_identifier
@@ -75,34 +76,37 @@ class ActionServerPlugin(Plugin):
         try:
             goal = self.get_readings_lock.get_nowait()
             rospy.loginfo('got goal')
+            if len(goal.controllers) > 1:
+                goals = defaultdict(dict)
+                # goals[str(Controller.JOINT)] = self.get_default_joint_goal()
             for controller in goal.controllers:
                 self.new_universe = True
+                goal_key = str(controller.type)
                 if controller.type == Controller.JOINT:
-                    # TODO implement me
-                    raise NotImplementedError()
                     rospy.loginfo('got joint goal')
-                    joint_goal = OrderedDict()
                     for i, joint_name in enumerate(controller.goal_state.name):
-                        sjs = SingleJointState(joint_name,
-                                               controller.goal_state.position[i],
-                                               0,
-                                               0)
-                        joint_goal[joint_name] = sjs
+                        goals[goal_key][joint_name] = {'weight': 1,
+                                                       'position': controller.goal_state.position[i]}
                 elif controller.type in [Controller.TRANSLATION_3D, Controller.ROTATION_3D]:
-                    key = str(controller.type)
-                    if goals is None:
-                        goals = defaultdict(dict)
                     root = controller.root_link
                     tip = controller.tip_link
                     controller.goal_pose = self.tf.transform_pose(root, controller.goal_pose)
-                    goals[key][root, tip] = controller
+                    goals[goal_key][root, tip] = controller
         except Empty:
             pass
         update = {self.cartesian_goal_identifier: goals}
         return update
 
+    def get_default_joint_goal(self):
+        joint_goal = OrderedDict()
+        for joint_name in sorted(self.controller_joints):
+            joint_goal[joint_name] = {'weight': 1,
+                                      'position': self.current_js[joint_name].position}
+        return joint_goal
+
     def update(self):
-        pass
+        self.controlled_joints = self.god_map.get_data(self.controlled_joints_identifier)
+        self.current_js = self.god_map.get_data(self.js_identifier)
 
     def start_once(self):
         self.new_universe = False
@@ -138,7 +142,6 @@ class ActionServerPlugin(Plugin):
         else:
             # TODO add goal for each controller
             self.get_readings_lock.put(goal)
-
 
     def cb_update_part(self):
         solution = self.update_lock.get()

@@ -76,7 +76,7 @@ def joint_position(current_joint, joint_goal, weight):
                           expression=current_joint)
 
 
-def position_conv(goal_position, current_position, weights=(1, 1, 1), trans_gain=3, max_trans_speed=0.3, ns=''):
+def position_conv(goal_position, current_position, weights=1, trans_gain=3, max_trans_speed=0.3, ns=''):
     """
     :param goal_position:
     :type goal_position: giskardpy.input_system.FrameInput
@@ -98,21 +98,21 @@ def position_conv(goal_position, current_position, weights=(1, 1, 1), trans_gain
 
     soft_constraints['align {} x position'.format(ns)] = SoftConstraint(lower=trans_control[0],
                                                                         upper=trans_control[0],
-                                                                        weight=weights[0],
+                                                                        weight=weights,
                                                                         expression=current_position[0])
     soft_constraints['align {} y position'.format(ns)] = SoftConstraint(lower=trans_control[1],
                                                                         upper=trans_control[1],
-                                                                        weight=weights[1],
+                                                                        weight=weights,
                                                                         expression=current_position[1])
     soft_constraints['align {} z position'.format(ns)] = SoftConstraint(lower=trans_control[2],
                                                                         upper=trans_control[2],
-                                                                        weight=weights[2],
+                                                                        weight=weights,
                                                                         expression=current_position[2])
 
     return soft_constraints
 
 
-def rotation_conv(goal_rotation, current_rotation, current_evaluated_rotation, weights=(1, 1, 1),
+def rotation_conv(goal_rotation, current_rotation, current_evaluated_rotation, weights=1,
                   rot_gain=3, max_rot_speed=0.5, ns=''):
     soft_constraints = {}
     axis, angle = sw.axis_angle_from_matrix((current_rotation.T * goal_rotation))
@@ -126,15 +126,15 @@ def rotation_conv(goal_rotation, current_rotation, current_evaluated_rotation, w
 
     soft_constraints['align {} rotation 0'.format(ns)] = SoftConstraint(lower=r_rot_control[0],
                                                                         upper=r_rot_control[0],
-                                                                        weight=weights[0],
+                                                                        weight=weights,
                                                                         expression=c_aa[0])
     soft_constraints['align {} rotation 1'.format(ns)] = SoftConstraint(lower=r_rot_control[1],
                                                                         upper=r_rot_control[1],
-                                                                        weight=weights[1],
+                                                                        weight=weights,
                                                                         expression=c_aa[1])
     soft_constraints['align {} rotation 2'.format(ns)] = SoftConstraint(lower=r_rot_control[2],
                                                                         upper=r_rot_control[2],
-                                                                        weight=weights[2],
+                                                                        weight=weights,
                                                                         expression=c_aa[2])
     return soft_constraints
 

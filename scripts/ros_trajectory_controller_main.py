@@ -18,8 +18,8 @@ if __name__ == '__main__':
 
     # roots = ['base_footprint']
     # tips = ['gripper_tool_frame']
-    roots = ['base_link', 'base_link', 'base_link']
-    tips = ['r_gripper_tool_frame', 'l_gripper_tool_frame', 'torso_lift_link']
+    roots = ['base_link', 'base_link']
+    tips = ['r_gripper_tool_frame', 'l_gripper_tool_frame']
     fk_identifier = 'fk'
     cartesian_goal_identifier = 'cartesian_goal'
 
@@ -49,7 +49,7 @@ if __name__ == '__main__':
                                                       collision_identifier=collision_identifier,
                                                       closest_point_identifier=closest_point_identifier,
                                                       gui=False,
-                                                      marker=False)))
+                                                      marker=True)))
     pm.register_plugin('fk',
                        FKPlugin(roots, tips, js_identifier=js_identifier, fk_identifier=fk_identifier))
     pm.register_plugin('cart bullet controller',

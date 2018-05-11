@@ -1,12 +1,13 @@
 from collections import namedtuple, OrderedDict
 import numpy as np
 import symengine_wrappers as spw
-from urdf_parser_py.urdf import URDF
+from urdf_parser_py.urdf import URDF, Box, Sphere, Mesh
 
 from giskardpy.input_system import JointStatesInput
 from giskardpy.qp_problem_builder import HardConstraint, JointConstraint
 
 Joint = namedtuple('Joint', ['symbol', 'velocity_limit', 'lower', 'upper', 'type', 'frame'])
+
 
 def hacky_urdf_parser_fix(urdf_str):
     # TODO this function is inefficient but the tested urdf's aren't big enough for it to be a problem
@@ -53,7 +54,7 @@ class Robot(object):
         if joint_states_input is not None:
             self.joint_states_input = joint_states_input
             for joint_name, joint in self._joints.items():
-            # for joint_name, joint_symbol in joint_states_input.joint_map.items():
+                # for joint_name, joint_symbol in joint_states_input.joint_map.items():
                 new_symbol = None
                 if joint.symbol is not None and joint_name in self.joint_states_input.joint_map:
                     new_symbol = self.joint_states_input.joint_map[joint_name]
@@ -167,8 +168,13 @@ class Robot(object):
             if child_link in self._urdf_robot.child_map:
                 for j, l in self._urdf_robot.child_map[child_link]:
                     joints.append(j)
-            if self._urdf_robot.link_map[child_link].collision is not None:
-                links.add(child_link)
+            link_collision = self._urdf_robot.link_map[child_link].collision
+            if link_collision is not None:
+                geo = link_collision.geometry
+                if isinstance(geo, Box) and np.prod(geo.size) > 0.01 or \
+                        isinstance(geo, Sphere) and geo.radius > 0.1 or \
+                        isinstance(geo, Mesh):
+                    links.add(child_link)
 
         return links
 

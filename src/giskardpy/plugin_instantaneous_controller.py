@@ -98,10 +98,12 @@ class CartesianBulletControllerPlugin(Plugin):
                     [self._goal_identifier, Controller.JOINT, joint_name, 'position'])
                 weight = self.god_map.get_expr([self._goal_identifier, Controller.JOINT, joint_name, 'weight'])
                 on_off = self.god_map.get_expr([self._goal_identifier, Controller.JOINT, joint_name, 'on_off'])
-                self.soft_constraints[joint_name] = joint_position(current_joint_key, goal_joint_key, weight, on_off)
+                # self.soft_constraints[joint_name] = joint_position(current_joint_key, goal_joint_key, weight, on_off)
                 controllable_links.update(robot.get_link_tree(joint_name))
 
-            for link in controllable_links:
+            for link in list(controllable_links):
+            # for link in ['head_mount_kinect_ir_link', 'head_mount_kinect_rgb_link', 'head_mount_link', 'head_mount_prosilica_link', 'head_pan_link', 'head_plate_frame', 'head_tilt_link', 'l_elbow_flex_link', 'l_forearm_link', 'l_forearm_roll_link', 'l_gripper_l_finger_link', 'l_gripper_palm_link', 'l_gripper_r_finger_link', 'l_gripper_r_finger_tip_link', 'l_shoulder_lift_link', 'l_shoulder_pan_link', 'l_upper_arm_link', 'l_upper_arm_roll_link', 'l_wrist_flex_link', 'l_wrist_roll_link', 'laser_tilt_mount_link', 'r_elbow_flex_link', 'r_forearm_link', 'r_forearm_roll_link', 'r_gripper_l_finger_link', 'r_gripper_palm_link', 'r_gripper_r_finger_link', 'r_gripper_r_finger_tip_link', 'r_shoulder_lift_link', 'r_shoulder_pan_link', 'r_upper_arm_link', 'r_upper_arm_roll_link', 'r_wrist_flex_link', 'r_wrist_roll_link', 'torso_lift_link']:
+            # for link in ['r_gripper_l_finger_tip_link', 'r_gripper_r_finger_tip_link']:
                 point_on_link_input = Point3Input.position_on_a_constructor(self.god_map.get_expr,
                                                                             '{}/{}'.format(
                                                                                 self._closest_point_identifier,

@@ -12,6 +12,7 @@ class GodMap(object):
         self.expr_separator = '_'
         self.key_to_expr = {}
         self.expr_to_key = {}
+        self.default_value = 0
 
     def __copy__(self):
         god_map_copy = GodMap()
@@ -36,22 +37,29 @@ class GodMap(object):
 
     def get_data(self, key):
         # TODO deal with unused identifiers
-        identifier_parts = key.split(self.separator)
+        if isinstance(key, str):
+            identifier_parts = key.split(self.separator)
+        else:
+            identifier_parts = [str(x) for x in key]
         namespace = identifier_parts[0]
         result = self._data.get(namespace)
         for member in identifier_parts[1:]:
             try:
                 result = self._get_member(result, member)
             except AttributeError:
-                result = 0
+                result = self.default_value
             except TypeError:
                 pass
             except KeyError as e:
-                traceback.print_exc()
-                raise KeyError(key)
+                # TODO is this really a good idea?
+                # traceback.print_exc()
+                # raise KeyError(key)
+                result = self.default_value
         return result
 
     def get_expr(self, key):
+        if isinstance(key, list):
+            key = '/'.join([str(x) for x in key])
         if key not in self.key_to_expr:
             expr = se.Symbol(key.replace(self.separator, self.expr_separator))
             if expr in self.expr_to_key:

@@ -23,6 +23,10 @@ class ProcessManager(object):
     def start_loop(self):
         for plugin in self._plugins.values():
             plugin.start(self._god_map)
+            # TODO is it really a good idea to call get_readings here?
+            # for identifier, value in plugin.get_readings().items():
+            #     self._god_map.set_data(identifier, value)
+        print('init complete')
         while self.update() and not rospy.is_shutdown():
             # TODO make sure this can be properly killed without rospy dependency
             if self.original_universe:
@@ -56,6 +60,11 @@ class ProcessManager(object):
                     print('parallel universe died')
                 parallel_universe.stop()
                 rospy.loginfo('parallel universe existed for {}s'.format(time()-t))
+
+                # copy new expressions
+                self._god_map.expr_to_key = parallel_universe.get_god_map().expr_to_key
+                self._god_map.key_to_expr = parallel_universe.get_god_map().key_to_expr
+
                 plugin.post_mortem_analysis(parallel_universe.get_god_map())
                 # TODO different function for get readings after end of universe?
                 for identifier, value in plugin.get_readings().items():

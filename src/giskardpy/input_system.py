@@ -6,7 +6,6 @@ class InputArray(object):
         for param_name, identifier in kwargs.items():
             setattr(self, param_name, sw.Symbol(str(identifier)))
 
-
 class JointStatesInput(InputArray):
     def __init__(self, joint_map):
         self.joint_map = joint_map

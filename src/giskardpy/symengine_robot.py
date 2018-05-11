@@ -1,12 +1,13 @@
 from collections import namedtuple, OrderedDict
 import numpy as np
 import symengine_wrappers as spw
-from urdf_parser_py.urdf import URDF
+from urdf_parser_py.urdf import URDF, Box, Sphere, Mesh
 
 from giskardpy.input_system import JointStatesInput
 from giskardpy.qp_problem_builder import HardConstraint, JointConstraint
 
 Joint = namedtuple('Joint', ['symbol', 'velocity_limit', 'lower', 'upper', 'type', 'frame'])
+
 
 def hacky_urdf_parser_fix(urdf_str):
     # TODO this function is inefficient but the tested urdf's aren't big enough for it to be a problem
@@ -53,7 +54,7 @@ class Robot(object):
         if joint_states_input is not None:
             self.joint_states_input = joint_states_input
             for joint_name, joint in self._joints.items():
-            # for joint_name, joint_symbol in joint_states_input.joint_map.items():
+                # for joint_name, joint_symbol in joint_states_input.joint_map.items():
                 new_symbol = None
                 if joint.symbol is not None and joint_name in self.joint_states_input.joint_map:
                     new_symbol = self.joint_states_input.joint_map[joint_name]
@@ -125,10 +126,13 @@ class Robot(object):
                     self.hard_constraints[joint_name] = HardConstraint(lower=joint.lower - joint.symbol,
                                                                        upper=joint.upper - joint.symbol,
                                                                        expression=joint.symbol)
-                if joint.velocity_limit is not None:
-                    self.joint_constraints[joint_name] = JointConstraint(lower=-joint.velocity_limit,
-                                                                         upper=joint.velocity_limit,
-                                                                         weight=self.default_weight)
+                if joint.velocity_limit is None:
+                    vel_limit = self.default_joint_vel_limit
+                else:
+                    vel_limit = min(joint.velocity_limit, self.default_joint_vel_limit)
+                self.joint_constraints[joint_name] = JointConstraint(lower=-vel_limit,
+                                                                     upper=vel_limit,
+                                                                     weight=self.default_weight)
 
     def get_fk_expression(self, root_link, tip_link):
         if (root_link, tip_link) not in self.fks:
@@ -155,26 +159,23 @@ class Robot(object):
     def get_joint_names(self):
         return [k for k, v in self._joints.items() if v.symbol is not None]
 
-    def get_link_tree(self, root, tip):
+    def get_link_tree(self, root):
         # TODO which links of a chain do we want to add?
-        chain_joints = self._urdf_robot.get_chain(root, tip, True, False, False)
-        first_non_fixed = True
-        for joint in chain_joints:
-            joint_info = self._urdf_robot.joint_map[joint]
-            if joint_info.type != 'fixed':
-                if first_non_fixed:
-                    return self.__get_link_tree2(joint_info.child)
-                first_non_fixed = True
+        links = set()
+        joints = [root]
+        for joint in joints:
+            child_link = self._urdf_robot.joint_map[joint].child
+            if child_link in self._urdf_robot.child_map:
+                for j, l in self._urdf_robot.child_map[child_link]:
+                    joints.append(j)
+            link_collision = self._urdf_robot.link_map[child_link].collision
+            if link_collision is not None:
+                geo = link_collision.geometry
+                if isinstance(geo, Box) and np.prod(geo.size) > 0.01 or \
+                        isinstance(geo, Sphere) and geo.radius > 0.1 or \
+                        isinstance(geo, Mesh):
+                    links.add(child_link)
 
-    def __get_link_tree2(self, root):
-        if root not in self._urdf_robot.child_map:
-            return []
-        links = []
-        if self._urdf_robot.link_map[root].collision is not None:
-            links.append(root)
-        for children in self._urdf_robot.child_map[root]:
-            joint, link = children
-            links.extend(self.__get_link_tree2(link))
         return links
 
     def get_rnd_joint_state(self):

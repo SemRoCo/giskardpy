@@ -1,3 +1,5 @@
+from symengine import Symbol
+
 import symengine_wrappers as sw
 from collections import OrderedDict
 
@@ -6,25 +8,36 @@ from giskardpy.qp_problem_builder import QProblemBuilder, SoftConstraint
 from giskardpy.symengine_robot import Robot
 
 
-class Controller(object):
+class SymEngineController(object):
     def __init__(self, urdf):
         self._soft_constraints = OrderedDict()
         self.robot = Robot(urdf)
+        self.controlled_joints = set()
+        self.hard_constraints = {}
+        self.joint_constraints = {}
+        self.qp_problem_builder = None
 
-    def add_constraints(self, soft_constraints):
-        self._soft_constraints.update(soft_constraints)
+    def is_initialized(self):
+        return self.qp_problem_builder is not None
 
-    def init(self, controlled_joints=None, free_symbols=None):
-        if controlled_joints is None:
-            controlled_joint_symbols = self.get_controlled_joint_symbols()
-            controlled_joints = self.get_controlled_joints()
-        else:
-            controlled_joint_symbols = [self.robot.get_joint_symbol_map().joint_map[x] for x in controlled_joints]
-        self.qp_problem_builder = QProblemBuilder({k: self.robot.joint_constraints[k] for k in controlled_joints},
-                                                  {k: self.robot.hard_constraints[k] for k in controlled_joints if
-                                                   k in self.robot.hard_constraints},
-                                                  self._soft_constraints,
-                                                  controlled_joint_symbols,
+    def set_controlled_joints(self, joint_names):
+        """
+        :param joint_names:
+        :type joint_names: set
+        """
+        # TODO might have to get it from a topic or something
+        self.controlled_joints.update(joint_names)
+        self.controlled_joint_symbols = [self.robot.get_joint_symbol_map().joint_map[x] for x in
+                                         self.controlled_joints]
+        self.joint_constraints = {k: self.robot.joint_constraints[k] for k in self.controlled_joints}
+        self.hard_constraints = {k: self.robot.hard_constraints[k] for k in self.controlled_joints if
+                                 k in self.robot.hard_constraints}
+
+    def init(self, soft_constraints, free_symbols):
+        self.qp_problem_builder = QProblemBuilder(self.joint_constraints,
+                                                  self.hard_constraints,
+                                                  soft_constraints,
+                                                  self.controlled_joint_symbols,
                                                   free_symbols)
 
     def get_controlled_joints(self):
@@ -45,52 +58,37 @@ class Controller(object):
         return real_next_cmd
 
 
-class JointController(Controller):
-    # TODO outdated this should be a function
-    def __init__(self, urdf):
-        super(JointController, self).__init__(urdf)
-        # TODO use symbol for weight
-        self.default_weight = 1
-        self._set_default_goal_joint_states()
 
-    def _set_default_goal_joint_states(self):
-        m = OrderedDict()
-        for joint_name in self.robot.joint_states_input.joint_map:
-            m[joint_name] = sw.Symbol('goal_{}'.format(joint_name))
-        self.goal_joint_states = JointStatesInput(m)
-
-    def init(self, current_joints=None, joint_goals=None):
-        """
-        :param current_joints: InputArray
-        :param joint_goals: InputArray
-        """
-
-        # TODO add chain
-        self.robot.set_joint_symbol_map(current_joints)
-        if joint_goals is not None:
-            self.goal_joint_states = joint_goals
-
-        self._soft_constraints = self.make_soft_constraints(self.robot.joint_states_input, self.goal_joint_states, 0)
-        super(JointController, self).init()
-
-    def make_soft_constraints(self, current_joints, joint_goals, weights):
-        """
-        :param current_joints: JointStatesInput
-        :param joint_goals: JointStatesInput
-        :param weights: TODO
-        :return:
-        """
-        soft_constraints = {}
-        for joint_name, current_joint_symbol in current_joints.joint_map.items():
-            sc = SoftConstraint(lower=joint_goals.joint_map[joint_name] - current_joint_symbol,
-                                upper=joint_goals.joint_map[joint_name] - current_joint_symbol,
-                                weight=1,
-                                expression=current_joint_symbol)
-            soft_constraints[joint_name] = sc
-        return soft_constraints
+def joint_position(current_joint, joint_goal, weight):
+    """
+    :param current_joint:
+    :type current_joint: Symbol
+    :param joint_goal:
+    :type joint_goal: Symbol
+    :param weight:
+    :type weight: Symbol
+    :return:
+    :rtype: dict
+    """
+    return SoftConstraint(lower=joint_goal - current_joint,
+                          upper=joint_goal - current_joint,
+                          weight=weight,
+                          expression=current_joint)
 
 
 def position_conv(goal_position, current_position, weights=(1, 1, 1), trans_gain=3, max_trans_speed=0.3, ns=''):
+    """
+    :param goal_position:
+    :type goal_position: giskardpy.input_system.FrameInput
+    :param current_position:
+    :type current_position: giskardpy.input_system.FrameInput
+    :param weights:
+    :type weights:
+    :param trans_gain:
+    :param max_trans_speed:
+    :param ns:
+    :return:
+    """
     soft_constraints = {}
 
     trans_error_vector = goal_position - current_position

@@ -16,11 +16,10 @@ from giskardpy.tfwrapper import TfWrapper
 from giskardpy.trajectory import SingleJointState, Transform, Point, Quaternion, Trajectory
 
 
-class ActionServer(Plugin):
+class ActionServerPlugin(Plugin):
     # TODO find a better name for this
-    def __init__(self, cartesian_goal_identifier='cartesian_goal', js_identifier='js', trajectory_identifier='traj',
-                 joint_goal_identifier='joint_goal', time_identifier='time', collision_identifier='collision'):
-        self.joint_goal_identifier = joint_goal_identifier
+    def __init__(self, cartesian_goal_identifier, js_identifier, trajectory_identifier, time_identifier,
+                 collision_identifier):
         self.cartesian_goal_identifier = cartesian_goal_identifier
         self.trajectory_identifier = trajectory_identifier
         self.js_identifier = js_identifier
@@ -33,7 +32,7 @@ class ActionServer(Plugin):
         self.get_readings_lock = Queue(1)
         self.update_lock = Queue(1)
 
-        super(ActionServer, self).__init__()
+        super(ActionServerPlugin, self).__init__()
 
     def create_parallel_universe(self):
         muh = self.new_universe
@@ -41,7 +40,7 @@ class ActionServer(Plugin):
         return muh
 
     def end_parallel_universe(self):
-        return super(ActionServer, self).end_parallel_universe()
+        return super(ActionServerPlugin, self).end_parallel_universe()
 
     def post_mortem_analysis(self, god_map):
         collisions = god_map.get_data(self.collision_identifier)
@@ -174,23 +173,23 @@ class ActionServer(Plugin):
         self.update_lock.task_done()
 
     def copy(self):
-        return LogTrajectory(trajectory_identifier=self.trajectory_identifier,
-                             joint_state_identifier=self.js_identifier,
-                             time_identifier=self.time_identifier)
+        return LogTrajectoryPlugin(trajectory_identifier=self.trajectory_identifier,
+                                   joint_state_identifier=self.js_identifier,
+                                   time_identifier=self.time_identifier)
 
     def __del__(self):
         # TODO find a way to cancel all goals when giskard is killed
         self._ac.cancel_all_goals()
 
 
-class LogTrajectory(Plugin):
-    def __init__(self, trajectory_identifier='traj', joint_state_identifier='js', time_identifier='time'):
+class LogTrajectoryPlugin(Plugin):
+    def __init__(self, trajectory_identifier, joint_state_identifier, time_identifier):
 
         self.trajectory_identifier = trajectory_identifier
         self.joint_state_identifier = joint_state_identifier
         self.time_identifier = time_identifier
         self.precision = 0.0025
-        super(LogTrajectory, self).__init__()
+        super(LogTrajectoryPlugin, self).__init__()
 
     def get_readings(self):
         return {self.trajectory_identifier: self.trajectory}

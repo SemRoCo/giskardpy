@@ -11,7 +11,7 @@ from giskardpy.trajectory import SingleJointState
 
 class JointStatePlugin(Plugin):
     # TODO implement chain
-    def __init__(self, js_identifier='js', time_identifier='time', next_cmd_identifier='motor'):
+    def __init__(self, js_identifier, time_identifier, next_cmd_identifier):
         super(JointStatePlugin, self).__init__()
         self.js_identifier = js_identifier
         self.time_identifier = time_identifier
@@ -60,7 +60,7 @@ class JointStatePlugin(Plugin):
 
 
 class KinematicSimPlugin(Plugin):
-    def __init__(self, js_identifier='js', next_cmd_identifier='motor', time_identifier='time'):
+    def __init__(self, js_identifier, next_cmd_identifier, time_identifier):
         self.js_identifier = js_identifier
         self.next_cmd_identifier = next_cmd_identifier
         self.time_identifier = time_identifier

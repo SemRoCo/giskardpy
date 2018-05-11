@@ -16,7 +16,7 @@ from giskardpy.utils import keydefaultdict
 
 
 class PyBulletPlugin(Plugin):
-    def __init__(self, js_identifier='js', collision_identifier='collision', closest_point_identifier='cpi', gui=False,
+    def __init__(self, js_identifier, collision_identifier, closest_point_identifier, gui=False,
                  marker=False):
         self.js_identifier = js_identifier
         self.collision_identifier = collision_identifier

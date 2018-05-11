@@ -1,7 +1,7 @@
 import rospy
 
 from giskardpy.plugin import PluginContainer
-from giskardpy.plugin_action_server import ActionServer
+from giskardpy.plugin_action_server import ActionServerPlugin
 from giskardpy.application import ROSApplication
 from giskardpy.plugin_instantaneous_controller import CartesianBulletControllerPlugin
 from giskardpy.plugin_fk import FKPlugin
@@ -40,10 +40,11 @@ if __name__ == '__main__':
     pm.register_plugin('controlled joints',
                        SetControlledJointsPlugin(controlled_joints_identifier=controlled_joints))
     pm.register_plugin('action server',
-                       ActionServer(js_identifier=js_identifier,
-                                    trajectory_identifier=trajectory_identifier,
-                                    cartesian_goal_identifier=cartesian_goal_identifier,
-                                    time_identifier=time_identifier))
+                       ActionServerPlugin(js_identifier=js_identifier,
+                                          trajectory_identifier=trajectory_identifier,
+                                          cartesian_goal_identifier=cartesian_goal_identifier,
+                                          time_identifier=time_identifier,
+                                          collision_identifier=collision_identifier))
     pm.register_plugin('bullet',
                        PluginContainer(PyBulletPlugin(js_identifier=js_identifier,
                                                       collision_identifier=collision_identifier,

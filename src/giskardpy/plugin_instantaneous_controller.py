@@ -12,9 +12,8 @@ from giskardpy.utils import keydefaultdict
 
 
 class CartesianBulletControllerPlugin(Plugin):
-    def __init__(self, root, js_identifier='js', fk_identifier='fk', goal_identifier='goal',
-                 next_cmd_identifier='motor', collision_identifier='collision', closest_point_identifier='cpi',
-                 controlled_joints_identifier='asdf'):
+    def __init__(self, root, js_identifier, fk_identifier, goal_identifier, next_cmd_identifier,
+                 collision_identifier, closest_point_identifier, controlled_joints_identifier):
         """
         :param roots:
         :type roots: list

@@ -46,7 +46,8 @@ class QPSolver(object):
         :type np.array
         """
         if nWSR is None:
-            nWSR = np.array([100])
+            # TODO change depending on number of constraints?
+            nWSR = np.array([200])
         if not self.started:
             success = self.qpProblem.init(H, g, A, lb, ub, lbA, ubA, nWSR)
             if success != PyReturnValue.SUCCESSFUL_RETURN:

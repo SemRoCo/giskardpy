@@ -1,4 +1,5 @@
 class Plugin(object):
+    # TODO merge update and get_replacements?
     def __init__(self):
         self.started = False
 
@@ -62,8 +63,7 @@ class Plugin(object):
         :return:
         :rtype: Plugin
         """
-        c = self.__class__()
-        return c
+        raise(NotImplementedError)
 
 
 

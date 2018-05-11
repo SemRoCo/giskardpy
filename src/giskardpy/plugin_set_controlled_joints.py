@@ -18,3 +18,7 @@ class SetControlledJointsPlugin(Plugin):
 
     def get_readings(self):
         return {self.controlled_joints_identifier: self.controlled_joints}
+
+    def copy(self):
+        c = self.__class__(self.controlled_joints_identifier)
+        return c

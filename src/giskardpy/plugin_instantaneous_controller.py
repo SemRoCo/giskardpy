@@ -50,11 +50,8 @@ class CartesianBulletControllerPlugin(Plugin):
                 self._controller.set_controlled_joints(new_controlled_joints)
             self.controlled_joints = new_controlled_joints
             self.modify_controller()
-            # self.god_map.set_data('{}/{}'.format(self._goal_identifier, Controller.JOINT),
-            #                       self.god_map.get_data(self._joint_states_identifier))
             asd = self.god_map.get_data(self._goal_identifier)
-            asd[str(Controller.JOINT)] = keydefaultdict(lambda k: {'on_off': 0,
-                                                                   'weight': 1,
+            asd[str(Controller.JOINT)] = keydefaultdict(lambda k: {'weight': 0,
                                                                    'position': self.god_map.get_data(
                                                                        [self._joint_states_identifier, k, 'position'])})
             self.god_map.set_data(self._goal_identifier, asd)
@@ -97,13 +94,10 @@ class CartesianBulletControllerPlugin(Plugin):
                 goal_joint_key = self.god_map.get_expr(
                     [self._goal_identifier, Controller.JOINT, joint_name, 'position'])
                 weight = self.god_map.get_expr([self._goal_identifier, Controller.JOINT, joint_name, 'weight'])
-                on_off = self.god_map.get_expr([self._goal_identifier, Controller.JOINT, joint_name, 'on_off'])
-                # self.soft_constraints[joint_name] = joint_position(current_joint_key, goal_joint_key, weight, on_off)
+                self.soft_constraints[joint_name] = joint_position(current_joint_key, goal_joint_key, weight)
                 controllable_links.update(robot.get_link_tree(joint_name))
 
             for link in list(controllable_links):
-            # for link in ['head_mount_kinect_ir_link', 'head_mount_kinect_rgb_link', 'head_mount_link', 'head_mount_prosilica_link', 'head_pan_link', 'head_plate_frame', 'head_tilt_link', 'l_elbow_flex_link', 'l_forearm_link', 'l_forearm_roll_link', 'l_gripper_l_finger_link', 'l_gripper_palm_link', 'l_gripper_r_finger_link', 'l_gripper_r_finger_tip_link', 'l_shoulder_lift_link', 'l_shoulder_pan_link', 'l_upper_arm_link', 'l_upper_arm_roll_link', 'l_wrist_flex_link', 'l_wrist_roll_link', 'laser_tilt_mount_link', 'r_elbow_flex_link', 'r_forearm_link', 'r_forearm_roll_link', 'r_gripper_l_finger_link', 'r_gripper_palm_link', 'r_gripper_r_finger_link', 'r_gripper_r_finger_tip_link', 'r_shoulder_lift_link', 'r_shoulder_pan_link', 'r_upper_arm_link', 'r_upper_arm_roll_link', 'r_wrist_flex_link', 'r_wrist_roll_link', 'torso_lift_link']:
-            # for link in ['r_gripper_l_finger_tip_link', 'r_gripper_r_finger_tip_link']:
                 point_on_link_input = Point3Input.position_on_a_constructor(self.god_map.get_expr,
                                                                             '{}/{}'.format(
                                                                                 self._closest_point_identifier,
@@ -137,7 +131,6 @@ class CartesianBulletControllerPlugin(Plugin):
         if change or self._controller is None:
             # TODO prevent this from being called too often
             # TODO turn off old constraints by adding new symbol
-            # TODO update collision avoidance
             # TODO sanity checking
 
             self._controller.init(self.soft_constraints, self.god_map.get_free_symbols())
@@ -173,7 +166,6 @@ class CartesianBulletControllerPlugin(Plugin):
         return {}
 
     def copy(self):
-        # return self
         cp = self.__class__(self.root, self._joint_states_identifier, self._fk_identifier,
                             self._goal_identifier, self._next_cmd_identifier, self._collision_identifier,
                             self._closest_point_identifier, self.controlled_joints_identifier)

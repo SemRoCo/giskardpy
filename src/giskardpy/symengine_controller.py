@@ -59,7 +59,7 @@ class SymEngineController(object):
 
 
 
-def joint_position(current_joint, joint_goal, weight, on_off):
+def joint_position(current_joint, joint_goal, weight):
     """
     :param current_joint:
     :type current_joint: Symbol
@@ -73,7 +73,7 @@ def joint_position(current_joint, joint_goal, weight, on_off):
     return SoftConstraint(lower=joint_goal - current_joint,
                           upper=joint_goal - current_joint,
                           weight=weight,
-                          expression=on_off * current_joint)
+                          expression=current_joint)
 
 
 def position_conv(goal_position, current_position, weights=(1, 1, 1), trans_gain=3, max_trans_speed=0.3, ns=''):

@@ -14,6 +14,8 @@ from giskardpy.process_manager import ProcessManager
 if __name__ == '__main__':
     rospy.init_node('muh')
 
+    root = 'base_link'
+
     # roots = ['base_footprint']
     # tips = ['gripper_tool_frame']
     roots = ['base_link', 'base_link', 'base_link']
@@ -51,7 +53,7 @@ if __name__ == '__main__':
     pm.register_plugin('fk',
                        FKPlugin(roots, tips, js_identifier=js_identifier, fk_identifier=fk_identifier))
     pm.register_plugin('cart bullet controller',
-                       CartesianBulletControllerPlugin(roots, tips,
+                       CartesianBulletControllerPlugin(root,
                                                        fk_identifier=fk_identifier,
                                                        goal_identifier=cartesian_goal_identifier,
                                                        js_identifier=js_identifier,

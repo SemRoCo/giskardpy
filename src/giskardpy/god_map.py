@@ -37,7 +37,10 @@ class GodMap(object):
 
     def get_data(self, key):
         # TODO deal with unused identifiers
-        identifier_parts = key.split(self.separator)
+        if isinstance(key, str):
+            identifier_parts = key.split(self.separator)
+        else:
+            identifier_parts = [str(x) for x in key]
         namespace = identifier_parts[0]
         result = self._data.get(namespace)
         for member in identifier_parts[1:]:
@@ -55,6 +58,8 @@ class GodMap(object):
         return result
 
     def get_expr(self, key):
+        if isinstance(key, list):
+            key = '/'.join([str(x) for x in key])
         if key not in self.key_to_expr:
             expr = se.Symbol(key.replace(self.separator, self.expr_separator))
             if expr in self.expr_to_key:

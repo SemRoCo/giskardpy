@@ -7,21 +7,22 @@ from geometry_msgs.msg._Point import Point
 from geometry_msgs.msg._PoseStamped import PoseStamped
 from geometry_msgs.msg._Quaternion import Quaternion
 from giskard_msgs.msg._Controller import Controller
-from giskard_msgs.msg._ControllerListAction import ControllerListAction
-from giskard_msgs.msg._ControllerListGoal import ControllerListGoal
+from giskard_msgs.msg._MoveAction import MoveAction
+from giskard_msgs.msg._MoveCmd import MoveCmd
+from giskard_msgs.msg._MoveGoal import MoveGoal
 from sensor_msgs.msg._JointState import JointState
 import numpy as np
 
 class Test(object):
     def __init__(self, action_server_name):
         # action server
-        self.client = SimpleActionClient(action_server_name, ControllerListAction)
+        self.client = SimpleActionClient(action_server_name, MoveAction)
         self.client.wait_for_server()
         self.joint_names = rospy.wait_for_message('/whole_body_controller/state', JointTrajectoryControllerState).joint_names
 
     def send_cart_goal(self, goal_pose):
-        goal = ControllerListGoal()
-        goal.type = ControllerListGoal.STANDARD_CONTROLLER
+        goal = MoveGoal()
+        goal.type = MoveGoal.PLAN_AND_EXECUTE
 
         # translaiton
         controller = Controller()
@@ -34,7 +35,8 @@ class Test(object):
         controller.p_gain = 3
         controller.enable_error_threshold = True
         controller.threshold_value = 0.05
-        goal.controllers.append(controller)
+        goal.cmd_seq.append(MoveCmd())
+        goal.cmd_seq[-1].controllers.append(controller)
 
         # rotation
         controller = Controller()
@@ -47,15 +49,16 @@ class Test(object):
         controller.p_gain = 3
         controller.enable_error_threshold = True
         controller.threshold_value = 0.2
-        goal.controllers.append(controller)
+        goal.cmd_seq.append(MoveCmd())
+        goal.cmd_seq[-1].controllers.append(controller)
 
         self.client.send_goal(goal)
         result = self.client.wait_for_result(rospy.Duration(10))
         print('finished in 10s?: {}'.format(result))
 
     def send_rnd_joint_goal(self):
-        goal = ControllerListGoal()
-        goal.type = ControllerListGoal.STANDARD_CONTROLLER
+        goal = MoveGoal()
+        goal.type = MoveGoal.PLAN_AND_EXECUTE
 
         # translation
         controller = Controller()
@@ -71,7 +74,9 @@ class Test(object):
         controller.p_gain = 3
         controller.enable_error_threshold = True
         controller.threshold_value = 0.05
-        goal.controllers.append(controller)
+        controller.weight = 1
+        goal.cmd_seq.append(MoveCmd())
+        goal.cmd_seq[-1].controllers.append(controller)
 
         self.client.send_goal(goal)
         result = self.client.wait_for_result()

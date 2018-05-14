@@ -45,7 +45,8 @@ if __name__ == '__main__':
                                           cartesian_goal_identifier=cartesian_goal_identifier,
                                           time_identifier=time_identifier,
                                           collision_identifier=collision_identifier,
-                                          controlled_joints_identifier=controlled_joints_identifier))
+                                          controlled_joints_identifier=controlled_joints_identifier,
+                                          plot_trajectory=False))
     pm.register_plugin('bullet',
                        PluginContainer(PyBulletPlugin(js_identifier=js_identifier,
                                                       collision_identifier=collision_identifier,

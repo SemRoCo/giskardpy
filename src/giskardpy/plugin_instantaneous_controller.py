@@ -173,16 +173,23 @@ class CartesianBulletControllerPlugin(Plugin):
         rot_prefix = '{}/{},{}/pose/orientation'.format(self._fk_identifier, root, tip)
         current_input = FrameInput.prefix_constructor(trans_prefix, rot_prefix, self.god_map.get_expr)
         weight = self.god_map.get_expr([self._goal_identifier, str(type), ','.join([root, tip]), 'weight'])
+        p_gain = self.god_map.get_expr([self._goal_identifier, str(type), ','.join([root, tip]), 'p_gain'])
+        max_speed = self.god_map.get_expr([self._goal_identifier, str(type), ','.join([root, tip]), 'threshold_value'])
+
         if type == Controller.TRANSLATION_3D:
             return position_conv(goal_input.get_position(),
                                  sw.pos_of(robot.get_fk_expression(root, tip)),
                                  weights=weight,
+                                 trans_gain=p_gain,
+                                 max_trans_speed=max_speed,
                                  ns='{}/{}'.format(root, tip))
         elif type == Controller.ROTATION_3D:
             return rotation_conv(goal_input.get_rotation(),
                                  sw.rot_of(robot.get_fk_expression(root, tip)),
                                  current_input.get_rotation(),
                                  weights=weight,
+                                 rot_gain=p_gain,
+                                 max_rot_speed=max_speed,
                                  ns='{}/{}'.format(root, tip))
 
         return {}

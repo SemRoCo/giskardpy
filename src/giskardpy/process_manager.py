@@ -6,7 +6,7 @@ from time import sleep, time
 import rospy
 
 from giskardpy.god_map import GodMap
-from giskardpy.exceptions import NameConflictException
+from giskardpy.exceptions import NameConflictException, MAX_NWSR_REACHEDException, QPSolverException
 
 
 class ProcessManager(object):
@@ -53,10 +53,14 @@ class ProcessManager(object):
                 for n, p in self._plugins.items():
                     parallel_universe.register_plugin(n, p.get_replacement())
                 t = time()
+                e = None
                 try:
                     parallel_universe.start_loop()
-                except:
+                except MAX_NWSR_REACHEDException as e:
+                    print(e)
+                except Exception as e:
                     traceback.print_exc()
+                finally:
                     print('parallel universe died')
                 parallel_universe.stop()
                 rospy.loginfo('parallel universe existed for {}s'.format(time()-t))
@@ -65,7 +69,7 @@ class ProcessManager(object):
                 self._god_map.expr_to_key = parallel_universe.get_god_map().expr_to_key
                 self._god_map.key_to_expr = parallel_universe.get_god_map().key_to_expr
 
-                plugin.post_mortem_analysis(parallel_universe.get_god_map())
+                plugin.post_mortem_analysis(parallel_universe.get_god_map(), e)
                 # TODO different function for get readings after end of universe?
                 for identifier, value in plugin.get_readings().items():
                     self._god_map.set_data(identifier, value)

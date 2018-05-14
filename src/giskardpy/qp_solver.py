@@ -2,6 +2,8 @@ import numpy as np
 import qpoases
 from qpoases import PyReturnValue
 
+from giskardpy.exceptions import MAX_NWSR_REACHEDException, QPSolverException
+
 
 class QPSolver(object):
     RETURN_VALUE_DICT = {value: name for name, value in vars(PyReturnValue).items()}
@@ -50,16 +52,16 @@ class QPSolver(object):
             nWSR = np.array([200])
         if not self.started:
             success = self.qpProblem.init(H, g, A, lb, ub, lbA, ubA, nWSR)
-            if success != PyReturnValue.SUCCESSFUL_RETURN:
-                print("Failed to initialize QP-problem. ERROR: {}".format(self.RETURN_VALUE_DICT[success]))
-                return None
-            self.started = True
+            if success == PyReturnValue.MAX_NWSR_REACHED:
+                raise MAX_NWSR_REACHEDException('Failed to initialize QP-problem.')
         else:
             success = self.qpProblem.hotstart(H, g, A, lb, ub, lbA, ubA, nWSR)
-            if success != PyReturnValue.SUCCESSFUL_RETURN:
-                print("Failed to hot start QP-problem. ERROR: {}".format(self.RETURN_VALUE_DICT[success]))
-                self.started = False
-                return None
+            if success == PyReturnValue.MAX_NWSR_REACHED:
+                raise MAX_NWSR_REACHEDException('Failed to hot start QP-problem.')
+        if success == PyReturnValue.SUCCESSFUL_RETURN:
+            self.started = True
+        else:
+            raise QPSolverException(self.RETURN_VALUE_DICT[success])
 
         self.qpProblem.getPrimalSolution(self.xdot_full)
         return self.xdot_full

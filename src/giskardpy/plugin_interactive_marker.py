@@ -1,15 +1,15 @@
 import numpy as np
 from collections import defaultdict
-from copy import copy, deepcopy
+from copy import deepcopy
 
 import rospy
 from actionlib.simple_action_client import SimpleActionClient
 from geometry_msgs.msg import Pose
-from geometry_msgs.msg._PoseStamped import PoseStamped
 from geometry_msgs.msg._Quaternion import Quaternion
 from giskard_msgs.msg._Controller import Controller
-from giskard_msgs.msg._ControllerListAction import ControllerListAction
-from giskard_msgs.msg._ControllerListGoal import ControllerListGoal
+from giskard_msgs.msg._MoveAction import MoveAction
+from giskard_msgs.msg._MoveCmd import MoveCmd
+from giskard_msgs.msg._MoveGoal import MoveGoal
 from interactive_markers.interactive_marker_server import InteractiveMarkerServer
 from interactive_markers.menu_handler import MenuHandler
 from tf.transformations import quaternion_multiply, quaternion_about_axis, quaternion_conjugate
@@ -57,7 +57,7 @@ class InteractiveMarkerPlugin(Plugin):
 
     def start_once(self):
         # giskard goal client
-        self.client = SimpleActionClient('qp_controller/command', ControllerListAction)
+        self.client = SimpleActionClient('qp_controller/command', MoveAction)
         self.client.wait_for_server()
 
         # marker server
@@ -288,7 +288,7 @@ class InteractiveMarkerPlugin(Plugin):
             controller.type = Controller.TRANSLATION_3D
             controller.p_gain = 3
             controller.enable_error_threshold = True
-            controller.threshold_value = 0.05
+            controller.threshold_value = 0.3
             controller.weight = 1.0
             return controller
 
@@ -297,7 +297,7 @@ class InteractiveMarkerPlugin(Plugin):
             controller.type = Controller.ROTATION_3D
             controller.p_gain = 3
             controller.enable_error_threshold = True
-            controller.threshold_value = 0.2
+            controller.threshold_value = 0.5
             controller.weight = 1.0
             return controller
 
@@ -310,11 +310,12 @@ class InteractiveMarkerPlugin(Plugin):
             return controller
 
         def send_all_goals(self):
-            goal = ControllerListGoal()
-            goal.type = ControllerListGoal.STANDARD_CONTROLLER
+            goal = MoveGoal()
+            goal.type = MoveGoal.PLAN_AND_EXECUTE
+            move_cmd = MoveCmd()
             for g in self.all_goals.values():
-                goal.controllers.extend(g)
-            # print(goal)
+                move_cmd.controllers.extend(g)
+            goal.cmd_seq.append(move_cmd)
             self.client.send_goal(goal)
 
     def copy(self):

@@ -34,11 +34,13 @@ class Plugin(object):
     def end_parallel_universe(self):
         return False
 
-    def post_mortem_analysis(self, god_map):
+    def post_mortem_analysis(self, god_map, exception):
         """
         Analyse the memory of a dead god from a parallel universe.
         :param god_map: the dead gods memory
-        :type: GodMap
+        :type god_map: GodMap
+        :param exception:
+        :type exception: Exception
         """
         pass
 

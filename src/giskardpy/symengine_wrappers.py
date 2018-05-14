@@ -7,7 +7,6 @@ from copy import deepcopy
 from symengine import Matrix, Symbol, eye, sympify, diag, zeros, lambdify, Abs, Max, Min, sin, cos, tan, acos, asin, \
     atan, atan2, nan, sqrt, log
 import numpy as np
-import sympy as sp2
 from symengine.lib.symengine_wrapper import Lambdify
 
 from giskardpy import BACKEND

@@ -16,12 +16,12 @@ from giskardpy.tfwrapper import TfWrapper
 from giskardpy.trajectory import SingleJointState, Transform, Point, Quaternion, Trajectory
 
 
-class ActionServer(Plugin):
+class ActionServerPlugin(Plugin):
     # TODO find a better name for this
-    def __init__(self, cartesian_goal_identifier='cartesian_goal', js_identifier='js', trajectory_identifier='traj',
-                 joint_goal_identifier='joint_goal', time_identifier='time', collision_identifier='collision'):
-        self.joint_goal_identifier = joint_goal_identifier
+    def __init__(self, cartesian_goal_identifier, js_identifier, trajectory_identifier, time_identifier,
+                 collision_identifier, controlled_joints_identifier):
         self.cartesian_goal_identifier = cartesian_goal_identifier
+        self.controlled_joints_identifier = controlled_joints_identifier
         self.trajectory_identifier = trajectory_identifier
         self.js_identifier = js_identifier
         self.time_identifier = time_identifier
@@ -33,7 +33,7 @@ class ActionServer(Plugin):
         self.get_readings_lock = Queue(1)
         self.update_lock = Queue(1)
 
-        super(ActionServer, self).__init__()
+        super(ActionServerPlugin, self).__init__()
 
     def create_parallel_universe(self):
         muh = self.new_universe
@@ -41,7 +41,7 @@ class ActionServer(Plugin):
         return muh
 
     def end_parallel_universe(self):
-        return super(ActionServer, self).end_parallel_universe()
+        return super(ActionServerPlugin, self).end_parallel_universe()
 
     def post_mortem_analysis(self, god_map):
         collisions = god_map.get_data(self.collision_identifier)
@@ -76,34 +76,37 @@ class ActionServer(Plugin):
         try:
             goal = self.get_readings_lock.get_nowait()
             rospy.loginfo('got goal')
+            if len(goal.controllers) >= 1:
+                goals = defaultdict(dict)
+                # goals[str(Controller.JOINT)] = self.get_default_joint_goal()
             for controller in goal.controllers:
                 self.new_universe = True
+                goal_key = str(controller.type)
                 if controller.type == Controller.JOINT:
-                    # TODO implement me
-                    raise NotImplementedError()
                     rospy.loginfo('got joint goal')
-                    joint_goal = OrderedDict()
                     for i, joint_name in enumerate(controller.goal_state.name):
-                        sjs = SingleJointState(joint_name,
-                                               controller.goal_state.position[i],
-                                               0,
-                                               0)
-                        joint_goal[joint_name] = sjs
+                        goals[goal_key][joint_name] = {'weight': 1,
+                                                       'position': controller.goal_state.position[i]}
                 elif controller.type in [Controller.TRANSLATION_3D, Controller.ROTATION_3D]:
-                    key = str(controller.type)
-                    if goals is None:
-                        goals = defaultdict(dict)
                     root = controller.root_link
                     tip = controller.tip_link
                     controller.goal_pose = self.tf.transform_pose(root, controller.goal_pose)
-                    goals[key][root, tip] = controller
+                    goals[goal_key][root, tip] = controller
         except Empty:
             pass
         update = {self.cartesian_goal_identifier: goals}
         return update
 
+    def get_default_joint_goal(self):
+        joint_goal = OrderedDict()
+        for joint_name in sorted(self.controller_joints):
+            joint_goal[joint_name] = {'weight': 1,
+                                      'position': self.current_js[joint_name].position}
+        return joint_goal
+
     def update(self):
-        pass
+        self.controlled_joints = self.god_map.get_data(self.controlled_joints_identifier)
+        self.current_js = self.god_map.get_data(self.js_identifier)
 
     def start_once(self):
         self.new_universe = False
@@ -140,7 +143,6 @@ class ActionServer(Plugin):
             # TODO add goal for each controller
             self.get_readings_lock.put(goal)
 
-
     def cb_update_part(self):
         solution = self.update_lock.get()
         rospy.loginfo('solution ready')
@@ -174,23 +176,23 @@ class ActionServer(Plugin):
         self.update_lock.task_done()
 
     def copy(self):
-        return LogTrajectory(trajectory_identifier=self.trajectory_identifier,
-                             joint_state_identifier=self.js_identifier,
-                             time_identifier=self.time_identifier)
+        return LogTrajectoryPlugin(trajectory_identifier=self.trajectory_identifier,
+                                   joint_state_identifier=self.js_identifier,
+                                   time_identifier=self.time_identifier)
 
     def __del__(self):
         # TODO find a way to cancel all goals when giskard is killed
         self._ac.cancel_all_goals()
 
 
-class LogTrajectory(Plugin):
-    def __init__(self, trajectory_identifier='traj', joint_state_identifier='js', time_identifier='time'):
+class LogTrajectoryPlugin(Plugin):
+    def __init__(self, trajectory_identifier, joint_state_identifier, time_identifier):
 
         self.trajectory_identifier = trajectory_identifier
         self.joint_state_identifier = joint_state_identifier
         self.time_identifier = time_identifier
         self.precision = 0.0025
-        super(LogTrajectory, self).__init__()
+        super(LogTrajectoryPlugin, self).__init__()
 
     def get_readings(self):
         return {self.trajectory_identifier: self.trajectory}
@@ -202,7 +204,7 @@ class LogTrajectory(Plugin):
         if self.trajectory is None:
             self.trajectory = Trajectory()
         self.trajectory.set(time, current_js)
-        if (time >= 1 and np.abs([v.velocity for v in current_js.values()]).max() < self.precision) or time >= 10:
+        if (time >= 1 and np.abs([v.velocity for v in current_js.values()]).max() < self.precision) or time >= 20:
             print('done')
             # self.plot_trajectory(self.trajectory)
             self.stop_universe = True

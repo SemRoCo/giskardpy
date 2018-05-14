@@ -1,7 +1,7 @@
 import rospy
 
 from giskardpy.plugin import PluginContainer
-from giskardpy.plugin_action_server import ActionServer
+from giskardpy.plugin_action_server import ActionServerPlugin
 from giskardpy.application import ROSApplication
 from giskardpy.plugin_instantaneous_controller import CartesianBulletControllerPlugin
 from giskardpy.plugin_fk import FKPlugin
@@ -14,7 +14,8 @@ from giskardpy.process_manager import ProcessManager
 if __name__ == '__main__':
     rospy.init_node('muh')
 
-    root = 'base_link'
+    # TODO do we need a solution where we have a different root for some links?
+    collision_root = 'base_link'
 
     # roots = ['base_footprint']
     # tips = ['gripper_tool_frame']
@@ -24,8 +25,7 @@ if __name__ == '__main__':
     cartesian_goal_identifier = 'cartesian_goal'
 
     js_identifier = 'js'
-    controlled_joints = 'controlled_joints'
-    joint_goal_identifier = 'joint_goal'
+    controlled_joints_identifier = 'controlled_joints'
     trajectory_identifier = 'traj'
     time_identifier = 'time'
     next_cmd_identifier = 'motor'
@@ -38,12 +38,14 @@ if __name__ == '__main__':
                                         time_identifier=time_identifier,
                                         next_cmd_identifier=next_cmd_identifier))
     pm.register_plugin('controlled joints',
-                       SetControlledJointsPlugin(controlled_joints_identifier=controlled_joints))
+                       SetControlledJointsPlugin(controlled_joints_identifier=controlled_joints_identifier))
     pm.register_plugin('action server',
-                       ActionServer(js_identifier=js_identifier,
-                                    trajectory_identifier=trajectory_identifier,
-                                    cartesian_goal_identifier=cartesian_goal_identifier,
-                                    time_identifier=time_identifier))
+                       ActionServerPlugin(js_identifier=js_identifier,
+                                          trajectory_identifier=trajectory_identifier,
+                                          cartesian_goal_identifier=cartesian_goal_identifier,
+                                          time_identifier=time_identifier,
+                                          collision_identifier=collision_identifier,
+                                          controlled_joints_identifier=controlled_joints_identifier))
     pm.register_plugin('bullet',
                        PluginContainer(PyBulletPlugin(js_identifier=js_identifier,
                                                       collision_identifier=collision_identifier,
@@ -53,14 +55,14 @@ if __name__ == '__main__':
     pm.register_plugin('fk',
                        FKPlugin(roots, tips, js_identifier=js_identifier, fk_identifier=fk_identifier))
     pm.register_plugin('cart bullet controller',
-                       CartesianBulletControllerPlugin(root,
+                       CartesianBulletControllerPlugin(collision_root,
                                                        fk_identifier=fk_identifier,
                                                        goal_identifier=cartesian_goal_identifier,
                                                        js_identifier=js_identifier,
                                                        next_cmd_identifier=next_cmd_identifier,
                                                        collision_identifier=collision_identifier,
                                                        closest_point_identifier=closest_point_identifier,
-                                                       controlled_joints_identifier=controlled_joints))
+                                                       controlled_joints_identifier=controlled_joints_identifier))
     pm.register_plugin('interactive marker', InteractiveMarkerPlugin(roots, tips))
 
     app = ROSApplication(pm)

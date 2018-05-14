@@ -51,7 +51,7 @@ if __name__ == '__main__':
                        PluginContainer(PyBulletPlugin(js_identifier=js_identifier,
                                                       collision_identifier=collision_identifier,
                                                       closest_point_identifier=closest_point_identifier,
-                                                      gui=False,
+                                                      gui=True,
                                                       marker=True)))
     pm.register_plugin('fk',
                        FKPlugin(roots, tips, js_identifier=js_identifier, fk_identifier=fk_identifier))

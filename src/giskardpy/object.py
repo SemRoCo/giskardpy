@@ -1,4 +1,5 @@
 from visualization_msgs.msg import MarkerArray, Marker
+from giskard_msgs.msg import WorldBody
 
 from giskardpy.trajectory import Transform
 from lxml import etree
@@ -209,3 +210,25 @@ def to_marker(urdf_object):
             m.mesh_use_embedded_materials = True
         ma.markers.append(m)
     return ma
+
+
+def from_msg(body_msg):
+    """
+
+    :param body_msg:
+    :type body_msg: WorldBody
+    :return:
+    """
+    if body_msg.type is WorldBody.MESH_BODY:
+        geom = MeshShape(filename=body_msg.mesh)
+    elif body_msg.type is WorldBody.PRIMITIVE_BODY:
+        # TODO: complete me
+        pass
+    elif body_msg.type is WorldBody.URDF_BODY:
+        # TODO: complete me
+        pass
+    else:
+        raise RuntimeError("Invalid shape of world body: {}".format(body_msg.shape))
+    col = CollisionProperty(name=body_msg.name + '_col', geometry=geom)
+    vis = VisualProperty(name=body_msg.name + '_vis', geometry=geom)
+    return WorldObject(name=body_msg.name, collision_props=[col], visual_props=[vis])

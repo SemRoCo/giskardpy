@@ -45,6 +45,7 @@
   <run_depend>cython</run_depend>
   <run_depend>urdfdom_py</run_depend>
   <run_depend>qpoases</run_depend>
+  <run_depend>giskard_msgs</run_depend>
 
   <test_depend>rosunit</test_depend>
 

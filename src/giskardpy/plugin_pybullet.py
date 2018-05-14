@@ -3,17 +3,19 @@ from rospkg import RosPack
 import rospy
 
 from geometry_msgs.msg import Point, Vector3
+from rospy_message_converter.message_converter import convert_ros_message_to_dictionary
 from std_msgs.msg import ColorRGBA
 from std_srvs.srv import SetBool, SetBoolResponse
-from giskard_msgs.srv import UpdateWorld, UpdateWorldResponse
+from giskard_msgs.srv import UpdateWorld, UpdateWorldResponse, UpdateWorldRequest
 from visualization_msgs.msg import Marker, MarkerArray
 
 from giskardpy.object import WorldObject, to_urdf_string, VisualProperty, BoxShape, CollisionProperty, to_marker, \
-    MeshShape
+    MeshShape, from_msg
 from giskardpy.plugin import Plugin
 from giskardpy.pybullet_world import PyBulletWorld, ContactInfo
 import giskardpy.trajectory as g
 from giskardpy.utils import keydefaultdict
+from rospy_message_converter import message_converter
 
 
 class PyBulletPlugin(Plugin):
@@ -55,8 +57,39 @@ class PyBulletPlugin(Plugin):
             self.world.muh(False)
         return SetBoolResponse()
 
-    def update_world_cb(self, msg):
-        rospy.loginfo('asked to update the world')
+    def update_world_cb(self, req):
+        """
+
+        :param req:
+        :type req: UpdateWorldRequest
+        :return:
+        """
+        rospy.loginfo('asked to update the world with %s', req)
+
+        if req.operation is UpdateWorldRequest.ADD:
+            print 'foo'
+            new_body = from_msg(req.body) # WorldObject
+            print 'bar'
+            urdf_string = to_urdf_string(new_body) # type: str
+            print 'caesar'
+            # TODO: use TF to resolve me
+            pose = req.body.pose.pose
+            self.world.spawn_object_from_urdf(new_body.name, urdf_string,
+                                              base_position= convert_ros_message_to_dictionary(pose.position).values(),
+                                              base_orientation= convert_ros_message_to_dictionary(pose.orientation).values())
+            print 'scooby'
+            self.marker_pub.publish(to_marker(new_body))
+            print 'doo'
+        elif req.operation is UpdateWorldRequest.REMOVE:
+            # TODO: implement me
+            pass
+        elif req.operation is UpdateWorldRequest.ALTER:
+            # TODO: implement me
+            pass
+        else:
+            return UpdateWorldResponse(UpdateWorldResponse.INVALID_OPERATION,
+                                       "Received invalid operation code: {}".format(req.operation))
+
         # self.world.spawn_object_from_urdf('kitchen', '{}/urdf/muh.urdf'.format(RosPack().get_path('iai_kitchen')))
         # self.world.spawn_object_from_urdf('shelf', '{}/urdf/shelves.urdf'.format(RosPack().get_path('iai_shelves')),
         #                                   [1.3,1,0])
@@ -78,6 +111,7 @@ class PyBulletPlugin(Plugin):
         # self.world.spawn_object_from_urdf_str('box', urdf_string)
         # self.marker_pub.publish(to_marker(my_obj))
         # rospy.sleep(0.2)
+
         return UpdateWorldResponse()
 
     def get_readings(self):

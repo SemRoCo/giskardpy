@@ -210,7 +210,7 @@ class PyBulletWorld(object):
         p.removeBody(self._robots[robot_name].id)
 
     def spawn_object_from_urdf(self, name, urdf_file, base_position=(0, 0, 0), base_orientation=(0, 0, 0, 1)):
-        print('loading {}'.format(urdf_file))
+        print('loading {} at ({}, {})'.format(urdf_file, base_position, base_orientation))
         self.deactivate_rendering()
         self._objects[name] = PyBulletRobot(name, urdf_file, base_position, base_orientation)
         self.activate_rendering()

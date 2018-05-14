@@ -81,11 +81,11 @@ class CartesianBulletControllerPlugin(Plugin):
         robot.set_joint_symbol_map(current_joints)
 
     def modify_controller(self):
-        new_chain = False
+        rebuild_controller = False
         robot = self._controller.robot
         hold_joints = set(self.controlled_joints)
         if not self._controller.is_initialized():
-
+            rebuild_controller = True
             controllable_links = set()
             for joint_name in self.controlled_joints:
                 current_joint_key = self.god_map.get_expr([self._joint_states_identifier, joint_name, 'position'])
@@ -119,7 +119,7 @@ class CartesianBulletControllerPlugin(Plugin):
             if key not in self.known_constraints:
                 self.known_constraints.add(key)
                 self.soft_constraints.update(self.controller_msg_to_constraint(root, tip, Controller.TRANSLATION_3D))
-                new_chain = True
+                rebuild_controller = True
             self.god_map.set_data([self._goal_identifier, Controller.TRANSLATION_3D, ','.join([root, tip]), 'weight'], 1)
         for (root, tip), value in self.god_map.get_data([self._goal_identifier, Controller.ROTATION_3D]).items():
             key = '{}/{},{}'.format(Controller.ROTATION_3D, root, tip)
@@ -127,7 +127,7 @@ class CartesianBulletControllerPlugin(Plugin):
             if key not in self.known_constraints:
                 self.known_constraints.add(key)
                 self.soft_constraints.update(self.controller_msg_to_constraint(root, tip, Controller.ROTATION_3D))
-                new_chain = True
+                rebuild_controller = True
             self.god_map.set_data([self._goal_identifier, Controller.ROTATION_3D, ','.join([root, tip]), 'weight'], 1)
 
         # TODO handle joint controller
@@ -146,7 +146,7 @@ class CartesianBulletControllerPlugin(Plugin):
 
         self.god_map.set_data([self._goal_identifier, Controller.JOINT], joint_goal)
 
-        if new_chain or self._controller is None:
+        if rebuild_controller or self._controller is None:
             # TODO prevent this from being called too often
             # TODO turn off old constraints by setting weight to 0
             # TODO sanity checking

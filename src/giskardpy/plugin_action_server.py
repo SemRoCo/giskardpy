@@ -76,7 +76,7 @@ class ActionServerPlugin(Plugin):
         try:
             goal = self.get_readings_lock.get_nowait()
             rospy.loginfo('got goal')
-            if len(goal.controllers) > 1:
+            if len(goal.controllers) >= 1:
                 goals = defaultdict(dict)
                 # goals[str(Controller.JOINT)] = self.get_default_joint_goal()
             for controller in goal.controllers:
@@ -204,7 +204,7 @@ class LogTrajectoryPlugin(Plugin):
         if self.trajectory is None:
             self.trajectory = Trajectory()
         self.trajectory.set(time, current_js)
-        if (time >= 1 and np.abs([v.velocity for v in current_js.values()]).max() < self.precision) or time >= 10:
+        if (time >= 1 and np.abs([v.velocity for v in current_js.values()]).max() < self.precision) or time >= 20:
             print('done')
             # self.plot_trajectory(self.trajectory)
             self.stop_universe = True

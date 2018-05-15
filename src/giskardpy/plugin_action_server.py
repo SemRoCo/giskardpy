@@ -8,6 +8,7 @@ from control_msgs.msg import FollowJointTrajectoryAction, FollowJointTrajectoryR
     JointTrajectoryControllerState
 from giskard_msgs.msg import Controller
 from giskard_msgs.msg._MoveAction import MoveAction
+from giskard_msgs.msg._MoveFeedback import MoveFeedback
 from giskard_msgs.msg._MoveGoal import MoveGoal
 from giskard_msgs.msg._MoveResult import MoveResult
 
@@ -85,7 +86,7 @@ class ActionServerPlugin(Plugin):
     def get_readings(self):
         goals = None
         try:
-            goal = self.get_readings_lock.get_nowait() # type: MoveGoal
+            goal = self.get_readings_lock.get_nowait()  # type: MoveGoal
             rospy.loginfo('got goal')
             self.execute = goal.type == MoveGoal.PLAN_AND_EXECUTE
             if len(goal.cmd_seq) >= 1:
@@ -105,6 +106,9 @@ class ActionServerPlugin(Plugin):
                     tip = controller.tip_link
                     controller.goal_pose = self.tf.transform_pose(root, controller.goal_pose)
                     goals[goal_key][root, tip] = controller
+            feedback = MoveFeedback()
+            feedback.phase = MoveFeedback.PLANNING
+            self._as.publish_feedback(feedback)
         except Empty:
             pass
         update = {self.cartesian_goal_identifier: goals}
@@ -153,26 +157,36 @@ class ActionServerPlugin(Plugin):
         self.get_readings_lock.put(goal)
 
     def cb_update_part(self):
-        result = self.update_lock.get() # type: MoveResult
+        result = self.update_lock.get()  # type: MoveResult
         rospy.loginfo('solution ready')
+        feedback = MoveFeedback()
+        feedback.phase = MoveFeedback.EXECUTION
         if result.error_code == MoveResult.SUCCESS and self.execute:
             goal = FollowJointTrajectoryGoal()
             goal.trajectory = result.trajectory
-            print('waiting for {:.3f} sec with {} points'.format(
-                goal.trajectory.points[-1].time_from_start.to_sec(),
-                len(goal.trajectory.points)))
             self._ac.send_goal(goal)
             t = rospy.get_rostime()
+            expected_duration = goal.trajectory.points[-1].time_from_start.to_sec()
+            rospy.loginfo(
+                'waiting for {:.3f} sec with {} points'.format(expected_duration, len(goal.trajectory.points)))
+
             while not self._ac.wait_for_result(rospy.Duration(.1)):
+                time_passed = (rospy.get_rostime() - t).to_sec()
+                feedback.progress = min(time_passed / expected_duration, 1)
+                self._as.publish_feedback(feedback)
                 if self._as.is_preempt_requested():
                     rospy.loginfo('new goal, cancel old one')
                     self._ac.cancel_all_goals()
                     result.error_code = MoveResult.INTERRUPTED
                     break
-            else: # if not break
+                if time_passed > expected_duration + 0.1:
+                    rospy.loginfo('controller took too long to execute trajectory')
+                    self._ac.cancel_all_goals()
+                    result.error_code = MoveResult.INTERRUPTED
+                    break
+            else:  # if not break
                 print('shit took {:.3f}s'.format((rospy.get_rostime() - t).to_sec()))
                 r = self._ac.get_result()
-                print('real result {}'.format(r))
                 if r.error_code == FollowJointTrajectoryResult.SUCCESSFUL:
                     result.error_code = MoveResult.SUCCESS
 

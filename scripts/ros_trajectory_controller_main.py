@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import rospy
 
 from giskardpy.plugin import PluginContainer

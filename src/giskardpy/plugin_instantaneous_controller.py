@@ -117,6 +117,7 @@ class CartesianBulletControllerPlugin(Plugin):
             key = '{}/{},{}'.format(Controller.TRANSLATION_3D, root, tip)
             hold_joints.difference_update(robot.get_chain_joints(root, tip))
             if key not in self.known_constraints:
+                print('added chain root: {} tip: {} type: TRANSLATION_3D'.format(root, tip))
                 self.known_constraints.add(key)
                 self.soft_constraints.update(self.controller_msg_to_constraint(root, tip, Controller.TRANSLATION_3D))
                 rebuild_controller = True
@@ -125,6 +126,7 @@ class CartesianBulletControllerPlugin(Plugin):
             key = '{}/{},{}'.format(Controller.ROTATION_3D, root, tip)
             hold_joints.difference_update(robot.get_chain_joints(root, tip))
             if key not in self.known_constraints:
+                print('added chain root: {} tip: {} type: ROTATION_3D'.format(root, tip))
                 self.known_constraints.add(key)
                 self.soft_constraints.update(self.controller_msg_to_constraint(root, tip, Controller.ROTATION_3D))
                 rebuild_controller = True

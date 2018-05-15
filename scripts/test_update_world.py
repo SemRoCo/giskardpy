@@ -20,16 +20,30 @@ def add_table_request():
 
 def add_table(proxy):
     """
-
-    :param proxy:
+    Adds a table to the giskard world, expecting success.
+    :param proxy: ServiceProxy to update the giskard world.
     :type proxy: rospy.ServiceProxy
     :return:
     """
-    rospy.loginfo("Adding table...")
+    rospy.loginfo("Adding table --expecting success...")
     resp = proxy(add_table_request()) # type: UpdateWorldResponse
     if resp.error_codes != UpdateWorldResponse.SUCCESS:
         raise RuntimeError(resp.error_msg)
-    rospy.loginfo("...success.")
+    rospy.loginfo("...OK.")
+
+
+def add_table_again(proxy):
+    """
+    Adds a table (that is already) to the giskard world, expecting failure.
+    :param proxy: ServiceProxy to update the giskard world.
+    :type proxy: rospy.ServiceProxy
+    :return:
+    """
+    rospy.loginfo("Adding table, again --expecting failure...")
+    resp = proxy(add_table_request()) # type: UpdateWorldResponse
+    if resp.error_codes != UpdateWorldResponse.DUPLICATE_BODY_ERROR:
+        raise RuntimeError(resp.error_msg)
+    rospy.loginfo("...OK.")
 
 
 def test_update_world():
@@ -37,6 +51,7 @@ def test_update_world():
     try:
         update_world = rospy.ServiceProxy('muh/update_world', UpdateWorld)
         add_table(update_world)
+        add_table_again(update_world)
     except rospy.ServiceException, e:
         print "Service call failed: %s"%e
 

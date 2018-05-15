@@ -230,6 +230,15 @@ class PyBulletWorld(object):
         """
         p.removeBody(self._objects[object_name])
 
+    def has_object(self, object_name):
+        """
+        Checks whether this world already contains an object with a specific name.
+        :param object_name: Identifier of the object that shall be checked.
+        :type object_name: str
+        :return: True if object with that name is already in the world. Else: returns False.
+        """
+        return object_name in self._objects.keys()
+
     def attach_object(self):
         # use pybullet constraints
         pass

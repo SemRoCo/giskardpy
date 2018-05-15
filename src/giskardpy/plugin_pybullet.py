@@ -67,19 +67,17 @@ class PyBulletPlugin(Plugin):
         rospy.loginfo('asked to update the world with %s', req)
 
         if req.operation is UpdateWorldRequest.ADD:
-            print 'foo'
-            new_body = from_msg(req.body) # WorldObject
-            print 'bar'
-            urdf_string = to_urdf_string(new_body) # type: str
-            print 'caesar'
-            # TODO: use TF to resolve me
+            # catch double-spawning
+            if self.world.has_object(req.body.name):
+                return UpdateWorldResponse(UpdateWorldResponse.DUPLICATE_BODY_ERROR,
+                                           "Cannot add body '{}' because a body with "
+                                           "this name is already present.".format(req.body.name))
+
+            # TODO: resolve pose
             pose = req.body.pose.pose
-            self.world.spawn_object_from_urdf(new_body.name, urdf_string,
+            self.world.spawn_object_from_urdf(req.body.name, to_urdf_string(from_msg(req.body)),
                                               base_position= convert_ros_message_to_dictionary(pose.position).values(),
                                               base_orientation= convert_ros_message_to_dictionary(pose.orientation).values())
-            print 'scooby'
-            self.marker_pub.publish(to_marker(new_body))
-            print 'doo'
         elif req.operation is UpdateWorldRequest.REMOVE:
             # TODO: implement me
             pass

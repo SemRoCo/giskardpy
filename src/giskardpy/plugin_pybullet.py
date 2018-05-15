@@ -59,13 +59,12 @@ class PyBulletPlugin(Plugin):
 
     def update_world_cb(self, req):
         """
-
-        :param req:
+        Callback function of the ROS service to update the internal giskard world.
+        :param req: Service request as received from the service client.
         :type req: UpdateWorldRequest
-        :return:
+        :return: Service response, reporting back any runtime errors that occurred.
+        :rtype UpdateWorldResponse
         """
-        #rospy.loginfo('asked to update the world with %s', req)
-
         if req.operation is UpdateWorldRequest.ADD:
             # catch double-spawning
             if self.world.has_object(req.body.name):
@@ -137,7 +136,7 @@ class PyBulletPlugin(Plugin):
         self.world.activate_viewer()
         #TODO get robot description from databus
         urdf = rospy.get_param('robot_description')
-        self.world.spawn_urdf_str_robot(self.robot_name, urdf)
+        self.world.spawn_robot_from_urdf(self.robot_name, urdf)
 
     def stop(self):
         pass

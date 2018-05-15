@@ -44,9 +44,17 @@ def replace_paths(urdf, name):
 
 
 class PyBulletRobot(object):
-    def __init__(self, name, urdf_string, base_position=(0, 0, 0), base_orientation=(0, 0, 0, 1)):
+    def __init__(self, name, urdf, base_position=(0, 0, 0), base_orientation=(0, 0, 0, 1)):
+        """
+
+        :param name:
+        :param urdf: Path to URDF file, or content of already loaded URDF file.
+        :type urdf: str
+        :param base_position:
+        :param base_orientation:
+        """
         self.name = name
-        self.id = p.loadURDF(replace_paths(urdf_string, name), base_position, base_orientation,
+        self.id = p.loadURDF(replace_paths(urdf, name), base_position, base_orientation,
                              flags=p.URDF_USE_SELF_COLLISION_EXCLUDE_PARENT)
         self.sometimes = set()
         self.init_js_info()
@@ -177,15 +185,19 @@ class PyBulletWorld(object):
         self._objects = {}
         self._robots = {}
 
-    def spawn_urdf_str_robot(self, robot_name, urdf_string, base_position=(0, 0, 0), base_orientation=(0, 0, 0, 1)):
-        self.deactivate_rendering()
-        self._robots[robot_name] = PyBulletRobot(robot_name, urdf_string, base_position, base_orientation)
-        self.activate_rendering()
+    def spawn_robot_from_urdf(self, robot_name, urdf, base_position=(0, 0, 0), base_orientation=(0, 0, 0, 1)):
+        """
 
-    def spawn_urdf_file_robot(self, robot_name, urdf_file, base_position=(0, 0, 0), base_orientation=(0, 0, 0, 1)):
-        with open(urdf_file, 'r') as f:
-            urdf_string = f.read().replace('\n', '')
-        self.spawn_urdf_str_robot(robot_name, urdf_string, base_position, base_orientation)
+        :param robot_name:
+        :param urdf: Path to URDF file, or content of already loaded URDF file.
+        :type urdf: str
+        :param base_position:
+        :param base_orientation:
+        :return:
+        """
+        self.deactivate_rendering()
+        self._robots[robot_name] = PyBulletRobot(robot_name, urdf, base_position, base_orientation)
+        self.activate_rendering()
 
     def get_robot_list(self):
         return list(self._robots.keys())
@@ -210,15 +222,18 @@ class PyBulletWorld(object):
         p.removeBody(self._robots[robot_name].id)
         del(self._robots[robot_name])
 
-    def spawn_object_from_urdf(self, name, urdf_file, base_position=(0, 0, 0), base_orientation=(0, 0, 0, 1)):
-        print('loading {} at ({}, {})'.format(urdf_file, base_position, base_orientation))
-        self.deactivate_rendering()
-        self._objects[name] = PyBulletRobot(name, urdf_file, base_position, base_orientation)
-        self.activate_rendering()
+    def spawn_object_from_urdf(self, name, urdf, base_position=(0, 0, 0), base_orientation=(0, 0, 0, 1)):
+        """
 
-    def spawn_object_from_urdf_str(self, name, urdf_str, base_position=(0, 0, 0), base_orientation=(0, 0, 0, 1)):
+        :param name:
+        :param urdf: Path to URDF file, or content of already loaded URDF file.
+        :type urdf: str
+        :param base_position:
+        :param base_orientation:
+        :return:
+        """
         self.deactivate_rendering()
-        self._objects[name] = PyBulletRobot(name, urdf_str, base_position, base_orientation)
+        self._objects[name] = PyBulletRobot(name, urdf, base_position, base_orientation)
         self.activate_rendering()
 
     def get_object_list(self):

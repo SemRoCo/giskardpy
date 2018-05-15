@@ -83,23 +83,23 @@ class TestPyBulletWorld(unittest.TestCase):
         self.assertEqual(p.getNumBodies(), 0)
 
     def test_spawn_robot1(self):
-        self.w.spawn_urdf_file_robot('pr2', 'pr2.urdf')
+        self.w.spawn_robot_from_urdf('pr2', 'pr2.urdf')
         self.assertEqual(p.getNumBodies(), 1)
 
     def test_delete_robot1(self):
-        self.w.spawn_urdf_file_robot('pr2', 'pr2.urdf')
+        self.w.spawn_robot_from_urdf('pr2', 'pr2.urdf')
         self.assertEqual(p.getNumBodies(), 1)
         self.w.delete_robot('pr2')
         self.assertEqual(p.getNumBodies(), 0)
 
     def test_collision_detection1(self):
-        self.w.spawn_urdf_file_robot('pr2', 'pr2.urdf')
+        self.w.spawn_robot_from_urdf('pr2', 'pr2.urdf')
         r = self.w.get_robot('pr2')
         self.w.set_joint_state('pr2', r.get_zero_joint_state())
         self.assertEqual(0, len(self.w.check_collision()))
 
     def test_collision_detection2(self):
-        self.w.spawn_urdf_file_robot('pr2', 'pr2.urdf')
+        self.w.spawn_robot_from_urdf('pr2', 'pr2.urdf')
         mjs = self.get_pr2_collision_js()
         self.w.set_joint_state('pr2', mjs)
         collisions = self.w.check_collision()
@@ -111,12 +111,12 @@ class TestPyBulletWorld(unittest.TestCase):
         self.assertEqual(self.w.get_object_list(), ['plane'])
 
     def test_list_robots1(self):
-        self.w.spawn_urdf_file_robot('pr2', 'pr2.urdf')
+        self.w.spawn_robot_from_urdf('pr2', 'pr2.urdf')
         self.assertEqual(self.w.get_robot_list(), ['pr2'])
 
     def test_joint_state(self):
         mjs = self.get_pr2_collision_js()
-        self.w.spawn_urdf_file_robot('pr2', 'pr2.urdf')
+        self.w.spawn_robot_from_urdf('pr2', 'pr2.urdf')
         self.w.set_joint_state('pr2', mjs)
         mjs2 = self.w.get_joint_state('pr2')
         for joint_name, sjs in mjs.items():

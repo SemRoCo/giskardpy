@@ -44,9 +44,17 @@ def replace_paths(urdf, name):
 
 
 class PyBulletRobot(object):
-    def __init__(self, name, urdf_string, base_position=(0, 0, 0), base_orientation=(0, 0, 0, 1)):
+    def __init__(self, name, urdf, base_position=(0, 0, 0), base_orientation=(0, 0, 0, 1)):
+        """
+
+        :param name:
+        :param urdf: Path to URDF file, or content of already loaded URDF file.
+        :type urdf: str
+        :param base_position:
+        :param base_orientation:
+        """
         self.name = name
-        self.id = p.loadURDF(replace_paths(urdf_string, name), base_position, base_orientation,
+        self.id = p.loadURDF(replace_paths(urdf, name), base_position, base_orientation,
                              flags=p.URDF_USE_SELF_COLLISION_EXCLUDE_PARENT)
         self.sometimes = set()
         self.init_js_info()
@@ -177,15 +185,19 @@ class PyBulletWorld(object):
         self._objects = {}
         self._robots = {}
 
-    def spawn_urdf_str_robot(self, robot_name, urdf_string, base_position=(0, 0, 0), base_orientation=(0, 0, 0, 1)):
-        self.deactivate_rendering()
-        self._robots[robot_name] = PyBulletRobot(robot_name, urdf_string, base_position, base_orientation)
-        self.activate_rendering()
+    def spawn_robot_from_urdf(self, robot_name, urdf, base_position=(0, 0, 0), base_orientation=(0, 0, 0, 1)):
+        """
 
-    def spawn_urdf_file_robot(self, robot_name, urdf_file, base_position=(0, 0, 0), base_orientation=(0, 0, 0, 1)):
-        with open(urdf_file, 'r') as f:
-            urdf_string = f.read().replace('\n', '')
-        self.spawn_urdf_str_robot(robot_name, urdf_string, base_position, base_orientation)
+        :param robot_name:
+        :param urdf: Path to URDF file, or content of already loaded URDF file.
+        :type urdf: str
+        :param base_position:
+        :param base_orientation:
+        :return:
+        """
+        self.deactivate_rendering()
+        self._robots[robot_name] = PyBulletRobot(robot_name, urdf, base_position, base_orientation)
+        self.activate_rendering()
 
     def get_robot_list(self):
         return list(self._robots.keys())
@@ -208,16 +220,20 @@ class PyBulletWorld(object):
 
     def delete_robot(self, robot_name):
         p.removeBody(self._robots[robot_name].id)
+        del(self._robots[robot_name])
 
-    def spawn_object_from_urdf(self, name, urdf_file, base_position=(0, 0, 0), base_orientation=(0, 0, 0, 1)):
-        print('loading {} at ({}, {})'.format(urdf_file, base_position, base_orientation))
-        self.deactivate_rendering()
-        self._objects[name] = PyBulletRobot(name, urdf_file, base_position, base_orientation)
-        self.activate_rendering()
+    def spawn_object_from_urdf(self, name, urdf, base_position=(0, 0, 0), base_orientation=(0, 0, 0, 1)):
+        """
 
-    def spawn_object_from_urdf_str(self, name, urdf_str, base_position=(0, 0, 0), base_orientation=(0, 0, 0, 1)):
+        :param name:
+        :param urdf: Path to URDF file, or content of already loaded URDF file.
+        :type urdf: str
+        :param base_position:
+        :param base_orientation:
+        :return:
+        """
         self.deactivate_rendering()
-        self._objects[name] = PyBulletRobot(name, urdf_str, base_position, base_orientation)
+        self._objects[name] = PyBulletRobot(name, urdf, base_position, base_orientation)
         self.activate_rendering()
 
     def get_object_list(self):
@@ -225,10 +241,33 @@ class PyBulletWorld(object):
 
     def delete_object(self, object_name):
         """
-        :param object_name:
+        Deletes an object with a specific name from the world.
+        :param object_name: Name of the object that shall be deleted.
         :type object_name: str
         """
-        p.removeBody(self._objects[object_name])
+        if not self.has_object(object_name):
+            raise RuntimeError('Cannot delete unknown object {}'.format(object_name))
+        p.removeBody(self._objects[object_name].id)
+        del(self._objects[object_name])
+
+    def delete_all_objects(self, remaining_objects=['plane']):
+        """
+        Deletes all objects in world. Optionally, one can specify a list of objects that shall remain in the world.
+        :param remaining_objects: Names of objects that shall remain in the world.
+        :type remaining_objects: list
+        """
+        for object_name in self.get_object_list():
+            if not object_name in remaining_objects:
+                self.delete_object(object_name)
+
+    def has_object(self, object_name):
+        """
+        Checks whether this world already contains an object with a specific name.
+        :param object_name: Identifier of the object that shall be checked.
+        :type object_name: str
+        :return: True if object with that name is already in the world. Else: returns False.
+        """
+        return object_name in self._objects.keys()
 
     def attach_object(self):
         # use pybullet constraints

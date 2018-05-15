@@ -59,33 +59,32 @@ class PyBulletPlugin(Plugin):
 
     def update_world_cb(self, req):
         """
-
-        :param req:
+        Callback function of the ROS service to update the internal giskard world.
+        :param req: Service request as received from the service client.
         :type req: UpdateWorldRequest
-        :return:
+        :return: Service response, reporting back any runtime errors that occurred.
+        :rtype UpdateWorldResponse
         """
-        rospy.loginfo('asked to update the world with %s', req)
-
         if req.operation is UpdateWorldRequest.ADD:
-            print 'foo'
-            new_body = from_msg(req.body) # WorldObject
-            print 'bar'
-            urdf_string = to_urdf_string(new_body) # type: str
-            print 'caesar'
-            # TODO: use TF to resolve me
+            # catch double-spawning
+            if self.world.has_object(req.body.name):
+                return UpdateWorldResponse(UpdateWorldResponse.DUPLICATE_BODY_ERROR,
+                                           "Cannot add body '{}' because a body with "
+                                           "this name is already present.".format(req.body.name))
+
+            # TODO: resolve pose
             pose = req.body.pose.pose
-            self.world.spawn_object_from_urdf(new_body.name, urdf_string,
+            self.world.spawn_object_from_urdf(req.body.name, to_urdf_string(from_msg(req.body)),
                                               base_position= convert_ros_message_to_dictionary(pose.position).values(),
                                               base_orientation= convert_ros_message_to_dictionary(pose.orientation).values())
-            print 'scooby'
-            self.marker_pub.publish(to_marker(new_body))
-            print 'doo'
         elif req.operation is UpdateWorldRequest.REMOVE:
             # TODO: implement me
             pass
         elif req.operation is UpdateWorldRequest.ALTER:
             # TODO: implement me
             pass
+        elif req.operation is UpdateWorldRequest.REMOVE_ALL:
+            self.world.delete_all_objects()
         else:
             return UpdateWorldResponse(UpdateWorldResponse.INVALID_OPERATION,
                                        "Received invalid operation code: {}".format(req.operation))
@@ -137,7 +136,7 @@ class PyBulletPlugin(Plugin):
         self.world.activate_viewer()
         #TODO get robot description from databus
         urdf = rospy.get_param('robot_description')
-        self.world.spawn_urdf_str_robot(self.robot_name, urdf)
+        self.world.spawn_robot_from_urdf(self.robot_name, urdf)
 
     def stop(self):
         pass

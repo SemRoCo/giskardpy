@@ -1,5 +1,6 @@
 from visualization_msgs.msg import MarkerArray, Marker
 from giskard_msgs.msg import WorldBody
+from shape_msgs.msg import SolidPrimitive
 
 from giskardpy.trajectory import Transform
 from lxml import etree
@@ -214,16 +215,26 @@ def to_marker(urdf_object):
 
 def from_msg(body_msg):
     """
-
-    :param body_msg:
+    Converts a body in the world from a ROS message to the corresponding internal representation.
+    :param body_msg: Input message that shall be converted.
     :type body_msg: WorldBody
-    :return:
+    :return: Internal representation of body, filled with data from input message.
+    :rtype WorldBody
     """
     if body_msg.type is WorldBody.MESH_BODY:
         geom = MeshShape(filename=body_msg.mesh)
     elif body_msg.type is WorldBody.PRIMITIVE_BODY:
-        # TODO: complete me
-        pass
+        if body_msg.shape.type is SolidPrimitive.BOX:
+            geom = BoxShape(body_msg.shape.dimensions[SolidPrimitive.BOX_X],
+                            body_msg.shape.dimensions[SolidPrimitive.BOX_Y],
+                            body_msg.shape.dimensions[SolidPrimitive.BOX_Z])
+        elif body_msg.shape.type is SolidPrimitive.CYLINDER:
+            geom = CylinderShape(body_msg.shape.dimensions[SolidPrimitive.CYLINDER_RADIUS],
+                                 body_msg.shape.dimensions[SolidPrimitive.CYLINDER_HEIGHT])
+        elif body_msg.shape.type is SolidPrimitive.SPHERE:
+            geom = SphereShape(body_msg.shape.dimensions[SolidPrimitive.SPHERE_RADIUS])
+        else:
+            raise RuntimeError("Invalid primitive shape '{}' of world body '{}'".format(body_msg.shape.type, body_msg.name))
     elif body_msg.type is WorldBody.URDF_BODY:
         # TODO: complete me
         pass

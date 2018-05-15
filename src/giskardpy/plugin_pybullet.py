@@ -64,7 +64,7 @@ class PyBulletPlugin(Plugin):
         :type req: UpdateWorldRequest
         :return:
         """
-        rospy.loginfo('asked to update the world with %s', req)
+        #rospy.loginfo('asked to update the world with %s', req)
 
         if req.operation is UpdateWorldRequest.ADD:
             # catch double-spawning
@@ -84,6 +84,8 @@ class PyBulletPlugin(Plugin):
         elif req.operation is UpdateWorldRequest.ALTER:
             # TODO: implement me
             pass
+        elif req.operation is UpdateWorldRequest.REMOVE_ALL:
+            self.world.delete_all_objects()
         else:
             return UpdateWorldResponse(UpdateWorldResponse.INVALID_OPERATION,
                                        "Received invalid operation code: {}".format(req.operation))

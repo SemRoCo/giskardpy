@@ -18,6 +18,10 @@ def add_table_request():
     return UpdateWorldRequest(UpdateWorldRequest.ADD, table)
 
 
+def clear_world_request():
+    return UpdateWorldRequest(UpdateWorldRequest.REMOVE_ALL, WorldBody())
+
+
 def add_table(proxy):
     """
     Adds a table to the giskard world, expecting success.
@@ -46,10 +50,19 @@ def add_table_again(proxy):
     rospy.loginfo("...OK.")
 
 
+def clear_world(proxy):
+    rospy.loginfo("Removing all bodies from the world --expecting success...")
+    resp = proxy(clear_world_request())  # type: UpdateWorldResponse
+    if resp.error_codes != UpdateWorldResponse.SUCCESS:
+        raise RuntimeError(resp.error_msg)
+    rospy.loginfo("...OK.")
+
+
 def test_update_world():
     rospy.wait_for_service('muh/update_world')
     try:
         update_world = rospy.ServiceProxy('muh/update_world', UpdateWorld)
+        clear_world(update_world)
         add_table(update_world)
         add_table_again(update_world)
     except rospy.ServiceException, e:

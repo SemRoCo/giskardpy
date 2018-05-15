@@ -208,6 +208,7 @@ class PyBulletWorld(object):
 
     def delete_robot(self, robot_name):
         p.removeBody(self._robots[robot_name].id)
+        del(self._robots[robot_name])
 
     def spawn_object_from_urdf(self, name, urdf_file, base_position=(0, 0, 0), base_orientation=(0, 0, 0, 1)):
         print('loading {} at ({}, {})'.format(urdf_file, base_position, base_orientation))
@@ -225,10 +226,24 @@ class PyBulletWorld(object):
 
     def delete_object(self, object_name):
         """
-        :param object_name:
+        Deletes an object with a specific name from the world.
+        :param object_name: Name of the object that shall be deleted.
         :type object_name: str
         """
-        p.removeBody(self._objects[object_name])
+        if not self.has_object(object_name):
+            raise RuntimeError('Cannot delete unknown object {}'.format(object_name))
+        p.removeBody(self._objects[object_name].id)
+        del(self._objects[object_name])
+
+    def delete_all_objects(self, remaining_objects=['plane']):
+        """
+        Deletes all objects in world. Optionally, one can specify a list of objects that shall remain in the world.
+        :param remaining_objects: Names of objects that shall remain in the world.
+        :type remaining_objects: list
+        """
+        for object_name in self.get_object_list():
+            if not object_name in remaining_objects:
+                self.delete_object(object_name)
 
     def has_object(self, object_name):
         """

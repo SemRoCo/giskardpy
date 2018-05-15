@@ -55,8 +55,7 @@ if __name__ == '__main__':
                                                       closest_point_identifier=closest_point_identifier,
                                                       gui=False,
                                                       marker=True)))
-    pm.register_plugin('fk',
-                       FKPlugin(roots, tips, js_identifier=js_identifier, fk_identifier=fk_identifier))
+    pm.register_plugin('fk', FKPlugin(js_identifier=js_identifier, fk_identifier=fk_identifier))
     pm.register_plugin('cart bullet controller',
                        CartesianBulletControllerPlugin(collision_root,
                                                        fk_identifier=fk_identifier,

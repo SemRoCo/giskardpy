@@ -11,12 +11,7 @@ from giskardpy.utils import keydefaultdict
 
 
 class FKPlugin(Plugin):
-    def __init__(self, roots, tips, fk_identifier, js_identifier):
-        if len(roots) != len(tips):
-            # TODO look for better exception
-            raise Exception('lengths of roots, tips and fk_identifiers don\'t match')
-        self.roots = roots
-        self.tips = tips
+    def __init__(self, fk_identifier, js_identifier):
         self._joint_states_identifier = js_identifier
         self.fk_identifier = fk_identifier
         self.fk = None

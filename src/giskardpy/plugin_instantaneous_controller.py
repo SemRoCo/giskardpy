@@ -6,7 +6,7 @@ from giskard_msgs.msg import Controller
 from giskardpy.input_system import JointStatesInput, FrameInput, Point3Input
 from giskardpy.plugin import Plugin
 from giskardpy.symengine_controller import SymEngineController, position_conv, rotation_conv, \
-    link_to_any_avoidance, joint_position
+    link_to_link_avoidance, joint_position
 import symengine_wrappers as sw
 from giskardpy.utils import keydefaultdict
 
@@ -107,11 +107,11 @@ class CartesianBulletControllerPlugin(Plugin):
                 trans_prefix = '{}/{},{}/pose/position'.format(self._fk_identifier, self.root, link)
                 rot_prefix = '{}/{},{}/pose/orientation'.format(self._fk_identifier, self.root, link)
                 current_input = FrameInput.prefix_constructor(trans_prefix, rot_prefix, self.god_map.get_expr)
-                self.soft_constraints.update(link_to_any_avoidance(link,
-                                                                   robot.get_fk_expression(self.root, link),
-                                                                   current_input.get_frame(),
-                                                                   point_on_link_input.get_expression(),
-                                                                   other_point_input.get_expression()))
+                self.soft_constraints.update(link_to_link_avoidance(link,
+                                                                    robot.get_fk_expression(self.root, link),
+                                                                    current_input.get_frame(),
+                                                                    point_on_link_input.get_expression(),
+                                                                    other_point_input.get_expression()))
 
         for (root, tip), value in self.god_map.get_data([self._goal_identifier, Controller.TRANSLATION_3D]).items():
             key = '{}/{},{}'.format(Controller.TRANSLATION_3D, root, tip)
@@ -149,8 +149,6 @@ class CartesianBulletControllerPlugin(Plugin):
         self.god_map.set_data([self._goal_identifier, Controller.JOINT], joint_goal)
 
         if rebuild_controller or self._controller is None:
-            # TODO prevent this from being called too often
-            # TODO turn off old constraints by setting weight to 0
             # TODO sanity checking
 
             self._controller.init(self.soft_constraints, self.god_map.get_free_symbols())

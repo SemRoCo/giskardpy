@@ -23,9 +23,9 @@ if __name__ == '__main__':
     # tips = ['gripper_tool_frame']
     roots = ['base_link', 'base_link']
     tips = ['r_gripper_tool_frame', 'l_gripper_tool_frame']
-    fk_identifier = 'fk'
-    cartesian_goal_identifier = 'cartesian_goal'
 
+    fk_identifier = 'fk'
+    cartesian_goal_identifier = 'goal'
     js_identifier = 'js'
     controlled_joints_identifier = 'controlled_joints'
     trajectory_identifier = 'traj'
@@ -33,6 +33,7 @@ if __name__ == '__main__':
     next_cmd_identifier = 'motor'
     collision_identifier = 'collision'
     closest_point_identifier = 'cpi'
+    collision_goal_identifier = 'collision_goal'
 
     pm = ProcessManager()
     pm.register_plugin('js',
@@ -48,11 +49,13 @@ if __name__ == '__main__':
                                           time_identifier=time_identifier,
                                           collision_identifier=collision_identifier,
                                           controlled_joints_identifier=controlled_joints_identifier,
+                                          collision_goal_identifier=collision_goal_identifier,
                                           plot_trajectory=False))
     pm.register_plugin('bullet',
                        PluginContainer(PyBulletPlugin(js_identifier=js_identifier,
                                                       collision_identifier=collision_identifier,
                                                       closest_point_identifier=closest_point_identifier,
+                                                      collision_goal_identifier=collision_goal_identifier,
                                                       gui=False,
                                                       marker=True)))
     pm.register_plugin('fk', FKPlugin(js_identifier=js_identifier, fk_identifier=fk_identifier))
@@ -64,7 +67,8 @@ if __name__ == '__main__':
                                                        next_cmd_identifier=next_cmd_identifier,
                                                        collision_identifier=collision_identifier,
                                                        closest_point_identifier=closest_point_identifier,
-                                                       controlled_joints_identifier=controlled_joints_identifier))
+                                                       controlled_joints_identifier=controlled_joints_identifier,
+                                                       collision_goal_identifier=collision_goal_identifier))
     pm.register_plugin('interactive marker', InteractiveMarkerPlugin(roots, tips))
 
     app = ROSApplication(pm)

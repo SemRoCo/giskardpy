@@ -32,6 +32,8 @@ class QProblemBuilder(object):
 
     def make_sympy_matrices(self):
         print('building new controller')
+        print('number of soft constraints {}'.format(len(self.soft_constraints_dict)))
+        t_total = time()
         # TODO cpu intensive
         weights = []
         lb = []
@@ -75,7 +77,7 @@ class QProblemBuilder(object):
         A_soft = spw.Matrix(soft_expressions)
         t = time()
         A_soft = A_soft.jacobian(M_controlled_joints)
-        # print('jacobian took {}'.format(time() - t))
+        print('jacobian took {}'.format(time() - t))
         identity = spw.eye(A_soft.shape[0])
         A_soft = A_soft.row_join(identity)
 
@@ -94,8 +96,8 @@ class QProblemBuilder(object):
         if self.free_symbols is None:
             self.free_symbols = self.big_ass_M.free_symbols
         self.cython_big_ass_M = spw.speed_up(self.big_ass_M, self.free_symbols, backend=BACKEND)
-
-        print('new controller ready')
+        print('autowrap took {}'.format(time() - t))
+        print('new controller ready {}s'.format(time() - t_total))
 
     def get_cmd(self, substitutions):
         """

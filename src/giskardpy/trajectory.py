@@ -107,32 +107,9 @@ class Trajectory(object):
     def values(self):
         return self._points.values()
 
-class ControllerMsg(object):
-    def __init__(self):
-        self.type = 0
-        self.root_link = ''
-        self.tip_link = ''
-        self.p_gain = 0
-        self.weight = 0
-        self.enable_error_threshold = True
-        self.threshold_value = 0
-        self.goal_pose = None
-        self.goal_state = None
-
-    def __hash__(self):
-        return '{}{}{}'.format(self.root_link, self.tip_link, self.type).__hash__()
-
-
-class TransGoal(object):
-    def __init__(self):
-        self.p_gain = None
-        self.max_speed = None
-        self.point = None
-        self.weight = None
-
-class RotGoal(object):
-    def __init__(self):
-        self.weight = None
-        self.max_speed = None
-        self.p_gain = None
-        self.rotation = None
+class ClosestPointInfo(object):
+    def __init__(self, position_on_a, position_on_b, contact_distance, min_dist):
+        self.position_on_a = position_on_a
+        self.position_on_b = position_on_b
+        self.contact_distance = contact_distance
+        self.min_dist = min_dist

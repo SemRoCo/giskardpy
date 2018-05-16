@@ -96,13 +96,13 @@ class TestPyBulletWorld(unittest.TestCase):
         self.w.spawn_robot_from_urdf('pr2', 'pr2.urdf')
         r = self.w.get_robot('pr2')
         self.w.set_joint_state('pr2', r.get_zero_joint_state())
-        self.assertEqual(0, len(self.w.check_collision()))
+        self.assertEqual(0, len(self.w.check_collisions()))
 
     def test_collision_detection2(self):
         self.w.spawn_robot_from_urdf('pr2', 'pr2.urdf')
         mjs = self.get_pr2_collision_js()
         self.w.set_joint_state('pr2', mjs)
-        collisions = self.w.check_collision()
+        collisions = self.w.check_collisions()
         collisions = [x for x in collisions.values() if x.contact_distance < 0.05]
         self.assertEqual(8, len(collisions))
 

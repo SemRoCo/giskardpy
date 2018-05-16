@@ -7,14 +7,14 @@ from giskard_msgs.msg import WorldBody
 from shape_msgs.msg import SolidPrimitive
 
 
-def add_table_request():
+def add_table_request(position=(-1.4, -1.05, 0.0), orientation=(0,0,1,0)):
     table = WorldBody()
     table.type = WorldBody.MESH_BODY
     table.name = "table"
     table.pose.header.stamp = rospy.Time.now()
     table.pose.header.frame_id = "map"
-    table.pose.pose.position = Point(-1.4, -1.05, 0.0)
-    table.pose.pose.orientation = Quaternion(0, 0, 1, 0)
+    table.pose.pose.position = Point(*position)
+    table.pose.pose.orientation = Quaternion(*orientation)
     table.mesh = 'package://iai_kitchen/meshes/misc/big_table_1.stl'
     return UpdateWorldRequest(UpdateWorldRequest.ADD, table)
 
@@ -93,13 +93,13 @@ def add_table_again(proxy):
     call_service(proxy, add_table_request(), UpdateWorldResponse.DUPLICATE_BODY_ERROR, "Adding table, again --expecting failure...")
 
 
-def add_table(proxy):
+def add_table(proxy, position=(-1.4, -1.05, 0.0), orientation=(0,0,1,0)):
     """
     Adds a table to the giskard world, expecting success.
     :param proxy: ServiceProxy to update the giskard world.
     :type proxy: rospy.ServiceProxy
     """
-    call_service(proxy, add_table_request(), UpdateWorldResponse.SUCCESS, "Adding table --expecting success...")
+    call_service(proxy, add_table_request(position, orientation), UpdateWorldResponse.SUCCESS, "Adding table --expecting success...")
 
 
 def add_sphere(proxy):
@@ -142,8 +142,8 @@ def test_update_world():
         add_sphere(update_world)
         add_cylinder(update_world)
         add_box(update_world)
-    except rospy.ServiceException, e:
-        print "Service call failed: %s"%e
+    except rospy.ServiceException as e:
+        print("Service call failed: {}".format(e))
 
 
 if __name__ == "__main__":

@@ -3,6 +3,7 @@ import rospkg
 from collections import namedtuple, OrderedDict, defaultdict
 from itertools import combinations
 from pybullet import JOINT_REVOLUTE, JOINT_PRISMATIC, JOINT_PLANAR, JOINT_SPHERICAL
+from time import time
 
 import pybullet_data
 from numpy.random.mtrand import seed
@@ -65,36 +66,38 @@ class PyBulletRobot(object):
 
     def init_js_info(self):
         self.joint_id_map = {}
-        self.link_id_map = {}
+        self.link_name_to_id = {}
+        self.link_id_to_name = {}
         self.joint_name_to_info = OrderedDict()
         self.joint_id_to_info = OrderedDict()
         self.joint_name_to_info['base'] = JointInfo(*([-1, 'base'] + [None] * 10 + ['base'] + [None] * 4))
         self.joint_id_to_info[-1] = JointInfo(*([-1, 'base'] + [None] * 10 + ['base'] + [None] * 4))
-        self.link_id_map[-1] = 'base'
-        self.link_id_map['base'] = -1
+        self.link_id_to_name[-1] = 'base'
+        self.link_name_to_id['base'] = -1
         for joint_index in range(p.getNumJoints(self.id)):
             joint_info = JointInfo(*p.getJointInfo(self.id, joint_index))
             self.joint_name_to_info[joint_info.joint_name] = joint_info
             self.joint_id_to_info[joint_info.joint_index] = joint_info
             self.joint_id_map[joint_index] = joint_info.joint_name
             self.joint_id_map[joint_info.joint_name] = joint_index
-            self.link_id_map[joint_info.link_name] = joint_index
-            self.link_id_map[joint_index] = joint_info.link_name
+            self.link_name_to_id[joint_info.link_name] = joint_index
+            self.link_id_to_name[joint_index] = joint_info.link_name
         self.generate_self_collision_matrix()
 
     def check_self_collision(self, d=0.5, whitelist=None):
         if whitelist is None:
             whitelist = self.sometimes
-        o = (0, 0, 0)
-        contact_infos = keydefaultdict(lambda k: ContactInfo(None, self.id, self.id, k[0], k[1], o, o, o, 1e9, 0))
-        contact_infos.update({(self.link_id_map[link_a], self.link_id_map[link_b]): ContactInfo(*x)
-                              for (link_a, link_b) in whitelist for x in p.getClosestPoints(self.id, self.id, d, link_a, link_b)})
-        contact_infos.update({(link_b, link_a): ContactInfo(ci.contact_flag, ci.body_unique_id_a, ci.body_unique_id_b,
+        contact_infos = keydefaultdict(lambda k: ContactInfo(None, self.id, self.id, k[0], k[1], (0, 0, 0), (0, 0, 0),
+                                                             (0, 0, 0), 1e9, 0))
+        contact_infos.update({(self.link_id_to_name[link_a], self.name, self.link_id_to_name[link_b]): ContactInfo(*x)
+                              for (link_a, link_b) in whitelist for x in
+                              p.getClosestPoints(self.id, self.id, d, link_a, link_b)})
+        contact_infos.update({(link_b, name, link_a): ContactInfo(ci.contact_flag, ci.body_unique_id_a, ci.body_unique_id_b,
                                                             ci.link_index_b, ci.link_index_a, ci.position_on_b,
                                                             ci.position_on_a,
                                                             [-x for x in ci.contact_normal_on_b], ci.contact_distance,
                                                             ci.normal_force)
-                              for (link_a, link_b), ci in contact_infos.items()})
+                              for (link_a, name, link_b), ci in contact_infos.items()})
         return contact_infos
 
     def get_joint_states(self):
@@ -175,6 +178,12 @@ class PyBulletRobot(object):
                 js[joint_name] = sjs
         return js
 
+    def get_link_names(self):
+        return self.link_name_to_id.keys()
+
+    def get_link_ids(self):
+        return self.link_id_to_name.keys()
+
     def __str__(self):
         return '{}/{}'.format(self.name, self.id)
 
@@ -203,7 +212,22 @@ class PyBulletWorld(object):
         return list(self._robots.keys())
 
     def get_robot(self, name):
+        """
+        :param name:
+        :type name: str
+        :return:
+        :rtype: PyBulletRobot
+        """
         return self._robots[name]
+
+    def get_object(self, name):
+        """
+        :param name:
+        :type name: str
+        :return:
+        :rtype: PyBulletRobot
+        """
+        return self._objects[name]
 
     def set_joint_state(self, robot_name, joint_state):
         """
@@ -220,7 +244,7 @@ class PyBulletWorld(object):
 
     def delete_robot(self, robot_name):
         p.removeBody(self._robots[robot_name].id)
-        del(self._robots[robot_name])
+        del (self._robots[robot_name])
 
     def spawn_object_from_urdf(self, name, urdf, base_position=(0, 0, 0), base_orientation=(0, 0, 0, 1)):
         """
@@ -248,7 +272,7 @@ class PyBulletWorld(object):
         if not self.has_object(object_name):
             raise RuntimeError('Cannot delete unknown object {}'.format(object_name))
         p.removeBody(self._objects[object_name].id)
-        del(self._objects[object_name])
+        del (self._objects[object_name])
 
     def delete_all_objects(self, remaining_objects=['plane']):
         """
@@ -276,30 +300,35 @@ class PyBulletWorld(object):
     def release_object(self):
         pass
 
-    def check_collision(self, d=0.05, self_collision=True):
+    def check_collisions(self, cut_off_distances, allowed_collision=set(), d=0.1, self_collision=True):
         """
-        :param d:
-        :type d: float
+        :param cut_off_distances:
+        :type cut_off_distances: dict
         :param self_collision:
         :type self_collision: bool
         :return:
         :rtype: dict
         """
-        o = (0, 0, 0)
-        collisions = keydefaultdict(lambda k: ContactInfo(None, self.id, self.id, k[0], k[1], o, o, o, 1e9, 0))
+        # TODO set self collision cut off distance in a cool way
+        collisions = keydefaultdict(lambda k: ContactInfo(None, self.id, self.id, k[0], k[1], (0, 0, 0), (0, 0, 0),
+                                                          (0, 0, 0), 1e9, 0))
         if self_collision:
-            for robot in self._robots.values(): # type: PyBulletRobot
+            for robot in self._robots.values():  # type: PyBulletRobot
                 if collisions is None:
                     collisions = robot.check_self_collision(d)
                 else:
                     collisions.update(robot.check_self_collision(d))
-        for robot in self._robots.values():
-            for robot_link in robot.joint_id_to_info.keys():
-                for object in self._objects.values():
-                    for object_link in object.joint_id_to_info.keys():
-                        collisions.update({(robot.link_id_map[robot_link], object.link_id_map[object_link]):
-                                               ContactInfo(*x) for x in
-                                           p.getClosestPoints(robot.id, object.id, d, robot_link, object_link)})
+        # TODO robot/robot collisions are missing
+        for robot_name, robot in self._robots.items():  # type: (str, PyBulletRobot)
+            for robot_link_name, robot_link in robot.link_name_to_id.items():
+                # TODO skip if collisions with all links of an object are allowed
+                for object_name, object in self._objects.items():  # type: (str, PyBulletRobot)
+                    for object_link_name, object_link in object.link_name_to_id.items():
+                        key = (robot_link_name, object_name, object_link_name)
+                        if key not in allowed_collision:
+                            collisions.update({key: ContactInfo(*x) for x in
+                                               p.getClosestPoints(robot.id, object.id, cut_off_distances[key] + d,
+                                                                  robot_link, object_link)})
         return collisions
 
     def check_trajectory_collision(self):

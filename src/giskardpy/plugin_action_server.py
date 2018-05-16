@@ -6,7 +6,7 @@ import actionlib
 import rospy
 from control_msgs.msg import FollowJointTrajectoryAction, FollowJointTrajectoryResult, FollowJointTrajectoryGoal, \
     JointTrajectoryControllerState
-from giskard_msgs.msg import Controller
+from giskard_msgs.msg import Controller, CollisionEntry
 from giskard_msgs.msg._MoveAction import MoveAction
 from giskard_msgs.msg._MoveFeedback import MoveFeedback
 from giskard_msgs.msg._MoveGoal import MoveGoal
@@ -24,7 +24,7 @@ from giskardpy.trajectory import SingleJointState, Transform, Point, Quaternion,
 class ActionServerPlugin(Plugin):
     # TODO find a better name for this
     def __init__(self, cartesian_goal_identifier, js_identifier, trajectory_identifier, time_identifier,
-                 collision_identifier, controlled_joints_identifier, plot_trajectory=False):
+                 collision_identifier, controlled_joints_identifier, collision_goal_identifier, plot_trajectory=False):
         self.plot_trajectory = plot_trajectory
         self.cartesian_goal_identifier = cartesian_goal_identifier
         self.controlled_joints_identifier = controlled_joints_identifier
@@ -32,6 +32,7 @@ class ActionServerPlugin(Plugin):
         self.js_identifier = js_identifier
         self.time_identifier = time_identifier
         self.collision_identifier = collision_identifier
+        self.collision_goal_identifier = collision_goal_identifier
 
         self.tf = TfWrapper()
         self.joint_goal = None
@@ -106,6 +107,7 @@ class ActionServerPlugin(Plugin):
                     tip = controller.tip_link
                     controller.goal_pose = self.tf.transform_pose(root, controller.goal_pose)
                     goals[goal_key][root, tip] = controller
+            self.god_map.set_data([self.collision_goal_identifier], goal.cmd_seq[0].collisions)
             feedback = MoveFeedback()
             feedback.phase = MoveFeedback.PLANNING
             self._as.publish_feedback(feedback)

@@ -2,6 +2,7 @@ from visualization_msgs.msg import MarkerArray, Marker
 from giskard_msgs.msg import WorldBody
 from shape_msgs.msg import SolidPrimitive
 
+from giskardpy.exceptions import CorruptShapeException
 from giskardpy.trajectory import Transform
 from lxml import etree
 import PyKDL as kdl # TODO: get rid of this dependency
@@ -234,11 +235,12 @@ def from_msg(body_msg):
         elif body_msg.shape.type is SolidPrimitive.SPHERE:
             geom = SphereShape(body_msg.shape.dimensions[SolidPrimitive.SPHERE_RADIUS])
         else:
-            raise RuntimeError("Invalid primitive shape '{}' of world body '{}'".format(body_msg.shape.type, body_msg.name))
+            raise CorruptShapeException("Invalid primitive shape '{}' of world body '{}'".format(body_msg.shape.type, body_msg.name))
     elif body_msg.type is WorldBody.URDF_BODY:
         # TODO: complete me
         pass
     else:
+        # TODO: replace me by a proper exception that can be reported back to the service client
         raise RuntimeError("Invalid shape of world body: {}".format(body_msg.shape))
     col = CollisionProperty(name=body_msg.name + '_col', geometry=geom)
     vis = VisualProperty(name=body_msg.name + '_vis', geometry=geom)

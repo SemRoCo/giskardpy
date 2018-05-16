@@ -23,6 +23,19 @@ def clear_world_request():
     return UpdateWorldRequest(UpdateWorldRequest.REMOVE_ALL, WorldBody())
 
 
+def add_cone_request():
+    cone = WorldBody()
+    cone.type = WorldBody.PRIMITIVE_BODY
+    cone.name = 'cone'
+    cone.pose.header.stamp = rospy.Time.now()
+    cone.pose.header.frame_id = 'map'
+    cone.pose.pose.orientation = Quaternion(0,0,0,1)
+    cone.shape.type = SolidPrimitive.CONE
+    cone.shape.dimensions.append(0.01)  # height of 1cm
+    cone.shape.dimensions.append(0.05)  # radius of 5cm
+    return UpdateWorldRequest(UpdateWorldRequest.ADD, cone)
+
+
 def add_sphere_request():
     sphere = WorldBody()
     sphere.type = WorldBody.PRIMITIVE_BODY
@@ -128,6 +141,15 @@ def add_box(proxy):
     call_service(proxy, add_box_request(), UpdateWorldResponse.SUCCESS, "Adding box --expecting success...")
 
 
+def add_cone(proxy):
+    """
+    Adds a cone to the giskard world, expecting failure.
+    :param proxy: ServiceProxy to update the giskard world.
+    :type proxy: rospy.ServiceProxy
+    """
+    call_service(proxy, add_cone_request(), UpdateWorldResponse.CORRUPT_SHAPE_ERROR, "Adding cone --expecting failure...")
+
+
 def clear_world(proxy):
     call_service(proxy, clear_world_request(), UpdateWorldResponse.SUCCESS, "Clearing world --expecting success...")
 
@@ -142,6 +164,7 @@ def test_update_world():
         add_sphere(update_world)
         add_cylinder(update_world)
         add_box(update_world)
+        add_cone(update_world)
     except rospy.ServiceException, e:
         print "Service call failed: %s"%e
 

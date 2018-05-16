@@ -9,6 +9,7 @@ from std_srvs.srv import SetBool, SetBoolResponse
 from giskard_msgs.srv import UpdateWorld, UpdateWorldResponse, UpdateWorldRequest
 from visualization_msgs.msg import Marker, MarkerArray
 
+from giskardpy.exceptions import CorruptShapeException, UnknownBodyException, DuplicateObjectNameException
 from giskardpy.object import WorldObject, to_urdf_string, VisualProperty, BoxShape, CollisionProperty, to_marker, \
     MeshShape, from_msg
 from giskardpy.plugin import Plugin
@@ -65,53 +66,53 @@ class PyBulletPlugin(Plugin):
         :return: Service response, reporting back any runtime errors that occurred.
         :rtype UpdateWorldResponse
         """
-        if req.operation is UpdateWorldRequest.ADD:
-            # catch double-spawning
-            if self.world.has_object(req.body.name):
-                return UpdateWorldResponse(UpdateWorldResponse.DUPLICATE_BODY_ERROR,
-                                           "Cannot add body '{}' because a body with "
-                                           "this name is already present.".format(req.body.name))
+        try:
+            if req.operation is UpdateWorldRequest.ADD:
+                # TODO: resolve pose
+                pose = req.body.pose.pose
+                self.world.spawn_object_from_urdf(req.body.name, to_urdf_string(from_msg(req.body)),
+                                                  base_position= convert_ros_message_to_dictionary(pose.position).values(),
+                                                  base_orientation= convert_ros_message_to_dictionary(pose.orientation).values())
+            elif req.operation is UpdateWorldRequest.REMOVE:
+                # TODO: implement me
+                pass
+            elif req.operation is UpdateWorldRequest.ALTER:
+                # TODO: implement me
+                pass
+            elif req.operation is UpdateWorldRequest.REMOVE_ALL:
+                self.world.delete_all_objects()
+            else:
+                return UpdateWorldResponse(UpdateWorldResponse.INVALID_OPERATION,
+                                           "Received invalid operation code: {}".format(req.operation))
 
-            # TODO: resolve pose
-            pose = req.body.pose.pose
-            self.world.spawn_object_from_urdf(req.body.name, to_urdf_string(from_msg(req.body)),
-                                              base_position= convert_ros_message_to_dictionary(pose.position).values(),
-                                              base_orientation= convert_ros_message_to_dictionary(pose.orientation).values())
-        elif req.operation is UpdateWorldRequest.REMOVE:
-            # TODO: implement me
-            pass
-        elif req.operation is UpdateWorldRequest.ALTER:
-            # TODO: implement me
-            pass
-        elif req.operation is UpdateWorldRequest.REMOVE_ALL:
-            self.world.delete_all_objects()
-        else:
-            return UpdateWorldResponse(UpdateWorldResponse.INVALID_OPERATION,
-                                       "Received invalid operation code: {}".format(req.operation))
-
-        # self.world.spawn_object_from_urdf('kitchen', '{}/urdf/muh.urdf'.format(RosPack().get_path('iai_kitchen')))
-        # self.world.spawn_object_from_urdf('shelf', '{}/urdf/shelves.urdf'.format(RosPack().get_path('iai_shelves')),
-        #                                   [1.3,1,0])
-        # my_obj = WorldObject(name='my_box',
-        #                      visual_props=[VisualProperty(geometry=BoxShape(0.5, 1.5, 1.5),
-        #                                                   origin=g.Transform(g.Point(.8,0,0),
-        #                                                                      g.Quaternion(0,0,0,1)))],
-        #                      collision_props=[CollisionProperty(geometry=BoxShape(0.5, 1.5, 1.5),
-        #                                                         origin=g.Transform(g.Point(.8, 0, 0),
-        #                                                                            g.Quaternion(0, 0, 0, 1)))])
-        # my_obj = WorldObject(name='my_sink',
-        #                      visual_props=[VisualProperty(geometry=MeshShape('package://iai_kitchen/meshes/misc/Sink2.dae'),
-        #                                                   origin=g.Transform(g.Point(.8,0,.6),
-        #                                                                      g.Quaternion(0,0,0,1)))],
-        #                      collision_props=[CollisionProperty(geometry=MeshShape('package://iai_kitchen/meshes/misc/Sink2.dae'),
-        #                                                         origin=g.Transform(g.Point(.8, 0, .6),
-        #                                                                            g.Quaternion(0, 0, 0, 1)))])
-        # urdf_string = to_urdf_string(my_obj)
-        # self.world.spawn_object_from_urdf_str('box', urdf_string)
-        # self.marker_pub.publish(to_marker(my_obj))
-        # rospy.sleep(0.2)
-
-        return UpdateWorldResponse()
+            # self.world.spawn_object_from_urdf('kitchen', '{}/urdf/muh.urdf'.format(RosPack().get_path('iai_kitchen')))
+            # self.world.spawn_object_from_urdf('shelf', '{}/urdf/shelves.urdf'.format(RosPack().get_path('iai_shelves')),
+            #                                   [1.3,1,0])
+            # my_obj = WorldObject(name='my_box',
+            #                      visual_props=[VisualProperty(geometry=BoxShape(0.5, 1.5, 1.5),
+            #                                                   origin=g.Transform(g.Point(.8,0,0),
+            #                                                                      g.Quaternion(0,0,0,1)))],
+            #                      collision_props=[CollisionProperty(geometry=BoxShape(0.5, 1.5, 1.5),
+            #                                                         origin=g.Transform(g.Point(.8, 0, 0),
+            #                                                                            g.Quaternion(0, 0, 0, 1)))])
+            # my_obj = WorldObject(name='my_sink',
+            #                      visual_props=[VisualProperty(geometry=MeshShape('package://iai_kitchen/meshes/misc/Sink2.dae'),
+            #                                                   origin=g.Transform(g.Point(.8,0,.6),
+            #                                                                      g.Quaternion(0,0,0,1)))],
+            #                      collision_props=[CollisionProperty(geometry=MeshShape('package://iai_kitchen/meshes/misc/Sink2.dae'),
+            #                                                         origin=g.Transform(g.Point(.8, 0, .6),
+            #                                                                            g.Quaternion(0, 0, 0, 1)))])
+            # urdf_string = to_urdf_string(my_obj)
+            # self.world.spawn_object_from_urdf_str('box', urdf_string)
+            # self.marker_pub.publish(to_marker(my_obj))
+            # rospy.sleep(0.2)
+            return UpdateWorldResponse()
+        except CorruptShapeException as e:
+            return UpdateWorldResponse(UpdateWorldResponse.CORRUPT_SHAPE_ERROR, e.message)
+        except UnknownBodyException as e:
+            return UpdateWorldResponse(UpdateWorldResponse.MISSING_BODY_ERROR, e.message)
+        except DuplicateObjectNameException as e:
+            return UpdateWorldResponse(UpdateWorldResponse.DUPLICATE_BODY_ERROR, e.message)
 
     def get_readings(self):
         collisions = self.world.check_collision()

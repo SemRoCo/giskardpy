@@ -7,6 +7,7 @@ from pybullet import JOINT_REVOLUTE, JOINT_PRISMATIC, JOINT_PLANAR, JOINT_SPHERI
 import pybullet_data
 from numpy.random.mtrand import seed
 
+from giskardpy.exceptions import UnknownBodyException, DuplicateObjectNameException, DuplicateRobotNameException
 from giskardpy.trajectory import MultiJointState, SingleJointState
 import numpy as np
 
@@ -195,6 +196,9 @@ class PyBulletWorld(object):
         :param base_orientation:
         :return:
         """
+        if self.has_robot(robot_name):
+            raise DuplicateRobotNameException('Cannot spawn robot "{}" because a robot with such a '
+                                               'name already exists'.format(robot_name))
         self.deactivate_rendering()
         self._robots[robot_name] = PyBulletRobot(robot_name, urdf, base_position, base_orientation)
         self.activate_rendering()
@@ -202,8 +206,17 @@ class PyBulletWorld(object):
     def get_robot_list(self):
         return list(self._robots.keys())
 
-    def get_robot(self, name):
-        return self._robots[name]
+    def get_robot(self, robot_name):
+        return self._robots[robot_name]
+
+    def has_robot(self, robot_name):
+        """
+        Checks whether this world already contains a robot with a specific name.
+        :param robot_name: Identifier of the robot that shall be checked.
+        :type robot_name: str
+        :return: True if robot with that name is already in the world. Else: returns False.
+        """
+        return robot_name in self._robots.keys()
 
     def set_joint_state(self, robot_name, joint_state):
         """
@@ -232,6 +245,9 @@ class PyBulletWorld(object):
         :param base_orientation:
         :return:
         """
+        if self.has_object(name):
+            raise DuplicateObjectNameException('Cannot spawn object "{}" because an object with such a '
+                                               'name already exists'.format(name))
         self.deactivate_rendering()
         self._objects[name] = PyBulletRobot(name, urdf, base_position, base_orientation)
         self.activate_rendering()
@@ -246,7 +262,7 @@ class PyBulletWorld(object):
         :type object_name: str
         """
         if not self.has_object(object_name):
-            raise RuntimeError('Cannot delete unknown object {}'.format(object_name))
+            raise UnknownBodyException('Cannot delete unknown object {}'.format(object_name))
         p.removeBody(self._objects[object_name].id)
         del(self._objects[object_name])
 

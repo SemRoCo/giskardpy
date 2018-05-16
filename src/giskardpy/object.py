@@ -92,8 +92,18 @@ class WorldObject(object):
         self.visual_props = visual_props
         self.collision_props = collision_props
 
+class Joint(object):
+    def __init__(self, name='', origin=Transform(), parent_link_name='', child_link_name='', ):
+        self.name = name
+        self.origin = origin
+        self.parent_link_name = parent_link_name
+        self.child_link_name = child_link_name
 
-def to_urdf_xml(urdf_object):
+class FixedJoint(Joint):
+    pass
+
+
+def to_urdf_xml(urdf_object, skip_robot_tag=False):
     """
     :param urdf_object:
     :type urdf_object: Union[WorldObject, InertialProperty]
@@ -101,7 +111,6 @@ def to_urdf_xml(urdf_object):
     :rtype: lxml.etree.Element
     """
     if isinstance(urdf_object, WorldObject):
-        root = etree.Element('robot', name=urdf_object.name)
         link = etree.Element('link', name='{}Link'.format(urdf_object.name))
         if urdf_object.inertial_props:
             link.append(to_urdf_xml(urdf_object.inertial_props))
@@ -109,7 +118,11 @@ def to_urdf_xml(urdf_object):
             link.append(to_urdf_xml(visual))
         for collision in urdf_object.collision_props:
             link.append(to_urdf_xml(collision))
-        root.append(link)
+        if skip_robot_tag:
+            root = link
+        else:
+            root = etree.Element('robot', name=urdf_object.name)
+            root.append(link)
     elif isinstance(urdf_object, InertialProperty):
         root = etree.Element('inertial')
         root.append(to_urdf_xml(urdf_object.origin))
@@ -167,17 +180,22 @@ def to_urdf_xml(urdf_object):
         if urdf_object.texture_filename:
             tex =etree.Element('texture', filename=urdf_object.texture_filename)
             root.append(tex)
+    elif isinstance(urdf_object, FixedJoint):
+        root = etree.Element('joint', name=urdf_object.name, type='fixed')
+        root.append(to_urdf_xml(urdf_object.origin))
+        root.append(etree.Element('parent', link=urdf_object.parent_link_name))
+        root.append(etree.Element('child', link=urdf_object.child_link_name))
     return root
 
 
-def to_urdf_string(urdf_object):
+def to_urdf_string(urdf_object, skip_robot_tag=False):
     """
     :param urdf_object:
     :type urdf_object: WorldObject
     :return:
     :rtype: str
     """
-    return etree.tostring(to_urdf_xml(urdf_object))
+    return etree.tostring(to_urdf_xml(urdf_object, skip_robot_tag=skip_robot_tag))
 
 def to_marker(urdf_object):
     ma = MarkerArray()
@@ -216,11 +234,11 @@ def to_marker(urdf_object):
 
 def from_msg(body_msg):
     """
-    Converts a body in the world from a ROS message to the corresponding internal representation.
+    Converts a body from a ROS message to the corresponding internal representation.
     :param body_msg: Input message that shall be converted.
     :type body_msg: WorldBody
     :return: Internal representation of body, filled with data from input message.
-    :rtype WorldBody
+    :rtype WorldObject
     """
     if body_msg.type is WorldBody.MESH_BODY:
         geom = MeshShape(filename=body_msg.mesh)

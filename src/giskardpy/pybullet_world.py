@@ -5,6 +5,7 @@ from itertools import combinations
 from pybullet import JOINT_REVOLUTE, JOINT_PRISMATIC, JOINT_PLANAR, JOINT_SPHERICAL
 
 import pybullet_data
+from copy import deepcopy
 from numpy.random.mtrand import seed
 
 from giskardpy.exceptions import UnknownBodyException, DuplicateObjectNameException, DuplicateRobotNameException
@@ -12,6 +13,8 @@ from giskardpy.trajectory import MultiJointState, SingleJointState
 import numpy as np
 
 from giskardpy.utils import keydefaultdict
+
+from giskardpy.object import WorldObject
 
 JointInfo = namedtuple('JointInfo', ['joint_index', 'joint_name', 'joint_type', 'q_index', 'u_index', 'flags',
                                      'joint_damping', 'joint_friction', 'joint_lower_limit', 'joint_upper_limit',
@@ -55,10 +58,13 @@ class PyBulletRobot(object):
         :param base_orientation:
         """
         self.name = name
-        self.id = p.loadURDF(replace_paths(urdf, name), base_position, base_orientation,
+        self.original_urdf = replace_paths(urdf, name)
+        self.id = p.loadURDF(self.original_urdf, base_position, base_orientation,
                              flags=p.URDF_USE_SELF_COLLISION_EXCLUDE_PARENT)
         self.sometimes = set()
         self.init_js_info()
+        self.attached_objects = {}
+        self.original_collision_matrix = deepcopy(self.sometimes) # TODO: translate from IDs to names
 
     def set_joint_state(self, multi_joint_state):
         for joint_name, singe_joint_state in multi_joint_state.items():
@@ -176,6 +182,60 @@ class PyBulletRobot(object):
                 js[joint_name] = sjs
         return js
 
+    def has_attached_object(self, object_name):
+        """
+        Checks whether an object has already been attached to the robot.
+        :param object_name: Name of the object for which to check.
+        :type object_name: str
+        :return: True if one of the attached objects has that name, else False.
+        :rtype: bool
+        """
+        return object_name in self.attached_objects.keys()
+
+    def attach_object(self, object, parent_link_name, transform):
+        """
+        Rigidly attach another object to the robot.
+        :param object: Object that shall be attached to the robot.
+        :type object: WorldObject
+        :param parent_link_name: Name of the link to which the object shall be attached.
+        :type parent_link_name: str
+        :param transform: Hom. transform between the reference frames of the parent link and the object.
+        :type Transform
+        :return: Nothing
+        """
+        if self.has_attached_object(object.name):
+            # TODO: choose better exception type
+            raise RuntimeError("An object '{}' has already been attached to the robot.".format(object.name))
+
+        # remember last joint state
+        # TODO: implement me
+
+        # assemble and store URDF string of new link and fixed joint
+        self.attached_objects[object.name] = '' # TODO: implement me
+
+        # for each attached object, insert the corresponding URDF sub-string into the original URDF string
+        new_urdf_string = self.original_urdf
+        for sub_string in self.attached_objects.values():
+            new_urdf_string = new_urdf_string.replace('</robot>', '{}</robot>'.format(sub_string))
+
+        # remove last robot
+        # TODO: implement me
+
+        # load new robot from new URDF
+        # TODO: implement me
+
+        # reload joint info
+        # TODO: implement me
+
+        # salvage last joint state
+        # TODO: implement me
+
+        # salvage original collision matrix
+        # TODO: implement me
+
+        # for each attached object, extend collision matrix
+        # TODO: implement me
+
     def __str__(self):
         return '{}/{}'.format(self.name, self.id)
 
@@ -284,13 +344,6 @@ class PyBulletWorld(object):
         :return: True if object with that name is already in the world. Else: returns False.
         """
         return object_name in self._objects.keys()
-
-    def attach_object(self):
-        # use pybullet constraints
-        pass
-
-    def release_object(self):
-        pass
 
     def check_collision(self, d=0.05, self_collision=True):
         """

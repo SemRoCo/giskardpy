@@ -78,6 +78,12 @@ def add_box_request():
     return UpdateWorldRequest(UpdateWorldRequest.ADD, box)
 
 
+def rem_sphere_request():
+    sphere = WorldBody()
+    sphere.name = 'sphere'
+    return UpdateWorldRequest(UpdateWorldRequest.REMOVE, sphere)
+
+
 def call_service(proxy, request, expected_error, user_msg):
     """
         Calls a Service proxy with a given request, and compares result with an expected error. Prints a message to the user.
@@ -150,6 +156,24 @@ def add_cone(proxy):
     call_service(proxy, add_cone_request(), UpdateWorldResponse.CORRUPT_SHAPE_ERROR, "Adding cone --expecting failure...")
 
 
+def remove_sphere(proxy):
+    """
+    Removes sphere from the giskard world, expecting success.
+    :param proxy: ServiceProxy to update the giskard world.
+    :type proxy: rospy.ServiceProxy
+    """
+    call_service(proxy, rem_sphere_request(), UpdateWorldResponse.SUCCESS, "Removing sphere --expecting success...")
+
+
+def remove_sphere_again(proxy):
+    """
+    Removes non-existing sphere from the giskard world, expecting failure.
+    :param proxy: ServiceProxy to update the giskard world.
+    :type proxy: rospy.ServiceProxy
+    """
+    call_service(proxy, rem_sphere_request(), UpdateWorldResponse.MISSING_BODY_ERROR, "Removing sphere --expecting failure...")
+
+
 def clear_world(proxy):
     call_service(proxy, clear_world_request(), UpdateWorldResponse.SUCCESS, "Clearing world --expecting success...")
 
@@ -165,6 +189,8 @@ def test_update_world():
         add_cylinder(update_world)
         add_box(update_world)
         add_cone(update_world)
+        remove_sphere(update_world)
+        remove_sphere_again(update_world)
     except rospy.ServiceException, e:
         print "Service call failed: %s"%e
 

@@ -74,8 +74,7 @@ class PyBulletPlugin(Plugin):
                                                   base_position= convert_ros_message_to_dictionary(pose.position).values(),
                                                   base_orientation= convert_ros_message_to_dictionary(pose.orientation).values())
             elif req.operation is UpdateWorldRequest.REMOVE:
-                # TODO: implement me
-                pass
+                self.world.delete_object(req.body.name)
             elif req.operation is UpdateWorldRequest.ALTER:
                 # TODO: implement me
                 pass

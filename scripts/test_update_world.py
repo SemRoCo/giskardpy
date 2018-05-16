@@ -42,7 +42,7 @@ def add_sphere_request():
     sphere.name = 'sphere'
     sphere.pose.header.stamp = rospy.Time.now()
     sphere.pose.header.frame_id = 'map'
-    sphere.pose.pose.position = Point(-1.3, -1.0, 0.77)
+    sphere.pose.pose.position = Point(-1.25, -1.0, 0.77)
     sphere.pose.pose.orientation = Quaternion(0,0,0,1)
     sphere.shape.type = SolidPrimitive.SPHERE
     sphere.shape.dimensions.append(0.05) # radius of 5cm

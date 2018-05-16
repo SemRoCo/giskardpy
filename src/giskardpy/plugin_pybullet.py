@@ -16,7 +16,6 @@ from giskardpy.plugin import Plugin
 from giskardpy.pybullet_world import PyBulletWorld, ContactInfo
 import giskardpy.trajectory as g
 from giskardpy.utils import keydefaultdict
-from rospy_message_converter import message_converter
 
 
 class PyBulletPlugin(Plugin):
@@ -70,9 +69,13 @@ class PyBulletPlugin(Plugin):
             if req.operation is UpdateWorldRequest.ADD:
                 # TODO: resolve pose
                 pose = req.body.pose.pose
+                # TODO: refactor this; either move this into a separate function or change interface of spawn...
+                p = req.body.pose.pose.position
+                q = req.body.pose.pose.orientation
+                base_position = [p.x, p.y, p.z]
+                base_orientation = [q.x, q.y, q.z, q.w]
                 self.world.spawn_object_from_urdf(req.body.name, to_urdf_string(from_msg(req.body)),
-                                                  base_position= convert_ros_message_to_dictionary(pose.position).values(),
-                                                  base_orientation= convert_ros_message_to_dictionary(pose.orientation).values())
+                                                  base_position=base_position, base_orientation=base_orientation)
             elif req.operation is UpdateWorldRequest.REMOVE:
                 self.world.delete_object(req.body.name)
             elif req.operation is UpdateWorldRequest.ALTER:

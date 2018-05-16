@@ -70,7 +70,7 @@ class PyBulletPlugin(Plugin):
         """
         try:
             if req.operation is UpdateWorldRequest.ADD:
-                pose = self.tf_wrapper.transform_pose(self.global_reference_frame_name, req.body.pose)
+                pose = self.tf_wrapper.transform_pose(self.global_reference_frame_name, req.pose)
                 # TODO: refactor this; either move this into a separate function or change interface of spawn...
                 p = pose.pose.position
                 q = pose.pose.orientation

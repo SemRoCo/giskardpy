@@ -6,12 +6,16 @@ from pybullet import JOINT_REVOLUTE, JOINT_PRISMATIC, JOINT_PLANAR, JOINT_SPHERI
 from time import time
 
 import pybullet_data
+from copy import deepcopy
 from numpy.random.mtrand import seed
 
+from giskardpy.exceptions import UnknownBodyException, DuplicateObjectNameException, DuplicateRobotNameException
 from giskardpy.trajectory import MultiJointState, SingleJointState
 import numpy as np
 
 from giskardpy.utils import keydefaultdict
+
+from giskardpy.object import WorldObject
 
 JointInfo = namedtuple('JointInfo', ['joint_index', 'joint_name', 'joint_type', 'q_index', 'u_index', 'flags',
                                      'joint_damping', 'joint_friction', 'joint_lower_limit', 'joint_upper_limit',
@@ -55,10 +59,13 @@ class PyBulletRobot(object):
         :param base_orientation:
         """
         self.name = name
-        self.id = p.loadURDF(replace_paths(urdf, name), base_position, base_orientation,
+        self.original_urdf = replace_paths(urdf, name)
+        self.id = p.loadURDF(self.original_urdf, base_position, base_orientation,
                              flags=p.URDF_USE_SELF_COLLISION_EXCLUDE_PARENT)
         self.sometimes = set()
         self.init_js_info()
+        self.attached_objects = {}
+        self.original_collision_matrix = deepcopy(self.sometimes) # TODO: translate from IDs to names
 
     def set_joint_state(self, multi_joint_state):
         for joint_name, singe_joint_state in multi_joint_state.items():
@@ -184,6 +191,60 @@ class PyBulletRobot(object):
     def get_link_ids(self):
         return self.link_id_to_name.keys()
 
+    def has_attached_object(self, object_name):
+        """
+        Checks whether an object has already been attached to the robot.
+        :param object_name: Name of the object for which to check.
+        :type object_name: str
+        :return: True if one of the attached objects has that name, else False.
+        :rtype: bool
+        """
+        return object_name in self.attached_objects.keys()
+
+    def attach_object(self, object, parent_link_name, transform):
+        """
+        Rigidly attach another object to the robot.
+        :param object: Object that shall be attached to the robot.
+        :type object: WorldObject
+        :param parent_link_name: Name of the link to which the object shall be attached.
+        :type parent_link_name: str
+        :param transform: Hom. transform between the reference frames of the parent link and the object.
+        :type Transform
+        :return: Nothing
+        """
+        if self.has_attached_object(object.name):
+            # TODO: choose better exception type
+            raise RuntimeError("An object '{}' has already been attached to the robot.".format(object.name))
+
+        # remember last joint state
+        # TODO: implement me
+
+        # assemble and store URDF string of new link and fixed joint
+        self.attached_objects[object.name] = '' # TODO: implement me
+
+        # for each attached object, insert the corresponding URDF sub-string into the original URDF string
+        new_urdf_string = self.original_urdf
+        for sub_string in self.attached_objects.values():
+            new_urdf_string = new_urdf_string.replace('</robot>', '{}</robot>'.format(sub_string))
+
+        # remove last robot
+        # TODO: implement me
+
+        # load new robot from new URDF
+        # TODO: implement me
+
+        # reload joint info
+        # TODO: implement me
+
+        # salvage last joint state
+        # TODO: implement me
+
+        # salvage original collision matrix
+        # TODO: implement me
+
+        # for each attached object, extend collision matrix
+        # TODO: implement me
+
     def __str__(self):
         return '{}/{}'.format(self.name, self.id)
 
@@ -204,6 +265,9 @@ class PyBulletWorld(object):
         :param base_orientation:
         :return:
         """
+        if self.has_robot(robot_name):
+            raise DuplicateRobotNameException('Cannot spawn robot "{}" because a robot with such a '
+                                               'name already exists'.format(robot_name))
         self.deactivate_rendering()
         self._robots[robot_name] = PyBulletRobot(robot_name, urdf, base_position, base_orientation)
         self.activate_rendering()
@@ -211,14 +275,23 @@ class PyBulletWorld(object):
     def get_robot_list(self):
         return list(self._robots.keys())
 
-    def get_robot(self, name):
+    def get_robot(self, robot_name):
         """
-        :param name:
-        :type name: str
+        :param robot_name:
+        :type robot_name: str
         :return:
         :rtype: PyBulletRobot
         """
-        return self._robots[name]
+        return self._robots[robot_name]
+
+    def has_robot(self, robot_name):
+        """
+        Checks whether this world already contains a robot with a specific name.
+        :param robot_name: Identifier of the robot that shall be checked.
+        :type robot_name: str
+        :return: True if robot with that name is already in the world. Else: returns False.
+        """
+        return robot_name in self._robots.keys()
 
     def get_object(self, name):
         """
@@ -256,6 +329,9 @@ class PyBulletWorld(object):
         :param base_orientation:
         :return:
         """
+        if self.has_object(name):
+            raise DuplicateObjectNameException('Cannot spawn object "{}" because an object with such a '
+                                               'name already exists'.format(name))
         self.deactivate_rendering()
         self._objects[name] = PyBulletRobot(name, urdf, base_position, base_orientation)
         self.activate_rendering()
@@ -270,7 +346,7 @@ class PyBulletWorld(object):
         :type object_name: str
         """
         if not self.has_object(object_name):
-            raise RuntimeError('Cannot delete unknown object {}'.format(object_name))
+            raise UnknownBodyException('Cannot delete unknown object {}'.format(object_name))
         p.removeBody(self._objects[object_name].id)
         del (self._objects[object_name])
 
@@ -292,13 +368,6 @@ class PyBulletWorld(object):
         :return: True if object with that name is already in the world. Else: returns False.
         """
         return object_name in self._objects.keys()
-
-    def attach_object(self):
-        # use pybullet constraints
-        pass
-
-    def release_object(self):
-        pass
 
     def check_collisions(self, cut_off_distances, allowed_collision=set(), d=0.1, self_collision=True):
         """

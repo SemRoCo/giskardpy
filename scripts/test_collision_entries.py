@@ -76,7 +76,7 @@ if __name__ == '__main__':
     rospy.wait_for_service('muh/update_world')
     update_world = rospy.ServiceProxy('muh/update_world', UpdateWorld)
     clear_world(update_world)
-    add_table(update_world, position=(0, 1.5, 0), orientation=(0,0,0,1))
+    add_table(update_world, position=(1.5, 0, 0), orientation=(0,0,0,1))
 
 
     reset(giskard)

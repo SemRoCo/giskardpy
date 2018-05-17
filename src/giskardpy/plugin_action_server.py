@@ -7,6 +7,7 @@ import rospy
 from control_msgs.msg import FollowJointTrajectoryAction, FollowJointTrajectoryResult, FollowJointTrajectoryGoal, \
     JointTrajectoryControllerState
 from giskard_msgs.msg import Controller, CollisionEntry
+from giskard_msgs.msg import MoveCmd
 from giskard_msgs.msg._MoveAction import MoveAction
 from giskard_msgs.msg._MoveFeedback import MoveFeedback
 from giskard_msgs.msg._MoveGoal import MoveGoal
@@ -36,6 +37,7 @@ class ActionServerPlugin(Plugin):
 
         self.tf = TfWrapper()
         self.joint_goal = None
+        self.start_js = None
         self.goal_solution = None
         self.get_readings_lock = Queue(1)
         self.update_lock = Queue(1)
@@ -50,50 +52,15 @@ class ActionServerPlugin(Plugin):
     def end_parallel_universe(self):
         return super(ActionServerPlugin, self).end_parallel_universe()
 
-    def post_mortem_analysis(self, god_map, exception):
-        collisions = god_map.get_data(self.collision_identifier)
-        in_collision = False
-        result = MoveResult()
-        result.error_code = MoveResult.INSOLVABLE
-        if isinstance(exception, MAX_NWSR_REACHEDException):
-            result.error_code = MoveResult.MAX_NWSR_REACHED
-        elif isinstance(exception, QPSolverException):
-            result.error_code = MoveResult.QP_SOLVER_ERROR
-        if exception is None:
-            if collisions is not None:
-                for (l1, l2), collision_info in collisions.items():
-                    in_collision = in_collision or collision_info.contact_distance < 0.0
-            if not in_collision:
-                result.error_code = MoveResult.SUCCESS
-                trajectory = god_map.get_data(self.trajectory_identifier)
-                js = god_map.get_data(self.js_identifier)
-                result.trajectory.joint_names = self.controller_joints
-                for time, traj_point in trajectory.items():
-                    p = JointTrajectoryPoint()
-                    p.time_from_start = rospy.Duration(time)
-                    for joint_name in self.controller_joints:
-                        if joint_name in traj_point:
-                            p.positions.append(traj_point[joint_name].position)
-                            p.velocities.append(traj_point[joint_name].velocity)
-                        else:
-                            p.positions.append(js[joint_name].position)
-                            p.velocities.append(js[joint_name].velocity)
-                    result.trajectory.points.append(p)
-            else:
-                result.error_code = MoveResult.END_STATE_COLLISION
-        self.update_lock.put(result)
-        self.update_lock.join()
-
     def get_readings(self):
         goals = None
         try:
-            goal = self.get_readings_lock.get_nowait()  # type: MoveGoal
+            cmd = self.get_readings_lock.get_nowait()  # type: MoveCmd
             rospy.loginfo('got goal')
-            self.execute = goal.type == MoveGoal.PLAN_AND_EXECUTE
-            if len(goal.cmd_seq) >= 1:
-                goals = defaultdict(dict)
+            goals = defaultdict(dict)
+
             # TODO support multiple move cmds
-            for controller in goal.cmd_seq[0].controllers:
+            for controller in cmd.controllers:
                 # TODO support collisions
                 self.new_universe = True
                 goal_key = str(controller.type)
@@ -107,14 +74,120 @@ class ActionServerPlugin(Plugin):
                     tip = controller.tip_link
                     controller.goal_pose = self.tf.transform_pose(root, controller.goal_pose)
                     goals[goal_key][root, tip] = controller
-            self.god_map.set_data([self.collision_goal_identifier], goal.cmd_seq[0].collisions)
+            self.god_map.set_data([self.collision_goal_identifier], cmd.collisions)
             feedback = MoveFeedback()
             feedback.phase = MoveFeedback.PLANNING
             self._as.publish_feedback(feedback)
         except Empty:
             pass
-        update = {self.cartesian_goal_identifier: goals}
+        update = {self.cartesian_goal_identifier: goals,
+                  self.js_identifier: self.current_js if self.start_js is None else self.start_js}
         return update
+
+    def update(self):
+        self.controlled_joints = self.god_map.get_data(self.controlled_joints_identifier)
+        self.current_js = self.god_map.get_data(self.js_identifier)
+
+    def post_mortem_analysis(self, god_map, exception):
+        collisions = god_map.get_data(self.collision_identifier)
+        in_collision = False
+        result = MoveResult()
+        result.error_code = MoveResult.INSOLVABLE
+        if isinstance(exception, MAX_NWSR_REACHEDException):
+            result.error_code = MoveResult.MAX_NWSR_REACHED
+        elif isinstance(exception, QPSolverException):
+            result.error_code = MoveResult.QP_SOLVER_ERROR
+        elif isinstance(exception, KeyError):
+            result.error_code = MoveResult.UNKNOWN_OBJECT
+        if exception is None:
+            if collisions is not None:
+                for _, collision_info in collisions.items():
+                    in_collision = in_collision or collision_info.contact_distance < 0.0
+            if not in_collision:
+                result.error_code = MoveResult.SUCCESS
+                trajectory = god_map.get_data(self.trajectory_identifier)
+                self.start_js = god_map.get_data(self.js_identifier)
+                result.trajectory.joint_names = self.controller_joints
+                for time, traj_point in trajectory.items():
+                    p = JointTrajectoryPoint()
+                    p.time_from_start = rospy.Duration(time)
+                    for joint_name in self.controller_joints:
+                        if joint_name in traj_point:
+                            p.positions.append(traj_point[joint_name].position)
+                            p.velocities.append(traj_point[joint_name].velocity)
+                        else:
+                            p.positions.append(self.start_js[joint_name].position)
+                            p.velocities.append(self.start_js[joint_name].velocity)
+                    result.trajectory.points.append(p)
+            else:
+                result.error_code = MoveResult.END_STATE_COLLISION
+        self.update_lock.put(result)
+        self.update_lock.join()
+
+    def action_server_cb(self, goal):
+        """
+        :param goal:
+        :type goal: MoveGoal
+        """
+        rospy.loginfo('received goal')
+        self.execute = goal.type == MoveGoal.PLAN_AND_EXECUTE
+        result = None
+        for i, move_cmd in enumerate(goal.cmd_seq):
+            # TODO handle empty controller case
+            self.get_readings_lock.put(move_cmd)
+            intermediate_result = self.update_lock.get()  # type: MoveResult
+            if intermediate_result.error_code != MoveResult.SUCCESS:
+                result = intermediate_result
+                break
+            if result is None:
+                result = intermediate_result
+            else:
+                step_size = result.trajectory.points[1].time_from_start - result.trajectory.points[0].time_from_start
+                end_of_last_point = result.trajectory.points[-1].time_from_start + step_size
+                for point in intermediate_result.trajectory.points:  # type: JointTrajectoryPoint
+                    point.time_from_start += end_of_last_point
+                    result.trajectory.points.append(point)
+            if i < len(goal.cmd_seq) - 1:
+                self.update_lock.task_done()
+        else:  # if not break
+            rospy.loginfo('solution ready')
+            feedback = MoveFeedback()
+            feedback.phase = MoveFeedback.EXECUTION
+            if result.error_code == MoveResult.SUCCESS and self.execute:
+                goal = FollowJointTrajectoryGoal()
+                goal.trajectory = result.trajectory
+                self._ac.send_goal(goal)
+                t = rospy.get_rostime()
+                expected_duration = goal.trajectory.points[-1].time_from_start.to_sec()
+                rospy.loginfo(
+                    'waiting for {:.3f} sec with {} points'.format(expected_duration, len(goal.trajectory.points)))
+
+                while not self._ac.wait_for_result(rospy.Duration(.1)):
+                    time_passed = (rospy.get_rostime() - t).to_sec()
+                    feedback.progress = min(time_passed / expected_duration, 1)
+                    self._as.publish_feedback(feedback)
+                    if self._as.is_preempt_requested():
+                        rospy.loginfo('new goal, cancel old one')
+                        self._ac.cancel_all_goals()
+                        result.error_code = MoveResult.INTERRUPTED
+                        break
+                    if time_passed > expected_duration + 0.1:
+                        rospy.loginfo('controller took too long to execute trajectory')
+                        self._ac.cancel_all_goals()
+                        result.error_code = MoveResult.INTERRUPTED
+                        break
+                else:  # if not break
+                    print('shit took {:.3f}s'.format((rospy.get_rostime() - t).to_sec()))
+                    r = self._ac.get_result()
+                    if r.error_code == FollowJointTrajectoryResult.SUCCESSFUL:
+                        result.error_code = MoveResult.SUCCESS
+        self.start_js = None
+        if result.error_code != MoveResult.SUCCESS:
+            self._as.set_aborted(result)
+        else:
+            self._as.set_succeeded(result)
+        rospy.loginfo('finished movement {}'.format(result.error_code))
+        self.update_lock.task_done()
 
     def get_default_joint_goal(self):
         joint_goal = OrderedDict()
@@ -122,10 +195,6 @@ class ActionServerPlugin(Plugin):
             joint_goal[joint_name] = {'weight': 1,
                                       'position': self.current_js[joint_name].position}
         return joint_goal
-
-    def update(self):
-        self.controlled_joints = self.god_map.get_data(self.controlled_joints_identifier)
-        self.current_js = self.god_map.get_data(self.js_identifier)
 
     def start_once(self):
         self.new_universe = False
@@ -149,55 +218,6 @@ class ActionServerPlugin(Plugin):
     def stop(self):
         # TODO figure out how to stop this shit
         pass
-
-    def action_server_cb(self, goal):
-        self.cb_get_readings_part(goal)
-        self.cb_update_part()
-
-    def cb_get_readings_part(self, goal):
-        rospy.loginfo('received goal')
-        self.get_readings_lock.put(goal)
-
-    def cb_update_part(self):
-        result = self.update_lock.get()  # type: MoveResult
-        rospy.loginfo('solution ready')
-        feedback = MoveFeedback()
-        feedback.phase = MoveFeedback.EXECUTION
-        if result.error_code == MoveResult.SUCCESS and self.execute:
-            goal = FollowJointTrajectoryGoal()
-            goal.trajectory = result.trajectory
-            self._ac.send_goal(goal)
-            t = rospy.get_rostime()
-            expected_duration = goal.trajectory.points[-1].time_from_start.to_sec()
-            rospy.loginfo(
-                'waiting for {:.3f} sec with {} points'.format(expected_duration, len(goal.trajectory.points)))
-
-            while not self._ac.wait_for_result(rospy.Duration(.1)):
-                time_passed = (rospy.get_rostime() - t).to_sec()
-                feedback.progress = min(time_passed / expected_duration, 1)
-                self._as.publish_feedback(feedback)
-                if self._as.is_preempt_requested():
-                    rospy.loginfo('new goal, cancel old one')
-                    self._ac.cancel_all_goals()
-                    result.error_code = MoveResult.INTERRUPTED
-                    break
-                if time_passed > expected_duration + 0.1:
-                    rospy.loginfo('controller took too long to execute trajectory')
-                    self._ac.cancel_all_goals()
-                    result.error_code = MoveResult.INTERRUPTED
-                    break
-            else:  # if not break
-                print('shit took {:.3f}s'.format((rospy.get_rostime() - t).to_sec()))
-                r = self._ac.get_result()
-                if r.error_code == FollowJointTrajectoryResult.SUCCESSFUL:
-                    result.error_code = MoveResult.SUCCESS
-
-        if result.error_code != MoveResult.SUCCESS:
-            self._as.set_aborted(result)
-        else:
-            self._as.set_succeeded(result)
-        rospy.loginfo('finished movement {}'.format(result.error_code))
-        self.update_lock.task_done()
 
     def copy(self):
         return LogTrajectoryPlugin(trajectory_identifier=self.trajectory_identifier,

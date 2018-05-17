@@ -70,13 +70,25 @@ class GiskardWrapper(object):
         req = UpdateWorldRequest(UpdateWorldRequest.REMOVE_ALL, WorldBody(), False, PoseStamped())
         self.update_world.call(req)
 
-    def add_box(self, name='box', size=(1,1,1), position=(0,0,0), orientation=(0,0,0,1)):
+    def remove_object(self, name):
+        """
+        :param name:
+        :type name: str
+        :return:
+        :rtype: giskard_msgs.srv._UpdateWorld.UpdateWorldResponse
+        """
+        object = WorldBody()
+        object.name = name
+        req = UpdateWorldRequest(UpdateWorldRequest.REMOVE, object, False, PoseStamped())
+        return self.update_world.call(req)
+
+    def add_box(self, name='box', size=(1,1,1), frame_id='map', position=(0,0,0), orientation=(0,0,0,1)):
         box = WorldBody()
         box.type = WorldBody.PRIMITIVE_BODY
         box.name = name
         pose = PoseStamped()
         pose.header.stamp = rospy.Time.now()
-        pose.header.frame_id = 'map'
+        pose.header.frame_id = frame_id
         pose.pose.position = Point(*position)
         pose.pose.orientation = Quaternion(*orientation)
         box.shape.type = SolidPrimitive.BOX
@@ -84,4 +96,54 @@ class GiskardWrapper(object):
         box.shape.dimensions.append(size[1])
         box.shape.dimensions.append(size[2])
         req = UpdateWorldRequest(UpdateWorldRequest.ADD, box, False, pose)
-        self.update_world.call(req)
+        return self.update_world.call(req)
+
+    def add_sphere(self, name='sphere', size=1, frame_id='map', position=(0,0,0), orientation=(0,0,0,1)):
+        object = WorldBody()
+        object.type = WorldBody.PRIMITIVE_BODY
+        object.name = name
+        pose = PoseStamped()
+        pose.header.stamp = rospy.Time.now()
+        pose.header.frame_id = frame_id
+        pose.pose.position = Point(*position)
+        pose.pose.orientation = Quaternion(*orientation)
+        object.shape.type = SolidPrimitive.SPHERE
+        object.shape.dimensions.append(size)
+        req = UpdateWorldRequest(UpdateWorldRequest.ADD, object, False, pose)
+        return self.update_world.call(req)
+
+    def add_cylinder(self, name='cylinder', size=(1,1), frame_id='map', position=(0,0,0), orientation=(0,0,0,1)):
+        object = WorldBody()
+        object.type = WorldBody.PRIMITIVE_BODY
+        object.name = name
+        pose = PoseStamped()
+        pose.header.stamp = rospy.Time.now()
+        pose.header.frame_id = frame_id
+        pose.pose.position = Point(*position)
+        pose.pose.orientation = Quaternion(*orientation)
+        object.shape.type = SolidPrimitive.CYLINDER
+        object.shape.dimensions.append(size[0])
+        object.shape.dimensions.append(size[1])
+        req = UpdateWorldRequest(UpdateWorldRequest.ADD, object, False, pose)
+        return self.update_world.call(req)
+
+    def add_cone(self, name='cone', size=(1,1), frame_id='map', position=(0,0,0), orientation=(0,0,0,1)):
+        object = WorldBody()
+        object.type = WorldBody.PRIMITIVE_BODY
+        object.name = name
+        pose = PoseStamped()
+        pose.header.stamp = rospy.Time.now()
+        pose.header.frame_id = frame_id
+        pose.pose.position = Point(*position)
+        pose.pose.orientation = Quaternion(*orientation)
+        object.shape.type = SolidPrimitive.CONE
+        object.shape.dimensions.append(size[0])
+        object.shape.dimensions.append(size[1])
+        req = UpdateWorldRequest(UpdateWorldRequest.ADD, object, False, pose)
+        return self.update_world.call(req)
+
+    def add_urdf(self, name, path):
+        object = WorldBody()
+        object.type = WorldBody.URDF_BODY
+        object.name = name
+        object.urdf = path

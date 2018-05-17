@@ -15,7 +15,7 @@ from visualization_msgs.msg import Marker, MarkerArray
 
 from giskardpy.exceptions import CorruptShapeException, UnknownBodyException, DuplicateObjectNameException
 from giskardpy.object import WorldObject, to_urdf_string, VisualProperty, BoxShape, CollisionProperty, to_marker, \
-    MeshShape, from_msg
+    MeshShape, from_msg, from_pose_msg
 from giskardpy.plugin import Plugin
 from giskardpy.pybullet_world import PyBulletWorld, ContactInfo
 import giskardpy.trajectory as g
@@ -61,21 +61,28 @@ class PyBulletPlugin(Plugin):
         """
         try:
             if req.operation is UpdateWorldRequest.ADD:
-                pose = self.tf_wrapper.transform_pose(self.global_reference_frame_name, req.pose)
-                # TODO: refactor this; either move this into a separate function or change interface of spawn...
-                p = pose.pose.position
-                q = pose.pose.orientation
-                base_position = [p.x, p.y, p.z]
-                base_orientation = [q.x, q.y, q.z, q.w]
-                self.world.spawn_object_from_urdf(req.body.name, to_urdf_string(from_msg(req.body)),
-                                                  base_position=base_position, base_orientation=base_orientation)
+                if req.rigidly_attached:
+                    self.world.get_robot(self.robot_name).attach_object(from_msg(req.body), req.pose.header.frame_id,
+                                                              from_pose_msg(req.pose.pose))
+                else:
+                    pose = self.tf_wrapper.transform_pose(self.global_reference_frame_name, req.pose)
+                    # TODO: refactor this; either move this into a separate function or change interface of spawn...
+                    p = pose.pose.position
+                    q = pose.pose.orientation
+                    base_position = [p.x, p.y, p.z]
+                    base_orientation = [q.x, q.y, q.z, q.w]
+                    self.world.spawn_object_from_urdf(req.body.name, to_urdf_string(from_msg(req.body)),
+                                                      base_position=base_position, base_orientation=base_orientation)
             elif req.operation is UpdateWorldRequest.REMOVE:
+                # TODO: discriminate between attached and non-attached objects
                 self.world.delete_object(req.body.name)
             elif req.operation is UpdateWorldRequest.ALTER:
                 # TODO: implement me
                 pass
             elif req.operation is UpdateWorldRequest.REMOVE_ALL:
                 self.world.delete_all_objects()
+                # TODO: move this into the world?
+                self.world.get_robot(self.robot_name).detach_all_objects()
             else:
                 return UpdateWorldResponse(UpdateWorldResponse.INVALID_OPERATION,
                                            "Received invalid operation code: {}".format(req.operation))

@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+from time import time
 
 import rospy
 from geometry_msgs.msg import Point, Quaternion, PoseStamped
@@ -7,15 +8,28 @@ from giskard_msgs.msg import WorldBody
 from shape_msgs.msg import SolidPrimitive
 
 
-def add_table_request(position=(-1.4, -1.05, 0.0), orientation=(0,0,1,0)):
+def add_wand_request():
+    wand = WorldBody()
+    wand.type = WorldBody.PRIMITIVE_BODY
+    wand.name = 'wand'
+    wand.shape.type = SolidPrimitive.CYLINDER
+    wand.shape.dimensions.append(0.15) # height of 15cm
+    wand.shape.dimensions.append(0.005) # radius of 0.5cm
+    pose = PoseStamped()
+    pose.header.frame_id = 'l_gripper_tool_frame'
+    pose.pose.orientation.w = 1.0
+    return UpdateWorldRequest(UpdateWorldRequest.ADD, wand, True, pose)
+
+
+def add_table_request():
     table = WorldBody()
     table.type = WorldBody.MESH_BODY
     table.name = "table"
     pose = PoseStamped()
     pose.header.stamp = rospy.Time.now()
     pose.header.frame_id = "map"
-    pose.pose.position = Point(*position)
-    pose.pose.orientation = Quaternion(*orientation)
+    pose.pose.position = Point(-1.4, -1.05, 0.0)
+    pose.pose.orientation = Quaternion(0,0,1,0)
     table.mesh = 'package://iai_kitchen/meshes/misc/big_table_1.stl'
     return UpdateWorldRequest(UpdateWorldRequest.ADD, table, False, pose)
 
@@ -101,11 +115,21 @@ def call_service(proxy, request, expected_error, user_msg):
         :param user_msg: Message that shall be printed to the user before calling the service.
         :type user_msg: str
     """
+    t = time()
     rospy.loginfo(user_msg)
     resp = proxy(request)  # type: UpdateWorldResponse
     if resp.error_codes != expected_error:
         raise RuntimeError(resp.error_msg)
-    rospy.loginfo("...OK.")
+    rospy.loginfo("...OK. Took {}s.".format(time() -t))
+
+
+def add_wand(proxy):
+    """
+    Adds a wand into the left gripper of the PR2, expecting success.
+    :param proxy: ServiceProxy to update the giskard world.
+    :type proxy: rospy.ServiceProxy
+    """
+    call_service(proxy, add_wand_request(), UpdateWorldResponse.SUCCESS, "Adding wand in gripper --expecting success...")
 
 
 def add_table_again(proxy):
@@ -117,13 +141,13 @@ def add_table_again(proxy):
     call_service(proxy, add_table_request(), UpdateWorldResponse.DUPLICATE_BODY_ERROR, "Adding table, again --expecting failure...")
 
 
-def add_table(proxy, position=(-1.4, -1.05, 0.0), orientation=(0,0,1,0)):
+def add_table(proxy):
     """
     Adds a table to the giskard world, expecting success.
     :param proxy: ServiceProxy to update the giskard world.
     :type proxy: rospy.ServiceProxy
     """
-    call_service(proxy, add_table_request(position, orientation), UpdateWorldResponse.SUCCESS, "Adding table --expecting success...")
+    call_service(proxy, add_table_request(), UpdateWorldResponse.SUCCESS, "Adding table --expecting success...")
 
 
 def add_sphere(proxy):
@@ -196,6 +220,7 @@ def test_update_world():
         add_cone(update_world)
         remove_sphere(update_world)
         remove_sphere_again(update_world)
+        add_wand(update_world)
     except rospy.ServiceException as e:
         print("Service call failed: {}".format(e))
 

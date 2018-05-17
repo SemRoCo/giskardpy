@@ -1,13 +1,12 @@
 from visualization_msgs.msg import MarkerArray, Marker
 from giskard_msgs.msg import WorldBody
 from shape_msgs.msg import SolidPrimitive
+from geometry_msgs.msg import Pose as PoseMsg, Point as PointMsg, Quaternion as QuaternionMsg
 
 from giskardpy.exceptions import CorruptShapeException
-from giskardpy.trajectory import Transform
+from giskardpy.trajectory import Transform, Point, Quaternion
 from lxml import etree
 import PyKDL as kdl # TODO: get rid of this dependency
-
-from trajectory import Point, Quaternion
 
 
 class ColorRgba(object):
@@ -111,7 +110,7 @@ def to_urdf_xml(urdf_object, skip_robot_tag=False):
     :rtype: lxml.etree.Element
     """
     if isinstance(urdf_object, WorldObject):
-        link = etree.Element('link', name='{}Link'.format(urdf_object.name))
+        link = etree.Element('link', name='{}_link'.format(urdf_object.name))
         if urdf_object.inertial_props:
             link.append(to_urdf_xml(urdf_object.inertial_props))
         for visual in urdf_object.visual_props:
@@ -230,6 +229,39 @@ def to_marker(urdf_object):
             m.mesh_use_embedded_materials = True
         ma.markers.append(m)
     return ma
+
+
+def from_point_msg(point_msg):
+    """
+
+    :param point_msg:
+    :type point_msg: PointMsg
+    :return:
+    :rtype: Point
+    """
+    return Point(point_msg.x, point_msg.y, point_msg.z)
+
+
+def from_quaternion_msg(q_msg):
+    """
+
+    :param quaternion_msg:
+    :type quaternion_msg: QuaternionMsg
+    :return:
+    :rtype: Quaternion
+    """
+    return Quaternion(q_msg.x, q_msg.y, q_msg.z, q_msg.w)
+
+
+def from_pose_msg(pose_msg):
+    """
+
+    :param pose_msg:
+    :type pose_msg: PoseMsg
+    :return:
+    :rtype: Transform
+    """
+    return Transform(from_point_msg(pose_msg.position), from_quaternion_msg(pose_msg.orientation))
 
 
 def from_msg(body_msg):

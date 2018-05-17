@@ -15,7 +15,7 @@ import numpy as np
 
 from giskardpy.utils import keydefaultdict
 
-from giskardpy.object import WorldObject
+from giskardpy.object import WorldObject, FixedJoint, from_msg, to_urdf_string
 
 JointInfo = namedtuple('JointInfo', ['joint_index', 'joint_name', 'joint_type', 'q_index', 'u_index', 'flags',
                                      'joint_damping', 'joint_friction', 'joint_lower_limit', 'joint_upper_limit',
@@ -216,27 +216,28 @@ class PyBulletRobot(object):
             # TODO: choose better exception type
             raise RuntimeError("An object '{}' has already been attached to the robot.".format(object.name))
 
-        # remember last joint state
+        # remember last joint state and base pose
         # TODO: implement me
 
         # assemble and store URDF string of new link and fixed joint
-        self.attached_objects[object.name] = '' # TODO: implement me
+        new_joint = FixedJoint('{}_joint'.format(object.name), transform, parent_link_name, '{}_link'.format(object.name))
+        self.attached_objects[object.name] = '{}{}'.format(to_urdf_string(new_joint), to_urdf_string(object, True))
 
         # for each attached object, insert the corresponding URDF sub-string into the original URDF string
         new_urdf_string = self.original_urdf
         for sub_string in self.attached_objects.values():
             new_urdf_string = new_urdf_string.replace('</robot>', '{}</robot>'.format(sub_string))
 
-        # remove last robot
-        # TODO: implement me
-
-        # load new robot from new URDF
-        # TODO: implement me
+        # remove last robot and load new robot from new URDF
+        p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 0)
+        p.removeBody(self.id)
+        self.id = p.loadURDF(new_urdf_string, (0,0,0), (0,0,0,1), flags=p.URDF_USE_SELF_COLLISION_EXCLUDE_PARENT)
+        p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 1)
 
         # reload joint info
         # TODO: implement me
 
-        # salvage last joint state
+        # salvage last joint state and base pose
         # TODO: implement me
 
         # salvage original collision matrix
@@ -244,6 +245,33 @@ class PyBulletRobot(object):
 
         # for each attached object, extend collision matrix
         # TODO: implement me
+
+    def detach_object(self, object_name):
+        pass
+
+    def detach_all_objects(self):
+        """
+
+        :return: Nothing.
+        """
+        if self.attached_objects:
+            # TODO: remember last joint state and base pose
+
+            # remove last robot and reload with original URDF
+            p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 0)
+            p.removeBody(self.id)
+            self.id = p.loadURDF(self.original_urdf, (0, 0, 0), (0, 0, 0, 1), flags=p.URDF_USE_SELF_COLLISION_EXCLUDE_PARENT)
+            p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 1)
+
+
+            # TODO: reload joint info
+
+            # TODO: salve last joint state and base pose
+
+            # TODO: salve original collision matrix
+
+            # forget about previously attached objects
+            self.attached_objects = {}
 
     def __str__(self):
         return '{}/{}'.format(self.name, self.id)

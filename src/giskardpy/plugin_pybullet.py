@@ -19,8 +19,8 @@ from giskardpy.object import WorldObject, to_urdf_string, VisualProperty, BoxSha
 from giskardpy.plugin import Plugin
 from giskardpy.pybullet_world import PyBulletWorld, ContactInfo
 import giskardpy.trajectory as g
+from giskardpy.tfwrapper import transform_pose
 from giskardpy.trajectory import ClosestPointInfo
-from giskardpy.tfwrapper import TfWrapper
 from giskardpy.utils import keydefaultdict
 
 
@@ -38,7 +38,6 @@ class PyBulletPlugin(Plugin):
         self.srv = rospy.Service('~update_world', UpdateWorld, self.update_world_cb)
         self.marker_pub = rospy.Publisher('visualization_marker_array', MarkerArray, queue_size=10)
         self.viz_gui = rospy.Service('~enable_marker', SetBool, self.enable_marker_cb)
-        self.tf_wrapper = TfWrapper()
         super(PyBulletPlugin, self).__init__()
 
     def enable_marker_cb(self, setbool):
@@ -65,7 +64,7 @@ class PyBulletPlugin(Plugin):
                     self.world.get_robot(self.robot_name).attach_object(from_msg(req.body), req.pose.header.frame_id,
                                                               from_pose_msg(req.pose.pose))
                 else:
-                    pose = self.tf_wrapper.transform_pose(self.global_reference_frame_name, req.pose)
+                    pose = transform_pose(self.global_reference_frame_name, req.pose)
                     # TODO: refactor this; either move this into a separate function or change interface of spawn...
                     p = pose.pose.position
                     q = pose.pose.orientation

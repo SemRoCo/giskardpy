@@ -20,7 +20,6 @@ from visualization_msgs.msg._InteractiveMarkerFeedback import InteractiveMarkerF
 from visualization_msgs.msg._Marker import Marker
 
 from giskardpy.plugin import Plugin
-from giskardpy.tfwrapper import TfWrapper
 
 MARKER_SCALE = 0.15
 
@@ -51,7 +50,6 @@ class InteractiveMarkerPlugin(Plugin):
         self.roots = roots
         self.tips = tips
         self.suffix = suffix
-        self.tf = TfWrapper()
         self.started = False
         self.markers = {}
 
@@ -180,7 +178,6 @@ class InteractiveMarkerPlugin(Plugin):
             self.tip_link = tip_link
             self.root_link = root_link
             self.all_goals = all_goals
-            self.tf = TfWrapper()
             self.reset_goal()
             self.marker_pub = rospy.Publisher('visualization_marker_array', MarkerArray, queue_size=10)
 

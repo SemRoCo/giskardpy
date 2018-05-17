@@ -18,7 +18,7 @@ from visualization_msgs.msg import MarkerArray
 
 from giskardpy.exceptions import MAX_NWSR_REACHEDException, QPSolverException
 from giskardpy.plugin import Plugin
-from giskardpy.tfwrapper import TfWrapper
+from giskardpy.tfwrapper import transform_pose
 from giskardpy.trajectory import SingleJointState, Transform, Point, Quaternion, Trajectory
 
 
@@ -35,7 +35,6 @@ class ActionServerPlugin(Plugin):
         self.collision_identifier = collision_identifier
         self.collision_goal_identifier = collision_goal_identifier
 
-        self.tf = TfWrapper()
         self.joint_goal = None
         self.start_js = None
         self.goal_solution = None
@@ -72,7 +71,7 @@ class ActionServerPlugin(Plugin):
                 elif controller.type in [Controller.TRANSLATION_3D, Controller.ROTATION_3D]:
                     root = controller.root_link
                     tip = controller.tip_link
-                    controller.goal_pose = self.tf.transform_pose(root, controller.goal_pose)
+                    controller.goal_pose = transform_pose(root, controller.goal_pose)
                     goals[goal_key][root, tip] = controller
             self.god_map.set_data([self.collision_goal_identifier], cmd.collisions)
             feedback = MoveFeedback()

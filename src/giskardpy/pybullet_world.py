@@ -1,5 +1,8 @@
 import pybullet as p
 import rospkg
+import string
+import random
+import os
 from collections import namedtuple, OrderedDict, defaultdict
 from itertools import combinations
 from pybullet import JOINT_REVOLUTE, JOINT_PRISMATIC, JOINT_PLANAR, JOINT_SPHERICAL
@@ -26,20 +29,6 @@ ContactInfo = namedtuple('ContactInfo', ['contact_flag', 'body_unique_id_a', 'bo
                                          'contact_distance', 'normal_force'])
 
 
-def replace_paths(urdf, name):
-    new_path = '/tmp/{}.urdf'.format(name)
-    with open(new_path, 'w') as o:
-        if urdf.endswith('.urdf'):
-            try:
-                # TODO find cleaner solution
-                with open(urdf, 'r') as f:
-                    urdf = f.read()
-            except IOError:
-                return urdf
-        o.write(resolve_ros_iris(urdf))
-    return new_path
-
-
 def resolve_ros_iris(input_urdf):
     """
     Replace all instances of ROS IRIs with a urdf string with global paths in the file system.
@@ -60,6 +49,50 @@ def resolve_ros_iris(input_urdf):
     return output_urdf
 
 
+def write_urdf_to_disc(filename, urdf_string):
+    """
+    Writes a URDF string into a temporary file on disc. Used to deliver URDFs to PyBullet that only loads file.
+    :param filename: Name of the temporary file without any path information, e.g. 'pr2.urdf'
+    :type filename: str
+    :param urdf_string: URDF as an XML string that shall be written to disc.
+    :type urdf_string: str
+    :return: Complete path to where the urdf was written, e.g. '/tmp/pr2.urdf'
+    :rtype: str
+    """
+    new_path = '/tmp/{}'.format(filename)
+    with open(new_path, 'w') as o:
+        o.write(urdf_string)
+    return new_path
+
+
+def random_string(size=6):
+    """
+    Creates and returns a random string.
+    :param size: Number of characters that the string shall contain.
+    :type size: int
+    :return: Generated random sequence of chars.
+    :rtype: str
+    """
+    return ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(size))
+
+
+def load_urdf_string_into_bullet(urdf_string, pose):
+    """
+    Loads a URDF string into the bullet world.
+    :param urdf_string: XML string of the URDF to load.
+    :type urdf_string: str
+    :param pose: Pose at which to load the URDF into the world.
+    :type pose: Transform
+    :return: internal PyBullet id of the loaded urdf
+    :rtype: int
+    """
+    filename = write_urdf_to_disc('{}.urdf'.format(random_string()), urdf_string)
+    id = p.loadURDF(filename, [pose.translation.x, pose.translation.y, pose.translation.z],
+                    [pose.rotation.x, pose.rotation.y, pose.rotation.z, pose.rotation.w],
+                    flags=p.URDF_USE_SELF_COLLISION_EXCLUDE_PARENT)
+    os.remove(filename)
+    return id
+
 class PyBulletRobot(object):
     def __init__(self, name, urdf, base_pose=Transform()):
         """
@@ -71,10 +104,8 @@ class PyBulletRobot(object):
         :type base_pose: Transform
         """
         self.name = name
-        self.original_urdf = replace_paths(urdf, name)
-        self.id = p.loadURDF(self.original_urdf, [base_pose.translation.x, base_pose.translation.y, base_pose.translation.z],
-                             [base_pose.rotation.x, base_pose.rotation.y, base_pose.rotation.z, base_pose.rotation.w],
-                             flags=p.URDF_USE_SELF_COLLISION_EXCLUDE_PARENT)
+        self.original_urdf = resolve_ros_iris(urdf)
+        self.id = load_urdf_string_into_bullet(self.original_urdf, base_pose)
         self.sometimes = set()
         self.init_js_info()
         self.attached_objects = {}
@@ -246,13 +277,14 @@ class PyBulletRobot(object):
         # remove last robot and load new robot from new URDF
         p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 0)
         p.removeBody(self.id)
-        self.id = p.loadURDF(new_urdf_string, (0,0,0), (0,0,0,1), flags=p.URDF_USE_SELF_COLLISION_EXCLUDE_PARENT)
+        # TODO: salvage last base pose
+        self.id = load_urdf_string_into_bullet(new_urdf_string, Transform())
         p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 1)
 
         # reload joint info
         # TODO: implement me
 
-        # salvage last joint state and base pose
+        # salvage last joint state
         # TODO: implement me
 
         # salvage original collision matrix
@@ -275,13 +307,15 @@ class PyBulletRobot(object):
             # remove last robot and reload with original URDF
             p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 0)
             p.removeBody(self.id)
-            self.id = p.loadURDF(self.original_urdf, (0, 0, 0), (0, 0, 0, 1), flags=p.URDF_USE_SELF_COLLISION_EXCLUDE_PARENT)
+
+            # TODO: salvage last base pose
+            self.id = load_urdf_string_into_bullet(self.original_urdf, Transform())
             p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 1)
 
 
             # TODO: reload joint info
 
-            # TODO: salve last joint state and base pose
+            # TODO: salve last joint state
 
             # TODO: salve original collision matrix
 
@@ -298,11 +332,25 @@ class PyBulletWorld(object):
         self._objects = {}
         self._robots = {}
 
+    def spawn_robot_from_urdf_file(self, robot_name, urdf_file, base_pose=Transform()):
+        """
+        Spawns a new robot into the world, reading its URDF from disc.
+        :param robot_name: Name of the new robot to spawn.
+        :type robot_name: str
+        :param urdf_file: Valid and existing filename of the URDF to load, e.g. '/home/foo/bar/pr2.urdf'
+        :type urdf_file: str
+        :param base_pose: Pose at which to spawn the robot.
+        :type base_pose: Transform
+        :return: Nothing
+        """
+        with open(urdf_file, 'r') as f:
+            self.spawn_robot_from_urdf(robot_name, f.read(), base_pose)
+
     def spawn_robot_from_urdf(self, robot_name, urdf, base_pose=Transform()):
         """
 
         :param robot_name:
-        :param urdf: Path to URDF file, or content of already loaded URDF file.
+        :param urdf: URDF to spawn as loaded XML string.
         :type urdf: str
         :param base_pose:
         :type base_pose: Transform

@@ -74,7 +74,6 @@ class PyBulletPlugin(Plugin):
                 pass
             elif req.operation is UpdateWorldRequest.REMOVE_ALL:
                 self.world.delete_all_objects()
-                # TODO: move this into the world?
                 self.world.get_robot(self.robot_name).detach_all_objects()
             else:
                 return UpdateWorldResponse(UpdateWorldResponse.INVALID_OPERATION,

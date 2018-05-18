@@ -363,6 +363,14 @@ class PyBulletWorld(object):
         p.removeBody(self._robots[robot_name].id)
         del (self._robots[robot_name])
 
+    def delete_all_robots(self):
+        """
+        Deletes all robots that have been spawned in this world.
+        :return: Nothing.
+        """
+        for robot_name in self.get_robot_list():
+            self.delete_robot(robot_name)
+
     def spawn_object_from_urdf(self, name, urdf, base_pose=Transform()):
         """
 
@@ -472,8 +480,8 @@ class PyBulletWorld(object):
         self.add_ground_plane()
 
     def clear_world(self):
-        for i in range(p.getNumBodies()):
-            p.removeBody(p.getBodyUniqueId(i))
+        self.delete_all_objects(remaining_objects=())
+        self.delete_all_robots()
 
     def deactivate_viewer(self):
         p.disconnect()

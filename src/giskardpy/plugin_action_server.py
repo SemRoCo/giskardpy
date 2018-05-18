@@ -84,11 +84,11 @@ class ActionServerPlugin(Plugin):
         return update
 
     def update(self):
-        self.controlled_joints = self.god_map.get_data(self.controlled_joints_identifier)
-        self.current_js = self.god_map.get_data(self.js_identifier)
+        self.controlled_joints = self.god_map.get_data([self.controlled_joints_identifier])
+        self.current_js = self.god_map.get_data([self.js_identifier])
 
     def post_mortem_analysis(self, god_map, exception):
-        collisions = god_map.get_data(self.collision_identifier)
+        collisions = god_map.get_data([self.collision_identifier])
         in_collision = False
         result = MoveResult()
         result.error_code = MoveResult.INSOLVABLE
@@ -104,8 +104,8 @@ class ActionServerPlugin(Plugin):
                     in_collision = in_collision or collision_info.contact_distance < 0.0
             if not in_collision:
                 result.error_code = MoveResult.SUCCESS
-                trajectory = god_map.get_data(self.trajectory_identifier)
-                self.start_js = god_map.get_data(self.js_identifier)
+                trajectory = god_map.get_data([self.trajectory_identifier])
+                self.start_js = god_map.get_data([self.js_identifier])
                 result.trajectory.joint_names = self.controller_joints
                 for time, traj_point in trajectory.items():
                     p = JointTrajectoryPoint()
@@ -242,9 +242,9 @@ class LogTrajectoryPlugin(Plugin):
         return {self.trajectory_identifier: self.trajectory}
 
     def update(self):
-        self.trajectory = self.god_map.get_data(self.trajectory_identifier)
-        time = self.god_map.get_data(self.time_identifier)
-        current_js = self.god_map.get_data(self.joint_state_identifier)
+        self.trajectory = self.god_map.get_data([self.trajectory_identifier])
+        time = self.god_map.get_data([self.time_identifier])
+        current_js = self.god_map.get_data([self.joint_state_identifier])
         if self.trajectory is None:
             self.trajectory = Trajectory()
         self.trajectory.set(time, current_js)

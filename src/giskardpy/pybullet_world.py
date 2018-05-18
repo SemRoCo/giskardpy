@@ -107,8 +107,10 @@ class PyBulletRobot(object):
     def check_self_collision(self, d=0.5, whitelist=None):
         if whitelist is None:
             whitelist = self.sometimes
-        contact_infos = keydefaultdict(lambda k: ContactInfo(None, self.id, self.id, k[0], k[1], (0, 0, 0), (0, 0, 0),
-                                                             (0, 0, 0), 1e9, 0))
+
+        def default_contact_info(k):
+            return ContactInfo(None, self.id, self.id, k[0], k[1], (0, 0, 0), (0, 0, 0), (0, 0, 0), 1e9, 0)
+        contact_infos = keydefaultdict(default_contact_info)
         contact_infos.update({(self.link_id_to_name[link_a], self.name, self.link_id_to_name[link_b]): ContactInfo(*x)
                               for (link_a, link_b) in whitelist for x in
                               p.getClosestPoints(self.id, self.id, d, link_a, link_b)})
@@ -420,8 +422,9 @@ class PyBulletWorld(object):
         :rtype: dict
         """
         # TODO set self collision cut off distance in a cool way
-        collisions = keydefaultdict(lambda k: ContactInfo(None, self.id, self.id, k[0], k[1], (0, 0, 0), (0, 0, 0),
-                                                          (0, 0, 0), 1e9, 0))
+        def default_contact_info(k):
+            return ContactInfo(None, self.id, self.id, k[0], k[1], (0, 0, 0), (0, 0, 0), (0, 0, 0), 1e9, 0)
+        collisions = keydefaultdict(default_contact_info)
         if self_collision:
             for robot in self._robots.values():  # type: PyBulletRobot
                 if collisions is None:

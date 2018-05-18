@@ -72,9 +72,6 @@ class ProcessManager(object):
                     self._god_map.key_to_expr = parallel_universe.get_god_map().key_to_expr
 
                     plugin.post_mortem_analysis(parallel_universe.get_god_map(), e)
-                    # TODO different function for get readings after end of universe?
-                    # for identifier, value in plugin.get_readings().items():
-                    #     self._god_map.set_data(identifier, value)
                 else:
                     break
         return True

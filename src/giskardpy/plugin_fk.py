@@ -17,19 +17,21 @@ class FKPlugin(Plugin):
         self.fk = None
         super(FKPlugin, self).__init__()
 
+    # @profile
     def get_readings(self):
         exprs = self.god_map.get_expr_values()
+
+        # @profile
         def on_demand_fk_evaluated(key):
-            root, tip = key
-            fk = self.fk[root, tip](**exprs)
+            fk = self.fk[key](**exprs)
             p = PoseStamped()
-            p.header.frame_id = tip
+            p.header.frame_id = key[1]
             p.pose.position.x = sw.pos_of(fk)[0, 0]
             p.pose.position.y = sw.pos_of(fk)[1, 0]
             p.pose.position.z = sw.pos_of(fk)[2, 0]
-            orientation = quaternion_from_matrix(fk)
-            p.pose.orientation = Quaternion(*orientation)
+            p.pose.orientation = Quaternion(*quaternion_from_matrix(fk))
             return p
+
         fks = keydefaultdict(on_demand_fk_evaluated)
         return {self.fk_identifier: fks}
 
@@ -47,6 +49,8 @@ class FKPlugin(Plugin):
         self.robot.set_joint_symbol_map(current_joints)
 
         free_symbols = self.god_map.get_free_symbols()
+
+        # @profile
         def on_demand_fk(key):
             # TODO possible speed up by merging fks into one matrix
             root, tip = key

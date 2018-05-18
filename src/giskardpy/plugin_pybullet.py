@@ -171,7 +171,7 @@ class PyBulletPlugin(Plugin):
                 self.closest_point_identifier: closest_point}
 
     def update(self):
-        js = self.god_map.get_data(self.js_identifier)
+        js = self.god_map.get_data([self.js_identifier])
         self.world.set_joint_state(self.robot_name, js)
 
     def start_once(self):

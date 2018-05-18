@@ -77,9 +77,9 @@ class KinematicSimPlugin(Plugin):
 
     def update(self):
         self.time += self.frequency
-        motor_commands = self.god_map.get_data(self.next_cmd_identifier)
+        motor_commands = self.god_map.get_data([self.next_cmd_identifier])
         if motor_commands is not None:
-            current_js = self.god_map.get_data(self.js_identifier)
+            current_js = self.god_map.get_data([self.js_identifier])
             self.next_js = OrderedDict()
             for joint_name, sjs in current_js.items():
                 if joint_name in motor_commands:

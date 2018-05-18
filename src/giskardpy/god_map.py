@@ -13,6 +13,7 @@ class GodMap(object):
         self.key_to_expr = {}
         self.expr_to_key = {}
         self.default_value = 0
+        self.last_expr_values = {}
 
     def __copy__(self):
         god_map_copy = GodMap()
@@ -40,7 +41,7 @@ class GodMap(object):
         if isinstance(key, str):
             identifier_parts = key.split(self.separator)
         else:
-            identifier_parts = [str(x) for x in key]
+            identifier_parts = key
         namespace = identifier_parts[0]
         result = self._data.get(namespace)
         for member in identifier_parts[1:]:
@@ -58,18 +59,18 @@ class GodMap(object):
         return result
 
     def get_expr(self, key):
-        if isinstance(key, list):
+        if isinstance(key, str):
+            identifier_parts = key.split(self.separator)
+        else:
+            identifier_parts = key
             key = '/'.join([str(x) for x in key])
         if key not in self.key_to_expr:
             expr = se.Symbol(key.replace(self.separator, self.expr_separator))
             if expr in self.expr_to_key:
                 raise Exception('{} not allowed in key'.format(self.expr_separator))
             self.key_to_expr[key] = expr
-            self.expr_to_key[str(expr)] = key
+            self.expr_to_key[str(expr)] = identifier_parts
         return self.key_to_expr[key]
-
-    def get_key(self, expr):
-        return self.expr_to_key[str(expr)]
 
     def get_expr_values(self):
         #TODO potential speedup by only updating entries that have changed

@@ -10,7 +10,7 @@ from copy import deepcopy
 from numpy.random.mtrand import seed
 
 from giskardpy.exceptions import UnknownBodyException, DuplicateObjectNameException, DuplicateRobotNameException
-from giskardpy.trajectory import MultiJointState, SingleJointState
+from giskardpy.trajectory import MultiJointState, SingleJointState, Transform
 import numpy as np
 
 from giskardpy.utils import keydefaultdict
@@ -62,18 +62,19 @@ def resolve_ros_iris(input_urdf):
 
 
 class PyBulletRobot(object):
-    def __init__(self, name, urdf, base_position=(0, 0, 0), base_orientation=(0, 0, 0, 1)):
+    def __init__(self, name, urdf, base_pose=Transform()):
         """
 
         :param name:
         :param urdf: Path to URDF file, or content of already loaded URDF file.
         :type urdf: str
-        :param base_position:
-        :param base_orientation:
+        :param base_pose:
+        :type base_pose: Transform
         """
         self.name = name
         self.original_urdf = replace_paths(urdf, name)
-        self.id = p.loadURDF(self.original_urdf, base_position, base_orientation,
+        self.id = p.loadURDF(self.original_urdf, [base_pose.translation.x, base_pose.translation.y, base_pose.translation.z],
+                             [base_pose.rotation.x, base_pose.rotation.y, base_pose.rotation.z, base_pose.rotation.w],
                              flags=p.URDF_USE_SELF_COLLISION_EXCLUDE_PARENT)
         self.sometimes = set()
         self.init_js_info()
@@ -298,21 +299,21 @@ class PyBulletWorld(object):
         self._objects = {}
         self._robots = {}
 
-    def spawn_robot_from_urdf(self, robot_name, urdf, base_position=(0, 0, 0), base_orientation=(0, 0, 0, 1)):
+    def spawn_robot_from_urdf(self, robot_name, urdf, base_pose=Transform()):
         """
 
         :param robot_name:
         :param urdf: Path to URDF file, or content of already loaded URDF file.
         :type urdf: str
-        :param base_position:
-        :param base_orientation:
+        :param base_pose:
+        :type base_pose: Transform
         :return:
         """
         if self.has_robot(robot_name):
             raise DuplicateRobotNameException('Cannot spawn robot "{}" because a robot with such a '
                                                'name already exists'.format(robot_name))
         self.deactivate_rendering()
-        self._robots[robot_name] = PyBulletRobot(robot_name, urdf, base_position, base_orientation)
+        self._robots[robot_name] = PyBulletRobot(robot_name, urdf, base_pose)
         self.activate_rendering()
 
     def get_robot_list(self):
@@ -362,7 +363,8 @@ class PyBulletWorld(object):
         p.removeBody(self._robots[robot_name].id)
         del (self._robots[robot_name])
 
-    def spawn_object_from_urdf(self, name, urdf, base_position=(0, 0, 0), base_orientation=(0, 0, 0, 1)):
+    # TODO: refactor into using Transform
+    def spawn_object_from_urdf(self, name, urdf, base_pose=Transform()):
         """
 
         :param name:
@@ -376,7 +378,7 @@ class PyBulletWorld(object):
             raise DuplicateObjectNameException('Cannot spawn object "{}" because an object with such a '
                                                'name already exists'.format(name))
         self.deactivate_rendering()
-        self._objects[name] = PyBulletRobot(name, urdf, base_position, base_orientation)
+        self._objects[name] = PyBulletRobot(name, urdf, base_pose)
         self.activate_rendering()
 
     def get_object_list(self):
@@ -465,6 +467,9 @@ class PyBulletWorld(object):
 
     def deactivate_viewer(self):
         p.disconnect()
+
+    def add_ground_plane(self):
+        pass
 
     def muh(self, gui=True):
         if gui:

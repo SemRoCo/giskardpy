@@ -412,7 +412,7 @@ class PyBulletWorld(object):
         """
         return object_name in self._objects.keys()
 
-    def check_collisions(self, cut_off_distances, allowed_collision=set(), d=0.1, self_collision=True):
+    def check_collisions(self, cut_off_distances=None, allowed_collision=set(), d=0.1, self_collision=True):
         """
         :param cut_off_distances:
         :type cut_off_distances: dict
@@ -421,6 +421,8 @@ class PyBulletWorld(object):
         :return:
         :rtype: dict
         """
+        if cut_off_distances is None:
+            cut_off_distances = defaultdict(lambda: d)
         # TODO set self collision cut off distance in a cool way
         def default_contact_info(k):
             return ContactInfo(None, self.id, self.id, k[0], k[1], (0, 0, 0), (0, 0, 0), (0, 0, 0), 1e9, 0)

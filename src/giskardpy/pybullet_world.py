@@ -10,12 +10,12 @@ from copy import deepcopy
 from numpy.random.mtrand import seed
 
 from giskardpy.exceptions import UnknownBodyException, DuplicateObjectNameException, DuplicateRobotNameException
-from giskardpy.trajectory import MultiJointState, SingleJointState, Transform
+from giskardpy.trajectory import MultiJointState, SingleJointState, Transform, Point
 import numpy as np
 
 from giskardpy.utils import keydefaultdict
 
-from giskardpy.object import WorldObject, FixedJoint, from_msg, to_urdf_string
+from giskardpy.object import WorldObject, FixedJoint, from_msg, to_urdf_string, BoxShape, CollisionProperty
 
 JointInfo = namedtuple('JointInfo', ['joint_index', 'joint_name', 'joint_type', 'q_index', 'u_index', 'flags',
                                      'joint_damping', 'joint_friction', 'joint_lower_limit', 'joint_upper_limit',
@@ -363,15 +363,14 @@ class PyBulletWorld(object):
         p.removeBody(self._robots[robot_name].id)
         del (self._robots[robot_name])
 
-    # TODO: refactor into using Transform
     def spawn_object_from_urdf(self, name, urdf, base_pose=Transform()):
         """
 
         :param name:
         :param urdf: Path to URDF file, or content of already loaded URDF file.
         :type urdf: str
-        :param base_position:
-        :param base_orientation:
+        :param base_pose:
+        :type base_pose: Transform
         :return:
         """
         if self.has_object(name):
@@ -380,6 +379,17 @@ class PyBulletWorld(object):
         self.deactivate_rendering()
         self._objects[name] = PyBulletRobot(name, urdf, base_pose)
         self.activate_rendering()
+
+    def spawn_object(self, object, base_pose=Transform()):
+        """
+        Spawns a new object into the Bullet world at a given pose.
+        :param object: New object to add to the world.
+        :type object: WorldObject
+        :param base_pose: Pose at which to spawn the object.
+        :type base_pose: Transform
+        :return: Nothing.
+        """
+        self.spawn_object_from_urdf(object.name, to_urdf_string(object), base_pose)
 
     def get_object_list(self):
         return list(self._objects.keys())
@@ -459,7 +469,7 @@ class PyBulletWorld(object):
         p.setAdditionalSearchPath(pybullet_data.getDataPath())  # optionally
         # print(pybullet_data.getDataPath())
         p.setGravity(0, 0, -9.8)
-        self.spawn_object_from_urdf('plane', 'plane.urdf')
+        self.add_ground_plane()
 
     def clear_world(self):
         for i in range(p.getNumBodies()):
@@ -469,7 +479,13 @@ class PyBulletWorld(object):
         p.disconnect()
 
     def add_ground_plane(self):
-        pass
+        """
+        Adds a ground plane to the Bullet World.
+        :return: Nothing.
+        """
+        # like in the PyBullet examples: spawn a big collision box in the origin
+        self.spawn_object(WorldObject(name='plane', collision_props=[CollisionProperty(geometry=BoxShape(30, 30, 10))]),
+                          Transform(translation=Point(0,0,-5)))
 
     def muh(self, gui=True):
         if gui:

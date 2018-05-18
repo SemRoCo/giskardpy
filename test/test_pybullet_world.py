@@ -70,11 +70,11 @@ class TestPyBulletWorld(unittest.TestCase):
         self.w.clear_world()
 
     def test_spawn_object1(self):
-        self.w.spawn_object_from_urdf('plane', 'plane.urdf')
+        self.w.add_ground_plane()
         self.assertEqual(p.getNumBodies(), 1)
 
     def test_delete1(self):
-        self.w.spawn_object_from_urdf('plane', 'plane.urdf')
+        self.w.add_ground_plane()
         self.w.delete_object('plane')
         self.assertEqual(p.getNumBodies(), 0)
 
@@ -107,7 +107,7 @@ class TestPyBulletWorld(unittest.TestCase):
         self.assertEqual(8, len(collisions))
 
     def test_list_objects1(self):
-        self.w.spawn_object_from_urdf('plane', 'plane.urdf')
+        self.w.add_ground_plane()
         self.assertEqual(self.w.get_object_list(), ['plane'])
 
     def test_list_robots1(self):

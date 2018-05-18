@@ -5,7 +5,6 @@ from itertools import combinations
 from pybullet import JOINT_REVOLUTE, JOINT_PRISMATIC, JOINT_PLANAR, JOINT_SPHERICAL
 from time import time
 
-import pybullet_data
 from copy import deepcopy
 from numpy.random.mtrand import seed
 
@@ -474,8 +473,6 @@ class PyBulletWorld(object):
             self.physicsClient = p.connect(p.GUI)  # or p.DIRECT for non-graphical version
         else:
             self.physicsClient = p.connect(p.DIRECT)  # or p.DIRECT for non-graphical version
-        p.setAdditionalSearchPath(pybullet_data.getDataPath())  # optionally
-        # print(pybullet_data.getDataPath())
         p.setGravity(0, 0, -9.8)
         self.add_ground_plane()
 

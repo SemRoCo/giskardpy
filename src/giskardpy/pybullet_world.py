@@ -115,6 +115,16 @@ class PyBulletRobot(object):
         for joint_name, singe_joint_state in multi_joint_state.items():
             p.resetJointState(self.id, self.joint_name_to_info[joint_name].joint_index, singe_joint_state.position)
 
+    def set_base_pose(self, position=(0, 0, 0), orientation=(0, 0, 0, 1)):
+        """
+        Set base pose in bullet world frame.
+        :param position:
+        :type position: list
+        :param orientation:
+        :type orientation: list
+        """
+        p.resetBasePositionAndOrientation(self.id, position, orientation)
+
     def init_js_info(self):
         self.joint_id_map = {}
         self.link_name_to_id = {}
@@ -500,7 +510,6 @@ class PyBulletWorld(object):
                     collisions = robot.check_self_collision(d)
                 else:
                     collisions.update(robot.check_self_collision(d))
-        # TODO robot/robot collisions are missing
         for robot_name, robot in self._robots.items():  # type: (str, PyBulletRobot)
             for robot_link_name, robot_link in robot.link_name_to_id.items():
                 # TODO skip if collisions with all links of an object are allowed
@@ -539,12 +548,6 @@ class PyBulletWorld(object):
         # like in the PyBullet examples: spawn a big collision box in the origin
         self.spawn_object(WorldObject(name='plane', collision_props=[CollisionProperty(geometry=BoxShape(30, 30, 10))]),
                           Transform(translation=Point(0,0,-5)))
-
-    def muh(self, gui=True):
-        if gui:
-            p.connect(p.GUI)
-        else:
-            p.connect(p.DIRECT)
 
     def deactivate_rendering(self):
         p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 0)

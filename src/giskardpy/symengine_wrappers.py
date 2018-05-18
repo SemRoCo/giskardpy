@@ -1,5 +1,7 @@
 import itertools
+import pickle
 from operator import mul
+from os.path import isfile
 from warnings import warn
 
 import symengine as sp
@@ -26,8 +28,32 @@ def fake_Min(x, y):
     return ((x + y) - fake_Abs(x - y)) / 2
 
 
+def safe_compiled_function(f, hash):
+    if not isfile(hash):
+        with open(hash, 'w') as file:
+            pickle.dump(f, file)
+
+def load_compiled_function(hash):
+    if isfile(hash):
+        with open(hash, 'r') as file:
+            fast_f = pickle.load(file)
+            return fast_f
+
+class CompiledFunction(object):
+    def __init__(self, str_params, fast_f, l, shape):
+        self.str_params = str_params
+        self.fast_f = fast_f
+        self.l = l
+        self.shape = shape
+
+    def __call__(self, **kwargs):
+        filtered_args = [kwargs[k] for k in self.str_params]
+        out = np.empty(self.l)
+        self.fast_f.unsafe_real(np.array(filtered_args, dtype=np.double), out)
+        return np.nan_to_num(out).reshape(self.shape)
+
 # @profile
-def speed_up(function, parameters, backend='llvm'):
+def speed_up(function, parameters, backend='llvm', hash=None):
     str_params = [str(x) for x in parameters]
     if len(parameters) == 0:
         try:
@@ -40,7 +66,7 @@ def speed_up(function, parameters, backend='llvm'):
     else:
         if backend == 'llvm':
             try:
-                cse = sp.cse(function)
+                # cse = sp.cse(function)
                 fast_f = Lambdify(list(parameters), function, backend=backend, cse=True, real=True)
             except RuntimeError as e:
                 warn('WARNING RuntimeError: "{}" during lambdify with LLVM backend, fallback to numpy'.format(e),
@@ -54,15 +80,15 @@ def speed_up(function, parameters, backend='llvm'):
                      RuntimeWarning)
                 backend = None
 
+        if backend in ['llvm', 'lambda']:
             # def f(**kwargs):
             #     filtered_args = [kwargs[k] for k in str_params]
-            #     return np.nan_to_num(np.asarray(fast_f(filtered_args)).reshape(function.shape))
-        if backend in ['llvm', 'lambda']:
-            def f(**kwargs):
-                filtered_args = [kwargs[k] for k in str_params]
-                out = np.empty(len(function))
-                fast_f.unsafe_real(np.array(filtered_args, dtype=np.double), out)
-                return np.nan_to_num(out).reshape(function.shape)
+            #     out = np.empty(len(function))
+            #     fast_f.unsafe_real(np.array(filtered_args, dtype=np.double), out)
+            #     return np.nan_to_num(out).reshape(function.shape)
+            f = CompiledFunction(str_params, fast_f, len(function), function.shape)
+            if hash is not None:
+                safe_compiled_function(f, hash)
         elif backend == 'cse':
             cse, reduced_f = sp.cse(function)
 

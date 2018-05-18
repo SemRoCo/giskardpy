@@ -19,7 +19,7 @@ from giskardpy.object import WorldObject, to_urdf_string, VisualProperty, BoxSha
 from giskardpy.plugin import Plugin
 from giskardpy.pybullet_world import PyBulletWorld, ContactInfo
 import giskardpy.trajectory as g
-from giskardpy.tfwrapper import transform_pose
+from giskardpy.tfwrapper import transform_pose, lookup_transform
 from giskardpy.trajectory import ClosestPointInfo
 from giskardpy.utils import keydefaultdict
 
@@ -111,6 +111,8 @@ class PyBulletPlugin(Plugin):
     def get_readings(self):
         default_distance = 0.05
         collision_goals = self.god_map.get_data([self.collision_goal_identifier])
+        if collision_goals is None:
+            collision_goals = []
         allowed_collisions = set()
         distances = defaultdict(lambda: default_distance)
         for collision_entry in collision_goals:  # type: CollisionEntry
@@ -166,6 +168,7 @@ class PyBulletPlugin(Plugin):
     def update(self):
         js = self.god_map.get_data([self.js_identifier])
         self.world.set_joint_state(self.robot_name, js)
+        p = lookup_transform('map', 'base_footprint')
 
     def start_once(self):
         self.collision_pub = rospy.Publisher('visualization_marker', Marker, queue_size=1)

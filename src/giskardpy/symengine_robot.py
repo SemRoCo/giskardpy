@@ -37,6 +37,9 @@ class Robot(object):
         else:
             self._load_from_urdf_string(urdf)
 
+    def get_name(self):
+        return self._urdf_robot.name
+
     def _load_from_urdf_string(self, urdf_str):
         return self._load_from_urdf(URDF.from_xml_string(hacky_urdf_parser_fix(urdf_str)))
 

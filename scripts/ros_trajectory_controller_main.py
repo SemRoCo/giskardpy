@@ -52,12 +52,12 @@ if __name__ == '__main__':
                                           collision_goal_identifier=collision_goal_identifier,
                                           plot_trajectory=False))
     pm.register_plugin('bullet',
-                       PluginContainer(PyBulletPlugin(js_identifier=js_identifier,
-                                                      collision_identifier=collision_identifier,
-                                                      closest_point_identifier=closest_point_identifier,
-                                                      collision_goal_identifier=collision_goal_identifier,
-                                                      gui=False,
-                                                      marker=True)))
+                       PyBulletPlugin(js_identifier=js_identifier,
+                                      collision_identifier=collision_identifier,
+                                      closest_point_identifier=closest_point_identifier,
+                                      collision_goal_identifier=collision_goal_identifier,
+                                      gui=False,
+                                      marker=True))
     pm.register_plugin('fk', FKPlugin(js_identifier=js_identifier, fk_identifier=fk_identifier))
     pm.register_plugin('cart bullet controller',
                        CartesianBulletControllerPlugin(collision_root,

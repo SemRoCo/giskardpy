@@ -31,8 +31,8 @@ class SymEngineController(object):
         self.controlled_joints.update(joint_names)
         self.controlled_joint_symbols = [self.robot.get_joint_symbol_map().joint_map[x] for x in
                                          self.controlled_joints]
-        self.joint_constraints = {k: self.robot.joint_constraints[k] for k in self.controlled_joints}
-        self.hard_constraints = {k: self.robot.hard_constraints[k] for k in self.controlled_joints if
+        self.joint_constraints = {(self.robot.get_name(), k): self.robot.joint_constraints[k] for k in self.controlled_joints}
+        self.hard_constraints = {(self.robot.get_name(), k): self.robot.hard_constraints[k] for k in self.controlled_joints if
                                  k in self.robot.hard_constraints}
 
     def init(self, soft_constraints, free_symbols):
@@ -147,7 +147,7 @@ def link_to_link_avoidance(link_name, current_pose, current_pose_eval, point_on_
     name = '{} to any collision'.format(link_name)
 
     dist = sw.euclidean_distance((current_pose * sw.inverse_frame(current_pose_eval) * point_on_link), other_point)
-    soft_constraints['{} x{}'.format(name, random.rand())] = SoftConstraint(lower=lower_limit - dist,
+    soft_constraints['{} x'.format(name, random.rand())] = SoftConstraint(lower=lower_limit - dist,
                                                            upper=upper_limit,
                                                            weight=weight,
                                                            expression=dist)

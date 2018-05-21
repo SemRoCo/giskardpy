@@ -89,15 +89,15 @@ def rotation3_rpy(roll, pitch, yaw):
         https://github.com/orocos/orocos_kinematics_dynamics/blob/master/orocos_kdl/src/frames.cpp#L167
     """
     rx = sp.Matrix([[1, 0, 0, 0],
-                    [0, sp.cos(roll), sp.sin(roll), 0],
-                    [0, -sp.sin(roll), sp.cos(roll), 0],
+                    [0, sp.cos(roll), -sp.sin(roll), 0],
+                    [0, sp.sin(roll), sp.cos(roll), 0],
                     [0, 0, 0, 1]])
-    ry = sp.Matrix([[sp.cos(pitch), 0, -sp.sin(pitch), 0],
+    ry = sp.Matrix([[sp.cos(pitch), 0, sp.sin(pitch), 0],
                     [0, 1, 0, 0],
-                    [sp.sin(pitch), 0, sp.cos(pitch), 0],
+                    [-sp.sin(pitch), 0, sp.cos(pitch), 0],
                     [0, 0, 0, 1]])
-    rz = sp.Matrix([[sp.cos(yaw), sp.sin(yaw), 0, 0],
-                    [-sp.sin(yaw), sp.cos(yaw), 0, 0],
+    rz = sp.Matrix([[sp.cos(yaw), -sp.sin(yaw), 0, 0],
+                    [sp.sin(yaw), sp.cos(yaw), 0, 0],
                     [0, 0, 1, 0],
                     [0, 0, 0, 1]])
     return (rz * ry * rx)
@@ -119,10 +119,10 @@ def rotation3_axis_angle(axis, angle):
     m_vt_0_1 = m_vt_0 * axis[1]
     m_vt_0_2 = m_vt_0 * axis[2]
     m_vt_1_2 = m_vt_1 * axis[2]
-    return sp.Matrix([[ct + m_vt_0*axis[0],  -m_st_2 + m_vt_0_1,   m_st_1 + m_vt_0_2, 0],
-                      [  m_st_2 + m_vt_0_1, ct + m_vt_1*axis[1],  -m_st_0 + m_vt_1_2, 0],
-                      [ -m_st_1 + m_vt_0_2,   m_st_0 + m_vt_1_2, ct + m_vt_2*axis[2], 0],
-                      [                  0,                   0,                   0, 1]])
+    return sp.Matrix([[ct + m_vt_0 * axis[0], -m_st_2 + m_vt_0_1, m_st_1 + m_vt_0_2, 0],
+                      [m_st_2 + m_vt_0_1, ct + m_vt_1 * axis[1], -m_st_0 + m_vt_1_2, 0],
+                      [-m_st_1 + m_vt_0_2, m_st_0 + m_vt_1_2, ct + m_vt_2 * axis[2], 0],
+                      [0, 0, 0, 1]])
 
 
 

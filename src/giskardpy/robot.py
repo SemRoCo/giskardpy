@@ -69,10 +69,16 @@ class Robot(object):
 
             rpy = (0,0,0)
             xyz = (0,0,0)
+            axis = (1,0,0)
             if joint_name not in self._joints:
                 if joint.origin is not None:
                     rpy = joint.origin.rpy if joint.origin.rpy is not None else (0,0,0)
                     xyz = joint.origin.xyz if joint.origin.xyz is not None else (0,0,0)
+
+                if joint.axis != None:
+                    axis = (joint.axis[0], joint.axis[1], joint.axis[2])
+
+                offset_frame = spw.frame3_rpy(*rpy, loc=spw.point3(*xyz))
 
                 if joint.type == 'revolute' or joint.type == 'continuous':
                     self._joints[joint_name] = Joint(spw.Symbol(joint_name),
@@ -80,9 +86,9 @@ class Robot(object):
                                                      joint.limit.lower,
                                                      joint.limit.upper,
                                                      joint.type == 'continuous')  
-                    self.frames[link_name] = parentFrame * spw.frame3_axis_angle(spw.vec3(*joint.axis),
+                    self.frames[link_name] = parentFrame * offset_frame * spw.frame3_axis_angle(spw.vec3(*axis),
                                                                                  spw.Symbol(joint_name),
-                                                                                 spw.point3(*xyz))
+                                                                                 spw.point3(0,0,0))
                 elif joint.type == 'prismatic':
                     self._joints[joint_name] = Joint(spw.Symbol(joint_name),
                                                      joint.limit.velocity,
@@ -91,7 +97,7 @@ class Robot(object):
                                                      False)
                     self.frames[link_name] = parentFrame * spw.frame3_rpy(*rpy,
                                                                           loc=spw.point3(*xyz) + spw.vec3(
-                                                                              *joint.axis) * spw.Symbol(joint_name))
+                                                                              *axis) * spw.Symbol(joint_name))
                 elif joint.type == 'fixed':
                     self.frames[link_name] = parentFrame * spw.frame3_rpy(*rpy, loc=spw.point3(*xyz))
                 else:

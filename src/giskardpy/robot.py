@@ -67,28 +67,33 @@ class Robot(object):
             link_name = jointsAndLinks[i + 1]
             joint = self.urdf_robot.joint_map[joint_name]
 
+            rpy = (0,0,0)
+            xyz = (0,0,0)
             if joint_name not in self._joints:
+                if joint.origin is not None:
+                    rpy = joint.origin.rpy if joint.origin.rpy is not None else (0,0,0)
+                    xyz = joint.origin.xyz if joint.origin.xyz is not None else (0,0,0)
+
                 if joint.type == 'revolute' or joint.type == 'continuous':
                     self._joints[joint_name] = Joint(spw.Symbol(joint_name),
                                                      joint.limit.velocity,
                                                      joint.limit.lower,
                                                      joint.limit.upper,
-                                                     joint.type == 'continuous')
+                                                     joint.type == 'continuous')  
                     self.frames[link_name] = parentFrame * spw.frame3_axis_angle(spw.vec3(*joint.axis),
                                                                                  spw.Symbol(joint_name),
-                                                                                 spw.point3(*joint.origin.xyz))
+                                                                                 spw.point3(*xyz))
                 elif joint.type == 'prismatic':
                     self._joints[joint_name] = Joint(spw.Symbol(joint_name),
                                                      joint.limit.velocity,
                                                      joint.limit.lower,
                                                      joint.limit.upper,
                                                      False)
-                    self.frames[link_name] = parentFrame * spw.frame3_rpy(*joint.origin.rpy,
-                                                                          loc=spw.point3(*joint.origin.xyz) + spw.vec3(
+                    self.frames[link_name] = parentFrame * spw.frame3_rpy(*rpy,
+                                                                          loc=spw.point3(*xyz) + spw.vec3(
                                                                               *joint.axis) * spw.Symbol(joint_name))
                 elif joint.type == 'fixed':
-                    self.frames[link_name] = parentFrame * spw.frame3_rpy(*joint.origin.rpy,
-                                                                          loc=spw.point3(*joint.origin.xyz))
+                    self.frames[link_name] = parentFrame * spw.frame3_rpy(*rpy, loc=spw.point3(*xyz))
                 else:
                     raise Exception('Joint type "' + joint.type + '" is not supported by urdf parser.')
             parentFrame = self.frames[link_name]

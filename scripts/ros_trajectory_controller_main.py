@@ -56,6 +56,7 @@ if __name__ == '__main__':
                                       collision_identifier=collision_identifier,
                                       closest_point_identifier=closest_point_identifier,
                                       collision_goal_identifier=collision_goal_identifier,
+                                      robot_root='base_footprint',
                                       gui=True,
                                       marker=True))
     pm.register_plugin('fk', FKPlugin(js_identifier=js_identifier, fk_identifier=fk_identifier))

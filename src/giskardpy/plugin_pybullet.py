@@ -26,11 +26,12 @@ from giskardpy.utils import keydefaultdict
 
 class PyBulletPlugin(Plugin):
     def __init__(self, js_identifier, collision_identifier, closest_point_identifier, collision_goal_identifier,
-                 gui=False, marker=False):
+                 robot_root, gui=False, marker=False):
         self.collision_goal_identifier = collision_goal_identifier
         self.js_identifier = js_identifier
         self.collision_identifier = collision_identifier
         self.closest_point_identifier = closest_point_identifier
+        self.robot_root = robot_root
         self.robot_name = 'pr2'
         self.global_reference_frame_name = 'map'
         self.marker = marker
@@ -62,10 +63,11 @@ class PyBulletPlugin(Plugin):
             if req.operation is UpdateWorldRequest.ADD:
                 if req.rigidly_attached:
                     self.world.get_robot().attach_object(from_msg(req.body), req.pose.header.frame_id,
-                                                              from_pose_msg(req.pose.pose))
+                                                         from_pose_msg(req.pose.pose))
                 else:
                     self.world.spawn_object_from_urdf(req.body.name, to_urdf_string(from_msg(req.body)),
-                                                      from_pose_msg(transform_pose(self.global_reference_frame_name, req.pose).pose))
+                                                      from_pose_msg(transform_pose(self.global_reference_frame_name,
+                                                                                   req.pose).pose))
             elif req.operation is UpdateWorldRequest.REMOVE:
                 # TODO: discriminate between attached and non-attached objects
                 self.world.delete_object(req.body.name)
@@ -95,7 +97,8 @@ class PyBulletPlugin(Plugin):
         distances = defaultdict(lambda: default_distance)
         for collision_entry in collision_goals:  # type: CollisionEntry
             if collision_entry.body_b == '' and \
-                collision_entry.type not in [CollisionEntry.ALLOW_ALL_COLLISIONS, CollisionEntry.AVOID_ALL_COLLISIONS]:
+                    collision_entry.type not in [CollisionEntry.ALLOW_ALL_COLLISIONS,
+                                                 CollisionEntry.AVOID_ALL_COLLISIONS]:
                 raise Exception('body_b not set')
 
             if collision_entry.body_b == '' and collision_entry.link_b != '':
@@ -129,7 +132,7 @@ class PyBulletPlugin(Plugin):
         if self.marker:
             self.make_collision_markers(collisions)
 
-        closest_point = defaultdict(lambda: ClosestPointInfo((0,0,0), (10,10,10), 1e9, default_distance))
+        closest_point = defaultdict(lambda: ClosestPointInfo((0, 0, 0), (10, 10, 10), 1e9, default_distance))
         for key, collision_info in collisions.items():  # type: ((str, str), ContactInfo)
             link1 = key[0]
             cpi = ClosestPointInfo(collision_info.position_on_a, collision_info.position_on_b,
@@ -145,7 +148,14 @@ class PyBulletPlugin(Plugin):
     def update(self):
         js = self.god_map.get_data([self.js_identifier])
         self.world.set_joint_state(js)
-        p = lookup_transform('map', 'base_footprint')
+        p = lookup_transform('map', self.robot_root)
+        self.world.get_robot().set_base_pose(position=[p.pose.position.x,
+                                                       p.pose.position.y,
+                                                       p.pose.position.z],
+                                             orientation=[p.pose.orientation.x,
+                                                          p.pose.orientation.y,
+                                                          p.pose.orientation.z,
+                                                          p.pose.orientation.w])
 
     def start_once(self):
         self.collision_pub = rospy.Publisher('visualization_marker', Marker, queue_size=1)
@@ -164,7 +174,7 @@ class PyBulletPlugin(Plugin):
     # @profile
     def make_collision_markers(self, collisions):
         m = Marker()
-        m.header.frame_id = 'base_footprint'
+        m.header.frame_id = 'map'
         m.action = Marker.ADD
         m.type = Marker.LINE_LIST
         m.id = 1337

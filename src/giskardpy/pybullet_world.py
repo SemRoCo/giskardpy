@@ -338,9 +338,9 @@ class PyBulletRobot(object):
 
 class PyBulletWorld(object):
     def __init__(self, gui=False):
-        self.gui = gui
+        self._gui = gui
         self._objects = {}
-        self._robots = {}
+        self._robot = None
 
     def spawn_robot_from_urdf_file(self, robot_name, urdf_file, base_pose=Transform()):
         """
@@ -366,33 +366,32 @@ class PyBulletWorld(object):
         :type base_pose: Transform
         :return:
         """
-        if self.has_robot(robot_name):
-            raise DuplicateRobotNameException('Cannot spawn robot "{}" because a robot with such a '
-                                               'name already exists'.format(robot_name))
+        if self.has_robot():
+            raise Exception('A robot is already loaded')
         self.deactivate_rendering()
-        self._robots[robot_name] = PyBulletRobot(robot_name, urdf, base_pose)
+        self._robot = PyBulletRobot(robot_name, urdf, base_pose)
         self.activate_rendering()
 
     def get_robot_list(self):
-        return list(self._robots.keys())
+        return list(self._robot.keys())
 
-    def get_robot(self, robot_name):
+    def get_robot(self):
         """
         :param robot_name:
         :type robot_name: str
         :return:
         :rtype: PyBulletRobot
         """
-        return self._robots[robot_name]
+        return self._robot
 
-    def has_robot(self, robot_name):
+    def has_robot(self):
         """
         Checks whether this world already contains a robot with a specific name.
         :param robot_name: Identifier of the robot that shall be checked.
         :type robot_name: str
         :return: True if robot with that name is already in the world. Else: returns False.
         """
-        return robot_name in self._robots.keys()
+        return self._robot is not None
 
     def get_object(self, name):
         """
@@ -403,7 +402,7 @@ class PyBulletWorld(object):
         """
         return self._objects[name]
 
-    def set_joint_state(self, robot_name, joint_state):
+    def set_joint_state(self, joint_state):
         """
         Set the current joint state readings for a robot in the world.
         :param robot_name: name of the robot to update
@@ -411,22 +410,23 @@ class PyBulletWorld(object):
         :param joint_state: sensor readings for the entire robot
         :type dict{string, MultiJointState}
         """
-        self._robots[robot_name].set_joint_state(joint_state)
+        self._robot.set_joint_state(joint_state)
 
-    def get_joint_state(self, robot_name):
-        return self._robots[robot_name].get_joint_states()
+    def get_joint_state(self):
+        return self._robot.get_joint_states()
 
-    def delete_robot(self, robot_name):
-        p.removeBody(self._robots[robot_name].id)
-        del (self._robots[robot_name])
+    def delete_robot(self):
+        p.removeBody(self._robot.id)
+        self._robot = None
+        # del (self._robot[robot_name])
 
-    def delete_all_robots(self):
-        """
-        Deletes all robots that have been spawned in this world.
-        :return: Nothing.
-        """
-        for robot_name in self.get_robot_list():
-            self.delete_robot(robot_name)
+    # def delete_all_robots(self):
+    #     """
+    #     Deletes all robots that have been spawned in this world.
+    #     :return: Nothing.
+    #     """
+    #     for robot_name in self.get_robot_list():
+    #         self.delete_robot()
 
     def spawn_object_from_urdf(self, name, urdf, base_pose=Transform()):
         """
@@ -505,28 +505,26 @@ class PyBulletWorld(object):
             return ContactInfo(None, self.id, self.id, k[0], k[1], (0, 0, 0), (0, 0, 0), (0, 0, 0), 1e9, 0)
         collisions = keydefaultdict(default_contact_info)
         if self_collision:
-            for robot in self._robots.values():  # type: PyBulletRobot
-                if collisions is None:
-                    collisions = robot.check_self_collision(d)
-                else:
-                    collisions.update(robot.check_self_collision(d))
-        for robot_name, robot in self._robots.items():  # type: (str, PyBulletRobot)
-            for robot_link_name, robot_link in robot.link_name_to_id.items():
-                # TODO skip if collisions with all links of an object are allowed
-                for object_name, object in self._objects.items():  # type: (str, PyBulletRobot)
-                    for object_link_name, object_link in object.link_name_to_id.items():
-                        key = (robot_link_name, object_name, object_link_name)
-                        if key not in allowed_collision:
-                            collisions.update({key: ContactInfo(*x) for x in
-                                               p.getClosestPoints(robot.id, object.id, cut_off_distances[key] + d,
-                                                                  robot_link, object_link)})
+            if collisions is None:
+                collisions = self._robot.check_self_collision(d)
+            else:
+                collisions.update(self._robot.check_self_collision(d))
+        for robot_link_name, robot_link in self._robot.link_name_to_id.items():
+            for object_name, object in self._objects.items():  # type: (str, PyBulletRobot)
+            # TODO skip if collisions with all links of an object are allowed
+                for object_link_name, object_link in object.link_name_to_id.items():
+                    key = (robot_link_name, object_name, object_link_name)
+                    if key not in allowed_collision:
+                        collisions.update({key: ContactInfo(*x) for x in
+                                           p.getClosestPoints(self._robot.id, object.id, cut_off_distances[key] + d,
+                                                              robot_link, object_link)})
         return collisions
 
     def check_trajectory_collision(self):
         pass
 
     def activate_viewer(self):
-        if self.gui:
+        if self._gui:
             self.physicsClient = p.connect(p.GUI)  # or p.DIRECT for non-graphical version
         else:
             self.physicsClient = p.connect(p.DIRECT)  # or p.DIRECT for non-graphical version
@@ -535,7 +533,8 @@ class PyBulletWorld(object):
 
     def clear_world(self):
         self.delete_all_objects(remaining_objects=())
-        self.delete_all_robots()
+        self.delete_robot()
+        # self.delete_all_robots()
 
     def deactivate_viewer(self):
         p.disconnect()

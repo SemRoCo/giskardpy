@@ -61,7 +61,7 @@ class PyBulletPlugin(Plugin):
         try:
             if req.operation is UpdateWorldRequest.ADD:
                 if req.rigidly_attached:
-                    self.world.get_robot(self.robot_name).attach_object(from_msg(req.body), req.pose.header.frame_id,
+                    self.world.get_robot().attach_object(from_msg(req.body), req.pose.header.frame_id,
                                                               from_pose_msg(req.pose.pose))
                 else:
                     self.world.spawn_object_from_urdf(req.body.name, to_urdf_string(from_msg(req.body)),
@@ -74,32 +74,10 @@ class PyBulletPlugin(Plugin):
                 pass
             elif req.operation is UpdateWorldRequest.REMOVE_ALL:
                 self.world.delete_all_objects()
-                self.world.get_robot(self.robot_name).detach_all_objects()
+                self.world.get_robot().detach_all_objects()
             else:
                 return UpdateWorldResponse(UpdateWorldResponse.INVALID_OPERATION,
                                            "Received invalid operation code: {}".format(req.operation))
-
-            # self.world.spawn_object_from_urdf('kitchen', '{}/urdf/muh.urdf'.format(RosPack().get_path('iai_kitchen')))
-            # self.world.spawn_object_from_urdf('shelf', '{}/urdf/shelves.urdf'.format(RosPack().get_path('iai_shelves')),
-            #                                   [1.3,1,0])
-            # my_obj = WorldObject(name='my_box',
-            #                      visual_props=[VisualProperty(geometry=BoxShape(0.5, 1.5, 1.5),
-            #                                                   origin=g.Transform(g.Point(.8,0,0),
-            #                                                                      g.Quaternion(0,0,0,1)))],
-            #                      collision_props=[CollisionProperty(geometry=BoxShape(0.5, 1.5, 1.5),
-            #                                                         origin=g.Transform(g.Point(.8, 0, 0),
-            #                                                                            g.Quaternion(0, 0, 0, 1)))])
-            # my_obj = WorldObject(name='my_sink',
-            #                      visual_props=[VisualProperty(geometry=MeshShape('package://iai_kitchen/meshes/misc/Sink2.dae'),
-            #                                                   origin=g.Transform(g.Point(.8,0,.6),
-            #                                                                      g.Quaternion(0,0,0,1)))],
-            #                      collision_props=[CollisionProperty(geometry=MeshShape('package://iai_kitchen/meshes/misc/Sink2.dae'),
-            #                                                         origin=g.Transform(g.Point(.8, 0, .6),
-            #                                                                            g.Quaternion(0, 0, 0, 1)))])
-            # urdf_string = to_urdf_string(my_obj)
-            # self.world.spawn_object_from_urdf_str('box', urdf_string)
-            # self.marker_pub.publish(to_marker(my_obj))
-            # rospy.sleep(0.2)
             return UpdateWorldResponse()
         except CorruptShapeException as e:
             return UpdateWorldResponse(UpdateWorldResponse.CORRUPT_SHAPE_ERROR, e.message)
@@ -124,8 +102,7 @@ class PyBulletPlugin(Plugin):
                 raise Exception('body_b is empty but link_b is not')
 
             if collision_entry.robot_link == '':
-                robot_name = self.world.get_robot_list()[0]
-                links_a = self.world.get_robot(robot_name).get_link_names()
+                links_a = self.world.get_robot().get_link_names()
             else:
                 links_a = [collision_entry.robot_link]
 
@@ -167,7 +144,7 @@ class PyBulletPlugin(Plugin):
 
     def update(self):
         js = self.god_map.get_data([self.js_identifier])
-        self.world.set_joint_state(self.robot_name, js)
+        self.world.set_joint_state(js)
         p = lookup_transform('map', 'base_footprint')
 
     def start_once(self):

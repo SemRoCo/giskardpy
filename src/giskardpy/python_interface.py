@@ -142,8 +142,11 @@ class GiskardWrapper(object):
         req = UpdateWorldRequest(UpdateWorldRequest.ADD, object, False, pose)
         return self.update_world.call(req)
 
+    def attach_object(self, name):
+        # TODO implement me
+        raise NotImplementedError
+
+
     def add_urdf(self, name, path):
-        object = WorldBody()
-        object.type = WorldBody.URDF_BODY
-        object.name = name
-        object.urdf = path
+        # TODO implement me
+        raise NotImplementedError

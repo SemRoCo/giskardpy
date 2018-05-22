@@ -57,7 +57,7 @@ if __name__ == '__main__':
                                       closest_point_identifier=closest_point_identifier,
                                       collision_goal_identifier=collision_goal_identifier,
                                       robot_root='base_footprint',
-                                      gui=True,
+                                      gui=False,
                                       marker=True))
     pm.register_plugin('fk', FKPlugin(js_identifier=js_identifier, fk_identifier=fk_identifier))
     pm.register_plugin('cart bullet controller',

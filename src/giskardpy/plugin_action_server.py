@@ -27,7 +27,7 @@ class ActionServerPlugin(Plugin):
     def __init__(self, cartesian_goal_identifier, js_identifier, trajectory_identifier, time_identifier,
                  collision_identifier, controlled_joints_identifier, collision_goal_identifier, plot_trajectory=False):
         self.plot_trajectory = plot_trajectory
-        self.cartesian_goal_identifier = cartesian_goal_identifier
+        self.goal_identifier = cartesian_goal_identifier
         self.controlled_joints_identifier = controlled_joints_identifier
         self.trajectory_identifier = trajectory_identifier
         self.js_identifier = js_identifier
@@ -57,7 +57,7 @@ class ActionServerPlugin(Plugin):
             cmd = self.get_readings_lock.get_nowait()  # type: MoveCmd
             rospy.loginfo('got goal')
             goals = defaultdict(dict)
-
+            goals['max_trajectory_length'] = cmd.max_trajectory_length
             # TODO support multiple move cmds
             for controller in cmd.controllers:
                 # TODO support collisions
@@ -74,12 +74,13 @@ class ActionServerPlugin(Plugin):
                     controller.goal_pose = transform_pose(root, controller.goal_pose)
                     goals[goal_key][root, tip] = controller
             self.god_map.set_data([self.collision_goal_identifier], cmd.collisions)
+            self.god_map.set_data([self.collision_goal_identifier], cmd.collisions)
             feedback = MoveFeedback()
             feedback.phase = MoveFeedback.PLANNING
             self._as.publish_feedback(feedback)
         except Empty:
             pass
-        update = {self.cartesian_goal_identifier: goals,
+        update = {self.goal_identifier: goals,
                   self.js_identifier: self.current_js if self.start_js is None else self.start_js}
         return update
 
@@ -222,7 +223,8 @@ class ActionServerPlugin(Plugin):
         return LogTrajectoryPlugin(trajectory_identifier=self.trajectory_identifier,
                                    joint_state_identifier=self.js_identifier,
                                    time_identifier=self.time_identifier,
-                                   plot_trajectory=self.plot_trajectory)
+                                   plot_trajectory=self.plot_trajectory,
+                                   goal_identifier=self.goal_identifier)
 
     def __del__(self):
         # TODO find a way to cancel all goals when giskard is killed
@@ -230,8 +232,10 @@ class ActionServerPlugin(Plugin):
 
 
 class LogTrajectoryPlugin(Plugin):
-    def __init__(self, trajectory_identifier, joint_state_identifier, time_identifier, plot_trajectory=False):
+    def __init__(self, trajectory_identifier, joint_state_identifier, time_identifier, goal_identifier,
+                 plot_trajectory=False):
         self.plot = plot_trajectory
+        self.goal_identifier = goal_identifier
         self.trajectory_identifier = trajectory_identifier
         self.joint_state_identifier = joint_state_identifier
         self.time_identifier = time_identifier
@@ -243,12 +247,14 @@ class LogTrajectoryPlugin(Plugin):
 
     def update(self):
         self.trajectory = self.god_map.get_data([self.trajectory_identifier])
+        traj_length = self.god_map.get_data([self.goal_identifier, 'max_trajectory_length'])
         time = self.god_map.get_data([self.time_identifier])
         current_js = self.god_map.get_data([self.joint_state_identifier])
         if self.trajectory is None:
             self.trajectory = Trajectory()
         self.trajectory.set(time, current_js)
-        if (time >= 1 and np.abs([v.velocity for v in current_js.values()]).max() < self.precision) or time >= 20:
+        if (time >= 1 and np.abs([v.velocity for v in current_js.values()]).max() < self.precision) or \
+                time >= traj_length:
             print('done')
             if self.plot:
                 self.plot_trajectory(self.trajectory)

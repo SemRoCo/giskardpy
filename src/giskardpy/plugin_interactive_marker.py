@@ -284,8 +284,7 @@ class InteractiveMarkerPlugin(Plugin):
             controller = self.make_controller(frame_id, pose)
             controller.type = Controller.TRANSLATION_3D
             controller.p_gain = 3
-            controller.enable_error_threshold = True
-            controller.threshold_value = 0.3
+            controller.max_speed = 0.3
             controller.weight = 1.0
             return controller
 
@@ -293,8 +292,7 @@ class InteractiveMarkerPlugin(Plugin):
             controller = self.make_controller(frame_id, pose)
             controller.type = Controller.ROTATION_3D
             controller.p_gain = 3
-            controller.enable_error_threshold = True
-            controller.threshold_value = 0.5
+            controller.max_speed = 0.5
             controller.weight = 1.0
             return controller
 
@@ -310,6 +308,7 @@ class InteractiveMarkerPlugin(Plugin):
             goal = MoveGoal()
             goal.type = MoveGoal.PLAN_AND_EXECUTE
             move_cmd = MoveCmd()
+            move_cmd.max_trajectory_length = 19
             for g in self.all_goals.values():
                 move_cmd.controllers.extend(g)
             goal.cmd_seq.append(move_cmd)

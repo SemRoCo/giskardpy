@@ -180,7 +180,7 @@ class CartesianBulletControllerPlugin(Plugin):
         current_input = FrameInput.prefix_constructor(trans_prefix, rot_prefix, self.god_map.get_expr)
         weight = self.god_map.get_expr([self._goal_identifier, str(type), ','.join([root, tip]), 'weight'])
         p_gain = self.god_map.get_expr([self._goal_identifier, str(type), ','.join([root, tip]), 'p_gain'])
-        max_speed = self.god_map.get_expr([self._goal_identifier, str(type), ','.join([root, tip]), 'threshold_value'])
+        max_speed = self.god_map.get_expr([self._goal_identifier, str(type), ','.join([root, tip]), 'max_speed'])
 
         if type == Controller.TRANSLATION_3D:
             return position_conv(goal_input.get_position(),

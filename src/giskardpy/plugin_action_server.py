@@ -16,7 +16,7 @@ from giskard_msgs.msg._MoveResult import MoveResult
 from trajectory_msgs.msg import JointTrajectoryPoint, JointTrajectory
 from visualization_msgs.msg import MarkerArray
 
-from giskardpy.exceptions import MAX_NWSR_REACHEDException, QPSolverException
+from giskardpy.exceptions import MAX_NWSR_REACHEDException, QPSolverException, SolverTimeoutError
 from giskardpy.plugin import Plugin
 from giskardpy.tfwrapper import transform_pose
 from giskardpy.trajectory import SingleJointState, Transform, Point, Quaternion, Trajectory
@@ -101,6 +101,8 @@ class ActionServerPlugin(Plugin):
             result.error_code = MoveResult.QP_SOLVER_ERROR
         elif isinstance(exception, KeyError):
             result.error_code = MoveResult.UNKNOWN_OBJECT
+        elif isinstance(exception, SolverTimeoutError):
+            result.error_code = MoveResult.SOLVER_TIMEOUT
         if exception is None:
             if collisions is not None:
                 for _, collision_info in collisions.items():
@@ -251,12 +253,13 @@ class LogTrajectoryPlugin(Plugin):
         self.trajectory = self.god_map.get_data([self.trajectory_identifier])
         traj_length = self.god_map.get_data([self.goal_identifier, 'max_trajectory_length'])
         time = self.god_map.get_data([self.time_identifier])
+        if time >= traj_length:
+            raise SolverTimeoutError()
         current_js = self.god_map.get_data([self.joint_state_identifier])
         if self.trajectory is None:
             self.trajectory = Trajectory()
         self.trajectory.set(time, current_js)
-        if (time >= 1 and np.abs([v.velocity for v in current_js.values()]).max() < self.precision) or \
-                time >= traj_length:
+        if (time >= 1 and np.abs([v.velocity for v in current_js.values()]).max() < self.precision):
             print('done')
             if self.plot:
                 self.plot_trajectory(self.trajectory)

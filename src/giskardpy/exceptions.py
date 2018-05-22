@@ -7,6 +7,9 @@ class NameConflictException(GiskardException):
 class QPSolverException(GiskardException):
     pass
 
+class SolverTimeoutError(GiskardException):
+    pass
+
 class MAX_NWSR_REACHEDException(QPSolverException):
     pass
 

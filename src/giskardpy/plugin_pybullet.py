@@ -13,12 +13,12 @@ from std_srvs.srv import SetBool, SetBoolResponse
 from giskard_msgs.srv import UpdateWorld, UpdateWorldResponse, UpdateWorldRequest
 from visualization_msgs.msg import Marker, MarkerArray
 
-from giskardpy.exceptions import CorruptShapeException, UnknownBodyException, DuplicateObjectNameException
+from giskardpy.exceptions import CorruptShapeException, UnknownBodyException, DuplicateObjectNameException, \
+    IntersectingCollisionException
 from giskardpy.object import WorldObject, to_urdf_string, VisualProperty, BoxShape, CollisionProperty, to_marker, \
     MeshShape, from_msg, from_pose_msg
 from giskardpy.plugin import Plugin
 from giskardpy.pybullet_world import PyBulletWorld, ContactInfo
-import giskardpy.trajectory as g
 from giskardpy.tfwrapper import transform_pose, lookup_transform
 from giskardpy.trajectory import ClosestPointInfo
 from giskardpy.utils import keydefaultdict
@@ -35,11 +35,31 @@ class PyBulletPlugin(Plugin):
         self.robot_name = 'pr2'
         self.global_reference_frame_name = 'map'
         self.marker = marker
-        self.world = PyBulletWorld(gui=gui)
-        self.srv = rospy.Service('~update_world', UpdateWorld, self.update_world_cb)
-        self.marker_pub = rospy.Publisher('visualization_marker_array', MarkerArray, queue_size=10)
-        self.viz_gui = rospy.Service('~enable_marker', SetBool, self.enable_marker_cb)
+        self.gui = gui
         super(PyBulletPlugin, self).__init__()
+
+    def copy(self):
+        cp = self.__class__(js_identifier=self.js_identifier,
+                            collision_identifier=self.collision_identifier,
+                            closest_point_identifier=self.closest_point_identifier,
+                            collision_goal_identifier=self.collision_goal_identifier,
+                            robot_root=self.robot_root,
+                            gui=self.gui)
+        cp.world = self.world
+        cp.srv = self.srv
+        cp.viz_gui = self.viz_gui
+        cp.collision_pub = self.collision_pub
+        return cp
+
+    def start_once(self):
+        self.world = PyBulletWorld(gui=self.gui)
+        self.srv = rospy.Service('~update_world', UpdateWorld, self.update_world_cb)
+        self.viz_gui = rospy.Service('~enable_marker', SetBool, self.enable_marker_cb)
+        self.collision_pub = rospy.Publisher('visualization_marker', Marker, queue_size=1)
+        self.world.activate_viewer()
+        # TODO get robot description from god map
+        urdf = rospy.get_param('robot_description')
+        self.world.spawn_robot_from_urdf(self.robot_name, urdf)
 
     def enable_marker_cb(self, setbool):
         """
@@ -132,11 +152,15 @@ class PyBulletPlugin(Plugin):
         if self.marker:
             self.make_collision_markers(collisions)
 
-        closest_point = defaultdict(lambda: ClosestPointInfo((0, 0, 0), (10, 10, 10), 1e9, default_distance))
+        closest_point = keydefaultdict(lambda k: ClosestPointInfo((10, 0, 0), (0, 0, 0), 1e9, default_distance, k, '',
+                                                                  (1, 0, 0)))
         for key, collision_info in collisions.items():  # type: ((str, str), ContactInfo)
             link1 = key[0]
             cpi = ClosestPointInfo(collision_info.position_on_a, collision_info.position_on_b,
-                                   collision_info.contact_distance, distances[key])
+                                   collision_info.contact_distance, distances[key], key[0], key[1],
+                                   collision_info.contact_normal_on_b)
+            # if cpi.contact_distance < 0:
+            #     raise IntersectingCollisionException(key)
             if link1 in closest_point:
                 closest_point[link1] = min(closest_point[link1], cpi, key=lambda x: x.contact_distance)
             else:
@@ -157,19 +181,9 @@ class PyBulletPlugin(Plugin):
                                                           p.pose.orientation.z,
                                                           p.pose.orientation.w])
 
-    def start_once(self):
-        self.collision_pub = rospy.Publisher('visualization_marker', Marker, queue_size=1)
-        self.world.activate_viewer()
-        # TODO get robot description from databus
-        urdf = rospy.get_param('robot_description')
-        self.world.spawn_robot_from_urdf(self.robot_name, urdf)
-
     def stop(self):
         pass
         # self.world.deactivate_viewer()
-
-    def copy(self):
-        return self
 
     # @profile
     def make_collision_markers(self, collisions):

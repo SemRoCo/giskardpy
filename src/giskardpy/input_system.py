@@ -36,16 +36,10 @@ class Point3Input(InputArray):
         return sw.point3(self.x, self.y, self.z)
 
     @classmethod
-    def position_on_a(cls, f, prefix):
-        return cls(x=f('{}/position_on_a/0'.format(prefix)),
-                   y=f('{}/position_on_a/1'.format(prefix)),
-                   z=f('{}/position_on_a/2'.format(prefix)))
-
-    @classmethod
-    def position_on_b(cls, f, prefix):
-        return cls(x=f('{}/position_on_b/0'.format(prefix)),
-                   y=f('{}/position_on_b/1'.format(prefix)),
-                   z=f('{}/position_on_b/2'.format(prefix)))
+    def prefix(cls, f, prefix):
+        return cls(x=f(prefix+['0']),
+                   y=f(prefix+['1']),
+                   z=f(prefix+['2']))
 
 class Vector3Input(Point3Input):
     def get_expression(self):

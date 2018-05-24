@@ -53,20 +53,21 @@ class QProblemBuilder(object):
         ubA = []
         soft_expressions = []
         hard_expressions = []
-        for c in self.joint_constraints_dict.values():
+        for k, c in sorted(self.joint_constraints_dict.items(), key=lambda k: str(k[0])):
             weights.append(c.weight)
             lb.append(c.lower)
             ub.append(c.upper)
-        for c in self.hard_constraints_dict.values():
+        for k, c in sorted(self.hard_constraints_dict.items(), key=lambda k: str(k[0])):
             lbA.append(c.lower)
             ubA.append(c.upper)
             hard_expressions.append(c.expression)
-        for k, c in self.soft_constraints_dict.items():
+        for k, c in sorted(self.soft_constraints_dict.items(), key=lambda k: str(k[0])):
             weights.append(c.weight)
             lbA.append(c.lower)
             ubA.append(c.upper)
             lb.append(-BIG_NUMBER)
             ub.append(BIG_NUMBER)
+            assert not isinstance(c.expression, spw.Matrix), 'Matrices are not allowed as soft contraint expression'
             soft_expressions.append(c.expression)
         tasd = time()
         a = ''.join(str(x) for x in sorted(chain(self.soft_constraints_dict.keys(),
@@ -77,6 +78,7 @@ class QProblemBuilder(object):
         hash = hashlib.md5(a).hexdigest()
         print(hash, time() - tasd)
         self.cython_big_ass_M = load_compiled_function(hash)
+        # self.cython_big_ass_M = None
         self.np_g = np.zeros(len(weights))
 
         if self.cython_big_ass_M is None:
@@ -126,6 +128,24 @@ class QProblemBuilder(object):
     def load_pickle(self, hash):
         return pickle.load(hash)
 
+    def debug_print(self, np_H, np_A, np_lb, np_ub, np_lbA, np_ubA, xdot_full):
+        lb = {}
+        ub = {}
+        lbA = {}
+        ubA = {}
+        for iJ, (k, c) in enumerate(sorted(self.joint_constraints_dict.items(), key=lambda k: str(k[0]))):
+            lb['joint--' + str(k)] = np_lb[iJ]
+            ub['joint--' + str(k)] = np_ub[iJ]
+
+        for iH, (k, c) in enumerate(sorted(self.hard_constraints_dict.items(), key=lambda k: str(k[0]))):
+            lbA['hard--' + str(k)] = np_lbA[iH]
+            ubA['hard--' + str(k)] = np_ubA[iH]
+
+        for iS, (k, c) in enumerate(sorted(self.soft_constraints_dict.items(), key=lambda k: str(k[0]))):
+            lbA['soft--' + str(k)] = np_lbA[iH + iS+1]
+            ubA['soft--' + str(k)] = np_ubA[iH + iS+1]
+        pass
+
     def get_cmd(self, substitutions):
         """
 
@@ -144,4 +164,5 @@ class QProblemBuilder(object):
         xdot_full = self.qp_solver.solve(np_H, self.np_g, np_A, np_lb, np_ub, np_lbA, np_ubA)
         if xdot_full is None:
             return None
+        # self.debug_print(np_H, np_A, np_lb, np_ub, np_lbA, np_ubA, xdot_full)
         return OrderedDict((observable, xdot_full[i]) for i, observable in enumerate(self.controlled_joints_strs))

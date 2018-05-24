@@ -3,7 +3,7 @@ from copy import copy
 import rospy
 from giskard_msgs.msg import Controller
 
-from giskardpy.input_system import JointStatesInput, FrameInput, Point3Input
+from giskardpy.input_system import JointStatesInput, FrameInput, Point3Input, Vector3Input
 from giskardpy.plugin import Plugin
 from giskardpy.symengine_controller import SymEngineController, position_conv, rotation_conv, \
     link_to_link_avoidance, joint_position
@@ -101,24 +101,27 @@ class CartesianBulletControllerPlugin(Plugin):
                 controllable_links.update(robot.get_link_tree(joint_name))
 
             for link in list(controllable_links):
-                point_on_link_input = Point3Input.position_on_a(self.god_map.get_expr,
-                                                                '{}/{}'.format(self._closest_point_identifier,
-                                                                               link))
-                other_point_input = Point3Input.position_on_b(self.god_map.get_expr,
-                                                              '{}/{}'.format(self._closest_point_identifier,
-                                                                             link))
+                point_on_link_input = Point3Input.prefix(self.god_map.get_expr,
+                                                         [self._closest_point_identifier, link, 'position_on_a'])
+                other_point_input = Point3Input.prefix(self.god_map.get_expr,
+                                                       [self._closest_point_identifier, link, 'position_on_b'])
                 trans_prefix = '{}/{},{}/pose/position'.format(self._fk_identifier, self.root, link)
                 rot_prefix = '{}/{},{}/pose/orientation'.format(self._fk_identifier, self.root, link)
                 current_input = FrameInput.prefix_constructor(trans_prefix, rot_prefix, self.god_map.get_expr)
                 min_dist = self.god_map.get_expr([self._closest_point_identifier, link, 'min_dist'])
+                contact_normal = Vector3Input.prefix(self.god_map.get_expr,
+                                                    [self._closest_point_identifier, link, 'contact_normal'])
+
                 self.soft_constraints.update(link_to_link_avoidance(link,
                                                                     robot.get_fk_expression(self.root, link),
                                                                     current_input.get_frame(),
                                                                     point_on_link_input.get_expression(),
                                                                     other_point_input.get_expression(),
+                                                                    contact_normal.get_expression(),
                                                                     min_dist))
 
-        for (root, tip), value in self.god_map.get_data([self._goal_identifier, str(Controller.TRANSLATION_3D)]).items():
+        for (root, tip), value in self.god_map.get_data(
+                [self._goal_identifier, str(Controller.TRANSLATION_3D)]).items():
             key = '{}/{},{}'.format(Controller.TRANSLATION_3D, root, tip)
             hold_joints.difference_update(robot.get_chain_joints(root, tip))
             if key not in self.known_constraints:
@@ -126,8 +129,9 @@ class CartesianBulletControllerPlugin(Plugin):
                 self.known_constraints.add(key)
                 self.soft_constraints.update(self.controller_msg_to_constraint(root, tip, Controller.TRANSLATION_3D))
                 rebuild_controller = True
-            self.god_map.set_data([self._goal_identifier, str(Controller.TRANSLATION_3D), ','.join([root, tip]), 'weight'],
-                                  1)
+            self.god_map.set_data(
+                [self._goal_identifier, str(Controller.TRANSLATION_3D), ','.join([root, tip]), 'weight'],
+                1)
         for (root, tip), value in self.god_map.get_data([self._goal_identifier, str(Controller.ROTATION_3D)]).items():
             key = '{}/{},{}'.format(Controller.ROTATION_3D, root, tip)
             hold_joints.difference_update(robot.get_chain_joints(root, tip))
@@ -136,7 +140,8 @@ class CartesianBulletControllerPlugin(Plugin):
                 self.known_constraints.add(key)
                 self.soft_constraints.update(self.controller_msg_to_constraint(root, tip, Controller.ROTATION_3D))
                 rebuild_controller = True
-            self.god_map.set_data([self._goal_identifier, str(Controller.ROTATION_3D), ','.join([root, tip]), 'weight'], 1)
+            self.god_map.set_data([self._goal_identifier, str(Controller.ROTATION_3D), ','.join([root, tip]), 'weight'],
+                                  1)
 
         # TODO handle joint controller
 

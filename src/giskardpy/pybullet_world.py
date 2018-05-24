@@ -498,11 +498,13 @@ class PyBulletWorld(object):
         :return:
         :rtype: dict
         """
+        # TODO implement a cooler way to remove wheel/plane collisions but detect eg. arm/plane collisions
+        allowed_collision.add('plane')
         if cut_off_distances is None:
             cut_off_distances = defaultdict(lambda: d)
         # TODO set self collision cut off distance in a cool way
         def default_contact_info(k):
-            return ContactInfo(None, self.id, self.id, k[0], k[1], (0, 0, 0), (0, 0, 0), (0, 0, 0), 1e9, 0)
+            return ContactInfo(None, self.id, self.id, k[0], k[1], (0, 0, 0), (0, 0, 0), (1, 0, 0), 1e9, 0)
         collisions = keydefaultdict(default_contact_info)
         if self_collision:
             if collisions is None:
@@ -512,12 +514,13 @@ class PyBulletWorld(object):
         for robot_link_name, robot_link in self._robot.link_name_to_id.items():
             for object_name, object in self._objects.items():  # type: (str, PyBulletRobot)
             # TODO skip if collisions with all links of an object are allowed
-                for object_link_name, object_link in object.link_name_to_id.items():
-                    key = (robot_link_name, object_name, object_link_name)
-                    if key not in allowed_collision:
-                        collisions.update({key: ContactInfo(*x) for x in
-                                           p.getClosestPoints(self._robot.id, object.id, cut_off_distances[key] + d,
-                                                              robot_link, object_link)})
+                if object_name not in allowed_collision:
+                    for object_link_name, object_link in object.link_name_to_id.items():
+                        key = (robot_link_name, object_name, object_link_name)
+                        if key not in allowed_collision:
+                            collisions.update({key: ContactInfo(*x) for x in
+                                               p.getClosestPoints(self._robot.id, object.id, cut_off_distances[key] + d,
+                                                                  robot_link, object_link)})
         return collisions
 
     def check_trajectory_collision(self):

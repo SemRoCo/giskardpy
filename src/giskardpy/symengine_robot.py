@@ -29,7 +29,7 @@ def hacky_urdf_parser_fix(urdf_str):
 
 class Robot(object):
     def __init__(self, urdf):
-        self.default_joint_vel_limit = 0.25
+        self.default_joint_vel_limit = 1
         self.default_weight = 0.0001
         self.fks = {}
         if urdf.endswith('.urdf'):

@@ -31,8 +31,10 @@ class SymEngineController(object):
         self.controlled_joints.update(joint_names)
         self.controlled_joint_symbols = [self.robot.get_joint_symbol_map().joint_map[x] for x in
                                          self.controlled_joints]
-        self.joint_constraints = {(self.robot.get_name(), k): self.robot.joint_constraints[k] for k in self.controlled_joints}
-        self.hard_constraints = {(self.robot.get_name(), k): self.robot.hard_constraints[k] for k in self.controlled_joints if
+        self.joint_constraints = {(self.robot.get_name(), k): self.robot.joint_constraints[k] for k in
+                                  self.controlled_joints}
+        self.hard_constraints = {(self.robot.get_name(), k): self.robot.hard_constraints[k] for k in
+                                 self.controlled_joints if
                                  k in self.robot.hard_constraints}
 
     def init(self, soft_constraints, free_symbols):
@@ -58,7 +60,6 @@ class SymEngineController(object):
             if joint_expr in next_cmd:
                 real_next_cmd[joint_name] = next_cmd[joint_expr]
         return real_next_cmd
-
 
 
 def joint_position(current_joint, joint_goal, weight):
@@ -91,7 +92,7 @@ def position_conv(goal_position, current_position, weights=1, trans_gain=3, max_
     :param ns:
     :return:
     """
-    soft_constraints = {}
+    soft_constraints = OrderedDict()
 
     trans_error_vector = goal_position - current_position
     trans_error = sw.norm(trans_error_vector)
@@ -116,7 +117,7 @@ def position_conv(goal_position, current_position, weights=1, trans_gain=3, max_
 
 def rotation_conv(goal_rotation, current_rotation, current_evaluated_rotation, weights=1,
                   rot_gain=3, max_rot_speed=0.5, ns=''):
-    soft_constraints = {}
+    soft_constraints = OrderedDict()
     axis, angle = sw.axis_angle_from_matrix((current_rotation.T * goal_rotation))
     capped_angle = sw.fake_Min(angle * rot_gain, max_rot_speed)
     r_rot_control = axis * capped_angle
@@ -141,15 +142,28 @@ def rotation_conv(goal_rotation, current_rotation, current_evaluated_rotation, w
     return soft_constraints
 
 
-def link_to_link_avoidance(link_name, current_pose, current_pose_eval, point_on_link, other_point, lower_limit=0.05,
-                           upper_limit=1e9, weight=10000):
-    soft_constraints = {}
+def link_to_link_avoidance(link_name, current_pose, current_pose_eval, point_on_link, other_point, contact_normal,
+                           lower_limit=0.05, upper_limit=1e9, weight=10000):
+    soft_constraints = OrderedDict()
     name = '{} to any collision'.format(link_name)
 
-    dist = sw.euclidean_distance((current_pose * sw.inverse_frame(current_pose_eval) * point_on_link), other_point)
-    soft_constraints['{} x'.format(name, random.rand())] = SoftConstraint(lower=lower_limit - dist,
-                                                           upper=upper_limit,
-                                                           weight=weight,
-                                                           expression=dist)
+    controllable_point = current_pose * sw.inverse_frame(current_pose_eval) * point_on_link
 
+    dist = (contact_normal.T * (controllable_point - other_point))[0]
+
+    soft_constraints['{} '.format(name)] = SoftConstraint(lower=lower_limit - dist,
+                                                          upper=upper_limit,
+                                                          weight=weight,
+                                                          expression=dist)
+    # add_debug_constraint(soft_constraints, '{} //debug dist//'.format(name), dist)
+    # add_debug_constraint(soft_constraints, '{} //debug n0//'.format(name), contact_normal[0])
+    # add_debug_constraint(soft_constraints, '{} //debug n1//'.format(name), contact_normal[1])
+    # add_debug_constraint(soft_constraints, '{} //debug n2//'.format(name), contact_normal[2])
     return soft_constraints
+
+
+def add_debug_constraint(d, key, expr):
+    d[key] = SoftConstraint(lower=expr,
+                            upper=expr,
+                            weight=0,
+                            expression=1)

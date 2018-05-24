@@ -16,23 +16,26 @@ from giskard_msgs.msg._MoveResult import MoveResult
 from trajectory_msgs.msg import JointTrajectoryPoint, JointTrajectory
 from visualization_msgs.msg import MarkerArray
 
-from giskardpy.exceptions import MAX_NWSR_REACHEDException, QPSolverException, SolverTimeoutError
+from giskardpy.exceptions import MAX_NWSR_REACHEDException, QPSolverException, SolverTimeoutError, \
+    IntersectingCollisionException
 from giskardpy.plugin import Plugin
 from giskardpy.tfwrapper import transform_pose
+from giskardpy.trajectory import ClosestPointInfo
 from giskardpy.trajectory import SingleJointState, Transform, Point, Quaternion, Trajectory
 
 
 class ActionServerPlugin(Plugin):
     # TODO find a better name for this
     def __init__(self, cartesian_goal_identifier, js_identifier, trajectory_identifier, time_identifier,
-                 collision_identifier, controlled_joints_identifier, collision_goal_identifier, plot_trajectory=False):
+                 closest_point_identifier, controlled_joints_identifier, collision_goal_identifier,
+                 plot_trajectory=False):
         self.plot_trajectory = plot_trajectory
         self.goal_identifier = cartesian_goal_identifier
         self.controlled_joints_identifier = controlled_joints_identifier
         self.trajectory_identifier = trajectory_identifier
         self.js_identifier = js_identifier
         self.time_identifier = time_identifier
-        self.collision_identifier = collision_identifier
+        self.closest_point_identifier = closest_point_identifier
         self.collision_goal_identifier = collision_goal_identifier
 
         self.joint_goal = None
@@ -53,6 +56,7 @@ class ActionServerPlugin(Plugin):
 
     def get_readings(self):
         goals = None
+        cmd = None
         try:
             cmd = self.get_readings_lock.get_nowait()  # type: MoveCmd
             rospy.loginfo('got goal')
@@ -75,15 +79,15 @@ class ActionServerPlugin(Plugin):
                     tip = controller.tip_link
                     controller.goal_pose = transform_pose(root, controller.goal_pose)
                     goals[goal_key][root, tip] = controller
-            self.god_map.set_data([self.collision_goal_identifier], cmd.collisions)
-            self.god_map.set_data([self.collision_goal_identifier], cmd.collisions)
+            # self.god_map.set_data([self.collision_goal_identifier], cmd.collisions)
             feedback = MoveFeedback()
             feedback.phase = MoveFeedback.PLANNING
             self._as.publish_feedback(feedback)
         except Empty:
             pass
         update = {self.goal_identifier: goals,
-                  self.js_identifier: self.current_js if self.start_js is None else self.start_js}
+                  self.js_identifier: self.current_js if self.start_js is None else self.start_js,
+                  self.collision_goal_identifier: cmd.collisions if cmd is not None else None}
         return update
 
     def update(self):
@@ -91,8 +95,6 @@ class ActionServerPlugin(Plugin):
         self.current_js = self.god_map.get_data([self.js_identifier])
 
     def post_mortem_analysis(self, god_map, exception):
-        collisions = god_map.get_data([self.collision_identifier])
-        in_collision = False
         result = MoveResult()
         result.error_code = MoveResult.INSOLVABLE
         if isinstance(exception, MAX_NWSR_REACHEDException):
@@ -104,10 +106,7 @@ class ActionServerPlugin(Plugin):
         elif isinstance(exception, SolverTimeoutError):
             result.error_code = MoveResult.SOLVER_TIMEOUT
         if exception is None:
-            if collisions is not None:
-                for _, collision_info in collisions.items():
-                    in_collision = in_collision or collision_info.contact_distance < 0.0
-            if not in_collision:
+            if not self.closest_point_constraint_violated(god_map):
                 result.error_code = MoveResult.SUCCESS
                 trajectory = god_map.get_data([self.trajectory_identifier])
                 self.start_js = god_map.get_data([self.js_identifier])
@@ -128,6 +127,14 @@ class ActionServerPlugin(Plugin):
         self.update_lock.put(result)
         self.update_lock.join()
 
+    def closest_point_constraint_violated(self, god_map):
+        cp = god_map.get_data([self.closest_point_identifier])
+        for link_name, cpi_info in cp.items():  # type: (str, ClosestPointInfo)
+            if cpi_info.contact_distance < cpi_info.min_dist * 0.9:
+                print(cpi_info.link_a, cpi_info.link_b, cpi_info.contact_distance)
+                return True
+        return False
+
     def action_server_cb(self, goal):
         """
         :param goal:
@@ -135,63 +142,72 @@ class ActionServerPlugin(Plugin):
         """
         rospy.loginfo('received goal')
         self.execute = goal.type == MoveGoal.PLAN_AND_EXECUTE
-        result = None
-        for i, move_cmd in enumerate(goal.cmd_seq):
-            # TODO handle empty controller case
-            self.get_readings_lock.put(move_cmd)
-            intermediate_result = self.update_lock.get()  # type: MoveResult
-            if intermediate_result.error_code != MoveResult.SUCCESS:
-                result = intermediate_result
-                break
-            if result is None:
-                result = intermediate_result
-            else:
-                step_size = result.trajectory.points[1].time_from_start - result.trajectory.points[0].time_from_start
-                end_of_last_point = result.trajectory.points[-1].time_from_start + step_size
-                for point in intermediate_result.trajectory.points:  # type: JointTrajectoryPoint
-                    point.time_from_start += end_of_last_point
-                    result.trajectory.points.append(point)
-            if i < len(goal.cmd_seq) - 1:
-                self.update_lock.task_done()
-        else:  # if not break
-            rospy.loginfo('solution ready')
-            feedback = MoveFeedback()
-            feedback.phase = MoveFeedback.EXECUTION
-            if result.error_code == MoveResult.SUCCESS and self.execute:
-                goal = FollowJointTrajectoryGoal()
-                goal.trajectory = result.trajectory
-                self._ac.send_goal(goal)
-                t = rospy.get_rostime()
-                expected_duration = goal.trajectory.points[-1].time_from_start.to_sec()
-                rospy.loginfo(
-                    'waiting for {:.3f} sec with {} points'.format(expected_duration, len(goal.trajectory.points)))
+        # TODO do we really want to check for start state collision?
+        if True or not self.closest_point_constraint_violated(self.god_map):
+            result = None
+            for i, move_cmd in enumerate(goal.cmd_seq):
+                # TODO handle empty controller case
+                self.get_readings_lock.put(move_cmd)
+                intermediate_result = self.update_lock.get()  # type: MoveResult
+                if intermediate_result.error_code != MoveResult.SUCCESS:
+                    result = intermediate_result
+                    break
+                if result is None:
+                    result = intermediate_result
+                else:
+                    step_size = result.trajectory.points[1].time_from_start - result.trajectory.points[
+                        0].time_from_start
+                    end_of_last_point = result.trajectory.points[-1].time_from_start + step_size
+                    for point in intermediate_result.trajectory.points:  # type: JointTrajectoryPoint
+                        point.time_from_start += end_of_last_point
+                        result.trajectory.points.append(point)
+                if i < len(goal.cmd_seq) - 1:
+                    self.update_lock.task_done()
+            else:  # if not break
+                rospy.loginfo('solution ready')
+                feedback = MoveFeedback()
+                feedback.phase = MoveFeedback.EXECUTION
+                if result.error_code == MoveResult.SUCCESS and self.execute:
+                    goal = FollowJointTrajectoryGoal()
+                    goal.trajectory = result.trajectory
+                    self._ac.send_goal(goal)
+                    t = rospy.get_rostime()
+                    expected_duration = goal.trajectory.points[-1].time_from_start.to_sec()
+                    rospy.loginfo('waiting for {:.3f} sec with {} points'.format(expected_duration,
+                                                                                 len(goal.trajectory.points)))
 
-                while not self._ac.wait_for_result(rospy.Duration(.1)):
-                    time_passed = (rospy.get_rostime() - t).to_sec()
-                    feedback.progress = min(time_passed / expected_duration, 1)
-                    self._as.publish_feedback(feedback)
-                    if self._as.is_preempt_requested():
-                        rospy.loginfo('new goal, cancel old one')
-                        self._ac.cancel_all_goals()
-                        result.error_code = MoveResult.INTERRUPTED
-                        break
-                    if time_passed > expected_duration + 0.1:
-                        rospy.loginfo('controller took too long to execute trajectory')
-                        self._ac.cancel_all_goals()
-                        result.error_code = MoveResult.INTERRUPTED
-                        break
-                else:  # if not break
-                    print('shit took {:.3f}s'.format((rospy.get_rostime() - t).to_sec()))
-                    r = self._ac.get_result()
-                    if r.error_code == FollowJointTrajectoryResult.SUCCESSFUL:
-                        result.error_code = MoveResult.SUCCESS
+                    while not self._ac.wait_for_result(rospy.Duration(.1)):
+                        time_passed = (rospy.get_rostime() - t).to_sec()
+                        feedback.progress = min(time_passed / expected_duration, 1)
+                        self._as.publish_feedback(feedback)
+                        if self._as.is_preempt_requested():
+                            rospy.loginfo('new goal, cancel old one')
+                            self._ac.cancel_all_goals()
+                            result.error_code = MoveResult.INTERRUPTED
+                            break
+                        if time_passed > expected_duration + 0.1:
+                            rospy.loginfo('controller took too long to execute trajectory')
+                            self._ac.cancel_all_goals()
+                            result.error_code = MoveResult.INTERRUPTED
+                            break
+                    else:  # if not break
+                        print('shit took {:.3f}s'.format((rospy.get_rostime() - t).to_sec()))
+                        r = self._ac.get_result()
+                        if r.error_code == FollowJointTrajectoryResult.SUCCESSFUL:
+                            result.error_code = MoveResult.SUCCESS
+        else:
+            result = MoveResult()
+            result.error_code = MoveResult.START_STATE_COLLISION
         self.start_js = None
         if result.error_code != MoveResult.SUCCESS:
             self._as.set_aborted(result)
         else:
             self._as.set_succeeded(result)
         rospy.loginfo('finished movement {}'.format(result.error_code))
-        self.update_lock.task_done()
+        try:
+            self.update_lock.task_done()
+        except ValueError:
+            pass
 
     def get_default_joint_goal(self):
         joint_goal = OrderedDict()
@@ -253,13 +269,14 @@ class LogTrajectoryPlugin(Plugin):
         self.trajectory = self.god_map.get_data([self.trajectory_identifier])
         traj_length = self.god_map.get_data([self.goal_identifier, 'max_trajectory_length'])
         time = self.god_map.get_data([self.time_identifier])
-        if time >= traj_length:
-            raise SolverTimeoutError()
+        # if time >= traj_length:
+        #     raise SolverTimeoutError()
         current_js = self.god_map.get_data([self.joint_state_identifier])
         if self.trajectory is None:
             self.trajectory = Trajectory()
         self.trajectory.set(time, current_js)
-        if (time >= 1 and np.abs([v.velocity for v in current_js.values()]).max() < self.precision):
+        if (time >= 1 and np.abs([v.velocity for v in current_js.values()]).max() < self.precision) or \
+                time >= traj_length:
             print('done')
             if self.plot:
                 self.plot_trajectory(self.trajectory)

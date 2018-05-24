@@ -4,6 +4,12 @@ class GiskardException(Exception):
 class NameConflictException(GiskardException):
     pass
 
+class StartStateCollisionException(GiskardException):
+    pass
+
+class IntersectingCollisionException(GiskardException):
+    pass
+
 class QPSolverException(GiskardException):
     pass
 

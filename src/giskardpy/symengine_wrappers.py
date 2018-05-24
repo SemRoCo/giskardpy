@@ -139,6 +139,9 @@ def norm(v):
         r += x ** 2
     return sp.sqrt(r)
 
+def scale(v, a):
+    return v/norm(v)*a
+
 
 def dot(a, b):
     return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]

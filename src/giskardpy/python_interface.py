@@ -31,7 +31,7 @@ class GiskardWrapper(object):
         controller.goal_pose = pose_stamped
         controller.type = Controller.TRANSLATION_3D
         controller.weight = 1
-        controller.threshold_value = 0.3
+        controller.max_speed = 0.3
         controller.p_gain = 3
         self.cmd_seq[-1].controllers.append(controller)
         controller = Controller()
@@ -40,15 +40,17 @@ class GiskardWrapper(object):
         controller.goal_pose = pose_stamped
         controller.type = Controller.ROTATION_3D
         controller.weight = 1
-        controller.threshold_value = 0.5
+        controller.max_speed = 0.5
         controller.p_gain = 3
         self.cmd_seq[-1].controllers.append(controller)
 
     def set_collision_entries(self, collisions):
         self.cmd_seq[-1].collisions.extend(collisions)
 
-    def add_cmd(self):
-        self.cmd_seq.append(MoveCmd())
+    def add_cmd(self, max_trajectory_length=20):
+        move_cmd = MoveCmd()
+        move_cmd.max_trajectory_length = max_trajectory_length
+        self.cmd_seq.append(move_cmd)
 
     def clear_cmds(self):
         self.cmd_seq = []

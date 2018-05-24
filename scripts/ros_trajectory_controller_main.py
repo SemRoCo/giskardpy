@@ -47,7 +47,7 @@ if __name__ == '__main__':
                                           trajectory_identifier=trajectory_identifier,
                                           cartesian_goal_identifier=cartesian_goal_identifier,
                                           time_identifier=time_identifier,
-                                          collision_identifier=collision_identifier,
+                                          closest_point_identifier=closest_point_identifier,
                                           controlled_joints_identifier=controlled_joints_identifier,
                                           collision_goal_identifier=collision_goal_identifier,
                                           plot_trajectory=False))

@@ -21,6 +21,7 @@ class TestCollisionAvoidance(unittest.TestCase):
         super(TestCollisionAvoidance, self).__init__(methodName)
 
     def setUp(self):
+        # TODO set joint goal instead of cart
         self.giskard.clear_world()
         p = PoseStamped()
         p.header.frame_id = 'base_link'
@@ -186,7 +187,41 @@ class TestCollisionAvoidance(unittest.TestCase):
         result = self.giskard.get_result()
         self.assertEqual(result.error_code, MoveResult.SUCCESS)
 
+    def test_joint_state_goal1(self):
+        goal_js = {'torso_lift_joint': 0.2}
+        self.giskard.set_joint_goal(goal_js)
+        self.giskard.plan_and_execute()
 
+        # goal = MoveGoal()
+        # goal.type = MoveGoal.PLAN_AND_EXECUTE
+        #
+        # # translation
+        # controller = Controller()
+        # controller.type = Controller.JOINT
+        # controller.tip_link = 'gripper_tool_frame'
+        # controller.root_link = 'base_footprint'
+        #
+        # for i, joint_name in enumerate(self.joint_names):
+        #     controller.goal_state.name.append(joint_name)
+        #     # controller.goal_state.position.append(0)
+        #     controller.goal_state.position.append(np.random.random()-0.5)
+        #
+        # controller.p_gain = 3
+        # controller.max_trajectory_length = 0.05
+        # controller.weight = 1
+        # goal.cmd_seq.append(MoveCmd())
+        # goal.cmd_seq[-1].controllers.append(controller)
+        #
+        # self.client.send_goal(goal)
+        # result = self.client.wait_for_result()
+        # final_js = rospy.wait_for_message('/whole_body_controller/state', JointTrajectoryControllerState) # type: JointTrajectoryControllerState
+        # asdf = {}
+        # for i, joint_name in enumerate(final_js.joint_names):
+        #     asdf[joint_name] = final_js.actual.positions[i]
+        # for i, joint_name in enumerate(controller.goal_state.name):
+        #     print('{} real:{} | exp:{}'.format(joint_name, asdf[joint_name], controller.goal_state.position[i]))
+        # print('finished in 10s?: {}'.format(result))
+    #TODO test that tries to keep some joint states
 
 if __name__ == '__main__':
     import rosunit

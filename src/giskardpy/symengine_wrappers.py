@@ -29,11 +29,12 @@ def safe_compiled_function(f, file_name):
     if not os.path.exists(os.path.dirname(file_name)):
         try:
             os.makedirs(os.path.dirname(file_name))
-            with open(file_name, 'w') as file:
-                pickle.dump(f, file)
         except OSError as exc:  # Guard against race condition
             if exc.errno != errno.EEXIST:
                 raise
+    with open(file_name, 'w') as file:
+        print('saved {}'.format(file_name))
+        pickle.dump(f, file)
 
 def load_compiled_function(file_name):
     if os.path.isfile(file_name):

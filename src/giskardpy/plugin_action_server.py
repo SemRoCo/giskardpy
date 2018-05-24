@@ -63,14 +63,15 @@ class ActionServerPlugin(Plugin):
             cmd = self.get_readings_lock.get_nowait()  # type: MoveCmd
             rospy.loginfo('got goal')
             goals = {}
+            goals[str(Controller.JOINT)] = {}
+            goals[str(Controller.TRANSLATION_3D)] = {}
+            goals[str(Controller.ROTATION_3D)] = {}
             # goals['max_trajectory_length'] = cmd.max_trajectory_length
             # TODO support multiple move cmds
             for controller in cmd.controllers:
                 # TODO support collisions
                 self.new_universe = True
                 goal_key = str(controller.type)
-                if goal_key not in goals:
-                    goals[goal_key] = {}
                 if controller.type == Controller.JOINT:
                     rospy.loginfo('got joint goal')
                     for i, joint_name in enumerate(controller.goal_state.name):
@@ -263,7 +264,7 @@ class LogTrajectoryPlugin(Plugin):
         self.joint_state_identifier = joint_state_identifier
         self.time_identifier = time_identifier
         self.is_preempted = is_preempted
-        self.precision = 0.0025
+        self.precision = 0.005
         super(LogTrajectoryPlugin, self).__init__()
 
     def update(self):

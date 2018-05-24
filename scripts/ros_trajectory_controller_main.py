@@ -31,6 +31,8 @@ if __name__ == '__main__':
     closest_point_identifier = 'cpi'
     collision_goal_identifier = 'collision_goal'
 
+    root_link = rospy.get_param('~root_link', 'base_footprint')
+
     pm = ProcessManager()
     pm.register_plugin('js',
                        JointStatePlugin(js_identifier=js_identifier,
@@ -52,12 +54,12 @@ if __name__ == '__main__':
                                       collision_identifier=collision_identifier,
                                       closest_point_identifier=closest_point_identifier,
                                       collision_goal_identifier=collision_goal_identifier,
-                                      root_link=rospy.get_param('~root_link', 'base_footprint'),
+                                      root_link=root_link,
                                       gui=rospy.get_param('~enable_gui', False),
                                       marker=rospy.get_param('~enable_collision_marker', True)))
     pm.register_plugin('fk', FKPlugin(js_identifier=js_identifier, fk_identifier=fk_identifier))
     pm.register_plugin('cart bullet controller',
-                       CartesianBulletControllerPlugin(root_link=rospy.get_param('~root_link', 'base_footprint'),
+                       CartesianBulletControllerPlugin(root_link=root_link,
                                                        fk_identifier=fk_identifier,
                                                        goal_identifier=cartesian_goal_identifier,
                                                        js_identifier=js_identifier,

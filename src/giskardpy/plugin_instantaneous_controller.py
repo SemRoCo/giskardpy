@@ -94,8 +94,8 @@ class CartesianBulletControllerPlugin(Plugin):
             for joint_name in self.controlled_joints:
                 current_joint_key = self.god_map.get_expr([self._joint_states_identifier, joint_name, 'position'])
                 goal_joint_key = self.god_map.get_expr(
-                    [self._goal_identifier, Controller.JOINT, joint_name, 'position'])
-                weight = self.god_map.get_expr([self._goal_identifier, Controller.JOINT, joint_name, 'weight'])
+                    [self._goal_identifier, str(Controller.JOINT), joint_name, 'position'])
+                weight = self.god_map.get_expr([self._goal_identifier, str(Controller.JOINT), joint_name, 'weight'])
                 self.soft_constraints[joint_name] = joint_position(current_joint_key, goal_joint_key, weight)
                 controllable_links.update(robot.get_link_tree(joint_name))
 
@@ -145,8 +145,7 @@ class CartesianBulletControllerPlugin(Plugin):
         # TODO handle joint controller
 
         # set weight of unused joints to 0
-        # TODO this breaks the rule of not modifying the god map inside of a plugin
-        joint_goal = self.god_map.get_data([self._goal_identifier, Controller.JOINT])
+        joint_goal = self.god_map.get_data([self._goal_identifier, str(Controller.JOINT)])
         for joint_name in self.controlled_joints:
             if joint_name not in joint_goal:
                 joint_goal[joint_name] = {'weight': 0,
@@ -156,7 +155,7 @@ class CartesianBulletControllerPlugin(Plugin):
                 if joint_name in hold_joints:
                     joint_goal[joint_name]['weight'] = 1
 
-        self.god_map.set_data([self._goal_identifier, Controller.JOINT], joint_goal)
+        self.god_map.set_data([self._goal_identifier, str(Controller.JOINT)], joint_goal)
 
         if rebuild_controller or self._controller is None:
             # TODO sanity checking

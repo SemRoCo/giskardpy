@@ -44,6 +44,20 @@ class GiskardWrapper(object):
         controller.p_gain = 3
         self.cmd_seq[-1].controllers.append(controller)
 
+    def set_joint_goal(self, joint_state):
+        """
+        :param joint_state:
+        :type joint_state: dict
+        """
+        controller = Controller()
+        controller.type = Controller.JOINT
+        controller.weight = 1
+        controller.max_speed = 1
+        for joint_name, joint_position in joint_state.items():
+            controller.goal_state.name.append(joint_name)
+            controller.goal_state.position.append(joint_position)
+        self.cmd_seq[-1].controllers.append(controller)
+
     def set_collision_entries(self, collisions):
         self.cmd_seq[-1].collisions.extend(collisions)
 

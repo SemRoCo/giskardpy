@@ -7,7 +7,7 @@ import rospy
 
 from geometry_msgs.msg import Point, Vector3
 from giskard_msgs.msg import CollisionEntry
-from rospy_message_converter.message_converter import convert_ros_message_to_dictionary
+from multiprocessing import Lock
 from std_msgs.msg import ColorRGBA
 from std_srvs.srv import SetBool, SetBoolResponse
 from giskard_msgs.srv import UpdateWorld, UpdateWorldResponse, UpdateWorldRequest
@@ -39,6 +39,7 @@ class PyBulletPlugin(Plugin):
         self.srv = rospy.Service('~update_world', UpdateWorld, self.update_world_cb)
         self.marker_pub = rospy.Publisher('visualization_marker_array', MarkerArray, queue_size=10)
         self.viz_gui = rospy.Service('~enable_marker', SetBool, self.enable_marker_cb)
+        self.lock = Lock()
         super(PyBulletPlugin, self).__init__()
 
     def enable_marker_cb(self, setbool):
@@ -59,103 +60,107 @@ class PyBulletPlugin(Plugin):
         :return: Service response, reporting back any runtime errors that occurred.
         :rtype UpdateWorldResponse
         """
-        try:
-            if req.operation is UpdateWorldRequest.ADD:
-                if req.rigidly_attached:
-                    self.world.get_robot().attach_object(from_msg(req.body), req.pose.header.frame_id,
-                                                         from_pose_msg(req.pose.pose))
+        with self.lock:
+            try:
+                if req.operation is UpdateWorldRequest.ADD:
+                    if req.rigidly_attached:
+                        # TODO: check whether we already know the object
+                        self.world.get_robot().attach_object(from_msg(req.body), req.pose.header.frame_id,
+                                                             from_pose_msg(req.pose.pose))
+                    else:
+                        self.world.spawn_object_from_urdf(req.body.name, to_urdf_string(from_msg(req.body)),
+                                                          from_pose_msg(transform_pose(self.global_reference_frame_name,
+                                                                                       req.pose).pose))
+                elif req.operation is UpdateWorldRequest.REMOVE:
+                    # TODO: discriminate between attached and non-attached objects
+                    self.world.delete_object(req.body.name)
+                elif req.operation is UpdateWorldRequest.ALTER:
+                    # TODO: implement me
+                    pass
+                elif req.operation is UpdateWorldRequest.REMOVE_ALL:
+                    self.world.delete_all_objects()
+                    self.world.get_robot().detach_all_objects()
                 else:
-                    self.world.spawn_object_from_urdf(req.body.name, to_urdf_string(from_msg(req.body)),
-                                                      from_pose_msg(transform_pose(self.global_reference_frame_name,
-                                                                                   req.pose).pose))
-            elif req.operation is UpdateWorldRequest.REMOVE:
-                # TODO: discriminate between attached and non-attached objects
-                self.world.delete_object(req.body.name)
-            elif req.operation is UpdateWorldRequest.ALTER:
-                # TODO: implement me
-                pass
-            elif req.operation is UpdateWorldRequest.REMOVE_ALL:
-                self.world.delete_all_objects()
-                self.world.get_robot().detach_all_objects()
-            else:
-                return UpdateWorldResponse(UpdateWorldResponse.INVALID_OPERATION,
-                                           "Received invalid operation code: {}".format(req.operation))
-            return UpdateWorldResponse()
-        except CorruptShapeException as e:
-            return UpdateWorldResponse(UpdateWorldResponse.CORRUPT_SHAPE_ERROR, e.message)
-        except UnknownBodyException as e:
-            return UpdateWorldResponse(UpdateWorldResponse.MISSING_BODY_ERROR, e.message)
-        except DuplicateObjectNameException as e:
-            return UpdateWorldResponse(UpdateWorldResponse.DUPLICATE_BODY_ERROR, e.message)
+                    return UpdateWorldResponse(UpdateWorldResponse.INVALID_OPERATION,
+                                               "Received invalid operation code: {}".format(req.operation))
+                return UpdateWorldResponse()
+            except CorruptShapeException as e:
+                return UpdateWorldResponse(UpdateWorldResponse.CORRUPT_SHAPE_ERROR, e.message)
+            except UnknownBodyException as e:
+                return UpdateWorldResponse(UpdateWorldResponse.MISSING_BODY_ERROR, e.message)
+            except DuplicateObjectNameException as e:
+                return UpdateWorldResponse(UpdateWorldResponse.DUPLICATE_BODY_ERROR, e.message)
 
     def get_readings(self):
-        default_distance = 0.05
-        collision_goals = self.god_map.get_data([self.collision_goal_identifier])
-        if collision_goals is None:
-            collision_goals = []
-        allowed_collisions = set()
-        distances = defaultdict(lambda: default_distance)
-        for collision_entry in collision_goals:  # type: CollisionEntry
-            if collision_entry.body_b == '' and \
-                    collision_entry.type not in [CollisionEntry.ALLOW_ALL_COLLISIONS,
-                                                 CollisionEntry.AVOID_ALL_COLLISIONS]:
-                raise Exception('body_b not set')
+        with self.lock:
+            default_distance = 0.05
+            collision_goals = self.god_map.get_data([self.collision_goal_identifier])
+            if collision_goals is None:
+                collision_goals = []
+            allowed_collisions = set()
+            distances = defaultdict(lambda: default_distance)
+            for collision_entry in collision_goals:  # type: CollisionEntry
+                if collision_entry.body_b == '' and \
+                        collision_entry.type not in [CollisionEntry.ALLOW_ALL_COLLISIONS,
+                                                     CollisionEntry.AVOID_ALL_COLLISIONS]:
+                    raise Exception('body_b not set')
 
-            if collision_entry.body_b == '' and collision_entry.link_b != '':
-                raise Exception('body_b is empty but link_b is not')
+                if collision_entry.body_b == '' and collision_entry.link_b != '':
+                    raise Exception('body_b is empty but link_b is not')
 
-            if collision_entry.robot_link == '':
-                links_a = self.world.get_robot().get_link_names()
-            else:
-                links_a = [collision_entry.robot_link]
-
-            if collision_entry.body_b == '':
-                bodies_b = self.world.get_object_list()
-            else:
-                bodies_b = [collision_entry.body_b]
-            for body_b in bodies_b:
-                if collision_entry.link_b == '':
-                    links_b = self.world.get_object(body_b).get_link_names()
+                if collision_entry.robot_link == '':
+                    links_a = self.world.get_robot().get_link_names()
                 else:
-                    links_b = [collision_entry.link_b]
+                    links_a = [collision_entry.robot_link]
 
-                for link_a, link_b in product(links_a, links_b):
-                    key = (link_a, body_b, link_b)
-                    if collision_entry.type == CollisionEntry.ALLOW_COLLISION or \
-                            collision_entry.type == CollisionEntry.ALLOW_ALL_COLLISIONS:
-                        allowed_collisions.add(key)
-                    if collision_entry.type == CollisionEntry.AVOID_COLLISION or \
-                            collision_entry.type == CollisionEntry.AVOID_ALL_COLLISIONS:
-                        distances[key] = collision_entry.min_dist
+                if collision_entry.body_b == '':
+                    bodies_b = self.world.get_object_list()
+                else:
+                    bodies_b = [collision_entry.body_b]
+                for body_b in bodies_b:
+                    if collision_entry.link_b == '':
+                        links_b = self.world.get_object(body_b).get_link_names()
+                    else:
+                        links_b = [collision_entry.link_b]
 
-        collisions = self.world.check_collisions(distances, allowed_collisions)
-        if self.marker:
-            self.make_collision_markers(collisions)
+                    for link_a, link_b in product(links_a, links_b):
+                        key = (link_a, body_b, link_b)
+                        if collision_entry.type == CollisionEntry.ALLOW_COLLISION or \
+                                collision_entry.type == CollisionEntry.ALLOW_ALL_COLLISIONS:
+                            allowed_collisions.add(key)
+                        if collision_entry.type == CollisionEntry.AVOID_COLLISION or \
+                                collision_entry.type == CollisionEntry.AVOID_ALL_COLLISIONS:
+                            distances[key] = collision_entry.min_dist
 
-        closest_point = defaultdict(lambda: ClosestPointInfo((0, 0, 0), (10, 10, 10), 1e9, default_distance))
-        for key, collision_info in collisions.items():  # type: ((str, str), ContactInfo)
-            link1 = key[0]
-            cpi = ClosestPointInfo(collision_info.position_on_a, collision_info.position_on_b,
-                                   collision_info.contact_distance, distances[key])
-            if link1 in closest_point:
-                closest_point[link1] = min(closest_point[link1], cpi, key=lambda x: x.contact_distance)
-            else:
-                closest_point[link1] = cpi
+            collisions = self.world.check_collisions(distances, allowed_collisions)
+            if self.marker:
+                self.make_collision_markers(collisions)
 
-        return {self.collision_identifier: None,
-                self.closest_point_identifier: closest_point}
+            closest_point = defaultdict(lambda: ClosestPointInfo((0, 0, 0), (10, 10, 10), 1e9, default_distance))
+            for key, collision_info in collisions.items():  # type: ((str, str), ContactInfo)
+                link1 = key[0]
+                cpi = ClosestPointInfo(collision_info.position_on_a, collision_info.position_on_b,
+                                       collision_info.contact_distance, distances[key])
+                if link1 in closest_point:
+                    closest_point[link1] = min(closest_point[link1], cpi, key=lambda x: x.contact_distance)
+                else:
+                    closest_point[link1] = cpi
+
+            return {self.collision_identifier: None,
+                    self.closest_point_identifier: closest_point}
 
     def update(self):
-        js = self.god_map.get_data([self.js_identifier])
-        self.world.set_joint_state(js)
-        p = lookup_transform('map', self.robot_root)
-        self.world.get_robot().set_base_pose(position=[p.pose.position.x,
-                                                       p.pose.position.y,
-                                                       p.pose.position.z],
-                                             orientation=[p.pose.orientation.x,
-                                                          p.pose.orientation.y,
-                                                          p.pose.orientation.z,
-                                                          p.pose.orientation.w])
+        with self.lock:
+            js = self.god_map.get_data([self.js_identifier])
+            self.world.set_joint_state(js)
+            p = lookup_transform('map', self.robot_root)
+            self.world.get_robot().set_base_pose(position=[p.pose.position.x,
+                                                           p.pose.position.y,
+                                                           p.pose.position.z],
+                                                 orientation=[p.pose.orientation.x,
+                                                              p.pose.orientation.y,
+                                                              p.pose.orientation.z,
+                                                              p.pose.orientation.w])
 
     def start_once(self):
         self.collision_pub = rospy.Publisher('visualization_marker', Marker, queue_size=1)

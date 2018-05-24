@@ -8,7 +8,6 @@ from itertools import combinations
 from pybullet import JOINT_REVOLUTE, JOINT_PRISMATIC, JOINT_PLANAR, JOINT_SPHERICAL
 from time import time
 
-from copy import deepcopy
 from numpy.random.mtrand import seed
 
 from giskardpy.exceptions import UnknownBodyException, DuplicateObjectNameException, DuplicateRobotNameException
@@ -108,9 +107,7 @@ class PyBulletRobot(object):
         self.id = load_urdf_string_into_bullet(self.original_urdf, base_pose)
         self.init_js_info()
         self.attached_objects = {}
-        self.sometimes = set()
-        self.generate_self_collision_matrix()
-        self.original_collision_matrix = deepcopy(self.sometimes) # TODO: translate from IDs to names
+        self.sometimes = self.calc_self_collision_matrix(set(combinations(self.joint_id_to_info.keys(), 2)))
 
     def set_joint_state(self, multi_joint_state):
         for joint_name, singe_joint_state in multi_joint_state.items():
@@ -182,18 +179,21 @@ class PyBulletRobot(object):
                 mjs.set(sjs)
         return mjs
 
-    def generate_self_collision_matrix(self, d=0.05, num_rnd_tries=200):
+    def calc_self_collision_matrix(self, combis, d=0.05, num_rnd_tries=200):
         # TODO computational expansive because of too many collision checks
         seed(1337)
         always = set()
-        self.all = set(combinations(self.joint_id_to_info.keys(), 2))
-        for link_a, link_b in self.all:
+
+        # find meaningless self-collisions
+        for link_a, link_b in combis:
             if self.joint_id_to_info[link_a].parent_index == link_b or \
                     self.joint_id_to_info[link_b].parent_index == link_a:
                 always.add((link_a, link_b))
-        rest = self.all.difference(always)
+        rest = combis.difference(always)
         always = always.union(self._check_all_collisions(rest, d, self.get_zero_joint_state()))
         rest = rest.difference(always)
+
+        # find meaningful self-collisions
         sometimes = self._check_all_collisions(rest, d, self.get_min_joint_state())
         rest = rest.difference(sometimes)
         sometimes2 = self._check_all_collisions(rest, d, self.get_max_joint_state())
@@ -204,8 +204,8 @@ class PyBulletRobot(object):
             if len(sometimes2) > 0:
                 rest = rest.difference(sometimes2)
                 sometimes = sometimes.union(sometimes2)
-        self.sometimes = sometimes
-        self.never = rest
+
+        return sometimes
 
     def _check_all_collisions(self, test_links, d, js):
         self.set_joint_state(js)
@@ -285,6 +285,11 @@ class PyBulletRobot(object):
         joint_state = self.get_joint_states()
         base_pose = self.get_base_pose()
 
+        # salvage last collision matrix, and save collisions as pairs of link names
+        collision_matrix = set()
+        for collision in self.sometimes:
+            collision_matrix.add((self.link_id_to_name[collision[0]], self.link_id_to_name[collision[1]]))
+
         # assemble and store URDF string of new link and fixed joint
         new_joint = FixedJoint('{}_joint'.format(object.name), transform, parent_link_name, '{}_link'.format(object.name))
         self.attached_objects[object.name] = '{}{}'.format(to_urdf_string(new_joint), to_urdf_string(object, True))
@@ -297,18 +302,23 @@ class PyBulletRobot(object):
         # remove last robot and load new robot from new URDF
         p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 0)
         p.removeBody(self.id)
-        self.id = load_urdf_string_into_bullet(new_urdf_string, base_pose)
+        self.id = (new_urdf_string, base_pose)
         p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 1)
 
         # reload joint info and last joint state
         self.init_js_info()
         self.set_joint_state(joint_state)
 
-        # reload original collision matrix
-        # TODO: implement me
+        # reload last collision matrix as pairs of link IDs
+        self.sometimes = set()
+        for collision in collision_matrix:
+            self.sometimes.add((self.link_name_to_id[collision[0]], self.link_name_to_id[collision[1]]))
 
-        # for each attached object, extend collision matrix
-        # TODO: implement me
+        # update the collision matrix for the newly attached object
+        object_id = self.link_name_to_id['{}_link'.format(object.name)]
+        link_pairs = {(object_id, link_id) for link_id in self.joint_id_to_info.keys()}
+        new_collisions = self.calc_self_collision_matrix(link_pairs)
+        self.sometimes.union(new_collisions)
 
     def detach_object(self, object_name):
         pass
@@ -323,6 +333,15 @@ class PyBulletRobot(object):
             base_pose = self.get_base_pose()
             joint_state = self.get_joint_states()
 
+            # salvage last collision matrix, and save collisions as pairs of link names
+            collision_matrix = set()
+            for collision in self.sometimes:
+                collision_matrix.add((self.link_id_to_name[collision[0]], self.link_id_to_name[collision[1]]))
+
+            # remove all collision entries related to attached objects
+            for object_name in self.attached_objects.keys():
+                collision_matrix = filter((lambda(collision): object_name not in collision), collision_matrix)
+
             # remove last robot and reload with original URDF
             p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 0)
             p.removeBody(self.id)
@@ -333,7 +352,10 @@ class PyBulletRobot(object):
             self.init_js_info()
             self.set_joint_state(joint_state)
 
-            # TODO: salve original collision matrix
+            # reload original collision matrix
+            self.sometimes = set()
+            for collision in collision_matrix:
+                self.sometimes.add((self.link_name_to_id[collision[0]], self.link_name_to_id[collision[1]]))
 
             # forget about previously attached objects
             self.attached_objects = {}

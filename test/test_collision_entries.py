@@ -140,9 +140,10 @@ class TestCollisionAvoidance(unittest.TestCase):
         self.giskard.set_collision_entries([collision_entry])
 
         result = self.giskard.plan_and_execute()
-        self.assertEqual(result.error_code, MoveResult.START_STATE_COLLISION)
+        # self.assertEqual(result.error_code, MoveResult.START_STATE_COLLISION)
+        self.assertEqual(result.error_code, MoveResult.SUCCESS)
 
-    def test_path_collision1(self):
+    def test_end_state_collision(self):
         self.add_box()
         p = PoseStamped()
         p.header.frame_id = 'r_gripper_tool_frame'
@@ -152,11 +153,11 @@ class TestCollisionAvoidance(unittest.TestCase):
 
         collision_entry = CollisionEntry()
         collision_entry.type = CollisionEntry.AVOID_ALL_COLLISIONS
-        collision_entry.min_dist = 0.5
+        collision_entry.min_dist = 5
         self.giskard.set_collision_entries([collision_entry])
 
         result = self.giskard.plan_and_execute()
-        self.assertEqual(result.error_code, MoveResult.SUCCESS)
+        self.assertEqual(result.error_code, MoveResult.END_STATE_COLLISION)
 
 
 

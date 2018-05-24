@@ -8,11 +8,10 @@ from itertools import combinations
 from pybullet import JOINT_REVOLUTE, JOINT_PRISMATIC, JOINT_PLANAR, JOINT_SPHERICAL
 from time import time
 
-from copy import deepcopy
 from numpy.random.mtrand import seed
 
 from giskardpy.exceptions import UnknownBodyException, DuplicateObjectNameException, DuplicateRobotNameException
-from giskardpy.trajectory import MultiJointState, SingleJointState, Transform, Point
+from giskardpy.trajectory import MultiJointState, SingleJointState, Transform, Point, Quaternion
 import numpy as np
 
 from giskardpy.utils import keydefaultdict
@@ -106,10 +105,9 @@ class PyBulletRobot(object):
         self.name = name
         self.original_urdf = resolve_ros_iris(urdf)
         self.id = load_urdf_string_into_bullet(self.original_urdf, base_pose)
-        self.sometimes = set()
         self.init_js_info()
         self.attached_objects = {}
-        self.original_collision_matrix = deepcopy(self.sometimes) # TODO: translate from IDs to names
+        self.sometimes = self.calc_self_collision_matrix(set(combinations(self.joint_id_to_info.keys(), 2)))
 
     def set_joint_state(self, multi_joint_state):
         for joint_name, singe_joint_state in multi_joint_state.items():
@@ -124,6 +122,15 @@ class PyBulletRobot(object):
         :type orientation: list
         """
         p.resetBasePositionAndOrientation(self.id, position, orientation)
+
+    def get_base_pose(self):
+        """
+        Retrieves the current base pose of the robot in the PyBullet world.
+        :return: Base pose of the robot in the world.
+        :rtype: Transform
+        """
+        [position, orientation] = p.getBasePositionAndOrientation(self.id)
+        return Transform(Point(*position), Quaternion(*orientation))
 
     def init_js_info(self):
         self.joint_id_map = {}
@@ -143,7 +150,6 @@ class PyBulletRobot(object):
             self.joint_id_map[joint_info.joint_name] = joint_index
             self.link_name_to_id[joint_info.link_name] = joint_index
             self.link_id_to_name[joint_index] = joint_info.link_name
-        self.generate_self_collision_matrix()
 
     def check_self_collision(self, d=0.5, whitelist=None):
         if whitelist is None:
@@ -173,18 +179,21 @@ class PyBulletRobot(object):
                 mjs.set(sjs)
         return mjs
 
-    def generate_self_collision_matrix(self, d=0.05, num_rnd_tries=200):
+    def calc_self_collision_matrix(self, combis, d=0.05, num_rnd_tries=200):
         # TODO computational expansive because of too many collision checks
         seed(1337)
         always = set()
-        self.all = set(combinations(self.joint_id_to_info.keys(), 2))
-        for link_a, link_b in self.all:
+
+        # find meaningless self-collisions
+        for link_a, link_b in combis:
             if self.joint_id_to_info[link_a].parent_index == link_b or \
                     self.joint_id_to_info[link_b].parent_index == link_a:
                 always.add((link_a, link_b))
-        rest = self.all.difference(always)
+        rest = combis.difference(always)
         always = always.union(self._check_all_collisions(rest, d, self.get_zero_joint_state()))
         rest = rest.difference(always)
+
+        # find meaningful self-collisions
         sometimes = self._check_all_collisions(rest, d, self.get_min_joint_state())
         rest = rest.difference(sometimes)
         sometimes2 = self._check_all_collisions(rest, d, self.get_max_joint_state())
@@ -195,8 +204,8 @@ class PyBulletRobot(object):
             if len(sometimes2) > 0:
                 rest = rest.difference(sometimes2)
                 sometimes = sometimes.union(sometimes2)
-        self.sometimes = sometimes
-        self.never = rest
+
+        return sometimes
 
     def _check_all_collisions(self, test_links, d, js):
         self.set_joint_state(js)
@@ -272,8 +281,14 @@ class PyBulletRobot(object):
             # TODO: choose better exception type
             raise RuntimeError("An object '{}' has already been attached to the robot.".format(object.name))
 
-        # remember last joint state and base pose
-        # TODO: implement me
+        # salvage last joint state and base pose
+        joint_state = self.get_joint_states()
+        base_pose = self.get_base_pose()
+
+        # salvage last collision matrix, and save collisions as pairs of link names
+        collision_matrix = set()
+        for collision in self.sometimes:
+            collision_matrix.add((self.link_id_to_name[collision[0]], self.link_id_to_name[collision[1]]))
 
         # assemble and store URDF string of new link and fixed joint
         new_joint = FixedJoint('{}_joint'.format(object.name), transform, parent_link_name, '{}_link'.format(object.name))
@@ -287,47 +302,103 @@ class PyBulletRobot(object):
         # remove last robot and load new robot from new URDF
         p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 0)
         p.removeBody(self.id)
-        # TODO: salvage last base pose
-        self.id = load_urdf_string_into_bullet(new_urdf_string, Transform())
+        self.id = load_urdf_string_into_bullet(new_urdf_string, base_pose)
         p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 1)
 
-        # reload joint info
-        # TODO: implement me
+        # reload joint info and last joint state
+        self.init_js_info()
+        self.set_joint_state(joint_state)
 
-        # salvage last joint state
-        # TODO: implement me
+        # reload last collision matrix as pairs of link IDs
+        self.sometimes = set()
+        for collision in collision_matrix:
+            self.sometimes.add((self.link_name_to_id[collision[0]], self.link_name_to_id[collision[1]]))
 
-        # salvage original collision matrix
-        # TODO: implement me
-
-        # for each attached object, extend collision matrix
-        # TODO: implement me
+        # update the collision matrix for the newly attached object
+        object_id = self.link_name_to_id['{}_link'.format(object.name)]
+        link_pairs = {(object_id, link_id) for link_id in self.joint_id_to_info.keys()}
+        new_collisions = self.calc_self_collision_matrix(link_pairs)
+        self.sometimes.union(new_collisions)
 
     def detach_object(self, object_name):
-        pass
+        """
+        Detaches an attached object from the robot.
+        :param object_name: Name of the object that shall be detached from the robot.
+        :type object_name: str
+        :return: Nothing.
+        """
+        if not self.has_attached_object(object_name):
+            # TODO: choose better exception type
+            raise RuntimeError("No object '{}' has been attached to the robot.".format(object.name))
+
+        # salvage last joint state and base pose
+        base_pose = self.get_base_pose()
+        joint_state = self.get_joint_states()
+
+        # salvage last collision matrix, and save collisions as pairs of link names
+        collision_matrix = set()
+        for collision in self.sometimes:
+            collision_matrix.add((self.link_id_to_name[collision[0]], self.link_id_to_name[collision[1]]))
+
+        # remove all collision entries related to the object that shall be detached
+        collision_matrix = filter((lambda (collision): object_name not in collision), collision_matrix)
+
+        # forget about the object that shall be detached
+        del(self.attached_objects[object_name])
+
+        # for each attached object, insert the corresponding URDF sub-string into the original URDF string
+        new_urdf_string = self.original_urdf
+        for sub_string in self.attached_objects.values():
+            new_urdf_string = new_urdf_string.replace('</robot>', '{}</robot>'.format(sub_string))
+
+        # remove last robot and load new robot from new URDF
+        p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 0)
+        p.removeBody(self.id)
+        self.id = (new_urdf_string, base_pose)
+        p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 1)
+
+        # reload joint info and last joint state
+        self.init_js_info()
+        self.set_joint_state(joint_state)
+
+        # reload last collision matrix as pairs of link IDs
+        self.sometimes = set()
+        for collision in collision_matrix:
+            self.sometimes.add((self.link_name_to_id[collision[0]], self.link_name_to_id[collision[1]]))
 
     def detach_all_objects(self):
         """
-
+        Detaches all object that have been attached to the robot.
         :return: Nothing.
         """
         if self.attached_objects:
-            # TODO: remember last joint state and base pose
+            # salvage last joint state and base pose
+            base_pose = self.get_base_pose()
+            joint_state = self.get_joint_states()
+
+            # salvage last collision matrix, and save collisions as pairs of link names
+            collision_matrix = set()
+            for collision in self.sometimes:
+                collision_matrix.add((self.link_id_to_name[collision[0]], self.link_id_to_name[collision[1]]))
+
+            # remove all collision entries related to attached objects
+            for object_name in self.attached_objects.keys():
+                collision_matrix = filter((lambda(collision): object_name not in collision), collision_matrix)
 
             # remove last robot and reload with original URDF
             p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 0)
             p.removeBody(self.id)
-
-            # TODO: salvage last base pose
-            self.id = load_urdf_string_into_bullet(self.original_urdf, Transform())
+            self.id = load_urdf_string_into_bullet(self.original_urdf, base_pose)
             p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 1)
 
+            # reload joint info and last joint state
+            self.init_js_info()
+            self.set_joint_state(joint_state)
 
-            # TODO: reload joint info
-
-            # TODO: salve last joint state
-
-            # TODO: salve original collision matrix
+            # reload original collision matrix
+            self.sometimes = set()
+            for collision in collision_matrix:
+                self.sometimes.add((self.link_name_to_id[collision[0]], self.link_name_to_id[collision[1]]))
 
             # forget about previously attached objects
             self.attached_objects = {}

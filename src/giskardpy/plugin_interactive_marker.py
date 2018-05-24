@@ -308,7 +308,7 @@ class InteractiveMarkerPlugin(Plugin):
             goal = MoveGoal()
             goal.type = MoveGoal.PLAN_AND_EXECUTE
             move_cmd = MoveCmd()
-            move_cmd.max_trajectory_length = 20
+            # move_cmd.max_trajectory_length = 20
             for g in self.all_goals.values():
                 move_cmd.controllers.extend(g)
             goal.cmd_seq.append(move_cmd)

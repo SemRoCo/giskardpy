@@ -49,7 +49,7 @@ class GiskardWrapper(object):
 
     def add_cmd(self, max_trajectory_length=20):
         move_cmd = MoveCmd()
-        move_cmd.max_trajectory_length = max_trajectory_length
+        # move_cmd.max_trajectory_length = max_trajectory_length
         self.cmd_seq.append(move_cmd)
 
     def clear_cmds(self):
@@ -67,9 +67,9 @@ class GiskardWrapper(object):
         self.clear_cmds()
         if wait:
             self.client.send_goal_and_wait(goal)
+            return self.client.get_result()
         else:
             self.client.send_goal(goal)
-        return self.client.get_result()
 
     def interrupt(self):
         self.client.cancel_goal()

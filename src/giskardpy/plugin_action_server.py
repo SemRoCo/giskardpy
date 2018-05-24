@@ -63,7 +63,7 @@ class ActionServerPlugin(Plugin):
             cmd = self.get_readings_lock.get_nowait()  # type: MoveCmd
             rospy.loginfo('got goal')
             goals = {}
-            goals['max_trajectory_length'] = cmd.max_trajectory_length
+            # goals['max_trajectory_length'] = cmd.max_trajectory_length
             # TODO support multiple move cmds
             for controller in cmd.controllers:
                 # TODO support collisions

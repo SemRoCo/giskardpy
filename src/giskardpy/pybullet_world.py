@@ -12,7 +12,7 @@ from copy import deepcopy
 from numpy.random.mtrand import seed
 
 from giskardpy.exceptions import UnknownBodyException, DuplicateObjectNameException, DuplicateRobotNameException
-from giskardpy.trajectory import MultiJointState, SingleJointState, Transform, Point
+from giskardpy.trajectory import MultiJointState, SingleJointState, Transform, Point, Quaternion
 import numpy as np
 
 from giskardpy.utils import keydefaultdict
@@ -106,9 +106,10 @@ class PyBulletRobot(object):
         self.name = name
         self.original_urdf = resolve_ros_iris(urdf)
         self.id = load_urdf_string_into_bullet(self.original_urdf, base_pose)
-        self.sometimes = set()
         self.init_js_info()
         self.attached_objects = {}
+        self.sometimes = set()
+        self.generate_self_collision_matrix()
         self.original_collision_matrix = deepcopy(self.sometimes) # TODO: translate from IDs to names
 
     def set_joint_state(self, multi_joint_state):
@@ -124,6 +125,15 @@ class PyBulletRobot(object):
         :type orientation: list
         """
         p.resetBasePositionAndOrientation(self.id, position, orientation)
+
+    def get_base_pose(self):
+        """
+        Retrieves the current base pose of the robot in the PyBullet world.
+        :return: Base pose of the robot in the world.
+        :rtype: Transform
+        """
+        [position, orientation] = p.getBasePositionAndOrientation(self.id)
+        return Transform(Point(*position), Quaternion(*orientation))
 
     def init_js_info(self):
         self.joint_id_map = {}
@@ -143,7 +153,6 @@ class PyBulletRobot(object):
             self.joint_id_map[joint_info.joint_name] = joint_index
             self.link_name_to_id[joint_info.link_name] = joint_index
             self.link_id_to_name[joint_index] = joint_info.link_name
-        self.generate_self_collision_matrix()
 
     def check_self_collision(self, d=0.5, whitelist=None):
         if whitelist is None:
@@ -272,8 +281,9 @@ class PyBulletRobot(object):
             # TODO: choose better exception type
             raise RuntimeError("An object '{}' has already been attached to the robot.".format(object.name))
 
-        # remember last joint state and base pose
-        # TODO: implement me
+        # salvage last joint state and base pose
+        joint_state = self.get_joint_states()
+        base_pose = self.get_base_pose()
 
         # assemble and store URDF string of new link and fixed joint
         new_joint = FixedJoint('{}_joint'.format(object.name), transform, parent_link_name, '{}_link'.format(object.name))
@@ -287,17 +297,14 @@ class PyBulletRobot(object):
         # remove last robot and load new robot from new URDF
         p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 0)
         p.removeBody(self.id)
-        # TODO: salvage last base pose
-        self.id = load_urdf_string_into_bullet(new_urdf_string, Transform())
+        self.id = load_urdf_string_into_bullet(new_urdf_string, base_pose)
         p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 1)
 
-        # reload joint info
-        # TODO: implement me
+        # reload joint info and last joint state
+        self.init_js_info()
+        self.set_joint_state(joint_state)
 
-        # salvage last joint state
-        # TODO: implement me
-
-        # salvage original collision matrix
+        # reload original collision matrix
         # TODO: implement me
 
         # for each attached object, extend collision matrix
@@ -312,20 +319,19 @@ class PyBulletRobot(object):
         :return: Nothing.
         """
         if self.attached_objects:
-            # TODO: remember last joint state and base pose
+            # salvage last joint state and base pose
+            base_pose = self.get_base_pose()
+            joint_state = self.get_joint_states()
 
             # remove last robot and reload with original URDF
             p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 0)
             p.removeBody(self.id)
-
-            # TODO: salvage last base pose
-            self.id = load_urdf_string_into_bullet(self.original_urdf, Transform())
+            self.id = load_urdf_string_into_bullet(self.original_urdf, base_pose)
             p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 1)
 
-
-            # TODO: reload joint info
-
-            # TODO: salve last joint state
+            # reload joint info and last joint state
+            self.init_js_info()
+            self.set_joint_state(joint_state)
 
             # TODO: salve original collision matrix
 

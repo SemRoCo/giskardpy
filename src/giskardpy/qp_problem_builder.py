@@ -11,7 +11,7 @@ import giskardpy.symengine_wrappers as spw
 from giskardpy.qp_solver import QPSolver
 import hashlib
 
-from giskardpy.symengine_wrappers import load_compiled_function
+from giskardpy.symengine_wrappers import load_compiled_function, safe_compiled_function
 
 SoftConstraint = namedtuple('SoftConstraint', ['lower', 'upper', 'weight', 'expression'])
 HardConstraint = namedtuple('HardConstraint', ['lower', 'upper', 'expression'])
@@ -22,10 +22,11 @@ BIG_NUMBER = 1e9
 
 class QProblemBuilder(object):
     def __init__(self, joint_constraints_dict, hard_constraints_dict, soft_constraints_dict, controlled_joint_symbols,
-                 free_symbols=None):
+                 free_symbols=None, path_to_functions=''):
         assert (not len(controlled_joint_symbols) > len(joint_constraints_dict))
         assert (not len(controlled_joint_symbols) < len(joint_constraints_dict))
         assert (len(hard_constraints_dict) <= len(controlled_joint_symbols))
+        self.path_to_functions = path_to_functions
         self.free_symbols = free_symbols
         self.joint_constraints_dict = joint_constraints_dict
         self.hard_constraints_dict = hard_constraints_dict
@@ -72,8 +73,8 @@ class QProblemBuilder(object):
         a = ''.join(str(x) for x in sorted(chain(self.soft_constraints_dict.keys(),
                                                  self.hard_constraints_dict.keys(),
                                                  self.joint_constraints_dict.keys())))
-        hash = hashlib.md5(a).hexdigest()
-        self.cython_big_ass_M = load_compiled_function(hash)
+        function_hash = hashlib.md5(a).hexdigest()
+        self.cython_big_ass_M = load_compiled_function(self.path_to_functions + function_hash)
         self.np_g = np.zeros(len(weights))
 
         if self.cython_big_ass_M is None:
@@ -112,7 +113,9 @@ class QProblemBuilder(object):
             t = time()
             if self.free_symbols is None:
                 self.free_symbols = self.big_ass_M.free_symbols
-            self.cython_big_ass_M = spw.speed_up(self.big_ass_M, self.free_symbols, backend=BACKEND, hash=hash)
+            self.cython_big_ass_M = spw.speed_up(self.big_ass_M, self.free_symbols, backend=BACKEND)
+            if function_hash is not None:
+                safe_compiled_function(self.cython_big_ass_M, self.path_to_functions + function_hash)
             print('autowrap took {}'.format(time() - t))
         print('new controller ready {}s'.format(time() - t_total))
 
@@ -137,8 +140,8 @@ class QProblemBuilder(object):
             ubA['hard--' + str(k)] = np_ubA[iH]
 
         for iS, (k, c) in enumerate(sorted(self.soft_constraints_dict.items(), key=lambda k: str(k[0]))):
-            lbA['soft--' + str(k)] = np_lbA[iH + iS+1]
-            ubA['soft--' + str(k)] = np_ubA[iH + iS+1]
+            lbA['soft--' + str(k)] = np_lbA[iH + iS + 1]
+            ubA['soft--' + str(k)] = np_ubA[iH + iS + 1]
         pass
 
     def get_cmd(self, substitutions):

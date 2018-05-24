@@ -12,9 +12,9 @@ from giskardpy.utils import keydefaultdict
 
 
 class CartesianBulletControllerPlugin(Plugin):
-    def __init__(self, root, js_identifier, fk_identifier, goal_identifier, next_cmd_identifier,
+    def __init__(self, root_link, js_identifier, fk_identifier, goal_identifier, next_cmd_identifier,
                  collision_identifier, closest_point_identifier, controlled_joints_identifier,
-                 collision_goal_identifier):
+                 collision_goal_identifier, path_to_functions):
         """
         :param roots:
         :type roots: list
@@ -32,7 +32,8 @@ class CartesianBulletControllerPlugin(Plugin):
         self._fk_identifier = fk_identifier
         self._collision_identifier = collision_identifier
         self._closest_point_identifier = closest_point_identifier
-        self.root = root
+        self.path_to_functions = path_to_functions
+        self.root = root_link
         self.soft_constraints = OrderedDict()
         self._joint_states_identifier = js_identifier
         self._goal_identifier = goal_identifier
@@ -66,7 +67,6 @@ class CartesianBulletControllerPlugin(Plugin):
             self.god_map.set_data([self._next_cmd_identifier], self.next_cmd)
             # updates = {self._next_cmd_identifier: self.next_cmd}
 
-
     def start_always(self):
         self.next_cmd = {}
 
@@ -75,7 +75,7 @@ class CartesianBulletControllerPlugin(Plugin):
 
     def start_once(self):
         urdf = rospy.get_param('robot_description')
-        self._controller = SymEngineController(urdf)
+        self._controller = SymEngineController(urdf, self.path_to_functions)
         robot = self._controller.robot
 
         current_joints = JointStatesInput.prefix_constructor(self.god_map.get_expr,
@@ -109,7 +109,7 @@ class CartesianBulletControllerPlugin(Plugin):
                 current_input = FrameInput.prefix_constructor(trans_prefix, rot_prefix, self.god_map.get_expr)
                 min_dist = self.god_map.get_expr([self._closest_point_identifier, link, 'min_dist'])
                 contact_normal = Vector3Input.prefix(self.god_map.get_expr,
-                                                    [self._closest_point_identifier, link, 'contact_normal'])
+                                                     [self._closest_point_identifier, link, 'contact_normal'])
 
                 self.soft_constraints.update(link_to_link_avoidance(link,
                                                                     robot.get_fk_expression(self.root, link),
@@ -124,7 +124,7 @@ class CartesianBulletControllerPlugin(Plugin):
             key = '{}/{},{}'.format(Controller.TRANSLATION_3D, root, tip)
             hold_joints.difference_update(robot.get_chain_joints(root, tip))
             if key not in self.known_constraints:
-                print('added chain root: {} tip: {} type: TRANSLATION_3D'.format(root, tip))
+                print('added chain {} -> {} type: TRANSLATION_3D'.format(root, tip))
                 self.known_constraints.add(key)
                 self.soft_constraints.update(self.controller_msg_to_constraint(root, tip, Controller.TRANSLATION_3D))
                 rebuild_controller = True
@@ -135,7 +135,7 @@ class CartesianBulletControllerPlugin(Plugin):
             key = '{}/{},{}'.format(Controller.ROTATION_3D, root, tip)
             hold_joints.difference_update(robot.get_chain_joints(root, tip))
             if key not in self.known_constraints:
-                print('added chain root: {} tip: {} type: ROTATION_3D'.format(root, tip))
+                print('added chain {} -> {} type: ROTATION_3D'.format(root, tip))
                 self.known_constraints.add(key)
                 self.soft_constraints.update(self.controller_msg_to_constraint(root, tip, Controller.ROTATION_3D))
                 rebuild_controller = True
@@ -208,7 +208,7 @@ class CartesianBulletControllerPlugin(Plugin):
         cp = self.__class__(self.root, self._joint_states_identifier, self._fk_identifier,
                             self._goal_identifier, self._next_cmd_identifier, self._collision_identifier,
                             self._closest_point_identifier, self.controlled_joints_identifier,
-                            self.collision_goal_identifier)
+                            self.collision_goal_identifier, self.path_to_functions)
         # TODO not cool that you always have to copy the controller here
         cp._controller = self._controller
         cp.soft_constraints = self.soft_constraints

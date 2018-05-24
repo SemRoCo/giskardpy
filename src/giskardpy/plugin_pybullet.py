@@ -26,12 +26,12 @@ from giskardpy.utils import keydefaultdict
 
 class PyBulletPlugin(Plugin):
     def __init__(self, js_identifier, collision_identifier, closest_point_identifier, collision_goal_identifier,
-                 robot_root, gui=False, marker=False):
+                 root_link, gui=False, marker=False):
         self.collision_goal_identifier = collision_goal_identifier
         self.js_identifier = js_identifier
         self.collision_identifier = collision_identifier
         self.closest_point_identifier = closest_point_identifier
-        self.robot_root = robot_root
+        self.robot_root = root_link
         self.robot_name = 'pr2'
         self.global_reference_frame_name = 'map'
         self.marker = marker
@@ -44,7 +44,7 @@ class PyBulletPlugin(Plugin):
                             collision_identifier=self.collision_identifier,
                             closest_point_identifier=self.closest_point_identifier,
                             collision_goal_identifier=self.collision_goal_identifier,
-                            robot_root=self.robot_root,
+                            root_link=self.robot_root,
                             gui=self.gui)
         cp.world = self.world
         cp.srv = self.srv

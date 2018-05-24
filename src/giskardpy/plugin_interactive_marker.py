@@ -38,7 +38,7 @@ def qv_mult(q1, v1):
     return quaternion_multiply(quaternion_multiply(q, v), quaternion_conjugate(q))[:-1]
 
 class InteractiveMarkerPlugin(Plugin):
-    def __init__(self, roots, tips, suffix=''):
+    def __init__(self, root_tips, suffix=''):
         """
         :param roots:
         :type roots: list
@@ -47,11 +47,10 @@ class InteractiveMarkerPlugin(Plugin):
         :param suffix:
         :type suffix: str
         """
-        self.roots = roots
-        self.tips = tips
+        self.roots, self.tips = zip(*root_tips)
         self.suffix = suffix
-        self.started = False
         self.markers = {}
+        super(InteractiveMarkerPlugin, self).__init__()
 
     def start_once(self):
         # giskard goal client

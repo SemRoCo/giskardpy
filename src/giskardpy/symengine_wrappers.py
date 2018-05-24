@@ -1,17 +1,14 @@
 import itertools
+import os
 import pickle
-from operator import mul
-from os.path import isfile
 from warnings import warn
 
+import errno
 import symengine as sp
-from copy import deepcopy
 from symengine import Matrix, Symbol, eye, sympify, diag, zeros, lambdify, Abs, Max, Min, sin, cos, tan, acos, asin, \
     atan, atan2, nan, sqrt, log
 import numpy as np
 from symengine.lib.symengine_wrapper import Lambdify
-
-from giskardpy import BACKEND
 
 pathSeparator = '_'
 
@@ -28,14 +25,19 @@ def fake_Min(x, y):
     return ((x + y) - fake_Abs(x - y)) / 2
 
 
-def safe_compiled_function(f, hash):
-    if not isfile(hash):
-        with open(hash, 'w') as file:
-            pickle.dump(f, file)
+def safe_compiled_function(f, file_name):
+    if not os.path.exists(os.path.dirname(file_name)):
+        try:
+            os.makedirs(os.path.dirname(file_name))
+            with open(file_name, 'w') as file:
+                pickle.dump(f, file)
+        except OSError as exc:  # Guard against race condition
+            if exc.errno != errno.EEXIST:
+                raise
 
-def load_compiled_function(hash):
-    if isfile(hash):
-        with open(hash, 'r') as file:
+def load_compiled_function(file_name):
+    if os.path.isfile(file_name):
+        with open(file_name, 'r') as file:
             fast_f = pickle.load(file)
             return fast_f
 
@@ -53,7 +55,8 @@ class CompiledFunction(object):
         return np.nan_to_num(out).reshape(self.shape)
 
 # @profile
-def speed_up(function, parameters, backend='llvm', hash=None):
+def speed_up(function, parameters, backend='llvm'):
+    # TODO use save/load for all options
     str_params = [str(x) for x in parameters]
     if len(parameters) == 0:
         try:
@@ -66,7 +69,6 @@ def speed_up(function, parameters, backend='llvm', hash=None):
     else:
         if backend == 'llvm':
             try:
-                # cse = sp.cse(function)
                 fast_f = Lambdify(list(parameters), function, backend=backend, cse=True, real=True)
             except RuntimeError as e:
                 warn('WARNING RuntimeError: "{}" during lambdify with LLVM backend, fallback to numpy'.format(e),
@@ -81,28 +83,7 @@ def speed_up(function, parameters, backend='llvm', hash=None):
                 backend = None
 
         if backend in ['llvm', 'lambda']:
-            # def f(**kwargs):
-            #     filtered_args = [kwargs[k] for k in str_params]
-            #     out = np.empty(len(function))
-            #     fast_f.unsafe_real(np.array(filtered_args, dtype=np.double), out)
-            #     return np.nan_to_num(out).reshape(function.shape)
             f = CompiledFunction(str_params, fast_f, len(function), function.shape)
-            if hash is not None:
-                safe_compiled_function(f, hash)
-        elif backend == 'cse':
-            cse, reduced_f = sp.cse(function)
-
-            # @profile
-            def f(**kwargs):
-                filtered_kwargs = {str(k): kwargs[k] for k in str_params}
-                cse_evaled = [(x[0], x[1].subs(filtered_kwargs)) for x in cse]
-                stuff = []
-                for entry in reduced_f:
-                    entry_evaled = entry
-                    for t in reversed(cse_evaled):
-                        entry_evaled = entry_evaled.subs(t[0], t[1])
-                    stuff.append(entry_evaled.subs(filtered_kwargs))
-                return np.array(stuff, dtype=float).reshape(function.shape)
         elif backend is None:
             # @profile
             def f(**kwargs):

@@ -1,17 +1,13 @@
-from numpy import random
-
 from symengine import Symbol
-
 import symengine_wrappers as sw
 from collections import OrderedDict
-
-from giskardpy.input_system import JointStatesInput
 from giskardpy.qp_problem_builder import QProblemBuilder, SoftConstraint
 from giskardpy.symengine_robot import Robot
 
 
 class SymEngineController(object):
-    def __init__(self, urdf):
+    def __init__(self, urdf, path_to_functions):
+        self.path_to_functions = path_to_functions
         self._soft_constraints = OrderedDict()
         self.robot = Robot(urdf)
         self.controlled_joints = set()
@@ -42,7 +38,8 @@ class SymEngineController(object):
                                                   self.hard_constraints,
                                                   soft_constraints,
                                                   self.controlled_joint_symbols,
-                                                  free_symbols)
+                                                  free_symbols,
+                                                  self.path_to_functions)
 
     def get_controlled_joints(self):
         return list(self.robot.joint_states_input.joint_map.keys())

@@ -1,8 +1,9 @@
 #!/usr/bin/env python
+import os
+from rospkg import RosPack
 
 import rospy
 
-from giskardpy.plugin import PluginContainer
 from giskardpy.plugin_action_server import ActionServerPlugin
 from giskardpy.application import ROSApplication
 from giskardpy.plugin_instantaneous_controller import CartesianBulletControllerPlugin
@@ -15,14 +16,9 @@ from giskardpy.process_manager import ProcessManager
 
 if __name__ == '__main__':
     rospy.init_node('muh')
+    print(os.getcwd())
 
     # TODO do we need a solution where we have a different root for some links?
-    collision_root = 'base_link'
-
-    # roots = ['base_footprint']
-    # tips = ['gripper_tool_frame']
-    roots = ['base_link', 'base_link']
-    tips = ['r_gripper_tool_frame', 'l_gripper_tool_frame']
 
     fk_identifier = 'fk'
     cartesian_goal_identifier = 'goal'
@@ -56,12 +52,12 @@ if __name__ == '__main__':
                                       collision_identifier=collision_identifier,
                                       closest_point_identifier=closest_point_identifier,
                                       collision_goal_identifier=collision_goal_identifier,
-                                      robot_root='base_footprint',
-                                      gui=True,
-                                      marker=True))
+                                      root_link=rospy.get_param('~root_link', 'base_footprint'),
+                                      gui=rospy.get_param('~enable_gui', False),
+                                      marker=rospy.get_param('~enable_collision_marker', True)))
     pm.register_plugin('fk', FKPlugin(js_identifier=js_identifier, fk_identifier=fk_identifier))
     pm.register_plugin('cart bullet controller',
-                       CartesianBulletControllerPlugin(collision_root,
+                       CartesianBulletControllerPlugin(root_link=rospy.get_param('~root_link', 'base_footprint'),
                                                        fk_identifier=fk_identifier,
                                                        goal_identifier=cartesian_goal_identifier,
                                                        js_identifier=js_identifier,
@@ -69,8 +65,12 @@ if __name__ == '__main__':
                                                        collision_identifier=collision_identifier,
                                                        closest_point_identifier=closest_point_identifier,
                                                        controlled_joints_identifier=controlled_joints_identifier,
-                                                       collision_goal_identifier=collision_goal_identifier))
-    pm.register_plugin('interactive marker', InteractiveMarkerPlugin(roots, tips))
+                                                       collision_goal_identifier=collision_goal_identifier,
+                                                       path_to_functions=RosPack().get_path('giskardpy') + '/data/'))
+    pm.register_plugin('interactive marker',
+                       InteractiveMarkerPlugin(rospy.get_param('~interactive_marker_chains',
+                                                               [('base_link', 'r_gripper_tool_frame'),
+                                                                ('base_link', 'l_gripper_tool_frame')])))
 
     app = ROSApplication(pm)
     app.run()

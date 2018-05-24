@@ -56,7 +56,7 @@ class GiskardWrapper(object):
         self.cmd_seq = []
         self.add_cmd()
 
-    def plan_and_execute(self):
+    def plan_and_execute(self, wait=True):
         """
         :return:
         :rtype: giskard_msgs.msg._MoveResult.MoveResult
@@ -65,7 +65,17 @@ class GiskardWrapper(object):
         goal.cmd_seq = self.cmd_seq
         goal.type = MoveGoal.PLAN_AND_EXECUTE
         self.clear_cmds()
-        self.client.send_goal_and_wait(goal)
+        if wait:
+            self.client.send_goal_and_wait(goal)
+        else:
+            self.client.send_goal(goal)
+        return self.client.get_result()
+
+    def interrupt(self):
+        self.client.cancel_goal()
+
+    def get_result(self,  timeout=rospy.Duration()):
+        self.client.wait_for_result(timeout)
         return self.client.get_result()
 
     def clear_world(self):

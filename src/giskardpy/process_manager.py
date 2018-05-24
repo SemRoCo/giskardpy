@@ -41,14 +41,11 @@ class ProcessManager(object):
 
     def update(self):
         for plugin_name, plugin in self._plugins.items():
-            plugin.update()
-            if plugin.end_parallel_universe():
-                print('destroying parallel universe')
-                return False
             while True:
-                for identifier, value in plugin.get_readings().items():
-                    self._god_map.set_data(identifier, value)
-                # TODO give plugins the change to apply changes for the parallel universe only?
+                plugin.update()
+                if plugin.end_parallel_universe():
+                    print('destroying parallel universe')
+                    return False
                 if plugin.create_parallel_universe():
                     print('creating new parallel universe')
                     parallel_universe = ProcessManager(initial_state=self._god_map)

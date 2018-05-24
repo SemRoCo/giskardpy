@@ -143,7 +143,7 @@ class TestCollisionAvoidance(unittest.TestCase):
         # self.assertEqual(result.error_code, MoveResult.START_STATE_COLLISION)
         self.assertEqual(result.error_code, MoveResult.SUCCESS)
 
-    def test_end_state_collision(self):
+    def test_interrupt1(self):
         self.add_box()
         p = PoseStamped()
         p.header.frame_id = 'r_gripper_tool_frame'
@@ -153,11 +153,38 @@ class TestCollisionAvoidance(unittest.TestCase):
 
         collision_entry = CollisionEntry()
         collision_entry.type = CollisionEntry.AVOID_ALL_COLLISIONS
-        collision_entry.min_dist = 5
+        collision_entry.min_dist = 0.5
         self.giskard.set_collision_entries([collision_entry])
 
-        result = self.giskard.plan_and_execute()
-        self.assertEqual(result.error_code, MoveResult.END_STATE_COLLISION)
+        self.giskard.plan_and_execute(wait=False)
+        self.giskard.interrupt()
+        result = self.giskard.get_result()
+        self.assertEqual(result.error_code, MoveResult.INTERRUPTED)
+
+    def test_waypoints(self):
+        p = PoseStamped()
+        p.header.frame_id = 'r_gripper_tool_frame'
+        p.pose.position = Point(0.1,0,0)
+        p.pose.orientation = Quaternion(0,0,0,1)
+        self.giskard.set_cart_goal('r_gripper_tool_frame', p)
+
+        self.giskard.add_cmd()
+        p = PoseStamped()
+        p.header.frame_id = 'r_gripper_tool_frame'
+        p.pose.position = Point(0,0,0.1)
+        p.pose.orientation = Quaternion(0,0,0,1)
+        self.giskard.set_cart_goal('r_gripper_tool_frame', p)
+
+        self.giskard.add_cmd()
+        p = PoseStamped()
+        p.header.frame_id = 'r_gripper_tool_frame'
+        p.pose.position = Point(-0.1,0,-0.1)
+        p.pose.orientation = Quaternion(0,0,0,1)
+        self.giskard.set_cart_goal('r_gripper_tool_frame', p)
+
+        self.giskard.plan_and_execute()
+        result = self.giskard.get_result()
+        self.assertEqual(result.error_code, MoveResult.SUCCESS)
 
 
 

@@ -1,5 +1,4 @@
 class Plugin(object):
-    # TODO merge update and get_replacements?
     def __init__(self):
         self.started = False
 
@@ -44,12 +43,12 @@ class Plugin(object):
         """
         pass
 
-    def get_readings(self):
-        """
-        :return:
-        :rtype: dict
-        """
-        return {}
+    # def get_readings(self):
+    #     """
+    #     :return:
+    #     :rtype: dict
+    #     """
+    #     return {}
 
     def get_replacement(self):
         """

@@ -117,8 +117,19 @@ class PyBulletPlugin(Plugin):
             except DuplicateObjectNameException as e:
                 return UpdateWorldResponse(UpdateWorldResponse.DUPLICATE_BODY_ERROR, e.message)
 
-    def get_readings(self):
+    def update(self):
         with self.lock:
+            js = self.god_map.get_data([self.js_identifier])
+            self.world.set_joint_state(js)
+            p = lookup_transform('map', self.robot_root)
+            self.world.get_robot().set_base_pose(position=[p.pose.position.x,
+                                                           p.pose.position.y,
+                                                           p.pose.position.z],
+                                                 orientation=[p.pose.orientation.x,
+                                                              p.pose.orientation.y,
+                                                              p.pose.orientation.z,
+                                                              p.pose.orientation.w])
+
             default_distance = 0.05
             collision_goals = self.god_map.get_data([self.collision_goal_identifier])
             if collision_goals is None:
@@ -176,21 +187,10 @@ class PyBulletPlugin(Plugin):
                 else:
                     closest_point[link1] = cpi
 
-            return {self.collision_identifier: None,
-                    self.closest_point_identifier: closest_point}
-
-    def update(self):
-        with self.lock:
-            js = self.god_map.get_data([self.js_identifier])
-            self.world.set_joint_state(js)
-            p = lookup_transform('map', self.robot_root)
-            self.world.get_robot().set_base_pose(position=[p.pose.position.x,
-                                                           p.pose.position.y,
-                                                           p.pose.position.z],
-                                                 orientation=[p.pose.orientation.x,
-                                                              p.pose.orientation.y,
-                                                              p.pose.orientation.z,
-                                                              p.pose.orientation.w])
+            self.god_map.set_data([self.collision_identifier], None)
+            self.god_map.set_data([self.closest_point_identifier], closest_point)
+            # return {self.collision_identifier: None,
+            #         self.closest_point_identifier: closest_point}
 
     def stop(self):
         pass

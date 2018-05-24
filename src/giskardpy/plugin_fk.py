@@ -18,7 +18,7 @@ class FKPlugin(Plugin):
         super(FKPlugin, self).__init__()
 
     # @profile
-    def get_readings(self):
+    def update(self):
         exprs = self.god_map.get_expr_values()
 
         # @profile
@@ -33,10 +33,8 @@ class FKPlugin(Plugin):
             return p
 
         fks = keydefaultdict(on_demand_fk_evaluated)
-        return {self.fk_identifier: fks}
-
-    def update(self):
-        super(FKPlugin, self).update()
+        self.god_map.set_data([self.fk_identifier], fks)
+        # return {self.fk_identifier: fks}
 
     def start_once(self):
         urdf = rospy.get_param('robot_description')

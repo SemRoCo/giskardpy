@@ -67,18 +67,13 @@ class QProblemBuilder(object):
             ubA.append(c.upper)
             lb.append(-BIG_NUMBER)
             ub.append(BIG_NUMBER)
-            assert not isinstance(c.expression, spw.Matrix), 'Matrices are not allowed as soft contraint expression'
+            assert not isinstance(c.expression, spw.Matrix), 'Matrices are not allowed as soft constraint expression'
             soft_expressions.append(c.expression)
-        tasd = time()
         a = ''.join(str(x) for x in sorted(chain(self.soft_constraints_dict.keys(),
                                                  self.hard_constraints_dict.keys(),
                                                  self.joint_constraints_dict.keys())))
-        print(time() - tasd)
-        tasd = time()
         hash = hashlib.md5(a).hexdigest()
-        print(hash, time() - tasd)
         self.cython_big_ass_M = load_compiled_function(hash)
-        # self.cython_big_ass_M = None
         self.np_g = np.zeros(len(weights))
 
         if self.cython_big_ass_M is None:

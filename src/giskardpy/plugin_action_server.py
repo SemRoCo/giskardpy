@@ -54,7 +54,9 @@ class ActionServerPlugin(Plugin):
     def end_parallel_universe(self):
         return super(ActionServerPlugin, self).end_parallel_universe()
 
-    def get_readings(self):
+    def update(self):
+        self.controlled_joints = self.god_map.get_data([self.controlled_joints_identifier])
+        self.current_js = self.god_map.get_data([self.js_identifier])
         goals = None
         cmd = None
         try:
@@ -79,20 +81,14 @@ class ActionServerPlugin(Plugin):
                     tip = controller.tip_link
                     controller.goal_pose = transform_pose(root, controller.goal_pose)
                     goals[goal_key][root, tip] = controller
-            # self.god_map.set_data([self.collision_goal_identifier], cmd.collisions)
             feedback = MoveFeedback()
             feedback.phase = MoveFeedback.PLANNING
             self._as.publish_feedback(feedback)
         except Empty:
             pass
-        update = {self.goal_identifier: goals,
-                  self.js_identifier: self.current_js if self.start_js is None else self.start_js,
-                  self.collision_goal_identifier: cmd.collisions if cmd is not None else None}
-        return update
-
-    def update(self):
-        self.controlled_joints = self.god_map.get_data([self.controlled_joints_identifier])
-        self.current_js = self.god_map.get_data([self.js_identifier])
+        self.god_map.set_data([self.goal_identifier], goals)
+        self.god_map.set_data([self.js_identifier], self.current_js if self.start_js is None else self.start_js)
+        self.god_map.set_data([self.collision_goal_identifier], cmd.collisions if cmd is not None else None)
 
     def post_mortem_analysis(self, god_map, exception):
         result = MoveResult()
@@ -155,8 +151,8 @@ class ActionServerPlugin(Plugin):
                 if result is None:
                     result = intermediate_result
                 else:
-                    step_size = result.trajectory.points[1].time_from_start - result.trajectory.points[
-                        0].time_from_start
+                    step_size = result.trajectory.points[1].time_from_start - \
+                                result.trajectory.points[0].time_from_start
                     end_of_last_point = result.trajectory.points[-1].time_from_start + step_size
                     for point in intermediate_result.trajectory.points:  # type: JointTrajectoryPoint
                         point.time_from_start += end_of_last_point
@@ -170,31 +166,36 @@ class ActionServerPlugin(Plugin):
                 if result.error_code == MoveResult.SUCCESS and self.execute:
                     goal = FollowJointTrajectoryGoal()
                     goal.trajectory = result.trajectory
-                    self._ac.send_goal(goal)
-                    t = rospy.get_rostime()
-                    expected_duration = goal.trajectory.points[-1].time_from_start.to_sec()
-                    rospy.loginfo('waiting for {:.3f} sec with {} points'.format(expected_duration,
-                                                                                 len(goal.trajectory.points)))
+                    if self._as.is_preempt_requested():
+                        rospy.loginfo('new goal, cancel old one')
+                        self._ac.cancel_all_goals()
+                        result.error_code = MoveResult.INTERRUPTED
+                    else:
+                        self._ac.send_goal(goal)
+                        t = rospy.get_rostime()
+                        expected_duration = goal.trajectory.points[-1].time_from_start.to_sec()
+                        rospy.loginfo('waiting for {:.3f} sec with {} points'.format(expected_duration,
+                                                                                     len(goal.trajectory.points)))
 
-                    while not self._ac.wait_for_result(rospy.Duration(.1)):
-                        time_passed = (rospy.get_rostime() - t).to_sec()
-                        feedback.progress = min(time_passed / expected_duration, 1)
-                        self._as.publish_feedback(feedback)
-                        if self._as.is_preempt_requested():
-                            rospy.loginfo('new goal, cancel old one')
-                            self._ac.cancel_all_goals()
-                            result.error_code = MoveResult.INTERRUPTED
-                            break
-                        if time_passed > expected_duration + 0.1:
-                            rospy.loginfo('controller took too long to execute trajectory')
-                            self._ac.cancel_all_goals()
-                            result.error_code = MoveResult.INTERRUPTED
-                            break
-                    else:  # if not break
-                        print('shit took {:.3f}s'.format((rospy.get_rostime() - t).to_sec()))
-                        r = self._ac.get_result()
-                        if r.error_code == FollowJointTrajectoryResult.SUCCESSFUL:
-                            result.error_code = MoveResult.SUCCESS
+                        while not self._ac.wait_for_result(rospy.Duration(.1)):
+                            time_passed = (rospy.get_rostime() - t).to_sec()
+                            feedback.progress = min(time_passed / expected_duration, 1)
+                            self._as.publish_feedback(feedback)
+                            if self._as.is_preempt_requested():
+                                rospy.loginfo('new goal, cancel old one')
+                                self._ac.cancel_all_goals()
+                                result.error_code = MoveResult.INTERRUPTED
+                                break
+                            if time_passed > expected_duration + 0.1:
+                                rospy.loginfo('controller took too long to execute trajectory')
+                                self._ac.cancel_all_goals()
+                                result.error_code = MoveResult.INTERRUPTED
+                                break
+                        else:  # if not break
+                            print('shit took {:.3f}s'.format((rospy.get_rostime() - t).to_sec()))
+                            r = self._ac.get_result()
+                            if r.error_code == FollowJointTrajectoryResult.SUCCESSFUL:
+                                result.error_code = MoveResult.SUCCESS
         else:
             result = MoveResult()
             result.error_code = MoveResult.START_STATE_COLLISION
@@ -240,11 +241,13 @@ class ActionServerPlugin(Plugin):
         pass
 
     def copy(self):
-        return LogTrajectoryPlugin(trajectory_identifier=self.trajectory_identifier,
-                                   joint_state_identifier=self.js_identifier,
-                                   time_identifier=self.time_identifier,
-                                   plot_trajectory=self.plot_trajectory,
-                                   goal_identifier=self.goal_identifier)
+        self.child = LogTrajectoryPlugin(trajectory_identifier=self.trajectory_identifier,
+                                         joint_state_identifier=self.js_identifier,
+                                         time_identifier=self.time_identifier,
+                                         plot_trajectory=self.plot_trajectory,
+                                         goal_identifier=self.goal_identifier,
+                                         is_preempted=lambda: self._as.is_preempt_requested())
+        return self.child
 
     def __del__(self):
         # TODO find a way to cancel all goals when giskard is killed
@@ -253,34 +256,37 @@ class ActionServerPlugin(Plugin):
 
 class LogTrajectoryPlugin(Plugin):
     def __init__(self, trajectory_identifier, joint_state_identifier, time_identifier, goal_identifier,
-                 plot_trajectory=False):
+                 plot_trajectory=False, is_preempted=lambda: False):
         self.plot = plot_trajectory
         self.goal_identifier = goal_identifier
         self.trajectory_identifier = trajectory_identifier
         self.joint_state_identifier = joint_state_identifier
         self.time_identifier = time_identifier
+        self.is_preempted = is_preempted
         self.precision = 0.0025
         super(LogTrajectoryPlugin, self).__init__()
 
-    def get_readings(self):
-        return {self.trajectory_identifier: self.trajectory}
-
     def update(self):
-        self.trajectory = self.god_map.get_data([self.trajectory_identifier])
-        traj_length = self.god_map.get_data([self.goal_identifier, 'max_trajectory_length'])
-        time = self.god_map.get_data([self.time_identifier])
-        # if time >= traj_length:
-        #     raise SolverTimeoutError()
         current_js = self.god_map.get_data([self.joint_state_identifier])
-        if self.trajectory is None:
-            self.trajectory = Trajectory()
-        self.trajectory.set(time, current_js)
-        if (time >= 1 and np.abs([v.velocity for v in current_js.values()]).max() < self.precision) or \
-                time >= traj_length:
+        time = self.god_map.get_data([self.time_identifier])
+        trajectory = self.god_map.get_data([self.trajectory_identifier])
+
+        if trajectory is None:
+            trajectory = Trajectory()
+        # traj_length = self.god_map.get_data([self.goal_identifier, 'max_trajectory_length'])
+        trajectory.set(time, current_js)
+        self.god_map.set_data([self.trajectory_identifier], trajectory)
+
+        if self.is_preempted():
+            print('goal preempted')
+            self.stop_universe = True
+            return
+        if (time >= 1 and np.abs([v.velocity for v in current_js.values()]).max() < self.precision):
             print('done')
             if self.plot:
-                self.plot_trajectory(self.trajectory)
+                self.plot_trajectory(trajectory)
             self.stop_universe = True
+            return
 
     def start_always(self):
         self.stop_universe = False

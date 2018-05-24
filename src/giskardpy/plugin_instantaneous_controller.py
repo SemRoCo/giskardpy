@@ -62,11 +62,10 @@ class CartesianBulletControllerPlugin(Plugin):
             next_cmd = self._controller.get_cmd(expr)
             self.next_cmd.update(next_cmd)
 
-    def get_readings(self):
         if len(self.next_cmd) > 0:
-            updates = {self._next_cmd_identifier: self.next_cmd}
-            return updates
-        return {}
+            self.god_map.set_data([self._next_cmd_identifier], self.next_cmd)
+            # updates = {self._next_cmd_identifier: self.next_cmd}
+
 
     def start_always(self):
         self.next_cmd = {}

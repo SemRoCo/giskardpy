@@ -302,7 +302,7 @@ class PyBulletRobot(object):
         # remove last robot and load new robot from new URDF
         p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 0)
         p.removeBody(self.id)
-        self.id = (new_urdf_string, base_pose)
+        self.id = load_urdf_string_into_bullet(new_urdf_string, base_pose)
         p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 1)
 
         # reload joint info and last joint state
@@ -321,11 +321,54 @@ class PyBulletRobot(object):
         self.sometimes.union(new_collisions)
 
     def detach_object(self, object_name):
-        pass
+        """
+        Detaches an attached object from the robot.
+        :param object_name: Name of the object that shall be detached from the robot.
+        :type object_name: str
+        :return: Nothing.
+        """
+        if not self.has_attached_object(object_name):
+            # TODO: choose better exception type
+            raise RuntimeError("No object '{}' has been attached to the robot.".format(object.name))
+
+        # salvage last joint state and base pose
+        base_pose = self.get_base_pose()
+        joint_state = self.get_joint_states()
+
+        # salvage last collision matrix, and save collisions as pairs of link names
+        collision_matrix = set()
+        for collision in self.sometimes:
+            collision_matrix.add((self.link_id_to_name[collision[0]], self.link_id_to_name[collision[1]]))
+
+        # remove all collision entries related to the object that shall be detached
+        collision_matrix = filter((lambda (collision): object_name not in collision), collision_matrix)
+
+        # forget about the object that shall be detached
+        del(self.attached_objects[object_name])
+
+        # for each attached object, insert the corresponding URDF sub-string into the original URDF string
+        new_urdf_string = self.original_urdf
+        for sub_string in self.attached_objects.values():
+            new_urdf_string = new_urdf_string.replace('</robot>', '{}</robot>'.format(sub_string))
+
+        # remove last robot and load new robot from new URDF
+        p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 0)
+        p.removeBody(self.id)
+        self.id = (new_urdf_string, base_pose)
+        p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 1)
+
+        # reload joint info and last joint state
+        self.init_js_info()
+        self.set_joint_state(joint_state)
+
+        # reload last collision matrix as pairs of link IDs
+        self.sometimes = set()
+        for collision in collision_matrix:
+            self.sometimes.add((self.link_name_to_id[collision[0]], self.link_name_to_id[collision[1]]))
 
     def detach_all_objects(self):
         """
-
+        Detaches all object that have been attached to the robot.
         :return: Nothing.
         """
         if self.attached_objects:

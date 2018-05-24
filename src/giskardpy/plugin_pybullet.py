@@ -63,8 +63,10 @@ class PyBulletPlugin(Plugin):
         with self.lock:
             try:
                 if req.operation is UpdateWorldRequest.ADD:
+                    if self.world.has_object(req.body.name) or self.world.get_robot().has_attached_object(req.body.name):
+                        DuplicateObjectNameException('Cannot spawn object "{}" because an object with such a '
+                                                     'name already exists'.format(req.body.name))
                     if req.rigidly_attached:
-                        # TODO: check whether we already know the object
                         self.world.get_robot().attach_object(from_msg(req.body), req.pose.header.frame_id,
                                                              from_pose_msg(req.pose.pose))
                     else:
@@ -72,8 +74,12 @@ class PyBulletPlugin(Plugin):
                                                           from_pose_msg(transform_pose(self.global_reference_frame_name,
                                                                                        req.pose).pose))
                 elif req.operation is UpdateWorldRequest.REMOVE:
-                    # TODO: discriminate between attached and non-attached objects
-                    self.world.delete_object(req.body.name)
+                    if self.world.has_object(req.body.name):
+                        self.world.delete_object(req.body.name)
+                    elif self.world.get_robot().has_attached_object(req.body.name):
+                        self.world.get_robot().detach_object(req.body.name)
+                    else:
+                        raise UnknownBodyException('Cannot delete unknown object {}'.format(req.body.name))
                 elif req.operation is UpdateWorldRequest.ALTER:
                     # TODO: implement me
                     pass

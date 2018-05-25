@@ -93,7 +93,7 @@ def load_urdf_string_into_bullet(urdf_string, pose):
     return id
 
 class PyBulletRobot(object):
-    def __init__(self, name, urdf, base_pose=Transform()):
+    def __init__(self, name, urdf, base_pose=Transform(), calc_self_collision_matrix=True):
         """
 
         :param name:
@@ -107,7 +107,10 @@ class PyBulletRobot(object):
         self.id = load_urdf_string_into_bullet(self.original_urdf, base_pose)
         self.init_js_info()
         self.attached_objects = {}
-        self.sometimes = self.calc_self_collision_matrix(set(combinations(self.joint_id_to_info.keys(), 2)))
+        if calc_self_collision_matrix:
+            self.sometimes = self.calc_self_collision_matrix(set(combinations(self.joint_id_to_info.keys(), 2)))
+        else:
+            self.sometimes = set()
 
     def set_joint_state(self, multi_joint_state):
         for joint_name, singe_joint_state in multi_joint_state.items():
@@ -513,7 +516,7 @@ class PyBulletWorld(object):
             raise DuplicateObjectNameException('Cannot spawn object "{}" because an object with such a '
                                                'name already exists'.format(name))
         self.deactivate_rendering()
-        self._objects[name] = PyBulletRobot(name, urdf, base_pose)
+        self._objects[name] = PyBulletRobot(name, urdf, base_pose, False)
         self.activate_rendering()
 
     def spawn_object(self, object, base_pose=Transform()):
@@ -538,7 +541,9 @@ class PyBulletWorld(object):
         """
         if not self.has_object(object_name):
             raise UnknownBodyException('Cannot delete unknown object {}'.format(object_name))
+        self.deactivate_rendering()
         p.removeBody(self._objects[object_name].id)
+        self.activate_rendering()
         del (self._objects[object_name])
 
     def delete_all_objects(self, remaining_objects=['plane']):

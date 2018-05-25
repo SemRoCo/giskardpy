@@ -2,10 +2,43 @@
 from time import time
 
 import rospy
-from geometry_msgs.msg import Point, Quaternion, PoseStamped
+import tf2_ros
+from geometry_msgs.msg import Point, Vector3, Quaternion, Pose, Transform, PoseStamped, TransformStamped
 from giskard_msgs.srv import UpdateWorld, UpdateWorldResponse, UpdateWorldRequest
 from giskard_msgs.msg import WorldBody
 from shape_msgs.msg import SolidPrimitive
+
+
+def to_point_msg(vector3_msg):
+    """
+    :param vector3_msg:
+    :type vector3_msg: Vector3
+    :return:
+    :rtype: Point
+    """
+    return Point(vector3_msg.x, vector3_msg.y, vector3_msg.z)
+
+
+def to_pose_msg(t_msg):
+    """
+
+    :param t_msg:
+    :type t_msg: Transform
+    :return:
+    :rtype: Pose
+    """
+    return Pose(to_point_msg(t_msg.translation), t_msg.rotation)
+
+
+def to_pose_stamped_msg(t_msg):
+    '''
+
+    :param t_msg:
+    :type t_msg: TransformStamped
+    :return:
+    :rtype PoseStamped
+    '''
+    return PoseStamped(t_msg.header, to_pose_msg(t_msg.transform))
 
 
 def add_wand_request():
@@ -101,6 +134,18 @@ def rem_sphere_request():
     sphere = WorldBody()
     sphere.name = 'sphere'
     return UpdateWorldRequest(UpdateWorldRequest.REMOVE, sphere, False, PoseStamped())
+
+
+def add_dummy_pr2_request():
+    pr2 = WorldBody()
+    pr2.name = "dummy_pr2"
+    pr2.type = WorldBody.URDF_BODY
+    pr2.urdf = rospy.get_param('/robot_description')
+    pr2.joint_state_topic = '/dummy_pr2/joint_states'
+    tf = tf2_ros.BufferClient('tf2_buffer_server')
+    tf.wait_for_server(rospy.Duration(0.5))
+    transform = tf.lookup_transform('map', 'dummy_pr2/base_footprint', rospy.Time.now(), rospy.Duration(0.5))
+    return UpdateWorldRequest(UpdateWorldRequest.ADD, pr2, False, to_pose_stamped_msg(transform))
 
 
 def call_service(proxy, request, expected_error, user_msg):
@@ -203,6 +248,15 @@ def remove_sphere_again(proxy):
     call_service(proxy, rem_sphere_request(), UpdateWorldResponse.MISSING_BODY_ERROR, "Removing sphere --expecting failure...")
 
 
+def add_dummy_pr2(proxy):
+    """
+    Adds dummy PR2 as an object to the giskard world, expecting success.
+    :param proxy: ServiceProxy to update the giskard world.
+    :type proxy: rospy.ServiceProxy
+    """
+    call_service(proxy, add_dummy_pr2_request(), UpdateWorldResponse.SUCCESS, "Adding dummy pr2 --expecting success...")
+
+
 def clear_world(proxy):
     call_service(proxy, clear_world_request(), UpdateWorldResponse.SUCCESS, "Clearing world --expecting success...")
 
@@ -221,6 +275,7 @@ def test_update_world():
         remove_sphere(update_world)
         remove_sphere_again(update_world)
         add_wand(update_world)
+        add_dummy_pr2(update_world)
     except rospy.ServiceException as e:
         print("Service call failed: {}".format(e))
 

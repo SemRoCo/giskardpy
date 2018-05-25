@@ -1,6 +1,8 @@
 <launch>
   <node pkg="joint_state_publisher" type="joint_state_publisher" name="dummy_pr2_sim" >
     <param name="use_gui" value="True" />
+    <param name="publish_default_velocities" value="True" />
+    <param name="publish_default_efforts" value="True" />
     <remap from="/joint_states" to="/dummy_pr2/joint_states" />
   </node>
 

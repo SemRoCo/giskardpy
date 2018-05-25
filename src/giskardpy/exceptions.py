@@ -40,3 +40,5 @@ class DuplicateRobotNameException(DuplicateBodyNameException):
 class DuplicateObjectNameException(DuplicateBodyNameException):
     pass
 
+class UnsupportedOptionException(UpdateWorldException):
+    pass

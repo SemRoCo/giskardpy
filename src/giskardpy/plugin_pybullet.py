@@ -6,22 +6,23 @@ from time import time
 import rospy
 
 from geometry_msgs.msg import Point, Vector3
-from giskard_msgs.msg import CollisionEntry
+from giskard_msgs.msg import CollisionEntry, WorldBody
 from multiprocessing import Lock
 from std_msgs.msg import ColorRGBA
 from std_srvs.srv import SetBool, SetBoolResponse
+from sensor_msgs.msg import JointState
 from giskard_msgs.srv import UpdateWorld, UpdateWorldResponse, UpdateWorldRequest
 from visualization_msgs.msg import Marker, MarkerArray
 
 from giskardpy.exceptions import CorruptShapeException, UnknownBodyException, DuplicateObjectNameException, \
-    IntersectingCollisionException
+    IntersectingCollisionException, UnsupportedOptionException
 from giskardpy.object import WorldObject, to_urdf_string, VisualProperty, BoxShape, CollisionProperty, to_marker, \
     MeshShape, from_msg, from_pose_msg
 from giskardpy.plugin import Plugin
 from giskardpy.pybullet_world import PyBulletWorld, ContactInfo
 from giskardpy.tfwrapper import transform_pose, lookup_transform
 from giskardpy.trajectory import ClosestPointInfo
-from giskardpy.utils import keydefaultdict
+from giskardpy.utils import keydefaultdict, to_joint_state_dict
 
 
 class PyBulletPlugin(Plugin):
@@ -37,6 +38,8 @@ class PyBulletPlugin(Plugin):
         self.marker = marker
         self.gui = gui
         self.lock = Lock()
+        self.object_js_subs = {} # JointState subscribers for articulated world objects
+        self.object_joint_states = {} # JointStates messages for articulated world objects
         super(PyBulletPlugin, self).__init__()
 
     def copy(self):
@@ -83,19 +86,37 @@ class PyBulletPlugin(Plugin):
         with self.lock:
             try:
                 if req.operation is UpdateWorldRequest.ADD:
+                    # Check that no object with this name already exists.
                     if self.world.has_object(req.body.name) or self.world.get_robot().has_attached_object(req.body.name):
                         DuplicateObjectNameException('Cannot spawn object "{}" because an object with such a '
                                                      'name already exists'.format(req.body.name))
+
+                    # CASE: Spawn rigidly attached object
                     if req.rigidly_attached:
+                        # Catch unsupported sub-case of rigidly attaching a robot to a robot
+                        if req.body.type is WorldBody.URDF_BODY:
+                            raise UnsupportedOptionException('Attaching URDF bodies to robots is not supported.')
                         self.world.get_robot().attach_object(from_msg(req.body), req.pose.header.frame_id,
                                                              from_pose_msg(req.pose.pose))
+
+                    # CASE: Spawn a 'free' object
                     else:
-                        self.world.spawn_object_from_urdf(req.body.name, to_urdf_string(from_msg(req.body)),
-                                                          from_pose_msg(transform_pose(self.global_reference_frame_name,
-                                                                                       req.pose).pose))
+                        urdf_string = req.body.urdf if req.body.type is WorldBody.URDF_BODY else to_urdf_string(from_msg(req.body))
+                        pose = from_pose_msg(transform_pose(self.global_reference_frame_name, req.pose).pose)
+                        self.world.spawn_object_from_urdf(req.body.name, urdf_string, pose)
+                        # SUB-CASE: If it is an articulated object, open up a joint state subscriber
+                        if req.body.joint_state_topic:
+                            callback = (lambda (msg): self.object_js_cb(req.body.name, msg))
+                            self.object_js_subs[req.body.name] = \
+                                rospy.Subscriber(req.body.joint_state_topic, JointState, callback, queue_size=1)
+
                 elif req.operation is UpdateWorldRequest.REMOVE:
                     if self.world.has_object(req.body.name):
                         self.world.delete_object(req.body.name)
+                        if self.object_js_subs.has_key(req.body.name):
+                            self.object_js_subs[req.body.name].unregister()
+                            del(self.object_js_subs[req.body.name])
+                            del(self.object_joint_states[req.body.name])
                     elif self.world.get_robot().has_attached_object(req.body.name):
                         self.world.get_robot().detach_object(req.body.name)
                     else:
@@ -106,6 +127,10 @@ class PyBulletPlugin(Plugin):
                 elif req.operation is UpdateWorldRequest.REMOVE_ALL:
                     self.world.delete_all_objects()
                     self.world.get_robot().detach_all_objects()
+                    for object_name in self.object_js_subs.keys():
+                        self.object_js_subs[object_name].unregister()
+                        del(self.object_js_subs[object_name])
+                        del(self.object_joint_states[object_name])
                 else:
                     return UpdateWorldResponse(UpdateWorldResponse.INVALID_OPERATION,
                                                "Received invalid operation code: {}".format(req.operation))
@@ -116,11 +141,15 @@ class PyBulletPlugin(Plugin):
                 return UpdateWorldResponse(UpdateWorldResponse.MISSING_BODY_ERROR, e.message)
             except DuplicateObjectNameException as e:
                 return UpdateWorldResponse(UpdateWorldResponse.DUPLICATE_BODY_ERROR, e.message)
+            except UnsupportedOptionException as e:
+                return UpdateWorldResponse(UpdateWorldResponse.UNSUPPORTED_OPERATION, e.message)
 
     def update(self):
         with self.lock:
             js = self.god_map.get_data([self.js_identifier])
             self.world.set_joint_state(js)
+            for object_name, object_joint_state in self.object_joint_states.iteritems():
+                self.world.get_object(object_name).set_joint_state(object_joint_state)
             p = lookup_transform('map', self.robot_root)
             self.world.get_robot().set_base_pose(position=[p.pose.position.x,
                                                            p.pose.position.y,
@@ -224,3 +253,14 @@ class PyBulletPlugin(Plugin):
             m.action = Marker.DELETE
         self.collision_pub.publish(m)
         # rospy.sleep(0.05)
+
+    def object_js_cb(self, object_name, msg):
+        """
+        Callback message for ROS Subscriber on JointState to get states of articulated objects into world.
+        :param object_name: Name of the object for which the Joint State message is.
+        :type object_name: str
+        :param msg: Current state of the articulated object that shall be set in the world.
+        :type msg: JointState
+        :return: Nothing
+        """
+        self.object_joint_states[object_name] = to_joint_state_dict(msg)

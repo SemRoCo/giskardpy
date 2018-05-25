@@ -56,7 +56,7 @@ class TestCollisionAvoidance(unittest.TestCase):
               'l_wrist_flex_joint': -2.22044604925e-16,
               'l_wrist_roll_joint': -0.258268529825,
 
-              'torso_lift_joint': 0.3,
+              'torso_lift_joint': 0.2,
               'head_pan_joint': 0,
               'head_tilt_joint': 0,
               }
@@ -231,36 +231,6 @@ class TestCollisionAvoidance(unittest.TestCase):
         goal_js = {'torso_lift_joint': 0.2}
         self.giskard.set_joint_goal(goal_js)
         self.giskard.plan_and_execute()
-
-        # goal = MoveGoal()
-        # goal.type = MoveGoal.PLAN_AND_EXECUTE
-        #
-        # # translation
-        # controller = Controller()
-        # controller.type = Controller.JOINT
-        # controller.tip_link = 'gripper_tool_frame'
-        # controller.root_link = 'base_footprint'
-        #
-        # for i, joint_name in enumerate(self.joint_names):
-        #     controller.goal_state.name.append(joint_name)
-        #     # controller.goal_state.position.append(0)
-        #     controller.goal_state.position.append(np.random.random()-0.5)
-        #
-        # controller.p_gain = 3
-        # controller.max_trajectory_length = 0.05
-        # controller.weight = 1
-        # goal.cmd_seq.append(MoveCmd())
-        # goal.cmd_seq[-1].controllers.append(controller)
-        #
-        # self.client.send_goal(goal)
-        # result = self.client.wait_for_result()
-        # final_js = rospy.wait_for_message('/whole_body_controller/state', JointTrajectoryControllerState) # type: JointTrajectoryControllerState
-        # asdf = {}
-        # for i, joint_name in enumerate(final_js.joint_names):
-        #     asdf[joint_name] = final_js.actual.positions[i]
-        # for i, joint_name in enumerate(controller.goal_state.name):
-        #     print('{} real:{} | exp:{}'.format(joint_name, asdf[joint_name], controller.goal_state.position[i]))
-        # print('finished in 10s?: {}'.format(result))
 
     def test_continuous_joint1(self):
         goal_js = {'r_wrist_roll_joint': 0,

@@ -52,7 +52,8 @@ class GiskardWrapper(object):
         controller = Controller()
         controller.type = Controller.JOINT
         controller.weight = 1
-        controller.max_speed = 1
+        controller.p_gain = 5
+        controller.max_speed = 0.5
         for joint_name, joint_position in joint_state.items():
             controller.goal_state.name.append(joint_name)
             controller.goal_state.position.append(joint_position)

@@ -77,6 +77,8 @@ class ActionServerPlugin(Plugin):
                     rospy.loginfo('got joint goal')
                     for i, joint_name in enumerate(controller.goal_state.name):
                         goals[goal_key][joint_name] = {'weight': controller.weight,
+                                                       'p_gain' : controller.p_gain,
+                                                       'max_speed': controller.max_speed,
                                                        'position': controller.goal_state.position[i]}
                 elif controller.type in [Controller.TRANSLATION_3D, Controller.ROTATION_3D]:
                     root = controller.root_link

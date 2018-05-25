@@ -54,6 +54,7 @@ if __name__ == '__main__':
                                       collision_identifier=collision_identifier,
                                       closest_point_identifier=closest_point_identifier,
                                       collision_goal_identifier=collision_goal_identifier,
+                                      map_frame=rospy.get_param('~map_frame', 'map'),
                                       root_link=root_link,
                                       gui=rospy.get_param('~enable_gui', False),
                                       marker=rospy.get_param('~enable_collision_marker', True)))

@@ -27,11 +27,12 @@ from giskardpy.utils import keydefaultdict, to_joint_state_dict
 
 class PyBulletPlugin(Plugin):
     def __init__(self, js_identifier, collision_identifier, closest_point_identifier, collision_goal_identifier,
-                 root_link, gui=False, marker=False):
+                 map_frame, root_link, gui=False, marker=False):
         self.collision_goal_identifier = collision_goal_identifier
         self.js_identifier = js_identifier
         self.collision_identifier = collision_identifier
         self.closest_point_identifier = closest_point_identifier
+        self.map_frame = map_frame
         self.robot_root = root_link
         self.robot_name = 'pr2'
         self.global_reference_frame_name = 'map'
@@ -47,11 +48,12 @@ class PyBulletPlugin(Plugin):
                             collision_identifier=self.collision_identifier,
                             closest_point_identifier=self.closest_point_identifier,
                             collision_goal_identifier=self.collision_goal_identifier,
+                            map_frame=self.map_frame,
                             root_link=self.robot_root,
                             gui=self.gui)
         cp.world = self.world
-        cp.srv = self.srv
-        cp.viz_gui = self.viz_gui
+        # cp.srv = self.srv
+        # cp.viz_gui = self.viz_gui
         cp.collision_pub = self.collision_pub
         return cp
 
@@ -142,15 +144,15 @@ class PyBulletPlugin(Plugin):
             except DuplicateObjectNameException as e:
                 return UpdateWorldResponse(UpdateWorldResponse.DUPLICATE_BODY_ERROR, e.message)
             except UnsupportedOptionException as e:
-                return UpdateWorldResponse(UpdateWorldResponse.UNSUPPORTED_OPERATION, e.message)
+                return UpdateWorldResponse(UpdateWorldResponse.UNSUPPORTED_OPTIONS, e.message)
 
     def update(self):
         with self.lock:
             js = self.god_map.get_data([self.js_identifier])
             self.world.set_joint_state(js)
-            for object_name, object_joint_state in self.object_joint_states.iteritems():
+            for object_name, object_joint_state in self.object_joint_states.items():
                 self.world.get_object(object_name).set_joint_state(object_joint_state)
-            p = lookup_transform('map', self.robot_root)
+            p = lookup_transform(self.map_frame, self.robot_root)
             self.world.get_robot().set_base_pose(position=[p.pose.position.x,
                                                            p.pose.position.y,
                                                            p.pose.position.z],

@@ -58,7 +58,7 @@ class SymEngineController(object):
         return real_next_cmd
 
 
-def joint_position(current_joint, joint_goal, weight):
+def joint_position(current_joint, joint_goal, weight, p_gain, max_speed):
     """
     :param current_joint:
     :type current_joint: Symbol
@@ -69,16 +69,19 @@ def joint_position(current_joint, joint_goal, weight):
     :return:
     :rtype: dict
     """
+    # TODO can't get out of joint limit?
     # TODO implement max_speed
     # TODO implement p_gain
-    return SoftConstraint(lower=joint_goal - current_joint,
-                          upper=joint_goal - current_joint,
+    limit = sw.fake_Min(p_gain*(joint_goal - current_joint), max_speed)
+    return SoftConstraint(lower=limit,
+                          upper=limit,
                           weight=weight,
                           expression=current_joint)
 
-def continuous_joint_position(current_joint, change, weight):
-    return SoftConstraint(lower=change,
-                          upper=change,
+def continuous_joint_position(current_joint, change, weight, p_gain, max_speed):
+    limit = sw.fake_Min(p_gain*(change), max_speed)
+    return SoftConstraint(lower=limit,
+                          upper=limit,
                           weight=weight,
                           expression=current_joint)
 

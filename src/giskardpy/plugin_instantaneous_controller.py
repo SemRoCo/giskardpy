@@ -91,6 +91,8 @@ class CartesianBulletControllerPlugin(Plugin):
                                                         joint_name,
                                                         'position'])
                 weight = self.god_map.get_expr([self._goal_identifier, str(Controller.JOINT), joint_name, 'weight'])
+                gain = self.god_map.get_expr([self._goal_identifier, str(Controller.JOINT), joint_name, 'p_gain'])
+                max_speed = self.god_map.get_expr([self._goal_identifier, str(Controller.JOINT), joint_name, 'max_speed'])
                 if robot.is_continuous(joint_name):
                     change = ShortestAngularDistanceInput(self.god_map.get_expr,
                                                           [self._pyfunctions_identifier],
@@ -99,9 +101,12 @@ class CartesianBulletControllerPlugin(Plugin):
                     pyfunctions[change.get_sdaffsafd()] = change
                     self.soft_constraints[joint_name] = continuous_joint_position(current_joint_key,
                                                                                   change.get_expression(),
-                                                                                  weight)
+                                                                                  weight,
+                                                                                  gain,
+                                                                                  max_speed)
                 else:
-                    self.soft_constraints[joint_name] = joint_position(current_joint_key, goal_joint_key, weight)
+                    self.soft_constraints[joint_name] = joint_position(current_joint_key, goal_joint_key, weight, gain,
+                                                                       max_speed)
                 controllable_links.update(robot.get_link_tree(joint_name))
             self.god_map.set_data([self._pyfunctions_identifier], pyfunctions)
 

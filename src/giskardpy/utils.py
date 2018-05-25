@@ -1,5 +1,7 @@
-from collections import defaultdict
-from math import pi
+from collections import defaultdict, OrderedDict
+from sensor_msgs.msg import JointState
+from giskardpy.trajectory import SingleJointState
+
 
 class keydefaultdict(defaultdict):
     def __missing__(self, key):
@@ -9,10 +11,25 @@ class keydefaultdict(defaultdict):
             ret = self[key] = self.default_factory(key)
             return ret
 
-# def shortest_angular_distance(from_angle, to_angle):
-#     diff = to_angle - from_angle
-#     pi2 = 2 * pi
-#     diff = ((diff % pi2) + pi2) % pi2
-#     if diff > pi:
-#         return diff - pi2
-#     return diff
+#
+# CONVERSION FUNCTIONS FOR ROS MESSAGES
+#
+
+
+def to_joint_state_dict(msg):
+    """
+    Converts a ROS message of type sensor_msgs/JointState into an instance of MultiJointState.
+    :param msg: ROS message to convert.
+    :type msg: JointState
+    :return: Corresponding MultiJointState instance.
+    :rtype: OrderedDict[str, SingleJointState]
+    """
+    mjs = OrderedDict()
+    for i, joint_name in enumerate(msg.name):
+        sjs = SingleJointState()
+        sjs.name = joint_name
+        sjs.position = msg.position[i]
+        sjs.velocity = msg.velocity[i]
+        sjs.effort = msg.effort[i]
+        mjs[joint_name] = sjs
+    return mjs

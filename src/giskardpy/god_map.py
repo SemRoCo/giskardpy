@@ -56,7 +56,10 @@ class GodMap(object):
                 # traceback.print_exc()
                 # raise KeyError(key)
                 result = self.default_value
-        return result
+        if callable(result):
+            return result(self)
+        else:
+            return result
 
     def get_expr(self, key):
         if isinstance(key, str):

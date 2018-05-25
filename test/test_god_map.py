@@ -114,6 +114,21 @@ class TestDataBus(unittest.TestCase):
         with self.assertRaises(IndexError):
             db.set_data('asdf/11111', 42)
 
+    def test_function1(self):
+        db = GodMap()
+        f = lambda gm: 1337
+        db.set_data(['muh'], f)
+        self.assertEqual(db.get_data(['muh']), 1337)
+
+    def test_function2(self):
+        db = GodMap()
+        class MUH(object):
+            def __call__(self, god_map):
+                return 42
+        a = MUH()
+        d = {'muh': a}
+        db.set_data(['mu'], d)
+        self.assertEqual(db.get_data(['mu', 'muh']), 42)
 
 if __name__ == '__main__':
     import rosunit

@@ -195,3 +195,6 @@ class Robot(object):
             if joint.symbol is not None:
                 js[str(joint.symbol)] = f(joint.lower, joint.upper)
         return js
+
+    def is_continuous(self, joint_name):
+        return self._joints[joint_name].type == 'continuous'

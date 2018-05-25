@@ -1,4 +1,3 @@
-from symengine import Symbol
 import symengine_wrappers as sw
 from collections import OrderedDict
 from giskardpy.qp_problem_builder import QProblemBuilder, SoftConstraint
@@ -70,8 +69,16 @@ def joint_position(current_joint, joint_goal, weight):
     :return:
     :rtype: dict
     """
+    # TODO implement max_speed
+    # TODO implement p_gain
     return SoftConstraint(lower=joint_goal - current_joint,
                           upper=joint_goal - current_joint,
+                          weight=weight,
+                          expression=current_joint)
+
+def continuous_joint_position(current_joint, change, weight):
+    return SoftConstraint(lower=change,
+                          upper=change,
                           weight=weight,
                           expression=current_joint)
 

@@ -73,6 +73,7 @@ class ActionServerPlugin(Plugin):
                 self.new_universe = True
                 goal_key = str(controller.type)
                 if controller.type == Controller.JOINT:
+                    # TODO check for unknown joint names
                     rospy.loginfo('got joint goal')
                     for i, joint_name in enumerate(controller.goal_state.name):
                         goals[goal_key][joint_name] = {'weight': controller.weight,

@@ -7,6 +7,7 @@ from sensor_msgs.msg import JointState
 
 from giskardpy.plugin import Plugin
 from giskardpy.trajectory import SingleJointState
+from giskardpy.utils import to_joint_state_dict
 
 
 class JointStatePlugin(Plugin):
@@ -29,18 +30,8 @@ class JointStatePlugin(Plugin):
 
     def update(self):
         try:
-            if self.mjs is None:
-                js = self.lock.get_nowait()
-            else:
-                js = self.lock.get_nowait()
-            self.mjs = OrderedDict()
-            for i, joint_name in enumerate(js.name):
-                sjs = SingleJointState()
-                sjs.name = joint_name
-                sjs.position = js.position[i]
-                sjs.velocity = js.velocity[i]
-                sjs.effort = js.effort[i]
-                self.mjs[joint_name] = sjs
+            js = self.lock.get_nowait()
+            self.mjs = to_joint_state_dict(js)
         except Empty:
             pass
         self.god_map.set_data([self.js_identifier], self.mjs)

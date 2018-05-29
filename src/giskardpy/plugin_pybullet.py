@@ -5,7 +5,7 @@ from time import time
 import numpy as np
 import rospy
 
-from geometry_msgs.msg import Point, Vector3
+from geometry_msgs.msg import Point, Vector3, PoseStamped, PointStamped
 from giskard_msgs.msg import CollisionEntry, WorldBody
 from multiprocessing import Lock
 from std_msgs.msg import ColorRGBA
@@ -21,9 +21,9 @@ from giskardpy.object import WorldObject, to_urdf_string, VisualProperty, BoxSha
 from giskardpy.plugin import Plugin
 from giskardpy.pybullet_world import PyBulletWorld, ContactInfo
 from giskardpy.symengine_wrappers import euclidean_distance
-from giskardpy.tfwrapper import transform_pose, lookup_transform
+from giskardpy.tfwrapper import transform_pose, lookup_transform, transform_point, transform_vector
 from giskardpy.trajectory import ClosestPointInfo
-from giskardpy.utils import keydefaultdict, to_joint_state_dict
+from giskardpy.utils import keydefaultdict, to_joint_state_dict, to_point_stamped, to_vector3_stamped, to_list
 
 
 class PyBulletPlugin(Plugin):
@@ -213,9 +213,17 @@ class PyBulletPlugin(Plugin):
                 lambda k: ClosestPointInfo((10, 0, 0), (0, 0, 0), 1e9, default_distance, k, '', (1, 0, 0)))
             for key, collision_info in collisions.items():  # type: ((str, str), ContactInfo)
                 link1 = key[0]
-                cpi = ClosestPointInfo(collision_info.position_on_a, collision_info.position_on_b,
-                                       collision_info.contact_distance, distances[key], key[0], key[1],
-                                       collision_info.contact_normal_on_b)
+                a_in_robot_root = to_list(transform_point(self.robot_root,
+                                                          to_point_stamped(self.map_frame,
+                                                                           collision_info.position_on_a)))
+                b_in_robot_root = to_list(transform_point(self.robot_root,
+                                                          to_point_stamped(self.map_frame,
+                                                                           collision_info.position_on_b)))
+                n_in_robot_root = to_list(transform_vector(self.robot_root,
+                                                           to_vector3_stamped(self.map_frame,
+                                                                              collision_info.contact_normal_on_b)))
+                cpi = ClosestPointInfo(a_in_robot_root, b_in_robot_root, collision_info.contact_distance,
+                                       distances[key], key[0], key[1], n_in_robot_root)
                 # if cpi.contact_distance < 0:
                 #     raise IntersectingCollisionException(key)
                 if link1 in closest_point:
@@ -235,7 +243,7 @@ class PyBulletPlugin(Plugin):
     # @profile
     def make_collision_markers(self, collisions):
         m = Marker()
-        m.header.frame_id = 'map'
+        m.header.frame_id = self.map_frame
         m.action = Marker.ADD
         m.type = Marker.LINE_LIST
         m.id = 1337
@@ -262,7 +270,7 @@ class PyBulletPlugin(Plugin):
 
     def make_collision_markers2(self, collisions):
         m = Marker()
-        m.header.frame_id = 'map'
+        m.header.frame_id = self.map_frame
         m.action = Marker.ADD
         m.type = Marker.POINTS
         m.id = 1337

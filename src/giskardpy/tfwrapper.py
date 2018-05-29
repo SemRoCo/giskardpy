@@ -1,6 +1,6 @@
 import rospy
-from geometry_msgs.msg import PoseStamped
-from tf2_geometry_msgs import do_transform_pose
+from geometry_msgs.msg import PoseStamped, Vector3Stamped, PointStamped
+from tf2_geometry_msgs import do_transform_pose, do_transform_vector3, do_transform_point
 from tf2_py._tf2 import ExtrapolationException
 from tf2_ros import Buffer, TransformListener
 
@@ -37,6 +37,52 @@ def transform_pose(target_frame, pose):
                                               pose.header.stamp,
                                               rospy.Duration(1.0))
         new_pose = do_transform_pose(pose, transform)
+        return new_pose
+    except ExtrapolationException as e:
+        rospy.logwarn(e)
+
+def transform_vector(target_frame, vector):
+    """
+    Transforms a pose stamped into a different target frame.
+    :param target_frame:
+    :type target_frame: str
+    :param vector:
+    :type vector: Vector3Stamped
+    :return: Transformed pose of None on loop failure
+    :rtype: Vector3Stamped
+    """
+    global tfBuffer
+    if tfBuffer is None:
+        init()
+    try:
+        transform = tfBuffer.lookup_transform(target_frame,
+                                              vector.header.frame_id,  # source frame
+                                              vector.header.stamp,
+                                              rospy.Duration(1.0))
+        new_pose = do_transform_vector3(vector, transform)
+        return new_pose
+    except ExtrapolationException as e:
+        rospy.logwarn(e)
+
+def transform_point(target_frame, point):
+    """
+    Transforms a pose stamped into a different target frame.
+    :param target_frame:
+    :type target_frame: str
+    :param point:
+    :type point: PointStamped
+    :return: Transformed pose of None on loop failure
+    :rtype: PointStamped
+    """
+    global tfBuffer
+    if tfBuffer is None:
+        init()
+    try:
+        transform = tfBuffer.lookup_transform(target_frame,
+                                              point.header.frame_id,  # source frame
+                                              point.header.stamp,
+                                              rospy.Duration(1.0))
+        new_pose = do_transform_point(point, transform)
         return new_pose
     except ExtrapolationException as e:
         rospy.logwarn(e)

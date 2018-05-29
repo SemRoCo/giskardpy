@@ -1,4 +1,6 @@
 from collections import defaultdict, OrderedDict
+
+from geometry_msgs.msg import PointStamped, Point, Vector3Stamped, Vector3, Pose, PoseStamped
 from sensor_msgs.msg import JointState
 from giskardpy.trajectory import SingleJointState
 
@@ -39,3 +41,51 @@ def to_joint_state_dict(msg):
             sjs.effort = 0
         mjs[joint_name] = sjs
     return mjs
+
+def to_point_stamped(frame_id, point):
+    """
+    :param frame_id:
+    :type frame_id: str
+    :param point:
+    :type point: list
+    :return:
+    :rtype: geometry_msgs.msg._PointStamped.PointStamped
+    """
+    p = PointStamped()
+    p.header.frame_id = frame_id
+    p.point = Point(*point)
+    return p
+
+def to_vector3_stamped(frame_id, vector):
+    """
+    :param frame_id:
+    :type frame_id: str
+    :param vector:
+    :type vector: list
+    :return:
+    :rtype: Vector3Stamped
+    """
+    v = Vector3Stamped()
+    v.header.frame_id = frame_id
+    v.vector = Vector3(*vector)
+    return v
+
+def to_list(thing):
+    if isinstance(thing, PointStamped):
+        thing = thing.point
+    if isinstance(thing, PoseStamped):
+        thing = thing.pose
+    if isinstance(thing, Vector3Stamped):
+        thing = thing.vector
+    if isinstance(thing, Point) or isinstance(thing, Vector3):
+        return [thing.x,
+                thing.y,
+                thing.z]
+    if isinstance(thing, Pose):
+        return [thing.position.x,
+                thing.position.y,
+                thing.position.z,
+                thing.orientation.x,
+                thing.orientation.y,
+                thing.orientation.z,
+                thing.orientation.w]

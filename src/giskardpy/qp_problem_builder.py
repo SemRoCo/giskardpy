@@ -131,9 +131,13 @@ class QProblemBuilder(object):
         ub = {}
         lbA = {}
         ubA = {}
+        weights = {}
+        xdot = {}
         for iJ, (k, c) in enumerate(sorted(self.joint_constraints_dict.items(), key=lambda k: str(k[0]))):
             lb['joint--' + str(k)] = np_lb[iJ]
             ub['joint--' + str(k)] = np_ub[iJ]
+            weights['weight--' + str(k)] = np_H[iJ, iJ]
+            xdot['x--' + str(k)] = xdot_full[iJ]
 
         for iH, (k, c) in enumerate(sorted(self.hard_constraints_dict.items(), key=lambda k: str(k[0]))):
             lbA['hard--' + str(k)] = np_lbA[iH]
@@ -142,6 +146,8 @@ class QProblemBuilder(object):
         for iS, (k, c) in enumerate(sorted(self.soft_constraints_dict.items(), key=lambda k: str(k[0]))):
             lbA['soft--' + str(k)] = np_lbA[iH + iS + 1]
             ubA['soft--' + str(k)] = np_ubA[iH + iS + 1]
+            weights['weight--' + str(k)] = np_H[iJ + iS + 1, iJ + iS + 1]
+            xdot['x--' + str(k)] = xdot_full[iJ + iS + 1]
         pass
 
     def get_cmd(self, substitutions):

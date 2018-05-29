@@ -29,7 +29,13 @@ def to_joint_state_dict(msg):
         sjs = SingleJointState()
         sjs.name = joint_name
         sjs.position = msg.position[i]
-        sjs.velocity = msg.velocity[i]
-        sjs.effort = msg.effort[i]
+        try:
+            sjs.velocity = msg.velocity[i]
+        except IndexError:
+            sjs.velocity = 0
+        try:
+            sjs.effort = msg.effort[i]
+        except IndexError:
+            sjs.effort = 0
         mjs[joint_name] = sjs
     return mjs

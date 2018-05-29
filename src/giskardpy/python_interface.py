@@ -4,12 +4,17 @@ from geometry_msgs.msg import PoseStamped, Point, Quaternion
 from giskard_msgs.msg import MoveAction, MoveCmd, Controller, MoveGoal, WorldBody
 from giskard_msgs.srv import UpdateWorld, UpdateWorldRequest
 from shape_msgs.msg import SolidPrimitive
+from visualization_msgs.msg import Marker, MarkerArray
+
+from giskardpy.object import to_marker, from_msg
+from giskardpy.tfwrapper import lookup_transform
 
 
 class GiskardWrapper(object):
     def __init__(self, root_tips):
         self.client = SimpleActionClient('qp_controller/command', MoveAction)
         self.update_world = rospy.ServiceProxy('muh/update_world', UpdateWorld)
+        self.marker_pub = rospy.Publisher('visualization_marker_array', MarkerArray, queue_size=10)
         rospy.wait_for_service('muh/update_world')
         self.client.wait_for_server()
         self.tip_to_root = {}
@@ -17,6 +22,7 @@ class GiskardWrapper(object):
         self.clear_cmds()
         for root, tip in root_tips:
             self.tip_to_root[tip] = root
+        rospy.sleep(.3)
 
     def set_cart_goal(self, tip, pose_stamped):
         """
@@ -52,8 +58,8 @@ class GiskardWrapper(object):
         controller = Controller()
         controller.type = Controller.JOINT
         controller.weight = 1
-        controller.p_gain = 5
-        controller.max_speed = 0.5
+        controller.p_gain = 12.5
+        controller.max_speed = 0.02
         for joint_name, joint_position in joint_state.items():
             controller.goal_state.name.append(joint_name)
             controller.goal_state.position.append(joint_position)
@@ -123,6 +129,11 @@ class GiskardWrapper(object):
         box.shape.dimensions.append(size[1])
         box.shape.dimensions.append(size[2])
         req = UpdateWorldRequest(UpdateWorldRequest.ADD, box, False, pose)
+        world_object = from_msg(box)
+        ma = to_marker(world_object)
+        ma.markers[0].pose = pose.pose
+
+        self.marker_pub.publish(ma)
         return self.update_world.call(req)
 
     def add_sphere(self, name='sphere', size=1, frame_id='map', position=(0,0,0), orientation=(0,0,0,1)):
@@ -174,6 +185,12 @@ class GiskardWrapper(object):
         raise NotImplementedError
 
 
-    def add_urdf(self, name, path):
-        # TODO implement me
-        raise NotImplementedError
+    def add_urdf(self, name, urdf, js_topic, map_frame, root_frame):
+        urdf_body = WorldBody()
+        urdf_body.name = name
+        urdf_body.type = WorldBody.URDF_BODY
+        urdf_body.urdf = urdf
+        urdf_body.joint_state_topic = js_topic
+        transform = lookup_transform(map_frame, root_frame)
+        req = UpdateWorldRequest(UpdateWorldRequest.ADD, urdf_body, False, transform)
+        return self.update_world.call(req)

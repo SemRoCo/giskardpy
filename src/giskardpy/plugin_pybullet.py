@@ -2,7 +2,7 @@ from collections import defaultdict
 from itertools import product
 from rospkg import RosPack
 from time import time
-
+import numpy as np
 import rospy
 
 from geometry_msgs.msg import Point, Vector3
@@ -20,6 +20,7 @@ from giskardpy.object import WorldObject, to_urdf_string, VisualProperty, BoxSha
     MeshShape, from_msg, from_pose_msg
 from giskardpy.plugin import Plugin
 from giskardpy.pybullet_world import PyBulletWorld, ContactInfo
+from giskardpy.symengine_wrappers import euclidean_distance
 from giskardpy.tfwrapper import transform_pose, lookup_transform
 from giskardpy.trajectory import ClosestPointInfo
 from giskardpy.utils import keydefaultdict, to_joint_state_dict
@@ -39,8 +40,8 @@ class PyBulletPlugin(Plugin):
         self.marker = marker
         self.gui = gui
         self.lock = Lock()
-        self.object_js_subs = {} # JointState subscribers for articulated world objects
-        self.object_joint_states = {} # JointStates messages for articulated world objects
+        self.object_js_subs = {}  # JointState subscribers for articulated world objects
+        self.object_joint_states = {}  # JointStates messages for articulated world objects
         super(PyBulletPlugin, self).__init__()
 
     def copy(self):
@@ -52,6 +53,7 @@ class PyBulletPlugin(Plugin):
                             root_link=self.robot_root,
                             gui=self.gui)
         cp.world = self.world
+        cp.marker = self.marker
         # cp.srv = self.srv
         # cp.viz_gui = self.viz_gui
         cp.collision_pub = self.collision_pub
@@ -89,7 +91,8 @@ class PyBulletPlugin(Plugin):
             try:
                 if req.operation is UpdateWorldRequest.ADD:
                     # Check that no object with this name already exists.
-                    if self.world.has_object(req.body.name) or self.world.get_robot().has_attached_object(req.body.name):
+                    if self.world.has_object(req.body.name) or self.world.get_robot().has_attached_object(
+                            req.body.name):
                         DuplicateObjectNameException('Cannot spawn object "{}" because an object with such a '
                                                      'name already exists'.format(req.body.name))
 
@@ -103,7 +106,8 @@ class PyBulletPlugin(Plugin):
 
                     # CASE: Spawn a 'free' object
                     else:
-                        urdf_string = req.body.urdf if req.body.type is WorldBody.URDF_BODY else to_urdf_string(from_msg(req.body))
+                        urdf_string = req.body.urdf if req.body.type is WorldBody.URDF_BODY else to_urdf_string(
+                            from_msg(req.body))
                         pose = from_pose_msg(transform_pose(self.global_reference_frame_name, req.pose).pose)
                         self.world.spawn_object_from_urdf(req.body.name, urdf_string, pose)
                         # SUB-CASE: If it is an articulated object, open up a joint state subscriber
@@ -117,8 +121,8 @@ class PyBulletPlugin(Plugin):
                         self.world.delete_object(req.body.name)
                         if self.object_js_subs.has_key(req.body.name):
                             self.object_js_subs[req.body.name].unregister()
-                            del(self.object_js_subs[req.body.name])
-                            del(self.object_joint_states[req.body.name])
+                            del (self.object_js_subs[req.body.name])
+                            del (self.object_joint_states[req.body.name])
                     elif self.world.get_robot().has_attached_object(req.body.name):
                         self.world.get_robot().detach_object(req.body.name)
                     else:
@@ -131,8 +135,8 @@ class PyBulletPlugin(Plugin):
                     self.world.get_robot().detach_all_objects()
                     for object_name in self.object_js_subs.keys():
                         self.object_js_subs[object_name].unregister()
-                        del(self.object_js_subs[object_name])
-                        del(self.object_joint_states[object_name])
+                        del (self.object_js_subs[object_name])
+                        del (self.object_joint_states[object_name])
                 else:
                     return UpdateWorldResponse(UpdateWorldResponse.INVALID_OPERATION,
                                                "Received invalid operation code: {}".format(req.operation))
@@ -161,7 +165,7 @@ class PyBulletPlugin(Plugin):
                                                               p.pose.orientation.z,
                                                               p.pose.orientation.w])
 
-            default_distance = 0.05
+            default_distance = 0.02
             collision_goals = self.god_map.get_data([self.collision_goal_identifier])
             if collision_goals is None:
                 collision_goals = []
@@ -203,16 +207,17 @@ class PyBulletPlugin(Plugin):
             collisions = self.world.check_collisions(distances, allowed_collisions)
             if self.marker:
                 self.make_collision_markers(collisions)
+                self.make_collision_markers2(collisions)
 
-            closest_point = keydefaultdict(lambda k: ClosestPointInfo((10, 0, 0), (0, 0, 0), 1e9, default_distance, k, '',
-                                                                  (1, 0, 0)))
+            closest_point = keydefaultdict(
+                lambda k: ClosestPointInfo((10, 0, 0), (0, 0, 0), 1e9, default_distance, k, '', (1, 0, 0)))
             for key, collision_info in collisions.items():  # type: ((str, str), ContactInfo)
                 link1 = key[0]
                 cpi = ClosestPointInfo(collision_info.position_on_a, collision_info.position_on_b,
                                        collision_info.contact_distance, distances[key], key[0], key[1],
-                                   collision_info.contact_normal_on_b)
-            # if cpi.contact_distance < 0:
-            #     raise IntersectingCollisionException(key)
+                                       collision_info.contact_normal_on_b)
+                # if cpi.contact_distance < 0:
+                #     raise IntersectingCollisionException(key)
                 if link1 in closest_point:
                     closest_point[link1] = min(closest_point[link1], cpi, key=lambda x: x.contact_distance)
                 else:
@@ -251,6 +256,33 @@ class PyBulletPlugin(Plugin):
                         m.points.append(Point(*collision_info.position_on_b))
                         m.colors.append(ColorRGBA(0, 1, 0, 1))
                         m.colors.append(ColorRGBA(0, 1, 0, 1))
+        else:
+            m.action = Marker.DELETE
+        self.collision_pub.publish(m)
+
+    def make_collision_markers2(self, collisions):
+        m = Marker()
+        m.header.frame_id = 'map'
+        m.action = Marker.ADD
+        m.type = Marker.POINTS
+        m.id = 1337
+        m.ns = 'pybullet collisions2'
+        m.scale = Vector3(0.02, 0, 0)
+        # m.color = ColorRGBA(1, 0, 0, 1)
+        if len(collisions) > 0:
+            # TODO visualize only specific contacts
+            for (_, collision_info) in collisions.items():  # type: (str, ContactInfo)
+                if collision_info.contact_distance is not None:
+                    if collision_info.contact_distance < 0.1:
+                        np_n = np.asarray(collision_info.contact_normal_on_b)
+                        np_a = np.asarray(collision_info.position_on_a)
+                        np_b = np.asarray(collision_info.position_on_b)
+                        bpn = np_n + np_b
+                        if np.linalg.norm(bpn - np_a) > np.linalg.norm(bpn - np_b):
+                            m.points.append(Point(*collision_info.position_on_b))
+                        else:
+                            m.points.append(Point(*collision_info.position_on_a))
+                        m.colors.append(ColorRGBA(0, 0, 1, 1))
         else:
             m.action = Marker.DELETE
         self.collision_pub.publish(m)

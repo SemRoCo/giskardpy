@@ -147,6 +147,17 @@ def add_dummy_pr2_request():
     transform = tf.lookup_transform('map', 'dummy_pr2/base_footprint', rospy.Time.now(), rospy.Duration(0.5))
     return UpdateWorldRequest(UpdateWorldRequest.ADD, pr2, False, to_pose_stamped_msg(transform))
 
+def add_kitchen_request():
+    pr2 = WorldBody()
+    pr2.name = "kitchen"
+    pr2.type = WorldBody.URDF_BODY
+    pr2.urdf = rospy.get_param('/kitchen_description')
+    pr2.joint_state_topic = '/kitchen_joint_states'
+    tf = tf2_ros.BufferClient('tf2_buffer_server')
+    tf.wait_for_server(rospy.Duration(0.5))
+    transform = tf.lookup_transform('map', 'world', rospy.Time.now(), rospy.Duration(0.5))
+    return UpdateWorldRequest(UpdateWorldRequest.ADD, pr2, False, to_pose_stamped_msg(transform))
+
 
 def call_service(proxy, request, expected_error, user_msg):
     """
@@ -256,6 +267,14 @@ def add_dummy_pr2(proxy):
     """
     call_service(proxy, add_dummy_pr2_request(), UpdateWorldResponse.SUCCESS, "Adding dummy pr2 --expecting success...")
 
+def add_kitchen(proxy):
+    """
+    Adds dummy PR2 as an object to the giskard world, expecting success.
+    :param proxy: ServiceProxy to update the giskard world.
+    :type proxy: rospy.ServiceProxy
+    """
+    call_service(proxy, add_kitchen_request(), UpdateWorldResponse.SUCCESS, "Adding kitchen --expecting success...")
+
 
 def clear_world(proxy):
     call_service(proxy, clear_world_request(), UpdateWorldResponse.SUCCESS, "Clearing world --expecting success...")
@@ -265,17 +284,18 @@ def test_update_world():
     rospy.wait_for_service('muh/update_world')
     try:
         update_world = rospy.ServiceProxy('muh/update_world', UpdateWorld)
-        clear_world(update_world)
-        add_table(update_world)
-        add_table_again(update_world)
-        add_sphere(update_world)
-        add_cylinder(update_world)
-        add_box(update_world)
-        add_cone(update_world)
-        remove_sphere(update_world)
-        remove_sphere_again(update_world)
-        add_wand(update_world)
-        add_dummy_pr2(update_world)
+        # clear_world(update_world)
+        # add_table(update_world)
+        # add_table_again(update_world)
+        # add_sphere(update_world)
+        # add_cylinder(update_world)
+        # add_box(update_world)
+        # add_cone(update_world)
+        # remove_sphere(update_world)
+        # remove_sphere_again(update_world)
+        # add_wand(update_world)
+        # add_dummy_pr2(update_world)
+        add_kitchen(update_world)
     except rospy.ServiceException as e:
         print("Service call failed: {}".format(e))
 

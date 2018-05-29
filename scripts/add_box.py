@@ -13,6 +13,7 @@ if __name__ == '__main__':
                                  frame_id=rospy.get_param('~frame', 'map'),
                                  position=rospy.get_param('~position', (0, 0, 0)),
                                  orientation=rospy.get_param('~orientation', (0, 0, 0, 1)))
+        rospy.sleep(0.5)
         if result.error_codes == result.SUCCESS:
             rospy.loginfo('box \'{}\' added'.format(name))
         else:

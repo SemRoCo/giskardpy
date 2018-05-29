@@ -72,14 +72,15 @@ def joint_position(current_joint, joint_goal, weight, p_gain, max_speed):
     # TODO can't get out of joint limit?
     # TODO implement max_speed
     # TODO implement p_gain
-    limit = sw.fake_Min(p_gain*(joint_goal - current_joint), max_speed)
+    limit = sw.fake_Min(p_gain * (joint_goal - current_joint), max_speed)
     return SoftConstraint(lower=limit,
                           upper=limit,
                           weight=weight,
                           expression=current_joint)
 
+
 def continuous_joint_position(current_joint, change, weight, p_gain, max_speed):
-    limit = sw.fake_Min(p_gain*(change), max_speed)
+    limit = sw.fake_Min(p_gain * (change), max_speed)
     return SoftConstraint(lower=limit,
                           upper=limit,
                           weight=weight,
@@ -166,6 +167,20 @@ def link_to_link_avoidance(link_name, current_pose, current_pose_eval, point_on_
     # add_debug_constraint(soft_constraints, '{} //debug n0//'.format(name), contact_normal[0])
     # add_debug_constraint(soft_constraints, '{} //debug n1//'.format(name), contact_normal[1])
     # add_debug_constraint(soft_constraints, '{} //debug n2//'.format(name), contact_normal[2])
+    return soft_constraints
+
+
+def link_to_link_avoidance_old(link_name, current_pose, current_pose_eval, point_on_link, other_point, lower_limit=0.05,
+                               upper_limit=1e9, weight=10000):
+    soft_constraints = {}
+    name = '{} to any collision'.format(link_name)
+
+    dist = sw.euclidean_distance((current_pose * sw.inverse_frame(current_pose_eval) * point_on_link), other_point)
+    soft_constraints['{} cpi'.format(name)] = SoftConstraint(lower=lower_limit - dist,
+                                            upper=upper_limit,
+                                            weight=weight,
+                                            expression=dist)
+
     return soft_constraints
 
 

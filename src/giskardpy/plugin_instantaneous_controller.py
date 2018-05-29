@@ -6,7 +6,7 @@ from giskard_msgs.msg import Controller
 from giskardpy.input_system import JointStatesInput, FrameInput, Point3Input, Vector3Input, ShortestAngularDistanceInput
 from giskardpy.plugin import Plugin
 from giskardpy.symengine_controller import SymEngineController, position_conv, rotation_conv, \
-    link_to_link_avoidance, joint_position, continuous_joint_position
+    link_to_link_avoidance, joint_position, continuous_joint_position, link_to_link_avoidance_old
 import symengine_wrappers as sw
 from giskardpy.utils import keydefaultdict
 
@@ -55,10 +55,8 @@ class CartesianBulletControllerPlugin(Plugin):
         self.controlled_joints = new_controlled_joints
         self.init_controller()
 
-
         if self.god_map.get_data([self._goal_identifier]) is not None:
             # TODO set joint goals
-
 
             if not self.controller_updated:
                 self.modify_controller()
@@ -92,7 +90,8 @@ class CartesianBulletControllerPlugin(Plugin):
                                                         'position'])
                 weight = self.god_map.get_expr([self._goal_identifier, str(Controller.JOINT), joint_name, 'weight'])
                 gain = self.god_map.get_expr([self._goal_identifier, str(Controller.JOINT), joint_name, 'p_gain'])
-                max_speed = self.god_map.get_expr([self._goal_identifier, str(Controller.JOINT), joint_name, 'max_speed'])
+                max_speed = self.god_map.get_expr(
+                    [self._goal_identifier, str(Controller.JOINT), joint_name, 'max_speed'])
                 if robot.is_continuous(joint_name):
                     change = ShortestAngularDistanceInput(self.god_map.get_expr,
                                                           [self._pyfunctions_identifier],
@@ -122,6 +121,12 @@ class CartesianBulletControllerPlugin(Plugin):
                 contact_normal = Vector3Input.prefix(self.god_map.get_expr,
                                                      [self._closest_point_identifier, link, 'contact_normal'])
 
+                # self.soft_constraints.update(link_to_link_avoidance_old(link,
+                #                                                         robot.get_fk_expression(self.root, link),
+                #                                                         current_input.get_frame(),
+                #                                                         point_on_link_input.get_expression(),
+                #                                                         other_point_input.get_expression(),
+                #                                                         min_dist))
                 self.soft_constraints.update(link_to_link_avoidance(link,
                                                                     robot.get_fk_expression(self.root, link),
                                                                     current_input.get_frame(),

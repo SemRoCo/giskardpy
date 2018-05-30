@@ -96,15 +96,15 @@ class CartesianBulletControllerPlugin(Plugin):
                                                           current_joint_key,
                                                           goal_joint_key)
                     pyfunctions[change.get_key()] = change
-                    self.soft_constraints[joint_name] = continuous_joint_position(current_joint_expr,
-                                                                                  change.get_expression(),
-                                                                                  weight,
-                                                                                  gain,
-                                                                                  max_speed)
+                    self.soft_constraints.update(continuous_joint_position(current_joint_expr,
+                                                                           change.get_expression(),
+                                                                           weight,
+                                                                           gain,
+                                                                           max_speed, joint_name))
                 else:
-                    self.soft_constraints[joint_name] = joint_position(current_joint_expr, goal_joint_expr, weight,
-                                                                       gain,
-                                                                       max_speed)
+                    self.soft_constraints.update(joint_position(current_joint_expr, goal_joint_expr, weight,
+                                                                gain,
+                                                                max_speed, joint_name))
                 controllable_links.update(robot.get_link_tree(joint_name))
             self.god_map.set_data([self._pyfunctions_identifier], pyfunctions)
 
@@ -120,12 +120,6 @@ class CartesianBulletControllerPlugin(Plugin):
                 contact_normal = Vector3Input.prefix(self.god_map.get_expr,
                                                      [self._closest_point_identifier, link, 'contact_normal'])
 
-                # self.soft_constraints.update(link_to_link_avoidance_old(link,
-                #                                                         robot.get_fk_expression(self.root, link),
-                #                                                         current_input.get_frame(),
-                #                                                         point_on_link_input.get_expression(),
-                #                                                         other_point_input.get_expression(),
-                #                                                         min_dist))
                 self.soft_constraints.update(link_to_link_avoidance(link,
                                                                     robot.get_fk_expression(self.root, link),
                                                                     current_input.get_frame(),

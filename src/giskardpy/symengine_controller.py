@@ -57,7 +57,7 @@ class SymEngineController(object):
         return real_next_cmd
 
 
-def joint_position(current_joint, joint_goal, weight, p_gain, max_speed):
+def joint_position(current_joint, joint_goal, weight, p_gain, max_speed, name):
     """
     :param current_joint:
     :type current_joint: Symbol
@@ -69,21 +69,26 @@ def joint_position(current_joint, joint_goal, weight, p_gain, max_speed):
     :rtype: dict
     """
     # TODO can't get out of joint limit?
-    # TODO implement max_speed
-    # TODO implement p_gain
     limit = sw.fake_Min(p_gain * (joint_goal - current_joint), max_speed)
-    return SoftConstraint(lower=limit,
-                          upper=limit,
-                          weight=weight,
-                          expression=current_joint)
+    soft_constraints = {}
+    soft_constraints[name] = SoftConstraint(lower=limit,
+                                            upper=limit,
+                                            weight=weight,
+                                            expression=current_joint)
+    return soft_constraints
 
 
-def continuous_joint_position(current_joint, change, weight, p_gain, max_speed):
+def continuous_joint_position(current_joint, change, weight, p_gain, max_speed, name):
     limit = sw.fake_Min(p_gain * (change), max_speed)
-    return SoftConstraint(lower=limit,
-                          upper=limit,
-                          weight=weight,
-                          expression=current_joint)
+    soft_constraints = {}
+    soft_constraints[name] = SoftConstraint(lower=limit,
+                                            upper=limit,
+                                            weight=weight,
+                                            expression=current_joint)
+    # add_debug_constraint(soft_constraints, '{} //change//'.format(name), change)
+    # add_debug_constraint(soft_constraints, '{} //p_gain//'.format(name), p_gain)
+    # add_debug_constraint(soft_constraints, '{} //max_speed//'.format(name), max_speed)
+    return soft_constraints
 
 
 def position_conv(goal_position, current_position, weights=1, trans_gain=3, max_trans_speed=0.3, ns=''):

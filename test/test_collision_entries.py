@@ -75,14 +75,14 @@ class TestCollisionAvoidance(unittest.TestCase):
         result = self.giskard.get_result()
         self.assertEqual(result.error_code, MoveResult.SUCCESS)
         current_joint_state = rospy.wait_for_message('joint_states', JointState)  # type: JointState
-        # for i, joint_name in enumerate(current_joint_state.name):
-        #     if joint_name in goal_js:
-        #         goal = normalize_angle(goal_js[joint_name])
-        #         current = normalize_angle(current_joint_state.position[i])
-        #         self.assertAlmostEqual(goal, current, 2,
-        #                                msg='{} is {} instead of {}'.format(joint_name,
-        #                                                                    current,
-        #                                                                    goal))
+        for i, joint_name in enumerate(current_joint_state.name):
+            if joint_name in goal_js:
+                goal = normalize_angle(goal_js[joint_name])
+                current = normalize_angle(current_joint_state.position[i])
+                self.assertAlmostEqual(goal, current, 2,
+                                       msg='{} is {} instead of {}'.format(joint_name,
+                                                                           current,
+                                                                           goal))
 
     def add_box(self):
         self.giskard.add_box(name='box', position=(1.2, 0, 0.5))
@@ -113,7 +113,7 @@ class TestCollisionAvoidance(unittest.TestCase):
 
         collision_entry = CollisionEntry()
         collision_entry.type = CollisionEntry.AVOID_COLLISION
-        collision_entry.min_dist = 0.01
+        collision_entry.min_dist = 0.1
         collision_entry.body_b = 'box'
         self.giskard.set_collision_entries([collision_entry])
 

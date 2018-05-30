@@ -49,7 +49,7 @@ if __name__ == '__main__':
                                           closest_point_identifier=closest_point_identifier,
                                           controlled_joints_identifier=controlled_joints_identifier,
                                           collision_goal_identifier=collision_goal_identifier,
-                                          plot_trajectory=True))
+                                          plot_trajectory=False))
     pm.register_plugin('bullet',
                        PyBulletPlugin(js_identifier=js_identifier,
                                       collision_identifier=collision_identifier,

@@ -67,7 +67,6 @@ class CartesianBulletControllerPlugin(Plugin):
 
         if len(self.next_cmd) > 0:
             self.god_map.set_data([self._next_cmd_identifier], self.next_cmd)
-            # updates = {self._next_cmd_identifier: self.next_cmd}
 
     def start_always(self):
         self.next_cmd = {}

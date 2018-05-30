@@ -9,7 +9,7 @@ class SymEngineController(object):
         self.path_to_functions = path_to_functions
         self._soft_constraints = OrderedDict()
         self.robot = Robot(urdf)
-        self.controlled_joints = set()
+        self.controlled_joints = []
         self.hard_constraints = {}
         self.joint_constraints = {}
         self.qp_problem_builder = None
@@ -23,14 +23,13 @@ class SymEngineController(object):
         :type joint_names: set
         """
         # TODO might have to get it from a topic or something
-        self.controlled_joints.update(joint_names)
+        self.controlled_joints.extend(x for x in joint_names if x not in self.controlled_joints)
         self.controlled_joint_symbols = [self.robot.get_joint_symbol_map().joint_map[x] for x in
                                          self.controlled_joints]
-        self.joint_constraints = {(self.robot.get_name(), k): self.robot.joint_constraints[k] for k in
-                                  self.controlled_joints}
-        self.hard_constraints = {(self.robot.get_name(), k): self.robot.hard_constraints[k] for k in
-                                 self.controlled_joints if
-                                 k in self.robot.hard_constraints}
+        self.joint_constraints = OrderedDict(((self.robot.get_name(), k), self.robot.joint_constraints[k]) for k in
+                                             self.controlled_joints)
+        self.hard_constraints = OrderedDict(((self.robot.get_name(), k), self.robot.hard_constraints[k]) for k in
+                                            self.controlled_joints if k in self.robot.hard_constraints)
 
     def init(self, soft_constraints, free_symbols):
         self.qp_problem_builder = QProblemBuilder(self.joint_constraints,
@@ -177,9 +176,9 @@ def link_to_link_avoidance_old(link_name, current_pose, current_pose_eval, point
 
     dist = sw.euclidean_distance((current_pose * sw.inverse_frame(current_pose_eval) * point_on_link), other_point)
     soft_constraints['{} cpi'.format(name)] = SoftConstraint(lower=lower_limit - dist,
-                                            upper=upper_limit,
-                                            weight=weight,
-                                            expression=dist)
+                                                             upper=upper_limit,
+                                                             weight=weight,
+                                                             expression=dist)
 
     return soft_constraints
 

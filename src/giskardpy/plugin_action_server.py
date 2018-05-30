@@ -2,6 +2,8 @@ import numpy as np
 from Queue import Empty, Queue
 from collections import OrderedDict, defaultdict
 import pylab as plt
+from itertools import combinations, product
+
 import actionlib
 import rospy
 from control_msgs.msg import FollowJointTrajectoryAction, FollowJointTrajectoryResult, FollowJointTrajectoryGoal, \
@@ -250,6 +252,7 @@ class ActionServerPlugin(Plugin):
                                          time_identifier=self.time_identifier,
                                          plot_trajectory=self.plot_trajectory,
                                          goal_identifier=self.goal_identifier,
+                                         controlled_joints_identifier=self.controlled_joints_identifier,
                                          is_preempted=lambda: self._as.is_preempt_requested())
         return self.child
 
@@ -260,8 +263,9 @@ class ActionServerPlugin(Plugin):
 
 class LogTrajectoryPlugin(Plugin):
     def __init__(self, trajectory_identifier, joint_state_identifier, time_identifier, goal_identifier,
-                 plot_trajectory=False, is_preempted=lambda: False):
+                 controlled_joints_identifier, plot_trajectory=False, is_preempted=lambda: False):
         self.plot = plot_trajectory
+        self.controlled_joints_identifier = controlled_joints_identifier
         self.goal_identifier = goal_identifier
         self.trajectory_identifier = trajectory_identifier
         self.joint_state_identifier = joint_state_identifier
@@ -288,7 +292,7 @@ class LogTrajectoryPlugin(Plugin):
         if (time >= 1 and np.abs([v.velocity for v in current_js.values()]).max() < self.precision):
             print('done')
             if self.plot:
-                self.plot_trajectory(trajectory)
+                plot_trajectory(trajectory, set(self.god_map.get_data([self.controlled_joints_identifier])))
             self.stop_universe = True
             return
 
@@ -301,18 +305,73 @@ class LogTrajectoryPlugin(Plugin):
     def end_parallel_universe(self):
         return self.stop_universe
 
-    def plot_trajectory(self, tj):
-        positions = []
-        velocities = []
-        for time, point in tj.items():
-            positions.append([v.position for v in point.values()])
-            velocities.append([v.velocity for v in point.values()])
-        positions = np.array(positions)
-        velocities = np.array(velocities)
-        plt.title('position')
-        plt.plot(positions - positions.mean(axis=0))
-        plt.show()
-        plt.title('velocity')
-        plt.plot(velocities)
-        plt.show()
-        pass
+def plot_trajectory(tj, controlled_joints):
+    """
+    :param tj:
+    :type tj: Trajectory
+    """
+    colors = ['b', 'g', 'r', 'c', 'm', 'y', 'k']
+    line_styles = ['', '--', '-.']
+    fmts = [''.join(x) for x in product(line_styles, colors)]
+    positions = []
+    velocities = []
+    names = [x for x in tj._points[0.0].keys() if x in controlled_joints]
+    for time, point in tj.items():
+        positions.append([v.position for j, v in point.items() if j in controlled_joints])
+        velocities.append([v.velocity for j, v in point.items() if j in controlled_joints])
+    positions = np.array(positions)
+    velocities = np.array(velocities)
+
+    f, (ax1, ax2) = plt.subplots(2, sharex=True)
+    ax1.set_title('position')
+    ax2.set_title('velocity')
+    positions -= positions.mean(axis=0)
+    for i, position in enumerate(positions.T):
+        ax1.plot(position, fmts[i], label=names[i])
+        ax2.plot(velocities[:,i], fmts[i])
+    box = ax1.get_position()
+    ax1.set_position([box.x0, box.y0, box.width * 0.6, box.height])
+    box = ax2.get_position()
+    ax2.set_position([box.x0, box.y0, box.width * 0.6, box.height])
+
+    # Put a legend to the right of the current axis
+    ax1.legend(loc='center', bbox_to_anchor=(1.45, 0))
+
+    plt.show()
+
+def plot_trajectory2(tj):
+    """
+    :param tj:
+    :type tj: Trajectory
+    """
+    colors = ['b', 'g', 'r', 'c', 'm', 'y', 'k']
+    line_styles = ['', '--', '-.']
+    fmts = [''.join(x) for x in product(line_styles, colors)]
+    positions = []
+    velocities = []
+    time = []
+    names = tj.joint_names
+    for point in tj.points:
+        positions.append(point.positions)
+        velocities.append(point.velocities)
+        time.append(point.time_from_start)
+    positions = np.array(positions)
+    velocities = np.array(velocities).T
+    time = np.array([x.to_sec() for x in time])
+
+    f, (ax1, ax2) = plt.subplots(2, sharex=True)
+    ax1.set_title('position')
+    ax2.set_title('velocity')
+    positions -= positions.mean(axis=0)
+    for i, position in enumerate(positions.T):
+        ax1.plot(time, position, fmts[i], label=names[i])
+        ax2.plot(time, velocities[i], fmts[i])
+    box = ax1.get_position()
+    ax1.set_position([box.x0, box.y0, box.width * 0.6, box.height])
+    box = ax2.get_position()
+    ax2.set_position([box.x0, box.y0, box.width * 0.6, box.height])
+
+    # Put a legend to the right of the current axis
+    ax1.legend(loc='center', bbox_to_anchor=(1.45, 0))
+
+    plt.show()

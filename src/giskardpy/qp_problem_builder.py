@@ -54,15 +54,15 @@ class QProblemBuilder(object):
         ubA = []
         soft_expressions = []
         hard_expressions = []
-        for k, c in sorted(self.joint_constraints_dict.items(), key=lambda k: str(k[0])):
+        for k, c in self.joint_constraints_dict.items():
             weights.append(c.weight)
             lb.append(c.lower)
             ub.append(c.upper)
-        for k, c in sorted(self.hard_constraints_dict.items(), key=lambda k: str(k[0])):
+        for k, c in self.hard_constraints_dict.items():
             lbA.append(c.lower)
             ubA.append(c.upper)
             hard_expressions.append(c.expression)
-        for k, c in sorted(self.soft_constraints_dict.items(), key=lambda k: str(k[0])):
+        for k, c in self.soft_constraints_dict.items():
             weights.append(c.weight)
             lbA.append(c.lower)
             ubA.append(c.upper)
@@ -133,17 +133,17 @@ class QProblemBuilder(object):
         ubA = {}
         weights = {}
         xdot = {}
-        for iJ, (k, c) in enumerate(sorted(self.joint_constraints_dict.items(), key=lambda k: str(k[0]))):
+        for iJ, (k, c) in enumerate(self.joint_constraints_dict.items()):
             lb['joint--' + str(k)] = np_lb[iJ]
             ub['joint--' + str(k)] = np_ub[iJ]
             weights['weight--' + str(k)] = np_H[iJ, iJ]
             xdot['x--' + str(k)] = xdot_full[iJ]
 
-        for iH, (k, c) in enumerate(sorted(self.hard_constraints_dict.items(), key=lambda k: str(k[0]))):
+        for iH, (k, c) in enumerate(self.hard_constraints_dict.items()):
             lbA['hard--' + str(k)] = np_lbA[iH]
             ubA['hard--' + str(k)] = np_ubA[iH]
 
-        for iS, (k, c) in enumerate(sorted(self.soft_constraints_dict.items(), key=lambda k: str(k[0]))):
+        for iS, (k, c) in enumerate(self.soft_constraints_dict.items()):
             lbA['soft--' + str(k)] = np_lbA[iH + iS + 1]
             ubA['soft--' + str(k)] = np_ubA[iH + iS + 1]
             weights['weight--' + str(k)] = np_H[iJ + iS + 1, iJ + iS + 1]

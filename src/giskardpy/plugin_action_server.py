@@ -295,16 +295,17 @@ class LogTrajectoryPlugin(Plugin):
             print('goal preempted')
             self.stop_universe = True
             return
-        if rounded_js in self.past_joint_states:
-            self.stop_universe = True
-            raise InsolvableException('endless wiggling detected')
+        if time >= 1:
+            if np.abs([v.velocity for v in current_js.values()]).max() < self.precision:
+                print('done')
+                if self.plot:
+                    plot_trajectory(trajectory, set(self.god_map.get_data([self.controlled_joints_identifier])))
+                self.stop_universe = True
+                return
+            if rounded_js in self.past_joint_states:
+                self.stop_universe = True
+                raise InsolvableException('endless wiggling detected')
         self.past_joint_states.add(rounded_js)
-        if (time >= 1 and np.abs([v.velocity for v in current_js.values()]).max() < self.precision):
-            print('done')
-            if self.plot:
-                plot_trajectory(trajectory, set(self.god_map.get_data([self.controlled_joints_identifier])))
-            self.stop_universe = True
-            return
 
     def start_always(self):
         self.stop_universe = False

@@ -80,7 +80,7 @@ class ShortestAngularDistanceInput(object):
     def __init__(self, f, prefix, current_angle, goal_angle):
         self.current_angle = current_angle
         self.goal_angle = goal_angle
-        self.name = f(prefix+[self.get_sdaffsafd()])
+        self.name = f(prefix + [self.get_key()])
 
     def __call__(self, god_map):
         """
@@ -89,15 +89,12 @@ class ShortestAngularDistanceInput(object):
         :return:
         :rtype: float
         """
-        # TODO get rid of unnecessary conversion
-        # TODO potential speedup by optimizing shortest_angular_distance
-        a1 = god_map.get_data(god_map.expr_to_key[str(self.current_angle)]) #type: float
-        a2 = god_map.get_data(god_map.expr_to_key[str(self.goal_angle)]) #type: float
+        a1 = god_map.get_data(self.current_angle)  # type: float
+        a2 = god_map.get_data(self.goal_angle)  # type: float
         return shortest_angular_distance(a1, a2)
 
-    def get_sdaffsafd(self):
-        # TODO rename me
-        return '{}__{}__{}'.format(self.__class__.__name__, str(self.current_angle), str(self.goal_angle))
+    def get_key(self):
+        return '__'.join(str(x) for x in [self.__class__.__name__] + self.current_angle + self.goal_angle)
 
     def get_expression(self):
         return self.name

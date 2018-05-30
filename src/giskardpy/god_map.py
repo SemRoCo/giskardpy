@@ -86,7 +86,6 @@ class GodMap(object):
         if isinstance(key, str):
             identifier_parts = key.split(self.separator)
         else:
-            # TODO handle tuple
             identifier_parts = [str(x) for x in key]
         namespace = identifier_parts[0]
         if namespace not in self._data:

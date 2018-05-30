@@ -82,11 +82,10 @@ class CartesianBulletControllerPlugin(Plugin):
             controllable_links = set()
             pyfunctions = {}
             for joint_name in self.controlled_joints:
-                current_joint_key = self.god_map.get_expr([self._joint_states_identifier, joint_name, 'position'])
-                goal_joint_key = self.god_map.get_expr([self._goal_identifier,
-                                                        str(Controller.JOINT),
-                                                        joint_name,
-                                                        'position'])
+                current_joint_key = [self._joint_states_identifier, joint_name, 'position']
+                goal_joint_key = [self._goal_identifier, str(Controller.JOINT), joint_name, 'position']
+                current_joint_expr = self.god_map.get_expr(current_joint_key)
+                goal_joint_expr = self.god_map.get_expr(goal_joint_key)
                 weight = self.god_map.get_expr([self._goal_identifier, str(Controller.JOINT), joint_name, 'weight'])
                 gain = self.god_map.get_expr([self._goal_identifier, str(Controller.JOINT), joint_name, 'p_gain'])
                 max_speed = self.god_map.get_expr(
@@ -96,14 +95,15 @@ class CartesianBulletControllerPlugin(Plugin):
                                                           [self._pyfunctions_identifier],
                                                           current_joint_key,
                                                           goal_joint_key)
-                    pyfunctions[change.get_sdaffsafd()] = change
-                    self.soft_constraints[joint_name] = continuous_joint_position(current_joint_key,
+                    pyfunctions[change.get_key()] = change
+                    self.soft_constraints[joint_name] = continuous_joint_position(current_joint_expr,
                                                                                   change.get_expression(),
                                                                                   weight,
                                                                                   gain,
                                                                                   max_speed)
                 else:
-                    self.soft_constraints[joint_name] = joint_position(current_joint_key, goal_joint_key, weight, gain,
+                    self.soft_constraints[joint_name] = joint_position(current_joint_expr, goal_joint_expr, weight,
+                                                                       gain,
                                                                        max_speed)
                 controllable_links.update(robot.get_link_tree(joint_name))
             self.god_map.set_data([self._pyfunctions_identifier], pyfunctions)

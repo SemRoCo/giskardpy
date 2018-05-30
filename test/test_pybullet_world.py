@@ -110,10 +110,6 @@ class TestPyBulletWorld(unittest.TestCase):
         self.w.add_ground_plane()
         self.assertEqual(self.w.get_object_list(), ['plane'])
 
-    def test_list_robots1(self):
-        self.w.spawn_robot_from_urdf_file('pr2', 'pr2.urdf')
-        self.assertEqual(self.w.get_robot_list(), ['pr2'])
-
     def test_joint_state(self):
         mjs = self.get_pr2_collision_js()
         self.w.spawn_robot_from_urdf_file('pr2', 'pr2.urdf')

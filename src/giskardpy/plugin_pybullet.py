@@ -28,8 +28,9 @@ from giskardpy.utils import keydefaultdict, to_joint_state_dict, to_point_stampe
 
 class PyBulletPlugin(Plugin):
     def __init__(self, js_identifier, collision_identifier, closest_point_identifier, collision_goal_identifier,
-                 map_frame, root_link, gui=False, marker=False):
+                 map_frame, root_link, path_to_data_folder='', gui=False, marker=False):
         self.collision_goal_identifier = collision_goal_identifier
+        self.path_to_data_folder = path_to_data_folder
         self.js_identifier = js_identifier
         self.collision_identifier = collision_identifier
         self.closest_point_identifier = closest_point_identifier
@@ -51,6 +52,7 @@ class PyBulletPlugin(Plugin):
                             collision_goal_identifier=self.collision_goal_identifier,
                             map_frame=self.map_frame,
                             root_link=self.robot_root,
+                            path_to_data_folder=self.path_to_data_folder,
                             gui=self.gui)
         cp.world = self.world
         cp.marker = self.marker
@@ -60,7 +62,7 @@ class PyBulletPlugin(Plugin):
         return cp
 
     def start_once(self):
-        self.world = PyBulletWorld(gui=self.gui)
+        self.world = PyBulletWorld(gui=self.gui, path_to_data_folder=self.path_to_data_folder)
         self.srv = rospy.Service('~update_world', UpdateWorld, self.update_world_cb)
         self.viz_gui = rospy.Service('~enable_marker', SetBool, self.enable_marker_cb)
         self.collision_pub = rospy.Publisher('visualization_marker', Marker, queue_size=1)

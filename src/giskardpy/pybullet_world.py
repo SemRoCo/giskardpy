@@ -97,7 +97,7 @@ def load_urdf_string_into_bullet(urdf_string, pose):
 
 
 class PyBulletRobot(object):
-    def __init__(self, name, urdf, base_pose=Transform(), calc_self_collision_matrix=True):
+    def __init__(self, name, urdf, base_pose=Transform(), calc_self_collision_matrix=True, path_to_data_folder=''):
         """
 
         :param name:
@@ -106,6 +106,7 @@ class PyBulletRobot(object):
         :param base_pose:
         :type base_pose: Transform
         """
+        self.path_to_data_folder = path_to_data_folder
         self.name = name
         self.original_urdf = resolve_ros_iris(urdf)
         self.id = load_urdf_string_into_bullet(self.original_urdf, base_pose)
@@ -120,8 +121,9 @@ class PyBulletRobot(object):
 
     def load_self_collision_matrix(self):
         urdf_hash = hashlib.md5(self.original_urdf).hexdigest()
-        if os.path.isfile(urdf_hash):
-            with open(urdf_hash) as f:
+        path = self.path_to_data_folder + urdf_hash
+        if os.path.isfile(path):
+            with open(path) as f:
                 self.sometimes = pickle.load(f)
                 print('loaded self collision matrix {}'.format(urdf_hash))
                 return True
@@ -129,16 +131,17 @@ class PyBulletRobot(object):
 
     def save_self_collision_matrix(self):
         urdf_hash = hashlib.md5(self.original_urdf).hexdigest()
-        if not os.path.exists(os.path.dirname(urdf_hash)):
+        path = self.path_to_data_folder + urdf_hash
+        if not os.path.exists(os.path.dirname(path)):
             try:
-                dir_name = os.path.dirname(urdf_hash)
+                dir_name = os.path.dirname(path)
                 if dir_name != '':
                     os.makedirs(dir_name)
             except OSError as exc:  # Guard against race condition
                 if exc.errno != errno.EEXIST:
                     raise
-        with open(urdf_hash, 'w') as file:
-            print('saved self collision matrix {}'.format(urdf_hash))
+        with open(path, 'w') as file:
+            print('saved self collision matrix {}'.format(path))
             pickle.dump(self.sometimes, file)
 
     def set_joint_state(self, multi_joint_state):
@@ -443,10 +446,11 @@ class PyBulletRobot(object):
 
 
 class PyBulletWorld(object):
-    def __init__(self, gui=False):
+    def __init__(self, gui=False, path_to_data_folder=''):
         self._gui = gui
         self._objects = {}
         self._robot = None
+        self.path_to_data_folder = path_to_data_folder
 
     def spawn_robot_from_urdf_file(self, robot_name, urdf_file, base_pose=Transform()):
         """
@@ -475,11 +479,8 @@ class PyBulletWorld(object):
         if self.has_robot():
             raise Exception('A robot is already loaded')
         self.deactivate_rendering()
-        self._robot = PyBulletRobot(robot_name, urdf, base_pose)
+        self._robot = PyBulletRobot(robot_name, urdf, base_pose, path_to_data_folder=self.path_to_data_folder)
         self.activate_rendering()
-
-    def get_robot_list(self):
-        return list(self._robot.keys())
 
     def get_robot(self):
         """

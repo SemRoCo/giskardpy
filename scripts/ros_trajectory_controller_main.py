@@ -20,6 +20,7 @@ if __name__ == '__main__':
 
     # TODO do we need a solution where we have a different root for some links?
 
+    path_to_data_folder = RosPack().get_path('giskardpy') + '/data/'
     fk_identifier = 'fk'
     cartesian_goal_identifier = 'goal'
     js_identifier = 'js'
@@ -56,8 +57,9 @@ if __name__ == '__main__':
                                       collision_goal_identifier=collision_goal_identifier,
                                       map_frame=rospy.get_param('~map_frame', 'map'),
                                       root_link=root_link,
+                                      path_to_data_folder=path_to_data_folder,
                                       gui=rospy.get_param('~enable_gui', True),
-                                      marker=rospy.get_param('~enable_collision_marker', True)))
+                                      marker=rospy.get_param('~enable_collision_marker', True),))
     pm.register_plugin('fk', FKPlugin(js_identifier=js_identifier, fk_identifier=fk_identifier))
     pm.register_plugin('cart bullet controller',
                        CartesianBulletControllerPlugin(root_link=root_link,
@@ -69,7 +71,7 @@ if __name__ == '__main__':
                                                        closest_point_identifier=closest_point_identifier,
                                                        controlled_joints_identifier=controlled_joints_identifier,
                                                        collision_goal_identifier=collision_goal_identifier,
-                                                       path_to_functions=RosPack().get_path('giskardpy') + '/data/'))
+                                                       path_to_functions=path_to_data_folder))
     pm.register_plugin('interactive marker',
                        InteractiveMarkerPlugin(rospy.get_param('~interactive_marker_chains',
                                                                [('base_link', 'r_gripper_tool_frame'),

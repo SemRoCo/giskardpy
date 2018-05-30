@@ -19,7 +19,7 @@ from trajectory_msgs.msg import JointTrajectoryPoint, JointTrajectory
 from visualization_msgs.msg import MarkerArray
 
 from giskardpy.exceptions import MAX_NWSR_REACHEDException, QPSolverException, SolverTimeoutError, \
-    IntersectingCollisionException
+    IntersectingCollisionException, InsolvableException
 from giskardpy.plugin import Plugin
 from giskardpy.tfwrapper import transform_pose
 from giskardpy.trajectory import ClosestPointInfo
@@ -107,6 +107,8 @@ class ActionServerPlugin(Plugin):
             result.error_code = MoveResult.UNKNOWN_OBJECT
         elif isinstance(exception, SolverTimeoutError):
             result.error_code = MoveResult.SOLVER_TIMEOUT
+        elif isinstance(exception, InsolvableException):
+            result.error_code = MoveResult.INSOLVABLE
         if exception is None:
             if not self.closest_point_constraint_violated(god_map):
                 result.error_code = MoveResult.SUCCESS
@@ -272,16 +274,20 @@ class LogTrajectoryPlugin(Plugin):
         self.time_identifier = time_identifier
         self.is_preempted = is_preempted
         self.precision = 0.005
+        self.wiggle_precision = 5
         super(LogTrajectoryPlugin, self).__init__()
+
+    def simplify_js(self, js):
+        return tuple(round(x.position, self.wiggle_precision) for x in js.values())
 
     def update(self):
         current_js = self.god_map.get_data([self.joint_state_identifier])
         time = self.god_map.get_data([self.time_identifier])
         trajectory = self.god_map.get_data([self.trajectory_identifier])
-
+        # traj_length = self.god_map.get_data([self.goal_identifier, 'max_trajectory_length'])
+        rounded_js = self.simplify_js(current_js)
         if trajectory is None:
             trajectory = Trajectory()
-        # traj_length = self.god_map.get_data([self.goal_identifier, 'max_trajectory_length'])
         trajectory.set(time, current_js)
         self.god_map.set_data([self.trajectory_identifier], trajectory)
 
@@ -289,6 +295,10 @@ class LogTrajectoryPlugin(Plugin):
             print('goal preempted')
             self.stop_universe = True
             return
+        if rounded_js in self.past_joint_states:
+            self.stop_universe = True
+            raise InsolvableException('endless wiggling detected')
+        self.past_joint_states.add(rounded_js)
         if (time >= 1 and np.abs([v.velocity for v in current_js.values()]).max() < self.precision):
             print('done')
             if self.plot:
@@ -298,6 +308,7 @@ class LogTrajectoryPlugin(Plugin):
 
     def start_always(self):
         self.stop_universe = False
+        self.past_joint_states = set()
 
     def stop(self):
         pass

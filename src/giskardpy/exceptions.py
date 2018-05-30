@@ -10,6 +10,9 @@ class StartStateCollisionException(GiskardException):
 class IntersectingCollisionException(GiskardException):
     pass
 
+class InsolvableException(GiskardException):
+    pass
+
 class QPSolverException(GiskardException):
     pass
 

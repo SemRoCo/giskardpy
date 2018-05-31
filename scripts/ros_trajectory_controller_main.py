@@ -15,7 +15,7 @@ from giskardpy.plugin_set_controlled_joints import SetControlledJointsPlugin
 from giskardpy.process_manager import ProcessManager
 
 if __name__ == '__main__':
-    rospy.init_node('muh')
+    rospy.init_node('giskard')
 
     # TODO do we need a solution where we have a different root for some links?
 

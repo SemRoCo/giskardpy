@@ -13,9 +13,9 @@ from giskardpy.tfwrapper import lookup_transform
 class GiskardWrapper(object):
     def __init__(self, root_tips):
         self.client = SimpleActionClient('qp_controller/command', MoveAction)
-        self.update_world = rospy.ServiceProxy('muh/update_world', UpdateWorld)
+        self.update_world = rospy.ServiceProxy('giskard/update_world', UpdateWorld)
         self.marker_pub = rospy.Publisher('visualization_marker_array', MarkerArray, queue_size=10)
-        rospy.wait_for_service('muh/update_world')
+        rospy.wait_for_service('giskard/update_world')
         self.client.wait_for_server()
         self.tip_to_root = {}
         self.collisions = []

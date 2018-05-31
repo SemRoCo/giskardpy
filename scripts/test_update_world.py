@@ -281,9 +281,9 @@ def clear_world(proxy):
 
 
 def test_update_world():
-    rospy.wait_for_service('muh/update_world')
+    rospy.wait_for_service('giskard/update_world')
     try:
-        update_world = rospy.ServiceProxy('muh/update_world', UpdateWorld)
+        update_world = rospy.ServiceProxy('giskard/update_world', UpdateWorld)
         # clear_world(update_world)
         # add_table(update_world)
         # add_table_again(update_world)

@@ -68,7 +68,6 @@ def joint_position(current_joint, joint_goal, weight, p_gain, max_speed, name):
     :return:
     :rtype: dict
     """
-    # TODO can't get out of joint limit?
     limit = sw.fake_Min(p_gain * (joint_goal - current_joint), max_speed)
     soft_constraints = {}
     soft_constraints[name] = SoftConstraint(lower=limit,

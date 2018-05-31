@@ -17,11 +17,9 @@ class FKPlugin(Plugin):
         self.fk = None
         super(FKPlugin, self).__init__()
 
-    # @profile
     def update(self):
         exprs = self.god_map.get_expr_values()
 
-        # @profile
         def on_demand_fk_evaluated(key):
             fk = self.fk[key](**exprs)
             p = PoseStamped()
@@ -34,7 +32,6 @@ class FKPlugin(Plugin):
 
         fks = keydefaultdict(on_demand_fk_evaluated)
         self.god_map.set_data([self.fk_identifier], fks)
-        # return {self.fk_identifier: fks}
 
     def start_once(self):
         urdf = rospy.get_param('robot_description')
@@ -48,7 +45,6 @@ class FKPlugin(Plugin):
 
         free_symbols = self.god_map.get_free_symbols()
 
-        # @profile
         def on_demand_fk(key):
             # TODO possible speed up by merging fks into one matrix
             root, tip = key

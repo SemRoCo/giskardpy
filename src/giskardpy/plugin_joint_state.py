@@ -11,7 +11,6 @@ from giskardpy.utils import to_joint_state_dict
 
 
 class JointStatePlugin(Plugin):
-    # TODO implement chain
     def __init__(self, js_identifier, time_identifier, next_cmd_identifier):
         super(JointStatePlugin, self).__init__()
         self.js_identifier = js_identifier
@@ -35,7 +34,6 @@ class JointStatePlugin(Plugin):
         except Empty:
             pass
         self.god_map.set_data([self.js_identifier], self.mjs)
-        # return {self.js_identifier: self.mjs}
 
     def start_always(self):
         self.joint_state_sub = rospy.Subscriber('joint_states', JointState, self.cb, queue_size=1)
@@ -69,25 +67,13 @@ class KinematicSimPlugin(Plugin):
                 else:
                     cmd = 0.0
                 self.next_js[joint_name] = SingleJointState(sjs.name, sjs.position + cmd * self.frequency, velocity=cmd)
-        # updates = {}
         if self.next_js is not None:
             self.god_map.set_data([self.js_identifier], self.next_js)
-            # updates[self.js_identifier] = self.next_js
         self.god_map.set_data([self.time_identifier], self.time)
-        # updates[self.time_identifier] = self.time
-        # return updates
 
     def start_always(self):
         self.next_js = None
 
-    def stop(self):
-        pass
-
-    def create_parallel_universe(self):
-        return super(KinematicSimPlugin, self).create_parallel_universe()
-
-    def end_parallel_universe(self):
-        return super(KinematicSimPlugin, self).end_parallel_universe()
-
     def copy(self):
+        # TODO return copy instead of self
         return self

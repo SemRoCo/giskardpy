@@ -43,13 +43,6 @@ class Plugin(object):
         """
         pass
 
-    # def get_readings(self):
-    #     """
-    #     :return:
-    #     :rtype: dict
-    #     """
-    #     return {}
-
     def get_replacement(self):
         """
         :return:

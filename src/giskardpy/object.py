@@ -37,6 +37,7 @@ class BoxShape(GeometricShape):
         self.y = y
         self.z = z
 
+# TODO add ConeShape
 
 class CylinderShape(GeometricShape):
     def __init__(self, radius=0.0, length=0.0):

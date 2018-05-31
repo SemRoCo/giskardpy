@@ -1,14 +1,12 @@
-from collections import OrderedDict, defaultdict
-from copy import copy
+from collections import OrderedDict
 import rospy
 from giskard_msgs.msg import Controller
 
 from giskardpy.input_system import JointStatesInput, FrameInput, Point3Input, Vector3Input, ShortestAngularDistanceInput
 from giskardpy.plugin import Plugin
 from giskardpy.symengine_controller import SymEngineController, position_conv, rotation_conv, \
-    link_to_link_avoidance, joint_position, continuous_joint_position, link_to_link_avoidance_old
+    link_to_link_avoidance, joint_position, continuous_joint_position
 import symengine_wrappers as sw
-from giskardpy.utils import keydefaultdict
 
 
 class CartesianBulletControllerPlugin(Plugin):
@@ -49,6 +47,7 @@ class CartesianBulletControllerPlugin(Plugin):
     # @profile
     def update(self):
         # update controlled joints
+        # TODO unnecessary to check this on every iteration
         new_controlled_joints = self.god_map.get_data([self.controlled_joints_identifier])
         if len(set(new_controlled_joints).difference(self.controlled_joints)) != 0:
             self._controller.set_controlled_joints(new_controlled_joints)
@@ -56,7 +55,6 @@ class CartesianBulletControllerPlugin(Plugin):
         self.init_controller()
 
         if self.god_map.get_data([self._goal_identifier]) is not None:
-            # TODO set joint goals
 
             if not self.controller_updated:
                 self.modify_controller()
@@ -169,9 +167,7 @@ class CartesianBulletControllerPlugin(Plugin):
                                    ','.join([root, tip]),
                                    'weight'], 1)
 
-        # TODO handle joint controller
-
-        # set weight of unused joints to 0
+        # set weight of used joints to 0
         joint_goal = self.god_map.get_data([self._goal_identifier, str(Controller.JOINT)])
         for joint_name in self.controlled_joints:
             if joint_name not in joint_goal:
@@ -236,7 +232,6 @@ class CartesianBulletControllerPlugin(Plugin):
                             self._goal_identifier, self._next_cmd_identifier, self._collision_identifier,
                             self._closest_point_identifier, self.controlled_joints_identifier,
                             self.collision_goal_identifier, self.path_to_functions)
-        # TODO not cool that you always have to copy the controller here
         cp._controller = self._controller
         cp.soft_constraints = self.soft_constraints
         cp.known_constraints = self.known_constraints

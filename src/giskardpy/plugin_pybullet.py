@@ -207,9 +207,9 @@ class PyBulletPlugin(Plugin):
                             distances[key] = collision_entry.min_dist
 
             collisions = self.world.check_collisions(distances, allowed_collisions)
-            if self.marker:
-                self.make_collision_markers(collisions)
-                self.make_collision_markers2(collisions)
+            # if self.marker:
+            #     self.make_collision_markers(collisions)
+            #     self.make_collision_markers2(collisions)
 
             closest_point = keydefaultdict(
                 lambda k: ClosestPointInfo((10, 0, 0), (0, 0, 0), 1e9, default_distance, k, '', (1, 0, 0)))
@@ -233,16 +233,46 @@ class PyBulletPlugin(Plugin):
                 else:
                     closest_point[link1] = cpi
 
+            if self.marker:
+                self.make_cpi_markers(closest_point)
+
             self.god_map.set_data([self.collision_identifier], None)
             self.god_map.set_data([self.closest_point_identifier], closest_point)
-            # return {self.collision_identifier: None,
-            #         self.closest_point_identifier: closest_point}
 
     def stop(self):
         pass
         # self.world.deactivate_viewer()
 
-    # @profile
+    def make_cpi_markers(self, collisions):
+        m = Marker()
+        m.header.frame_id = self.robot_root
+        m.action = Marker.ADD
+        m.type = Marker.LINE_LIST
+        m.id = 1337
+        m.ns = 'pybullet collisions'
+        m.scale = Vector3(0.003, 0, 0)
+        if len(collisions) > 0:
+            # TODO visualize only specific contacts
+            for collision_info in collisions.values(): # type: ClosestPointInfo
+                red_threshold = collision_info.min_dist
+                yellow_threshold = collision_info.min_dist * 2
+                green_threshold = collision_info.min_dist * 3
+
+                if collision_info.contact_distance < green_threshold:
+                    m.points.append(Point(*collision_info.position_on_a))
+                    m.points.append(Point(*collision_info.position_on_b))
+                    m.colors.append(ColorRGBA(0, 1, 0, 1))
+                    m.colors.append(ColorRGBA(0, 1, 0, 1))
+                if collision_info.contact_distance < yellow_threshold:
+                    m.colors[-2] = ColorRGBA(1, 1, 0, 1)
+                    m.colors[-1] = ColorRGBA(1, 1, 0, 1)
+                if collision_info.contact_distance < red_threshold:
+                    m.colors[-2] = ColorRGBA(1, 0, 0, 1)
+                    m.colors[-1] = ColorRGBA(1, 0, 0, 1)
+        else:
+            m.action = Marker.DELETE
+        self.collision_pub.publish(m)
+
     def make_collision_markers(self, collisions):
         m = Marker()
         m.header.frame_id = self.map_frame

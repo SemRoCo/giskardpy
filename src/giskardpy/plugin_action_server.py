@@ -1,25 +1,23 @@
 import numpy as np
 from Queue import Empty, Queue
-from collections import OrderedDict, defaultdict
+from collections import OrderedDict
 import pylab as plt
-from itertools import combinations, product
+from itertools import product
 
 import actionlib
 import rospy
 from control_msgs.msg import FollowJointTrajectoryAction, FollowJointTrajectoryResult, FollowJointTrajectoryGoal, \
     JointTrajectoryControllerState
-from giskard_msgs.msg import Controller, CollisionEntry
+from giskard_msgs.msg import Controller
 from giskard_msgs.msg import MoveCmd
 from giskard_msgs.msg._MoveAction import MoveAction
 from giskard_msgs.msg._MoveFeedback import MoveFeedback
 from giskard_msgs.msg._MoveGoal import MoveGoal
 from giskard_msgs.msg._MoveResult import MoveResult
 
-from trajectory_msgs.msg import JointTrajectoryPoint, JointTrajectory
-from visualization_msgs.msg import MarkerArray
+from trajectory_msgs.msg import JointTrajectoryPoint
 
-from giskardpy.exceptions import MAX_NWSR_REACHEDException, QPSolverException, SolverTimeoutError, \
-    IntersectingCollisionException, InsolvableException
+from giskardpy.exceptions import MAX_NWSR_REACHEDException, QPSolverException, SolverTimeoutError, InsolvableException
 from giskardpy.plugin import Plugin
 from giskardpy.tfwrapper import transform_pose
 from giskardpy.trajectory import ClosestPointInfo
@@ -27,7 +25,7 @@ from giskardpy.trajectory import SingleJointState, Transform, Point, Quaternion,
 
 
 class ActionServerPlugin(Plugin):
-    # TODO find a better name for this
+    # TODO find a better name than ActionServerPlugin
     def __init__(self, cartesian_goal_identifier, js_identifier, trajectory_identifier, time_identifier,
                  closest_point_identifier, controlled_joints_identifier, collision_goal_identifier,
                  plot_trajectory=False):
@@ -69,9 +67,7 @@ class ActionServerPlugin(Plugin):
             goals[str(Controller.TRANSLATION_3D)] = {}
             goals[str(Controller.ROTATION_3D)] = {}
             # goals['max_trajectory_length'] = cmd.max_trajectory_length
-            # TODO support multiple move cmds
             for controller in cmd.controllers:
-                # TODO support collisions
                 self.new_universe = True
                 goal_key = str(controller.type)
                 if controller.type == Controller.JOINT:
@@ -242,10 +238,7 @@ class ActionServerPlugin(Plugin):
                                                         JointTrajectoryControllerState).joint_names
         self._as.start()
 
-        print('running')
-
     def stop(self):
-        # TODO figure out how to stop this shit
         pass
 
     def copy(self):

@@ -58,7 +58,7 @@ if __name__ == '__main__':
                                       map_frame=rospy.get_param('~map_frame', 'map'),
                                       root_link=root_link,
                                       path_to_data_folder=path_to_data_folder,
-                                      gui=rospy.get_param('~enable_gui', True),
+                                      gui=rospy.get_param('~enable_gui', False),
                                       marker=rospy.get_param('~enable_collision_marker', True),))
     pm.register_plugin('fk', FKPlugin(js_identifier=js_identifier, fk_identifier=fk_identifier))
     pm.register_plugin('cart bullet controller',

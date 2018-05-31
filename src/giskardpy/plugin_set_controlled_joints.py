@@ -16,7 +16,6 @@ class SetControlledJointsPlugin(Plugin):
 
     def update(self):
         self.god_map.set_data([self.controlled_joints_identifier], self.controlled_joints)
-        # return {self.controlled_joints_identifier: self.controlled_joints}
 
     def copy(self):
         c = self.__class__(self.controlled_joints_identifier)

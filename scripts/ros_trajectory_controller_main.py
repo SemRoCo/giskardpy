@@ -16,7 +16,6 @@ from giskardpy.process_manager import ProcessManager
 
 if __name__ == '__main__':
     rospy.init_node('muh')
-    print(os.getcwd())
 
     # TODO do we need a solution where we have a different root for some links?
 

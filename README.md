@@ -17,6 +17,11 @@ cd ../symengine.py
 sudo python setup.py install
 ```
 
+Install pybullet:
+```
+sudo pip install pybullet
+```
+
 Now create the workspace
 ```
 source /opt/ros/kinetic/setup.bash          # start using ROS kinetic

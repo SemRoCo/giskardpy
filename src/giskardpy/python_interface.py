@@ -3,6 +3,7 @@ from actionlib import SimpleActionClient
 from geometry_msgs.msg import PoseStamped, Point, Quaternion
 from giskard_msgs.msg import MoveAction, MoveCmd, Controller, MoveGoal, WorldBody
 from giskard_msgs.srv import UpdateWorld, UpdateWorldRequest
+from sensor_msgs.msg import JointState
 from shape_msgs.msg import SolidPrimitive
 from visualization_msgs.msg import Marker, MarkerArray
 
@@ -31,6 +32,17 @@ class GiskardWrapper(object):
         :param pose_stamped:
         :type pose_stamped: PoseStamped
         """
+        self.set_tranlation_goal(tip, pose_stamped)
+        self.set_rotation_goal(tip, pose_stamped)
+
+
+    def set_tranlation_goal(self, tip, pose_stamped):
+        """
+        :param tip:
+        :type tip: str
+        :param pose_stamped:
+        :type pose_stamped: PoseStamped
+        """
         controller = Controller()
         controller.root_link = self.tip_to_root[tip]
         controller.tip_link = tip
@@ -40,6 +52,14 @@ class GiskardWrapper(object):
         controller.max_speed = 0.3
         controller.p_gain = 3
         self.cmd_seq[-1].controllers.append(controller)
+
+    def set_rotation_goal(self, tip, pose_stamped):
+        """
+        :param tip:
+        :type tip: str
+        :param pose_stamped:
+        :type pose_stamped: PoseStamped
+        """
         controller = Controller()
         controller.root_link = self.tip_to_root[tip]
         controller.tip_link = tip
@@ -49,6 +69,7 @@ class GiskardWrapper(object):
         controller.max_speed = 0.5
         controller.p_gain = 3
         self.cmd_seq[-1].controllers.append(controller)
+
 
     def set_joint_goal(self, joint_state):
         """
@@ -60,9 +81,12 @@ class GiskardWrapper(object):
         controller.weight = 1
         controller.p_gain = 10
         controller.max_speed = 0.3
-        for joint_name, joint_position in joint_state.items():
-            controller.goal_state.name.append(joint_name)
-            controller.goal_state.position.append(joint_position)
+        if isinstance(joint_state, dict):
+            for joint_name, joint_position in joint_state.items():
+                controller.goal_state.name.append(joint_name)
+                controller.goal_state.position.append(joint_position)
+        elif isinstance(joint_state, JointState):
+            controller.goal_state = joint_state
         self.cmd_seq[-1].controllers.append(controller)
 
     def set_collision_entries(self, collisions):

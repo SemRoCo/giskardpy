@@ -172,6 +172,10 @@ class CartesianBulletControllerPlugin(Plugin):
         for joint_name in self.controlled_joints:
             if joint_name not in joint_goal:
                 joint_goal[joint_name] = {'weight': 0,
+                                          'p_gain': 10,
+                                          'max_speed':
+
+                                              robot.default_joint_vel_limit,
                                           'position': self.god_map.get_data([self._joint_states_identifier,
                                                                              joint_name,
                                                                              'position'])}

@@ -23,9 +23,16 @@ class GodMap(object):
         return god_map_copy
 
     def _get_member(self, identifier,  member):
+        """
+        :param identifier:
+        :type identifier: Union[None, dict, list, tuple, object]
+        :param member:
+        :type member: str
+        :return:
+        """
         if identifier is None:
             raise AttributeError()
-        if ',' in member:
+        if ',' in member: # handle tuple member
             member = member.replace('(','')
             member = member.replace(')','')
             member = tuple(member.split(','))
@@ -37,6 +44,12 @@ class GodMap(object):
             return getattr(identifier, member)
 
     def get_data(self, key):
+        """
+
+        :param key: Key in the from of "foo/bar" or ["foo, bar"]
+        :type key: Union[list, str]
+        :return: object that is saved at key
+        """
         # TODO deal with unused identifiers
         if isinstance(key, str):
             identifier_parts = key.split(self.separator)

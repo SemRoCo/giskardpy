@@ -68,20 +68,30 @@ def joint_position(current_joint, joint_goal, weight, p_gain, max_speed, name):
     :return:
     :rtype: dict
     """
-    limit = sw.fake_Min(p_gain * (joint_goal - current_joint), max_speed)
-    soft_constraints = {}
-    soft_constraints[name] = SoftConstraint(lower=limit,
-                                            upper=limit,
+    soft_constraints = OrderedDict()
+
+    err = joint_goal - current_joint
+    capped_err = sw.fake_Max(sw.fake_Min(p_gain * err, max_speed), -max_speed)
+
+    soft_constraints[name] = SoftConstraint(lower=capped_err,
+                                            upper=capped_err,
                                             weight=weight,
                                             expression=current_joint)
+    add_debug_constraint(soft_constraints, '{} //current_joint//'.format(name), current_joint)
+    add_debug_constraint(soft_constraints, '{} //joint_goal//'.format(name), joint_goal)
+    add_debug_constraint(soft_constraints, '{} //max_speed//'.format(name), max_speed)
+    # add_debug_constraint(soft_constraints, '{} //sign//'.format(name), sign)
+    # add_debug_constraint(soft_constraints, '{} //capped_unsigned_err//'.format(name), capped_unsigned_err)
     return soft_constraints
 
 
 def continuous_joint_position(current_joint, change, weight, p_gain, max_speed, name):
-    limit = sw.fake_Min(p_gain * (change), max_speed)
-    soft_constraints = {}
-    soft_constraints[name] = SoftConstraint(lower=limit,
-                                            upper=limit,
+    soft_constraints = OrderedDict()
+
+    capped_err = sw.fake_Max(sw.fake_Min(p_gain * change, max_speed), -max_speed)
+
+    soft_constraints[name] = SoftConstraint(lower=capped_err,
+                                            upper=capped_err,
                                             weight=weight,
                                             expression=current_joint)
     # add_debug_constraint(soft_constraints, '{} //change//'.format(name), change)
@@ -130,7 +140,9 @@ def rotation_conv(goal_rotation, current_rotation, current_evaluated_rotation, w
                   rot_gain=3, max_rot_speed=0.5, ns=''):
     soft_constraints = OrderedDict()
     axis, angle = sw.axis_angle_from_matrix((current_rotation.T * goal_rotation))
-    capped_angle = sw.fake_Min(angle * rot_gain, max_rot_speed)
+
+    capped_angle = sw.fake_Max(sw.fake_Min(rot_gain * angle, max_rot_speed), -max_rot_speed)
+
     r_rot_control = axis * capped_angle
 
     hack = sw.rotation3_axis_angle([0, 0, 1], 0.0001)

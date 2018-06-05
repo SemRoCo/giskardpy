@@ -12,6 +12,8 @@ if __name__ == '__main__':
     typess = rospy.get_param('~types')
     goal = MoveGoal()
     move_cmd = MoveCmd()
+    if not (len(roots) == len(tips) and len(tips) == len(typess)):
+        raise Exception('number of roots, tips and types not equal')
     for root, tip, types in zip(roots, tips, typess):
         for type in types:
             controller = Controller()

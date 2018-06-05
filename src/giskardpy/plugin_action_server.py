@@ -266,8 +266,9 @@ class LogTrajectoryPlugin(Plugin):
         self.joint_state_identifier = joint_state_identifier
         self.time_identifier = time_identifier
         self.is_preempted = is_preempted
-        self.precision = 0.005
-        self.wiggle_precision = 5
+        self.precision = 0.05 # TODO expose
+        self.max_traj_length = 20
+        self.wiggle_precision = 5 # TODO expose
         super(LogTrajectoryPlugin, self).__init__()
 
     def simplify_js(self, js):
@@ -289,13 +290,14 @@ class LogTrajectoryPlugin(Plugin):
             self.stop_universe = True
             return
         if time >= 1:
-            if np.abs([v.velocity for v in current_js.values()]).max() < self.precision:
+            if np.abs([v.velocity for v in current_js.values()]).max() < self.precision or\
+                    (self.plot and time > self.max_traj_length):
                 print('done')
                 if self.plot:
                     plot_trajectory(trajectory, set(self.god_map.get_data([self.controlled_joints_identifier])))
                 self.stop_universe = True
                 return
-            if rounded_js in self.past_joint_states:
+            if not self.plot and (rounded_js in self.past_joint_states):
                 self.stop_universe = True
                 raise InsolvableException('endless wiggling detected')
         self.past_joint_states.add(rounded_js)

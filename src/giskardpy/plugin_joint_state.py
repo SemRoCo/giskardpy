@@ -51,7 +51,7 @@ class KinematicSimPlugin(Plugin):
         self.js_identifier = js_identifier
         self.next_cmd_identifier = next_cmd_identifier
         self.time_identifier = time_identifier
-        self.frequency = 0.1
+        self.frequency = 0.1 # TODO expose
         self.time = -self.frequency
         super(KinematicSimPlugin, self).__init__()
 

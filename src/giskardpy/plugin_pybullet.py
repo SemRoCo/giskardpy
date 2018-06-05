@@ -167,7 +167,7 @@ class PyBulletPlugin(Plugin):
                                                               p.pose.orientation.z,
                                                               p.pose.orientation.w])
 
-            default_distance = 0.02
+            default_distance = 0.02 # TODO expose
             collision_goals = self.god_map.get_data([self.collision_goal_identifier])
             if collision_goals is None:
                 collision_goals = []
@@ -207,9 +207,6 @@ class PyBulletPlugin(Plugin):
                             distances[key] = collision_entry.min_dist
 
             collisions = self.world.check_collisions(distances, allowed_collisions)
-            # if self.marker:
-            #     self.make_collision_markers(collisions)
-            #     self.make_collision_markers2(collisions)
 
             closest_point = keydefaultdict(
                 lambda k: ClosestPointInfo((10, 0, 0), (0, 0, 0), 1e9, default_distance, k, '', (1, 0, 0)))

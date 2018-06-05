@@ -8,6 +8,7 @@ import symengine as sp
 from symengine import Matrix, Symbol, eye, sympify, diag, zeros, lambdify, Abs, Max, Min, sin, cos, tan, acos, asin, \
     atan, atan2, nan, sqrt, log
 import numpy as np
+
 from symengine.lib.symengine_wrapper import Lambdify
 
 pathSeparator = '_'
@@ -24,6 +25,41 @@ def fake_Max(x, y):
 def fake_Min(x, y):
     return ((x + y) - fake_Abs(x - y)) / 2
 
+def fake_sign(a, e=-2.22507385851e-308):
+    """
+    if a > e:
+        return 1
+    if a < e:
+        return -1
+    if a == e:
+        return nan
+    """
+    a -= e
+    return a / fake_Abs(a)  # 1 or -1
+
+def fake_if(a, b, c, e=-2.22507385851e-308):
+    """
+    if a >= 0:
+        return b
+    else:
+        return c
+
+    ** actual behavior **
+    if a > e:
+        return b
+    if a < e:
+        return c
+    if a == e:
+        return nan
+    :type a: Union[float, Symbol]
+    :type b: Union[float, Symbol]
+    :type c: Union[float, Symbol]
+    """
+    a = fake_sign(a, e) # 1 or -1
+    i = fake_Max(0, a) * b # 0 or b
+    e = -fake_Min(0, a) * c # 0 or c
+    return i + e  # i or e
+
 
 def safe_compiled_function(f, file_name):
     if not os.path.exists(os.path.dirname(file_name)):
@@ -36,11 +72,13 @@ def safe_compiled_function(f, file_name):
         print('saved {}'.format(file_name))
         pickle.dump(f, file)
 
+
 def load_compiled_function(file_name):
     if os.path.isfile(file_name):
         with open(file_name, 'r') as file:
             fast_f = pickle.load(file)
             return fast_f
+
 
 class CompiledFunction(object):
     def __init__(self, str_params, fast_f, l, shape):
@@ -54,6 +92,7 @@ class CompiledFunction(object):
         out = np.empty(self.l)
         self.fast_f.unsafe_real(np.array(filtered_args, dtype=np.double), out)
         return np.nan_to_num(out).reshape(self.shape)
+
 
 # @profile
 def speed_up(function, parameters, backend='llvm'):
@@ -121,8 +160,9 @@ def norm(v):
         r += x ** 2
     return sp.sqrt(r)
 
+
 def scale(v, a):
-    return v/norm(v)*a
+    return v / norm(v) * a
 
 
 def dot(a, b):
@@ -208,9 +248,10 @@ def frame3_quaternion(x, y, z, qx, qy, qz, qw):
 
 def inverse_frame(frame):
     inv = sp.eye(4)
-    inv[:3,:3] = frame[:3,:3].T
-    inv[:3,3] = -inv[:3,:3]*frame[:3,3]
+    inv[:3, :3] = frame[:3, :3].T
+    inv[:3, 3] = -inv[:3, :3] * frame[:3, 3]
     return inv
+
 
 def pos_of(frame):
     return frame[:4, 3:]
@@ -332,5 +373,6 @@ def quaternion_make_unique(q):
 def cosine_distance(q1, q2):
     return 1 - (q1.T * q2)[0]
 
+
 def euclidean_distance(v1, v2):
-    return norm(v1-v2)
+    return norm(v1 - v2)

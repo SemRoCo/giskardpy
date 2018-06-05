@@ -19,7 +19,10 @@ if __name__ == '__main__':
 
     # TODO do we need a solution where we have a different root for some links?
 
-    path_to_data_folder = RosPack().get_path('giskardpy') + '/data/'
+
+    path_to_data_folder = rospy.get_param('~path_to_data_folder', RosPack().get_path('giskardpy') + '/data/') # type: str
+    if not path_to_data_folder.endswith('/'):
+        path_to_data_folder += '/'
     fk_identifier = 'fk'
     cartesian_goal_identifier = 'goal'
     js_identifier = 'js'
@@ -32,6 +35,7 @@ if __name__ == '__main__':
     collision_goal_identifier = 'collision_goal'
 
     root_link = rospy.get_param('~root_link', 'base_footprint')
+    # root_link = rospy.get_param('~root_link', 'odom')
 
     pm = ProcessManager()
     pm.register_plugin('js',
@@ -75,6 +79,9 @@ if __name__ == '__main__':
                        InteractiveMarkerPlugin(rospy.get_param('~interactive_marker_chains',
                                                                [('base_link', 'r_gripper_tool_frame'),
                                                                 ('base_link', 'l_gripper_tool_frame')])))
+    # pm.register_plugin('interactive marker',
+    #                    InteractiveMarkerPlugin(rospy.get_param('~interactive_marker_chains',
+    #                                                            [('base_footprint', 'gripper_tool_frame')])))
 
     app = ROSApplication(pm)
     app.run()

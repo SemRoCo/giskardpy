@@ -1,6 +1,5 @@
 import pickle
 from collections import OrderedDict, namedtuple
-
 import numpy as np
 from itertools import chain
 from time import time
@@ -43,8 +42,6 @@ class QProblemBuilder(object):
 
     # @profile
     def make_sympy_matrices(self):
-        print('building new controller')
-        print('number of soft constraints {}'.format(len(self.soft_constraints_dict)))
         t_total = time()
         # TODO cpu intensive
         weights = []
@@ -78,6 +75,7 @@ class QProblemBuilder(object):
         self.np_g = np.zeros(len(weights))
 
         if self.cython_big_ass_M is None:
+            print('new controller requested; compiling')
             self.H = spw.diag(*weights)
 
             self.lb = spw.Matrix(lb)
@@ -117,7 +115,9 @@ class QProblemBuilder(object):
             if function_hash is not None:
                 safe_compiled_function(self.cython_big_ass_M, self.path_to_functions + function_hash)
             print('autowrap took {}'.format(time() - t))
-        print('new controller ready {}s'.format(time() - t_total))
+        else:
+            print('controller loaded {}'.format(function_hash))
+        print('controller ready {}s'.format(time() - t_total))
 
     def save_pickle(self, hash, f):
         with open('/tmp/{}'.format(hash), 'w') as file:
@@ -127,27 +127,38 @@ class QProblemBuilder(object):
         return pickle.load(hash)
 
     def debug_print(self, np_H, np_A, np_lb, np_ub, np_lbA, np_ubA, xdot_full):
-        lb = {}
-        ub = {}
-        lbA = {}
-        ubA = {}
-        weights = {}
-        xdot = {}
+        import pandas as pd
+        lb = []
+        ub = []
+        lbA = []
+        ubA = []
+        weights = []
+        xdot = []
         for iJ, (k, c) in enumerate(self.joint_constraints_dict.items()):
-            lb['joint--' + str(k)] = np_lb[iJ]
-            ub['joint--' + str(k)] = np_ub[iJ]
-            weights['weight--' + str(k)] = np_H[iJ, iJ]
-            xdot['x--' + str(k)] = xdot_full[iJ]
+            key = 'j -- ' + str(k)
+            lb.append(key)
+            ub.append(key)
+            weights.append(key)
+            xdot.append(key)
 
         for iH, (k, c) in enumerate(self.hard_constraints_dict.items()):
-            lbA['hard--' + str(k)] = np_lbA[iH]
-            ubA['hard--' + str(k)] = np_ubA[iH]
+            key = 'h -- ' + str(k)
+            lbA.append(key)
+            ubA.append(key)
 
         for iS, (k, c) in enumerate(self.soft_constraints_dict.items()):
-            lbA['soft--' + str(k)] = np_lbA[iH + iS + 1]
-            ubA['soft--' + str(k)] = np_ubA[iH + iS + 1]
-            weights['weight--' + str(k)] = np_H[iJ + iS + 1, iJ + iS + 1]
-            xdot['x--' + str(k)] = xdot_full[iJ + iS + 1]
+            key = 's -- ' + str(k)
+            lbA.append(key)
+            ubA.append(key)
+            weights.append(key)
+            xdot.append(key)
+        p_lb = pd.DataFrame(np_lb[:-len(self.soft_constraints_dict)], lb)
+        p_ub = pd.DataFrame(np_ub[:-len(self.soft_constraints_dict)], ub)
+        p_lbA = pd.DataFrame(np_lbA, lbA)
+        p_ubA = pd.DataFrame(np_ubA, ubA)
+        p_weights = pd.DataFrame(np_H.dot(np.ones(np_H.shape[0])), weights)
+        p_xdot = pd.DataFrame(xdot_full, xdot)
+        p_A = pd.DataFrame(np_A, lbA, weights)
         pass
 
     def get_cmd(self, substitutions):

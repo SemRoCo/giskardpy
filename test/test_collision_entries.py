@@ -66,10 +66,10 @@ class TestCollisionAvoidance(unittest.TestCase):
         collision_entry.type = CollisionEntry.ALLOW_ALL_COLLISIONS
         self.giskard.set_collision_entries([collision_entry])
 
-        self.test_js_goal(js)
+        self.set_and_check_js_goal(js)
         super(TestCollisionAvoidance, self).setUpClass()
 
-    def test_js_goal(self, goal_js):
+    def set_and_check_js_goal(self, goal_js):
         self.giskard.set_joint_goal(goal_js)
         self.giskard.plan_and_execute()
         result = self.giskard.get_result()
@@ -113,7 +113,7 @@ class TestCollisionAvoidance(unittest.TestCase):
 
         collision_entry = CollisionEntry()
         collision_entry.type = CollisionEntry.AVOID_COLLISION
-        collision_entry.min_dist = 0.1
+        collision_entry.min_dist = 0.05
         collision_entry.body_b = 'box'
         self.giskard.set_collision_entries([collision_entry])
 
@@ -147,13 +147,13 @@ class TestCollisionAvoidance(unittest.TestCase):
 
         collision_entry = CollisionEntry()
         collision_entry.type = CollisionEntry.AVOID_ALL_COLLISIONS
-        collision_entry.min_dist = 0.2
+        collision_entry.min_dist = 0.05
         self.giskard.set_collision_entries([collision_entry])
 
         result = self.giskard.plan_and_execute()
         self.assertEqual(result.error_code, MoveResult.SUCCESS)
 
-    def test_start_state_collision1(self):
+    def test_get_out_of_collision(self):
         self.add_box()
         p = PoseStamped()
         p.header.frame_id = 'r_gripper_tool_frame'
@@ -198,6 +198,7 @@ class TestCollisionAvoidance(unittest.TestCase):
         self.giskard.set_collision_entries([collision_entry])
 
         self.giskard.plan_and_execute(wait=False)
+        rospy.sleep(.5)
         self.giskard.interrupt()
         result = self.giskard.get_result()
         self.assertEqual(result.error_code, MoveResult.INTERRUPTED)

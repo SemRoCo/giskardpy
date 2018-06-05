@@ -95,7 +95,9 @@ class ActionServerPlugin(Plugin):
     def post_mortem_analysis(self, god_map, exception):
         result = MoveResult()
         result.error_code = MoveResult.INSOLVABLE
-        if isinstance(exception, MAX_NWSR_REACHEDException):
+        if self._as.is_preempt_requested():
+            result.error_code = MoveResult.INTERRUPTED
+        elif isinstance(exception, MAX_NWSR_REACHEDException):
             result.error_code = MoveResult.MAX_NWSR_REACHED
         elif isinstance(exception, QPSolverException):
             result.error_code = MoveResult.QP_SOLVER_ERROR
@@ -105,7 +107,7 @@ class ActionServerPlugin(Plugin):
             result.error_code = MoveResult.SOLVER_TIMEOUT
         elif isinstance(exception, InsolvableException):
             result.error_code = MoveResult.INSOLVABLE
-        if exception is None:
+        if exception is None and not self._as.is_preempt_requested():
             if not self.closest_point_constraint_violated(god_map):
                 result.error_code = MoveResult.SUCCESS
                 trajectory = god_map.get_data([self.trajectory_identifier])
@@ -190,7 +192,7 @@ class ActionServerPlugin(Plugin):
                                 self._ac.cancel_all_goals()
                                 result.error_code = MoveResult.INTERRUPTED
                                 break
-                            if time_passed > expected_duration + 0.1:
+                            if time_passed > expected_duration + 0.1: # TODO new error code
                                 rospy.loginfo('controller took too long to execute trajectory')
                                 self._ac.cancel_all_goals()
                                 result.error_code = MoveResult.INTERRUPTED
@@ -266,7 +268,7 @@ class LogTrajectoryPlugin(Plugin):
         self.joint_state_identifier = joint_state_identifier
         self.time_identifier = time_identifier
         self.is_preempted = is_preempted
-        self.precision = 0.05 # TODO expose
+        self.precision = 0.001 # TODO expose
         self.max_traj_length = 20
         self.wiggle_precision = 5 # TODO expose
         super(LogTrajectoryPlugin, self).__init__()

@@ -12,7 +12,7 @@ import symengine_wrappers as sw
 class CartesianBulletControllerPlugin(Plugin):
     def __init__(self, root_link, js_identifier, fk_identifier, goal_identifier, next_cmd_identifier,
                  collision_identifier, closest_point_identifier, controlled_joints_identifier,
-                 collision_goal_identifier, path_to_functions):
+                 collision_goal_identifier, path_to_functions, nWSR):
         """
         :param roots:
         :type roots: list
@@ -32,6 +32,7 @@ class CartesianBulletControllerPlugin(Plugin):
         self._collision_identifier = collision_identifier
         self._closest_point_identifier = closest_point_identifier
         self.path_to_functions = path_to_functions
+        self.nWSR = nWSR
         self.root = root_link
         self.soft_constraints = OrderedDict()
         self._joint_states_identifier = js_identifier
@@ -60,7 +61,7 @@ class CartesianBulletControllerPlugin(Plugin):
                 self.modify_controller()
 
             expr = self.god_map.get_expr_values()
-            next_cmd = self._controller.get_cmd(expr)
+            next_cmd = self._controller.get_cmd(expr, self.nWSR)
             self.next_cmd.update(next_cmd)
 
         if len(self.next_cmd) > 0:
@@ -235,7 +236,7 @@ class CartesianBulletControllerPlugin(Plugin):
         cp = self.__class__(self.root, self._joint_states_identifier, self._fk_identifier,
                             self._goal_identifier, self._next_cmd_identifier, self._collision_identifier,
                             self._closest_point_identifier, self.controlled_joints_identifier,
-                            self.collision_goal_identifier, self.path_to_functions)
+                            self.collision_goal_identifier, self.path_to_functions, self.nWSR)
         cp._controller = self._controller
         cp.soft_constraints = self.soft_constraints
         cp.known_constraints = self.known_constraints

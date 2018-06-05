@@ -28,7 +28,7 @@ class ActionServerPlugin(Plugin):
     # TODO find a better name than ActionServerPlugin
     def __init__(self, cartesian_goal_identifier, js_identifier, trajectory_identifier, time_identifier,
                  closest_point_identifier, controlled_joints_identifier, collision_goal_identifier,
-                 plot_trajectory=False):
+                 joint_convergence_threshold, wiggle_precision_threshold, plot_trajectory=False):
         self.plot_trajectory = plot_trajectory
         self.goal_identifier = cartesian_goal_identifier
         self.controlled_joints_identifier = controlled_joints_identifier
@@ -37,6 +37,8 @@ class ActionServerPlugin(Plugin):
         self.time_identifier = time_identifier
         self.closest_point_identifier = closest_point_identifier
         self.collision_goal_identifier = collision_goal_identifier
+        self.joint_convergence_threshold = joint_convergence_threshold
+        self.wiggle_precision_threshold = wiggle_precision_threshold
 
         self.joint_goal = None
         self.start_js = None
@@ -250,6 +252,8 @@ class ActionServerPlugin(Plugin):
                                          plot_trajectory=self.plot_trajectory,
                                          goal_identifier=self.goal_identifier,
                                          controlled_joints_identifier=self.controlled_joints_identifier,
+                                         joint_convergence_threshold=self.joint_convergence_threshold,
+                                         wiggle_precision_threshold=self.wiggle_precision_threshold,
                                          is_preempted=lambda: self._as.is_preempt_requested())
         return self.child
 
@@ -260,7 +264,8 @@ class ActionServerPlugin(Plugin):
 
 class LogTrajectoryPlugin(Plugin):
     def __init__(self, trajectory_identifier, joint_state_identifier, time_identifier, goal_identifier,
-                 controlled_joints_identifier, plot_trajectory=False, is_preempted=lambda: False):
+                 controlled_joints_identifier, joint_convergence_threshold, wiggle_precision_threshold,
+                 plot_trajectory=False, is_preempted=lambda: False):
         self.plot = plot_trajectory
         self.controlled_joints_identifier = controlled_joints_identifier
         self.goal_identifier = goal_identifier
@@ -268,9 +273,9 @@ class LogTrajectoryPlugin(Plugin):
         self.joint_state_identifier = joint_state_identifier
         self.time_identifier = time_identifier
         self.is_preempted = is_preempted
-        self.precision = 0.001 # TODO expose
+        self.precision = joint_convergence_threshold
         self.max_traj_length = 20
-        self.wiggle_precision = 5 # TODO expose
+        self.wiggle_precision = wiggle_precision_threshold
         super(LogTrajectoryPlugin, self).__init__()
 
     def simplify_js(self, js):
@@ -292,7 +297,7 @@ class LogTrajectoryPlugin(Plugin):
             self.stop_universe = True
             return
         if time >= 1:
-            if np.abs([v.velocity for v in current_js.values()]).max() < self.precision or\
+            if np.abs([v.velocity for v in current_js.values()]).max() < self.precision or \
                     (self.plot and time > self.max_traj_length):
                 print('done')
                 if self.plot:

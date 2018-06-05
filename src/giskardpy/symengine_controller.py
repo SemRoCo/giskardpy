@@ -45,8 +45,8 @@ class SymEngineController(object):
     def get_controlled_joint_symbols(self):
         return list(self.robot.joint_states_input.joint_map.values())
 
-    def get_cmd(self, substitutions):
-        next_cmd = self.qp_problem_builder.get_cmd(substitutions)
+    def get_cmd(self, substitutions, nWSR=None):
+        next_cmd = self.qp_problem_builder.get_cmd(substitutions, nWSR)
         if next_cmd is None:
             pass
         real_next_cmd = {}

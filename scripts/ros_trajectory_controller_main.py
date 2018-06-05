@@ -52,6 +52,9 @@ if __name__ == '__main__':
                                           closest_point_identifier=closest_point_identifier,
                                           controlled_joints_identifier=controlled_joints_identifier,
                                           collision_goal_identifier=collision_goal_identifier,
+                                          joint_convergence_threshold=rospy.get_param('~joint_convergence_threshold',
+                                                                                      0.001),
+                                          wiggle_precision_threshold=rospy.get_param('~wiggle_precision_threshold', 5),
                                           plot_trajectory=False))
     pm.register_plugin('bullet',
                        PyBulletPlugin(js_identifier=js_identifier,
@@ -74,7 +77,8 @@ if __name__ == '__main__':
                                                        closest_point_identifier=closest_point_identifier,
                                                        controlled_joints_identifier=controlled_joints_identifier,
                                                        collision_goal_identifier=collision_goal_identifier,
-                                                       path_to_functions=path_to_data_folder))
+                                                       path_to_functions=path_to_data_folder,
+                                                       nWSR=rospy.get_param('~nWSR', None)))
     pm.register_plugin('interactive marker',
                        InteractiveMarkerPlugin(rospy.get_param('~interactive_marker_chains',
                                                                [('base_link', 'r_gripper_tool_frame'),

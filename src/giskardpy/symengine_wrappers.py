@@ -56,9 +56,9 @@ def fake_if(a, b, c, e=-2.22507385851e-308):
     :type c: Union[float, Symbol]
     """
     a = fake_sign(a, e) # 1 or -1
-    i = fake_Max(0, a) * b # 0 or b
-    e = -fake_Min(0, a) * c # 0 or c
-    return i + e  # i or e
+    _if = fake_Max(0, a) * b # 0 or b
+    _else = -fake_Min(0, a) * c # 0 or c
+    return _if + _else  # i or e
 
 
 def safe_compiled_function(f, file_name):

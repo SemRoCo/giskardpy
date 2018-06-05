@@ -28,12 +28,14 @@ from giskardpy.utils import keydefaultdict, to_joint_state_dict, to_point_stampe
 
 class PyBulletPlugin(Plugin):
     def __init__(self, js_identifier, collision_identifier, closest_point_identifier, collision_goal_identifier,
-                 map_frame, root_link, path_to_data_folder='', gui=False, marker=False):
+                 map_frame, root_link, default_collision_avoidance_distance, path_to_data_folder='', gui=False,
+                 marker=False):
         self.collision_goal_identifier = collision_goal_identifier
         self.path_to_data_folder = path_to_data_folder
         self.js_identifier = js_identifier
         self.collision_identifier = collision_identifier
         self.closest_point_identifier = closest_point_identifier
+        self.default_collision_avoidance_distance = default_collision_avoidance_distance
         self.map_frame = map_frame
         self.robot_root = root_link
         self.robot_name = 'pr2'
@@ -53,7 +55,8 @@ class PyBulletPlugin(Plugin):
                             map_frame=self.map_frame,
                             root_link=self.robot_root,
                             path_to_data_folder=self.path_to_data_folder,
-                            gui=self.gui)
+                            gui=self.gui,
+                            default_collision_avoidance_distance=self.default_collision_avoidance_distance)
         cp.world = self.world
         cp.marker = self.marker
         # cp.srv = self.srv
@@ -167,12 +170,11 @@ class PyBulletPlugin(Plugin):
                                                               p.pose.orientation.z,
                                                               p.pose.orientation.w])
 
-            default_distance = 0.02 # TODO expose
             collision_goals = self.god_map.get_data([self.collision_goal_identifier])
             if collision_goals is None:
                 collision_goals = []
             allowed_collisions = set()
-            distances = defaultdict(lambda: default_distance)
+            distances = defaultdict(lambda: self.default_collision_avoidance_distance)
             for collision_entry in collision_goals:  # type: CollisionEntry
                 if collision_entry.body_b == '' and \
                         collision_entry.type not in [CollisionEntry.ALLOW_ALL_COLLISIONS,
@@ -208,8 +210,13 @@ class PyBulletPlugin(Plugin):
 
             collisions = self.world.check_collisions(distances, allowed_collisions)
 
-            closest_point = keydefaultdict(
-                lambda k: ClosestPointInfo((10, 0, 0), (0, 0, 0), 1e9, default_distance, k, '', (1, 0, 0)))
+            closest_point = keydefaultdict(lambda k: ClosestPointInfo((10, 0, 0),
+                                                                      (0, 0, 0),
+                                                                      1e9,
+                                                                      self.default_collision_avoidance_distance,
+                                                                      k,
+                                                                      '',
+                                                                      (1, 0, 0)))
             for key, collision_info in collisions.items():  # type: ((str, str), ContactInfo)
                 link1 = key[0]
                 a_in_robot_root = to_list(transform_point(self.robot_root,
@@ -249,7 +256,6 @@ class PyBulletPlugin(Plugin):
         m.ns = 'pybullet collisions'
         m.scale = Vector3(0.003, 0, 0)
         if len(collisions) > 0:
-            # TODO visualize only specific contacts
             for collision_info in collisions.values(): # type: ClosestPointInfo
                 red_threshold = collision_info.min_dist
                 yellow_threshold = collision_info.min_dist * 2
@@ -269,61 +275,6 @@ class PyBulletPlugin(Plugin):
         else:
             m.action = Marker.DELETE
         self.collision_pub.publish(m)
-
-    def make_collision_markers(self, collisions):
-        m = Marker()
-        m.header.frame_id = self.map_frame
-        m.action = Marker.ADD
-        m.type = Marker.LINE_LIST
-        m.id = 1337
-        m.ns = 'pybullet collisions'
-        m.scale = Vector3(0.003, 0, 0)
-        # m.color = ColorRGBA(1, 0, 0, 1)
-        if len(collisions) > 0:
-            # TODO visualize only specific contacts
-            for (_, collision_info) in collisions.items():
-                if collision_info.contact_distance is not None:
-                    if collision_info.contact_distance < 0.05:
-                        m.points.append(Point(*collision_info.position_on_a))
-                        m.points.append(Point(*collision_info.position_on_b))
-                        m.colors.append(ColorRGBA(1, 0, 0, 1))
-                        m.colors.append(ColorRGBA(1, 0, 0, 1))
-                    elif collision_info.contact_distance < 0.1:
-                        m.points.append(Point(*collision_info.position_on_a))
-                        m.points.append(Point(*collision_info.position_on_b))
-                        m.colors.append(ColorRGBA(0, 1, 0, 1))
-                        m.colors.append(ColorRGBA(0, 1, 0, 1))
-        else:
-            m.action = Marker.DELETE
-        self.collision_pub.publish(m)
-
-    def make_collision_markers2(self, collisions):
-        m = Marker()
-        m.header.frame_id = self.map_frame
-        m.action = Marker.ADD
-        m.type = Marker.POINTS
-        m.id = 1337
-        m.ns = 'pybullet collisions2'
-        m.scale = Vector3(0.02, 0, 0)
-        # m.color = ColorRGBA(1, 0, 0, 1)
-        if len(collisions) > 0:
-            # TODO visualize only specific contacts
-            for (_, collision_info) in collisions.items():  # type: (str, ContactInfo)
-                if collision_info.contact_distance is not None:
-                    if collision_info.contact_distance < 0.1:
-                        np_n = np.asarray(collision_info.contact_normal_on_b)
-                        np_a = np.asarray(collision_info.position_on_a)
-                        np_b = np.asarray(collision_info.position_on_b)
-                        bpn = np_n + np_b
-                        if np.linalg.norm(bpn - np_a) > np.linalg.norm(bpn - np_b):
-                            m.points.append(Point(*collision_info.position_on_b))
-                        else:
-                            m.points.append(Point(*collision_info.position_on_a))
-                        m.colors.append(ColorRGBA(0, 0, 1, 1))
-        else:
-            m.action = Marker.DELETE
-        self.collision_pub.publish(m)
-        # rospy.sleep(0.05)
 
     def object_js_cb(self, object_name, msg):
         """

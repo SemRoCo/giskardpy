@@ -17,12 +17,23 @@ from giskardpy.process_manager import ProcessManager
 if __name__ == '__main__':
     rospy.init_node('giskard')
 
-    # TODO do we need a solution where we have a different root for some links?
-
-
-    path_to_data_folder = rospy.get_param('~path_to_data_folder', RosPack().get_path('giskardpy') + '/data/') # type: str
+    # root_link = rospy.get_param('~root_link', 'odom')
+    root_link = rospy.get_param('~root_link', 'base_footprint')
+    root_tips = rospy.get_param('~interactive_marker_chains', [('base_link', 'r_gripper_tool_frame'),
+                                                               ('base_link', 'l_gripper_tool_frame')])
+    sample_period = rospy.get_param('~sample_period', 0.1)
+    joint_convergence_threshold = rospy.get_param('~joint_convergence_threshold', 0.001)
+    wiggle_precision_threshold = rospy.get_param('~wiggle_precision_threshold', 5)
+    map_frame = rospy.get_param('~map_frame', 'map')
+    gui = rospy.get_param('~enable_gui', False)
+    marker = rospy.get_param('~enable_collision_marker', True)
+    default_collision_avoidance_distance = rospy.get_param('~default_collision_avoidance_distance', 0.02)
+    nWSR = rospy.get_param('~nWSR', None)
+    default_joint_vel_limit = rospy.get_param('~default_joint_vel_limit', 1)
+    path_to_data_folder = rospy.get_param('~path_to_data_folder', RosPack().get_path('giskardpy') + '/data/')
     if not path_to_data_folder.endswith('/'):
         path_to_data_folder += '/'
+
     fk_identifier = 'fk'
     cartesian_goal_identifier = 'goal'
     js_identifier = 'js'
@@ -34,14 +45,13 @@ if __name__ == '__main__':
     closest_point_identifier = 'cpi'
     collision_goal_identifier = 'collision_goal'
 
-    root_link = rospy.get_param('~root_link', 'base_footprint')
-    # root_link = rospy.get_param('~root_link', 'odom')
 
     pm = ProcessManager()
     pm.register_plugin('js',
                        JointStatePlugin(js_identifier=js_identifier,
                                         time_identifier=time_identifier,
-                                        next_cmd_identifier=next_cmd_identifier))
+                                        next_cmd_identifier=next_cmd_identifier,
+                                        sample_period=sample_period))
     pm.register_plugin('controlled joints',
                        SetControlledJointsPlugin(controlled_joints_identifier=controlled_joints_identifier))
     pm.register_plugin('action server',
@@ -52,20 +62,20 @@ if __name__ == '__main__':
                                           closest_point_identifier=closest_point_identifier,
                                           controlled_joints_identifier=controlled_joints_identifier,
                                           collision_goal_identifier=collision_goal_identifier,
-                                          joint_convergence_threshold=rospy.get_param('~joint_convergence_threshold',
-                                                                                      0.001),
-                                          wiggle_precision_threshold=rospy.get_param('~wiggle_precision_threshold', 5),
+                                          joint_convergence_threshold=joint_convergence_threshold,
+                                          wiggle_precision_threshold=wiggle_precision_threshold,
                                           plot_trajectory=False))
     pm.register_plugin('bullet',
                        PyBulletPlugin(js_identifier=js_identifier,
                                       collision_identifier=collision_identifier,
                                       closest_point_identifier=closest_point_identifier,
                                       collision_goal_identifier=collision_goal_identifier,
-                                      map_frame=rospy.get_param('~map_frame', 'map'),
+                                      map_frame=map_frame,
                                       root_link=root_link,
                                       path_to_data_folder=path_to_data_folder,
-                                      gui=rospy.get_param('~enable_gui', False),
-                                      marker=rospy.get_param('~enable_collision_marker', True),))
+                                      gui=gui,
+                                      marker=marker,
+                                      default_collision_avoidance_distance=default_collision_avoidance_distance))
     pm.register_plugin('fk', FKPlugin(js_identifier=js_identifier, fk_identifier=fk_identifier))
     pm.register_plugin('cart bullet controller',
                        CartesianBulletControllerPlugin(root_link=root_link,
@@ -78,14 +88,10 @@ if __name__ == '__main__':
                                                        controlled_joints_identifier=controlled_joints_identifier,
                                                        collision_goal_identifier=collision_goal_identifier,
                                                        path_to_functions=path_to_data_folder,
-                                                       nWSR=rospy.get_param('~nWSR', None)))
+                                                       nWSR=nWSR,
+                                                       default_joint_vel_limit=default_joint_vel_limit))
     pm.register_plugin('interactive marker',
-                       InteractiveMarkerPlugin(rospy.get_param('~interactive_marker_chains',
-                                                               [('base_link', 'r_gripper_tool_frame'),
-                                                                ('base_link', 'l_gripper_tool_frame')])))
-    # pm.register_plugin('interactive marker',
-    #                    InteractiveMarkerPlugin(rospy.get_param('~interactive_marker_chains',
-    #                                                            [('base_footprint', 'gripper_tool_frame')])))
+                       InteractiveMarkerPlugin(root_tips=root_tips))
 
     app = ROSApplication(pm)
     app.run()

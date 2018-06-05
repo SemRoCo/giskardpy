@@ -28,8 +28,8 @@ def hacky_urdf_parser_fix(urdf_str):
 
 
 class Robot(object):
-    def __init__(self, urdf):
-        self.default_joint_vel_limit = 1 # TODO expose
+    def __init__(self, urdf, default_joint_vel_limit=0):
+        self.default_joint_vel_limit = default_joint_vel_limit
         self.default_weight = 0.0001
         self.fks = {}
         if urdf.endswith('.urdf'):
@@ -120,7 +120,6 @@ class Robot(object):
         self.joint_states_input = JointStatesInput(joint_map)
 
     def _create_constraints(self):
-        # TODO add weights
         self.hard_constraints = OrderedDict()
         self.joint_constraints = OrderedDict()
         for i, (joint_name, joint) in enumerate(self._joints.items()):
@@ -163,7 +162,6 @@ class Robot(object):
         return [k for k, v in self._joints.items() if v.symbol is not None]
 
     def get_link_tree(self, root):
-        # TODO which links of a chain do we want to add?
         links = set()
         joints = [root]
         for joint in joints:

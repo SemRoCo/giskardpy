@@ -12,7 +12,7 @@ import symengine_wrappers as sw
 class CartesianBulletControllerPlugin(Plugin):
     def __init__(self, root_link, js_identifier, fk_identifier, goal_identifier, next_cmd_identifier,
                  collision_identifier, closest_point_identifier, controlled_joints_identifier,
-                 collision_goal_identifier, path_to_functions, nWSR):
+                 collision_goal_identifier, path_to_functions, nWSR, default_joint_vel_limit):
         """
         :param roots:
         :type roots: list
@@ -33,6 +33,7 @@ class CartesianBulletControllerPlugin(Plugin):
         self._closest_point_identifier = closest_point_identifier
         self.path_to_functions = path_to_functions
         self.nWSR = nWSR
+        self.default_joint_vel_limit = default_joint_vel_limit
         self.root = root_link
         self.soft_constraints = OrderedDict()
         self._joint_states_identifier = js_identifier
@@ -129,7 +130,7 @@ class CartesianBulletControllerPlugin(Plugin):
 
     def start_once(self):
         urdf = rospy.get_param('robot_description')
-        self._controller = SymEngineController(urdf, self.path_to_functions)
+        self._controller = SymEngineController(urdf, self.path_to_functions, self.default_joint_vel_limit)
         robot = self._controller.robot
 
         current_joints = JointStatesInput.prefix_constructor(self.god_map.get_expr,
@@ -236,7 +237,8 @@ class CartesianBulletControllerPlugin(Plugin):
         cp = self.__class__(self.root, self._joint_states_identifier, self._fk_identifier,
                             self._goal_identifier, self._next_cmd_identifier, self._collision_identifier,
                             self._closest_point_identifier, self.controlled_joints_identifier,
-                            self.collision_goal_identifier, self.path_to_functions, self.nWSR)
+                            self.collision_goal_identifier, self.path_to_functions, self.nWSR,
+                            self.default_joint_vel_limit)
         cp._controller = self._controller
         cp.soft_constraints = self.soft_constraints
         cp.known_constraints = self.known_constraints

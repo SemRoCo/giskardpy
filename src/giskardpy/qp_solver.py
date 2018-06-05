@@ -48,7 +48,6 @@ class QPSolver(object):
         :type np.array
         """
         if nWSR is None:
-            # TODO change depending on number of constraints or expose
             nWSR = np.array([sum(A.shape)*2])
         else:
             nWSR = np.array([nWSR])

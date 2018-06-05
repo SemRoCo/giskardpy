@@ -5,10 +5,10 @@ from giskardpy.symengine_robot import Robot
 
 
 class SymEngineController(object):
-    def __init__(self, urdf, path_to_functions):
+    def __init__(self, urdf, path_to_functions, default_joint_vel_limit):
         self.path_to_functions = path_to_functions
         self._soft_constraints = OrderedDict()
-        self.robot = Robot(urdf)
+        self.robot = Robot(urdf, default_joint_vel_limit)
         self.controlled_joints = []
         self.hard_constraints = {}
         self.joint_constraints = {}
@@ -22,7 +22,6 @@ class SymEngineController(object):
         :param joint_names:
         :type joint_names: set
         """
-        # TODO might have to get it from a topic or something
         self.controlled_joints.extend(x for x in joint_names if x not in self.controlled_joints)
         self.controlled_joint_symbols = [self.robot.get_joint_symbol_map().joint_map[x] for x in
                                          self.controlled_joints]

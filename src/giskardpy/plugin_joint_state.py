@@ -11,11 +11,12 @@ from giskardpy.utils import to_joint_state_dict
 
 
 class JointStatePlugin(Plugin):
-    def __init__(self, js_identifier, time_identifier, next_cmd_identifier):
+    def __init__(self, js_identifier, time_identifier, next_cmd_identifier, sample_period):
         super(JointStatePlugin, self).__init__()
         self.js_identifier = js_identifier
         self.time_identifier = time_identifier
         self.next_cmd_identifier = next_cmd_identifier
+        self.sample_period = sample_period
         self.js = None
         self.mjs = None
         self.lock = Queue(maxsize=1)
@@ -43,15 +44,15 @@ class JointStatePlugin(Plugin):
 
     def copy(self):
         return KinematicSimPlugin(js_identifier=self.js_identifier, next_cmd_identifier=self.next_cmd_identifier,
-                                  time_identifier=self.time_identifier)
+                                  time_identifier=self.time_identifier, sample_period=self.sample_period)
 
 
 class KinematicSimPlugin(Plugin):
-    def __init__(self, js_identifier, next_cmd_identifier, time_identifier):
+    def __init__(self, js_identifier, next_cmd_identifier, time_identifier, sample_period):
         self.js_identifier = js_identifier
         self.next_cmd_identifier = next_cmd_identifier
         self.time_identifier = time_identifier
-        self.frequency = 0.1 # TODO expose
+        self.frequency = sample_period
         self.time = -self.frequency
         super(KinematicSimPlugin, self).__init__()
 

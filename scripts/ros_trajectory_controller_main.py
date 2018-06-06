@@ -34,6 +34,7 @@ if __name__ == '__main__':
         nWSR = None
     default_joint_vel_limit = rospy.get_param('~default_joint_vel_limit', 1)
     path_to_data_folder = rospy.get_param('~path_to_data_folder', RosPack().get_path('giskardpy') + '/data/')
+    # path_to_data_folder = '/home/ichumuh/giskardpy_ws/src/giskardpy/data/pr2'
     if not path_to_data_folder.endswith('/'):
         path_to_data_folder += '/'
 

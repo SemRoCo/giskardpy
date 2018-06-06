@@ -229,7 +229,7 @@ class PyBulletPlugin(Plugin):
                                                            to_vector3_stamped(self.map_frame,
                                                                               collision_info.contact_normal_on_b)))
                 cpi = ClosestPointInfo(a_in_robot_root, b_in_robot_root, collision_info.contact_distance,
-                                       distances[key], key[0], key[1], n_in_robot_root)
+                                       distances[key], key[0], key[2], n_in_robot_root)
                 # if cpi.contact_distance < 0:
                 #     raise IntersectingCollisionException(key)
                 if link1 in closest_point:

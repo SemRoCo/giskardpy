@@ -1,0 +1,28 @@
+<launch>
+  <node pkg="giskardpy" type="ros_trajectory_controller_main.py" name="giskard" output="screen">
+    <param name="path_to_data_folder" value="$(find giskardpy)/data/donbot" />
+    <rosparam param="enable_gui">False</rosparam>
+    <rosparam param="map_frame">map</rosparam>
+    <rosparam param="root_link">odom</rosparam>
+    <rosparam param="enable_collision_marker">True</rosparam>
+    <rosparam param="interactive_marker_chains">
+     - [base_footprint, gripper_tool_frame]
+     - [base_footprint, camera_link]
+    </rosparam>
+  </node>
+  <node pkg="giskardpy" type="init_chain.py" name="init_chain">
+    <rosparam param="roots">
+      - base_footprint
+      - base_footprint
+    </rosparam>
+    <rosparam param="tips">
+      - gripper_tool_frame
+      - camera_link
+    </rosparam>
+    <!-- 2 = TRANSLATION_3D; 3 = ROTATION_3D -->
+    <rosparam param="types"> 
+      - [2, 3]
+      - [2, 3]
+    </rosparam>
+  </node>
+</launch>

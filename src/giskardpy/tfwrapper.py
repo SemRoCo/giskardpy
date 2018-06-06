@@ -35,7 +35,7 @@ def transform_pose(target_frame, pose):
         transform = tfBuffer.lookup_transform(target_frame,
                                               pose.header.frame_id,  # source frame
                                               pose.header.stamp,
-                                              rospy.Duration(1.0))
+                                              rospy.Duration(5.0))
         new_pose = do_transform_pose(pose, transform)
         return new_pose
     except ExtrapolationException as e:
@@ -58,7 +58,7 @@ def transform_vector(target_frame, vector):
         transform = tfBuffer.lookup_transform(target_frame,
                                               vector.header.frame_id,  # source frame
                                               vector.header.stamp,
-                                              rospy.Duration(1.0))
+                                              rospy.Duration(5.0))
         new_pose = do_transform_vector3(vector, transform)
         return new_pose
     except ExtrapolationException as e:
@@ -81,7 +81,7 @@ def transform_point(target_frame, point):
         transform = tfBuffer.lookup_transform(target_frame,
                                               point.header.frame_id,  # source frame
                                               point.header.stamp,
-                                              rospy.Duration(1.0))
+                                              rospy.Duration(5.0))
         new_pose = do_transform_point(point, transform)
         return new_pose
     except ExtrapolationException as e:

@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 import unittest
 from math import pi
+from rospkg import RosPack
+
 import rospy
 from actionlib import SimpleActionClient
 from angles import normalize_angle
@@ -10,7 +12,9 @@ from giskard_msgs.srv import UpdateWorld
 from sensor_msgs.msg import JointState
 
 from giskardpy.python_interface import GiskardWrapper
+from giskardpy.tfwrapper import lookup_transform
 from test_update_world import add_table, clear_world
+from numpy import pi
 
 PKG = 'giskardpy'
 
@@ -84,8 +88,24 @@ class TestCollisionAvoidance(unittest.TestCase):
                                                                            current,
                                                                            goal))
 
+    def set_and_check_cart_goal(self, tip, goal_pose):
+        self.giskard.set_cart_goal(tip, goal_pose)
+        self.giskard.plan_and_execute()
+        current_pose = lookup_transform(goal_pose.header.frame_id, tip)
+        self.assertAlmostEqual(goal_pose.pose.position.x, current_pose.pose.position.x, 2)
+        self.assertAlmostEqual(goal_pose.pose.position.y, current_pose.pose.position.y, 2)
+        self.assertAlmostEqual(goal_pose.pose.position.z, current_pose.pose.position.z, 2)
+
+        self.assertAlmostEqual(goal_pose.pose.orientation.x, current_pose.pose.orientation.x, 1)
+        self.assertAlmostEqual(goal_pose.pose.orientation.y, current_pose.pose.orientation.y, 1)
+        self.assertAlmostEqual(goal_pose.pose.orientation.z, current_pose.pose.orientation.z, 1)
+        self.assertAlmostEqual(goal_pose.pose.orientation.w, current_pose.pose.orientation.w, 1)
+
     def add_box(self):
         self.giskard.add_box(name='box', position=(1.2, 0, 0.5))
+
+    def add_kitchen(self):
+        self.giskard.add_urdf('kitchen', rospy.get_param('kitchen_description'), 'kitchen_joint_states', 'map', 'world')
 
     def test_AllowCollision1(self):
         self.add_box()
@@ -256,6 +276,49 @@ class TestCollisionAvoidance(unittest.TestCase):
                                        msg='{} is {} instead of {}'.format(joint_name,
                                                                            current,
                                                                            goal))
+
+    def test_place_spoon1(self):
+        goal_js = {
+            'r_elbow_flex_joint': -1.43322543123,
+            'r_forearm_roll_joint': pi/2,
+            'r_gripper_joint': 2.22044604925e-16,
+            'r_gripper_l_finger_joint': 2.22044604925e-16,
+            'r_gripper_l_finger_tip_joint': 2.22044604925e-16,
+            'r_gripper_motor_screw_joint': 0.0,
+            'r_gripper_motor_slider_joint': 0.0,
+            'r_gripper_r_finger_joint': 2.22044604925e-16,
+            'r_gripper_r_finger_tip_joint': 2.22044604925e-16,
+            'r_shoulder_lift_joint': 0,
+            'r_shoulder_pan_joint': -1.39478600655,
+            'r_upper_arm_roll_joint': -pi/2,
+            'r_wrist_flex_joint': 0,
+            'r_wrist_roll_joint': 0,
+
+            'l_elbow_flex_joint': -1.53432386765,
+            'l_forearm_roll_joint': -0.335634766956,
+            'l_gripper_joint': 2.22044604925e-16,
+            'l_gripper_l_finger_joint': 2.22044604925e-16,
+            'l_gripper_l_finger_tip_joint': 2.22044604925e-16,
+            'l_gripper_motor_screw_joint': 0.0,
+            'l_gripper_motor_slider_joint': 0.0,
+            'l_gripper_r_finger_joint': 2.22044604925e-16,
+            'l_gripper_r_finger_tip_joint': 2.22044604925e-16,
+            'l_shoulder_lift_joint': 0.199493756207,
+            'l_shoulder_pan_joint': 0.854317292495,
+            'l_upper_arm_roll_joint': 1.90837777308,
+            'l_wrist_flex_joint': -0.623267982468,
+            'l_wrist_roll_joint': -0.910310693429,
+
+            'torso_lift_joint': 0.206303584043,
+        }
+        self.set_and_check_js_goal(goal_js)
+        self.add_kitchen()
+        self.giskard.avoid_collision(0.05, body_b='kitchen')
+        p = PoseStamped()
+        p.header.frame_id = 'base_footprint'
+        p.pose.position = Point(0.69, -0.374, 0.82)
+        p.pose.orientation = Quaternion(-0.010, 0.719, 0.006, 0.695)
+        self.set_and_check_cart_goal('r_gripper_tool_frame', p)
 
 
 if __name__ == '__main__':

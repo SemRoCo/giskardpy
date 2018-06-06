@@ -1,7 +1,7 @@
 import rospy
 from actionlib import SimpleActionClient
 from geometry_msgs.msg import PoseStamped, Point, Quaternion
-from giskard_msgs.msg import MoveAction, MoveCmd, Controller, MoveGoal, WorldBody
+from giskard_msgs.msg import MoveAction, MoveCmd, Controller, MoveGoal, WorldBody, CollisionEntry
 from giskard_msgs.srv import UpdateWorld, UpdateWorldRequest
 from sensor_msgs.msg import JointState
 from shape_msgs.msg import SolidPrimitive
@@ -91,6 +91,15 @@ class GiskardWrapper(object):
 
     def set_collision_entries(self, collisions):
         self.cmd_seq[-1].collisions.extend(collisions)
+
+    def avoid_collision(self, min_dist, robot_link='', body_b='', link_b=''):
+        collision_entry = CollisionEntry()
+        collision_entry.type = CollisionEntry.AVOID_COLLISION
+        collision_entry.min_dist = min_dist
+        collision_entry.robot_link = robot_link
+        collision_entry.body_b = body_b
+        collision_entry.link_b = link_b
+        self.set_collision_entries([collision_entry])
 
     def add_cmd(self, max_trajectory_length=20):
         move_cmd = MoveCmd()

@@ -6,9 +6,10 @@ from warnings import warn
 import errno
 import symengine as sp
 from symengine import Matrix, Symbol, eye, sympify, diag, zeros, lambdify, Abs, Max, Min, sin, cos, tan, acos, asin, \
-    atan, atan2, nan, sqrt, log
+    atan, atan2, nan, sqrt, log, tanh
 import numpy as np
 
+# from symengine.lib.symengine import tanh
 from symengine.lib.symengine_wrapper import Lambdify
 
 pathSeparator = '_'
@@ -25,21 +26,24 @@ def fake_Max(x, y):
 def fake_Min(x, y):
     return ((x + y) - fake_Abs(x - y)) / 2
 
+
 def fake_sign(a, e=-2.22507385851e-308):
     """
-    if a > e:
+    if a > 0:
         return 1
-    if a < e:
+    if a < 0:
         return -1
-    if a == e:
-        return nan
+    if a == 0:
+        return 0
     """
-    a -= e
-    return a / fake_Abs(a)  # 1 or -1
+    return a / (e + fake_Abs(a))
 
-def fake_if(a, b, c, e=-2.22507385851e-308):
+def sigmoid(a, e=9e300):
+    return (tanh(a*e)+1)/2
+
+def fake_if(a, b, c, e=2.22507385851e-308):
     """
-    if a >= 0:
+    if a > 0:
         return b
     else:
         return c
@@ -50,15 +54,16 @@ def fake_if(a, b, c, e=-2.22507385851e-308):
     if a < e:
         return c
     if a == e:
-        return nan
+        return 0
     :type a: Union[float, Symbol]
     :type b: Union[float, Symbol]
     :type c: Union[float, Symbol]
     """
-    a = fake_sign(a, e) # 1 or -1
-    _if = fake_Max(0, a) * b # 0 or b
-    _else = -fake_Min(0, a) * c # 0 or c
+    a = fake_sign(a - e)  # 1 or -1
+    _if = fake_Max(0, a) * b  # 0 or b
+    _else = -fake_Min(0, a) * c  # 0 or c
     return _if + _else  # i or e
+    # return sigmoid((a-e)) * b + sigmoid(-(a-e)) * c
 
 
 def safe_compiled_function(f, file_name):

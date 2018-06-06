@@ -22,6 +22,7 @@ if __name__ == '__main__':
     root_tips = rospy.get_param('~interactive_marker_chains', [('base_link', 'r_gripper_tool_frame'),
                                                                ('base_link', 'l_gripper_tool_frame')])
     sample_period = rospy.get_param('~sample_period', 0.1)
+    fill_velocity_values = rospy.get_param('~fill_velocity_values', False)
     joint_convergence_threshold = rospy.get_param('~joint_convergence_threshold', 0.001)
     wiggle_precision_threshold = rospy.get_param('~wiggle_precision_threshold', 5)
     map_frame = rospy.get_param('~map_frame', 'map')
@@ -29,6 +30,8 @@ if __name__ == '__main__':
     marker = rospy.get_param('~enable_collision_marker', True)
     default_collision_avoidance_distance = rospy.get_param('~default_collision_avoidance_distance', 0.02)
     nWSR = rospy.get_param('~nWSR', None)
+    if nWSR == 'None':
+        nWSR = None
     default_joint_vel_limit = rospy.get_param('~default_joint_vel_limit', 1)
     path_to_data_folder = rospy.get_param('~path_to_data_folder', RosPack().get_path('giskardpy') + '/data/')
     if not path_to_data_folder.endswith('/'):
@@ -64,7 +67,8 @@ if __name__ == '__main__':
                                           collision_goal_identifier=collision_goal_identifier,
                                           joint_convergence_threshold=joint_convergence_threshold,
                                           wiggle_precision_threshold=wiggle_precision_threshold,
-                                          plot_trajectory=False))
+                                          plot_trajectory=False,
+                                          fill_velocity_values=fill_velocity_values))
     pm.register_plugin('bullet',
                        PyBulletPlugin(js_identifier=js_identifier,
                                       collision_identifier=collision_identifier,

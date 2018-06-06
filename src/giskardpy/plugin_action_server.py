@@ -28,7 +28,9 @@ class ActionServerPlugin(Plugin):
     # TODO find a better name than ActionServerPlugin
     def __init__(self, cartesian_goal_identifier, js_identifier, trajectory_identifier, time_identifier,
                  closest_point_identifier, controlled_joints_identifier, collision_goal_identifier,
-                 joint_convergence_threshold, wiggle_precision_threshold, plot_trajectory=False):
+                 joint_convergence_threshold, wiggle_precision_threshold, fill_velocity_values,
+                 plot_trajectory=False):
+        self.fill_velocity_values = fill_velocity_values
         self.plot_trajectory = plot_trajectory
         self.goal_identifier = cartesian_goal_identifier
         self.controlled_joints_identifier = controlled_joints_identifier
@@ -121,10 +123,12 @@ class ActionServerPlugin(Plugin):
                     for joint_name in self.controller_joints:
                         if joint_name in traj_point:
                             p.positions.append(traj_point[joint_name].position)
-                            p.velocities.append(traj_point[joint_name].velocity)
+                            if self.fill_velocity_values:
+                                p.velocities.append(traj_point[joint_name].velocity)
                         else:
                             p.positions.append(self.start_js[joint_name].position)
-                            p.velocities.append(self.start_js[joint_name].velocity)
+                            if self.fill_velocity_values:
+                                p.velocities.append(self.start_js[joint_name].velocity)
                     result.trajectory.points.append(p)
             else:
                 result.error_code = MoveResult.END_STATE_COLLISION

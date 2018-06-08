@@ -173,7 +173,7 @@ class CartesianBulletControllerPlugin(Plugin):
         joint_goal = self.god_map.get_data([self._goal_identifier, str(Controller.JOINT)])
         for joint_name in self.controlled_joints:
             if joint_name not in joint_goal:
-                joint_goal[joint_name] = {'weight': 0,
+                joint_goal[joint_name] = {'weight': 0.0,
                                           'p_gain': 10,
                                           'max_speed':
 

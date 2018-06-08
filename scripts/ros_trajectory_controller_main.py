@@ -33,7 +33,7 @@ if __name__ == '__main__':
     if nWSR == 'None':
         nWSR = None
     default_joint_vel_limit = rospy.get_param('~default_joint_vel_limit', 1)
-    path_to_data_folder = rospy.get_param('~path_to_data_folder', RosPack().get_path('giskardpy') + '/data/')
+    path_to_data_folder = rospy.get_param('~path_to_data_folder', RosPack().get_path('giskardpy') + '/data/pr2/')
     # path_to_data_folder = '/home/ichumuh/giskardpy_ws/src/giskardpy/data/pr2'
     if not path_to_data_folder.endswith('/'):
         path_to_data_folder += '/'
@@ -68,7 +68,7 @@ if __name__ == '__main__':
                                           collision_goal_identifier=collision_goal_identifier,
                                           joint_convergence_threshold=joint_convergence_threshold,
                                           wiggle_precision_threshold=wiggle_precision_threshold,
-                                          plot_trajectory=False,
+                                          plot_trajectory=True,
                                           fill_velocity_values=fill_velocity_values))
     pm.register_plugin('bullet',
                        PyBulletPlugin(js_identifier=js_identifier,

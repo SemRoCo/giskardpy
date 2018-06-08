@@ -6,11 +6,11 @@ from warnings import warn
 import errno
 import symengine as sp
 from symengine import Matrix, Symbol, eye, sympify, diag, zeros, lambdify, Abs, Max, Min, sin, cos, tan, acos, asin, \
-    atan, atan2, nan, sqrt, log, tanh
+    atan, atan2, nan, sqrt, log, tanh, var
 import numpy as np
 
-# from symengine.lib.symengine import tanh
 from symengine.lib.symengine_wrapper import Lambdify
+from tf.transformations import unit_vector
 
 pathSeparator = '_'
 
@@ -38,10 +38,12 @@ def fake_sign(a, e=-2.22507385851e-308):
     """
     return a / (e + fake_Abs(a))
 
-def sigmoid(a, e=9e300):
-    return (tanh(a*e)+1)/2
 
-def fake_if(a, b, c, e=2.22507385851e-308):
+def sigmoid(a, e=9e300):
+    return (tanh(a * e) + 1) / 2
+
+
+def if_greater_zero(a, b, c, e=2.22507385851e-308):
     """
     if a > 0:
         return b
@@ -64,6 +66,17 @@ def fake_if(a, b, c, e=2.22507385851e-308):
     _else = -fake_Min(0, a) * c  # 0 or c
     return _if + _else  # i or e
     # return sigmoid((a-e)) * b + sigmoid(-(a-e)) * c
+
+
+def if_eq_zero(a, b, c, e=2.22507385851e-308):
+    """
+    if a == 0:
+        return b
+    else:
+        return c
+    """
+    a = fake_Abs(fake_sign(a, e))
+    return (1 - a) * b + a * c
 
 
 def safe_compiled_function(f, file_name):
@@ -171,7 +184,7 @@ def scale(v, a):
 
 
 def dot(a, b):
-    return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+    return (a.T*b)[0]
 
 
 def translation3(x, y, z):
@@ -271,13 +284,13 @@ def rot_of(frame):
 
 
 def trace(matrix):
-    return sum(matrix[i, i] for i in range(3))
+    return sum(matrix[i, i] for i in range(matrix.shape[0]))
 
 
 def rotation_distance(rotation_matrix1, rotation_matrix2):
     difference = rotation_matrix1 * rotation_matrix2.T
     # return -(((trace(difference) - 1)/2)-1)
-    v = (trace(difference) - 1) / 2
+    v = (trace(difference[:3, :3]) - 1) / 2
     # v = Max(-1, v)
     # v = Min(1, v)
     return sp.acos(v)
@@ -285,7 +298,7 @@ def rotation_distance(rotation_matrix1, rotation_matrix2):
 
 def axis_angle_from_matrix(rotation_matrix):
     rm = rotation_matrix
-    angle = (trace(rm) - 1) / 2
+    angle = (trace(rm[:3, :3]) - 1) / 2
     angle = sp.acos(angle)
     x = (rm[2, 1] - rm[1, 2])
     y = (rm[0, 2] - rm[2, 0])
@@ -345,6 +358,51 @@ def quaternion_from_rpy(roll, pitch, yaw):
     return sp.Matrix([x, y, z, w])
 
 
+def quaternion_from_matrix(matrix):
+    q = Matrix([0, 0, 0, 0])
+    M = Matrix(matrix)
+    t = trace(M)
+
+    if0 = t - M[3, 3]
+
+    if1 = M[1, 1] - M[0, 0]
+
+    m_i_i = if_greater_zero(if1, M[1, 1], M[0, 0])
+    m_j_j = if_greater_zero(if1, M[2, 2], M[1, 1])
+    m_k_k = if_greater_zero(if1, M[0, 0], M[2, 2])
+
+    m_i_j = if_greater_zero(if1, M[1, 2], M[0, 1])
+    m_j_i = if_greater_zero(if1, M[2, 1], M[1, 0])
+    m_k_i = if_greater_zero(if1, M[0, 1], M[2, 0])
+    m_i_k = if_greater_zero(if1, M[1, 0], M[0, 2])
+    m_k_j = if_greater_zero(if1, M[0, 2], M[2, 1])
+    m_j_k = if_greater_zero(if1, M[2, 0], M[1, 2])
+
+    if2 = M[2, 2] - m_i_i
+
+    m_i_i = if_greater_zero(if2, M[2, 2], m_i_i)
+    m_j_j = if_greater_zero(if2, M[0, 0], m_j_j)
+    m_k_k = if_greater_zero(if2, M[1, 1], m_k_k)
+
+    m_i_j = if_greater_zero(if2, M[2, 0], m_i_j)
+    m_j_i = if_greater_zero(if2, M[0, 2], m_j_i)
+    m_k_i = if_greater_zero(if2, M[1, 2], m_k_i)
+    m_i_k = if_greater_zero(if2, M[2, 1], m_i_k)
+    m_k_j = if_greater_zero(if2, M[1, 0], m_k_j)
+    m_j_k = if_greater_zero(if2, M[0, 1], m_j_k)
+
+    t2 = m_i_i - (m_j_j + m_k_k) + M[3, 3]
+    q[0] = if_greater_zero(if0, M[2, 1] - M[1, 2],
+                           if_greater_zero(if2, m_i_j + m_j_i, if_greater_zero(if1, m_k_i + m_i_k, t2)))
+    q[1] = if_greater_zero(if0, M[0, 2] - M[2, 0],
+                           if_greater_zero(if2, m_k_i + m_i_k, if_greater_zero(if1, t2, m_i_j + m_j_i)))
+    q[2] = if_greater_zero(if0, M[1, 0] - M[0, 1],
+                           if_greater_zero(if2, t2, if_greater_zero(if1, m_i_j + m_j_i, m_k_i + m_i_k)))
+    q[3] = if_greater_zero(if0, t, m_k_j - m_j_k)
+    q *= if_greater_zero(if0, 0.5 / sp.sqrt(t * M[3, 3]), 0.5 / sp.sqrt(t2 * M[3, 3]))
+    return q
+
+
 def quaternion_multiply(q1, q2):
     x0, y0, z0, w0 = q2
     x1, y1, z1, w1 = q1
@@ -381,3 +439,61 @@ def cosine_distance(q1, q2):
 
 def euclidean_distance(v1, v2):
     return norm(v1 - v2)
+
+
+def slerp(r1, r2, t):
+    xa, ya, za, wa = quaternion_from_matrix(r1)
+    xb, yb, zb, wb = quaternion_from_matrix(r2)
+    cos_half_theta = wa * wb + xa * xb + ya * yb + za * zb
+
+    if (cos_half_theta < 0):
+        wb = -wb
+        xb = -xb
+        yb = -yb
+        zb = -zb
+        cos_half_theta = -cos_half_theta
+
+    if (abs(cos_half_theta) >= 1.0):
+        return a
+
+    half_theta = acos(cos_half_theta)
+    sin_half_theta = sqrt(1.0 - cos_half_theta * cos_half_theta)
+
+    if (abs(sin_half_theta) < 0.001):
+        return Matrix([
+            0.5 * xa + 0.5 * xb,
+            0.5 * ya + 0.5 * yb,
+            0.5 * za + 0.5 * zb,
+            0.5 * wa + 0.5 * wb])
+
+    ratio_a = sin((1.0 - t) * half_theta) / sin_half_theta
+    ratio_b = sin(t * half_theta) / sin_half_theta
+
+    return Matrix([
+        ratio_a * xa + ratio_b * xb,
+        ratio_a * ya + ratio_b * yb,
+        ratio_a * za + ratio_b * zb,
+        ratio_a * wa + ratio_b * wb])
+
+
+_EPS = np.finfo(float).eps * 4.0
+
+def slerp2(q0, q1, fraction):
+    d = dot(q0, q1)
+    q1 *= if_greater_zero(d, 1, -1)
+    d = fake_Abs(d)
+    angle = acos(d)
+    isin = 1.0 / sin(angle)
+    qr = q0 * sin((1.0 - fraction) * angle) * isin
+    q1 *= sin(fraction * angle) * isin
+    qr = qr + q1
+
+    return if_eq_zero(fraction,
+                      q0,
+                      if_eq_zero(fraction - 1,
+                                 q1,
+                                 if_greater_zero(_EPS - fake_Abs(fake_Abs(d) - 1.0),
+                                                 q0,
+                                                 if_greater_zero(_EPS - fake_Abs(angle),
+                                                                 q0,
+                                                                 qr))))

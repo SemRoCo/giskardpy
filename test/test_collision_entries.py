@@ -12,7 +12,7 @@ from giskard_msgs.srv import UpdateWorld
 from sensor_msgs.msg import JointState
 
 from giskardpy.python_interface import GiskardWrapper
-from giskardpy.tfwrapper import lookup_transform
+from giskardpy.tfwrapper import lookup_transform, transform_pose
 from test_update_world import add_table, clear_world
 from numpy import pi
 
@@ -89,17 +89,18 @@ class TestCollisionAvoidance(unittest.TestCase):
                                                                            goal))
 
     def set_and_check_cart_goal(self, tip, goal_pose):
+        goal_in_base = transform_pose('base_footprint', goal_pose)
         self.giskard.set_cart_goal(tip, goal_pose)
         self.giskard.plan_and_execute()
-        current_pose = lookup_transform(goal_pose.header.frame_id, tip)
-        self.assertAlmostEqual(goal_pose.pose.position.x, current_pose.pose.position.x, 2)
-        self.assertAlmostEqual(goal_pose.pose.position.y, current_pose.pose.position.y, 2)
-        self.assertAlmostEqual(goal_pose.pose.position.z, current_pose.pose.position.z, 2)
+        current_pose = lookup_transform('base_footprint', tip)
+        self.assertAlmostEqual(goal_in_base.pose.position.x, current_pose.pose.position.x, 2)
+        self.assertAlmostEqual(goal_in_base.pose.position.y, current_pose.pose.position.y, 2)
+        self.assertAlmostEqual(goal_in_base.pose.position.z, current_pose.pose.position.z, 2)
 
-        self.assertAlmostEqual(goal_pose.pose.orientation.x, current_pose.pose.orientation.x, 1)
-        self.assertAlmostEqual(goal_pose.pose.orientation.y, current_pose.pose.orientation.y, 1)
-        self.assertAlmostEqual(goal_pose.pose.orientation.z, current_pose.pose.orientation.z, 1)
-        self.assertAlmostEqual(goal_pose.pose.orientation.w, current_pose.pose.orientation.w, 1)
+        self.assertAlmostEqual(goal_in_base.pose.orientation.x, current_pose.pose.orientation.x, 1)
+        self.assertAlmostEqual(goal_in_base.pose.orientation.y, current_pose.pose.orientation.y, 1)
+        self.assertAlmostEqual(goal_in_base.pose.orientation.z, current_pose.pose.orientation.z, 1)
+        self.assertAlmostEqual(goal_in_base.pose.orientation.w, current_pose.pose.orientation.w, 1)
 
     def add_box(self):
         self.giskard.add_box(name='box', position=(1.2, 0, 0.5))
@@ -280,7 +281,7 @@ class TestCollisionAvoidance(unittest.TestCase):
     def test_place_spoon1(self):
         goal_js = {
             'r_elbow_flex_joint': -1.43322543123,
-            'r_forearm_roll_joint': pi/2,
+            'r_forearm_roll_joint': pi / 2,
             'r_gripper_joint': 2.22044604925e-16,
             'r_gripper_l_finger_joint': 2.22044604925e-16,
             'r_gripper_l_finger_tip_joint': 2.22044604925e-16,
@@ -290,7 +291,7 @@ class TestCollisionAvoidance(unittest.TestCase):
             'r_gripper_r_finger_tip_joint': 2.22044604925e-16,
             'r_shoulder_lift_joint': 0,
             'r_shoulder_pan_joint': -1.39478600655,
-            'r_upper_arm_roll_joint': -pi/2,
+            'r_upper_arm_roll_joint': -pi / 2,
             'r_wrist_flex_joint': 0,
             'r_wrist_roll_joint': 0,
 
@@ -319,6 +320,40 @@ class TestCollisionAvoidance(unittest.TestCase):
         p.pose.position = Point(0.69, -0.374, 0.82)
         p.pose.orientation = Quaternion(-0.010, 0.719, 0.006, 0.695)
         self.set_and_check_cart_goal('r_gripper_tool_frame', p)
+
+    def test_weird_wiggling(self):
+        goal_js = {
+            'torso_lift_joint': 0.137863459754,
+
+            'r_upper_arm_roll_joint': -3.24008158875,
+            'r_shoulder_pan_joint': 0.206949462075,
+            'r_shoulder_lift_joint': -0.249453873652,
+            'r_forearm_roll_joint': 1.83979114862,
+            'r_elbow_flex_joint': -1.36820120012,
+            'r_wrist_flex_joint': -1.52492789587,
+            'r_wrist_roll_joint': -13.6248743778,
+
+            'l_upper_arm_roll_joint': 1.63487737202,
+            'l_shoulder_pan_joint': 1.36222920328,
+            'l_shoulder_lift_joint': 0.229120778526,
+            'l_forearm_roll_joint': 13.7578920265,
+            'l_elbow_flex_joint': -1.48141189643,
+            'l_wrist_flex_joint': -1.22662876066,
+            'l_wrist_roll_joint': -53.6150824007,
+        }
+        self.set_and_check_js_goal(goal_js)
+
+        p = PoseStamped()
+        p.header.frame_id = 'l_gripper_tool_frame'
+        p.pose.position.x = -0.1
+        p.pose.orientation.w = 1
+        self.set_and_check_cart_goal('l_gripper_tool_frame', p)
+
+        p = PoseStamped()
+        p.header.frame_id = 'l_gripper_tool_frame'
+        p.pose.position.x = 0.2
+        p.pose.orientation.w = 1
+        self.set_and_check_cart_goal('l_gripper_tool_frame', p)
 
 
 if __name__ == '__main__':

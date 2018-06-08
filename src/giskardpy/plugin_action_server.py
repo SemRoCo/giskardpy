@@ -148,6 +148,7 @@ class ActionServerPlugin(Plugin):
         :param goal:
         :type goal: MoveGoal
         """
+        # TODO check for undefined goal.type
         rospy.loginfo('received goal')
         self.execute = goal.type == MoveGoal.PLAN_AND_EXECUTE
         # TODO do we really want to check for start state collision?

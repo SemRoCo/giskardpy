@@ -32,16 +32,20 @@ class GodMap(object):
         """
         if identifier is None:
             raise AttributeError()
-        if ',' in member: # handle tuple member
+        if callable(identifier):
+            # TODO this solution calls identifier multiple times if the result is an array, make it faster
+            return self._get_member(identifier(self), member)
+        elif ',' in member: # handle tuple member
             member = member.replace('(','')
             member = member.replace(')','')
             member = tuple(member.split(','))
-        if isinstance(identifier, dict):
+        try:
             return identifier[member]
-        elif isinstance(identifier, list) or (isinstance(identifier, tuple) and member.isdigit()):
-            return identifier[int(member)]
-        else:
-            return getattr(identifier, member)
+        except TypeError:
+            try:
+                return identifier[int(member)]
+            except (TypeError, ValueError):
+                return getattr(identifier, member)
 
     def get_data(self, key):
         """

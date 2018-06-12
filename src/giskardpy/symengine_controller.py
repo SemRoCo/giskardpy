@@ -161,6 +161,79 @@ def rotation_conv(goal_rotation, current_rotation, current_evaluated_rotation, w
     return soft_constraints
 
 
+def rotation_conv_slerp(goal_rotation, current_rotation, current_evaluated_rotation, weights=1,
+                        rot_gain=3, max_rot_speed=0.5, ns=''):
+    soft_constraints = OrderedDict()
+
+    axis, rot_error = sw.axis_angle_from_matrix((current_rotation.T * goal_rotation))
+
+    control = rot_gain * rot_error
+
+    interpolation_value = sw.if_greater_zero(max_rot_speed - control,
+                                             1,
+                                             max_rot_speed / control)
+
+    intermediate_goal = sw.slerp2(sw.quaternion_from_matrix(current_rotation),
+                                  sw.quaternion_from_matrix(goal_rotation),
+                                  interpolation_value)
+
+    rm = current_rotation.T * sw.rotation3_quaternion(*intermediate_goal)
+
+    axis2, angle2 = sw.axis_angle_from_matrix(rm)
+
+    r_rot_control = current_rotation[:3,:3] * (axis2*angle2)
+
+
+    hack = sw.rotation3_axis_angle([0, 0, 1], 0.0001)
+    axis, angle = sw.axis_angle_from_matrix((current_rotation.T * (current_evaluated_rotation * hack)).T)
+    c_aa = (axis * angle)
+
+    soft_constraints['align {} rotation 0'.format(ns)] = SoftConstraint(lower=r_rot_control[0],
+                                                                        upper=r_rot_control[0],
+                                                                        weight=weights,
+                                                                        expression=c_aa[0])
+    soft_constraints['align {} rotation 1'.format(ns)] = SoftConstraint(lower=r_rot_control[1],
+                                                                        upper=r_rot_control[1],
+                                                                        weight=weights,
+                                                                        expression=c_aa[1])
+    soft_constraints['align {} rotation 2'.format(ns)] = SoftConstraint(lower=r_rot_control[2],
+                                                                        upper=r_rot_control[2],
+                                                                        weight=weights,
+                                                                        expression=c_aa[2])
+
+    add_debug_constraint(soft_constraints, '{} //debug interpolation_value//'.format(ns), interpolation_value)
+    add_debug_constraint(soft_constraints, '{} //debug intermediate_goal[0]//'.format(ns), intermediate_goal[0])
+    add_debug_constraint(soft_constraints, '{} //debug intermediate_goal[1]//'.format(ns), intermediate_goal[1])
+    add_debug_constraint(soft_constraints, '{} //debug intermediate_goal[2]//'.format(ns), intermediate_goal[2])
+    add_debug_constraint(soft_constraints, '{} //debug intermediate_goal[3]//'.format(ns), intermediate_goal[3])
+    return soft_constraints
+
+def rotation_conv_slerp2(goal_rotation, current_rotation, current_evaluated_rotation, slerp, weights=1,
+                        rot_gain=3, max_rot_speed=0.5, ns=''):
+    soft_constraints = OrderedDict()
+
+
+
+    hack = sw.rotation3_axis_angle([0, 0, 1], 0.0001)
+
+    axis, angle = sw.axis_angle_from_matrix((current_rotation.T * (current_evaluated_rotation * hack)).T)
+    c_aa = (axis * angle)
+
+    soft_constraints['align {} rotation 0'.format(ns)] = SoftConstraint(lower=slerp[0],
+                                                                        upper=slerp[0],
+                                                                        weight=weights,
+                                                                        expression=c_aa[0])
+    soft_constraints['align {} rotation 1'.format(ns)] = SoftConstraint(lower=slerp[1],
+                                                                        upper=slerp[1],
+                                                                        weight=weights,
+                                                                        expression=c_aa[1])
+    soft_constraints['align {} rotation 2'.format(ns)] = SoftConstraint(lower=slerp[2],
+                                                                        upper=slerp[2],
+                                                                        weight=weights,
+                                                                        expression=c_aa[2])
+    return soft_constraints
+
+
 def link_to_link_avoidance(link_name, current_pose, current_pose_eval, point_on_link, other_point, contact_normal,
                            lower_limit=0.05, upper_limit=1e9, weight=10000):
     soft_constraints = OrderedDict()

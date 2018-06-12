@@ -28,7 +28,7 @@ class ActionServerPlugin(Plugin):
     # TODO find a better name than ActionServerPlugin
     def __init__(self, cartesian_goal_identifier, js_identifier, trajectory_identifier, time_identifier,
                  closest_point_identifier, controlled_joints_identifier, collision_goal_identifier,
-                 joint_convergence_threshold, wiggle_precision_threshold, fill_velocity_values,
+                 pyfunction_identifier, joint_convergence_threshold, wiggle_precision_threshold, fill_velocity_values,
                  plot_trajectory=False):
         self.fill_velocity_values = fill_velocity_values
         self.plot_trajectory = plot_trajectory
@@ -41,6 +41,7 @@ class ActionServerPlugin(Plugin):
         self.collision_goal_identifier = collision_goal_identifier
         self.joint_convergence_threshold = joint_convergence_threshold
         self.wiggle_precision_threshold = wiggle_precision_threshold
+        self.pyfunction_identifier = pyfunction_identifier
 
         self.joint_goal = None
         self.start_js = None
@@ -132,6 +133,7 @@ class ActionServerPlugin(Plugin):
                     result.trajectory.points.append(p)
             else:
                 result.error_code = MoveResult.END_STATE_COLLISION
+        self.god_map.set_data([self.pyfunction_identifier], god_map.get_data([self.pyfunction_identifier]))
         self.update_lock.put(result)
         self.update_lock.join()
 

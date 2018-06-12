@@ -1,6 +1,7 @@
 from collections import defaultdict, OrderedDict
 
-from geometry_msgs.msg import PointStamped, Point, Vector3Stamped, Vector3, Pose, PoseStamped
+from geometry_msgs.msg import PointStamped, Point, Vector3Stamped, Vector3, Pose, PoseStamped, QuaternionStamped, \
+    Quaternion
 from sensor_msgs.msg import JointState
 from giskardpy.trajectory import SingleJointState
 
@@ -71,6 +72,13 @@ def to_vector3_stamped(frame_id, vector):
     return v
 
 def to_list(thing):
+    if isinstance(thing, QuaternionStamped):
+        thing = thing.quaternion
+    if isinstance(thing, Quaternion):
+        return [thing.x,
+                thing.y,
+                thing.z,
+                thing.w]
     if isinstance(thing, PointStamped):
         thing = thing.point
     if isinstance(thing, PoseStamped):

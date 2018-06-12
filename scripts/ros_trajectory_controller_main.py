@@ -68,7 +68,7 @@ if __name__ == '__main__':
                                           collision_goal_identifier=collision_goal_identifier,
                                           joint_convergence_threshold=joint_convergence_threshold,
                                           wiggle_precision_threshold=wiggle_precision_threshold,
-                                          plot_trajectory=True,
+                                          plot_trajectory=False,
                                           fill_velocity_values=fill_velocity_values))
     pm.register_plugin('bullet',
                        PyBulletPlugin(js_identifier=js_identifier,

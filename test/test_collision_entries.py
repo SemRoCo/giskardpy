@@ -341,18 +341,21 @@ class TestCollisionAvoidance(unittest.TestCase):
             'l_wrist_flex_joint': -1.22662876066,
             'l_wrist_roll_joint': -53.6150824007,
         }
+        self.giskard.allow_all_collisions()
         self.set_and_check_js_goal(goal_js)
 
         p = PoseStamped()
         p.header.frame_id = 'l_gripper_tool_frame'
         p.pose.position.x = -0.1
         p.pose.orientation.w = 1
+        self.giskard.allow_all_collisions()
         self.set_and_check_cart_goal('l_gripper_tool_frame', p)
 
         p = PoseStamped()
         p.header.frame_id = 'l_gripper_tool_frame'
         p.pose.position.x = 0.2
         p.pose.orientation.w = 1
+        self.giskard.allow_all_collisions()
         self.set_and_check_cart_goal('l_gripper_tool_frame', p)
 
 

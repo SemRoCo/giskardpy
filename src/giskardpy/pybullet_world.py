@@ -617,15 +617,15 @@ class PyBulletWorld(object):
             return ContactInfo(None, self.id, self.id, k[0], k[1], (0, 0, 0), (0, 0, 0), (1, 0, 0), 1e9, 0)
 
         collisions = keydefaultdict(default_contact_info)
-        if self_collision:
+        if self_collision and self.get_robot().name not in allowed_collision:
             if collisions is None:
                 collisions = self._robot.check_self_collision(d)
             else:
                 collisions.update(self._robot.check_self_collision(d))
-        for robot_link_name, robot_link in self._robot.link_name_to_id.items():
-            for object_name, object in self._objects.items():  # type: (str, PyBulletRobot)
+        for object_name, object in self._objects.items():  # type: (str, PyBulletRobot)
+            if object_name not in allowed_collision:
+                for robot_link_name, robot_link in self._robot.link_name_to_id.items():
                 # TODO skip if collisions with all links of an object are allowed
-                if object_name not in allowed_collision:
                     for object_link_name, object_link in object.link_name_to_id.items():
                         key = (robot_link_name, object_name, object_link_name)
                         if key not in allowed_collision:

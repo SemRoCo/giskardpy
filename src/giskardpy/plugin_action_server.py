@@ -17,7 +17,8 @@ from giskard_msgs.msg._MoveResult import MoveResult
 
 from trajectory_msgs.msg import JointTrajectoryPoint
 
-from giskardpy.exceptions import MAX_NWSR_REACHEDException, QPSolverException, SolverTimeoutError, InsolvableException
+from giskardpy.exceptions import MAX_NWSR_REACHEDException, QPSolverException, SolverTimeoutError, InsolvableException, \
+    SymengineException
 from giskardpy.plugin import Plugin
 from giskardpy.tfwrapper import transform_pose
 from giskardpy.trajectory import ClosestPointInfo
@@ -111,6 +112,8 @@ class ActionServerPlugin(Plugin):
             result.error_code = MoveResult.SOLVER_TIMEOUT
         elif isinstance(exception, InsolvableException):
             result.error_code = MoveResult.INSOLVABLE
+        elif isinstance(exception, SymengineException):
+            result.error_code = MoveResult.SYMENGINE_ERROR
         if exception is None and not self._as.is_preempt_requested():
             if not self.closest_point_constraint_violated(god_map):
                 result.error_code = MoveResult.SUCCESS

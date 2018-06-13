@@ -6,6 +6,7 @@
     <rosparam param="joint_convergence_threshold">0.001</rosparam>
     <rosparam param="wiggle_precision_threshold">5</rosparam>
     <rosparam param="sample_period">0.05</rosparam>
+    <rosparam param="default_joint_vel_limit">0.5</rosparam>
     <rosparam param="default_collision_avoidance_distance">0.04</rosparam>
     <rosparam param="fill_velocity_values">False</rosparam>
     <rosparam param="nWSR">None</rosparam> <!-- None results in a nWSR estimation thats fine most of the time -->

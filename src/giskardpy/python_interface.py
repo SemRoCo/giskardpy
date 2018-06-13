@@ -66,7 +66,7 @@ class GiskardWrapper(object):
         controller.goal_pose = pose_stamped
         controller.type = Controller.ROTATION_3D
         controller.weight = 1
-        controller.max_speed = 0.5
+        controller.max_speed = 1.0
         controller.p_gain = 3
         self.cmd_seq[-1].controllers.append(controller)
 
@@ -80,7 +80,7 @@ class GiskardWrapper(object):
         controller.type = Controller.JOINT
         controller.weight = 1
         controller.p_gain = 10
-        controller.max_speed = 0.3
+        controller.max_speed = 1
         if isinstance(joint_state, dict):
             for joint_name, joint_position in joint_state.items():
                 controller.goal_state.name.append(joint_name)
@@ -99,6 +99,11 @@ class GiskardWrapper(object):
         collision_entry.robot_link = robot_link
         collision_entry.body_b = body_b
         collision_entry.link_b = link_b
+        self.set_collision_entries([collision_entry])
+
+    def allow_all_collisions(self):
+        collision_entry = CollisionEntry()
+        collision_entry.type = CollisionEntry.ALLOW_ALL_COLLISIONS
         self.set_collision_entries([collision_entry])
 
     def add_cmd(self, max_trajectory_length=20):

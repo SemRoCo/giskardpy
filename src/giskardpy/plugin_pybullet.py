@@ -193,20 +193,24 @@ class PyBulletPlugin(Plugin):
                     bodies_b = self.world.get_object_list()
                 else:
                     bodies_b = [collision_entry.body_b]
-                for body_b in bodies_b:
-                    if collision_entry.link_b == '':
-                        links_b = self.world.get_object(body_b).get_link_names()
-                    else:
-                        links_b = [collision_entry.link_b]
+                if collision_entry.type == CollisionEntry.ALLOW_ALL_COLLISIONS:
+                    allowed_collisions.update(self.world.get_object_list())
+                    allowed_collisions.add(self.world.get_robot().name)
+                else:
+                    for body_b in bodies_b:
+                        if collision_entry.link_b == '':
+                            links_b = self.world.get_object(body_b).get_link_names()
+                        else:
+                            links_b = [collision_entry.link_b]
 
-                    for link_a, link_b in product(links_a, links_b):
-                        key = (link_a, body_b, link_b)
-                        if collision_entry.type == CollisionEntry.ALLOW_COLLISION or \
-                                collision_entry.type == CollisionEntry.ALLOW_ALL_COLLISIONS:
-                            allowed_collisions.add(key)
-                        if collision_entry.type == CollisionEntry.AVOID_COLLISION or \
-                                collision_entry.type == CollisionEntry.AVOID_ALL_COLLISIONS:
-                            distances[key] = collision_entry.min_dist
+                        for link_a, link_b in product(links_a, links_b):
+                            key = (link_a, body_b, link_b)
+                            if collision_entry.type == CollisionEntry.ALLOW_COLLISION or \
+                                    collision_entry.type == CollisionEntry.ALLOW_ALL_COLLISIONS:
+                                allowed_collisions.add(key)
+                            if collision_entry.type == CollisionEntry.AVOID_COLLISION or \
+                                    collision_entry.type == CollisionEntry.AVOID_ALL_COLLISIONS:
+                                distances[key] = collision_entry.min_dist
 
             collisions = self.world.check_collisions(distances, allowed_collisions)
 

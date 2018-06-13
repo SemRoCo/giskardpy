@@ -361,41 +361,41 @@ def plot_trajectory(tj, controlled_joints):
     # Put a legend to the right of the current axis
     ax1.legend(loc='center', bbox_to_anchor=(1.45, 0))
 
-    plt.show()
+    plt.savefig('trajectory.pdf')
 
-def plot_trajectory2(tj):
-    """
-    :param tj:
-    :type tj: Trajectory
-    """
-    colors = ['b', 'g', 'r', 'c', 'm', 'y', 'k']
-    line_styles = ['', '--', '-.']
-    fmts = [''.join(x) for x in product(line_styles, colors)]
-    positions = []
-    velocities = []
-    time = []
-    names = tj.joint_names
-    for point in tj.points:
-        positions.append(point.positions)
-        velocities.append(point.velocities)
-        time.append(point.time_from_start)
-    positions = np.array(positions)
-    velocities = np.array(velocities).T
-    time = np.array([x.to_sec() for x in time])
-
-    f, (ax1, ax2) = plt.subplots(2, sharex=True)
-    ax1.set_title('position')
-    ax2.set_title('velocity')
-    positions -= positions.mean(axis=0)
-    for i, position in enumerate(positions.T):
-        ax1.plot(time, position, fmts[i], label=names[i])
-        ax2.plot(time, velocities[i], fmts[i])
-    box = ax1.get_position()
-    ax1.set_position([box.x0, box.y0, box.width * 0.6, box.height])
-    box = ax2.get_position()
-    ax2.set_position([box.x0, box.y0, box.width * 0.6, box.height])
-
-    # Put a legend to the right of the current axis
-    ax1.legend(loc='center', bbox_to_anchor=(1.45, 0))
-
-    plt.show()
+# def plot_trajectory2(tj):
+#     """
+#     :param tj:
+#     :type tj: Trajectory
+#     """
+#     colors = ['b', 'g', 'r', 'c', 'm', 'y', 'k']
+#     line_styles = ['', '--', '-.']
+#     fmts = [''.join(x) for x in product(line_styles, colors)]
+#     positions = []
+#     velocities = []
+#     time = []
+#     names = tj.joint_names
+#     for point in tj.points:
+#         positions.append(point.positions)
+#         velocities.append(point.velocities)
+#         time.append(point.time_from_start)
+#     positions = np.array(positions)
+#     velocities = np.array(velocities).T
+#     time = np.array([x.to_sec() for x in time])
+#
+#     f, (ax1, ax2) = plt.subplots(2, sharex=True)
+#     ax1.set_title('position')
+#     ax2.set_title('velocity')
+#     positions -= positions.mean(axis=0)
+#     for i, position in enumerate(positions.T):
+#         ax1.plot(time, position, fmts[i], label=names[i])
+#         ax2.plot(time, velocities[i], fmts[i])
+#     box = ax1.get_position()
+#     ax1.set_position([box.x0, box.y0, box.width * 0.6, box.height])
+#     box = ax2.get_position()
+#     ax2.set_position([box.x0, box.y0, box.width * 0.6, box.height])
+#
+#     # Put a legend to the right of the current axis
+#     ax1.legend(loc='center', bbox_to_anchor=(1.45, 0))
+#
+#     plt.show()

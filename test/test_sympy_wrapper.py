@@ -13,6 +13,7 @@ from numpy import pi
 
 import giskardpy.symengine_wrappers as spw
 from giskardpy import BACKEND
+from giskardpy.utils import georg_slerp
 
 PKG = 'giskardpy'
 
@@ -282,6 +283,29 @@ class TestSympyWrapper(unittest.TestCase):
             rq2 = np.array(q2).astype(float).T[0]
             np.testing.assert_array_almost_equal(rq1, rq2)
 
+    def test_georg_slerp(self):
+        q1 = np.array([0.348, -0.52, 0.616, -0.479])
+        q2 = np.array([0.845, 0.262, 0.363, 0.293])
+        np.testing.assert_array_almost_equal(georg_slerp(q1, q2, 0.1),
+                                             np.array([0.448726, -0.462604, 0.639831, -0.419085]))
+
+        np.testing.assert_array_almost_equal(georg_slerp(q1, q2, 0.5),
+                                             np.array([0.757226, -0.163759, 0.621395, -0.118059]))
+
+        np.testing.assert_array_almost_equal(georg_slerp(q1, q2, 0.8),
+                                             np.array([0.854405, 0.095176, 0.493150, 0.134153]))
+
+        np.testing.assert_array_almost_equal(georg_slerp(q1, q2, 1.0),
+                                             np.array([0.845000, 0.262000, 0.363000, 0.293000]))
+
+        np.testing.assert_array_almost_equal(georg_slerp(q2, q1, 0.2),
+                                             np.array([0.854405, 0.095176, 0.493150, 0.134153]))
+
+        np.testing.assert_array_almost_equal(georg_slerp(q2, q1, 0.4),
+                                             np.array([0.803953, -0.078316, 0.588752, -0.034092]))
+
+        np.testing.assert_array_almost_equal(georg_slerp(q2, q1, 1.0),
+                                             np.array([0.348000, -0.520000, 0.616000, -0.479000]))
 
 if __name__ == '__main__':
     import rosunit

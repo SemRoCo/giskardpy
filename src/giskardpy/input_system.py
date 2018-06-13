@@ -5,7 +5,7 @@ import symengine_wrappers as sw
 from math import pi
 import numpy as np
 
-from giskardpy.utils import to_list
+from giskardpy.utils import to_list, georg_slerp
 
 
 class InputArray(object):
@@ -149,15 +149,19 @@ class SlerpInput(object):
         else:
             interpolation_value = max_speed / control
 
-        intermediate_goal = quaternion_slerp(current_rotation,
-                                             goal_rotation,
-                                             interpolation_value)
+        intermediate_goal = georg_slerp(current_rotation,
+                                        goal_rotation,
+                                        interpolation_value)
 
         rm = current_rotation_m.T.dot(quaternion_matrix(intermediate_goal))
 
         angle2, axis2, _ = rotation_from_matrix(rm)
+        #
+        # r_rot_control = current_rotation_m[:3, :3].dot((axis2 * angle2))
 
-        r_rot_control = current_rotation_m[:3, :3].dot((axis2 * angle2))
+        # angle2, axis2, _ = rotation_from_matrix(quaternion_matrix(intermediate_goal))
+
+        r_rot_control = (axis2 * angle2)
 
         return r_rot_control
 

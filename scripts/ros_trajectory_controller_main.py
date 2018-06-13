@@ -26,7 +26,7 @@ if __name__ == '__main__':
     joint_convergence_threshold = rospy.get_param('~joint_convergence_threshold', 0.001)
     wiggle_precision_threshold = rospy.get_param('~wiggle_precision_threshold', 5)
     map_frame = rospy.get_param('~map_frame', 'map')
-    gui = rospy.get_param('~enable_gui', True)
+    gui = rospy.get_param('~enable_gui', False)
     marker = rospy.get_param('~enable_collision_marker', True)
     default_collision_avoidance_distance = rospy.get_param('~default_collision_avoidance_distance', 0.02)
     nWSR = rospy.get_param('~nWSR', None)
@@ -70,7 +70,7 @@ if __name__ == '__main__':
                                           joint_convergence_threshold=joint_convergence_threshold,
                                           wiggle_precision_threshold=wiggle_precision_threshold,
                                           pyfunction_identifier=pyfunction_identifier,
-                                          plot_trajectory=False,
+                                          plot_trajectory=True,
                                           fill_velocity_values=fill_velocity_values))
     pm.register_plugin('bullet',
                        PyBulletPlugin(js_identifier=js_identifier,

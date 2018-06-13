@@ -57,4 +57,6 @@ class FKPlugin(Plugin):
         pass
 
     def copy(self):
-        return self
+        cp = self.__class__(self.fk_identifier, self._joint_states_identifier)
+        cp.fk = self.fk
+        return cp

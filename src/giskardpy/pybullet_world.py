@@ -217,8 +217,9 @@ class PyBulletRobot(object):
                 mjs.set(sjs)
         return mjs
 
-    def calc_self_collision_matrix(self, combis, d=0.05, d2=0.01, num_rnd_tries=1000):
+    def calc_self_collision_matrix(self, combis, d=0.05, d2=0.0, num_rnd_tries=1000):
         # TODO computational expansive because of too many collision checks
+        print('calculating self collision matrix')
         seed(1337)
         always = set()
 

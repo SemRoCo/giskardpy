@@ -23,7 +23,9 @@ class TestCollisionAvoidance(unittest.TestCase):
     def __init__(self, methodName='runTest'):
         rospy.init_node('test_collision_avoidance')
         self.giskard = GiskardWrapper([('base_link', 'l_gripper_tool_frame'),
-                                       ('base_link', 'r_gripper_tool_frame')])
+                                       ('base_link', 'r_gripper_tool_frame'),
+                                       # ('torso_lift_link', 'r_gripper_tool_frame'),
+                                       ])
 
         super(TestCollisionAvoidance, self).__init__(methodName)
 
@@ -355,8 +357,19 @@ class TestCollisionAvoidance(unittest.TestCase):
         p.header.frame_id = 'l_gripper_tool_frame'
         p.pose.position.x = 0.2
         p.pose.orientation.w = 1
-        self.giskard.allow_all_collisions()
+        # self.giskard.allow_all_collisions()
         self.set_and_check_cart_goal('l_gripper_tool_frame', p)
+
+    def test_root_link_not_equal_chain_root(self):
+        p = PoseStamped()
+        p.header.frame_id = 'base_footprint'
+        p.pose.position.x = 0.8
+        p.pose.position.y = -0.5
+        p.pose.position.z = 1
+        p.pose.orientation.w = 1
+        self.giskard.allow_all_collisions()
+        self.giskard.set_tranlation_goal('r_gripper_tool_frame', p, 'torso_lift_link')
+        self.giskard.plan_and_execute()
 
 
 if __name__ == '__main__':

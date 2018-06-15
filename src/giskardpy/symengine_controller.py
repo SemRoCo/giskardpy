@@ -76,9 +76,9 @@ def joint_position(current_joint, joint_goal, weight, p_gain, max_speed, name):
                                             upper=capped_err,
                                             weight=weight,
                                             expression=current_joint)
-    add_debug_constraint(soft_constraints, '{} //current_joint//'.format(name), current_joint)
-    add_debug_constraint(soft_constraints, '{} //joint_goal//'.format(name), joint_goal)
-    add_debug_constraint(soft_constraints, '{} //max_speed//'.format(name), max_speed)
+    # add_debug_constraint(soft_constraints, '{} //current_joint//'.format(name), current_joint)
+    # add_debug_constraint(soft_constraints, '{} //joint_goal//'.format(name), joint_goal)
+    # add_debug_constraint(soft_constraints, '{} //max_speed//'.format(name), max_speed)
     return soft_constraints
 
 
@@ -91,8 +91,8 @@ def continuous_joint_position(current_joint, change, weight, p_gain, max_speed, 
                                             upper=capped_err,
                                             weight=weight,
                                             expression=current_joint)
-    add_debug_constraint(soft_constraints, '{} //change//'.format(name), change)
-    add_debug_constraint(soft_constraints, '{} //max_speed//'.format(name), max_speed)
+    # add_debug_constraint(soft_constraints, '{} //change//'.format(name), change)
+    # add_debug_constraint(soft_constraints, '{} //max_speed//'.format(name), max_speed)
     return soft_constraints
 
 

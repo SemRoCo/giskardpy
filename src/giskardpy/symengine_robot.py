@@ -111,10 +111,21 @@ class Robot(object):
                 vel_limit = min(joint.limit.velocity, self.default_joint_vel_limit)
             else:
                 vel_limit = None
+
+            if joint.safety_controller is not None:
+                lower_limit = joint.safety_controller.soft_lower_limit
+                upper_limit = joint.safety_controller.soft_upper_limit
+            else:
+                if joint.limit is not None:
+                    lower_limit = joint.limit.lower if joint.limit.lower is not None else None
+                    upper_limit = joint.limit.upper if joint.limit.upper is not None else None
+                else:
+                    lower_limit = None
+                    upper_limit = None
             self._joints[joint_name] = Joint(joint_symbol,
                                              vel_limit,
-                                             joint.limit.lower if joint.limit is not None else None,
-                                             joint.limit.upper if joint.limit is not None else None,
+                                             lower_limit,
+                                             upper_limit,
                                              joint.type,
                                              joint_frame)
         self.joint_states_input = JointStatesInput(joint_map)

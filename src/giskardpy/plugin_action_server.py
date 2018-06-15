@@ -282,7 +282,7 @@ class LogTrajectoryPlugin(Plugin):
         self.time_identifier = time_identifier
         self.is_preempted = is_preempted
         self.precision = joint_convergence_threshold
-        self.max_traj_length = 20
+        self.max_traj_length = 200
         self.wiggle_precision = wiggle_precision_threshold
         super(LogTrajectoryPlugin, self).__init__()
 
@@ -350,11 +350,12 @@ def plot_trajectory(tj, controlled_joints):
     f, (ax1, ax2) = plt.subplots(2, sharex=True)
     ax1.set_title('position')
     ax2.set_title('velocity')
-    positions -= positions.mean(axis=0)
+    # positions -= positions.mean(axis=0)
     for i, position in enumerate(positions.T):
         ax1.plot(times, position, fmts[i], label=names[i])
         ax2.plot(times, velocities[i], fmts[i])
     box = ax1.get_position()
+    ax1.set_ylim(-3,1)
     ax1.set_position([box.x0, box.y0, box.width * 0.6, box.height])
     box = ax2.get_position()
     ax2.set_position([box.x0, box.y0, box.width * 0.6, box.height])
@@ -362,7 +363,7 @@ def plot_trajectory(tj, controlled_joints):
     # Put a legend to the right of the current axis
     ax1.legend(loc='center', bbox_to_anchor=(1.45, 0))
 
-    plt.show()
+    plt.savefig('trajectory.pdf')
 
 def plot_trajectory2(tj):
     """

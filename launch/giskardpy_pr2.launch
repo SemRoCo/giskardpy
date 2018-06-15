@@ -5,17 +5,17 @@
     <rosparam param="map_frame">map</rosparam>
     <rosparam param="joint_convergence_threshold">0.001</rosparam>
     <rosparam param="wiggle_precision_threshold">5</rosparam>
-    <rosparam param="sample_period">0.05</rosparam>
+    <rosparam param="sample_period">0.1</rosparam>
     <rosparam param="default_joint_vel_limit">0.5</rosparam>
-    <rosparam param="default_collision_avoidance_distance">0.04</rosparam>
+    <rosparam param="default_collision_avoidance_distance">0.02</rosparam>
     <rosparam param="fill_velocity_values">False</rosparam>
     <rosparam param="nWSR">None</rosparam> <!-- None results in a nWSR estimation thats fine most of the time -->
     <rosparam param="root_link">base_footprint</rosparam>
     <rosparam param="enable_collision_marker">True</rosparam>
+    <rosparam param="enable_self_collision">False</rosparam>
     <rosparam param="interactive_marker_chains">
       - [base_link, r_gripper_tool_frame]
       - [base_link, l_gripper_tool_frame]
-      - [base_link, torso_lift_link]
     </rosparam>
   </node>
 
@@ -23,16 +23,13 @@
     <rosparam param="roots">
       - base_link
       - base_link
-      - base_link
     </rosparam>
     <rosparam param="tips">
       - r_gripper_tool_frame
       - l_gripper_tool_frame
-      - torso_lift_link 
     </rosparam>
     <!-- 2 = TRANSLATION_3D; 3 = ROTATION_3D -->
     <rosparam param="types"> 
-      - [2, 3]
       - [2, 3]
       - [2, 3]
     </rosparam>

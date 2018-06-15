@@ -29,13 +29,14 @@ from giskardpy.utils import keydefaultdict, to_joint_state_dict, to_point_stampe
 class PyBulletPlugin(Plugin):
     def __init__(self, js_identifier, collision_identifier, closest_point_identifier, collision_goal_identifier,
                  map_frame, root_link, default_collision_avoidance_distance, path_to_data_folder='', gui=False,
-                 marker=False):
+                 marker=False, enable_self_collision=True):
         self.collision_goal_identifier = collision_goal_identifier
         self.path_to_data_folder = path_to_data_folder
         self.js_identifier = js_identifier
         self.collision_identifier = collision_identifier
         self.closest_point_identifier = closest_point_identifier
         self.default_collision_avoidance_distance = default_collision_avoidance_distance
+        self.enable_self_collision = enable_self_collision
         self.map_frame = map_frame
         self.robot_root = root_link
         self.robot_name = 'pr2'
@@ -212,7 +213,7 @@ class PyBulletPlugin(Plugin):
                                     collision_entry.type == CollisionEntry.AVOID_ALL_COLLISIONS:
                                 distances[key] = collision_entry.min_dist
 
-            collisions = self.world.check_collisions(distances, allowed_collisions)
+            collisions = self.world.check_collisions(distances, allowed_collisions, self_collision=self.enable_self_collision)
 
             closest_point = keydefaultdict(lambda k: ClosestPointInfo((10, 0, 0),
                                                                       (0, 0, 0),

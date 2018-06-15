@@ -599,7 +599,7 @@ class PyBulletWorld(object):
         """
         return object_name in self._objects.keys()
 
-    def check_collisions(self, cut_off_distances=None, allowed_collision=set(), d=0.1, self_collision=True):
+    def check_collisions(self, cut_off_distances, allowed_collision=set(), self_collision_d=0.1, self_collision=True):
         """
         :param cut_off_distances:
         :type cut_off_distances: dict
@@ -610,8 +610,6 @@ class PyBulletWorld(object):
         """
         # TODO implement a cooler way to remove wheel/plane collisions but detect eg. arm/plane collisions
         allowed_collision.add('plane')
-        if cut_off_distances is None:
-            cut_off_distances = defaultdict(lambda: d)
 
         # TODO set self collision cut off distance in a cool way
         def default_contact_info(k):
@@ -619,10 +617,11 @@ class PyBulletWorld(object):
 
         collisions = keydefaultdict(default_contact_info)
         if self_collision and self.get_robot().name not in allowed_collision:
+            # TODO use cut_off_distances in self collision
             if collisions is None:
-                collisions = self._robot.check_self_collision(d)
+                collisions = self._robot.check_self_collision(self_collision_d)
             else:
-                collisions.update(self._robot.check_self_collision(d))
+                collisions.update(self._robot.check_self_collision(self_collision_d))
         for object_name, object in self._objects.items():  # type: (str, PyBulletRobot)
             if object_name not in allowed_collision:
                 for robot_link_name, robot_link in self._robot.link_name_to_id.items():
@@ -631,7 +630,8 @@ class PyBulletWorld(object):
                         key = (robot_link_name, object_name, object_link_name)
                         if key not in allowed_collision:
                             collisions.update({key: ContactInfo(*x) for x in
-                                               p.getClosestPoints(self._robot.id, object.id, cut_off_distances[key] + d,
+                                               p.getClosestPoints(self._robot.id, object.id,
+                                                                  cut_off_distances[key] + self_collision_d,
                                                                   robot_link, object_link)})
         return collisions
 

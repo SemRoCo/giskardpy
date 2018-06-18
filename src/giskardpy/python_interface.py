@@ -12,8 +12,8 @@ from giskardpy.tfwrapper import lookup_transform
 
 
 class GiskardWrapper(object):
-    def __init__(self, root_tips):
-        self.client = SimpleActionClient('qp_controller/command', MoveAction)
+    def __init__(self, giskard_topic='qp_controller/command'):
+        self.client = SimpleActionClient(giskard_topic, MoveAction)
         self.update_world = rospy.ServiceProxy('giskard/update_world', UpdateWorld)
         self.marker_pub = rospy.Publisher('visualization_marker_array', MarkerArray, queue_size=10)
         rospy.wait_for_service('giskard/update_world')
@@ -21,22 +21,20 @@ class GiskardWrapper(object):
         self.tip_to_root = {}
         self.collisions = []
         self.clear_cmds()
-        for root, tip in root_tips:
-            self.tip_to_root[tip] = root
         rospy.sleep(.3)
 
-    def set_cart_goal(self, tip, pose_stamped, root=None):
+    def set_cart_goal(self, root, tip, pose_stamped):
         """
         :param tip:
         :type tip: str
         :param pose_stamped:
         :type pose_stamped: PoseStamped
         """
-        self.set_tranlation_goal(tip, pose_stamped, root)
-        self.set_rotation_goal(tip, pose_stamped, root)
+        self.set_tranlation_goal(root, tip, pose_stamped)
+        self.set_rotation_goal(root, tip, pose_stamped)
 
 
-    def set_tranlation_goal(self, tip, pose_stamped, root=None):
+    def set_tranlation_goal(self, root, tip, pose_stamped):
         """
         :param tip:
         :type tip: str
@@ -44,7 +42,7 @@ class GiskardWrapper(object):
         :type pose_stamped: PoseStamped
         """
         controller = Controller()
-        controller.root_link = self.tip_to_root[tip] if root is None else root
+        controller.root_link = root
         controller.tip_link = tip
         controller.goal_pose = pose_stamped
         controller.type = Controller.TRANSLATION_3D
@@ -53,7 +51,7 @@ class GiskardWrapper(object):
         controller.p_gain = 3
         self.cmd_seq[-1].controllers.append(controller)
 
-    def set_rotation_goal(self, tip, pose_stamped, root=None):
+    def set_rotation_goal(self, root, tip, pose_stamped):
         """
         :param tip:
         :type tip: str
@@ -61,7 +59,7 @@ class GiskardWrapper(object):
         :type pose_stamped: PoseStamped
         """
         controller = Controller()
-        controller.root_link = self.tip_to_root[tip] if root is None else root
+        controller.root_link = root
         controller.tip_link = tip
         controller.goal_pose = pose_stamped
         controller.type = Controller.ROTATION_3D

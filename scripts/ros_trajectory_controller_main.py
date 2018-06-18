@@ -15,26 +15,26 @@ from giskardpy.plugin_set_controlled_joints import SetControlledJointsPlugin
 from giskardpy.process_manager import ProcessManager
 
 if __name__ == '__main__':
+    # TODO 0 0 0 in base footprint as goal results in /0
     rospy.init_node('giskard')
 
     # root_link = rospy.get_param('~root_link', 'odom')
-    root_tips = rospy.get_param('~interactive_marker_chains', [('base_link', 'r_gripper_tool_frame'),
-                                                               ('base_link', 'l_gripper_tool_frame')])
-    gui = rospy.get_param('~enable_gui', False)
-    map_frame = rospy.get_param('~map_frame', 'map')
-    joint_convergence_threshold = rospy.get_param('~joint_convergence_threshold', 0.001)
-    wiggle_precision_threshold = rospy.get_param('~wiggle_precision_threshold', 5)
-    sample_period = rospy.get_param('~sample_period', 0.1)
-    default_joint_vel_limit = rospy.get_param('~default_joint_vel_limit', 0.5)
-    default_collision_avoidance_distance = rospy.get_param('~default_collision_avoidance_distance', 0.02)
-    fill_velocity_values = rospy.get_param('~fill_velocity_values', False)
-    nWSR = rospy.get_param('~nWSR', None)
-    root_link = rospy.get_param('~root_link', 'base_footprint')
-    marker = rospy.get_param('~enable_collision_marker', True)
-    enable_self_collision = rospy.get_param('~enable_self_collision', False)
+    root_tips = rospy.get_param('~interactive_marker_chains')
+    gui = rospy.get_param('~enable_gui')
+    map_frame = rospy.get_param('~map_frame')
+    joint_convergence_threshold = rospy.get_param('~joint_convergence_threshold')
+    wiggle_precision_threshold = rospy.get_param('~wiggle_precision_threshold')
+    sample_period = rospy.get_param('~sample_period')
+    default_joint_vel_limit = rospy.get_param('~default_joint_vel_limit')
+    default_collision_avoidance_distance = rospy.get_param('~default_collision_avoidance_distance')
+    fill_velocity_values = rospy.get_param('~fill_velocity_values')
+    nWSR = rospy.get_param('~nWSR')
+    root_link = rospy.get_param('~root_link')
+    marker = rospy.get_param('~enable_collision_marker')
+    enable_self_collision = rospy.get_param('~enable_self_collision')
     if nWSR == 'None':
         nWSR = None
-    path_to_data_folder = rospy.get_param('~path_to_data_folder', RosPack().get_path('giskardpy') + '/data/pr2/')
+    path_to_data_folder = rospy.get_param('~path_to_data_folder')
     # path_to_data_folder = '/home/ichumuh/giskardpy_ws/src/giskardpy/data/pr2'
     if not path_to_data_folder.endswith('/'):
         path_to_data_folder += '/'

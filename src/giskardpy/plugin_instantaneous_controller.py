@@ -46,15 +46,20 @@ class CartesianBulletControllerPlugin(Plugin):
         self.max_number_collision_entries = 10
         super(CartesianBulletControllerPlugin, self).__init__()
 
+    def copy(self):
+        cp = self.__class__(self.root, self._joint_states_identifier, self._fk_identifier,
+                            self._goal_identifier, self._next_cmd_identifier, self._collision_identifier,
+                            self._closest_point_identifier, self.controlled_joints_identifier,
+                            self.collision_goal_identifier, self.path_to_functions, self.nWSR,
+                            self.default_joint_vel_limit)
+        cp._controller = self._controller
+        cp.soft_constraints = self.soft_constraints
+        cp.known_constraints = self.known_constraints
+        # cp.controlled_joints = self.controlled_joints
+        return cp
+
     # @profile
     def update(self):
-        # update controlled joints
-        # TODO unnecessary to check this on every iteration
-        new_controlled_joints = self.god_map.get_data([self.controlled_joints_identifier])
-        if len(set(new_controlled_joints).difference(self.controlled_joints)) != 0:
-            self._controller.set_controlled_joints(new_controlled_joints)
-        self.controlled_joints = new_controlled_joints
-        self.init_controller()
 
         if self.god_map.get_data([self._goal_identifier]) is not None:
 
@@ -138,6 +143,12 @@ class CartesianBulletControllerPlugin(Plugin):
                                                              self._joint_states_identifier,
                                                              'position')
         robot.set_joint_symbol_map(current_joints)
+
+        new_controlled_joints = self.god_map.get_data([self.controlled_joints_identifier])
+        if len(set(new_controlled_joints).difference(self.controlled_joints)) != 0:
+            self._controller.set_controlled_joints(new_controlled_joints)
+        self.controlled_joints = new_controlled_joints
+        self.init_controller()
 
     def modify_controller(self):
         robot = self._controller.robot
@@ -233,14 +244,3 @@ class CartesianBulletControllerPlugin(Plugin):
 
         return {}
 
-    def copy(self):
-        cp = self.__class__(self.root, self._joint_states_identifier, self._fk_identifier,
-                            self._goal_identifier, self._next_cmd_identifier, self._collision_identifier,
-                            self._closest_point_identifier, self.controlled_joints_identifier,
-                            self.collision_goal_identifier, self.path_to_functions, self.nWSR,
-                            self.default_joint_vel_limit)
-        cp._controller = self._controller
-        cp.soft_constraints = self.soft_constraints
-        cp.known_constraints = self.known_constraints
-        # cp.controlled_joints = self.controlled_joints
-        return cp

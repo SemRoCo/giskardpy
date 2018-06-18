@@ -57,7 +57,8 @@ class PyBulletPlugin(Plugin):
                             root_link=self.robot_root,
                             path_to_data_folder=self.path_to_data_folder,
                             gui=self.gui,
-                            default_collision_avoidance_distance=self.default_collision_avoidance_distance)
+                            default_collision_avoidance_distance=self.default_collision_avoidance_distance,
+                            enable_self_collision=self.enable_self_collision)
         cp.world = self.world
         cp.marker = self.marker
         # cp.srv = self.srv

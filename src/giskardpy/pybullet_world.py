@@ -613,7 +613,8 @@ class PyBulletWorld(object):
 
         # TODO set self collision cut off distance in a cool way
         def default_contact_info(k):
-            return ContactInfo(None, self.id, self.id, k[0], k[1], (0, 0, 0), (0, 0, 0), (1, 0, 0), 1e9, 0)
+            # TODO I think this is buggy but never gets called
+            return ContactInfo(None, -2, -2, k[0], k[1], (0, 0, 0), (0, 0, 0), (1, 0, 0), 1e9, 0)
 
         collisions = keydefaultdict(default_contact_info)
         if self_collision and self.get_robot().name not in allowed_collision:
@@ -640,6 +641,7 @@ class PyBulletWorld(object):
 
     def activate_viewer(self):
         if self._gui:
+            # TODO expose opengl2 option for gui?
             self.physicsClient = p.connect(p.GUI)  # or p.DIRECT for non-graphical version
         else:
             self.physicsClient = p.connect(p.DIRECT)  # or p.DIRECT for non-graphical version

@@ -5,7 +5,7 @@ from giskardpy.python_interface import GiskardWrapper
 
 if __name__ == '__main__':
     rospy.init_node('add_urdf')
-    giskard = GiskardWrapper([])
+    giskard = GiskardWrapper()
     try:
         name = rospy.get_param('~name')
         path = rospy.get_param('~path', None)

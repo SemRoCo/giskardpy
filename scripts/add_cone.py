@@ -6,7 +6,7 @@ from giskardpy.python_interface import GiskardWrapper
 if __name__ == '__main__':
     # TODO cone not supported
     rospy.init_node('add_cone')
-    giskard = GiskardWrapper([])
+    giskard = GiskardWrapper()
     try:
         name = rospy.get_param('~name')
         result = giskard.add_cone(name=name,

@@ -611,7 +611,8 @@ class PyBulletWorld(object):
         """
         return object_name in self._objects.keys()
 
-    def check_collisions(self, cut_off_distances, allowed_collision=set(), self_collision_d=0.1, self_collision=True):
+    def check_collisions(self, cut_off_distances, allowed_collision=set(), self_collision_d=0.1, self_collision=True,
+                         controllable_links=None):
         """
         :param cut_off_distances:
         :type cut_off_distances: dict
@@ -638,6 +639,8 @@ class PyBulletWorld(object):
         for object_name, object in self._objects.items():  # type: (str, PyBulletRobot)
             if object_name not in allowed_collision:
                 for robot_link_name, robot_link in self._robot.link_name_to_id.items():
+                    if controllable_links is not None and robot_link_name not in controllable_links:
+                        continue
                     for object_link_name, object_link in object.link_name_to_id.items():
                         key = (robot_link_name, object_name, object_link_name)
                         if key not in allowed_collision:

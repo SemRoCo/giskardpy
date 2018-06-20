@@ -16,6 +16,7 @@ from giskardpy.process_manager import ProcessManager
 
 if __name__ == '__main__':
     # TODO 0 0 0 in base footprint as goal results in /0
+    # TODO bug if first goal is joint
     rospy.init_node('giskard')
 
     # root_link = rospy.get_param('~root_link', 'odom')
@@ -49,6 +50,7 @@ if __name__ == '__main__':
     collision_identifier = 'collision'
     closest_point_identifier = 'cpi'
     collision_goal_identifier = 'collision_goal'
+    controllable_links_identifier = 'controllable_links'
 
 
     pm = ProcessManager()
@@ -76,6 +78,7 @@ if __name__ == '__main__':
                                       collision_identifier=collision_identifier,
                                       closest_point_identifier=closest_point_identifier,
                                       collision_goal_identifier=collision_goal_identifier,
+                                      controllable_links_identifier=controllable_links_identifier,
                                       map_frame=map_frame,
                                       root_link=root_link,
                                       path_to_data_folder=path_to_data_folder,
@@ -93,6 +96,7 @@ if __name__ == '__main__':
                                                        collision_identifier=collision_identifier,
                                                        closest_point_identifier=closest_point_identifier,
                                                        controlled_joints_identifier=controlled_joints_identifier,
+                                                       controllable_links_identifier=controllable_links_identifier,
                                                        collision_goal_identifier=collision_goal_identifier,
                                                        path_to_functions=path_to_data_folder,
                                                        nWSR=nWSR,

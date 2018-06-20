@@ -9,6 +9,7 @@ from visualization_msgs.msg import Marker, MarkerArray
 
 from giskardpy.object import to_marker, from_msg
 from giskardpy.tfwrapper import lookup_transform
+from giskardpy.utils import dict_to_joint_states
 
 
 class GiskardWrapper(object):
@@ -21,6 +22,7 @@ class GiskardWrapper(object):
         self.tip_to_root = {}
         self.collisions = []
         self.clear_cmds()
+        self.object_js_topics = {}
         rospy.sleep(.3)
 
     def set_cart_goal(self, root, tip, pose_stamped):
@@ -67,7 +69,6 @@ class GiskardWrapper(object):
         controller.max_speed = 1.0
         controller.p_gain = 3
         self.cmd_seq[-1].controllers.append(controller)
-
 
     def set_joint_goal(self, joint_state):
         """
@@ -220,13 +221,17 @@ class GiskardWrapper(object):
         # TODO implement me
         raise NotImplementedError
 
-
-    def add_urdf(self, name, urdf, js_topic, map_frame, root_frame):
+    def add_urdf(self, name, urdf, js_topic, pose):
         urdf_body = WorldBody()
         urdf_body.name = name
         urdf_body.type = WorldBody.URDF_BODY
         urdf_body.urdf = urdf
         urdf_body.joint_state_topic = js_topic
-        transform = lookup_transform(map_frame, root_frame)
-        req = UpdateWorldRequest(UpdateWorldRequest.ADD, urdf_body, False, transform)
+        req = UpdateWorldRequest(UpdateWorldRequest.ADD, urdf_body, False, pose)
+        self.object_js_topics[name] = rospy.Publisher(js_topic, JointState, queue_size=10)
         return self.update_world.call(req)
+
+    def set_object_joint_state(self, object_name, joint_states):
+        if isinstance(joint_states, dict):
+            joint_states = dict_to_joint_states(joint_states)
+        self.object_js_topics[object_name].publish(joint_states)

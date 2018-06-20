@@ -12,6 +12,7 @@ import symengine_wrappers as sw
 class CartesianBulletControllerPlugin(Plugin):
     def __init__(self, root_link, js_identifier, fk_identifier, goal_identifier, next_cmd_identifier,
                  collision_identifier, closest_point_identifier, controlled_joints_identifier,
+                 controllable_links_identifier,
                  collision_goal_identifier, path_to_functions, nWSR, default_joint_vel_limit):
         """
         :param roots:
@@ -39,6 +40,7 @@ class CartesianBulletControllerPlugin(Plugin):
         self._joint_states_identifier = js_identifier
         self._goal_identifier = goal_identifier
         self._next_cmd_identifier = next_cmd_identifier
+        self.controllable_links_identifier = controllable_links_identifier
         self._controller = None
         self.known_constraints = set()
         self.controlled_joints = set()
@@ -50,6 +52,7 @@ class CartesianBulletControllerPlugin(Plugin):
         cp = self.__class__(self.root, self._joint_states_identifier, self._fk_identifier,
                             self._goal_identifier, self._next_cmd_identifier, self._collision_identifier,
                             self._closest_point_identifier, self.controlled_joints_identifier,
+                            self.controllable_links_identifier,
                             self.collision_goal_identifier, self.path_to_functions, self.nWSR,
                             self.default_joint_vel_limit)
         cp._controller = self._controller
@@ -111,6 +114,7 @@ class CartesianBulletControllerPlugin(Plugin):
                                                                 gain,
                                                                 max_speed, joint_name))
                 controllable_links.update(robot.get_link_tree(joint_name))
+            self.god_map.set_data([self.controllable_links_identifier], controllable_links)
             self.god_map.set_data([self._pyfunctions_identifier], pyfunctions)
 
             for link in list(controllable_links):

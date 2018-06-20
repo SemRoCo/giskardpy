@@ -190,6 +190,18 @@ class Robot(object):
 
         return links
 
+    def get_controllable_links(self, root_link):
+        links = set()
+        if root_link in self._urdf_robot.child_map:
+            for j, l in self._urdf_robot.child_map[root_link]:
+                joint_info = self._urdf_robot.joint_map[j]
+                if joint_info.joint_type in ['revolute', 'continuous', 'prismatic']:
+                    # links.add(l)
+                    links.update(self.get_link_tree(j))
+                links.update(self.get_controllable_links(l))
+        return links
+
+
     def get_rnd_joint_state(self):
         js = {}
 

@@ -28,9 +28,11 @@ from giskardpy.utils import keydefaultdict, to_joint_state_dict, to_point_stampe
 
 class PyBulletPlugin(Plugin):
     def __init__(self, js_identifier, collision_identifier, closest_point_identifier, collision_goal_identifier,
+                 controllable_links_identifier,
                  map_frame, root_link, default_collision_avoidance_distance, path_to_data_folder='', gui=False,
                  marker=False, enable_self_collision=True):
         self.collision_goal_identifier = collision_goal_identifier
+        self.controllable_links_identifier = controllable_links_identifier
         self.path_to_data_folder = path_to_data_folder
         self.js_identifier = js_identifier
         self.collision_identifier = collision_identifier
@@ -53,6 +55,7 @@ class PyBulletPlugin(Plugin):
                             collision_identifier=self.collision_identifier,
                             closest_point_identifier=self.closest_point_identifier,
                             collision_goal_identifier=self.collision_goal_identifier,
+                            controllable_links_identifier=self.controllable_links_identifier,
                             map_frame=self.map_frame,
                             root_link=self.robot_root,
                             path_to_data_folder=self.path_to_data_folder,
@@ -213,8 +216,9 @@ class PyBulletPlugin(Plugin):
                             if collision_entry.type == CollisionEntry.AVOID_COLLISION or \
                                     collision_entry.type == CollisionEntry.AVOID_ALL_COLLISIONS:
                                 distances[key] = collision_entry.min_dist
-
-            collisions = self.world.check_collisions(distances, allowed_collisions, self_collision=self.enable_self_collision)
+            controllable_links = self.god_map.get_data([self.controllable_links_identifier])
+            collisions = self.world.check_collisions(distances, allowed_collisions, self_collision=self.enable_self_collision,
+                                                     controllable_links=controllable_links)
 
             closest_point = keydefaultdict(lambda k: ClosestPointInfo((10, 0, 0),
                                                                       (0, 0, 0),

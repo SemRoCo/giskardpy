@@ -119,7 +119,7 @@ class PyBulletPlugin(Plugin):
                         self.world.spawn_object_from_urdf(req.body.name, urdf_string, pose)
                         # SUB-CASE: If it is an articulated object, open up a joint state subscriber
                         if req.body.joint_state_topic:
-                            callback = (lambda (msg): self.object_js_cb(req.body.name, msg))
+                            callback = (lambda msg: self.object_js_cb(req.body.name, msg))
                             self.object_js_subs[req.body.name] = \
                                 rospy.Subscriber(req.body.joint_state_topic, JointState, callback, queue_size=1)
 
@@ -160,7 +160,7 @@ class PyBulletPlugin(Plugin):
     def update(self):
         with self.lock:
             js = self.god_map.get_data([self.js_identifier])
-            self.world.set_joint_state(js)
+            self.world.set_robot_joint_state(js)
             for object_name, object_joint_state in self.object_joint_states.items():
                 self.world.get_object(object_name).set_joint_state(object_joint_state)
             p = lookup_transform(self.map_frame, self.robot_root)

@@ -1,5 +1,7 @@
 import unittest
-from collections import namedtuple, OrderedDict
+from bson.json_util import default
+from collections import namedtuple, OrderedDict, defaultdict
+from time import sleep
 
 from giskardpy.god_map import GodMap
 from giskardpy.pybullet_world import PyBulletWorld
@@ -35,28 +37,7 @@ class TestPyBulletWorld(unittest.TestCase):
               ('r_shoulder_pan_joint', -0.54341218738967),
               ('r_upper_arm_roll_joint', -0.8518325699325913),
               ('r_wrist_flex_joint', -1.1127555669432887),
-              ('r_wrist_roll_joint', 2.3104656448272642),
-              ('laser_tilt_mount_joint', 0.0),
-              ('r_gripper_l_finger_joint', 0.0),
-              ('r_gripper_r_finger_joint', 0.0),
-              ('l_gripper_l_finger_joint', 0.0),
-              ('l_gripper_r_finger_joint', 0.0),
-              ('l_gripper_l_finger_tip_joint', 0.0),
-              ('l_gripper_r_finger_tip_joint', 0.0),
-              ('r_gripper_l_finger_tip_joint', 0.0),
-              ('r_gripper_r_finger_tip_joint', 0.0),
-              ('fl_caster_l_wheel_joint', 0.0),
-              ('fl_caster_r_wheel_joint', 0.0),
-              ('fr_caster_l_wheel_joint', 0.0),
-              ('fr_caster_r_wheel_joint', 0.0),
-              ('bl_caster_l_wheel_joint', 0.0),
-              ('bl_caster_r_wheel_joint', 0.0),
-              ('br_caster_l_wheel_joint', 0.0),
-              ('br_caster_r_wheel_joint', 0.0),
-              ('fl_caster_rotation_joint', 0.0),
-              ('fr_caster_rotation_joint', 0.0),
-              ('bl_caster_rotation_joint', 0.0),
-              ('br_caster_rotation_joint', 0.0)]
+              ('r_wrist_roll_joint', 2.3104656448272642),]
         mjs = OrderedDict()
         for joint_name, joint_position in js:
             sjs = SingleJointState()
@@ -68,43 +49,44 @@ class TestPyBulletWorld(unittest.TestCase):
     def tearDown(self):
         super(TestPyBulletWorld, self).tearDown()
         self.w.clear_world()
+        self.w.add_ground_plane()
 
     def test_spawn_object1(self):
-        self.w.add_ground_plane()
         self.assertEqual(p.getNumBodies(), 1)
 
     def test_delete1(self):
-        self.w.add_ground_plane()
         self.w.delete_object('plane')
-        self.assertEqual(p.getNumBodies(), 0)
+        self.assertEqual(0, p.getNumBodies())
 
     def test_clear_world1(self):
         self.w.clear_world()
-        self.assertEqual(p.getNumBodies(), 0)
+        self.assertEqual(1, p.getNumBodies())
 
     def test_spawn_robot1(self):
         self.w.spawn_robot_from_urdf_file('pr2', 'pr2.urdf')
-        self.assertEqual(p.getNumBodies(), 1)
+        self.assertEqual(2, p.getNumBodies())
 
     def test_delete_robot1(self):
         self.w.spawn_robot_from_urdf_file('pr2', 'pr2.urdf')
-        self.assertEqual(p.getNumBodies(), 1)
-        self.w.delete_robot('pr2')
-        self.assertEqual(p.getNumBodies(), 0)
+        self.assertEqual(2, p.getNumBodies())
+        self.w.delete_robot()
+        self.assertEqual(1, p.getNumBodies())
 
     def test_collision_detection1(self):
         self.w.spawn_robot_from_urdf_file('pr2', 'pr2.urdf')
-        r = self.w.get_robot('pr2')
-        self.w.set_joint_state('pr2', r.get_zero_joint_state())
-        self.assertEqual(0, len(self.w.check_collisions()))
+        r = self.w.get_robot()
+        self.w.set_robot_joint_state(r.get_zero_joint_state())
+        cut_off_distances = defaultdict(lambda : 0.05)
+        collisions = self.w.check_collisions(cut_off_distances, self_collision_d=0.05)
+        self.assertEqual(0, len(collisions), str(dict(collisions).keys()))
 
     def test_collision_detection2(self):
         self.w.spawn_robot_from_urdf_file('pr2', 'pr2.urdf')
         mjs = self.get_pr2_collision_js()
-        self.w.set_joint_state('pr2', mjs)
-        collisions = self.w.check_collisions()
-        collisions = [x for x in collisions.values() if x.contact_distance < 0.05]
-        self.assertEqual(8, len(collisions))
+        self.w.set_robot_joint_state(mjs)
+        cut_off_distances = defaultdict(lambda: 0.05)
+        collisions = self.w.check_collisions(cut_off_distances, self_collision_d=0.05)
+        self.assertEqual(2, len(collisions), str(dict(collisions).keys()))
 
     def test_list_objects1(self):
         self.w.add_ground_plane()
@@ -113,10 +95,21 @@ class TestPyBulletWorld(unittest.TestCase):
     def test_joint_state(self):
         mjs = self.get_pr2_collision_js()
         self.w.spawn_robot_from_urdf_file('pr2', 'pr2.urdf')
-        self.w.set_joint_state('pr2', mjs)
-        mjs2 = self.w.get_joint_state('pr2')
+        self.w.set_robot_joint_state(mjs)
+        mjs2 = self.w.get_robot_joint_state()
         for joint_name, sjs in mjs.items():
             self.assertEqual(sjs.position, mjs2.get(joint_name).position)
+
+    def test_set_object_joint_state(self):
+        object_name = 'pr2'
+        mjs = self.get_pr2_collision_js()
+        self.w.spawn_object_from_urdf_file(object_name, 'pr2.urdf')
+        self.w.set_object_joint_state(object_name, mjs)
+        mjs2 = self.w.get_object_joint_state(object_name)
+        for joint_name, sjs in mjs.items():
+            self.assertEqual(sjs.position, mjs2.get(joint_name).position)
+
+
 
 
 if __name__ == '__main__':

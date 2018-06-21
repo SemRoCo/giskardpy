@@ -124,7 +124,8 @@ class testPythonInterface(unittest.TestCase):
         self.giskard.add_box(name='box', position=position)
 
     def add_kitchen(self):
-        self.giskard.add_urdf('kitchen', rospy.get_param('kitchen_description'), 'kitchen_joint_states', 'map', 'world')
+        p = lookup_transform('world', 'map')
+        self.giskard.add_urdf('kitchen', rospy.get_param('kitchen_description'), 'kitchen_joint_states', p)
 
     def test_AllowCollision1(self):
         self.add_box()
@@ -415,7 +416,7 @@ class testPythonInterface(unittest.TestCase):
         self.set_and_check_js_goal(gaya_pose)
 
         self.add_kitchen()
-        kitchen_js = {'sink_area_left_upper_drawer_main_joint': 0.48}
+        kitchen_js = {'sink_area_left_upper_drawer_main_joint': 0.45}
         self.giskard.set_object_joint_state('kitchen', kitchen_js)
 
         pick_spoon_pose = PoseStamped()

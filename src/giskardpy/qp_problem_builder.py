@@ -134,19 +134,19 @@ class QProblemBuilder(object):
         ubA = []
         weights = []
         xdot = []
-        for iJ, (k, c) in enumerate(self.joint_constraints_dict.items()):
+        for iJ, k in enumerate(self.joint_constraints_dict.keys()):
             key = 'j -- ' + str(k)
             lb.append(key)
             ub.append(key)
             weights.append(key)
             xdot.append(key)
 
-        for iH, (k, c) in enumerate(self.hard_constraints_dict.items()):
+        for iH, k in enumerate(self.hard_constraints_dict.keys()):
             key = 'h -- ' + str(k)
             lbA.append(key)
             ubA.append(key)
 
-        for iS, (k, c) in enumerate(self.soft_constraints_dict.items()):
+        for iS, k in enumerate(self.soft_constraints_dict.keys()):
             key = 's -- ' + str(k)
             lbA.append(key)
             ubA.append(key)

@@ -62,6 +62,7 @@ class QPSolver(object):
         if success == PyReturnValue.SUCCESSFUL_RETURN:
             self.started = True
         else:
+            self.started = False
             raise QPSolverException(self.RETURN_VALUE_DICT[success])
 
         self.qpProblem.getPrimalSolution(self.xdot_full)

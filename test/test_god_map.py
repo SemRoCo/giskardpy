@@ -59,7 +59,7 @@ class TestDataBus(unittest.TestCase):
             asdf = 32
         db = GodMap()
         db.set_data('asdf', C1())
-        db.set_data('asdf/asdf', C1)
+        db.set_data('asdf/asdf', C1())
         self.assertEqual(db.get_data('asdf/asdf/asdf'), 32)
 
     def test_dict1(self):

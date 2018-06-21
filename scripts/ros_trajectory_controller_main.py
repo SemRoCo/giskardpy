@@ -50,6 +50,7 @@ if __name__ == '__main__':
     collision_identifier = 'collision'
     closest_point_identifier = 'cpi'
     collision_goal_identifier = 'collision_goal'
+    pyfunction_identifier = 'pyfunctions'
     controllable_links_identifier = 'controllable_links'
     robot_description_identifier = 'robot_description'
 
@@ -74,6 +75,7 @@ if __name__ == '__main__':
                                           collision_goal_identifier=collision_goal_identifier,
                                           joint_convergence_threshold=joint_convergence_threshold,
                                           wiggle_precision_threshold=wiggle_precision_threshold,
+                                          pyfunction_identifier=pyfunction_identifier,
                                           plot_trajectory=False,
                                           fill_velocity_values=fill_velocity_values))
     pm.register_plugin('bullet',
@@ -99,6 +101,7 @@ if __name__ == '__main__':
                                                        js_identifier=js_identifier,
                                                        next_cmd_identifier=next_cmd_identifier,
                                                        collision_identifier=collision_identifier,
+                                                       pyfunction_identifier=pyfunction_identifier,
                                                        closest_point_identifier=closest_point_identifier,
                                                        controlled_joints_identifier=controlled_joints_identifier,
                                                        controllable_links_identifier=controllable_links_identifier,

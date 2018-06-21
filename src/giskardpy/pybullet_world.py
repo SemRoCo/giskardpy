@@ -48,6 +48,7 @@ def resolve_ros_iris(input_urdf):
             output_urdf += line.replace(package_name, real_path)
         else:
             output_urdf += line
+        output_urdf += '\n'
     return output_urdf
 
 
@@ -333,10 +334,7 @@ class PyBulletRobot(object):
                                '{}_link'.format(object.name))
         self.attached_objects[object.name] = '{}{}'.format(to_urdf_string(new_joint), to_urdf_string(object, True))
 
-        # for each attached object, insert the corresponding URDF sub-string into the original URDF string
-        new_urdf_string = self.original_urdf
-        for sub_string in self.attached_objects.values():
-            new_urdf_string = new_urdf_string.replace('</robot>', '{}</robot>'.format(sub_string))
+        new_urdf_string = self.get_urdf()
 
         # remove last robot and load new robot from new URDF
         p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 0)
@@ -359,6 +357,13 @@ class PyBulletRobot(object):
         new_collisions = self.calc_self_collision_matrix(link_pairs)
         self.sometimes.union(new_collisions)
 
+    def get_urdf(self):
+        # for each attached object, insert the corresponding URDF sub-string into the original URDF string
+        new_urdf_string = self.original_urdf
+        for sub_string in self.attached_objects.values():
+            new_urdf_string = new_urdf_string.replace('</robot>', '{}</robot>'.format(sub_string))
+        return new_urdf_string
+
     def detach_object(self, object_name):
         """
         Detaches an attached object from the robot.
@@ -368,7 +373,7 @@ class PyBulletRobot(object):
         """
         if not self.has_attached_object(object_name):
             # TODO: choose better exception type
-            raise RuntimeError("No object '{}' has been attached to the robot.".format(object.name))
+            raise RuntimeError("No object '{}' has been attached to the robot.".format(object_name))
 
         # salvage last joint state and base pose
         base_pose = self.get_base_pose()
@@ -386,14 +391,12 @@ class PyBulletRobot(object):
         del (self.attached_objects[object_name])
 
         # for each attached object, insert the corresponding URDF sub-string into the original URDF string
-        new_urdf_string = self.original_urdf
-        for sub_string in self.attached_objects.values():
-            new_urdf_string = new_urdf_string.replace('</robot>', '{}</robot>'.format(sub_string))
+        new_urdf_string = self.get_urdf()
 
         # remove last robot and load new robot from new URDF
         p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 0)
         p.removeBody(self.id)
-        self.id = (new_urdf_string, base_pose)
+        self.id = load_urdf_string_into_bullet(new_urdf_string, base_pose)
         p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 1)
 
         # reload joint info and last joint state

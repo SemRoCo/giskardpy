@@ -432,11 +432,13 @@ class testPythonInterface(unittest.TestCase):
     def test_attached_collision(self):
         self.add_box()
         self.giskard.attach_box('pocky', [0.1, 0.02, 0.02], self.r_tip, [0.05,0,0])
+        # self.giskard.attach_box('pocky2', [0.1, 0.02, 0.02], self.l_tip, [0.05,0,0])
         p = PoseStamped()
         p.header.frame_id = self.r_tip
-        p.pose.position.x = -0.1
+        p.pose.position.x = -0.11
         p.pose.orientation.w = 1
         self.set_and_check_cart_goal(self.default_root, self.r_tip, p)
+        self.giskard.remove_object('pocky')
 
 
 

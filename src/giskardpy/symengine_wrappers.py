@@ -114,7 +114,8 @@ class CompiledFunction(object):
             self.fast_f.unsafe_real(np.array(filtered_args, dtype=np.double), out)
             return np.nan_to_num(out).reshape(self.shape)
         except KeyError as e:
-            raise SymengineException('{}\ntry deleting the last loaded compiler to trigger recompilation'.format(e.message))
+            msg = '{}\ntry deleting the last loaded compiler to trigger recompilation'.format(e.message)
+            raise SymengineException(msg)
 
 
 # @profile

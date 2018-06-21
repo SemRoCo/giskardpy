@@ -67,11 +67,8 @@ class QProblemBuilder(object):
             ub.append(BIG_NUMBER)
             assert not isinstance(c.expression, spw.Matrix), 'Matrices are not allowed as soft constraint expression'
             soft_expressions.append(c.expression)
-        a = ''.join(str(x) for x in sorted(chain(self.soft_constraints_dict.keys(),
-                                                 self.hard_constraints_dict.keys(),
-                                                 self.joint_constraints_dict.keys())))
-        function_hash = hashlib.md5(a).hexdigest()
-        self.cython_big_ass_M = load_compiled_function(self.path_to_functions + function_hash)
+
+        self.cython_big_ass_M = load_compiled_function(self.path_to_functions)
         self.np_g = np.zeros(len(weights))
 
         if self.cython_big_ass_M is None:
@@ -112,11 +109,11 @@ class QProblemBuilder(object):
             if self.free_symbols is None:
                 self.free_symbols = self.big_ass_M.free_symbols
             self.cython_big_ass_M = spw.speed_up(self.big_ass_M, self.free_symbols, backend=BACKEND)
-            if function_hash is not None:
-                safe_compiled_function(self.cython_big_ass_M, self.path_to_functions + function_hash)
+            if self.path_to_functions is not None:
+                safe_compiled_function(self.cython_big_ass_M, self.path_to_functions)
             print('autowrap took {}'.format(time() - t))
         else:
-            print('controller loaded {}'.format(self.path_to_functions + function_hash))
+            print('controller loaded {}'.format(self.path_to_functions))
         print('controller ready {}s'.format(time() - t_total))
 
     def save_pickle(self, hash, f):

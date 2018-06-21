@@ -90,7 +90,8 @@ if __name__ == '__main__':
                                       gui=gui,
                                       marker=marker,
                                       default_collision_avoidance_distance=default_collision_avoidance_distance,
-                                      enable_self_collision=enable_self_collision))
+                                      enable_self_collision=enable_self_collision,
+                                      robot_description_identifier=robot_description_identifier))
     pm.register_plugin('fk', FKPlugin(js_identifier=js_identifier,
                                       fk_identifier=fk_identifier,
                                       robot_description_identifier=robot_description_identifier))
@@ -108,7 +109,8 @@ if __name__ == '__main__':
                                                        collision_goal_identifier=collision_goal_identifier,
                                                        path_to_functions=path_to_data_folder,
                                                        nWSR=nWSR,
-                                                       default_joint_vel_limit=default_joint_vel_limit))
+                                                       default_joint_vel_limit=default_joint_vel_limit,
+                                                       robot_description_identifier=robot_description_identifier))
     pm.register_plugin('interactive marker',
                        InteractiveMarkerPlugin(root_tips=root_tips))
 

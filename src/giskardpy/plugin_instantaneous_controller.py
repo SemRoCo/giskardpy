@@ -1,3 +1,4 @@
+import hashlib
 from collections import OrderedDict
 import rospy
 from giskard_msgs.msg import Controller
@@ -13,7 +14,7 @@ import symengine_wrappers as sw
 class CartesianBulletControllerPlugin(Plugin):
     def __init__(self, root_link, js_identifier, fk_identifier, goal_identifier, next_cmd_identifier,
                  collision_identifier, closest_point_identifier, controlled_joints_identifier,
-                 controllable_links_identifier,
+                 controllable_links_identifier, robot_description_identifier,
                  collision_goal_identifier, pyfunction_identifier, path_to_functions, nWSR, default_joint_vel_limit):
         """
         :param roots:
@@ -28,6 +29,7 @@ class CartesianBulletControllerPlugin(Plugin):
         :param closest_point_identifier:
         """
         self.collision_goal_identifier = collision_goal_identifier
+        self.robot_description_identifier = robot_description_identifier
         self.controlled_joints_identifier = controlled_joints_identifier
         self._pyfunctions_identifier = pyfunction_identifier
         self._fk_identifier = fk_identifier
@@ -47,25 +49,29 @@ class CartesianBulletControllerPlugin(Plugin):
         self.controlled_joints = set()
         self.controller_updated = False
         self.max_number_collision_entries = 10
+        self.urdf_hash = ''
         super(CartesianBulletControllerPlugin, self).__init__()
 
     def copy(self):
         cp = self.__class__(self.root, self._joint_states_identifier, self._fk_identifier,
                             self._goal_identifier, self._next_cmd_identifier, self._collision_identifier,
                             self._closest_point_identifier, self.controlled_joints_identifier,
-                            self.controllable_links_identifier,
+                            self.controllable_links_identifier, self.robot_description_identifier,
                             self.collision_goal_identifier, self._pyfunctions_identifier,
                             self.path_to_functions, self.nWSR,
                             self.default_joint_vel_limit)
         cp._controller = self._controller
         cp.soft_constraints = self.soft_constraints
         cp.known_constraints = self.known_constraints
-        # cp.controlled_joints = self.controlled_joints
+        cp.urdf_hash = self.urdf_hash
+        cp.controlled_joints = self.controlled_joints
         return cp
 
     # @profile
     def update(self):
-
+        # TODO don't call start once here lol
+        self.start_once()
+        self.init_controller()
         if self.god_map.get_data([self._goal_identifier]) is not None:
 
             if not self.controller_updated:
@@ -140,21 +146,26 @@ class CartesianBulletControllerPlugin(Plugin):
                                                                     min_dist))
 
     def start_once(self):
-        urdf = rospy.get_param('robot_description')
-        self._controller = SymEngineController(urdf, self.path_to_functions, self.default_joint_vel_limit)
-        robot = self._controller.robot
+        # TODO probably buggy if object gets attached during planning
+        urdf = self.god_map.get_data([self.robot_description_identifier])
+        new_urdf_hash = hashlib.md5(urdf).hexdigest()
+        if self.urdf_hash != new_urdf_hash:
+            self.urdf_hash = new_urdf_hash
+            self._controller = SymEngineController(urdf, self.path_to_functions, self.default_joint_vel_limit)
+            robot = self._controller.robot
 
-        current_joints = JointStatesInput.prefix_constructor(self.god_map.get_expr,
-                                                             robot.get_joint_names(),
-                                                             self._joint_states_identifier,
-                                                             'position')
-        robot.set_joint_symbol_map(current_joints)
+            current_joints = JointStatesInput.prefix_constructor(self.god_map.get_expr,
+                                                                 robot.get_joint_names(),
+                                                                 self._joint_states_identifier,
+                                                                 'position')
+            robot.set_joint_symbol_map(current_joints)
 
-        new_controlled_joints = self.god_map.get_data([self.controlled_joints_identifier])
-        if len(set(new_controlled_joints).difference(self.controlled_joints)) != 0:
+            new_controlled_joints = self.god_map.get_data([self.controlled_joints_identifier])
+            # if len(set(new_controlled_joints).difference(self.controlled_joints)) != 0:
             self._controller.set_controlled_joints(new_controlled_joints)
-        self.controlled_joints = new_controlled_joints
-        self.init_controller()
+            self.controlled_joints = new_controlled_joints
+            self.init_controller()
+            self.start_always()
 
     def modify_controller(self):
         robot = self._controller.robot

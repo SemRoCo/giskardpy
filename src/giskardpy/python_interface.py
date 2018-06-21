@@ -243,7 +243,6 @@ class GiskardWrapper(object):
         # self.marker_pub.publish(ma)
         return self.update_world.call(req)
 
-
     def add_urdf(self, name, urdf, js_topic, pose):
         urdf_body = WorldBody()
         urdf_body.name = name

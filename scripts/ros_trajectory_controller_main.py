@@ -15,25 +15,27 @@ from giskardpy.plugin_set_controlled_joints import SetControlledJointsPlugin
 from giskardpy.process_manager import ProcessManager
 
 if __name__ == '__main__':
+    # TODO 0 0 0 in base footprint as goal results in /0
+    # TODO bug if first goal is joint
     rospy.init_node('giskard')
 
     # root_link = rospy.get_param('~root_link', 'odom')
-    root_link = rospy.get_param('~root_link', 'base_footprint')
-    root_tips = rospy.get_param('~interactive_marker_chains', [('base_link', 'r_gripper_tool_frame'),
-                                                               ('base_link', 'l_gripper_tool_frame')])
-    sample_period = rospy.get_param('~sample_period', 0.1)
-    fill_velocity_values = rospy.get_param('~fill_velocity_values', False)
-    joint_convergence_threshold = rospy.get_param('~joint_convergence_threshold', 0.001)
-    wiggle_precision_threshold = rospy.get_param('~wiggle_precision_threshold', 5)
-    map_frame = rospy.get_param('~map_frame', 'map')
-    gui = rospy.get_param('~enable_gui', False)
-    marker = rospy.get_param('~enable_collision_marker', True)
-    default_collision_avoidance_distance = rospy.get_param('~default_collision_avoidance_distance', 0.02)
-    nWSR = rospy.get_param('~nWSR', None)
+    root_tips = rospy.get_param('~interactive_marker_chains')
+    gui = rospy.get_param('~enable_gui')
+    map_frame = rospy.get_param('~map_frame')
+    joint_convergence_threshold = rospy.get_param('~joint_convergence_threshold')
+    wiggle_precision_threshold = rospy.get_param('~wiggle_precision_threshold')
+    sample_period = rospy.get_param('~sample_period')
+    default_joint_vel_limit = rospy.get_param('~default_joint_vel_limit')
+    default_collision_avoidance_distance = rospy.get_param('~default_collision_avoidance_distance')
+    fill_velocity_values = rospy.get_param('~fill_velocity_values')
+    nWSR = rospy.get_param('~nWSR')
+    root_link = rospy.get_param('~root_link')
+    marker = rospy.get_param('~enable_collision_marker')
+    enable_self_collision = rospy.get_param('~enable_self_collision')
     if nWSR == 'None':
         nWSR = None
-    default_joint_vel_limit = rospy.get_param('~default_joint_vel_limit', 1)
-    path_to_data_folder = rospy.get_param('~path_to_data_folder', RosPack().get_path('giskardpy') + '/data/pr2/')
+    path_to_data_folder = rospy.get_param('~path_to_data_folder')
     # path_to_data_folder = '/home/ichumuh/giskardpy_ws/src/giskardpy/data/pr2'
     if not path_to_data_folder.endswith('/'):
         path_to_data_folder += '/'
@@ -49,6 +51,7 @@ if __name__ == '__main__':
     closest_point_identifier = 'cpi'
     collision_goal_identifier = 'collision_goal'
     pyfunction_identifier = 'pyfunctions'
+    controllable_links_identifier = 'controllable_links'
 
 
     pm = ProcessManager()
@@ -70,19 +73,21 @@ if __name__ == '__main__':
                                           joint_convergence_threshold=joint_convergence_threshold,
                                           wiggle_precision_threshold=wiggle_precision_threshold,
                                           pyfunction_identifier=pyfunction_identifier,
-                                          plot_trajectory=True,
+                                          plot_trajectory=False,
                                           fill_velocity_values=fill_velocity_values))
     pm.register_plugin('bullet',
                        PyBulletPlugin(js_identifier=js_identifier,
                                       collision_identifier=collision_identifier,
                                       closest_point_identifier=closest_point_identifier,
                                       collision_goal_identifier=collision_goal_identifier,
+                                      controllable_links_identifier=controllable_links_identifier,
                                       map_frame=map_frame,
                                       root_link=root_link,
                                       path_to_data_folder=path_to_data_folder,
                                       gui=gui,
                                       marker=marker,
-                                      default_collision_avoidance_distance=default_collision_avoidance_distance))
+                                      default_collision_avoidance_distance=default_collision_avoidance_distance,
+                                      enable_self_collision=enable_self_collision))
     pm.register_plugin('fk', FKPlugin(js_identifier=js_identifier, fk_identifier=fk_identifier))
     pm.register_plugin('cart bullet controller',
                        CartesianBulletControllerPlugin(root_link=root_link,
@@ -94,6 +99,7 @@ if __name__ == '__main__':
                                                        pyfunction_identifier=pyfunction_identifier,
                                                        closest_point_identifier=closest_point_identifier,
                                                        controlled_joints_identifier=controlled_joints_identifier,
+                                                       controllable_links_identifier=controllable_links_identifier,
                                                        collision_goal_identifier=collision_goal_identifier,
                                                        path_to_functions=path_to_data_folder,
                                                        nWSR=nWSR,

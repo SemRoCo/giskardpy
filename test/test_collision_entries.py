@@ -18,66 +18,76 @@ from numpy import pi
 
 PKG = 'giskardpy'
 
+default_joint_state = {'r_elbow_flex_joint': -1.29610152504,
+                       'r_forearm_roll_joint': -0.0301682323805,
+                       'r_gripper_joint': 2.22044604925e-16,
+                       'r_shoulder_lift_joint': 1.20324921318,
+                       'r_shoulder_pan_joint': -0.73456435706,
+                       'r_upper_arm_roll_joint': -0.70790051778,
+                       'r_wrist_flex_joint': -0.10001,
+                       'r_wrist_roll_joint': 0.258268529825,
 
-class TestCollisionAvoidance(unittest.TestCase):
+                       'l_elbow_flex_joint': -1.29610152504,
+                       'l_forearm_roll_joint': 0.0301682323805,
+                       'l_gripper_joint': 2.22044604925e-16,
+                       'l_shoulder_lift_joint': 1.20324921318,
+                       'l_shoulder_pan_joint': 0.73456435706,
+                       'l_upper_arm_roll_joint': 0.70790051778,
+                       'l_wrist_flex_joint': -0.1001,
+                       'l_wrist_roll_joint': -0.258268529825,
+
+                       'torso_lift_joint': 0.2,
+                       'head_pan_joint': 0,
+                       'head_tilt_joint': 0}
+
+gaya_pose = {'r_shoulder_pan_joint': -1.7125,
+             'r_shoulder_lift_joint': -0.25672,
+             'r_upper_arm_roll_joint': -1.46335,
+             'r_elbow_flex_joint': -2.12216,
+             'r_forearm_roll_joint': 1.76632,
+             'r_wrist_flex_joint': -0.10001,
+             'r_wrist_roll_joint': 0.05106,
+
+             'l_shoulder_pan_joint': 1.9652,
+             'l_shoulder_lift_joint': - 0.26499,
+             'l_upper_arm_roll_joint': 1.3837,
+             'l_elbow_flex_joint': - 2.1224,
+             'l_forearm_roll_joint': 16.99,
+             'l_wrist_flex_joint': - 0.10001,
+             'l_wrist_roll_joint': 0}
+
+
+class testPythonInterface(unittest.TestCase):
     def __init__(self, methodName='runTest'):
         rospy.init_node('test_collision_avoidance')
-        self.giskard = GiskardWrapper([('base_link', 'l_gripper_tool_frame'),
-                                       ('base_link', 'r_gripper_tool_frame')])
-
-        super(TestCollisionAvoidance, self).__init__(methodName)
+        self.giskard = GiskardWrapper()
+        self.default_root = 'base_link'
+        self.r_tip = 'r_gripper_tool_frame'
+        self.l_tip = 'l_gripper_tool_frame'
+        self.simple_base_pose_pub = rospy.Publisher('/move_base_simple/goal', PoseStamped, queue_size=10)
+        rospy.sleep(0.5)
+        super(testPythonInterface, self).__init__(methodName)
 
     def setUp(self):
         # TODO set joint goal instead of cart
         self.giskard.clear_world()
-        js = {'r_elbow_flex_joint': -1.29610152504,
-              'r_forearm_roll_joint': -0.0301682323805,
-              'r_gripper_joint': 2.22044604925e-16,
-              'r_gripper_l_finger_joint': 2.22044604925e-16,
-              'r_gripper_l_finger_tip_joint': 2.22044604925e-16,
-              'r_gripper_motor_screw_joint': 0.0,
-              'r_gripper_motor_slider_joint': 0.0,
-              'r_gripper_r_finger_joint': 2.22044604925e-16,
-              'r_gripper_r_finger_tip_joint': 2.22044604925e-16,
-              'r_shoulder_lift_joint': 1.20324921318,
-              'r_shoulder_pan_joint': -0.643456435706,
-              'r_upper_arm_roll_joint': -0.680790051778,
-              'r_wrist_flex_joint': -2.22044604925e-16,
-              'r_wrist_roll_joint': 0.258268529825,
-
-              'l_elbow_flex_joint': -1.29610152504,
-              'l_forearm_roll_joint': 0.0301682323805,
-              'l_gripper_joint': 2.22044604925e-16,
-              'l_gripper_l_finger_joint': 2.22044604925e-16,
-              'l_gripper_l_finger_tip_joint': 2.22044604925e-16,
-              'l_gripper_motor_screw_joint': 0.0,
-              'l_gripper_motor_slider_joint': 0.0,
-              'l_gripper_r_finger_joint': 2.22044604925e-16,
-              'l_gripper_r_finger_tip_joint': 2.22044604925e-16,
-              'l_shoulder_lift_joint': 1.20324921318,
-              'l_shoulder_pan_joint': 0.643456435706,
-              'l_upper_arm_roll_joint': 0.680790051778,
-              'l_wrist_flex_joint': -2.22044604925e-16,
-              'l_wrist_roll_joint': -0.258268529825,
-
-              'torso_lift_joint': 0.2,
-              'head_pan_joint': 0,
-              'head_tilt_joint': 0,
-              }
-        self.giskard.set_joint_goal(js)
+        self.giskard.set_joint_goal(default_joint_state)
 
         collision_entry = CollisionEntry()
         collision_entry.type = CollisionEntry.ALLOW_ALL_COLLISIONS
         self.giskard.set_collision_entries([collision_entry])
 
-        self.set_and_check_js_goal(js)
-        super(TestCollisionAvoidance, self).setUpClass()
+        self.set_and_check_js_goal(default_joint_state)
+        super(testPythonInterface, self).setUpClass()
+
+    def move_pr2_base(self, goal_pose):
+        self.simple_base_pose_pub.publish(goal_pose)
 
     def set_and_check_js_goal(self, goal_js):
         self.giskard.set_joint_goal(goal_js)
         self.giskard.plan_and_execute()
         result = self.giskard.get_result()
-        self.assertEqual(result.error_code, MoveResult.SUCCESS)
+        self.assertEqual(MoveResult.SUCCESS, result.error_code)
         current_joint_state = rospy.wait_for_message('joint_states', JointState)  # type: JointState
         for i, joint_name in enumerate(current_joint_state.name):
             if joint_name in goal_js:
@@ -88,9 +98,9 @@ class TestCollisionAvoidance(unittest.TestCase):
                                                                            current,
                                                                            goal))
 
-    def set_and_check_cart_goal(self, tip, goal_pose):
+    def set_and_check_cart_goal(self, root, tip, goal_pose):
         goal_in_base = transform_pose('base_footprint', goal_pose)
-        self.giskard.set_cart_goal(tip, goal_pose)
+        self.giskard.set_cart_goal(root, tip, goal_pose)
         self.giskard.plan_and_execute()
         current_pose = lookup_transform('base_footprint', tip)
         self.assertAlmostEqual(goal_in_base.pose.position.x, current_pose.pose.position.x, 2)
@@ -102,19 +112,20 @@ class TestCollisionAvoidance(unittest.TestCase):
         self.assertAlmostEqual(goal_in_base.pose.orientation.z, current_pose.pose.orientation.z, 1)
         self.assertAlmostEqual(goal_in_base.pose.orientation.w, current_pose.pose.orientation.w, 1)
 
-    def add_box(self):
-        self.giskard.add_box(name='box', position=(1.2, 0, 0.5))
+    def add_box(self, position=(1.2, 0, 0.5)):
+        self.giskard.add_box(name='box', position=position)
 
     def add_kitchen(self):
-        self.giskard.add_urdf('kitchen', rospy.get_param('kitchen_description'), 'kitchen_joint_states', 'map', 'world')
+        p = lookup_transform('world', 'map')
+        self.giskard.add_urdf('kitchen', rospy.get_param('kitchen_description'), 'kitchen_joint_states', p)
 
     def test_AllowCollision1(self):
         self.add_box()
         p = PoseStamped()
-        p.header.frame_id = 'r_gripper_tool_frame'
+        p.header.frame_id = self.r_tip
         p.pose.position = Point(0.1, 0, 0)
         p.pose.orientation = Quaternion(0, 0, 0, 1)
-        self.giskard.set_cart_goal('r_gripper_tool_frame', p)
+        self.giskard.set_cart_goal(self.default_root, self.r_tip, p)
 
         collision_entry = CollisionEntry()
         collision_entry.type = CollisionEntry.ALLOW_COLLISION
@@ -127,10 +138,10 @@ class TestCollisionAvoidance(unittest.TestCase):
     def test_avoid_collision1(self):
         self.add_box()
         p = PoseStamped()
-        p.header.frame_id = 'r_gripper_tool_frame'
+        p.header.frame_id = self.r_tip
         p.pose.position = Point(0.1, 0, 0)
         p.pose.orientation = Quaternion(0, 0, 0, 1)
-        self.giskard.set_cart_goal('r_gripper_tool_frame', p)
+        self.giskard.set_cart_goal(self.default_root, self.r_tip, p)
 
         collision_entry = CollisionEntry()
         collision_entry.type = CollisionEntry.AVOID_COLLISION
@@ -144,10 +155,10 @@ class TestCollisionAvoidance(unittest.TestCase):
     def test_unknown_object1(self):
         self.add_box()
         p = PoseStamped()
-        p.header.frame_id = 'r_gripper_tool_frame'
+        p.header.frame_id = self.r_tip
         p.pose.position = Point(0.1, 0, 0)
         p.pose.orientation = Quaternion(0, 0, 0, 1)
-        self.giskard.set_cart_goal('r_gripper_tool_frame', p)
+        self.giskard.set_cart_goal(self.default_root, self.r_tip, p)
 
         collision_entry = CollisionEntry()
         collision_entry.type = CollisionEntry.AVOID_COLLISION
@@ -161,10 +172,10 @@ class TestCollisionAvoidance(unittest.TestCase):
     def test_avoid_all_collision1(self):
         self.add_box()
         p = PoseStamped()
-        p.header.frame_id = 'r_gripper_tool_frame'
+        p.header.frame_id = self.r_tip
         p.pose.position = Point(0.1, 0, 0)
         p.pose.orientation = Quaternion(0, 0, 0, 1)
-        self.giskard.set_cart_goal('r_gripper_tool_frame', p)
+        self.giskard.set_cart_goal(self.default_root, self.r_tip, p)
 
         collision_entry = CollisionEntry()
         collision_entry.type = CollisionEntry.AVOID_ALL_COLLISIONS
@@ -177,10 +188,10 @@ class TestCollisionAvoidance(unittest.TestCase):
     def test_get_out_of_collision(self):
         self.add_box()
         p = PoseStamped()
-        p.header.frame_id = 'r_gripper_tool_frame'
+        p.header.frame_id = self.r_tip
         p.pose.position = Point(0.15, 0, 0)
         p.pose.orientation = Quaternion(0, 0, 0, 1)
-        self.giskard.set_cart_goal('r_gripper_tool_frame', p)
+        self.giskard.set_cart_goal(self.default_root, self.r_tip, p)
 
         collision_entry = CollisionEntry()
         collision_entry.type = CollisionEntry.ALLOW_ALL_COLLISIONS
@@ -191,10 +202,10 @@ class TestCollisionAvoidance(unittest.TestCase):
         self.assertEqual(result.error_code, MoveResult.SUCCESS)
 
         p = PoseStamped()
-        p.header.frame_id = 'r_gripper_tool_frame'
+        p.header.frame_id = self.r_tip
         p.pose.position = Point(0.1, 0, 0)
         p.pose.orientation = Quaternion(0, 0, 0, 1)
-        self.giskard.set_cart_goal('r_gripper_tool_frame', p)
+        self.giskard.set_cart_goal(self.default_root, self.r_tip, p)
 
         collision_entry = CollisionEntry()
         collision_entry.type = CollisionEntry.AVOID_ALL_COLLISIONS
@@ -208,10 +219,10 @@ class TestCollisionAvoidance(unittest.TestCase):
     def test_interrupt1(self):
         self.add_box()
         p = PoseStamped()
-        p.header.frame_id = 'r_gripper_tool_frame'
+        p.header.frame_id = self.r_tip
         p.pose.position = Point(0.1, 0, 0)
         p.pose.orientation = Quaternion(0, 0, 0, 1)
-        self.giskard.set_cart_goal('r_gripper_tool_frame', p)
+        self.giskard.set_cart_goal(self.default_root, self.r_tip, p)
 
         collision_entry = CollisionEntry()
         collision_entry.type = CollisionEntry.AVOID_ALL_COLLISIONS
@@ -226,24 +237,24 @@ class TestCollisionAvoidance(unittest.TestCase):
 
     def test_waypoints(self):
         p = PoseStamped()
-        p.header.frame_id = 'r_gripper_tool_frame'
+        p.header.frame_id = self.r_tip
         p.pose.position = Point(0.1, 0, 0)
         p.pose.orientation = Quaternion(0, 0, 0, 1)
-        self.giskard.set_cart_goal('r_gripper_tool_frame', p)
+        self.giskard.set_cart_goal(self.default_root, self.r_tip, p)
 
         self.giskard.add_cmd()
         p = PoseStamped()
-        p.header.frame_id = 'r_gripper_tool_frame'
+        p.header.frame_id = self.r_tip
         p.pose.position = Point(0, 0, 0.1)
         p.pose.orientation = Quaternion(0, 0, 0, 1)
-        self.giskard.set_cart_goal('r_gripper_tool_frame', p)
+        self.giskard.set_cart_goal(self.default_root, self.r_tip, p)
 
         self.giskard.add_cmd()
         p = PoseStamped()
-        p.header.frame_id = 'r_gripper_tool_frame'
+        p.header.frame_id = self.r_tip
         p.pose.position = Point(-0.1, 0, -0.1)
         p.pose.orientation = Quaternion(0, 0, 0, 1)
-        self.giskard.set_cart_goal('r_gripper_tool_frame', p)
+        self.giskard.set_cart_goal(self.default_root, self.r_tip, p)
 
         self.giskard.plan_and_execute()
         result = self.giskard.get_result()
@@ -279,31 +290,25 @@ class TestCollisionAvoidance(unittest.TestCase):
                                                                            goal))
 
     def test_place_spoon1(self):
+        base_pose = PoseStamped()
+        base_pose.header.frame_id = 'map'
+        base_pose.pose.position = Point(-1.010, -0.152, 0.000)
+        base_pose.pose.orientation = Quaternion(0.000, 0.000, -0.707, 0.707)
+        self.move_pr2_base(base_pose)
+
         goal_js = {
             'r_elbow_flex_joint': -1.43322543123,
             'r_forearm_roll_joint': pi / 2,
             'r_gripper_joint': 2.22044604925e-16,
-            'r_gripper_l_finger_joint': 2.22044604925e-16,
-            'r_gripper_l_finger_tip_joint': 2.22044604925e-16,
-            'r_gripper_motor_screw_joint': 0.0,
-            'r_gripper_motor_slider_joint': 0.0,
-            'r_gripper_r_finger_joint': 2.22044604925e-16,
-            'r_gripper_r_finger_tip_joint': 2.22044604925e-16,
             'r_shoulder_lift_joint': 0,
             'r_shoulder_pan_joint': -1.39478600655,
             'r_upper_arm_roll_joint': -pi / 2,
-            'r_wrist_flex_joint': 0,
+            'r_wrist_flex_joint': -0.1001,
             'r_wrist_roll_joint': 0,
 
             'l_elbow_flex_joint': -1.53432386765,
             'l_forearm_roll_joint': -0.335634766956,
             'l_gripper_joint': 2.22044604925e-16,
-            'l_gripper_l_finger_joint': 2.22044604925e-16,
-            'l_gripper_l_finger_tip_joint': 2.22044604925e-16,
-            'l_gripper_motor_screw_joint': 0.0,
-            'l_gripper_motor_slider_joint': 0.0,
-            'l_gripper_r_finger_joint': 2.22044604925e-16,
-            'l_gripper_r_finger_tip_joint': 2.22044604925e-16,
             'l_shoulder_lift_joint': 0.199493756207,
             'l_shoulder_pan_joint': 0.854317292495,
             'l_upper_arm_roll_joint': 1.90837777308,
@@ -319,7 +324,7 @@ class TestCollisionAvoidance(unittest.TestCase):
         p.header.frame_id = 'base_footprint'
         p.pose.position = Point(0.69, -0.374, 0.82)
         p.pose.orientation = Quaternion(-0.010, 0.719, 0.006, 0.695)
-        self.set_and_check_cart_goal('r_gripper_tool_frame', p)
+        self.set_and_check_cart_goal(self.default_root, self.r_tip, p)
 
     def test_weird_wiggling(self):
         goal_js = {
@@ -341,19 +346,80 @@ class TestCollisionAvoidance(unittest.TestCase):
             'l_wrist_flex_joint': -1.22662876066,
             'l_wrist_roll_joint': -53.6150824007,
         }
+        self.giskard.allow_all_collisions()
         self.set_and_check_js_goal(goal_js)
 
         p = PoseStamped()
-        p.header.frame_id = 'l_gripper_tool_frame'
+        p.header.frame_id = self.l_tip
         p.pose.position.x = -0.1
         p.pose.orientation.w = 1
-        self.set_and_check_cart_goal('l_gripper_tool_frame', p)
+        self.giskard.allow_all_collisions()
+        self.set_and_check_cart_goal(self.default_root, self.l_tip, p)
 
         p = PoseStamped()
-        p.header.frame_id = 'l_gripper_tool_frame'
+        p.header.frame_id = self.l_tip
         p.pose.position.x = 0.2
         p.pose.orientation.w = 1
-        self.set_and_check_cart_goal('l_gripper_tool_frame', p)
+        # self.giskard.allow_all_collisions()
+        self.set_and_check_cart_goal(self.default_root, self.l_tip, p)
+
+    def test_root_link_not_equal_chain_root(self):
+        p = PoseStamped()
+        p.header.frame_id = 'base_footprint'
+        p.pose.position.x = 0.8
+        p.pose.position.y = -0.5
+        p.pose.position.z = 1
+        p.pose.orientation.w = 1
+        self.giskard.allow_all_collisions()
+        self.giskard.set_tranlation_goal('torso_lift_link', self.r_tip, p)
+        self.giskard.plan_and_execute()
+
+    def test_did_not_reach_joint_state_with_launch_file(self):
+        self.giskard.allow_all_collisions()
+        self.set_and_check_js_goal(gaya_pose)
+
+        goal_js = {
+            'r_shoulder_pan_joint': 0,
+            'r_shoulder_lift_joint': 0,
+            'r_upper_arm_roll_joint': 0,
+            'r_elbow_flex_joint': -0.1508,
+            'r_forearm_roll_joint': 0,
+            'r_wrist_flex_joint': -0.10001,
+            'r_wrist_roll_joint': 0,
+
+            'l_shoulder_pan_joint': 0,
+            'l_shoulder_lift_joint': 0,
+            'l_upper_arm_roll_joint': 0,
+            'l_elbow_flex_joint': -0.1508,
+            'l_forearm_roll_joint': 0,
+            'l_wrist_flex_joint': -0.10001,
+            'l_wrist_roll_joint': 0,
+        }
+        self.set_and_check_js_goal(goal_js)
+
+    def test_pick_up_spoon(self):
+        base_pose = PoseStamped()
+        base_pose.header.frame_id = 'map'
+        base_pose.pose.position = Point(0.365, 0.368, 0.000)
+        base_pose.pose.orientation = Quaternion(0.000, 0.000, -0.007, 1.000)
+        self.move_pr2_base(base_pose)
+
+        self.giskard.allow_all_collisions()
+        self.set_and_check_js_goal(gaya_pose)
+
+        self.add_kitchen()
+        kitchen_js = {'sink_area_left_upper_drawer_main_joint': 0.45}
+        self.giskard.set_object_joint_state('kitchen', kitchen_js)
+
+        pick_spoon_pose = PoseStamped()
+        pick_spoon_pose.header.frame_id = 'base_footprint'
+        pick_spoon_pose.pose.position = Point(0.567, 0.498, 0.804)
+        pick_spoon_pose.pose.orientation = Quaternion(0.018, 0.702, 0.004, 0.712)
+        self.set_and_check_cart_goal(self.default_root, self.l_tip, pick_spoon_pose)
+
+    def test_base_link_in_collision(self):
+        self.add_box([0.5,0.5,-0.2])
+        self.set_and_check_js_goal(gaya_pose)
 
 
 if __name__ == '__main__':
@@ -361,4 +427,4 @@ if __name__ == '__main__':
 
     rosunit.unitrun(package=PKG,
                     test_name='TestCollisionAvoidance',
-                    test=TestCollisionAvoidance)
+                    test=testPythonInterface)

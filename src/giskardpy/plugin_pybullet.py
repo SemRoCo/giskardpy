@@ -28,14 +28,17 @@ from giskardpy.utils import keydefaultdict, to_joint_state_dict, to_point_stampe
 
 class PyBulletPlugin(Plugin):
     def __init__(self, js_identifier, collision_identifier, closest_point_identifier, collision_goal_identifier,
+                 controllable_links_identifier,
                  map_frame, root_link, default_collision_avoidance_distance, path_to_data_folder='', gui=False,
-                 marker=False):
+                 marker=False, enable_self_collision=True):
         self.collision_goal_identifier = collision_goal_identifier
+        self.controllable_links_identifier = controllable_links_identifier
         self.path_to_data_folder = path_to_data_folder
         self.js_identifier = js_identifier
         self.collision_identifier = collision_identifier
         self.closest_point_identifier = closest_point_identifier
         self.default_collision_avoidance_distance = default_collision_avoidance_distance
+        self.enable_self_collision = enable_self_collision
         self.map_frame = map_frame
         self.robot_root = root_link
         self.robot_name = 'pr2'
@@ -52,11 +55,13 @@ class PyBulletPlugin(Plugin):
                             collision_identifier=self.collision_identifier,
                             closest_point_identifier=self.closest_point_identifier,
                             collision_goal_identifier=self.collision_goal_identifier,
+                            controllable_links_identifier=self.controllable_links_identifier,
                             map_frame=self.map_frame,
                             root_link=self.robot_root,
                             path_to_data_folder=self.path_to_data_folder,
                             gui=self.gui,
-                            default_collision_avoidance_distance=self.default_collision_avoidance_distance)
+                            default_collision_avoidance_distance=self.default_collision_avoidance_distance,
+                            enable_self_collision=self.enable_self_collision)
         cp.world = self.world
         cp.marker = self.marker
         # cp.srv = self.srv
@@ -117,7 +122,7 @@ class PyBulletPlugin(Plugin):
                         self.world.spawn_object_from_urdf(req.body.name, urdf_string, pose)
                         # SUB-CASE: If it is an articulated object, open up a joint state subscriber
                         if req.body.joint_state_topic:
-                            callback = (lambda (msg): self.object_js_cb(req.body.name, msg))
+                            callback = (lambda msg: self.object_js_cb(req.body.name, msg))
                             self.object_js_subs[req.body.name] = \
                                 rospy.Subscriber(req.body.joint_state_topic, JointState, callback, queue_size=1)
 
@@ -158,7 +163,7 @@ class PyBulletPlugin(Plugin):
     def update(self):
         with self.lock:
             js = self.god_map.get_data([self.js_identifier])
-            self.world.set_joint_state(js)
+            self.world.set_robot_joint_state(js)
             for object_name, object_joint_state in self.object_joint_states.items():
                 self.world.get_object(object_name).set_joint_state(object_joint_state)
             p = lookup_transform(self.map_frame, self.robot_root)
@@ -193,22 +198,27 @@ class PyBulletPlugin(Plugin):
                     bodies_b = self.world.get_object_list()
                 else:
                     bodies_b = [collision_entry.body_b]
-                for body_b in bodies_b:
-                    if collision_entry.link_b == '':
-                        links_b = self.world.get_object(body_b).get_link_names()
-                    else:
-                        links_b = [collision_entry.link_b]
+                if collision_entry.type == CollisionEntry.ALLOW_ALL_COLLISIONS:
+                    allowed_collisions.update(self.world.get_object_list())
+                    allowed_collisions.add(self.world.get_robot().name)
+                else:
+                    for body_b in bodies_b:
+                        if collision_entry.link_b == '':
+                            links_b = self.world.get_object(body_b).get_link_names()
+                        else:
+                            links_b = [collision_entry.link_b]
 
-                    for link_a, link_b in product(links_a, links_b):
-                        key = (link_a, body_b, link_b)
-                        if collision_entry.type == CollisionEntry.ALLOW_COLLISION or \
-                                collision_entry.type == CollisionEntry.ALLOW_ALL_COLLISIONS:
-                            allowed_collisions.add(key)
-                        if collision_entry.type == CollisionEntry.AVOID_COLLISION or \
-                                collision_entry.type == CollisionEntry.AVOID_ALL_COLLISIONS:
-                            distances[key] = collision_entry.min_dist
-
-            collisions = self.world.check_collisions(distances, allowed_collisions)
+                        for link_a, link_b in product(links_a, links_b):
+                            key = (link_a, body_b, link_b)
+                            if collision_entry.type == CollisionEntry.ALLOW_COLLISION or \
+                                    collision_entry.type == CollisionEntry.ALLOW_ALL_COLLISIONS:
+                                allowed_collisions.add(key)
+                            if collision_entry.type == CollisionEntry.AVOID_COLLISION or \
+                                    collision_entry.type == CollisionEntry.AVOID_ALL_COLLISIONS:
+                                distances[key] = collision_entry.min_dist
+            controllable_links = self.god_map.get_data([self.controllable_links_identifier])
+            collisions = self.world.check_collisions(distances, allowed_collisions, self_collision=self.enable_self_collision,
+                                                     controllable_links=controllable_links)
 
             closest_point = keydefaultdict(lambda k: ClosestPointInfo((10, 0, 0),
                                                                       (0, 0, 0),

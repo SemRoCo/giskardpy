@@ -13,6 +13,7 @@ import symengine_wrappers as sw
 class CartesianBulletControllerPlugin(Plugin):
     def __init__(self, root_link, js_identifier, fk_identifier, goal_identifier, next_cmd_identifier,
                  collision_identifier, closest_point_identifier, controlled_joints_identifier,
+                 controllable_links_identifier,
                  collision_goal_identifier, pyfunction_identifier, path_to_functions, nWSR, default_joint_vel_limit):
         """
         :param roots:
@@ -40,6 +41,7 @@ class CartesianBulletControllerPlugin(Plugin):
         self._joint_states_identifier = js_identifier
         self._goal_identifier = goal_identifier
         self._next_cmd_identifier = next_cmd_identifier
+        self.controllable_links_identifier = controllable_links_identifier
         self._controller = None
         self.known_constraints = set()
         self.controlled_joints = set()
@@ -47,15 +49,22 @@ class CartesianBulletControllerPlugin(Plugin):
         self.max_number_collision_entries = 10
         super(CartesianBulletControllerPlugin, self).__init__()
 
+    def copy(self):
+        cp = self.__class__(self.root, self._joint_states_identifier, self._fk_identifier,
+                            self._goal_identifier, self._next_cmd_identifier, self._collision_identifier,
+                            self._closest_point_identifier, self.controlled_joints_identifier,
+                            self.controllable_links_identifier,
+                            self.collision_goal_identifier, self._pyfunctions_identifier,
+                            self.path_to_functions, self.nWSR,
+                            self.default_joint_vel_limit)
+        cp._controller = self._controller
+        cp.soft_constraints = self.soft_constraints
+        cp.known_constraints = self.known_constraints
+        # cp.controlled_joints = self.controlled_joints
+        return cp
+
     # @profile
     def update(self):
-        # update controlled joints
-        # TODO unnecessary to check this on every iteration
-        new_controlled_joints = self.god_map.get_data([self.controlled_joints_identifier])
-        if len(set(new_controlled_joints).difference(self.controlled_joints)) != 0:
-            self._controller.set_controlled_joints(new_controlled_joints)
-        self.controlled_joints = new_controlled_joints
-        self.init_controller()
 
         if self.god_map.get_data([self._goal_identifier]) is not None:
 
@@ -107,6 +116,7 @@ class CartesianBulletControllerPlugin(Plugin):
                                                                 gain,
                                                                 max_speed, joint_name))
                 controllable_links.update(robot.get_link_tree(joint_name))
+            self.god_map.set_data([self.controllable_links_identifier], controllable_links)
             self.god_map.set_data([self._pyfunctions_identifier], pyfunctions)
 
             for link in list(controllable_links):
@@ -139,6 +149,12 @@ class CartesianBulletControllerPlugin(Plugin):
                                                              self._joint_states_identifier,
                                                              'position')
         robot.set_joint_symbol_map(current_joints)
+
+        new_controlled_joints = self.god_map.get_data([self.controlled_joints_identifier])
+        if len(set(new_controlled_joints).difference(self.controlled_joints)) != 0:
+            self._controller.set_controlled_joints(new_controlled_joints)
+        self.controlled_joints = new_controlled_joints
+        self.init_controller()
 
     def modify_controller(self):
         robot = self._controller.robot
@@ -229,35 +245,13 @@ class CartesianBulletControllerPlugin(Plugin):
                                  max_trans_speed=max_speed,
                                  ns='{}/{}'.format(root, tip))
         elif type == Controller.ROTATION_3D:
-            slerp_input = SlerpInput(self.god_map.get_expr, [self._pyfunctions_identifier],
-                                     current_rot_prefix, goal_rot_prefix, p_gain_key, max_speed_key)
-            pyfunctions[slerp_input.get_key()] = slerp_input
-            self.god_map.set_data([self._pyfunctions_identifier], pyfunctions)
-            return rotation_conv_slerp2(goal_input.get_rotation(),
-                                        sw.rot_of(robot.get_fk_expression(root, tip)),
-                                        current_input.get_rotation(),
-                                        slerp_input.get_expression(),
-                                        weights=weight,
-                                        rot_gain=p_gain,
-                                        max_rot_speed=max_speed,
-                                        ns='{}/{}'.format(root, tip))
-            # return rotation_conv_slerp(goal_input.get_rotation(),
-            #                            sw.rot_of(robot.get_fk_expression(root, tip)),
-            #                            current_input.get_rotation(),
-            #                            weights=weight,
-            #                            rot_gain=p_gain,
-            #                            max_rot_speed=max_speed,
-            #                            ns='{}/{}'.format(root, tip))
+            return rotation_conv(goal_input.get_rotation(),
+                                 sw.rot_of(robot.get_fk_expression(root, tip)),
+                                 current_input.get_rotation(),
+                                 weights=weight,
+                                 rot_gain=p_gain,
+                                 max_rot_speed=max_speed,
+                                 ns='{}/{}'.format(root, tip))
+
         return {}
 
-    def copy(self):
-        cp = self.__class__(self.root, self._joint_states_identifier, self._fk_identifier,
-                            self._goal_identifier, self._next_cmd_identifier, self._collision_identifier,
-                            self._closest_point_identifier, self.controlled_joints_identifier,
-                            self.collision_goal_identifier, self._pyfunctions_identifier, self.path_to_functions,
-                            self.nWSR, self.default_joint_vel_limit)
-        cp._controller = self._controller
-        cp.soft_constraints = self.soft_constraints
-        cp.known_constraints = self.known_constraints
-        # cp.controlled_joints = self.controlled_joints
-        return cp

@@ -217,8 +217,9 @@ class PyBulletRobot(object):
                 mjs.set(sjs)
         return mjs
 
-    def calc_self_collision_matrix(self, combis, d=0.05, d2=0.01, num_rnd_tries=1000):
+    def calc_self_collision_matrix(self, combis, d=0.05, d2=0.0, num_rnd_tries=1000):
         # TODO computational expansive because of too many collision checks
+        print('calculating self collision matrix')
         seed(1337)
         always = set()
 
@@ -482,6 +483,37 @@ class PyBulletWorld(object):
         self._robot = PyBulletRobot(robot_name, urdf, base_pose, path_to_data_folder=self.path_to_data_folder)
         self.activate_rendering()
 
+    def spawn_object_from_urdf_file(self, object_name, urdf_file, base_pose=Transform()):
+        """
+        Spawns a new robot into the world, reading its URDF from disc.
+        :param robot_name: Name of the new robot to spawn.
+        :type robot_name: str
+        :param urdf_file: Valid and existing filename of the URDF to load, e.g. '/home/foo/bar/pr2.urdf'
+        :type urdf_file: str
+        :param base_pose: Pose at which to spawn the robot.
+        :type base_pose: Transform
+        :return: Nothing
+        """
+        with open(urdf_file, 'r') as f:
+            self.spawn_object_from_urdf(object_name, f.read(), base_pose)
+
+    def spawn_object_from_urdf(self, name, urdf, base_pose=Transform()):
+        """
+
+        :param name:
+        :param urdf: Path to URDF file, or content of already loaded URDF file.
+        :type urdf: str
+        :param base_pose:
+        :type base_pose: Transform
+        :return:
+        """
+        if self.has_object(name):
+            raise DuplicateObjectNameException('Cannot spawn object "{}" because an object with such a '
+                                               'name already exists'.format(name))
+        self.deactivate_rendering()
+        self._objects[name] = PyBulletRobot(name, urdf, base_pose, False)
+        self.activate_rendering()
+
     def get_robot(self):
         """
         :param robot_name:
@@ -509,7 +541,7 @@ class PyBulletWorld(object):
         """
         return self._objects[name]
 
-    def set_joint_state(self, joint_state):
+    def set_robot_joint_state(self, joint_state):
         """
         Set the current joint state readings for a robot in the world.
         :param robot_name: name of the robot to update
@@ -519,38 +551,19 @@ class PyBulletWorld(object):
         """
         self._robot.set_joint_state(joint_state)
 
-    def get_joint_state(self):
+    def get_robot_joint_state(self):
         return self._robot.get_joint_states()
 
+    def set_object_joint_state(self, object_name, joint_state):
+        self.get_object(object_name).set_joint_state(joint_state)
+
+    def get_object_joint_state(self, object_name):
+        return self.get_object(object_name).get_joint_states()
+
     def delete_robot(self):
-        p.removeBody(self._robot.id)
-        self._robot = None
-        # del (self._robot[robot_name])
-
-    # def delete_all_robots(self):
-    #     """
-    #     Deletes all robots that have been spawned in this world.
-    #     :return: Nothing.
-    #     """
-    #     for robot_name in self.get_robot_list():
-    #         self.delete_robot()
-
-    def spawn_object_from_urdf(self, name, urdf, base_pose=Transform()):
-        """
-
-        :param name:
-        :param urdf: Path to URDF file, or content of already loaded URDF file.
-        :type urdf: str
-        :param base_pose:
-        :type base_pose: Transform
-        :return:
-        """
-        if self.has_object(name):
-            raise DuplicateObjectNameException('Cannot spawn object "{}" because an object with such a '
-                                               'name already exists'.format(name))
-        self.deactivate_rendering()
-        self._objects[name] = PyBulletRobot(name, urdf, base_pose, False)
-        self.activate_rendering()
+        if self._robot is not None:
+            p.removeBody(self._robot.id)
+            self._robot = None
 
     def spawn_object(self, object, base_pose=Transform()):
         """
@@ -598,7 +611,8 @@ class PyBulletWorld(object):
         """
         return object_name in self._objects.keys()
 
-    def check_collisions(self, cut_off_distances=None, allowed_collision=set(), d=0.1, self_collision=True):
+    def check_collisions(self, cut_off_distances, allowed_collision=set(), self_collision_d=0.1, self_collision=True,
+                         controllable_links=None):
         """
         :param cut_off_distances:
         :type cut_off_distances: dict
@@ -609,28 +623,30 @@ class PyBulletWorld(object):
         """
         # TODO implement a cooler way to remove wheel/plane collisions but detect eg. arm/plane collisions
         allowed_collision.add('plane')
-        if cut_off_distances is None:
-            cut_off_distances = defaultdict(lambda: d)
 
         # TODO set self collision cut off distance in a cool way
         def default_contact_info(k):
-            return ContactInfo(None, self.id, self.id, k[0], k[1], (0, 0, 0), (0, 0, 0), (1, 0, 0), 1e9, 0)
+            # TODO I think this is buggy but never gets called
+            return ContactInfo(None, -2, -2, k[0], k[1], (0, 0, 0), (0, 0, 0), (1, 0, 0), 1e9, 0)
 
         collisions = keydefaultdict(default_contact_info)
-        if self_collision:
+        if self_collision and self.get_robot().name not in allowed_collision:
+            # TODO use cut_off_distances in self collision
             if collisions is None:
-                collisions = self._robot.check_self_collision(d)
+                collisions = self._robot.check_self_collision(self_collision_d)
             else:
-                collisions.update(self._robot.check_self_collision(d))
-        for robot_link_name, robot_link in self._robot.link_name_to_id.items():
-            for object_name, object in self._objects.items():  # type: (str, PyBulletRobot)
-                # TODO skip if collisions with all links of an object are allowed
-                if object_name not in allowed_collision:
+                collisions.update(self._robot.check_self_collision(self_collision_d))
+        for object_name, object in self._objects.items():  # type: (str, PyBulletRobot)
+            if object_name not in allowed_collision:
+                for robot_link_name, robot_link in self._robot.link_name_to_id.items():
+                    if controllable_links is not None and robot_link_name not in controllable_links:
+                        continue
                     for object_link_name, object_link in object.link_name_to_id.items():
                         key = (robot_link_name, object_name, object_link_name)
                         if key not in allowed_collision:
                             collisions.update({key: ContactInfo(*x) for x in
-                                               p.getClosestPoints(self._robot.id, object.id, cut_off_distances[key] + d,
+                                               p.getClosestPoints(self._robot.id, object.id,
+                                                                  cut_off_distances[key] + self_collision_d,
                                                                   robot_link, object_link)})
         return collisions
 
@@ -639,6 +655,7 @@ class PyBulletWorld(object):
 
     def activate_viewer(self):
         if self._gui:
+            # TODO expose opengl2 option for gui?
             self.physicsClient = p.connect(p.GUI)  # or p.DIRECT for non-graphical version
         else:
             self.physicsClient = p.connect(p.DIRECT)  # or p.DIRECT for non-graphical version
@@ -646,21 +663,23 @@ class PyBulletWorld(object):
         self.add_ground_plane()
 
     def clear_world(self):
-        self.delete_all_objects(remaining_objects=())
+        self.delete_all_objects()
         self.delete_robot()
         # self.delete_all_robots()
 
     def deactivate_viewer(self):
         p.disconnect()
 
-    def add_ground_plane(self):
+    def add_ground_plane(self, name='plane'):
         """
         Adds a ground plane to the Bullet World.
         :return: Nothing.
         """
         # like in the PyBullet examples: spawn a big collision box in the origin
-        self.spawn_object(WorldObject(name='plane', collision_props=[CollisionProperty(geometry=BoxShape(30, 30, 10))]),
-                          Transform(translation=Point(0, 0, -5)))
+        if not self.has_object(name):
+            self.spawn_object(WorldObject(name=name,
+                                          collision_props=[CollisionProperty(geometry=BoxShape(30, 30, 10))]),
+                              Transform(translation=Point(0, 0, -5)))
 
     def deactivate_rendering(self):
         p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 0)

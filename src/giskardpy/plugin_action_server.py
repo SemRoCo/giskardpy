@@ -17,7 +17,8 @@ from giskard_msgs.msg._MoveResult import MoveResult
 
 from trajectory_msgs.msg import JointTrajectoryPoint
 
-from giskardpy.exceptions import MAX_NWSR_REACHEDException, QPSolverException, SolverTimeoutError, InsolvableException
+from giskardpy.exceptions import MAX_NWSR_REACHEDException, QPSolverException, SolverTimeoutError, InsolvableException, \
+    SymengineException
 from giskardpy.plugin import Plugin
 from giskardpy.tfwrapper import transform_pose
 from giskardpy.trajectory import ClosestPointInfo
@@ -112,6 +113,8 @@ class ActionServerPlugin(Plugin):
             result.error_code = MoveResult.SOLVER_TIMEOUT
         elif isinstance(exception, InsolvableException):
             result.error_code = MoveResult.INSOLVABLE
+        elif isinstance(exception, SymengineException):
+            result.error_code = MoveResult.SYMENGINE_ERROR
         if exception is None and not self._as.is_preempt_requested():
             if not self.closest_point_constraint_violated(god_map):
                 result.error_code = MoveResult.SUCCESS
@@ -281,7 +284,7 @@ class LogTrajectoryPlugin(Plugin):
         self.time_identifier = time_identifier
         self.is_preempted = is_preempted
         self.precision = joint_convergence_threshold
-        self.max_traj_length = 20
+        self.max_traj_length = 200
         self.wiggle_precision = wiggle_precision_threshold
         super(LogTrajectoryPlugin, self).__init__()
 
@@ -349,11 +352,12 @@ def plot_trajectory(tj, controlled_joints):
     f, (ax1, ax2) = plt.subplots(2, sharex=True)
     ax1.set_title('position')
     ax2.set_title('velocity')
-    positions -= positions.mean(axis=0)
+    # positions -= positions.mean(axis=0)
     for i, position in enumerate(positions.T):
         ax1.plot(times, position, fmts[i], label=names[i])
         ax2.plot(times, velocities[i], fmts[i])
     box = ax1.get_position()
+    ax1.set_ylim(-3,1)
     ax1.set_position([box.x0, box.y0, box.width * 0.6, box.height])
     box = ax2.get_position()
     ax2.set_position([box.x0, box.y0, box.width * 0.6, box.height])

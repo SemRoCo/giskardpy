@@ -9,11 +9,12 @@ from visualization_msgs.msg import Marker, MarkerArray
 
 from giskardpy.object import to_marker, from_msg
 from giskardpy.tfwrapper import lookup_transform
+from giskardpy.utils import dict_to_joint_states
 
 
 class GiskardWrapper(object):
-    def __init__(self, root_tips):
-        self.client = SimpleActionClient('qp_controller/command', MoveAction)
+    def __init__(self, giskard_topic='qp_controller/command'):
+        self.client = SimpleActionClient(giskard_topic, MoveAction)
         self.update_world = rospy.ServiceProxy('giskard/update_world', UpdateWorld)
         self.marker_pub = rospy.Publisher('visualization_marker_array', MarkerArray, queue_size=10)
         rospy.wait_for_service('giskard/update_world')
@@ -21,22 +22,21 @@ class GiskardWrapper(object):
         self.tip_to_root = {}
         self.collisions = []
         self.clear_cmds()
-        for root, tip in root_tips:
-            self.tip_to_root[tip] = root
+        self.object_js_topics = {}
         rospy.sleep(.3)
 
-    def set_cart_goal(self, tip, pose_stamped):
+    def set_cart_goal(self, root, tip, pose_stamped):
         """
         :param tip:
         :type tip: str
         :param pose_stamped:
         :type pose_stamped: PoseStamped
         """
-        self.set_tranlation_goal(tip, pose_stamped)
-        self.set_rotation_goal(tip, pose_stamped)
+        self.set_tranlation_goal(root, tip, pose_stamped)
+        self.set_rotation_goal(root, tip, pose_stamped)
 
 
-    def set_tranlation_goal(self, tip, pose_stamped):
+    def set_tranlation_goal(self, root, tip, pose_stamped):
         """
         :param tip:
         :type tip: str
@@ -44,7 +44,7 @@ class GiskardWrapper(object):
         :type pose_stamped: PoseStamped
         """
         controller = Controller()
-        controller.root_link = self.tip_to_root[tip]
+        controller.root_link = root
         controller.tip_link = tip
         controller.goal_pose = pose_stamped
         controller.type = Controller.TRANSLATION_3D
@@ -53,7 +53,7 @@ class GiskardWrapper(object):
         controller.p_gain = 3
         self.cmd_seq[-1].controllers.append(controller)
 
-    def set_rotation_goal(self, tip, pose_stamped):
+    def set_rotation_goal(self, root, tip, pose_stamped):
         """
         :param tip:
         :type tip: str
@@ -61,15 +61,14 @@ class GiskardWrapper(object):
         :type pose_stamped: PoseStamped
         """
         controller = Controller()
-        controller.root_link = self.tip_to_root[tip]
+        controller.root_link = root
         controller.tip_link = tip
         controller.goal_pose = pose_stamped
         controller.type = Controller.ROTATION_3D
         controller.weight = 1
-        controller.max_speed = 0.5
+        controller.max_speed = 1.0
         controller.p_gain = 3
         self.cmd_seq[-1].controllers.append(controller)
-
 
     def set_joint_goal(self, joint_state):
         """
@@ -80,7 +79,7 @@ class GiskardWrapper(object):
         controller.type = Controller.JOINT
         controller.weight = 1
         controller.p_gain = 10
-        controller.max_speed = 0.3
+        controller.max_speed = 1
         if isinstance(joint_state, dict):
             for joint_name, joint_position in joint_state.items():
                 controller.goal_state.name.append(joint_name)
@@ -99,6 +98,11 @@ class GiskardWrapper(object):
         collision_entry.robot_link = robot_link
         collision_entry.body_b = body_b
         collision_entry.link_b = link_b
+        self.set_collision_entries([collision_entry])
+
+    def allow_all_collisions(self):
+        collision_entry = CollisionEntry()
+        collision_entry.type = CollisionEntry.ALLOW_ALL_COLLISIONS
         self.set_collision_entries([collision_entry])
 
     def add_cmd(self, max_trajectory_length=20):
@@ -217,13 +221,17 @@ class GiskardWrapper(object):
         # TODO implement me
         raise NotImplementedError
 
-
-    def add_urdf(self, name, urdf, js_topic, map_frame, root_frame):
+    def add_urdf(self, name, urdf, js_topic, pose):
         urdf_body = WorldBody()
         urdf_body.name = name
         urdf_body.type = WorldBody.URDF_BODY
         urdf_body.urdf = urdf
         urdf_body.joint_state_topic = js_topic
-        transform = lookup_transform(map_frame, root_frame)
-        req = UpdateWorldRequest(UpdateWorldRequest.ADD, urdf_body, False, transform)
+        req = UpdateWorldRequest(UpdateWorldRequest.ADD, urdf_body, False, pose)
+        self.object_js_topics[name] = rospy.Publisher(js_topic, JointState, queue_size=10)
         return self.update_world.call(req)
+
+    def set_object_joint_state(self, object_name, joint_states):
+        if isinstance(joint_states, dict):
+            joint_states = dict_to_joint_states(joint_states)
+        self.object_js_topics[object_name].publish(joint_states)

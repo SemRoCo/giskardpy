@@ -45,6 +45,14 @@ def to_joint_state_dict(msg):
         mjs[joint_name] = sjs
     return mjs
 
+def dict_to_joint_states(joint_state_dict):
+    js = JointState()
+    for k, v in joint_state_dict.items():
+        js.name.append(k)
+        js.position.append(v)
+        js.velocity.append(0)
+        js.effort.append(0)
+    return js
 
 def to_point_stamped(frame_id, point):
     """

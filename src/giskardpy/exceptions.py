@@ -1,6 +1,9 @@
 class GiskardException(Exception):
     pass
 
+class SymengineException(GiskardException):
+    pass
+
 class NameConflictException(GiskardException):
     pass
 

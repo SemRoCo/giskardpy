@@ -12,6 +12,8 @@ import numpy as np
 from symengine.lib.symengine_wrapper import Lambdify
 from tf.transformations import unit_vector
 
+from giskardpy.exceptions import SymengineException
+
 pathSeparator = '_'
 
 
@@ -106,10 +108,13 @@ class CompiledFunction(object):
         self.shape = shape
 
     def __call__(self, **kwargs):
-        filtered_args = [kwargs[k] for k in self.str_params]
-        out = np.empty(self.l)
-        self.fast_f.unsafe_real(np.array(filtered_args, dtype=np.double), out)
-        return np.nan_to_num(out).reshape(self.shape)
+        try:
+            filtered_args = [kwargs[k] for k in self.str_params]
+            out = np.empty(self.l)
+            self.fast_f.unsafe_real(np.array(filtered_args, dtype=np.double), out)
+            return np.nan_to_num(out).reshape(self.shape)
+        except KeyError as e:
+            raise SymengineException('{}\ntry deleting the last loaded compiler to trigger recompilation'.format(e.message))
 
 
 # @profile

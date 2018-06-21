@@ -116,7 +116,7 @@ class QProblemBuilder(object):
                 safe_compiled_function(self.cython_big_ass_M, self.path_to_functions + function_hash)
             print('autowrap took {}'.format(time() - t))
         else:
-            print('controller loaded {}'.format(function_hash))
+            print('controller loaded {}'.format(self.path_to_functions + function_hash))
         print('controller ready {}s'.format(time() - t_total))
 
     def save_pickle(self, hash, f):

@@ -40,6 +40,7 @@ class ProcessManager(object):
         return self._god_map
 
     def update(self):
+        # TODO doesn't die during planning
         for plugin_name, plugin in self._plugins.items():
             while True:
                 plugin.update()

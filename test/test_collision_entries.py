@@ -64,6 +64,7 @@ class testPythonInterface(unittest.TestCase):
         self.default_root = 'base_link'
         self.r_tip = 'r_gripper_tool_frame'
         self.l_tip = 'l_gripper_tool_frame'
+        self.map = 'map'
         self.simple_base_pose_pub = rospy.Publisher('/move_base_simple/goal', PoseStamped, queue_size=10)
         rospy.sleep(0.5)
         super(testPythonInterface, self).__init__(methodName)
@@ -78,10 +79,17 @@ class testPythonInterface(unittest.TestCase):
         self.giskard.set_collision_entries([collision_entry])
 
         self.set_and_check_js_goal(default_joint_state)
+        self.reset_pr2_base()
         super(testPythonInterface, self).setUpClass()
 
     def move_pr2_base(self, goal_pose):
         self.simple_base_pose_pub.publish(goal_pose)
+
+    def reset_pr2_base(self):
+        p = PoseStamped()
+        p.header.frame_id = self.map
+        p.pose.orientation.w = 1
+        self.move_pr2_base(p)
 
     def set_and_check_js_goal(self, goal_js):
         self.giskard.set_joint_goal(goal_js)
@@ -419,6 +427,16 @@ class testPythonInterface(unittest.TestCase):
     def test_base_link_in_collision(self):
         self.add_box([0.5,0.5,-0.2])
         self.set_and_check_js_goal(gaya_pose)
+
+    def test_attached_collision(self):
+        self.add_box()
+        self.giskard.attach_box('pocky', [0.1, 0.02, 0.02], self.r_tip, [0.05,0,0])
+        p = PoseStamped()
+        p.header.frame_id = self.r_tip
+        p.pose.position.x = -0.1
+        p.pose.orientation.w = 1
+        self.set_and_check_cart_goal(self.default_root, self.r_tip, p)
+
 
 
 if __name__ == '__main__':

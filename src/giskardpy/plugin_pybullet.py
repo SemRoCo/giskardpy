@@ -180,6 +180,7 @@ class PyBulletPlugin(Plugin):
                 collision_goals = []
             allowed_collisions = set()
             distances = defaultdict(lambda: self.default_collision_avoidance_distance)
+            # TODO properly handle multiple collision entries
             for collision_entry in collision_goals:  # type: CollisionEntry
                 if collision_entry.body_b == '' and \
                         collision_entry.type not in [CollisionEntry.ALLOW_ALL_COLLISIONS,

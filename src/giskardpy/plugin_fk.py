@@ -11,8 +11,9 @@ from giskardpy.utils import keydefaultdict
 
 
 class FKPlugin(Plugin):
-    def __init__(self, fk_identifier, js_identifier):
+    def __init__(self, fk_identifier, js_identifier, robot_description_identifier):
         self._joint_states_identifier = js_identifier
+        self.robot_description_identifier=robot_description_identifier
         self.fk_identifier = fk_identifier
         self.fk = None
         super(FKPlugin, self).__init__()
@@ -35,6 +36,7 @@ class FKPlugin(Plugin):
 
     def start_once(self):
         urdf = rospy.get_param('robot_description')
+        urdf = self.god_map.get_data()
         self.robot = Robot(urdf)
         joint_names = self.robot.get_joint_names()
         current_joints = JointStatesInput.prefix_constructor(self.god_map.get_expr,
@@ -52,6 +54,7 @@ class FKPlugin(Plugin):
             return sw.speed_up(fk, free_symbols, backend=BACKEND)
 
         self.fk = keydefaultdict(on_demand_fk)
+
 
     def stop(self):
         pass

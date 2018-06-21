@@ -11,7 +11,7 @@ from giskardpy.plugin_fk import FKPlugin
 from giskardpy.plugin_interactive_marker import InteractiveMarkerPlugin
 from giskardpy.plugin_joint_state import JointStatePlugin
 from giskardpy.plugin_pybullet import PyBulletPlugin
-from giskardpy.plugin_set_controlled_joints import SetControlledJointsPlugin
+from giskardpy.plugin_set_controlled_joints import SetControlledJointsPlugin, UploadRobotDescriptionPlugin
 from giskardpy.process_manager import ProcessManager
 
 if __name__ == '__main__':
@@ -51,6 +51,7 @@ if __name__ == '__main__':
     closest_point_identifier = 'cpi'
     collision_goal_identifier = 'collision_goal'
     controllable_links_identifier = 'controllable_links'
+    robot_description_identifier = 'robot_description'
 
 
     pm = ProcessManager()
@@ -61,6 +62,8 @@ if __name__ == '__main__':
                                         sample_period=sample_period))
     pm.register_plugin('controlled joints',
                        SetControlledJointsPlugin(controlled_joints_identifier=controlled_joints_identifier))
+    pm.register_plugin('upload robot description',
+                       UploadRobotDescriptionPlugin(robot_description_identifier=robot_description_identifier))
     pm.register_plugin('action server',
                        ActionServerPlugin(js_identifier=js_identifier,
                                           trajectory_identifier=trajectory_identifier,
@@ -86,7 +89,9 @@ if __name__ == '__main__':
                                       marker=marker,
                                       default_collision_avoidance_distance=default_collision_avoidance_distance,
                                       enable_self_collision=enable_self_collision))
-    pm.register_plugin('fk', FKPlugin(js_identifier=js_identifier, fk_identifier=fk_identifier))
+    pm.register_plugin('fk', FKPlugin(js_identifier=js_identifier,
+                                      fk_identifier=fk_identifier,
+                                      robot_description_identifier=robot_description_identifier))
     pm.register_plugin('cart bullet controller',
                        CartesianBulletControllerPlugin(root_link=root_link,
                                                        fk_identifier=fk_identifier,

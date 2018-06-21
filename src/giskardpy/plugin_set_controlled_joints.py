@@ -15,8 +15,22 @@ class SetControlledJointsPlugin(Plugin):
         self.controlled_joints = msg.joint_names
         self.god_map.set_data([self.controlled_joints_identifier], self.controlled_joints)
 
-    # def update(self):
-
     def copy(self):
         c = self.__class__(self.controlled_joints_identifier)
+        return c
+
+
+class UploadRobotDescriptionPlugin(Plugin):
+    def __init__(self, robot_description_identifier, param_name='robot_description'):
+        self.urdf = ''
+        self.param_name = param_name
+        self.robot_description_identifier = robot_description_identifier
+        super(UploadRobotDescriptionPlugin, self).__init__()
+
+    def start_always(self):
+        self.urdf = rospy.get_param(self.param_name)
+        self.god_map.set_data([self.robot_description_identifier], self.urdf)
+
+    def copy(self):
+        c = self.__class__(self.robot_description_identifier, self.param_name)
         return c

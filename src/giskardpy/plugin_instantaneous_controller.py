@@ -2,10 +2,11 @@ from collections import OrderedDict
 import rospy
 from giskard_msgs.msg import Controller
 
-from giskardpy.input_system import JointStatesInput, FrameInput, Point3Input, Vector3Input, ShortestAngularDistanceInput
+from giskardpy.input_system import JointStatesInput, FrameInput, Point3Input, Vector3Input, \
+    ShortestAngularDistanceInput, SlerpInput
 from giskardpy.plugin import Plugin
 from giskardpy.symengine_controller import SymEngineController, position_conv, rotation_conv, \
-    link_to_link_avoidance, joint_position, continuous_joint_position
+    link_to_link_avoidance, joint_position, continuous_joint_position, rotation_conv_slerp, rotation_conv_slerp2
 import symengine_wrappers as sw
 
 
@@ -13,7 +14,7 @@ class CartesianBulletControllerPlugin(Plugin):
     def __init__(self, root_link, js_identifier, fk_identifier, goal_identifier, next_cmd_identifier,
                  collision_identifier, closest_point_identifier, controlled_joints_identifier,
                  controllable_links_identifier,
-                 collision_goal_identifier, path_to_functions, nWSR, default_joint_vel_limit):
+                 collision_goal_identifier, pyfunction_identifier, path_to_functions, nWSR, default_joint_vel_limit):
         """
         :param roots:
         :type roots: list
@@ -28,7 +29,7 @@ class CartesianBulletControllerPlugin(Plugin):
         """
         self.collision_goal_identifier = collision_goal_identifier
         self.controlled_joints_identifier = controlled_joints_identifier
-        self._pyfunctions_identifier = 'pyfunctions'
+        self._pyfunctions_identifier = pyfunction_identifier
         self._fk_identifier = fk_identifier
         self._collision_identifier = collision_identifier
         self._closest_point_identifier = closest_point_identifier
@@ -53,7 +54,8 @@ class CartesianBulletControllerPlugin(Plugin):
                             self._goal_identifier, self._next_cmd_identifier, self._collision_identifier,
                             self._closest_point_identifier, self.controlled_joints_identifier,
                             self.controllable_links_identifier,
-                            self.collision_goal_identifier, self.path_to_functions, self.nWSR,
+                            self.collision_goal_identifier, self._pyfunctions_identifier,
+                            self.path_to_functions, self.nWSR,
                             self.default_joint_vel_limit)
         cp._controller = self._controller
         cp.soft_constraints = self.soft_constraints
@@ -217,18 +219,23 @@ class CartesianBulletControllerPlugin(Plugin):
         """
         robot = self._controller.robot
 
-        trans_prefix = '{}/{}/{},{}/goal_pose/pose/position'.format(self._goal_identifier, Controller.TRANSLATION_3D,
-                                                                    root, tip)
-        rot_prefix = '{}/{}/{},{}/goal_pose/pose/orientation'.format(self._goal_identifier, Controller.ROTATION_3D,
-                                                                     root, tip)
-        goal_input = FrameInput.prefix_constructor(trans_prefix, rot_prefix, self.god_map.get_expr)
+        goal_trans_prefix = [self._goal_identifier, str(Controller.TRANSLATION_3D), '{},{}'.format(root, tip),
+                             'goal_pose', 'pose', 'position']
+        goal_rot_prefix = [self._goal_identifier, str(Controller.ROTATION_3D), '{},{}'.format(root, tip), 'goal_pose',
+                           'pose', 'orientation']
+        goal_input = FrameInput.prefix_constructor(goal_trans_prefix, goal_rot_prefix, self.god_map.get_expr)
 
-        trans_prefix = '{}/{},{}/pose/position'.format(self._fk_identifier, root, tip)
-        rot_prefix = '{}/{},{}/pose/orientation'.format(self._fk_identifier, root, tip)
-        current_input = FrameInput.prefix_constructor(trans_prefix, rot_prefix, self.god_map.get_expr)
-        weight = self.god_map.get_expr([self._goal_identifier, str(type), ','.join([root, tip]), 'weight'])
-        p_gain = self.god_map.get_expr([self._goal_identifier, str(type), ','.join([root, tip]), 'p_gain'])
-        max_speed = self.god_map.get_expr([self._goal_identifier, str(type), ','.join([root, tip]), 'max_speed'])
+        current_trans_prefix = [self._fk_identifier, '{},{}'.format(root, tip), 'pose', 'position']
+        current_rot_prefix = [self._fk_identifier, '{},{}'.format(root, tip), 'pose', 'orientation']
+        current_input = FrameInput.prefix_constructor(current_trans_prefix, current_rot_prefix, self.god_map.get_expr)
+        weight_key = [self._goal_identifier, str(type), ','.join([root, tip]), 'weight']
+        weight = self.god_map.get_expr(weight_key)
+        p_gain_key = [self._goal_identifier, str(type), ','.join([root, tip]), 'p_gain']
+        p_gain = self.god_map.get_expr(p_gain_key)
+        max_speed_key = [self._goal_identifier, str(type), ','.join([root, tip]), 'max_speed']
+        max_speed = self.god_map.get_expr(max_speed_key)
+
+        pyfunctions = self.god_map.get_data([self._pyfunctions_identifier])
 
         if type == Controller.TRANSLATION_3D:
             return position_conv(goal_input.get_position(),

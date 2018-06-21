@@ -29,7 +29,7 @@ class ActionServerPlugin(Plugin):
     # TODO find a better name than ActionServerPlugin
     def __init__(self, cartesian_goal_identifier, js_identifier, trajectory_identifier, time_identifier,
                  closest_point_identifier, controlled_joints_identifier, collision_goal_identifier,
-                 joint_convergence_threshold, wiggle_precision_threshold, fill_velocity_values,
+                 pyfunction_identifier, joint_convergence_threshold, wiggle_precision_threshold, fill_velocity_values,
                  plot_trajectory=False):
         self.fill_velocity_values = fill_velocity_values
         self.plot_trajectory = plot_trajectory
@@ -42,6 +42,7 @@ class ActionServerPlugin(Plugin):
         self.collision_goal_identifier = collision_goal_identifier
         self.joint_convergence_threshold = joint_convergence_threshold
         self.wiggle_precision_threshold = wiggle_precision_threshold
+        self.pyfunction_identifier = pyfunction_identifier
 
         self.joint_goal = None
         self.start_js = None
@@ -135,6 +136,7 @@ class ActionServerPlugin(Plugin):
                     result.trajectory.points.append(p)
             else:
                 result.error_code = MoveResult.END_STATE_COLLISION
+        self.god_map.set_data([self.pyfunction_identifier], god_map.get_data([self.pyfunction_identifier]))
         self.update_lock.put(result)
         self.update_lock.join()
 
@@ -365,39 +367,39 @@ def plot_trajectory(tj, controlled_joints):
 
     plt.savefig('trajectory.pdf')
 
-def plot_trajectory2(tj):
-    """
-    :param tj:
-    :type tj: Trajectory
-    """
-    colors = ['b', 'g', 'r', 'c', 'm', 'y', 'k']
-    line_styles = ['', '--', '-.']
-    fmts = [''.join(x) for x in product(line_styles, colors)]
-    positions = []
-    velocities = []
-    time = []
-    names = tj.joint_names
-    for point in tj.points:
-        positions.append(point.positions)
-        velocities.append(point.velocities)
-        time.append(point.time_from_start)
-    positions = np.array(positions)
-    velocities = np.array(velocities).T
-    time = np.array([x.to_sec() for x in time])
-
-    f, (ax1, ax2) = plt.subplots(2, sharex=True)
-    ax1.set_title('position')
-    ax2.set_title('velocity')
-    positions -= positions.mean(axis=0)
-    for i, position in enumerate(positions.T):
-        ax1.plot(time, position, fmts[i], label=names[i])
-        ax2.plot(time, velocities[i], fmts[i])
-    box = ax1.get_position()
-    ax1.set_position([box.x0, box.y0, box.width * 0.6, box.height])
-    box = ax2.get_position()
-    ax2.set_position([box.x0, box.y0, box.width * 0.6, box.height])
-
-    # Put a legend to the right of the current axis
-    ax1.legend(loc='center', bbox_to_anchor=(1.45, 0))
-
-    plt.show()
+# def plot_trajectory2(tj):
+#     """
+#     :param tj:
+#     :type tj: Trajectory
+#     """
+#     colors = ['b', 'g', 'r', 'c', 'm', 'y', 'k']
+#     line_styles = ['', '--', '-.']
+#     fmts = [''.join(x) for x in product(line_styles, colors)]
+#     positions = []
+#     velocities = []
+#     time = []
+#     names = tj.joint_names
+#     for point in tj.points:
+#         positions.append(point.positions)
+#         velocities.append(point.velocities)
+#         time.append(point.time_from_start)
+#     positions = np.array(positions)
+#     velocities = np.array(velocities).T
+#     time = np.array([x.to_sec() for x in time])
+#
+#     f, (ax1, ax2) = plt.subplots(2, sharex=True)
+#     ax1.set_title('position')
+#     ax2.set_title('velocity')
+#     positions -= positions.mean(axis=0)
+#     for i, position in enumerate(positions.T):
+#         ax1.plot(time, position, fmts[i], label=names[i])
+#         ax2.plot(time, velocities[i], fmts[i])
+#     box = ax1.get_position()
+#     ax1.set_position([box.x0, box.y0, box.width * 0.6, box.height])
+#     box = ax2.get_position()
+#     ax2.set_position([box.x0, box.y0, box.width * 0.6, box.height])
+#
+#     # Put a legend to the right of the current axis
+#     ax1.legend(loc='center', bbox_to_anchor=(1.45, 0))
+#
+#     plt.show()

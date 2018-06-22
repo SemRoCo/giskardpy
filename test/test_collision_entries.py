@@ -429,6 +429,42 @@ class testPythonInterface(unittest.TestCase):
         self.add_box([0.5,0.5,-0.2])
         self.set_and_check_js_goal(gaya_pose)
 
+    def test_allow_collision2(self):
+        self.add_box()
+        ces = []
+        ce = CollisionEntry()
+        ce.type = CollisionEntry.ALLOW_COLLISION
+        ce.robot_link = 'l_gripper_l_finger_tip_link'
+        ce.body_b = 'box'
+        ces.append(ce)
+        ce = CollisionEntry()
+        ce.type = CollisionEntry.ALLOW_COLLISION
+        ce.robot_link = 'l_gripper_r_finger_tip_link'
+        ce.body_b = 'box'
+        ces.append(ce)
+        ce = CollisionEntry()
+        ce.type = CollisionEntry.ALLOW_COLLISION
+        ce.robot_link = 'l_gripper_l_finger_link'
+        ce.body_b = 'box'
+        ces.append(ce)
+        ce = CollisionEntry()
+        ce.type = CollisionEntry.ALLOW_COLLISION
+        ce.robot_link = 'l_gripper_r_finger_link'
+        ce.body_b = 'box'
+        ces.append(ce)
+        ce = CollisionEntry()
+        ce.type = CollisionEntry.ALLOW_COLLISION
+        ce.robot_link = 'l_gripper_palm_link'
+        ce.body_b = 'box'
+        ces.append(ce)
+        self.giskard.set_collision_entries(ces)
+        p = PoseStamped()
+        p.header.frame_id = self.l_tip
+        p.pose.position.x = 0.11
+        p.pose.orientation.w = 1
+        self.set_and_check_cart_goal(self.default_root, self.l_tip, p)
+
+
     def test_attached_collision(self):
         self.add_box()
         self.giskard.attach_box('pocky', [0.1, 0.02, 0.02], self.r_tip, [0.05,0,0])

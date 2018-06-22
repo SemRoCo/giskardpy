@@ -73,8 +73,8 @@ class ActionServerPlugin(Plugin):
             goals[str(Controller.TRANSLATION_3D)] = {}
             goals[str(Controller.ROTATION_3D)] = {}
             # goals['max_trajectory_length'] = cmd.max_trajectory_length
+            self.new_universe = True
             for controller in cmd.controllers:
-                self.new_universe = True
                 goal_key = str(controller.type)
                 if controller.type == Controller.JOINT:
                     # TODO check for unknown joint names
@@ -153,70 +153,73 @@ class ActionServerPlugin(Plugin):
         :param goal:
         :type goal: MoveGoal
         """
-        # TODO check for undefined goal.type
         rospy.loginfo('received goal')
         self.execute = goal.type == MoveGoal.PLAN_AND_EXECUTE
-        # TODO do we really want to check for start state collision?
-        if True or not self.closest_point_constraint_violated(self.god_map):
-            result = None
-            for i, move_cmd in enumerate(goal.cmd_seq):
-                # TODO handle empty controller case
-                self.get_readings_lock.put(move_cmd)
-                intermediate_result = self.update_lock.get()  # type: MoveResult
-                if intermediate_result.error_code != MoveResult.SUCCESS:
-                    result = intermediate_result
-                    break
-                if result is None:
-                    result = intermediate_result
-                else:
-                    step_size = result.trajectory.points[1].time_from_start - \
-                                result.trajectory.points[0].time_from_start
-                    end_of_last_point = result.trajectory.points[-1].time_from_start + step_size
-                    for point in intermediate_result.trajectory.points:  # type: JointTrajectoryPoint
-                        point.time_from_start += end_of_last_point
-                        result.trajectory.points.append(point)
-                if i < len(goal.cmd_seq) - 1:
-                    self.update_lock.task_done()
-            else:  # if not break
-                rospy.loginfo('solution ready')
-                feedback = MoveFeedback()
-                feedback.phase = MoveFeedback.EXECUTION
-                if result.error_code == MoveResult.SUCCESS and self.execute:
-                    goal = FollowJointTrajectoryGoal()
-                    goal.trajectory = result.trajectory
-                    if self._as.is_preempt_requested():
-                        rospy.loginfo('new goal, cancel old one')
-                        self._ac.cancel_all_goals()
-                        result.error_code = MoveResult.INTERRUPTED
-                    else:
-                        self._ac.send_goal(goal)
-                        t = rospy.get_rostime()
-                        expected_duration = goal.trajectory.points[-1].time_from_start.to_sec()
-                        rospy.loginfo('waiting for {:.3f} sec with {} points'.format(expected_duration,
-                                                                                     len(goal.trajectory.points)))
-
-                        while not self._ac.wait_for_result(rospy.Duration(.1)):
-                            time_passed = (rospy.get_rostime() - t).to_sec()
-                            feedback.progress = min(time_passed / expected_duration, 1)
-                            self._as.publish_feedback(feedback)
-                            if self._as.is_preempt_requested():
-                                rospy.loginfo('new goal, cancel old one')
-                                self._ac.cancel_all_goals()
-                                result.error_code = MoveResult.INTERRUPTED
-                                break
-                            if time_passed > expected_duration + 0.1: # TODO new error code
-                                rospy.loginfo('controller took too long to execute trajectory')
-                                self._ac.cancel_all_goals()
-                                result.error_code = MoveResult.INTERRUPTED
-                                break
-                        else:  # if not break
-                            print('shit took {:.3f}s'.format((rospy.get_rostime() - t).to_sec()))
-                            r = self._ac.get_result()
-                            if r.error_code == FollowJointTrajectoryResult.SUCCESSFUL:
-                                result.error_code = MoveResult.SUCCESS
-        else:
+        if goal.type == MoveGoal.UNDEFINED:
             result = MoveResult()
-            result.error_code = MoveResult.START_STATE_COLLISION
+            result.error_code = MoveResult.INSOLVABLE
+        else:
+            # TODO do we really want to check for start state collision?
+            if True or not self.closest_point_constraint_violated(self.god_map):
+                result = None
+                for i, move_cmd in enumerate(goal.cmd_seq):
+                    # TODO handle empty controller case
+                    self.get_readings_lock.put(move_cmd)
+                    intermediate_result = self.update_lock.get()  # type: MoveResult
+                    if intermediate_result.error_code != MoveResult.SUCCESS:
+                        result = intermediate_result
+                        break
+                    if result is None:
+                        result = intermediate_result
+                    else:
+                        step_size = result.trajectory.points[1].time_from_start - \
+                                    result.trajectory.points[0].time_from_start
+                        end_of_last_point = result.trajectory.points[-1].time_from_start + step_size
+                        for point in intermediate_result.trajectory.points:  # type: JointTrajectoryPoint
+                            point.time_from_start += end_of_last_point
+                            result.trajectory.points.append(point)
+                    if i < len(goal.cmd_seq) - 1:
+                        self.update_lock.task_done()
+                else:  # if not break
+                    rospy.loginfo('solution ready')
+                    feedback = MoveFeedback()
+                    feedback.phase = MoveFeedback.EXECUTION
+                    if result.error_code == MoveResult.SUCCESS and self.execute:
+                        goal = FollowJointTrajectoryGoal()
+                        goal.trajectory = result.trajectory
+                        if self._as.is_preempt_requested():
+                            rospy.loginfo('new goal, cancel old one')
+                            self._ac.cancel_all_goals()
+                            result.error_code = MoveResult.INTERRUPTED
+                        else:
+                            self._ac.send_goal(goal)
+                            t = rospy.get_rostime()
+                            expected_duration = goal.trajectory.points[-1].time_from_start.to_sec()
+                            rospy.loginfo('waiting for {:.3f} sec with {} points'.format(expected_duration,
+                                                                                         len(goal.trajectory.points)))
+
+                            while not self._ac.wait_for_result(rospy.Duration(.1)):
+                                time_passed = (rospy.get_rostime() - t).to_sec()
+                                feedback.progress = min(time_passed / expected_duration, 1)
+                                self._as.publish_feedback(feedback)
+                                if self._as.is_preempt_requested():
+                                    rospy.loginfo('new goal, cancel old one')
+                                    self._ac.cancel_all_goals()
+                                    result.error_code = MoveResult.INTERRUPTED
+                                    break
+                                if time_passed > expected_duration + 0.1: # TODO new error code
+                                    rospy.loginfo('controller took too long to execute trajectory')
+                                    self._ac.cancel_all_goals()
+                                    result.error_code = MoveResult.INTERRUPTED
+                                    break
+                            else:  # if not break
+                                print('shit took {:.3f}s'.format((rospy.get_rostime() - t).to_sec()))
+                                r = self._ac.get_result()
+                                if r.error_code == FollowJointTrajectoryResult.SUCCESSFUL:
+                                    result.error_code = MoveResult.SUCCESS
+            else:
+                result = MoveResult()
+                result.error_code = MoveResult.START_STATE_COLLISION
         self.start_js = None
         if result.error_code != MoveResult.SUCCESS:
             self._as.set_aborted(result)

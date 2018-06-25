@@ -356,6 +356,7 @@ class PyBulletRobot(object):
         link_pairs = {(object_id, link_id) for link_id in self.joint_id_to_info.keys()}
         new_collisions = self.calc_self_collision_matrix(link_pairs)
         self.sometimes.union(new_collisions)
+        print('object {} attached to {} in pybullet world'.format(object.name, self.name))
 
     def get_urdf(self):
         # for each attached object, insert the corresponding URDF sub-string into the original URDF string
@@ -407,6 +408,7 @@ class PyBulletRobot(object):
         self.sometimes = set()
         for collision in collision_matrix:
             self.sometimes.add((self.link_name_to_id[collision[0]], self.link_name_to_id[collision[1]]))
+        print('object {} detachted from {} in pybullet world'.format(object_name, self.name))
 
     def detach_all_objects(self):
         """
@@ -578,6 +580,7 @@ class PyBulletWorld(object):
         :return: Nothing.
         """
         self.spawn_object_from_urdf(object.name, to_urdf_string(object), base_pose)
+        print('object {} added to pybullet world'.format(object.name))
 
     def get_object_list(self):
         return list(self._objects.keys())
@@ -594,6 +597,7 @@ class PyBulletWorld(object):
         p.removeBody(self._objects[object_name].id)
         self.activate_rendering()
         del (self._objects[object_name])
+        print('object {} deleted from pybullet world'.format(object_name))
 
     def delete_all_objects(self, remaining_objects=['plane']):
         """

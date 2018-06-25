@@ -105,7 +105,7 @@ class PyBulletPlugin(Plugin):
                     # Check that no object with this name already exists.
                     if self.world.has_object(req.body.name) or self.world.get_robot().has_attached_object(
                             req.body.name):
-                        DuplicateObjectNameException('Cannot spawn object "{}" because an object with such a '
+                        raise DuplicateObjectNameException('Cannot spawn object "{}" because an object with such a '
                                                      'name already exists'.format(req.body.name))
 
                     # CASE: Spawn rigidly attached object

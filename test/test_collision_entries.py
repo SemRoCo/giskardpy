@@ -120,8 +120,8 @@ class testPythonInterface(unittest.TestCase):
         self.assertAlmostEqual(goal_in_base.pose.orientation.z, current_pose.pose.orientation.z, 1)
         self.assertAlmostEqual(goal_in_base.pose.orientation.w, current_pose.pose.orientation.w, 1)
 
-    def add_box(self, position=(1.2, 0, 0.5)):
-        r = self.giskard.add_box(name='box', position=position)
+    def add_box(self, name='box', position=(1.2, 0, 0.5)):
+        r = self.giskard.add_box(name=name, position=position)
         self.assertEqual(r.error_codes, UpdateWorldResponse.SUCCESS)
 
     def add_kitchen(self):
@@ -466,7 +466,7 @@ class testPythonInterface(unittest.TestCase):
         self.set_and_check_cart_goal(self.default_root, self.l_tip, p)
 
 
-    def test_attached_collision(self):
+    def test_attached_collision1(self):
         self.add_box()
         r = self.giskard.attach_box('pocky', [0.1, 0.02, 0.02], self.r_tip, [0.05,0,0])
         self.assertEqual(r.error_codes, UpdateWorldResponse.SUCCESS)
@@ -479,6 +479,46 @@ class testPythonInterface(unittest.TestCase):
         p.pose.orientation.w = 1
         self.set_and_check_cart_goal(self.default_root, self.r_tip, p)
         r = self.giskard.remove_object('pocky')
+        self.assertEqual(r.error_codes, UpdateWorldResponse.SUCCESS)
+
+    def test_attached_collision2(self):
+        pocky = 'http://muh#pocky'
+        self.add_box()
+        self.add_box(pocky, position=[1.2,0,1.6])
+        r = self.giskard.attach_box(pocky, [0.1, 0.02, 0.02], self.r_tip, [0.05,0,0])
+        self.assertEqual(r.error_codes, UpdateWorldResponse.DUPLICATE_BODY_ERROR)
+        r = self.giskard.remove_object(pocky)
+        self.assertEqual(r.error_codes, UpdateWorldResponse.SUCCESS)
+        r = self.giskard.attach_box(pocky, [0.1, 0.02, 0.02], self.r_tip, [0.05,0,0])
+        self.assertEqual(r.error_codes, UpdateWorldResponse.SUCCESS)
+        p = PoseStamped()
+        p.header.frame_id = self.r_tip
+        p.pose.position.x = -0.11
+        p.pose.orientation.w = 1
+        self.set_and_check_cart_goal(self.default_root, self.r_tip, p)
+        r = self.giskard.remove_object(pocky)
+        self.assertEqual(r.error_codes, UpdateWorldResponse.SUCCESS)
+
+    def test_attached_collision3(self):
+        pocky = 'http://muh#pocky'
+        self.add_box()
+        r = self.giskard.attach_box(pocky, [0.1, 0.02, 0.02], self.r_tip, [0.05,0,0])
+        self.assertEqual(r.error_codes, UpdateWorldResponse.SUCCESS)
+
+        ces = []
+        ce = CollisionEntry()
+        ce.type = CollisionEntry.ALLOW_COLLISION
+        ce.robot_link = 'pocky'
+        ce.body_b = 'box'
+        ces.append(ce)
+        self.giskard.set_collision_entries(ces)
+
+        p = PoseStamped()
+        p.header.frame_id = self.r_tip
+        p.pose.position.x = -0.11
+        p.pose.orientation.w = 1
+        self.set_and_check_cart_goal(self.default_root, self.r_tip, p)
+        r = self.giskard.remove_object(pocky)
         self.assertEqual(r.error_codes, UpdateWorldResponse.SUCCESS)
 
 

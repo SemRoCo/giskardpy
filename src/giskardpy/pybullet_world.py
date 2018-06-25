@@ -318,7 +318,7 @@ class PyBulletRobot(object):
         """
         if self.has_attached_object(object.name):
             # TODO: choose better exception type
-            raise RuntimeError("An object '{}' has already been attached to the robot.".format(object.name))
+            raise DuplicateObjectNameException("An object '{}' has already been attached to the robot.".format(object.name))
 
         # salvage last joint state and base pose
         joint_state = self.get_joint_states()

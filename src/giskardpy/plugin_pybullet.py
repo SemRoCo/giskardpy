@@ -161,6 +161,8 @@ class PyBulletPlugin(Plugin):
                 return UpdateWorldResponse(UpdateWorldResponse.DUPLICATE_BODY_ERROR, e.message)
             except UnsupportedOptionException as e:
                 return UpdateWorldResponse(UpdateWorldResponse.UNSUPPORTED_OPTIONS, e.message)
+            except Exception as e:
+                return UpdateWorldResponse(UpdateWorldResponse.UNSUPPORTED_OPTIONS, e.message)
 
     def update(self):
         with self.lock:

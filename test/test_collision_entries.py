@@ -8,7 +8,7 @@ from actionlib import SimpleActionClient
 from angles import normalize_angle
 from geometry_msgs.msg import PoseStamped, Point, Quaternion
 from giskard_msgs.msg import MoveAction, MoveGoal, MoveCmd, Controller, CollisionEntry, MoveResult
-from giskard_msgs.srv import UpdateWorld
+from giskard_msgs.srv import UpdateWorld, UpdateWorldResponse
 from sensor_msgs.msg import JointState
 
 from giskardpy.python_interface import GiskardWrapper
@@ -121,7 +121,8 @@ class testPythonInterface(unittest.TestCase):
         self.assertAlmostEqual(goal_in_base.pose.orientation.w, current_pose.pose.orientation.w, 1)
 
     def add_box(self, position=(1.2, 0, 0.5)):
-        self.giskard.add_box(name='box', position=position)
+        r = self.giskard.add_box(name='box', position=position)
+        self.assertEqual(r.error_codes, UpdateWorldResponse.SUCCESS)
 
     def add_kitchen(self):
         p = lookup_transform('world', 'map')
@@ -467,14 +468,18 @@ class testPythonInterface(unittest.TestCase):
 
     def test_attached_collision(self):
         self.add_box()
-        self.giskard.attach_box('pocky', [0.1, 0.02, 0.02], self.r_tip, [0.05,0,0])
+        r = self.giskard.attach_box('pocky', [0.1, 0.02, 0.02], self.r_tip, [0.05,0,0])
+        self.assertEqual(r.error_codes, UpdateWorldResponse.SUCCESS)
+        r = self.giskard.attach_box('pocky', [0.1, 0.02, 0.02], self.r_tip, [0.05,0,0])
+        self.assertEqual(r.error_codes, UpdateWorldResponse.DUPLICATE_BODY_ERROR)
         # self.giskard.attach_box('pocky2', [0.1, 0.02, 0.02], self.l_tip, [0.05,0,0])
         p = PoseStamped()
         p.header.frame_id = self.r_tip
         p.pose.position.x = -0.11
         p.pose.orientation.w = 1
         self.set_and_check_cart_goal(self.default_root, self.r_tip, p)
-        self.giskard.remove_object('pocky')
+        r = self.giskard.remove_object('pocky')
+        self.assertEqual(r.error_codes, UpdateWorldResponse.SUCCESS)
 
 
 

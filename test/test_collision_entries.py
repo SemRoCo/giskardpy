@@ -7,7 +7,7 @@ import rospy
 from actionlib import SimpleActionClient
 from angles import normalize_angle
 from geometry_msgs.msg import PoseStamped, Point, Quaternion
-from giskard_msgs.msg import MoveAction, MoveGoal, MoveCmd, Controller, CollisionEntry, MoveResult
+from giskard_msgs.msg import MoveAction, MoveGoal, MoveCmd, Controller, CollisionEntry, MoveResult, MoveActionResult
 from giskard_msgs.srv import UpdateWorld, UpdateWorldResponse
 from sensor_msgs.msg import JointState
 
@@ -560,6 +560,21 @@ class testPythonInterface(unittest.TestCase):
         r = self.giskard.remove_object(pocky)
         self.assertEqual(r.error_codes, UpdateWorldResponse.SUCCESS)
 
+
+    def test_collision_during_planning1(self):
+        self.add_box()
+        p = PoseStamped()
+        p.header.frame_id = self.r_tip
+        p.pose.position = Point(0.1, 0, 0)
+        p.pose.orientation = Quaternion(0, 0, 0, 1)
+
+        collision_entry = CollisionEntry()
+        collision_entry.type = CollisionEntry.AVOID_ALL_COLLISIONS
+        collision_entry.min_dist = 0.5
+        self.giskard.set_collision_entries([collision_entry])
+        self.giskard.set_cart_goal(self.default_root, self.r_tip, p)
+        r = self.giskard.plan_and_execute()
+        self.assertEqual(r.error_code, MoveResult.PATH_COLLISION)
 
 
 if __name__ == '__main__':

@@ -10,7 +10,7 @@ class NameConflictException(GiskardException):
 class StartStateCollisionException(GiskardException):
     pass
 
-class IntersectingCollisionException(GiskardException):
+class PathCollisionException(GiskardException):
     pass
 
 class InsolvableException(GiskardException):

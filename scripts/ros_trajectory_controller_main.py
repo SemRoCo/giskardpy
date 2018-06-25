@@ -36,6 +36,7 @@ if __name__ == '__main__':
     if nWSR == 'None':
         nWSR = None
     path_to_data_folder = rospy.get_param('~path_to_data_folder')
+    collision_time_threshold = rospy.get_param('~collision_time_threshold')
     # path_to_data_folder = '/home/ichumuh/giskardpy_ws/src/giskardpy/data/pr2'
     if not path_to_data_folder.endswith('/'):
         path_to_data_folder += '/'
@@ -77,7 +78,8 @@ if __name__ == '__main__':
                                           wiggle_precision_threshold=wiggle_precision_threshold,
                                           pyfunction_identifier=pyfunction_identifier,
                                           plot_trajectory=False,
-                                          fill_velocity_values=fill_velocity_values))
+                                          fill_velocity_values=fill_velocity_values,
+                                          collision_time_threshold=collision_time_threshold))
     pm.register_plugin('bullet',
                        PyBulletPlugin(js_identifier=js_identifier,
                                       collision_identifier=collision_identifier,

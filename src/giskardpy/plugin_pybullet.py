@@ -15,7 +15,7 @@ from giskard_msgs.srv import UpdateWorld, UpdateWorldResponse, UpdateWorldReques
 from visualization_msgs.msg import Marker, MarkerArray
 
 from giskardpy.exceptions import CorruptShapeException, UnknownBodyException, DuplicateObjectNameException, \
-    IntersectingCollisionException, UnsupportedOptionException
+    PathCollisionException, UnsupportedOptionException
 from giskardpy.object import WorldObject, to_urdf_string, VisualProperty, BoxShape, CollisionProperty, to_marker, \
     MeshShape, from_msg, from_pose_msg
 from giskardpy.plugin import Plugin

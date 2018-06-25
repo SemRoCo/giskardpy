@@ -37,7 +37,7 @@ class ActionServerPlugin(Plugin):
     def __init__(self, cartesian_goal_identifier, js_identifier, trajectory_identifier, time_identifier,
                  closest_point_identifier, controlled_joints_identifier, collision_goal_identifier,
                  pyfunction_identifier, joint_convergence_threshold, wiggle_precision_threshold, fill_velocity_values,
-                 collision_time_threshold,
+                 collision_time_threshold, max_traj_length,
                  plot_trajectory=False):
         self.fill_velocity_values = fill_velocity_values
         self.plot_trajectory = plot_trajectory
@@ -52,6 +52,7 @@ class ActionServerPlugin(Plugin):
         self.wiggle_precision_threshold = wiggle_precision_threshold
         self.pyfunction_identifier = pyfunction_identifier
         self.collision_time_threshold = collision_time_threshold
+        self.max_traj_length = max_traj_length
 
         self.joint_goal = None
         self.start_js = None
@@ -281,7 +282,8 @@ class ActionServerPlugin(Plugin):
                                          joint_convergence_threshold=self.joint_convergence_threshold,
                                          wiggle_precision_threshold=self.wiggle_precision_threshold,
                                          is_preempted=lambda: self._as.is_preempt_requested(),
-                                         collision_time_threshold=self.collision_time_threshold)
+                                         collision_time_threshold=self.collision_time_threshold,
+                                         max_traj_length=self.max_traj_length)
         return self.child
 
     def __del__(self):
@@ -293,7 +295,7 @@ class LogTrajectoryPlugin(Plugin):
     def __init__(self, trajectory_identifier, joint_state_identifier, time_identifier, goal_identifier,
                  closest_point_identifier,
                  controlled_joints_identifier, joint_convergence_threshold, wiggle_precision_threshold,
-                 collision_time_threshold,
+                 collision_time_threshold, max_traj_length,
                  plot_trajectory=False, is_preempted=lambda: False, ):
         self.plot = plot_trajectory
         self.closest_point_identifier = closest_point_identifier
@@ -304,7 +306,7 @@ class LogTrajectoryPlugin(Plugin):
         self.time_identifier = time_identifier
         self.is_preempted = is_preempted
         self.precision = joint_convergence_threshold
-        self.max_traj_length = 200
+        self.max_traj_length = max_traj_length
         self.collision_time_threshold = collision_time_threshold
         self.wiggle_precision = wiggle_precision_threshold
         super(LogTrajectoryPlugin, self).__init__()
@@ -328,6 +330,9 @@ class LogTrajectoryPlugin(Plugin):
             self.stop_universe = True
             return
         if time >= 1:
+            if time > self.max_traj_length:
+                self.stop_universe = True
+                raise SolverTimeoutError('didn\'t a solution after {} s'.format(self.max_traj_length))
             if np.abs([v.velocity for v in current_js.values()]).max() < self.precision or \
                     (self.plot and time > self.max_traj_length):
                 print('done')

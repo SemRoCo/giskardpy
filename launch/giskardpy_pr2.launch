@@ -7,7 +7,8 @@
     <param name="enable_gui" value="$(arg gui)"/>
     <rosparam param="map_frame">map</rosparam>
     <rosparam param="joint_convergence_threshold">0.001</rosparam>
-    <rosparam param="wiggle_precision_threshold">5</rosparam>
+    <rosparam param="wiggle_precision_threshold">7</rosparam>
+    <rosparam param="max_traj_length">1</rosparam>
     <rosparam param="sample_period">0.1</rosparam>
     <rosparam param="default_joint_vel_limit">0.5</rosparam>
     <rosparam param="default_collision_avoidance_distance">0.05</rosparam>

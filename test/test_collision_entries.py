@@ -577,6 +577,22 @@ class testPythonInterface(unittest.TestCase):
         self.assertEqual(r.error_code, MoveResult.PATH_COLLISION)
 
 
+    # def test_max_traj_length(self):
+    #     self.add_box()
+    #     p = PoseStamped()
+    #     p.header.frame_id = self.r_tip
+    #     p.pose.position = Point(0.1, 0, 0)
+    #     p.pose.orientation = Quaternion(0, 0, 0, 1)
+    #     self.giskard.set_cart_goal(self.default_root, self.r_tip, p)
+    #
+    #     collision_entry = CollisionEntry()
+    #     collision_entry.type = CollisionEntry.AVOID_ALL_COLLISIONS
+    #     collision_entry.min_dist = 0.5
+    #     self.giskard.set_collision_entries([collision_entry])
+    #
+    #     result = self.giskard.plan_and_execute()
+    #     self.assertEqual(result.error_code, MoveResult.SOLVER_TIMEOUT)
+
 if __name__ == '__main__':
     import rosunit
 

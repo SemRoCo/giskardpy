@@ -91,6 +91,35 @@ class testPythonInterface(unittest.TestCase):
         p.pose.orientation.w = 1
         self.move_pr2_base(p)
 
+    def get_allow_l_gripper(self, body_b='box'):
+        ces = []
+        ce = CollisionEntry()
+        ce.type = CollisionEntry.ALLOW_COLLISION
+        ce.robot_link = 'l_gripper_l_finger_tip_link'
+        ce.body_b = body_b
+        ces.append(ce)
+        ce = CollisionEntry()
+        ce.type = CollisionEntry.ALLOW_COLLISION
+        ce.robot_link = 'l_gripper_r_finger_tip_link'
+        ce.body_b = body_b
+        ces.append(ce)
+        ce = CollisionEntry()
+        ce.type = CollisionEntry.ALLOW_COLLISION
+        ce.robot_link = 'l_gripper_l_finger_link'
+        ce.body_b = body_b
+        ces.append(ce)
+        ce = CollisionEntry()
+        ce.type = CollisionEntry.ALLOW_COLLISION
+        ce.robot_link = 'l_gripper_r_finger_link'
+        ce.body_b = body_b
+        ces.append(ce)
+        ce = CollisionEntry()
+        ce.type = CollisionEntry.ALLOW_COLLISION
+        ce.robot_link = 'l_gripper_palm_link'
+        ce.body_b = body_b
+        ces.append(ce)
+        return ces
+
     def set_and_check_js_goal(self, goal_js):
         self.giskard.set_joint_goal(goal_js)
         self.giskard.plan_and_execute()
@@ -125,8 +154,12 @@ class testPythonInterface(unittest.TestCase):
         self.assertEqual(r.error_codes, UpdateWorldResponse.SUCCESS)
 
     def add_kitchen(self):
-        p = lookup_transform('world', 'map')
+        # p = lookup_transform('world', 'map')
+        p = PoseStamped()
+        p.header.frame_id = 'map'
+        p.pose.orientation.w = 1
         self.giskard.add_urdf('kitchen', rospy.get_param('kitchen_description'), 'kitchen_joint_states', p)
+        rospy.sleep(.5)
 
     def test_AllowCollision1(self):
         self.add_box()
@@ -419,45 +452,51 @@ class testPythonInterface(unittest.TestCase):
         self.add_kitchen()
         kitchen_js = {'sink_area_left_upper_drawer_main_joint': 0.45}
         self.giskard.set_object_joint_state('kitchen', kitchen_js)
+        rospy.sleep(.5)
 
+        # put gripper above drawer
         pick_spoon_pose = PoseStamped()
         pick_spoon_pose.header.frame_id = 'base_footprint'
-        pick_spoon_pose.pose.position = Point(0.567, 0.498, 0.804)
+        pick_spoon_pose.pose.position = Point(0.567, 0.498, 0.89)
         pick_spoon_pose.pose.orientation = Quaternion(0.018, 0.702, 0.004, 0.712)
         self.set_and_check_cart_goal(self.default_root, self.l_tip, pick_spoon_pose)
 
+        #put gripper in drawer
+        self.giskard.set_collision_entries(self.get_allow_l_gripper('kitchen'))
+        p = PoseStamped()
+        p.header.frame_id = self.l_tip
+        p.pose.position.x = 0.1
+        p.pose.orientation.w = 1
+        self.set_and_check_cart_goal(self.default_root, self.l_tip, p)
+
+        #attach spoon
+        r = self.giskard.attach_box('pocky', [0.02, 0.02, 0.1], self.l_tip, [0, 0, 0])
+        self.assertEqual(r.error_codes, UpdateWorldResponse.SUCCESS)
+
+        # allow grippe and spoon
+        ces = self.get_allow_l_gripper('kitchen')
+        ce = CollisionEntry()
+        ce.type = CollisionEntry.ALLOW_COLLISION
+        ce.robot_link = 'pocky'
+        ce.body_b = 'kitchen'
+        ces.append(ce)
+        self.giskard.set_collision_entries(ces)
+
+        # pick up
+        p = PoseStamped()
+        p.header.frame_id = self.l_tip
+        p.pose.position.x = -0.1
+        p.pose.orientation.w = 1
+        self.set_and_check_cart_goal(self.default_root, self.l_tip, p)
+
+
     def test_base_link_in_collision(self):
-        self.add_box([0.5,0.5,-0.2])
+        self.add_box(position=[0.5,0.5,-0.2])
         self.set_and_check_js_goal(gaya_pose)
 
     def test_allow_collision2(self):
         self.add_box()
-        ces = []
-        ce = CollisionEntry()
-        ce.type = CollisionEntry.ALLOW_COLLISION
-        ce.robot_link = 'l_gripper_l_finger_tip_link'
-        ce.body_b = 'box'
-        ces.append(ce)
-        ce = CollisionEntry()
-        ce.type = CollisionEntry.ALLOW_COLLISION
-        ce.robot_link = 'l_gripper_r_finger_tip_link'
-        ce.body_b = 'box'
-        ces.append(ce)
-        ce = CollisionEntry()
-        ce.type = CollisionEntry.ALLOW_COLLISION
-        ce.robot_link = 'l_gripper_l_finger_link'
-        ce.body_b = 'box'
-        ces.append(ce)
-        ce = CollisionEntry()
-        ce.type = CollisionEntry.ALLOW_COLLISION
-        ce.robot_link = 'l_gripper_r_finger_link'
-        ce.body_b = 'box'
-        ces.append(ce)
-        ce = CollisionEntry()
-        ce.type = CollisionEntry.ALLOW_COLLISION
-        ce.robot_link = 'l_gripper_palm_link'
-        ce.body_b = 'box'
-        ces.append(ce)
+        ces = self.get_allow_l_gripper('box')
         self.giskard.set_collision_entries(ces)
         p = PoseStamped()
         p.header.frame_id = self.l_tip

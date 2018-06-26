@@ -192,7 +192,7 @@ def dot(a, b):
     return (a.T*b)[0]
 
 
-def translation3(x, y, z):
+def translation3(x, y, z, w=1):
     r = sp.eye(4)
     r[0, 3] = x
     r[1, 3] = y

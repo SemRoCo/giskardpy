@@ -3,6 +3,7 @@ import traceback
 import rospy
 
 class ROSApplication(object):
+    """Superclass for all giskard ROS applications. Runs a process manager until it terminates."""
     # TODO do we still have this class?
     def __init__(self, process_manager):
         self.process_manager = process_manager

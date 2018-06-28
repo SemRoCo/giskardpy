@@ -88,7 +88,9 @@ class Robot(object):
 
             if joint.type in ['fixed', 'revolute', 'continuous', 'prismatic']:
                 if joint.origin is not None:
-                    joint_frame = spw.translation3(*joint.origin.xyz) * spw.rotation3_rpy(*joint.origin.rpy)
+                    xyz = joint.origin.xyz if joint.origin.xyz is not None else [0,0,0]
+                    rpy = joint.origin.rpy if joint.origin.rpy is not None else [0,0,0]
+                    joint_frame = spw.translation3(*xyz) * spw.rotation3_rpy(*rpy)
                 else:
                     joint_frame = spw.eye(4)
             else:

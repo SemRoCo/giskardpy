@@ -11,7 +11,7 @@ from giskardpy.plugin_fk import FKPlugin
 from giskardpy.plugin_interactive_marker import InteractiveMarkerPlugin
 from giskardpy.plugin_joint_state import JointStatePlugin
 from giskardpy.plugin_pybullet import PyBulletPlugin
-from giskardpy.plugin_set_controlled_joints import SetControlledJointsPlugin
+from giskardpy.plugin_set_controlled_joints import SetControlledJointsPlugin, UploadRobotDescriptionPlugin
 from giskardpy.process_manager import ProcessManager
 
 if __name__ == '__main__':
@@ -36,6 +36,8 @@ if __name__ == '__main__':
     if nWSR == 'None':
         nWSR = None
     path_to_data_folder = rospy.get_param('~path_to_data_folder')
+    collision_time_threshold = rospy.get_param('~collision_time_threshold')
+    max_traj_length = rospy.get_param('~max_traj_length')
     # path_to_data_folder = '/home/ichumuh/giskardpy_ws/src/giskardpy/data/pr2'
     if not path_to_data_folder.endswith('/'):
         path_to_data_folder += '/'
@@ -52,6 +54,7 @@ if __name__ == '__main__':
     collision_goal_identifier = 'collision_goal'
     pyfunction_identifier = 'pyfunctions'
     controllable_links_identifier = 'controllable_links'
+    robot_description_identifier = 'robot_description'
 
 
     pm = ProcessManager()
@@ -62,6 +65,8 @@ if __name__ == '__main__':
                                         sample_period=sample_period))
     pm.register_plugin('controlled joints',
                        SetControlledJointsPlugin(controlled_joints_identifier=controlled_joints_identifier))
+    pm.register_plugin('upload robot description',
+                       UploadRobotDescriptionPlugin(robot_description_identifier=robot_description_identifier))
     pm.register_plugin('action server',
                        ActionServerPlugin(js_identifier=js_identifier,
                                           trajectory_identifier=trajectory_identifier,
@@ -74,7 +79,9 @@ if __name__ == '__main__':
                                           wiggle_precision_threshold=wiggle_precision_threshold,
                                           pyfunction_identifier=pyfunction_identifier,
                                           plot_trajectory=False,
-                                          fill_velocity_values=fill_velocity_values))
+                                          fill_velocity_values=fill_velocity_values,
+                                          collision_time_threshold=collision_time_threshold,
+                                          max_traj_length=max_traj_length))
     pm.register_plugin('bullet',
                        PyBulletPlugin(js_identifier=js_identifier,
                                       collision_identifier=collision_identifier,
@@ -87,8 +94,11 @@ if __name__ == '__main__':
                                       gui=gui,
                                       marker=marker,
                                       default_collision_avoidance_distance=default_collision_avoidance_distance,
-                                      enable_self_collision=enable_self_collision))
-    pm.register_plugin('fk', FKPlugin(js_identifier=js_identifier, fk_identifier=fk_identifier))
+                                      enable_self_collision=enable_self_collision,
+                                      robot_description_identifier=robot_description_identifier))
+    pm.register_plugin('fk', FKPlugin(js_identifier=js_identifier,
+                                      fk_identifier=fk_identifier,
+                                      robot_description_identifier=robot_description_identifier))
     pm.register_plugin('cart bullet controller',
                        CartesianBulletControllerPlugin(root_link=root_link,
                                                        fk_identifier=fk_identifier,
@@ -103,7 +113,8 @@ if __name__ == '__main__':
                                                        collision_goal_identifier=collision_goal_identifier,
                                                        path_to_functions=path_to_data_folder,
                                                        nWSR=nWSR,
-                                                       default_joint_vel_limit=default_joint_vel_limit))
+                                                       default_joint_vel_limit=default_joint_vel_limit,
+                                                       robot_description_identifier=robot_description_identifier))
     pm.register_plugin('interactive marker',
                        InteractiveMarkerPlugin(root_tips=root_tips))
 

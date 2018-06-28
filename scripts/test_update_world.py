@@ -295,7 +295,7 @@ def test_update_world():
         remove_sphere_again(update_world)
         add_wand(update_world)
         # add_dummy_pr2(update_world)
-        add_kitchen(update_world)
+        # add_kitchen(update_world)
     except rospy.ServiceException as e:
         print("Service call failed: {}".format(e))
 

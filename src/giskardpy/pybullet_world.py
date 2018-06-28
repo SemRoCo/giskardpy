@@ -48,6 +48,7 @@ def resolve_ros_iris(input_urdf):
             output_urdf += line.replace(package_name, real_path)
         else:
             output_urdf += line
+        output_urdf += '\n'
     return output_urdf
 
 
@@ -317,7 +318,7 @@ class PyBulletRobot(object):
         """
         if self.has_attached_object(object.name):
             # TODO: choose better exception type
-            raise RuntimeError("An object '{}' has already been attached to the robot.".format(object.name))
+            raise DuplicateObjectNameException("An object '{}' has already been attached to the robot.".format(object.name))
 
         # salvage last joint state and base pose
         joint_state = self.get_joint_states()
@@ -330,13 +331,10 @@ class PyBulletRobot(object):
 
         # assemble and store URDF string of new link and fixed joint
         new_joint = FixedJoint('{}_joint'.format(object.name), transform, parent_link_name,
-                               '{}_link'.format(object.name))
+                               object.name)
         self.attached_objects[object.name] = '{}{}'.format(to_urdf_string(new_joint), to_urdf_string(object, True))
 
-        # for each attached object, insert the corresponding URDF sub-string into the original URDF string
-        new_urdf_string = self.original_urdf
-        for sub_string in self.attached_objects.values():
-            new_urdf_string = new_urdf_string.replace('</robot>', '{}</robot>'.format(sub_string))
+        new_urdf_string = self.get_urdf()
 
         # remove last robot and load new robot from new URDF
         p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 0)
@@ -354,10 +352,18 @@ class PyBulletRobot(object):
             self.sometimes.add((self.link_name_to_id[collision[0]], self.link_name_to_id[collision[1]]))
 
         # update the collision matrix for the newly attached object
-        object_id = self.link_name_to_id['{}_link'.format(object.name)]
+        object_id = self.link_name_to_id[object.name]
         link_pairs = {(object_id, link_id) for link_id in self.joint_id_to_info.keys()}
         new_collisions = self.calc_self_collision_matrix(link_pairs)
         self.sometimes.union(new_collisions)
+        print('object {} attached to {} in pybullet world'.format(object.name, self.name))
+
+    def get_urdf(self):
+        # for each attached object, insert the corresponding URDF sub-string into the original URDF string
+        new_urdf_string = self.original_urdf
+        for sub_string in self.attached_objects.values():
+            new_urdf_string = new_urdf_string.replace('</robot>', '{}</robot>'.format(sub_string))
+        return new_urdf_string
 
     def detach_object(self, object_name):
         """
@@ -368,7 +374,7 @@ class PyBulletRobot(object):
         """
         if not self.has_attached_object(object_name):
             # TODO: choose better exception type
-            raise RuntimeError("No object '{}' has been attached to the robot.".format(object.name))
+            raise RuntimeError("No object '{}' has been attached to the robot.".format(object_name))
 
         # salvage last joint state and base pose
         base_pose = self.get_base_pose()
@@ -386,14 +392,12 @@ class PyBulletRobot(object):
         del (self.attached_objects[object_name])
 
         # for each attached object, insert the corresponding URDF sub-string into the original URDF string
-        new_urdf_string = self.original_urdf
-        for sub_string in self.attached_objects.values():
-            new_urdf_string = new_urdf_string.replace('</robot>', '{}</robot>'.format(sub_string))
+        new_urdf_string = self.get_urdf()
 
         # remove last robot and load new robot from new URDF
         p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 0)
         p.removeBody(self.id)
-        self.id = (new_urdf_string, base_pose)
+        self.id = load_urdf_string_into_bullet(new_urdf_string, base_pose)
         p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 1)
 
         # reload joint info and last joint state
@@ -404,6 +408,7 @@ class PyBulletRobot(object):
         self.sometimes = set()
         for collision in collision_matrix:
             self.sometimes.add((self.link_name_to_id[collision[0]], self.link_name_to_id[collision[1]]))
+        print('object {} detachted from {} in pybullet world'.format(object_name, self.name))
 
     def detach_all_objects(self):
         """
@@ -575,6 +580,7 @@ class PyBulletWorld(object):
         :return: Nothing.
         """
         self.spawn_object_from_urdf(object.name, to_urdf_string(object), base_pose)
+        print('object {} added to pybullet world'.format(object.name))
 
     def get_object_list(self):
         return list(self._objects.keys())
@@ -591,6 +597,7 @@ class PyBulletWorld(object):
         p.removeBody(self._objects[object_name].id)
         self.activate_rendering()
         del (self._objects[object_name])
+        print('object {} deleted from pybullet world'.format(object_name))
 
     def delete_all_objects(self, remaining_objects=['plane']):
         """
@@ -656,7 +663,7 @@ class PyBulletWorld(object):
     def activate_viewer(self):
         if self._gui:
             # TODO expose opengl2 option for gui?
-            self.physicsClient = p.connect(p.GUI)  # or p.DIRECT for non-graphical version
+            self.physicsClient = p.connect(p.GUI, options='--opengl2')  # or p.DIRECT for non-graphical version
         else:
             self.physicsClient = p.connect(p.DIRECT)  # or p.DIRECT for non-graphical version
         p.setGravity(0, 0, -9.8)

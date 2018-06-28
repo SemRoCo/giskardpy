@@ -111,7 +111,7 @@ def to_urdf_xml(urdf_object, skip_robot_tag=False):
     :rtype: lxml.etree.Element
     """
     if isinstance(urdf_object, WorldObject):
-        link = etree.Element('link', name='{}_link'.format(urdf_object.name))
+        link = etree.Element('link', name=urdf_object.name)
         if urdf_object.inertial_props:
             link.append(to_urdf_xml(urdf_object.inertial_props))
         for visual in urdf_object.visual_props:

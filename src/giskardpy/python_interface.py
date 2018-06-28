@@ -152,24 +152,27 @@ class GiskardWrapper(object):
         req = UpdateWorldRequest(UpdateWorldRequest.REMOVE, object, False, PoseStamped())
         return self.update_world.call(req)
 
-    def add_box(self, name='box', size=(1,1,1), frame_id='map', position=(0,0,0), orientation=(0,0,0,1)):
+    def make_box(self, name='box', size=(1,1,1)):
         box = WorldBody()
         box.type = WorldBody.PRIMITIVE_BODY
         box.name = name
+        box.shape.type = SolidPrimitive.BOX
+        box.shape.dimensions.append(size[0])
+        box.shape.dimensions.append(size[1])
+        box.shape.dimensions.append(size[2])
+        return box
+
+    def add_box(self, name='box', size=(1, 1, 1), frame_id='map', position=(0, 0, 0), orientation=(0, 0, 0, 1)):
+        box = self.make_box(name, size)
         pose = PoseStamped()
         pose.header.stamp = rospy.Time.now()
         pose.header.frame_id = frame_id
         pose.pose.position = Point(*position)
         pose.pose.orientation = Quaternion(*orientation)
-        box.shape.type = SolidPrimitive.BOX
-        box.shape.dimensions.append(size[0])
-        box.shape.dimensions.append(size[1])
-        box.shape.dimensions.append(size[2])
         req = UpdateWorldRequest(UpdateWorldRequest.ADD, box, False, pose)
         world_object = from_msg(box)
         ma = to_marker(world_object)
         ma.markers[0].pose = pose.pose
-
         self.marker_pub.publish(ma)
         return self.update_world.call(req)
 
@@ -217,9 +220,28 @@ class GiskardWrapper(object):
         req = UpdateWorldRequest(UpdateWorldRequest.ADD, object, False, pose)
         return self.update_world.call(req)
 
-    def attach_object(self, name):
-        # TODO implement me
-        raise NotImplementedError
+    def attach_box(self, name='box', size=(1, 1, 1), frame_id='map', position=(0, 0, 0), orientation=(0, 0, 0, 1)):
+        box = self.make_box(name, size)
+        pose = PoseStamped()
+        pose.header.stamp = rospy.Time.now()
+        pose.header.frame_id = frame_id
+        pose.pose.position = Point(*position)
+        pose.pose.orientation = Quaternion(*orientation)
+
+        # wand = WorldBody()
+        # wand.type = WorldBody.PRIMITIVE_BODY
+        # wand.name = 'wand'
+        # wand.shape.type = SolidPrimitive.CYLINDER
+        # wand.shape.dimensions.append(0.15) # height of 15cm
+        # wand.shape.dimensions.append(0.005) # radius of 0.5cm
+        # return UpdateWorldRequest(UpdateWorldRequest.ADD, wand, True, pose)
+
+        req = UpdateWorldRequest(UpdateWorldRequest.ADD, box, True, pose)
+        # world_object = from_msg(box)
+        # ma = to_marker(world_object)
+        # ma.markers[0].pose = pose.pose
+        # self.marker_pub.publish(ma)
+        return self.update_world.call(req)
 
     def add_urdf(self, name, urdf, js_topic, pose):
         urdf_body = WorldBody()

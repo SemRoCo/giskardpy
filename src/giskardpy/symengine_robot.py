@@ -185,8 +185,9 @@ class Robot(object):
             link_collision = self._urdf_robot.link_map[child_link].collision
             if link_collision is not None:
                 geo = link_collision.geometry
-                if isinstance(geo, Box) and np.prod(geo.size) > 0.01 or \
-                        isinstance(geo, Sphere) and geo.radius > 0.1 or \
+                # TODO handle cylinder and cone
+                if isinstance(geo, Box) and (np.prod(geo.size) > 0.0001 or max(geo.size) > 0.05)or \
+                        isinstance(geo, Sphere) and geo.radius > 0.05 or \
                         isinstance(geo, Mesh):
                     links.add(child_link)
 

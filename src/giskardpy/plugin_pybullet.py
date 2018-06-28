@@ -15,7 +15,7 @@ from giskard_msgs.srv import UpdateWorld, UpdateWorldResponse, UpdateWorldReques
 from visualization_msgs.msg import Marker, MarkerArray
 
 from giskardpy.exceptions import CorruptShapeException, UnknownBodyException, DuplicateObjectNameException, \
-    IntersectingCollisionException, UnsupportedOptionException
+    PathCollisionException, UnsupportedOptionException
 from giskardpy.object import WorldObject, to_urdf_string, VisualProperty, BoxShape, CollisionProperty, to_marker, \
     MeshShape, from_msg, from_pose_msg
 from giskardpy.plugin import Plugin
@@ -28,7 +28,7 @@ from giskardpy.utils import keydefaultdict, to_joint_state_dict, to_point_stampe
 
 class PyBulletPlugin(Plugin):
     def __init__(self, js_identifier, collision_identifier, closest_point_identifier, collision_goal_identifier,
-                 controllable_links_identifier,
+                 controllable_links_identifier, robot_description_identifier,
                  map_frame, root_link, default_collision_avoidance_distance, path_to_data_folder='', gui=False,
                  marker=False, enable_self_collision=True):
         self.collision_goal_identifier = collision_goal_identifier
@@ -38,6 +38,7 @@ class PyBulletPlugin(Plugin):
         self.collision_identifier = collision_identifier
         self.closest_point_identifier = closest_point_identifier
         self.default_collision_avoidance_distance = default_collision_avoidance_distance
+        self.robot_description_identifier = robot_description_identifier
         self.enable_self_collision = enable_self_collision
         self.map_frame = map_frame
         self.robot_root = root_link
@@ -61,6 +62,7 @@ class PyBulletPlugin(Plugin):
                             path_to_data_folder=self.path_to_data_folder,
                             gui=self.gui,
                             default_collision_avoidance_distance=self.default_collision_avoidance_distance,
+                            robot_description_identifier=self.robot_description_identifier,
                             enable_self_collision=self.enable_self_collision)
         cp.world = self.world
         cp.marker = self.marker
@@ -103,7 +105,7 @@ class PyBulletPlugin(Plugin):
                     # Check that no object with this name already exists.
                     if self.world.has_object(req.body.name) or self.world.get_robot().has_attached_object(
                             req.body.name):
-                        DuplicateObjectNameException('Cannot spawn object "{}" because an object with such a '
+                        raise DuplicateObjectNameException('Cannot spawn object "{}" because an object with such a '
                                                      'name already exists'.format(req.body.name))
 
                     # CASE: Spawn rigidly attached object
@@ -159,9 +161,12 @@ class PyBulletPlugin(Plugin):
                 return UpdateWorldResponse(UpdateWorldResponse.DUPLICATE_BODY_ERROR, e.message)
             except UnsupportedOptionException as e:
                 return UpdateWorldResponse(UpdateWorldResponse.UNSUPPORTED_OPTIONS, e.message)
+            except Exception as e:
+                return UpdateWorldResponse(UpdateWorldResponse.UNSUPPORTED_OPTIONS, e.message)
 
     def update(self):
         with self.lock:
+            self.god_map.set_data([self.robot_description_identifier], self.world.get_robot().get_urdf())
             js = self.god_map.get_data([self.js_identifier])
             self.world.set_robot_joint_state(js)
             for object_name, object_joint_state in self.object_joint_states.items():
@@ -180,7 +185,9 @@ class PyBulletPlugin(Plugin):
                 collision_goals = []
             allowed_collisions = set()
             distances = defaultdict(lambda: self.default_collision_avoidance_distance)
+            # TODO properly handle multiple collision entries
             for collision_entry in collision_goals:  # type: CollisionEntry
+
                 if collision_entry.body_b == '' and \
                         collision_entry.type not in [CollisionEntry.ALLOW_ALL_COLLISIONS,
                                                      CollisionEntry.AVOID_ALL_COLLISIONS]:
@@ -217,7 +224,8 @@ class PyBulletPlugin(Plugin):
                                     collision_entry.type == CollisionEntry.AVOID_ALL_COLLISIONS:
                                 distances[key] = collision_entry.min_dist
             controllable_links = self.god_map.get_data([self.controllable_links_identifier])
-            collisions = self.world.check_collisions(distances, allowed_collisions, self_collision=self.enable_self_collision,
+            collisions = self.world.check_collisions(distances, allowed_collisions,
+                                                     self_collision=self.enable_self_collision,
                                                      controllable_links=controllable_links)
 
             closest_point = keydefaultdict(lambda k: ClosestPointInfo((10, 0, 0),

@@ -7,7 +7,8 @@
     <param name="enable_gui" value="$(arg gui)"/>
     <rosparam param="map_frame">map</rosparam>
     <rosparam param="joint_convergence_threshold">0.001</rosparam>
-    <rosparam param="wiggle_precision_threshold">5</rosparam>
+    <rosparam param="wiggle_precision_threshold">7</rosparam>
+    <rosparam param="max_traj_length">30</rosparam>
     <rosparam param="sample_period">0.1</rosparam>
     <rosparam param="default_joint_vel_limit">0.5</rosparam>
     <rosparam param="default_collision_avoidance_distance">0.05</rosparam>
@@ -16,6 +17,7 @@
     <rosparam param="root_link">base_footprint</rosparam>
     <rosparam param="enable_collision_marker">True</rosparam>
     <rosparam param="enable_self_collision">False</rosparam>
+    <rosparam param="collision_time_threshold">15</rosparam>
     <rosparam param="interactive_marker_chains">
       - [base_link, r_gripper_tool_frame]
       - [base_link, l_gripper_tool_frame]

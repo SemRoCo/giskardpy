@@ -7,8 +7,8 @@ import rospy
 from actionlib import SimpleActionClient
 from angles import normalize_angle
 from geometry_msgs.msg import PoseStamped, Point, Quaternion
-from giskard_msgs.msg import MoveAction, MoveGoal, MoveCmd, Controller, CollisionEntry, MoveResult
-from giskard_msgs.srv import UpdateWorld
+from giskard_msgs.msg import MoveAction, MoveGoal, MoveCmd, Controller, CollisionEntry, MoveResult, MoveActionResult
+from giskard_msgs.srv import UpdateWorld, UpdateWorldResponse
 from sensor_msgs.msg import JointState
 
 from giskardpy.python_interface import GiskardWrapper
@@ -64,6 +64,7 @@ class testPythonInterface(unittest.TestCase):
         self.default_root = 'base_link'
         self.r_tip = 'r_gripper_tool_frame'
         self.l_tip = 'l_gripper_tool_frame'
+        self.map = 'map'
         self.simple_base_pose_pub = rospy.Publisher('/move_base_simple/goal', PoseStamped, queue_size=10)
         rospy.sleep(0.5)
         super(testPythonInterface, self).__init__(methodName)
@@ -78,10 +79,46 @@ class testPythonInterface(unittest.TestCase):
         self.giskard.set_collision_entries([collision_entry])
 
         self.set_and_check_js_goal(default_joint_state)
+        self.reset_pr2_base()
         super(testPythonInterface, self).setUpClass()
 
     def move_pr2_base(self, goal_pose):
         self.simple_base_pose_pub.publish(goal_pose)
+
+    def reset_pr2_base(self):
+        p = PoseStamped()
+        p.header.frame_id = self.map
+        p.pose.orientation.w = 1
+        self.move_pr2_base(p)
+
+    def get_allow_l_gripper(self, body_b='box'):
+        ces = []
+        ce = CollisionEntry()
+        ce.type = CollisionEntry.ALLOW_COLLISION
+        ce.robot_link = 'l_gripper_l_finger_tip_link'
+        ce.body_b = body_b
+        ces.append(ce)
+        ce = CollisionEntry()
+        ce.type = CollisionEntry.ALLOW_COLLISION
+        ce.robot_link = 'l_gripper_r_finger_tip_link'
+        ce.body_b = body_b
+        ces.append(ce)
+        ce = CollisionEntry()
+        ce.type = CollisionEntry.ALLOW_COLLISION
+        ce.robot_link = 'l_gripper_l_finger_link'
+        ce.body_b = body_b
+        ces.append(ce)
+        ce = CollisionEntry()
+        ce.type = CollisionEntry.ALLOW_COLLISION
+        ce.robot_link = 'l_gripper_r_finger_link'
+        ce.body_b = body_b
+        ces.append(ce)
+        ce = CollisionEntry()
+        ce.type = CollisionEntry.ALLOW_COLLISION
+        ce.robot_link = 'l_gripper_palm_link'
+        ce.body_b = body_b
+        ces.append(ce)
+        return ces
 
     def set_and_check_js_goal(self, goal_js):
         self.giskard.set_joint_goal(goal_js)
@@ -112,12 +149,17 @@ class testPythonInterface(unittest.TestCase):
         self.assertAlmostEqual(goal_in_base.pose.orientation.z, current_pose.pose.orientation.z, 1)
         self.assertAlmostEqual(goal_in_base.pose.orientation.w, current_pose.pose.orientation.w, 1)
 
-    def add_box(self, position=(1.2, 0, 0.5)):
-        self.giskard.add_box(name='box', position=position)
+    def add_box(self, name='box', position=(1.2, 0, 0.5)):
+        r = self.giskard.add_box(name=name, position=position)
+        self.assertEqual(r.error_codes, UpdateWorldResponse.SUCCESS)
 
     def add_kitchen(self):
-        p = lookup_transform('world', 'map')
+        # p = lookup_transform('world', 'map')
+        p = PoseStamped()
+        p.header.frame_id = 'map'
+        p.pose.orientation.w = 1
         self.giskard.add_urdf('kitchen', rospy.get_param('kitchen_description'), 'kitchen_joint_states', p)
+        rospy.sleep(.5)
 
     def test_AllowCollision1(self):
         self.add_box()
@@ -410,45 +452,51 @@ class testPythonInterface(unittest.TestCase):
         self.add_kitchen()
         kitchen_js = {'sink_area_left_upper_drawer_main_joint': 0.45}
         self.giskard.set_object_joint_state('kitchen', kitchen_js)
+        rospy.sleep(.5)
 
+        # put gripper above drawer
         pick_spoon_pose = PoseStamped()
         pick_spoon_pose.header.frame_id = 'base_footprint'
-        pick_spoon_pose.pose.position = Point(0.567, 0.498, 0.804)
+        pick_spoon_pose.pose.position = Point(0.567, 0.498, 0.89)
         pick_spoon_pose.pose.orientation = Quaternion(0.018, 0.702, 0.004, 0.712)
         self.set_and_check_cart_goal(self.default_root, self.l_tip, pick_spoon_pose)
 
+        #put gripper in drawer
+        self.giskard.set_collision_entries(self.get_allow_l_gripper('kitchen'))
+        p = PoseStamped()
+        p.header.frame_id = self.l_tip
+        p.pose.position.x = 0.1
+        p.pose.orientation.w = 1
+        self.set_and_check_cart_goal(self.default_root, self.l_tip, p)
+
+        #attach spoon
+        r = self.giskard.attach_box('pocky', [0.02, 0.02, 0.1], self.l_tip, [0, 0, 0])
+        self.assertEqual(r.error_codes, UpdateWorldResponse.SUCCESS)
+
+        # allow grippe and spoon
+        ces = self.get_allow_l_gripper('kitchen')
+        ce = CollisionEntry()
+        ce.type = CollisionEntry.ALLOW_COLLISION
+        ce.robot_link = 'pocky'
+        ce.body_b = 'kitchen'
+        ces.append(ce)
+        self.giskard.set_collision_entries(ces)
+
+        # pick up
+        p = PoseStamped()
+        p.header.frame_id = self.l_tip
+        p.pose.position.x = -0.1
+        p.pose.orientation.w = 1
+        self.set_and_check_cart_goal(self.default_root, self.l_tip, p)
+
+
     def test_base_link_in_collision(self):
-        self.add_box([0.5,0.5,-0.2])
+        self.add_box(position=[0.5,0.5,-0.2])
         self.set_and_check_js_goal(gaya_pose)
 
     def test_allow_collision2(self):
         self.add_box()
-        ces = []
-        ce = CollisionEntry()
-        ce.type = CollisionEntry.ALLOW_COLLISION
-        ce.robot_link = 'l_gripper_l_finger_tip_link'
-        ce.body_b = 'box'
-        ces.append(ce)
-        ce = CollisionEntry()
-        ce.type = CollisionEntry.ALLOW_COLLISION
-        ce.robot_link = 'l_gripper_r_finger_tip_link'
-        ce.body_b = 'box'
-        ces.append(ce)
-        ce = CollisionEntry()
-        ce.type = CollisionEntry.ALLOW_COLLISION
-        ce.robot_link = 'l_gripper_l_finger_link'
-        ce.body_b = 'box'
-        ces.append(ce)
-        ce = CollisionEntry()
-        ce.type = CollisionEntry.ALLOW_COLLISION
-        ce.robot_link = 'l_gripper_r_finger_link'
-        ce.body_b = 'box'
-        ces.append(ce)
-        ce = CollisionEntry()
-        ce.type = CollisionEntry.ALLOW_COLLISION
-        ce.robot_link = 'l_gripper_palm_link'
-        ce.body_b = 'box'
-        ces.append(ce)
+        ces = self.get_allow_l_gripper('box')
         self.giskard.set_collision_entries(ces)
         p = PoseStamped()
         p.header.frame_id = self.l_tip
@@ -457,6 +505,93 @@ class testPythonInterface(unittest.TestCase):
         self.set_and_check_cart_goal(self.default_root, self.l_tip, p)
 
 
+    def test_attached_collision1(self):
+        self.add_box()
+        r = self.giskard.attach_box('pocky', [0.1, 0.02, 0.02], self.r_tip, [0.05,0,0])
+        self.assertEqual(r.error_codes, UpdateWorldResponse.SUCCESS)
+        r = self.giskard.attach_box('pocky', [0.1, 0.02, 0.02], self.r_tip, [0.05,0,0])
+        self.assertEqual(r.error_codes, UpdateWorldResponse.DUPLICATE_BODY_ERROR)
+        # self.giskard.attach_box('pocky2', [0.1, 0.02, 0.02], self.l_tip, [0.05,0,0])
+        p = PoseStamped()
+        p.header.frame_id = self.r_tip
+        p.pose.position.x = -0.11
+        p.pose.orientation.w = 1
+        self.set_and_check_cart_goal(self.default_root, self.r_tip, p)
+        r = self.giskard.remove_object('pocky')
+        self.assertEqual(r.error_codes, UpdateWorldResponse.SUCCESS)
+
+    def test_attached_collision2(self):
+        pocky = 'http://muh#pocky'
+        self.add_box()
+        self.add_box(pocky, position=[1.2,0,1.6])
+        r = self.giskard.attach_box(pocky, [0.1, 0.02, 0.02], self.r_tip, [0.05,0,0])
+        self.assertEqual(r.error_codes, UpdateWorldResponse.DUPLICATE_BODY_ERROR)
+        r = self.giskard.remove_object(pocky)
+        self.assertEqual(r.error_codes, UpdateWorldResponse.SUCCESS)
+        r = self.giskard.attach_box(pocky, [0.1, 0.02, 0.02], self.r_tip, [0.05,0,0])
+        self.assertEqual(r.error_codes, UpdateWorldResponse.SUCCESS)
+        p = PoseStamped()
+        p.header.frame_id = self.r_tip
+        p.pose.position.x = -0.11
+        p.pose.orientation.w = 1
+        self.set_and_check_cart_goal(self.default_root, self.r_tip, p)
+        r = self.giskard.remove_object(pocky)
+        self.assertEqual(r.error_codes, UpdateWorldResponse.SUCCESS)
+
+    def test_attached_collision3(self):
+        pocky = 'http://muh#pocky'
+        self.add_box()
+        r = self.giskard.attach_box(pocky, [0.1, 0.02, 0.02], self.r_tip, [0.05,0,0])
+        self.assertEqual(r.error_codes, UpdateWorldResponse.SUCCESS)
+
+        ces = []
+        ce = CollisionEntry()
+        ce.type = CollisionEntry.ALLOW_COLLISION
+        ce.robot_link = 'pocky'
+        ce.body_b = 'box'
+        ces.append(ce)
+        self.giskard.set_collision_entries(ces)
+
+        p = PoseStamped()
+        p.header.frame_id = self.r_tip
+        p.pose.position.x = -0.11
+        p.pose.orientation.w = 1
+        self.set_and_check_cart_goal(self.default_root, self.r_tip, p)
+        r = self.giskard.remove_object(pocky)
+        self.assertEqual(r.error_codes, UpdateWorldResponse.SUCCESS)
+
+
+    def test_collision_during_planning1(self):
+        self.add_box()
+        p = PoseStamped()
+        p.header.frame_id = self.r_tip
+        p.pose.position = Point(0.1, 0, 0)
+        p.pose.orientation = Quaternion(0, 0, 0, 1)
+
+        collision_entry = CollisionEntry()
+        collision_entry.type = CollisionEntry.AVOID_ALL_COLLISIONS
+        collision_entry.min_dist = 0.5
+        self.giskard.set_collision_entries([collision_entry])
+        self.giskard.set_cart_goal(self.default_root, self.r_tip, p)
+        r = self.giskard.plan_and_execute()
+        self.assertEqual(r.error_code, MoveResult.PATH_COLLISION)
+
+
+    # def test_max_traj_length(self):
+    #     self.add_box()
+    #     p = PoseStamped()
+    #     p.header.frame_id = self.r_tip
+    #     p.pose.position = Point(0.1, 0, 0)
+    #     p.pose.orientation = Quaternion(0, 0, 0, 1)
+    #     self.giskard.set_cart_goal(self.default_root, self.r_tip, p)
+    #
+    #     collision_entry = CollisionEntry()
+    #     collision_entry.type = CollisionEntry.AVOID_ALL_COLLISIONS
+    #     collision_entry.min_dist = 0.5
+    #     self.giskard.set_collision_entries([collision_entry])
+    #
+    #     result = self.giskard.plan_and_execute()
+    #     self.assertEqual(result.error_code, MoveResult.SOLVER_TIMEOUT)
 
 if __name__ == '__main__':
     import rosunit

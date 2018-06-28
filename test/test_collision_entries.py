@@ -1,10 +1,8 @@
 #!/usr/bin/env python
 import unittest
 from math import pi
-from rospkg import RosPack
 
 import rospy
-from actionlib import SimpleActionClient
 from angles import normalize_angle
 from geometry_msgs.msg import PoseStamped, Point, Quaternion
 from giskard_msgs.msg import MoveAction, MoveGoal, MoveCmd, Controller, CollisionEntry, MoveResult, MoveActionResult
@@ -13,7 +11,6 @@ from sensor_msgs.msg import JointState
 
 from giskardpy.python_interface import GiskardWrapper
 from giskardpy.tfwrapper import lookup_transform, transform_pose
-from test_update_world import add_table, clear_world
 from numpy import pi
 
 PKG = 'giskardpy'

@@ -160,9 +160,17 @@ def speed_up(function, parameters, backend='llvm'):
 
 
 def cross(u, v):
-    return sp.Matrix([u[1] * v[2] - u[2] * v[1],
-                      u[2] * v[0] - u[0] * v[2],
-                      u[0] * v[1] - u[1] * v[0]])
+    if len(u) != len(v):
+        raise ValueError('lengths {} and {} don\' align'.format(len(u), len(v)))
+    if len(u) == 3:
+        return sp.Matrix([u[1] * v[2] - u[2] * v[1],
+                          u[2] * v[0] - u[0] * v[2],
+                          u[0] * v[1] - u[1] * v[0]])
+    if len(u) == 4:
+        return sp.Matrix([u[1] * v[2] - u[2] * v[1],
+                          u[2] * v[0] - u[0] * v[2],
+                          u[0] * v[1] - u[1] * v[0],
+                          0])
 
 
 def vector3(x, y, z):

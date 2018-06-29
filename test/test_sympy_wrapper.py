@@ -307,6 +307,31 @@ class TestSympyWrapper(unittest.TestCase):
         np.testing.assert_array_almost_equal(georg_slerp(q2, q1, 1.0),
                                              np.array([0.348000, -0.520000, 0.616000, -0.479000]))
 
+    def test_cross1(self):
+        for i in range(100):
+            u = np.random.rand(3)
+            v = np.random.rand(3)
+            np_cross = np.cross(u,v)
+            sw_cross = spw.cross(u,v)
+            sw_cross = np.array(sw_cross).astype(float).T[0]
+            np.testing.assert_array_almost_equal(np_cross, sw_cross)
+            self.assertEqual(len(sw_cross), len(np_cross))
+            self.assertEqual(len(sw_cross), 3)
+
+    def test_cross2(self):
+        for i in range(100):
+            u = np.random.rand(4)
+            u[-1] = 0
+            v = np.random.rand(4)
+            v[-1] = 0
+            np_cross = np.cross(u[:-1],v[:-1])
+
+            sw_cross = spw.cross(u,v)
+            sw_cross = np.array(sw_cross).astype(float).T[0]
+            np.testing.assert_array_almost_equal(np_cross, sw_cross[:-1])
+            self.assertEqual(sw_cross[-1], 0)
+            self.assertEqual(len(sw_cross), 4)
+
 if __name__ == '__main__':
     import rosunit
 

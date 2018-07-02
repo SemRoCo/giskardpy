@@ -5,7 +5,6 @@ import PyKDL
 from urdf_parser_py.urdf import URDF
 
 from giskardpy.symengine_robot import Robot, hacky_urdf_parser_fix
-from giskardpy.symengine_controller import JointController
 from kdl_parser import kdl_tree_from_urdf_model
 import numpy as np
 import giskardpy.symengine_wrappers as sw
@@ -105,74 +104,74 @@ class TestSymengineController(unittest.TestCase):
                 np.testing.assert_array_almost_equal(kdl_fk, symengine_fk, decimal=3)
                 np.testing.assert_array_almost_equal(kdl_r.fk_np_inv(js), sw.inverse_frame(symengine_fk), decimal=3)
 
-    def test_joint_controller_pointy1(self):
-        r = Robot('pointy.urdf')
-        jc = JointController('pointy.urdf')
-        jc.init()
-        goal = {}
-        for i in range(20):
-            for joint_name, joint_value in r.get_rnd_joint_state().items():
-                goal[str(jc.goal_joint_states.joint_map[joint_name])] = joint_value
-            end_state = trajectory_rollout(jc, goal)
-            for joint_name in end_state:
-                self.assertEqual(goal[str(jc.goal_joint_states.joint_map[joint_name])], end_state[joint_name])
-
-    def test_joint_controller_donbot1(self):
-        r = Robot('iai_donbot.urdf')
-        jc = JointController('iai_donbot.urdf')
-        jc.init()
-        m = jc.get_goal_symbol_map()
-        goal = {}
-        for i in range(20):
-            for joint_name, joint_value in r.get_rnd_joint_state().items():
-                goal[str(m[joint_name])] = joint_value
-            end_state = trajectory_rollout(jc, goal)
-            for joint_name in end_state:
-                self.assertEqual(goal[str(m[joint_name])], end_state[joint_name],
-                                 msg='{} is wrong'.format(joint_name))
-
-    def test_joint_controller_2d_base_bot1(self):
-        r = Robot('2d_base_bot.urdf')
-        jc = JointController('2d_base_bot.urdf')
-        jc.init()
-        m = jc._set_default_goal_joint_states()
-        goal = {}
-        for i in range(20):
-            for joint_name, joint_value in r.get_rnd_joint_state().items():
-                goal[str(m[joint_name])] = joint_value
-            end_state = trajectory_rollout(jc, goal)
-            for joint_name in end_state:
-                self.assertEqual(goal[str(m[joint_name])], end_state[joint_name],
-                                 msg='{} is wrong'.format(joint_name))
-
-    def test_joint_controller_boxy1(self):
-        r = Robot('boxy.urdf')
-        jc = JointController('boxy.urdf')
-        jc.init()
-        m = jc.get_goal_symbol_map()
-        goal = {}
-        for i in range(20):
-            for joint_name, joint_value in r.get_rnd_joint_state().items():
-                goal[str(m[joint_name])] = joint_value
-            end_state = trajectory_rollout(jc, goal)
-            for joint_name in end_state:
-                self.assertEqual(goal[str(m[joint_name])], end_state[joint_name],
-                                 msg='{} is wrong'.format(joint_name))
-
-    def test_joint_controller_pr21(self):
-        # TODO fix
-        r = Robot('pr2.urdf')
-        jc = JointController('pr2.urdf')
-        jc.init()
-        m = jc.get_goal_symbol_map()
-        goal = {}
-        for i in range(20):
-            for joint_name, joint_value in r.get_rnd_joint_state().items():
-                goal[str(m[joint_name])] = joint_value
-            end_state = trajectory_rollout(jc, goal)
-            for joint_name in end_state:
-                self.assertEqual(goal[str(m[joint_name])], end_state[joint_name],
-                                 msg='{} is wrong'.format(joint_name))
+    # def test_joint_controller_pointy1(self):
+    #     r = Robot('pointy.urdf')
+    #     jc = JointController('pointy.urdf')
+    #     jc.init()
+    #     goal = {}
+    #     for i in range(20):
+    #         for joint_name, joint_value in r.get_rnd_joint_state().items():
+    #             goal[str(jc.goal_joint_states.joint_map[joint_name])] = joint_value
+    #         end_state = trajectory_rollout(jc, goal)
+    #         for joint_name in end_state:
+    #             self.assertEqual(goal[str(jc.goal_joint_states.joint_map[joint_name])], end_state[joint_name])
+    #
+    # def test_joint_controller_donbot1(self):
+    #     r = Robot('iai_donbot.urdf')
+    #     jc = JointController('iai_donbot.urdf')
+    #     jc.init()
+    #     m = jc.get_goal_symbol_map()
+    #     goal = {}
+    #     for i in range(20):
+    #         for joint_name, joint_value in r.get_rnd_joint_state().items():
+    #             goal[str(m[joint_name])] = joint_value
+    #         end_state = trajectory_rollout(jc, goal)
+    #         for joint_name in end_state:
+    #             self.assertEqual(goal[str(m[joint_name])], end_state[joint_name],
+    #                              msg='{} is wrong'.format(joint_name))
+    #
+    # def test_joint_controller_2d_base_bot1(self):
+    #     r = Robot('2d_base_bot.urdf')
+    #     jc = JointController('2d_base_bot.urdf')
+    #     jc.init()
+    #     m = jc._set_default_goal_joint_states()
+    #     goal = {}
+    #     for i in range(20):
+    #         for joint_name, joint_value in r.get_rnd_joint_state().items():
+    #             goal[str(m[joint_name])] = joint_value
+    #         end_state = trajectory_rollout(jc, goal)
+    #         for joint_name in end_state:
+    #             self.assertEqual(goal[str(m[joint_name])], end_state[joint_name],
+    #                              msg='{} is wrong'.format(joint_name))
+    #
+    # def test_joint_controller_boxy1(self):
+    #     r = Robot('boxy.urdf')
+    #     jc = JointController('boxy.urdf')
+    #     jc.init()
+    #     m = jc.get_goal_symbol_map()
+    #     goal = {}
+    #     for i in range(20):
+    #         for joint_name, joint_value in r.get_rnd_joint_state().items():
+    #             goal[str(m[joint_name])] = joint_value
+    #         end_state = trajectory_rollout(jc, goal)
+    #         for joint_name in end_state:
+    #             self.assertEqual(goal[str(m[joint_name])], end_state[joint_name],
+    #                              msg='{} is wrong'.format(joint_name))
+    #
+    # def test_joint_controller_pr21(self):
+    #     # TODO fix
+    #     r = Robot('pr2.urdf')
+    #     jc = JointController('pr2.urdf')
+    #     jc.init()
+    #     m = jc.get_goal_symbol_map()
+    #     goal = {}
+    #     for i in range(20):
+    #         for joint_name, joint_value in r.get_rnd_joint_state().items():
+    #             goal[str(m[joint_name])] = joint_value
+    #         end_state = trajectory_rollout(jc, goal)
+    #         for joint_name in end_state:
+    #             self.assertEqual(goal[str(m[joint_name])], end_state[joint_name],
+    #                              msg='{} is wrong'.format(joint_name))
 
 
 

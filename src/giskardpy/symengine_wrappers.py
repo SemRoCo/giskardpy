@@ -61,7 +61,7 @@ def if_greater_zero(condition, if_result, else_result, epsilon=2.22507385851e-30
     :type else_result: Union[float, Symbol]
     :type epsilon: float
     """
-    condition = diffable_sign(condition - epsilon)  # 1 or -1
+    condition = diffable_sign(condition + epsilon)  # 1 or -1
     _if = diffable_Max(0, condition) * if_result  # 0 or if_result
     _else = -diffable_Min(0, condition) * else_result  # 0 or else_result
     return _if + _else  # if_result or else_result

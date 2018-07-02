@@ -79,7 +79,7 @@ def joint_position(current_joint, joint_goal, weight, p_gain, max_speed, name):
     soft_constraints = OrderedDict()
 
     err = joint_goal - current_joint
-    capped_err = sw.fake_Max(sw.fake_Min(p_gain * err, max_speed), -max_speed)
+    capped_err = sw.diffable_Max(sw.diffable_Min(p_gain * err, max_speed), -max_speed)
 
     soft_constraints[name] = SoftConstraint(lower=capped_err,
                                             upper=capped_err,
@@ -94,7 +94,7 @@ def joint_position(current_joint, joint_goal, weight, p_gain, max_speed, name):
 def continuous_joint_position(current_joint, change, weight, p_gain, max_speed, name):
     soft_constraints = OrderedDict()
 
-    capped_err = sw.fake_Max(sw.fake_Min(p_gain * change, max_speed), -max_speed)
+    capped_err = sw.diffable_Max(sw.diffable_Min(p_gain * change, max_speed), -max_speed)
 
     soft_constraints[name] = SoftConstraint(lower=capped_err,
                                             upper=capped_err,
@@ -122,7 +122,7 @@ def position_conv(goal_position, current_position, weights=1, trans_gain=3, max_
 
     trans_error_vector = goal_position - current_position
     trans_error = sw.norm(trans_error_vector)
-    trans_scale = sw.fake_Min(trans_error * trans_gain, max_trans_speed)
+    trans_scale = sw.diffable_Min(trans_error * trans_gain, max_trans_speed)
     trans_control = trans_error_vector / trans_error * trans_scale
 
     soft_constraints['align {} x position'.format(ns)] = SoftConstraint(lower=trans_control[0],
@@ -146,7 +146,7 @@ def rotation_conv(goal_rotation, current_rotation, current_evaluated_rotation, w
     soft_constraints = OrderedDict()
     axis, angle = sw.axis_angle_from_matrix((current_rotation.T * goal_rotation))
 
-    capped_angle = sw.fake_Max(sw.fake_Min(rot_gain * angle, max_rot_speed), -max_rot_speed)
+    capped_angle = sw.diffable_Max(sw.diffable_Min(rot_gain * angle, max_rot_speed), -max_rot_speed)
 
     r_rot_control = axis * capped_angle
 

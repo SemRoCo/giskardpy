@@ -1,4 +1,3 @@
-import itertools
 import os
 import pickle
 from warnings import warn
@@ -10,26 +9,25 @@ from symengine import Matrix, Symbol, eye, sympify, diag, zeros, lambdify, Abs, 
 import numpy as np
 
 from symengine.lib.symengine_wrapper import Lambdify
-from tf.transformations import unit_vector
 
 from giskardpy.exceptions import SymengineException
 
 pathSeparator = '_'
 
 
-def fake_Abs(x):
+def diffable_abs(x):
     return sp.sqrt(x ** 2)
 
 
-def fake_Max(x, y):
-    return ((x + y) + fake_Abs(x - y)) / 2
+def diffable_Max(x, y):
+    return ((x + y) + diffable_abs(x - y)) / 2
 
 
-def fake_Min(x, y):
-    return ((x + y) - fake_Abs(x - y)) / 2
+def diffable_Min(x, y):
+    return ((x + y) - diffable_abs(x - y)) / 2
 
 
-def fake_sign(a, e=-2.22507385851e-308):
+def diffable_sign(a, epsilon=-2.22507385851e-308):
     """
     if a > 0:
         return 1
@@ -37,48 +35,52 @@ def fake_sign(a, e=-2.22507385851e-308):
         return -1
     if a == 0:
         return 0
+
+    :type a: Union[float, Symbol]
+    :type epsilon: float
     """
-    return a / (e + fake_Abs(a))
+    return a / (epsilon + diffable_abs(a))
 
 
-def sigmoid(a, e=9e300):
-    return (tanh(a * e) + 1) / 2
-
-
-def if_greater_zero(a, b, c, e=2.22507385851e-308):
+def if_greater_zero(condition, if_result, else_result, epsilon=2.22507385851e-308):
     """
-    if a > 0:
-        return b
+    if condition > 0:
+        return if_result
     else:
-        return c
+        return else_result
 
     ** actual behavior **
-    if a > e:
-        return b
-    if a < e:
-        return c
-    if a == e:
+    if condition > e:
+        return if_result
+    if condition < e:
+        return else_result
+    if condition == e:
         return 0
-    :type a: Union[float, Symbol]
-    :type b: Union[float, Symbol]
-    :type c: Union[float, Symbol]
+    :type condition: Union[float, Symbol]
+    :type if_result: Union[float, Symbol]
+    :type else_result: Union[float, Symbol]
+    :type epsilon: float
     """
-    a = fake_sign(a - e)  # 1 or -1
-    _if = fake_Max(0, a) * b  # 0 or b
-    _else = -fake_Min(0, a) * c  # 0 or c
-    return _if + _else  # i or e
-    # return sigmoid((a-e)) * b + sigmoid(-(a-e)) * c
+    condition = diffable_sign(condition - epsilon)  # 1 or -1
+    _if = diffable_Max(0, condition) * if_result  # 0 or if_result
+    _else = -diffable_Min(0, condition) * else_result  # 0 or else_result
+    return _if + _else  # if_result or else_result
 
 
-def if_eq_zero(a, b, c, e=2.22507385851e-308):
+def if_eq_zero(condition, if_result, else_result, epsilon=2.22507385851e-308):
     """
-    if a == 0:
-        return b
+    if condition == 0:
+        return if_result
     else:
-        return c
+        return else_result
+    :type condition: Union[float, Symbol]
+    :type if_result: Union[float, Symbol]
+    :type else_result: Union[float, Symbol]
+    :param epsilon: function is unstable if condition==epsilon
+    :type epsilon: float
     """
-    a = fake_Abs(fake_sign(a, e))
-    return (1 - a) * b + a * c
+    condition = diffable_abs(diffable_sign(condition, epsilon))
+    return (1 - condition) * if_result + condition * else_result
 
 
 def safe_compiled_function(f, file_name):
@@ -198,7 +200,7 @@ def scale(v, a):
 
 
 def dot(a, b):
-    return (a.T*b)[0]
+    return (a.T * b)[0]
 
 
 def translation3(x, y, z):
@@ -443,7 +445,7 @@ def quaternion_diff(q_current, q_goal):
 
 
 def quaternion_make_unique(q):
-    sign = q[3] / fake_Abs(q[3])
+    sign = q[3] / diffable_abs(q[3])
     return q * sign
 
 
@@ -492,10 +494,11 @@ def slerp(r1, r2, t):
 
 _EPS = np.finfo(float).eps * 4.0
 
+
 def slerp2(q0, q1, fraction):
     d = dot(q0, q1)
     q1 *= if_greater_zero(d, 1, -1)
-    d = fake_Abs(d)
+    d = diffable_abs(d)
     angle = acos(d)
     isin = 1.0 / sin(angle)
     qr = q0 * sin((1.0 - fraction) * angle) * isin
@@ -506,8 +509,8 @@ def slerp2(q0, q1, fraction):
                       q0,
                       if_eq_zero(fraction - 1,
                                  q1,
-                                 if_greater_zero(_EPS - fake_Abs(fake_Abs(d) - 1.0),
+                                 if_greater_zero(_EPS - diffable_abs(diffable_abs(d) - 1.0),
                                                  q0,
-                                                 if_greater_zero(_EPS - fake_Abs(angle),
+                                                 if_greater_zero(_EPS - diffable_abs(angle),
                                                                  q0,
                                                                  qr))))

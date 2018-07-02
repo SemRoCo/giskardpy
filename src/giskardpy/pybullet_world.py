@@ -318,7 +318,8 @@ class PyBulletRobot(object):
         """
         if self.has_attached_object(object.name):
             # TODO: choose better exception type
-            raise DuplicateObjectNameException("An object '{}' has already been attached to the robot.".format(object.name))
+            raise DuplicateObjectNameException(
+                "An object '{}' has already been attached to the robot.".format(object.name))
 
         # salvage last joint state and base pose
         joint_state = self.get_joint_states()
@@ -651,10 +652,12 @@ class PyBulletWorld(object):
                     for object_link_name, object_link in object.link_name_to_id.items():
                         key = (robot_link_name, object_name, object_link_name)
                         if key not in allowed_collision:
-                            collisions.update({key: ContactInfo(*x) for x in
-                                               p.getClosestPoints(self._robot.id, object.id,
-                                                                  cut_off_distances[key] + self_collision_d,
-                                                                  robot_link, object_link)})
+                            contacts = [ContactInfo(*x) for x in p.getClosestPoints(self._robot.id, object.id,
+                                                                                    cut_off_distances[
+                                                                                        key] + self_collision_d,
+                                                                                    robot_link, object_link)]
+                            if len(contacts) > 0:
+                                collisions.update({key: min(contacts, key=lambda x: x.contact_distance)})
         return collisions
 
     def check_trajectory_collision(self):

@@ -22,6 +22,110 @@ class TestSympyWrapper(unittest.TestCase):
     def setUp(self):
         np.random.seed(23)
 
+    def test_abs(self):
+        # TODO
+        pass
+
+    def test_max(self):
+        # TODO
+        pass
+
+    def test_min(self):
+        # TODO
+        pass
+
+    def test_sign(self):
+        # TODO
+        pass
+
+
+    def test_if_greater_zero1(self):
+        for i in range(100):
+            a = np.random.rand()
+            b = np.random.rand()
+            c = np.random.rand()
+            result = spw.if_greater_zero(a, b, c)
+            if a > 0:
+                self.assertAlmostEqual(result, b)
+            else:
+                self.assertAlmostEqual(result, c)
+
+    def test_if_greater_zero2(self):
+        muh = 9e9
+        for i in range(100):
+            a = np.random.rand() * muh
+            b = np.random.rand() * muh
+            c = np.random.rand() * muh
+            result = spw.if_greater_zero(a, b, c)
+            if a > 0:
+                self.assertAlmostEqual(result, b, 5)
+            else:
+                self.assertAlmostEqual(result, c, 5)
+
+    def test_if_eq_zero(self):
+        for i in range(50):
+            a = np.random.choice(range(-5, 5))
+            b = np.random.rand()
+            c = np.random.rand()
+            result = spw.if_eq_zero(a, b, c)
+            if a == 0:
+                self.assertAlmostEqual(result, b, 5, msg='a:{} b:{} c:{}; should be {}'.format(a, b, c, b))
+            else:
+                self.assertAlmostEqual(result, c, 5, msg='a:{} b:{} c:{}; should be {}'.format(a, b, c, c))
+
+    def test_safe_compiled_function(self):
+        # TODO
+        pass
+
+    def test_load_compiled_function(self):
+        # TODO
+        pass
+
+    def test_compiled_function(self):
+        # TODO
+        pass
+
+    def test_speed_up(self):
+        # TODO
+        pass
+
+    def test_cross1(self):
+        for i in range(100):
+            u = np.random.rand(3)
+            v = np.random.rand(3)
+            np_cross = np.cross(u,v)
+            sw_cross = spw.cross(u,v)
+            sw_cross = np.array(sw_cross).astype(float).T[0]
+            np.testing.assert_array_almost_equal(np_cross, sw_cross)
+            self.assertEqual(len(sw_cross), len(np_cross))
+            self.assertEqual(len(sw_cross), 3)
+
+    def test_cross2(self):
+        for i in range(100):
+            u = np.random.rand(4)
+            u[-1] = 0
+            v = np.random.rand(4)
+            v[-1] = 0
+            np_cross = np.cross(u[:-1],v[:-1])
+
+            sw_cross = spw.cross(u,v)
+            sw_cross = np.array(sw_cross).astype(float).T[0]
+            np.testing.assert_array_almost_equal(np_cross, sw_cross[:-1])
+            self.assertEqual(sw_cross[-1], 0)
+            self.assertEqual(len(sw_cross), 4)
+
+    def test_norm(self):
+        # TODO
+        pass
+
+    def test_scale(self):
+        # TODO
+        pass
+
+    def test_dot(self):
+        # TODO
+        pass
+
     def test_trace(self):
         for i in range(50):
             m1 = quaternion_matrix(random_quaternion())
@@ -210,39 +314,7 @@ class TestSympyWrapper(unittest.TestCase):
             q3 = quaternion_from_matrix(quaternion_matrix(q1))
             np.testing.assert_array_almost_equal(q2, q3)
 
-    def test_fake_if1(self):
-        for i in range(100):
-            a = np.random.rand()
-            b = np.random.rand()
-            c = np.random.rand()
-            result = spw.if_greater_zero(a, b, c)
-            if a > 0:
-                self.assertAlmostEqual(result, b)
-            else:
-                self.assertAlmostEqual(result, c)
 
-    def test_fake_if2(self):
-        muh = 9e9
-        for i in range(100):
-            a = np.random.rand() * muh
-            b = np.random.rand() * muh
-            c = np.random.rand() * muh
-            result = spw.if_greater_zero(a, b, c)
-            if a > 0:
-                self.assertAlmostEqual(result, b, 5)
-            else:
-                self.assertAlmostEqual(result, c, 5)
-
-    def test_fake_if_eq(self):
-        for i in range(50):
-            a = np.random.choice(range(-5, 5))
-            b = np.random.rand()
-            c = np.random.rand()
-            result = spw.if_eq_zero(a, b, c)
-            if a == 0:
-                self.assertAlmostEqual(result, b, 5, msg='a:{} b:{} c:{}; should be {}'.format(a, b, c, b))
-            else:
-                self.assertAlmostEqual(result, c, 5, msg='a:{} b:{} c:{}; should be {}'.format(a, b, c, c))
 
     def test_slerp1(self):
         for i in range(50):
@@ -307,30 +379,6 @@ class TestSympyWrapper(unittest.TestCase):
         np.testing.assert_array_almost_equal(georg_slerp(q2, q1, 1.0),
                                              np.array([0.348000, -0.520000, 0.616000, -0.479000]))
 
-    def test_cross1(self):
-        for i in range(100):
-            u = np.random.rand(3)
-            v = np.random.rand(3)
-            np_cross = np.cross(u,v)
-            sw_cross = spw.cross(u,v)
-            sw_cross = np.array(sw_cross).astype(float).T[0]
-            np.testing.assert_array_almost_equal(np_cross, sw_cross)
-            self.assertEqual(len(sw_cross), len(np_cross))
-            self.assertEqual(len(sw_cross), 3)
-
-    def test_cross2(self):
-        for i in range(100):
-            u = np.random.rand(4)
-            u[-1] = 0
-            v = np.random.rand(4)
-            v[-1] = 0
-            np_cross = np.cross(u[:-1],v[:-1])
-
-            sw_cross = spw.cross(u,v)
-            sw_cross = np.array(sw_cross).astype(float).T[0]
-            np.testing.assert_array_almost_equal(np_cross, sw_cross[:-1])
-            self.assertEqual(sw_cross[-1], 0)
-            self.assertEqual(len(sw_cross), 4)
 
 if __name__ == '__main__':
     import rosunit

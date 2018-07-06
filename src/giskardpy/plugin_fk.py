@@ -29,9 +29,9 @@ class FKPlugin(Plugin):
             fk = self.fk[key](**exprs)
             p = PoseStamped()
             p.header.frame_id = key[1]
-            p.pose.position.x = sw.pos_of(fk)[0, 0]
-            p.pose.position.y = sw.pos_of(fk)[1, 0]
-            p.pose.position.z = sw.pos_of(fk)[2, 0]
+            p.pose.position.x = sw.position_of(fk)[0, 0]
+            p.pose.position.y = sw.position_of(fk)[1, 0]
+            p.pose.position.z = sw.position_of(fk)[2, 0]
             p.pose.orientation = Quaternion(*quaternion_from_matrix(fk))
             return p
 

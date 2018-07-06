@@ -90,7 +90,7 @@ class Robot(object):
                 if joint.origin is not None:
                     xyz = joint.origin.xyz if joint.origin.xyz is not None else [0,0,0]
                     rpy = joint.origin.rpy if joint.origin.rpy is not None else [0,0,0]
-                    joint_frame = spw.translation3(*xyz) * spw.rotation3_rpy(*rpy)
+                    joint_frame = spw.translation3(*xyz) * spw.rotation_matrix_from_rpy(*rpy)
                 else:
                     joint_frame = spw.eye(4)
             else:
@@ -98,9 +98,9 @@ class Robot(object):
 
             if joint.type == 'revolute' or joint.type == 'continuous':
                 if joint.mimic is None:
-                    joint_frame *= spw.rotation3_axis_angle(spw.vector3(*joint.axis), joint_symbol)
+                    joint_frame *= spw.rotation_matrix_from_axis_angle(spw.vector3(*joint.axis), joint_symbol)
                 else:
-                    joint_frame *= spw.rotation3_axis_angle(spw.vector3(*joint.axis), mimic)
+                    joint_frame *= spw.rotation_matrix_from_axis_angle(spw.vector3(*joint.axis), mimic)
 
             elif joint.type == 'prismatic':
                 if joint.mimic is None:

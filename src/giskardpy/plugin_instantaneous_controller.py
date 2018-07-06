@@ -250,14 +250,14 @@ class CartesianBulletControllerPlugin(Plugin):
 
         if type == Controller.TRANSLATION_3D:
             return position_conv(goal_input.get_position(),
-                                 sw.pos_of(robot.get_fk_expression(root, tip)),
+                                 sw.position_of(robot.get_fk_expression(root, tip)),
                                  weights=weight,
                                  trans_gain=p_gain,
                                  max_trans_speed=max_speed,
                                  ns='{}/{}'.format(root, tip))
         elif type == Controller.ROTATION_3D:
             return rotation_conv(goal_input.get_rotation(),
-                                 sw.rot_of(robot.get_fk_expression(root, tip)),
+                                 sw.rotation_of(robot.get_fk_expression(root, tip)),
                                  current_input.get_rotation(),
                                  weights=weight,
                                  rot_gain=p_gain,

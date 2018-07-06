@@ -80,13 +80,13 @@ class FrameInput(InputArray):
                         qw=f(orientation_prefix + ['w']))
 
     def get_frame(self):
-        return sw.frame3_quaternion(self.x, self.y, self.z, self.qx, self.qy, self.qz, self.qw)
+        return sw.frame_quaternion(self.x, self.y, self.z, self.qx, self.qy, self.qz, self.qw)
 
     def get_position(self):
         return sw.point3(self.x, self.y, self.z)
 
     def get_rotation(self):
-        return sw.rotation3_quaternion(self.qx, self.qy, self.qz, self.qw)
+        return sw.rotation_matrix_from_quaternion(self.qx, self.qy, self.qz, self.qw)
 
 
 class ShortestAngularDistanceInput(object):

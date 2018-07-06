@@ -79,7 +79,7 @@ def joint_position(current_joint, joint_goal, weight, p_gain, max_speed, name):
     soft_constraints = OrderedDict()
 
     err = joint_goal - current_joint
-    capped_err = sw.diffable_Max(sw.diffable_Min(p_gain * err, max_speed), -max_speed)
+    capped_err = sw.diffable_max_fast(sw.diffable_min_fast(p_gain * err, max_speed), -max_speed)
 
     soft_constraints[name] = SoftConstraint(lower=capped_err,
                                             upper=capped_err,
@@ -94,7 +94,7 @@ def joint_position(current_joint, joint_goal, weight, p_gain, max_speed, name):
 def continuous_joint_position(current_joint, change, weight, p_gain, max_speed, name):
     soft_constraints = OrderedDict()
 
-    capped_err = sw.diffable_Max(sw.diffable_Min(p_gain * change, max_speed), -max_speed)
+    capped_err = sw.diffable_max_fast(sw.diffable_min_fast(p_gain * change, max_speed), -max_speed)
 
     soft_constraints[name] = SoftConstraint(lower=capped_err,
                                             upper=capped_err,
@@ -122,7 +122,7 @@ def position_conv(goal_position, current_position, weights=1, trans_gain=3, max_
 
     trans_error_vector = goal_position - current_position
     trans_error = sw.norm(trans_error_vector)
-    trans_scale = sw.diffable_Min(trans_error * trans_gain, max_trans_speed)
+    trans_scale = sw.diffable_min_fast(trans_error * trans_gain, max_trans_speed)
     trans_control = trans_error_vector / trans_error * trans_scale
 
     soft_constraints['align {} x position'.format(ns)] = SoftConstraint(lower=trans_control[0],
@@ -146,11 +146,11 @@ def rotation_conv(goal_rotation, current_rotation, current_evaluated_rotation, w
     soft_constraints = OrderedDict()
     axis, angle = sw.axis_angle_from_matrix((current_rotation.T * goal_rotation))
 
-    capped_angle = sw.diffable_Max(sw.diffable_Min(rot_gain * angle, max_rot_speed), -max_rot_speed)
+    capped_angle = sw.diffable_max_fast(sw.diffable_min_fast(rot_gain * angle, max_rot_speed), -max_rot_speed)
 
     r_rot_control = axis * capped_angle
 
-    hack = sw.rotation3_axis_angle([0, 0, 1], 0.0001)
+    hack = sw.rotation_matrix_from_axis_angle([0, 0, 1], 0.0001)
 
     axis, angle = sw.axis_angle_from_matrix((current_rotation.T * (current_evaluated_rotation * hack)).T)
     c_aa = (axis * angle)
@@ -186,14 +186,14 @@ def rotation_conv_slerp(goal_rotation, current_rotation, current_evaluated_rotat
                                   sw.quaternion_from_matrix(goal_rotation),
                                   interpolation_value)
 
-    rm = current_rotation.T * sw.rotation3_quaternion(*intermediate_goal)
+    rm = current_rotation.T * sw.rotation_matrix_from_quaternion(*intermediate_goal)
 
     axis2, angle2 = sw.axis_angle_from_matrix(rm)
 
     r_rot_control = current_rotation[:3,:3] * (axis2*angle2)
 
 
-    hack = sw.rotation3_axis_angle([0, 0, 1], 0.0001)
+    hack = sw.rotation_matrix_from_axis_angle([0, 0, 1], 0.0001)
     axis, angle = sw.axis_angle_from_matrix((current_rotation.T * (current_evaluated_rotation * hack)).T)
     c_aa = (axis * angle)
 
@@ -223,7 +223,7 @@ def rotation_conv_slerp2(goal_rotation, current_rotation, current_evaluated_rota
 
 
 
-    hack = sw.rotation3_axis_angle([0, 0, 1], 0.0001)
+    hack = sw.rotation_matrix_from_axis_angle([0, 0, 1], 0.0001)
 
     axis, angle = sw.axis_angle_from_matrix((current_rotation.T * (current_evaluated_rotation * hack)).T)
     c_aa = (axis * angle)

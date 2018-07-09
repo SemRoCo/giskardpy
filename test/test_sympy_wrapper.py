@@ -46,7 +46,7 @@ def list_of_same_size(draw, elements, number_of_lists, min_size, max_size):
 
 def unit_vector(length, elements=None):
     if elements is None:
-        elements = limited_float(min_dist_to_zero=1e-50)
+        elements = limited_float(min_dist_to_zero=1e-20)
     vector = st.lists(elements,
                       min_size=length,
                       max_size=length).filter(lambda x: np.linalg.norm(x) > SMALL_NUMBER and
@@ -54,7 +54,7 @@ def unit_vector(length, elements=None):
 
     def normalize(v):
         l = np.linalg.norm(v)
-        return [x / l for x in v]
+        return [round(x / l, 10) for x in v]
 
     return st.builds(normalize, vector)
 
@@ -236,7 +236,6 @@ class TestSympyWrapper(unittest.TestCase):
     @given(quaternion(),
            quaternion(),
            st.floats(allow_nan=False, allow_infinity=False, min_value=0, max_value=1))
-    @reproduce_failure('3.66.0', 'AXicY2DABIxYxHABAmoBAMkAAw==')
     def test_speed_up3(self, q1, q2, t):
         q1_s = spw.var('q1x q1y q1z q1w')
         q2_s = spw.var('q2x q2y q2z q2w')

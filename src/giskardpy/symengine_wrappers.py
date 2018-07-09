@@ -765,7 +765,7 @@ def diffable_slerp(q1, q2, t):
     q2 = if_greater_zero(if0, -q2, q2)
     cos_half_theta = if_greater_zero(if0, -cos_half_theta, cos_half_theta)
 
-    if1 = abs(cos_half_theta) - 1.0
+    if1 = diffable_abs(cos_half_theta) - 1.0
 
     half_theta = acos(cos_half_theta)
 
@@ -773,7 +773,7 @@ def diffable_slerp(q1, q2, t):
     # prevent /0
     sin_half_theta = if_eq_zero(sin_half_theta, 1, sin_half_theta)
 
-    if2 = 0.001 - abs(sin_half_theta)
+    if2 = 0.001 - diffable_abs(sin_half_theta)
 
     ratio_a = sin((1.0 - t) * half_theta) / sin_half_theta
     ratio_b = sin(t * half_theta) / sin_half_theta

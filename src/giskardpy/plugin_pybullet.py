@@ -154,15 +154,15 @@ class PyBulletPlugin(Plugin):
                                                "Received invalid operation code: {}".format(req.operation))
                 return UpdateWorldResponse()
             except CorruptShapeException as e:
-                return UpdateWorldResponse(UpdateWorldResponse.CORRUPT_SHAPE_ERROR, e.message)
+                return UpdateWorldResponse(UpdateWorldResponse.CORRUPT_SHAPE_ERROR, str(e))
             except UnknownBodyException as e:
-                return UpdateWorldResponse(UpdateWorldResponse.MISSING_BODY_ERROR, e.message)
+                return UpdateWorldResponse(UpdateWorldResponse.MISSING_BODY_ERROR, str(e))
             except DuplicateObjectNameException as e:
-                return UpdateWorldResponse(UpdateWorldResponse.DUPLICATE_BODY_ERROR, e.message)
+                return UpdateWorldResponse(UpdateWorldResponse.DUPLICATE_BODY_ERROR, str(e))
             except UnsupportedOptionException as e:
-                return UpdateWorldResponse(UpdateWorldResponse.UNSUPPORTED_OPTIONS, e.message)
+                return UpdateWorldResponse(UpdateWorldResponse.UNSUPPORTED_OPTIONS, str(e))
             except Exception as e:
-                return UpdateWorldResponse(UpdateWorldResponse.UNSUPPORTED_OPTIONS, e.message)
+                return UpdateWorldResponse(UpdateWorldResponse.UNSUPPORTED_OPTIONS, str(e))
 
     def update(self):
         with self.lock:

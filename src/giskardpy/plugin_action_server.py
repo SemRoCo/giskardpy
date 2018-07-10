@@ -21,8 +21,8 @@ from giskardpy.exceptions import MAX_NWSR_REACHEDException, QPSolverException, S
     SymengineException, PathCollisionException
 from giskardpy.plugin import Plugin
 from giskardpy.tfwrapper import transform_pose
-from giskardpy.trajectory import ClosestPointInfo
-from giskardpy.trajectory import SingleJointState, Transform, Point, Quaternion, Trajectory
+from giskardpy.data_types import ClosestPointInfo
+from giskardpy.data_types import SingleJointState, Transform, Point, Quaternion, Trajectory
 
 
 def closest_point_constraint_violated(cp, multiplier=0.9):

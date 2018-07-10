@@ -4,7 +4,7 @@ from shape_msgs.msg import SolidPrimitive
 from geometry_msgs.msg import Pose as PoseMsg, Point as PointMsg, Quaternion as QuaternionMsg
 
 from giskardpy.exceptions import CorruptShapeException
-from giskardpy.trajectory import Transform, Point, Quaternion
+from giskardpy.data_types import Transform, Point, Quaternion
 from lxml import etree
 import PyKDL as kdl # TODO: get rid of this dependency
 

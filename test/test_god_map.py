@@ -1,138 +1,179 @@
 import unittest
 from collections import namedtuple
+from hypothesis import given, reproduce_failure, assume
+import hypothesis.strategies as st
 
 from giskardpy.god_map import GodMap
+from giskardpy.test_utils import valid_key, variable_name, keys_values, lists_of_same_length
 
-PKG = 'giskardpy'
+PKG = u'giskardpy'
 
 
-class TestDataBus(unittest.TestCase):
-    def test_set1(self):
+class TestGodMap(unittest.TestCase):
+    @given(valid_key,
+           st.integers())
+    def test_set_get_integer(self, key, number):
         db = GodMap()
-        db.set_data('asdf', 2)
-        self.assertEqual(db.get_data('asdf'), 2)
+        db.set_data([key], number)
+        self.assertEqual(db.get_data([key]), number, msg=u'key={}, number={}'.format(key, number))
 
-    def test_set2(self):
+    @given(valid_key,
+           st.floats(allow_nan=False))
+    def test_set_get_float(self, key, number):
         db = GodMap()
-        db.set_data('asdf', 2)
-        db.set_data('asdf', 2)
-        self.assertEqual(db.get_data('asdf'), 2)
+        db.set_data([key], number)
+        db.set_data([key], number)
 
-    def test_namedtuple(self):
-        Frame = namedtuple('Frame', ['pos'])
+        self.assertEqual(db.get_data([key]), number)
+
+    @given(valid_key,
+           variable_name(),
+           keys_values())
+    def test_namedtuple(self, key, tuple_name, key_values):
+        Frame = namedtuple(tuple_name, key_values[0])
         db = GodMap()
-        db.set_data('f12', Frame(pos=2))
-        self.assertEqual(db.get_data('f12/pos'), 2)
+        db.set_data([key], Frame(*key_values[1]))
+        for k, v in zip(*key_values):
+            self.assertEqual(db.get_data([key, k]), v)
 
     def test_namedtuple1(self):
-        Frame = namedtuple('Frame', ['pos'])
+        Frame = namedtuple(u'Frame', [u'pos'])
         db = GodMap()
-        db.set_data('f12', Frame(pos=2))
+        db.set_data([u'f12'], Frame(pos=2))
         with self.assertRaises(AttributeError):
-            db.set_data('f12/pos', 42)
+            db.set_data([u'f12', u'pos'], 42)
 
-    def test_class1(self):
-        class C1(object):
-            asdf = 32
-        db = GodMap()
-        db.set_data('asdf', C1())
-        self.assertEqual(db.get_data('asdf/asdf'), 32)
+    @given(valid_key,
+           variable_name(),
+           keys_values())
+    def test_class1(self, key, class_name, key_values):
+        c = type(str(class_name), (object,), {})()
+        for k, v in zip(*key_values):
+            setattr(c, k, None)
 
-    def test_class2(self):
-        class C1(object):
-            asdf = 32
         db = GodMap()
-        db.set_data('asdf', C1())
-        db.set_data('asdf/asdf', 2)
-        self.assertEqual(db.get_data('asdf/asdf'), 2)
+        db.set_data([key], c)
 
-    def test_class4(self):
-        class C1(object):
-            asdf = 32
-        db = GodMap()
-        db.set_data('asdf', C1())
-        db.set_data('asdf/asdff', 2)
-        self.assertEqual(db.get_data('asdf/asdff'), 2)
+        for k, v in zip(*key_values):
+            self.assertEqual(db.get_data([key, k]), None)
+        for k, v in zip(*key_values):
+            db.set_data([key, k], v)
+        for k, v in zip(*key_values):
+            self.assertEqual(db.get_data([key, k]), v)
 
-    def test_class3(self):
-        class C1(object):
-            asdf = 32
+    @given(st.lists(variable_name(), unique=True))
+    def test_class3(self, class_names):
         db = GodMap()
-        db.set_data('asdf', C1())
-        db.set_data('asdf/asdf', C1())
-        self.assertEqual(db.get_data('asdf/asdf/asdf'), 32)
+        for i, name in enumerate(class_names):
+            c = type(str(name), (object,), {})()
+            db.set_data(class_names[:i + 1], c)
 
-    def test_dict1(self):
-        d = {'fu': 1, 'ba': 2}
-        db = GodMap()
-        db.set_data('asdf', d)
-        self.assertEqual(db.get_data('asdf/fu'), 1)
-        self.assertEqual(db.get_data('asdf/ba'), 2)
+        for i, name in enumerate(class_names):
+            c = db.get_data(class_names[:i + 1])
+            self.assertEqual(type(c).__name__, name)
 
-    def test_dict2(self):
-        d = {'fu': 1, 'ba': 2}
+    @given(valid_key,
+           keys_values())
+    def test_dict1(self, key, key_values):
+        d = {k: v for k, v in zip(*key_values)}
         db = GodMap()
-        db.set_data('asdf', d)
-        db.set_data('asdf/fu', 42)
-        db.set_data('asdf/lulu', 1337)
-        self.assertEqual(db.get_data('asdf/fu'), 42)
-        self.assertEqual(db.get_data('asdf/ba'), 2)
-        self.assertEqual(db.get_data('asdf/lulu'), 1337)
+        db.set_data([key], d)
+        for k, v in zip(*key_values):
+            self.assertEqual(db.get_data([key, k]), v)
 
-    def test_dict3(self):
-        d = {('a','b'): 42}
+    @given(valid_key,
+           keys_values())
+    def test_dict2(self, key, key_values):
+        d = {}
         db = GodMap()
-        db.set_data('asdf', d)
-        self.assertEqual(db.get_data('asdf/a,b'), 42)
-        self.assertEqual(db.get_data('asdf/(a,b)'), 42)
+        db.set_data([key], d)
+        for k, v in zip(*key_values):
+            db.set_data([key, k], v)
+        for k, v in zip(*key_values):
+            self.assertEqual(db.get_data([key, k]), v)
 
-    def test_list1(self):
-        l = range(10)
+    @given(valid_key,
+           st.lists(valid_key, min_size=1),
+           st.floats(allow_nan=False))
+    def test_dict3(self, key, tuple_key, value):
+        tuple_key = tuple(tuple_key)
+        d = {tuple_key: value}
         db = GodMap()
-        db.set_data('asdf', l)
-        for i in l:
-            self.assertEqual(db.get_data('asdf/{}'.format(i)), i)
+        db.set_data([key], d)
+        self.assertEqual(db.get_data([key, tuple_key]), value)
 
-    def test_tuple1(self):
-        l = (0,1,2,3,4)
+    @given(valid_key,
+           st.lists(st.floats(allow_nan=False), min_size=1))
+    def test_list1(self, key, value):
         db = GodMap()
-        db.set_data('asdf', l)
-        for i in l:
-            self.assertEqual(db.get_data('asdf/{}'.format(i)), i)
+        db.set_data([key], value)
+        for i, v in enumerate(value):
+            self.assertEqual(db.get_data([key, i]), v)
 
-    def test_list2(self):
-        l = range(10)
+    @given(valid_key,
+           st.lists(st.floats(allow_nan=False), min_size=1))
+    def test_tuple1(self, key, value):
+        value = tuple(value)
         db = GodMap()
-        db.set_data('asdf', l)
-        db.set_data('asdf/0', 42)
-        self.assertEqual(db.get_data('asdf/0'), 42)
+        db.set_data([key], value)
+        for i, v in enumerate(value):
+            self.assertEqual(db.get_data([key, i]), v)
 
-    def test_list3(self):
-        l = range(10)
+    @given(valid_key,
+           lists_of_same_length([st.floats(allow_nan=False), st.floats(allow_nan=False)]))
+    def test_list_overwrite_entry(self, key, lists):
+        first_values, second_values = lists
         db = GodMap()
-        db.set_data('asdf', l)
+        db.set_data([key], first_values)
+        for i, v in enumerate(first_values):
+            self.assertEqual(db.get_data([key, i]), v)
+            db.set_data([key, i], second_values[i])
+
+        for i, v in enumerate(second_values):
+            self.assertEqual(db.get_data([key, i]), v)
+
+    @given(valid_key,
+           st.lists(st.floats(allow_nan=False), min_size=1))
+    def test_list_index_error(self, key, l):
+        db = GodMap()
+        db.set_data([key], l)
         with self.assertRaises(IndexError):
-            db.set_data('asdf/11111', 42)
+            db.set_data([key, len(l)+1], 0)
 
-    def test_function1(self):
+    @given(valid_key,
+           st.lists(st.floats(allow_nan=False), min_size=1))
+    def test_list_negative_index(self, key, l):
         db = GodMap()
-        f = lambda gm: 1337
-        db.set_data(['muh'], f)
-        self.assertEqual(db.get_data(['muh']), 1337)
+        db.set_data([key], l)
+        for i in range(len(l)):
+            self.assertEqual(db.get_data([key, -i]), l[-i])
 
-    def test_function2(self):
+    @given(valid_key,
+           st.floats(allow_nan=False))
+    def test_function1(self, key, value):
+        # TODO not clean that i try to call every function
         db = GodMap()
+        f = lambda gm: value
+        db.set_data([key], f)
+        self.assertEqual(db.get_data([key]), value)
+
+    @given(valid_key, valid_key, st.floats(allow_nan=False))
+    def test_function2(self, key, dict_key, return_value):
+        db = GodMap()
+
         class MUH(object):
             def __call__(self, god_map):
-                return 42
+                return return_value
+
         a = MUH()
-        d = {'muh': a}
-        db.set_data(['mu'], d)
-        self.assertEqual(db.get_data(['mu', 'muh']), 42)
+        d = {dict_key: a}
+        db.set_data([key], d)
+        self.assertEqual(db.get_data([key, dict_key]), return_value)
+
 
 if __name__ == '__main__':
     import rosunit
 
     rosunit.unitrun(package=PKG,
                     test_name='TestDataBus',
-                    test=TestDataBus)
+                    test=TestGodMap)

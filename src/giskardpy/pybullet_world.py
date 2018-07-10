@@ -13,7 +13,7 @@ import errno
 from numpy.random.mtrand import seed
 
 from giskardpy.exceptions import UnknownBodyException, DuplicateObjectNameException, DuplicateRobotNameException
-from giskardpy.trajectory import MultiJointState, SingleJointState, Transform, Point, Quaternion
+from giskardpy.data_types import MultiJointState, SingleJointState, Transform, Point, Quaternion
 import numpy as np
 
 from giskardpy.utils import keydefaultdict

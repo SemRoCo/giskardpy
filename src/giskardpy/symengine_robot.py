@@ -130,7 +130,7 @@ class Robot(object):
                                              upper_limit,
                                              joint.type,
                                              joint_frame)
-        self.joint_states_input = JointStatesInput(joint_map)
+        self.joint_states_input = JointStatesInput(lambda x: spw.Symbol(x[0]), joint_map)
 
     def _create_constraints(self):
         self.hard_constraints = OrderedDict()

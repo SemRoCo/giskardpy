@@ -4,12 +4,13 @@ import traceback
 import symengine as se
 from copy import copy
 
+SEPARATOR = u'/'
 
 class GodMap(object):
     def __init__(self):
         self._data = {}
-        self.separator = '/'
-        self.expr_separator = '_'
+        self.separator = SEPARATOR
+        self.expr_separator = u'_'
         self.key_to_expr = {}
         self.expr_to_key = {}
         self.default_value = 0
@@ -35,17 +36,20 @@ class GodMap(object):
         if callable(identifier):
             # TODO this solution calls identifier multiple times if the result is an array, make it faster
             return self._get_member(identifier(self), member)
-        elif ',' in member: # handle tuple member
-            member = member.replace('(','')
-            member = member.replace(')','')
-            member = tuple(member.split(','))
+        # elif u',' in member: # handle tuple member
+        #     member = member.replace(u'(',u'')
+        #     member = member.replace(u')',u'')
+        #     member = tuple(member.split(u','))
         try:
             return identifier[member]
         except TypeError:
             try:
                 return identifier[int(member)]
             except (TypeError, ValueError):
-                return getattr(identifier, member)
+                try:
+                    return getattr(identifier, member)
+                except TypeError as e:
+                    pass
 
     def get_data(self, key):
         """
@@ -55,10 +59,12 @@ class GodMap(object):
         :return: object that is saved at key
         """
         # TODO deal with unused identifiers
-        if isinstance(key, str):
-            identifier_parts = key.split(self.separator)
-        else:
-            identifier_parts = key
+        # if isinstance(key, str):
+        #     identifier_parts = key.split(self.separator)
+        # else:
+        assert isinstance(key, list) or isinstance(key, tuple)
+        key = tuple(key)
+        identifier_parts = key
         namespace = identifier_parts[0]
         result = self._data.get(namespace)
         for member in identifier_parts[1:]:
@@ -79,35 +85,42 @@ class GodMap(object):
             return result
 
     def get_expr(self, key):
-        if isinstance(key, str):
-            identifier_parts = key.split(self.separator)
-        else:
-            identifier_parts = key
-            key = '/'.join([str(x) for x in key])
+        assert isinstance(key, list) or isinstance(key, tuple)
+        key = tuple(key)
+        # if isinstance(key, str):
+        #     identifier_parts = key.split(self.separator)
+        # else:
+        identifier_parts = key
+        # key = self.separator.join(key)
         if key not in self.key_to_expr:
-            expr = se.Symbol(key.replace(self.separator, self.expr_separator))
+            expr = se.Symbol(self.expr_separator.join([str(x) for x in key]))
+            # expr = se.Symbol(key.replace(self.separator, self.expr_separator))
             if expr in self.expr_to_key:
-                raise Exception('{} not allowed in key'.format(self.expr_separator))
+                raise Exception(u'{} not allowed in key'.format(self.expr_separator))
             self.key_to_expr[key] = expr
             self.expr_to_key[str(expr)] = identifier_parts
         return self.key_to_expr[key]
 
     def get_expr_values(self):
         #TODO potential speedup by only updating entries that have changed
-        return {expr: self.get_data(key) for expr, key in self.expr_to_key.items()}
+        return {expr: self.get_data(tuple(key)) for expr, key in self.expr_to_key.items()}
 
     def get_free_symbols(self):
         return self.key_to_expr.values()
 
     def set_data(self, key, value):
-        if isinstance(key, str):
-            identifier_parts = key.split(self.separator)
-        else:
-            identifier_parts = [str(x) for x in key]
+        assert isinstance(key, list) or isinstance(key, tuple)
+        key = tuple(key)
+        if len(key) == 0:
+            raise ValueError(u'key is empty')
+        # if isinstance(key, str):
+        #     identifier_parts = key.split(self.separator)
+        # else:
+        identifier_parts = key
         namespace = identifier_parts[0]
         if namespace not in self._data:
             if len(identifier_parts) > 1:
-                raise KeyError('Can not access member of unknown namespace: {}'.format(key))
+                raise KeyError(u'Can not access member of unknown namespace: {}'.format(key))
             else:
                 self._data[namespace] = value
         else:

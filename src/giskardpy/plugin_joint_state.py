@@ -6,7 +6,7 @@ import rospy
 from sensor_msgs.msg import JointState
 
 from giskardpy.plugin import Plugin
-from giskardpy.trajectory import SingleJointState
+from giskardpy.data_types import SingleJointState
 from giskardpy.utils import to_joint_state_dict
 
 

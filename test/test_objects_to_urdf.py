@@ -2,7 +2,7 @@ import unittest
 
 from giskardpy.object import WorldObject, to_urdf_string, MeshShape, ColorRgba, MaterialProperty, VisualProperty, \
     BoxShape, FixedJoint
-from giskardpy.trajectory import Transform, Point, Quaternion
+from giskardpy.data_types import Transform, Point, Quaternion
 
 PKG = 'giskardpy'
 

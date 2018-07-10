@@ -4,7 +4,7 @@ import math
 from geometry_msgs.msg import PointStamped, Point, Vector3Stamped, Vector3, Pose, PoseStamped, QuaternionStamped, \
     Quaternion
 from sensor_msgs.msg import JointState
-from giskardpy.trajectory import SingleJointState
+from giskardpy.data_types import SingleJointState
 
 
 class keydefaultdict(defaultdict):
@@ -15,6 +15,29 @@ class keydefaultdict(defaultdict):
             ret = self[key] = self.default_factory(key)
             return ret
 
+
+
+
+def slerp(q1, q2, t):
+    cos_half_theta = np.dot(q1, q2)
+
+    if (cos_half_theta < 0):
+        q2 = -q2
+        cos_half_theta = -cos_half_theta
+
+    if (abs(cos_half_theta) >= 1.0):
+        return q1
+
+    half_theta = math.acos(cos_half_theta)
+    sin_half_theta = np.sqrt(1.0 - cos_half_theta * cos_half_theta)
+
+    if (abs(sin_half_theta) < 0.001):
+        return 0.5 * q1 + 0.5 * q2
+
+    ratio_a = np.sin((1.0 - t) * half_theta) / sin_half_theta
+    ratio_b = np.sin(t * half_theta) / sin_half_theta
+
+    return ratio_a * q1 + ratio_b * q2
 
 #
 # CONVERSION FUNCTIONS FOR ROS MESSAGES
@@ -111,24 +134,3 @@ def to_list(thing):
                 thing.orientation.z,
                 thing.orientation.w]
 
-
-def slerp(q1, q2, t):
-    cos_half_theta = np.dot(q1, q2)
-
-    if (cos_half_theta < 0):
-        q2 = -q2
-        cos_half_theta = -cos_half_theta
-
-    if (abs(cos_half_theta) >= 1.0):
-        return q1
-
-    half_theta = math.acos(cos_half_theta)
-    sin_half_theta = np.sqrt(1.0 - cos_half_theta * cos_half_theta)
-
-    if (abs(sin_half_theta) < 0.001):
-        return 0.5 * q1 + 0.5 * q2
-
-    ratio_a = np.sin((1.0 - t) * half_theta) / sin_half_theta
-    ratio_b = np.sin(t * half_theta) / sin_half_theta
-
-    return ratio_a * q1 + ratio_b * q2

@@ -22,7 +22,7 @@ from giskardpy.plugin import Plugin
 from giskardpy.pybullet_world import PyBulletWorld, ContactInfo
 from giskardpy.symengine_wrappers import euclidean_distance
 from giskardpy.tfwrapper import transform_pose, lookup_transform, transform_point, transform_vector
-from giskardpy.trajectory import ClosestPointInfo
+from giskardpy.data_types import ClosestPointInfo
 from giskardpy.utils import keydefaultdict, to_joint_state_dict, to_point_stamped, to_vector3_stamped, to_list
 
 

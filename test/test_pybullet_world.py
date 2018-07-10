@@ -7,7 +7,7 @@ from giskardpy.god_map import GodMap
 from giskardpy.pybullet_world import PyBulletWorld
 import pybullet as p
 
-from giskardpy.trajectory import MultiJointState, SingleJointState
+from giskardpy.data_types import MultiJointState, SingleJointState
 
 PKG = 'giskardpy'
 

@@ -106,7 +106,7 @@ class CartesianBulletControllerPlugin(Plugin):
                 gain = self.god_map.to_symbol([self._goal_identifier, str(Controller.JOINT), joint_name, 'p_gain'])
                 max_speed = self.god_map.to_symbol(
                     [self._goal_identifier, str(Controller.JOINT), joint_name, 'max_speed'])
-                if robot.is_continuous(joint_name):
+                if robot.is_joint_continuous(joint_name):
                     change = ShortestAngularDistanceInput(self.god_map.to_symbol,
                                                           [self._pyfunctions_identifier],
                                                           current_joint_key,
@@ -121,7 +121,7 @@ class CartesianBulletControllerPlugin(Plugin):
                     self.soft_constraints.update(joint_position(current_joint_expr, goal_joint_expr, weight,
                                                                 gain,
                                                                 max_speed, joint_name))
-                controllable_links.update(robot.get_link_tree(joint_name))
+                controllable_links.update(robot.get_sub_tree_link_names_with_collision(joint_name))
             self.god_map.set_data([self.controllable_links_identifier], controllable_links)
             self.god_map.set_data([self._pyfunctions_identifier], pyfunctions)
 
@@ -163,7 +163,7 @@ class CartesianBulletControllerPlugin(Plugin):
             robot = self._controller.robot
 
             current_joints = JointStatesInput(self.god_map.to_symbol,
-                                              robot.get_joint_names(),
+                                              robot.get_joint_names_movable(),
                                               [self._joint_states_identifier],
                                               ['position'])
             robot.set_joint_symbol_map(current_joints)
@@ -182,7 +182,7 @@ class CartesianBulletControllerPlugin(Plugin):
         for (root, tip), value in self.god_map.get_data([self._goal_identifier,
                                                          str(Controller.TRANSLATION_3D)]).items():
             key = '{}/{},{}'.format(Controller.TRANSLATION_3D, root, tip)
-            hold_joints.difference_update(robot.get_chain_joints(root, tip))
+            hold_joints.difference_update(robot.get_joint_names_from_chain_movable(root, tip))
             if key not in self.known_constraints:
                 print('added chain {} -> {} type: TRANSLATION_3D'.format(root, tip))
                 self.known_constraints.add(key)
@@ -194,7 +194,7 @@ class CartesianBulletControllerPlugin(Plugin):
                                    'weight'], 1)
         for (root, tip), value in self.god_map.get_data([self._goal_identifier, str(Controller.ROTATION_3D)]).items():
             key = '{}/{},{}'.format(Controller.ROTATION_3D, root, tip)
-            hold_joints.difference_update(robot.get_chain_joints(root, tip))
+            hold_joints.difference_update(robot.get_joint_names_from_chain_movable(root, tip))
             if key not in self.known_constraints:
                 print('added chain {} -> {} type: ROTATION_3D'.format(root, tip))
                 self.known_constraints.add(key)

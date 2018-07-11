@@ -1,5 +1,7 @@
+from __future__ import division
 from collections import defaultdict, OrderedDict
 import numpy as np
+from numpy import pi
 import math
 from geometry_msgs.msg import PointStamped, Point, Vector3Stamped, Vector3, Pose, PoseStamped, QuaternionStamped, \
     Quaternion
@@ -14,8 +16,6 @@ class keydefaultdict(defaultdict):
         else:
             ret = self[key] = self.default_factory(key)
             return ret
-
-
 
 
 def slerp(q1, q2, t):
@@ -38,6 +38,27 @@ def slerp(q1, q2, t):
     ratio_b = np.sin(t * half_theta) / sin_half_theta
 
     return ratio_a * q1 + ratio_b * q2
+
+
+def sphere_volume(r):
+    return (4 / 3.) * pi * r ** 3
+
+def sphere_surface(r):
+    return 4*pi*r**2
+
+def cube_volume(l, w, h):
+    return l * w * h
+
+
+def cube_surface(l, w, h):
+    return 2 * (l * w + l * h + w * h)
+
+
+def cylinder_volume(r, h):
+    return pi * r ** 2 * h
+
+def cylinder_surface(r, h):
+    return 2*pi*r*(h+r)
 
 #
 # CONVERSION FUNCTIONS FOR ROS MESSAGES
@@ -68,6 +89,7 @@ def to_joint_state_dict(msg):
         mjs[joint_name] = sjs
     return mjs
 
+
 def dict_to_joint_states(joint_state_dict):
     js = JointState()
     for k, v in joint_state_dict.items():
@@ -76,6 +98,7 @@ def dict_to_joint_states(joint_state_dict):
         js.velocity.append(0)
         js.effort.append(0)
     return js
+
 
 def to_point_stamped(frame_id, point):
     """
@@ -133,4 +156,3 @@ def to_list(thing):
                 thing.orientation.y,
                 thing.orientation.z,
                 thing.orientation.w]
-

@@ -27,8 +27,7 @@ class SymEngineController(object):
         :type joint_names: set
         """
         self.controlled_joints.extend(x for x in joint_names if x not in self.controlled_joints)
-        self.controlled_joint_symbols = [self.robot.get_joint_symbol_map().joint_map[x] for x in
-                                         self.controlled_joints]
+        self.controlled_joint_symbols = [self.robot.joint_to_symbol(x) for x in self.controlled_joints]
         self.joint_constraints = OrderedDict(((self.robot.get_name(), k), self.robot.joint_constraints[k]) for k in
                                              self.controlled_joints)
         self.hard_constraints = OrderedDict(((self.robot.get_name(), k), self.robot.hard_constraints[k]) for k in

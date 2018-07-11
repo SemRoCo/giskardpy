@@ -5,6 +5,7 @@ from hypothesis.strategies import composite
 import keyword
 import numpy as np
 
+from giskardpy.symengine_robot import Robot
 
 BIG_NUMBER = 1e100
 SMALL_NUMBER = 1e-100
@@ -32,6 +33,16 @@ def lists_of_same_length(draw, data_types=(), max_length=10, unique=False):
     for elements in data_types:
         lists.append(draw(st.lists(elements, min_size=length, max_size=length, unique=unique)))
     return lists
+
+
+@composite
+def rnd_joint_state(draw, joint_limits):
+    return {jn: draw(st.floats(ll, ul, allow_nan=False, allow_infinity=False)) for jn, (ll, ul) in joint_limits.items()}
+
+@composite
+def pr2_joint_state(draw):
+    pr2 = Robot.from_urdf_file(u'../test/pr2.urdf')
+    return draw(rnd_joint_state(*pr2.get_joint_limits()))
 
 
 def limited_float(outer_limit=BIG_NUMBER, min_dist_to_zero=None):

@@ -23,7 +23,7 @@ class FKPlugin(Plugin):
     def update(self):
         # TODO don't use start once here
         self.start_once()
-        exprs = self.god_map.get_expr_values()
+        exprs = self.god_map.get_symbol_map()
 
         def on_demand_fk_evaluated(key):
             fk = self.fk[key](**exprs)
@@ -45,13 +45,13 @@ class FKPlugin(Plugin):
             self.urdf_hash = new_urdf_hash
             self.robot = Robot(urdf)
             joint_names = self.robot.get_joint_names()
-            current_joints = JointStatesInput(self.god_map.get_expr,
+            current_joints = JointStatesInput(self.god_map.to_symbol,
                                               joint_names,
                                               (self._joint_states_identifier,),
                                               ('position',))
             self.robot.set_joint_symbol_map(current_joints)
 
-            free_symbols = self.god_map.get_free_symbols()
+            free_symbols = self.god_map.get_registered_symbols()
 
             def on_demand_fk(key):
                 # TODO possible speed up by merging fks into one matrix

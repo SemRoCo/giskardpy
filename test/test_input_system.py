@@ -6,7 +6,7 @@ import hypothesis.strategies as st
 
 from giskardpy.god_map import GodMap
 from giskardpy.input_system import JointStatesInput, Point3Input, Vector3Input, FrameInput
-from giskardpy.test_utils import valid_key, variable_name
+from giskardpy.test_utils import variable_name
 import giskardpy.symengine_wrappers as spw
 
 
@@ -21,7 +21,7 @@ class TestInputSystem(unittest.TestCase):
            st.lists(variable_name()))
     def test_joint_states_input(self, joint_names, prefix, suffix):
         gm = GodMap()
-        js_input = JointStatesInput(gm.get_expr, joint_names, prefix, suffix)
+        js_input = JointStatesInput(gm.to_symbol, joint_names, prefix, suffix)
         for i, (joint_name, joint_symbol) in enumerate(js_input.joint_map.items()):
             self.assertTrue(joint_name in joint_names)
             symbol_str = str(joint_symbol)
@@ -37,7 +37,7 @@ class TestInputSystem(unittest.TestCase):
            st.lists(variable_name()))
     def test_point3_input(self, x, y, z, prefix, suffix):
         gm = GodMap()
-        input = Point3Input(gm.get_expr, prefix, suffix, x, y, z)
+        input = Point3Input(gm.to_symbol, prefix, suffix, x, y, z)
         x_symbol = str(input.x)
         y_symbol = str(input.y)
         z_symbol = str(input.z)
@@ -55,7 +55,7 @@ class TestInputSystem(unittest.TestCase):
            st.lists(variable_name()))
     def test_vector3_input(self, x, y, z, prefix, suffix):
         gm = GodMap()
-        input = Vector3Input(gm.get_expr, prefix, suffix, x, y, z)
+        input = Vector3Input(gm.to_symbol, prefix, suffix, x, y, z)
         x_symbol = str(input.x)
         y_symbol = str(input.y)
         z_symbol = str(input.z)
@@ -80,7 +80,7 @@ class TestInputSystem(unittest.TestCase):
     def test_frame_input(self, translation_prefix, translation_suffix, rotation_prefix, rotation_suffix,
                          x, y, z, qx, qy, qz, qw):
         gm = GodMap()
-        input = FrameInput(gm.get_expr, translation_prefix, translation_suffix, rotation_prefix, rotation_suffix,
+        input = FrameInput(gm.to_symbol, translation_prefix, translation_suffix, rotation_prefix, rotation_suffix,
                            x, y, z, qx, qy, qz, qw)
         x_symbol = str(input.x)
         y_symbol = str(input.y)

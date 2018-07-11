@@ -4,13 +4,10 @@ import hypothesis.strategies as st
 from hypothesis.strategies import composite
 import keyword
 import numpy as np
-from giskardpy.god_map import SEPARATOR
 
 
 BIG_NUMBER = 1e100
 SMALL_NUMBER = 1e-100
-
-valid_key = st.text(st.characters(blacklist_characters=[SEPARATOR]), min_size=1)
 
 vector = lambda x: st.lists(limited_float(), min_size=x, max_size=x)
 

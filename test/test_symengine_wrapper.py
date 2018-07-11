@@ -14,6 +14,9 @@ from tf.transformations import quaternion_matrix, quaternion_about_axis, quatern
 
 from numpy import pi
 
+from transforms3d.axangles import mat2axangle
+from transforms3d.euler import euler2mat
+
 import giskardpy.symengine_wrappers as spw
 from giskardpy import BACKEND
 from giskardpy.test_utils import limited_float, SMALL_NUMBER, unit_vector, quaternion, vector, \
@@ -435,25 +438,23 @@ class TestSympyWrapper(unittest.TestCase):
         self.assertTrue(np.isclose(r1, r2).all(), msg='{} != {}'.format(r1, r2))
 
     # fails if numbers too big or too small
-    # TODO bug in rotation_from_matrix.py lol
-    # @given(angle(),
-    #        angle(),
-    #        angle())
-    # @reproduce_failure('3.66.0', 'AXicY2BAAgcOIJgXoAwAKqEDEQ==')
-    # def test_axis_angle_from_rpy(self, roll, pitch, yaw):
-    #     angle2, axis2, _ = rotation_from_matrix(euler_matrix(roll, pitch, yaw))
-    #     assume(abs(angle2) > SMALL_NUMBER)
-    #     axis, angle = spw.axis_angle_from_rpy(roll, pitch, yaw)
-    #     angle = float(angle)
-    #     axis = np.array(axis).astype(float).T[0]
-    #     if angle < 0:
-    #         angle = -angle
-    #         axis = [-x for x in axis]
-    #     if angle2 < 0:
-    #         angle2 = -angle2
-    #         axis2 *= -1
-    #     self.assertTrue(np.isclose(angle, angle2), msg='{} != {}'.format(angle, angle2))
-    #     self.assertTrue(np.isclose(axis, axis2).all(), msg='{} != {}'.format(axis, axis2))
+    @given(angle(),
+           angle(),
+           angle())
+    def test_axis_angle_from_rpy(self, roll, pitch, yaw):
+        axis2, angle2 = mat2axangle(euler2mat(roll, pitch, yaw))
+        assume(abs(angle2) > SMALL_NUMBER)
+        axis, angle = spw.axis_angle_from_rpy(roll, pitch, yaw)
+        angle = float(angle)
+        axis = np.array(axis).astype(float).T[0]
+        if angle < 0:
+            angle = -angle
+            axis = [-x for x in axis]
+        if angle2 < 0:
+            angle2 = -angle2
+            axis2 *= -1
+        self.assertTrue(np.isclose(angle, angle2), msg='{} != {}'.format(angle, angle2))
+        self.assertTrue(np.isclose(axis, axis2).all(), msg='{} != {}'.format(axis, axis2))
 
     # fails if numbers too big or too small
     # TODO rpy does not follow some conventions I guess

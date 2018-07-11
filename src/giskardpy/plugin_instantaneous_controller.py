@@ -77,7 +77,7 @@ class CartesianBulletControllerPlugin(Plugin):
             if not self.controller_updated:
                 self.modify_controller()
 
-            expr = self.god_map.get_expr_values()
+            expr = self.god_map.get_symbol_map()
             next_cmd = self._controller.get_cmd(expr, self.nWSR)
             self.next_cmd.update(next_cmd)
 
@@ -100,14 +100,14 @@ class CartesianBulletControllerPlugin(Plugin):
             for joint_name in self.controlled_joints:
                 current_joint_key = [self._joint_states_identifier, joint_name, 'position']
                 goal_joint_key = [self._goal_identifier, str(Controller.JOINT), joint_name, 'position']
-                current_joint_expr = self.god_map.get_expr(current_joint_key)
-                goal_joint_expr = self.god_map.get_expr(goal_joint_key)
-                weight = self.god_map.get_expr([self._goal_identifier, str(Controller.JOINT), joint_name, 'weight'])
-                gain = self.god_map.get_expr([self._goal_identifier, str(Controller.JOINT), joint_name, 'p_gain'])
-                max_speed = self.god_map.get_expr(
+                current_joint_expr = self.god_map.to_symbol(current_joint_key)
+                goal_joint_expr = self.god_map.to_symbol(goal_joint_key)
+                weight = self.god_map.to_symbol([self._goal_identifier, str(Controller.JOINT), joint_name, 'weight'])
+                gain = self.god_map.to_symbol([self._goal_identifier, str(Controller.JOINT), joint_name, 'p_gain'])
+                max_speed = self.god_map.to_symbol(
                     [self._goal_identifier, str(Controller.JOINT), joint_name, 'max_speed'])
                 if robot.is_continuous(joint_name):
-                    change = ShortestAngularDistanceInput(self.god_map.get_expr,
+                    change = ShortestAngularDistanceInput(self.god_map.to_symbol,
                                                           [self._pyfunctions_identifier],
                                                           current_joint_key,
                                                           goal_joint_key)
@@ -126,13 +126,13 @@ class CartesianBulletControllerPlugin(Plugin):
             self.god_map.set_data([self._pyfunctions_identifier], pyfunctions)
 
             for link in list(controllable_links):
-                point_on_link_input = Point3Input(self.god_map.get_expr,
+                point_on_link_input = Point3Input(self.god_map.to_symbol,
                                                   prefix=[self._closest_point_identifier, link, 'position_on_a'])
-                other_point_input = Point3Input(self.god_map.get_expr,
+                other_point_input = Point3Input(self.god_map.to_symbol,
                                                 prefix=[self._closest_point_identifier, link, 'position_on_b'])
                 # trans_prefix = '{}/{},{}/pose/position'.format(self._fk_identifier, self.root, link)
                 # rot_prefix = '{}/{},{}/pose/orientation'.format(self._fk_identifier, self.root, link)
-                current_input = FrameInput(self.god_map.get_expr,
+                current_input = FrameInput(self.god_map.to_symbol,
                                            translation_prefix=[self._fk_identifier,
                                                                (self.root, link),
                                                                u'pose',
@@ -141,8 +141,8 @@ class CartesianBulletControllerPlugin(Plugin):
                                                             (self.root, link),
                                                             u'pose',
                                                             u'orientation'])
-                min_dist = self.god_map.get_expr([self._closest_point_identifier, link, 'min_dist'])
-                contact_normal = Vector3Input(self.god_map.get_expr,
+                min_dist = self.god_map.to_symbol([self._closest_point_identifier, link, 'min_dist'])
+                contact_normal = Vector3Input(self.god_map.to_symbol,
                                               prefix=[self._closest_point_identifier, link, 'contact_normal'])
 
                 self.soft_constraints.update(link_to_link_avoidance(link,
@@ -162,7 +162,7 @@ class CartesianBulletControllerPlugin(Plugin):
             self._controller = SymEngineController(urdf, self.path_to_functions, self.default_joint_vel_limit)
             robot = self._controller.robot
 
-            current_joints = JointStatesInput(self.god_map.get_expr,
+            current_joints = JointStatesInput(self.god_map.to_symbol,
                                               robot.get_joint_names(),
                                               [self._joint_states_identifier],
                                               ['position'])
@@ -223,7 +223,7 @@ class CartesianBulletControllerPlugin(Plugin):
         if self.rebuild_controller or self._controller is None:
             # TODO sanity checking
 
-            self._controller.init(self.soft_constraints, self.god_map.get_free_symbols())
+            self._controller.init(self.soft_constraints, self.god_map.get_registered_symbols())
             self.rebuild_controller = False
         self.controller_updated = True
 
@@ -241,7 +241,7 @@ class CartesianBulletControllerPlugin(Plugin):
         # goal_rot_prefix = [self._goal_identifier, str(Controller.ROTATION_3D), '{},{}'.format(root, tip), 'goal_pose',
         #                    'pose', 'orientation']
 
-        goal_input = FrameInput(self.god_map.get_expr,
+        goal_input = FrameInput(self.god_map.to_symbol,
                                 translation_prefix=[self._goal_identifier,
                                                     str(Controller.TRANSLATION_3D),
                                                     (root, tip),
@@ -257,7 +257,7 @@ class CartesianBulletControllerPlugin(Plugin):
 
         # current_trans_prefix = [self._fk_identifier, '{},{}'.format(root, tip), 'pose', 'position']
         # current_rot_prefix = [self._fk_identifier, '{},{}'.format(root, tip), 'pose', 'orientation']
-        current_input = FrameInput(self.god_map.get_expr,
+        current_input = FrameInput(self.god_map.to_symbol,
                                    translation_prefix=[self._fk_identifier,
                                                        (root, tip),
                                                        u'pose',
@@ -268,11 +268,11 @@ class CartesianBulletControllerPlugin(Plugin):
                                                     u'orientation'])
         # current_input = FrameInput.prefix_constructor(current_trans_prefix, current_rot_prefix, self.god_map.get_expr)
         weight_key = [self._goal_identifier, str(type), (root, tip), 'weight']
-        weight = self.god_map.get_expr(weight_key)
+        weight = self.god_map.to_symbol(weight_key)
         p_gain_key = [self._goal_identifier, str(type), (root, tip), 'p_gain']
-        p_gain = self.god_map.get_expr(p_gain_key)
+        p_gain = self.god_map.to_symbol(p_gain_key)
         max_speed_key = [self._goal_identifier, str(type), (root, tip), 'max_speed']
-        max_speed = self.god_map.get_expr(max_speed_key)
+        max_speed = self.god_map.to_symbol(max_speed_key)
 
         pyfunctions = self.god_map.get_data([self._pyfunctions_identifier])
 

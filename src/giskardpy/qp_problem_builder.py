@@ -31,7 +31,6 @@ class QProblemBuilder(object):
         self.hard_constraints_dict = hard_constraints_dict
         self.soft_constraints_dict = soft_constraints_dict
         self.controlled_joints = controlled_joint_symbols
-        self.controlled_joints_strs = [str(x) for x in self.controlled_joints]
         self.make_sympy_matrices()
 
         self.shape1 = len(self.hard_constraints_dict) + len(self.soft_constraints_dict)
@@ -178,4 +177,4 @@ class QProblemBuilder(object):
             return None
         # TODO enable debug print in an elegant way
         # self.debug_print(np_H, np_A, np_lb, np_ub, np_lbA, np_ubA, xdot_full)
-        return OrderedDict((observable, xdot_full[i]) for i, observable in enumerate(self.controlled_joints_strs))
+        return OrderedDict((observable, xdot_full[i]) for i, observable in enumerate(self.controlled_joints))

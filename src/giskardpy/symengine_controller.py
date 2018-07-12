@@ -11,7 +11,6 @@ class SymEngineController(object):
     def __init__(self, urdf, path_to_functions, default_joint_vel_limit):
         self.urdf = urdf
         self.path_to_functions = path_to_functions
-        self._soft_constraints = OrderedDict()
         self.robot = Robot(urdf, default_joint_vel_limit)
         self.controlled_joints = []
         self.hard_constraints = {}
@@ -26,8 +25,8 @@ class SymEngineController(object):
         :param joint_names:
         :type joint_names: set
         """
-        self.controlled_joints.extend(x for x in joint_names if x not in self.controlled_joints)
-        self.controlled_joint_symbols = [self.robot.get_joint_symbol(x) for x in self.controlled_joints]
+        self.controlled_joints = joint_names
+        self.joint_to_symbols_str = OrderedDict((x, self.robot.get_joint_symbol(x)) for x in self.controlled_joints)
         self.joint_constraints = OrderedDict(((self.robot.get_name(), k), self.robot.joint_constraints[k]) for k in
                                              self.controlled_joints)
         self.hard_constraints = OrderedDict(((self.robot.get_name(), k), self.robot.hard_constraints[k]) for k in
@@ -37,32 +36,20 @@ class SymEngineController(object):
         a = ''.join(str(x) for x in sorted(chain(soft_constraints.keys(),
                                                  self.hard_constraints.keys(),
                                                  self.joint_constraints.keys())))
-        function_hash = hashlib.md5(a+self.urdf).hexdigest()
+        function_hash = hashlib.md5(a + self.urdf).hexdigest()
         path_to_functions = self.path_to_functions + function_hash
         self.qp_problem_builder = QProblemBuilder(self.joint_constraints,
                                                   self.hard_constraints,
                                                   soft_constraints,
-                                                  self.controlled_joint_symbols,
+                                                  self.joint_to_symbols_str.values(),
                                                   free_symbols,
                                                   path_to_functions)
-
-    def get_controlled_joints(self):
-        return list(self.robot.get_joint_symbols().keys())
-
-    def get_controlled_joint_symbols(self):
-        return list(self.robot.get_joint_symbols().values())
 
     def get_cmd(self, substitutions, nWSR=None):
         next_cmd = self.qp_problem_builder.get_cmd(substitutions, nWSR)
         if next_cmd is None:
             pass
-        real_next_cmd = {}
-        # TODO use own controlled joints?
-        for joint_name in self.get_controlled_joints():
-            joint_expr = str(self.robot.get_joint_symbol(joint_name))
-            if joint_expr in next_cmd:
-                real_next_cmd[joint_name] = next_cmd[joint_expr]
-        return real_next_cmd
+        return {name: next_cmd[symbol] for name, symbol in self.joint_to_symbols_str.items()}
 
 
 def joint_position(current_joint, joint_goal, weight, p_gain, max_speed, name):
@@ -190,8 +177,7 @@ def rotation_conv_slerp(goal_rotation, current_rotation, current_evaluated_rotat
 
     axis2, angle2 = sw.axis_angle_from_matrix(rm)
 
-    r_rot_control = current_rotation[:3,:3] * (axis2*angle2)
-
+    r_rot_control = current_rotation[:3, :3] * (axis2 * angle2)
 
     hack = sw.rotation_matrix_from_axis_angle([0, 0, 1], 0.0001)
     axis, angle = sw.axis_angle_from_matrix((current_rotation.T * (current_evaluated_rotation * hack)).T)
@@ -217,11 +203,10 @@ def rotation_conv_slerp(goal_rotation, current_rotation, current_evaluated_rotat
     add_debug_constraint(soft_constraints, '{} //debug intermediate_goal[3]//'.format(ns), intermediate_goal[3])
     return soft_constraints
 
+
 def rotation_conv_slerp2(goal_rotation, current_rotation, current_evaluated_rotation, slerp, weights=1,
-                        rot_gain=3, max_rot_speed=0.5, ns=''):
+                         rot_gain=3, max_rot_speed=0.5, ns=''):
     soft_constraints = OrderedDict()
-
-
 
     hack = sw.rotation_matrix_from_axis_angle([0, 0, 1], 0.0001)
 

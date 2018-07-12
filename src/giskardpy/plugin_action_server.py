@@ -175,7 +175,7 @@ class ActionServerPlugin(Plugin):
             # TODO do we really want to check for start state collision?
             # if True:
             result = None
-            for i, move_cmd in enumerate(goal.cmd_seq):
+            for i, move_cmd in enumerate(goal.cmd_seq): # type: (int, MoveCmd)
                 # TODO handle empty controller case
                 self.get_readings_lock.put(move_cmd)
                 intermediate_result = self.update_lock.get()  # type: MoveResult

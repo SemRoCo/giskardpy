@@ -33,6 +33,7 @@ class SymEngineController(object):
                                             self.controlled_joints if k in self.robot.hard_constraints)
 
     def init(self, soft_constraints, free_symbols):
+        # a = ''.join(str(x) for x in sorted(chain(sorted(soft_constraints.keys()),
         a = ''.join(str(x) for x in sorted(chain(soft_constraints.keys(),
                                                  self.hard_constraints.keys(),
                                                  self.joint_constraints.keys())))

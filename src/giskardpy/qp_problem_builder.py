@@ -122,7 +122,7 @@ class QProblemBuilder(object):
     def load_pickle(self, hash):
         return pickle.load(hash)
 
-    def debug_print(self, np_H, np_A, np_lb, np_ub, np_lbA, np_ubA, xdot_full):
+    def debug_print(self, np_H, np_A, np_lb, np_ub, np_lbA, np_ubA, xdot_full=None):
         import pandas as pd
         lb = []
         ub = []
@@ -153,7 +153,8 @@ class QProblemBuilder(object):
         p_lbA = pd.DataFrame(np_lbA, lbA)
         p_ubA = pd.DataFrame(np_ubA, ubA)
         p_weights = pd.DataFrame(np_H.dot(np.ones(np_H.shape[0])), weights)
-        p_xdot = pd.DataFrame(xdot_full, xdot)
+        if xdot_full is not None:
+            p_xdot = pd.DataFrame(xdot_full, xdot)
         p_A = pd.DataFrame(np_A, lbA, weights)
         pass
 
@@ -172,9 +173,10 @@ class QProblemBuilder(object):
         np_ub = np.array(np_big_ass_M[self.shape1:, -1])
         np_lbA = np.array(np_big_ass_M[:self.shape1, -2])
         np_ubA = np.array(np_big_ass_M[:self.shape1, -1])
+        self.debug_print(np_H, np_A, np_lb, np_ub, np_lbA, np_ubA)
         xdot_full = self.qp_solver.solve(np_H, self.np_g, np_A, np_lb, np_ub, np_lbA, np_ubA, nWSR)
         if xdot_full is None:
             return None
         # TODO enable debug print in an elegant way
-        # self.debug_print(np_H, np_A, np_lb, np_ub, np_lbA, np_ubA, xdot_full)
+        self.debug_print(np_H, np_A, np_lb, np_ub, np_lbA, np_ubA, xdot_full)
         return OrderedDict((observable, xdot_full[i]) for i, observable in enumerate(self.controlled_joints))

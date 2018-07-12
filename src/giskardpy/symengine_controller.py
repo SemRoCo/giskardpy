@@ -27,7 +27,7 @@ class SymEngineController(object):
         :type joint_names: set
         """
         self.controlled_joints.extend(x for x in joint_names if x not in self.controlled_joints)
-        self.controlled_joint_symbols = [self.robot.joint_to_symbol(x) for x in self.controlled_joints]
+        self.controlled_joint_symbols = [self.robot.get_joint_symbol(x) for x in self.controlled_joints]
         self.joint_constraints = OrderedDict(((self.robot.get_name(), k), self.robot.joint_constraints[k]) for k in
                                              self.controlled_joints)
         self.hard_constraints = OrderedDict(((self.robot.get_name(), k), self.robot.hard_constraints[k]) for k in
@@ -47,18 +47,19 @@ class SymEngineController(object):
                                                   path_to_functions)
 
     def get_controlled_joints(self):
-        return list(self.robot.joint_states_input.joint_map.keys())
+        return list(self.robot.get_joint_symbols().keys())
 
     def get_controlled_joint_symbols(self):
-        return list(self.robot.joint_states_input.joint_map.values())
+        return list(self.robot.get_joint_symbols().values())
 
     def get_cmd(self, substitutions, nWSR=None):
         next_cmd = self.qp_problem_builder.get_cmd(substitutions, nWSR)
         if next_cmd is None:
             pass
         real_next_cmd = {}
+        # TODO use own controlled joints?
         for joint_name in self.get_controlled_joints():
-            joint_expr = str(self.robot.joint_states_input.joint_map[joint_name])
+            joint_expr = str(self.robot.get_joint_symbol(joint_name))
             if joint_expr in next_cmd:
                 real_next_cmd[joint_name] = next_cmd[joint_expr]
         return real_next_cmd

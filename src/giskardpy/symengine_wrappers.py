@@ -158,9 +158,12 @@ def safe_compiled_function(f, file_name):
 
 def load_compiled_function(file_name):
     if os.path.isfile(file_name):
-        with open(file_name, 'r') as file:
-            fast_f = pickle.load(file)
-            return fast_f
+        try:
+            with open(file_name, 'r') as file:
+                fast_f = pickle.load(file)
+                return fast_f
+        except EOFError as e:
+            raise EOFError('{} corrupted, pls delete'.format(file_name))
 
 
 class CompiledFunction(object):

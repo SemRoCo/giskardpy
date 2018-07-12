@@ -37,103 +37,81 @@ TRANSLATIONAL_JOINT_TYPES = [u'prismatic']
 class Robot(object):
     # TODO split urdf part into separate file?
     def __init__(self, urdf, default_joint_vel_limit=0):
+        """
+        :param urdf:
+        :type urdf: str
+        :param default_joint_vel_limit: all velocity limits which are undefined or higher than this will be set to this
+        :type default_joint_vel_limit: float
+        """
         self.default_joint_velocity_limit = default_joint_vel_limit
         self.default_weight = 0.0001
         self.fks = {}
+        self._joint_to_frame = {}
         self._load_from_urdf_string(urdf)
 
     @classmethod
     def from_urdf_file(cls, urdf_file, default_joint_vel_limit=0):
+        """
+        :param urdf_file: path to urdf file
+        :type urdf_file: str
+        :param default_joint_vel_limit: all velocity limits which are undefined or higher than this will be set to this
+        :type default_joint_vel_limit: float
+        :rtype: Robot
+        """
         with open(urdf_file, 'r') as f:
             urdf_string = f.read()
         self = cls(urdf_string, default_joint_vel_limit)
         return self
 
     def _load_from_urdf_string(self, urdf_str):
-        return self._load_from_urdf(URDF.from_xml_string(hacky_urdf_parser_fix(urdf_str)))
-
-    def _load_from_urdf(self, urdf_robot):
-        self._urdf_robot = urdf_robot
-        self._create_sym_frames()
+        """
+        :type urdf_str: str
+        """
+        self._urdf_robot = URDF.from_xml_string(hacky_urdf_parser_fix(urdf_str))
+        self._create_frames_expressions()
         self._create_constraints()
 
     def get_name(self):
+        """
+        :rtype: str
+        """
         return self._urdf_robot.name
 
-    def set_joint_symbol_map(self, joint_states_input=None):
-        # TODO replace self._joints with map from name to symbol and name to frame
-        if joint_states_input is not None:
-            self.joint_states_input = joint_states_input
-            for joint_name, joint in self._joints.items():
-                new_symbol = None
-                if joint.symbol is not None and joint_name in self.joint_states_input.joint_map:
-                    new_symbol = self.joint_states_input.joint_map[joint_name]
-                self._joints[joint_name] = Joint(new_symbol,
-                                                 joint.velocity_limit,
-                                                 joint.lower,
-                                                 joint.upper,
-                                                 joint.type,
-                                                 # TODO this line is relatively slow
-                                                 joint.frame.subs(self.joint_states_input.joint_map))
-            self._create_constraints()
-
-    def _create_sym_frames(self):
-        self._joints = {}
-        joint_map = {}
-        for joint_name, joint in self._urdf_robot.joint_map.items():
-            joint_symbol = None
-            if self.is_joint_movable(joint_name):
-                joint_map[joint_name] = spw.Symbol(joint_name)
-                joint_symbol = joint_map[joint_name]
-            elif self.is_joint_mimic(joint_name):
-                joint_map[joint.mimic.joint] = spw.Symbol(joint.mimic.joint)
-                multiplier = 1 if joint.mimic.multiplier is None else joint.mimic.multiplier
-                offset = 0 if joint.mimic.offset is None else joint.mimic.offset
-                mimic = joint_map[joint.mimic.joint] * multiplier + offset
+    def _create_frames_expressions(self):
+        for joint_name, urdf_joint in self._urdf_robot.joint_map.items():
+            joint_symbol = spw.Symbol(joint_name)
+            if self.is_joint_mimic(joint_name):
+                multiplier = 1 if urdf_joint.mimic.multiplier is None else urdf_joint.mimic.multiplier
+                offset = 0 if urdf_joint.mimic.offset is None else urdf_joint.mimic.offset
+                joint_symbol = spw.Symbol(urdf_joint.mimic.joint) * multiplier + offset
 
             if self.is_joint_type_supported(joint_name):
-                if joint.origin is not None:
-                    xyz = joint.origin.xyz if joint.origin.xyz is not None else [0, 0, 0]
-                    rpy = joint.origin.rpy if joint.origin.rpy is not None else [0, 0, 0]
+                if urdf_joint.origin is not None:
+                    xyz = urdf_joint.origin.xyz if urdf_joint.origin.xyz is not None else [0, 0, 0]
+                    rpy = urdf_joint.origin.rpy if urdf_joint.origin.rpy is not None else [0, 0, 0]
                     joint_frame = spw.translation3(*xyz) * spw.rotation_matrix_from_rpy(*rpy)
                 else:
                     joint_frame = spw.eye(4)
             else:
                 # TODO more specific exception
-                raise Exception('Joint type "{}" is not supported by urdf parser.'.format(joint.type))
+                raise Exception('Joint type "{}" is not supported by urdf parser.'.format(urdf_joint.type))
 
-            if joint.type in ROTATIONAL_JOINT_TYPES:
-                if joint.mimic is None:
-                    joint_frame *= spw.rotation_matrix_from_axis_angle(spw.vector3(*joint.axis), joint_symbol)
-                else:
-                    joint_frame *= spw.rotation_matrix_from_axis_angle(spw.vector3(*joint.axis), mimic)
+            if urdf_joint.type in ROTATIONAL_JOINT_TYPES:
+                joint_frame *= spw.rotation_matrix_from_axis_angle(spw.vector3(*urdf_joint.axis), joint_symbol)
+            elif urdf_joint.type in TRANSLATIONAL_JOINT_TYPES:
+                joint_frame *= spw.translation3(*(spw.point3(*urdf_joint.axis) * joint_symbol)[:3])
 
-            elif joint.type in TRANSLATIONAL_JOINT_TYPES:
-                if joint.mimic is None:
-                    joint_frame *= spw.translation3(*(spw.point3(*joint.axis) * joint_symbol)[:3])
-                else:
-                    joint_frame *= spw.translation3(*(spw.point3(*joint.axis) * mimic)[:3])
-
-            if joint.limit is not None:
-                vel_limit = min(joint.limit.velocity, self.default_joint_velocity_limit)
-            else:
-                vel_limit = None
-
-            lower_limit, upper_limit = self.get_joint_lower_upper_limit(joint.name)
-            self._joints[joint_name] = Joint(joint_symbol,
-                                             vel_limit,
-                                             lower_limit,
-                                             upper_limit,
-                                             joint.type,
-                                             joint_frame)
-        self.joint_states_input = JointStatesInput(lambda x: spw.Symbol(x[0]), joint_map)
+            self._joint_to_frame[joint_name] = joint_frame
 
     def _create_constraints(self):
+        """
+        Creates hard and joint constraints.
+        """
         self.hard_constraints = OrderedDict()
         self.joint_constraints = OrderedDict()
-        for i, joint_name in enumerate(self.get_joint_names_movable()):
+        for i, joint_name in enumerate(self.get_joint_names_controllable()):
             lower_limit, upper_limit = self.get_joint_lower_upper_limit(joint_name)
-            joint_symbol = self.joint_to_symbol(joint_name)
+            joint_symbol = self.get_joint_symbol(joint_name)
             velocity_limit = self.get_joint_velocity_limit(joint_name)
 
             if lower_limit is not None and upper_limit is not None:
@@ -160,26 +138,17 @@ class Robot(object):
         return self.fks[root_link, tip_link]
 
     # JOINT FUNCITONS
-    def get_joint_frame(self, joint_name):
-        return self._joints[joint_name].frame
 
-    def get_joint_names_from_chain(self, root_link, tip_link):
+    def set_joint_symbol_map(self, joints_to_symbols=None):
         """
-        :rtype root: str
-        :rtype tip: str
-        :return: list
-        :rtype: list
+        :param joints_to_symbols: maps urdf joint names to symbols
+        :type joints_to_symbols: dict
         """
-        return self._urdf_robot.get_chain(root_link, tip_link, True, False, True)
-
-    def get_joint_names_from_chain_movable(self, root_link, tip_link):
-        """
-        :rtype root: str
-        :rtype tip: str
-        :return: list
-        :rtype: list
-        """
-        return self._urdf_robot.get_chain(root_link, tip_link, True, False, False)
+        if joints_to_symbols is not None:
+            for joint_name in self.get_joint_names_controllable():
+                # TODO this line is slow af
+                self._joint_to_frame[joint_name] = self._joint_to_frame[joint_name].subs(joints_to_symbols)
+            self._create_constraints()
 
     def get_joint_names(self):
         """
@@ -187,46 +156,28 @@ class Robot(object):
         """
         return self._urdf_robot.joint_map.keys()
 
-    def get_joint_names_movable(self):
+    def get_joint_names_from_chain(self, root_link, tip_link):
+        """
+        :rtype root: str
+        :rtype tip: str
+        :rtype: list
+        """
+        return self._urdf_robot.get_chain(root_link, tip_link, True, False, True)
+
+    def get_joint_names_from_chain_controllable(self, root_link, tip_link):
+        """
+        :rtype root: str
+        :rtype tip: str
+        :rtype: list
+        """
+        return self._urdf_robot.get_chain(root_link, tip_link, True, False, False)
+
+    def get_joint_names_controllable(self):
         """
         :return: returns the names of all movable joints which are not mimic.
         :rtype: list
         """
-        return [joint_name for joint_name in self.get_joint_names() if self.is_joint_movable(joint_name)]
-
-    def joint_to_symbol(self, joint_name):
-        """
-        :type joint_name: str
-        :rtype: spw.Symbol
-        """
-        return self._joints[joint_name].symbol
-
-    def is_joint_movable(self, joint_name):
-        """
-        :type joint_name: str
-        :return: True if joint type is revolute, continuous or prismatic
-        :rtype: bool
-        """
-        joint = self._urdf_robot.joint_map[joint_name]
-        return joint.type in MOVABLE_JOINT_TYPES and joint.mimic is None
-
-    def is_joint_mimic(self, joint_name):
-        """
-        :type joint_name: str
-        :rtype: bool
-        """
-        joint = self._urdf_robot.joint_map[joint_name]
-        return joint.type in MOVABLE_JOINT_TYPES and joint.mimic is not None
-
-    def is_joint_continuous(self, joint_name):
-        """
-        :type joint_name: str
-        :rtype: bool
-        """
-        return self._urdf_robot.joint_map[joint_name].type == u'continuous'
-
-    def is_joint_type_supported(self, joint_name):
-        return self._urdf_robot.joint_map[joint_name].type in JOINT_TYPES
+        return [joint_name for joint_name in self.get_joint_names() if self.is_joint_controllable(joint_name)]
 
     def get_joint_limits(self):
         """
@@ -234,11 +185,19 @@ class Robot(object):
         :rtype: dict
         """
         return {joint_name: self.get_joint_lower_upper_limit(joint_name) for joint_name in self.get_joint_names()
-                if self.is_joint_movable(joint_name)}
+                if self.is_joint_controllable(joint_name)}
+
+    def get_joint_symbols(self):
+        """
+        :return: dict mapping urdf joint name to symbol
+        :rtype: dict
+        """
+        return {joint_name: self.get_joint_symbol(joint_name) for joint_name in self.get_joint_names_controllable()}
 
     def get_joint_lower_upper_limit(self, joint_names):
         """
         Returns joint limits specified in the safety controller entry if given, else returns the normal limits.
+        :param joint_name: name of the joint in the urdf
         :type joint_names: str
         :return: lower limit, upper limit or None if not applicable
         :rtype: float, float
@@ -259,6 +218,7 @@ class Robot(object):
 
     def get_joint_velocity_limit(self, joint_name):
         """
+        :param joint_name: name of the joint in the urdf
         :type joint_name: str
         :return: minimum of default velocity limit and limit specified in urdf
         :rtype: float
@@ -269,7 +229,57 @@ class Robot(object):
         else:
             return min(limit.velocity, self.default_joint_velocity_limit)
 
-    # LINKFUNCTIONS
+    def get_joint_frame(self, joint_name):
+        """
+        :param joint_name: name of the joint in the urdf
+        :type joint_name: str
+        :return: matrix expression describing the transformation caused by this joint
+        :rtype: spw.Matrix
+        """
+        return self._joint_to_frame[joint_name]
+
+    def get_joint_symbol(self, joint_name):
+        """
+        :param joint_name: name of the joint in the urdf
+        :type joint_name: str
+        :rtype: spw.Symbol
+        """
+        # TODO this is slow, use extra dict instead?
+        free_symbols = self._joint_to_frame[joint_name].free_symbols
+        assert len(free_symbols) == 1
+        return free_symbols.pop()
+
+    def is_joint_controllable(self, joint_name):
+        """
+        :param joint_name: name of the joint in the urdf
+        :type joint_name: str
+        :return: True if joint type is revolute, continuous or prismatic
+        :rtype: bool
+        """
+        joint = self._urdf_robot.joint_map[joint_name]
+        return joint.type in MOVABLE_JOINT_TYPES and joint.mimic is None
+
+    def is_joint_mimic(self, joint_name):
+        """
+        :param joint_name: name of the joint in the urdf
+        :type joint_name: str
+        :rtype: bool
+        """
+        joint = self._urdf_robot.joint_map[joint_name]
+        return joint.type in MOVABLE_JOINT_TYPES and joint.mimic is not None
+
+    def is_joint_continuous(self, joint_name):
+        """
+        :param joint_name: name of the joint in the urdf
+        :type joint_name: str
+        :rtype: bool
+        """
+        return self._urdf_robot.joint_map[joint_name].type == u'continuous'
+
+    def is_joint_type_supported(self, joint_name):
+        return self._urdf_robot.joint_map[joint_name].type in JOINT_TYPES
+
+    # LINK FUNCTIONS
 
     def get_link_names_from_chain(self, root_link, tip_link):
         """

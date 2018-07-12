@@ -44,12 +44,12 @@ class FKPlugin(Plugin):
         if self.urdf_hash != new_urdf_hash:
             self.urdf_hash = new_urdf_hash
             self.robot = Robot(urdf)
-            joint_names = self.robot.get_joint_names_movable()
+            joint_names = self.robot.get_joint_names_controllable()
             current_joints = JointStatesInput(self.god_map.to_symbol,
                                               joint_names,
                                               (self._joint_states_identifier,),
                                               ('position',))
-            self.robot.set_joint_symbol_map(current_joints)
+            self.robot.set_joint_symbol_map(current_joints.joint_map)
 
             free_symbols = self.god_map.get_registered_symbols()
 

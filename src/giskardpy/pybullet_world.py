@@ -520,57 +520,6 @@ class PyBulletWorld(object):
         self._objects[name] = PyBulletRobot(name, urdf, base_pose, False)
         self.activate_rendering()
 
-    def get_robot(self):
-        """
-        :param robot_name:
-        :type robot_name: str
-        :return:
-        :rtype: PyBulletRobot
-        """
-        return self._robot
-
-    def has_robot(self):
-        """
-        Checks whether this world already contains a robot with a specific name.
-        :param robot_name: Identifier of the robot that shall be checked.
-        :type robot_name: str
-        :return: True if robot with that name is already in the world. Else: returns False.
-        """
-        return self._robot is not None
-
-    def get_object(self, name):
-        """
-        :param name:
-        :type name: str
-        :return:
-        :rtype: PyBulletRobot
-        """
-        return self._objects[name]
-
-    def set_robot_joint_state(self, joint_state):
-        """
-        Set the current joint state readings for a robot in the world.
-        :param robot_name: name of the robot to update
-        :type string
-        :param joint_state: sensor readings for the entire robot
-        :type dict{string, MultiJointState}
-        """
-        self._robot.set_joint_state(joint_state)
-
-    def get_robot_joint_state(self):
-        return self._robot.get_joint_states()
-
-    def set_object_joint_state(self, object_name, joint_state):
-        self.get_object(object_name).set_joint_state(joint_state)
-
-    def get_object_joint_state(self, object_name):
-        return self.get_object(object_name).get_joint_states()
-
-    def delete_robot(self):
-        if self._robot is not None:
-            p.removeBody(self._robot.id)
-            self._robot = None
-
     def spawn_object(self, object, base_pose=Transform()):
         """
         Spawns a new object into the Bullet world at a given pose.
@@ -583,8 +532,68 @@ class PyBulletWorld(object):
         self.spawn_object_from_urdf(object.name, to_urdf_string(object), base_pose)
         print('object {} added to pybullet world'.format(object.name))
 
-    def get_object_list(self):
+    def has_robot(self):
+        """
+        Checks whether this world already contains a robot with a specific name.
+        :param robot_name: Identifier of the robot that shall be checked.
+        :type robot_name: str
+        :return: True if robot with that name is already in the world. Else: returns False.
+        """
+        return self._robot is not None
+
+    def has_object(self, object_name):
+        """
+        Checks whether this world already contains an object with a specific name.
+        :param object_name: Identifier of the object that shall be checked.
+        :type object_name: str
+        :return: True if object with that name is already in the world. Else: returns False.
+        """
+        return object_name in self._objects.keys()
+
+    def get_robot(self):
+        """
+        :param robot_name:
+        :type robot_name: str
+        :return:
+        :rtype: PyBulletRobot
+        """
+        return self._robot
+
+    def get_object(self, name):
+        """
+        :param name:
+        :type name: str
+        :return:
+        :rtype: PyBulletRobot
+        """
+        return self._objects[name]
+
+    def get_robot_joint_state(self):
+        return self._robot.get_joint_states()
+
+    def get_object_joint_state(self, object_name):
+        return self.get_object(object_name).get_joint_states()
+
+    def get_object_names(self):
         return list(self._objects.keys())
+
+    def set_robot_joint_state(self, joint_state):
+        """
+        Set the current joint state readings for a robot in the world.
+        :param robot_name: name of the robot to update
+        :type string
+        :param joint_state: sensor readings for the entire robot
+        :type dict{string, MultiJointState}
+        """
+        self._robot.set_joint_state(joint_state)
+
+    def set_object_joint_state(self, object_name, joint_state):
+        self.get_object(object_name).set_joint_state(joint_state)
+
+    def delete_robot(self):
+        if self._robot is not None:
+            p.removeBody(self._robot.id)
+            self._robot = None
 
     def delete_object(self, object_name):
         """
@@ -606,18 +615,9 @@ class PyBulletWorld(object):
         :param remaining_objects: Names of objects that shall remain in the world.
         :type remaining_objects: list
         """
-        for object_name in self.get_object_list():
+        for object_name in self.get_object_names():
             if not object_name in remaining_objects:
                 self.delete_object(object_name)
-
-    def has_object(self, object_name):
-        """
-        Checks whether this world already contains an object with a specific name.
-        :param object_name: Identifier of the object that shall be checked.
-        :type object_name: str
-        :return: True if object with that name is already in the world. Else: returns False.
-        """
-        return object_name in self._objects.keys()
 
     def check_collisions(self, cut_off_distances, allowed_collision=set(), self_collision_d=0.1, self_collision=True,
                          controllable_links=None):

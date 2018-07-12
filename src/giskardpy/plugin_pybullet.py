@@ -202,11 +202,11 @@ class PyBulletPlugin(Plugin):
                     links_a = [collision_entry.robot_link]
 
                 if collision_entry.body_b == '':
-                    bodies_b = self.world.get_object_list()
+                    bodies_b = self.world.get_object_names()
                 else:
                     bodies_b = [collision_entry.body_b]
                 if collision_entry.type == CollisionEntry.ALLOW_ALL_COLLISIONS:
-                    allowed_collisions.update(self.world.get_object_list())
+                    allowed_collisions.update(self.world.get_object_names())
                     allowed_collisions.add(self.world.get_robot().name)
                 else:
                     for body_b in bodies_b:

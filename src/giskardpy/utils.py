@@ -7,7 +7,7 @@ from geometry_msgs.msg import PointStamped, Point, Vector3Stamped, Vector3, Pose
     Quaternion
 from sensor_msgs.msg import JointState
 from giskardpy.data_types import SingleJointState
-
+from giskardpy.data_types import ClosestPointInfo
 
 class keydefaultdict(defaultdict):
     def __missing__(self, key):
@@ -59,6 +59,16 @@ def cylinder_volume(r, h):
 
 def cylinder_surface(r, h):
     return 2*pi*r*(h+r)
+
+
+
+def closest_point_constraint_violated(cp, multiplier=0.9):
+    for link_name, cpi_info in cp.items():  # type: (str, ClosestPointInfo)
+        if cpi_info.contact_distance < cpi_info.min_dist * multiplier:
+            print(cpi_info.link_a, cpi_info.link_b, cpi_info.contact_distance)
+            return True
+    return False
+
 
 #
 # CONVERSION FUNCTIONS FOR ROS MESSAGES

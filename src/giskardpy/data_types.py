@@ -13,7 +13,7 @@ class SingleJointState(object):
 
 
 class MultiJointState(object):
-    #TODO emulate dict?
+    # TODO emulate dict?
     def __init__(self):
         self._states = OrderedDict()
 
@@ -39,8 +39,8 @@ class Point(object):
         self.y = y
         self.z = z
 
-    def __str__(self):
-        return 'x:{:.3f} y:{:.3f} z:{:.3f}'.format(self.x, self.y, self.z)
+    def __repr__(self):
+        return u'{}(x={}, y={}, z={})'.format(self.__class__.__name__, self.x, self.y, self.z)
 
 
 class Quaternion(object):
@@ -50,8 +50,8 @@ class Quaternion(object):
         self.z = z
         self.w = w
 
-    def __str__(self):
-        return 'x:{:.3f} y:{:.3f} z:{:.3f} w:{:.3f}'.format(self.x, self.y, self.z, self.w)
+    def __repr__(self):
+        return u'{}(x={}, y={}, z={}, w={})'.format(self.__class__.__name__, self.x, self.y, self.z, self.w)
 
 
 class Transform(object):
@@ -59,8 +59,8 @@ class Transform(object):
         self.translation = translation
         self.rotation = rotation
 
-    def __str__(self):
-        return 't:{} r:{}'.format(self.translation, self.rotation)
+    def __repr__(self):
+        return u'{}(translation={}, rotation={})'.format(self.__class__.__name__, self.translation, self.rotation)
 
 
 class Stamped(object):
@@ -106,6 +106,7 @@ class Trajectory(object):
 
     def values(self):
         return self._points.values()
+
 
 class ClosestPointInfo(object):
     def __init__(self, position_on_a, position_on_b, contact_distance, min_dist, link_a, link_b, contact_normal):

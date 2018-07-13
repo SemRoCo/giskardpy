@@ -12,7 +12,7 @@ from time import time
 import errno
 from numpy.random.mtrand import seed
 
-from giskardpy.exceptions import UnknownBodyException, DuplicateObjectNameException, DuplicateRobotNameException
+from giskardpy.exceptions import UnknownBodyException, DuplicateObjectNameException, RobotExistsException
 from giskardpy.data_types import MultiJointState, SingleJointState, Transform, Point, Quaternion
 import numpy as np
 
@@ -484,7 +484,9 @@ class PyBulletWorld(object):
         :return:
         """
         if self.has_robot():
-            raise Exception('A robot is already loaded')
+            raise RobotExistsException(u'A robot is already loaded')
+        if self.has_object(robot_name):
+            raise DuplicateObjectNameException(u'can\'t add robot; object with name "{}" already exists'.format(robot_name))
         self.deactivate_rendering()
         self._robot = PyBulletRobot(robot_name, urdf, base_pose, path_to_data_folder=self.path_to_data_folder)
         self.activate_rendering()
@@ -514,8 +516,9 @@ class PyBulletWorld(object):
         :return:
         """
         if self.has_object(name):
-            raise DuplicateObjectNameException('Cannot spawn object "{}" because an object with such a '
-                                               'name already exists'.format(name))
+            raise DuplicateObjectNameException(u'object with name "{}" already exists'.format(name))
+        if self.has_robot() and self.get_robot().name == name:
+            raise DuplicateObjectNameException(u'robot with name "{}" already exists'.format(name))
         self.deactivate_rendering()
         self._objects[name] = PyBulletRobot(name, urdf, base_pose, False)
         self.activate_rendering()
@@ -609,7 +612,7 @@ class PyBulletWorld(object):
         del (self._objects[object_name])
         print('object {} deleted from pybullet world'.format(object_name))
 
-    def delete_all_objects(self, remaining_objects=['plane']):
+    def delete_all_objects(self, remaining_objects=(u'plane',)):
         """
         Deletes all objects in world. Optionally, one can specify a list of objects that shall remain in the world.
         :param remaining_objects: Names of objects that shall remain in the world.
@@ -660,13 +663,10 @@ class PyBulletWorld(object):
                                 collisions.update({key: min(contacts, key=lambda x: x.contact_distance)})
         return collisions
 
-    def check_trajectory_collision(self):
-        pass
-
     def activate_viewer(self):
         if self._gui:
             # TODO expose opengl2 option for gui?
-            self.physicsClient = p.connect(p.GUI, options='--opengl2')  # or p.DIRECT for non-graphical version
+            self.physicsClient = p.connect(p.GUI, options=u'--opengl2')  # or p.DIRECT for non-graphical version
         else:
             self.physicsClient = p.connect(p.DIRECT)  # or p.DIRECT for non-graphical version
         p.setGravity(0, 0, -9.8)
@@ -675,12 +675,12 @@ class PyBulletWorld(object):
     def clear_world(self):
         self.delete_all_objects()
         self.delete_robot()
-        # self.delete_all_robots()
+        self.add_ground_plane()
 
     def deactivate_viewer(self):
         p.disconnect()
 
-    def add_ground_plane(self, name='plane'):
+    def add_ground_plane(self, name=u'plane'):
         """
         Adds a ground plane to the Bullet World.
         :return: Nothing.

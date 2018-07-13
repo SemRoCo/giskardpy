@@ -37,7 +37,6 @@ class BoxShape(GeometricShape):
         self.y = y
         self.z = z
 
-# TODO add ConeShape
 
 class CylinderShape(GeometricShape):
     def __init__(self, radius=0.0, length=0.0):
@@ -91,6 +90,29 @@ class WorldObject(object):
         self.inertial_props = inertial_props
         self.visual_props = visual_props
         self.collision_props = collision_props
+
+class Box(WorldObject):
+    def __init__(self, name, length, width, height):
+        geom = BoxShape(length,
+                        width,
+                        height)
+        col = CollisionProperty(name=name + '_col', geometry=geom)
+        vis = VisualProperty(name=name + '_vis', geometry=geom)
+        super(Box, self).__init__(name, collision_props=[col], visual_props=[vis])
+
+class Sphere(WorldObject):
+    def __init__(self, name, radius):
+        geom = SphereShape(radius)
+        col = CollisionProperty(name=name + '_col', geometry=geom)
+        vis = VisualProperty(name=name + '_vis', geometry=geom)
+        super(Sphere, self).__init__(name, collision_props=[col], visual_props=[vis])
+
+class Cylinder(WorldObject):
+    def __init__(self, name, radius, length):
+        geom = CylinderShape(radius, length)
+        col = CollisionProperty(name=name + '_col', geometry=geom)
+        vis = VisualProperty(name=name + '_vis', geometry=geom)
+        super(Cylinder, self).__init__(name, collision_props=[col], visual_props=[vis])
 
 class Joint(object):
     def __init__(self, name='', origin=Transform(), parent_link_name='', child_link_name='', ):

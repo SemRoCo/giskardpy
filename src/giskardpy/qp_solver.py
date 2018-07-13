@@ -47,6 +47,7 @@ class QPSolver(object):
         :return: x according to the equations above, len = number of joints
         :type np.array
         """
+        # TODO kevins bug somehow results in /0
         if nWSR is None:
             nWSR = np.array([sum(A.shape)*2])
         else:

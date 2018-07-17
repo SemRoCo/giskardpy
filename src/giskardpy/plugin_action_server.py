@@ -148,14 +148,6 @@ class ActionServerPlugin(Plugin):
         self.update_lock.put(result)
         self.update_lock.join()
 
-    def closest_point_constraint_violated(self, god_map):
-        cp = god_map.get_data([self.closest_point_identifier])
-        for link_name, cpi_info in cp.items():  # type: (str, ClosestPointInfo)
-            if cpi_info.contact_distance < cpi_info.min_dist * 0.9:
-                print(cpi_info.link_a, cpi_info.link_b, cpi_info.contact_distance)
-                return True
-        return False
-
     def action_server_cb(self, goal):
         """
         :param goal:
@@ -238,13 +230,6 @@ class ActionServerPlugin(Plugin):
             self.update_lock.task_done()
         except ValueError:
             pass
-
-    def get_default_joint_goal(self):
-        joint_goal = OrderedDict()
-        for joint_name in sorted(self.controller_joints):
-            joint_goal[joint_name] = {'weight': 1,
-                                      'position': self.current_js[joint_name].position}
-        return joint_goal
 
     def start_once(self):
         self.new_universe = False

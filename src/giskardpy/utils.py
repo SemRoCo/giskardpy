@@ -1,4 +1,6 @@
 from __future__ import division
+
+import hashlib
 from collections import defaultdict, OrderedDict
 import numpy as np
 from numpy import pi
@@ -17,6 +19,8 @@ class keydefaultdict(defaultdict):
             ret = self[key] = self.default_factory(key)
             return ret
 
+def urdfs_equal(urdf1, urdf2):
+    return hashlib.md5(urdf1).hexdigest() == hashlib.md5(urdf2).hexdigest()
 
 def slerp(q1, q2, t):
     cos_half_theta = np.dot(q1, q2)

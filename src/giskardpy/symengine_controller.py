@@ -8,10 +8,15 @@ from giskardpy.symengine_robot import Robot
 
 
 class SymEngineController(object):
-    def __init__(self, urdf, path_to_functions, default_joint_vel_limit):
-        self.urdf = urdf
+    def __init__(self, robot, path_to_functions):
+        """
+
+        :param robot:
+        :type robot: Robot
+        :param path_to_functions:
+        """
         self.path_to_functions = path_to_functions
-        self.robot = Robot(urdf, default_joint_vel_limit)
+        self.robot = robot
         self.controlled_joints = []
         self.hard_constraints = {}
         self.joint_constraints = {}
@@ -33,11 +38,10 @@ class SymEngineController(object):
                                             self.controlled_joints if k in self.robot.hard_constraints)
 
     def init(self, soft_constraints, free_symbols):
-        # a = ''.join(str(x) for x in sorted(chain(sorted(soft_constraints.keys()),
         a = ''.join(str(x) for x in sorted(chain(soft_constraints.keys(),
                                                  self.hard_constraints.keys(),
                                                  self.joint_constraints.keys())))
-        function_hash = hashlib.md5(a + self.urdf).hexdigest()
+        function_hash = hashlib.md5(a + self.robot.get_hash()).hexdigest()
         path_to_functions = self.path_to_functions + function_hash
         self.qp_problem_builder = QProblemBuilder(self.joint_constraints,
                                                   self.hard_constraints,

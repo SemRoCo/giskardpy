@@ -15,7 +15,8 @@ class LogTrajectoryPlugin(Plugin):
                  closest_point_identifier,
                  controlled_joints_identifier, joint_convergence_threshold, wiggle_precision_threshold,
                  collision_time_threshold, max_traj_length,
-                 plot_trajectory=False, is_preempted=lambda: False, ):
+                 plot_trajectory=False, is_preempted=lambda: False):
+        # TODO use a separete plugin to trigger preempted
         self.plot = plot_trajectory
         self.closest_point_identifier = closest_point_identifier
         self.controlled_joints_identifier = controlled_joints_identifier

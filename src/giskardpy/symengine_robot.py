@@ -1,11 +1,12 @@
-from collections import namedtuple, OrderedDict
+import hashlib
+from collections import namedtuple, OrderedDict, defaultdict
 import numpy as np
 import symengine_wrappers as spw
 from urdf_parser_py.urdf import URDF, Box, Sphere, Mesh, Cylinder
 
 from giskardpy.input_system import JointStatesInput
 from giskardpy.qp_problem_builder import HardConstraint, JointConstraint
-from giskardpy.utils import cube_volume, cube_surface, sphere_volume, cylinder_volume, cylinder_surface
+from giskardpy.utils import cube_volume, cube_surface, sphere_volume, cylinder_volume, cylinder_surface, keydefaultdict
 
 Joint = namedtuple('Joint', ['symbol', 'velocity_limit', 'lower', 'upper', 'type', 'frame'])
 
@@ -36,10 +37,13 @@ TRANSLATIONAL_JOINT_TYPES = [u'prismatic']
 
 class Robot(object):
     # TODO split urdf part into separate file?
+    # TODO remove slow shit from init?
     def __init__(self, urdf, default_joint_vel_limit=0):
         """
         :param urdf:
         :type urdf: str
+        :param joints_to_symbols_map: maps urdf joint names to symbols
+        :type joints_to_symbols_map: dict
         :param default_joint_vel_limit: all velocity limits which are undefined or higher than this will be set to this
         :type default_joint_vel_limit: float
         """
@@ -47,13 +51,17 @@ class Robot(object):
         self.default_weight = 0.0001
         self.fks = {}
         self._joint_to_frame = {}
-        self._load_from_urdf_string(urdf)
+        self.joint_to_symbol_map = keydefaultdict(lambda x: spw.Symbol(x))
+        self.urdf = urdf
+        self._urdf_robot = URDF.from_xml_string(hacky_urdf_parser_fix(self.urdf))
 
     @classmethod
-    def from_urdf_file(cls, urdf_file, default_joint_vel_limit=0):
+    def from_urdf_file(cls, urdf_file, joints_to_symbols_map=None, default_joint_vel_limit=0):
         """
         :param urdf_file: path to urdf file
         :type urdf_file: str
+        :param joints_to_symbols_map: maps urdf joint names to symbols
+        :type joints_to_symbols_map: dict
         :param default_joint_vel_limit: all velocity limits which are undefined or higher than this will be set to this
         :type default_joint_vel_limit: float
         :rtype: Robot
@@ -61,13 +69,16 @@ class Robot(object):
         with open(urdf_file, 'r') as f:
             urdf_string = f.read()
         self = cls(urdf_string, default_joint_vel_limit)
+        self.parse_urdf(joints_to_symbols_map)
         return self
 
-    def _load_from_urdf_string(self, urdf_str):
+    def parse_urdf(self, joints_to_symbols_map=None):
         """
-        :type urdf_str: str
+        :param joints_to_symbols_map: maps urdf joint names to symbols
+        :type joints_to_symbols_map: dict
         """
-        self._urdf_robot = URDF.from_xml_string(hacky_urdf_parser_fix(urdf_str))
+        if joints_to_symbols_map is not None:
+            self.joint_to_symbol_map.update(joints_to_symbols_map)
         self._create_frames_expressions()
         self._create_constraints()
 
@@ -79,11 +90,12 @@ class Robot(object):
 
     def _create_frames_expressions(self):
         for joint_name, urdf_joint in self._urdf_robot.joint_map.items():
-            joint_symbol = spw.Symbol(joint_name)
+            if self.is_joint_controllable(joint_name):
+                joint_symbol = self.get_joint_symbol(joint_name)
             if self.is_joint_mimic(joint_name):
                 multiplier = 1 if urdf_joint.mimic.multiplier is None else urdf_joint.mimic.multiplier
                 offset = 0 if urdf_joint.mimic.offset is None else urdf_joint.mimic.offset
-                joint_symbol = spw.Symbol(urdf_joint.mimic.joint) * multiplier + offset
+                joint_symbol = self.get_joint_symbol(urdf_joint.mimic.joint) * multiplier + offset
 
             if self.is_joint_type_supported(joint_name):
                 if urdf_joint.origin is not None:
@@ -138,17 +150,6 @@ class Robot(object):
         return self.fks[root_link, tip_link]
 
     # JOINT FUNCITONS
-
-    def set_joint_symbol_map(self, joints_to_symbols=None):
-        """
-        :param joints_to_symbols: maps urdf joint names to symbols
-        :type joints_to_symbols: dict
-        """
-        if joints_to_symbols is not None:
-            for joint_name in self.get_joint_names_controllable():
-                # TODO this line is slow af
-                self._joint_to_frame[joint_name] = self._joint_to_frame[joint_name].subs(joints_to_symbols)
-            self._create_constraints()
 
     def get_joint_names(self):
         """
@@ -244,10 +245,7 @@ class Robot(object):
         :type joint_name: str
         :rtype: spw.Symbol
         """
-        # TODO this is slow, use extra dict instead?
-        free_symbols = self._joint_to_frame[joint_name].free_symbols
-        assert len(free_symbols) == 1
-        return free_symbols.pop()
+        return self.joint_to_symbol_map[joint_name]
 
     def is_joint_controllable(self, joint_name):
         """
@@ -350,3 +348,9 @@ class Robot(object):
                                                   cylinder_surface(geo.radius, geo.length) > surface_threshold) or \
                    isinstance(geo, Mesh)
         return False
+
+    def get_urdf(self):
+        return self.urdf
+
+    def get_hash(self):
+        return hashlib.md5(self.urdf).hexdigest()

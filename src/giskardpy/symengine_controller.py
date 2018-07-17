@@ -20,9 +20,11 @@ class SymEngineController(object):
         self.controlled_joints = []
         self.hard_constraints = {}
         self.joint_constraints = {}
+        self.soft_constraints = {}
+        self.free_symbols = set()
         self.qp_problem_builder = None
 
-    def is_initialized(self):
+    def is_compiled(self):
         return self.qp_problem_builder is not None
 
     def set_controlled_joints(self, joint_names):
@@ -37,24 +39,35 @@ class SymEngineController(object):
         self.hard_constraints = OrderedDict(((self.robot.get_name(), k), self.robot.hard_constraints[k]) for k in
                                             self.controlled_joints if k in self.robot.hard_constraints)
 
-    def init(self, soft_constraints, free_symbols):
-        a = ''.join(str(x) for x in sorted(chain(soft_constraints.keys(),
+    def update_soft_constraints(self, soft_constraints, free_symbols):
+        last_number_of_constraints = len(self.soft_constraints)
+        self.free_symbols.update(free_symbols)
+        self.soft_constraints.update(soft_constraints)
+        if last_number_of_constraints != len(self.soft_constraints):
+            self.qp_problem_builder = None
+
+    def compile(self):
+        a = ''.join(str(x) for x in sorted(chain(self.soft_constraints.keys(),
                                                  self.hard_constraints.keys(),
                                                  self.joint_constraints.keys())))
         function_hash = hashlib.md5(a + self.robot.get_hash()).hexdigest()
         path_to_functions = self.path_to_functions + function_hash
         self.qp_problem_builder = QProblemBuilder(self.joint_constraints,
                                                   self.hard_constraints,
-                                                  soft_constraints,
+                                                  self.soft_constraints,
                                                   self.joint_to_symbols_str.values(),
-                                                  free_symbols,
+                                                  self.free_symbols,
                                                   path_to_functions)
 
     def get_cmd(self, substitutions, nWSR=None):
-        next_cmd = self.qp_problem_builder.get_cmd(substitutions, nWSR)
-        if next_cmd is None:
-            pass
-        return {name: next_cmd[symbol] for name, symbol in self.joint_to_symbols_str.items()}
+        try:
+            next_cmd = self.qp_problem_builder.get_cmd(substitutions, nWSR)
+            if next_cmd is None:
+                pass
+            return {name: next_cmd[symbol] for name, symbol in self.joint_to_symbols_str.items()}
+        except AttributeError:
+            self.compile()
+            return self.get_cmd(substitutions, nWSR)
 
 
 def joint_position(current_joint, joint_goal, weight, p_gain, max_speed, name):

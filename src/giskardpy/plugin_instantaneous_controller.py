@@ -1,11 +1,10 @@
-import hashlib
 from collections import OrderedDict
-import rospy
 from giskard_msgs.msg import Controller
 
 from giskardpy.input_system import JointStatesInput, FrameInput, Point3Input, Vector3Input, \
     ShortestAngularDistanceInput
 from giskardpy.plugin import Plugin
+from giskardpy.plugin_fk import RobotPlugin
 from giskardpy.symengine_controller import SymEngineController, position_conv, rotation_conv, \
     link_to_link_avoidance, joint_position, continuous_joint_position
 import symengine_wrappers as sw
@@ -13,7 +12,7 @@ from giskardpy.symengine_robot import Robot
 from giskardpy.utils import urdfs_equal
 
 
-class CartesianBulletControllerPlugin(Plugin):
+class CartesianBulletControllerPlugin(RobotPlugin):
     def __init__(self, root_link, js_identifier, fk_identifier, goal_identifier, next_cmd_identifier,
                  collision_identifier, closest_point_identifier, controlled_joints_identifier,
                  controllable_links_identifier, robot_description_identifier,
@@ -31,7 +30,6 @@ class CartesianBulletControllerPlugin(Plugin):
         :param closest_point_identifier:
         """
         self.collision_goal_identifier = collision_goal_identifier
-        self.robot_description_identifier = robot_description_identifier
         self.controlled_joints_identifier = controlled_joints_identifier
         self._pyfunctions_identifier = pyfunction_identifier
         self._fk_identifier = fk_identifier
@@ -41,134 +39,122 @@ class CartesianBulletControllerPlugin(Plugin):
         self.nWSR = nWSR
         self.default_joint_vel_limit = default_joint_vel_limit
         self.root = root_link
-        self.soft_constraints = OrderedDict()
         self._joint_states_identifier = js_identifier
         self._goal_identifier = goal_identifier
         self._next_cmd_identifier = next_cmd_identifier
         self.controllable_links_identifier = controllable_links_identifier
-        self._controller = None
+        self.controller = None
         self.known_constraints = set()
         self.controlled_joints = set()
-        self.controller_updated = False
         self.max_number_collision_entries = 10
         self.robot = None
-        super(CartesianBulletControllerPlugin, self).__init__()
+        self.used_joints = set()
+        self.controllable_links = set()
+        super(CartesianBulletControllerPlugin, self).__init__(robot_description_identifier,
+                                                              self._joint_states_identifier,
+                                                              self.default_joint_vel_limit)
 
     def copy(self):
         cp = self.__class__(self.root, self._joint_states_identifier, self._fk_identifier,
                             self._goal_identifier, self._next_cmd_identifier, self._collision_identifier,
                             self._closest_point_identifier, self.controlled_joints_identifier,
-                            self.controllable_links_identifier, self.robot_description_identifier,
+                            self.controllable_links_identifier, self._robot_description_identifier,
                             self.collision_goal_identifier, self._pyfunctions_identifier,
                             self.path_to_functions, self.nWSR,
                             self.default_joint_vel_limit)
-        cp._controller = self._controller
+        cp.controller = self.controller
         cp.robot = self.robot
-        cp.soft_constraints = self.soft_constraints
         cp.known_constraints = self.known_constraints
         cp.controlled_joints = self.controlled_joints
         return cp
 
-    # @profile
-    def update(self):
-        # TODO check if robot urdf was updated
-        # TODO check if there is a goal
-        # TODO check if we need new controller
-        # TODO set default joint goal
-
-        # TODO don't call start once here
-        self.start_once()
-        self.init_controller()
-        if self.god_map.get_data([self._goal_identifier]) is not None:
-
-            if not self.controller_updated:
-                self.add_cart_controller_soft_constraints()
-
-            expr = self.god_map.get_symbol_map()
-            next_cmd = self._controller.get_cmd(expr, self.nWSR)
-            self.next_cmd.update(next_cmd)
-
-        if len(self.next_cmd) > 0:
-            self.god_map.set_data([self._next_cmd_identifier], self.next_cmd)
-
     def start_always(self):
+        super(CartesianBulletControllerPlugin, self).start_always()
         self.next_cmd = {}
-        self.rebuild_controller = False
+        if self.was_urdf_updated():
+            self.update_controlled_joints_and_links()
+            self.init_controller()
+            self.add_js_controller_soft_constraints()
+            self.add_collision_avoidance_soft_constraints()
+        self.add_cart_controller_soft_constraints()
+        self.set_default_joint_goal(self.used_joints)
 
-    def stop(self):
-        pass
+    def update(self):
+        expr = self.god_map.get_symbol_map()
+        next_cmd = self.controller.get_cmd(expr, self.nWSR)
+        self.next_cmd.update(next_cmd)
+
+        self.god_map.set_data([self._next_cmd_identifier], self.next_cmd)
+
+    def update_controlled_joints_and_links(self):
+        self.controlled_joints = self.god_map.get_data([self.controlled_joints_identifier])
+
+        self.controllable_links = set()
+        for joint_name in self.controlled_joints:
+            self.controllable_links.update(self.get_robot().get_sub_tree_link_names_with_collision(joint_name))
+        self.god_map.set_data([self.controllable_links_identifier], self.controllable_links)
 
     def init_controller(self):
-        if not self._controller.is_initialized():
-            self.rebuild_controller = True
-            controllable_links = set()
+        self.controller = SymEngineController(self.robot, self.path_to_functions)
+        self.controller.set_controlled_joints(self.controlled_joints)
 
-            for joint_name in self.controlled_joints:
-                controllable_links.update(self.get_robot().get_sub_tree_link_names_with_collision(joint_name))
-            self.god_map.set_data([self.controllable_links_identifier], controllable_links)
+    def get_joint_current_expr(self, joint_name):
+        key = [self._joint_states_identifier, joint_name, u'position']
+        return self.god_map.to_symbol(key)
 
-            self.add_js_controller_soft_constraints()
+    def get_joint_goal_expr(self, joint_name):
+        key = [self._goal_identifier, str(Controller.JOINT), joint_name, u'position']
+        return self.god_map.to_symbol(key)
 
-            self.add_collision_avoidance_soft_constraints(controllable_links)
+    def get_joint_weight_expr(self, joint_name):
+        weight_key = [self._goal_identifier, str(Controller.JOINT), joint_name, u'weight']
+        return self.god_map.to_symbol(weight_key)
 
-    def start_once(self):
-        # TODO probably buggy if object gets attached during planning
-        new_urdf = self.god_map.get_data([self.robot_description_identifier])
-        # TODO figure out a better solution which does not require the urdf to be rehashed all the time
-        if self.get_robot() is None or urdfs_equal(self.get_robot().get_urdf(), new_urdf):
-            self.controlled_joints = self.god_map.get_data([self.controlled_joints_identifier])
+    def get_joint_gain_key(self, joint_name):
+        gain_key = [self._goal_identifier, str(Controller.JOINT), joint_name, u'p_gain']
+        return self.god_map.to_symbol(gain_key)
 
-            self.robot = Robot(new_urdf, self.default_joint_vel_limit)
-            current_joints = JointStatesInput(self.god_map.to_symbol,
-                                              self.get_robot().get_joint_names_controllable(),
-                                              [self._joint_states_identifier],
-                                              [u'position'])
-            self.get_robot().parse_urdf(current_joints.joint_map)
+    def get_joint_max_speed_key(self, joint_name):
+        max_speed_key = [self._goal_identifier, str(Controller.JOINT), joint_name, u'max_speed']
+        return self.god_map.to_symbol(max_speed_key)
 
-            self._controller = SymEngineController(self.robot, self.path_to_functions)
-            self._controller.set_controlled_joints(self.controlled_joints)
-
-            self.init_controller()
-            self.start_always()
-
-    def get_robot(self):
-        """
-        :rtype: Robot
-        """
-        return self.robot
+    def get_joint_change_expr(self, joint_name):
+        current_joint_key = [self._joint_states_identifier, joint_name, u'position']
+        goal_joint_key = [self._goal_identifier, str(Controller.JOINT), joint_name, u'position']
+        return ShortestAngularDistanceInput(self.god_map.to_symbol,
+                                            [self._pyfunctions_identifier],
+                                            current_joint_key,
+                                            goal_joint_key)
 
     def add_js_controller_soft_constraints(self):
         pyfunctions = {}
         for joint_name in self.controlled_joints:
-            current_joint_key = [self._joint_states_identifier, joint_name, u'position']
-            goal_joint_key = [self._goal_identifier, str(Controller.JOINT), joint_name, u'position']
-            current_joint_expr = self.god_map.to_symbol(current_joint_key)
-            goal_joint_expr = self.god_map.to_symbol(goal_joint_key)
-            weight = self.god_map.to_symbol([self._goal_identifier, str(Controller.JOINT), joint_name, u'weight'])
-            gain = self.god_map.to_symbol([self._goal_identifier, str(Controller.JOINT), joint_name, u'p_gain'])
-            max_speed = self.god_map.to_symbol(
-                [self._goal_identifier, str(Controller.JOINT), joint_name, u'max_speed'])
+
+            joint_current_expr = self.get_joint_current_expr(joint_name)
+            goal_joint_expr = self.get_joint_goal_expr(joint_name)
+            weight_expr = self.get_joint_weight_expr(joint_name)
+            gain_expr = self.get_joint_gain_key(joint_name)
+            max_speed_expr = self.get_joint_max_speed_key(joint_name)
 
             if self.get_robot().is_joint_continuous(joint_name):
-                change = ShortestAngularDistanceInput(self.god_map.to_symbol,
-                                                      [self._pyfunctions_identifier],
-                                                      current_joint_key,
-                                                      goal_joint_key)
+                change = self.get_joint_change_expr(joint_name)
                 pyfunctions[change.get_key()] = change
-                self.soft_constraints.update(continuous_joint_position(current_joint_expr,
-                                                                       change.get_expression(),
-                                                                       weight,
-                                                                       gain,
-                                                                       max_speed, joint_name))
+                soft_constraints = continuous_joint_position(joint_current_expr,
+                                                             change.get_expression(),
+                                                             weight_expr,
+                                                             gain_expr,
+                                                             max_speed_expr, joint_name)
+                self.controller.update_soft_constraints(soft_constraints, self.god_map.get_registered_symbols())
             else:
-                self.soft_constraints.update(joint_position(current_joint_expr, goal_joint_expr, weight,
-                                                            gain,
-                                                            max_speed, joint_name))
+                soft_constraints = joint_position(joint_current_expr, goal_joint_expr, weight_expr,
+                                                  gain_expr, max_speed_expr, joint_name)
+            self.controller.update_soft_constraints(soft_constraints, self.god_map.get_registered_symbols())
 
         self.god_map.set_data([self._pyfunctions_identifier], pyfunctions)
 
-    def add_collision_avoidance_soft_constraints(self, controllable_links):
-        for link in list(controllable_links):
+    def add_collision_avoidance_soft_constraints(self):
+
+        for link in list(self.controllable_links):
             point_on_link_input = Point3Input(self.god_map.to_symbol,
                                               prefix=[self._closest_point_identifier, link, u'position_on_a'])
             other_point_input = Point3Input(self.god_map.to_symbol,
@@ -186,40 +172,23 @@ class CartesianBulletControllerPlugin(Plugin):
             contact_normal = Vector3Input(self.god_map.to_symbol,
                                           prefix=[self._closest_point_identifier, link, u'contact_normal'])
 
-            self.soft_constraints.update(link_to_link_avoidance(link,
-                                                                self.get_robot().get_fk_expression(self.root, link),
-                                                                current_input.get_frame(),
-                                                                point_on_link_input.get_expression(),
-                                                                other_point_input.get_expression(),
-                                                                contact_normal.get_expression(),
-                                                                min_dist))
+            soft_constraints = link_to_link_avoidance(link,
+                                                      self.get_robot().get_fk_expression(self.root, link),
+                                                      current_input.get_frame(),
+                                                      point_on_link_input.get_expression(),
+                                                      other_point_input.get_expression(),
+                                                      contact_normal.get_expression(),
+                                                      min_dist)
+            self.controller.update_soft_constraints(soft_constraints, self.god_map.get_registered_symbols())
 
     def add_cart_controller_soft_constraints(self):
-        used_joints = self.muh(Controller.TRANSLATION_3D)
-        used_joints.update(self.muh(Controller.ROTATION_3D))
-
-        # set weight of used joints to 0
-        self.set_default_joint_goal(used_joints)
-
-        if self.rebuild_controller or self._controller is None:
-            # TODO sanity checking
-
-            self._controller.init(self.soft_constraints, self.god_map.get_registered_symbols())
-            self.rebuild_controller = False
-        self.controller_updated = True
-
-    def muh(self, t):
-        used_joints = set()
-        for (root, tip), value in self.god_map.get_data([self._goal_identifier, str(t)]).items():
-            key = u'{}/{},{}'.format(t, root, tip)
-            used_joints.update(self.get_robot().get_joint_names_from_chain_controllable(root, tip))
-            if key not in self.known_constraints:
-                print(u'added chain {} -> {} type: {}'.format(root, tip, t))
-                self.known_constraints.add(key)
-                self.soft_constraints.update(self.controller_msg_to_constraint(root, tip, t))
-                self.rebuild_controller = True
-        return used_joints
-
+        print(u'loaded chains:')
+        for t in [Controller.TRANSLATION_3D, Controller.ROTATION_3D]:
+            for (root, tip), value in self.god_map.get_data([self._goal_identifier, str(t)]).items():
+                self.used_joints.update(self.get_robot().get_joint_names_from_chain_controllable(root, tip))
+                print(u'{} -> {} type: {}'.format(root, tip, t))
+                self.controller.update_soft_constraints(self.controller_msg_to_constraint(root, tip, t),
+                                                        self.god_map.get_registered_symbols())
 
     def set_default_joint_goal(self, used_joints):
         """
@@ -228,14 +197,14 @@ class CartesianBulletControllerPlugin(Plugin):
         joint_goal = self.god_map.get_data([self._goal_identifier, str(Controller.JOINT)])
         for joint_name in self.controlled_joints:
             if joint_name not in joint_goal:
-                joint_goal[joint_name] = {'weight': 0.0,
-                                          'p_gain': 10,
-                                          'max_speed': self.get_robot().default_joint_velocity_limit,
-                                          'position': self.god_map.get_data([self._joint_states_identifier,
-                                                                             joint_name,
-                                                                             'position'])}
+                joint_goal[joint_name] = {u'weight': 0.0,
+                                          u'p_gain': 10,
+                                          u'max_speed': self.get_robot().default_joint_velocity_limit,
+                                          u'position': self.god_map.get_data([self._joint_states_identifier,
+                                                                              joint_name,
+                                                                              u'position'])}
                 if joint_name not in used_joints:
-                    joint_goal[joint_name]['weight'] = 1
+                    joint_goal[joint_name][u'weight'] = 1
 
         self.god_map.set_data([self._goal_identifier, str(Controller.JOINT)], joint_goal)
 
@@ -246,8 +215,6 @@ class CartesianBulletControllerPlugin(Plugin):
         :return:
         :rtype: dict
         """
-        robot = self._controller.robot
-
         goal_input = FrameInput(self.god_map.to_symbol,
                                 translation_prefix=[self._goal_identifier,
                                                     str(Controller.TRANSLATION_3D),
@@ -271,7 +238,6 @@ class CartesianBulletControllerPlugin(Plugin):
                                                     (root, tip),
                                                     u'pose',
                                                     u'orientation'])
-        # current_input = FrameInput.prefix_constructor(current_trans_prefix, current_rot_prefix, self.god_map.get_expr)
         weight_key = [self._goal_identifier, str(type), (root, tip), u'weight']
         weight = self.god_map.to_symbol(weight_key)
         p_gain_key = [self._goal_identifier, str(type), (root, tip), u'p_gain']
@@ -281,14 +247,14 @@ class CartesianBulletControllerPlugin(Plugin):
 
         if type == Controller.TRANSLATION_3D:
             return position_conv(goal_input.get_position(),
-                                 sw.position_of(robot.get_fk_expression(root, tip)),
+                                 sw.position_of(self.get_robot().get_fk_expression(root, tip)),
                                  weights=weight,
                                  trans_gain=p_gain,
                                  max_trans_speed=max_speed,
                                  ns=u'{}/{}'.format(root, tip))
         elif type == Controller.ROTATION_3D:
             return rotation_conv(goal_input.get_rotation(),
-                                 sw.rotation_of(robot.get_fk_expression(root, tip)),
+                                 sw.rotation_of(self.get_robot().get_fk_expression(root, tip)),
                                  current_input.get_rotation(),
                                  weights=weight,
                                  rot_gain=p_gain,

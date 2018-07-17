@@ -62,7 +62,7 @@ class Plugin(object):
 
 
 class PluginContainer(Plugin):
-    def __init__(self, replacement, call_start=True):
+    def __init__(self, replacement, call_start=False):
         """
         :param replacement:
         :type replacement: Plugin

@@ -4,6 +4,7 @@ from rospkg import RosPack
 
 import rospy
 
+from giskardpy.plugin import PluginContainer
 from giskardpy.plugin_action_server import ActionServerPlugin
 from giskardpy.application import ROSApplication
 from giskardpy.plugin_instantaneous_controller import CartesianBulletControllerPlugin
@@ -56,7 +57,6 @@ if __name__ == '__main__':
     controllable_links_identifier = 'controllable_links'
     robot_description_identifier = 'robot_description'
 
-
     pm = ProcessManager()
     pm.register_plugin('js',
                        JointStatePlugin(js_identifier=js_identifier,
@@ -100,21 +100,22 @@ if __name__ == '__main__':
                                       fk_identifier=fk_identifier,
                                       robot_description_identifier=robot_description_identifier))
     pm.register_plugin('cart bullet controller',
-                       CartesianBulletControllerPlugin(root_link=root_link,
-                                                       fk_identifier=fk_identifier,
-                                                       goal_identifier=cartesian_goal_identifier,
-                                                       js_identifier=js_identifier,
-                                                       next_cmd_identifier=next_cmd_identifier,
-                                                       collision_identifier=collision_identifier,
-                                                       pyfunction_identifier=pyfunction_identifier,
-                                                       closest_point_identifier=closest_point_identifier,
-                                                       controlled_joints_identifier=controlled_joints_identifier,
-                                                       controllable_links_identifier=controllable_links_identifier,
-                                                       collision_goal_identifier=collision_goal_identifier,
-                                                       path_to_functions=path_to_data_folder,
-                                                       nWSR=nWSR,
-                                                       default_joint_vel_limit=default_joint_vel_limit,
-                                                       robot_description_identifier=robot_description_identifier))
+                       PluginContainer(
+                           CartesianBulletControllerPlugin(root_link=root_link,
+                                                           fk_identifier=fk_identifier,
+                                                           goal_identifier=cartesian_goal_identifier,
+                                                           js_identifier=js_identifier,
+                                                           next_cmd_identifier=next_cmd_identifier,
+                                                           collision_identifier=collision_identifier,
+                                                           pyfunction_identifier=pyfunction_identifier,
+                                                           closest_point_identifier=closest_point_identifier,
+                                                           controlled_joints_identifier=controlled_joints_identifier,
+                                                           controllable_links_identifier=controllable_links_identifier,
+                                                           collision_goal_identifier=collision_goal_identifier,
+                                                           path_to_functions=path_to_data_folder,
+                                                           nWSR=nWSR,
+                                                           default_joint_vel_limit=default_joint_vel_limit,
+                                                           robot_description_identifier=robot_description_identifier)))
     pm.register_plugin('interactive marker',
                        InteractiveMarkerPlugin(root_tips=root_tips))
 

@@ -11,18 +11,55 @@ from giskardpy.symengine_robot import Robot
 from giskardpy.utils import keydefaultdict, urdfs_equal
 
 
-class FKPlugin(Plugin):
-    def __init__(self, fk_identifier, js_identifier, robot_description_identifier):
+class RobotPlugin(Plugin):
+    """
+    Plugin that keeps a symengine robot in sync with the god map.
+    """
+
+    def __init__(self, robot_description_identifier, js_identifier, default_joint_vel_limit=0):
+        self._robot_description_identifier = robot_description_identifier
         self._joint_states_identifier = js_identifier
-        self.robot_description_identifier = robot_description_identifier
+        self.default_joint_vel_limit = default_joint_vel_limit
+        self.robot = None
+        self.__urdf_updated = False
+        super(RobotPlugin, self).__init__()
+
+    def start_always(self):
+        if self.__is_urdf_updated():
+            self.init_robot()
+            self.__urdf_updated = True
+        else:
+            self.__urdf_updated = False
+
+    def __is_urdf_updated(self):
+        new_urdf = self.god_map.get_data([self._robot_description_identifier])
+        # TODO figure out a better solution which does not require the urdf to be rehashed all the time
+        return self.get_robot() is None or not urdfs_equal(self.get_robot().get_urdf(), new_urdf)
+
+    def was_urdf_updated(self):
+        return self.__urdf_updated
+
+    def init_robot(self):
+        urdf = self.god_map.get_data([self._robot_description_identifier])
+        self.robot = Robot(urdf, self.default_joint_vel_limit)
+        current_joints = JointStatesInput(self.god_map.to_symbol,
+                                          self.get_robot().get_joint_names_controllable(),
+                                          [self._joint_states_identifier],
+                                          [u'position'])
+        self.get_robot().parse_urdf(current_joints.joint_map)
+
+    def get_robot(self):
+        return self.robot
+
+
+class FKPlugin(RobotPlugin):
+    def __init__(self, fk_identifier, js_identifier, robot_description_identifier):
         self.fk_identifier = fk_identifier
         self.fk = None
         self.robot = None
-        super(FKPlugin, self).__init__()
+        super(FKPlugin, self).__init__(robot_description_identifier, js_identifier)
 
     def update(self):
-        # TODO don't use start once here
-        self.start_once()
         exprs = self.god_map.get_symbol_map()
 
         def on_demand_fk_evaluated(key):
@@ -38,17 +75,9 @@ class FKPlugin(Plugin):
         fks = keydefaultdict(on_demand_fk_evaluated)
         self.god_map.set_data([self.fk_identifier], fks)
 
-    def start_once(self):
-        new_urdf = self.god_map.get_data([self.robot_description_identifier])
-        if self.get_robot() is None or urdfs_equal(self.get_robot().get_urdf(), new_urdf):
-            self.robot = Robot(new_urdf)
-            joint_names = self.robot.get_joint_names_controllable()
-            current_joints = JointStatesInput(self.god_map.to_symbol,
-                                              joint_names,
-                                              (self._joint_states_identifier,),
-                                              ('position',))
-            self.robot.parse_urdf(current_joints.joint_map)
-
+    def start_always(self):
+        super(FKPlugin, self).start_always()
+        if self.was_urdf_updated():
             free_symbols = self.god_map.get_registered_symbols()
 
             def on_demand_fk(key):
@@ -59,17 +88,11 @@ class FKPlugin(Plugin):
 
             self.fk = keydefaultdict(on_demand_fk)
 
-    def get_robot(self):
-        """
-        :rtype: Robot
-        """
-        return self.robot
-
     def stop(self):
         pass
 
     def copy(self):
-        cp = self.__class__(self.fk_identifier, self._joint_states_identifier, self.robot_description_identifier)
+        cp = self.__class__(self.fk_identifier, self._joint_states_identifier, self._robot_description_identifier)
         cp.fk = self.fk
         cp.robot = self.robot
         return cp

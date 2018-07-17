@@ -99,6 +99,7 @@ class PyBulletPlugin(Plugin):
         :return: Service response, reporting back any runtime errors that occurred.
         :rtype UpdateWorldResponse
         """
+        # TODO block or queue updates while planning
         with self.lock:
             try:
                 if req.operation is UpdateWorldRequest.ADD:

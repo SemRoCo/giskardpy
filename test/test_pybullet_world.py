@@ -1,5 +1,4 @@
 import unittest
-from collections import namedtuple, OrderedDict, defaultdict
 
 from hypothesis.strategies import composite
 
@@ -8,12 +7,10 @@ from giskardpy.object import WorldObject, Box, Sphere, Cylinder
 from giskardpy.pybullet_world import PyBulletWorld
 import pybullet as p
 import hypothesis.strategies as st
-from hypothesis.database import DirectoryBasedExampleDatabase
 from hypothesis.stateful import Bundle, RuleBasedStateMachine, rule, invariant
 from giskardpy.data_types import MultiJointState, SingleJointState, Transform, Point, Quaternion
-from giskardpy.test_utils import variable_name
+from giskardpy.test_utils import variable_name, robot_urdfs
 
-robot_urdfs = st.sampled_from([u'pr2.urdf', u'boxy.urdf', u'iai_donbot.urdf'])
 
 def small_float():
     return st.floats(min_value=-100, max_value=100, allow_nan=False, allow_infinity=False)
@@ -90,7 +87,7 @@ class TestPyBulletWorld(RuleBasedStateMachine):
 
     @rule(target=robot_names,
           name=variable_name(),
-          robot_urdf=robot_urdfs,
+          robot_urdf=robot_urdfs(),
           base_pose=transform())
     def spawn_robot(self, name, robot_urdf, base_pose):
         robot_existed = self.world.has_robot()

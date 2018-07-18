@@ -68,14 +68,14 @@ class PyBulletPlugin(Plugin):
         cp.marker = self.marker
         # cp.srv = self.srv
         # cp.viz_gui = self.viz_gui
-        cp.collision_pub = self.collision_pub
+        cp.pub_collision_marker = self.pub_collision_marker
         return cp
 
     def start_once(self):
         self.world = PyBulletWorld(gui=self.gui, path_to_data_folder=self.path_to_data_folder)
-        self.srv = rospy.Service('~update_world', UpdateWorld, self.update_world_cb)
-        self.viz_gui = rospy.Service('~enable_marker', SetBool, self.enable_marker_cb)
-        self.collision_pub = rospy.Publisher('visualization_marker', Marker, queue_size=1)
+        self.srv_update_world = rospy.Service('~update_world', UpdateWorld, self.update_world_cb)
+        self.srv_viz_gui = rospy.Service('~enable_marker', SetBool, self.enable_marker_cb)
+        self.pub_collision_marker = rospy.Publisher('visualization_marker', Marker, queue_size=1)
         self.world.activate_viewer()
         # TODO get robot description from god map
         urdf = rospy.get_param('robot_description')
@@ -263,8 +263,12 @@ class PyBulletPlugin(Plugin):
             self.god_map.set_data([self.closest_point_identifier], closest_point)
 
     def stop(self):
-        pass
+        # self.world.clear_world()
+        # self.srv_update_world.shutdown()
+        # self.srv_viz_gui.shutdown()
+        # self.pub_collision_marker.unregister()
         # self.world.deactivate_viewer()
+        pass
 
     def make_cpi_markers(self, collisions):
         m = Marker()
@@ -293,7 +297,7 @@ class PyBulletPlugin(Plugin):
                     m.colors[-1] = ColorRGBA(1, 0, 0, 1)
         else:
             m.action = Marker.DELETE
-        self.collision_pub.publish(m)
+        self.pub_collision_marker.publish(m)
 
     def object_js_cb(self, object_name, msg):
         """

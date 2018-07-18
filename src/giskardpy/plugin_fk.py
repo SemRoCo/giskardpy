@@ -49,6 +49,9 @@ class RobotPlugin(Plugin):
         self.get_robot().parse_urdf(current_joints.joint_map)
 
     def get_robot(self):
+        """
+        :rtype: Robot
+        """
         return self.robot
 
 

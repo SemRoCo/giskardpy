@@ -16,8 +16,8 @@ class KinematicSimPlugin(Plugin):
     def update(self):
         self.time += self.frequency
         motor_commands = self.god_map.get_data([self.next_cmd_identifier])
+        current_js = self.god_map.get_data([self.js_identifier])
         if motor_commands is not None:
-            current_js = self.god_map.get_data([self.js_identifier])
             self.next_js = OrderedDict()
             for joint_name, sjs in current_js.items():
                 if joint_name in motor_commands:
@@ -27,6 +27,10 @@ class KinematicSimPlugin(Plugin):
                 self.next_js[joint_name] = SingleJointState(sjs.name, sjs.position + cmd * self.frequency, velocity=cmd)
         if self.next_js is not None:
             self.god_map.set_data([self.js_identifier], self.next_js)
+        elif current_js is not None:
+            self.god_map.set_data([self.js_identifier], current_js)
+        else:
+            self.god_map.set_data([self.js_identifier], current_js)
         self.god_map.set_data([self.time_identifier], self.time)
 
     def start_always(self):

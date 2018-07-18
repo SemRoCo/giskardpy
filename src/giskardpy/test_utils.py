@@ -12,6 +12,10 @@ SMALL_NUMBER = 1e-100
 
 vector = lambda x: st.lists(limited_float(), min_size=x, max_size=x)
 
+def robot_urdfs():
+    # return st.sampled_from([u'pr2.urdf', u'boxy.urdf', u'iai_donbot.urdf'])
+    return st.sampled_from([u'pr2.urdf'])
+
 def angle(*args, **kwargs):
     return st.builds(normalize_angle, limited_float(*args, **kwargs))
 

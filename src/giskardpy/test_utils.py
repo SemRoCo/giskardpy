@@ -4,6 +4,7 @@ import hypothesis.strategies as st
 from hypothesis.strategies import composite
 import keyword
 import numpy as np
+from numpy import pi
 
 from giskardpy.symengine_robot import Robot
 
@@ -13,8 +14,8 @@ SMALL_NUMBER = 1e-100
 vector = lambda x: st.lists(limited_float(), min_size=x, max_size=x)
 
 def robot_urdfs():
-    # return st.sampled_from([u'pr2.urdf', u'boxy.urdf', u'iai_donbot.urdf'])
-    return st.sampled_from([u'pr2.urdf'])
+    return st.sampled_from([u'pr2.urdf', u'boxy.urdf', u'iai_donbot.urdf'])
+    # return st.sampled_from([u'pr2.urdf'])
 
 def angle(*args, **kwargs):
     return st.builds(normalize_angle, limited_float(*args, **kwargs))
@@ -42,6 +43,14 @@ def lists_of_same_length(draw, data_types=(), max_length=10, unique=False):
 @composite
 def rnd_joint_state(draw, joint_limits):
     return {jn: draw(st.floats(ll, ul, allow_nan=False, allow_infinity=False)) for jn, (ll, ul) in joint_limits.items()}
+
+@composite
+def rnd_joint_state2(draw, joint_limits):
+    muh = draw(joint_limits)
+    muh = {jn: ((ll if ll is not None else pi*2), (ul if ul is not None else pi*2))
+                    for (jn, (ll, ul)) in muh.items()}
+    return {jn: draw(st.floats(ll, ul, allow_nan=False, allow_infinity=False)) for jn, (ll, ul) in muh.items()}
+
 
 @composite
 def pr2_joint_state(draw):

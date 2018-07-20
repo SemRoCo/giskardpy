@@ -13,12 +13,13 @@ from giskardpy.utils import dict_to_joint_states
 
 
 class GiskardWrapper(object):
-    def __init__(self, giskard_topic='qp_controller/command'):
-        self.client = SimpleActionClient(giskard_topic, MoveAction)
-        self.update_world = rospy.ServiceProxy('giskard/update_world', UpdateWorld)
-        self.marker_pub = rospy.Publisher('visualization_marker_array', MarkerArray, queue_size=10)
-        rospy.wait_for_service('giskard/update_world')
-        self.client.wait_for_server()
+    def __init__(self, giskard_topic='qp_controller/command', ns='giskard'):
+        if giskard_topic is not None:
+            self.client = SimpleActionClient(giskard_topic, MoveAction)
+            self.update_world = rospy.ServiceProxy('{}/update_world'.format(ns), UpdateWorld)
+            self.marker_pub = rospy.Publisher('visualization_marker_array', MarkerArray, queue_size=10)
+            rospy.wait_for_service('{}/update_world'.format(ns))
+            self.client.wait_for_server()
         self.tip_to_root = {}
         self.collisions = []
         self.clear_cmds()
@@ -119,15 +120,19 @@ class GiskardWrapper(object):
         :return:
         :rtype: giskard_msgs.msg._MoveResult.MoveResult
         """
-        goal = MoveGoal()
-        goal.cmd_seq = self.cmd_seq
-        goal.type = MoveGoal.PLAN_AND_EXECUTE
-        self.clear_cmds()
+        goal = self._get_goal()
         if wait:
             self.client.send_goal_and_wait(goal)
             return self.client.get_result()
         else:
             self.client.send_goal(goal)
+
+    def _get_goal(self):
+        goal = MoveGoal()
+        goal.cmd_seq = self.cmd_seq
+        goal.type = MoveGoal.PLAN_AND_EXECUTE
+        self.clear_cmds()
+        return goal
 
     def interrupt(self):
         self.client.cancel_goal()

@@ -47,7 +47,11 @@ class InteractiveMarkerPlugin(Plugin):
         :param suffix:
         :type suffix: str
         """
-        self.roots, self.tips = zip(*root_tips)
+        if len(root_tips) > 0:
+            self.roots, self.tips = zip(*root_tips)
+        else:
+            self.roots = []
+            self.tips = []
         self.suffix = suffix
         self.markers = {}
         super(InteractiveMarkerPlugin, self).__init__()
@@ -312,6 +316,9 @@ class InteractiveMarkerPlugin(Plugin):
                 move_cmd.controllers.extend(g)
             goal.cmd_seq.append(move_cmd)
             self.client.send_goal(goal)
+
+        def stop(self):
+            self.marker_pub.unregister()
 
     def copy(self):
         return self

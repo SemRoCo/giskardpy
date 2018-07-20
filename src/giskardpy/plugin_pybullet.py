@@ -75,7 +75,7 @@ class PyBulletPlugin(Plugin):
         self.world = PyBulletWorld(gui=self.gui, path_to_data_folder=self.path_to_data_folder)
         self.srv_update_world = rospy.Service('~update_world', UpdateWorld, self.update_world_cb)
         self.srv_viz_gui = rospy.Service('~enable_marker', SetBool, self.enable_marker_cb)
-        self.pub_collision_marker = rospy.Publisher('visualization_marker', Marker, queue_size=1)
+        self.pub_collision_marker = rospy.Publisher('~visualization_marker', Marker, queue_size=1)
         self.world.activate_viewer()
         # TODO get robot description from god map
         urdf = rospy.get_param('robot_description')
@@ -169,7 +169,8 @@ class PyBulletPlugin(Plugin):
         with self.lock:
             self.god_map.set_data([self.robot_description_identifier], self.world.get_robot().get_urdf())
             js = self.god_map.get_data([self.js_identifier])
-            self.world.set_robot_joint_state(js)
+            if js is not None:
+                self.world.set_robot_joint_state(js)
             for object_name, object_joint_state in self.object_joint_states.items():
                 self.world.get_object(object_name).set_joint_state(object_joint_state)
             p = lookup_transform(self.map_frame, self.robot_root)
@@ -263,12 +264,12 @@ class PyBulletPlugin(Plugin):
             self.god_map.set_data([self.closest_point_identifier], closest_point)
 
     def stop(self):
-        # self.world.clear_world()
-        # self.srv_update_world.shutdown()
-        # self.srv_viz_gui.shutdown()
-        # self.pub_collision_marker.unregister()
-        # self.world.deactivate_viewer()
-        pass
+        self.pub_collision_marker.publish(Marker(action=Marker.DELETEALL))
+        self.world.clear_world()
+        self.srv_update_world.shutdown()
+        self.srv_viz_gui.shutdown()
+        self.pub_collision_marker.unregister()
+        self.world.deactivate_viewer()
 
     def make_cpi_markers(self, collisions):
         m = Marker()

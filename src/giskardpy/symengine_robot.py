@@ -6,7 +6,8 @@ from urdf_parser_py.urdf import URDF, Box, Sphere, Mesh, Cylinder
 
 from giskardpy.input_system import JointStatesInput
 from giskardpy.qp_problem_builder import HardConstraint, JointConstraint
-from giskardpy.utils import cube_volume, cube_surface, sphere_volume, cylinder_volume, cylinder_surface, keydefaultdict
+from giskardpy.utils import cube_volume, cube_surface, sphere_volume, cylinder_volume, cylinder_surface, keydefaultdict, \
+    suppress_stdout, suppress_stderr
 
 Joint = namedtuple('Joint', ['symbol', 'velocity_limit', 'lower', 'upper', 'type', 'frame'])
 
@@ -53,7 +54,8 @@ class Robot(object):
         self._joint_to_frame = {}
         self.joint_to_symbol_map = keydefaultdict(lambda x: spw.Symbol(x))
         self.urdf = urdf
-        self._urdf_robot = URDF.from_xml_string(hacky_urdf_parser_fix(self.urdf))
+        with suppress_stderr():
+            self._urdf_robot = URDF.from_xml_string(hacky_urdf_parser_fix(self.urdf))
 
     @classmethod
     def from_urdf_file(cls, urdf_file, joints_to_symbols_map=None, default_joint_vel_limit=0):

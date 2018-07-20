@@ -16,7 +16,7 @@ from giskardpy.exceptions import UnknownBodyException, DuplicateObjectNameExcept
 from giskardpy.data_types import MultiJointState, SingleJointState, Transform, Point, Quaternion
 import numpy as np
 
-from giskardpy.utils import keydefaultdict
+from giskardpy.utils import keydefaultdict, suppress_stdout
 
 from giskardpy.object import WorldObject, FixedJoint, from_msg, to_urdf_string, BoxShape, CollisionProperty
 import hashlib
@@ -90,6 +90,7 @@ def load_urdf_string_into_bullet(urdf_string, pose):
     :rtype: int
     """
     filename = write_urdf_to_disc('{}.urdf'.format(random_string()), urdf_string)
+    # with suppress_stdout():
     id = p.loadURDF(filename, [pose.translation.x, pose.translation.y, pose.translation.z],
                     [pose.rotation.x, pose.rotation.y, pose.rotation.z, pose.rotation.w],
                     flags=p.URDF_USE_SELF_COLLISION_EXCLUDE_PARENT)
@@ -331,9 +332,9 @@ class PyBulletRobot(object):
             collision_matrix.add((self.link_id_to_name[collision[0]], self.link_id_to_name[collision[1]]))
 
         # assemble and store URDF string of new link and fixed joint
-        new_joint = FixedJoint('{}_joint'.format(object.name), transform, parent_link_name,
+        new_joint = FixedJoint(u'{}_joint'.format(object.name), transform, parent_link_name,
                                object.name)
-        self.attached_objects[object.name] = '{}{}'.format(to_urdf_string(new_joint), to_urdf_string(object, True))
+        self.attached_objects[object.name] = u'{}{}'.format(to_urdf_string(new_joint), to_urdf_string(object, True))
 
         new_urdf_string = self.get_urdf()
 
@@ -357,13 +358,13 @@ class PyBulletRobot(object):
         link_pairs = {(object_id, link_id) for link_id in self.joint_id_to_info.keys()}
         new_collisions = self.calc_self_collision_matrix(link_pairs)
         self.sometimes.union(new_collisions)
-        print('object {} attached to {} in pybullet world'.format(object.name, self.name))
+        print(u'object {} attached to {} in pybullet world'.format(object.name, self.name))
 
     def get_urdf(self):
         # for each attached object, insert the corresponding URDF sub-string into the original URDF string
         new_urdf_string = self.original_urdf
         for sub_string in self.attached_objects.values():
-            new_urdf_string = new_urdf_string.replace('</robot>', '{}</robot>'.format(sub_string))
+            new_urdf_string = new_urdf_string.replace(u'</robot>', '{}</robot>'.format(sub_string))
         return new_urdf_string
 
     def detach_object(self, object_name):
@@ -375,7 +376,7 @@ class PyBulletRobot(object):
         """
         if not self.has_attached_object(object_name):
             # TODO: choose better exception type
-            raise RuntimeError("No object '{}' has been attached to the robot.".format(object_name))
+            raise RuntimeError(u"No object '{}' has been attached to the robot.".format(object_name))
 
         # salvage last joint state and base pose
         base_pose = self.get_base_pose()
@@ -409,7 +410,7 @@ class PyBulletRobot(object):
         self.sometimes = set()
         for collision in collision_matrix:
             self.sometimes.add((self.link_name_to_id[collision[0]], self.link_name_to_id[collision[1]]))
-        print('object {} detachted from {} in pybullet world'.format(object_name, self.name))
+        print(u'object {} detachted from {} in pybullet world'.format(object_name, self.name))
 
     def detach_all_objects(self):
         """

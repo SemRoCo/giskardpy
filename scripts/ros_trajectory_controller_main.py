@@ -15,11 +15,9 @@ from giskardpy.plugin_pybullet import PyBulletPlugin
 from giskardpy.plugin_set_controlled_joints import SetControlledJointsPlugin, UploadRobotDescriptionPlugin
 from giskardpy.process_manager import ProcessManager
 
-if __name__ == '__main__':
+def giskard_pm():
     # TODO 0 0 0 in base footprint as goal results in /0
     # TODO bug if first goal is joint
-    rospy.init_node('giskard')
-
     # root_link = rospy.get_param('~root_link', 'odom')
     root_tips = rospy.get_param('~interactive_marker_chains')
     gui = rospy.get_param('~enable_gui')
@@ -118,6 +116,10 @@ if __name__ == '__main__':
                                                            robot_description_identifier=robot_description_identifier)))
     pm.register_plugin('interactive marker',
                        InteractiveMarkerPlugin(root_tips=root_tips))
+    return pm
 
-    app = ROSApplication(pm)
+if __name__ == '__main__':
+    rospy.init_node('giskard')
+    app = ROSApplication(giskard_pm())
     app.run()
+

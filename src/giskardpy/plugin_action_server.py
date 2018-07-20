@@ -26,6 +26,7 @@ from giskardpy.data_types import ClosestPointInfo
 from giskardpy.data_types import SingleJointState, Transform, Point, Quaternion, Trajectory
 from giskardpy.utils import closest_point_constraint_violated
 
+ERROR_CODE_TO_NAME = {getattr(MoveResult, x): x for x in dir(MoveResult) if x.isupper()}
 
 class ActionServerPlugin(Plugin):
     # TODO find a better name than ActionServerPlugin
@@ -59,18 +60,19 @@ class ActionServerPlugin(Plugin):
 
     def start_once(self):
         self.new_universe = False
-        self._action_name = 'qp_controller/command'
+        self._action_name = u'qp_controller/command'
         # TODO remove whole body controller and use remapping
-        self._ac = actionlib.SimpleActionClient('/whole_body_controller/follow_joint_trajectory',
+        self._ac = actionlib.SimpleActionClient(u'/whole_body_controller/follow_joint_trajectory',
                                                 FollowJointTrajectoryAction)
         self._as = actionlib.SimpleActionServer(self._action_name, MoveAction,
                                                 execute_cb=self.action_server_cb, auto_start=False)
-        self.controller_joints = rospy.wait_for_message('/whole_body_controller/state',
+        self.controller_joints = rospy.wait_for_message(u'/whole_body_controller/state',
                                                         JointTrajectoryControllerState).joint_names
         self._as.start()
 
     def stop(self):
-        pass
+        self._as = None
+        self._ac = None
 
     def copy(self):
         self.child = LogTrajectoryPlugin(trajectory_identifier=self.trajectory_identifier,
@@ -105,7 +107,7 @@ class ActionServerPlugin(Plugin):
             self.new_universe = True
             self.publish_feedback(MoveFeedback.PLANNING, 0)
         self.god_map.set_data([self.goal_identifier], goals)
-        # TODO why use start js here?
+        # TODO create a more obvious way to modify a god map for a parallel universe
         self.god_map.set_data([self.js_identifier], self.current_js if self.start_js is None else self.start_js)
         self.god_map.set_data([self.collision_goal_identifier], cmd.collisions if cmd is not None else None)
 
@@ -240,12 +242,13 @@ class ActionServerPlugin(Plugin):
         :param goal:
         :type goal: MoveGoal
         """
-        rospy.loginfo(u'received goal')
+        rospy.loginfo(u'goal received')
         self.execute = goal.type == MoveGoal.PLAN_AND_EXECUTE
         if goal.type == MoveGoal.UNDEFINED:
             result = MoveResult()
             # TODO new error code
             result.error_code = MoveResult.INSOLVABLE
+            self._as.set_aborted(result)
         else:
             result = MoveResult()
             for i, move_cmd in enumerate(goal.cmd_seq):  # type: (int, MoveCmd)
@@ -264,13 +267,13 @@ class ActionServerPlugin(Plugin):
                 if result.error_code == MoveResult.SUCCESS and self.execute:
                     result.error_code = self.send_to_robot(result)
 
-        self.start_js = None
-        if result.error_code != MoveResult.SUCCESS:
-            self._as.set_aborted(result)
-        else:
-            self._as.set_succeeded(result)
-        rospy.loginfo(u'finished movement {}'.format(result.error_code))
-        self.let_process_manager_continue()
+            self.start_js = None
+            if result.error_code != MoveResult.SUCCESS:
+                self._as.set_aborted(result)
+            else:
+                self._as.set_succeeded(result)
+            self.let_process_manager_continue()
+        rospy.loginfo(u'goal result: {}'.format(ERROR_CODE_TO_NAME[result.error_code]))
 
     def send_to_robot(self, result):
         """

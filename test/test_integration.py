@@ -1,158 +1,132 @@
 #!/usr/bin/env python
-import unittest
+from multiprocessing import Queue
+from threading import Thread
 
-from giskard_msgs.msg import MoveActionGoal, MoveGoal
+import pytest
+from giskard_msgs.msg import MoveActionGoal, MoveGoal, MoveActionResult, MoveResult
 from hypothesis.strategies import composite
 
-from giskardpy.exceptions import DuplicateObjectNameException, UnknownBodyException, RobotExistsException
-from giskardpy.object import WorldObject, Box, Sphere, Cylinder
-from giskardpy.plugin import PluginContainer
-from giskardpy.pybullet_world import PyBulletWorld
-import pybullet as p
 import hypothesis.strategies as st
-from hypothesis.stateful import Bundle, RuleBasedStateMachine, rule, invariant, initialize
-from giskardpy.data_types import MultiJointState, SingleJointState, Transform, Point, Quaternion
-from giskardpy.test_utils import variable_name, robot_urdfs
-import os
-from rospkg import RosPack
+from hypothesis.stateful import Bundle, RuleBasedStateMachine, rule, invariant, initialize, run_state_machine_as_test, \
+    precondition
+from giskardpy.python_interface import GiskardWrapper
 
 import rospy
 
-from giskardpy.plugin_action_server import ActionServerPlugin
-from giskardpy.application import ROSApplication
-from giskardpy.plugin_instantaneous_controller import CartesianBulletControllerPlugin
-from giskardpy.plugin_fk import FKPlugin
-from giskardpy.plugin_interactive_marker import InteractiveMarkerPlugin
-from giskardpy.plugin_joint_state import JointStatePlugin
-from giskardpy.plugin_kinematic_sim import KinematicSimPlugin
-from giskardpy.plugin_pybullet import PyBulletPlugin
-from giskardpy.plugin_set_controlled_joints import SetControlledJointsPlugin, UploadRobotDescriptionPlugin, \
-    UploadUrdfPlugin
-from giskardpy.process_manager import ProcessManager
+from hypothesis import settings
+
+from giskardpy.test_utils import rnd_joint_state, rnd_joint_state2
+from ros_trajectory_controller_main import giskard_pm
 
 
 class TestPyBulletWorld(RuleBasedStateMachine):
+    js = Bundle(u'js')
+    joint_limits = Bundle(u'joint_limits')
+
     def __init__(self):
         super(TestPyBulletWorld, self).__init__()
-        rospy.init_node('test_integration')
+        rospy.init_node(u'test_integration')
+        self.giskard = GiskardWrapper(None)
+        self.sub_result = rospy.Subscriber(u'/qp_controller/command/result', MoveActionResult, self.cb, queue_size=100)
+        self.results = Queue(100)
         self.pm = None
 
-    @initialize(urdf=robot_urdfs())
-    def init(self, urdf):
-        with open(urdf, u'r') as f:
-            urdf = f.read()
-        gui = False
-        map_frame = u'map'
-        joint_convergence_threshold = 0.002
-        wiggle_precision_threshold = 7
-        sample_period = 0.1
-        default_joint_vel_limit = 0.5
-        default_collision_avoidance_distance = 0.05
-        fill_velocity_values = False
-        nWSR = None
-        root_link = u'base_footprint'
-        marker = True
-        enable_self_collision = True
-        path_to_data_folder = u'../data/pr2/'
-        collision_time_threshold = 15
-        max_traj_length = 30
+    def cb(self, msg):
+        self.results.put(msg.result)
 
-        fk_identifier = 'fk'
-        cartesian_goal_identifier = 'goal'
-        js_identifier = 'js'
-        controlled_joints_identifier = 'controlled_joints'
-        trajectory_identifier = 'traj'
-        time_identifier = 'time'
-        next_cmd_identifier = 'motor'
-        collision_identifier = 'collision'
-        closest_point_identifier = 'cpi'
-        collision_goal_identifier = 'collision_goal'
-        pyfunction_identifier = 'pyfunctions'
-        controllable_links_identifier = 'controllable_links'
-        robot_description_identifier = 'robot_description'
-        self.pm = ProcessManager()
-        self.pm.register_plugin('js',
-                           JointStatePlugin(js_identifier=js_identifier,
-                                            time_identifier=time_identifier,
-                                            next_cmd_identifier=next_cmd_identifier,
-                                            sample_period=sample_period))
-        self.pm.register_plugin('upload robot description',
-                           UploadUrdfPlugin(robot_description_identifier=robot_description_identifier,
-                                            urdf=urdf))
-        self.pm.register_plugin('action server',
-                           ActionServerPlugin(js_identifier=js_identifier,
-                                              trajectory_identifier=trajectory_identifier,
-                                              cartesian_goal_identifier=cartesian_goal_identifier,
-                                              time_identifier=time_identifier,
-                                              closest_point_identifier=closest_point_identifier,
-                                              controlled_joints_identifier=controlled_joints_identifier,
-                                              collision_goal_identifier=collision_goal_identifier,
-                                              joint_convergence_threshold=joint_convergence_threshold,
-                                              wiggle_precision_threshold=wiggle_precision_threshold,
-                                              pyfunction_identifier=pyfunction_identifier,
-                                              plot_trajectory=False,
-                                              fill_velocity_values=fill_velocity_values,
-                                              collision_time_threshold=collision_time_threshold,
-                                              max_traj_length=max_traj_length))
-        self.pm.register_plugin('bullet',
-                           PyBulletPlugin(js_identifier=js_identifier,
-                                          collision_identifier=collision_identifier,
-                                          closest_point_identifier=closest_point_identifier,
-                                          collision_goal_identifier=collision_goal_identifier,
-                                          controllable_links_identifier=controllable_links_identifier,
-                                          map_frame=map_frame,
-                                          root_link=root_link,
-                                          path_to_data_folder=path_to_data_folder,
-                                          gui=gui,
-                                          marker=marker,
-                                          default_collision_avoidance_distance=default_collision_avoidance_distance,
-                                          enable_self_collision=enable_self_collision,
-                                          robot_description_identifier=robot_description_identifier))
-        self.pm.register_plugin('fk', FKPlugin(js_identifier=js_identifier,
-                                          fk_identifier=fk_identifier,
-                                          robot_description_identifier=robot_description_identifier))
-        self.pm.register_plugin('cart bullet controller',
-                           PluginContainer(
-                               CartesianBulletControllerPlugin(root_link=root_link,
-                                                               fk_identifier=fk_identifier,
-                                                               goal_identifier=cartesian_goal_identifier,
-                                                               js_identifier=js_identifier,
-                                                               next_cmd_identifier=next_cmd_identifier,
-                                                               collision_identifier=collision_identifier,
-                                                               pyfunction_identifier=pyfunction_identifier,
-                                                               closest_point_identifier=closest_point_identifier,
-                                                               controlled_joints_identifier=controlled_joints_identifier,
-                                                               controllable_links_identifier=controllable_links_identifier,
-                                                               collision_goal_identifier=collision_goal_identifier,
-                                                               path_to_functions=path_to_data_folder,
-                                                               nWSR=nWSR,
-                                                               default_joint_vel_limit=default_joint_vel_limit,
-                                                               robot_description_identifier=robot_description_identifier)))
+    @initialize(target=joint_limits)
+    def init(self):
+        rospy.set_param(u'~interactive_marker_chains', [])
+        rospy.set_param(u'~enable_gui', False)
+        rospy.set_param(u'~map_frame', u'map')
+        rospy.set_param(u'~joint_convergence_threshold', 0.002)
+        rospy.set_param(u'~wiggle_precision_threshold', 7)
+        rospy.set_param(u'~sample_period', 0.1)
+        rospy.set_param(u'~default_joint_vel_limit', 0.5)
+        rospy.set_param(u'~default_collision_avoidance_distance', 0.05)
+        rospy.set_param(u'~fill_velocity_values', False)
+        rospy.set_param(u'~nWSR', u'None')
+        rospy.set_param(u'~root_link', u'base_footprint')
+        rospy.set_param(u'~enable_collision_marker', False)
+        rospy.set_param(u'~enable_self_collision', False)
+        rospy.set_param(u'~path_to_data_folder', u'../data/pr2/')
+        rospy.set_param(u'~collision_time_threshold', 15)
+        rospy.set_param(u'~max_traj_length', 30)
+        self.pm = giskard_pm()
         self.pm.start_plugins()
+        # cart_plugin = self.pm._plugins[u'cart bullet controller'].replacement
+        self.robot = self.pm._plugins[u'fk'].get_robot()
+        controlled_joints = self.pm._plugins[u'controlled joints'].controlled_joints
+        self.joint_limits = {joint_name: self.robot.get_joint_lower_upper_limit(joint_name) for joint_name in
+                             controlled_joints if self.robot.is_joint_controllable(joint_name)}
+        return self.joint_limits
 
     def loop_once(self):
         self.pm.update()
 
-    # @invariant()
-    # def loop(self):
-    #     if self.pm is not None:
+    # def set_goal(self):
+    #     goal = MoveGoal()
+    #     assert self.send_fake_goal().error_code == MoveResult.INSOLVABLE
     #     self.loop_once()
 
-    @rule()
-    def set_goal(self):
-        self.loop_once()
-        goal = MoveGoal()
-        self.pm._plugins['action server'].action_server_cb(goal)
-        self.loop_once()
+    @rule(js=rnd_joint_state2(joint_limits))
+    def set_js_goal(self, js):
+        self.giskard.set_joint_goal(js)
+        assert self.send_fake_goal().error_code == MoveResult.SUCCESS
+
+    def send_fake_goal(self):
+        goal = MoveActionGoal()
+        goal.goal = self.giskard._get_goal()
+
+        t1 = Thread(target=self.pm._plugins[u'action server']._as.action_server.internal_goal_callback, args=(goal,))
+        t1.start()
+        while self.results.empty():
+            self.loop_once()
+        t1.join()
+        result = self.results.get()
+        return result
 
     def teardown(self):
         self.pm.stop()
 
+
+@pytest.fixture(scope="session")
+def shutdown_ros(request):
+    def fin():
+        rospy.sleep(0.5)
+        rospy.signal_shutdown('holy fuck it took me way too long to figure this shit out.')
+
+    request.addfinalizer(fin)
+    return 0
+
+
 TestTrees = TestPyBulletWorld.TestCase
+TestTrees.settings = settings(max_examples=2, stateful_step_count=10, timeout=300)
+
+
+def test_hack_to_shutdown_ros(shutdown_ros):
+    pass
+
 
 if __name__ == '__main__':
-    # unittest.main()
+    pass
     state = TestPyBulletWorld()
-    state.init(urdf=u'pr2.urdf')
-    state.set_goal()
+    v1 = state.init()
+    state.set_js_goal(js={'head_pan_joint': 2.0323372301955806e-08,
+                          'head_tilt_joint': -0.1481484279260326,
+                          'l_elbow_flex_joint': -0.25720986816287045,
+                          'l_forearm_roll_joint': -2426096630891975.0,
+                          'l_shoulder_lift_joint': 0.7277546370009919,
+                          'l_shoulder_pan_joint': 0.009406189082520854,
+                          'l_upper_arm_roll_joint': 0.0,
+                          'l_wrist_flex_joint': -1.999999773072091,
+                          'l_wrist_roll_joint': 9.559964998171719e-253,
+                          'r_elbow_flex_joint': -1.4858974548339847,
+                          'r_forearm_roll_joint': -1e-05,
+                          'r_shoulder_lift_joint': -0.34563774483324,
+                          'r_shoulder_pan_joint': 0.1329508508979699,
+                          'r_upper_arm_roll_joint': 7.6809765110486e-07,
+                          'r_wrist_flex_joint': -1.999536380792552,
+                          'r_wrist_roll_joint': 1.1489250587411545e-165,
+                          'torso_lift_joint': 0.2868457629922887})
     state.teardown()

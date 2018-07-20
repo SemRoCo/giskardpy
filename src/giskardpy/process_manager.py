@@ -88,7 +88,7 @@ class ProcessManager(object):
                         traceback.print_exc()
                     finally:
                         print(u'parallel universe died')
-                    parallel_universe.stop()
+                    # parallel_universe.stop()
                     rospy.loginfo(u'parallel universe existed for {}s'.format(time()-t))
 
                     # copy new expressions

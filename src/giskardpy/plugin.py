@@ -9,10 +9,10 @@ class Plugin(object):
         :return:
         """
         self.god_map = god_map
-        self.start_always()
         if not self.started:
             self.start_once()
             self.started = True
+        self.start_always()
 
     def start_once(self):
         pass

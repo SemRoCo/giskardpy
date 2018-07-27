@@ -18,7 +18,7 @@ from giskard_msgs.msg._MoveResult import MoveResult
 from trajectory_msgs.msg import JointTrajectoryPoint, JointTrajectory
 
 from giskardpy.exceptions import MAX_NWSR_REACHEDException, QPSolverException, SolverTimeoutError, InsolvableException, \
-    SymengineException, PathCollisionException
+    SymengineException, PathCollisionException, UnknownBodyException
 from giskardpy.plugin import Plugin
 from giskardpy.plugin_log_trajectory import LogTrajectoryPlugin
 from giskardpy.tfwrapper import transform_pose
@@ -225,7 +225,7 @@ class ActionServerPlugin(Plugin):
             error_code = MoveResult.MAX_NWSR_REACHED
         elif isinstance(exception, QPSolverException):
             error_code = MoveResult.QP_SOLVER_ERROR
-        elif isinstance(exception, KeyError):
+        elif isinstance(exception, UnknownBodyException):
             error_code = MoveResult.UNKNOWN_OBJECT
         elif isinstance(exception, SolverTimeoutError):
             error_code = MoveResult.SOLVER_TIMEOUT

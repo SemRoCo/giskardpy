@@ -16,8 +16,8 @@ from visualization_msgs.msg import Marker, MarkerArray
 
 from giskardpy.exceptions import CorruptShapeException, UnknownBodyException, DuplicateObjectNameException, \
     PathCollisionException, UnsupportedOptionException
-from giskardpy.object import WorldObject, to_urdf_string, VisualProperty, BoxShape, CollisionProperty, to_marker, \
-    MeshShape, from_msg, from_pose_msg
+from giskardpy.object import UrdfObject, to_urdf_string, VisualProperty, BoxShape, CollisionProperty, to_marker, \
+    MeshShape, world_body_to_urdf_object, from_pose_msg
 from giskardpy.plugin import Plugin
 from giskardpy.pybullet_world import PyBulletWorld, ContactInfo
 from giskardpy.symengine_wrappers import euclidean_distance
@@ -75,7 +75,7 @@ class PyBulletPlugin(Plugin):
         self.world = PyBulletWorld(gui=self.gui, path_to_data_folder=self.path_to_data_folder)
         self.srv_update_world = rospy.Service('~update_world', UpdateWorld, self.update_world_cb)
         self.srv_viz_gui = rospy.Service('~enable_marker', SetBool, self.enable_marker_cb)
-        self.pub_collision_marker = rospy.Publisher('~visualization_marker', Marker, queue_size=1)
+        self.pub_collision_marker = rospy.Publisher('~visualization_marker_array', MarkerArray, queue_size=1)
         self.world.activate_viewer()
         # TODO get robot description from god map
         urdf = rospy.get_param('robot_description')
@@ -103,31 +103,10 @@ class PyBulletPlugin(Plugin):
         with self.lock:
             try:
                 if req.operation is UpdateWorldRequest.ADD:
-                    # Check that no object with this name already exists.
-                    if self.world.has_object(req.body.name) or self.world.get_robot().has_attached_object(
-                            req.body.name):
-                        raise DuplicateObjectNameException('Cannot spawn object "{}" because an object with such a '
-                                                     'name already exists'.format(req.body.name))
-
-                    # CASE: Spawn rigidly attached object
                     if req.rigidly_attached:
-                        # Catch unsupported sub-case of rigidly attaching a robot to a robot
-                        if req.body.type is WorldBody.URDF_BODY:
-                            raise UnsupportedOptionException('Attaching URDF bodies to robots is not supported.')
-                        self.world.get_robot().attach_object(from_msg(req.body), req.pose.header.frame_id,
-                                                             from_pose_msg(req.pose.pose))
-
-                    # CASE: Spawn a 'free' object
+                        self.attach_object(req)
                     else:
-                        urdf_string = req.body.urdf if req.body.type is WorldBody.URDF_BODY else to_urdf_string(
-                            from_msg(req.body))
-                        pose = from_pose_msg(transform_pose(self.global_reference_frame_name, req.pose).pose)
-                        self.world.spawn_object_from_urdf(req.body.name, urdf_string, pose)
-                        # SUB-CASE: If it is an articulated object, open up a joint state subscriber
-                        if req.body.joint_state_topic:
-                            callback = (lambda msg: self.object_js_cb(req.body.name, msg))
-                            self.object_js_subs[req.body.name] = \
-                                rospy.Subscriber(req.body.joint_state_topic, JointState, callback, queue_size=1)
+                        self.add_object(req)
 
                 elif req.operation is UpdateWorldRequest.REMOVE:
                     if self.world.has_object(req.body.name):
@@ -144,12 +123,7 @@ class PyBulletPlugin(Plugin):
                     # TODO: implement me
                     pass
                 elif req.operation is UpdateWorldRequest.REMOVE_ALL:
-                    self.world.delete_all_objects()
-                    self.world.get_robot().detach_all_objects()
-                    for object_name in self.object_js_subs.keys():
-                        self.object_js_subs[object_name].unregister()
-                        del (self.object_js_subs[object_name])
-                        del (self.object_joint_states[object_name])
+                    self.clear_world()
                 else:
                     return UpdateWorldResponse(UpdateWorldResponse.INVALID_OPERATION,
                                                "Received invalid operation code: {}".format(req.operation))
@@ -164,6 +138,60 @@ class PyBulletPlugin(Plugin):
                 return UpdateWorldResponse(UpdateWorldResponse.UNSUPPORTED_OPTIONS, str(e))
             except Exception as e:
                 return UpdateWorldResponse(UpdateWorldResponse.UNSUPPORTED_OPTIONS, str(e))
+
+    def add_object(self, req):
+        """
+        :type req: UpdateWorldRequest
+        :return:
+        """
+        world_body = req.body
+        global_pose = from_pose_msg(transform_pose(self.global_reference_frame_name, req.pose).pose)
+        if world_body.type is WorldBody.URDF_BODY:
+            self.world.spawn_object_from_urdf_str(world_body.name, world_body.urdf, global_pose)
+        else:
+            self.world.spawn_urdf_object(world_body_to_urdf_object(world_body), global_pose)
+
+        # SUB-CASE: If it is an articulated object, open up a joint state subscriber
+        if world_body.joint_state_topic:
+            callback = (lambda msg: self.object_js_cb(world_body.name, msg))
+            self.object_js_subs[world_body.name] = \
+                rospy.Subscriber(world_body.joint_state_topic, JointState, callback, queue_size=1)
+
+        self.publish_object_as_marker(req)
+
+    def attach_object(self, req):
+        if req.body.type is WorldBody.URDF_BODY:
+            raise UnsupportedOptionException(u'Attaching URDF bodies to robots is not supported.')
+        self.world.attach_object(world_body_to_urdf_object(req.body),
+                                 req.pose.header.frame_id,
+                                 from_pose_msg(req.pose.pose))
+        self.publish_object_as_marker(req)
+
+    # def remove_object(self, name):
+    # TODO continue here
+    #     if self.world.has_object(req.body.name):
+    #         self.world.delete_object(req.body.name)
+    #         if self.object_js_subs.has_key(req.body.name):
+    #             self.object_js_subs[req.body.name].unregister()
+    #             del (self.object_js_subs[req.body.name])
+    #             del (self.object_joint_states[req.body.name])
+    #     elif self.world.get_robot().has_attached_object(req.body.name):
+    #         self.world.get_robot().detach_object(req.body.name)
+    #     else:
+    #         raise UnknownBodyException('Cannot delete unknown object {}'.format(req.body.name))
+
+    def publish_object_as_marker(self, req):
+        ma = to_marker(req)
+        self.pub_collision_marker.publish(ma)
+
+    def clear_world(self):
+        self.pub_collision_marker.publish(MarkerArray([Marker(action=Marker.DELETEALL)]))
+        self.world.delete_all_objects()
+        self.world.get_robot().detach_all_objects()
+        for sub in self.object_js_subs.values():
+            sub.unregister()
+        self.object_js_subs = {}
+        self.object_joint_states = {}
 
     def update(self):
         with self.lock:
@@ -190,20 +218,20 @@ class PyBulletPlugin(Plugin):
             # TODO properly handle multiple collision entries
             for collision_entry in collision_goals:  # type: CollisionEntry
 
-                if collision_entry.body_b == '' and \
+                if collision_entry.body_b == u'' and \
                         collision_entry.type not in [CollisionEntry.ALLOW_ALL_COLLISIONS,
                                                      CollisionEntry.AVOID_ALL_COLLISIONS]:
-                    raise Exception('body_b not set')
+                    raise Exception(u'body_b not set')
 
-                if collision_entry.body_b == '' and collision_entry.link_b != '':
-                    raise Exception('body_b is empty but link_b is not')
+                if collision_entry.body_b == u'' and collision_entry.link_b != u'':
+                    raise Exception(u'body_b is empty but link_b is not')
 
-                if collision_entry.robot_link == '':
+                if collision_entry.robot_link == u'':
                     links_a = self.world.get_robot().get_link_names()
                 else:
                     links_a = [collision_entry.robot_link]
 
-                if collision_entry.body_b == '':
+                if collision_entry.body_b == u'':
                     bodies_b = self.world.get_object_names()
                 else:
                     bodies_b = [collision_entry.body_b]
@@ -212,7 +240,9 @@ class PyBulletPlugin(Plugin):
                     allowed_collisions.add(self.world.get_robot().name)
                 else:
                     for body_b in bodies_b:
-                        if collision_entry.link_b == '':
+                        if collision_entry.link_b == u'':
+                            if not self.world.has_object(body_b):
+                                raise UnknownBodyException(u'body_b \'{}\' unknown'.format(body_b))
                             links_b = self.world.get_object(body_b).get_link_names()
                         else:
                             links_b = [collision_entry.link_b]
@@ -264,8 +294,7 @@ class PyBulletPlugin(Plugin):
             self.god_map.set_data([self.closest_point_identifier], closest_point)
 
     def stop(self):
-        self.pub_collision_marker.publish(Marker(action=Marker.DELETEALL))
-        self.world.clear_world()
+        self.clear_world()
         self.srv_update_world.shutdown()
         self.srv_viz_gui.shutdown()
         self.pub_collision_marker.unregister()
@@ -280,7 +309,7 @@ class PyBulletPlugin(Plugin):
         m.ns = 'pybullet collisions'
         m.scale = Vector3(0.003, 0, 0)
         if len(collisions) > 0:
-            for collision_info in collisions.values(): # type: ClosestPointInfo
+            for collision_info in collisions.values():  # type: ClosestPointInfo
                 red_threshold = collision_info.min_dist
                 yellow_threshold = collision_info.min_dist * 2
                 green_threshold = collision_info.min_dist * 3
@@ -298,7 +327,9 @@ class PyBulletPlugin(Plugin):
                     m.colors[-1] = ColorRGBA(1, 0, 0, 1)
         else:
             m.action = Marker.DELETE
-        self.pub_collision_marker.publish(m)
+        ma = MarkerArray()
+        ma.markers.append(m)
+        self.pub_collision_marker.publish(ma)
 
     def object_js_cb(self, object_name, msg):
         """
@@ -307,6 +338,5 @@ class PyBulletPlugin(Plugin):
         :type object_name: str
         :param msg: Current state of the articulated object that shall be set in the world.
         :type msg: JointState
-        :return: Nothing
         """
         self.object_joint_states[object_name] = to_joint_state_dict(msg)

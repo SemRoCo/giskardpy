@@ -7,7 +7,7 @@ from tf2_ros import Buffer, TransformListener
 tfBuffer = None
 tf_listener = None
 
-def init(tf_buffer_size=2):
+def init(tf_buffer_size=10):
     """
     If you want to specify the buffer size, call this function manually, otherwise don't worry about it.
     :param tf_buffer_size:

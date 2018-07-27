@@ -1,7 +1,9 @@
+from giskard_msgs.srv import UpdateWorldRequest
+from std_msgs.msg import ColorRGBA
 from visualization_msgs.msg import MarkerArray, Marker
 from giskard_msgs.msg import WorldBody
 from shape_msgs.msg import SolidPrimitive
-from geometry_msgs.msg import Pose as PoseMsg, Point as PointMsg, Quaternion as QuaternionMsg
+from geometry_msgs.msg import Pose as PoseMsg, Point as PointMsg, Quaternion as QuaternionMsg, Vector3
 
 from giskardpy.exceptions import CorruptShapeException
 from giskardpy.data_types import Transform, Point, Quaternion
@@ -84,14 +86,14 @@ class CollisionProperty(object):
         self.geometry = geometry
 
 
-class WorldObject(object):
+class UrdfObject(object):
     def __init__(self, name='', inertial_props=None, visual_props=(), collision_props=()):
         self.name = name
         self.inertial_props = inertial_props
         self.visual_props = visual_props
         self.collision_props = collision_props
 
-class Box(WorldObject):
+class Box(UrdfObject):
     def __init__(self, name, length, width, height):
         geom = BoxShape(length,
                         width,
@@ -100,14 +102,14 @@ class Box(WorldObject):
         vis = VisualProperty(name=name + '_vis', geometry=geom)
         super(Box, self).__init__(name, collision_props=[col], visual_props=[vis])
 
-class Sphere(WorldObject):
+class Sphere(UrdfObject):
     def __init__(self, name, radius):
         geom = SphereShape(radius)
         col = CollisionProperty(name=name + '_col', geometry=geom)
         vis = VisualProperty(name=name + '_vis', geometry=geom)
         super(Sphere, self).__init__(name, collision_props=[col], visual_props=[vis])
 
-class Cylinder(WorldObject):
+class Cylinder(UrdfObject):
     def __init__(self, name, radius, length):
         geom = CylinderShape(radius, length)
         col = CollisionProperty(name=name + '_col', geometry=geom)
@@ -132,7 +134,7 @@ def to_urdf_xml(urdf_object, skip_robot_tag=False):
     :return:
     :rtype: lxml.etree.Element
     """
-    if isinstance(urdf_object, WorldObject):
+    if isinstance(urdf_object, UrdfObject):
         link = etree.Element('link', name=urdf_object.name)
         if urdf_object.inertial_props:
             link.append(to_urdf_xml(urdf_object.inertial_props))
@@ -213,13 +215,80 @@ def to_urdf_xml(urdf_object, skip_robot_tag=False):
 def to_urdf_string(urdf_object, skip_robot_tag=False):
     """
     :param urdf_object:
-    :type urdf_object: WorldObject
+    :type urdf_object: UrdfObject
     :return:
     :rtype: str
     """
     return etree.tostring(to_urdf_xml(urdf_object, skip_robot_tag=skip_robot_tag))
 
-def to_marker(urdf_object):
+def to_marker(thing):
+    """
+    :type thing: Union[UpdateWorldRequest, WorldBody]
+    :rtype: MarkerArray
+    """
+    ma = MarkerArray()
+    if isinstance(thing, UrdfObject):
+        pass
+        # TODO
+        # return urdf_object_to_marker_msg(thing)
+    elif isinstance(thing, WorldBody):
+        ma.markers.append(world_body_to_marker_msg(thing))
+    elif isinstance(thing, UpdateWorldRequest):
+        ma.markers.append(update_world_to_marker_msg(thing))
+    return ma
+
+def update_world_to_marker_msg(update_world_req, id=1, ns=''):
+    """
+    :type update_world_req: UpdateWorldRequest
+    :type id: int
+    :type ns: str
+    :rtype: Marker
+    """
+    m = world_body_to_marker_msg(update_world_req.body, id, ns)
+    m.header = update_world_req.pose.header
+    m.pose = update_world_req.pose.pose
+    m.frame_locked = update_world_req.rigidly_attached
+    if update_world_req.operation == UpdateWorldRequest.ADD:
+        m.action = Marker.ADD
+    elif update_world_req.operation == UpdateWorldRequest.REMOVE:
+        m.action = Marker.DELETE
+    elif update_world_req.operation == UpdateWorldRequest.REMOVE_ALL:
+        m.action = Marker.DELETEALL
+    return m
+
+
+def world_body_to_marker_msg(world_body, id=1, ns=''):
+    """
+    :type world_body: WorldBody
+    :rtype: Marker
+    """
+    m = Marker()
+    m.ns = u'{}/{}'.format(ns, world_body.name)
+    m.id = id
+    if world_body.type == WorldBody.URDF_BODY:
+        raise Exception(u'can\'t convert urdf body world object to marker array')
+    elif world_body.type == WorldBody.PRIMITIVE_BODY:
+        if world_body.shape.type == SolidPrimitive.BOX:
+            m.type = Marker.CUBE
+        elif world_body.shape.type == SolidPrimitive.SPHERE:
+            m.type = Marker.SPHERE
+        elif world_body.shape.type == SolidPrimitive.CYLINDER:
+            m.type = Marker.CYLINDER
+        else:
+            raise Exception(u'world body type {} can\'t be converted to marker'.format(world_body.shape.type))
+    elif world_body.type == WorldBody.MESH_BODY:
+        m.type = Marker.MESH_RESOURCE
+        m.mesh_resource = world_body.mesh
+    m.scale = Vector3(*world_body.shape.dimensions)
+    m.color = ColorRGBA(0,1,0,0.8)
+    return m
+
+
+def urdf_object_to_marker_msg(urdf_object):
+    """
+    :type urdf_object: UrdfObject
+    :rtype: MarkerArray
+    """
     ma = MarkerArray()
     for visual_property in urdf_object.visual_props:
         m = Marker()
@@ -253,6 +322,37 @@ def to_marker(urdf_object):
         ma.markers.append(m)
     return ma
 
+def world_body_to_urdf_object(world_body_msg):
+    """
+    Converts a body from a ROS message to the corresponding internal representation.
+    :param world_body_msg: Input message that shall be converted.
+    :type world_body_msg: WorldBody
+    :return: Internal representation of body, filled with data from input message.
+    :rtype UrdfObject
+    """
+    if world_body_msg.type is WorldBody.MESH_BODY:
+        geom = MeshShape(filename=world_body_msg.mesh)
+    elif world_body_msg.type is WorldBody.PRIMITIVE_BODY:
+        if world_body_msg.shape.type is SolidPrimitive.BOX:
+            geom = BoxShape(world_body_msg.shape.dimensions[SolidPrimitive.BOX_X],
+                            world_body_msg.shape.dimensions[SolidPrimitive.BOX_Y],
+                            world_body_msg.shape.dimensions[SolidPrimitive.BOX_Z])
+        elif world_body_msg.shape.type is SolidPrimitive.CYLINDER:
+            geom = CylinderShape(world_body_msg.shape.dimensions[SolidPrimitive.CYLINDER_RADIUS],
+                                 world_body_msg.shape.dimensions[SolidPrimitive.CYLINDER_HEIGHT])
+        elif world_body_msg.shape.type is SolidPrimitive.SPHERE:
+            geom = SphereShape(world_body_msg.shape.dimensions[SolidPrimitive.SPHERE_RADIUS])
+        else:
+            raise CorruptShapeException("Invalid primitive shape '{}' of world body '{}'".format(world_body_msg.shape.type, world_body_msg.name))
+    elif world_body_msg.type is WorldBody.URDF_BODY:
+        # TODO: complete me
+        pass
+    else:
+        # TODO: replace me by a proper exception that can be reported back to the service client
+        raise RuntimeError("Invalid shape of world body: {}".format(world_body_msg.shape))
+    col = CollisionProperty(name=world_body_msg.name + '_col', geometry=geom)
+    vis = VisualProperty(name=world_body_msg.name + '_vis', geometry=geom)
+    return UrdfObject(name=world_body_msg.name, collision_props=[col], visual_props=[vis])
 
 def from_point_msg(point_msg):
     """
@@ -285,36 +385,3 @@ def from_pose_msg(pose_msg):
     :rtype: Transform
     """
     return Transform(from_point_msg(pose_msg.position), from_quaternion_msg(pose_msg.orientation))
-
-
-def from_msg(body_msg):
-    """
-    Converts a body from a ROS message to the corresponding internal representation.
-    :param body_msg: Input message that shall be converted.
-    :type body_msg: WorldBody
-    :return: Internal representation of body, filled with data from input message.
-    :rtype WorldObject
-    """
-    if body_msg.type is WorldBody.MESH_BODY:
-        geom = MeshShape(filename=body_msg.mesh)
-    elif body_msg.type is WorldBody.PRIMITIVE_BODY:
-        if body_msg.shape.type is SolidPrimitive.BOX:
-            geom = BoxShape(body_msg.shape.dimensions[SolidPrimitive.BOX_X],
-                            body_msg.shape.dimensions[SolidPrimitive.BOX_Y],
-                            body_msg.shape.dimensions[SolidPrimitive.BOX_Z])
-        elif body_msg.shape.type is SolidPrimitive.CYLINDER:
-            geom = CylinderShape(body_msg.shape.dimensions[SolidPrimitive.CYLINDER_RADIUS],
-                                 body_msg.shape.dimensions[SolidPrimitive.CYLINDER_HEIGHT])
-        elif body_msg.shape.type is SolidPrimitive.SPHERE:
-            geom = SphereShape(body_msg.shape.dimensions[SolidPrimitive.SPHERE_RADIUS])
-        else:
-            raise CorruptShapeException("Invalid primitive shape '{}' of world body '{}'".format(body_msg.shape.type, body_msg.name))
-    elif body_msg.type is WorldBody.URDF_BODY:
-        # TODO: complete me
-        pass
-    else:
-        # TODO: replace me by a proper exception that can be reported back to the service client
-        raise RuntimeError("Invalid shape of world body: {}".format(body_msg.shape))
-    col = CollisionProperty(name=body_msg.name + '_col', geometry=geom)
-    vis = VisualProperty(name=body_msg.name + '_vis', geometry=geom)
-    return WorldObject(name=body_msg.name, collision_props=[col], visual_props=[vis])

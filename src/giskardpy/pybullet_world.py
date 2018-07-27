@@ -18,7 +18,8 @@ import numpy as np
 
 from giskardpy.utils import keydefaultdict, suppress_stdout
 
-from giskardpy.object import WorldObject, FixedJoint, from_msg, to_urdf_string, BoxShape, CollisionProperty
+from giskardpy.object import UrdfObject, FixedJoint, world_body_to_urdf_object, to_urdf_string, BoxShape, \
+    CollisionProperty
 import hashlib
 
 JointInfo = namedtuple('JointInfo', ['joint_index', 'joint_name', 'joint_type', 'q_index', 'u_index', 'flags',
@@ -310,13 +311,14 @@ class PyBulletRobot(object):
         """
         Rigidly attach another object to the robot.
         :param object: Object that shall be attached to the robot.
-        :type object: WorldObject
+        :type object: UrdfObject
         :param parent_link_name: Name of the link to which the object shall be attached.
         :type parent_link_name: str
         :param transform: Hom. transform between the reference frames of the parent link and the object.
         :type Transform
         :return: Nothing
         """
+        # TODO should only be called through world because this class does not know what objects exist
         if self.has_attached_object(object.name):
             # TODO: choose better exception type
             raise DuplicateObjectNameException(
@@ -487,28 +489,14 @@ class PyBulletWorld(object):
         if self.has_robot():
             raise RobotExistsException(u'A robot is already loaded')
         if self.has_object(robot_name):
-            raise DuplicateObjectNameException(u'can\'t add robot; object with name "{}" already exists'.format(robot_name))
+            raise DuplicateObjectNameException(
+                u'can\'t add robot; object with name "{}" already exists'.format(robot_name))
         self.deactivate_rendering()
         self._robot = PyBulletRobot(robot_name, urdf, base_pose, path_to_data_folder=self.path_to_data_folder)
         self.activate_rendering()
 
-    def spawn_object_from_urdf_file(self, object_name, urdf_file, base_pose=Transform()):
+    def spawn_object_from_urdf_str(self, name, urdf, base_pose=Transform()):
         """
-        Spawns a new robot into the world, reading its URDF from disc.
-        :param robot_name: Name of the new robot to spawn.
-        :type robot_name: str
-        :param urdf_file: Valid and existing filename of the URDF to load, e.g. '/home/foo/bar/pr2.urdf'
-        :type urdf_file: str
-        :param base_pose: Pose at which to spawn the robot.
-        :type base_pose: Transform
-        :return: Nothing
-        """
-        with open(urdf_file, 'r') as f:
-            self.spawn_object_from_urdf(object_name, f.read(), base_pose)
-
-    def spawn_object_from_urdf(self, name, urdf, base_pose=Transform()):
-        """
-
         :param name:
         :param urdf: Path to URDF file, or content of already loaded URDF file.
         :type urdf: str
@@ -523,18 +511,38 @@ class PyBulletWorld(object):
         self.deactivate_rendering()
         self._objects[name] = PyBulletRobot(name, urdf, base_pose, False)
         self.activate_rendering()
+        print(u'object {} added to pybullet world'.format(name))
 
-    def spawn_object(self, object, base_pose=Transform()):
+    def spawn_object_from_urdf_file(self, object_name, urdf_file, base_pose=Transform()):
+        """
+        Spawns a new robot into the world, reading its URDF from disc.
+        :param robot_name: Name of the new robot to spawn.
+        :type robot_name: str
+        :param urdf_file: Valid and existing filename of the URDF to load, e.g. '/home/foo/bar/pr2.urdf'
+        :type urdf_file: str
+        :param base_pose: Pose at which to spawn the robot.
+        :type base_pose: Transform
+        :return: Nothing
+        """
+        with open(urdf_file, u'r') as f:
+            self.spawn_object_from_urdf_str(object_name, f.read(), base_pose)
+
+    def spawn_urdf_object(self, urdf_object, base_pose=Transform()):
         """
         Spawns a new object into the Bullet world at a given pose.
-        :param object: New object to add to the world.
-        :type object: WorldObject
+        :param urdf_object: New object to add to the world.
+        :type urdf_object: UrdfObject
         :param base_pose: Pose at which to spawn the object.
         :type base_pose: Transform
         :return: Nothing.
         """
-        self.spawn_object_from_urdf(object.name, to_urdf_string(object), base_pose)
-        print('object {} added to pybullet world'.format(object.name))
+        self.spawn_object_from_urdf_str(urdf_object.name, to_urdf_string(urdf_object), base_pose)
+
+    def attach_object(self, object, parent_link, transform):
+        if self.has_object(object.name):
+            raise DuplicateObjectNameException(
+                u'Can\'t attach existing object \'{}\'.'.format(object.name))
+        self.get_robot().attach_object(object, parent_link, transform)
 
     def has_robot(self):
         """
@@ -634,7 +642,7 @@ class PyBulletWorld(object):
         :rtype: dict
         """
         # TODO implement a cooler way to remove wheel/plane collisions but detect eg. arm/plane collisions
-        allowed_collision.add('plane')
+        allowed_collision.add(u'plane')
 
         # TODO set self collision cut off distance in a cool way
         def default_contact_info(k):
@@ -688,9 +696,9 @@ class PyBulletWorld(object):
         """
         # like in the PyBullet examples: spawn a big collision box in the origin
         if not self.has_object(name):
-            self.spawn_object(WorldObject(name=name,
-                                          collision_props=[CollisionProperty(geometry=BoxShape(30, 30, 10))]),
-                              Transform(translation=Point(0, 0, -5)))
+            self.spawn_urdf_object(UrdfObject(name=name,
+                                              collision_props=[CollisionProperty(geometry=BoxShape(30, 30, 10))]),
+                                   Transform(translation=Point(0, 0, -5)))
 
     def deactivate_rendering(self):
         p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 0)

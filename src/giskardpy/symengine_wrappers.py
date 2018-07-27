@@ -159,11 +159,11 @@ def safe_compiled_function(f, file_name):
 def load_compiled_function(file_name):
     if os.path.isfile(file_name):
         try:
-            with open(file_name, 'r') as file:
+            with open(file_name, u'r') as file:
                 fast_f = pickle.load(file)
                 return fast_f
         except EOFError as e:
-            raise EOFError('{} corrupted, pls delete'.format(file_name))
+            raise EOFError(u'{} corrupted, pls delete'.format(file_name))
 
 
 class CompiledFunction(object):
@@ -181,11 +181,11 @@ class CompiledFunction(object):
             # TODO nan to num is kinda dangerous
             return np.nan_to_num(out).reshape(self.shape)
         except KeyError as e:
-            msg = '{}\ntry deleting the last loaded compiler to trigger recompilation'.format(e.message)
+            msg = u'KeyError: {}\ntry deleting the last loaded compiler to trigger recompilation'.format(e.message)
             raise SymengineException(msg)
 
 
-def speed_up(function, parameters, backend='llvm'):
+def speed_up(function, parameters, backend=u'llvm'):
     # TODO use save/load for all options
     str_params = [str(x) for x in parameters]
     if len(parameters) == 0:

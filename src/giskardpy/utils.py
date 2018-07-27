@@ -11,6 +11,8 @@ import math
 from geometry_msgs.msg import PointStamped, Point, Vector3Stamped, Vector3, Pose, PoseStamped, QuaternionStamped, \
     Quaternion
 from sensor_msgs.msg import JointState
+from tf.transformations import quaternion_multiply, quaternion_conjugate
+
 from giskardpy.data_types import SingleJointState
 from giskardpy.data_types import ClosestPointInfo
 from contextlib import contextmanager
@@ -119,6 +121,20 @@ def closest_point_constraint_violated(cp, multiplier=0.9):
             print(cpi_info.link_a, cpi_info.link_b, cpi_info.contact_distance)
             return True
     return False
+
+def qv_mult(q1, v1):
+    """
+    Transforms a vector by a quaternion
+    :param q1: Quaternion
+    :type q1: list
+    :param v1: vector
+    :type v1: list
+    :return: transformed vector
+    :type: list
+    """
+    q = q1
+    v = [v1[0], v1[1], v1[2], 0]
+    return quaternion_multiply(quaternion_multiply(q, v), quaternion_conjugate(q))[:-1]
 
 
 #

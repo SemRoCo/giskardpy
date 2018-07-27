@@ -16,7 +16,7 @@
     <rosparam param="nWSR">None</rosparam> <!-- None results in a nWSR estimation thats fine most of the time -->
     <rosparam param="root_link">base_footprint</rosparam>
     <rosparam param="enable_collision_marker">True</rosparam>
-    <rosparam param="enable_self_collision">False</rosparam>
+    <rosparam param="enable_self_collision">True</rosparam>
     <rosparam param="collision_time_threshold">15</rosparam>
     <rosparam param="interactive_marker_chains">
       - [base_link, r_gripper_tool_frame]

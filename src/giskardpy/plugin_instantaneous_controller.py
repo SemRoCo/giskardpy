@@ -67,8 +67,8 @@ class CartesianBulletControllerPlugin(RobotPlugin):
     def start_always(self):
         super(CartesianBulletControllerPlugin, self).start_always()
         self.next_cmd = {}
+        self.update_controlled_joints_and_links()
         if self.was_urdf_updated():
-            self.update_controlled_joints_and_links()
             self.init_controller()
             self.add_js_controller_soft_constraints()
             self.add_collision_avoidance_soft_constraints()

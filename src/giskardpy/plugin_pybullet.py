@@ -23,7 +23,8 @@ from giskardpy.pybullet_world import PyBulletWorld, ContactInfo
 from giskardpy.symengine_wrappers import euclidean_distance
 from giskardpy.tfwrapper import transform_pose, lookup_transform, transform_point, transform_vector
 from giskardpy.data_types import ClosestPointInfo
-from giskardpy.utils import keydefaultdict, to_joint_state_dict, to_point_stamped, to_vector3_stamped, to_list
+from giskardpy.utils import keydefaultdict, to_joint_state_dict, to_point_stamped, to_vector3_stamped, to_list, \
+    closest_point_constraint_violated
 
 
 class PyBulletPlugin(Plugin):
@@ -109,16 +110,7 @@ class PyBulletPlugin(Plugin):
                         self.add_object(req)
 
                 elif req.operation is UpdateWorldRequest.REMOVE:
-                    if self.world.has_object(req.body.name):
-                        self.world.delete_object(req.body.name)
-                        if self.object_js_subs.has_key(req.body.name):
-                            self.object_js_subs[req.body.name].unregister()
-                            del (self.object_js_subs[req.body.name])
-                            del (self.object_joint_states[req.body.name])
-                    elif self.world.get_robot().has_attached_object(req.body.name):
-                        self.world.get_robot().detach_object(req.body.name)
-                    else:
-                        raise UnknownBodyException('Cannot delete unknown object {}'.format(req.body.name))
+                    self.remove_object(req.body.name)
                 elif req.operation is UpdateWorldRequest.ALTER:
                     # TODO: implement me
                     pass
@@ -127,6 +119,7 @@ class PyBulletPlugin(Plugin):
                 else:
                     return UpdateWorldResponse(UpdateWorldResponse.INVALID_OPERATION,
                                                "Received invalid operation code: {}".format(req.operation))
+                self.publish_object_as_marker(req)
                 return UpdateWorldResponse()
             except CorruptShapeException as e:
                 return UpdateWorldResponse(UpdateWorldResponse.CORRUPT_SHAPE_ERROR, str(e))
@@ -157,7 +150,7 @@ class PyBulletPlugin(Plugin):
             self.object_js_subs[world_body.name] = \
                 rospy.Subscriber(world_body.joint_state_topic, JointState, callback, queue_size=1)
 
-        self.publish_object_as_marker(req)
+        # self.publish_object_as_marker(req)
 
     def attach_object(self, req):
         if req.body.type is WorldBody.URDF_BODY:
@@ -165,20 +158,19 @@ class PyBulletPlugin(Plugin):
         self.world.attach_object(world_body_to_urdf_object(req.body),
                                  req.pose.header.frame_id,
                                  from_pose_msg(req.pose.pose))
-        self.publish_object_as_marker(req)
+        # self.publish_object_as_marker(req)
 
-    # def remove_object(self, name):
-    # TODO continue here
-    #     if self.world.has_object(req.body.name):
-    #         self.world.delete_object(req.body.name)
-    #         if self.object_js_subs.has_key(req.body.name):
-    #             self.object_js_subs[req.body.name].unregister()
-    #             del (self.object_js_subs[req.body.name])
-    #             del (self.object_joint_states[req.body.name])
-    #     elif self.world.get_robot().has_attached_object(req.body.name):
-    #         self.world.get_robot().detach_object(req.body.name)
-    #     else:
-    #         raise UnknownBodyException('Cannot delete unknown object {}'.format(req.body.name))
+    def remove_object(self, name):
+        if self.world.has_object(name):
+            self.world.delete_object(name)
+            if self.object_js_subs.has_key(name):
+                self.object_js_subs[name].unregister()
+                del (self.object_js_subs[name])
+                del (self.object_joint_states[name])
+        elif self.world.get_robot().has_attached_object(name):
+            self.world.get_robot().detach_object(name)
+        else:
+            raise UnknownBodyException('Cannot delete unknown object {}'.format(name))
 
     def publish_object_as_marker(self, req):
         ma = to_marker(req)
@@ -211,87 +203,106 @@ class PyBulletPlugin(Plugin):
                                                               p.pose.orientation.w])
 
             collision_goals = self.god_map.get_data([self.collision_goal_identifier])
-            if collision_goals is None:
-                collision_goals = []
-            allowed_collisions = set()
-            distances = defaultdict(lambda: self.default_collision_avoidance_distance)
-            # TODO properly handle multiple collision entries
-            for collision_entry in collision_goals:  # type: CollisionEntry
-
-                if collision_entry.body_b == u'' and \
-                        collision_entry.type not in [CollisionEntry.ALLOW_ALL_COLLISIONS,
-                                                     CollisionEntry.AVOID_ALL_COLLISIONS]:
-                    raise Exception(u'body_b not set')
-
-                if collision_entry.body_b == u'' and collision_entry.link_b != u'':
-                    raise Exception(u'body_b is empty but link_b is not')
-
-                if collision_entry.robot_link == u'':
-                    links_a = self.world.get_robot().get_link_names()
-                else:
-                    links_a = [collision_entry.robot_link]
-
-                if collision_entry.body_b == u'':
-                    bodies_b = self.world.get_object_names()
-                else:
-                    bodies_b = [collision_entry.body_b]
-                if collision_entry.type == CollisionEntry.ALLOW_ALL_COLLISIONS:
-                    allowed_collisions.update(self.world.get_object_names())
-                    allowed_collisions.add(self.world.get_robot().name)
-                else:
-                    for body_b in bodies_b:
-                        if collision_entry.link_b == u'':
-                            if not self.world.has_object(body_b):
-                                raise UnknownBodyException(u'body_b \'{}\' unknown'.format(body_b))
-                            links_b = self.world.get_object(body_b).get_link_names()
-                        else:
-                            links_b = [collision_entry.link_b]
-
-                        for link_a, link_b in product(links_a, links_b):
-                            key = (link_a, body_b, link_b)
-                            if collision_entry.type == CollisionEntry.ALLOW_COLLISION or \
-                                    collision_entry.type == CollisionEntry.ALLOW_ALL_COLLISIONS:
-                                allowed_collisions.add(key)
-                            if collision_entry.type == CollisionEntry.AVOID_COLLISION or \
-                                    collision_entry.type == CollisionEntry.AVOID_ALL_COLLISIONS:
-                                distances[key] = collision_entry.min_dist
+            distances, allowed_collisions = self.collision_goals_to_collision_matrix(collision_goals)
             controllable_links = self.god_map.get_data([self.controllable_links_identifier])
             collisions = self.world.check_collisions(distances, allowed_collisions,
                                                      self_collision=self.enable_self_collision,
                                                      controllable_links=controllable_links)
 
-            closest_point = keydefaultdict(lambda k: ClosestPointInfo((10, 0, 0),
-                                                                      (0, 0, 0),
-                                                                      1e9,
-                                                                      self.default_collision_avoidance_distance,
-                                                                      k,
-                                                                      '',
-                                                                      (1, 0, 0)))
-            for key, collision_info in collisions.items():  # type: ((str, str), ContactInfo)
-                link1 = key[0]
-                a_in_robot_root = to_list(transform_point(self.robot_root,
-                                                          to_point_stamped(self.map_frame,
-                                                                           collision_info.position_on_a)))
-                b_in_robot_root = to_list(transform_point(self.robot_root,
-                                                          to_point_stamped(self.map_frame,
-                                                                           collision_info.position_on_b)))
-                n_in_robot_root = to_list(transform_vector(self.robot_root,
-                                                           to_vector3_stamped(self.map_frame,
-                                                                              collision_info.contact_normal_on_b)))
-                cpi = ClosestPointInfo(a_in_robot_root, b_in_robot_root, collision_info.contact_distance,
-                                       distances[key], key[0], key[2], n_in_robot_root)
-                # if cpi.contact_distance < 0:
-                #     raise IntersectingCollisionException(key)
-                if link1 in closest_point:
-                    closest_point[link1] = min(closest_point[link1], cpi, key=lambda x: x.contact_distance)
-                else:
-                    closest_point[link1] = cpi
+            closest_point = self.collisions_to_closest_point(collisions, distances)
 
             if self.marker:
                 self.make_cpi_markers(closest_point)
 
-            self.god_map.set_data([self.collision_identifier], None)
+            # self.god_map.set_data([self.collision_identifier], None)
+            # if closest_point_constraint_violated(closest_point):
+            #     raise Exception(u'cpi violated')
             self.god_map.set_data([self.closest_point_identifier], closest_point)
+
+    def collision_goals_to_collision_matrix(self, collision_goals):
+        # distances (linka, bodyb, linkb) -> min allowed distance
+        # priority: later entries overwrite previous ones
+        # allowed_collision can contain: body_b, (robot_link, body_b, link_b)
+        # whitelist
+        if collision_goals is None:
+            collision_goals = []
+        allowed_collisions = set()
+        min_allowed_distance = defaultdict(lambda: self.default_collision_avoidance_distance)
+        # TODO properly handle multiple collision entries
+        for collision_entry in collision_goals:  # type: CollisionEntry
+            # check if msg got properly filled
+            if collision_entry.body_b == u'' and \
+                    collision_entry.type not in [CollisionEntry.ALLOW_ALL_COLLISIONS,
+                                                 CollisionEntry.AVOID_ALL_COLLISIONS]:
+                raise Exception(u'body_b not set')
+
+            if collision_entry.body_b == u'' and collision_entry.link_b != u'':
+                raise Exception(u'body_b is empty but link_b is not')
+
+            if collision_entry.type == CollisionEntry.AVOID_ALL_COLLISIONS:
+                min_allowed_distance = defaultdict(lambda: collision_entry.min_dist)
+                allowed_collisions = set()
+            elif collision_entry.type == CollisionEntry.ALLOW_ALL_COLLISIONS:
+                allowed_collisions = set()
+                allowed_collisions.update(self.world.get_object_names())
+                allowed_collisions.add(self.world.get_robot().name)
+            else: # avoid or allow specific collisions
+                if collision_entry.robot_link == u'': # empty robot link means every link
+                    links_a = self.world.get_robot().get_link_names()
+                else:
+                    links_a = [collision_entry.robot_link]
+
+                if collision_entry.body_b == u'': # empty body b means every body b
+                    bodies_b = self.world.get_object_names()
+                else:
+                    bodies_b = [collision_entry.body_b]
+
+                for body_b in bodies_b:
+                    if collision_entry.link_b == u'': # empty link b means every link from body b
+                        if not self.world.has_object(body_b):
+                            raise UnknownBodyException(u'body_b \'{}\' unknown'.format(body_b))
+                        links_b = self.world.get_object(body_b).get_link_names()
+                    else:
+                        links_b = [collision_entry.link_b]
+
+                    for link_a, link_b in product(links_a, links_b):
+                        key = (link_a, body_b, link_b)
+                        if collision_entry.type == CollisionEntry.ALLOW_COLLISION:
+                            allowed_collisions.add(key)
+                        elif collision_entry.type == CollisionEntry.AVOID_COLLISION:
+                            min_allowed_distance[key] = collision_entry.min_dist
+
+
+        return min_allowed_distance, allowed_collisions
+
+    def collisions_to_closest_point(self, collisions, distances):
+        closest_point = keydefaultdict(lambda k: ClosestPointInfo((10, 0, 0),
+                                                                  (0, 0, 0),
+                                                                  1e9,
+                                                                  self.default_collision_avoidance_distance,
+                                                                  k,
+                                                                  '',
+                                                                  (1, 0, 0)))
+        for key, collision_info in collisions.items():  # type: ((str, str), ContactInfo)
+            link1 = key[0]
+            a_in_robot_root = to_list(transform_point(self.robot_root,
+                                                      to_point_stamped(self.map_frame,
+                                                                       collision_info.position_on_a)))
+            b_in_robot_root = to_list(transform_point(self.robot_root,
+                                                      to_point_stamped(self.map_frame,
+                                                                       collision_info.position_on_b)))
+            n_in_robot_root = to_list(transform_vector(self.robot_root,
+                                                       to_vector3_stamped(self.map_frame,
+                                                                          collision_info.contact_normal_on_b)))
+            cpi = ClosestPointInfo(a_in_robot_root, b_in_robot_root, collision_info.contact_distance,
+                                   distances[key], key[0], key[2], n_in_robot_root)
+            # if cpi.contact_distance < 0:
+            #     raise IntersectingCollisionException(key)
+            if link1 in closest_point:
+                closest_point[link1] = min(closest_point[link1], cpi, key=lambda x: x.contact_distance)
+            else:
+                closest_point[link1] = cpi
+        return closest_point
 
     def stop(self):
         self.clear_world()

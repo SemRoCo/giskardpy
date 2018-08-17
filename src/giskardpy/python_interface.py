@@ -127,6 +127,9 @@ class GiskardWrapper(object):
         else:
             self.client.send_goal(goal)
 
+    def get_collision_entries(self):
+        return self.cmd_seq
+
     def _get_goal(self):
         goal = MoveGoal()
         goal.cmd_seq = self.cmd_seq

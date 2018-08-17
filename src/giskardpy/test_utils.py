@@ -15,6 +15,7 @@ from numpy import pi
 
 from sensor_msgs.msg import JointState
 
+from giskardpy.data_types import ClosestPointInfo
 from giskardpy.pybullet_world import PyBulletWorld
 from giskardpy.python_interface import GiskardWrapper
 from giskardpy.symengine_robot import Robot
@@ -160,10 +161,17 @@ class GiskardTestWrapper(object):
         """
         return self.controlled_joints
 
-    def get_allow_l_gripper(self, body_b=u'box'):
-        links = [u'l_gripper_l_finger_tip_link', u'l_gripper_r_finger_tip_link', u'l_gripper_l_finger_link',
+    def get_l_gripper_links(self):
+        return [u'l_gripper_l_finger_tip_link', u'l_gripper_r_finger_tip_link', u'l_gripper_l_finger_link',
                  u'l_gripper_r_finger_link', u'l_gripper_r_finger_link', u'l_gripper_palm_link']
+
+    def get_allow_l_gripper(self, body_b=u'box'):
+        links = self.get_l_gripper_links()
         return [CollisionEntry(CollisionEntry.ALLOW_COLLISION, 0, link, body_b, '') for link in links]
+
+    def get_l_gripper_collision_entries(self, body_b=u'box', distance=0, action=CollisionEntry.ALLOW_COLLISION):
+        links = self.get_l_gripper_links()
+        return [CollisionEntry(action, distance, link, body_b, '') for link in links]
 
     def get_current_joint_state(self):
         """
@@ -172,6 +180,7 @@ class GiskardTestWrapper(object):
         return rospy.wait_for_message(u'joint_states', JointState)
 
     def tear_down(self):
+        rospy.sleep(1)
         print(u'stopping plugins')
         self.pm.stop()
 
@@ -231,12 +240,14 @@ class GiskardTestWrapper(object):
         :rtype: MoveResult
         """
         goal = MoveActionGoal()
+        collision_entires = self.wrapper.get_collision_entries()
         goal.goal = self.wrapper._get_goal()
 
         t1 = Thread(target=self.pm._plugins[u'action server']._as.action_server.internal_goal_callback, args=(goal,))
         t1.start()
         while self.results.empty():
             self.loop_once()
+        # self.are_collision_entires_violated(collision_entires, self.pm.get_god_map())
         t1.join()
         result = self.results.get()
         return result
@@ -283,4 +294,13 @@ class GiskardTestWrapper(object):
     def attach_box(self, name=u'box', size=(1, 1, 1), frame_id=u'map', position=(0, 0, 0), orientation=(0, 0, 0, 1),
                    expected_response=UpdateWorldResponse.SUCCESS):
         assert self.wrapper.attach_box(name, size, frame_id, position, orientation).error_codes == expected_response
+
+    def check_cpi(self, links, distance_threshold):
+        cpi_identifier = u'cpi'
+        cpi = self.pm.get_god_map().get_data([cpi_identifier])
+        if cpi == 0 or cpi == None:
+            return False
+        for link in links:
+            assert cpi[link].contact_distance >= distance_threshold
+
 

@@ -664,9 +664,9 @@ class PyBulletWorld(object):
                     for object_link_name, object_link in object.link_name_to_id.items():
                         key = (robot_link_name, object_name, object_link_name)
                         if key not in allowed_collision:
+                            distance = cut_off_distances[key] + self_collision_d
                             contacts = [ContactInfo(*x) for x in p.getClosestPoints(self._robot.id, object.id,
-                                                                                    cut_off_distances[
-                                                                                        key] + self_collision_d,
+                                                                                    distance,
                                                                                     robot_link, object_link)]
                             if len(contacts) > 0:
                                 collisions.update({key: min(contacts, key=lambda x: x.contact_distance)})

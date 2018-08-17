@@ -465,6 +465,22 @@ class TestCollisionAvoidanceGoals(object):
         resetted_giskard.set_cart_goal(resetted_giskard.default_root, resetted_giskard.r_tip, p)
         resetted_giskard.send_and_check_goal(expected_error_code=MoveResult.PATH_COLLISION)
 
+
+    def test_avoid_collision_gripper(self, resetted_giskard, pocky):
+        """
+        :type resetted_giskard: GiskardTestWrapper
+        """
+        resetted_giskard.allow_all_collisions()
+        ces = resetted_giskard.get_l_gripper_collision_entries(u'box', 0.05, CollisionEntry.AVOID_COLLISION)
+        resetted_giskard.add_collision_entries(ces)
+        p = PoseStamped()
+        p.header.frame_id = resetted_giskard.l_tip
+        p.header.stamp = rospy.get_rostime()
+        p.pose.position.x = 0.11
+        p.pose.orientation.w = 1
+        resetted_giskard.set_and_check_cart_goal(resetted_giskard.default_root, resetted_giskard.l_tip, p)
+        resetted_giskard.check_cpi(resetted_giskard.get_l_gripper_links(), 0.05)
+
     #
     # def test_place_spoon1(self):
     #     base_pose = PoseStamped()

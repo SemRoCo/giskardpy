@@ -243,19 +243,7 @@ class GiskardWrapper(object):
         pose.pose.position = Point(*position)
         pose.pose.orientation = Quaternion(*orientation)
 
-        # wand = WorldBody()
-        # wand.type = WorldBody.PRIMITIVE_BODY
-        # wand.name = 'wand'
-        # wand.shape.type = SolidPrimitive.CYLINDER
-        # wand.shape.dimensions.append(0.15) # height of 15cm
-        # wand.shape.dimensions.append(0.005) # radius of 0.5cm
-        # return UpdateWorldRequest(UpdateWorldRequest.ADD, wand, True, pose)
-
         req = UpdateWorldRequest(UpdateWorldRequest.ADD, box, True, pose)
-        # world_object = from_msg(box)
-        # ma = to_marker(world_object)
-        # ma.markers[0].pose = pose.pose
-        # self.marker_pub.publish(ma)
         return self.update_world.call(req)
 
     def add_urdf(self, name, urdf, js_topic, pose):

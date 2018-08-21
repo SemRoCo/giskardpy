@@ -235,6 +235,8 @@ class ActionServerPlugin(Plugin):
             error_code = MoveResult.SYMENGINE_ERROR
         elif isinstance(exception, PathCollisionException):
             error_code = MoveResult.PATH_COLLISION
+        elif exception is not None:
+            error_code = MoveResult.INSOLVABLE
         return error_code
 
     def action_server_cb(self, goal):

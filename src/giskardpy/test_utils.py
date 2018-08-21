@@ -28,22 +28,25 @@ SMALL_NUMBER = 1e-100
 
 vector = lambda x: st.lists(limited_float(), min_size=x, max_size=x)
 
+
 def robot_urdfs():
     return st.sampled_from([u'pr2.urdf', u'boxy.urdf', u'iai_donbot.urdf'])
     # return st.sampled_from([u'pr2.urdf'])
 
+
 def angle(*args, **kwargs):
     return st.builds(normalize_angle, limited_float(*args, **kwargs))
 
+
 def keys_values(max_length=10, value_type=st.floats(allow_nan=False)):
     return lists_of_same_length([variable_name(), value_type], max_length=max_length, unique=True)
+
 
 @composite
 def variable_name(draw):
     variable = draw(st.text(u'qwertyuiopasdfghjklzxcvbnm', min_size=1))
     assume(variable not in keyword.kwlist)
     return variable
-
 
 
 @composite
@@ -59,11 +62,12 @@ def lists_of_same_length(draw, data_types=(), max_length=10, unique=False):
 def rnd_joint_state(draw, joint_limits):
     return {jn: draw(st.floats(ll, ul, allow_nan=False, allow_infinity=False)) for jn, (ll, ul) in joint_limits.items()}
 
+
 @composite
 def rnd_joint_state2(draw, joint_limits):
     muh = draw(joint_limits)
-    muh = {jn: ((ll if ll is not None else pi*2), (ul if ul is not None else pi*2))
-                    for (jn, (ll, ul)) in muh.items()}
+    muh = {jn: ((ll if ll is not None else pi * 2), (ul if ul is not None else pi * 2))
+           for (jn, (ll, ul)) in muh.items()}
     return {jn: draw(st.floats(ll, ul, allow_nan=False, allow_infinity=False)) for jn, (ll, ul) in muh.items()}
 
 
@@ -109,7 +113,6 @@ def pykdl_frame_to_numpy(pykdl_frame):
                      [0, 0, 0, 1]])
 
 
-
 class GiskardTestWrapper(object):
     def __init__(self):
         rospy.set_param(u'~enable_gui', False)
@@ -138,7 +141,7 @@ class GiskardTestWrapper(object):
         self.controlled_joints = self.pm._plugins[u'controlled joints'].controlled_joints
         self.joint_limits = {joint_name: self.robot.get_joint_lower_upper_limit(joint_name) for joint_name in
                              self.controlled_joints if self.robot.is_joint_controllable(joint_name)}
-        self.world = self.pm._plugins[u'bullet'].world # type: PyBulletWorld
+        self.world = self.pm._plugins[u'bullet'].world  # type: PyBulletWorld
         self.default_root = u'base_link'
         self.r_tip = u'r_gripper_tool_frame'
         self.l_tip = u'l_gripper_tool_frame'
@@ -163,7 +166,11 @@ class GiskardTestWrapper(object):
 
     def get_l_gripper_links(self):
         return [u'l_gripper_l_finger_tip_link', u'l_gripper_r_finger_tip_link', u'l_gripper_l_finger_link',
-                 u'l_gripper_r_finger_link', u'l_gripper_r_finger_link', u'l_gripper_palm_link']
+                u'l_gripper_r_finger_link', u'l_gripper_r_finger_link', u'l_gripper_palm_link']
+
+    def get_r_gripper_links(self):
+        return [u'r_gripper_l_finger_tip_link', u'r_gripper_r_finger_tip_link', u'r_gripper_l_finger_link',
+                u'r_gripper_r_finger_link', u'r_gripper_r_finger_link', u'r_gripper_palm_link']
 
     def get_allow_l_gripper(self, body_b=u'box'):
         links = self.get_l_gripper_links()
@@ -249,6 +256,7 @@ class GiskardTestWrapper(object):
             self.loop_once()
         # self.are_collision_entires_violated(collision_entires, self.pm.get_god_map())
         t1.join()
+        self.loop_once()
         result = self.results.get()
         return result
 
@@ -275,6 +283,9 @@ class GiskardTestWrapper(object):
     #
     def clear_world(self):
         assert self.wrapper.clear_world().error_codes == UpdateWorldResponse.SUCCESS
+        assert len(self.world.get_object_names()) == 1
+        assert len(self.world.get_robot().get_attached_objects()) == 0
+        assert self.world.has_object(u'plane')
 
     def remove_object(self, name, expected_response=UpdateWorldResponse.SUCCESS):
         assert self.wrapper.remove_object(name).error_codes == expected_response
@@ -282,6 +293,21 @@ class GiskardTestWrapper(object):
 
     def add_box(self, name=u'box', position=(1.2, 0, 0.5)):
         r = self.wrapper.add_box(name=name, position=position)
+        assert r.error_codes == UpdateWorldResponse.SUCCESS
+        assert self.world.has_object(name)
+
+    def add_sphere(self, name=u'sphere', position=(1.2, 0, 0.5)):
+        r = self.wrapper.add_sphere(name=name, position=position)
+        assert r.error_codes == UpdateWorldResponse.SUCCESS
+        assert self.world.has_object(name)
+
+    def add_cylinder(self, name=u'cylinder', position=(1.2, 0, 0.5)):
+        r = self.wrapper.add_cylinder(name=name, position=position)
+        assert r.error_codes == UpdateWorldResponse.SUCCESS
+        assert self.world.has_object(name)
+
+    def add_urdf(self, name, urdf, js_topic, pose):
+        r = self.wrapper.add_urdf(name, urdf, js_topic, pose)
         assert r.error_codes == UpdateWorldResponse.SUCCESS
         assert self.world.has_object(name)
 
@@ -295,12 +321,26 @@ class GiskardTestWrapper(object):
                    expected_response=UpdateWorldResponse.SUCCESS):
         assert self.wrapper.attach_box(name, size, frame_id, position, orientation).error_codes == expected_response
 
-    def check_cpi(self, links, distance_threshold):
+    def check_cpi_geq(self, links, distance_threshold):
         cpi_identifier = u'cpi'
         cpi = self.pm.get_god_map().get_data([cpi_identifier])
         if cpi == 0 or cpi == None:
             return False
         for link in links:
-            assert cpi[link].contact_distance >= distance_threshold
+            assert cpi[link].contact_distance >= distance_threshold, u'{} -- {}\n {} < {}'.format(link,
+                                                                                                  cpi[link].link_b,
+                                                                                                  cpi[
+                                                                                                      link].contact_distance,
+                                                                                                  distance_threshold)
 
-
+    def check_cpi_leq(self, links, distance_threshold):
+        cpi_identifier = u'cpi'
+        cpi = self.pm.get_god_map().get_data([cpi_identifier])
+        if cpi == 0 or cpi == None:
+            return False
+        for link in links:
+            assert cpi[link].contact_distance <= distance_threshold, u'{} -- {}\n {} > {}'.format(link,
+                                                                                                  cpi[link].link_b,
+                                                                                                  cpi[
+                                                                                                      link].contact_distance,
+                                                                                                  distance_threshold)

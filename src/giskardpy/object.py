@@ -270,16 +270,22 @@ def world_body_to_marker_msg(world_body, id=1, ns=''):
     elif world_body.type == WorldBody.PRIMITIVE_BODY:
         if world_body.shape.type == SolidPrimitive.BOX:
             m.type = Marker.CUBE
+            m.scale = Vector3(*world_body.shape.dimensions)
         elif world_body.shape.type == SolidPrimitive.SPHERE:
             m.type = Marker.SPHERE
+            m.scale = Vector3(world_body.shape.dimensions[0],
+                              world_body.shape.dimensions[0],
+                              world_body.shape.dimensions[0])
         elif world_body.shape.type == SolidPrimitive.CYLINDER:
             m.type = Marker.CYLINDER
+            m.scale = Vector3(world_body.shape.dimensions[SolidPrimitive.CYLINDER_RADIUS],
+                              world_body.shape.dimensions[SolidPrimitive.CYLINDER_RADIUS],
+                              world_body.shape.dimensions[SolidPrimitive.CYLINDER_HEIGHT])
         else:
             raise Exception(u'world body type {} can\'t be converted to marker'.format(world_body.shape.type))
     elif world_body.type == WorldBody.MESH_BODY:
         m.type = Marker.MESH_RESOURCE
         m.mesh_resource = world_body.mesh
-    m.scale = Vector3(*world_body.shape.dimensions)
     m.color = ColorRGBA(0,1,0,0.8)
     return m
 
@@ -343,13 +349,13 @@ def world_body_to_urdf_object(world_body_msg):
         elif world_body_msg.shape.type is SolidPrimitive.SPHERE:
             geom = SphereShape(world_body_msg.shape.dimensions[SolidPrimitive.SPHERE_RADIUS])
         else:
-            raise CorruptShapeException("Invalid primitive shape '{}' of world body '{}'".format(world_body_msg.shape.type, world_body_msg.name))
+            raise CorruptShapeException(u'Invalid primitive shape \'{}\' of world body \'{}\''.format(world_body_msg.shape.type, world_body_msg.name))
     elif world_body_msg.type is WorldBody.URDF_BODY:
         # TODO: complete me
         pass
     else:
         # TODO: replace me by a proper exception that can be reported back to the service client
-        raise RuntimeError("Invalid shape of world body: {}".format(world_body_msg.shape))
+        raise RuntimeError(u'Invalid shape of world body: {}'.format(world_body_msg.shape))
     col = CollisionProperty(name=world_body_msg.name + '_col', geometry=geom)
     vis = VisualProperty(name=world_body_msg.name + '_vis', geometry=geom)
     return UrdfObject(name=world_body_msg.name, collision_props=[col], visual_props=[vis])

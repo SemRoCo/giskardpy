@@ -12,7 +12,7 @@ from time import time
 import errno
 from numpy.random.mtrand import seed
 
-from giskardpy.exceptions import UnknownBodyException, DuplicateObjectNameException, RobotExistsException
+from giskardpy.exceptions import UnknownBodyException, RobotExistsException, DuplicateNameException
 from giskardpy.data_types import MultiJointState, SingleJointState, Transform, Point, Quaternion
 import numpy as np
 
@@ -146,6 +146,9 @@ class PyBulletRobot(object):
         with open(path, 'w') as file:
             print('saved self collision matrix {}'.format(path))
             pickle.dump(self.sometimes, file)
+
+    def get_attached_objects(self):
+        return self.attached_objects
 
     def set_joint_state(self, multi_joint_state):
         for joint_name, singe_joint_state in multi_joint_state.items():
@@ -321,7 +324,7 @@ class PyBulletRobot(object):
         # TODO should only be called through world because this class does not know what objects exist
         if self.has_attached_object(object.name):
             # TODO: choose better exception type
-            raise DuplicateObjectNameException(
+            raise DuplicateNameException(
                 "An object '{}' has already been attached to the robot.".format(object.name))
 
         # salvage last joint state and base pose
@@ -489,7 +492,7 @@ class PyBulletWorld(object):
         if self.has_robot():
             raise RobotExistsException(u'A robot is already loaded')
         if self.has_object(robot_name):
-            raise DuplicateObjectNameException(
+            raise DuplicateNameException(
                 u'can\'t add robot; object with name "{}" already exists'.format(robot_name))
         self.deactivate_rendering()
         self._robot = PyBulletRobot(robot_name, urdf, base_pose, path_to_data_folder=self.path_to_data_folder)
@@ -505,9 +508,9 @@ class PyBulletWorld(object):
         :return:
         """
         if self.has_object(name):
-            raise DuplicateObjectNameException(u'object with name "{}" already exists'.format(name))
+            raise DuplicateNameException(u'object with name "{}" already exists'.format(name))
         if self.has_robot() and self.get_robot().name == name:
-            raise DuplicateObjectNameException(u'robot with name "{}" already exists'.format(name))
+            raise DuplicateNameException(u'robot with name "{}" already exists'.format(name))
         self.deactivate_rendering()
         self._objects[name] = PyBulletRobot(name, urdf, base_pose, False)
         self.activate_rendering()
@@ -540,7 +543,7 @@ class PyBulletWorld(object):
 
     def attach_object(self, object, parent_link, transform):
         if self.has_object(object.name):
-            raise DuplicateObjectNameException(
+            raise DuplicateNameException(
                 u'Can\'t attach existing object \'{}\'.'.format(object.name))
         self.get_robot().attach_object(object, parent_link, transform)
 
@@ -631,8 +634,7 @@ class PyBulletWorld(object):
             if not object_name in remaining_objects:
                 self.delete_object(object_name)
 
-    def check_collisions(self, cut_off_distances, allowed_collision=set(), self_collision_d=0.1, self_collision=True,
-                         controllable_links=None):
+    def check_collisions(self, cut_off_distances, self_collision_d=0.1, self_collision=True):
         """
         :param cut_off_distances:
         :type cut_off_distances: dict
@@ -641,35 +643,25 @@ class PyBulletWorld(object):
         :return:
         :rtype: dict
         """
-        # TODO implement a cooler way to remove wheel/plane collisions but detect eg. arm/plane collisions
-        allowed_collision.add(u'plane')
 
-        # TODO set self collision cut off distance in a cool way
-        def default_contact_info(k):
-            # TODO I think this is buggy but never gets called
-            return ContactInfo(None, -2, -2, k[0], k[1], (0, 0, 0), (0, 0, 0), (1, 0, 0), 1e9, 0)
 
-        collisions = keydefaultdict(default_contact_info)
-        if self_collision and self.get_robot().name not in allowed_collision:
+        collisions = defaultdict(lambda: None)
+        if self_collision:
             # TODO use cut_off_distances in self collision
             if collisions is None:
                 collisions = self._robot.check_self_collision(self_collision_d)
             else:
                 collisions.update(self._robot.check_self_collision(self_collision_d))
-        for object_name, object in self._objects.items():  # type: (str, PyBulletRobot)
-            if object_name not in allowed_collision:
-                for robot_link_name, robot_link in self._robot.link_name_to_id.items():
-                    if controllable_links is not None and robot_link_name not in controllable_links:
-                        continue
-                    for object_link_name, object_link in object.link_name_to_id.items():
-                        key = (robot_link_name, object_name, object_link_name)
-                        if key not in allowed_collision:
-                            distance = cut_off_distances[key] + self_collision_d
-                            contacts = [ContactInfo(*x) for x in p.getClosestPoints(self._robot.id, object.id,
-                                                                                    distance,
-                                                                                    robot_link, object_link)]
-                            if len(contacts) > 0:
-                                collisions.update({key: min(contacts, key=lambda x: x.contact_distance)})
+        for k, distance in cut_off_distances.items():
+            (robot_link, body_b, link_b) = k
+            object_id = self._objects[body_b].id
+            robot_link_id = self.get_robot().link_name_to_id[robot_link]
+            link_b_id = self._objects[body_b].link_name_to_id[link_b]
+            contacts = [ContactInfo(*x) for x in p.getClosestPoints(self._robot.id, object_id,
+                                                                    distance,
+                                                                    robot_link_id, link_b_id)]
+            if len(contacts) > 0:
+                collisions.update({k: min(contacts, key=lambda x: x.contact_distance)})
         return collisions
 
     def activate_viewer(self):

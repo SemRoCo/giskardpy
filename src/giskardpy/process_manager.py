@@ -6,7 +6,7 @@ from time import sleep, time
 import rospy
 
 from giskardpy.god_map import GodMap
-from giskardpy.exceptions import NameConflictException, MAX_NWSR_REACHEDException, QPSolverException
+from giskardpy.exceptions import MAX_NWSR_REACHEDException, QPSolverException
 
 
 class ProcessManager(object):
@@ -26,7 +26,7 @@ class ProcessManager(object):
     def register_plugin(self, name, plugin):
         """Registers a plugin with the process manager. The name needs to be unique."""
         if name in self._plugins:
-            raise NameConflictException(u'A plugin with name "{}" already exists.'.format(name))
+            raise KeyError(u'A plugin with name "{}" already exists.'.format(name))
         self._plugins[name] = plugin
 
     def start_loop(self):

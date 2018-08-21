@@ -1,3 +1,4 @@
+import rospkg
 from multiprocessing import Queue
 from threading import Thread
 import numpy as np
@@ -6,15 +7,19 @@ import rospy
 from numpy import pi
 from angles import normalize_angle, normalize_angle_positive, shortest_angular_distance
 from geometry_msgs.msg import PoseStamped, Point, Quaternion
-from giskard_msgs.msg import MoveActionResult, CollisionEntry, MoveActionGoal, MoveResult
-from giskard_msgs.srv import UpdateWorldResponse
+from giskard_msgs.msg import MoveActionResult, CollisionEntry, MoveActionGoal, MoveResult, WorldBody
+from giskard_msgs.srv import UpdateWorldResponse, UpdateWorldRequest
 from sensor_msgs.msg import JointState
+from shape_msgs.msg import SolidPrimitive
 
 from giskardpy.python_interface import GiskardWrapper
 from giskardpy.test_utils import GiskardTestWrapper
 from giskardpy.tfwrapper import transform_pose, lookup_transform, init as tf_init
 from giskardpy.utils import to_list
 from ros_trajectory_controller_main import giskard_pm
+
+# TODO roslaunch iai_pr2_sim ros_control_sim.launch
+# TODO roslaunch iai_kitchen upload_kitchen_obj.launch
 
 # scopes = ['module', 'class', 'function']
 pocky_pose = {u'r_elbow_flex_joint': -1.29610152504,
@@ -58,21 +63,20 @@ default_pose = {u'r_elbow_flex_joint': -0.15,
                 u'head_tilt_joint': 0}
 
 
-
-@pytest.fixture(scope='module')
+@pytest.fixture(scope=u'module')
 def ros(request):
-    print('init ros')
-    rospy.init_node('tests')
+    print(u'init ros')
+    rospy.init_node(u'tests')
     tf_init(60)
 
     def kill_ros():
-        print('shutdown ros')
-        rospy.signal_shutdown('die')
+        print(u'shutdown ros')
+        rospy.signal_shutdown(u'die')
 
     request.addfinalizer(kill_ros)
 
 
-@pytest.fixture(scope='module')
+@pytest.fixture(scope=u'module')
 def giskard(request, ros):
     c = GiskardTestWrapper()
     request.addfinalizer(c.tear_down)
@@ -86,81 +90,99 @@ def resetted_giskard(giskard):
     """
     print(u'resetting giskard')
     giskard.clear_world()
-    giskard.set_joint_goal(default_pose)
-
-    collision_entry = CollisionEntry()
-    collision_entry.type = CollisionEntry.ALLOW_ALL_COLLISIONS
-    giskard.wrapper.set_collision_entries([collision_entry])
-    giskard.send_and_check_goal()
-    giskard.check_joint_state(default_pose)
     giskard.reset_pr2_base()
     return giskard
 
 
 @pytest.fixture()
-def pocky(resetted_giskard):
-    resetted_giskard.send_and_check_joint_goal(pocky_pose)
-    resetted_giskard.add_box()
+def zero_pose(resetted_giskard):
+    """
+    :type giskard: GiskardTestWrapper
+    """
+    resetted_giskard.set_joint_goal(default_pose)
+    resetted_giskard.allow_all_collisions()
+    resetted_giskard.send_and_check_goal()
+    return resetted_giskard
 
+@pytest.fixture()
+def pocky_pose_setup(resetted_giskard):
+    resetted_giskard.set_joint_goal(pocky_pose)
+    resetted_giskard.allow_all_collisions()
+    resetted_giskard.send_and_check_goal()
+    return resetted_giskard
+
+@pytest.fixture()
+def box_setup(pocky_pose_setup):
+    pocky_pose_setup.add_box()
+    return pocky_pose_setup
+
+@pytest.fixture()
+def kitchen_setup(zero_pose):
+    object_name = u'kitchen'
+    zero_pose.add_urdf(object_name,
+                       rospy.get_param(u'kitchen_description'),
+                       u'/kitchen/joint_states',
+                       lookup_transform(u'map', u'iai_kitchen/world'))
+    return zero_pose
 
 class TestJointGoals(object):
-    def test_joint_movement1(self, resetted_giskard):
+    def test_joint_movement1(self, zero_pose):
         """
-        :type resetted_giskard: GiskardTestWrapper
+        :type zero_pose: GiskardTestWrapper
         """
-        resetted_giskard.send_and_check_joint_goal(pocky_pose)
+        zero_pose.send_and_check_joint_goal(pocky_pose_setup)
 
-    def test_partial_joint_state_goal1(self, resetted_giskard):
+    def test_partial_joint_state_goal1(self, zero_pose):
         """
-        :type resetted_giskard: GiskardTestWrapper
+        :type zero_pose: GiskardTestWrapper
         """
-        js = dict(pocky_pose.items()[:3])
-        resetted_giskard.send_and_check_joint_goal(js)
+        js = dict(pocky_pose_setup.items()[:3])
+        zero_pose.send_and_check_joint_goal(js)
 
-    def test_continuous_joint1(self, resetted_giskard):
+    def test_continuous_joint1(self, zero_pose):
         """
-        :type resetted_giskard: GiskardTestWrapper
+        :type zero_pose: GiskardTestWrapper
         """
         js = {u'r_wrist_roll_joint': -pi,
               u'l_wrist_roll_joint': 3.5 * pi, }
-        resetted_giskard.send_and_check_joint_goal(js)
+        zero_pose.send_and_check_joint_goal(js)
 
 
 class TestCartGoals(object):
-    def test_cart_goal_1eef(self, resetted_giskard):
+    def test_cart_goal_1eef(self, zero_pose):
         """
-        :type resetted_giskard: GiskardTestWrapper
+        :type zero_pose: GiskardTestWrapper
         """
         p = PoseStamped()
-        p.header.frame_id = resetted_giskard.r_tip
+        p.header.frame_id = zero_pose.r_tip
         p.pose.position = Point(-0.1, 0, 0)
         p.pose.orientation = Quaternion(0, 0, 0, 1)
-        resetted_giskard.set_and_check_cart_goal(resetted_giskard.default_root, resetted_giskard.r_tip, p)
+        zero_pose.set_and_check_cart_goal(zero_pose.default_root, zero_pose.r_tip, p)
 
-    def test_cart_goal_2eef(self, resetted_giskard):
+    def test_cart_goal_2eef(self, zero_pose):
         """
-        :type resetted_giskard: GiskardTestWrapper
+        :type zero_pose: GiskardTestWrapper
         """
         # FIXME? eef don't move at the same time
         r_goal = PoseStamped()
-        r_goal.header.frame_id = resetted_giskard.r_tip
+        r_goal.header.frame_id = zero_pose.r_tip
         r_goal.header.stamp = rospy.get_rostime()
         r_goal.pose.position = Point(-0.1, 0, 0)
         r_goal.pose.orientation = Quaternion(0, 0, 0, 1)
-        resetted_giskard.set_cart_goal(resetted_giskard.default_root, resetted_giskard.r_tip, r_goal)
+        zero_pose.set_cart_goal(zero_pose.default_root, zero_pose.r_tip, r_goal)
         l_goal = PoseStamped()
-        l_goal.header.frame_id = resetted_giskard.l_tip
+        l_goal.header.frame_id = zero_pose.l_tip
         l_goal.header.stamp = rospy.get_rostime()
         l_goal.pose.position = Point(-0.05, 0, 0)
         l_goal.pose.orientation = Quaternion(0, 0, 0, 1)
-        resetted_giskard.set_cart_goal(resetted_giskard.default_root, resetted_giskard.l_tip, l_goal)
-        resetted_giskard.send_and_check_goal()
-        resetted_giskard.check_cart_goal(resetted_giskard.r_tip, r_goal)
-        resetted_giskard.check_cart_goal(resetted_giskard.l_tip, l_goal)
+        zero_pose.set_cart_goal(zero_pose.default_root, zero_pose.l_tip, l_goal)
+        zero_pose.send_and_check_goal()
+        zero_pose.check_cart_goal(zero_pose.r_tip, r_goal)
+        zero_pose.check_cart_goal(zero_pose.l_tip, l_goal)
 
-    def test_weird_wiggling(self, resetted_giskard):
+    def test_weird_wiggling(self, zero_pose):
         """
-        :type resetted_giskard: GiskardTestWrapper
+        :type zero_pose: GiskardTestWrapper
         """
         # FIXME get rid of wiggling
         goal_js = {
@@ -182,28 +204,28 @@ class TestCartGoals(object):
             u'l_wrist_flex_joint': -1.22662876066,
             u'l_wrist_roll_joint': -53.6150824007,
         }
-        resetted_giskard.allow_all_collisions()
-        resetted_giskard.send_and_check_joint_goal(goal_js)
+        zero_pose.allow_all_collisions()
+        zero_pose.send_and_check_joint_goal(goal_js)
 
         p = PoseStamped()
-        p.header.frame_id = resetted_giskard.l_tip
+        p.header.frame_id = zero_pose.l_tip
         p.header.stamp = rospy.get_rostime()
         p.pose.position.x = -0.1
         p.pose.orientation.w = 1
-        resetted_giskard.allow_all_collisions()
-        resetted_giskard.set_and_check_cart_goal(resetted_giskard.default_root, resetted_giskard.l_tip, p)
+        zero_pose.allow_all_collisions()
+        zero_pose.set_and_check_cart_goal(zero_pose.default_root, zero_pose.l_tip, p)
 
         p = PoseStamped()
-        p.header.frame_id = resetted_giskard.l_tip
+        p.header.frame_id = zero_pose.l_tip
         p.header.stamp = rospy.get_rostime()
         p.pose.position.x = 0.2
         p.pose.orientation.w = 1
         # self.giskard.allow_all_collisions()
-        resetted_giskard.set_and_check_cart_goal(resetted_giskard.default_root, resetted_giskard.l_tip, p)
+        zero_pose.set_and_check_cart_goal(zero_pose.default_root, zero_pose.l_tip, p)
 
-    def test_root_link_not_equal_chain_root(self, resetted_giskard):
+    def test_root_link_not_equal_chain_root(self, zero_pose):
         """
-        :type resetted_giskard: GiskardTestWrapper
+        :type zero_pose: GiskardTestWrapper
         """
         p = PoseStamped()
         p.header.frame_id = u'base_footprint'
@@ -211,38 +233,38 @@ class TestCartGoals(object):
         p.pose.position.y = -0.5
         p.pose.position.z = 1
         p.pose.orientation.w = 1
-        resetted_giskard.allow_all_collisions()
-        resetted_giskard.set_cart_goal(u'torso_lift_link', resetted_giskard.r_tip, p)
-        resetted_giskard.send_and_check_goal()
+        zero_pose.allow_all_collisions()
+        zero_pose.set_cart_goal(u'torso_lift_link', zero_pose.r_tip, p)
+        zero_pose.send_and_check_goal()
 
-    def test_waypoints(self, resetted_giskard):
+    def test_waypoints(self, zero_pose):
         """
-        :type resetted_giskard: GiskardTestWrapper
+        :type zero_pose: GiskardTestWrapper
         """
         p = PoseStamped()
-        p.header.frame_id = resetted_giskard.r_tip
+        p.header.frame_id = zero_pose.r_tip
         p.header.stamp = rospy.get_rostime()
         p.pose.position = Point(-0.1, 0, 0)
         p.pose.orientation = Quaternion(0, 0, 0, 1)
-        resetted_giskard.set_cart_goal(resetted_giskard.default_root, resetted_giskard.r_tip, p)
+        zero_pose.set_cart_goal(zero_pose.default_root, zero_pose.r_tip, p)
 
-        resetted_giskard.add_waypoint()
+        zero_pose.add_waypoint()
         p = PoseStamped()
-        p.header.frame_id = resetted_giskard.r_tip
+        p.header.frame_id = zero_pose.r_tip
         p.header.stamp = rospy.get_rostime()
         p.pose.position = Point(-0.1, 0, -0.1)
         p.pose.orientation = Quaternion(0, 0, 0, 1)
-        resetted_giskard.set_cart_goal(resetted_giskard.default_root, resetted_giskard.r_tip, p)
+        zero_pose.set_cart_goal(zero_pose.default_root, zero_pose.r_tip, p)
 
-        resetted_giskard.add_waypoint()
+        zero_pose.add_waypoint()
         p = PoseStamped()
-        p.header.frame_id = resetted_giskard.r_tip
+        p.header.frame_id = zero_pose.r_tip
         p.header.stamp = rospy.get_rostime()
         p.pose.position = Point(0.2, 0, 0.1)
         p.pose.orientation = Quaternion(0, 0, 0, 1)
-        resetted_giskard.set_cart_goal(resetted_giskard.default_root, resetted_giskard.r_tip, p)
+        zero_pose.set_cart_goal(zero_pose.default_root, zero_pose.r_tip, p)
 
-        resetted_giskard.send_and_check_goal()
+        zero_pose.send_and_check_goal()
 
     # def test_interrupt1(self, resetted_giskard):
     #     """
@@ -269,169 +291,332 @@ class TestCartGoals(object):
 
 
 class TestCollisionAvoidanceGoals(object):
-    def test_base_link_in_collision(self, resetted_giskard):
+    def test_add_box(self, zero_pose):
         """
-        :type resetted_giskard: GiskardTestWrapper
+        :type zero_pose: GiskardTestWrapper
+        """
+        object_name = u'muh'
+        zero_pose.add_box(object_name, position=[1.2, 0, 1.6])
+
+    def test_add_remove_sphere(self, zero_pose):
+        """
+        :type zero_pose: GiskardTestWrapper
+        """
+        object_name = u'muh'
+        zero_pose.add_sphere(object_name, position=[1.2, 0, 1.6])
+        zero_pose.remove_object(object_name)
+
+    def test_add_remove_cylinder(self, zero_pose):
+        """
+        :type zero_pose: GiskardTestWrapper
+        """
+        object_name = u'muh'
+        zero_pose.add_cylinder(object_name, position=[1.2, 0, 1.6])
+        zero_pose.remove_object(object_name)
+
+    def test_add_urdf_body(self, kitchen_setup):
+        """
+        :type kitchen_setup: GiskardTestWrapper
+        """
+        kitchen_setup.remove_object(u'kitchen')
+
+    def test_attach_box(self, zero_pose):
+        """
+        :type zero_pose: GiskardTestWrapper
+        """
+        pocky = u'http://muh#pocky'
+        zero_pose.attach_box(pocky, [0.1, 0.02, 0.02], zero_pose.r_tip, [0.05, 0, 0])
+
+    def test_add_remove_object(self, zero_pose):
+        """
+        :type zero_pose: GiskardTestWrapper
+        """
+        object_name = u'muh'
+        zero_pose.add_box(object_name, position=[1.2, 0, 1.6])
+        zero_pose.remove_object(object_name)
+
+    def test_invalid_update_world(self, zero_pose):
+        """
+        :type zero_pose: GiskardTestWrapper
+        """
+        req = UpdateWorldRequest(42, WorldBody(), True, PoseStamped())
+        assert zero_pose.wrapper.update_world.call(req).error_codes == UpdateWorldResponse.INVALID_OPERATION
+
+    def test_missing_body_error(self, zero_pose):
+        """
+        :type zero_pose: GiskardTestWrapper
+        """
+        zero_pose.remove_object(u'muh', expected_response=UpdateWorldResponse.MISSING_BODY_ERROR)
+
+    def test_attach_existing_object(self, zero_pose):
+        """
+        :type zero_pose: GiskardTestWrapper
+        """
+        # TODO if we don't allow there to be attached objects and free objects of the same name, we also have to check robot links?
+        pocky = u'http://muh#pocky'
+        zero_pose.add_box(pocky, position=[1.2, 0, 1.6])
+        zero_pose.attach_box(pocky, [0.1, 0.02, 0.02], zero_pose.r_tip, [0.05, 0, 0],
+                             expected_response=UpdateWorldResponse.DUPLICATE_BODY_ERROR)
+
+    def test_corrupt_shape_error(self, zero_pose):
+        """
+        :type zero_pose: GiskardTestWrapper
+        """
+        req = UpdateWorldRequest(UpdateWorldRequest.ADD, WorldBody(type=WorldBody.PRIMITIVE_BODY,
+                                                                   shape=SolidPrimitive(type=42)), True, PoseStamped())
+        assert zero_pose.wrapper.update_world.call(req).error_codes == UpdateWorldResponse.CORRUPT_SHAPE_ERROR
+
+    def test_unsupported_options(self, kitchen_setup):
+        """
+        :type kitchen_setup: GiskardTestWrapper
+        """
+        wb = WorldBody()
+        pose = PoseStamped()
+        pose.header.stamp = rospy.Time.now()
+        pose.header.frame_id = str(u'map')
+        pose.pose.position = Point()
+        pose.pose.orientation = Quaternion(w=1)
+        wb.type = WorldBody.URDF_BODY
+
+        req = UpdateWorldRequest(UpdateWorldRequest.ADD, wb, True, pose)
+        assert kitchen_setup.wrapper.update_world.call(req).error_codes == UpdateWorldResponse.UNSUPPORTED_OPTIONS
+
+    def test_link_b_set_but_body_b_not(self, box_setup):
+        """
+        :type box_setup: GiskardTestWrapper
+        """
+        ce = CollisionEntry()
+        ce.type = CollisionEntry.AVOID_COLLISION
+        ce.link_b = u'asdf'
+        box_setup.add_collision_entries([ce])
+        box_setup.send_and_check_goal(MoveResult.INSOLVABLE)
+
+    def test_unknown_robot_link(self, box_setup):
+        """
+        :type box_setup: GiskardTestWrapper
+        """
+        ce = CollisionEntry()
+        ce.type = CollisionEntry.AVOID_COLLISION
+        ce.robot_link = u'asdf'
+        box_setup.add_collision_entries([ce])
+        box_setup.send_and_check_goal(MoveResult.UNKNOWN_OBJECT)
+
+    def test_unknown_body_b(self, box_setup):
+        """
+        :type box_setup: GiskardTestWrapper
+        """
+        ce = CollisionEntry()
+        ce.type = CollisionEntry.AVOID_COLLISION
+        ce.body_b = u'asdf'
+        box_setup.add_collision_entries([ce])
+        box_setup.send_and_check_goal(MoveResult.UNKNOWN_OBJECT)
+
+    def test_unknown_link_b(self, box_setup):
+        """
+        :type box_setup: GiskardTestWrapper
+        """
+        ce = CollisionEntry()
+        ce.type = CollisionEntry.AVOID_COLLISION
+        ce.body_b = u'box'
+        ce.link_b = u'asdf'
+        box_setup.add_collision_entries([ce])
+        box_setup.send_and_check_goal(MoveResult.UNKNOWN_OBJECT)
+
+    def test_base_link_in_collision(self, zero_pose):
+        """
+        :type zero_pose: GiskardTestWrapper
         """
         # FIXME fails with self collision avoidance
-        resetted_giskard.add_box(position=[0, 0, -0.2])
-        resetted_giskard.send_and_check_joint_goal(pocky_pose)
+        zero_pose.add_box(position=[0, 0, -0.2])
+        zero_pose.send_and_check_joint_goal(pocky_pose)
 
-    def test_unknown_object1(self, resetted_giskard, pocky):
+    def test_unknown_object1(self, box_setup):
         """
-        :type resetted_giskard: GiskardTestWrapper
+        :type box_setup: GiskardTestWrapper
         """
         # TODO should we throw unknown object?
         p = PoseStamped()
-        p.header.frame_id = resetted_giskard.r_tip
+        p.header.frame_id = box_setup.r_tip
         p.pose.position = Point(0.1, 0, 0)
         p.pose.orientation = Quaternion(0, 0, 0, 1)
-        resetted_giskard.set_cart_goal(resetted_giskard.default_root, resetted_giskard.r_tip, p)
+        box_setup.set_cart_goal(box_setup.default_root, box_setup.r_tip, p)
 
         collision_entry = CollisionEntry()
         collision_entry.type = CollisionEntry.AVOID_COLLISION
         collision_entry.min_dist = 0.05
         collision_entry.body_b = u'muh'
-        resetted_giskard.add_collision_entries([collision_entry])
+        box_setup.add_collision_entries([collision_entry])
 
-        resetted_giskard.send_and_check_goal(MoveResult.UNKNOWN_OBJECT)
+        box_setup.send_and_check_goal(MoveResult.UNKNOWN_OBJECT)
 
-    def test_allow_collision(self, resetted_giskard, pocky):
+
+    # def test_avoid_collision(self, box_setup):
+    #     """
+    #     :type box_setup: GiskardTestWrapper
+    #     """
+    #     # FIXME
+    #     ce = CollisionEntry()
+    #     ce.type = CollisionEntry.AVOID_COLLISION
+    #     ce.body_b = u'box'
+    #     box_setup.add_collision_entries([ce])
+    #     box_setup.send_and_check_goal(MoveResult.SUCCESS)
+    #     box_setup.check_cpi_geq(box_setup.get_l_gripper_links(), 0.048)
+    #     box_setup.check_cpi_geq(box_setup.get_r_gripper_links(), 0.048)
+
+    def test_allow_collision(self, box_setup):
         """
-        :type resetted_giskard: GiskardTestWrapper
+        :type box_setup: GiskardTestWrapper
         """
         p = PoseStamped()
-        p.header.frame_id = resetted_giskard.r_tip
+        p.header.frame_id = box_setup.r_tip
         p.header.stamp = rospy.get_rostime()
-        p.pose.position = Point(0.1, 0, 0)
+        p.pose.position = Point(0.15, 0, 0)
         p.pose.orientation = Quaternion(0, 0, 0, 1)
 
         collision_entry = CollisionEntry()
         collision_entry.type = CollisionEntry.ALLOW_COLLISION
         collision_entry.body_b = u'box'
-        resetted_giskard.wrapper.set_collision_entries([collision_entry])
+        collision_entry.link_b = u'base'
+        box_setup.wrapper.set_collision_entries([collision_entry])
 
-        resetted_giskard.set_and_check_cart_goal(resetted_giskard.default_root, resetted_giskard.r_tip, p)
+        box_setup.set_and_check_cart_goal(box_setup.default_root, box_setup.r_tip, p)
 
-    def test_avoid_collision1(self, resetted_giskard, pocky):
+        box_setup.check_cpi_geq(box_setup.get_l_gripper_links(), 0.0)
+        box_setup.check_cpi_leq(box_setup.get_r_gripper_links(), 0.0)
+
+    def test_avoid_collision(self, box_setup):
         """
-        :type resetted_giskard: GiskardTestWrapper
+        :type box_setup: GiskardTestWrapper
         """
-        # resetted_giskard.send_and_check_joint_goal(pocky_pose)
-        # resetted_giskard.add_box()
         p = PoseStamped()
-        p.header.frame_id = resetted_giskard.r_tip
+        p.header.frame_id = box_setup.r_tip
         p.pose.position = Point(0.1, 0, 0)
         p.pose.orientation = Quaternion(0, 0, 0, 1)
-        resetted_giskard.set_cart_goal(resetted_giskard.default_root, resetted_giskard.r_tip, p)
+        box_setup.set_cart_goal(box_setup.default_root, box_setup.r_tip, p)
 
         collision_entry = CollisionEntry()
         collision_entry.type = CollisionEntry.AVOID_COLLISION
         collision_entry.min_dist = 0.05
         collision_entry.body_b = u'box'
-        resetted_giskard.add_collision_entries([collision_entry])
+        box_setup.add_collision_entries([collision_entry])
 
-        resetted_giskard.send_and_check_goal()
+        box_setup.send_and_check_goal()
+        box_setup.check_cpi_geq(box_setup.get_l_gripper_links(), 0.048)
+        box_setup.check_cpi_geq(box_setup.get_r_gripper_links(), 0.048)
 
-    def test_avoid_all_collision1(self, resetted_giskard, pocky):
+    def test_avoid_collision_with_far_object(self, pocky_pose_setup):
         """
-        :type resetted_giskard: GiskardTestWrapper
+        :type pocky_pose_setup: GiskardTestWrapper
         """
+        pocky_pose_setup.add_box(position=[25,25,25])
         p = PoseStamped()
-        p.header.frame_id = resetted_giskard.r_tip
+        p.header.frame_id = pocky_pose_setup.r_tip
         p.pose.position = Point(0.1, 0, 0)
         p.pose.orientation = Quaternion(0, 0, 0, 1)
-        resetted_giskard.set_cart_goal(resetted_giskard.default_root, resetted_giskard.r_tip, p)
+        pocky_pose_setup.set_cart_goal(pocky_pose_setup.default_root, pocky_pose_setup.r_tip, p)
+
+        collision_entry = CollisionEntry()
+        collision_entry.type = CollisionEntry.AVOID_COLLISION
+        collision_entry.min_dist = 0.05
+        collision_entry.body_b = u'box'
+        pocky_pose_setup.add_collision_entries([collision_entry])
+
+        pocky_pose_setup.send_and_check_goal()
+        pocky_pose_setup.check_cpi_geq(pocky_pose_setup.get_l_gripper_links(), 0.048)
+        pocky_pose_setup.check_cpi_geq(pocky_pose_setup.get_r_gripper_links(), 0.048)
+
+    def test_avoid_all_collision(self, box_setup):
+        """
+        :type box_setup: GiskardTestWrapper
+        """
+        p = PoseStamped()
+        p.header.frame_id = box_setup.r_tip
+        p.pose.position = Point(0.1, 0, 0)
+        p.pose.orientation = Quaternion(0, 0, 0, 1)
+        box_setup.set_cart_goal(box_setup.default_root, box_setup.r_tip, p)
 
         collision_entry = CollisionEntry()
         collision_entry.type = CollisionEntry.AVOID_ALL_COLLISIONS
         collision_entry.min_dist = 0.05
-        resetted_giskard.add_collision_entries([collision_entry])
+        box_setup.add_collision_entries([collision_entry])
 
-        resetted_giskard.send_and_check_goal()
+        box_setup.send_and_check_goal()
 
-    def test_get_out_of_collision(self, resetted_giskard, pocky):
+        box_setup.check_cpi_geq(box_setup.get_l_gripper_links(), 0.048)
+        box_setup.check_cpi_geq(box_setup.get_r_gripper_links(), 0.048)
+
+    def test_get_out_of_collision(self, box_setup):
         """
-        :type resetted_giskard: GiskardTestWrapper
+        :type box_setup: GiskardTestWrapper
         """
         p = PoseStamped()
-        p.header.frame_id = resetted_giskard.r_tip
+        p.header.frame_id = box_setup.r_tip
         p.pose.position = Point(0.15, 0, 0)
         p.pose.orientation = Quaternion(0, 0, 0, 1)
-        resetted_giskard.set_cart_goal(resetted_giskard.default_root, resetted_giskard.r_tip, p)
+        box_setup.set_cart_goal(box_setup.default_root, box_setup.r_tip, p)
 
         collision_entry = CollisionEntry()
         collision_entry.type = CollisionEntry.ALLOW_ALL_COLLISIONS
         collision_entry.min_dist = 0.05
-        resetted_giskard.add_collision_entries([collision_entry])
+        box_setup.add_collision_entries([collision_entry])
 
-        resetted_giskard.send_and_check_goal()
+        box_setup.send_and_check_goal()
 
         p = PoseStamped()
-        p.header.frame_id = resetted_giskard.r_tip
+        p.header.frame_id = box_setup.r_tip
         p.pose.position = Point(0.1, 0, 0)
         p.pose.orientation = Quaternion(0, 0, 0, 1)
-        resetted_giskard.set_cart_goal(resetted_giskard.default_root, resetted_giskard.r_tip, p)
+        box_setup.set_cart_goal(box_setup.default_root, box_setup.r_tip, p)
 
         collision_entry = CollisionEntry()
         collision_entry.type = CollisionEntry.AVOID_ALL_COLLISIONS
         collision_entry.min_dist = 0.05
-        resetted_giskard.add_collision_entries([collision_entry])
+        box_setup.add_collision_entries([collision_entry])
 
-        resetted_giskard.send_and_check_goal()
+        box_setup.send_and_check_goal()
 
-    def test_allow_collision_gripper(self, resetted_giskard, pocky):
+        box_setup.check_cpi_geq(box_setup.get_l_gripper_links(), 0.048)
+        box_setup.check_cpi_geq(box_setup.get_r_gripper_links(), 0.048)
+
+    def test_allow_collision_gripper(self, box_setup):
         """
-        :type resetted_giskard: GiskardTestWrapper
+        :type box_setup: GiskardTestWrapper
         """
-        ces = resetted_giskard.get_allow_l_gripper(u'box')
-        resetted_giskard.add_collision_entries(ces)
+        ces = box_setup.get_allow_l_gripper(u'box')
+        box_setup.add_collision_entries(ces)
         p = PoseStamped()
-        p.header.frame_id = resetted_giskard.l_tip
+        p.header.frame_id = box_setup.l_tip
         p.header.stamp = rospy.get_rostime()
         p.pose.position.x = 0.11
         p.pose.orientation.w = 1
-        resetted_giskard.set_and_check_cart_goal(resetted_giskard.default_root, resetted_giskard.l_tip, p)
+        box_setup.set_and_check_cart_goal(box_setup.default_root, box_setup.l_tip, p)
+        box_setup.check_cpi_leq(box_setup.get_l_gripper_links(), 0.0)
+        box_setup.check_cpi_geq(box_setup.get_r_gripper_links(), 0.048)
 
-    def test_attached_collision1(self, resetted_giskard, pocky):
+    def test_attached_collision1(self, box_setup):
         """
-        :type resetted_giskard: GiskardTestWrapper
+        :type box_setup: GiskardTestWrapper
         """
-        resetted_giskard.attach_box('pocky', [0.1, 0.02, 0.02], resetted_giskard.r_tip, [0.05, 0, 0])
-        resetted_giskard.attach_box('pocky', [0.1, 0.02, 0.02], resetted_giskard.r_tip, [0.05, 0, 0],
-                                    expected_response=UpdateWorldResponse.DUPLICATE_BODY_ERROR)
+        attached_link_name = u'pocky'
+        box_setup.attach_box(attached_link_name, [0.1, 0.02, 0.02], box_setup.r_tip, [0.05, 0, 0])
+        box_setup.attach_box(attached_link_name, [0.1, 0.02, 0.02], box_setup.r_tip, [0.05, 0, 0],
+                             expected_response=UpdateWorldResponse.DUPLICATE_BODY_ERROR)
         p = PoseStamped()
-        p.header.frame_id = resetted_giskard.r_tip
+        p.header.frame_id = box_setup.r_tip
         p.header.stamp = rospy.get_rostime()
         p.pose.position.x = -0.11
         p.pose.orientation.w = 1
-        resetted_giskard.set_and_check_cart_goal(resetted_giskard.default_root, resetted_giskard.r_tip, p)
-        resetted_giskard.remove_object('pocky')
+        box_setup.set_and_check_cart_goal(box_setup.default_root, box_setup.r_tip, p)
+        box_setup.check_cpi_geq(box_setup.get_l_gripper_links(), 0.048)
+        box_setup.check_cpi_geq([attached_link_name], 0.048)
+        box_setup.remove_object(attached_link_name)
 
-    def test_attach_existing_object(self, resetted_giskard):
+    def test_attached_collision_avoidance(self, box_setup):
         """
-        :type resetted_giskard: GiskardTestWrapper
-        """
-        # TODO if we don't allow there to be attached objects and free objects of the same name, we also have to check robot links?
-        pocky = 'http://muh#pocky'
-        resetted_giskard.add_box(pocky, position=[1.2, 0, 1.6])
-        resetted_giskard.attach_box(pocky, [0.1, 0.02, 0.02], resetted_giskard.r_tip, [0.05, 0, 0],
-                                    expected_response=UpdateWorldResponse.DUPLICATE_BODY_ERROR)
-
-    def test_add_remove_object(self, resetted_giskard):
-        """
-        :type resetted_giskard: GiskardTestWrapper
-        """
-        object_name = 'muh'
-        resetted_giskard.add_box(object_name, position=[1.2, 0, 1.6])
-        resetted_giskard.remove_object(object_name)
-
-    def test_attached_collision_avoidance(self, resetted_giskard, pocky):
-        """
-        :type resetted_giskard: GiskardTestWrapper
+        :type box_setup: GiskardTestWrapper
         """
         pocky = 'http://muh#pocky'
-        resetted_giskard.attach_box(pocky, [0.1, 0.02, 0.02], resetted_giskard.r_tip, [0.05, 0, 0])
+        box_setup.attach_box(pocky, [0.1, 0.02, 0.02], box_setup.r_tip, [0.05, 0, 0])
 
         ces = []
         ce = CollisionEntry()
@@ -439,21 +624,22 @@ class TestCollisionAvoidanceGoals(object):
         ce.robot_link = pocky
         ce.body_b = 'box'
         ces.append(ce)
-        resetted_giskard.add_collision_entries(ces)
+        box_setup.add_collision_entries(ces)
 
         p = PoseStamped()
-        p.header.frame_id = resetted_giskard.r_tip
+        p.header.frame_id = box_setup.r_tip
         p.header.stamp = rospy.get_rostime()
         p.pose.position.y = -0.11
         p.pose.orientation.w = 1
-        resetted_giskard.set_and_check_cart_goal(resetted_giskard.default_root, resetted_giskard.r_tip, p)
+        box_setup.set_and_check_cart_goal(box_setup.default_root, box_setup.r_tip, p)
+        box_setup.check_cpi_geq(box_setup.get_l_gripper_links(), 0.048)
 
-    def test_collision_during_planning1(self, resetted_giskard, pocky):
+    def test_collision_during_planning1(self, box_setup):
         """
-        :type resetted_giskard: GiskardTestWrapper
+        :type box_setup: GiskardTestWrapper
         """
         p = PoseStamped()
-        p.header.frame_id = resetted_giskard.r_tip
+        p.header.frame_id = box_setup.r_tip
         p.header.stamp = rospy.get_rostime()
         p.pose.position = Point(0.1, 0, 0)
         p.pose.orientation = Quaternion(0, 0, 0, 1)
@@ -461,25 +647,25 @@ class TestCollisionAvoidanceGoals(object):
         collision_entry = CollisionEntry()
         collision_entry.type = CollisionEntry.AVOID_ALL_COLLISIONS
         collision_entry.min_dist = 1
-        resetted_giskard.add_collision_entries([collision_entry])
-        resetted_giskard.set_cart_goal(resetted_giskard.default_root, resetted_giskard.r_tip, p)
-        resetted_giskard.send_and_check_goal(expected_error_code=MoveResult.PATH_COLLISION)
+        box_setup.add_collision_entries([collision_entry])
+        box_setup.set_cart_goal(box_setup.default_root, box_setup.r_tip, p)
+        box_setup.send_and_check_goal(expected_error_code=MoveResult.PATH_COLLISION)
 
-
-    def test_avoid_collision_gripper(self, resetted_giskard, pocky):
+    def test_avoid_collision_gripper(self, box_setup):
         """
-        :type resetted_giskard: GiskardTestWrapper
+        :type box_setup: GiskardTestWrapper
         """
-        resetted_giskard.allow_all_collisions()
-        ces = resetted_giskard.get_l_gripper_collision_entries(u'box', 0.05, CollisionEntry.AVOID_COLLISION)
-        resetted_giskard.add_collision_entries(ces)
+        box_setup.allow_all_collisions()
+        ces = box_setup.get_l_gripper_collision_entries(u'box', 0.05, CollisionEntry.AVOID_COLLISION)
+        box_setup.add_collision_entries(ces)
         p = PoseStamped()
-        p.header.frame_id = resetted_giskard.l_tip
+        p.header.frame_id = box_setup.l_tip
         p.header.stamp = rospy.get_rostime()
-        p.pose.position.x = 0.11
+        p.pose.position.x = 0.
         p.pose.orientation.w = 1
-        resetted_giskard.set_and_check_cart_goal(resetted_giskard.default_root, resetted_giskard.l_tip, p)
-        resetted_giskard.check_cpi(resetted_giskard.get_l_gripper_links(), 0.05)
+        box_setup.set_cart_goal(box_setup.default_root, box_setup.l_tip, p)
+        box_setup.send_goal()
+        box_setup.check_cpi_geq(box_setup.get_l_gripper_links(), 0.049)
 
     #
     # def test_place_spoon1(self):

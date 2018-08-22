@@ -212,21 +212,6 @@ class GiskardWrapper(object):
         req = UpdateWorldRequest(UpdateWorldRequest.ADD, object, False, pose)
         return self.update_world.call(req)
 
-    def add_cone(self, name=u'cone', size=(1,1), frame_id=u'map', position=(0,0,0), orientation=(0,0,0,1)):
-        object = WorldBody()
-        object.type = WorldBody.PRIMITIVE_BODY
-        object.name = str(name)
-        pose = PoseStamped()
-        pose.header.stamp = rospy.Time.now()
-        pose.header.frame_id = str(frame_id)
-        pose.pose.position = Point(*position)
-        pose.pose.orientation = Quaternion(*orientation)
-        object.shape.type = SolidPrimitive.CONE
-        object.shape.dimensions.append(size[0])
-        object.shape.dimensions.append(size[1])
-        req = UpdateWorldRequest(UpdateWorldRequest.ADD, object, False, pose)
-        return self.update_world.call(req)
-
     def attach_box(self, name=u'box', size=(1, 1, 1), frame_id=u'map', position=(0, 0, 0), orientation=(0, 0, 0, 1)):
         """
         :param name:

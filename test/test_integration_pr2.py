@@ -1,3 +1,4 @@
+import shutil
 import rospkg
 from multiprocessing import Queue
 from threading import Thread
@@ -66,6 +67,7 @@ default_pose = {u'r_elbow_flex_joint': -0.15,
 @pytest.fixture(scope=u'module')
 def ros(request):
     print(u'init ros')
+    # shutil.rmtree(u'../data/')
     rospy.init_node(u'tests')
     tf_init(60)
 
@@ -130,13 +132,13 @@ class TestJointGoals(object):
         """
         :type zero_pose: GiskardTestWrapper
         """
-        zero_pose.send_and_check_joint_goal(pocky_pose_setup)
+        zero_pose.send_and_check_joint_goal(pocky_pose)
 
     def test_partial_joint_state_goal1(self, zero_pose):
         """
         :type zero_pose: GiskardTestWrapper
         """
-        js = dict(pocky_pose_setup.items()[:3])
+        js = dict(pocky_pose.items()[:3])
         zero_pose.send_and_check_joint_goal(js)
 
     def test_continuous_joint1(self, zero_pose):
@@ -154,6 +156,7 @@ class TestCartGoals(object):
         :type zero_pose: GiskardTestWrapper
         """
         p = PoseStamped()
+        p.header.stamp = rospy.get_rostime()
         p.header.frame_id = zero_pose.r_tip
         p.pose.position = Point(-0.1, 0, 0)
         p.pose.orientation = Quaternion(0, 0, 0, 1)
@@ -227,7 +230,9 @@ class TestCartGoals(object):
         """
         :type zero_pose: GiskardTestWrapper
         """
+        #FIXME init hot start failed when all tests are run in a row?
         p = PoseStamped()
+        p.header.stamp = rospy.get_rostime()
         p.header.frame_id = u'base_footprint'
         p.pose.position.x = 0.8
         p.pose.position.y = -0.5
@@ -494,6 +499,8 @@ class TestCollisionAvoidanceGoals(object):
         p.pose.orientation = Quaternion(0, 0, 0, 1)
         box_setup.set_cart_goal(box_setup.default_root, box_setup.r_tip, p)
 
+        box_setup.wrapper.avoid_collision()
+
         collision_entry = CollisionEntry()
         collision_entry.type = CollisionEntry.AVOID_COLLISION
         collision_entry.min_dist = 0.05
@@ -666,6 +673,25 @@ class TestCollisionAvoidanceGoals(object):
         box_setup.set_cart_goal(box_setup.default_root, box_setup.l_tip, p)
         box_setup.send_goal()
         box_setup.check_cpi_geq(box_setup.get_l_gripper_links(), 0.049)
+
+    def test_end_state_collision(self, box_setup):
+        """
+        :type box_setup: GiskardTestWrapper
+        """
+        # TODO endstate impossible as long as we check for path collision?
+        pass
+
+    def test_filled_vel_values(self, box_setup):
+        """
+        :type box_setup: GiskardTestWrapper
+        """
+        pass
+
+    def test_undefined_goal(self, box_setup):
+        """
+        :type box_setup: GiskardTestWrapper
+        """
+        pass
 
     #
     # def test_place_spoon1(self):

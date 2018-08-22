@@ -309,8 +309,11 @@ class PyBulletPlugin(Plugin):
             n_in_robot_root = to_list(transform_vector(self.robot_root,
                                                        to_vector3_stamped(self.map_frame,
                                                                           collision_info.contact_normal_on_b)))
-            cpi = ClosestPointInfo(a_in_robot_root, b_in_robot_root, collision_info.contact_distance,
-                                   distances[key], key[0], u'{} - {}'.format(key[1], key[2]), n_in_robot_root)
+            try:
+                cpi = ClosestPointInfo(a_in_robot_root, b_in_robot_root, collision_info.contact_distance,
+                                       distances[key], key[0], u'{} - {}'.format(key[1], key[2]), n_in_robot_root)
+            except KeyError:
+                continue
             if link1 in closest_point:
                 closest_point[link1] = min(closest_point[link1], cpi, key=lambda x: x.contact_distance)
             else:

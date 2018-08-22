@@ -90,31 +90,34 @@ class KDL(object):
             self.robots[root, tip] = self.KDLRobot(self.chain)
         return self.robots[root, tip]
 
+donbot_urdf = u'../test/urdfs/iai_donbot.urdf'
+pr2_urdf = u'../test/urdfs/pr2.urdf'
+body_urdf = u'../test/urdfs/boxy.urdf'
 
 class TestSymengineController(unittest.TestCase):
-    pr2_joint_limits = Robot.from_urdf_file(u'../test/pr2.urdf').get_joint_limits()
-    donbot_joint_limits = Robot.from_urdf_file(u'../test/iai_donbot.urdf').get_joint_limits()
-    boxy_joint_limits = Robot.from_urdf_file(u'../test/boxy.urdf').get_joint_limits()
+    pr2_joint_limits = Robot.from_urdf_file(pr2_urdf).get_joint_limits()
+    donbot_joint_limits = Robot.from_urdf_file(donbot_urdf).get_joint_limits()
+    boxy_joint_limits = Robot.from_urdf_file(body_urdf).get_joint_limits()
 
     def test_constraints_pr2(self):
-        r = Robot.from_urdf_file(u'pr2.urdf')
+        r = Robot.from_urdf_file(pr2_urdf)
         self.assertEqual(len(r.hard_constraints), 26)
         self.assertEqual(len(r.joint_constraints), 45)
 
     def test_constraints_donbot(self):
-        r = Robot.from_urdf_file(u'iai_donbot.urdf')
+        r = Robot.from_urdf_file(donbot_urdf)
         self.assertEqual(len(r.hard_constraints), 9)
         self.assertEqual(len(r.joint_constraints), 10)
 
     def test_constraints_boxy(self):
-        r = Robot.from_urdf_file(u'boxy.urdf')
+        r = Robot.from_urdf_file(body_urdf)
         self.assertEqual(len(r.hard_constraints), 26)
         self.assertEqual(len(r.joint_constraints), 26)
 
     @given(rnd_joint_state(pr2_joint_limits))
     def test_pr2_fk1(self, js):
-        r = Robot.from_urdf_file(u'pr2.urdf')
-        kdl = KDL(u'pr2.urdf')
+        r = Robot.from_urdf_file(pr2_urdf)
+        kdl = KDL(pr2_urdf)
         root = u'base_link'
         tips = [u'l_gripper_tool_frame', u'r_gripper_tool_frame']
         for tip in tips:
@@ -127,8 +130,8 @@ class TestSymengineController(unittest.TestCase):
 
     @given(rnd_joint_state(donbot_joint_limits))
     def test_donbot_fk1(self, js):
-        r = Robot.from_urdf_file(u'iai_donbot.urdf')
-        kdl = KDL(u'iai_donbot.urdf')
+        r = Robot.from_urdf_file(donbot_urdf)
+        kdl = KDL(donbot_urdf)
         root = u'base_footprint'
         tips = [u'gripper_tool_frame']
         for tip in tips:
@@ -140,8 +143,8 @@ class TestSymengineController(unittest.TestCase):
 
     @given(rnd_joint_state(boxy_joint_limits))
     def test_donbot_fk1(self, js):
-        r = Robot.from_urdf_file(u'boxy.urdf')
-        kdl = KDL(u'boxy.urdf')
+        r = Robot.from_urdf_file(body_urdf)
+        kdl = KDL(body_urdf)
         root = u'base_footprint'
         tips = [u'left_gripper_tool_frame', u'right_gripper_tool_frame']
         for tip in tips:
@@ -255,7 +258,7 @@ class TestSymengineController(unittest.TestCase):
                     u'right_arm_6_joint': {u'right_gripper_finger_right_link', u'right_gripper_gripper_right_link',
                                            u'right_gripper_base_link', u'right_gripper_gripper_left_link',
                                            u'right_arm_7_link', u'right_gripper_finger_left_link'}}
-        r = Robot.from_urdf_file(u'boxy.urdf')
+        r = Robot.from_urdf_file(body_urdf)
         for joint in r.get_joint_names_controllable():
             self.assertSetEqual(set(r.get_sub_tree_link_names_with_collision(joint)), expected[joint])
             # print(u'u\'{}\': {{{}}},'.format(joint,
@@ -307,7 +310,7 @@ class TestSymengineController(unittest.TestCase):
                     u'l_wrist_flex_joint': {u'l_wrist_flex_link', u'l_wrist_roll_link', u'l_gripper_palm_link', u'l_gripper_l_finger_link', u'l_gripper_r_finger_link', u'l_gripper_l_finger_tip_link', u'l_gripper_r_finger_tip_link'},
                     u'l_upper_arm_roll_joint': {u'l_upper_arm_roll_link', u'l_upper_arm_link', u'l_elbow_flex_link', u'l_forearm_roll_link', u'l_forearm_link', u'l_wrist_flex_link', u'l_wrist_roll_link', u'l_gripper_palm_link', u'l_gripper_l_finger_link', u'l_gripper_r_finger_link', u'l_gripper_l_finger_tip_link', u'l_gripper_r_finger_tip_link'},
                     u'l_gripper_r_finger_joint': {u'l_gripper_r_finger_link', u'l_gripper_r_finger_tip_link'}}
-        r = Robot.from_urdf_file(u'pr2.urdf')
+        r = Robot.from_urdf_file(pr2_urdf)
         for joint in r.get_joint_names_controllable():
             self.assertSetEqual(set(r.get_sub_tree_link_names_with_collision(joint)), expected[joint])
 
@@ -322,27 +325,27 @@ class TestSymengineController(unittest.TestCase):
                     u'odom_x_joint': {u'base_link', u'plate', u'ur5_base_link', u'ur5_shoulder_link', u'ur5_upper_arm_link', u'ur5_forearm_link', u'ur5_wrist_1_link', u'ur5_wrist_2_link', u'ur5_wrist_3_link', u'ur5_ee_link', u'gripper_base_link', u'gripper_gripper_left_link', u'gripper_finger_left_link', u'gripper_gripper_right_link', u'gripper_finger_right_link'},
                     u'ur5_shoulder_pan_joint': {u'ur5_shoulder_link', u'ur5_upper_arm_link', u'ur5_forearm_link', u'ur5_wrist_1_link', u'ur5_wrist_2_link', u'ur5_wrist_3_link', u'ur5_ee_link', u'gripper_base_link', u'gripper_gripper_left_link', u'gripper_finger_left_link', u'gripper_gripper_right_link', u'gripper_finger_right_link'},
                     u'gripper_joint': {u'gripper_gripper_right_link', u'gripper_finger_right_link'}}
-        r = Robot.from_urdf_file(u'iai_donbot.urdf')
+        r = Robot.from_urdf_file(donbot_urdf)
         for joint in r.get_joint_names_controllable():
             self.assertSetEqual(set(r.get_sub_tree_link_names_with_collision(joint)), expected[joint])
 
     def test_get_joint_names_pr2(self):
         expected = {u'l_shoulder_pan_joint', u'br_caster_l_wheel_joint', u'r_gripper_l_finger_tip_joint', u'r_elbow_flex_joint', u'torso_lift_joint', u'r_gripper_l_finger_joint', u'r_forearm_roll_joint', u'l_gripper_r_finger_tip_joint', u'r_shoulder_lift_joint', u'fl_caster_rotation_joint', u'l_gripper_motor_screw_joint', u'r_wrist_roll_joint', u'r_gripper_motor_slider_joint', u'l_forearm_roll_joint', u'r_gripper_joint', u'bl_caster_rotation_joint', u'fl_caster_r_wheel_joint', u'l_shoulder_lift_joint', u'head_pan_joint', u'head_tilt_joint', u'fr_caster_l_wheel_joint', u'fl_caster_l_wheel_joint', u'l_gripper_motor_slider_joint', u'br_caster_r_wheel_joint', u'r_gripper_motor_screw_joint', u'r_upper_arm_roll_joint', u'fr_caster_rotation_joint', u'torso_lift_motor_screw_joint', u'bl_caster_l_wheel_joint', u'r_wrist_flex_joint', u'r_gripper_r_finger_tip_joint', u'l_elbow_flex_joint', u'laser_tilt_mount_joint', u'r_shoulder_pan_joint', u'fr_caster_r_wheel_joint', u'l_wrist_roll_joint', u'r_gripper_r_finger_joint', u'bl_caster_r_wheel_joint', u'l_gripper_joint', u'l_gripper_l_finger_tip_joint', u'br_caster_rotation_joint', u'l_gripper_l_finger_joint', u'l_wrist_flex_joint', u'l_upper_arm_roll_joint', u'l_gripper_r_finger_joint'}
 
-        r = Robot.from_urdf_file(u'pr2.urdf')
+        r = Robot.from_urdf_file(pr2_urdf)
         self.assertSetEqual(set(r.get_joint_names_controllable()), expected)
         # print(u', '.join([u'u\'{}\''.format(x) for x in r.get_joint_names()]))
 
     def test_get_joint_names_donbot(self):
         expected = {u'ur5_wrist_3_joint', u'ur5_elbow_joint', u'ur5_wrist_1_joint', u'odom_z_joint', u'ur5_shoulder_lift_joint', u'odom_y_joint', u'ur5_wrist_2_joint', u'odom_x_joint', u'ur5_shoulder_pan_joint', u'gripper_joint'}
 
-        r = Robot.from_urdf_file(u'iai_donbot.urdf')
+        r = Robot.from_urdf_file(donbot_urdf)
         self.assertSetEqual(set(r.get_joint_names_controllable()), expected)
 
     def test_get_joint_names_boxy(self):
         expected = {u'left_arm_2_joint', u'neck_joint_end', u'neck_wrist_1_joint', u'right_arm_2_joint', u'right_arm_4_joint', u'neck_wrist_3_joint', u'right_arm_3_joint', u'right_gripper_base_gripper_right_joint', u'left_gripper_base_gripper_right_joint', u'left_arm_0_joint', u'right_gripper_base_gripper_left_joint', u'left_arm_4_joint', u'left_arm_6_joint', u'right_arm_1_joint', u'left_arm_1_joint', u'neck_wrist_2_joint', u'triangle_base_joint', u'neck_elbow_joint', u'right_arm_5_joint', u'left_arm_3_joint', u'neck_shoulder_pan_joint', u'right_arm_0_joint', u'neck_shoulder_lift_joint', u'left_arm_5_joint', u'left_gripper_base_gripper_left_joint', u'right_arm_6_joint'}
 
-        r = Robot.from_urdf_file(u'boxy.urdf')
+        r = Robot.from_urdf_file(body_urdf)
         self.assertSetEqual(set(r.get_joint_names_controllable()), expected)
 
 if __name__ == '__main__':

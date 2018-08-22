@@ -22,14 +22,14 @@ from giskardpy.object import UrdfObject, FixedJoint, world_body_to_urdf_object, 
     CollisionProperty
 import hashlib
 
-JointInfo = namedtuple('JointInfo', ['joint_index', 'joint_name', 'joint_type', 'q_index', 'u_index', 'flags',
-                                     'joint_damping', 'joint_friction', 'joint_lower_limit', 'joint_upper_limit',
-                                     'joint_max_force', 'joint_max_velocity', 'link_name', 'joint_axis',
-                                     'parent_frame_pos', 'parent_frame_orn', 'parent_index'])
+JointInfo = namedtuple(u'JointInfo', [u'joint_index', u'joint_name', u'joint_type', u'q_index', u'u_index', u'flags',
+                                     u'joint_damping', u'joint_friction', u'joint_lower_limit', u'joint_upper_limit',
+                                     u'joint_max_force', u'joint_max_velocity', u'link_name', u'joint_axis',
+                                     u'parent_frame_pos', u'parent_frame_orn', u'parent_index'])
 
-ContactInfo = namedtuple('ContactInfo', ['contact_flag', 'body_unique_id_a', 'body_unique_id_b', 'link_index_a',
-                                         'link_index_b', 'position_on_a', 'position_on_b', 'contact_normal_on_b',
-                                         'contact_distance', 'normal_force'])
+ContactInfo = namedtuple(u'ContactInfo', [u'contact_flag', u'body_unique_id_a', u'body_unique_id_b', u'link_index_a',
+                                         u'link_index_b', u'position_on_a', u'position_on_b', u'contact_normal_on_b',
+                                         u'contact_distance', u'normal_force'])
 
 
 def resolve_ros_iris(input_urdf):
@@ -41,15 +41,15 @@ def resolve_ros_iris(input_urdf):
     :rtype: str
     """
     rospack = rospkg.RosPack()
-    output_urdf = ''
-    for line in input_urdf.split('\n'):
-        if 'package://' in line:
-            package_name = line.split('package://', 1)[-1].split('/', 1)[0]
+    output_urdf = u''
+    for line in input_urdf.split(u'\n'):
+        if u'package://' in line:
+            package_name = line.split(u'package://', 1)[-1].split(u'/', 1)[0]
             real_path = rospack.get_path(package_name)
             output_urdf += line.replace(package_name, real_path)
         else:
             output_urdf += line
-        output_urdf += '\n'
+        output_urdf += u'\n'
     return output_urdf
 
 
@@ -63,8 +63,8 @@ def write_urdf_to_disc(filename, urdf_string):
     :return: Complete path to where the urdf was written, e.g. '/tmp/pr2.urdf'
     :rtype: str
     """
-    new_path = '/tmp/{}'.format(filename)
-    with open(new_path, 'w') as o:
+    new_path = u'/tmp/{}'.format(filename)
+    with open(new_path, u'w') as o:
         o.write(urdf_string)
     return new_path
 
@@ -77,7 +77,7 @@ def random_string(size=6):
     :return: Generated random sequence of chars.
     :rtype: str
     """
-    return ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(size))
+    return u''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(size))
 
 
 def load_urdf_string_into_bullet(urdf_string, pose):
@@ -90,7 +90,7 @@ def load_urdf_string_into_bullet(urdf_string, pose):
     :return: internal PyBullet id of the loaded urdf
     :rtype: int
     """
-    filename = write_urdf_to_disc('{}.urdf'.format(random_string()), urdf_string)
+    filename = write_urdf_to_disc(u'{}.urdf'.format(random_string()), urdf_string)
     # with suppress_stdout():
     id = p.loadURDF(filename, [pose.translation.x, pose.translation.y, pose.translation.z],
                     [pose.rotation.x, pose.rotation.y, pose.rotation.z, pose.rotation.w],
@@ -100,6 +100,7 @@ def load_urdf_string_into_bullet(urdf_string, pose):
 
 
 class PyBulletRobot(object):
+    base_link_name = u'base'
     def __init__(self, name, urdf, base_pose=Transform(), calc_self_collision_matrix=True, path_to_data_folder=''):
         """
 
@@ -128,7 +129,7 @@ class PyBulletRobot(object):
         if os.path.isfile(path):
             with open(path) as f:
                 self.sometimes = pickle.load(f)
-                print('loaded self collision matrix {}'.format(urdf_hash))
+                print(u'loaded self collision matrix {}'.format(urdf_hash))
                 return True
         return False
 
@@ -138,13 +139,13 @@ class PyBulletRobot(object):
         if not os.path.exists(os.path.dirname(path)):
             try:
                 dir_name = os.path.dirname(path)
-                if dir_name != '':
+                if dir_name != u'':
                     os.makedirs(dir_name)
             except OSError as exc:  # Guard against race condition
                 if exc.errno != errno.EEXIST:
                     raise
-        with open(path, 'w') as file:
-            print('saved self collision matrix {}'.format(path))
+        with open(path, u'w') as file:
+            print(u'saved self collision matrix {}'.format(path))
             pickle.dump(self.sometimes, file)
 
     def get_attached_objects(self):
@@ -179,10 +180,12 @@ class PyBulletRobot(object):
         self.link_id_to_name = {}
         self.joint_name_to_info = OrderedDict()
         self.joint_id_to_info = OrderedDict()
-        self.joint_name_to_info['base'] = JointInfo(*([-1, 'base'] + [None] * 10 + ['base'] + [None] * 4))
-        self.joint_id_to_info[-1] = JointInfo(*([-1, 'base'] + [None] * 10 + ['base'] + [None] * 4))
-        self.link_id_to_name[-1] = 'base'
-        self.link_name_to_id['base'] = -1
+        self.joint_name_to_info[self.base_link_name] = JointInfo(*([-1, self.base_link_name] + [None] * 10 +
+                                                                   [self.base_link_name] + [None] * 4))
+        self.joint_id_to_info[-1] = JointInfo(*([-1, self.base_link_name] + [None] * 10 +
+                                                [self.base_link_name] + [None] * 4))
+        self.link_id_to_name[-1] = self.base_link_name
+        self.link_name_to_id[self.base_link_name] = -1
         for joint_index in range(p.getNumJoints(self.id)):
             joint_info = JointInfo(*p.getJointInfo(self.id, joint_index))
             self.joint_name_to_info[joint_info.joint_name] = joint_info
@@ -225,7 +228,7 @@ class PyBulletRobot(object):
 
     def calc_self_collision_matrix(self, combis, d=0.05, d2=0.0, num_rnd_tries=1000):
         # TODO computational expansive because of too many collision checks
-        print('calculating self collision matrix')
+        print(u'calculating self collision matrix')
         seed(1337)
         always = set()
 
@@ -321,11 +324,11 @@ class PyBulletRobot(object):
         :type Transform
         :return: Nothing
         """
-        # TODO should only be called through world because this class does not know what objects exist
+        # TODO should only be called through world because this class does not know which objects exist
         if self.has_attached_object(object.name):
             # TODO: choose better exception type
             raise DuplicateNameException(
-                "An object '{}' has already been attached to the robot.".format(object.name))
+                u'An object \'{}\' has already been attached to the robot.'.format(object.name))
 
         # salvage last joint state and base pose
         joint_state = self.get_joint_states()
@@ -369,7 +372,7 @@ class PyBulletRobot(object):
         # for each attached object, insert the corresponding URDF sub-string into the original URDF string
         new_urdf_string = self.original_urdf
         for sub_string in self.attached_objects.values():
-            new_urdf_string = new_urdf_string.replace(u'</robot>', '{}</robot>'.format(sub_string))
+            new_urdf_string = new_urdf_string.replace(u'</robot>', u'{}</robot>'.format(sub_string))
         return new_urdf_string
 
     def detach_object(self, object_name):
@@ -455,11 +458,11 @@ class PyBulletRobot(object):
             self.attached_objects = {}
 
     def __str__(self):
-        return '{}/{}'.format(self.name, self.id)
+        return u'{}/{}'.format(self.name, self.id)
 
 
 class PyBulletWorld(object):
-    def __init__(self, gui=False, path_to_data_folder=''):
+    def __init__(self, gui=False, path_to_data_folder=u''):
         self._gui = gui
         self._objects = {}
         self._robot = None
@@ -476,7 +479,7 @@ class PyBulletWorld(object):
         :type base_pose: Transform
         :return: Nothing
         """
-        with open(urdf_file, 'r') as f:
+        with open(urdf_file, u'r') as f:
             self.spawn_robot_from_urdf(robot_name, f.read(), base_pose)
 
     def spawn_robot_from_urdf(self, robot_name, urdf, base_pose=Transform()):
@@ -617,12 +620,12 @@ class PyBulletWorld(object):
         :type object_name: str
         """
         if not self.has_object(object_name):
-            raise UnknownBodyException('Cannot delete unknown object {}'.format(object_name))
+            raise UnknownBodyException(u'Cannot delete unknown object {}'.format(object_name))
         self.deactivate_rendering()
         p.removeBody(self._objects[object_name].id)
         self.activate_rendering()
         del (self._objects[object_name])
-        print('object {} deleted from pybullet world'.format(object_name))
+        print(u'object {} deleted from pybullet world'.format(object_name))
 
     def delete_all_objects(self, remaining_objects=(u'plane',)):
         """

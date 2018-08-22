@@ -46,29 +46,29 @@ class LogTrajectoryPlugin(Plugin):
         self.god_map.set_data([self.trajectory_identifier], trajectory)
 
         if self.is_preempted():
-            print('goal preempted')
+            print(u'goal preempted')
             self.stop_universe = True
             return
         if time >= 1:
             if time > self.max_traj_length:
                 self.stop_universe = True
-                raise SolverTimeoutError('didn\'t a solution after {} s'.format(self.max_traj_length))
+                raise SolverTimeoutError(u'didn\'t a solution after {} s'.format(self.max_traj_length))
             if np.abs([v.velocity for v in current_js.values()]).max() < self.precision or \
                     (self.plot and time > self.max_traj_length):
-                print('done')
+                print(u'done')
                 if self.plot:
                     plot_trajectory(trajectory, set(self.god_map.get_data([self.controlled_joints_identifier])))
                 self.stop_universe = True
                 return
             if not self.plot and (rounded_js in self.past_joint_states):
                 self.stop_universe = True
-                raise InsolvableException('endless wiggling detected')
+                raise InsolvableException(u'endless wiggling detected')
             if time >= self.collision_time_threshold:
                 cp = self.god_map.get_data([self.closest_point_identifier])
                 if closest_point_constraint_violated(cp, multiplier=1):
                     self.stop_universe = True
                     raise PathCollisionException(
-                        'robot is in collision after {} seconds'.format(self.collision_time_threshold))
+                        u'robot is in collision after {} seconds'.format(self.collision_time_threshold))
         self.past_joint_states.add(rounded_js)
 
     def start_always(self):

@@ -108,7 +108,7 @@ class Robot(object):
                     joint_frame = spw.eye(4)
             else:
                 # TODO more specific exception
-                raise Exception('Joint type "{}" is not supported by urdf parser.'.format(urdf_joint.type))
+                raise Exception(u'Joint type "{}" is not supported by urdf parser.'.format(urdf_joint.type))
 
             if urdf_joint.type in ROTATIONAL_JOINT_TYPES:
                 joint_frame *= spw.rotation_matrix_from_axis_angle(spw.vector3(*urdf_joint.axis), joint_symbol)

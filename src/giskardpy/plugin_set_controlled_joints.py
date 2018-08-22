@@ -35,15 +35,15 @@ class UploadRobotDescriptionPlugin(Plugin):
         c = self.__class__(self.robot_description_identifier, self.param_name)
         return c
 
-class UploadUrdfPlugin(Plugin):
-    def __init__(self, robot_description_identifier, urdf):
-        self.urdf = urdf
-        self.robot_description_identifier = robot_description_identifier
-        super(UploadUrdfPlugin, self).__init__()
-
-    def start_always(self):
-        self.god_map.set_data([self.robot_description_identifier], self.urdf)
-
-    def copy(self):
-        c = self.__class__(self.robot_description_identifier, self.urdf)
-        return c
+# class UploadUrdfPlugin(Plugin):
+#     def __init__(self, robot_description_identifier, urdf):
+#         self.urdf = urdf
+#         self.robot_description_identifier = robot_description_identifier
+#         super(UploadUrdfPlugin, self).__init__()
+#
+#     def start_always(self):
+#         self.god_map.set_data([self.robot_description_identifier], self.urdf)
+#
+#     def copy(self):
+#         c = self.__class__(self.robot_description_identifier, self.urdf)
+#         return c

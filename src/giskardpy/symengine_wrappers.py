@@ -197,29 +197,29 @@ def speed_up(function, parameters, backend=u'llvm'):
         def f(**kwargs):
             return constant_result
     else:
-        if backend == 'llvm':
+        if backend == u'llvm':
             try:
                 fast_f = Lambdify(list(parameters), function, backend=backend, cse=True, real=True)
             except RuntimeError as e:
-                warn('WARNING RuntimeError: "{}" during lambdify with LLVM backend, fallback to numpy'.format(e),
+                warn(u'WARNING RuntimeError: "{}" during lambdify with LLVM backend, fallback to numpy'.format(e),
                      RuntimeWarning)
-                backend = 'lambda'
-        if backend == 'lambda':
+                backend = u'lambda'
+        if backend == u'lambda':
             try:
-                fast_f = Lambdify(list(parameters), function, backend='lambda', cse=True, real=True)
+                fast_f = Lambdify(list(parameters), function, backend=u'lambda', cse=True, real=True)
             except RuntimeError as e:
-                warn('WARNING RuntimeError: "{}" during lambdify with lambda backend, no speedup possible'.format(e),
+                warn(u'WARNING RuntimeError: "{}" during lambdify with lambda backend, no speedup possible'.format(e),
                      RuntimeWarning)
                 backend = None
 
-        if backend in ['llvm', 'lambda']:
+        if backend in [u'llvm', u'lambda']:
             f = CompiledFunction(str_params, fast_f, len(function), function.shape)
         elif backend is None:
             # @profile
             def f(**kwargs):
                 filtered_kwargs = {str(k): kwargs[k] for k in str_params}
                 return np.array(function.subs(filtered_kwargs).tolist(), dtype=float).reshape(function.shape)
-        if backend == 'python':
+        if backend == u'python':
             f = function
 
     return f

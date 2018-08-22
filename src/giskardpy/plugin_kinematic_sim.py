@@ -27,8 +27,6 @@ class KinematicSimPlugin(Plugin):
                 self.next_js[joint_name] = SingleJointState(sjs.name, sjs.position + cmd * self.frequency, velocity=cmd)
         if self.next_js is not None:
             self.god_map.set_data([self.js_identifier], self.next_js)
-        elif current_js is not None:
-            self.god_map.set_data([self.js_identifier], current_js)
         else:
             self.god_map.set_data([self.js_identifier], current_js)
         self.god_map.set_data([self.time_identifier], self.time)

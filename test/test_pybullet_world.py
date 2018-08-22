@@ -2,7 +2,7 @@ import unittest
 
 from hypothesis.strategies import composite
 
-from giskardpy.exceptions import DuplicateObjectNameException, UnknownBodyException, RobotExistsException
+from giskardpy.exceptions import UnknownBodyException, RobotExistsException, DuplicateNameException
 from giskardpy.object import UrdfObject, Box, Sphere, Cylinder
 from giskardpy.pybullet_world import PyBulletWorld
 import pybullet as p
@@ -49,7 +49,7 @@ class TestPyBulletWorld(RuleBasedStateMachine):
         try:
             self.world.spawn_urdf_object(object, base_pose)
             assert name in self.world.get_object_names()
-        except DuplicateObjectNameException:
+        except DuplicateNameException:
             assert object_existed or robot_existed
         return name
 
@@ -65,7 +65,7 @@ class TestPyBulletWorld(RuleBasedStateMachine):
         try:
             self.world.spawn_urdf_object(object, base_pose)
             assert self.world.has_object(name)
-        except DuplicateObjectNameException:
+        except DuplicateNameException:
             assert object_existed or robot_existed
         return name
 
@@ -81,7 +81,7 @@ class TestPyBulletWorld(RuleBasedStateMachine):
         try:
             self.world.spawn_urdf_object(object, base_pose)
             assert self.world.has_object(name)
-        except DuplicateObjectNameException:
+        except DuplicateNameException:
             assert object_existed or robot_existed
         return name
 
@@ -99,7 +99,7 @@ class TestPyBulletWorld(RuleBasedStateMachine):
         except RobotExistsException:
             assert robot_existed
             assert self.world.has_robot()
-        except DuplicateObjectNameException:
+        except DuplicateNameException:
             assert object_existed
             assert not self.world.has_robot()
         return name

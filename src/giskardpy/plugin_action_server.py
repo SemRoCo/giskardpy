@@ -1,8 +1,5 @@
 import numpy as np
 from Queue import Empty, Queue
-from collections import OrderedDict
-import pylab as plt
-from itertools import product
 
 import actionlib
 import rospy
@@ -22,8 +19,6 @@ from giskardpy.exceptions import MAX_NWSR_REACHEDException, QPSolverException, S
 from giskardpy.plugin import Plugin
 from giskardpy.plugin_log_trajectory import LogTrajectoryPlugin
 from giskardpy.tfwrapper import transform_pose
-from giskardpy.data_types import ClosestPointInfo
-from giskardpy.data_types import SingleJointState, Transform, Point, Quaternion, Trajectory
 from giskardpy.utils import closest_point_constraint_violated
 
 ERROR_CODE_TO_NAME = {getattr(MoveResult, x): x for x in dir(MoveResult) if x.isupper()}
@@ -345,7 +340,7 @@ class ActionServerPlugin(Plugin):
                 error_code = MoveResult.INTERRUPTED
                 break
         else:  # if not break
-            print('shit took {:.3f}s'.format((rospy.get_rostime() - t).to_sec()))
+            print(u'shit took {:.3f}s'.format((rospy.get_rostime() - t).to_sec()))
             r = self._ac.get_result()
             if r.error_code == FollowJointTrajectoryResult.SUCCESSFUL:
                 error_code = MoveResult.SUCCESS

@@ -247,14 +247,12 @@ class GiskardTestWrapper(object):
         :rtype: MoveResult
         """
         goal = MoveActionGoal()
-        collision_entires = self.wrapper.get_collision_entries()
         goal.goal = self.wrapper._get_goal()
 
         t1 = Thread(target=self.pm._plugins[u'action server']._as.action_server.internal_goal_callback, args=(goal,))
         t1.start()
         while self.results.empty():
             self.loop_once()
-        # self.are_collision_entires_violated(collision_entires, self.pm.get_god_map())
         t1.join()
         self.loop_once()
         result = self.results.get()

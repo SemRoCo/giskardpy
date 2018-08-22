@@ -84,9 +84,9 @@ class CartesianBulletControllerPlugin(RobotPlugin):
 
     def update_controlled_joints_and_links(self):
         self.controlled_joints = self.god_map.get_data([self.controlled_joints_identifier])
-        if self.controlled_joints is None:
-            self.controlled_joints = self.get_robot().get_joint_names_controllable()
-            self.god_map.set_data([self.controlled_joints_identifier], self.controlled_joints)
+        # if self.controlled_joints is None:
+        #     self.controlled_joints = self.get_robot().get_joint_names_controllable()
+        #     self.god_map.set_data([self.controlled_joints_identifier], self.controlled_joints)
 
         self.controllable_links = set()
         for joint_name in self.controlled_joints:

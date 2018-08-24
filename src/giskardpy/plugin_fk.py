@@ -13,10 +13,16 @@ from giskardpy.utils import keydefaultdict, urdfs_equal
 
 class RobotPlugin(Plugin):
     """
-    Plugin that keeps a symengine robot in sync with the god map.
+    Efficiently keeps a symengine robot in sync with the god map.
+    Inherit from this plugin if you want to use symengine robots who's urdf is in the god map.
     """
 
     def __init__(self, robot_description_identifier, js_identifier, default_joint_vel_limit=0):
+        """
+        :type robot_description_identifier: str
+        :type js_identifier: str
+        :type default_joint_vel_limit: float
+        """
         self._robot_description_identifier = robot_description_identifier
         self._joint_states_identifier = js_identifier
         self.default_joint_vel_limit = default_joint_vel_limit
@@ -56,6 +62,9 @@ class RobotPlugin(Plugin):
 
 
 class FKPlugin(RobotPlugin):
+    """
+    Puts all forward kinematics of a robot in the god map, but they are only computed on demand.
+    """
     def __init__(self, fk_identifier, js_identifier, robot_description_identifier):
         self.fk_identifier = fk_identifier
         self.fk = None
@@ -66,6 +75,11 @@ class FKPlugin(RobotPlugin):
         exprs = self.god_map.get_symbol_map()
 
         def on_demand_fk_evaluated(key):
+            """
+            :param key: (root_name, tip_name)
+            :type key: tuple
+            :rtype: PoseStamped
+            """
             fk = self.fk[key](**exprs)
             p = PoseStamped()
             p.header.frame_id = key[1]
@@ -84,6 +98,11 @@ class FKPlugin(RobotPlugin):
             free_symbols = self.god_map.get_registered_symbols()
 
             def on_demand_fk(key):
+                """
+                :param key: (root_name, tip_name)
+                :type key: tuple
+                :return: function that takes a expression dict and returns the fk
+                """
                 # TODO possible speed up by merging fks into one matrix
                 root, tip = key
                 fk = self.robot.get_fk_expression(root, tip)

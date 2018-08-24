@@ -13,7 +13,7 @@ import errno
 from numpy.random.mtrand import seed
 
 from giskardpy.exceptions import UnknownBodyException, RobotExistsException, DuplicateNameException
-from giskardpy.data_types import MultiJointState, SingleJointState, Transform, Point, Quaternion
+from giskardpy.data_types import SingleJointState, Transform, Point, Quaternion
 import numpy as np
 
 from giskardpy.utils import keydefaultdict, suppress_stdout
@@ -152,6 +152,12 @@ class PyBulletRobot(object):
         return self.attached_objects
 
     def set_joint_state(self, multi_joint_state):
+        """
+
+        :param multi_joint_state:
+        :type multi_joint_state: dict
+        :return:
+        """
         for joint_name, singe_joint_state in multi_joint_state.items():
             p.resetJointState(self.id, self.joint_name_to_info[joint_name].joint_index, singe_joint_state.position)
 
@@ -217,13 +223,13 @@ class PyBulletRobot(object):
         return contact_infos
 
     def get_joint_states(self):
-        mjs = MultiJointState()
+        mjs = dict()
         for joint_info in self.joint_name_to_info.values():
             if joint_info.joint_type in [p.JOINT_REVOLUTE, p.JOINT_PRISMATIC]:
                 sjs = SingleJointState()
                 sjs.name = joint_info.joint_name
                 sjs.position = p.getJointState(self.id, joint_info.joint_index)[0]
-                mjs.set(sjs)
+                mjs[sjs.name] = sjs
         return mjs
 
     def calc_self_collision_matrix(self, combis, d=0.05, d2=0.0, num_rnd_tries=1000):
@@ -589,8 +595,8 @@ class PyBulletWorld(object):
     def get_robot_joint_state(self):
         return self._robot.get_joint_states()
 
-    def get_object_joint_state(self, object_name):
-        return self.get_object(object_name).get_joint_states()
+    # def get_object_joint_state(self, object_name):
+    #     return self.get_object(object_name).get_joint_states()
 
     def get_object_names(self):
         return list(self._objects.keys())

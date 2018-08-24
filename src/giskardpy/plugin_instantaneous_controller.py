@@ -9,21 +9,34 @@ import symengine_wrappers as sw
 
 
 class CartesianBulletControllerPlugin(RobotPlugin):
+    """
+    Instantaneous controller that can do joint/cartesian movements while avoiding collisions.
+    """
+
     def __init__(self, root_link, js_identifier, fk_identifier, goal_identifier, next_cmd_identifier,
                  collision_identifier, closest_point_identifier, controlled_joints_identifier,
                  controllable_links_identifier, robot_description_identifier,
                  collision_goal_identifier, pyfunction_identifier, path_to_functions, nWSR, default_joint_vel_limit):
         """
-        :param roots:
-        :type roots: list
-        :param tips:
-        :type tips: list
-        :param js_identifier:
-        :param fk_identifier:
-        :param goal_identifier:
-        :param next_cmd_identifier:
-        :param collision_identifier:
-        :param closest_point_identifier:
+        :param root_link: the robots root link
+        :type root_link: str
+        :type js_identifier: str
+        :type fk_identifier: str
+        :type goal_identifier: str
+        :type next_cmd_identifier: str
+        :type collision_identifier:  str
+        :type closest_point_identifier: str
+        :type controlled_joints_identifier: str
+        :type controllable_links_identifier: str
+        :type robot_description_identifier: str
+        :type collision_goal_identifier: str
+        :type pyfunction_identifier: str
+        :param path_to_functions: path to folder where compiled functions and the self collision matrix are stored
+        :type path_to_functions: str
+        :param nWSR: magic number for QP solver. has to be big for difficult problems. choose None if you're like wtf.
+        :type nWSR: Union[int, None]
+        :param default_joint_vel_limit: caps the joint velocities defined in the urdf.
+        :type default_joint_vel_limit: float
         """
         self.collision_goal_identifier = collision_goal_identifier
         self.controlled_joints_identifier = controlled_joints_identifier
@@ -73,7 +86,7 @@ class CartesianBulletControllerPlugin(RobotPlugin):
             self.add_js_controller_soft_constraints()
             self.add_collision_avoidance_soft_constraints()
         self.add_cart_controller_soft_constraints()
-        self.set_default_joint_goal()
+        self.set_unused_joint_goals_to_current()
 
     def update(self):
         expr = self.god_map.get_symbol_map()
@@ -84,10 +97,6 @@ class CartesianBulletControllerPlugin(RobotPlugin):
 
     def update_controlled_joints_and_links(self):
         self.controlled_joints = self.god_map.get_data([self.controlled_joints_identifier])
-        # if self.controlled_joints is None:
-        #     self.controlled_joints = self.get_robot().get_joint_names_controllable()
-        #     self.god_map.set_data([self.controlled_joints_identifier], self.controlled_joints)
-
         self.controllable_links = set()
         for joint_name in self.controlled_joints:
             self.controllable_links.update(self.get_robot().get_sub_tree_link_names_with_collision(joint_name))
@@ -97,10 +106,7 @@ class CartesianBulletControllerPlugin(RobotPlugin):
         self.controller = SymEngineController(self.robot, self.path_to_functions)
         self.controller.set_controlled_joints(self.controlled_joints)
 
-    def set_default_joint_goal(self):
-        """
-        Set joint goal for all unused joints to current position.
-        """
+    def set_unused_joint_goals_to_current(self):
         joint_goal = self.god_map.get_data([self._goal_identifier, str(Controller.JOINT)])
         for joint_name in self.controlled_joints:
             if joint_name not in joint_goal:
@@ -115,7 +121,7 @@ class CartesianBulletControllerPlugin(RobotPlugin):
 
         self.god_map.set_data([self._goal_identifier, str(Controller.JOINT)], joint_goal)
 
-    def get_joint_current_expr(self, joint_name):
+    def get_expr_joint_current_position(self, joint_name):
         """
         :type joint_name: str
         :rtype: sw.Symbol
@@ -123,7 +129,7 @@ class CartesianBulletControllerPlugin(RobotPlugin):
         key = [self._joint_states_identifier, joint_name, u'position']
         return self.god_map.to_symbol(key)
 
-    def get_joint_goal_expr(self, joint_name):
+    def get_expr_joint_goal_position(self, joint_name):
         """
         :type joint_name: str
         :rtype: sw.Symbol
@@ -131,7 +137,7 @@ class CartesianBulletControllerPlugin(RobotPlugin):
         key = [self._goal_identifier, str(Controller.JOINT), joint_name, u'position']
         return self.god_map.to_symbol(key)
 
-    def get_joint_weight_expr(self, joint_name):
+    def get_expr_joint_goal_weight(self, joint_name):
         """
         :type joint_name: str
         :rtype: sw.Symbol
@@ -139,7 +145,7 @@ class CartesianBulletControllerPlugin(RobotPlugin):
         weight_key = [self._goal_identifier, str(Controller.JOINT), joint_name, u'weight']
         return self.god_map.to_symbol(weight_key)
 
-    def get_joint_gain_key(self, joint_name):
+    def get_expr_joint_goal_gain(self, joint_name):
         """
         :type joint_name: str
         :rtype: sw.Symbol
@@ -147,7 +153,7 @@ class CartesianBulletControllerPlugin(RobotPlugin):
         gain_key = [self._goal_identifier, str(Controller.JOINT), joint_name, u'p_gain']
         return self.god_map.to_symbol(gain_key)
 
-    def get_joint_max_speed_key(self, joint_name):
+    def get_expr_joint_goal_max_speed(self, joint_name):
         """
         :type joint_name: str
         :rtype: sw.Symbol
@@ -155,7 +161,7 @@ class CartesianBulletControllerPlugin(RobotPlugin):
         max_speed_key = [self._goal_identifier, str(Controller.JOINT), joint_name, u'max_speed']
         return self.god_map.to_symbol(max_speed_key)
 
-    def get_joint_change_expr(self, joint_name):
+    def get_expr_joint_distance_to_goal(self, joint_name):
         """
         :type joint_name: str
         :rtype: ShortestAngularDistanceInput
@@ -174,14 +180,14 @@ class CartesianBulletControllerPlugin(RobotPlugin):
         pyfunctions = {}
         for joint_name in self.controlled_joints:
 
-            joint_current_expr = self.get_joint_current_expr(joint_name)
-            goal_joint_expr = self.get_joint_goal_expr(joint_name)
-            weight_expr = self.get_joint_weight_expr(joint_name)
-            gain_expr = self.get_joint_gain_key(joint_name)
-            max_speed_expr = self.get_joint_max_speed_key(joint_name)
+            joint_current_expr = self.get_expr_joint_current_position(joint_name)
+            goal_joint_expr = self.get_expr_joint_goal_position(joint_name)
+            weight_expr = self.get_expr_joint_goal_weight(joint_name)
+            gain_expr = self.get_expr_joint_goal_gain(joint_name)
+            max_speed_expr = self.get_expr_joint_goal_max_speed(joint_name)
 
             if self.get_robot().is_joint_continuous(joint_name):
-                change = self.get_joint_change_expr(joint_name)
+                change = self.get_expr_joint_distance_to_goal(joint_name)
                 pyfunctions[change.get_key()] = change
                 soft_constraints = continuous_joint_position(joint_current_expr,
                                                              change.get_expression(),
@@ -232,10 +238,10 @@ class CartesianBulletControllerPlugin(RobotPlugin):
             for (root, tip), value in self.god_map.get_data([self._goal_identifier, str(t)]).items():
                 self.used_joints.update(self.get_robot().get_joint_names_from_chain_controllable(root, tip))
                 print(u'{} -> {} type: {}'.format(root, tip, t))
-                self.controller.update_soft_constraints(self.controller_msg_to_constraint(root, tip, t),
+                self.controller.update_soft_constraints(self.cart_goal_to_soft_constraints(root, tip, t),
                                                         self.god_map.get_registered_symbols())
 
-    def controller_msg_to_constraint(self, root, tip, type):
+    def cart_goal_to_soft_constraints(self, root, tip, type):
         """
         :type root: str
         :type tip: str
@@ -243,6 +249,7 @@ class CartesianBulletControllerPlugin(RobotPlugin):
         :type type: int
         :rtype: dict
         """
+        # TODO split this into 2 functions, for translation and rotation
         goal_input = FrameInput(self.god_map.to_symbol,
                                 translation_prefix=[self._goal_identifier,
                                                     str(Controller.TRANSLATION_3D),

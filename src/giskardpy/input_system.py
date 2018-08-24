@@ -75,7 +75,7 @@ class ShortestAngularDistanceInput(object):
         return shortest_angular_distance(a1, a2)
 
     def get_key(self):
-        return '__'.join(str(x) for x in [self.__class__.__name__] + self.current_angle + self.goal_angle)
+        return u'__'.join(str(x) for x in [self.__class__.__name__] + self.current_angle + self.goal_angle)
 
     def get_expression(self):
         return self.name

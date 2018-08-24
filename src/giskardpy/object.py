@@ -65,14 +65,14 @@ class InertialProperty(object):
 
 
 class MaterialProperty(object):
-    def __init__(self, name='', color=ColorRgba(), texture_filename=''):
+    def __init__(self, name=u'', color=ColorRgba(), texture_filename=''):
         self.name = name
         self.color = color
         self.texture_filename = texture_filename
 
 
 class VisualProperty(object):
-    def __init__(self, name='', origin=Transform(), geometry=None, material=None):
+    def __init__(self, name=u'', origin=Transform(), geometry=None, material=None):
         self.name = name
         self.origin = origin
         self.geometry = geometry
@@ -80,14 +80,14 @@ class VisualProperty(object):
 
 
 class CollisionProperty(object):
-    def __init__(self, name='', origin=Transform(), geometry=None):
+    def __init__(self, name=u'', origin=Transform(), geometry=None):
         self.name = name
         self.origin = origin
         self.geometry = geometry
 
 
 class UrdfObject(object):
-    def __init__(self, name='', inertial_props=None, visual_props=(), collision_props=()):
+    def __init__(self, name=u'', inertial_props=None, visual_props=(), collision_props=()):
         self.name = name
         self.inertial_props = inertial_props
         self.visual_props = visual_props
@@ -98,22 +98,22 @@ class Box(UrdfObject):
         geom = BoxShape(length,
                         width,
                         height)
-        col = CollisionProperty(name=name + '_col', geometry=geom)
-        vis = VisualProperty(name=name + '_vis', geometry=geom)
+        col = CollisionProperty(name=name + u'_col', geometry=geom)
+        vis = VisualProperty(name=name + u'_vis', geometry=geom)
         super(Box, self).__init__(name, collision_props=[col], visual_props=[vis])
 
 class Sphere(UrdfObject):
     def __init__(self, name, radius):
         geom = SphereShape(radius)
-        col = CollisionProperty(name=name + '_col', geometry=geom)
-        vis = VisualProperty(name=name + '_vis', geometry=geom)
+        col = CollisionProperty(name=name + u'_col', geometry=geom)
+        vis = VisualProperty(name=name + u'_vis', geometry=geom)
         super(Sphere, self).__init__(name, collision_props=[col], visual_props=[vis])
 
 class Cylinder(UrdfObject):
     def __init__(self, name, radius, length):
         geom = CylinderShape(radius, length)
-        col = CollisionProperty(name=name + '_col', geometry=geom)
-        vis = VisualProperty(name=name + '_vis', geometry=geom)
+        col = CollisionProperty(name=name + u'_col', geometry=geom)
+        vis = VisualProperty(name=name + u'_vis', geometry=geom)
         super(Cylinder, self).__init__(name, collision_props=[col], visual_props=[vis])
 
 class Joint(object):
@@ -135,7 +135,7 @@ def to_urdf_xml(urdf_object, skip_robot_tag=False):
     :rtype: lxml.etree.Element
     """
     if isinstance(urdf_object, UrdfObject):
-        link = etree.Element('link', name=urdf_object.name)
+        link = etree.Element(u'link', name=urdf_object.name)
         if urdf_object.inertial_props:
             link.append(to_urdf_xml(urdf_object.inertial_props))
         for visual in urdf_object.visual_props:
@@ -145,70 +145,70 @@ def to_urdf_xml(urdf_object, skip_robot_tag=False):
         if skip_robot_tag:
             root = link
         else:
-            root = etree.Element('robot', name=urdf_object.name)
+            root = etree.Element(u'robot', name=urdf_object.name)
             root.append(link)
     elif isinstance(urdf_object, InertialProperty):
-        root = etree.Element('inertial')
+        root = etree.Element(u'inertial')
         root.append(to_urdf_xml(urdf_object.origin))
         root.append(to_urdf_xml(urdf_object.inertia))
-        mass = etree.Element('mass', value=str(urdf_object.mass))
+        mass = etree.Element(u'mass', value=str(urdf_object.mass))
         root.append(mass)
     elif isinstance(urdf_object, VisualProperty):
         if urdf_object.name:
-            root = etree.Element('visual', name=urdf_object.name)
+            root = etree.Element(u'visual', name=urdf_object.name)
         else:
-            root = etree.Element('visual')
+            root = etree.Element(u'visual')
         root.append(to_urdf_xml(urdf_object.origin))
         root.append(to_urdf_xml(urdf_object.geometry))
         if urdf_object.material:
             root.append(to_urdf_xml(urdf_object.material))
     elif isinstance(urdf_object, CollisionProperty):
-        root = etree.Element('collision', name=urdf_object.name)
+        root = etree.Element(u'collision', name=urdf_object.name)
         root.append(to_urdf_xml(urdf_object.origin))
         root.append(to_urdf_xml(urdf_object.geometry))
     elif isinstance(urdf_object, Transform):
         r = kdl.Rotation.Quaternion(urdf_object.rotation.x, urdf_object.rotation.y,
                                     urdf_object.rotation.z, urdf_object.rotation.w)
         rpy = r.GetRPY()
-        rpy_string = '{} {} {}'.format(rpy[0], rpy[1], rpy[2])
-        xyz_string = '{} {} {}'.format(urdf_object.translation.x, urdf_object.translation.y, urdf_object.translation.z)
-        root = etree.Element('origin', xyz=xyz_string, rpy=rpy_string)
+        rpy_string = u'{} {} {}'.format(rpy[0], rpy[1], rpy[2])
+        xyz_string = u'{} {} {}'.format(urdf_object.translation.x, urdf_object.translation.y, urdf_object.translation.z)
+        root = etree.Element(u'origin', xyz=xyz_string, rpy=rpy_string)
     elif isinstance(urdf_object, InertiaMatrix):
-        root = etree.Element('inertia', ixx=str(urdf_object.ixx), ixy=str(urdf_object.ixy), ixz=str(urdf_object.ixz),
+        root = etree.Element(u'inertia', ixx=str(urdf_object.ixx), ixy=str(urdf_object.ixy), ixz=str(urdf_object.ixz),
                              iyy=str(urdf_object.iyy), iyz=str(urdf_object.iyz), izz=str(urdf_object.izz))
     elif isinstance(urdf_object, BoxShape):
-        root = etree.Element('geometry')
-        size_string = '{} {} {}'.format(urdf_object.x, urdf_object.y, urdf_object.z)
-        box = etree.Element('box', size=size_string)
+        root = etree.Element(u'geometry')
+        size_string = u'{} {} {}'.format(urdf_object.x, urdf_object.y, urdf_object.z)
+        box = etree.Element(u'box', size=size_string)
         root.append(box)
     elif isinstance(urdf_object, CylinderShape):
-        root = etree.Element('geometry')
-        cyl = etree.Element('cylinder', radius=str(urdf_object.radius), length=str(urdf_object.length))
+        root = etree.Element(u'geometry')
+        cyl = etree.Element(u'cylinder', radius=str(urdf_object.radius), length=str(urdf_object.length))
         root.append(cyl)
     elif isinstance(urdf_object, SphereShape):
-        root = etree.Element('geometry')
-        sphere = etree.Element('sphere', radius=str(urdf_object.radius))
+        root = etree.Element(u'geometry')
+        sphere = etree.Element(u'sphere', radius=str(urdf_object.radius))
         root.append(sphere)
     elif isinstance(urdf_object, MeshShape):
-        root = etree.Element('geometry')
-        scale_string = '{} {} {}'.format(urdf_object.scale[0], urdf_object.scale[1], urdf_object.scale[2])
-        mesh = etree.Element('mesh', scale=scale_string, filename=urdf_object.filename)
+        root = etree.Element(u'geometry')
+        scale_string = u'{} {} {}'.format(urdf_object.scale[0], urdf_object.scale[1], urdf_object.scale[2])
+        mesh = etree.Element(u'mesh', scale=scale_string, filename=urdf_object.filename)
         root.append(mesh)
     elif isinstance(urdf_object, MaterialProperty):
-        root = etree.Element('material', name=urdf_object.name)
+        root = etree.Element(u'material', name=urdf_object.name)
         if urdf_object.color:
-            color_string = '{} {} {} {}'.format(str(urdf_object.color.r), str(urdf_object.color.g),
+            color_string = u'{} {} {} {}'.format(str(urdf_object.color.r), str(urdf_object.color.g),
                                                 str(urdf_object.color.b), str(urdf_object.color.a))
-            color = etree.Element('color', rgba=color_string)
+            color = etree.Element(u'color', rgba=color_string)
             root.append(color)
         if urdf_object.texture_filename:
-            tex =etree.Element('texture', filename=urdf_object.texture_filename)
+            tex =etree.Element(u'texture', filename=urdf_object.texture_filename)
             root.append(tex)
     elif isinstance(urdf_object, FixedJoint):
-        root = etree.Element('joint', name=urdf_object.name, type='fixed')
+        root = etree.Element(u'joint', name=urdf_object.name, type=u'fixed')
         root.append(to_urdf_xml(urdf_object.origin))
-        root.append(etree.Element('parent', link=urdf_object.parent_link_name))
-        root.append(etree.Element('child', link=urdf_object.child_link_name))
+        root.append(etree.Element(u'parent', link=urdf_object.parent_link_name))
+        root.append(etree.Element(u'child', link=urdf_object.child_link_name))
     return root
 
 
@@ -237,7 +237,7 @@ def to_marker(thing):
         ma.markers.append(update_world_to_marker_msg(thing))
     return ma
 
-def update_world_to_marker_msg(update_world_req, id=1, ns=''):
+def update_world_to_marker_msg(update_world_req, id=1, ns=u''):
     """
     :type update_world_req: UpdateWorldRequest
     :type id: int
@@ -257,7 +257,7 @@ def update_world_to_marker_msg(update_world_req, id=1, ns=''):
     return m
 
 
-def world_body_to_marker_msg(world_body, id=1, ns=''):
+def world_body_to_marker_msg(world_body, id=1, ns=u''):
     """
     :type world_body: WorldBody
     :rtype: Marker
@@ -302,10 +302,10 @@ def urdf_object_to_marker_msg(urdf_object):
         m.color.g = 1
         m.color.b = 0
         m.color.a = 0.8
-        m.ns = 'bullet/{}'.format(urdf_object.name)
+        m.ns = u'bullet/{}'.format(urdf_object.name)
         m.action = Marker.ADD
         m.id = 1337
-        m.header.frame_id = 'map'
+        m.header.frame_id = u'map'
         m.pose.position.x = visual_property.origin.translation.x
         m.pose.position.y = visual_property.origin.translation.y
         m.pose.position.z = visual_property.origin.translation.z
@@ -356,8 +356,8 @@ def world_body_to_urdf_object(world_body_msg):
     else:
         # TODO: replace me by a proper exception that can be reported back to the service client
         raise RuntimeError(u'Invalid shape of world body: {}'.format(world_body_msg.shape))
-    col = CollisionProperty(name=world_body_msg.name + '_col', geometry=geom)
-    vis = VisualProperty(name=world_body_msg.name + '_vis', geometry=geom)
+    col = CollisionProperty(name=world_body_msg.name + u'_col', geometry=geom)
+    vis = VisualProperty(name=world_body_msg.name + u'_vis', geometry=geom)
     return UrdfObject(name=world_body_msg.name, collision_props=[col], visual_props=[vis])
 
 def from_point_msg(point_msg):

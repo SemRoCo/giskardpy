@@ -27,14 +27,14 @@ MARKER_SCALE = 0.15
 
 
 class InteractiveMarkerPlugin(Plugin):
+    """
+    Spawns interactive Marker which send cart goals to action server.
+    Does not interact with god map
+    """
     def __init__(self, root_tips, suffix=u''):
         """
-        :param roots:
-        :type roots: list
-        :param tips:
-        :type tips: list
+        :param root_tips:
         :param suffix:
-        :type suffix: str
         """
         if len(root_tips) > 0:
             self.roots, self.tips = zip(*root_tips)

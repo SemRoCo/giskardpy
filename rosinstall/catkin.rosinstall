@@ -5,4 +5,8 @@
 - git: 
     local-name: giskardpy
     uri: https://github.com/SemRoCo/giskardpy.git
+    version: devel_v0.2
+- git: 
+    local-name: giskard_msgs
+    uri: https://github.com/SemRoCo/giskard_msgs.git
     version: master

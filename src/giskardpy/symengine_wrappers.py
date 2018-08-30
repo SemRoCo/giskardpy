@@ -1,33 +1,192 @@
-import itertools
-from operator import mul
+import os
+import pickle
 from warnings import warn
 
+import errno
 import symengine as sp
 from symengine import Matrix, Symbol, eye, sympify, diag, zeros, lambdify, Abs, Max, Min, sin, cos, tan, acos, asin, \
-    atan, atan2, nan, sqrt, log
+    atan, atan2, nan, sqrt, log, tanh, var
 import numpy as np
-import sympy as sp2
+from numpy import pi
+
 from symengine.lib.symengine_wrapper import Lambdify
 
-from giskardpy import BACKEND
+from giskardpy.exceptions import SymengineException
 
-pathSeparator = '__'
+pathSeparator = '_'
+
+# VERY_SMALL_NUMBER = 2.22507385851e-308
+VERY_SMALL_NUMBER = 1e-100
 
 
-def fake_Abs(x):
+def diffable_abs(x):
+    """
+    :type x: Union[float, Symbol]
+    :return: abs(x)
+    :rtype: Union[float, Symbol]
+    """
     return sp.sqrt(x ** 2)
 
 
-def fake_Max(x, y):
-    return ((x + y) + fake_Abs(x - y)) / 2
+def diffable_sign(x):
+    """
+    !Returns shit if x is very close to but not equal to zero!
+    if x > 0:
+        return 1
+    if x < 0:
+        return -1
+    if x == 0:
+        return 0
+
+    :type x: Union[float, Symbol]
+    :return: sign(x)
+    :rtype: Union[float, Symbol]
+    """
+    # return x/(-VERY_SMALL_NUMBER + diffable_abs(x))
+    return (tanh(x * 1e105))
 
 
-def fake_Min(x, y):
-    return ((x + y) - fake_Abs(x - y)) / 2
+def diffable_heaviside(x):
+    return 0.5 * (diffable_sign(x + VERY_SMALL_NUMBER) + 1)
 
 
-# @profile
-def speed_up(function, parameters, backend=None):
+def diffable_max_fast(x, y):
+    """
+    Can be compiled quickly.
+    !gets very imprecise if inputs outside of [-1e7,1e7]!
+    :type x: Union[float, Symbol]
+    :type y: Union[float, Symbol]
+    :return: max(x, y)
+    :rtype: Union[float, Symbol]
+    """
+    return ((x + y) + diffable_abs(x - y)) / 2
+
+
+def diffable_max(x, y):
+    """
+    !takes a long time to compile!
+    :type x: Union[float, Symbol]
+    :type y: Union[float, Symbol]
+    :return: max(x, y)
+    :rtype: Union[float, Symbol]
+    """
+    return if_greater_zero(x - y, x, y)
+
+
+def diffable_min_fast(x, y):
+    """
+    Can be compiled quickly.
+    !gets very imprecise if inputs outside of [-1e7,1e7]!
+    :type x: Union[float, Symbol]
+    :type y: Union[float, Symbol]
+    :return: min(x, y)
+    :rtype: Union[float, Symbol]
+    """
+    return ((x + y) - diffable_abs(x - y)) / 2
+
+
+def diffable_min(x, y):
+    """
+    !takes a long time to compile!
+    :type x: Union[float, Symbol]
+    :type y: Union[float, Symbol]
+    :return: min(x, y)
+    :rtype: Union[float, Symbol]
+    """
+    return if_greater_zero(y - x, x, y)
+
+
+def if_greater_zero(condition, if_result, else_result):
+    """
+    !takes a long time to compile!
+    !Returns shit if condition is very close to but not equal to zero!
+    :type condition: Union[float, Symbol]
+    :type if_result: Union[float, Symbol]
+    :type else_result: Union[float, Symbol]
+    :return: if_result if condition > 0 else else_result
+    :rtype: Union[float, Symbol]
+    """
+    # condition -= VERY_SMALL_NUMBER
+    # _if = diffable_heaviside(condition) * if_result
+    # _else = diffable_heaviside(-condition) * else_result
+    # return _if + _else
+    _condition = diffable_sign(condition - VERY_SMALL_NUMBER)  # 1 or -1
+    _if = diffable_max_fast(0, _condition) * if_result  # 0 or if_result
+    _else = -diffable_min_fast(0, _condition) * else_result  # 0 or else_result
+    return _if + _else  # if_result or else_result
+
+
+def if_greater_eq_zero(condition, if_result, else_result):
+    """
+    !takes a long time to compile!
+    !Returns shit if condition is very close to but not equal to zero!
+    :type condition: Union[float, Symbol]
+    :type if_result: Union[float, Symbol]
+    :type else_result: Union[float, Symbol]
+    :return: if_result if condition >= 0 else else_result
+    :rtype: Union[float, Symbol]
+    """
+    return if_greater_zero(-condition, else_result, if_result)
+
+
+def if_eq_zero(condition, if_result, else_result):
+    """
+    A short expression which can be compiled quickly.
+    !Returns shit if condition is very close to but not equal to zero!
+    !Returns shit if if_result is outside of [-1e8,1e8]!
+    :type condition: Union[float, Symbol]
+    :type if_result: Union[float, Symbol]
+    :type else_result: Union[float, Symbol]
+    :return: if_result if condition == 0 else else_result
+    :rtype: Union[float, Symbol]
+    """
+    condition = diffable_abs(diffable_sign(condition))
+    return (1 - condition) * if_result + condition * else_result
+
+
+def safe_compiled_function(f, file_name):
+    if not os.path.exists(os.path.dirname(file_name)):
+        try:
+            os.makedirs(os.path.dirname(file_name))
+        except OSError as exc:  # Guard against race condition
+            if exc.errno != errno.EEXIST:
+                raise
+    with open(file_name, 'w') as file:
+        print('saved {}'.format(file_name))
+        pickle.dump(f, file)
+
+
+def load_compiled_function(file_name):
+    if os.path.isfile(file_name):
+        try:
+            with open(file_name, u'r') as file:
+                fast_f = pickle.load(file)
+                return fast_f
+        except EOFError as e:
+            raise EOFError(u'{} corrupted, pls delete'.format(file_name))
+
+
+class CompiledFunction(object):
+    def __init__(self, str_params, fast_f, l, shape):
+        self.str_params = str_params
+        self.fast_f = fast_f
+        self.l = l
+        self.shape = shape
+
+    def __call__(self, **kwargs):
+        try:
+            filtered_args = [kwargs[k] for k in self.str_params]
+            out = np.empty(self.l)
+            self.fast_f.unsafe_real(np.array(filtered_args, dtype=np.double), out)
+            # TODO nan to num is kinda dangerous
+            return np.nan_to_num(out).reshape(self.shape)
+        except KeyError as e:
+            msg = u'KeyError: {}\ntry deleting the last loaded compiler to trigger recompilation'.format(e.message)
+            raise SymengineException(msg)
+
+
+def speed_up(function, parameters, backend=u'llvm'):
+    # TODO use save/load for all options
     str_params = [str(x) for x in parameters]
     if len(parameters) == 0:
         try:
@@ -38,87 +197,123 @@ def speed_up(function, parameters, backend=None):
         def f(**kwargs):
             return constant_result
     else:
-        if backend == 'llvm':
+        if backend == u'llvm':
             try:
-                cse = sp.cse(function)
                 fast_f = Lambdify(list(parameters), function, backend=backend, cse=True, real=True)
             except RuntimeError as e:
-                warn('WARNING RuntimeError: "{}" during lambdify with LLVM backend, fallback to numpy'.format(e),
+                warn(u'WARNING RuntimeError: "{}" during lambdify with LLVM backend, fallback to numpy'.format(e),
                      RuntimeWarning)
-                backend = 'lambda'
-        if backend == 'lambda':
+                backend = u'lambda'
+        if backend == u'lambda':
             try:
-                fast_f = Lambdify(list(parameters), function, backend='lambda', cse=True, real=True)
+                fast_f = Lambdify(list(parameters), function, backend=u'lambda', cse=True, real=True)
             except RuntimeError as e:
-                warn('WARNING RuntimeError: "{}" during lambdify with lambda backend, no speedup possible'.format(e),
+                warn(u'WARNING RuntimeError: "{}" during lambdify with lambda backend, no speedup possible'.format(e),
                      RuntimeWarning)
                 backend = None
 
-            # def f(**kwargs):
-            #     filtered_args = [kwargs[k] for k in str_params]
-            #     return np.nan_to_num(np.asarray(fast_f(filtered_args)).reshape(function.shape))
-        if backend in ['llvm', 'lambda']:
-            def f(**kwargs):
-                filtered_args = [kwargs[k] for k in str_params]
-                out = np.empty(len(function))
-                fast_f.unsafe_real(np.array(filtered_args, dtype=np.double), out)
-                return np.nan_to_num(out).reshape(function.shape)
-        elif backend == 'cse':
-            cse, reduced_f = sp.cse(function)
-
-            # @profile
-            def f(**kwargs):
-                filtered_kwargs = {str(k): kwargs[k] for k in str_params}
-                cse_evaled = [(x[0], x[1].subs(filtered_kwargs)) for x in cse]
-                stuff = []
-                for entry in reduced_f:
-                    entry_evaled = entry
-                    for t in reversed(cse_evaled):
-                        entry_evaled = entry_evaled.subs(t[0], t[1])
-                    stuff.append(entry_evaled.subs(filtered_kwargs))
-                return np.array(stuff, dtype=float).reshape(function.shape)
+        if backend in [u'llvm', u'lambda']:
+            f = CompiledFunction(str_params, fast_f, len(function), function.shape)
         elif backend is None:
             # @profile
             def f(**kwargs):
                 filtered_kwargs = {str(k): kwargs[k] for k in str_params}
                 return np.array(function.subs(filtered_kwargs).tolist(), dtype=float).reshape(function.shape)
-        if backend == 'python':
+        if backend == u'python':
             f = function
 
     return f
 
 
 def cross(u, v):
-    return sp.Matrix([u[1] * v[2] - u[2] * v[1],
-                      u[2] * v[0] - u[0] * v[2],
-                      u[0] * v[1] - u[1] * v[0]])
+    """
+    :param u: 1d matrix
+    :type u: Matrix
+    :param v: 1d matrix
+    :type v: Matrix
+    :return: 1d Matrix. If u and v have length 4, it ignores the last entry and adds a zero to the result.
+    :rtype: Matrix
+    """
+    if len(u) != len(v):
+        raise ValueError('lengths {} and {} don\' align'.format(len(u), len(v)))
+    if len(u) == 3:
+        return sp.Matrix([u[1] * v[2] - u[2] * v[1],
+                          u[2] * v[0] - u[0] * v[2],
+                          u[0] * v[1] - u[1] * v[0]])
+    if len(u) == 4:
+        return sp.Matrix([u[1] * v[2] - u[2] * v[1],
+                          u[2] * v[0] - u[0] * v[2],
+                          u[0] * v[1] - u[1] * v[0],
+                          0])
 
 
-def vec3(x, y, z):
+def vector3(x, y, z):
+    """
+    :param x: Union[float, Symbol]
+    :param y: Union[float, Symbol]
+    :param z: Union[float, Symbol]
+    :rtype: Matrix
+    """
     return sp.Matrix([x, y, z, 0])
 
 
-unitX = vec3(1, 0, 0)
-unitY = vec3(0, 1, 0)
-unitZ = vec3(0, 0, 1)
+unitX = vector3(1, 0, 0)
+unitY = vector3(0, 1, 0)
+unitZ = vector3(0, 0, 1)
 
 
 def point3(x, y, z):
+    """
+    :param x: Union[float, Symbol]
+    :param y: Union[float, Symbol]
+    :param z: Union[float, Symbol]
+    :rtype: Matrix
+    """
     return sp.Matrix([x, y, z, 1])
 
 
 def norm(v):
+    """
+    :type v: Matrix
+    :return: |v|_2
+    :rtype: Union[float, Symbol]
+    """
     r = 0
     for x in v:
         r += x ** 2
     return sp.sqrt(r)
 
 
+def scale(v, a):
+    """
+    :type v: Matrix
+    :type a: Union[float, Symbol]
+    :rtype: Matrix
+    """
+    return v / norm(v) * a
+
+
 def dot(a, b):
-    return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+    """
+    :type a: Matrix
+    :type b: Matrix
+    :rtype: Union[float, Symbol]
+    """
+    return (a.T * b)[0]
 
 
 def translation3(x, y, z):
+    """
+    :type x: Union[float, Symbol]
+    :type y: Union[float, Symbol]
+    :type z: Union[float, Symbol]
+    :return: 4x4 Matrix
+        [[1,0,0,x],
+         [0,1,0,y],
+         [0,0,1,z],
+         [0,0,0,1]]
+    :rtype: Matrix
+    """
     r = sp.eye(4)
     r[0, 3] = x
     r[1, 3] = y
@@ -126,11 +321,17 @@ def translation3(x, y, z):
     return r
 
 
-def rotation3_rpy(roll, pitch, yaw):
-    """ Conversion of roll, pitch, yaw to 4x4 rotation matrix according to:
-        https://github.com/orocos/orocos_kinematics_dynamics/blob/master/orocos_kdl/src/frames.cpp#L167
+def rotation_matrix_from_rpy(roll, pitch, yaw):
     """
-    # return sp.Matrix(quaternion_matrix(quaternion_from_euler(roll, pitch, yaw, axes='rxyz')).T.tolist())
+    Conversion of roll, pitch, yaw to 4x4 rotation matrix according to:
+    https://github.com/orocos/orocos_kinematics_dynamics/blob/master/orocos_kdl/src/frames.cpp#L167
+    :type roll: Union[float, Symbol]
+    :type pitch: Union[float, Symbol]
+    :type yaw: Union[float, Symbol]
+    :return: 4x4 Matrix
+    :rtype: Matrix
+    """
+    # TODO don't split this into 3 matrices
 
     rx = sp.Matrix([[1, 0, 0, 0],
                     [0, sp.cos(roll), -sp.sin(roll), 0],
@@ -147,9 +348,15 @@ def rotation3_rpy(roll, pitch, yaw):
     return (rz * ry * rx)
 
 
-def rotation3_axis_angle(axis, angle):
-    """ Conversion of unit axis and angle to 4x4 rotation matrix according to:
-        http://www.euclideanspace.com/maths/geometry/rotations/conversions/angleToMatrix/index.htm
+def rotation_matrix_from_axis_angle(axis, angle):
+    """
+    Conversion of unit axis and angle to 4x4 rotation matrix according to:
+    http://www.euclideanspace.com/maths/geometry/rotations/conversions/angleToMatrix/index.htm
+    :param axis: 3x1 Matrix
+    :type axis: Matrix
+    :type angle: Union[float, Symbol]
+    :return: 4x4 Matrix
+    :rtype: Matrix
     """
     ct = sp.cos(angle)
     st = sp.sin(angle)
@@ -169,9 +376,16 @@ def rotation3_axis_angle(axis, angle):
                       [0, 0, 0, 1]])
 
 
-def rotation3_quaternion(x, y, z, w):
-    """ Unit quaternion to 4x4 rotation matrix according to:
-        https://github.com/orocos/orocos_kinematics_dynamics/blob/master/orocos_kdl/src/frames.cpp#L167
+def rotation_matrix_from_quaternion(x, y, z, w):
+    """
+    Unit quaternion to 4x4 rotation matrix according to:
+    https://github.com/orocos/orocos_kinematics_dynamics/blob/master/orocos_kdl/src/frames.cpp#L167
+    :type x: Union[float, Symbol]
+    :type y: Union[float, Symbol]
+    :type z: Union[float, Symbol]
+    :type w: Union[float, Symbol]
+    :return: 4x4 Matrix
+    :rtype: Matrix
     """
     x2 = x * x
     y2 = y * y
@@ -183,46 +397,129 @@ def rotation3_quaternion(x, y, z, w):
                       [0, 0, 0, 1]])
 
 
-def frame3_axis_angle(axis, angle, loc):
-    return translation3(*loc) * rotation3_axis_angle(axis, angle)
+def frame_axis_angle(x, y, z, axis, angle):
+    """
+    :type x: Union[float, Symbol]
+    :type y: Union[float, Symbol]
+    :type z: Union[float, Symbol]
+    :param axis: 3x1 Matrix
+    :type axis: Matrix
+    :type angle: Union[float, Symbol]
+    :return: 4x4 Matrix
+    :rtype: Matrix
+    """
+    return translation3(x, y, z) * rotation_matrix_from_axis_angle(axis, angle)
 
 
-def frame3_rpy(r, p, y, loc):
-    return translation3(*loc) * rotation3_rpy(r, p, y)
+def frame_rpy(x, y, z, roll, pitch, yaw):
+    """
+    :type x: Union[float, Symbol]
+    :type y: Union[float, Symbol]
+    :type z: Union[float, Symbol]
+    :type roll: Union[float, Symbol]
+    :type pitch: Union[float, Symbol]
+    :type yaw: Union[float, Symbol]
+    :return: 4x4 Matrix
+    :rtype: Matrix
+    """
+    return translation3(x, y, z) * rotation_matrix_from_rpy(roll, pitch, yaw)
 
 
-def frame3_quaternion(q1, q2, q3, q4, loc):
-    return translation3(*loc) * rotation3_quaternion(q1, q2, q3, q4)
+def frame_quaternion(x, y, z, qx, qy, qz, qw):
+    """
+    :type x: Union[float, Symbol]
+    :type y: Union[float, Symbol]
+    :type z: Union[float, Symbol]
+    :type qx: Union[float, Symbol]
+    :type qy: Union[float, Symbol]
+    :type qz: Union[float, Symbol]
+    :type qw: Union[float, Symbol]
+    :return: 4x4 Matrix
+    :rtype: Matrix
+    """
+    return translation3(x, y, z) * rotation_matrix_from_quaternion(qx, qy, qz, qw)
 
 
-def pos_of(frame):
+def inverse_frame(frame):
+    """
+    :param frame: 4x4 Matrix
+    :type frame: Matrix
+    :return: 4x4 Matrix
+    :rtype: Matrix
+    """
+    inv = sp.eye(4)
+    inv[:3, :3] = frame[:3, :3].T
+    inv[:3, 3] = -inv[:3, :3] * frame[:3, 3]
+    return inv
+
+
+def position_of(frame):
+    """
+    :param frame: 4x4 Matrix
+    :type frame: Matrix
+    :return: 4x1 Matrix; the translation part of a frame in form of a point
+    :rtype: Matrix
+    """
     return frame[:4, 3:]
 
 
-def trans_of(frame):
+def translation_of(frame):
+    """
+    :param frame: 4x4 Matrix
+    :type frame: Matrix
+    :return: 4x4 Matrix; sets the rotation part of a frame to identity
+    :rtype: Matrix
+    """
     return sp.eye(3).col_join(sp.Matrix([[0] * 3])).row_join(frame[:4, 3:])
 
 
-def rot_of(frame):
+def rotation_of(frame):
+    """
+    :param frame: 4x4 Matrix
+    :type frame: Matrix
+    :return: 4x4 Matrix; sets the translation part of a frame to 0
+    :rtype: Matrix
+    """
     return frame[:4, :3].row_join(sp.Matrix([0, 0, 0, 1]))
 
 
 def trace(matrix):
-    return sum(matrix[i, i] for i in range(3))
+    """
+    :type matrix: Matrix
+    :rtype: Union[float, Symbol]
+    """
+    return sum(matrix[i, i] for i in range(matrix.shape[0]))
 
 
 def rotation_distance(rotation_matrix1, rotation_matrix2):
+    """
+    :param rotation_matrix1: 4x4 or 3x3 Matrix
+    :type rotation_matrix1: Matrix
+    :param rotation_matrix2: 4x4 or 3x3 Matrix
+    :type rotation_matrix2: Matrix
+    :return: angle from the axis/angle representation of rotation_matrix1 * rotation_matrix2.T
+    :rtype: Union[float, Symbol]
+    """
+    # TODO test me
     difference = rotation_matrix1 * rotation_matrix2.T
     # return -(((trace(difference) - 1)/2)-1)
-    v = (trace(difference) - 1) / 2
+    v = (trace(difference[:3, :3]) - 1) / 2
     # v = Max(-1, v)
     # v = Min(1, v)
     return sp.acos(v)
 
 
 def axis_angle_from_matrix(rotation_matrix):
+    """
+    :param rotation_matrix: 4x4 or 3x3 Matrix
+    :type rotation_matrix: Matrix
+    :return: 3x1 Matrix, angle
+    :rtype: (Matrix, Union[float, Symbol])
+    """
+    # TODO nan if angle 0
+    # TODO use 'if' to make angle always positive?
     rm = rotation_matrix
-    angle = (trace(rm) - 1) / 2
+    angle = (trace(rm[:3, :3]) - 1) / 2
     angle = sp.acos(angle)
     x = (rm[2, 1] - rm[1, 2])
     y = (rm[0, 2] - rm[2, 0])
@@ -233,31 +530,87 @@ def axis_angle_from_matrix(rotation_matrix):
     return axis, angle
 
 
-def axis_angle_from_quaternion(q):
-    w2 = sp.sqrt(1 - q[3] ** 2)
-    angle = 2 * sp.acos(q[3])
-    x = q[0] / w2
-    y = q[1] / w2
-    z = q[2] / w2
+def axis_angle_from_quaternion(x, y, z, w):
+    """
+    :type x: Union[float, Symbol]
+    :type y: Union[float, Symbol]
+    :type z: Union[float, Symbol]
+    :type w: Union[float, Symbol]
+    :return: 4x1 Matrix
+    :rtype: Matrix
+    """
+    # TODO buggy, angle goes from 0 - 2*pi instead of -pi - +pi
+    w2 = sp.sqrt(1 - w ** 2)
+    angle = (2 * sp.acos(w))
+    x = x / w2
+    y = y / w2
+    z = z / w2
     return sp.Matrix([x, y, z]), angle
 
 
+def quaternion_from_axis_angle(axis, angle):
+    """
+    :param axis: 3x1 Matrix
+    :type axis: Matrix
+    :type angle: Union[float, Symbol]
+    :return: 4x1 Matrix
+    :rtype: Matrix
+    """
+    half_angle = angle / 2
+    return sp.Matrix([axis[0] * sp.sin(half_angle),
+                      axis[1] * sp.sin(half_angle),
+                      axis[2] * sp.sin(half_angle),
+                      sp.cos(half_angle)])
+
+
 def axis_angle_from_rpy(roll, pitch, yaw):
-    return axis_angle_from_quaternion(*quaternion_from_rpy(roll, pitch, yaw))
+    """
+    :type roll: Union[float, Symbol]
+    :type pitch: Union[float, Symbol]
+    :type yaw: Union[float, Symbol]
+    :return: 3x1 Matrix, angle
+    :rtype: (Matrix, Union[float, Symbol])
+    """
+    return axis_angle_from_matrix(rotation_matrix_from_rpy(roll, pitch, yaw))
+
+
+_EPS = np.finfo(float).eps * 4.0
 
 
 def rpy_from_matrix(rotation_matrix):
-    sy = sp.sqrt(rotation_matrix[0, 0] * rotation_matrix[0, 0] +
-                 rotation_matrix[1, 0] * rotation_matrix[1, 0])
+    """
+    !takes time to compile!
+    :param rotation_matrix: 4x4 Matrix
+    :type rotation_matrix: Matrix
+    :return: roll, pitch, yaw
+    :rtype: (Union[float, Symbol], Union[float, Symbol], Union[float, Symbol])
+    """
+    i = 0
+    j = 1
+    k = 2
 
-    x = sp.atan2(rotation_matrix[2, 1], rotation_matrix[2, 2])
-    y = sp.atan2(-rotation_matrix[2, 0], sy)
-    z = sp.atan2(rotation_matrix[1, 0], rotation_matrix[0, 0])
-
-    return x, y, z
+    cy = sqrt(rotation_matrix[i, i] * rotation_matrix[i, i] + rotation_matrix[j, i] * rotation_matrix[j, i])
+    if0 = cy - _EPS
+    ax = if_greater_zero(if0,
+                         atan2(rotation_matrix[k, j], rotation_matrix[k, k]),
+                         atan2(-rotation_matrix[j, k], rotation_matrix[j, j]))
+    ay = if_greater_zero(if0,
+                         atan2(-rotation_matrix[k, i], cy),
+                         atan2(-rotation_matrix[k, i], cy))
+    az = if_greater_zero(if0,
+                         atan2(rotation_matrix[j, i], rotation_matrix[i, i]),
+                         0)
+    return ax, ay, az
 
 
 def quaternion_from_rpy(roll, pitch, yaw):
+    """
+    :type roll: Union[float, Symbol]
+    :type pitch: Union[float, Symbol]
+    :type yaw: Union[float, Symbol]
+    :return: 4x1 Matrix
+    :type: Matrix
+    """
     roll_half = roll / 2.0
     pitch_half = pitch / 2.0
     yaw_half = yaw / 2.0
@@ -282,7 +635,70 @@ def quaternion_from_rpy(roll, pitch, yaw):
     return sp.Matrix([x, y, z, w])
 
 
+def quaternion_from_matrix(matrix):
+    """
+    !takes a loooong time to compile!
+    :param matrix: 4x4 or 3x3 Matrix
+    :type matrix: Matrix
+    :return: 4x1 Matrix
+    :rtype: Matrix
+    """
+    q = Matrix([0, 0, 0, 0])
+    M = Matrix(matrix)
+    t = trace(M)
+
+    if0 = t - M[3, 3]
+
+    if1 = M[1, 1] - M[0, 0]
+
+    m_i_i = if_greater_zero(if1, M[1, 1], M[0, 0])
+    m_i_j = if_greater_zero(if1, M[1, 2], M[0, 1])
+    m_i_k = if_greater_zero(if1, M[1, 0], M[0, 2])
+
+    m_j_i = if_greater_zero(if1, M[2, 1], M[1, 0])
+    m_j_j = if_greater_zero(if1, M[2, 2], M[1, 1])
+    m_j_k = if_greater_zero(if1, M[2, 0], M[1, 2])
+
+    m_k_i = if_greater_zero(if1, M[0, 1], M[2, 0])
+    m_k_j = if_greater_zero(if1, M[0, 2], M[2, 1])
+    m_k_k = if_greater_zero(if1, M[0, 0], M[2, 2])
+
+    if2 = M[2, 2] - m_i_i
+
+    m_i_i = if_greater_zero(if2, M[2, 2], m_i_i)
+    m_i_j = if_greater_zero(if2, M[2, 0], m_i_j)
+    m_i_k = if_greater_zero(if2, M[2, 1], m_i_k)
+
+    m_j_i = if_greater_zero(if2, M[0, 2], m_j_i)
+    m_j_j = if_greater_zero(if2, M[0, 0], m_j_j)
+    m_j_k = if_greater_zero(if2, M[0, 1], m_j_k)
+
+    m_k_i = if_greater_zero(if2, M[1, 2], m_k_i)
+    m_k_j = if_greater_zero(if2, M[1, 0], m_k_j)
+    m_k_k = if_greater_zero(if2, M[1, 1], m_k_k)
+
+    t = if_greater_zero(if0, t, m_i_i - (m_j_j + m_k_k) + M[3, 3])
+    q[0] = if_greater_zero(if0, M[2, 1] - M[1, 2],
+                           if_greater_zero(if2, m_i_j + m_j_i, if_greater_zero(if1, m_k_i + m_i_k, t)))
+    q[1] = if_greater_zero(if0, M[0, 2] - M[2, 0],
+                           if_greater_zero(if2, m_k_i + m_i_k, if_greater_zero(if1, t, m_i_j + m_j_i)))
+    q[2] = if_greater_zero(if0, M[1, 0] - M[0, 1],
+                           if_greater_zero(if2, t, if_greater_zero(if1, m_i_j + m_j_i, m_k_i + m_i_k)))
+    q[3] = if_greater_zero(if0, t, m_k_j - m_j_k)
+
+    q *= 0.5 / sp.sqrt(t * M[3, 3])
+    return q
+
+
 def quaternion_multiply(q1, q2):
+    """
+    :param q1: 4x1 Matrix
+    :type q1: Matrix
+    :param q2: 4x1 Matrix
+    :type q2: Matrix
+    :return: 4x1 Matrix
+    :rtype: Matrix
+    """
     x0, y0, z0, w0 = q2
     x1, y1, z1, w1 = q1
     return sp.Matrix([x1 * w0 + y1 * z0 - z1 * y0 + w1 * x0,
@@ -291,26 +707,82 @@ def quaternion_multiply(q1, q2):
                       -x1 * x0 - y1 * y0 - z1 * z0 + w1 * w0])
 
 
-def quaterntion_from_axis_angle(axis, angle):
-    half_angle = angle / 2
-    return sp.Matrix([axis[0] * sp.sin(half_angle),
-                      axis[1] * sp.sin(half_angle),
-                      axis[2] * sp.sin(half_angle),
-                      sp.cos(half_angle)])
-
-
 def quaternion_conjugate(quaternion):
+    """
+    :param quaternion: 4x1 Matrix
+    :type quaternion: Matrix
+    :return: 4x1 Matrix
+    :rtype: Matrix
+    """
     return sp.Matrix([-quaternion[0], -quaternion[1], -quaternion[2], quaternion[3]])
 
 
-def quaternion_diff(q_current, q_goal):
-    return quaternion_multiply(quaternion_conjugate(q_current), q_goal)
+def quaternion_diff(q0, q1):
+    """
+    :param q0: 4x1 Matrix
+    :type q0: Matrix
+    :param q1: 4x1 Matrix
+    :type q1: Matrix
+    :return: 4x1 Matrix p, such that q1*p=q2
+    :rtype: Matrix
+    """
+    return quaternion_multiply(quaternion_conjugate(q0), q1)
 
 
-def quaternion_make_unique(q):
-    sign = q[3] / fake_Abs(q[3])
-    return q * sign
+def cosine_distance(v0, v1):
+    """
+    :param v0: nx1 Matrix
+    :type v0: Matrix
+    :param v1: nx1 Matrix
+    :type v1: Matrix
+    :rtype: Union[float, Symbol]
+    """
+    return 1 - (v0.T * v1)[0]
 
 
-def cosine_distance(q1, q2):
-    return 1 - (q1.T * q2)[0]
+def euclidean_distance(v1, v2):
+    """
+    :param v1: nx1 Matrix
+    :type v1: Matrix
+    :param v2: nx1 Matrix
+    :type v2: Matrix
+    :rtype: Union[float, Symbol]
+    """
+    return norm(v1 - v2)
+
+
+def diffable_slerp(q1, q2, t):
+    """
+    !takes a long time to compile!
+    :param q1: 4x1 Matrix
+    :type q1: Matrix
+    :param q2: 4x1 Matrix
+    :type q2: Matrix
+    :param t: 4x1 Matrix
+    :type t:  Union[float, Symbol]
+    :return: 4x1 Matrix; Return spherical linear interpolation between two quaternions.
+    :rtype: Matrix
+    """
+    cos_half_theta = dot(q1, q2)
+
+    if0 = -cos_half_theta
+    q2 = if_greater_zero(if0, -q2, q2)
+    cos_half_theta = if_greater_zero(if0, -cos_half_theta, cos_half_theta)
+
+    if1 = diffable_abs(cos_half_theta) - 1.0
+
+    # enforce acos(x) with -1 < x < 1
+    cos_half_theta = diffable_min_fast(1, cos_half_theta)
+    cos_half_theta = diffable_max_fast(-1, cos_half_theta)
+
+    half_theta = acos(cos_half_theta)
+
+    sin_half_theta = sqrt(1.0 - cos_half_theta * cos_half_theta)
+    # prevent /0
+    sin_half_theta = if_eq_zero(sin_half_theta, 1, sin_half_theta)
+    if2 = 0.001 - diffable_abs(sin_half_theta)
+
+    ratio_a = sin((1.0 - t) * half_theta) / sin_half_theta
+    ratio_b = sin(t * half_theta) / sin_half_theta
+    return if_greater_eq_zero(if1, sp.Matrix(q1),
+                              if_greater_zero(if2, 0.5 * q1 + 0.5 * q2, ratio_a * q1 + ratio_b * q2))

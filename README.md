@@ -5,16 +5,21 @@ The core python library of the Giskard framework for constraint- and optimizatio
 
 First install symengine + symengine.py
 ```
+sudo apt-get install llvm-6.0-dev
 git clone https://github.com/symengine/symengine.git
-cd symengine
-git checkout 2f5ff9db9ff511ee243438a85ea8e2da2d05af39
-cmake -DWITH_LLVM:BOOL=ON .
-make
-make install
-cd ..
 git clone https://github.com/symengine/symengine.py.git
-cd symengine.py
+cd symengine
+git checkout `cat ../symengine.py/symengine_version.txt`
+cmake -DBUILD_SHARED_LIBS:BOOL=ON -DWITH_LLVM:BOOL=ON .
+make
+sudo make install
+cd ../symengine.py
 sudo python setup.py install
+```
+
+Install pybullet:
+```
+sudo pip install pybullet
 ```
 
 Now create the workspace

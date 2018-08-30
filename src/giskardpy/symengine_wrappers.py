@@ -500,6 +500,7 @@ def rotation_distance(rotation_matrix1, rotation_matrix2):
     :return: angle from the axis/angle representation of rotation_matrix1 * rotation_matrix2.T
     :rtype: Union[float, Symbol]
     """
+    # TODO test me
     difference = rotation_matrix1 * rotation_matrix2.T
     # return -(((trace(difference) - 1)/2)-1)
     v = (trace(difference[:3, :3]) - 1) / 2

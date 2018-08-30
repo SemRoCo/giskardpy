@@ -4,6 +4,10 @@ import symengine_wrappers as sw
 from copy import copy
 
 class GodMap(object):
+    """
+    Data structure used by plugins to exchange information.
+    """
+
     def __init__(self):
         self._data = {}
         self.expr_separator = u'_'

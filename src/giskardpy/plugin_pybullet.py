@@ -13,14 +13,14 @@ from visualization_msgs.msg import Marker, MarkerArray
 from giskardpy.exceptions import CorruptShapeException, UnknownBodyException, \
     UnsupportedOptionException, DuplicateNameException, PhysicsWorldException
 from giskardpy.object import to_marker, world_body_to_urdf_object, from_pose_msg
-from giskardpy.plugin import Plugin
+from giskardpy.plugin import PluginBase
 from giskardpy.pybullet_world import PyBulletWorld, ContactInfo
 from giskardpy.tfwrapper import transform_pose, lookup_transform, transform_point, transform_vector
 from giskardpy.data_types import ClosestPointInfo
-from giskardpy.utils import keydefaultdict, to_joint_state_dict, to_point_stamped, to_vector3_stamped, to_list
+from giskardpy.utils import keydefaultdict, to_joint_state_dict, to_point_stamped, to_vector3_stamped, msg_to_list
 
 
-class PyBulletPlugin(Plugin):
+class PyBulletPlugin(PluginBase):
     def __init__(self, js_identifier, collision_identifier, closest_point_identifier, collision_goal_identifier,
                  controllable_links_identifier, robot_description_identifier,
                  map_frame, root_link, default_collision_avoidance_distance, path_to_data_folder='', gui=False,
@@ -66,7 +66,7 @@ class PyBulletPlugin(Plugin):
         return cp
 
     def start_once(self):
-        self.world = PyBulletWorld(gui=self.gui, path_to_data_folder=self.path_to_data_folder)
+        self.world = PyBulletWorld(enable_gui=self.gui, path_to_data_folder=self.path_to_data_folder)
         self.srv_update_world = rospy.Service('~update_world', UpdateWorld, self.update_world_cb)
         self.srv_viz_gui = rospy.Service('~enable_marker', SetBool, self.enable_marker_cb)
         self.pub_collision_marker = rospy.Publisher('~visualization_marker_array', MarkerArray, queue_size=1)
@@ -77,9 +77,7 @@ class PyBulletPlugin(Plugin):
 
     def enable_marker_cb(self, setbool):
         """
-        :param setbool:
         :type setbool: std_srvs.srv._SetBool.SetBoolRequest
-        :return:
         :rtype: SetBoolResponse
         """
         # TODO test me
@@ -129,7 +127,6 @@ class PyBulletPlugin(Plugin):
     def add_object(self, req):
         """
         :type req: UpdateWorldRequest
-        :return:
         """
         world_body = req.body
         global_pose = from_pose_msg(transform_pose(self.global_reference_frame_name, req.pose).pose)
@@ -147,6 +144,9 @@ class PyBulletPlugin(Plugin):
 
 
     def attach_object(self, req):
+        """
+        :type req: UpdateWorldResponse
+        """
         if req.body.type is WorldBody.URDF_BODY:
             raise UnsupportedOptionException(u'Attaching URDF bodies to robots is not supported.')
         self.world.attach_object(world_body_to_urdf_object(req.body),
@@ -183,6 +183,9 @@ class PyBulletPlugin(Plugin):
         self.world.get_robot().detach_all_objects()
 
     def update(self):
+        """
+        Computes closest point info for all robot links and safes it to the god map.
+        """
         with self.lock:
             # TODO only update urdf if it has changed
             self.god_map.set_data([self.robot_description_identifier], self.world.get_robot().get_urdf())
@@ -206,12 +209,12 @@ class PyBulletPlugin(Plugin):
             collision_goals = self.god_map.get_data([self.collision_goal_identifier])
             collision_matrix = self.collision_goals_to_collision_matrix(collision_goals)
             collisions = self.world.check_collisions(collision_matrix,
-                                                     self_collision=self.enable_self_collision)
+                                                     enable_self_collision=self.enable_self_collision)
 
             closest_point = self.collisions_to_closest_point(collisions, collision_matrix)
 
             if self.marker:
-                self.make_cpi_markers(closest_point)
+                self.publish_cpi_markers(closest_point)
 
             self.god_map.set_data([self.closest_point_identifier], closest_point)
 
@@ -282,12 +285,14 @@ class PyBulletPlugin(Plugin):
 
         return min_allowed_distance
 
-    def collisions_to_closest_point(self, collisions, distances):
+    def collisions_to_closest_point(self, collisions, min_allowed_distance):
         """
-
-        :param collisions:
-        :param distances:
-        :return:
+        :param collisions: (robot_link, body_b, link_b) -> ContactInfo
+        :type collisions: dict
+        :param min_allowed_distance: (robot_link, body_b, link_b) -> min allowed distance
+        :type min_allowed_distance: dict
+        :return: robot_link -> ClosestPointInfo of closest thing
+        :rtype: dict
         """
         closest_point = keydefaultdict(lambda k: ClosestPointInfo((10, 0, 0),
                                                                   (0, 0, 0),
@@ -296,22 +301,22 @@ class PyBulletPlugin(Plugin):
                                                                   k,
                                                                   '',
                                                                   (1, 0, 0)))
-        for key, collision_info in collisions.items():  # type: ((str, str), ContactInfo)
+        for key, collision_info in collisions.items():  # type: ((str, str, str), ContactInfo)
             if collision_info is None:
                 continue
             link1 = key[0]
-            a_in_robot_root = to_list(transform_point(self.robot_root,
-                                                      to_point_stamped(self.map_frame,
+            a_in_robot_root = msg_to_list(transform_point(self.robot_root,
+                                                          to_point_stamped(self.map_frame,
                                                                        collision_info.position_on_a)))
-            b_in_robot_root = to_list(transform_point(self.robot_root,
-                                                      to_point_stamped(self.map_frame,
+            b_in_robot_root = msg_to_list(transform_point(self.robot_root,
+                                                          to_point_stamped(self.map_frame,
                                                                        collision_info.position_on_b)))
-            n_in_robot_root = to_list(transform_vector(self.robot_root,
-                                                       to_vector3_stamped(self.map_frame,
+            n_in_robot_root = msg_to_list(transform_vector(self.robot_root,
+                                                           to_vector3_stamped(self.map_frame,
                                                                           collision_info.contact_normal_on_b)))
             try:
                 cpi = ClosestPointInfo(a_in_robot_root, b_in_robot_root, collision_info.contact_distance,
-                                       distances[key], key[0], u'{} - {}'.format(key[1], key[2]), n_in_robot_root)
+                                       min_allowed_distance[key], key[0], u'{} - {}'.format(key[1], key[2]), n_in_robot_root)
             except KeyError:
                 continue
             if link1 in closest_point:
@@ -327,16 +332,23 @@ class PyBulletPlugin(Plugin):
         self.pub_collision_marker.unregister()
         self.world.deactivate_viewer()
 
-    def make_cpi_markers(self, collisions):
+    def publish_cpi_markers(self, closest_point_infos):
+        """
+        Publishes a string for each ClosestPointInfo in the dict. If the distance is below the threshold, the string
+        is colored red. If it is below threshold*2 it is yellow. If it is below threshold*3 it is green.
+        Otherwise no string will be published.
+        :type closest_point_infos: dict
+        """
         m = Marker()
         m.header.frame_id = self.robot_root
         m.action = Marker.ADD
         m.type = Marker.LINE_LIST
         m.id = 1337
+        # TODO make namespace parameter
         m.ns = u'pybullet collisions'
         m.scale = Vector3(0.003, 0, 0)
-        if len(collisions) > 0:
-            for collision_info in collisions.values():  # type: ClosestPointInfo
+        if len(closest_point_infos) > 0:
+            for collision_info in closest_point_infos.values():  # type: ClosestPointInfo
                 red_threshold = collision_info.min_dist
                 yellow_threshold = collision_info.min_dist * 2
                 green_threshold = collision_info.min_dist * 3

@@ -19,22 +19,24 @@ from visualization_msgs.msg._InteractiveMarkerControl import InteractiveMarkerCo
 from visualization_msgs.msg._InteractiveMarkerFeedback import InteractiveMarkerFeedback
 from visualization_msgs.msg._Marker import Marker
 
-from giskardpy.plugin import Plugin
+from giskardpy.plugin import PluginBase
 from giskardpy.utils import qv_mult
 
 MARKER_SCALE = 0.15
 
 
 
-class InteractiveMarkerPlugin(Plugin):
+class InteractiveMarkerPlugin(PluginBase):
     """
     Spawns interactive Marker which send cart goals to action server.
-    Does not interact with god map
+    Does not interact with god map.
     """
     def __init__(self, root_tips, suffix=u''):
         """
-        :param root_tips:
-        :param suffix:
+        :param root_tips: list containing root->tip tuple for each interactive marker.
+        :type root_tips: list
+        :param suffix: the marker will be called 'eef_control{}'.format(suffix)
+        :type suffix: str
         """
         if len(root_tips) > 0:
             self.roots, self.tips = zip(*root_tips)
@@ -57,14 +59,19 @@ class InteractiveMarkerPlugin(Plugin):
         all_goals = {}
 
         for root, tip in zip(self.roots, self.tips):
-            int_marker = self.make6DofMarker(InteractiveMarkerControl.MOVE_ROTATE_3D, root, tip)
+            int_marker = self.make_6dof_marker(InteractiveMarkerControl.MOVE_ROTATE_3D, root, tip)
             self.server.insert(int_marker,
                                self.process_feedback(self.server, int_marker.name, self.client, root, tip, all_goals))
             self.menu_handler.apply(self.server, int_marker.name)
 
         self.server.applyChanges()
 
-    def makeSphere(self, msg):
+    def make_sphere(self, msg):
+        """
+        :param msg:
+        :return:
+        :rtype: Marker
+        """
         marker = Marker()
 
         marker.type = Marker.SPHERE
@@ -78,14 +85,14 @@ class InteractiveMarkerPlugin(Plugin):
 
         return marker
 
-    def makeBoxControl(self, msg):
+    def make_sphere_control(self, msg):
         control = InteractiveMarkerControl()
         control.always_visible = True
-        control.markers.append(self.makeSphere(msg))
+        control.markers.append(self.make_sphere(msg))
         msg.controls.append(control)
         return control
 
-    def make6DofMarker(self, interaction_mode, root_link, tip_link):
+    def make_6dof_marker(self, interaction_mode, root_link, tip_link):
         def normed_q(x, y, z, w):
             return np.array([x, y, z, w]) / np.linalg.norm([x, y, z, w])
 
@@ -98,7 +105,7 @@ class InteractiveMarkerPlugin(Plugin):
         int_marker.name = u'eef_{}_to_{}'.format(root_link, tip_link)
 
         # insert a box
-        self.makeBoxControl(int_marker)
+        self.make_sphere_control(int_marker)
         int_marker.controls[0].interaction_mode = interaction_mode
 
         if interaction_mode != InteractiveMarkerControl.NONE:

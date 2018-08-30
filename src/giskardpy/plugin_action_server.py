@@ -16,20 +16,45 @@ from trajectory_msgs.msg import JointTrajectoryPoint, JointTrajectory
 
 from giskardpy.exceptions import MAX_NWSR_REACHEDException, QPSolverException, SolverTimeoutError, InsolvableException, \
     SymengineException, PathCollisionException, UnknownBodyException
-from giskardpy.plugin import Plugin
+from giskardpy.plugin import PluginBase
 from giskardpy.plugin_log_trajectory import LogTrajectoryPlugin
 from giskardpy.tfwrapper import transform_pose
 from giskardpy.utils import closest_point_constraint_violated
 
 ERROR_CODE_TO_NAME = {getattr(MoveResult, x): x for x in dir(MoveResult) if x.isupper()}
 
-class ActionServerPlugin(Plugin):
+class ActionServerPlugin(PluginBase):
+    """
+    Offers and action server and uses giskard to solve the goals.
+    """
     # TODO find a better name than ActionServerPlugin
     def __init__(self, cartesian_goal_identifier, js_identifier, trajectory_identifier, time_identifier,
                  closest_point_identifier, controlled_joints_identifier, collision_goal_identifier,
                  pyfunction_identifier, joint_convergence_threshold, wiggle_precision_threshold, fill_velocity_values,
                  collision_time_threshold, max_traj_length,
                  plot_trajectory=False):
+        """
+        :type cartesian_goal_identifier: str
+        :type js_identifier: str
+        :type trajectory_identifier: str
+        :type time_identifier: str
+        :type closest_point_identifier: str
+        :type controlled_joints_identifier: str
+        :type collision_goal_identifier: str
+        :type pyfunction_identifier: str
+        :param joint_convergence_threshold: if the maximum joint velocity falls below this value, the current universe is killed
+        :type joint_convergence_threshold: float
+        :param wiggle_precision_threshold: rounds joint states to this many decimal places and stops the universe if a joint state is seen twice
+        :type wiggle_precision_threshold: float
+        :param fill_velocity_values: The pr2 doesn't like velocities in its joint traj goals.
+        :type fill_velocity_values: bool
+        :param collision_time_threshold: if the robot is in collision after this many s, it is assumed, that it can't get out and the univserse is killed
+        :type collision_time_threshold: float
+        :param max_traj_length: if no traj can be found that takes less than this many s to execute, the planning is stopped.
+        :type max_traj_length: float
+        :param plot_trajectory: saves a plot of the joint traj for debugging.
+        :type plot_trajectory: bool
+        """
         self.fill_velocity_values = fill_velocity_values
         self.plot_trajectory = plot_trajectory
         self.goal_identifier = cartesian_goal_identifier
@@ -126,6 +151,11 @@ class ActionServerPlugin(Plugin):
         return goals
 
     def joint_controller_to_goal(self, controller):
+        """
+        :type controller: Controller
+        :return: joint_name -> {controller parameter -> value}
+        :rtype: dict
+        """
         # TODO check for unknown joint names?
         goals = {}
         rospy.loginfo(u'got joint goal')
@@ -137,6 +167,11 @@ class ActionServerPlugin(Plugin):
         return goals
 
     def cart_controller_to_goal(self, controller):
+        """
+        :type controller: Controller
+        :return: (root_link, tip_link) -> {controller parameter -> value}
+        :rtype: dict
+        """
         goals = {}
         root = controller.root_link
         tip = controller.tip_link
@@ -145,6 +180,9 @@ class ActionServerPlugin(Plugin):
         return goals
 
     def post_mortem_analysis(self, god_map, exception):
+        """
+        Extracts logged traj from god map of the dead universe and publishes the result.
+        """
         self.publish_feedback(MoveFeedback.PLANNING, 1)
         result = MoveResult()
         result.error_code = self.exception_to_error_code(exception)
@@ -155,7 +193,7 @@ class ActionServerPlugin(Plugin):
             else:
                 result.error_code = MoveResult.END_STATE_COLLISION
         # keep pyfunctions created in parallel universe
-        # TODO this sucks find a better way
+        # TODO find a better way to copy python functions from the parallel universe
         self.god_map.set_data([self.pyfunction_identifier], god_map.get_data([self.pyfunction_identifier]))
         self.send_to_action_server_and_wait(result)
 

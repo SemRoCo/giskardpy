@@ -6,12 +6,12 @@ from tf.transformations import quaternion_from_matrix
 import symengine_wrappers as sw
 from giskardpy import BACKEND
 from giskardpy.input_system import JointStatesInput
-from giskardpy.plugin import Plugin
+from giskardpy.plugin import PluginBase
 from giskardpy.symengine_robot import Robot
 from giskardpy.utils import keydefaultdict, urdfs_equal
 
 
-class RobotPlugin(Plugin):
+class RobotPlugin(PluginBase):
     """
     Efficiently keeps a symengine robot in sync with the god map.
     Inherit from this plugin if you want to use symengine robots who's urdf is in the god map.

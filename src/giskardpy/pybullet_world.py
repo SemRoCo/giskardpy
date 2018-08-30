@@ -100,15 +100,20 @@ def load_urdf_string_into_bullet(urdf_string, pose):
 
 
 class PyBulletRobot(object):
+    """
+    Keeps track of and offers convenience functions for an urdf object in bullet.
+    """
+    #TODO maybe merge symengien robot with this class?
     base_link_name = u'base'
     def __init__(self, name, urdf, base_pose=Transform(), calc_self_collision_matrix=True, path_to_data_folder=''):
         """
-
-        :param name:
+        :type name: str
         :param urdf: Path to URDF file, or content of already loaded URDF file.
         :type urdf: str
-        :param base_pose:
         :type base_pose: Transform
+        :type calc_self_collision_matrix: bool
+        :param path_to_data_folder: where the self collision matrix is stored
+        :type path_to_data_folder: str
         """
         self.path_to_data_folder = path_to_data_folder
         self.name = name
@@ -124,6 +129,9 @@ class PyBulletRobot(object):
             self.sometimes = set()
 
     def load_self_collision_matrix(self):
+        """
+        :rtype: bool
+        """
         urdf_hash = hashlib.md5(self.original_urdf).hexdigest()
         path = self.path_to_data_folder + urdf_hash
         if os.path.isfile(path):
@@ -149,6 +157,9 @@ class PyBulletRobot(object):
             pickle.dump(self.sometimes, file)
 
     def get_attached_objects(self):
+        """
+        :rtype: dict
+        """
         return self.attached_objects
 
     def set_joint_state(self, multi_joint_state):
@@ -311,10 +322,8 @@ class PyBulletRobot(object):
 
     def has_attached_object(self, object_name):
         """
-        Checks whether an object has already been attached to the robot.
-        :param object_name: Name of the object for which to check.
+        Checks whether an object with this name has already been attached to the robot.
         :type object_name: str
-        :return: True if one of the attached objects has that name, else False.
         :rtype: bool
         """
         return object_name in self.attached_objects.keys()
@@ -328,7 +337,6 @@ class PyBulletRobot(object):
         :type parent_link_name: str
         :param transform: Hom. transform between the reference frames of the parent link and the object.
         :type Transform
-        :return: Nothing
         """
         # TODO should only be called through world because this class does not know which objects exist
         if self.has_attached_object(object.name):
@@ -375,6 +383,9 @@ class PyBulletRobot(object):
         print(u'object {} attached to {} in pybullet world'.format(object.name, self.name))
 
     def get_urdf(self):
+        """
+        :rtype: str
+        """
         # for each attached object, insert the corresponding URDF sub-string into the original URDF string
         new_urdf_string = self.original_urdf
         for sub_string in self.attached_objects.values():
@@ -386,7 +397,6 @@ class PyBulletRobot(object):
         Detaches an attached object from the robot.
         :param object_name: Name of the object that shall be detached from the robot.
         :type object_name: str
-        :return: Nothing.
         """
         if not self.has_attached_object(object_name):
             # TODO: choose better exception type
@@ -429,7 +439,6 @@ class PyBulletRobot(object):
     def detach_all_objects(self):
         """
         Detaches all object that have been attached to the robot.
-        :return: Nothing.
         """
         if self.attached_objects:
             # salvage last joint state and base pose
@@ -468,8 +477,16 @@ class PyBulletRobot(object):
 
 
 class PyBulletWorld(object):
-    def __init__(self, gui=False, path_to_data_folder=u''):
-        self._gui = gui
+    """
+    Wraps around the shitty pybullet api.
+    """
+    def __init__(self, enable_gui=False, path_to_data_folder=u''):
+        """
+        :type enable_gui: bool
+        :param path_to_data_folder: location where compiled collision matrices are stored
+        :type path_to_data_folder: str
+        """
+        self._gui = enable_gui
         self._objects = {}
         self._robot = None
         self.path_to_data_folder = path_to_data_folder
@@ -483,20 +500,16 @@ class PyBulletWorld(object):
         :type urdf_file: str
         :param base_pose: Pose at which to spawn the robot.
         :type base_pose: Transform
-        :return: Nothing
         """
         with open(urdf_file, u'r') as f:
             self.spawn_robot_from_urdf(robot_name, f.read(), base_pose)
 
     def spawn_robot_from_urdf(self, robot_name, urdf, base_pose=Transform()):
         """
-
-        :param robot_name:
+        :type robot_name: str
         :param urdf: URDF to spawn as loaded XML string.
         :type urdf: str
-        :param base_pose:
         :type base_pose: Transform
-        :return:
         """
         if self.has_robot():
             raise RobotExistsException(u'A robot is already loaded')
@@ -509,12 +522,10 @@ class PyBulletWorld(object):
 
     def spawn_object_from_urdf_str(self, name, urdf, base_pose=Transform()):
         """
-        :param name:
+        :type name: str
         :param urdf: Path to URDF file, or content of already loaded URDF file.
         :type urdf: str
-        :param base_pose:
         :type base_pose: Transform
-        :return:
         """
         if self.has_object(name):
             raise DuplicateNameException(u'object with name "{}" already exists'.format(name))
@@ -534,7 +545,6 @@ class PyBulletWorld(object):
         :type urdf_file: str
         :param base_pose: Pose at which to spawn the robot.
         :type base_pose: Transform
-        :return: Nothing
         """
         with open(urdf_file, u'r') as f:
             self.spawn_object_from_urdf_str(object_name, f.read(), base_pose)
@@ -546,7 +556,6 @@ class PyBulletWorld(object):
         :type urdf_object: UrdfObject
         :param base_pose: Pose at which to spawn the object.
         :type base_pose: Transform
-        :return: Nothing.
         """
         self.spawn_object_from_urdf_str(urdf_object.name, to_urdf_string(urdf_object), base_pose)
 
@@ -558,60 +567,51 @@ class PyBulletWorld(object):
 
     def has_robot(self):
         """
-        Checks whether this world already contains a robot with a specific name.
-        :param robot_name: Identifier of the robot that shall be checked.
-        :type robot_name: str
-        :return: True if robot with that name is already in the world. Else: returns False.
+        :rtype: bool
         """
         return self._robot is not None
 
     def has_object(self, object_name):
         """
-        Checks whether this world already contains an object with a specific name.
-        :param object_name: Identifier of the object that shall be checked.
+        Checks for objects with the same name.
         :type object_name: str
-        :return: True if object with that name is already in the world. Else: returns False.
+        :rtype: bool
         """
         return object_name in self._objects.keys()
 
     def get_robot(self):
         """
-        :param robot_name:
-        :type robot_name: str
-        :return:
         :rtype: PyBulletRobot
         """
         return self._robot
 
     def get_object(self, name):
         """
-        :param name:
         :type name: str
-        :return:
         :rtype: PyBulletRobot
         """
         return self._objects[name]
 
-    def get_robot_joint_state(self):
-        return self._robot.get_joint_states()
-
-    # def get_object_joint_state(self, object_name):
-    #     return self.get_object(object_name).get_joint_states()
-
     def get_object_names(self):
+        """
+        :rtype: list
+        """
         return list(self._objects.keys())
 
     def set_robot_joint_state(self, joint_state):
         """
         Set the current joint state readings for a robot in the world.
-        :param robot_name: name of the robot to update
-        :type string
-        :param joint_state: sensor readings for the entire robot
-        :type dict{string, MultiJointState}
+        :param joint_state: joint name -> SingleJointState
+        :type joint_state: dict
         """
         self._robot.set_joint_state(joint_state)
 
     def set_object_joint_state(self, object_name, joint_state):
+        """
+        :type object_name: str
+        :param joint_state: joint name -> SingleJointState
+        :type joint_state: dict
+        """
         self.get_object(object_name).set_joint_state(joint_state)
 
     def delete_robot(self):
@@ -622,7 +622,6 @@ class PyBulletWorld(object):
     def delete_object(self, object_name):
         """
         Deletes an object with a specific name from the world.
-        :param object_name: Name of the object that shall be deleted.
         :type object_name: str
         """
         if not self.has_object(object_name):
@@ -643,19 +642,21 @@ class PyBulletWorld(object):
             if not object_name in remaining_objects:
                 self.delete_object(object_name)
 
-    def check_collisions(self, cut_off_distances, self_collision_d=0.1, self_collision=True):
+    def check_collisions(self, cut_off_distances, self_collision_d=0.1, enable_self_collision=True):
         """
-        :param cut_off_distances:
+        :param cut_off_distances: (robot_link, body_b, link_b) -> cut off distance. Contacts between objects not in this
+                                    dict or further away than the cut off distance will be ignored.
         :type cut_off_distances: dict
-        :param self_collision:
-        :type self_collision: bool
-        :return:
+        :param self_collision_d: distances grater than this value will be ignored
+        :type self_collision_d: float
+        :type enable_self_collision: bool
+        :return: (robot_link, body_b, link_b) -> ContactInfo
         :rtype: dict
         """
-
-
+        # TODO merge self collisions with normal collision loop
+        # TODO I think I have to multiply distance with something
         collisions = defaultdict(lambda: None)
-        if self_collision:
+        if enable_self_collision:
             # TODO use cut_off_distances in self collision
             if collisions is None:
                 collisions = self._robot.check_self_collision(self_collision_d)
@@ -693,7 +694,6 @@ class PyBulletWorld(object):
     def add_ground_plane(self, name=u'plane'):
         """
         Adds a ground plane to the Bullet World.
-        :return: Nothing.
         """
         # like in the PyBullet examples: spawn a big collision box in the origin
         if not self.has_object(name):

@@ -1,4 +1,4 @@
-class Plugin(object):
+class PluginBase(object):
     def __init__(self):
         self.started = False
 
@@ -72,7 +72,7 @@ class Plugin(object):
         This function is called on every plugin when a new universe is created. Useful e.g. to replace a plugin that
         monitors the robot state with a simulation.
         DON'T override this function.
-        :rtype: Plugin
+        :rtype: PluginBase
         """
         c = self.copy()
         c.started = self.started
@@ -81,13 +81,12 @@ class Plugin(object):
     def copy(self):
         """
         :return: Used by get_replacement, override this function
-        :rtype: Plugin
+        :rtype: PluginBase
         """
-        raise(NotImplementedError)
+        raise (NotImplementedError)
 
 
-
-class PluginContainer(Plugin):
+class PluginParallelUniverseOnly(PluginBase):
     """
     This Class can be used if you want a plugin to be only active in a parallel universe
     """
@@ -95,14 +94,14 @@ class PluginContainer(Plugin):
     def __init__(self, replacement, call_start=False):
         """
         :param replacement: Plugin that gets only activated in parallel universes
-        :type replacement: Plugin
+        :type replacement: PluginBase
         :param call_start: Whether this plugin should call the replacements start. If this is False the plugin will get
                             started during the first parallel universe.
         :type call_start: bool
         """
         self.replacement = replacement
         self.call_init = call_start
-        super(PluginContainer, self).__init__()
+        super(PluginParallelUniverseOnly, self).__init__()
 
     def copy(self):
         return self.replacement

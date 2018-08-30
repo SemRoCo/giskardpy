@@ -8,7 +8,7 @@ from giskardpy.pybullet_world import PyBulletWorld
 import pybullet as p
 import hypothesis.strategies as st
 from hypothesis.stateful import Bundle, RuleBasedStateMachine, rule, invariant
-from giskardpy.data_types import MultiJointState, SingleJointState, Transform, Point, Quaternion
+from giskardpy.data_types import SingleJointState, Transform, Point, Quaternion
 from giskardpy.test_utils import variable_name, robot_urdfs
 
 

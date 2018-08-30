@@ -96,6 +96,10 @@ class CartesianBulletControllerPlugin(RobotPlugin):
         self.god_map.set_data([self._next_cmd_identifier], self.next_cmd)
 
     def update_controlled_joints_and_links(self):
+        """
+        Gets controlled joints from god map and uses this to calculate the controllable link, which are written to
+        the god map.
+        """
         self.controlled_joints = self.god_map.get_data([self.controlled_joints_identifier])
         self.controllable_links = set()
         for joint_name in self.controlled_joints:
@@ -107,6 +111,9 @@ class CartesianBulletControllerPlugin(RobotPlugin):
         self.controller.set_controlled_joints(self.controlled_joints)
 
     def set_unused_joint_goals_to_current(self):
+        """
+        Sets the goal for all joints which are not used in another goal to their current position.
+        """
         joint_goal = self.god_map.get_data([self._goal_identifier, str(Controller.JOINT)])
         for joint_name in self.controlled_joints:
             if joint_name not in joint_goal:
@@ -175,7 +182,7 @@ class CartesianBulletControllerPlugin(RobotPlugin):
 
     def add_js_controller_soft_constraints(self):
         """
-        to self.controller and saves functions for continuous joints in god map
+        to self.controller and saves functions for continuous joints in god map.
         """
         pyfunctions = {}
         for joint_name in self.controlled_joints:
@@ -203,6 +210,9 @@ class CartesianBulletControllerPlugin(RobotPlugin):
         self.god_map.set_data([self._pyfunctions_identifier], pyfunctions)
 
     def add_collision_avoidance_soft_constraints(self):
+        """
+        Adds a constraint for each link that pushed it away from its closest point.
+        """
         soft_constraints = {}
         for link in list(self.controllable_links):
             point_on_link_input = Point3Input(self.god_map.to_symbol,
@@ -233,6 +243,9 @@ class CartesianBulletControllerPlugin(RobotPlugin):
         self.controller.update_soft_constraints(soft_constraints, self.god_map.get_registered_symbols())
 
     def add_cart_controller_soft_constraints(self):
+        """
+        Adds cart controller constraints for each goal.
+        """
         print(u'used chains:')
         for t in [Controller.TRANSLATION_3D, Controller.ROTATION_3D]:
             for (root, tip), value in self.god_map.get_data([self._goal_identifier, str(t)]).items():

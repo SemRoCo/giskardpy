@@ -20,7 +20,7 @@ from giskardpy.pybullet_world import PyBulletWorld
 from giskardpy.python_interface import GiskardWrapper
 from giskardpy.symengine_robot import Robot
 from giskardpy.tfwrapper import transform_pose, lookup_transform
-from giskardpy.utils import to_list
+from giskardpy.utils import msg_to_list
 from ros_trajectory_controller_main import giskard_pm
 
 BIG_NUMBER = 1e100
@@ -30,7 +30,7 @@ vector = lambda x: st.lists(limited_float(), min_size=x, max_size=x)
 
 
 def robot_urdfs():
-    return st.sampled_from([u'pr2.urdf', u'boxy.urdf', u'iai_donbot.urdf'])
+    return st.sampled_from([u'urdfs/pr2.urdf', u'urdfs/boxy.urdf', u'urdfs/iai_donbot.urdf'])
     # return st.sampled_from([u'pr2.urdf'])
 
 
@@ -73,7 +73,7 @@ def rnd_joint_state2(draw, joint_limits):
 
 @composite
 def pr2_joint_state(draw):
-    pr2 = Robot.from_urdf_file(u'../test/pr2.urdf')
+    pr2 = Robot.from_urdf_file(u'../test/urdfs/pr2.urdf')
     return draw(rnd_joint_state(*pr2.get_joint_limits()))
 
 
@@ -233,11 +233,11 @@ class GiskardTestWrapper(object):
     def check_cart_goal(self, tip, goal_pose):
         goal_in_base = transform_pose(u'base_footprint', goal_pose)
         current_pose = lookup_transform(u'base_footprint', tip)
-        np.testing.assert_array_almost_equal(to_list(goal_in_base.pose.position),
-                                             to_list(current_pose.pose.position), decimal=3)
+        np.testing.assert_array_almost_equal(msg_to_list(goal_in_base.pose.position),
+                                             msg_to_list(current_pose.pose.position), decimal=3)
 
-        np.testing.assert_array_almost_equal(to_list(goal_in_base.pose.orientation),
-                                             to_list(current_pose.pose.orientation), decimal=2)
+        np.testing.assert_array_almost_equal(msg_to_list(goal_in_base.pose.orientation),
+                                             msg_to_list(current_pose.pose.orientation), decimal=2)
 
     #
     # GENERAL GOAL STUFF ###############################################################################################

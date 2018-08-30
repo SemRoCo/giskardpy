@@ -4,7 +4,7 @@ from rospkg import RosPack
 
 import rospy
 
-from giskardpy.plugin import PluginContainer
+from giskardpy.plugin import PluginParallelUniverseOnly
 from giskardpy.plugin_action_server import ActionServerPlugin
 from giskardpy.application import ROSApplication
 from giskardpy.plugin_instantaneous_controller import CartesianBulletControllerPlugin
@@ -18,6 +18,7 @@ from giskardpy.process_manager import ProcessManager
 def giskard_pm():
     # TODO 0 0 0 in base footprint as goal results in /0
     # TODO bug if first goal is joint
+    # TODO you should specify here which plugins get replaced with which during a parallel universe
     # root_link = rospy.get_param('~root_link', 'odom')
     root_tips = rospy.get_param(u'~interactive_marker_chains')
     gui = rospy.get_param(u'~enable_gui')
@@ -98,7 +99,7 @@ def giskard_pm():
                                       fk_identifier=fk_identifier,
                                       robot_description_identifier=robot_description_identifier))
     pm.register_plugin(u'cart bullet controller',
-                       PluginContainer(
+                       PluginParallelUniverseOnly(
                            CartesianBulletControllerPlugin(root_link=root_link,
                                                            fk_identifier=fk_identifier,
                                                            goal_identifier=cartesian_goal_identifier,

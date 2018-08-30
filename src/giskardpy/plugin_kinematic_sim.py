@@ -1,11 +1,21 @@
 from collections import OrderedDict
 
 from giskardpy.data_types import SingleJointState
-from giskardpy.plugin import Plugin
+from giskardpy.plugin import PluginBase
 
 
-class KinematicSimPlugin(Plugin):
+class KinematicSimPlugin(PluginBase):
+    """
+    Takes joint commands from the god map, add them to the current joint state and writes the js back to the god map.
+    """
     def __init__(self, js_identifier, next_cmd_identifier, time_identifier, sample_period):
+        """
+        :type js_identifier: str
+        :type next_cmd_identifier: str
+        :type time_identifier: str
+        :param sample_period: the time difference in s between each step.
+        :type sample_period: float
+        """
         self.js_identifier = js_identifier
         self.next_cmd_identifier = next_cmd_identifier
         self.time_identifier = time_identifier

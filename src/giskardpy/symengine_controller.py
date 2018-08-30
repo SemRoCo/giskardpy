@@ -8,12 +8,16 @@ from giskardpy.symengine_robot import Robot
 
 
 class SymEngineController(object):
+    """
+    This class handles constraints and computes joint commands using symengine and qpOases.
+    """
+    # TODO should anybody how uses this card know about constrains?
+
     def __init__(self, robot, path_to_functions):
         """
-
-        :param robot:
         :type robot: Robot
-        :param path_to_functions:
+        :param path_to_functions: location where compiled functions are stored
+        :type: str
         """
         self.path_to_functions = path_to_functions
         self.robot = robot
@@ -26,7 +30,6 @@ class SymEngineController(object):
 
     def set_controlled_joints(self, joint_names):
         """
-        :param joint_names:
         :type joint_names: set
         """
         self.controlled_joints = joint_names
@@ -37,6 +40,12 @@ class SymEngineController(object):
                                             self.controlled_joints if k in self.robot.hard_constraints)
 
     def update_soft_constraints(self, soft_constraints, free_symbols):
+        """
+        Triggers a recompile if the number of soft constraints has changed.
+        :type soft_constraints: dict
+        :type free_symbols: set
+        """
+        # TODO bug if soft constraints get replaced, actual amount does not change.
         last_number_of_constraints = len(self.soft_constraints)
         self.free_symbols.update(free_symbols)
         self.soft_constraints.update(soft_constraints)
@@ -57,6 +66,15 @@ class SymEngineController(object):
                                                   path_to_functions)
 
     def get_cmd(self, substitutions, nWSR=None):
+        """
+        Computes joint commands that satisfy constrains given substitutions.
+        :param substitutions: maps symbol names as str to floats.
+        :type substitutions: dict
+        :param nWSR: magic number, if None throws errors, increase this until it stops.
+        :type nWSR: int
+        :return: maps joint names to command
+        :rtype: dict
+        """
         try:
             next_cmd = self.qp_problem_builder.get_cmd(substitutions, nWSR)
             if next_cmd is None:
@@ -69,13 +87,9 @@ class SymEngineController(object):
 
 def joint_position(current_joint, joint_goal, weight, p_gain, max_speed, name):
     """
-    :param current_joint:
-    :type current_joint: Symbol
-    :param joint_goal:
-    :type joint_goal: Symbol
-    :param weight:
-    :type weight: Symbol
-    :return:
+    :type current_joint: sw.Symbol
+    :type joint_goal: sw.Symbol
+    :type weight: sw.Symbol
     :rtype: dict
     """
     soft_constraints = OrderedDict()
@@ -93,15 +107,26 @@ def joint_position(current_joint, joint_goal, weight, p_gain, max_speed, name):
     return soft_constraints
 
 
-def continuous_joint_position(current_joint, change, weight, p_gain, max_speed, name):
+def continuous_joint_position(current_joint, rotation_distance, weight, p_gain, max_speed, constraint_name):
+    """
+    :type current_joint: sw.Symbol
+    :type rotation_distance: sw.Symbol
+    :type weight: sw.Symbol
+    :type p_gain: sw.Symbol
+    :param max_speed: in rad/s or m/s depending on joint type.
+    :type max_speed: sw.Symbol
+    :type constraint_name: str
+    :dict:
+    """
+    # TODO almost the same as joint_position
     soft_constraints = OrderedDict()
 
-    capped_err = sw.diffable_max_fast(sw.diffable_min_fast(p_gain * change, max_speed), -max_speed)
+    capped_err = sw.diffable_max_fast(sw.diffable_min_fast(p_gain * rotation_distance, max_speed), -max_speed)
 
-    soft_constraints[name] = SoftConstraint(lower=capped_err,
-                                            upper=capped_err,
-                                            weight=weight,
-                                            expression=current_joint)
+    soft_constraints[constraint_name] = SoftConstraint(lower=capped_err,
+                                                       upper=capped_err,
+                                                       weight=weight,
+                                                       expression=current_joint)
     # add_debug_constraint(soft_constraints, '{} //change//'.format(name), change)
     # add_debug_constraint(soft_constraints, '{} //max_speed//'.format(name), max_speed)
     return soft_constraints
@@ -109,16 +134,21 @@ def continuous_joint_position(current_joint, change, weight, p_gain, max_speed, 
 
 def position_conv(goal_position, current_position, weights=1, trans_gain=3, max_trans_speed=0.3, ns=''):
     """
-    :param goal_position:
-    :type goal_position: giskardpy.input_system.FrameInput
-    :param current_position:
-    :type current_position: giskardpy.input_system.FrameInput
-    :param weights:
-    :type weights:
-    :param trans_gain:
-    :param max_trans_speed:
-    :param ns:
-    :return:
+    Creates soft constrains which computes how current_position has to change to become goal_position.
+    :param goal_position: 4x1 symengine Matrix.
+    :type goal_position: sw.Matrix
+    :param current_position: 4x1 symengine Matrix. Describes fk with joint positions.
+    :type current_position: sw.Matrix
+    :param weights: how important are these constraints
+    :type weights: sw.Symbol
+    :param trans_gain: how was max_trans_speed is reached.
+    :type trans_gain: sw.Symbol
+    :param max_trans_speed: maximum speed in m/s
+    :type max_trans_speed: sw.Symbol
+    :param ns: some string to make constraint names unique
+    :type ns: str
+    :return: contains the constraints
+    :rtype: dict
     """
     soft_constraints = OrderedDict()
 
@@ -145,6 +175,24 @@ def position_conv(goal_position, current_position, weights=1, trans_gain=3, max_
 
 def rotation_conv(goal_rotation, current_rotation, current_evaluated_rotation, weights=1,
                   rot_gain=3, max_rot_speed=0.5, ns=''):
+    """
+    Creates soft constrains which computes how current_rotation has to change to become goal_rotation.
+    :param goal_rotation: 4x4 symengine Matrix.
+    :type goal_rotation: sw.Matrix
+    :param current_rotation: 4x4 symengine Matrix. Describes current rotation with joint positions
+    :type current_rotation: sw.Matrix
+    :param current_evaluated_rotation: 4x4 symengine Matrix. contains the evaluated current rotation.
+    :type current_evaluated_rotation: sw.Matrix
+    :param weights: how important these constraints are
+    :type weights: sw.Symbol
+    :param rot_gain: how quickly max_rot_speed is reached.
+    :type rot_gain: sw.Symbol
+    :param max_rot_speed: maximum rotation speed in rad/s
+    :type max_rot_speed: sw.Symbol
+    :param ns: some string to make the constraint names unique
+    :return: contains the constraints.
+    :rtype: dict
+    """
     soft_constraints = OrderedDict()
     axis, angle = sw.axis_angle_from_matrix((current_rotation.T * goal_rotation))
 
@@ -245,6 +293,29 @@ def rotation_conv(goal_rotation, current_rotation, current_evaluated_rotation, w
 
 def link_to_link_avoidance(link_name, current_pose, current_pose_eval, point_on_link, other_point, contact_normal,
                            lower_limit=0.05, upper_limit=1e9, weight=10000):
+    """
+    Pushes a robot link away from another point.
+    :type link_name: str
+    :param current_pose: 4x4 symengine matrix describing the fk to the link with joint positions.
+    :type current_pose: sw.Matrix
+    :param current_pose_eval: 4x4 symengine matrix which contains the pose of the link. The entries should only be one symbol
+                                which get directly replaced with the fk.
+    :type current_pose_eval: sw.Matrix
+    :param point_on_link: 4x1 symengine Matrix. Point on the link in root frame.
+    :type point_on_link: sw.Matrix
+    :param other_point: 4x1 symengine Matrix. Position of the other point in root frame.
+    :type other_point: sw.Matrix
+    :param contact_normal: 4x1 symengine Matrix. Vector pointing from the other point to the contact point on the link.
+    :type contact_normal: sw.Matrix
+    :param lower_limit: minimal allowed distance to the other point.
+    :type lower_limit: sw.Symbol
+    :param upper_limit: maximum distance allowed to the other point.
+    :type upper_limit: sw.Symbol
+    :param weight: How important this constraint is.
+    :type weight: sw.Symbol
+    :return: contains the soft constraint.
+    :rtype: dict
+    """
     soft_constraints = OrderedDict()
     name = u'{} to any collision'.format(link_name)
 
@@ -264,6 +335,15 @@ def link_to_link_avoidance(link_name, current_pose, current_pose_eval, point_on_
 
 
 def add_debug_constraint(d, key, expr):
+    """
+    If you want to see an arbitrary evaluated expression in the matrix use this.
+    These softconstraints will not influence anything.
+    :param d: a dict where the softcontraint will be added to
+    :type: dict
+    :param key: a name to identify the debug soft contraint
+    :type key: str
+    :type expr: sw.Symbol
+    """
     d[key] = SoftConstraint(lower=expr,
                             upper=expr,
                             weight=0,

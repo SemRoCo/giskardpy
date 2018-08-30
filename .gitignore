@@ -28,6 +28,9 @@ msg/_*.py
 # qcreator stuff
 CMakeLists.txt.user
 
+# python stuff
+*.hypothesis/
+*.pytest_cache/
 srv/_*.py
 *.pcd
 *.pyc
@@ -45,3 +48,4 @@ qtcreator-*
 
 # Catkin custom files
 CATKIN_IGNORE
+

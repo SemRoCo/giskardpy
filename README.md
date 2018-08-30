@@ -5,12 +5,12 @@ The core python library of the Giskard framework for constraint- and optimizatio
 
 First install symengine + symengine.py
 ```
-sudo apt-get install llvm-4.0-dev
+sudo apt-get install llvm-6.0-dev
 git clone https://github.com/symengine/symengine.git
 git clone https://github.com/symengine/symengine.py.git
 cd symengine
 git checkout `cat ../symengine.py/symengine_version.txt`
-cmake -DWITH_LLVM:BOOL=ON .
+cmake -DBUILD_SHARED_LIBS:BOOL=ON -DWITH_LLVM:BOOL=ON .
 make
 sudo make install
 cd ../symengine.py

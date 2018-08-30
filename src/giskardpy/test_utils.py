@@ -41,6 +41,12 @@ def angle(*args, **kwargs):
 def keys_values(max_length=10, value_type=st.floats(allow_nan=False)):
     return lists_of_same_length([variable_name(), value_type], max_length=max_length, unique=True)
 
+def compare_axis_angle(angle1, axis1, angle2, axis2):
+    if np.isclose(axis1, axis2).all():
+        assert np.isclose(angle1, angle2), '{} != {}'.format(angle, angle2)
+    elif np.isclose(axis1, -axis2).all():
+        assert np.isclose(angle1, abs(angle2-2*pi)), '{} != {}'.format(angle, angle2)
+
 
 @composite
 def variable_name(draw):

@@ -15,12 +15,12 @@ from tf.transformations import quaternion_matrix, quaternion_about_axis, quatern
 from numpy import pi
 
 from transforms3d.axangles import mat2axangle
-from transforms3d.euler import euler2mat
+from transforms3d.euler import euler2mat, axangle2euler, euler2axangle
 
 import giskardpy.symengine_wrappers as spw
 from giskardpy import BACKEND
 from giskardpy.test_utils import limited_float, SMALL_NUMBER, unit_vector, quaternion, vector, \
-    pykdl_frame_to_numpy, lists_of_same_length, angle
+    pykdl_frame_to_numpy, lists_of_same_length, angle, compare_axis_angle
 
 PKG = 'giskardpy'
 
@@ -180,7 +180,7 @@ class TestSympyWrapper(unittest.TestCase):
     @given(quaternion(),
            quaternion(),
            st.floats(allow_nan=False, allow_infinity=False, min_value=0, max_value=1))
-    def test_speed_up3(self, q1, q2, t):
+    def test_speed_up_slerp(self, q1, q2, t):
         q1_s = spw.var('q1x q1y q1z q1w')
         q2_s = spw.var('q2x q2y q2z q2w')
         t_s = spw.Symbol('t')
@@ -442,7 +442,7 @@ class TestSympyWrapper(unittest.TestCase):
            angle(),
            angle())
     def test_axis_angle_from_rpy(self, roll, pitch, yaw):
-        axis2, angle2 = mat2axangle(euler2mat(roll, pitch, yaw))
+        axis2, angle2 = euler2axangle(roll, pitch, yaw)
         assume(abs(angle2) > SMALL_NUMBER)
         axis, angle = spw.axis_angle_from_rpy(roll, pitch, yaw)
         angle = float(angle)
@@ -453,8 +453,9 @@ class TestSympyWrapper(unittest.TestCase):
         if angle2 < 0:
             angle2 = -angle2
             axis2 *= -1
-        self.assertTrue(np.isclose(angle, angle2), msg='{} != {}'.format(angle, angle2))
-        self.assertTrue(np.isclose(axis, axis2).all(), msg='{} != {}'.format(axis, axis2))
+        compare_axis_angle(angle, axis, angle2, axis2)
+        # self.assertTrue(np.isclose(angle, angle2), msg='{} != {}'.format(angle, angle2))
+        # self.assertTrue(np.isclose(axis, axis2).all(), msg='{} != {}'.format(axis, axis2))
 
     # fails if numbers too big or too small
     # TODO rpy does not follow some conventions I guess

@@ -12,16 +12,28 @@ import hashlib
 
 from giskardpy.symengine_wrappers import load_compiled_function, safe_compiled_function
 
-SoftConstraint = namedtuple('SoftConstraint', ['lower', 'upper', 'weight', 'expression'])
-HardConstraint = namedtuple('HardConstraint', ['lower', 'upper', 'expression'])
-JointConstraint = namedtuple('JointConstraint', ['lower', 'upper', 'weight'])
+SoftConstraint = namedtuple(u'SoftConstraint', [u'lower', u'upper', u'weight', u'expression'])
+HardConstraint = namedtuple(u'HardConstraint', [u'lower', u'upper', u'expression'])
+JointConstraint = namedtuple(u'JointConstraint', [u'lower', u'upper', u'weight'])
 
 BIG_NUMBER = 1e9
 
 
 class QProblemBuilder(object):
+    """
+    Wraps around QPOases. Builds the required matrices from constraints.
+    """
     def __init__(self, joint_constraints_dict, hard_constraints_dict, soft_constraints_dict, controlled_joint_symbols,
                  free_symbols=None, path_to_functions=''):
+        """
+        :type joint_constraints_dict: dict
+        :type hard_constraints_dict: dict
+        :type soft_constraints_dict: dict
+        :type controlled_joint_symbols: set
+        :type free_symbols: set
+        :param path_to_functions: location where the compiled functions can be safed.
+        :type path_to_functions: str
+        """
         assert (not len(controlled_joint_symbols) > len(joint_constraints_dict))
         assert (not len(controlled_joint_symbols) < len(joint_constraints_dict))
         assert (len(hard_constraints_dict) <= len(controlled_joint_symbols))
@@ -31,8 +43,7 @@ class QProblemBuilder(object):
         self.hard_constraints_dict = hard_constraints_dict
         self.soft_constraints_dict = soft_constraints_dict
         self.controlled_joints = controlled_joint_symbols
-        self.controlled_joints_strs = [str(x) for x in self.controlled_joints]
-        self.make_sympy_matrices()
+        self.make_matrices()
 
         self.shape1 = len(self.hard_constraints_dict) + len(self.soft_constraints_dict)
         self.shape2 = len(self.joint_constraints_dict) + len(self.soft_constraints_dict)
@@ -41,7 +52,11 @@ class QProblemBuilder(object):
                                   len(self.hard_constraints_dict) + len(self.soft_constraints_dict))
 
     # @profile
-    def make_sympy_matrices(self):
+    def make_matrices(self):
+        """
+        Turns constrains into a function that computes the matrices needed for QPOases.
+        """
+        # TODO split this into smaller functions to increase readability
         t_total = time()
         # TODO cpu intensive
         weights = []
@@ -65,14 +80,14 @@ class QProblemBuilder(object):
             ubA.append(c.upper)
             lb.append(-BIG_NUMBER)
             ub.append(BIG_NUMBER)
-            assert not isinstance(c.expression, spw.Matrix), 'Matrices are not allowed as soft constraint expression'
+            assert not isinstance(c.expression, spw.Matrix), u'Matrices are not allowed as soft constraint expression'
             soft_expressions.append(c.expression)
 
         self.cython_big_ass_M = load_compiled_function(self.path_to_functions)
         self.np_g = np.zeros(len(weights))
 
         if self.cython_big_ass_M is None:
-            print('new controller requested; compiling')
+            print(u'new controller requested; compiling')
             self.H = spw.diag(*weights)
 
             self.lb = spw.Matrix(lb)
@@ -90,7 +105,7 @@ class QProblemBuilder(object):
             A_soft = spw.Matrix(soft_expressions)
             t = time()
             A_soft = A_soft.jacobian(M_controlled_joints)
-            print('jacobian took {}'.format(time() - t))
+            print(u'jacobian took {}'.format(time() - t))
             identity = spw.eye(A_soft.shape[0])
             A_soft = A_soft.row_join(identity)
 
@@ -111,19 +126,19 @@ class QProblemBuilder(object):
             self.cython_big_ass_M = spw.speed_up(self.big_ass_M, self.free_symbols, backend=BACKEND)
             if self.path_to_functions is not None:
                 safe_compiled_function(self.cython_big_ass_M, self.path_to_functions)
-            print('autowrap took {}'.format(time() - t))
+            print(u'autowrap took {}'.format(time() - t))
         else:
-            print('controller loaded {}'.format(self.path_to_functions))
-        print('controller ready {}s'.format(time() - t_total))
+            print(u'controller loaded {}'.format(self.path_to_functions))
+        print(u'controller ready {}s'.format(time() - t_total))
 
     def save_pickle(self, hash, f):
-        with open('/tmp/{}'.format(hash), 'w') as file:
+        with open(u'/tmp/{}'.format(hash), u'w') as file:
             pickle.dump(f, file)
 
     def load_pickle(self, hash):
         return pickle.load(hash)
 
-    def debug_print(self, np_H, np_A, np_lb, np_ub, np_lbA, np_ubA, xdot_full):
+    def debug_print(self, np_H, np_A, np_lb, np_ub, np_lbA, np_ubA, xdot_full=None):
         import pandas as pd
         lb = []
         ub = []
@@ -154,28 +169,31 @@ class QProblemBuilder(object):
         p_lbA = pd.DataFrame(np_lbA, lbA)
         p_ubA = pd.DataFrame(np_ubA, ubA)
         p_weights = pd.DataFrame(np_H.dot(np.ones(np_H.shape[0])), weights)
-        p_xdot = pd.DataFrame(xdot_full, xdot)
+        if xdot_full is not None:
+            p_xdot = pd.DataFrame(xdot_full, xdot)
         p_A = pd.DataFrame(np_A, lbA, weights)
         pass
 
     def get_cmd(self, substitutions, nWSR=None):
         """
-
+        Uses substitutions for each symbol to compute the next commands for each joint.
         :param substitutions: symbol -> value
         :type substitutions: dict
         :return: joint name -> joint command
         :rtype: dict
         """
         np_big_ass_M = self.cython_big_ass_M(**substitutions)
+        # TODO create functions to extract the different matrices.
         np_H = np.array(np_big_ass_M[self.shape1:, :-2])
         np_A = np.array(np_big_ass_M[:self.shape1, :self.shape2])
         np_lb = np.array(np_big_ass_M[self.shape1:, -2])
         np_ub = np.array(np_big_ass_M[self.shape1:, -1])
         np_lbA = np.array(np_big_ass_M[:self.shape1, -2])
         np_ubA = np.array(np_big_ass_M[:self.shape1, -1])
+        # self.debug_print(np_H, np_A, np_lb, np_ub, np_lbA, np_ubA)
         xdot_full = self.qp_solver.solve(np_H, self.np_g, np_A, np_lb, np_ub, np_lbA, np_ubA, nWSR)
         if xdot_full is None:
             return None
-        # TODO enable debug print in an elegant way
+        # TODO enable debug print in an elegant way, preferably without slowing anything down
         # self.debug_print(np_H, np_A, np_lb, np_ub, np_lbA, np_ubA, xdot_full)
-        return OrderedDict((observable, xdot_full[i]) for i, observable in enumerate(self.controlled_joints_strs))
+        return OrderedDict((observable, xdot_full[i]) for i, observable in enumerate(self.controlled_joints))

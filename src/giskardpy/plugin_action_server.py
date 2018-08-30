@@ -1,8 +1,5 @@
 import numpy as np
 from Queue import Empty, Queue
-from collections import OrderedDict
-import pylab as plt
-from itertools import product
 
 import actionlib
 import rospy
@@ -15,30 +12,49 @@ from giskard_msgs.msg._MoveFeedback import MoveFeedback
 from giskard_msgs.msg._MoveGoal import MoveGoal
 from giskard_msgs.msg._MoveResult import MoveResult
 
-from trajectory_msgs.msg import JointTrajectoryPoint
+from trajectory_msgs.msg import JointTrajectoryPoint, JointTrajectory
 
 from giskardpy.exceptions import MAX_NWSR_REACHEDException, QPSolverException, SolverTimeoutError, InsolvableException, \
-    SymengineException, PathCollisionException
-from giskardpy.plugin import Plugin
+    SymengineException, PathCollisionException, UnknownBodyException
+from giskardpy.plugin import PluginBase
+from giskardpy.plugin_log_trajectory import LogTrajectoryPlugin
 from giskardpy.tfwrapper import transform_pose
-from giskardpy.trajectory import ClosestPointInfo
-from giskardpy.trajectory import SingleJointState, Transform, Point, Quaternion, Trajectory
+from giskardpy.utils import closest_point_constraint_violated
 
+ERROR_CODE_TO_NAME = {getattr(MoveResult, x): x for x in dir(MoveResult) if x.isupper()}
 
-def closest_point_constraint_violated(cp, multiplier=0.9):
-    for link_name, cpi_info in cp.items():  # type: (str, ClosestPointInfo)
-        if cpi_info.contact_distance < cpi_info.min_dist * multiplier:
-            print(cpi_info.link_a, cpi_info.link_b, cpi_info.contact_distance)
-            return True
-    return False
-
-class ActionServerPlugin(Plugin):
+class ActionServerPlugin(PluginBase):
+    """
+    Offers and action server and uses giskard to solve the goals.
+    """
     # TODO find a better name than ActionServerPlugin
     def __init__(self, cartesian_goal_identifier, js_identifier, trajectory_identifier, time_identifier,
                  closest_point_identifier, controlled_joints_identifier, collision_goal_identifier,
                  pyfunction_identifier, joint_convergence_threshold, wiggle_precision_threshold, fill_velocity_values,
                  collision_time_threshold, max_traj_length,
                  plot_trajectory=False):
+        """
+        :type cartesian_goal_identifier: str
+        :type js_identifier: str
+        :type trajectory_identifier: str
+        :type time_identifier: str
+        :type closest_point_identifier: str
+        :type controlled_joints_identifier: str
+        :type collision_goal_identifier: str
+        :type pyfunction_identifier: str
+        :param joint_convergence_threshold: if the maximum joint velocity falls below this value, the current universe is killed
+        :type joint_convergence_threshold: float
+        :param wiggle_precision_threshold: rounds joint states to this many decimal places and stops the universe if a joint state is seen twice
+        :type wiggle_precision_threshold: float
+        :param fill_velocity_values: The pr2 doesn't like velocities in its joint traj goals.
+        :type fill_velocity_values: bool
+        :param collision_time_threshold: if the robot is in collision after this many s, it is assumed, that it can't get out and the univserse is killed
+        :type collision_time_threshold: float
+        :param max_traj_length: if no traj can be found that takes less than this many s to execute, the planning is stopped.
+        :type max_traj_length: float
+        :param plot_trajectory: saves a plot of the joint traj for debugging.
+        :type plot_trajectory: bool
+        """
         self.fill_velocity_values = fill_velocity_values
         self.plot_trajectory = plot_trajectory
         self.goal_identifier = cartesian_goal_identifier
@@ -57,219 +73,26 @@ class ActionServerPlugin(Plugin):
         self.joint_goal = None
         self.start_js = None
         self.goal_solution = None
-        self.get_readings_lock = Queue(1)
-        self.update_lock = Queue(1)
+        self.move_cmd_queue = Queue(1)
+        self.results_queue = Queue(1)
 
         super(ActionServerPlugin, self).__init__()
 
-    def create_parallel_universe(self):
-        muh = self.new_universe
-        self.new_universe = False
-        return muh
-
-    def end_parallel_universe(self):
-        return super(ActionServerPlugin, self).end_parallel_universe()
-
-    def update(self):
-        self.controlled_joints = self.god_map.get_data([self.controlled_joints_identifier])
-        self.current_js = self.god_map.get_data([self.js_identifier])
-        goals = None
-        cmd = None
-        try:
-            cmd = self.get_readings_lock.get_nowait()  # type: MoveCmd
-            rospy.loginfo('got goal')
-            goals = {}
-            goals[str(Controller.JOINT)] = {}
-            goals[str(Controller.TRANSLATION_3D)] = {}
-            goals[str(Controller.ROTATION_3D)] = {}
-            # goals['max_trajectory_length'] = cmd.max_trajectory_length
-            self.new_universe = True
-            for controller in cmd.controllers:
-                goal_key = str(controller.type)
-                if controller.type == Controller.JOINT:
-                    # TODO check for unknown joint names
-                    rospy.loginfo('got joint goal')
-                    for i, joint_name in enumerate(controller.goal_state.name):
-                        goals[goal_key][joint_name] = {'weight': controller.weight,
-                                                       'p_gain' : controller.p_gain,
-                                                       'max_speed': controller.max_speed,
-                                                       'position': controller.goal_state.position[i]}
-                elif controller.type in [Controller.TRANSLATION_3D, Controller.ROTATION_3D]:
-                    root = controller.root_link
-                    tip = controller.tip_link
-                    controller.goal_pose = transform_pose(root, controller.goal_pose)
-                    goals[goal_key][root, tip] = controller
-            feedback = MoveFeedback()
-            feedback.phase = MoveFeedback.PLANNING
-            self._as.publish_feedback(feedback)
-        except Empty:
-            pass
-        self.god_map.set_data([self.goal_identifier], goals)
-        self.god_map.set_data([self.js_identifier], self.current_js if self.start_js is None else self.start_js)
-        self.god_map.set_data([self.collision_goal_identifier], cmd.collisions if cmd is not None else None)
-
-    def post_mortem_analysis(self, god_map, exception):
-        result = MoveResult()
-        result.error_code = MoveResult.INSOLVABLE
-        if self._as.is_preempt_requested():
-            result.error_code = MoveResult.INTERRUPTED
-        elif isinstance(exception, MAX_NWSR_REACHEDException):
-            result.error_code = MoveResult.MAX_NWSR_REACHED
-        elif isinstance(exception, QPSolverException):
-            result.error_code = MoveResult.QP_SOLVER_ERROR
-        elif isinstance(exception, KeyError):
-            result.error_code = MoveResult.UNKNOWN_OBJECT
-        elif isinstance(exception, SolverTimeoutError):
-            result.error_code = MoveResult.SOLVER_TIMEOUT
-        elif isinstance(exception, InsolvableException):
-            result.error_code = MoveResult.INSOLVABLE
-        elif isinstance(exception, SymengineException):
-            result.error_code = MoveResult.SYMENGINE_ERROR
-        elif isinstance(exception, PathCollisionException):
-            result.error_code = MoveResult.PATH_COLLISION
-        if exception is None and not self._as.is_preempt_requested():
-            cp = god_map.get_data([self.closest_point_identifier])
-            if not closest_point_constraint_violated(cp):
-                result.error_code = MoveResult.SUCCESS
-                trajectory = god_map.get_data([self.trajectory_identifier])
-                self.start_js = god_map.get_data([self.js_identifier])
-                result.trajectory.joint_names = self.controller_joints
-                for time, traj_point in trajectory.items():
-                    p = JointTrajectoryPoint()
-                    p.time_from_start = rospy.Duration(time)
-                    for joint_name in self.controller_joints:
-                        if joint_name in traj_point:
-                            p.positions.append(traj_point[joint_name].position)
-                            if self.fill_velocity_values:
-                                p.velocities.append(traj_point[joint_name].velocity)
-                        else:
-                            p.positions.append(self.start_js[joint_name].position)
-                            if self.fill_velocity_values:
-                                p.velocities.append(self.start_js[joint_name].velocity)
-                    result.trajectory.points.append(p)
-            else:
-                result.error_code = MoveResult.END_STATE_COLLISION
-        self.god_map.set_data([self.pyfunction_identifier], god_map.get_data([self.pyfunction_identifier]))
-        self.update_lock.put(result)
-        self.update_lock.join()
-
-    def closest_point_constraint_violated(self, god_map):
-        cp = god_map.get_data([self.closest_point_identifier])
-        for link_name, cpi_info in cp.items():  # type: (str, ClosestPointInfo)
-            if cpi_info.contact_distance < cpi_info.min_dist * 0.9:
-                print(cpi_info.link_a, cpi_info.link_b, cpi_info.contact_distance)
-                return True
-        return False
-
-    def action_server_cb(self, goal):
-        """
-        :param goal:
-        :type goal: MoveGoal
-        """
-        rospy.loginfo('received goal')
-        self.execute = goal.type == MoveGoal.PLAN_AND_EXECUTE
-        if goal.type == MoveGoal.UNDEFINED:
-            result = MoveResult()
-            result.error_code = MoveResult.INSOLVABLE
-        else:
-            # TODO do we really want to check for start state collision?
-            # if True:
-            result = None
-            for i, move_cmd in enumerate(goal.cmd_seq):
-                # TODO handle empty controller case
-                self.get_readings_lock.put(move_cmd)
-                intermediate_result = self.update_lock.get()  # type: MoveResult
-                if intermediate_result.error_code != MoveResult.SUCCESS:
-                    result = intermediate_result
-                    break
-                if result is None:
-                    result = intermediate_result
-                else:
-                    step_size = result.trajectory.points[1].time_from_start - \
-                                result.trajectory.points[0].time_from_start
-                    end_of_last_point = result.trajectory.points[-1].time_from_start + step_size
-                    for point in intermediate_result.trajectory.points:  # type: JointTrajectoryPoint
-                        point.time_from_start += end_of_last_point
-                        result.trajectory.points.append(point)
-                if i < len(goal.cmd_seq) - 1:
-                    self.update_lock.task_done()
-            else:  # if not break
-                rospy.loginfo('solution ready')
-                feedback = MoveFeedback()
-                feedback.phase = MoveFeedback.EXECUTION
-                if result.error_code == MoveResult.SUCCESS and self.execute:
-                    goal = FollowJointTrajectoryGoal()
-                    goal.trajectory = result.trajectory
-                    if self._as.is_preempt_requested():
-                        rospy.loginfo('new goal, cancel old one')
-                        self._ac.cancel_all_goals()
-                        result.error_code = MoveResult.INTERRUPTED
-                    else:
-                        self._ac.send_goal(goal)
-                        t = rospy.get_rostime()
-                        expected_duration = goal.trajectory.points[-1].time_from_start.to_sec()
-                        rospy.loginfo('waiting for {:.3f} sec with {} points'.format(expected_duration,
-                                                                                     len(goal.trajectory.points)))
-
-                        while not self._ac.wait_for_result(rospy.Duration(.1)):
-                            time_passed = (rospy.get_rostime() - t).to_sec()
-                            feedback.progress = min(time_passed / expected_duration, 1)
-                            self._as.publish_feedback(feedback)
-                            if self._as.is_preempt_requested():
-                                rospy.loginfo('new goal, cancel old one')
-                                self._ac.cancel_all_goals()
-                                result.error_code = MoveResult.INTERRUPTED
-                                break
-                            if time_passed > expected_duration + 0.1: # TODO new error code
-                                rospy.loginfo('controller took too long to execute trajectory')
-                                self._ac.cancel_all_goals()
-                                result.error_code = MoveResult.INTERRUPTED
-                                break
-                        else:  # if not break
-                            print('shit took {:.3f}s'.format((rospy.get_rostime() - t).to_sec()))
-                            r = self._ac.get_result()
-                            if r.error_code == FollowJointTrajectoryResult.SUCCESSFUL:
-                                result.error_code = MoveResult.SUCCESS
-            # else:
-            #     result = MoveResult()
-            #     result.error_code = MoveResult.START_STATE_COLLISION
-        self.start_js = None
-        if result.error_code != MoveResult.SUCCESS:
-            self._as.set_aborted(result)
-        else:
-            self._as.set_succeeded(result)
-        rospy.loginfo('finished movement {}'.format(result.error_code))
-        try:
-            self.update_lock.task_done()
-        except ValueError:
-            pass
-
-    def get_default_joint_goal(self):
-        joint_goal = OrderedDict()
-        for joint_name in sorted(self.controller_joints):
-            joint_goal[joint_name] = {'weight': 1,
-                                      'position': self.current_js[joint_name].position}
-        return joint_goal
-
     def start_once(self):
         self.new_universe = False
-        # action server
-        self._action_name = 'qp_controller/command'
+        self._action_name = u'qp_controller/command'
         # TODO remove whole body controller and use remapping
-        self._ac = actionlib.SimpleActionClient('/whole_body_controller/follow_joint_trajectory',
+        self._ac = actionlib.SimpleActionClient(u'/whole_body_controller/follow_joint_trajectory',
                                                 FollowJointTrajectoryAction)
-        # self._ac = actionlib.SimpleActionClient('/follow_joint_trajectory', FollowJointTrajectoryAction)
-        # self.state_sub = rospy.Subscriber('/whole_body_controller/state', JointTrajectoryControllerState,
-        #                                   self.state_cb)
-        # self.state_sub = rospy.Subscriber('/fake_state', JointTrajectoryControllerState, self.state_cb)
         self._as = actionlib.SimpleActionServer(self._action_name, MoveAction,
                                                 execute_cb=self.action_server_cb, auto_start=False)
-        self.controller_joints = rospy.wait_for_message('/whole_body_controller/state',
+        self.controller_joints = rospy.wait_for_message(u'/whole_body_controller/state',
                                                         JointTrajectoryControllerState).joint_names
         self._as.start()
 
     def stop(self):
-        pass
+        self._as = None
+        self._ac = None
 
     def copy(self):
         self.child = LogTrajectoryPlugin(trajectory_identifier=self.trajectory_identifier,
@@ -286,152 +109,281 @@ class ActionServerPlugin(Plugin):
                                          max_traj_length=self.max_traj_length)
         return self.child
 
+    def create_parallel_universe(self):
+        muh = self.new_universe
+        self.new_universe = False
+        return muh
+
+    def end_parallel_universe(self):
+        return super(ActionServerPlugin, self).end_parallel_universe()
+
+    def update(self):
+        self.controlled_joints = self.god_map.get_data([self.controlled_joints_identifier])
+        self.current_js = self.god_map.get_data([self.js_identifier])
+        goals = None
+        cmd = self.get_move_cmd_from_action_server()
+        if cmd is not None:
+            goals = self.cmd_to_goals(cmd)
+            self.new_universe = True
+            self.publish_feedback(MoveFeedback.PLANNING, 0)
+        self.god_map.set_data([self.goal_identifier], goals)
+        # TODO create a more obvious way to modify a god map for a parallel universe
+        self.god_map.set_data([self.js_identifier], self.current_js if self.start_js is None else self.start_js)
+        self.god_map.set_data([self.collision_goal_identifier], cmd.collisions if cmd is not None else None)
+
+    def cmd_to_goals(self, cmd):
+        """
+        :type cmd: MoveCmd
+        :rtype: dict
+        """
+        goals = {}
+        goals[str(Controller.JOINT)] = {}
+        goals[str(Controller.TRANSLATION_3D)] = {}
+        goals[str(Controller.ROTATION_3D)] = {}
+        for controller in cmd.controllers:
+            t = str(controller.type)
+            if controller.type == Controller.JOINT:
+                goals[t].update(self.joint_controller_to_goal(controller))
+            elif controller.type == Controller.TRANSLATION_3D:
+                goals[t].update(self.cart_controller_to_goal(controller))
+            elif controller.type == Controller.ROTATION_3D:
+                goals[t].update(self.cart_controller_to_goal(controller))
+        return goals
+
+    def joint_controller_to_goal(self, controller):
+        """
+        :type controller: Controller
+        :return: joint_name -> {controller parameter -> value}
+        :rtype: dict
+        """
+        # TODO check for unknown joint names?
+        goals = {}
+        rospy.loginfo(u'got joint goal')
+        for i, joint_name in enumerate(controller.goal_state.name):
+            goals[joint_name] = {u'weight': controller.weight,
+                                 u'p_gain': controller.p_gain,
+                                 u'max_speed': controller.max_speed,
+                                 u'position': controller.goal_state.position[i]}
+        return goals
+
+    def cart_controller_to_goal(self, controller):
+        """
+        :type controller: Controller
+        :return: (root_link, tip_link) -> {controller parameter -> value}
+        :rtype: dict
+        """
+        goals = {}
+        root = controller.root_link
+        tip = controller.tip_link
+        controller.goal_pose = transform_pose(root, controller.goal_pose)
+        goals[root, tip] = controller
+        return goals
+
+    def post_mortem_analysis(self, god_map, exception):
+        """
+        Extracts logged traj from god map of the dead universe and publishes the result.
+        """
+        self.publish_feedback(MoveFeedback.PLANNING, 1)
+        result = MoveResult()
+        result.error_code = self.exception_to_error_code(exception)
+        if result.error_code == MoveResult.SUCCESS:
+            last_cp = god_map.get_data([self.closest_point_identifier])
+            if not closest_point_constraint_violated(last_cp):
+                result.trajectory = self.get_traj_msg(god_map)
+            else:
+                result.error_code = MoveResult.END_STATE_COLLISION
+        # keep pyfunctions created in parallel universe
+        # TODO find a better way to copy python functions from the parallel universe
+        self.god_map.set_data([self.pyfunction_identifier], god_map.get_data([self.pyfunction_identifier]))
+        self.send_to_action_server_and_wait(result)
+
+    def send_to_action_server_and_wait(self, result):
+        self.results_queue.put(result)
+        self.results_queue.join()
+
+    def get_move_cmd_from_action_server(self):
+        """
+        :rtype: MoveCmd
+        """
+        try:
+            return self.move_cmd_queue.get_nowait()
+        except Empty:
+            return None
+
+    def let_process_manager_continue(self):
+        self.results_queue.task_done()
+
+    def send_to_process_manager_and_wait(self, move_cmd):
+        """
+        :type move_cmd: MoveCmd
+        :rtype: MoveResult
+        """
+        self.move_cmd_queue.put(move_cmd)
+        return self.results_queue.get()
+
+    def get_traj_msg(self, god_map):
+        """
+        :type god_map: giskardpy.god_map.GodMap
+        :rtype: JointTrajectory
+        """
+        trajectory_msg = JointTrajectory()
+        trajectory = god_map.get_data([self.trajectory_identifier])
+        self.start_js = god_map.get_data([self.js_identifier])
+        trajectory_msg.joint_names = self.controller_joints
+        for time, traj_point in trajectory.items():
+            p = JointTrajectoryPoint()
+            p.time_from_start = rospy.Duration(time)
+            for joint_name in self.controller_joints:
+                if joint_name in traj_point:
+                    p.positions.append(traj_point[joint_name].position)
+                    if self.fill_velocity_values:
+                        p.velocities.append(traj_point[joint_name].velocity)
+                else:
+                    p.positions.append(self.start_js[joint_name].position)
+                    if self.fill_velocity_values:
+                        p.velocities.append(self.start_js[joint_name].velocity)
+            trajectory_msg.points.append(p)
+        return trajectory_msg
+
+    def exception_to_error_code(self, exception):
+        """
+        :type exception: Exception
+        :rtype: int
+        """
+        error_code = MoveResult.SUCCESS
+        if self._as.is_preempt_requested():
+            # TODO throw exception on preempted in order to get rid of if?
+            error_code = MoveResult.INTERRUPTED
+        elif isinstance(exception, MAX_NWSR_REACHEDException):
+            error_code = MoveResult.MAX_NWSR_REACHED
+        elif isinstance(exception, QPSolverException):
+            error_code = MoveResult.QP_SOLVER_ERROR
+        elif isinstance(exception, UnknownBodyException):
+            error_code = MoveResult.UNKNOWN_OBJECT
+        elif isinstance(exception, SolverTimeoutError):
+            error_code = MoveResult.SOLVER_TIMEOUT
+        elif isinstance(exception, InsolvableException):
+            error_code = MoveResult.INSOLVABLE
+        elif isinstance(exception, SymengineException):
+            error_code = MoveResult.SYMENGINE_ERROR
+        elif isinstance(exception, PathCollisionException):
+            error_code = MoveResult.PATH_COLLISION
+        elif exception is not None:
+            error_code = MoveResult.INSOLVABLE
+        return error_code
+
+    def action_server_cb(self, goal):
+        """
+        :param goal:
+        :type goal: MoveGoal
+        """
+        rospy.loginfo(u'goal received')
+        self.execute = goal.type == MoveGoal.PLAN_AND_EXECUTE
+        if goal.type == MoveGoal.UNDEFINED:
+            result = MoveResult()
+            # TODO new error code
+            result.error_code = MoveResult.INSOLVABLE
+            self._as.set_aborted(result)
+        else:
+            result = MoveResult()
+            for i, move_cmd in enumerate(goal.cmd_seq):  # type: (int, MoveCmd)
+                # TODO handle empty controller case
+                intermediate_result = self.send_to_process_manager_and_wait(move_cmd)
+                result.error_code = intermediate_result.error_code
+                if result.error_code != MoveResult.SUCCESS:
+                    # clear traj from prev cmds
+                    result.trajectory = JointTrajectory()
+                    break
+                result.trajectory = self.append_trajectory(result.trajectory, intermediate_result.trajectory)
+                if i < len(goal.cmd_seq) - 1:
+                    self.let_process_manager_continue()
+            else:  # if not break
+                rospy.loginfo(u'found solution')
+                if result.error_code == MoveResult.SUCCESS and self.execute:
+                    result.error_code = self.send_to_robot(result)
+
+            self.start_js = None
+            if result.error_code != MoveResult.SUCCESS:
+                self._as.set_aborted(result)
+            else:
+                self._as.set_succeeded(result)
+            self.let_process_manager_continue()
+        rospy.loginfo(u'goal result: {}'.format(ERROR_CODE_TO_NAME[result.error_code]))
+
+    def send_to_robot(self, result):
+        """
+        :type result: MoveResult
+        :return: error code from MoveResult
+        :rtype: int
+        """
+        goal = FollowJointTrajectoryGoal()
+        goal.trajectory = result.trajectory
+        if self._as.is_preempt_requested():
+            rospy.loginfo(u'new goal, cancel old one')
+            self._ac.cancel_all_goals()
+            error_code = MoveResult.INTERRUPTED
+        else:
+            self._ac.send_goal(goal)
+            expected_duration = goal.trajectory.points[-1].time_from_start.to_sec()
+            rospy.loginfo(u'waiting for {:.3f} sec with {} points'.format(expected_duration,
+                                                                          len(goal.trajectory.points)))
+            error_code = self.wait_for_result_and_feed_back_feedback(expected_duration)
+        return error_code
+
+    def append_trajectory(self, traj1, traj2):
+        """
+        :type traj1: JointTrajectory
+        :type traj2: JointTrajectory
+        :rtype: JointTrajectory
+        """
+        # FIXME probably overwrite traj1
+        if len(traj1.points) == 0:
+            return traj2
+        # FIXME this step size assume a fixed distance between traj points
+        step_size = traj1.points[1].time_from_start - \
+                    traj1.points[0].time_from_start
+        end_of_last_point = traj1.points[-1].time_from_start + step_size
+        for point in traj2.points:  # type: JointTrajectoryPoint
+            point.time_from_start += end_of_last_point
+            traj1.points.append(point)
+        return traj1
+
+    def publish_feedback(self, phase, progress):
+        feedback = MoveFeedback()
+        feedback.phase = phase
+        feedback.progress = progress
+        self._as.publish_feedback(feedback)
+
+    def wait_for_result_and_feed_back_feedback(self, expected_duration):
+        """
+        :type expected_duration: float
+        :return: error code from MoveResult
+        :rtype: int
+        """
+        t = rospy.get_rostime()
+        phase = MoveFeedback.EXECUTION
+        error_code = MoveResult.SUCCESS
+        while not self._ac.wait_for_result(rospy.Duration(.1)):
+            time_passed = (rospy.get_rostime() - t).to_sec()
+            self.publish_feedback(phase, min(time_passed / expected_duration, 1))
+
+            if self._as.is_preempt_requested():
+                rospy.loginfo(u'new goal, cancel old one')
+                self._ac.cancel_all_goals()
+                error_code = MoveResult.INTERRUPTED
+                break
+            if time_passed > expected_duration + 0.1:  # TODO new error code
+                rospy.loginfo(u'controller took too long to execute trajectory')
+                self._ac.cancel_all_goals()
+                error_code = MoveResult.INTERRUPTED
+                break
+        else:  # if not break
+            print(u'shit took {:.3f}s'.format((rospy.get_rostime() - t).to_sec()))
+            r = self._ac.get_result()
+            if r.error_code == FollowJointTrajectoryResult.SUCCESSFUL:
+                error_code = MoveResult.SUCCESS
+        return error_code
+
     def __del__(self):
         # TODO find a way to cancel all goals when giskard is killed
         self._ac.cancel_all_goals()
-
-
-class LogTrajectoryPlugin(Plugin):
-    def __init__(self, trajectory_identifier, joint_state_identifier, time_identifier, goal_identifier,
-                 closest_point_identifier,
-                 controlled_joints_identifier, joint_convergence_threshold, wiggle_precision_threshold,
-                 collision_time_threshold, max_traj_length,
-                 plot_trajectory=False, is_preempted=lambda: False, ):
-        self.plot = plot_trajectory
-        self.closest_point_identifier = closest_point_identifier
-        self.controlled_joints_identifier = controlled_joints_identifier
-        self.goal_identifier = goal_identifier
-        self.trajectory_identifier = trajectory_identifier
-        self.joint_state_identifier = joint_state_identifier
-        self.time_identifier = time_identifier
-        self.is_preempted = is_preempted
-        self.precision = joint_convergence_threshold
-        self.max_traj_length = max_traj_length
-        self.collision_time_threshold = collision_time_threshold
-        self.wiggle_precision = wiggle_precision_threshold
-        super(LogTrajectoryPlugin, self).__init__()
-
-    def simplify_js(self, js):
-        return tuple(round(x.position, self.wiggle_precision) for x in js.values())
-
-    def update(self):
-        current_js = self.god_map.get_data([self.joint_state_identifier])
-        time = self.god_map.get_data([self.time_identifier])
-        trajectory = self.god_map.get_data([self.trajectory_identifier])
-        # traj_length = self.god_map.get_data([self.goal_identifier, 'max_trajectory_length'])
-        rounded_js = self.simplify_js(current_js)
-        if trajectory is None:
-            trajectory = Trajectory()
-        trajectory.set(time, current_js)
-        self.god_map.set_data([self.trajectory_identifier], trajectory)
-
-        if self.is_preempted():
-            print('goal preempted')
-            self.stop_universe = True
-            return
-        if time >= 1:
-            if time > self.max_traj_length:
-                self.stop_universe = True
-                raise SolverTimeoutError('didn\'t a solution after {} s'.format(self.max_traj_length))
-            if np.abs([v.velocity for v in current_js.values()]).max() < self.precision or \
-                    (self.plot and time > self.max_traj_length):
-                print('done')
-                if self.plot:
-                    plot_trajectory(trajectory, set(self.god_map.get_data([self.controlled_joints_identifier])))
-                self.stop_universe = True
-                return
-            if not self.plot and (rounded_js in self.past_joint_states):
-                self.stop_universe = True
-                raise InsolvableException('endless wiggling detected')
-            if time >= self.collision_time_threshold:
-                cp = self.god_map.get_data([self.closest_point_identifier])
-                if closest_point_constraint_violated(cp, multiplier=1):
-                    self.stop_universe = True
-                    raise PathCollisionException(
-                        'robot is in collision after {} seconds'.format(self.collision_time_threshold))
-        self.past_joint_states.add(rounded_js)
-
-    def start_always(self):
-        self.stop_universe = False
-        self.past_joint_states = set()
-
-    def stop(self):
-        pass
-
-    def end_parallel_universe(self):
-        return self.stop_universe
-
-def plot_trajectory(tj, controlled_joints):
-    """
-    :param tj:
-    :type tj: Trajectory
-    """
-    colors = ['b', 'g', 'r', 'c', 'm', 'y', 'k']
-    line_styles = ['', '--', '-.']
-    fmts = [''.join(x) for x in product(line_styles, colors)]
-    positions = []
-    velocities = []
-    times = []
-    names = [x for x in tj._points[0.0].keys() if x in controlled_joints]
-    for time, point in tj.items():
-        positions.append([v.position for j, v in point.items() if j in controlled_joints])
-        velocities.append([v.velocity for j, v in point.items() if j in controlled_joints])
-        times.append(time)
-    positions = np.array(positions)
-    velocities = np.array(velocities).T
-    times = np.array(times)
-
-    f, (ax1, ax2) = plt.subplots(2, sharex=True)
-    ax1.set_title('position')
-    ax2.set_title('velocity')
-    # positions -= positions.mean(axis=0)
-    for i, position in enumerate(positions.T):
-        ax1.plot(times, position, fmts[i], label=names[i])
-        ax2.plot(times, velocities[i], fmts[i])
-    box = ax1.get_position()
-    ax1.set_ylim(-3,1)
-    ax1.set_position([box.x0, box.y0, box.width * 0.6, box.height])
-    box = ax2.get_position()
-    ax2.set_position([box.x0, box.y0, box.width * 0.6, box.height])
-
-    # Put a legend to the right of the current axis
-    ax1.legend(loc='center', bbox_to_anchor=(1.45, 0))
-
-    plt.savefig('trajectory.pdf')
-
-# def plot_trajectory2(tj):
-#     """
-#     :param tj:
-#     :type tj: Trajectory
-#     """
-#     colors = ['b', 'g', 'r', 'c', 'm', 'y', 'k']
-#     line_styles = ['', '--', '-.']
-#     fmts = [''.join(x) for x in product(line_styles, colors)]
-#     positions = []
-#     velocities = []
-#     time = []
-#     names = tj.joint_names
-#     for point in tj.points:
-#         positions.append(point.positions)
-#         velocities.append(point.velocities)
-#         time.append(point.time_from_start)
-#     positions = np.array(positions)
-#     velocities = np.array(velocities).T
-#     time = np.array([x.to_sec() for x in time])
-#
-#     f, (ax1, ax2) = plt.subplots(2, sharex=True)
-#     ax1.set_title('position')
-#     ax2.set_title('velocity')
-#     positions -= positions.mean(axis=0)
-#     for i, position in enumerate(positions.T):
-#         ax1.plot(time, position, fmts[i], label=names[i])
-#         ax2.plot(time, velocities[i], fmts[i])
-#     box = ax1.get_position()
-#     ax1.set_position([box.x0, box.y0, box.width * 0.6, box.height])
-#     box = ax2.get_position()
-#     ax2.set_position([box.x0, box.y0, box.width * 0.6, box.height])
-#
-#     # Put a legend to the right of the current axis
-#     ax1.legend(loc='center', bbox_to_anchor=(1.45, 0))
-#
-#     plt.show()

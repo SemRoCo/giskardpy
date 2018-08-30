@@ -1,10 +1,12 @@
+from giskard_msgs.srv import UpdateWorldRequest
+from std_msgs.msg import ColorRGBA
 from visualization_msgs.msg import MarkerArray, Marker
 from giskard_msgs.msg import WorldBody
 from shape_msgs.msg import SolidPrimitive
-from geometry_msgs.msg import Pose as PoseMsg, Point as PointMsg, Quaternion as QuaternionMsg
+from geometry_msgs.msg import Pose as PoseMsg, Point as PointMsg, Quaternion as QuaternionMsg, Vector3
 
 from giskardpy.exceptions import CorruptShapeException
-from giskardpy.trajectory import Transform, Point, Quaternion
+from giskardpy.data_types import Transform, Point, Quaternion
 from lxml import etree
 import PyKDL as kdl # TODO: get rid of this dependency
 
@@ -37,7 +39,6 @@ class BoxShape(GeometricShape):
         self.y = y
         self.z = z
 
-# TODO add ConeShape
 
 class CylinderShape(GeometricShape):
     def __init__(self, radius=0.0, length=0.0):
@@ -64,14 +65,14 @@ class InertialProperty(object):
 
 
 class MaterialProperty(object):
-    def __init__(self, name='', color=ColorRgba(), texture_filename=''):
+    def __init__(self, name=u'', color=ColorRgba(), texture_filename=''):
         self.name = name
         self.color = color
         self.texture_filename = texture_filename
 
 
 class VisualProperty(object):
-    def __init__(self, name='', origin=Transform(), geometry=None, material=None):
+    def __init__(self, name=u'', origin=Transform(), geometry=None, material=None):
         self.name = name
         self.origin = origin
         self.geometry = geometry
@@ -79,18 +80,41 @@ class VisualProperty(object):
 
 
 class CollisionProperty(object):
-    def __init__(self, name='', origin=Transform(), geometry=None):
+    def __init__(self, name=u'', origin=Transform(), geometry=None):
         self.name = name
         self.origin = origin
         self.geometry = geometry
 
 
-class WorldObject(object):
-    def __init__(self, name='', inertial_props=None, visual_props=(), collision_props=()):
+class UrdfObject(object):
+    def __init__(self, name=u'', inertial_props=None, visual_props=(), collision_props=()):
         self.name = name
         self.inertial_props = inertial_props
         self.visual_props = visual_props
         self.collision_props = collision_props
+
+class Box(UrdfObject):
+    def __init__(self, name, length, width, height):
+        geom = BoxShape(length,
+                        width,
+                        height)
+        col = CollisionProperty(name=name + u'_col', geometry=geom)
+        vis = VisualProperty(name=name + u'_vis', geometry=geom)
+        super(Box, self).__init__(name, collision_props=[col], visual_props=[vis])
+
+class Sphere(UrdfObject):
+    def __init__(self, name, radius):
+        geom = SphereShape(radius)
+        col = CollisionProperty(name=name + u'_col', geometry=geom)
+        vis = VisualProperty(name=name + u'_vis', geometry=geom)
+        super(Sphere, self).__init__(name, collision_props=[col], visual_props=[vis])
+
+class Cylinder(UrdfObject):
+    def __init__(self, name, radius, length):
+        geom = CylinderShape(radius, length)
+        col = CollisionProperty(name=name + u'_col', geometry=geom)
+        vis = VisualProperty(name=name + u'_vis', geometry=geom)
+        super(Cylinder, self).__init__(name, collision_props=[col], visual_props=[vis])
 
 class Joint(object):
     def __init__(self, name='', origin=Transform(), parent_link_name='', child_link_name='', ):
@@ -110,8 +134,8 @@ def to_urdf_xml(urdf_object, skip_robot_tag=False):
     :return:
     :rtype: lxml.etree.Element
     """
-    if isinstance(urdf_object, WorldObject):
-        link = etree.Element('link', name=urdf_object.name)
+    if isinstance(urdf_object, UrdfObject):
+        link = etree.Element(u'link', name=urdf_object.name)
         if urdf_object.inertial_props:
             link.append(to_urdf_xml(urdf_object.inertial_props))
         for visual in urdf_object.visual_props:
@@ -121,83 +145,156 @@ def to_urdf_xml(urdf_object, skip_robot_tag=False):
         if skip_robot_tag:
             root = link
         else:
-            root = etree.Element('robot', name=urdf_object.name)
+            root = etree.Element(u'robot', name=urdf_object.name)
             root.append(link)
     elif isinstance(urdf_object, InertialProperty):
-        root = etree.Element('inertial')
+        root = etree.Element(u'inertial')
         root.append(to_urdf_xml(urdf_object.origin))
         root.append(to_urdf_xml(urdf_object.inertia))
-        mass = etree.Element('mass', value=str(urdf_object.mass))
+        mass = etree.Element(u'mass', value=str(urdf_object.mass))
         root.append(mass)
     elif isinstance(urdf_object, VisualProperty):
         if urdf_object.name:
-            root = etree.Element('visual', name=urdf_object.name)
+            root = etree.Element(u'visual', name=urdf_object.name)
         else:
-            root = etree.Element('visual')
+            root = etree.Element(u'visual')
         root.append(to_urdf_xml(urdf_object.origin))
         root.append(to_urdf_xml(urdf_object.geometry))
         if urdf_object.material:
             root.append(to_urdf_xml(urdf_object.material))
     elif isinstance(urdf_object, CollisionProperty):
-        root = etree.Element('collision', name=urdf_object.name)
+        root = etree.Element(u'collision', name=urdf_object.name)
         root.append(to_urdf_xml(urdf_object.origin))
         root.append(to_urdf_xml(urdf_object.geometry))
     elif isinstance(urdf_object, Transform):
         r = kdl.Rotation.Quaternion(urdf_object.rotation.x, urdf_object.rotation.y,
                                     urdf_object.rotation.z, urdf_object.rotation.w)
         rpy = r.GetRPY()
-        rpy_string = '{} {} {}'.format(rpy[0], rpy[1], rpy[2])
-        xyz_string = '{} {} {}'.format(urdf_object.translation.x, urdf_object.translation.y, urdf_object.translation.z)
-        root = etree.Element('origin', xyz=xyz_string, rpy=rpy_string)
+        rpy_string = u'{} {} {}'.format(rpy[0], rpy[1], rpy[2])
+        xyz_string = u'{} {} {}'.format(urdf_object.translation.x, urdf_object.translation.y, urdf_object.translation.z)
+        root = etree.Element(u'origin', xyz=xyz_string, rpy=rpy_string)
     elif isinstance(urdf_object, InertiaMatrix):
-        root = etree.Element('inertia', ixx=str(urdf_object.ixx), ixy=str(urdf_object.ixy), ixz=str(urdf_object.ixz),
+        root = etree.Element(u'inertia', ixx=str(urdf_object.ixx), ixy=str(urdf_object.ixy), ixz=str(urdf_object.ixz),
                              iyy=str(urdf_object.iyy), iyz=str(urdf_object.iyz), izz=str(urdf_object.izz))
     elif isinstance(urdf_object, BoxShape):
-        root = etree.Element('geometry')
-        size_string = '{} {} {}'.format(urdf_object.x, urdf_object.y, urdf_object.z)
-        box = etree.Element('box', size=size_string)
+        root = etree.Element(u'geometry')
+        size_string = u'{} {} {}'.format(urdf_object.x, urdf_object.y, urdf_object.z)
+        box = etree.Element(u'box', size=size_string)
         root.append(box)
     elif isinstance(urdf_object, CylinderShape):
-        root = etree.Element('geometry')
-        cyl = etree.Element('cylinder', radius=str(urdf_object.radius), length=str(urdf_object.length))
+        root = etree.Element(u'geometry')
+        cyl = etree.Element(u'cylinder', radius=str(urdf_object.radius), length=str(urdf_object.length))
         root.append(cyl)
     elif isinstance(urdf_object, SphereShape):
-        root = etree.Element('geometry')
-        sphere = etree.Element('sphere', radius=str(urdf_object.radius))
+        root = etree.Element(u'geometry')
+        sphere = etree.Element(u'sphere', radius=str(urdf_object.radius))
         root.append(sphere)
     elif isinstance(urdf_object, MeshShape):
-        root = etree.Element('geometry')
-        scale_string = '{} {} {}'.format(urdf_object.scale[0], urdf_object.scale[1], urdf_object.scale[2])
-        mesh = etree.Element('mesh', scale=scale_string, filename=urdf_object.filename)
+        root = etree.Element(u'geometry')
+        scale_string = u'{} {} {}'.format(urdf_object.scale[0], urdf_object.scale[1], urdf_object.scale[2])
+        mesh = etree.Element(u'mesh', scale=scale_string, filename=urdf_object.filename)
         root.append(mesh)
     elif isinstance(urdf_object, MaterialProperty):
-        root = etree.Element('material', name=urdf_object.name)
+        root = etree.Element(u'material', name=urdf_object.name)
         if urdf_object.color:
-            color_string = '{} {} {} {}'.format(str(urdf_object.color.r), str(urdf_object.color.g),
+            color_string = u'{} {} {} {}'.format(str(urdf_object.color.r), str(urdf_object.color.g),
                                                 str(urdf_object.color.b), str(urdf_object.color.a))
-            color = etree.Element('color', rgba=color_string)
+            color = etree.Element(u'color', rgba=color_string)
             root.append(color)
         if urdf_object.texture_filename:
-            tex =etree.Element('texture', filename=urdf_object.texture_filename)
+            tex =etree.Element(u'texture', filename=urdf_object.texture_filename)
             root.append(tex)
     elif isinstance(urdf_object, FixedJoint):
-        root = etree.Element('joint', name=urdf_object.name, type='fixed')
+        root = etree.Element(u'joint', name=urdf_object.name, type=u'fixed')
         root.append(to_urdf_xml(urdf_object.origin))
-        root.append(etree.Element('parent', link=urdf_object.parent_link_name))
-        root.append(etree.Element('child', link=urdf_object.child_link_name))
+        root.append(etree.Element(u'parent', link=urdf_object.parent_link_name))
+        root.append(etree.Element(u'child', link=urdf_object.child_link_name))
     return root
 
 
 def to_urdf_string(urdf_object, skip_robot_tag=False):
     """
     :param urdf_object:
-    :type urdf_object: WorldObject
+    :type urdf_object: UrdfObject
     :return:
     :rtype: str
     """
     return etree.tostring(to_urdf_xml(urdf_object, skip_robot_tag=skip_robot_tag))
 
-def to_marker(urdf_object):
+def to_marker(thing):
+    """
+    :type thing: Union[UpdateWorldRequest, WorldBody]
+    :rtype: MarkerArray
+    """
+    ma = MarkerArray()
+    if isinstance(thing, UrdfObject):
+        pass
+        # TODO
+        # return urdf_object_to_marker_msg(thing)
+    elif isinstance(thing, WorldBody):
+        ma.markers.append(world_body_to_marker_msg(thing))
+    elif isinstance(thing, UpdateWorldRequest):
+        ma.markers.append(update_world_to_marker_msg(thing))
+    return ma
+
+def update_world_to_marker_msg(update_world_req, id=1, ns=u''):
+    """
+    :type update_world_req: UpdateWorldRequest
+    :type id: int
+    :type ns: str
+    :rtype: Marker
+    """
+    m = world_body_to_marker_msg(update_world_req.body, id, ns)
+    m.header = update_world_req.pose.header
+    m.pose = update_world_req.pose.pose
+    m.frame_locked = update_world_req.rigidly_attached
+    if update_world_req.operation == UpdateWorldRequest.ADD:
+        m.action = Marker.ADD
+    elif update_world_req.operation == UpdateWorldRequest.REMOVE:
+        m.action = Marker.DELETE
+    elif update_world_req.operation == UpdateWorldRequest.REMOVE_ALL:
+        m.action = Marker.DELETEALL
+    return m
+
+
+def world_body_to_marker_msg(world_body, id=1, ns=u''):
+    """
+    :type world_body: WorldBody
+    :rtype: Marker
+    """
+    m = Marker()
+    m.ns = u'{}/{}'.format(ns, world_body.name)
+    m.id = id
+    if world_body.type == WorldBody.URDF_BODY:
+        raise Exception(u'can\'t convert urdf body world object to marker array')
+    elif world_body.type == WorldBody.PRIMITIVE_BODY:
+        if world_body.shape.type == SolidPrimitive.BOX:
+            m.type = Marker.CUBE
+            m.scale = Vector3(*world_body.shape.dimensions)
+        elif world_body.shape.type == SolidPrimitive.SPHERE:
+            m.type = Marker.SPHERE
+            m.scale = Vector3(world_body.shape.dimensions[0],
+                              world_body.shape.dimensions[0],
+                              world_body.shape.dimensions[0])
+        elif world_body.shape.type == SolidPrimitive.CYLINDER:
+            m.type = Marker.CYLINDER
+            m.scale = Vector3(world_body.shape.dimensions[SolidPrimitive.CYLINDER_RADIUS],
+                              world_body.shape.dimensions[SolidPrimitive.CYLINDER_RADIUS],
+                              world_body.shape.dimensions[SolidPrimitive.CYLINDER_HEIGHT])
+        else:
+            raise Exception(u'world body type {} can\'t be converted to marker'.format(world_body.shape.type))
+    elif world_body.type == WorldBody.MESH_BODY:
+        m.type = Marker.MESH_RESOURCE
+        m.mesh_resource = world_body.mesh
+    m.color = ColorRGBA(0,1,0,0.8)
+    return m
+
+
+def urdf_object_to_marker_msg(urdf_object):
+    """
+    :type urdf_object: UrdfObject
+    :rtype: MarkerArray
+    """
     ma = MarkerArray()
     for visual_property in urdf_object.visual_props:
         m = Marker()
@@ -205,10 +302,10 @@ def to_marker(urdf_object):
         m.color.g = 1
         m.color.b = 0
         m.color.a = 0.8
-        m.ns = 'bullet/{}'.format(urdf_object.name)
+        m.ns = u'bullet/{}'.format(urdf_object.name)
         m.action = Marker.ADD
         m.id = 1337
-        m.header.frame_id = 'map'
+        m.header.frame_id = u'map'
         m.pose.position.x = visual_property.origin.translation.x
         m.pose.position.y = visual_property.origin.translation.y
         m.pose.position.z = visual_property.origin.translation.z
@@ -231,6 +328,37 @@ def to_marker(urdf_object):
         ma.markers.append(m)
     return ma
 
+def world_body_to_urdf_object(world_body_msg):
+    """
+    Converts a body from a ROS message to the corresponding internal representation.
+    :param world_body_msg: Input message that shall be converted.
+    :type world_body_msg: WorldBody
+    :return: Internal representation of body, filled with data from input message.
+    :rtype UrdfObject
+    """
+    if world_body_msg.type is WorldBody.MESH_BODY:
+        geom = MeshShape(filename=world_body_msg.mesh)
+    elif world_body_msg.type is WorldBody.PRIMITIVE_BODY:
+        if world_body_msg.shape.type is SolidPrimitive.BOX:
+            geom = BoxShape(world_body_msg.shape.dimensions[SolidPrimitive.BOX_X],
+                            world_body_msg.shape.dimensions[SolidPrimitive.BOX_Y],
+                            world_body_msg.shape.dimensions[SolidPrimitive.BOX_Z])
+        elif world_body_msg.shape.type is SolidPrimitive.CYLINDER:
+            geom = CylinderShape(world_body_msg.shape.dimensions[SolidPrimitive.CYLINDER_RADIUS],
+                                 world_body_msg.shape.dimensions[SolidPrimitive.CYLINDER_HEIGHT])
+        elif world_body_msg.shape.type is SolidPrimitive.SPHERE:
+            geom = SphereShape(world_body_msg.shape.dimensions[SolidPrimitive.SPHERE_RADIUS])
+        else:
+            raise CorruptShapeException(u'Invalid primitive shape \'{}\' of world body \'{}\''.format(world_body_msg.shape.type, world_body_msg.name))
+    elif world_body_msg.type is WorldBody.URDF_BODY:
+        # TODO: complete me
+        pass
+    else:
+        # TODO: replace me by a proper exception that can be reported back to the service client
+        raise RuntimeError(u'Invalid shape of world body: {}'.format(world_body_msg.shape))
+    col = CollisionProperty(name=world_body_msg.name + u'_col', geometry=geom)
+    vis = VisualProperty(name=world_body_msg.name + u'_vis', geometry=geom)
+    return UrdfObject(name=world_body_msg.name, collision_props=[col], visual_props=[vis])
 
 def from_point_msg(point_msg):
     """
@@ -263,36 +391,3 @@ def from_pose_msg(pose_msg):
     :rtype: Transform
     """
     return Transform(from_point_msg(pose_msg.position), from_quaternion_msg(pose_msg.orientation))
-
-
-def from_msg(body_msg):
-    """
-    Converts a body from a ROS message to the corresponding internal representation.
-    :param body_msg: Input message that shall be converted.
-    :type body_msg: WorldBody
-    :return: Internal representation of body, filled with data from input message.
-    :rtype WorldObject
-    """
-    if body_msg.type is WorldBody.MESH_BODY:
-        geom = MeshShape(filename=body_msg.mesh)
-    elif body_msg.type is WorldBody.PRIMITIVE_BODY:
-        if body_msg.shape.type is SolidPrimitive.BOX:
-            geom = BoxShape(body_msg.shape.dimensions[SolidPrimitive.BOX_X],
-                            body_msg.shape.dimensions[SolidPrimitive.BOX_Y],
-                            body_msg.shape.dimensions[SolidPrimitive.BOX_Z])
-        elif body_msg.shape.type is SolidPrimitive.CYLINDER:
-            geom = CylinderShape(body_msg.shape.dimensions[SolidPrimitive.CYLINDER_RADIUS],
-                                 body_msg.shape.dimensions[SolidPrimitive.CYLINDER_HEIGHT])
-        elif body_msg.shape.type is SolidPrimitive.SPHERE:
-            geom = SphereShape(body_msg.shape.dimensions[SolidPrimitive.SPHERE_RADIUS])
-        else:
-            raise CorruptShapeException("Invalid primitive shape '{}' of world body '{}'".format(body_msg.shape.type, body_msg.name))
-    elif body_msg.type is WorldBody.URDF_BODY:
-        # TODO: complete me
-        pass
-    else:
-        # TODO: replace me by a proper exception that can be reported back to the service client
-        raise RuntimeError("Invalid shape of world body: {}".format(body_msg.shape))
-    col = CollisionProperty(name=body_msg.name + '_col', geometry=geom)
-    vis = VisualProperty(name=body_msg.name + '_vis', geometry=geom)
-    return WorldObject(name=body_msg.name, collision_props=[col], visual_props=[vis])

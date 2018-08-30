@@ -6,7 +6,7 @@
     <param name="path_to_data_folder" value="$(find giskardpy)/data/pr2" />
     <param name="enable_gui" value="$(arg gui)"/>
     <rosparam param="map_frame">map</rosparam>
-    <rosparam param="joint_convergence_threshold">0.001</rosparam>
+    <rosparam param="joint_convergence_threshold">0.002</rosparam>
     <rosparam param="wiggle_precision_threshold">7</rosparam>
     <rosparam param="max_traj_length">30</rosparam>
     <rosparam param="sample_period">0.1</rosparam>
@@ -16,7 +16,7 @@
     <rosparam param="nWSR">None</rosparam> <!-- None results in a nWSR estimation thats fine most of the time -->
     <rosparam param="root_link">base_footprint</rosparam>
     <rosparam param="enable_collision_marker">True</rosparam>
-    <rosparam param="enable_self_collision">False</rosparam>
+    <rosparam param="enable_self_collision">True</rosparam>
     <rosparam param="collision_time_threshold">15</rosparam>
     <rosparam param="interactive_marker_chains">
       - [base_link, r_gripper_tool_frame]

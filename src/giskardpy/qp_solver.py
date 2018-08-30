@@ -47,6 +47,7 @@ class QPSolver(object):
         :return: x according to the equations above, len = number of joints
         :type np.array
         """
+        # TODO kevins bug somehow results in /0
         if nWSR is None:
             nWSR = np.array([sum(A.shape)*2])
         else:
@@ -54,11 +55,13 @@ class QPSolver(object):
         if not self.started:
             success = self.qpProblem.init(H, g, A, lb, ub, lbA, ubA, nWSR)
             if success == PyReturnValue.MAX_NWSR_REACHED:
-                raise MAX_NWSR_REACHEDException('Failed to initialize QP-problem.')
+                self.started = False
+                raise MAX_NWSR_REACHEDException(u'Failed to initialize QP-problem.')
         else:
             success = self.qpProblem.hotstart(H, g, A, lb, ub, lbA, ubA, nWSR)
             if success == PyReturnValue.MAX_NWSR_REACHED:
-                raise MAX_NWSR_REACHEDException('Failed to hot start QP-problem.')
+                self.started = False
+                raise MAX_NWSR_REACHEDException(u'Failed to hot start QP-problem.')
         if success == PyReturnValue.SUCCESSFUL_RETURN:
             self.started = True
         else:

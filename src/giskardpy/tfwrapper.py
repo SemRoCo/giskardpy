@@ -7,10 +7,10 @@ from tf2_ros import Buffer, TransformListener
 tfBuffer = None
 tf_listener = None
 
-def init(tf_buffer_size=2):
+def init(tf_buffer_size=10):
     """
     If you want to specify the buffer size, call this function manually, otherwise don't worry about it.
-    :param tf_buffer_size:
+    :param tf_buffer_size: in secs
     :type tf_buffer_size: int
     """
     global tfBuffer, tf_listener
@@ -21,9 +21,7 @@ def init(tf_buffer_size=2):
 def transform_pose(target_frame, pose):
     """
     Transforms a pose stamped into a different target frame.
-    :param target_frame:
     :type target_frame: str
-    :param pose:
     :type pose: PoseStamped
     :return: Transformed pose of None on loop failure
     :rtype: PoseStamped
@@ -44,9 +42,7 @@ def transform_pose(target_frame, pose):
 def transform_vector(target_frame, vector):
     """
     Transforms a pose stamped into a different target frame.
-    :param target_frame:
     :type target_frame: str
-    :param vector:
     :type vector: Vector3Stamped
     :return: Transformed pose of None on loop failure
     :rtype: Vector3Stamped
@@ -67,9 +63,7 @@ def transform_vector(target_frame, vector):
 def transform_point(target_frame, point):
     """
     Transforms a pose stamped into a different target frame.
-    :param target_frame:
     :type target_frame: str
-    :param point:
     :type point: PointStamped
     :return: Transformed pose of None on loop failure
     :rtype: PointStamped
@@ -89,9 +83,7 @@ def transform_point(target_frame, point):
 
 def lookup_transform(target_frame, source_frame):
     """
-    :param target_frame:
     :type target_frame: str
-    :param source_frame:
     :type source_frame: str
     :return: Transform from target_frame to source_frame
     :rtype: PoseStamped

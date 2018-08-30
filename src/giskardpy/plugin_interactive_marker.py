@@ -19,59 +19,59 @@ from visualization_msgs.msg._InteractiveMarkerControl import InteractiveMarkerCo
 from visualization_msgs.msg._InteractiveMarkerFeedback import InteractiveMarkerFeedback
 from visualization_msgs.msg._Marker import Marker
 
-from giskardpy.plugin import Plugin
+from giskardpy.plugin import PluginBase
+from giskardpy.utils import qv_mult
 
 MARKER_SCALE = 0.15
 
-def qv_mult(q1, v1):
-    """
-    Transforms a vector by a quaternion
-    :param q1: Quaternion
-    :type q1: list
-    :param v1: vector
-    :type v1: list
-    :return: transformed vector
-    :type: list
-    """
-    q = q1
-    v = [v1[0], v1[1], v1[2], 0]
-    return quaternion_multiply(quaternion_multiply(q, v), quaternion_conjugate(q))[:-1]
 
-class InteractiveMarkerPlugin(Plugin):
-    def __init__(self, root_tips, suffix=''):
+
+class InteractiveMarkerPlugin(PluginBase):
+    """
+    Spawns interactive Marker which send cart goals to action server.
+    Does not interact with god map.
+    """
+    def __init__(self, root_tips, suffix=u''):
         """
-        :param roots:
-        :type roots: list
-        :param tips:
-        :type tips: list
-        :param suffix:
+        :param root_tips: list containing root->tip tuple for each interactive marker.
+        :type root_tips: list
+        :param suffix: the marker will be called 'eef_control{}'.format(suffix)
         :type suffix: str
         """
-        self.roots, self.tips = zip(*root_tips)
+        if len(root_tips) > 0:
+            self.roots, self.tips = zip(*root_tips)
+        else:
+            self.roots = []
+            self.tips = []
         self.suffix = suffix
         self.markers = {}
         super(InteractiveMarkerPlugin, self).__init__()
 
     def start_once(self):
         # giskard goal client
-        self.client = SimpleActionClient('qp_controller/command', MoveAction)
+        self.client = SimpleActionClient(u'qp_controller/command', MoveAction)
         self.client.wait_for_server()
 
         # marker server
-        self.server = InteractiveMarkerServer("eef_control{}".format(self.suffix))
+        self.server = InteractiveMarkerServer(u'eef_control{}'.format(self.suffix))
         self.menu_handler = MenuHandler()
 
         all_goals = {}
 
         for root, tip in zip(self.roots, self.tips):
-            int_marker = self.make6DofMarker(InteractiveMarkerControl.MOVE_ROTATE_3D, root, tip)
+            int_marker = self.make_6dof_marker(InteractiveMarkerControl.MOVE_ROTATE_3D, root, tip)
             self.server.insert(int_marker,
                                self.process_feedback(self.server, int_marker.name, self.client, root, tip, all_goals))
             self.menu_handler.apply(self.server, int_marker.name)
 
         self.server.applyChanges()
 
-    def makeSphere(self, msg):
+    def make_sphere(self, msg):
+        """
+        :param msg:
+        :return:
+        :rtype: Marker
+        """
         marker = Marker()
 
         marker.type = Marker.SPHERE
@@ -85,14 +85,14 @@ class InteractiveMarkerPlugin(Plugin):
 
         return marker
 
-    def makeBoxControl(self, msg):
+    def make_sphere_control(self, msg):
         control = InteractiveMarkerControl()
         control.always_visible = True
-        control.markers.append(self.makeSphere(msg))
+        control.markers.append(self.make_sphere(msg))
         msg.controls.append(control)
         return control
 
-    def make6DofMarker(self, interaction_mode, root_link, tip_link):
+    def make_6dof_marker(self, interaction_mode, root_link, tip_link):
         def normed_q(x, y, z, w):
             return np.array([x, y, z, w]) / np.linalg.norm([x, y, z, w])
 
@@ -100,56 +100,54 @@ class InteractiveMarkerPlugin(Plugin):
 
         int_marker.header.frame_id = tip_link
         int_marker.pose.orientation.w = 1
-        # int_marker.pose = self.tf.lookup_transform(root_link, tip_link).pose
-        # int_marker.header.frame_id = root_link
         int_marker.scale = MARKER_SCALE
 
-        int_marker.name = "eef_{}_to_{}".format(root_link, tip_link)
+        int_marker.name = u'eef_{}_to_{}'.format(root_link, tip_link)
 
         # insert a box
-        self.makeBoxControl(int_marker)
+        self.make_sphere_control(int_marker)
         int_marker.controls[0].interaction_mode = interaction_mode
 
         if interaction_mode != InteractiveMarkerControl.NONE:
             control_modes_dict = {
-                InteractiveMarkerControl.MOVE_3D: "MOVE_3D",
-                InteractiveMarkerControl.ROTATE_3D: "ROTATE_3D",
-                InteractiveMarkerControl.MOVE_ROTATE_3D: "MOVE_ROTATE_3D"}
-            int_marker.name += "_" + control_modes_dict[interaction_mode]
+                InteractiveMarkerControl.MOVE_3D: u'MOVE_3D',
+                InteractiveMarkerControl.ROTATE_3D: u'ROTATE_3D',
+                InteractiveMarkerControl.MOVE_ROTATE_3D: u'MOVE_ROTATE_3D'}
+            int_marker.name += u'_' + control_modes_dict[interaction_mode]
 
         control = InteractiveMarkerControl()
         control.orientation = Quaternion(0, 0, 0, 1)
-        control.name = "rotate_x"
+        control.name = u'rotate_x'
         control.interaction_mode = InteractiveMarkerControl.ROTATE_AXIS
         int_marker.controls.append(control)
 
         control = InteractiveMarkerControl()
         control.orientation = Quaternion(0, 0, 0, 1)
-        control.name = "move_x"
+        control.name = u'move_x'
         control.interaction_mode = InteractiveMarkerControl.MOVE_AXIS
         int_marker.controls.append(control)
 
         control = InteractiveMarkerControl()
         control.orientation = Quaternion(*normed_q(0, 1, 0, 1))
-        control.name = "rotate_z"
+        control.name = u'rotate_z'
         control.interaction_mode = InteractiveMarkerControl.ROTATE_AXIS
         int_marker.controls.append(control)
 
         control = InteractiveMarkerControl()
         control.orientation = Quaternion(*normed_q(0, 1, 0, 1))
-        control.name = "move_z"
+        control.name = u'move_z'
         control.interaction_mode = InteractiveMarkerControl.MOVE_AXIS
         int_marker.controls.append(control)
 
         control = InteractiveMarkerControl()
         control.orientation = Quaternion(*normed_q(0, 0, 1, 1))
-        control.name = "rotate_y"
+        control.name = u'rotate_y'
         control.interaction_mode = InteractiveMarkerControl.ROTATE_AXIS
         int_marker.controls.append(control)
 
         control = InteractiveMarkerControl()
         control.orientation = Quaternion(*normed_q(0, 0, 1, 1))
-        control.name = "move_y"
+        control.name = u'move_y'
         control.interaction_mode = InteractiveMarkerControl.MOVE_AXIS
         int_marker.controls.append(control)
         self.markers[int_marker.name] = int_marker
@@ -178,7 +176,7 @@ class InteractiveMarkerPlugin(Plugin):
             self.root_link = root_link
             self.all_goals = all_goals
             self.reset_goal()
-            self.marker_pub = rospy.Publisher('visualization_marker_array', MarkerArray, queue_size=10)
+            self.marker_pub = rospy.Publisher(u'visualization_marker_array', MarkerArray, queue_size=10)
 
         def reset_goal(self):
             p = Pose()
@@ -191,7 +189,7 @@ class InteractiveMarkerPlugin(Plugin):
             if feedback.event_type == InteractiveMarkerFeedback.MOUSE_UP:
                 self.all_goals = defaultdict(list)
                 self.all_goals[self.root_link, self.tip_link] = []
-                print('got interactive goal update')
+                print(u'got interactive goal update')
                 # translation
                 controller = self.make_translation_controller(feedback.header.frame_id,
                                                               feedback.pose)
@@ -237,7 +235,7 @@ class InteractiveMarkerPlugin(Plugin):
             m.color.g = 0
             m.color.b = 0
             m.color.a = 1
-            m.ns = 'interactive_marker_{}_{}'.format(self.root_link, self.tip_link)
+            m.ns = u'interactive_marker_{}_{}'.format(self.root_link, self.tip_link)
             m.id = 0
             ma.markers.append(m)
             # y
@@ -252,7 +250,7 @@ class InteractiveMarkerPlugin(Plugin):
             m.color.g = 1
             m.color.b = 0
             m.color.a = 1
-            m.ns = 'interactive_marker_{}_{}'.format(self.root_link, self.tip_link)
+            m.ns = u'interactive_marker_{}_{}'.format(self.root_link, self.tip_link)
             m.id = 1
             ma.markers.append(m)
             # z
@@ -266,7 +264,7 @@ class InteractiveMarkerPlugin(Plugin):
             m.color.g = 0
             m.color.b = 1
             m.color.a = 1
-            m.ns = 'interactive_marker_{}_{}'.format(self.root_link, self.tip_link)
+            m.ns = u'interactive_marker_{}_{}'.format(self.root_link, self.tip_link)
             m.id = 2
             ma.markers.append(m)
             self.marker_pub.publish(ma)
@@ -312,6 +310,9 @@ class InteractiveMarkerPlugin(Plugin):
                 move_cmd.controllers.extend(g)
             goal.cmd_seq.append(move_cmd)
             self.client.send_goal(goal)
+
+        def stop(self):
+            self.marker_pub.unregister()
 
     def copy(self):
         return self

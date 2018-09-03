@@ -1,3 +1,10 @@
+from time import time
+
+import rospy
+from py_trees import Behaviour, Blackboard
+from smach import State
+
+
 class PluginBase(object):
     def __init__(self):
         self.started = False
@@ -113,3 +120,29 @@ class PluginParallelUniverseOnly(PluginBase):
     def get_replacement(self):
         c = self.copy()
         return c
+
+
+class GiskardState(State):
+    Finished = 'next'
+    GodMapIOKey = 'god_map'
+    def __init__(self, outcomes=[]):
+        State.__init__(self,
+                       outcomes=[self.Finished]+outcomes,
+                       io_keys=[self.GodMapIOKey])
+
+    def get_god_map(self, ud):
+        return getattr(ud, self.GodMapIOKey)
+
+class SleepState(GiskardState):
+    def execute(self, ud):
+        # rospy.sleep(0.1)
+        god_map = self.get_god_map(ud)
+        if god_map.get_data(['c']) == 10000:
+            print(time() - god_map.get_data(['time']))
+        god_map.set_data(['c'], god_map.get_data(['c'])+1)
+        return self.Finished
+
+class GiskardBehavior(Behaviour):
+    def __init__(self, name):
+        self.god_map = Blackboard().god_map
+        super(GiskardBehavior, self).__init__(name)

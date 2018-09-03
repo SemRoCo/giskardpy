@@ -24,19 +24,5 @@
     </rosparam>
   </node>
 
-  <node pkg="giskardpy" type="init_chain.py" name="init_chain">
-    <rosparam param="roots">
-      - base_link
-      - base_link
-    </rosparam>
-    <rosparam param="tips">
-      - r_gripper_tool_frame
-      - l_gripper_tool_frame
-    </rosparam>
-    <!-- 2 = TRANSLATION_3D; 3 = ROTATION_3D -->
-    <rosparam param="types"> 
-      - [2, 3]
-      - [2, 3]
-    </rosparam>
-  </node>
+
 </launch>

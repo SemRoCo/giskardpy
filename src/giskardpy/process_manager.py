@@ -36,11 +36,12 @@ class ProcessManager(object):
         until it is stopped or the ROS node is shut down.
         """
         self.start_plugins()
-        print(u'init complete')
+        # print(u'init complete')
         while self.update() and not rospy.is_shutdown():
             # TODO make sure this can be properly killed without rospy dependency
-            if self.original_universe:
-                rospy.sleep(0.1)
+            # if self.original_universe:
+            #     rospy.sleep(0.1)
+            pass
 
     def start_plugins(self):
         for plugin in self._plugins.values():
@@ -71,10 +72,10 @@ class ProcessManager(object):
             while True:
                 plugin.update()
                 if plugin.end_parallel_universe():
-                    print(u'destroying parallel universe')
+                    # print(u'destroying parallel universe')
                     return False
                 if plugin.create_parallel_universe():
-                    print(u'creating new parallel universe')
+                    # print(u'creating new parallel universe')
                     parallel_universe = ProcessManager(initial_state=self._god_map)
                     for n, p in self._plugins.items():
                         parallel_universe.register_plugin(n, p.get_replacement())
@@ -86,10 +87,10 @@ class ProcessManager(object):
                         print(e)
                     except Exception as e:
                         traceback.print_exc()
-                    finally:
-                        print(u'parallel universe died')
+                    # finally:
+                    #     print(u'parallel universe died')
                     # parallel_universe.stop()
-                    rospy.loginfo(u'parallel universe existed for {}s'.format(time()-t))
+                    # rospy.loginfo(u'parallel universe existed for {}s'.format(time()-t))
 
                     # copy new expressions
                     self._god_map.expr_to_key = parallel_universe.get_god_map().expr_to_key

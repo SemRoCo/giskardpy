@@ -1,10 +1,14 @@
 import traceback
 from itertools import product
 import numpy as np
+from time import time
+
 import rospy
 from geometry_msgs.msg import Point, Vector3
 from giskard_msgs.msg import CollisionEntry, WorldBody
 from multiprocessing import Lock
+
+from py_trees import Behaviour, Status, Blackboard
 from std_msgs.msg import ColorRGBA
 from std_srvs.srv import SetBool, SetBoolResponse
 from sensor_msgs.msg import JointState
@@ -13,7 +17,7 @@ from visualization_msgs.msg import Marker, MarkerArray
 from giskardpy.exceptions import CorruptShapeException, UnknownBodyException, \
     UnsupportedOptionException, DuplicateNameException, PhysicsWorldException
 from giskardpy.object import to_marker, world_body_to_urdf_object, from_pose_msg
-from giskardpy.plugin import PluginBase
+from giskardpy.plugin import PluginBase, GiskardState, GiskardBehavior
 from giskardpy.pybullet_world import PyBulletWorld, ContactInfo
 from giskardpy.tfwrapper import transform_pose, lookup_transform, transform_point, transform_vector
 from giskardpy.data_types import ClosestPointInfo
@@ -121,8 +125,9 @@ class PyBulletPlugin(PluginBase):
                 return UpdateWorldResponse(UpdateWorldResponse.UNSUPPORTED_OPTIONS, str(e))
             except Exception as e:
                 traceback.print_exc()
-                return UpdateWorldResponse(UpdateWorldResponse.UNSUPPORTED_OPTIONS, u'{}: {}'.format(e.__class__.__name__,
-                                                                                                     str(e)))
+                return UpdateWorldResponse(UpdateWorldResponse.UNSUPPORTED_OPTIONS,
+                                           u'{}: {}'.format(e.__class__.__name__,
+                                                            str(e)))
 
     def add_object(self, req):
         """
@@ -131,7 +136,7 @@ class PyBulletPlugin(PluginBase):
         world_body = req.body
         global_pose = from_pose_msg(transform_pose(self.global_reference_frame_name, req.pose).pose)
         if world_body.type is WorldBody.URDF_BODY:
-            #TODO test me
+            # TODO test me
             self.world.spawn_object_from_urdf_str(world_body.name, world_body.urdf, global_pose)
         else:
             self.world.spawn_urdf_object(world_body_to_urdf_object(world_body), global_pose)
@@ -141,7 +146,6 @@ class PyBulletPlugin(PluginBase):
             callback = (lambda msg: self.object_js_cb(world_body.name, msg))
             self.object_js_subs[world_body.name] = \
                 rospy.Subscriber(world_body.joint_state_topic, JointState, callback, queue_size=1)
-
 
     def attach_object(self, req):
         """
@@ -178,7 +182,7 @@ class PyBulletPlugin(PluginBase):
     def clear_world(self):
         self.pub_collision_marker.publish(MarkerArray([Marker(action=Marker.DELETEALL)]))
         for object_name in self.world.get_object_names():
-            if object_name != u'plane': #TODO get rid of this hard coded special case
+            if object_name != u'plane':  # TODO get rid of this hard coded special case
                 self.remove_object(object_name)
         self.world.get_robot().detach_all_objects()
 
@@ -307,16 +311,17 @@ class PyBulletPlugin(PluginBase):
             link1 = key[0]
             a_in_robot_root = msg_to_list(transform_point(self.robot_root,
                                                           to_point_stamped(self.map_frame,
-                                                                       collision_info.position_on_a)))
+                                                                           collision_info.position_on_a)))
             b_in_robot_root = msg_to_list(transform_point(self.robot_root,
                                                           to_point_stamped(self.map_frame,
-                                                                       collision_info.position_on_b)))
+                                                                           collision_info.position_on_b)))
             n_in_robot_root = msg_to_list(transform_vector(self.robot_root,
                                                            to_vector3_stamped(self.map_frame,
-                                                                          collision_info.contact_normal_on_b)))
+                                                                              collision_info.contact_normal_on_b)))
             try:
                 cpi = ClosestPointInfo(a_in_robot_root, b_in_robot_root, collision_info.contact_distance,
-                                       min_allowed_distance[key], key[0], u'{} - {}'.format(key[1], key[2]), n_in_robot_root)
+                                       min_allowed_distance[key], key[0], u'{} - {}'.format(key[1], key[2]),
+                                       n_in_robot_root)
             except KeyError:
                 continue
             if link1 in closest_point:
@@ -379,3 +384,103 @@ class PyBulletPlugin(PluginBase):
         :type msg: JointState
         """
         self.object_joint_states[object_name] = to_joint_state_dict(msg)
+
+
+class InitPyBulletWorld(GiskardState):
+
+    def __init__(self, pybullet_identifier, path_to_data_folder='', gui=False):
+        self.pybullet_identifier = pybullet_identifier
+        self.path_to_data_folder = path_to_data_folder
+        self.gui = gui
+        self.robot_name = 'robby'
+        super(InitPyBulletWorld, self).__init__()
+
+    def execute(self, ud):
+        god_map = self.get_god_map(ud)
+        self.world = PyBulletWorld(enable_gui=self.gui, path_to_data_folder=self.path_to_data_folder)
+        self.world.activate_viewer()
+        # TODO get robot description from god map
+        urdf = rospy.get_param('robot_description')
+        self.world.spawn_robot_from_urdf(self.robot_name, urdf)
+        god_map.set_data([self.pybullet_identifier], self.world)
+        return self.Finished
+
+
+class PybulletMonitorState(GiskardState):
+    def __init__(self, js_identifier, pybullet_identifier, map_frame, root_link, path_to_data_folder='', gui=False):
+        self.js_identifier = js_identifier
+        self.pybullet_identifier = pybullet_identifier
+        self.path_to_data_folder = path_to_data_folder
+        self.gui = gui
+        self.robot_name = 'robby'
+        self.map_frame = map_frame
+        self.root_link = root_link
+        super(PybulletMonitorState, self).__init__()
+
+    def get_world(self, god_map):
+        return god_map.get_data([self.pybullet_identifier])
+
+    def execute(self, ud):
+        god_map = self.get_god_map(ud)
+        world = self.get_world(god_map)
+        js = god_map.get_data([self.js_identifier])
+        if js is not None:
+            world.set_robot_joint_state(js)
+        p = lookup_transform(self.map_frame, self.root_link)
+        world.get_robot().set_base_pose(position=[p.pose.position.x,
+                                                  p.pose.position.y,
+                                                  p.pose.position.z],
+                                        orientation=[p.pose.orientation.x,
+                                                     p.pose.orientation.y,
+                                                     p.pose.orientation.z,
+                                                     p.pose.orientation.w])
+        return self.Finished
+
+
+class InitPyBulletWorldB(GiskardBehavior):
+    def __init__(self, name, pybullet_identifier, path_to_data_folder='', gui=False):
+        self.pybullet_identifier = pybullet_identifier
+        self.path_to_data_folder = path_to_data_folder
+        self.gui = gui
+        self.robot_name = 'robby'
+        super(InitPyBulletWorldB, self).__init__(name)
+
+    def setup(self, timeout):
+        self.world = PyBulletWorld(enable_gui=self.gui, path_to_data_folder=self.path_to_data_folder)
+        self.world.activate_viewer()
+        # TODO get robot description from god map
+        urdf = rospy.get_param('robot_description')
+        self.world.spawn_robot_from_urdf(self.robot_name, urdf)
+        self.god_map.set_data([self.pybullet_identifier], self.world)
+        return super(InitPyBulletWorldB, self).setup(timeout)
+
+    def update(self):
+        return Status.SUCCESS
+
+class PyBulletMonitorB(GiskardBehavior):
+    def __init__(self, name, js_identifier, pybullet_identifier, map_frame, root_link):
+        self.js_identifier = js_identifier
+        self.pybullet_identifier = pybullet_identifier
+        self.robot_name = 'robby'
+        self.map_frame = map_frame
+        self.root_link = root_link
+        super(PyBulletMonitorB, self).__init__(name)
+
+    def setup(self, timeout):
+        self.world = self.god_map.get_data([self.pybullet_identifier])
+        return super(PyBulletMonitorB, self).setup(timeout)
+
+    def update(self):
+        js = self.god_map.get_data([self.js_identifier])
+        if js is not None:
+            self.world.set_robot_joint_state(js)
+        p = lookup_transform(self.map_frame, self.root_link)
+        self.world.get_robot().set_base_pose(position=[p.pose.position.x,
+                                                  p.pose.position.y,
+                                                  p.pose.position.z],
+                                        orientation=[p.pose.orientation.x,
+                                                     p.pose.orientation.y,
+                                                     p.pose.orientation.z,
+                                                     p.pose.orientation.w])
+        # print(time() - Blackboard().time)
+        return Status.SUCCESS

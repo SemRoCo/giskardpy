@@ -13,8 +13,10 @@ import keyword
 import numpy as np
 from numpy import pi
 
+from py_trees import Blackboard
 from sensor_msgs.msg import JointState
 
+from giskard_trees import grow_tree
 from giskardpy.data_types import ClosestPointInfo
 from giskardpy.pybullet_world import PyBulletWorld
 from giskardpy.python_interface import GiskardWrapper
@@ -139,21 +141,21 @@ class GiskardTestWrapper(object):
         rospy.set_param(u'~max_traj_length', 30)
         self.sub_result = rospy.Subscriber(u'/qp_controller/command/result', MoveActionResult, self.cb, queue_size=100)
 
-        self.pm = giskard_pm()
-        self.pm.start_plugins()
+        self.tree = grow_tree()
         self.wrapper = GiskardWrapper(ns=u'tests')
         self.results = Queue(100)
-        self.robot = self.pm._plugins[u'fk'].get_robot()
-        self.controlled_joints = self.pm._plugins[u'controlled joints'].controlled_joints
+        self.robot = self.tree.root.children[0].children[1].children[0].robot
+        self.controlled_joints = Blackboard().god_map.get_data([u'controlled_joints'])
         self.joint_limits = {joint_name: self.robot.get_joint_lower_upper_limit(joint_name) for joint_name in
                              self.controlled_joints if self.robot.is_joint_controllable(joint_name)}
-        self.world = self.pm._plugins[u'bullet'].world  # type: PyBulletWorld
+        self.world = Blackboard().god_map.get_data([u'pybullet_world'])  # type: PyBulletWorld
         self.default_root = u'base_link'
         self.r_tip = u'r_gripper_tool_frame'
         self.l_tip = u'l_gripper_tool_frame'
         self.map = u'map'
         self.simple_base_pose_pub = rospy.Publisher(u'/move_base_simple/goal', PoseStamped, queue_size=10)
         rospy.sleep(1)
+        self.tree.tick()
 
     def cb(self, msg):
         """
@@ -162,7 +164,7 @@ class GiskardTestWrapper(object):
         self.results.put(msg.result)
 
     def loop_once(self):
-        self.pm.update()
+        self.tree.tick()
 
     def get_controlled_joint_names(self):
         """
@@ -248,6 +250,9 @@ class GiskardTestWrapper(object):
     #
     # GENERAL GOAL STUFF ###############################################################################################
     #
+    def get_as(self):
+        return Blackboard().get('giskardpy/command')
+
     def send_goal(self):
         """
         :rtype: MoveResult
@@ -255,7 +260,7 @@ class GiskardTestWrapper(object):
         goal = MoveActionGoal()
         goal.goal = self.wrapper._get_goal()
 
-        t1 = Thread(target=self.pm._plugins[u'action server']._as.action_server.internal_goal_callback, args=(goal,))
+        t1 = Thread(target=self.get_as()._as.action_server.internal_goal_callback, args=(goal,))
         t1.start()
         while self.results.empty():
             self.loop_once()

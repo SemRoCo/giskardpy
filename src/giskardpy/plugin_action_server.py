@@ -11,22 +11,25 @@ from giskard_msgs.msg._MoveAction import MoveAction
 from giskard_msgs.msg._MoveFeedback import MoveFeedback
 from giskard_msgs.msg._MoveGoal import MoveGoal
 from giskard_msgs.msg._MoveResult import MoveResult
+from py_trees import Blackboard, Status
 
 from trajectory_msgs.msg import JointTrajectoryPoint, JointTrajectory
 
 from giskardpy.exceptions import MAX_NWSR_REACHEDException, QPSolverException, SolverTimeoutError, InsolvableException, \
     SymengineException, PathCollisionException, UnknownBodyException
-from giskardpy.plugin import PluginBase
+from giskardpy.plugin import PluginBase, GiskardBehavior
 from giskardpy.plugin_log_trajectory import LogTrajectoryPlugin
 from giskardpy.tfwrapper import transform_pose
 from giskardpy.utils import closest_point_constraint_violated
 
 ERROR_CODE_TO_NAME = {getattr(MoveResult, x): x for x in dir(MoveResult) if x.isupper()}
 
+
 class ActionServerPlugin(PluginBase):
     """
     Offers and action server and uses giskard to solve the goals.
     """
+
     # TODO find a better name than ActionServerPlugin
     def __init__(self, cartesian_goal_identifier, js_identifier, trajectory_identifier, time_identifier,
                  closest_point_identifier, controlled_joints_identifier, collision_goal_identifier,
@@ -387,3 +390,193 @@ class ActionServerPlugin(PluginBase):
     def __del__(self):
         # TODO find a way to cancel all goals when giskard is killed
         self._ac.cancel_all_goals()
+
+
+class ActionServerHandler(object):
+    """
+    Interface to action server which is more useful for behaviors.
+    """
+    def __init__(self, action_name, action_type):
+        self.goal_queue = Queue(1)
+        self.result_queue = Queue(1)
+        self._as = actionlib.SimpleActionServer(action_name, action_type,
+                                                execute_cb=self.execute_cb, auto_start=False)
+        self._as.register_preempt_callback(self.cancel_cb)
+        self._as.start()
+
+
+    def execute_cb(self, goal):
+        """
+        :type goal: MoveGoal
+        """
+        rospy.loginfo(u'goal received')
+        self.goal_queue.put(goal)
+        self.result_queue.get()()
+        # if result.error_code == MoveResult.SUCCESS:
+        #     self._as.set_succeeded(result)
+        # else:
+        #     self._as.set_aborted(result)
+
+        # rospy.loginfo(u'goal result: {}'.format(ERROR_CODE_TO_NAME[result.error_code]))
+        rospy.loginfo(u'execute cb finished')
+
+    def get_goal(self):
+        try:
+            goal = self.goal_queue.get()
+            self.canceled = False
+            return goal
+        except Empty:
+            return None
+
+    def has_goal(self):
+        return not self.goal_queue.empty()
+
+    def cancel_cb(self):
+        self.canceled = True
+        self.get_goal() # clear old goal
+        if self._as.new_goal:
+            # TODO cancel because new goal
+            self.send_preempted()
+            pass
+        else:
+            # TODO cancel because real cancel
+            self.send_preempted()
+            pass
+
+    def was_last_goal_canceled(self):
+        # TODO test me
+        r = self.canceled
+        # self.canceled = False
+        return r
+
+
+    def send_feedback(self):
+        # TODO
+        pass
+
+    def send_preempted(self):
+        # TODO put shit in queue
+        def call_me_now():
+            self._as.set_preempted()
+        self.result_queue.put(call_me_now)
+
+    def send_result(self, result=None):
+        """
+        :type result: MoveResult
+        """
+        def call_me_now():
+            self._as.set_succeeded(result)
+        self.result_queue.put(call_me_now)
+
+
+def do_shit_with_goal(goal):
+    rospy.loginfo(u'goal received')
+    self.execute = goal.type == MoveGoal.PLAN_AND_EXECUTE
+    if goal.type == MoveGoal.UNDEFINED:
+        result = MoveResult()
+        # TODO new error code
+        result.error_code = MoveResult.INSOLVABLE
+        self._as.set_aborted(result)
+    else:
+        result = MoveResult()
+        for i, move_cmd in enumerate(goal.cmd_seq):  # type: (int, MoveCmd)
+            # TODO handle empty controller case
+            intermediate_result = self.send_to_process_manager_and_wait(move_cmd)
+            result.error_code = intermediate_result.error_code
+            if result.error_code != MoveResult.SUCCESS:
+                # clear traj from prev cmds
+                result.trajectory = JointTrajectory()
+                break
+            result.trajectory = self.append_trajectory(result.trajectory, intermediate_result.trajectory)
+            if i < len(goal.cmd_seq) - 1:
+                self.let_process_manager_continue()
+        else:  # if not break
+            rospy.loginfo(u'found solution')
+            if result.error_code == MoveResult.SUCCESS and self.execute:
+                # TODO put result msg on god map/blackboard
+                # result.error_code = self.send_to_robot(result)
+                pass
+
+        self.start_js = None
+        if result.error_code != MoveResult.SUCCESS:
+            self._as.set_aborted(result)
+        else:
+            self._as.set_succeeded(result)
+        self.let_process_manager_continue()
+    rospy.loginfo(u'goal result: {}'.format(ERROR_CODE_TO_NAME[result.error_code]))
+
+def append_trajectory(traj1, traj2):
+    """
+    :type traj1: JointTrajectory
+    :type traj2: JointTrajectory
+    :rtype: JointTrajectory
+    """
+    # FIXME probably overwrite traj1
+    if len(traj1.points) == 0:
+        return traj2
+    # FIXME this step size assume a fixed distance between traj points
+    step_size = traj1.points[1].time_from_start - \
+                traj1.points[0].time_from_start
+    end_of_last_point = traj1.points[-1].time_from_start + step_size
+    for point in traj2.points:  # type: JointTrajectoryPoint
+        point.time_from_start += end_of_last_point
+        traj1.points.append(point)
+    return traj1
+
+
+def move_action_to_goal(msg):
+    return None
+
+def move_aciton_to_collision_goal(msg):
+    return None
+
+class ActionServerBehavior(GiskardBehavior):
+    def __init__(self, name, as_name, action_type=None):
+        self.as_handler = None
+        self.as_name = as_name
+        self.action_type = action_type
+        super(ActionServerBehavior, self).__init__(name)
+
+    def setup(self, timeout):
+        # TODO handle timeout
+        self.as_handler = Blackboard().get(self.as_name)
+        if self.as_handler is None:
+            self.as_handler = ActionServerHandler(self.as_name, self.action_type)
+            Blackboard().set(self.as_name, self.as_handler)
+        return super(ActionServerBehavior, self).setup(timeout)
+
+    def get_as(self):
+        """
+        :rtype: ActionServerHandler
+        """
+        return self.as_handler
+
+
+class GoalReceived(ActionServerBehavior):
+    def update(self):
+        if self.get_as().has_goal():
+            return Status.SUCCESS
+        return Status.FAILURE
+
+
+class GetGoal(ActionServerBehavior):
+    def __init__(self, name, as_name):
+        super(GetGoal, self).__init__(name, as_name)
+
+    def get_goal(self):
+        return self.get_as().get_goal()
+
+
+class GoalCanceled(ActionServerBehavior):
+    def update(self):
+        if self.get_as().was_last_goal_canceled():
+            return Status.SUCCESS
+        else:
+            return Status.FAILURE
+
+
+class SendResult(ActionServerBehavior):
+    def update(self):
+        # TODO get result from god map or blackboard
+        self.get_as().send_result()
+        return Status.SUCCESS

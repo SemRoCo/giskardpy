@@ -91,7 +91,7 @@ def resetted_giskard(giskard):
     :type giskard: GiskardTestWrapper
     """
     print(u'resetting giskard')
-    giskard.clear_world()
+    # giskard.clear_world()
     giskard.reset_pr2_base()
     return giskard
 
@@ -102,14 +102,14 @@ def zero_pose(resetted_giskard):
     :type giskard: GiskardTestWrapper
     """
     resetted_giskard.set_joint_goal(default_pose)
-    resetted_giskard.allow_all_collisions()
+    # resetted_giskard.allow_all_collisions()
     resetted_giskard.send_and_check_goal()
     return resetted_giskard
 
 @pytest.fixture()
 def pocky_pose_setup(resetted_giskard):
     resetted_giskard.set_joint_goal(pocky_pose)
-    resetted_giskard.allow_all_collisions()
+    # resetted_giskard.allow_all_collisions()
     resetted_giskard.send_and_check_goal()
     return resetted_giskard
 

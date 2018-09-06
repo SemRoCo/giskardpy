@@ -7,7 +7,7 @@ from py_trees import Status, Blackboard
 from sensor_msgs.msg import JointState
 from smach import State
 
-from giskardpy.plugin import PluginBase, GiskardState, GiskardBehavior
+from giskardpy.plugin import PluginBase, GiskardBehavior, NewPluginBase
 from giskardpy.plugin_kinematic_sim import KinematicSimPlugin
 from giskardpy.utils import to_joint_state_dict
 
@@ -50,7 +50,7 @@ class JointStatePlugin(PluginBase):
             pass
         self.god_map.set_data([self.js_identifier], self.mjs)
 
-    def start_always(self):
+    def initialize(self):
         self.joint_state_sub = rospy.Subscriber(u'joint_states', JointState, self.cb, queue_size=1)
 
     def stop(self):
@@ -61,13 +61,20 @@ class JointStatePlugin(PluginBase):
                                   time_identifier=self.time_identifier, sample_period=self.sample_period)
 
 
-class MonitorJS(GiskardState):
+class JointStatePlugin2(NewPluginBase):
+    """
+    Listens to a joint state topic, transforms it into a dict and writes it to the got map.
+    Gets replace with a kinematic sim plugin during a parallel universe.
+    """
+
     def __init__(self, js_identifier):
-        super(MonitorJS, self).__init__()
-        self.sub = rospy.Subscriber('joint_states', JointState, self.cb)
-        self.lock = Queue(maxsize=1)
+        """
+        :type js_identifier: str
+        """
+        super(JointStatePlugin2, self).__init__()
         self.js_identifier = js_identifier
         self.mjs = None
+        self.lock = Queue(maxsize=1)
 
     def cb(self, data):
         try:
@@ -76,15 +83,17 @@ class MonitorJS(GiskardState):
             pass
         self.lock.put(data)
 
-    def execute(self, ud):
-        # print('execute')
+    def update(self):
         try:
             js = self.lock.get_nowait()
             self.mjs = to_joint_state_dict(js)
         except Empty:
             pass
-        ud.god_map.set_data([self.js_identifier], self.mjs)
-        return self.Finished
+        self.god_map.set_data([self.js_identifier], self.mjs)
+
+    def setup(self):
+        self.joint_state_sub = rospy.Subscriber(u'joint_states', JointState, self.cb, queue_size=1)
+
 
 
 class JSBehavior(GiskardBehavior):

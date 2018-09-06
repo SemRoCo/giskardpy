@@ -1,8 +1,12 @@
+from collections import OrderedDict
+from threading import Thread
 from time import time
 
 import rospy
-from py_trees import Behaviour, Blackboard
+from py_trees import Behaviour, Blackboard, Status
 from smach import State
+
+from giskardpy.exceptions import MAX_NWSR_REACHEDException
 
 
 class PluginBase(object):
@@ -19,7 +23,7 @@ class PluginBase(object):
         if not self.started:
             self.start_once()
             self.started = True
-        self.start_always()
+        self.initialize()
 
     def start_once(self):
         """
@@ -28,7 +32,7 @@ class PluginBase(object):
         """
         pass
 
-    def start_always(self):
+    def initialize(self):
         """
         This function is called everything the plugin gets started. start_once will be called first.
         """
@@ -122,27 +126,74 @@ class PluginParallelUniverseOnly(PluginBase):
         return c
 
 
-class GiskardState(State):
-    Finished = 'next'
-    GodMapIOKey = 'god_map'
-    def __init__(self, outcomes=[]):
-        State.__init__(self,
-                       outcomes=[self.Finished]+outcomes,
-                       io_keys=[self.GodMapIOKey])
+class NewPluginBase(object):
+    def __init__(self):
+        self.god_map = Blackboard().god_map
 
-    def get_god_map(self, ud):
-        return getattr(ud, self.GodMapIOKey)
+    def setup(self):
+        pass
 
-class SleepState(GiskardState):
-    def execute(self, ud):
-        # rospy.sleep(0.1)
-        god_map = self.get_god_map(ud)
-        if god_map.get_data(['c']) == 10000:
-            print(time() - god_map.get_data(['time']))
-        god_map.set_data(['c'], god_map.get_data(['c'])+1)
-        return self.Finished
+    def initialize(self):
+        pass
+
+    def stop(self):
+        pass
+
+    def update(self):
+        return Status.SUCCESS
 
 class GiskardBehavior(Behaviour):
     def __init__(self, name):
         self.god_map = Blackboard().god_map
         super(GiskardBehavior, self).__init__(name)
+
+class PluginBehavior(GiskardBehavior):
+
+    def __init__(self, name):
+        self._plugins = OrderedDict()
+        super(PluginBehavior, self).__init__(name)
+
+    def add_plugin(self, name, plugin):
+        """Registers a plugin with the process manager. The name needs to be unique."""
+        if name in self._plugins:
+            raise KeyError(u'A plugin with name "{}" already exists.'.format(name))
+        self._plugins[name] = plugin
+
+    def setup(self, timeout):
+        self.running = False
+        self.start_plugins()
+        return super(PluginBehavior, self).setup(timeout)
+
+    def start_plugins(self):
+        for plugin in self._plugins.values():
+            plugin.setup()
+
+    def initialise(self):
+        self.running = True
+        self.update_thread = Thread(target=self.loop_over_plugins())
+        self.update_thread.start()
+        super(PluginBehavior, self).initialise()
+
+    def init_plugins(self):
+        for plugin in self._plugins.values():
+            plugin.initialize()
+
+    def terminate(self, new_status):
+        self.running = False
+        self.update_thread.join()
+        self.stop_plugins()
+        super(PluginBehavior, self).terminate(new_status)
+
+    def stop_plugins(self):
+        for plugin_name, plugin in self._plugins.items():
+            plugin.stop()
+
+    def update(self):
+        return Status.RUNNING
+
+    def loop_over_plugins(self):
+        self.init_plugins()
+        for plugin_name, plugin in self._plugins.items():
+            if self.running:
+                plugin.update()
+            rospy.sleep(.5)

@@ -17,7 +17,7 @@ from visualization_msgs.msg import Marker, MarkerArray
 from giskardpy.exceptions import CorruptShapeException, UnknownBodyException, \
     UnsupportedOptionException, DuplicateNameException, PhysicsWorldException
 from giskardpy.object import to_marker, world_body_to_urdf_object, from_pose_msg
-from giskardpy.plugin import PluginBase, GiskardState, GiskardBehavior
+from giskardpy.plugin import PluginBase, GiskardBehavior, NewPluginBase
 from giskardpy.pybullet_world import PyBulletWorld, ContactInfo
 from giskardpy.tfwrapper import transform_pose, lookup_transform, transform_point, transform_vector
 from giskardpy.data_types import ClosestPointInfo
@@ -386,55 +386,47 @@ class PyBulletPlugin(PluginBase):
         self.object_joint_states[object_name] = to_joint_state_dict(msg)
 
 
-class InitPyBulletWorld(GiskardState):
+class PyBulletMonitor(NewPluginBase):
 
-    def __init__(self, pybullet_identifier, path_to_data_folder='', gui=False):
-        self.pybullet_identifier = pybullet_identifier
-        self.path_to_data_folder = path_to_data_folder
-        self.gui = gui
-        self.robot_name = 'robby'
-        super(InitPyBulletWorld, self).__init__()
-
-    def execute(self, ud):
-        god_map = self.get_god_map(ud)
-        self.world = PyBulletWorld(enable_gui=self.gui, path_to_data_folder=self.path_to_data_folder)
-        self.world.activate_viewer()
-        # TODO get robot description from god map
-        urdf = rospy.get_param('robot_description')
-        self.world.spawn_robot_from_urdf(self.robot_name, urdf)
-        god_map.set_data([self.pybullet_identifier], self.world)
-        return self.Finished
-
-
-class PybulletMonitorState(GiskardState):
     def __init__(self, js_identifier, pybullet_identifier, map_frame, root_link, path_to_data_folder='', gui=False):
         self.js_identifier = js_identifier
         self.pybullet_identifier = pybullet_identifier
         self.path_to_data_folder = path_to_data_folder
         self.gui = gui
-        self.robot_name = 'robby'
+        self.robot_name = u'robby'
         self.map_frame = map_frame
         self.root_link = root_link
-        super(PybulletMonitorState, self).__init__()
+        super(PyBulletMonitor, self).__init__()
+        self.world = self.god_map.get_data([self.pybullet_identifier])
+        if self.world is None:
+            self.world = PyBulletWorld(enable_gui=self.gui, path_to_data_folder=self.path_to_data_folder)
 
-    def get_world(self, god_map):
-        return god_map.get_data([self.pybullet_identifier])
+    def initialize(self):
+        super(PyBulletMonitor, self).initialize()
 
-    def execute(self, ud):
-        god_map = self.get_god_map(ud)
-        world = self.get_world(god_map)
-        js = god_map.get_data([self.js_identifier])
+    def stop(self):
+        super(PyBulletMonitor, self).stop()
+
+    def setup(self):
+        self.world.activate_viewer()
+        # TODO get robot description from god map
+        urdf = rospy.get_param(u'robot_description')
+        self.world.spawn_robot_from_urdf(self.robot_name, urdf)
+        self.god_map.set_data([self.pybullet_identifier], self.world)
+
+    def update(self):
+        js = self.god_map.get_data([self.js_identifier])
         if js is not None:
-            world.set_robot_joint_state(js)
+            self.world.set_robot_joint_state(js)
         p = lookup_transform(self.map_frame, self.root_link)
-        world.get_robot().set_base_pose(position=[p.pose.position.x,
-                                                  p.pose.position.y,
-                                                  p.pose.position.z],
-                                        orientation=[p.pose.orientation.x,
-                                                     p.pose.orientation.y,
-                                                     p.pose.orientation.z,
-                                                     p.pose.orientation.w])
-        return self.Finished
+        self.world.get_robot().set_base_pose(position=[p.pose.position.x,
+                                                       p.pose.position.y,
+                                                       p.pose.position.z],
+                                             orientation=[p.pose.orientation.x,
+                                                          p.pose.orientation.y,
+                                                          p.pose.orientation.z,
+                                                          p.pose.orientation.w])
+        return Status.SUCCESS
 
 
 class InitPyBulletWorldB(GiskardBehavior):
@@ -457,6 +449,7 @@ class InitPyBulletWorldB(GiskardBehavior):
     def update(self):
         return Status.SUCCESS
 
+
 class PyBulletMonitorB(GiskardBehavior):
     def __init__(self, name, js_identifier, pybullet_identifier, map_frame, root_link):
         self.js_identifier = js_identifier
@@ -476,11 +469,11 @@ class PyBulletMonitorB(GiskardBehavior):
             self.world.set_robot_joint_state(js)
         p = lookup_transform(self.map_frame, self.root_link)
         self.world.get_robot().set_base_pose(position=[p.pose.position.x,
-                                                  p.pose.position.y,
-                                                  p.pose.position.z],
-                                        orientation=[p.pose.orientation.x,
-                                                     p.pose.orientation.y,
-                                                     p.pose.orientation.z,
-                                                     p.pose.orientation.w])
+                                                       p.pose.position.y,
+                                                       p.pose.position.z],
+                                             orientation=[p.pose.orientation.x,
+                                                          p.pose.orientation.y,
+                                                          p.pose.orientation.z,
+                                                          p.pose.orientation.w])
         # print(time() - Blackboard().time)
         return Status.SUCCESS

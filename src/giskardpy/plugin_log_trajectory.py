@@ -4,7 +4,7 @@ from itertools import product
 
 from giskardpy.exceptions import SolverTimeoutError, InsolvableException, \
     SymengineException, PathCollisionException
-from giskardpy.plugin import PluginBase
+from giskardpy.plugin import PluginBase, NewPluginBase
 from giskardpy.data_types import SingleJointState, Transform, Point, Quaternion, Trajectory
 from giskardpy.utils import closest_point_constraint_violated
 
@@ -102,7 +102,7 @@ class LogTrajectoryPlugin(PluginBase):
                         u'robot is in collision after {} seconds'.format(self.collision_time_threshold))
         self.past_joint_states.add(rounded_js)
 
-    def start_always(self):
+    def initialize(self):
         self.stop_universe = False
         self.past_joint_states = set()
 
@@ -111,6 +111,38 @@ class LogTrajectoryPlugin(PluginBase):
 
     def end_parallel_universe(self):
         return self.stop_universe
+
+class NewLogTrajPlugin(NewPluginBase):
+    # TODO split log and interrupt conditions
+    def __init__(self, trajectory_identifier, joint_state_identifier, time_identifier):
+        """
+        :type trajectory_identifier: str
+        :type joint_state_identifier: str
+        :type time_identifier: str
+        """
+        self.trajectory_identifier = trajectory_identifier
+        self.joint_state_identifier = joint_state_identifier
+        self.time_identifier = time_identifier
+        super(NewLogTrajPlugin, self).__init__()
+
+    def setup(self):
+        super(NewLogTrajPlugin, self).setup()
+
+    def initialize(self):
+        self.stop_universe = False
+        self.past_joint_states = set()
+        super(NewLogTrajPlugin, self).initialize()
+
+    def update(self):
+        current_js = self.god_map.get_data([self.joint_state_identifier])
+        time = self.god_map.get_data([self.time_identifier])
+        trajectory = self.god_map.get_data([self.trajectory_identifier])
+        if trajectory is None:
+            trajectory = Trajectory()
+        trajectory.set(time, current_js)
+        self.god_map.set_data([self.trajectory_identifier], trajectory)
+
+        return super(NewLogTrajPlugin, self).update()
 
 
 def plot_trajectory(tj, controlled_joints):

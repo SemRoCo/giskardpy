@@ -39,7 +39,7 @@ TRANSLATIONAL_JOINT_TYPES = [u'prismatic']
 class Robot(object):
     # TODO split urdf part into separate file?
     # TODO remove slow shit from init?
-    def __init__(self, urdf, default_joint_vel_limit=0):
+    def __init__(self, urdf, default_joint_vel_limit=1):
         """
         :param urdf:
         :type urdf: str
@@ -58,7 +58,7 @@ class Robot(object):
             self._urdf_robot = URDF.from_xml_string(hacky_urdf_parser_fix(self.urdf))
 
     @classmethod
-    def from_urdf_file(cls, urdf_file, joints_to_symbols_map=None, default_joint_vel_limit=0):
+    def from_urdf_file(cls, urdf_file, joints_to_symbols_map=None, default_joint_vel_limit=1):
         """
         :param urdf_file: path to urdf file
         :type urdf_file: str

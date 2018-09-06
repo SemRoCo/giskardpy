@@ -61,11 +61,11 @@ class NewKinSimPlugin(NewPluginBase):
         self.next_cmd_identifier = next_cmd_identifier
         self.time_identifier = time_identifier
         self.frequency = sample_period
-        self.time = -self.frequency
         super(NewKinSimPlugin, self).__init__()
 
     def initialize(self):
         self.next_js = None
+        self.time = -self.frequency
         super(NewKinSimPlugin, self).initialize()
 
     def update(self):
@@ -85,4 +85,4 @@ class NewKinSimPlugin(NewPluginBase):
         else:
             self.god_map.set_data([self.js_identifier], current_js)
         self.god_map.set_data([self.time_identifier], self.time)
-        super(NewKinSimPlugin, self).update()
+        return super(NewKinSimPlugin, self).update()

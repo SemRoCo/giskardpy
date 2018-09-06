@@ -31,7 +31,7 @@ class IMServer(object):
     Spawns interactive Marker which send cart goals to action server.
     Does not interact with god map.
     """
-    def __init__(self, root_tips, suffix=u''):
+    def __init__(self, root_tips, suffix=u'', giskard_name=u'giskardpy/command'):
         """
         :param root_tips: list containing root->tip tuple for each interactive marker.
         :type root_tips: list
@@ -44,12 +44,13 @@ class IMServer(object):
             self.roots = []
             self.tips = []
         self.suffix = suffix
+        self.giskard_name = giskard_name
         self.markers = {}
         self.start_once()
 
     def start_once(self):
         # giskard goal client
-        self.client = SimpleActionClient(u'qp_controller/command', MoveAction)
+        self.client = SimpleActionClient(self.giskard_name, MoveAction)
         self.client.wait_for_server()
 
         # marker server
@@ -313,7 +314,7 @@ class IMServer(object):
 
 
 if __name__ == u'__main__':
-    rospy.init_node(u'interactive_marker')
+    rospy.init_node(u'giskard_interactive_marker')
     root_tips = rospy.get_param(u'~interactive_marker_chains')
     im = IMServer(root_tips)
     while not rospy.is_shutdown():

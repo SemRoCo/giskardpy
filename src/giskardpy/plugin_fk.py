@@ -1,6 +1,7 @@
 import hashlib
 
 from geometry_msgs.msg import PoseStamped, Quaternion
+from py_trees import Status
 from tf.transformations import quaternion_from_matrix
 
 import symengine_wrappers as sw
@@ -18,7 +19,7 @@ class RobotPlugin(PluginBase):
     Inherit from this plugin if you want to use symengine robots who's urdf is in the god map.
     """
 
-    def __init__(self, robot_description_identifier, js_identifier, default_joint_vel_limit=0):
+    def __init__(self, robot_description_identifier, js_identifier, default_joint_vel_limit=1):
         """
         :type robot_description_identifier: str
         :type js_identifier: str
@@ -129,6 +130,7 @@ class NewFkPlugin(NewRobotPlugin):
         super(NewFkPlugin, self).__init__(robot_description_identifier, js_identifier)
 
     def initialize(self):
+        super(NewFkPlugin, self).initialize()
         if self.was_urdf_updated():
             free_symbols = self.god_map.get_registered_symbols()
 
@@ -165,3 +167,4 @@ class NewFkPlugin(NewRobotPlugin):
 
         fks = keydefaultdict(on_demand_fk_evaluated)
         self.god_map.set_data([self.fk_identifier], fks)
+        return Status.RUNNING

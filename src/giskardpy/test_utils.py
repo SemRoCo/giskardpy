@@ -142,9 +142,11 @@ class GiskardTestWrapper(object):
         self.sub_result = rospy.Subscriber(u'/qp_controller/command/result', MoveActionResult, self.cb, queue_size=100)
 
         self.tree = grow_tree()
+        self.tree.tick()
+        rospy.sleep(1)
         self.wrapper = GiskardWrapper(ns=u'tests')
         self.results = Queue(100)
-        self.robot = self.tree.root.children[0].children[1].children[0].robot
+        self.robot = self.tree.root.children[0].children[0].children[1]._plugins['fk'].robot
         self.controlled_joints = Blackboard().god_map.get_data([u'controlled_joints'])
         self.joint_limits = {joint_name: self.robot.get_joint_lower_upper_limit(joint_name) for joint_name in
                              self.controlled_joints if self.robot.is_joint_controllable(joint_name)}
@@ -155,7 +157,6 @@ class GiskardTestWrapper(object):
         self.map = u'map'
         self.simple_base_pose_pub = rospy.Publisher(u'/move_base_simple/goal', PoseStamped, queue_size=10)
         rospy.sleep(1)
-        self.tree.tick()
 
     def cb(self, msg):
         """
@@ -259,11 +260,15 @@ class GiskardTestWrapper(object):
         """
         goal = MoveActionGoal()
         goal.goal = self.wrapper._get_goal()
-
+        i = 0
         t1 = Thread(target=self.get_as()._as.action_server.internal_goal_callback, args=(goal,))
         t1.start()
         while self.results.empty():
             self.loop_once()
+            # if i >= 100:
+            #     assert False, 'planning took too long'
+            rospy.sleep(.5)
+            i += 1
         t1.join()
         self.loop_once()
         result = self.results.get()

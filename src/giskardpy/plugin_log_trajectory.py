@@ -131,14 +131,14 @@ class NewLogTrajPlugin(NewPluginBase):
     def initialize(self):
         self.stop_universe = False
         self.past_joint_states = set()
+        self.trajectory = Trajectory()
+        self.god_map.set_data([self.trajectory_identifier], self.trajectory)
         super(NewLogTrajPlugin, self).initialize()
 
     def update(self):
         current_js = self.god_map.get_data([self.joint_state_identifier])
         time = self.god_map.get_data([self.time_identifier])
         trajectory = self.god_map.get_data([self.trajectory_identifier])
-        if trajectory is None:
-            trajectory = Trajectory()
         trajectory.set(time, current_js)
         self.god_map.set_data([self.trajectory_identifier], trajectory)
 

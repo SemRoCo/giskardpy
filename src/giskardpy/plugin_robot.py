@@ -6,7 +6,7 @@ from giskardpy.utils import urdfs_equal
 
 class NewRobotPlugin(NewPluginBase):
 
-    def __init__(self, robot_description_identifier, js_identifier, default_joint_vel_limit=0):
+    def __init__(self, robot_description_identifier, js_identifier, default_joint_vel_limit=1):
         """
         :type robot_description_identifier: str
         :type js_identifier: str
@@ -17,10 +17,16 @@ class NewRobotPlugin(NewPluginBase):
         self._joint_states_identifier = js_identifier
         self.default_joint_vel_limit = default_joint_vel_limit
         self.robot = None
-        self.__urdf_updated = False
+        self.__urdf_updated = True
         self.controlled_joints = set()
         self.controllable_links = set()
-        self.init_robot()
+        # self.init_robot()
+
+    def get_god_map(self):
+        """
+        :rtype: giskardpy.god_map.GodMap
+        """
+        return self.god_map
 
     def initialize(self):
         if self.__is_urdf_updated():
@@ -52,16 +58,17 @@ class NewRobotPlugin(NewPluginBase):
         """
         return self.robot
 
-    def update_controlled_joints_and_links(self, controlled_joints_identifier, controllable_links_identifier):
+    def update_controlled_joints_and_links(self, controlled_joints_identifier, controllable_links_identifier=None):
         """
         Gets controlled joints from god map and uses this to calculate the controllable link, which are written to
         the god map.
         """
         self.controlled_joints = self.god_map.get_data([controlled_joints_identifier])
         self.controllable_links = set()
-        for joint_name in self.controlled_joints:
-            self.controllable_links.update(self.get_robot().get_sub_tree_link_names_with_collision(joint_name))
-        self.god_map.set_data([controllable_links_identifier], self.controllable_links)
+        if controllable_links_identifier is not None:
+            for joint_name in self.controlled_joints:
+                self.controllable_links.update(self.get_robot().get_sub_tree_link_names_with_collision(joint_name))
+            self.god_map.set_data([controllable_links_identifier], self.controllable_links)
 
 
 

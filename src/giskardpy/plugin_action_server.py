@@ -411,6 +411,7 @@ class ActionServerHandler(object):
         """
         rospy.loginfo(u'goal received')
         self.goal_queue.put(goal)
+        print('goal put')
         self.result_queue.get()()
         # if result.error_code == MoveResult.SUCCESS:
         #     self._as.set_succeeded(result)
@@ -422,7 +423,7 @@ class ActionServerHandler(object):
 
     def get_goal(self):
         try:
-            goal = self.goal_queue.get()
+            goal = self.goal_queue.get_nowait()
             self.canceled = False
             return goal
         except Empty:
@@ -432,16 +433,18 @@ class ActionServerHandler(object):
         return not self.goal_queue.empty()
 
     def cancel_cb(self):
+        print('\ncancel called--------------------------------------------------------------------\n')
         self.canceled = True
         self.get_goal() # clear old goal
-        if self._as.new_goal:
-            # TODO cancel because new goal
-            self.send_preempted()
-            pass
-        else:
-            # TODO cancel because real cancel
-            self.send_preempted()
-            pass
+        print('\ncancel finished--------------------------------------------------------------------\n')
+        # if self._as.new_goal:
+        #     # TODO cancel because new goal
+        #     self.send_preempted()
+        #     pass
+        # else:
+        #     # TODO cancel because real cancel
+        #     self.send_preempted()
+        #     pass
 
     def was_last_goal_canceled(self):
         # TODO test me
@@ -456,6 +459,7 @@ class ActionServerHandler(object):
 
     def send_preempted(self):
         # TODO put shit in queue
+        print('preemptefffd')
         def call_me_now():
             self._as.set_preempted()
         self.result_queue.put(call_me_now)
@@ -464,71 +468,11 @@ class ActionServerHandler(object):
         """
         :type result: MoveResult
         """
+        print('send_result')
         def call_me_now():
             self._as.set_succeeded(result)
         self.result_queue.put(call_me_now)
 
-
-def do_shit_with_goal(goal):
-    rospy.loginfo(u'goal received')
-    self.execute = goal.type == MoveGoal.PLAN_AND_EXECUTE
-    if goal.type == MoveGoal.UNDEFINED:
-        result = MoveResult()
-        # TODO new error code
-        result.error_code = MoveResult.INSOLVABLE
-        self._as.set_aborted(result)
-    else:
-        result = MoveResult()
-        for i, move_cmd in enumerate(goal.cmd_seq):  # type: (int, MoveCmd)
-            # TODO handle empty controller case
-            intermediate_result = self.send_to_process_manager_and_wait(move_cmd)
-            result.error_code = intermediate_result.error_code
-            if result.error_code != MoveResult.SUCCESS:
-                # clear traj from prev cmds
-                result.trajectory = JointTrajectory()
-                break
-            result.trajectory = self.append_trajectory(result.trajectory, intermediate_result.trajectory)
-            if i < len(goal.cmd_seq) - 1:
-                self.let_process_manager_continue()
-        else:  # if not break
-            rospy.loginfo(u'found solution')
-            if result.error_code == MoveResult.SUCCESS and self.execute:
-                # TODO put result msg on god map/blackboard
-                # result.error_code = self.send_to_robot(result)
-                pass
-
-        self.start_js = None
-        if result.error_code != MoveResult.SUCCESS:
-            self._as.set_aborted(result)
-        else:
-            self._as.set_succeeded(result)
-        self.let_process_manager_continue()
-    rospy.loginfo(u'goal result: {}'.format(ERROR_CODE_TO_NAME[result.error_code]))
-
-def append_trajectory(traj1, traj2):
-    """
-    :type traj1: JointTrajectory
-    :type traj2: JointTrajectory
-    :rtype: JointTrajectory
-    """
-    # FIXME probably overwrite traj1
-    if len(traj1.points) == 0:
-        return traj2
-    # FIXME this step size assume a fixed distance between traj points
-    step_size = traj1.points[1].time_from_start - \
-                traj1.points[0].time_from_start
-    end_of_last_point = traj1.points[-1].time_from_start + step_size
-    for point in traj2.points:  # type: JointTrajectoryPoint
-        point.time_from_start += end_of_last_point
-        traj1.points.append(point)
-    return traj1
-
-
-def move_action_to_goal(msg):
-    return None
-
-def move_aciton_to_collision_goal(msg):
-    return None
 
 class ActionServerBehavior(GiskardBehavior):
     def __init__(self, name, as_name, action_type=None):
@@ -578,5 +522,8 @@ class GoalCanceled(ActionServerBehavior):
 class SendResult(ActionServerBehavior):
     def update(self):
         # TODO get result from god map or blackboard
-        self.get_as().send_result()
+        if self.get_as().was_last_goal_canceled():
+            self.get_as().send_preempted()
+        else:
+            self.get_as().send_result()
         return Status.SUCCESS

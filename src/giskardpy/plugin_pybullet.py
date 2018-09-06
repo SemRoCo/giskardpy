@@ -398,8 +398,6 @@ class PyBulletMonitor(NewPluginBase):
         self.root_link = root_link
         super(PyBulletMonitor, self).__init__()
         self.world = self.god_map.get_data([self.pybullet_identifier])
-        if self.world is None:
-            self.world = PyBulletWorld(enable_gui=self.gui, path_to_data_folder=self.path_to_data_folder)
 
     def initialize(self):
         super(PyBulletMonitor, self).initialize()
@@ -408,11 +406,14 @@ class PyBulletMonitor(NewPluginBase):
         super(PyBulletMonitor, self).stop()
 
     def setup(self):
-        self.world.activate_viewer()
-        # TODO get robot description from god map
-        urdf = rospy.get_param(u'robot_description')
-        self.world.spawn_robot_from_urdf(self.robot_name, urdf)
-        self.god_map.set_data([self.pybullet_identifier], self.world)
+        self.world = self.get_god_map().get_data([self.pybullet_identifier])
+        if self.world is None:
+            self.world = PyBulletWorld(enable_gui=self.gui, path_to_data_folder=self.path_to_data_folder)
+            self.world.activate_viewer()
+            # TODO get robot description from god map
+            urdf = rospy.get_param(u'robot_description')
+            self.world.spawn_robot_from_urdf(self.robot_name, urdf)
+            self.god_map.set_data([self.pybullet_identifier], self.world)
 
     def update(self):
         js = self.god_map.get_data([self.js_identifier])
@@ -426,7 +427,7 @@ class PyBulletMonitor(NewPluginBase):
                                                           p.pose.orientation.y,
                                                           p.pose.orientation.z,
                                                           p.pose.orientation.w])
-        return Status.SUCCESS
+        return Status.RUNNING
 
 
 class InitPyBulletWorldB(GiskardBehavior):

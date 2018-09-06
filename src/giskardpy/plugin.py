@@ -1,4 +1,5 @@
 from collections import OrderedDict
+from multiprocessing import Lock
 from threading import Thread
 from time import time
 
@@ -140,17 +141,32 @@ class NewPluginBase(object):
         pass
 
     def update(self):
-        return Status.SUCCESS
+        return Status.RUNNING
+
+    def get_god_map(self):
+        """
+        :rtype: giskardpy.god_map.GodMap
+        """
+        return self.god_map
 
 class GiskardBehavior(Behaviour):
     def __init__(self, name):
         self.god_map = Blackboard().god_map
         super(GiskardBehavior, self).__init__(name)
 
+    def get_god_map(self):
+        """
+        :rtype: giskardpy.god_map.GodMap
+        """
+        return self.god_map
+
 class PluginBehavior(GiskardBehavior):
 
-    def __init__(self, name):
+    def __init__(self, name, sleep=.5):
         self._plugins = OrderedDict()
+        self.set_status(Status.INVALID)
+        self.status_lock = Lock()
+        self.sleep = sleep
         super(PluginBehavior, self).__init__(name)
 
     def add_plugin(self, name, plugin):
@@ -160,7 +176,6 @@ class PluginBehavior(GiskardBehavior):
         self._plugins[name] = plugin
 
     def setup(self, timeout):
-        self.running = False
         self.start_plugins()
         return super(PluginBehavior, self).setup(timeout)
 
@@ -169,8 +184,9 @@ class PluginBehavior(GiskardBehavior):
             plugin.setup()
 
     def initialise(self):
-        self.running = True
-        self.update_thread = Thread(target=self.loop_over_plugins())
+        with self.status_lock:
+            self.set_status(Status.RUNNING)
+        self.update_thread = Thread(target=self.loop_over_plugins)
         self.update_thread.start()
         super(PluginBehavior, self).initialise()
 
@@ -178,8 +194,13 @@ class PluginBehavior(GiskardBehavior):
         for plugin in self._plugins.values():
             plugin.initialize()
 
+    def is_running(self):
+        return self.my_status == Status.RUNNING
+
     def terminate(self, new_status):
-        self.running = False
+        # self.status = new_status
+        with self.status_lock:
+            self.set_status(Status.FAILURE)
         self.update_thread.join()
         self.stop_plugins()
         super(PluginBehavior, self).terminate(new_status)
@@ -189,11 +210,22 @@ class PluginBehavior(GiskardBehavior):
             plugin.stop()
 
     def update(self):
-        return Status.RUNNING
+        with self.status_lock:
+            return self.my_status
+
+    def set_status(self, new_state):
+        self.my_status = new_state
 
     def loop_over_plugins(self):
         self.init_plugins()
-        for plugin_name, plugin in self._plugins.items():
-            if self.running:
-                plugin.update()
-            rospy.sleep(.5)
+        while self.is_running():
+            for plugin_name, plugin in self._plugins.items():
+                with self.status_lock:
+                    if not self.is_running():
+                        return
+                    status = plugin.update()
+                    self.set_status(status)
+                    assert self.my_status is not None, u'{} did not return a status'.format(plugin_name)
+                    if not self.is_running():
+                        return
+                rospy.sleep(self.sleep)

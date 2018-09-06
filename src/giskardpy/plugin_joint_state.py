@@ -2,6 +2,7 @@ from Queue import Empty, Queue
 from time import time
 
 import rospy
+from iai_wsg_50_msgs.msg import Status
 from py_trees import Status, Blackboard
 
 from sensor_msgs.msg import JointState
@@ -90,6 +91,7 @@ class JointStatePlugin2(NewPluginBase):
         except Empty:
             pass
         self.god_map.set_data([self.js_identifier], self.mjs)
+        return Status.RUNNING
 
     def setup(self):
         self.joint_state_sub = rospy.Subscriber(u'joint_states', JointState, self.cb, queue_size=1)

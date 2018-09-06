@@ -323,9 +323,10 @@ class CartesianBulletControllerPlugin(RobotPlugin):
 class GoalToConstraints(GetGoal, NewRobotPlugin):
     def __init__(self, name, as_name, root_link, robot_description_identifier, js_identifier, goal_identifier,
                  controlled_joints_identifier, controllable_links_identifier, fk_identifier, pyfunction_identifier,
-                 closest_point_identifier):
+                 closest_point_identifier, soft_constraint_identifier):
         GetGoal.__init__(self, name, as_name)
         NewRobotPlugin.__init__(self, robot_description_identifier, js_identifier)
+        self.soft_constraint_identifier = soft_constraint_identifier
         self._goal_identifier = goal_identifier
         self.controlled_joints_identifier = controlled_joints_identifier
         self.controllable_links_identifier = controllable_links_identifier
@@ -345,6 +346,7 @@ class GoalToConstraints(GetGoal, NewRobotPlugin):
 
     def initialise(self):
         NewRobotPlugin.initialize(self)
+        self.get_god_map().set_data([self._goal_identifier], None)
 
     def terminate(self, new_status):
         super(GoalToConstraints, self).terminate(new_status)
@@ -382,6 +384,8 @@ class GoalToConstraints(GetGoal, NewRobotPlugin):
         for collision in move_cmd.collisions:  # type: CollisionEntry
             # TODO don't do this here?
             pass
+        self.god_map.set_data([self.soft_constraint_identifier], self.soft_constraints)
+        return Status.SUCCESS
 
     def add_cart_controller_soft_constraints(self, controller, t):
         """
@@ -635,23 +639,29 @@ def cart_controller_to_goal(controller):
 
 
 class ControllerPlugin(NewRobotPlugin):
-    def __init__(self, robot_description_identifier, js_identifier, path_to_functions, next_cmd_identifier, nWSR=None):
+    def __init__(self, robot_description_identifier, js_identifier, path_to_functions, next_cmd_identifier,
+                 soft_constraint_identifier, controlled_joints_identifier, nWSR=None):
         super(ControllerPlugin, self).__init__(robot_description_identifier, js_identifier)
+        self.soft_constraint_identifier = soft_constraint_identifier
         self.path_to_functions = path_to_functions
         self.nWSR = nWSR
+        self.controlled_joints_identifier = controlled_joints_identifier
         self._next_cmd_identifier = next_cmd_identifier
 
     def setup(self):
         super(ControllerPlugin, self).setup()
 
     def initialize(self):
+        super(ControllerPlugin, self).initialize()
+        self.update_controlled_joints_and_links(self.controlled_joints_identifier)
         self.init_controller()
         self.next_cmd = {}
-        super(ControllerPlugin, self).initialize()
 
     def init_controller(self):
+        soft_constraints = self.god_map.get_data([self.soft_constraint_identifier])
         self.controller = SymEngineController(self.robot, self.path_to_functions)
         self.controller.set_controlled_joints(self.controlled_joints)
+        self.controller.update_soft_constraints(soft_constraints, self.get_god_map().get_registered_symbols())
 
     def update(self):
         expr = self.god_map.get_symbol_map()
@@ -659,3 +669,4 @@ class ControllerPlugin(NewRobotPlugin):
         self.next_cmd.update(next_cmd)
 
         self.god_map.set_data([self._next_cmd_identifier], self.next_cmd)
+        return Status.RUNNING

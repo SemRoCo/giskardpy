@@ -14,11 +14,14 @@ from giskardpy.god_map import GodMap
 from giskardpy.plugin import PluginBehavior
 from giskardpy.plugin_action_server import GoalReceived, GetGoal, SendResult, GoalCanceled
 from giskardpy.plugin_fk import NewFkPlugin
+from giskardpy.plugin_goal_reached import GoalReachedPlugin
 from giskardpy.plugin_instantaneous_controller import GoalToConstraints, ControllerPlugin
 from giskardpy.plugin_joint_state import JSBehavior, JointStatePlugin, JointStatePlugin2
 from giskardpy.plugin_kinematic_sim import NewKinSimPlugin
 from giskardpy.plugin_log_trajectory import NewLogTrajPlugin
 from giskardpy.plugin_pybullet import PyBulletMonitor
+from giskardpy.plugin_send_trajectory import SendTrajectory
+
 
 class MySuccess(Success):
     def update(self):
@@ -47,10 +50,9 @@ def grow_tree():
     blackboard = Blackboard
     blackboard.god_map = GodMap()
 
-    root_tips = rospy.get_param(u'~interactive_marker_chains')
     # gui = rospy.get_param(u'~enable_gui')
-    gui = True
-    # gui = False
+    # gui = True
+    gui = False
     map_frame = rospy.get_param(u'~map_frame')
     joint_convergence_threshold = rospy.get_param(u'~joint_convergence_threshold')
     wiggle_precision_threshold = rospy.get_param(u'~wiggle_precision_threshold')
@@ -85,7 +87,7 @@ def grow_tree():
     controllable_links_identifier = u'controllable_links'
     robot_description_identifier = u'robot_description'
     pybullet_identifier = u'pybullet_world'
-
+    soft_constraint_identifier = u'soft_constraints'
     action_server_name =  u'giskardpy/command'
 
     ini(u'robot_description', robot_description_identifier, controlled_joints_identifier)
@@ -108,7 +110,7 @@ def grow_tree():
     planning.add_child(GoalCanceled(u'goal canceled', action_server_name))
     # planning.add_child(Count('actual planning', fail_until=0, running_until=2, success_until=3))
 
-    actual_planning = PluginBehavior('actual planning')
+    actual_planning = PluginBehavior('actual planning', sleep=0)
     actual_planning.add_plugin('kin sim', NewKinSimPlugin(js_identifier, next_cmd_identifier,
                                                           time_identifier, sample_period))
     actual_planning.add_plugin('fk', NewFkPlugin(fk_identifier, js_identifier, robot_description_identifier))
@@ -117,20 +119,24 @@ def grow_tree():
     # actual_planning.add_plugin('coll')
     actual_planning.add_plugin('controller', ControllerPlugin(robot_description_identifier, js_identifier,
                                                               path_to_data_folder, next_cmd_identifier,
+                                                              soft_constraint_identifier, controlled_joints_identifier,
                                                               nWSR))
     actual_planning.add_plugin('log', NewLogTrajPlugin(trajectory_identifier, js_identifier, time_identifier))
-
+    actual_planning.add_plugin('goal reached', GoalReachedPlugin(js_identifier, time_identifier,
+                                                                 joint_convergence_threshold))
+    planning.add_child(actual_planning)
     # ----------------------------------------------
     parse_goal = Sequence('parse goal')
     parse_goal.add_child(GoalToConstraints(u'update constraints', action_server_name, root_link,
                                            robot_description_identifier, js_identifier, cartesian_goal_identifier,
                                            controlled_joints_identifier, controllable_links_identifier,
-                                           fk_identifier, pyfunction_identifier, closest_point_identifier))
+                                           fk_identifier, pyfunction_identifier, closest_point_identifier,
+                                           soft_constraint_identifier))
 
     #----------------------------------------------
     publish_result = Selector('pub result')
     publish_result.add_child(GoalCanceled(u'goal_canceled2', action_server_name))
-    publish_result.add_child(Count('send traj', fail_until=0, running_until=2, success_until=3))
+    publish_result.add_child(SendTrajectory(u'send traj', trajectory_identifier, fill_velocity_values))
     #----------------------------------------------
     main = Sequence('main')
     main.add_child(wait_for_goal)
@@ -168,4 +174,4 @@ def grow_tree():
 if __name__ == u'__main__':
     rospy.init_node(u'giskard')
     tree = grow_tree()
-    tree.tick_tock(2000)
+    tree.tick_tock(1000)

@@ -9,7 +9,6 @@ from giskardpy.plugin_action_server import ActionServerPlugin
 from giskardpy.application import ROSApplication
 from giskardpy.plugin_instantaneous_controller import CartesianBulletControllerPlugin
 from giskardpy.plugin_fk import FKPlugin
-from giskardpy.plugin_interactive_marker import InteractiveMarkerPlugin
 from giskardpy.plugin_joint_state import JointStatePlugin
 from giskardpy.plugin_pybullet import PyBulletPlugin
 from giskardpy.plugin_set_controlled_joints import SetControlledJointsPlugin, UploadRobotDescriptionPlugin
@@ -20,7 +19,6 @@ def giskard_pm():
     # TODO bug if first goal is joint
     # TODO you should specify here which plugins get replaced with which during a parallel universe
     # root_link = rospy.get_param('~root_link', 'odom')
-    root_tips = rospy.get_param(u'~interactive_marker_chains')
     gui = rospy.get_param(u'~enable_gui')
     map_frame = rospy.get_param(u'~map_frame')
     joint_convergence_threshold = rospy.get_param(u'~joint_convergence_threshold')
@@ -115,8 +113,8 @@ def giskard_pm():
                                                            nWSR=nWSR,
                                                            default_joint_vel_limit=default_joint_vel_limit,
                                                            robot_description_identifier=robot_description_identifier)))
-    pm.register_plugin(u'interactive marker',
-                       InteractiveMarkerPlugin(root_tips=root_tips))
+    # pm.register_plugin(u'interactive marker',
+    #                    InteractiveMarkerPlugin(root_tips=root_tips))
     return pm
 
 if __name__ == u'__main__':

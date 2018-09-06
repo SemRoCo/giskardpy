@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 import numpy as np
 from collections import defaultdict
 from copy import deepcopy
@@ -19,14 +20,13 @@ from visualization_msgs.msg._InteractiveMarkerControl import InteractiveMarkerCo
 from visualization_msgs.msg._InteractiveMarkerFeedback import InteractiveMarkerFeedback
 from visualization_msgs.msg._Marker import Marker
 
-from giskardpy.plugin import PluginBase
 from giskardpy.utils import qv_mult
 
 MARKER_SCALE = 0.15
 
 
 
-class InteractiveMarkerPlugin(PluginBase):
+class IMServer(object):
     """
     Spawns interactive Marker which send cart goals to action server.
     Does not interact with god map.
@@ -45,7 +45,7 @@ class InteractiveMarkerPlugin(PluginBase):
             self.tips = []
         self.suffix = suffix
         self.markers = {}
-        super(InteractiveMarkerPlugin, self).__init__()
+        self.start_once()
 
     def start_once(self):
         # giskard goal client
@@ -311,8 +311,10 @@ class InteractiveMarkerPlugin(PluginBase):
             goal.cmd_seq.append(move_cmd)
             self.client.send_goal(goal)
 
-        def stop(self):
-            self.marker_pub.unregister()
 
-    def copy(self):
-        return self
+if __name__ == u'__main__':
+    rospy.init_node(u'interactive_marker')
+    root_tips = rospy.get_param(u'~interactive_marker_chains')
+    im = IMServer(root_tips)
+    while not rospy.is_shutdown():
+        rospy.sleep(1)

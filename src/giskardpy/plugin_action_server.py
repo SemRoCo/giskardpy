@@ -409,9 +409,8 @@ class ActionServerHandler(object):
         """
         :type goal: MoveGoal
         """
-        rospy.loginfo(u'goal received')
+        # rospy.loginfo(u'goal received')
         self.goal_queue.put(goal)
-        print('goal put')
         self.result_queue.get()()
         # if result.error_code == MoveResult.SUCCESS:
         #     self._as.set_succeeded(result)
@@ -419,7 +418,6 @@ class ActionServerHandler(object):
         #     self._as.set_aborted(result)
 
         # rospy.loginfo(u'goal result: {}'.format(ERROR_CODE_TO_NAME[result.error_code]))
-        rospy.loginfo(u'execute cb finished')
 
     def get_goal(self):
         try:
@@ -433,10 +431,8 @@ class ActionServerHandler(object):
         return not self.goal_queue.empty()
 
     def cancel_cb(self):
-        print('\ncancel called--------------------------------------------------------------------\n')
         self.canceled = True
         self.get_goal() # clear old goal
-        print('\ncancel finished--------------------------------------------------------------------\n')
         # if self._as.new_goal:
         #     # TODO cancel because new goal
         #     self.send_preempted()
@@ -459,7 +455,6 @@ class ActionServerHandler(object):
 
     def send_preempted(self):
         # TODO put shit in queue
-        print('preemptefffd')
         def call_me_now():
             self._as.set_preempted()
         self.result_queue.put(call_me_now)
@@ -468,7 +463,6 @@ class ActionServerHandler(object):
         """
         :type result: MoveResult
         """
-        print('send_result')
         def call_me_now():
             self._as.set_succeeded(result)
         self.result_queue.put(call_me_now)

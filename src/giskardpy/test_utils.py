@@ -139,14 +139,14 @@ class GiskardTestWrapper(object):
         rospy.set_param(u'~path_to_data_folder', u'../data/pr2/')
         rospy.set_param(u'~collision_time_threshold', 15)
         rospy.set_param(u'~max_traj_length', 30)
-        self.sub_result = rospy.Subscriber(u'/qp_controller/command/result', MoveActionResult, self.cb, queue_size=100)
+        self.sub_result = rospy.Subscriber(u'/giskardpy/command/result', MoveActionResult, self.cb, queue_size=100)
 
         self.tree = grow_tree()
         self.tree.tick()
         rospy.sleep(1)
         self.wrapper = GiskardWrapper(ns=u'tests')
         self.results = Queue(100)
-        self.robot = self.tree.root.children[0].children[0].children[1]._plugins['fk'].robot
+        self.robot = self.tree.root.children[0].children[0].children[1]._plugins[u'fk'].robot
         self.controlled_joints = Blackboard().god_map.get_data([u'controlled_joints'])
         self.joint_limits = {joint_name: self.robot.get_joint_lower_upper_limit(joint_name) for joint_name in
                              self.controlled_joints if self.robot.is_joint_controllable(joint_name)}
@@ -198,7 +198,7 @@ class GiskardTestWrapper(object):
     def tear_down(self):
         rospy.sleep(1)
         print(u'stopping plugins')
-        self.pm.stop()
+        # self.tree.destroy(
 
     #
     # JOINT GOAL STUFF #################################################################################################

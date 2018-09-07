@@ -93,10 +93,6 @@ def grow_tree():
     ini(u'robot_description', robot_description_identifier, controlled_joints_identifier)
 
     #----------------------------------------------
-    # init = Sequence('init')
-    # init.add_child(Count('init giskard', fail_until=0, running_until=2, success_until=3))
-    # init.add_child(Failure('dont call init again'))
-    #----------------------------------------------
     wait_for_goal = Selector('wait for goal')
     wait_for_goal.add_child(GoalReceived(u'has_goal', action_server_name, MoveAction))
     monitor = PluginBehavior('monitor')
@@ -108,7 +104,6 @@ def grow_tree():
     #----------------------------------------------
     planning = Selector('planning')
     planning.add_child(GoalCanceled(u'goal canceled', action_server_name))
-    # planning.add_child(Count('actual planning', fail_until=0, running_until=2, success_until=3))
 
     actual_planning = PluginBehavior('actual planning', sleep=0)
     actual_planning.add_plugin('kin sim', NewKinSimPlugin(js_identifier, next_cmd_identifier,
@@ -144,11 +139,9 @@ def grow_tree():
     main.add_child(planning)
     main.add_child(publish_result)
     main.add_child(SendResult(u'send result', action_server_name))
-
+    #
     #----------------------------------------------
     root = Sequence('root')
-    # root = Sequence('root')
-    # root.add_child(init)
     root.add_child(main)
 
     tree = BehaviourTree(root)
@@ -174,4 +167,10 @@ def grow_tree():
 if __name__ == u'__main__':
     rospy.init_node(u'giskard')
     tree = grow_tree()
-    tree.tick_tock(1000)
+    while not rospy.is_shutdown():
+        try:
+            tree.tick()
+            rospy.sleep(0.5)
+        except KeyboardInterrupt:
+            break
+    print("\n")

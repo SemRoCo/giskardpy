@@ -218,7 +218,7 @@ class PluginBehavior(GiskardBehavior):
 
     def loop_over_plugins(self):
         self.init_plugins()
-        while self.is_running():
+        while self.is_running() and not rospy.is_shutdown():
             for plugin_name, plugin in self._plugins.items():
                 with self.status_lock:
                     if not self.is_running():

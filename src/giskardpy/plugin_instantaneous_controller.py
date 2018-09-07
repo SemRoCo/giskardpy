@@ -519,6 +519,7 @@ class GoalToConstraints(GetGoal, NewRobotPlugin):
                                                            min_dist))
 
         # self.controller.update_soft_constraints(soft_constraints, self.god_map.get_registered_symbols())
+        self.soft_constraints.update(soft_constraints)
 
     def set_unused_joint_goals_to_current(self):
         """

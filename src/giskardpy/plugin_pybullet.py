@@ -659,8 +659,8 @@ class CollisionChecker(PybulletPlugin):
                 if collision_info.contact_distance < red_threshold:
                     m.colors[-2] = ColorRGBA(1, 0, 0, 1)
                     m.colors[-1] = ColorRGBA(1, 0, 0, 1)
-            else:
-                m.action = Marker.DELETE
+            # else:
+            #     m.action = Marker.DELETE
         ma = MarkerArray()
         ma.markers.append(m)
         self.pub_collision_marker.publish(ma)

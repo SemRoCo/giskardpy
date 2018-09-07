@@ -323,7 +323,7 @@ class CartesianBulletControllerPlugin(RobotPlugin):
 class GoalToConstraints(GetGoal, NewRobotPlugin):
     def __init__(self, name, as_name, root_link, robot_description_identifier, js_identifier, goal_identifier,
                  controlled_joints_identifier, controllable_links_identifier, fk_identifier, pyfunction_identifier,
-                 closest_point_identifier, soft_constraint_identifier):
+                 closest_point_identifier, soft_constraint_identifier, collision_goal_identifier):
         GetGoal.__init__(self, name, as_name)
         NewRobotPlugin.__init__(self, robot_description_identifier, js_identifier)
         self.soft_constraint_identifier = soft_constraint_identifier
@@ -333,6 +333,7 @@ class GoalToConstraints(GetGoal, NewRobotPlugin):
         self.fk_identifier = fk_identifier
         self.pyfunction_identifier = pyfunction_identifier
         self.closest_point_identifier = closest_point_identifier
+        self.collision_goal_identifier = collision_goal_identifier
         self.root = root_link
         self.soft_constraints = {}
         self.used_joints = set()
@@ -380,6 +381,8 @@ class GoalToConstraints(GetGoal, NewRobotPlugin):
         self.god_map.set_data([self._goal_identifier], shit)
 
         self.set_unused_joint_goals_to_current()
+
+        self.get_god_map().set_data([self.collision_goal_identifier], move_cmd.collisions)
 
         for collision in move_cmd.collisions:  # type: CollisionEntry
             # TODO don't do this here?

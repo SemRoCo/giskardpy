@@ -19,7 +19,7 @@ from giskardpy.plugin_instantaneous_controller import GoalToConstraints, Control
 from giskardpy.plugin_joint_state import JSBehavior, JointStatePlugin, JointStatePlugin2
 from giskardpy.plugin_kinematic_sim import NewKinSimPlugin
 from giskardpy.plugin_log_trajectory import NewLogTrajPlugin
-from giskardpy.plugin_pybullet import PyBulletMonitor
+from giskardpy.plugin_pybullet import PyBulletMonitor, PyBulletUpdatePlugin, CollisionChecker
 from giskardpy.plugin_send_trajectory import SendTrajectory
 
 
@@ -100,6 +100,8 @@ def grow_tree():
     monitor.add_plugin('fk', NewFkPlugin(fk_identifier, js_identifier, robot_description_identifier))
     monitor.add_plugin('pw', PyBulletMonitor(js_identifier, pybullet_identifier, map_frame, root_link,
                                              path_to_data_folder, gui))
+    monitor.add_plugin('pybullet updater', PyBulletUpdatePlugin(pybullet_identifier, robot_description_identifier,
+                                                                path_to_data_folder, gui))
     wait_for_goal.add_child(monitor)
     #----------------------------------------------
     planning = Selector('planning')
@@ -111,7 +113,11 @@ def grow_tree():
     actual_planning.add_plugin('fk', NewFkPlugin(fk_identifier, js_identifier, robot_description_identifier))
     actual_planning.add_plugin('pw', PyBulletMonitor(js_identifier, pybullet_identifier, map_frame, root_link,
                                              path_to_data_folder, gui))
-    # actual_planning.add_plugin('coll')
+    actual_planning.add_plugin('coll', CollisionChecker(collision_goal_identifier, controllable_links_identifier,
+                                                        pybullet_identifier, closest_point_identifier,
+                                                        default_collision_avoidance_distance,
+                                                        enable_self_collision, map_frame, root_link,
+                                                        path_to_data_folder, gui))
     actual_planning.add_plugin('controller', ControllerPlugin(robot_description_identifier, js_identifier,
                                                               path_to_data_folder, next_cmd_identifier,
                                                               soft_constraint_identifier, controlled_joints_identifier,
@@ -126,7 +132,7 @@ def grow_tree():
                                            robot_description_identifier, js_identifier, cartesian_goal_identifier,
                                            controlled_joints_identifier, controllable_links_identifier,
                                            fk_identifier, pyfunction_identifier, closest_point_identifier,
-                                           soft_constraint_identifier))
+                                           soft_constraint_identifier, collision_goal_identifier))
 
     #----------------------------------------------
     publish_result = Selector('pub result')
@@ -139,7 +145,6 @@ def grow_tree():
     main.add_child(planning)
     main.add_child(publish_result)
     main.add_child(SendResult(u'send result', action_server_name))
-    #
     #----------------------------------------------
     root = Sequence('root')
     root.add_child(main)
@@ -170,7 +175,7 @@ if __name__ == u'__main__':
     while not rospy.is_shutdown():
         try:
             tree.tick()
-            rospy.sleep(0.5)
+            rospy.sleep(1)
         except KeyboardInterrupt:
             break
     print("\n")

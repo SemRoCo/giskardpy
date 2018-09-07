@@ -337,7 +337,7 @@ class GiskardTestWrapper(object):
 
     def check_cpi_geq(self, links, distance_threshold):
         cpi_identifier = u'cpi'
-        cpi = self.pm.get_god_map().get_data([cpi_identifier])
+        cpi = Blackboard().god_map.get_data([cpi_identifier])
         if cpi == 0 or cpi == None:
             return False
         for link in links:
@@ -349,7 +349,7 @@ class GiskardTestWrapper(object):
 
     def check_cpi_leq(self, links, distance_threshold):
         cpi_identifier = u'cpi'
-        cpi = self.pm.get_god_map().get_data([cpi_identifier])
+        cpi = Blackboard().god_map.get_data([cpi_identifier])
         if cpi == 0 or cpi == None:
             return False
         for link in links:

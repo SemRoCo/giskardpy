@@ -40,7 +40,7 @@ class RobotPlugin(PluginBase):
             self.__urdf_updated = False
 
     def __is_urdf_updated(self):
-        new_urdf = self.god_map.get_data([self._robot_description_identifier])
+        new_urdf = self.god_map.safe_get_data([self._robot_description_identifier])
         # TODO figure out a better solution which does not require the urdf to be rehashed all the time
         return self.get_robot() is None or not urdfs_equal(self.get_robot().get_urdf(), new_urdf)
 
@@ -48,7 +48,7 @@ class RobotPlugin(PluginBase):
         return self.__urdf_updated
 
     def init_robot(self):
-        urdf = self.god_map.get_data([self._robot_description_identifier])
+        urdf = self.god_map.safe_get_data([self._robot_description_identifier])
         self.robot = Robot(urdf, self.default_joint_vel_limit)
         current_joints = JointStatesInput(self.god_map.to_symbol,
                                           self.get_robot().get_joint_names_controllable(),
@@ -93,7 +93,7 @@ class FKPlugin(RobotPlugin):
             return p
 
         fks = keydefaultdict(on_demand_fk_evaluated)
-        self.god_map.set_data([self.fk_identifier], fks)
+        self.god_map.safe_set_data([self.fk_identifier], fks)
 
     def initialize(self):
         super(FKPlugin, self).initialize()
@@ -166,5 +166,5 @@ class NewFkPlugin(NewRobotPlugin):
             return p
 
         fks = keydefaultdict(on_demand_fk_evaluated)
-        self.god_map.set_data([self.fk_identifier], fks)
+        self.god_map.safe_set_data([self.fk_identifier], fks)
         return Status.RUNNING

@@ -20,7 +20,7 @@ class SetControlledJointsPlugin(PluginBase):
         # TODO make topic name a parameter
         msg = rospy.wait_for_message(u'/whole_body_controller/state', JointTrajectoryControllerState) # type: JointTrajectoryControllerState
         self.controlled_joints = msg.joint_names
-        self.god_map.set_data([self.controlled_joints_identifier], self.controlled_joints)
+        self.god_map.safe_set_data([self.controlled_joints_identifier], self.controlled_joints)
 
     def copy(self):
         c = self.__class__(self.controlled_joints_identifier)
@@ -43,7 +43,7 @@ class UploadRobotDescriptionPlugin(PluginBase):
 
     def initialize(self):
         self.urdf = rospy.get_param(self.param_name)
-        self.god_map.set_data([self.robot_description_identifier], self.urdf)
+        self.god_map.safe_set_data([self.robot_description_identifier], self.urdf)
 
     def copy(self):
         c = self.__class__(self.robot_description_identifier, self.param_name)

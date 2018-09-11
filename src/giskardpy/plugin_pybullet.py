@@ -192,9 +192,9 @@ class PyBulletPlugin(PluginBase):
         """
         with self.lock:
             # TODO only update urdf if it has changed
-            self.god_map.set_data([self.robot_description_identifier], self.world.get_robot().get_urdf())
+            self.god_map.safe_set_data([self.robot_description_identifier], self.world.get_robot().get_urdf())
 
-            js = self.god_map.get_data([self.js_identifier])
+            js = self.god_map.safe_get_data([self.js_identifier])
             if js is not None:
                 self.world.set_robot_joint_state(js)
             for object_name, object_joint_state in self.object_joint_states.items():
@@ -210,7 +210,7 @@ class PyBulletPlugin(PluginBase):
                                                               p.pose.orientation.z,
                                                               p.pose.orientation.w])
             # TODO not necessary to parse collision goals every time
-            collision_goals = self.god_map.get_data([self.collision_goal_identifier])
+            collision_goals = self.god_map.safe_get_data([self.collision_goal_identifier])
             collision_matrix = self.collision_goals_to_collision_matrix(collision_goals)
             collisions = self.world.check_collisions(collision_matrix,
                                                      enable_self_collision=self.enable_self_collision)
@@ -220,7 +220,7 @@ class PyBulletPlugin(PluginBase):
             if self.marker:
                 self.publish_cpi_markers(closest_point)
 
-            self.god_map.set_data([self.closest_point_identifier], closest_point)
+            self.god_map.safe_set_data([self.closest_point_identifier], closest_point)
 
     def collision_goals_to_collision_matrix(self, collision_goals):
         """
@@ -238,7 +238,7 @@ class PyBulletPlugin(PluginBase):
             collision_goals.insert(0, CollisionEntry(type=CollisionEntry.AVOID_ALL_COLLISIONS,
                                                      min_dist=self.default_collision_avoidance_distance))
 
-        controllable_links = self.god_map.get_data([self.controllable_links_identifier])
+        controllable_links = self.god_map.safe_get_data([self.controllable_links_identifier])
 
         for collision_entry in collision_goals:  # type: CollisionEntry
             # check if msg got properly filled
@@ -395,14 +395,14 @@ class PybulletPlugin(NewPluginBase):
         super(PybulletPlugin, self).__init__()
 
     def setup(self):
-        self.world = self.get_god_map().get_data([self.pybullet_identifier])
+        self.world = self.get_god_map().safe_get_data([self.pybullet_identifier])
         if self.world is None:
             self.world = PyBulletWorld(enable_gui=self.gui, path_to_data_folder=self.path_to_data_folder)
             self.world.activate_viewer()
             # TODO get robot description from god map
             urdf = rospy.get_param(u'robot_description')
             self.world.spawn_robot_from_urdf(self.robot_name, urdf)
-            self.god_map.set_data([self.pybullet_identifier], self.world)
+            self.god_map.safe_set_data([self.pybullet_identifier], self.world)
 
 
 class PyBulletMonitor(PybulletPlugin):
@@ -413,10 +413,10 @@ class PyBulletMonitor(PybulletPlugin):
         self.map_frame = map_frame
         self.root_link = root_link
         super(PyBulletMonitor, self).__init__(pybullet_identifier, path_to_data_folder, gui)
-        self.world = self.god_map.get_data([self.pybullet_identifier])
+        self.world = self.god_map.safe_get_data([self.pybullet_identifier])
 
     def update(self):
-        js = self.god_map.get_data([self.js_identifier])
+        js = self.god_map.safe_get_data([self.js_identifier])
         if js is not None:
             self.world.set_robot_joint_state(js)
         p = lookup_transform(self.map_frame, self.root_link)
@@ -561,7 +561,7 @@ class PyBulletUpdatePlugin(PybulletPlugin):
         """
         with self.lock:
             # TODO only update urdf if it has changed
-            self.god_map.set_data([self.robot_description_identifier], self.world.get_robot().get_urdf())
+            self.god_map.safe_set_data([self.robot_description_identifier], self.world.get_robot().get_urdf())
 
             for object_name, object_joint_state in self.object_joint_states.items():
                 self.world.get_object(object_name).set_joint_state(object_joint_state)
@@ -597,7 +597,7 @@ class CollisionChecker(PybulletPlugin):
         rospy.sleep(.5)
 
     def initialize(self):
-        collision_goals = self.god_map.get_data([self.collision_goal_identifier])
+        collision_goals = self.god_map.safe_get_data([self.collision_goal_identifier])
         self.collision_matrix = self.collision_goals_to_collision_matrix(collision_goals)
         super(CollisionChecker, self).initialize()
 
@@ -615,7 +615,7 @@ class CollisionChecker(PybulletPlugin):
             if self.marker:
                 self.publish_cpi_markers(closest_point)
 
-            self.god_map.set_data([self.closest_point_identifier], closest_point)
+            self.god_map.safe_set_data([self.closest_point_identifier], closest_point)
         return super(CollisionChecker, self).update()
 
     def enable_marker_cb(self, setbool):
@@ -681,7 +681,7 @@ class CollisionChecker(PybulletPlugin):
             collision_goals.insert(0, CollisionEntry(type=CollisionEntry.AVOID_ALL_COLLISIONS,
                                                      min_dist=self.default_collision_avoidance_distance))
 
-        controllable_links = self.god_map.get_data([self.controllable_links_identifier])
+        controllable_links = self.god_map.safe_get_data([self.controllable_links_identifier])
 
         for collision_entry in collision_goals:  # type: CollisionEntry
             # check if msg got properly filled
@@ -788,7 +788,7 @@ class InitPyBulletWorldB(GiskardBehavior):
         # TODO get robot description from god map
         urdf = rospy.get_param('robot_description')
         self.world.spawn_robot_from_urdf(self.robot_name, urdf)
-        self.god_map.set_data([self.pybullet_identifier], self.world)
+        self.god_map.safe_set_data([self.pybullet_identifier], self.world)
         return super(InitPyBulletWorldB, self).setup(timeout)
 
     def update(self):
@@ -805,11 +805,11 @@ class PyBulletMonitorB(GiskardBehavior):
         super(PyBulletMonitorB, self).__init__(name)
 
     def setup(self, timeout):
-        self.world = self.god_map.get_data([self.pybullet_identifier])
+        self.world = self.god_map.safe_get_data([self.pybullet_identifier])
         return super(PyBulletMonitorB, self).setup(timeout)
 
     def update(self):
-        js = self.god_map.get_data([self.js_identifier])
+        js = self.god_map.safe_get_data([self.js_identifier])
         if js is not None:
             self.world.set_robot_joint_state(js)
         p = lookup_transform(self.map_frame, self.root_link)

@@ -90,8 +90,8 @@ def giskard_pm():
         StateMachine.add('init', init, transitions={'end': 'monitor'})
         StateMachine.add('monitor', monitor, transitions={'end': 'monitor'})
 
-    top.userdata.god_map.set_data(['c'],0)
-    top.userdata.god_map.set_data(['time'], time())
+    top.userdata.god_map.safe_set_data(['c'], 0)
+    top.userdata.god_map.safe_set_data(['time'], time())
     print(top.execute(parent_ud=None))
 
     pm = ProcessManager()

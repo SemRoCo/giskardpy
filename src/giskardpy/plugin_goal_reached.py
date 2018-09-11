@@ -19,8 +19,8 @@ class GoalReachedPlugin(NewPluginBase):
         super(GoalReachedPlugin, self).initialize()
 
     def update(self):
-        current_js = self.god_map.get_data([self.joint_state_identifier])
-        time = self.god_map.get_data([self.time_identifier])
+        current_js = self.god_map.safe_get_data([self.joint_state_identifier])
+        time = self.god_map.safe_get_data([self.time_identifier])
         if time >= 1:
             if np.abs([v.velocity for v in current_js.values()]).max() < self.joint_convergence_threshold:
                 print(u'done')

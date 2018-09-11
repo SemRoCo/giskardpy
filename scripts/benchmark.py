@@ -23,7 +23,7 @@ class Counter(PluginBase):
     def update(self):
         self.count += 1
         if self.count == 10000 or self.count == 1000 or self.count == 100000:
-            print('{} {}'.format(self.count, (time() - self.god_map.get_data(['time'])) / self.count))
+            print('{} {}'.format(self.count, (time() - self.god_map.safe_get_data(['time'])) / self.count))
 
 
     def end_parallel_universe(self):
@@ -50,7 +50,7 @@ class StartParallel(PluginBase):
 
 
 pm = ProcessManager()
-pm.get_god_map().set_data(['time'], time())
+pm.get_god_map().safe_set_data(['time'], time())
 pm.register_plugin(u'init pb',Success())
 pm.register_plugin(u'urdf',Success())
 

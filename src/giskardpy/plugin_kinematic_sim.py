@@ -25,8 +25,8 @@ class KinematicSimPlugin(PluginBase):
 
     def update(self):
         self.time += self.frequency
-        motor_commands = self.god_map.get_data([self.next_cmd_identifier])
-        current_js = self.god_map.get_data([self.js_identifier])
+        motor_commands = self.god_map.safe_get_data([self.next_cmd_identifier])
+        current_js = self.god_map.safe_get_data([self.js_identifier])
         if motor_commands is not None:
             self.next_js = OrderedDict()
             for joint_name, sjs in current_js.items():
@@ -36,10 +36,10 @@ class KinematicSimPlugin(PluginBase):
                     cmd = 0.0
                 self.next_js[joint_name] = SingleJointState(sjs.name, sjs.position + cmd * self.frequency, velocity=cmd)
         if self.next_js is not None:
-            self.god_map.set_data([self.js_identifier], self.next_js)
+            self.god_map.safe_set_data([self.js_identifier], self.next_js)
         else:
-            self.god_map.set_data([self.js_identifier], current_js)
-        self.god_map.set_data([self.time_identifier], self.time)
+            self.god_map.safe_set_data([self.js_identifier], current_js)
+        self.god_map.safe_set_data([self.time_identifier], self.time)
 
     def initialize(self):
         self.next_js = None
@@ -70,8 +70,8 @@ class NewKinSimPlugin(NewPluginBase):
 
     def update(self):
         self.time += self.frequency
-        motor_commands = self.god_map.get_data([self.next_cmd_identifier])
-        current_js = self.god_map.get_data([self.js_identifier])
+        motor_commands = self.god_map.safe_get_data([self.next_cmd_identifier])
+        current_js = self.god_map.safe_get_data([self.js_identifier])
         if motor_commands is not None:
             self.next_js = OrderedDict()
             for joint_name, sjs in current_js.items():
@@ -81,8 +81,8 @@ class NewKinSimPlugin(NewPluginBase):
                     cmd = 0.0
                 self.next_js[joint_name] = SingleJointState(sjs.name, sjs.position + cmd * self.frequency, velocity=cmd)
         if self.next_js is not None:
-            self.god_map.set_data([self.js_identifier], self.next_js)
+            self.god_map.safe_set_data([self.js_identifier], self.next_js)
         else:
-            self.god_map.set_data([self.js_identifier], current_js)
-        self.god_map.set_data([self.time_identifier], self.time)
+            self.god_map.safe_set_data([self.js_identifier], current_js)
+        self.god_map.safe_set_data([self.time_identifier], self.time)
         return super(NewKinSimPlugin, self).update()

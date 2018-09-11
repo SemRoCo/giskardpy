@@ -49,7 +49,7 @@ class JointStatePlugin(PluginBase):
             self.mjs = to_joint_state_dict(js)
         except Empty:
             pass
-        self.god_map.set_data([self.js_identifier], self.mjs)
+        self.god_map.safe_set_data([self.js_identifier], self.mjs)
 
     def initialize(self):
         self.joint_state_sub = rospy.Subscriber(u'joint_states', JointState, self.cb, queue_size=1)
@@ -90,7 +90,7 @@ class JointStatePlugin2(NewPluginBase):
             self.mjs = to_joint_state_dict(js)
         except Empty:
             pass
-        self.god_map.set_data([self.js_identifier], self.mjs)
+        self.god_map.safe_set_data([self.js_identifier], self.mjs)
         return Status.RUNNING
 
     def setup(self):
@@ -128,5 +128,5 @@ class JSBehavior(GiskardBehavior):
             self.mjs = to_joint_state_dict(js)
         except Empty:
             pass
-        self.god_map.set_data([self.js_identifier], self.mjs)
+        self.god_map.safe_set_data([self.js_identifier], self.mjs)
         return Status.SUCCESS

@@ -36,7 +36,7 @@ class NewRobotPlugin(NewPluginBase):
             self.__urdf_updated = False
 
     def __is_urdf_updated(self):
-        new_urdf = self.god_map.get_data([self._robot_description_identifier])
+        new_urdf = self.god_map.safe_get_data([self._robot_description_identifier])
         # TODO figure out a better solution which does not require the urdf to be rehashed all the time
         return self.get_robot() is None or not urdfs_equal(self.get_robot().get_urdf(), new_urdf)
 
@@ -44,7 +44,7 @@ class NewRobotPlugin(NewPluginBase):
         return self.__urdf_updated
 
     def init_robot(self):
-        urdf = self.god_map.get_data([self._robot_description_identifier])
+        urdf = self.god_map.safe_get_data([self._robot_description_identifier])
         self.robot = Robot(urdf, self.default_joint_vel_limit)
         current_joints = JointStatesInput(self.god_map.to_symbol,
                                           self.get_robot().get_joint_names_controllable(),
@@ -63,12 +63,12 @@ class NewRobotPlugin(NewPluginBase):
         Gets controlled joints from god map and uses this to calculate the controllable link, which are written to
         the god map.
         """
-        self.controlled_joints = self.god_map.get_data([controlled_joints_identifier])
+        self.controlled_joints = self.god_map.safe_get_data([controlled_joints_identifier])
         self.controllable_links = set()
         if controllable_links_identifier is not None:
             for joint_name in self.controlled_joints:
                 self.controllable_links.update(self.get_robot().get_sub_tree_link_names_with_collision(joint_name))
-            self.god_map.set_data([controllable_links_identifier], self.controllable_links)
+            self.god_map.safe_set_data([controllable_links_identifier], self.controllable_links)
 
 
 

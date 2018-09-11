@@ -101,18 +101,18 @@ class CartesianBulletControllerPlugin(RobotPlugin):
         next_cmd = self.controller.get_cmd(expr, self.nWSR)
         self.next_cmd.update(next_cmd)
 
-        self.god_map.set_data([self._next_cmd_identifier], self.next_cmd)
+        self.god_map.safe_set_data([self._next_cmd_identifier], self.next_cmd)
 
     def update_controlled_joints_and_links(self):
         """
         Gets controlled joints from god map and uses this to calculate the controllable link, which are written to
         the god map.
         """
-        self.controlled_joints = self.god_map.get_data([self.controlled_joints_identifier])
+        self.controlled_joints = self.god_map.safe_get_data([self.controlled_joints_identifier])
         self.controllable_links = set()
         for joint_name in self.controlled_joints:
             self.controllable_links.update(self.get_robot().get_sub_tree_link_names_with_collision(joint_name))
-        self.god_map.set_data([self.controllable_links_identifier], self.controllable_links)
+        self.god_map.safe_set_data([self.controllable_links_identifier], self.controllable_links)
 
     def init_controller(self):
         self.controller = SymEngineController(self.robot, self.path_to_functions)
@@ -122,19 +122,19 @@ class CartesianBulletControllerPlugin(RobotPlugin):
         """
         Sets the goal for all joints which are not used in another goal to their current position.
         """
-        joint_goal = self.god_map.get_data([self._goal_identifier, str(Controller.JOINT)])
+        joint_goal = self.god_map.safe_get_data([self._goal_identifier, str(Controller.JOINT)])
         for joint_name in self.controlled_joints:
             if joint_name not in joint_goal:
                 joint_goal[joint_name] = {u'weight': 0.0,
                                           u'p_gain': 10,
                                           u'max_speed': self.get_robot().default_joint_velocity_limit,
-                                          u'position': self.god_map.get_data([self._joint_states_identifier,
-                                                                              joint_name,
+                                          u'position': self.god_map.safe_get_data([self._joint_states_identifier,
+                                                                                   joint_name,
                                                                               u'position'])}
                 if joint_name not in self.used_joints:
                     joint_goal[joint_name][u'weight'] = 1
 
-        self.god_map.set_data([self._goal_identifier, str(Controller.JOINT)], joint_goal)
+        self.god_map.safe_set_data([self._goal_identifier, str(Controller.JOINT)], joint_goal)
 
     def get_expr_joint_current_position(self, joint_name):
         """
@@ -215,7 +215,7 @@ class CartesianBulletControllerPlugin(RobotPlugin):
                                                   gain_expr, max_speed_expr, joint_name)
             self.controller.update_soft_constraints(soft_constraints, self.god_map.get_registered_symbols())
 
-        self.god_map.set_data([self._pyfunctions_identifier], pyfunctions)
+        self.god_map.safe_set_data([self._pyfunctions_identifier], pyfunctions)
 
     def add_collision_avoidance_soft_constraints(self):
         """
@@ -256,7 +256,7 @@ class CartesianBulletControllerPlugin(RobotPlugin):
         """
         print(u'used chains:')
         for t in [Controller.TRANSLATION_3D, Controller.ROTATION_3D]:
-            for (root, tip), value in self.god_map.get_data([self._goal_identifier, str(t)]).items():
+            for (root, tip), value in self.god_map.safe_get_data([self._goal_identifier, str(t)]).items():
                 self.used_joints.update(self.get_robot().get_joint_names_from_chain_controllable(root, tip))
                 print(u'{} -> {} type: {}'.format(root, tip, t))
                 self.controller.update_soft_constraints(self.cart_goal_to_soft_constraints(root, tip, t),
@@ -347,7 +347,7 @@ class GoalToConstraints(GetGoal, NewRobotPlugin):
 
     def initialise(self):
         NewRobotPlugin.initialize(self)
-        self.get_god_map().set_data([self._goal_identifier], None)
+        self.get_god_map().safe_set_data([self._goal_identifier], None)
 
     def terminate(self, new_status):
         super(GoalToConstraints, self).terminate(new_status)
@@ -378,16 +378,16 @@ class GoalToConstraints(GetGoal, NewRobotPlugin):
                 print(u'unsupported controller type')
                 return Status.FAILURE
         shit = cmd_to_goals(move_cmd)
-        self.god_map.set_data([self._goal_identifier], shit)
+        self.god_map.safe_set_data([self._goal_identifier], shit)
 
         self.set_unused_joint_goals_to_current()
 
-        self.get_god_map().set_data([self.collision_goal_identifier], move_cmd.collisions)
+        self.get_god_map().safe_set_data([self.collision_goal_identifier], move_cmd.collisions)
 
         for collision in move_cmd.collisions:  # type: CollisionEntry
             # TODO don't do this here?
             pass
-        self.god_map.set_data([self.soft_constraint_identifier], self.soft_constraints)
+        self.god_map.safe_set_data([self.soft_constraint_identifier], self.soft_constraints)
         return Status.SUCCESS
 
     def add_cart_controller_soft_constraints(self, controller, t):
@@ -485,7 +485,7 @@ class GoalToConstraints(GetGoal, NewRobotPlugin):
                                                             gain_expr, max_speed_expr, joint_name))
             # self.controller.update_soft_constraints(soft_constraints, self.god_map.get_registered_symbols())
 
-        self.god_map.set_data([self.pyfunction_identifier], pyfunctions)
+        self.god_map.safe_set_data([self.pyfunction_identifier], pyfunctions)
 
     def add_collision_avoidance_soft_constraints(self):
         """
@@ -525,19 +525,19 @@ class GoalToConstraints(GetGoal, NewRobotPlugin):
         """
         Sets the goal for all joints which are not used in another goal to their current position.
         """
-        joint_goal = self.god_map.get_data([self._goal_identifier, str(Controller.JOINT)])
+        joint_goal = self.god_map.safe_get_data([self._goal_identifier, str(Controller.JOINT)])
         for joint_name in self.controlled_joints:
             if joint_name not in joint_goal:
                 joint_goal[joint_name] = {u'weight': 0.0,
                                           u'p_gain': 10,
                                           u'max_speed': self.get_robot().default_joint_velocity_limit,
-                                          u'position': self.god_map.get_data([self._joint_states_identifier,
-                                                                              joint_name,
+                                          u'position': self.god_map.safe_get_data([self._joint_states_identifier,
+                                                                                   joint_name,
                                                                               u'position'])}
                 if joint_name not in self.used_joints:
                     joint_goal[joint_name][u'weight'] = 1
 
-        self.god_map.set_data([self._goal_identifier, str(Controller.JOINT)], joint_goal)
+        self.god_map.safe_set_data([self._goal_identifier, str(Controller.JOINT)], joint_goal)
 
     def get_expr_joint_current_position(self, joint_name):
         """
@@ -662,7 +662,7 @@ class ControllerPlugin(NewRobotPlugin):
         self.next_cmd = {}
 
     def init_controller(self):
-        soft_constraints = self.god_map.get_data([self.soft_constraint_identifier])
+        soft_constraints = self.god_map.safe_get_data([self.soft_constraint_identifier])
         self.controller = SymEngineController(self.robot, self.path_to_functions)
         self.controller.set_controlled_joints(self.controlled_joints)
         self.controller.update_soft_constraints(soft_constraints, self.get_god_map().get_registered_symbols())
@@ -672,5 +672,5 @@ class ControllerPlugin(NewRobotPlugin):
         next_cmd = self.controller.get_cmd(expr, self.nWSR)
         self.next_cmd.update(next_cmd)
 
-        self.god_map.set_data([self._next_cmd_identifier], self.next_cmd)
+        self.god_map.safe_set_data([self._next_cmd_identifier], self.next_cmd)
         return Status.RUNNING

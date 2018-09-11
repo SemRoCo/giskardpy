@@ -1,3 +1,4 @@
+import traceback
 from collections import OrderedDict
 from multiprocessing import Lock
 from threading import Thread
@@ -210,22 +211,35 @@ class PluginBehavior(GiskardBehavior):
             plugin.stop()
 
     def update(self):
+        # print('update wait')
         with self.status_lock:
+            # print('update got')
+            if not self.update_thread.is_alive():
+                return Status.SUCCESS
             return self.my_status
 
     def set_status(self, new_state):
         self.my_status = new_state
 
     def loop_over_plugins(self):
-        self.init_plugins()
-        while self.is_running() and not rospy.is_shutdown():
-            for plugin_name, plugin in self._plugins.items():
-                with self.status_lock:
-                    if not self.is_running():
-                        return
-                    status = plugin.update()
-                    self.set_status(status)
-                    assert self.my_status is not None, u'{} did not return a status'.format(plugin_name)
-                    if not self.is_running():
-                        return
-                rospy.sleep(self.sleep)
+        try:
+            self.init_plugins()
+            while self.is_running() and not rospy.is_shutdown():
+                for plugin_name, plugin in self._plugins.items():
+                    # print('loop wait {}'.format(plugin_name))
+                    with self.status_lock:
+                        # print('loop got {}'.format(plugin_name))
+                        if not self.is_running():
+                            return
+                        status = plugin.update()
+                        self.set_status(status)
+                        assert self.my_status is not None, u'{} did not return a status'.format(plugin_name)
+                        if not self.is_running():
+                            return
+                    rospy.sleep(self.sleep)
+                    # print('looped {}'.format(plugin_name))
+                    # rospy.sleep(.1)
+        except Exception as e:
+            traceback.print_exc()
+            # TODO make 'exception' string a parameter somewhere
+            Blackboard().set('exception', e)

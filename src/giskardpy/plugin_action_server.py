@@ -121,18 +121,18 @@ class ActionServerPlugin(PluginBase):
         return super(ActionServerPlugin, self).end_parallel_universe()
 
     def update(self):
-        self.controlled_joints = self.god_map.get_data([self.controlled_joints_identifier])
-        self.current_js = self.god_map.get_data([self.js_identifier])
+        self.controlled_joints = self.god_map.safe_get_data([self.controlled_joints_identifier])
+        self.current_js = self.god_map.safe_get_data([self.js_identifier])
         goals = None
         cmd = self.get_move_cmd_from_action_server()
         if cmd is not None:
             goals = self.cmd_to_goals(cmd)
             self.new_universe = True
             self.publish_feedback(MoveFeedback.PLANNING, 0)
-        self.god_map.set_data([self.goal_identifier], goals)
+        self.god_map.safe_set_data([self.goal_identifier], goals)
         # TODO create a more obvious way to modify a god map for a parallel universe
-        self.god_map.set_data([self.js_identifier], self.current_js if self.start_js is None else self.start_js)
-        self.god_map.set_data([self.collision_goal_identifier], cmd.collisions if cmd is not None else None)
+        self.god_map.safe_set_data([self.js_identifier], self.current_js if self.start_js is None else self.start_js)
+        self.god_map.safe_set_data([self.collision_goal_identifier], cmd.collisions if cmd is not None else None)
 
     def cmd_to_goals(self, cmd):
         """
@@ -190,14 +190,14 @@ class ActionServerPlugin(PluginBase):
         result = MoveResult()
         result.error_code = self.exception_to_error_code(exception)
         if result.error_code == MoveResult.SUCCESS:
-            last_cp = god_map.get_data([self.closest_point_identifier])
+            last_cp = god_map.safe_get_data([self.closest_point_identifier])
             if not closest_point_constraint_violated(last_cp):
                 result.trajectory = self.get_traj_msg(god_map)
             else:
                 result.error_code = MoveResult.END_STATE_COLLISION
         # keep pyfunctions created in parallel universe
         # TODO find a better way to copy python functions from the parallel universe
-        self.god_map.set_data([self.pyfunction_identifier], god_map.get_data([self.pyfunction_identifier]))
+        self.god_map.safe_set_data([self.pyfunction_identifier], god_map.safe_get_data([self.pyfunction_identifier]))
         self.send_to_action_server_and_wait(result)
 
     def send_to_action_server_and_wait(self, result):
@@ -230,8 +230,8 @@ class ActionServerPlugin(PluginBase):
         :rtype: JointTrajectory
         """
         trajectory_msg = JointTrajectory()
-        trajectory = god_map.get_data([self.trajectory_identifier])
-        self.start_js = god_map.get_data([self.js_identifier])
+        trajectory = god_map.safe_get_data([self.trajectory_identifier])
+        self.start_js = god_map.safe_get_data([self.js_identifier])
         trajectory_msg.joint_names = self.controller_joints
         for time, traj_point in trajectory.items():
             p = JointTrajectoryPoint()
@@ -453,10 +453,10 @@ class ActionServerHandler(object):
         # TODO
         pass
 
-    def send_preempted(self):
+    def send_preempted(self, result=None):
         # TODO put shit in queue
         def call_me_now():
-            self._as.set_preempted()
+            self._as.set_preempted(result)
         self.result_queue.put(call_me_now)
 
     def send_result(self, result=None):
@@ -507,7 +507,7 @@ class GetGoal(ActionServerBehavior):
 
 class GoalCanceled(ActionServerBehavior):
     def update(self):
-        if self.get_as().was_last_goal_canceled():
+        if self.get_as().was_last_goal_canceled() or Blackboard().get('exception') is not None:
             return Status.SUCCESS
         else:
             return Status.FAILURE
@@ -516,8 +516,39 @@ class GoalCanceled(ActionServerBehavior):
 class SendResult(ActionServerBehavior):
     def update(self):
         # TODO get result from god map or blackboard
-        if self.get_as().was_last_goal_canceled():
-            self.get_as().send_preempted()
+        e = Blackboard().get('exception')
+        Blackboard().set('exception', None)
+        result = MoveResult()
+        result.error_code = self.exception_to_error_code(e)
+        if self.get_as().was_last_goal_canceled() or not result.error_code == MoveResult.SUCCESS:
+            self.get_as().send_preempted(result)
         else:
-            self.get_as().send_result()
+            self.get_as().send_result(result)
         return Status.SUCCESS
+
+    def exception_to_error_code(self, exception):
+        """
+        :type exception: Exception
+        :rtype: int
+        """
+        error_code = MoveResult.SUCCESS
+        # if self._as.is_preempt_requested():
+            # TODO throw exception on preempted in order to get rid of if?
+            # error_code = MoveResult.INTERRUPTED
+        if isinstance(exception, MAX_NWSR_REACHEDException):
+            error_code = MoveResult.MAX_NWSR_REACHED
+        elif isinstance(exception, QPSolverException):
+            error_code = MoveResult.QP_SOLVER_ERROR
+        elif isinstance(exception, UnknownBodyException):
+            error_code = MoveResult.UNKNOWN_OBJECT
+        elif isinstance(exception, SolverTimeoutError):
+            error_code = MoveResult.SOLVER_TIMEOUT
+        elif isinstance(exception, InsolvableException):
+            error_code = MoveResult.INSOLVABLE
+        elif isinstance(exception, SymengineException):
+            error_code = MoveResult.SYMENGINE_ERROR
+        elif isinstance(exception, PathCollisionException):
+            error_code = MoveResult.PATH_COLLISION
+        elif exception is not None:
+            error_code = MoveResult.INSOLVABLE
+        return error_code

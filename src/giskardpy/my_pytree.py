@@ -22,7 +22,7 @@ class PrintJs(Behaviour):
         return super(PrintJs, self).setup(timeout)
 
     def update(self):
-        print(self.god_map.get_data(['js']))
+        print(self.god_map.safe_get_data(['js']))
         return Status.SUCCESS
 
 

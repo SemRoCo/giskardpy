@@ -25,8 +25,8 @@ class SendTrajectory(ActionClient, GiskardBehavior):
 
     def initialise(self):
         super(SendTrajectory, self).initialise()
-        trajectory = self.get_god_map().get_data([self.trajectory_identifier])
-        self.get_god_map().set_data([self.trajectory_identifier], None)
+        trajectory = self.get_god_map().safe_get_data([self.trajectory_identifier])
+        self.get_god_map().safe_set_data([self.trajectory_identifier], None)
         goal = FollowJointTrajectoryGoal()
         goal.trajectory = self.traj_to_msg(trajectory)
         self.action_goal = goal

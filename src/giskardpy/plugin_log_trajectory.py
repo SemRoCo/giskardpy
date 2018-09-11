@@ -66,15 +66,15 @@ class LogTrajectoryPlugin(PluginBase):
         return tuple(round(x.position, self.wiggle_precision) for x in js.values())
 
     def update(self):
-        current_js = self.god_map.get_data([self.joint_state_identifier])
-        time = self.god_map.get_data([self.time_identifier])
-        trajectory = self.god_map.get_data([self.trajectory_identifier])
+        current_js = self.god_map.safe_get_data([self.joint_state_identifier])
+        time = self.god_map.safe_get_data([self.time_identifier])
+        trajectory = self.god_map.safe_get_data([self.trajectory_identifier])
         # traj_length = self.god_map.get_data([self.goal_identifier, 'max_trajectory_length'])
         rounded_js = self.round_js(current_js)
         if trajectory is None:
             trajectory = Trajectory()
         trajectory.set(time, current_js)
-        self.god_map.set_data([self.trajectory_identifier], trajectory)
+        self.god_map.safe_set_data([self.trajectory_identifier], trajectory)
 
         if self.is_preempted():
             print(u'goal preempted')
@@ -88,14 +88,14 @@ class LogTrajectoryPlugin(PluginBase):
                     (self.plot and time > self.max_traj_length):
                 print(u'done')
                 if self.plot:
-                    plot_trajectory(trajectory, set(self.god_map.get_data([self.controlled_joints_identifier])))
+                    plot_trajectory(trajectory, set(self.god_map.safe_get_data([self.controlled_joints_identifier])))
                 self.stop_universe = True
                 return
             if not self.plot and (rounded_js in self.past_joint_states):
                 self.stop_universe = True
                 raise InsolvableException(u'endless wiggling detected')
             if time >= self.collision_time_threshold:
-                cp = self.god_map.get_data([self.closest_point_identifier])
+                cp = self.god_map.safe_get_data([self.closest_point_identifier])
                 if closest_point_constraint_violated(cp, tolerance=1):
                     self.stop_universe = True
                     raise PathCollisionException(
@@ -132,15 +132,15 @@ class NewLogTrajPlugin(NewPluginBase):
         self.stop_universe = False
         self.past_joint_states = set()
         self.trajectory = Trajectory()
-        self.god_map.set_data([self.trajectory_identifier], self.trajectory)
+        self.god_map.safe_set_data([self.trajectory_identifier], self.trajectory)
         super(NewLogTrajPlugin, self).initialize()
 
     def update(self):
-        current_js = self.god_map.get_data([self.joint_state_identifier])
-        time = self.god_map.get_data([self.time_identifier])
-        trajectory = self.god_map.get_data([self.trajectory_identifier])
+        current_js = self.god_map.safe_get_data([self.joint_state_identifier])
+        time = self.god_map.safe_get_data([self.time_identifier])
+        trajectory = self.god_map.safe_get_data([self.trajectory_identifier])
         trajectory.set(time, current_js)
-        self.god_map.set_data([self.trajectory_identifier], trajectory)
+        self.god_map.safe_set_data([self.trajectory_identifier], trajectory)
 
         return super(NewLogTrajPlugin, self).update()
 

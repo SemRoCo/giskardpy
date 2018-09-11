@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 import functools
 from random import randint
 from time import time
@@ -40,11 +41,11 @@ class Rnd(Behaviour):
 
 def ini(param_name, robot_description_identifier, controlled_joints_identifier):
     urdf = rospy.get_param(param_name)
-    Blackboard().god_map.set_data([robot_description_identifier], urdf)
+    Blackboard().god_map.safe_set_data([robot_description_identifier], urdf)
 
     msg = rospy.wait_for_message(u'/whole_body_controller/state',
                                  JointTrajectoryControllerState)  # type: JointTrajectoryControllerState
-    Blackboard().god_map.set_data([controlled_joints_identifier], msg.joint_names)
+    Blackboard().god_map.safe_set_data([controlled_joints_identifier], msg.joint_names)
 
 def grow_tree():
     blackboard = Blackboard

@@ -147,10 +147,10 @@ class GiskardTestWrapper(object):
         self.wrapper = GiskardWrapper(ns=u'tests')
         self.results = Queue(100)
         self.robot = self.tree.root.children[0].children[0].children[1]._plugins[u'fk'].robot
-        self.controlled_joints = Blackboard().god_map.get_data([u'controlled_joints'])
+        self.controlled_joints = Blackboard().god_map.safe_get_data([u'controlled_joints'])
         self.joint_limits = {joint_name: self.robot.get_joint_lower_upper_limit(joint_name) for joint_name in
                              self.controlled_joints if self.robot.is_joint_controllable(joint_name)}
-        self.world = Blackboard().god_map.get_data([u'pybullet_world'])  # type: PyBulletWorld
+        self.world = Blackboard().god_map.safe_get_data([u'pybullet_world'])  # type: PyBulletWorld
         self.default_root = u'base_link'
         self.r_tip = u'r_gripper_tool_frame'
         self.l_tip = u'l_gripper_tool_frame'
@@ -337,7 +337,7 @@ class GiskardTestWrapper(object):
 
     def check_cpi_geq(self, links, distance_threshold):
         cpi_identifier = u'cpi'
-        cpi = Blackboard().god_map.get_data([cpi_identifier])
+        cpi = Blackboard().god_map.safe_get_data([cpi_identifier])
         if cpi == 0 or cpi == None:
             return False
         for link in links:
@@ -349,7 +349,7 @@ class GiskardTestWrapper(object):
 
     def check_cpi_leq(self, links, distance_threshold):
         cpi_identifier = u'cpi'
-        cpi = Blackboard().god_map.get_data([cpi_identifier])
+        cpi = Blackboard().god_map.safe_get_data([cpi_identifier])
         if cpi == 0 or cpi == None:
             return False
         for link in links:

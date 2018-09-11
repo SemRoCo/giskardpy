@@ -161,6 +161,9 @@ class GiskardBehavior(Behaviour):
         """
         return self.god_map
 
+    def raise_to_blackboard(self, exception):
+        Blackboard().set('exception', exception)
+
 class PluginBehavior(GiskardBehavior):
 
     def __init__(self, name, sleep=.5):
@@ -199,7 +202,6 @@ class PluginBehavior(GiskardBehavior):
         return self.my_status == Status.RUNNING
 
     def terminate(self, new_status):
-        # self.status = new_status
         with self.status_lock:
             self.set_status(Status.FAILURE)
         self.update_thread.join()
@@ -211,9 +213,7 @@ class PluginBehavior(GiskardBehavior):
             plugin.stop()
 
     def update(self):
-        # print('update wait')
         with self.status_lock:
-            # print('update got')
             if not self.update_thread.is_alive():
                 return Status.SUCCESS
             return self.my_status
@@ -226,9 +226,7 @@ class PluginBehavior(GiskardBehavior):
             self.init_plugins()
             while self.is_running() and not rospy.is_shutdown():
                 for plugin_name, plugin in self._plugins.items():
-                    # print('loop wait {}'.format(plugin_name))
                     with self.status_lock:
-                        # print('loop got {}'.format(plugin_name))
                         if not self.is_running():
                             return
                         status = plugin.update()
@@ -237,8 +235,6 @@ class PluginBehavior(GiskardBehavior):
                         if not self.is_running():
                             return
                     rospy.sleep(self.sleep)
-                    # print('looped {}'.format(plugin_name))
-                    # rospy.sleep(.1)
         except Exception as e:
             traceback.print_exc()
             # TODO make 'exception' string a parameter somewhere

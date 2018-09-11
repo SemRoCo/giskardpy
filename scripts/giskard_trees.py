@@ -17,6 +17,7 @@ from giskardpy.plugin_action_server import GoalReceived, GetGoal, SendResult, Go
 from giskardpy.plugin_fk import NewFkPlugin
 from giskardpy.plugin_goal_reached import GoalReachedPlugin
 from giskardpy.plugin_instantaneous_controller import GoalToConstraints, ControllerPlugin
+from giskardpy.plugin_interrupts import CollisionCancel
 from giskardpy.plugin_joint_state import JSBehavior, JointStatePlugin, JointStatePlugin2
 from giskardpy.plugin_kinematic_sim import NewKinSimPlugin
 from giskardpy.plugin_log_trajectory import NewLogTrajPlugin
@@ -107,6 +108,8 @@ def grow_tree():
     #----------------------------------------------
     planning = Selector('planning')
     planning.add_child(GoalCanceled(u'goal canceled', action_server_name))
+    planning.add_child(CollisionCancel('in collision', collision_time_threshold, time_identifier,
+                                       closest_point_identifier))
 
     actual_planning = PluginBehavior('actual planning', sleep=0)
     actual_planning.add_plugin('kin sim', NewKinSimPlugin(js_identifier, next_cmd_identifier,

@@ -88,11 +88,8 @@ class GodMap(object):
             return result
 
     def safe_get_data(self, identifier):
-        # print('waiting to get')
         with self.lock:
-            # print('getting')
             r = self.get_data(identifier)
-        # print('got')
         return r
 
     def to_symbol(self, identifier):
@@ -119,11 +116,8 @@ class GodMap(object):
         :rtype: dict
         """
         #TODO potential speedup by only updating entries that have changed
-        # print('waiting symbol')
         with self.lock:
-            # print('getting symbol')
             return {expr: self.get_data(key) for expr, key in self.expr_to_key.items()}
-        # print('got symbol')
 
     def get_registered_symbols(self):
         """
@@ -163,8 +157,5 @@ class GodMap(object):
                 self._data[namespace] = value
 
     def safe_set_data(self, identifier, value):
-        # print('waiting to set')
         with self.lock:
-            # print('setting')
             self.set_data(identifier, value)
-        # print('set')

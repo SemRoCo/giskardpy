@@ -642,23 +642,22 @@ class TestCollisionAvoidanceGoals(object):
         box_setup.set_and_check_cart_goal(box_setup.default_root, box_setup.r_tip, p)
         box_setup.check_cpi_geq(box_setup.get_l_gripper_links(), 0.048)
 
-    # def test_collision_during_planning1(self, box_setup):
-    #     """
-    #     :type box_setup: GiskardTestWrapper
-    #     """
-    #     # FIXME
-    #     p = PoseStamped()
-    #     p.header.frame_id = box_setup.r_tip
-    #     p.header.stamp = rospy.get_rostime()
-    #     p.pose.position = Point(0.1, 0, 0)
-    #     p.pose.orientation = Quaternion(0, 0, 0, 1)
-    #
-    #     collision_entry = CollisionEntry()
-    #     collision_entry.type = CollisionEntry.AVOID_ALL_COLLISIONS
-    #     collision_entry.min_dist = 1
-    #     box_setup.add_collision_entries([collision_entry])
-    #     box_setup.set_cart_goal(box_setup.default_root, box_setup.r_tip, p)
-    #     box_setup.send_and_check_goal(expected_error_code=MoveResult.PATH_COLLISION)
+    def test_collision_during_planning1(self, box_setup):
+        """
+        :type box_setup: GiskardTestWrapper
+        """
+        p = PoseStamped()
+        p.header.frame_id = box_setup.r_tip
+        p.header.stamp = rospy.get_rostime()
+        p.pose.position = Point(0.1, 0, 0)
+        p.pose.orientation = Quaternion(0, 0, 0, 1)
+
+        collision_entry = CollisionEntry()
+        collision_entry.type = CollisionEntry.AVOID_ALL_COLLISIONS
+        collision_entry.min_dist = 1
+        box_setup.add_collision_entries([collision_entry])
+        box_setup.set_cart_goal(box_setup.default_root, box_setup.r_tip, p)
+        box_setup.send_and_check_goal(expected_error_code=MoveResult.PATH_COLLISION)
 
     def test_avoid_collision_gripper(self, box_setup):
         """

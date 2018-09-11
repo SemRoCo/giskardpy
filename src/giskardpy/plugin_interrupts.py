@@ -1,12 +1,39 @@
 from py_trees import Status
 
-from giskardpy.exceptions import PathCollisionException
-from giskardpy.plugin import GiskardBehavior
+from giskardpy.exceptions import PathCollisionException, InsolvableException
+from giskardpy.plugin import GiskardBehavior, NewPluginBase
 from giskardpy.utils import closest_point_constraint_violated
 
 
-class WiggleCancel(GiskardBehavior):
-    pass
+class WiggleCancel(NewPluginBase):
+    def __init__(self, wiggle_precision_threshold, joint_state_identifier, time_identifier):
+        self.joint_state_identifier = joint_state_identifier
+        self.wiggle_precision = wiggle_precision_threshold
+        self.time_identifier = time_identifier
+        super(WiggleCancel, self).__init__()
+
+    def initialize(self):
+        self.past_joint_states = set()
+        super(WiggleCancel, self).initialize()
+
+    def update(self):
+        current_js = self.god_map.safe_get_data([self.joint_state_identifier])
+        time = self.get_god_map().safe_get_data([self.time_identifier])
+        rounded_js = self.round_js(current_js)
+        # TODO make 1 a parameter
+        if time >= 1 and rounded_js in self.past_joint_states:
+            raise InsolvableException(u'endless wiggling detected')
+        self.past_joint_states.add(rounded_js)
+        return super(WiggleCancel, self).update()
+
+    def round_js(self, js):
+        """
+        :param js: joint_name -> SingleJointState
+        :type js: dict
+        :return: a sequence of all the rounded joint positions
+        :rtype: tuple
+        """
+        return tuple(round(x.position, self.wiggle_precision) for x in js.values())
 
 
 class MaxTrajLength(GiskardBehavior):

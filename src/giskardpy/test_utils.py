@@ -127,7 +127,7 @@ class GiskardTestWrapper(object):
         rospy.set_param(u'~interactive_marker_chains', [])
         rospy.set_param(u'~map_frame', u'map')
         rospy.set_param(u'~joint_convergence_threshold', 0.002)
-        rospy.set_param(u'~wiggle_precision_threshold', 7)
+        rospy.set_param(u'~wiggle_precision_threshold', 4)
         rospy.set_param(u'~sample_period', 0.1)
         rospy.set_param(u'~default_joint_vel_limit', 10)
         rospy.set_param(u'~default_collision_avoidance_distance', 0.05)

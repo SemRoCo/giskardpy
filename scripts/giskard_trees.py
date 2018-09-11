@@ -17,7 +17,7 @@ from giskardpy.plugin_action_server import GoalReceived, GetGoal, SendResult, Go
 from giskardpy.plugin_fk import NewFkPlugin
 from giskardpy.plugin_goal_reached import GoalReachedPlugin
 from giskardpy.plugin_instantaneous_controller import GoalToConstraints, ControllerPlugin
-from giskardpy.plugin_interrupts import CollisionCancel
+from giskardpy.plugin_interrupts import CollisionCancel, WiggleCancel
 from giskardpy.plugin_joint_state import JSBehavior, JointStatePlugin, JointStatePlugin2
 from giskardpy.plugin_kinematic_sim import NewKinSimPlugin
 from giskardpy.plugin_log_trajectory import NewLogTrajPlugin
@@ -129,6 +129,7 @@ def grow_tree():
     actual_planning.add_plugin('log', NewLogTrajPlugin(trajectory_identifier, js_identifier, time_identifier))
     actual_planning.add_plugin('goal reached', GoalReachedPlugin(js_identifier, time_identifier,
                                                                  joint_convergence_threshold))
+    actual_planning.add_plugin('wiggle', WiggleCancel(wiggle_precision_threshold, js_identifier, time_identifier))
     planning.add_child(actual_planning)
     # ----------------------------------------------
     parse_goal = Sequence('parse goal')

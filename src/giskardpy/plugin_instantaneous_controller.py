@@ -6,6 +6,7 @@ from giskard_msgs.msg import MoveCmd
 from giskard_msgs.msg import MoveGoal
 from py_trees import Status
 
+from giskardpy.exceptions import InsolvableException
 from giskardpy.input_system import FrameInput, Point3Input, Vector3Input, \
     ShortestAngularDistanceInput
 from giskardpy.plugin_action_server import GetGoal
@@ -15,7 +16,8 @@ from giskardpy.symengine_controller import SymEngineController, position_conv, r
 import symengine_wrappers as sw
 from giskardpy.tfwrapper import transform_pose
 
-
+# TODO plan only not supported
+# TODO waypoints not supported
 class GoalToConstraints(GetGoal, NewRobotPlugin):
     def __init__(self, name, as_name, root_link, robot_description_identifier, js_identifier, goal_identifier,
                  controlled_joints_identifier, controllable_links_identifier, fk_identifier, pyfunction_identifier,
@@ -54,8 +56,11 @@ class GoalToConstraints(GetGoal, NewRobotPlugin):
 
         goal_msg = self.get_goal()  # type: MoveGoal
         if len(goal_msg.cmd_seq) == 0:
-            print(u'goal empty')
-            return Status.FAILURE
+            self.raise_to_blackboard(InsolvableException(u'goal empty'))
+            return Status.SUCCESS
+        if goal_msg.type != MoveGoal.PLAN_AND_EXECUTE:
+            self.raise_to_blackboard(InsolvableException(u'only plan and execute is supported'))
+            return Status.SUCCESS
 
         if self.was_urdf_updated():
             # TODO do this somewhere else?
@@ -69,11 +74,10 @@ class GoalToConstraints(GetGoal, NewRobotPlugin):
                 self.add_cart_controller_soft_constraints(controller, controller.type)
                 # god_map_rdy_goal = cart_controller_to_goal(controller)
             elif controller.type in [Controller.JOINT]:
-                # TODO handle overwrites
-                god_map_rdy_goal = joint_controller_to_goal(controller)
+                pass
             else:
-                print(u'unsupported controller type')
-                return Status.FAILURE
+                self.raise_to_blackboard(InsolvableException(u'unsupported controller type'))
+                return Status.SUCCESS
         shit = cmd_to_goals(move_cmd)
         self.god_map.safe_set_data([self._goal_identifier], shit)
 

@@ -254,12 +254,13 @@ class GiskardTestWrapper(object):
     def get_as(self):
         return Blackboard().get('giskardpy/command')
 
-    def send_goal(self):
+    def send_goal(self, goal=None):
         """
         :rtype: MoveResult
         """
-        goal = MoveActionGoal()
-        goal.goal = self.wrapper._get_goal()
+        if goal is None:
+            goal = MoveActionGoal()
+            goal.goal = self.wrapper._get_goal()
         i = 0
         t1 = Thread(target=self.get_as()._as.action_server.internal_goal_callback, args=(goal,))
         t1.start()

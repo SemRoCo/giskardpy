@@ -8,7 +8,7 @@ import rospy
 from numpy import pi
 from angles import normalize_angle, normalize_angle_positive, shortest_angular_distance
 from geometry_msgs.msg import PoseStamped, Point, Quaternion
-from giskard_msgs.msg import MoveActionResult, CollisionEntry, MoveActionGoal, MoveResult, WorldBody
+from giskard_msgs.msg import MoveActionResult, CollisionEntry, MoveActionGoal, MoveResult, WorldBody, MoveGoal
 from giskard_msgs.srv import UpdateWorldResponse, UpdateWorldRequest
 from sensor_msgs.msg import JointState
 from shape_msgs.msg import SolidPrimitive
@@ -152,6 +152,23 @@ class TestJointGoals(object):
               u'l_wrist_roll_joint': 3.5 * pi, }
         zero_pose.send_and_check_joint_goal(js)
 
+    def test_undefined_type(self, zero_pose):
+        """
+        :type zero_pose: GiskardTestWrapper
+        """
+        goal = MoveActionGoal()
+        goal.goal.type = MoveGoal.UNDEFINED
+        result = zero_pose.send_goal(goal)
+        assert result.error_code == MoveResult.INSOLVABLE
+
+    def test_empty_goal(self, zero_pose):
+        """
+        :type zero_pose: GiskardTestWrapper
+        """
+        goal = MoveActionGoal()
+        goal.goal.type = MoveGoal.PLAN_AND_EXECUTE
+        result = zero_pose.send_goal(goal)
+        assert result.error_code == MoveResult.INSOLVABLE
 
 class TestCartGoals(object):
     def test_cart_goal_1eef(self, zero_pose):
@@ -777,6 +794,8 @@ class TestCollisionAvoidanceGoals(object):
     #     :type box_setup: GiskardTestWrapper
     #     """
     #     pass
+
+    # TODO test plan only
 
     #
     # def test_place_spoon1(self):

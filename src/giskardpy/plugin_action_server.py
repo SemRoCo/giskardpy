@@ -31,15 +31,8 @@ class ActionServerHandler(object):
         """
         :type goal: MoveGoal
         """
-        # rospy.loginfo(u'goal received')
         self.goal_queue.put(goal)
         self.result_queue.get()()
-        # if result.error_code == MoveResult.SUCCESS:
-        #     self._as.set_succeeded(result)
-        # else:
-        #     self._as.set_aborted(result)
-
-        # rospy.loginfo(u'goal result: {}'.format(ERROR_CODE_TO_NAME[result.error_code]))
 
     def get_goal(self):
         try:
@@ -55,19 +48,10 @@ class ActionServerHandler(object):
     def cancel_cb(self):
         self.canceled = True
         self.get_goal() # clear old goal
-        # if self._as.new_goal:
-        #     # TODO cancel because new goal
-        #     self.send_preempted()
-        #     pass
-        # else:
-        #     # TODO cancel because real cancel
-        #     self.send_preempted()
-        #     pass
 
     def was_last_goal_canceled(self):
         # TODO test me
         r = self.canceled
-        # self.canceled = False
         return r
 
 
@@ -154,9 +138,6 @@ class SendResult(ActionServerBehavior):
         :rtype: int
         """
         error_code = MoveResult.SUCCESS
-        # if self._as.is_preempt_requested():
-            # TODO throw exception on preempted in order to get rid of if?
-            # error_code = MoveResult.INTERRUPTED
         if isinstance(exception, MAX_NWSR_REACHEDException):
             error_code = MoveResult.MAX_NWSR_REACHED
         elif isinstance(exception, QPSolverException):

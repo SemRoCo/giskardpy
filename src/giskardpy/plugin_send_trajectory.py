@@ -68,8 +68,8 @@ class SendTrajectory(ActionClient, GiskardBehavior):
             self.feedback_message = "sent goal to the action server"
             return py_trees.Status.RUNNING
         if self.action_client.get_state() == GoalStatus.ABORTED:
-            result = self.action_client.get_result()
-            self.feedback_message = result.message
+            # result = self.action_client.get_result()
+            # self.feedback_message = result.message
             return py_trees.Status.FAILURE
         result = self.action_client.get_result()
         if result:

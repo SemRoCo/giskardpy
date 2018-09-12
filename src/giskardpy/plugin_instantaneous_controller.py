@@ -1,3 +1,5 @@
+from copy import copy
+
 from giskard_msgs.msg import CollisionEntry
 from giskard_msgs.msg import Controller
 from giskard_msgs.msg import MoveCmd
@@ -47,6 +49,7 @@ class GoalToConstraints(GetGoal, NewRobotPlugin):
         super(GoalToConstraints, self).terminate(new_status)
 
     def update(self):
+        # TODO make this interruptable
         self.update_controlled_joints_and_links(self.controlled_joints_identifier, self.controllable_links_identifier)
 
         goal_msg = self.get_goal()  # type: MoveGoal
@@ -78,9 +81,6 @@ class GoalToConstraints(GetGoal, NewRobotPlugin):
 
         self.get_god_map().safe_set_data([self.collision_goal_identifier], move_cmd.collisions)
 
-        for collision in move_cmd.collisions:  # type: CollisionEntry
-            # TODO don't do this here?
-            pass
         self.god_map.safe_set_data([self.soft_constraint_identifier], self.soft_constraints)
         return Status.SUCCESS
 
@@ -345,6 +345,7 @@ class ControllerPlugin(NewRobotPlugin):
         self.nWSR = nWSR
         self.controlled_joints_identifier = controlled_joints_identifier
         self._next_cmd_identifier = next_cmd_identifier
+        self.soft_constraints = None
 
     def setup(self):
         super(ControllerPlugin, self).setup()
@@ -356,10 +357,12 @@ class ControllerPlugin(NewRobotPlugin):
         self.next_cmd = {}
 
     def init_controller(self):
-        soft_constraints = self.god_map.safe_get_data([self.soft_constraint_identifier])
-        self.controller = SymEngineController(self.robot, self.path_to_functions)
-        self.controller.set_controlled_joints(self.controlled_joints)
-        self.controller.update_soft_constraints(soft_constraints, self.get_god_map().get_registered_symbols())
+        new_soft_constraints = self.god_map.safe_get_data([self.soft_constraint_identifier])
+        if self.soft_constraints is None or set(self.soft_constraints.keys()) != set(new_soft_constraints.keys()):
+            self.soft_constraints = copy(new_soft_constraints)
+            self.controller = SymEngineController(self.robot, self.path_to_functions)
+            self.controller.set_controlled_joints(self.controlled_joints)
+            self.controller.update_soft_constraints(self.soft_constraints, self.get_god_map().get_registered_symbols())
 
     def update(self):
         expr = self.god_map.get_symbol_map()

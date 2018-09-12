@@ -11,11 +11,13 @@ from pybullet import JOINT_REVOLUTE, JOINT_PRISMATIC, JOINT_PLANAR, JOINT_SPHERI
 import errno
 from numpy.random.mtrand import seed
 
+import giskardpy
+from giskardpy import DEBUG
 from giskardpy.exceptions import UnknownBodyException, RobotExistsException, DuplicateNameException
 from giskardpy.data_types import SingleJointState, Transform, Point, Quaternion
 import numpy as np
 
-from giskardpy.utils import keydefaultdict, suppress_stdout
+from giskardpy.utils import keydefaultdict, suppress_stdout, NullContextManager
 
 from giskardpy.object import UrdfObject, FixedJoint, to_urdf_string, BoxShape, \
     CollisionProperty
@@ -90,10 +92,10 @@ def load_urdf_string_into_bullet(urdf_string, pose):
     :rtype: int
     """
     filename = write_urdf_to_disc(u'{}.urdf'.format(random_string()), urdf_string)
-    # with suppress_stdout():
-    id = p.loadURDF(filename, [pose.translation.x, pose.translation.y, pose.translation.z],
-                    [pose.rotation.x, pose.rotation.y, pose.rotation.z, pose.rotation.w],
-                    flags=p.URDF_USE_SELF_COLLISION_EXCLUDE_PARENT)
+    with NullContextManager() if giskardpy.PRINT_LEVEL == DEBUG else suppress_stdout():
+        id = p.loadURDF(filename, [pose.translation.x, pose.translation.y, pose.translation.z],
+                        [pose.rotation.x, pose.rotation.y, pose.rotation.z, pose.rotation.w],
+                        flags=p.URDF_USE_SELF_COLLISION_EXCLUDE_PARENT)
     os.remove(filename)
     return id
 

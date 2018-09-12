@@ -1,19 +1,19 @@
 #!/usr/bin/env python
 import functools
-from random import randint
 from time import time
 
 import rospy
 from control_msgs.msg import JointTrajectoryControllerState
 from giskard_msgs.msg import MoveAction
-from py_trees import Sequence, Selector, BehaviourTree, Blackboard, Behaviour, Status, Chooser
-from py_trees.behaviours import SuccessEveryN, Success, Count, Failure
+from py_trees import Sequence, Selector, BehaviourTree, Blackboard
 import py_trees
 from py_trees.display import render_dot_tree
 
+import giskardpy
+from giskardpy import DEBUG
 from giskardpy.god_map import GodMap
 from giskardpy.plugin import PluginBehavior
-from giskardpy.plugin_action_server import GoalReceived, GetGoal, SendResult, GoalCanceled
+from giskardpy.plugin_action_server import GoalReceived, SendResult, GoalCanceled
 from giskardpy.plugin_fk import NewFkPlugin
 from giskardpy.plugin_goal_reached import GoalReachedPlugin
 from giskardpy.plugin_instantaneous_controller import GoalToConstraints, ControllerPlugin
@@ -24,21 +24,6 @@ from giskardpy.plugin_log_trajectory import NewLogTrajPlugin
 from giskardpy.plugin_pybullet import PyBulletMonitor, PyBulletUpdatePlugin, CollisionChecker
 from giskardpy.plugin_send_trajectory import SendTrajectory
 
-
-class MySuccess(Success):
-    def update(self):
-        print('success')
-        return Status.SUCCESS
-
-class Rnd(Behaviour):
-    def __init__(self, name, p):
-        self.p = p
-        super(Rnd, self).__init__(name)
-
-    def update(self):
-        if randint(0,self.p) == 0:
-            return Status.SUCCESS
-        return Status.FAILURE
 
 def ini(param_name, robot_description_identifier, controlled_joints_identifier):
     urdf = rospy.get_param(param_name)
@@ -52,10 +37,12 @@ def grow_tree():
     blackboard = Blackboard
     blackboard.god_map = GodMap()
 
-    # gui = rospy.get_param(u'~enable_gui')
-    # gui = True
-    gui = False
+    gui = rospy.get_param(u'~enable_gui')
     map_frame = rospy.get_param(u'~map_frame')
+    debug = rospy.get_param(u'~debug')
+    if debug:
+        giskardpy.PRINT_LEVEL = DEBUG
+    tree_tick_rate = rospy.get_param(u'~tree_tick_rate')
     joint_convergence_threshold = rospy.get_param(u'~joint_convergence_threshold')
     wiggle_precision_threshold = rospy.get_param(u'~wiggle_precision_threshold')
     sample_period = rospy.get_param(u'~sample_period')
@@ -82,7 +69,6 @@ def grow_tree():
     trajectory_identifier = u'traj'
     time_identifier = u'time'
     next_cmd_identifier = u'motor'
-    collision_identifier = u'collision'
     closest_point_identifier = u'cpi'
     collision_goal_identifier = u'collision_goal'
     pyfunction_identifier = u'pyfunctions'
@@ -132,41 +118,35 @@ def grow_tree():
     actual_planning.add_plugin('wiggle', WiggleCancel(wiggle_precision_threshold, js_identifier, time_identifier))
     planning.add_child(actual_planning)
     # ----------------------------------------------
-    parse_goal = Sequence('parse goal')
-    parse_goal.add_child(GoalToConstraints(u'update constraints', action_server_name, root_link,
-                                           robot_description_identifier, js_identifier, cartesian_goal_identifier,
-                                           controlled_joints_identifier, controllable_links_identifier,
-                                           fk_identifier, pyfunction_identifier, closest_point_identifier,
-                                           soft_constraint_identifier, collision_goal_identifier))
 
     #----------------------------------------------
     publish_result = Selector('pub result')
     publish_result.add_child(GoalCanceled(u'goal_canceled2', action_server_name))
     publish_result.add_child(SendTrajectory(u'send traj', trajectory_identifier, fill_velocity_values))
     #----------------------------------------------
-    main = Sequence('main')
-    main.add_child(wait_for_goal)
-    main.add_child(parse_goal)
-    main.add_child(planning)
-    main.add_child(publish_result)
-    main.add_child(SendResult(u'send result', action_server_name))
-    #----------------------------------------------
     root = Sequence('root')
-    root.add_child(main)
+    root.add_child(wait_for_goal)
+    root.add_child(GoalToConstraints(u'update constraints', action_server_name, root_link,
+                                           robot_description_identifier, js_identifier, cartesian_goal_identifier,
+                                           controlled_joints_identifier, controllable_links_identifier,
+                                           fk_identifier, pyfunction_identifier, closest_point_identifier,
+                                           soft_constraint_identifier, collision_goal_identifier))
+    root.add_child(planning)
+    root.add_child(publish_result)
+    root.add_child(SendResult(u'send result', action_server_name))
 
     tree = BehaviourTree(root)
 
+    if debug:
+        def post_tick(snapshot_visitor, behaviour_tree):
+            print("\n" + py_trees.display.ascii_tree(behaviour_tree.root,
+                                                     snapshot_information=snapshot_visitor))
 
-    def post_tick(snapshot_visitor, behaviour_tree):
-        print("\n" + py_trees.display.ascii_tree(behaviour_tree.root,
-                                                 snapshot_information=snapshot_visitor))
 
-
-    snapshot_visitor = py_trees.visitors.SnapshotVisitor()
-    tree.add_post_tick_handler(functools.partial(post_tick, snapshot_visitor))
-    tree.visitors.append(snapshot_visitor)
-
-    render_dot_tree(root)
+        snapshot_visitor = py_trees.visitors.SnapshotVisitor()
+        tree.add_post_tick_handler(functools.partial(post_tick, snapshot_visitor))
+        tree.visitors.append(snapshot_visitor)
+        render_dot_tree(root, name=path_to_data_folder+'/'+'asdf')
 
     blackboard.time = time()
 
@@ -176,11 +156,12 @@ def grow_tree():
 
 if __name__ == u'__main__':
     rospy.init_node(u'giskard')
+    tree_tick_rate = rospy.get_param(u'~tree_tick_rate')
     tree = grow_tree()
     while not rospy.is_shutdown():
         try:
             tree.tick()
-            rospy.sleep(1)
+            rospy.sleep(tree_tick_rate)
         except KeyboardInterrupt:
             break
     print("\n")

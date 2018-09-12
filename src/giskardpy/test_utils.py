@@ -123,6 +123,8 @@ class GiskardTestWrapper(object):
     def __init__(self):
         rospy.set_param(u'~enable_gui', False)
         rospy.set_param(u'~interactive_marker_chains', [])
+        rospy.set_param(u'~debug', True)
+        rospy.set_param(u'~tree_tick_rate', .1)
         rospy.set_param(u'~map_frame', u'map')
         rospy.set_param(u'~joint_convergence_threshold', 0.002)
         rospy.set_param(u'~wiggle_precision_threshold', 4)
@@ -144,7 +146,7 @@ class GiskardTestWrapper(object):
         rospy.sleep(1)
         self.wrapper = GiskardWrapper(ns=u'tests')
         self.results = Queue(100)
-        self.robot = self.tree.root.children[0].children[0].children[1]._plugins[u'fk'].robot
+        self.robot = self.tree.root.children[0].children[1]._plugins[u'fk'].robot
         self.controlled_joints = Blackboard().god_map.safe_get_data([u'controlled_joints'])
         self.joint_limits = {joint_name: self.robot.get_joint_lower_upper_limit(joint_name) for joint_name in
                              self.controlled_joints if self.robot.is_joint_controllable(joint_name)}

@@ -67,14 +67,14 @@ class QPSolver(object):
             if success == PyReturnValue.SUCCESSFUL_RETURN:
                 self.started = True
                 break
-            elif success == PyReturnValue.INIT_FAILED_HOTSTART:
-                print(u'{}; trying round A workaround'.format(self.RETURN_VALUE_DICT[success]))
+            else:
+                print(u'{}; retrying with A rounded to 5 decimal places'.format(self.RETURN_VALUE_DICT[success]))
                 r = 5
                 A = np.round(A, r)
                 nWSR = None
-            else:
-                self.started = False
-                raise QPSolverException(self.RETURN_VALUE_DICT[success])
+        else: # if not break
+            self.started = False
+            raise QPSolverException(self.RETURN_VALUE_DICT[success])
 
         self.qpProblem.getPrimalSolution(self.xdot_full)
         return self.xdot_full

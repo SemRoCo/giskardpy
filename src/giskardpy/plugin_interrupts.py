@@ -51,13 +51,15 @@ class CollisionCancel(GiskardBehavior):
         return super(CollisionCancel, self).setup(timeout)
 
     def initialise(self):
+        # TODO figure out a clean why of deciding how is responsible for godmap cleanup
+        self.god_map.safe_set_data([self.closest_point_identifier], None)
         super(CollisionCancel, self).initialise()
 
     def update(self):
         time = self.get_god_map().safe_get_data([self.time_identifier])
         if time >= self.collision_time_threshold:
             cp = self.god_map.safe_get_data([self.closest_point_identifier])
-            if closest_point_constraint_violated(cp, tolerance=1):
+            if cp is not None and closest_point_constraint_violated(cp, tolerance=1):
                 self.raise_to_blackboard(PathCollisionException(
                     u'robot is in collision after {} seconds'.format(self.collision_time_threshold)))
                 return Status.SUCCESS

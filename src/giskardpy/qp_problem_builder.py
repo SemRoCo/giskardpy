@@ -197,3 +197,7 @@ class QProblemBuilder(object):
         # TODO enable debug print in an elegant way, preferably without slowing anything down
         # self.debug_print(np_H, np_A, np_lb, np_ub, np_lbA, np_ubA, xdot_full)
         return OrderedDict((observable, xdot_full[i]) for i, observable in enumerate(self.controlled_joints))
+
+
+# with pd.option_context('display.max_rows', None, 'display.max_columns', None):
+#     print(df)

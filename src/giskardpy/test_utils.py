@@ -137,7 +137,7 @@ class GiskardTestWrapper(object):
         rospy.set_param(u'~enable_collision_marker', True)
         rospy.set_param(u'~enable_self_collision', False)
         rospy.set_param(u'~path_to_data_folder', u'../data/pr2/')
-        rospy.set_param(u'~collision_time_threshold', 15)
+        rospy.set_param(u'~collision_time_threshold', 10)
         rospy.set_param(u'~max_traj_length', 30)
         self.sub_result = rospy.Subscriber(u'/giskardpy/command/result', MoveActionResult, self.cb, queue_size=100)
 

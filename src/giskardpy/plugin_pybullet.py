@@ -599,6 +599,7 @@ class CollisionChecker(PybulletPlugin):
     def initialize(self):
         collision_goals = self.god_map.safe_get_data([self.collision_goal_identifier])
         self.collision_matrix = self.collision_goals_to_collision_matrix(collision_goals)
+        self.god_map.safe_set_data([self.closest_point_identifier], None)
         super(CollisionChecker, self).initialize()
 
     def update(self):

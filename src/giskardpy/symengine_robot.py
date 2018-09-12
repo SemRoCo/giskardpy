@@ -1,10 +1,8 @@
 import hashlib
-from collections import namedtuple, OrderedDict, defaultdict
-import numpy as np
+from collections import namedtuple, OrderedDict
 import symengine_wrappers as spw
 from urdf_parser_py.urdf import URDF, Box, Sphere, Mesh, Cylinder
 
-from giskardpy.input_system import JointStatesInput
 from giskardpy.qp_problem_builder import HardConstraint, JointConstraint
 from giskardpy.utils import cube_volume, cube_surface, sphere_volume, cylinder_volume, cylinder_surface, keydefaultdict, \
     suppress_stdout, suppress_stderr

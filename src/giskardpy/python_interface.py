@@ -5,10 +5,7 @@ from giskard_msgs.msg import MoveAction, MoveCmd, Controller, MoveGoal, WorldBod
 from giskard_msgs.srv import UpdateWorld, UpdateWorldRequest, UpdateWorldResponse
 from sensor_msgs.msg import JointState
 from shape_msgs.msg import SolidPrimitive
-from visualization_msgs.msg import Marker, MarkerArray
-
-from giskardpy.object import to_marker, world_body_to_urdf_object
-from giskardpy.tfwrapper import lookup_transform
+from visualization_msgs.msg import MarkerArray
 from giskardpy.utils import dict_to_joint_states
 
 

@@ -18,7 +18,7 @@ from giskardpy.plugin_fk import NewFkPlugin
 from giskardpy.plugin_goal_reached import GoalReachedPlugin
 from giskardpy.plugin_instantaneous_controller import GoalToConstraints, ControllerPlugin
 from giskardpy.plugin_interrupts import CollisionCancel, WiggleCancel
-from giskardpy.plugin_joint_state import JSBehavior, JointStatePlugin, JointStatePlugin2
+from giskardpy.plugin_joint_state import  JointStatePlugin2
 from giskardpy.plugin_kinematic_sim import NewKinSimPlugin
 from giskardpy.plugin_log_trajectory import NewLogTrajPlugin
 from giskardpy.plugin_pybullet import PyBulletMonitor, PyBulletUpdatePlugin, CollisionChecker

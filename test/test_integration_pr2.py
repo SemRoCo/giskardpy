@@ -17,7 +17,6 @@ from giskardpy.python_interface import GiskardWrapper
 from giskardpy.test_utils import GiskardTestWrapper
 from giskardpy.tfwrapper import transform_pose, lookup_transform, init as tf_init
 from giskardpy.utils import msg_to_list
-from ros_trajectory_controller_main import giskard_pm
 
 # TODO roslaunch iai_pr2_sim ros_control_sim.launch
 # TODO roslaunch iai_kitchen upload_kitchen_obj.launch
@@ -708,6 +707,7 @@ class TestCollisionAvoidanceGoals(object):
         """
         :type box_setup: GiskardTestWrapper
         """
+        # FIXME sometimes says endless wiggle detected
         p = PoseStamped()
         p.header.frame_id = box_setup.r_tip
         p.header.stamp = rospy.get_rostime()

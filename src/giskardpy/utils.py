@@ -1,13 +1,8 @@
 from __future__ import division
 
-import codecs
-import ctypes
-import hashlib
-import tempfile
 from collections import defaultdict, OrderedDict
 import numpy as np
 from numpy import pi
-import math
 from geometry_msgs.msg import PointStamped, Point, Vector3Stamped, Vector3, Pose, PoseStamped, QuaternionStamped, \
     Quaternion
 from sensor_msgs.msg import JointState
@@ -17,7 +12,6 @@ from giskardpy.data_types import SingleJointState
 from giskardpy.data_types import ClosestPointInfo
 from contextlib import contextmanager
 import sys, os
-import io
 
 
 @contextmanager

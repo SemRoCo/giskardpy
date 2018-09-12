@@ -17,13 +17,11 @@ from py_trees import Blackboard
 from sensor_msgs.msg import JointState
 
 from giskard_trees import grow_tree
-from giskardpy.data_types import ClosestPointInfo
 from giskardpy.pybullet_world import PyBulletWorld
 from giskardpy.python_interface import GiskardWrapper
 from giskardpy.symengine_robot import Robot
 from giskardpy.tfwrapper import transform_pose, lookup_transform
 from giskardpy.utils import msg_to_list
-from ros_trajectory_controller_main import giskard_pm
 
 BIG_NUMBER = 1e100
 SMALL_NUMBER = 1e-100

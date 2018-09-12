@@ -1,5 +1,5 @@
 from giskardpy.input_system import JointStatesInput
-from giskardpy.plugin import NewPluginBase, GiskardBehavior
+from giskardpy.plugin import NewPluginBase
 from giskardpy.symengine_robot import Robot
 from giskardpy.utils import urdfs_equal
 

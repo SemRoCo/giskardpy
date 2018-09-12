@@ -1,5 +1,4 @@
 import copy
-import traceback
 from multiprocessing import Lock
 
 import symengine_wrappers as sw

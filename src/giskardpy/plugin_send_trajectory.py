@@ -1,9 +1,7 @@
-import actionlib_msgs
 import py_trees
 import rospy
 from actionlib_msgs.msg import GoalStatus
 from control_msgs.msg import FollowJointTrajectoryAction, FollowJointTrajectoryGoal, JointTrajectoryControllerState
-from giskard_msgs.msg import MoveResult
 from py_trees_ros.actions import ActionClient
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 

@@ -7,7 +7,6 @@ import os
 from collections import namedtuple, OrderedDict, defaultdict
 from itertools import combinations
 from pybullet import JOINT_REVOLUTE, JOINT_PRISMATIC, JOINT_PLANAR, JOINT_SPHERICAL
-from time import time
 
 import errno
 from numpy.random.mtrand import seed
@@ -18,7 +17,7 @@ import numpy as np
 
 from giskardpy.utils import keydefaultdict, suppress_stdout
 
-from giskardpy.object import UrdfObject, FixedJoint, world_body_to_urdf_object, to_urdf_string, BoxShape, \
+from giskardpy.object import UrdfObject, FixedJoint, to_urdf_string, BoxShape, \
     CollisionProperty
 import hashlib
 

@@ -1,14 +1,12 @@
 import pickle
 from collections import OrderedDict, namedtuple
 import numpy as np
-from itertools import chain
 from time import time
 
 from giskardpy import BACKEND
 
 import giskardpy.symengine_wrappers as spw
 from giskardpy.qp_solver import QPSolver
-import hashlib
 
 from giskardpy.symengine_wrappers import load_compiled_function, safe_compiled_function
 

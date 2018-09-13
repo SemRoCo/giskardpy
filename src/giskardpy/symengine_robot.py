@@ -1,10 +1,8 @@
 import hashlib
-from collections import namedtuple, OrderedDict, defaultdict
-import numpy as np
+from collections import namedtuple, OrderedDict
 import symengine_wrappers as spw
 from urdf_parser_py.urdf import URDF, Box, Sphere, Mesh, Cylinder
 
-from giskardpy.input_system import JointStatesInput
 from giskardpy.qp_problem_builder import HardConstraint, JointConstraint
 from giskardpy.utils import cube_volume, cube_surface, sphere_volume, cylinder_volume, cylinder_surface, keydefaultdict, \
     suppress_stdout, suppress_stderr
@@ -39,7 +37,7 @@ TRANSLATIONAL_JOINT_TYPES = [u'prismatic']
 class Robot(object):
     # TODO split urdf part into separate file?
     # TODO remove slow shit from init?
-    def __init__(self, urdf, default_joint_vel_limit=0):
+    def __init__(self, urdf, default_joint_vel_limit=1):
         """
         :param urdf:
         :type urdf: str
@@ -58,7 +56,7 @@ class Robot(object):
             self._urdf_robot = URDF.from_xml_string(hacky_urdf_parser_fix(self.urdf))
 
     @classmethod
-    def from_urdf_file(cls, urdf_file, joints_to_symbols_map=None, default_joint_vel_limit=0):
+    def from_urdf_file(cls, urdf_file, joints_to_symbols_map=None, default_joint_vel_limit=1):
         """
         :param urdf_file: path to urdf file
         :type urdf_file: str

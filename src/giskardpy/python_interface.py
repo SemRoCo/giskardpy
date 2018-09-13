@@ -5,19 +5,16 @@ from giskard_msgs.msg import MoveAction, MoveCmd, Controller, MoveGoal, WorldBod
 from giskard_msgs.srv import UpdateWorld, UpdateWorldRequest, UpdateWorldResponse
 from sensor_msgs.msg import JointState
 from shape_msgs.msg import SolidPrimitive
-from visualization_msgs.msg import Marker, MarkerArray
-
-from giskardpy.object import to_marker, world_body_to_urdf_object
-from giskardpy.tfwrapper import lookup_transform
+from visualization_msgs.msg import MarkerArray
 from giskardpy.utils import dict_to_joint_states
 
 
 class GiskardWrapper(object):
-    def __init__(self, giskard_topic=u'qp_controller/command', ns=u'giskard'):
+    def __init__(self, giskard_topic=u'giskardpy/command', ns=u'giskard'):
         if giskard_topic is not None:
             self.client = SimpleActionClient(giskard_topic, MoveAction)
             self.update_world = rospy.ServiceProxy(u'{}/update_world'.format(ns), UpdateWorld)
-            # self.marker_pub = rospy.Publisher('visualization_marker_array', MarkerArray, queue_size=10)
+            self.marker_pub = rospy.Publisher('visualization_marker_array', MarkerArray, queue_size=10)
             rospy.wait_for_service(u'{}/update_world'.format(ns))
             self.client.wait_for_server()
         self.tip_to_root = {}

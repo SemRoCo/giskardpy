@@ -7,18 +7,19 @@ import os
 from collections import namedtuple, OrderedDict, defaultdict
 from itertools import combinations
 from pybullet import JOINT_REVOLUTE, JOINT_PRISMATIC, JOINT_PLANAR, JOINT_SPHERICAL
-from time import time
 
 import errno
 from numpy.random.mtrand import seed
 
+import giskardpy
+from giskardpy import DEBUG
 from giskardpy.exceptions import UnknownBodyException, RobotExistsException, DuplicateNameException
 from giskardpy.data_types import SingleJointState, Transform, Point, Quaternion
 import numpy as np
 
-from giskardpy.utils import keydefaultdict, suppress_stdout
+from giskardpy.utils import keydefaultdict, suppress_stdout, NullContextManager
 
-from giskardpy.object import UrdfObject, FixedJoint, world_body_to_urdf_object, to_urdf_string, BoxShape, \
+from giskardpy.object import UrdfObject, FixedJoint, to_urdf_string, BoxShape, \
     CollisionProperty
 import hashlib
 
@@ -91,10 +92,10 @@ def load_urdf_string_into_bullet(urdf_string, pose):
     :rtype: int
     """
     filename = write_urdf_to_disc(u'{}.urdf'.format(random_string()), urdf_string)
-    # with suppress_stdout():
-    id = p.loadURDF(filename, [pose.translation.x, pose.translation.y, pose.translation.z],
-                    [pose.rotation.x, pose.rotation.y, pose.rotation.z, pose.rotation.w],
-                    flags=p.URDF_USE_SELF_COLLISION_EXCLUDE_PARENT)
+    with NullContextManager() if giskardpy.PRINT_LEVEL == DEBUG else suppress_stdout():
+        id = p.loadURDF(filename, [pose.translation.x, pose.translation.y, pose.translation.z],
+                        [pose.rotation.x, pose.rotation.y, pose.rotation.z, pose.rotation.w],
+                        flags=p.URDF_USE_SELF_COLLISION_EXCLUDE_PARENT)
     os.remove(filename)
     return id
 
@@ -668,7 +669,7 @@ class PyBulletWorld(object):
             robot_link_id = self.get_robot().link_name_to_id[robot_link]
             link_b_id = self._objects[body_b].link_name_to_id[link_b]
             contacts = [ContactInfo(*x) for x in p.getClosestPoints(self._robot.id, object_id,
-                                                                    distance,
+                                                                    distance*3,
                                                                     robot_link_id, link_b_id)]
             if len(contacts) > 0:
                 collisions.update({k: min(contacts, key=lambda x: x.contact_distance)})

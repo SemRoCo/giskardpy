@@ -1,116 +1,41 @@
 import numpy as np
 import pylab as plt
 from itertools import product
-
-from giskardpy.exceptions import SolverTimeoutError, InsolvableException, \
-    SymengineException, PathCollisionException
-from giskardpy.plugin import PluginBase
-from giskardpy.data_types import SingleJointState, Transform, Point, Quaternion, Trajectory
-from giskardpy.utils import closest_point_constraint_violated
+from giskardpy.plugin import NewPluginBase
+from giskardpy.data_types import Trajectory
 
 
-class LogTrajectoryPlugin(PluginBase):
-    """
-    Keeps track of the joint trajectory and stores it in the god map.
-    """
-
-    # TODO another plugin should trigger the end of the universe
-    # TODO expects time to start at zero, get rid of this assumption
-    # TODO user should be able to specify joint convergence threshold per joint
-    # TODO add parameter for location where debug plots should be saved
-    def __init__(self, trajectory_identifier, joint_state_identifier, time_identifier, goal_identifier,
-                 closest_point_identifier,
-                 controlled_joints_identifier, joint_convergence_threshold, wiggle_precision_threshold,
-                 collision_time_threshold, max_traj_length,
-                 plot_trajectory=False, is_preempted=lambda: False):
+class NewLogTrajPlugin(NewPluginBase):
+    # TODO split log and interrupt conditions
+    def __init__(self, trajectory_identifier, joint_state_identifier, time_identifier):
         """
         :type trajectory_identifier: str
         :type joint_state_identifier: str
         :type time_identifier: str
-        :type goal_identifier: str
-        :type closest_point_identifier: str
-        :type controlled_joints_identifier: str
-        :param joint_convergence_threshold: if the maximum joint velocity falls below this value, the current universe is killed
-        :type joint_convergence_threshold: float
-        :param wiggle_precision_threshold: rounds joint states to this many decimal places and stops the universe if a joint state is seen twice
-        :type wiggle_precision_threshold: float
-        :param collision_time_threshold: if the robot is in collision after this many s, it is assumed, that it can't get out and the univserse is killed
-        :type collision_time_threshold: float
-        :param max_traj_length: if no traj can be found that takes less than this many s to execute, the planning is stopped.
-        :type max_traj_length: float
-        :param plot_trajectory: saves a plot of the joint traj for debugging.
-        :type plot_trajectory: bool
-        :param is_preempted: if this function evaluates to True, the planning is stopped
         """
-        self.plot = plot_trajectory
-        self.closest_point_identifier = closest_point_identifier
-        self.controlled_joints_identifier = controlled_joints_identifier
-        self.goal_identifier = goal_identifier
         self.trajectory_identifier = trajectory_identifier
         self.joint_state_identifier = joint_state_identifier
         self.time_identifier = time_identifier
-        self.is_preempted = is_preempted
-        self.precision = joint_convergence_threshold
-        self.max_traj_length = max_traj_length
-        self.collision_time_threshold = collision_time_threshold
-        self.wiggle_precision = wiggle_precision_threshold
-        super(LogTrajectoryPlugin, self).__init__()
+        super(NewLogTrajPlugin, self).__init__()
 
-    def round_js(self, js):
-        """
-        :param js: joint_name -> SingleJointState
-        :type js: dict
-        :return: a sequence of all the rounded joint positions
-        :rtype: tuple
-        """
-        return tuple(round(x.position, self.wiggle_precision) for x in js.values())
+    def setup(self):
+        super(NewLogTrajPlugin, self).setup()
 
-    def update(self):
-        current_js = self.god_map.get_data([self.joint_state_identifier])
-        time = self.god_map.get_data([self.time_identifier])
-        trajectory = self.god_map.get_data([self.trajectory_identifier])
-        # traj_length = self.god_map.get_data([self.goal_identifier, 'max_trajectory_length'])
-        rounded_js = self.round_js(current_js)
-        if trajectory is None:
-            trajectory = Trajectory()
-        trajectory.set(time, current_js)
-        self.god_map.set_data([self.trajectory_identifier], trajectory)
-
-        if self.is_preempted():
-            print(u'goal preempted')
-            self.stop_universe = True
-            return
-        if time >= 1:
-            if time > self.max_traj_length:
-                self.stop_universe = True
-                raise SolverTimeoutError(u'didn\'t a solution after {} s'.format(self.max_traj_length))
-            if np.abs([v.velocity for v in current_js.values()]).max() < self.precision or \
-                    (self.plot and time > self.max_traj_length):
-                print(u'done')
-                if self.plot:
-                    plot_trajectory(trajectory, set(self.god_map.get_data([self.controlled_joints_identifier])))
-                self.stop_universe = True
-                return
-            if not self.plot and (rounded_js in self.past_joint_states):
-                self.stop_universe = True
-                raise InsolvableException(u'endless wiggling detected')
-            if time >= self.collision_time_threshold:
-                cp = self.god_map.get_data([self.closest_point_identifier])
-                if closest_point_constraint_violated(cp, tolerance=1):
-                    self.stop_universe = True
-                    raise PathCollisionException(
-                        u'robot is in collision after {} seconds'.format(self.collision_time_threshold))
-        self.past_joint_states.add(rounded_js)
-
-    def start_always(self):
+    def initialize(self):
         self.stop_universe = False
         self.past_joint_states = set()
+        self.trajectory = Trajectory()
+        self.god_map.safe_set_data([self.trajectory_identifier], self.trajectory)
+        super(NewLogTrajPlugin, self).initialize()
 
-    def stop(self):
-        pass
+    def update(self):
+        current_js = self.god_map.safe_get_data([self.joint_state_identifier])
+        time = self.god_map.safe_get_data([self.time_identifier])
+        trajectory = self.god_map.safe_get_data([self.trajectory_identifier])
+        trajectory.set(time, current_js)
+        self.god_map.safe_set_data([self.trajectory_identifier], trajectory)
 
-    def end_parallel_universe(self):
-        return self.stop_universe
+        return super(NewLogTrajPlugin, self).update()
 
 
 def plot_trajectory(tj, controlled_joints):

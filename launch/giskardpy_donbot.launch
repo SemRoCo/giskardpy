@@ -1,28 +1,32 @@
 <launch>
-  <node pkg="giskardpy" type="ros_trajectory_controller_main.py" name="giskard" output="screen">
-    <param name="path_to_data_folder" value="$(find giskardpy)/data/donbot" />
-    <rosparam param="enable_gui">False</rosparam>
+
+  <arg name="gui" default="false" />
+
+  <node pkg="giskardpy" type="giskard_trees.py" name="giskard" output="screen">
+    <param name="path_to_data_folder" value="$(find giskardpy)/data/pr2" />
+    <param name="enable_gui" value="$(arg gui)"/>
     <rosparam param="map_frame">map</rosparam>
+    <rosparam param="joint_convergence_threshold">0.002</rosparam>
+    <rosparam param="wiggle_precision_threshold">7</rosparam>
+    <rosparam param="max_traj_length">30</rosparam>
+    <rosparam param="sample_period">0.1</rosparam>
+    <rosparam param="default_joint_vel_limit">0.5</rosparam>
+    <rosparam param="default_collision_avoidance_distance">0.05</rosparam>
+    <rosparam param="fill_velocity_values">False</rosparam>
+    <rosparam param="nWSR">None</rosparam> <!-- None results in a nWSR estimation thats fine most of the time -->
     <rosparam param="root_link">odom</rosparam>
     <rosparam param="enable_collision_marker">True</rosparam>
+    <rosparam param="enable_self_collision">True</rosparam>
+    <rosparam param="collision_time_threshold">15</rosparam>
+    <rosparam param="debug">False</rosparam>
+    <rosparam param="tree_tick_rate">.2</rosparam>
+  </node>
+
+  <node pkg="giskardpy" type="interactive_marker.py" name="giskard_interactive_marker" output="screen">
     <rosparam param="interactive_marker_chains">
      - [base_footprint, gripper_tool_frame]
      - [base_footprint, camera_link]
     </rosparam>
   </node>
-  <node pkg="giskardpy" type="init_chain.py" name="init_chain">
-    <rosparam param="roots">
-      - base_footprint
-      - base_footprint
-    </rosparam>
-    <rosparam param="tips">
-      - gripper_tool_frame
-      - camera_link
-    </rosparam>
-    <!-- 2 = TRANSLATION_3D; 3 = ROTATION_3D -->
-    <rosparam param="types"> 
-      - [2, 3]
-      - [2, 3]
-    </rosparam>
-  </node>
+
 </launch>

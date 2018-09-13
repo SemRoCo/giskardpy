@@ -1,33 +1,27 @@
 from Queue import Empty, Queue
 
 import rospy
+from iai_wsg_50_msgs.msg import Status
+from py_trees import Status
 
 from sensor_msgs.msg import JointState
 
-from giskardpy.plugin import PluginBase
-from giskardpy.plugin_kinematic_sim import KinematicSimPlugin
+from giskardpy.plugin import NewPluginBase
 from giskardpy.utils import to_joint_state_dict
 
 
-class JointStatePlugin(PluginBase):
+class JointStatePlugin2(NewPluginBase):
     """
     Listens to a joint state topic, transforms it into a dict and writes it to the got map.
     Gets replace with a kinematic sim plugin during a parallel universe.
     """
-    def __init__(self, js_identifier, time_identifier, next_cmd_identifier, sample_period):
+
+    def __init__(self, js_identifier):
         """
         :type js_identifier: str
-        :type time_identifier: str
-        :type next_cmd_identifier: str
-        :param sample_period: gets passed to KinematicSimPlugin
-        :type: int
         """
-        super(JointStatePlugin, self).__init__()
+        super(JointStatePlugin2, self).__init__()
         self.js_identifier = js_identifier
-        self.time_identifier = time_identifier
-        self.next_cmd_identifier = next_cmd_identifier
-        self.sample_period = sample_period
-        self.js = None
         self.mjs = None
         self.lock = Queue(maxsize=1)
 
@@ -44,15 +38,8 @@ class JointStatePlugin(PluginBase):
             self.mjs = to_joint_state_dict(js)
         except Empty:
             pass
-        self.god_map.set_data([self.js_identifier], self.mjs)
+        self.god_map.safe_set_data([self.js_identifier], self.mjs)
+        return Status.RUNNING
 
-    def start_always(self):
+    def setup(self):
         self.joint_state_sub = rospy.Subscriber(u'joint_states', JointState, self.cb, queue_size=1)
-
-    def stop(self):
-        self.joint_state_sub.unregister()
-
-    def copy(self):
-        return KinematicSimPlugin(js_identifier=self.js_identifier, next_cmd_identifier=self.next_cmd_identifier,
-                                  time_identifier=self.time_identifier, sample_period=self.sample_period)
-

@@ -1,9 +1,6 @@
 from angles import shortest_angular_distance
-from tf.transformations import rotation_from_matrix, quaternion_matrix, quaternion_slerp
 
 import symengine_wrappers as sw
-from math import pi
-import numpy as np
 
 
 class InputArray(object):

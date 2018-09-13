@@ -1,13 +1,8 @@
 from __future__ import division
 
-import codecs
-import ctypes
-import hashlib
-import tempfile
 from collections import defaultdict, OrderedDict
 import numpy as np
 from numpy import pi
-import math
 from geometry_msgs.msg import PointStamped, Point, Vector3Stamped, Vector3, Pose, PoseStamped, QuaternionStamped, \
     Quaternion
 from sensor_msgs.msg import JointState
@@ -17,37 +12,6 @@ from giskardpy.data_types import SingleJointState
 from giskardpy.data_types import ClosestPointInfo
 from contextlib import contextmanager
 import sys, os
-import io
-
-
-@contextmanager
-def suppress_stdout(to=os.devnull):
-    '''
-    import os
-
-    with stdout_redirected(to=filename):
-        print("from Python")
-        os.system("echo non-Python applications are also supported")
-    '''
-    fd = sys.stdout.fileno()
-
-    ##### assert that Python and C stdio write using the same file descriptor
-    ####assert libc.fileno(ctypes.c_void_p.in_dll(libc, "stdout")) == fd == 1
-
-    def _redirect_stdout(to):
-        sys.stdout.close()  # + implicit flush()
-        os.dup2(to.fileno(), fd)  # fd writes to 'to' file
-        sys.stdout = os.fdopen(fd, 'w')  # Python writes to fd
-
-    with os.fdopen(os.dup(fd), 'w') as old_stdout:
-        with open(to, 'w') as file:
-            _redirect_stdout(to=file)
-        try:
-            yield  # allow code to be run with the redirected stdout
-        finally:
-            _redirect_stdout(to=old_stdout)  # restore stdout.
-            # buffering and flags such as
-            # CLOEXEC may be different
 
 
 @contextmanager
@@ -60,6 +24,24 @@ def suppress_stderr():
         finally:
             sys.stderr = old_stdout
 
+@contextmanager
+def suppress_stdout():
+    devnull = os.open('/dev/null', os.O_WRONLY)
+    old_stdout = os.dup(1)
+    os.dup2(devnull, 1)
+    try:
+        yield
+    finally:
+        os.dup2(old_stdout, 1)
+        os.close(devnull)
+
+class NullContextManager(object):
+    def __init__(self, dummy_resource=None):
+        self.dummy_resource = dummy_resource
+    def __enter__(self):
+        return self.dummy_resource
+    def __exit__(self, *args):
+        pass
 
 class keydefaultdict(defaultdict):
     """

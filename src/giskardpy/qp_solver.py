@@ -47,24 +47,32 @@ class QPSolver(object):
         :return: x according to the equations above, len = number of joints
         :type np.array
         """
-        # TODO kevins bug somehow results in /0
-        if nWSR is None:
-            nWSR = np.array([sum(A.shape)*2])
-        else:
-            nWSR = np.array([nWSR])
-        if not self.started:
-            success = self.qpProblem.init(H, g, A, lb, ub, lbA, ubA, nWSR)
-            if success == PyReturnValue.MAX_NWSR_REACHED:
-                self.started = False
-                raise MAX_NWSR_REACHEDException(u'Failed to initialize QP-problem.')
-        else:
-            success = self.qpProblem.hotstart(H, g, A, lb, ub, lbA, ubA, nWSR)
-            if success == PyReturnValue.MAX_NWSR_REACHED:
-                self.started = False
-                raise MAX_NWSR_REACHEDException(u'Failed to hot start QP-problem.')
-        if success == PyReturnValue.SUCCESSFUL_RETURN:
-            self.started = True
-        else:
+        number_of_retries = 2
+        while number_of_retries > 0:
+            if nWSR is None:
+                nWSR = np.array([sum(A.shape)*2])
+            else:
+                nWSR = np.array([nWSR])
+            number_of_retries -= 1
+            if not self.started:
+                success = self.qpProblem.init(H, g, A, lb, ub, lbA, ubA, nWSR)
+                if success == PyReturnValue.MAX_NWSR_REACHED:
+                    self.started = False
+                    raise MAX_NWSR_REACHEDException(u'Failed to initialize QP-problem.')
+            else:
+                success = self.qpProblem.hotstart(H, g, A, lb, ub, lbA, ubA, nWSR)
+                if success == PyReturnValue.MAX_NWSR_REACHED:
+                    self.started = False
+                    raise MAX_NWSR_REACHEDException(u'Failed to hot start QP-problem.')
+            if success == PyReturnValue.SUCCESSFUL_RETURN:
+                self.started = True
+                break
+            else:
+                print(u'{}; retrying with A rounded to 5 decimal places'.format(self.RETURN_VALUE_DICT[success]))
+                r = 5
+                A = np.round(A, r)
+                nWSR = None
+        else: # if not break
             self.started = False
             raise QPSolverException(self.RETURN_VALUE_DICT[success])
 

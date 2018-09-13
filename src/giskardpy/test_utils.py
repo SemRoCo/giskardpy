@@ -13,15 +13,15 @@ import keyword
 import numpy as np
 from numpy import pi
 
+from py_trees import Blackboard
 from sensor_msgs.msg import JointState
 
-from giskardpy.data_types import ClosestPointInfo
+from giskard_trees import grow_tree
 from giskardpy.pybullet_world import PyBulletWorld
 from giskardpy.python_interface import GiskardWrapper
 from giskardpy.symengine_robot import Robot
 from giskardpy.tfwrapper import transform_pose, lookup_transform
 from giskardpy.utils import msg_to_list
-from ros_trajectory_controller_main import giskard_pm
 
 BIG_NUMBER = 1e100
 SMALL_NUMBER = 1e-100
@@ -123,9 +123,11 @@ class GiskardTestWrapper(object):
     def __init__(self):
         rospy.set_param(u'~enable_gui', False)
         rospy.set_param(u'~interactive_marker_chains', [])
+        rospy.set_param(u'~debug', True)
+        rospy.set_param(u'~tree_tick_rate', .1)
         rospy.set_param(u'~map_frame', u'map')
         rospy.set_param(u'~joint_convergence_threshold', 0.002)
-        rospy.set_param(u'~wiggle_precision_threshold', 7)
+        rospy.set_param(u'~wiggle_precision_threshold', 4)
         rospy.set_param(u'~sample_period', 0.1)
         rospy.set_param(u'~default_joint_vel_limit', 10)
         rospy.set_param(u'~default_collision_avoidance_distance', 0.05)
@@ -135,19 +137,20 @@ class GiskardTestWrapper(object):
         rospy.set_param(u'~enable_collision_marker', True)
         rospy.set_param(u'~enable_self_collision', False)
         rospy.set_param(u'~path_to_data_folder', u'../data/pr2/')
-        rospy.set_param(u'~collision_time_threshold', 15)
+        rospy.set_param(u'~collision_time_threshold', 10)
         rospy.set_param(u'~max_traj_length', 30)
-        self.sub_result = rospy.Subscriber(u'/qp_controller/command/result', MoveActionResult, self.cb, queue_size=100)
+        self.sub_result = rospy.Subscriber(u'/giskardpy/command/result', MoveActionResult, self.cb, queue_size=100)
 
-        self.pm = giskard_pm()
-        self.pm.start_plugins()
+        self.tree = grow_tree()
+        self.tree.tick()
+        rospy.sleep(1)
         self.wrapper = GiskardWrapper(ns=u'tests')
         self.results = Queue(100)
-        self.robot = self.pm._plugins[u'fk'].get_robot()
-        self.controlled_joints = self.pm._plugins[u'controlled joints'].controlled_joints
+        self.robot = self.tree.root.children[0].children[1]._plugins[u'fk'].robot
+        self.controlled_joints = Blackboard().god_map.safe_get_data([u'controlled_joints'])
         self.joint_limits = {joint_name: self.robot.get_joint_lower_upper_limit(joint_name) for joint_name in
                              self.controlled_joints if self.robot.is_joint_controllable(joint_name)}
-        self.world = self.pm._plugins[u'bullet'].world  # type: PyBulletWorld
+        self.world = Blackboard().god_map.safe_get_data([u'pybullet_world'])  # type: PyBulletWorld
         self.default_root = u'base_link'
         self.r_tip = u'r_gripper_tool_frame'
         self.l_tip = u'l_gripper_tool_frame'
@@ -162,7 +165,7 @@ class GiskardTestWrapper(object):
         self.results.put(msg.result)
 
     def loop_once(self):
-        self.pm.update()
+        self.tree.tick()
 
     def get_controlled_joint_names(self):
         """
@@ -195,7 +198,7 @@ class GiskardTestWrapper(object):
     def tear_down(self):
         rospy.sleep(1)
         print(u'stopping plugins')
-        self.pm.stop()
+        # self.tree.destroy(
 
     #
     # JOINT GOAL STUFF #################################################################################################
@@ -248,17 +251,25 @@ class GiskardTestWrapper(object):
     #
     # GENERAL GOAL STUFF ###############################################################################################
     #
-    def send_goal(self):
+    def get_as(self):
+        return Blackboard().get('giskardpy/command')
+
+    def send_goal(self, goal=None):
         """
         :rtype: MoveResult
         """
-        goal = MoveActionGoal()
-        goal.goal = self.wrapper._get_goal()
-
-        t1 = Thread(target=self.pm._plugins[u'action server']._as.action_server.internal_goal_callback, args=(goal,))
+        if goal is None:
+            goal = MoveActionGoal()
+            goal.goal = self.wrapper._get_goal()
+        i = 0
+        t1 = Thread(target=self.get_as()._as.action_server.internal_goal_callback, args=(goal,))
         t1.start()
         while self.results.empty():
             self.loop_once()
+            # if i >= 100:
+            #     assert False, 'planning took too long'
+            rospy.sleep(.5)
+            i += 1
         t1.join()
         self.loop_once()
         result = self.results.get()
@@ -327,7 +338,7 @@ class GiskardTestWrapper(object):
 
     def check_cpi_geq(self, links, distance_threshold):
         cpi_identifier = u'cpi'
-        cpi = self.pm.get_god_map().get_data([cpi_identifier])
+        cpi = Blackboard().god_map.safe_get_data([cpi_identifier])
         if cpi == 0 or cpi == None:
             return False
         for link in links:
@@ -339,7 +350,7 @@ class GiskardTestWrapper(object):
 
     def check_cpi_leq(self, links, distance_threshold):
         cpi_identifier = u'cpi'
-        cpi = self.pm.get_god_map().get_data([cpi_identifier])
+        cpi = Blackboard().god_map.safe_get_data([cpi_identifier])
         if cpi == 0 or cpi == None:
             return False
         for link in links:

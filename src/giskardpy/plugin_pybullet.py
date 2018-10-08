@@ -375,6 +375,8 @@ class CollisionChecker(PybulletPlugin):
             else:
                 raise UnknownBodyException(u'body_b \'{}\' unknown'.format(collision_entry.body_b))
 
+            link_b_was_set = len(collision_entry.link_bs) > 0
+
             for body_b in bodies_b:
                 # if link_b is empty, use all links from body_b
                 link_bs = collision_entry.link_bs
@@ -388,7 +390,7 @@ class CollisionChecker(PybulletPlugin):
                                 raise UnknownBodyException(u'link_b \'{}\' unknown'.format(link_b))
 
                 for robot_link in robot_links:
-                    if link_bs == [] and body_b == self.world.get_robot().name:
+                    if not link_b_was_set and body_b == self.world.get_robot().name:
                         link_bs = self.world.get_robot().get_possible_collisions(robot_link)
                     for link_b in link_bs:
                         keys = [(robot_link, body_b, link_b)]

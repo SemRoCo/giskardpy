@@ -49,12 +49,6 @@ class IMServer(object):
         self.suffix = suffix
         self.giskard_name = giskard_name
         self.markers = {}
-        self.start_once()
-
-    def start_once(self):
-        # giskard goal client
-        # self.client = SimpleActionClient(self.giskard_name, MoveAction)
-        # self.client.wait_for_server()
 
         # marker server
         self.server = InteractiveMarkerServer(u'eef_control{}'.format(self.suffix))

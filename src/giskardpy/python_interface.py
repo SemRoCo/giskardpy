@@ -18,6 +18,7 @@ class GiskardWrapper(object):
             rospy.wait_for_service(u'{}/update_world'.format(ns))
             self.client.wait_for_server()
         self.tip_to_root = {}
+        self.robot_name = rospy.get_param(u'robot_description').split('\n',1)[1].split('" ',1)[0].split('"')[1]
         self.collisions = []
         self.clear_cmds()
         self.object_js_topics = {}
@@ -89,13 +90,17 @@ class GiskardWrapper(object):
     def set_collision_entries(self, collisions):
         self.cmd_seq[-1].collisions.extend(collisions)
 
-    def avoid_collision(self, min_dist, robot_link=u'', body_b=u'', link_b=u''):
+    def avoid_collision(self, min_dist, robot_links=None, body_b=u'', link_bs=None):
+        if robot_links is None:
+            robot_links = []
+        if link_bs is None:
+            link_bs = []
         collision_entry = CollisionEntry()
         collision_entry.type = CollisionEntry.AVOID_COLLISION
         collision_entry.min_dist = min_dist
-        collision_entry.robot_link = str(robot_link)
+        collision_entry.robot_links = [str(x) for x in robot_links]
         collision_entry.body_b = str(body_b)
-        collision_entry.link_b = str(link_b)
+        collision_entry.link_bs = [str(x) for x in link_bs]
         self.set_collision_entries([collision_entry])
 
     def allow_all_collisions(self):
@@ -242,3 +247,10 @@ class GiskardWrapper(object):
         if isinstance(joint_states, dict):
             joint_states = dict_to_joint_states(joint_states)
         self.object_js_topics[object_name].publish(joint_states)
+
+    def disable_self_collision(self):
+        collision_entry = CollisionEntry()
+        collision_entry.type = CollisionEntry.ALLOW_COLLISION
+        collision_entry.min_dist = 1
+        collision_entry.body_b = self.robot_name
+        self.set_collision_entries([collision_entry])

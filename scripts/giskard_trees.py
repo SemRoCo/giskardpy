@@ -7,23 +7,26 @@ from control_msgs.msg import JointTrajectoryControllerState
 from giskard_msgs.msg import MoveAction
 from py_trees import Sequence, Selector, BehaviourTree, Blackboard
 import py_trees
+from py_trees.behaviours import SuccessEveryN
 from py_trees.display import render_dot_tree
+from py_trees.meta import running_is_failure, success_is_running
 
 import giskardpy
 from giskardpy import DEBUG
 from giskardpy.god_map import GodMap
-from giskardpy.plugin import PluginBehavior
+from giskardpy.plugin import PluginBehavior, SuccessPlugin
 from giskardpy.plugin_action_server import GoalReceived, SendResult, GoalCanceled
 from giskardpy.plugin_fk import NewFkPlugin
 from giskardpy.plugin_goal_reached import GoalReachedPlugin
 from giskardpy.plugin_instantaneous_controller import GoalToConstraints, ControllerPlugin
 from giskardpy.plugin_interrupts import CollisionCancel, WiggleCancel
-from giskardpy.plugin_joint_state import  JointStatePlugin2
+from giskardpy.plugin_joint_state import JointStatePlugin2
 from giskardpy.plugin_kinematic_sim import NewKinSimPlugin
 from giskardpy.plugin_log_trajectory import NewLogTrajPlugin
 from giskardpy.plugin_pybullet import PyBulletMonitor, PyBulletUpdatePlugin, CollisionChecker
 from giskardpy.plugin_send_trajectory import SendTrajectory
 
+# TODO sync with param server behavior?
 
 def ini(param_name, robot_description_identifier, controlled_joints_identifier):
     urdf = rospy.get_param(param_name)
@@ -32,6 +35,7 @@ def ini(param_name, robot_description_identifier, controlled_joints_identifier):
     msg = rospy.wait_for_message(u'/whole_body_controller/state',
                                  JointTrajectoryControllerState)  # type: JointTrajectoryControllerState
     Blackboard().god_map.safe_set_data([controlled_joints_identifier], msg.joint_names)
+
 
 def grow_tree():
     blackboard = Blackboard
@@ -52,7 +56,7 @@ def grow_tree():
     nWSR = rospy.get_param(u'~nWSR')
     root_link = rospy.get_param(u'~root_link')
     marker = rospy.get_param(u'~enable_collision_marker')
-    enable_self_collision = rospy.get_param(u'~enable_self_collision')
+    # enable_self_collision = rospy.get_param(u'~enable_self_collision')
     if nWSR == u'None':
         nWSR = None
     path_to_data_folder = rospy.get_param(u'~path_to_data_folder')
@@ -76,61 +80,70 @@ def grow_tree():
     robot_description_identifier = u'robot_description'
     pybullet_identifier = u'pybullet_world'
     soft_constraint_identifier = u'soft_constraints'
-    action_server_name =  u'giskardpy/command'
+    action_server_name = u'giskardpy/command'
 
     ini(u'robot_description', robot_description_identifier, controlled_joints_identifier)
 
-    #----------------------------------------------
-    wait_for_goal = Selector('wait for goal')
-    wait_for_goal.add_child(GoalReceived(u'has_goal', action_server_name, MoveAction))
-    monitor = PluginBehavior('monitor')
-    monitor.add_plugin('js', JointStatePlugin2(js_identifier))
-    monitor.add_plugin('fk', NewFkPlugin(fk_identifier, js_identifier, robot_description_identifier))
-    monitor.add_plugin('pw', PyBulletMonitor(js_identifier, pybullet_identifier, map_frame, root_link,
-                                             path_to_data_folder, gui))
-    monitor.add_plugin('pybullet updater', PyBulletUpdatePlugin(pybullet_identifier, robot_description_identifier,
-                                                                path_to_data_folder, gui))
+    # ----------------------------------------------
+    sync = PluginBehavior(u'sync')
+    sync.add_plugin(u'js', JointStatePlugin2(js_identifier))
+    sync.add_plugin(u'fk', NewFkPlugin(fk_identifier, js_identifier, robot_description_identifier))
+    sync.add_plugin(u'pw', PyBulletMonitor(js_identifier, pybullet_identifier, controlled_joints_identifier,
+                                              map_frame, root_link, path_to_data_folder, gui))
+    sync.add_plugin(u'in sync', SuccessPlugin())
+    # ----------------------------------------------
+    wait_for_goal = Selector(u'wait for goal')
+    wait_for_goal.add_child(GoalReceived(u'has goal', action_server_name, MoveAction))
+    monitor = PluginBehavior(u'monitor')
+    monitor.add_plugin(u'js', JointStatePlugin2(js_identifier))
+    monitor.add_plugin(u'fk', NewFkPlugin(fk_identifier, js_identifier, robot_description_identifier))
+    monitor.add_plugin(u'pw', PyBulletMonitor(js_identifier, pybullet_identifier, controlled_joints_identifier,
+                                              map_frame, root_link, path_to_data_folder, gui))
+    monitor.add_plugin(u'pybullet updater', PyBulletUpdatePlugin(pybullet_identifier, controlled_joints_identifier,
+                                                                 robot_description_identifier, path_to_data_folder,
+                                                                 gui))
     wait_for_goal.add_child(monitor)
-    #----------------------------------------------
-    planning = Selector('planning')
+    # ----------------------------------------------
+    planning = Selector(u'planning')
     planning.add_child(GoalCanceled(u'goal canceled', action_server_name))
-    planning.add_child(CollisionCancel('in collision', collision_time_threshold, time_identifier,
+    planning.add_child(CollisionCancel(u'in collision', collision_time_threshold, time_identifier,
                                        closest_point_identifier))
 
-    actual_planning = PluginBehavior('actual planning', sleep=0)
-    actual_planning.add_plugin('kin sim', NewKinSimPlugin(js_identifier, next_cmd_identifier,
-                                                          time_identifier, sample_period))
-    actual_planning.add_plugin('fk', NewFkPlugin(fk_identifier, js_identifier, robot_description_identifier))
-    actual_planning.add_plugin('pw', PyBulletMonitor(js_identifier, pybullet_identifier, map_frame, root_link,
-                                             path_to_data_folder, gui))
-    actual_planning.add_plugin('coll', CollisionChecker(collision_goal_identifier, controllable_links_identifier,
-                                                        pybullet_identifier, closest_point_identifier,
-                                                        default_collision_avoidance_distance,
-                                                        enable_self_collision, map_frame, root_link,
-                                                        path_to_data_folder, gui))
-    actual_planning.add_plugin('controller', ControllerPlugin(robot_description_identifier, js_identifier,
-                                                              path_to_data_folder, next_cmd_identifier,
-                                                              soft_constraint_identifier, controlled_joints_identifier,
-                                                              nWSR))
-    actual_planning.add_plugin('log', NewLogTrajPlugin(trajectory_identifier, js_identifier, time_identifier))
-    actual_planning.add_plugin('goal reached', GoalReachedPlugin(js_identifier, time_identifier,
-                                                                 joint_convergence_threshold))
-    actual_planning.add_plugin('wiggle', WiggleCancel(wiggle_precision_threshold, js_identifier, time_identifier))
+    actual_planning = PluginBehavior(u'planning', sleep=0)
+    actual_planning.add_plugin(u'kin sim', NewKinSimPlugin(js_identifier, next_cmd_identifier,
+                                                           time_identifier, sample_period))
+    actual_planning.add_plugin(u'fk', NewFkPlugin(fk_identifier, js_identifier, robot_description_identifier))
+    actual_planning.add_plugin(u'pw', PyBulletMonitor(js_identifier, pybullet_identifier, controlled_joints_identifier,
+                                                      map_frame, root_link, path_to_data_folder, gui))
+    actual_planning.add_plugin(u'coll', CollisionChecker(collision_goal_identifier, controllable_links_identifier,
+                                                         pybullet_identifier, controlled_joints_identifier,
+                                                         closest_point_identifier, default_collision_avoidance_distance,
+                                                         map_frame, root_link,
+                                                         path_to_data_folder, gui))
+    actual_planning.add_plugin(u'controller', ControllerPlugin(robot_description_identifier, js_identifier,
+                                                               path_to_data_folder, next_cmd_identifier,
+                                                               soft_constraint_identifier, controlled_joints_identifier,
+                                                               nWSR))
+    actual_planning.add_plugin(u'log', NewLogTrajPlugin(trajectory_identifier, js_identifier, time_identifier))
+    actual_planning.add_plugin(u'goal reached', GoalReachedPlugin(js_identifier, time_identifier,
+                                                                  joint_convergence_threshold))
+    actual_planning.add_plugin(u'wiggle', WiggleCancel(wiggle_precision_threshold, js_identifier, time_identifier))
     planning.add_child(actual_planning)
     # ----------------------------------------------
 
-    #----------------------------------------------
-    publish_result = Selector('pub result')
-    publish_result.add_child(GoalCanceled(u'goal_canceled2', action_server_name))
+    # ----------------------------------------------
+    publish_result = Selector(u'move robot')
+    publish_result.add_child(GoalCanceled(u'goal canceled', action_server_name))
     publish_result.add_child(SendTrajectory(u'send traj', trajectory_identifier, fill_velocity_values))
-    #----------------------------------------------
-    root = Sequence('root')
+    # ----------------------------------------------
+    root = Sequence(u'root')
+    root.add_child(sync)
     root.add_child(wait_for_goal)
     root.add_child(GoalToConstraints(u'update constraints', action_server_name, root_link,
-                                           robot_description_identifier, js_identifier, cartesian_goal_identifier,
-                                           controlled_joints_identifier, controllable_links_identifier,
-                                           fk_identifier, pyfunction_identifier, closest_point_identifier,
-                                           soft_constraint_identifier, collision_goal_identifier))
+                                     robot_description_identifier, js_identifier, cartesian_goal_identifier,
+                                     controlled_joints_identifier, controllable_links_identifier,
+                                     fk_identifier, pyfunction_identifier, closest_point_identifier,
+                                     soft_constraint_identifier, collision_goal_identifier))
     root.add_child(planning)
     root.add_child(publish_result)
     root.add_child(SendResult(u'send result', action_server_name))
@@ -138,21 +151,22 @@ def grow_tree():
     tree = BehaviourTree(root)
 
     if debug:
+        # TODO create data folder if it does not exist
         def post_tick(snapshot_visitor, behaviour_tree):
-            print("\n" + py_trees.display.ascii_tree(behaviour_tree.root,
+            print(u'\n' + py_trees.display.ascii_tree(behaviour_tree.root,
                                                      snapshot_information=snapshot_visitor))
-
 
         snapshot_visitor = py_trees.visitors.SnapshotVisitor()
         tree.add_post_tick_handler(functools.partial(post_tick, snapshot_visitor))
         tree.visitors.append(snapshot_visitor)
-        render_dot_tree(root, name=path_to_data_folder+'/'+'asdf')
+        render_dot_tree(root, name=path_to_data_folder + u'/tree')
 
     blackboard.time = time()
 
     # TODO fail if monitor is not called once
     tree.setup(30)
     return tree
+
 
 if __name__ == u'__main__':
     rospy.init_node(u'giskard')
@@ -164,4 +178,4 @@ if __name__ == u'__main__':
             rospy.sleep(tree_tick_rate)
         except KeyboardInterrupt:
             break
-    print("\n")
+    print(u'\n')

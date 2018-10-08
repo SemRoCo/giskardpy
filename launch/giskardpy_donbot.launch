@@ -1,9 +1,9 @@
 <launch>
 
-  <arg name="gui" default="false" />
+  <arg name="gui" default="false"/>
 
   <node pkg="giskardpy" type="giskard_trees.py" name="giskard" output="screen">
-    <param name="path_to_data_folder" value="$(find giskardpy)/data/pr2" />
+    <param name="path_to_data_folder" value="$(find giskardpy)/data/donbot" />
     <param name="enable_gui" value="$(arg gui)"/>
     <rosparam param="map_frame">map</rosparam>
     <rosparam param="joint_convergence_threshold">0.002</rosparam>
@@ -16,13 +16,13 @@
     <rosparam param="nWSR">None</rosparam> <!-- None results in a nWSR estimation thats fine most of the time -->
     <rosparam param="root_link">odom</rosparam>
     <rosparam param="enable_collision_marker">True</rosparam>
-    <rosparam param="enable_self_collision">True</rosparam>
     <rosparam param="collision_time_threshold">15</rosparam>
-    <rosparam param="debug">False</rosparam>
-    <rosparam param="tree_tick_rate">.2</rosparam>
+    <rosparam param="debug">True</rosparam>
+    <rosparam param="tree_tick_rate">1</rosparam>
   </node>
 
   <node pkg="giskardpy" type="interactive_marker.py" name="giskard_interactive_marker" output="screen">
+    <rosparam param="enable_self_collision">False</rosparam>
     <rosparam param="interactive_marker_chains">
      - [base_footprint, gripper_tool_frame]
      - [base_footprint, camera_link]

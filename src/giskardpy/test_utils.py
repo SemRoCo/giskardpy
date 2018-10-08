@@ -17,6 +17,7 @@ from py_trees import Blackboard
 from sensor_msgs.msg import JointState
 
 from giskard_trees import grow_tree
+from giskardpy.plugin_pybullet import CollisionChecker
 from giskardpy.pybullet_world import PyBulletWorld
 from giskardpy.python_interface import GiskardWrapper
 from giskardpy.symengine_robot import Robot
@@ -135,7 +136,7 @@ class GiskardTestWrapper(object):
         rospy.set_param(u'~nWSR', u'None')
         rospy.set_param(u'~root_link', u'base_footprint')
         rospy.set_param(u'~enable_collision_marker', True)
-        rospy.set_param(u'~enable_self_collision', False)
+        # rospy.set_param(u'~enable_self_collision', True)
         rospy.set_param(u'~path_to_data_folder', u'../data/pr2/')
         rospy.set_param(u'~collision_time_threshold', 10)
         rospy.set_param(u'~max_traj_length', 30)
@@ -146,11 +147,12 @@ class GiskardTestWrapper(object):
         rospy.sleep(1)
         self.wrapper = GiskardWrapper(ns=u'tests')
         self.results = Queue(100)
-        self.robot = self.tree.root.children[0].children[1]._plugins[u'fk'].robot
+        self.robot = self.tree.root.children[0]._plugins[u'fk'].robot
         self.controlled_joints = Blackboard().god_map.safe_get_data([u'controlled_joints'])
         self.joint_limits = {joint_name: self.robot.get_joint_lower_upper_limit(joint_name) for joint_name in
                              self.controlled_joints if self.robot.is_joint_controllable(joint_name)}
         self.world = Blackboard().god_map.safe_get_data([u'pybullet_world'])  # type: PyBulletWorld
+        self.world_plugin = self.tree.root.children[3].children[2]._plugins[u'coll'] # type: CollisionChecker
         self.default_root = u'base_link'
         self.r_tip = u'r_gripper_tool_frame'
         self.l_tip = u'l_gripper_tool_frame'
@@ -180,6 +182,13 @@ class GiskardTestWrapper(object):
     def get_r_gripper_links(self):
         return [u'r_gripper_l_finger_tip_link', u'r_gripper_r_finger_tip_link', u'r_gripper_l_finger_link',
                 u'r_gripper_r_finger_link', u'r_gripper_r_finger_link', u'r_gripper_palm_link']
+
+    def get_r_upper_arm(self):
+        return [u'r_shoulder_lift_link', u'r_upper_arm_roll_link', u'r_upper_arm_link']
+
+    def get_r_forearm_links(self):
+        return [u'r_wrist_flex_link', u'r_wrist_roll_link', u'r_forearm_roll_link', u'r_forearm_link',
+                u'r_forearm_link']
 
     def get_allow_l_gripper(self, body_b=u'box'):
         links = self.get_l_gripper_links()
@@ -329,6 +338,12 @@ class GiskardTestWrapper(object):
     def allow_all_collisions(self):
         self.wrapper.allow_all_collisions()
 
+    def enable_self_collision(self):
+        pass
+
+    def disable_self_collision(self):
+        self.wrapper.disable_self_collision()
+
     def add_collision_entries(self, collisions_entries):
         self.wrapper.set_collision_entries(collisions_entries)
 
@@ -336,9 +351,15 @@ class GiskardTestWrapper(object):
                    expected_response=UpdateWorldResponse.SUCCESS):
         assert self.wrapper.attach_box(name, size, frame_id, position, orientation).error_codes == expected_response
 
+    def get_cpi(self, distance_threshold):
+        collision_goals = [CollisionEntry(type=CollisionEntry.AVOID_ALL_COLLISIONS, min_dist=distance_threshold)]
+
+        collision_matrix = self.world_plugin.collision_goals_to_collision_matrix(collision_goals)
+        collisions = self.world.check_collisions(collision_matrix)
+        return self.world_plugin.collisions_to_closest_point(collisions, collision_matrix)
+
     def check_cpi_geq(self, links, distance_threshold):
-        cpi_identifier = u'cpi'
-        cpi = Blackboard().god_map.safe_get_data([cpi_identifier])
+        cpi = self.get_cpi(distance_threshold)
         if cpi == 0 or cpi == None:
             return False
         for link in links:
@@ -349,8 +370,7 @@ class GiskardTestWrapper(object):
                                                                                                   distance_threshold)
 
     def check_cpi_leq(self, links, distance_threshold):
-        cpi_identifier = u'cpi'
-        cpi = Blackboard().god_map.safe_get_data([cpi_identifier])
+        cpi = self.get_cpi(distance_threshold)
         if cpi == 0 or cpi == None:
             return False
         for link in links:

@@ -23,32 +23,38 @@ from giskardpy.utils import keydefaultdict, to_joint_state_dict, to_point_stampe
 
 
 class PybulletPlugin(NewPluginBase):
-    def __init__(self, pybullet_identifier, path_to_data_folder='', gui=False):
+    def __init__(self, pybullet_identifier, controlled_joints_identifier, path_to_data_folder='', gui=False):
         self.pybullet_identifier = pybullet_identifier
+        self.controlled_joints_identifier = controlled_joints_identifier
         self.path_to_data_folder = path_to_data_folder
         self.gui = gui
-        self.robot_name = u'robby'
+        # TODO find a non hacky way to get robot name from urdf
+        self.robot_name = rospy.get_param(u'robot_description').split('\n',1)[1].split('" ',1)[0].split('"')[1]
         super(PybulletPlugin, self).__init__()
 
     def setup(self):
         self.world = self.get_god_map().safe_get_data([self.pybullet_identifier])
+        self.controlled_joints = self.get_god_map().safe_get_data([self.controlled_joints_identifier])
         if self.world is None:
             self.world = PyBulletWorld(enable_gui=self.gui, path_to_data_folder=self.path_to_data_folder)
             self.world.activate_viewer()
             # TODO get robot description from god map
             urdf = rospy.get_param(u'robot_description')
-            self.world.spawn_robot_from_urdf(self.robot_name, urdf)
+            self.world.spawn_robot_from_urdf(self.robot_name, urdf, self.controlled_joints)
             self.god_map.safe_set_data([self.pybullet_identifier], self.world)
 
 
 class PyBulletMonitor(PybulletPlugin):
-
-    def __init__(self, js_identifier, pybullet_identifier, map_frame, root_link, path_to_data_folder='', gui=False):
+    """
+    Syncs pybullet with god map.
+    """
+    def __init__(self, js_identifier, pybullet_identifier, controlled_joints_identifier, map_frame, root_link,
+                 path_to_data_folder='', gui=False):
         self.js_identifier = js_identifier
         self.robot_name = u'robby'
         self.map_frame = map_frame
         self.root_link = root_link
-        super(PyBulletMonitor, self).__init__(pybullet_identifier, path_to_data_folder, gui)
+        super(PyBulletMonitor, self).__init__(pybullet_identifier, controlled_joints_identifier, path_to_data_folder, gui)
         self.world = self.god_map.safe_get_data([self.pybullet_identifier])
 
     def update(self):
@@ -63,14 +69,14 @@ class PyBulletMonitor(PybulletPlugin):
                                                           p.pose.orientation.y,
                                                           p.pose.orientation.z,
                                                           p.pose.orientation.w])
-        return Status.RUNNING
+        return None
 
 
 class PyBulletUpdatePlugin(PybulletPlugin):
     # TODO reject changed if plugin not active or something
-    def __init__(self, pybullet_identifier, robot_description_identifier,
+    def __init__(self, pybullet_identifier, controlled_joints_identifier, robot_description_identifier,
                  path_to_data_folder='', gui=False):
-        super(PyBulletUpdatePlugin, self).__init__(pybullet_identifier, path_to_data_folder, gui)
+        super(PyBulletUpdatePlugin, self).__init__(pybullet_identifier, controlled_joints_identifier, path_to_data_folder, gui)
         self.robot_description_identifier = robot_description_identifier
         self.global_reference_frame_name = 'map'
         self.lock = Lock()
@@ -206,16 +212,15 @@ class PyBulletUpdatePlugin(PybulletPlugin):
 
 
 class CollisionChecker(PybulletPlugin):
-    def __init__(self, collision_goal_identifier, controllable_links_identifier, pybullet_identifier,
+    def __init__(self, collision_goal_identifier, controllable_links_identifier, pybullet_identifier, controlled_joints_identifier,
                  closest_point_identifier, default_collision_avoidance_distance,
-                 enable_self_collision, map_frame, root_link,
+                 map_frame, root_link,
                  path_to_data_folder='', gui=False):
-        super(CollisionChecker, self).__init__(pybullet_identifier, path_to_data_folder, gui)
+        super(CollisionChecker, self).__init__(pybullet_identifier, controlled_joints_identifier, path_to_data_folder, gui)
         self.collision_goal_identifier = collision_goal_identifier
         self.controllable_links_identifier = controllable_links_identifier
         self.closest_point_identifier = closest_point_identifier
         self.default_collision_avoidance_distance = default_collision_avoidance_distance
-        self.enable_self_collision = enable_self_collision
         self.map_frame = map_frame
         self.robot_root = root_link
         self.robot_name = 'pr2'
@@ -229,7 +234,7 @@ class CollisionChecker(PybulletPlugin):
     def setup(self):
         super(CollisionChecker, self).setup()
         self.pub_collision_marker = rospy.Publisher(u'~visualization_marker_array', MarkerArray, queue_size=1)
-        self.srv_viz_gui = rospy.Service('~enable_marker', SetBool, self.enable_marker_cb)
+        self.srv_viz_gui = rospy.Service(u'~enable_marker', SetBool, self.enable_marker_cb)
         rospy.sleep(.5)
 
     def initialize(self):
@@ -244,8 +249,7 @@ class CollisionChecker(PybulletPlugin):
         """
         with self.lock:
             # TODO not necessary to parse collision goals every time
-            collisions = self.world.check_collisions(self.collision_matrix,
-                                                     enable_self_collision=self.enable_self_collision)
+            collisions = self.world.check_collisions(self.collision_matrix)
 
             closest_point = self.collisions_to_closest_point(collisions, self.collision_matrix)
 
@@ -311,7 +315,11 @@ class CollisionChecker(PybulletPlugin):
         """
         if collision_goals is None:
             collision_goals = []
-        min_allowed_distance = dict()
+        collision_matrix = self.world.get_robot().get_self_collision_matrix()
+        # if self.enable_self_collision:
+        min_allowed_distance = collision_matrix
+        # else:
+        #     min_allowed_distance = {}
         if len([x for x in collision_goals if x.type in [CollisionEntry.AVOID_ALL_COLLISIONS,
                                                          CollisionEntry.ALLOW_ALL_COLLISIONS]]) == 0:
             # add avoid all collision if there is no other avoid or allow all
@@ -321,51 +329,81 @@ class CollisionChecker(PybulletPlugin):
         controllable_links = self.god_map.safe_get_data([self.controllable_links_identifier])
 
         for collision_entry in collision_goals:  # type: CollisionEntry
+            if collision_entry.type in [CollisionEntry.ALLOW_ALL_COLLISIONS,
+                                        CollisionEntry.AVOID_ALL_COLLISIONS]:
+                if collision_entry.robot_links != []:
+                    rospy.logwarn(u'type==AVOID_ALL_COLLISION but robot_links is set, it will be ignored.')
+                    collision_entry.robot_links = []
+                if collision_entry.body_b != u'':
+                    rospy.logwarn(u'type==AVOID_ALL_COLLISION but body_b is set, it will be ignored.')
+                    collision_entry.body_b = u''
+                if collision_entry.link_bs != []:
+                    rospy.logwarn(u'type==AVOID_ALL_COLLISION but link_bs is set, it will be ignored.')
+                    collision_entry.link_bs = []
+
+                if collision_entry.type == CollisionEntry.ALLOW_ALL_COLLISIONS:
+                    min_allowed_distance = {}
+                    continue
+                else:
+                    min_allowed_distance = collision_matrix
+
             # check if msg got properly filled
-            if collision_entry.body_b == u'' and collision_entry.link_b != u'':
+            if collision_entry.body_b == u'' and collision_entry.link_bs != []:
                 raise PhysicsWorldException(u'body_b is empty but link_b is not')
 
             # if robot link is empty, use all robot links
-            if collision_entry.robot_link == u'':
+            if collision_entry.robot_links == []:
                 robot_links = set(self.world.get_robot().get_link_names())
-            elif collision_entry.robot_link in self.world.get_robot().get_link_names():
-                # TODO this check is linear but could be constant
-                robot_links = {collision_entry.robot_link}
             else:
-                raise UnknownBodyException(u'robot_link \'{}\' unknown'.format(collision_entry.robot_link))
+                for robot_link in collision_entry.robot_links:
+                    if robot_link not in self.world.get_robot().get_link_names():
+                        raise UnknownBodyException(u'robot_link \'{}\' unknown'.format(robot_link))
+                robot_links = set(collision_entry.robot_links)
 
             # remove all non controllable links
-            # TODO make pybullet robot know which links are controllable
-            # TODO on first look controllable links are none
-            if controllable_links is not None:
-                robot_links.intersection_update(controllable_links)
+            # TODO make pybullet robot know which links are controllable?
+            robot_links.intersection_update(controllable_links)
 
             # if body_b is empty, use all objects
             if collision_entry.body_b == u'':
                 bodies_b = self.world.get_object_names()
-            elif self.world.has_object(collision_entry.body_b):
+                if collision_entry.type == CollisionEntry.AVOID_COLLISION:
+                    bodies_b.append(self.world.get_robot().name)
+            elif self.world.has_object(collision_entry.body_b) or \
+                    collision_entry.body_b == self.world.get_robot().name:
                 bodies_b = [collision_entry.body_b]
             else:
                 raise UnknownBodyException(u'body_b \'{}\' unknown'.format(collision_entry.body_b))
 
             for body_b in bodies_b:
                 # if link_b is empty, use all links from body_b
-                if collision_entry.link_b == u'':  # empty link b means every link from body b
-                    links_b = self.world.get_object(body_b).get_link_names()
-                elif collision_entry.link_b in self.world.get_object(body_b).get_link_names():
-                    links_b = [collision_entry.link_b]
-                else:
-                    raise UnknownBodyException(u'link_b \'{}\' unknown'.format(collision_entry.link_b))
+                link_bs = collision_entry.link_bs
+                if body_b != self.world.get_robot().name:
+                    if link_bs == []:
+                        link_bs = self.world.get_object(body_b).get_link_names()
+                    elif link_bs != []:
+                        for link_b in link_bs:
+                            # TODO use sets and intersection to safe time
+                            if link_b not in self.world.get_object(body_b).get_link_names():
+                                raise UnknownBodyException(u'link_b \'{}\' unknown'.format(link_b))
 
-                for robot_link, link_b in product(robot_links, links_b):
-                    key = (robot_link, body_b, link_b)
-                    if collision_entry.type == CollisionEntry.ALLOW_COLLISION or \
-                            collision_entry.type == CollisionEntry.ALLOW_ALL_COLLISIONS:
-                        if key in min_allowed_distance:
-                            del min_allowed_distance[key]
-                    elif collision_entry.type == CollisionEntry.AVOID_COLLISION or \
-                            collision_entry.type == CollisionEntry.AVOID_ALL_COLLISIONS:
-                        min_allowed_distance[key] = collision_entry.min_dist
+                for robot_link in robot_links:
+                    if link_bs == [] and body_b == self.world.get_robot().name:
+                        link_bs = self.world.get_robot().get_possible_collisions(robot_link)
+                    for link_b in link_bs:
+                        keys = [(robot_link, body_b, link_b)]
+                        if body_b == self.world.get_robot().name:
+                            if link_b not in self.world.get_robot().get_possible_collisions(robot_link):
+                                continue
+                            keys.append((link_b, body_b, robot_link))
+
+                        for key in keys:
+                            if collision_entry.type == CollisionEntry.ALLOW_COLLISION:
+                                if key in min_allowed_distance:
+                                    del min_allowed_distance[key]
+
+                            elif collision_entry.type == CollisionEntry.AVOID_COLLISION:
+                                min_allowed_distance[key] = collision_entry.min_dist
 
         return min_allowed_distance
 

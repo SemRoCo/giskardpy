@@ -53,4 +53,4 @@ class NewFkPlugin(NewRobotPlugin):
 
         fks = keydefaultdict(on_demand_fk_evaluated)
         self.god_map.safe_set_data([self.fk_identifier], fks)
-        return Status.RUNNING
+        return None

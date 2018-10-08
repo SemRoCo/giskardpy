@@ -209,16 +209,6 @@ class TestCartGoals(object):
         """
         # FIXME get rid of wiggling
         goal_js = {
-            u'torso_lift_joint': 0.137863459754,
-
-            u'r_upper_arm_roll_joint': -3.24008158875,
-            u'r_shoulder_pan_joint': 0.206949462075,
-            u'r_shoulder_lift_joint': -0.249453873652,
-            u'r_forearm_roll_joint': 1.83979114862,
-            u'r_elbow_flex_joint': -1.36820120012,
-            u'r_wrist_flex_joint': -1.52492789587,
-            u'r_wrist_roll_joint': -13.6248743778,
-
             u'l_upper_arm_roll_joint': 1.63487737202,
             u'l_shoulder_pan_joint': 1.36222920328,
             u'l_shoulder_lift_joint': 0.229120778526,
@@ -243,7 +233,7 @@ class TestCartGoals(object):
         p.header.stamp = rospy.get_rostime()
         p.pose.position.x = 0.2
         p.pose.orientation.w = 1
-        # self.giskard.allow_all_collisions()
+        zero_pose.allow_all_collisions()
         zero_pose.set_and_check_cart_goal(zero_pose.default_root, zero_pose.l_tip, p)
 
     def test_hot_init_failed(self, zero_pose):
@@ -414,7 +404,8 @@ class TestCollisionAvoidanceGoals(object):
         """
         :type zero_pose: GiskardTestWrapper
         """
-        # TODO if we don't allow there to be attached objects and free objects of the same name, we also have to check robot links?
+        # TODO if we don't allow there to be attached objects and free objects of the same name,
+        # we also have to check robot links?
         pocky = u'http://muh#pocky'
         zero_pose.add_box(pocky, position=[1.2, 0, 1.6])
         zero_pose.attach_box(pocky, [0.1, 0.02, 0.02], zero_pose.r_tip, [0.05, 0, 0],
@@ -496,7 +487,6 @@ class TestCollisionAvoidanceGoals(object):
         """
         :type box_setup: GiskardTestWrapper
         """
-        # TODO should we throw unknown object?
         p = PoseStamped()
         p.header.frame_id = box_setup.r_tip
         p.pose.position = Point(0.1, 0, 0)
@@ -534,6 +524,100 @@ class TestCollisionAvoidanceGoals(object):
     # result = self.giskard.get_result()
     # self.assertEqual(result.error_code, MoveResult.INTERRUPTED)
 
+    def test_allow_self_collision(self, zero_pose):
+        """
+        :type zero_pose: GiskardTestWrapper
+        """
+        zero_pose.check_cpi_geq(zero_pose.get_r_gripper_links(), 0.1)
+        zero_pose.check_cpi_geq(zero_pose.get_l_gripper_links(), 0.1)
+
+    def test_allow_self_collision2(self, zero_pose):
+        """
+        :type zero_pose: GiskardTestWrapper
+        """
+        goal_js = {
+            u'l_elbow_flex_joint': -1.43286344265,
+            u'l_forearm_roll_joint': 1.26465060073,
+            u'l_shoulder_lift_joint': 0.47990329056,
+            u'l_shoulder_pan_joint': 0.281272240139,
+            u'l_upper_arm_roll_joint': 0.528415402668,
+            u'l_wrist_flex_joint': -1.18811419869,
+            u'l_wrist_roll_joint': 2.26884630124,
+        }
+        zero_pose.allow_all_collisions()
+        zero_pose.send_and_check_joint_goal(goal_js)
+
+        p = PoseStamped()
+        p.header.frame_id = zero_pose.l_tip
+        p.header.stamp = rospy.get_rostime()
+        p.pose.position.x = 0.2
+        p.pose.orientation.w = 1
+        zero_pose.disable_self_collision()
+        zero_pose.set_and_check_cart_goal(zero_pose.default_root, zero_pose.l_tip, p)
+        zero_pose.check_cpi_leq(zero_pose.get_l_gripper_links(), 0.01)
+        zero_pose.check_cpi_leq([u'r_forearm_link'], 0.01)
+        zero_pose.check_cpi_geq(zero_pose.get_r_gripper_links(), 0.05)
+
+    def test_allow_self_collision3(self, zero_pose):
+        """
+        :type zero_pose: GiskardTestWrapper
+        """
+        goal_js = {
+            u'l_elbow_flex_joint': -1.43286344265,
+            u'l_forearm_roll_joint': 1.26465060073,
+            u'l_shoulder_lift_joint': 0.47990329056,
+            u'l_shoulder_pan_joint': 0.281272240139,
+            u'l_upper_arm_roll_joint': 0.528415402668,
+            u'l_wrist_flex_joint': -1.18811419869,
+            u'l_wrist_roll_joint': 2.26884630124,
+        }
+        zero_pose.allow_all_collisions()
+        zero_pose.send_and_check_joint_goal(goal_js)
+
+        p = PoseStamped()
+        p.header.frame_id = zero_pose.l_tip
+        p.header.stamp = rospy.get_rostime()
+        p.pose.position.x = 0.18
+        p.pose.position.z = 0.02
+        p.pose.orientation.w = 1
+
+        ces = []
+        ces.append(CollisionEntry(type=CollisionEntry.ALLOW_COLLISION,
+                                  robot_links=zero_pose.get_l_gripper_links(),
+                                  body_b=u'pr2',
+                                  link_bs=zero_pose.get_r_forearm_links()))
+        zero_pose.add_collision_entries(ces)
+
+        zero_pose.set_and_check_cart_goal(zero_pose.default_root, zero_pose.l_tip, p)
+        zero_pose.check_cpi_leq(zero_pose.get_l_gripper_links(), 0.01)
+        zero_pose.check_cpi_leq([u'r_forearm_link'], 0.01)
+        zero_pose.check_cpi_geq(zero_pose.get_r_gripper_links(), 0.05)
+
+    def test_avoid_self_collision(self, zero_pose):
+        """
+        :type zero_pose: GiskardTestWrapper
+        """
+        goal_js = {
+            u'l_elbow_flex_joint': -1.43286344265,
+            u'l_forearm_roll_joint': 1.26465060073,
+            u'l_shoulder_lift_joint': 0.47990329056,
+            u'l_shoulder_pan_joint': 0.281272240139,
+            u'l_upper_arm_roll_joint': 0.528415402668,
+            u'l_wrist_flex_joint': -1.18811419869,
+            u'l_wrist_roll_joint': 2.26884630124,
+        }
+        zero_pose.allow_all_collisions()
+        zero_pose.send_and_check_joint_goal(goal_js)
+
+        p = PoseStamped()
+        p.header.frame_id = zero_pose.l_tip
+        p.header.stamp = rospy.get_rostime()
+        p.pose.position.x = 0.2
+        p.pose.orientation.w = 1
+        zero_pose.set_cart_goal(zero_pose.default_root, zero_pose.l_tip, p)
+        zero_pose.send_goal()
+        zero_pose.check_cpi_geq(zero_pose.get_r_gripper_links(), 0.048)
+
     def test_avoid_collision(self, box_setup):
         """
         :type box_setup: GiskardTestWrapper
@@ -541,6 +625,7 @@ class TestCollisionAvoidanceGoals(object):
         ce = CollisionEntry()
         ce.type = CollisionEntry.AVOID_COLLISION
         ce.body_b = u'box'
+        ce.min_dist = 0.05
         box_setup.add_collision_entries([ce])
         box_setup.send_and_check_goal(MoveResult.SUCCESS)
         box_setup.check_cpi_geq(box_setup.get_l_gripper_links(), 0.048)
@@ -565,8 +650,7 @@ class TestCollisionAvoidanceGoals(object):
         box_setup.set_and_check_cart_goal(box_setup.default_root, box_setup.r_tip, p)
 
         box_setup.check_cpi_geq(box_setup.get_l_gripper_links(), 0.0)
-        # TODO collisions are not checked for allowed things
-        # box_setup.check_cpi_leq(box_setup.get_r_gripper_links(), 0.0)
+        box_setup.check_cpi_leq(box_setup.get_r_gripper_links(), 0.0)
 
     def test_avoid_collision2(self, box_setup):
         """
@@ -775,6 +859,8 @@ class TestCollisionAvoidanceGoals(object):
         box_setup.set_cart_goal(box_setup.default_root, box_setup.l_tip, p)
         box_setup.send_goal()
         box_setup.check_cpi_geq(box_setup.get_l_gripper_links(), 0.049)
+
+
     #
     # def test_end_state_collision(self, box_setup):
     #     """

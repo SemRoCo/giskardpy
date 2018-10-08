@@ -20,7 +20,13 @@ class NewPluginBase(object):
         pass
 
     def update(self):
-        return Status.RUNNING
+        """
+        :return: Status.Success, if the job of the behavior plugin is finished
+                 Status.Failure, if something went wrong the the behavior is stopped
+                 Status.Running, if the behavior should only be killed in emergencies
+                 None, does not change the current status of the behavior
+        """
+        return None
 
     def get_god_map(self):
         """
@@ -108,7 +114,8 @@ class PluginBehavior(GiskardBehavior):
                         if not self.is_running():
                             return
                         status = plugin.update()
-                        self.set_status(status)
+                        if status is not None:
+                            self.set_status(status)
                         assert self.my_status is not None, u'{} did not return a status'.format(plugin_name)
                         if not self.is_running():
                             return
@@ -117,3 +124,7 @@ class PluginBehavior(GiskardBehavior):
             traceback.print_exc()
             # TODO make 'exception' string a parameter somewhere
             Blackboard().set('exception', e)
+
+class SuccessPlugin(NewPluginBase):
+    def update(self):
+        return Status.SUCCESS

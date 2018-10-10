@@ -9,7 +9,7 @@ from py_trees import Sequence, Selector, BehaviourTree, Blackboard
 import py_trees
 from py_trees.behaviours import SuccessEveryN
 from py_trees.display import render_dot_tree
-from py_trees.meta import running_is_failure, success_is_running
+from py_trees.meta import running_is_failure, success_is_running, failure_is_success
 
 import giskardpy
 from giskardpy import DEBUG
@@ -25,6 +25,7 @@ from giskardpy.plugin_kinematic_sim import NewKinSimPlugin
 from giskardpy.plugin_log_trajectory import NewLogTrajPlugin
 from giskardpy.plugin_pybullet import PyBulletMonitor, PyBulletUpdatePlugin, CollisionChecker
 from giskardpy.plugin_send_trajectory import SendTrajectory
+
 
 # TODO sync with param server behavior?
 
@@ -89,7 +90,7 @@ def grow_tree():
     sync.add_plugin(u'js', JointStatePlugin2(js_identifier))
     sync.add_plugin(u'fk', NewFkPlugin(fk_identifier, js_identifier, robot_description_identifier))
     sync.add_plugin(u'pw', PyBulletMonitor(js_identifier, pybullet_identifier, controlled_joints_identifier,
-                                              map_frame, root_link, path_to_data_folder, gui))
+                                           map_frame, root_link, path_to_data_folder, gui))
     sync.add_plugin(u'in sync', SuccessPlugin())
     # ----------------------------------------------
     wait_for_goal = Selector(u'wait for goal')
@@ -104,7 +105,7 @@ def grow_tree():
                                                                  gui))
     wait_for_goal.add_child(monitor)
     # ----------------------------------------------
-    planning = Selector(u'planning')
+    planning = failure_is_success(Selector)(u'planning')
     planning.add_child(GoalCanceled(u'goal canceled', action_server_name))
     planning.add_child(CollisionCancel(u'in collision', collision_time_threshold, time_identifier,
                                        closest_point_identifier))
@@ -132,9 +133,11 @@ def grow_tree():
     # ----------------------------------------------
 
     # ----------------------------------------------
-    publish_result = Selector(u'move robot')
+    publish_result = failure_is_success(Selector)(u'move robot')
     publish_result.add_child(GoalCanceled(u'goal canceled', action_server_name))
-    publish_result.add_child(SendTrajectory(u'send traj', trajectory_identifier, fill_velocity_values))
+    publish_result.add_child(SendTrajectory(u'send traj',
+                                            trajectory_identifier,
+                                            fill_velocity_values))
     # ----------------------------------------------
     root = Sequence(u'root')
     root.add_child(sync)
@@ -154,7 +157,7 @@ def grow_tree():
         # TODO create data folder if it does not exist
         def post_tick(snapshot_visitor, behaviour_tree):
             print(u'\n' + py_trees.display.ascii_tree(behaviour_tree.root,
-                                                     snapshot_information=snapshot_visitor))
+                                                      snapshot_information=snapshot_visitor))
 
         snapshot_visitor = py_trees.visitors.SnapshotVisitor()
         tree.add_post_tick_handler(functools.partial(post_tick, snapshot_visitor))

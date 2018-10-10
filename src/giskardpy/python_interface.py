@@ -10,7 +10,7 @@ from giskardpy.utils import dict_to_joint_states
 
 
 class GiskardWrapper(object):
-    def __init__(self, giskard_topic=u'giskardpy/command', ns=u'giskard'):
+    def __init__(self, giskard_topic=u'giskardpy/command', ns=u'giskard', joint_gain=10, joint_max_speed=1):
         if giskard_topic is not None:
             self.client = SimpleActionClient(giskard_topic, MoveAction)
             self.update_world = rospy.ServiceProxy(u'{}/update_world'.format(ns), UpdateWorld)
@@ -22,6 +22,8 @@ class GiskardWrapper(object):
         self.collisions = []
         self.clear_cmds()
         self.object_js_topics = {}
+        self.joint_gain = joint_gain
+        self.joint_max_speed = joint_max_speed
         rospy.sleep(.3)
 
     def set_cart_goal(self, root, tip, pose_stamped):
@@ -35,7 +37,7 @@ class GiskardWrapper(object):
         self.set_rotation_goal(root, tip, pose_stamped)
 
 
-    def set_tranlation_goal(self, root, tip, pose_stamped):
+    def set_tranlation_goal(self, root, tip, pose_stamped, p_gain=3, max_speed=0.1):
         """
         :param tip:
         :type tip: str
@@ -48,11 +50,11 @@ class GiskardWrapper(object):
         controller.goal_pose = pose_stamped
         controller.type = Controller.TRANSLATION_3D
         controller.weight = 1
-        controller.max_speed = 0.3
-        controller.p_gain = 3
+        controller.max_speed = max_speed
+        controller.p_gain = p_gain
         self.cmd_seq[-1].controllers.append(controller)
 
-    def set_rotation_goal(self, root, tip, pose_stamped):
+    def set_rotation_goal(self, root, tip, pose_stamped, p_gain=3, max_speed=1.0):
         """
         :param tip:
         :type tip: str
@@ -65,8 +67,8 @@ class GiskardWrapper(object):
         controller.goal_pose = pose_stamped
         controller.type = Controller.ROTATION_3D
         controller.weight = 1
-        controller.max_speed = 1.0
-        controller.p_gain = 3
+        controller.max_speed = max_speed
+        controller.p_gain = p_gain
         self.cmd_seq[-1].controllers.append(controller)
 
     def set_joint_goal(self, joint_state):
@@ -77,8 +79,8 @@ class GiskardWrapper(object):
         controller = Controller()
         controller.type = Controller.JOINT
         controller.weight = 1
-        controller.p_gain = 10
-        controller.max_speed = 1
+        controller.p_gain = self.joint_gain
+        controller.max_speed = self.joint_max_speed
         if isinstance(joint_state, dict):
             for joint_name, joint_position in joint_state.items():
                 controller.goal_state.name.append(joint_name)

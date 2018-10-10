@@ -95,6 +95,7 @@ def joint_position(current_joint, joint_goal, weight, p_gain, max_speed, name):
     soft_constraints = OrderedDict()
 
     err = joint_goal - current_joint
+    # TODO it would be more efficient to safe the max joint vel in hard constraints
     capped_err = sw.diffable_max_fast(sw.diffable_min_fast(p_gain * err, max_speed), -max_speed)
 
     soft_constraints[name] = SoftConstraint(lower=capped_err,

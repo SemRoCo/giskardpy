@@ -1,7 +1,8 @@
 import py_trees
 import rospy
 from actionlib_msgs.msg import GoalStatus
-from control_msgs.msg import FollowJointTrajectoryAction, FollowJointTrajectoryGoal, JointTrajectoryControllerState
+from control_msgs.msg import FollowJointTrajectoryAction, FollowJointTrajectoryGoal, JointTrajectoryControllerState, \
+    FollowJointTrajectoryResult
 from py_trees_ros.actions import ActionClient
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 
@@ -9,6 +10,8 @@ from giskardpy.plugin import GiskardBehavior
 
 
 class SendTrajectory(ActionClient, GiskardBehavior):
+    error_code_to_str = {value: name for name, value in vars(FollowJointTrajectoryResult).items() if isinstance(value, int)}
+
     def __init__(self, name, trajectory_identifier, fill_velocity_values,
                  action_namespace=u'/whole_body_controller/follow_joint_trajectory'):
         GiskardBehavior.__init__(self, name)
@@ -68,8 +71,8 @@ class SendTrajectory(ActionClient, GiskardBehavior):
             self.feedback_message = "sent goal to the action server"
             return py_trees.Status.RUNNING
         if self.action_client.get_state() == GoalStatus.ABORTED:
-            # result = self.action_client.get_result()
-            # self.feedback_message = result.message
+            result = self.action_client.get_result()
+            self.feedback_message = self.error_code_to_str[result.error_code]
             return py_trees.Status.FAILURE
         result = self.action_client.get_result()
         if result:

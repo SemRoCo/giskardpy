@@ -230,6 +230,15 @@ class Robot(object):
         else:
             return min(limit.velocity, self.default_joint_velocity_limit)
 
+    # def get_joint_velocity_limit_symbol(self, joint_name):
+    #     symbol = spw.Symbol()
+    #     limit = self._urdf_robot.joint_map[joint_name].limit
+    #     if limit is None or limit.velocity is None:
+    #         limit = spw.diffable_min_fast(self.default_joint_velocity_limit,
+    #     else:
+    #         return min(limit.velocity, self.default_joint_velocity_limit)
+    #     return spw.diffable_min_fast()
+
     def get_joint_frame(self, joint_name):
         """
         :param joint_name: name of the joint in the urdf

@@ -883,6 +883,8 @@ class TestCollisionAvoidanceGoals(object):
 
     # TODO test plan only
 
+    # TODO test translation and orientation goal in different frame
+
     #
     # def test_place_spoon1(self):
     #     base_pose = PoseStamped()

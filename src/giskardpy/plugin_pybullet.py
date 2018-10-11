@@ -29,7 +29,7 @@ class PybulletPlugin(NewPluginBase):
         self.path_to_data_folder = path_to_data_folder
         self.gui = gui
         # TODO find a non hacky way to get robot name from urdf
-        self.robot_name = rospy.get_param(u'robot_description').split('\n',1)[1].split('" ',1)[0].split('"')[1]
+        self.robot_name = rospy.get_param(u'robot_description').split('\n', 1)[1].split('" ', 1)[0].split('"')[1]
         super(PybulletPlugin, self).__init__()
 
     def setup(self):
@@ -48,13 +48,15 @@ class PyBulletMonitor(PybulletPlugin):
     """
     Syncs pybullet with god map.
     """
+
     def __init__(self, js_identifier, pybullet_identifier, controlled_joints_identifier, map_frame, root_link,
                  path_to_data_folder='', gui=False):
         self.js_identifier = js_identifier
         self.robot_name = u'robby'
         self.map_frame = map_frame
         self.root_link = root_link
-        super(PyBulletMonitor, self).__init__(pybullet_identifier, controlled_joints_identifier, path_to_data_folder, gui)
+        super(PyBulletMonitor, self).__init__(pybullet_identifier, controlled_joints_identifier, path_to_data_folder,
+                                              gui)
         self.world = self.god_map.safe_get_data([self.pybullet_identifier])
 
     def update(self):
@@ -76,7 +78,8 @@ class PyBulletUpdatePlugin(PybulletPlugin):
     # TODO reject changed if plugin not active or something
     def __init__(self, pybullet_identifier, controlled_joints_identifier, robot_description_identifier,
                  path_to_data_folder='', gui=False):
-        super(PyBulletUpdatePlugin, self).__init__(pybullet_identifier, controlled_joints_identifier, path_to_data_folder, gui)
+        super(PyBulletUpdatePlugin, self).__init__(pybullet_identifier, controlled_joints_identifier,
+                                                   path_to_data_folder, gui)
         self.robot_description_identifier = robot_description_identifier
         self.global_reference_frame_name = 'map'
         self.lock = Lock()
@@ -115,7 +118,9 @@ class PyBulletUpdatePlugin(PybulletPlugin):
 
                 elif req.operation is UpdateWorldRequest.REMOVE:
                     self.remove_object(req.body.name)
-                # TODO implement alter
+                elif req.operation is UpdateWorldRequest.ALTER:
+                    self.remove_object(req.body.name)
+                    self.add_object(req)
                 elif req.operation is UpdateWorldRequest.REMOVE_ALL:
                     self.clear_world()
                 else:
@@ -220,11 +225,13 @@ class PyBulletUpdatePlugin(PybulletPlugin):
 
 
 class CollisionChecker(PybulletPlugin):
-    def __init__(self, collision_goal_identifier, controllable_links_identifier, pybullet_identifier, controlled_joints_identifier,
+    def __init__(self, collision_goal_identifier, controllable_links_identifier, pybullet_identifier,
+                 controlled_joints_identifier,
                  closest_point_identifier, default_collision_avoidance_distance,
                  map_frame, root_link,
                  path_to_data_folder='', gui=False):
-        super(CollisionChecker, self).__init__(pybullet_identifier, controlled_joints_identifier, path_to_data_folder, gui)
+        super(CollisionChecker, self).__init__(pybullet_identifier, controlled_joints_identifier, path_to_data_folder,
+                                               gui)
         self.collision_goal_identifier = collision_goal_identifier
         self.controllable_links_identifier = controllable_links_identifier
         self.closest_point_identifier = closest_point_identifier
@@ -375,8 +382,8 @@ class CollisionChecker(PybulletPlugin):
             # if body_b is empty, use all objects
             if collision_entry.body_b == u'':
                 bodies_b = self.world.get_object_names()
-                if collision_entry.type == CollisionEntry.AVOID_COLLISION:
-                    bodies_b.append(self.world.get_robot().name)
+                # if collision_entry.type == CollisionEntry.AVOID_COLLISION:
+                bodies_b.append(self.world.get_robot().name)
             elif self.world.has_object(collision_entry.body_b) or \
                     collision_entry.body_b == self.world.get_robot().name:
                 bodies_b = [collision_entry.body_b]
@@ -412,7 +419,8 @@ class CollisionChecker(PybulletPlugin):
                                 if key in min_allowed_distance:
                                     del min_allowed_distance[key]
 
-                            elif collision_entry.type == CollisionEntry.AVOID_COLLISION:
+                            elif collision_entry.type == CollisionEntry.AVOID_COLLISION or \
+                                    collision_entry.type == CollisionEntry.AVOID_ALL_COLLISIONS:
                                 min_allowed_distance[key] = collision_entry.min_dist
 
         return min_allowed_distance

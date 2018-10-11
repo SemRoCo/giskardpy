@@ -34,7 +34,10 @@ class JointStatePlugin2(NewPluginBase):
 
     def update(self):
         try:
-            js = self.lock.get_nowait()
+            if self.mjs is None:
+                js = self.lock.get()
+            else:
+                js = self.lock.get_nowait()
             self.mjs = to_joint_state_dict(js)
         except Empty:
             pass

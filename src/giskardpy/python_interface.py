@@ -110,6 +110,12 @@ class GiskardWrapper(object):
         collision_entry.type = CollisionEntry.ALLOW_ALL_COLLISIONS
         self.set_collision_entries([collision_entry])
 
+    def avoid_all_collisions(self, distance=0.05):
+        collision_entry = CollisionEntry()
+        collision_entry.type = CollisionEntry.AVOID_ALL_COLLISIONS
+        collision_entry.min_dist = distance
+        self.set_collision_entries([collision_entry])
+
     def add_cmd(self, max_trajectory_length=20):
         move_cmd = MoveCmd()
         # move_cmd.max_trajectory_length = max_trajectory_length

@@ -192,11 +192,11 @@ class GiskardTestWrapper(object):
 
     def get_allow_l_gripper(self, body_b=u'box'):
         links = self.get_l_gripper_links()
-        return [CollisionEntry(CollisionEntry.ALLOW_COLLISION, 0, link, body_b, '') for link in links]
+        return [CollisionEntry(CollisionEntry.ALLOW_COLLISION, 0, [link], body_b, []) for link in links]
 
     def get_l_gripper_collision_entries(self, body_b=u'box', distance=0, action=CollisionEntry.ALLOW_COLLISION):
         links = self.get_l_gripper_links()
-        return [CollisionEntry(action, distance, link, body_b, '') for link in links]
+        return [CollisionEntry(action, distance, [link], body_b, []) for link in links]
 
     def get_current_joint_state(self):
         """
@@ -338,10 +338,13 @@ class GiskardTestWrapper(object):
     def allow_all_collisions(self):
         self.wrapper.allow_all_collisions()
 
+    def avoid_all_collisions(self, distance=0.5):
+        self.wrapper.avoid_all_collisions(distance)
+
     def enable_self_collision(self):
         pass
 
-    def disable_self_collision(self):
+    def allow_self_collision(self):
         self.wrapper.disable_self_collision()
 
     def add_collision_entries(self, collisions_entries):

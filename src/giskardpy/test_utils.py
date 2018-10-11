@@ -315,8 +315,8 @@ class GiskardTestWrapper(object):
         assert self.wrapper.remove_object(name).error_codes == expected_response
         assert not self.world.has_object(name)
 
-    def add_box(self, name=u'box', position=(1.2, 0, 0.5)):
-        r = self.wrapper.add_box(name=name, position=position)
+    def add_box(self, name=u'box', size=(1, 1, 1), frame_id=u'map', position=(0, 0, 0), orientation=(0, 0, 0, 1)):
+        r = self.wrapper.add_box(name, size, frame_id, position, orientation)
         assert r.error_codes == UpdateWorldResponse.SUCCESS
         assert self.world.has_object(name)
 
@@ -347,9 +347,10 @@ class GiskardTestWrapper(object):
     def add_collision_entries(self, collisions_entries):
         self.wrapper.set_collision_entries(collisions_entries)
 
-    def attach_box(self, name=u'box', size=(1, 1, 1), frame_id=u'map', position=(0, 0, 0), orientation=(0, 0, 0, 1),
+    def attach_box(self, name=u'box', size=None, frame_id=None, position=None, orientation=None,
                    expected_response=UpdateWorldResponse.SUCCESS):
         assert self.wrapper.attach_box(name, size, frame_id, position, orientation).error_codes == expected_response
+        assert not self.world.has_object(name)
 
     def get_cpi(self, distance_threshold):
         collision_goals = [CollisionEntry(type=CollisionEntry.AVOID_ALL_COLLISIONS, min_dist=distance_threshold)]

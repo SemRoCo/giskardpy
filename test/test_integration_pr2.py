@@ -379,6 +379,22 @@ class TestCollisionAvoidanceGoals(object):
         pocky = u'http://muh#pocky'
         zero_pose.attach_box(pocky, [0.1, 0.02, 0.02], zero_pose.r_tip, [0.05, 0, 0])
 
+    def test_attach_existing_box(self, zero_pose):
+        """
+        :type zero_pose: GiskardTestWrapper
+        """
+        pocky = u'http://muh#pocky'
+        zero_pose.add_box(pocky, [0.1, 0.02, 0.02], zero_pose.r_tip, [0.05, 0, 0])
+        zero_pose.attach_box(pocky, frame_id=zero_pose.r_tip)
+
+    def test_attach_to_nonexistant_robot_link(self, zero_pose):
+        """
+        :type zero_pose: GiskardTestWrapper
+        """
+        pocky = u'http://muh#pocky'
+        zero_pose.attach_box(pocky, [0.1, 0.02, 0.02], u'', [0.05, 0, 0],
+                             expected_response=UpdateWorldResponse.CORRUPT_SHAPE_ERROR)
+
     def test_add_remove_object(self, zero_pose):
         """
         :type zero_pose: GiskardTestWrapper

@@ -124,6 +124,7 @@ class PyBulletUpdatePlugin(PybulletPlugin):
                 self.publish_object_as_marker(req)
                 return UpdateWorldResponse()
             except CorruptShapeException as e:
+                traceback.print_exc()
                 return UpdateWorldResponse(UpdateWorldResponse.CORRUPT_SHAPE_ERROR, str(e))
             except UnknownBodyException as e:
                 return UpdateWorldResponse(UpdateWorldResponse.MISSING_BODY_ERROR, str(e))
@@ -161,9 +162,16 @@ class PyBulletUpdatePlugin(PybulletPlugin):
         """
         if req.body.type is WorldBody.URDF_BODY:
             raise UnsupportedOptionException(u'Attaching URDF bodies to robots is not supported.')
-        self.world.attach_object(world_body_to_urdf_object(req.body),
-                                 req.pose.header.frame_id,
-                                 from_pose_msg(req.pose.pose))
+        if req.pose.header.frame_id not in self.world.get_robot().get_link_names():
+            raise CorruptShapeException(u'robot link \'{}\' does not exist'.format(req.pose.header.frame_id))
+        if self.world.has_object(req.body.name):
+            self.world.attach_object(req.body,
+                                     req.pose.header.frame_id,
+                                     from_pose_msg(req.pose.pose))
+        else:
+            self.world.attach_object(world_body_to_urdf_object(req.body),
+                                     req.pose.header.frame_id,
+                                     from_pose_msg(req.pose.pose))
 
     def remove_object(self, name):
         if self.world.has_object(name):

@@ -21,7 +21,7 @@ import numpy as np
 from giskardpy.utils import keydefaultdict, suppress_stdout, NullContextManager
 
 from giskardpy.object import UrdfObject, FixedJoint, to_urdf_string, BoxShape, \
-    CollisionProperty
+    CollisionProperty, remove_outer_tag
 import hashlib
 
 JointInfo = namedtuple(u'JointInfo', [u'joint_index', u'joint_name', u'joint_type', u'q_index', u'u_index', u'flags',
@@ -90,7 +90,7 @@ def load_urdf_string_into_bullet(urdf_string, pose):
     :param pose: Pose at which to load the URDF into the world.
     :type pose: Transform
     :return: internal PyBullet id of the loaded urdf
-    :rtype: int
+    :rtype: intload_urdf_string_into_bullet
     """
     filename = write_urdf_to_disc(u'{}.urdf'.format(random_string()), urdf_string)
     with NullContextManager() if giskardpy.PRINT_LEVEL == DEBUG else suppress_stdout():
@@ -339,21 +339,34 @@ class PyBulletRobot(object):
         """
         return object_name in self.attached_objects.keys()
 
-    def attach_object(self, object, parent_link_name, transform):
+    # def attach_pybullet_robot(self, object, parent_link_name, transform):
+    #     """
+    #
+    #     :param object:
+    #     :type object: PyBulletRobot
+    #     :param parent_link_name:
+    #     :type parent_link_name: str
+    #     :param transform:
+    #     :type transform: Transform
+    #     :return:
+    #     """
+    #     object.name
+
+    def attach_object(self, object_, parent_link_name, transform):
         """
         Rigidly attach another object to the robot.
-        :param object: Object that shall be attached to the robot.
-        :type object: UrdfObject
+        :param object_: Object that shall be attached to the robot.
+        :type object_: UrdfObject
         :param parent_link_name: Name of the link to which the object shall be attached.
         :type parent_link_name: str
         :param transform: Hom. transform between the reference frames of the parent link and the object.
-        :type Transform
+        :type transform: Transform
         """
         # TODO should only be called through world because this class does not know which objects exist
-        if self.has_attached_object(object.name):
+        if self.has_attached_object(object_.name):
             # TODO: choose better exception type
             raise DuplicateNameException(
-                u'An object \'{}\' has already been attached to the robot.'.format(object.name))
+                u'An object \'{}\' has already been attached to the robot.'.format(object_.name))
 
         # salvage last joint state and base pose
         joint_state = self.get_joint_states()
@@ -365,9 +378,10 @@ class PyBulletRobot(object):
             collision_matrix.add((self.link_id_to_name[collision[0]], self.link_id_to_name[collision[1]]))
 
         # assemble and store URDF string of new link and fixed joint
-        new_joint = FixedJoint(u'{}_joint'.format(object.name), transform, parent_link_name,
-                               object.name)
-        self.attached_objects[object.name] = u'{}{}'.format(to_urdf_string(new_joint), to_urdf_string(object, True))
+        new_joint = FixedJoint(u'{}_joint'.format(object_.name), transform, parent_link_name,
+                               object_.name)
+        self.attached_objects[object_.name] = u'{}{}'.format(to_urdf_string(new_joint),
+                                                             remove_outer_tag(object_.get_urdf()))
 
         new_urdf_string = self.get_urdf()
 
@@ -387,11 +401,11 @@ class PyBulletRobot(object):
             self.possible_collisions.add((self.link_name_to_id[collision[0]], self.link_name_to_id[collision[1]]))
 
         # update the collision matrix for the newly attached object
-        object_id = self.link_name_to_id[object.name]
+        object_id = self.link_name_to_id[object_.name]
         link_pairs = {(object_id, link_id) for link_id in self.joint_id_to_info.keys()}
         new_collisions = self.calc_self_collision_matrix(link_pairs)
         self.possible_collisions.union(new_collisions)
-        print(u'object {} attached to {} in pybullet world'.format(object.name, self.name))
+        print(u'object {} attached to {} in pybullet world'.format(object_.name, self.name))
 
     def get_urdf(self):
         """
@@ -573,11 +587,13 @@ class PyBulletWorld(object):
         """
         self.spawn_object_from_urdf_str(urdf_object.name, to_urdf_string(urdf_object), base_pose)
 
-    def attach_object(self, object, parent_link, transform):
-        if self.has_object(object.name):
-            raise DuplicateNameException(
-                u'Can\'t attach existing object \'{}\'.'.format(object.name))
-        self.get_robot().attach_object(object, parent_link, transform)
+    def attach_object(self, object_, parent_link, transform):
+        if self.has_object(object_.name):
+            object_ = self.get_object(object_.name)
+            self.delete_object(object_.name)
+            # raise DuplicateNameException(
+            #     u'Can\'t attach existing object \'{}\'.'.format(object.name))
+        self.get_robot().attach_object(object_, parent_link, transform)
 
     def has_robot(self):
         """
@@ -649,7 +665,7 @@ class PyBulletWorld(object):
         self.deactivate_rendering()
         p.removeBody(self.get_object_id(object_name))
         self.activate_rendering()
-        del (self._object_id_to_name[self.get_object_id(object_name).id])
+        del (self._object_id_to_name[self.get_object_id(object_name)])
         del (self._object_names_to_objects[object_name])
         print(u'object {} deleted from pybullet world'.format(object_name))
 

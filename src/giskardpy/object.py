@@ -93,6 +93,9 @@ class UrdfObject(object):
         self.visual_props = visual_props
         self.collision_props = collision_props
 
+    def get_urdf(self):
+        return to_urdf_string(self)
+
 class Box(UrdfObject):
     def __init__(self, name, length, width, height):
         geom = BoxShape(length,
@@ -391,3 +394,12 @@ def from_pose_msg(pose_msg):
     :rtype: Transform
     """
     return Transform(from_point_msg(pose_msg.position), from_quaternion_msg(pose_msg.orientation))
+
+def remove_outer_tag(xml):
+    """
+    :param xml:
+    :type xml: str
+    :return:
+    :rtype: str
+    """
+    return xml.split('>', 1)[1].rsplit('<',1)[0]

@@ -121,25 +121,7 @@ def pykdl_frame_to_numpy(pykdl_frame):
 
 
 class GiskardTestWrapper(object):
-    def __init__(self):
-        rospy.set_param(u'~enable_gui', False)
-        rospy.set_param(u'~interactive_marker_chains', [])
-        rospy.set_param(u'~debug', True)
-        rospy.set_param(u'~tree_tick_rate', .1)
-        rospy.set_param(u'~map_frame', u'map')
-        rospy.set_param(u'~joint_convergence_threshold', 0.002)
-        rospy.set_param(u'~wiggle_precision_threshold', 4)
-        rospy.set_param(u'~sample_period', 0.1)
-        rospy.set_param(u'~default_joint_vel_limit', 10)
-        rospy.set_param(u'~default_collision_avoidance_distance', 0.05)
-        rospy.set_param(u'~fill_velocity_values', False)
-        rospy.set_param(u'~nWSR', u'None')
-        rospy.set_param(u'~root_link', u'base_footprint')
-        rospy.set_param(u'~enable_collision_marker', True)
-        # rospy.set_param(u'~enable_self_collision', True)
-        rospy.set_param(u'~path_to_data_folder', u'../data/pr2/')
-        rospy.set_param(u'~collision_time_threshold', 10)
-        rospy.set_param(u'~max_traj_length', 30)
+    def __init__(self, default_root=u'base_link'):
         self.sub_result = rospy.Subscriber(u'/giskardpy/command/result', MoveActionResult, self.cb, queue_size=100)
 
         self.tree = grow_tree()
@@ -153,9 +135,7 @@ class GiskardTestWrapper(object):
                              self.controlled_joints if self.robot.is_joint_controllable(joint_name)}
         self.world = Blackboard().god_map.safe_get_data([u'pybullet_world'])  # type: PyBulletWorld
         self.world_plugin = self.tree.root.children[3].children[2]._plugins[u'coll'] # type: CollisionChecker
-        self.default_root = u'base_link'
-        self.r_tip = u'r_gripper_tool_frame'
-        self.l_tip = u'l_gripper_tool_frame'
+        self.default_root = default_root
         self.map = u'map'
         self.simple_base_pose_pub = rospy.Publisher(u'/move_base_simple/goal', PoseStamped, queue_size=10)
         rospy.sleep(1)
@@ -175,28 +155,6 @@ class GiskardTestWrapper(object):
         """
         return self.controlled_joints
 
-    def get_l_gripper_links(self):
-        return [u'l_gripper_l_finger_tip_link', u'l_gripper_r_finger_tip_link', u'l_gripper_l_finger_link',
-                u'l_gripper_r_finger_link', u'l_gripper_r_finger_link', u'l_gripper_palm_link']
-
-    def get_r_gripper_links(self):
-        return [u'r_gripper_l_finger_tip_link', u'r_gripper_r_finger_tip_link', u'r_gripper_l_finger_link',
-                u'r_gripper_r_finger_link', u'r_gripper_r_finger_link', u'r_gripper_palm_link']
-
-    def get_r_upper_arm(self):
-        return [u'r_shoulder_lift_link', u'r_upper_arm_roll_link', u'r_upper_arm_link']
-
-    def get_r_forearm_links(self):
-        return [u'r_wrist_flex_link', u'r_wrist_roll_link', u'r_forearm_roll_link', u'r_forearm_link',
-                u'r_forearm_link']
-
-    def get_allow_l_gripper(self, body_b=u'box'):
-        links = self.get_l_gripper_links()
-        return [CollisionEntry(CollisionEntry.ALLOW_COLLISION, 0, [link], body_b, []) for link in links]
-
-    def get_l_gripper_collision_entries(self, body_b=u'box', distance=0, action=CollisionEntry.ALLOW_COLLISION):
-        links = self.get_l_gripper_links()
-        return [CollisionEntry(action, distance, [link], body_b, []) for link in links]
 
     def get_current_joint_state(self):
         """
@@ -261,7 +219,7 @@ class GiskardTestWrapper(object):
     # GENERAL GOAL STUFF ###############################################################################################
     #
     def get_as(self):
-        return Blackboard().get('giskardpy/command')
+        return Blackboard().get(u'giskardpy/command')
 
     def send_goal(self, goal=None):
         """
@@ -286,18 +244,6 @@ class GiskardTestWrapper(object):
 
     def send_and_check_goal(self, expected_error_code=MoveResult.SUCCESS):
         assert self.send_goal().error_code == expected_error_code
-
-    def move_pr2_base(self, goal_pose):
-        """
-        :type goal_pose: PoseStamped
-        """
-        self.simple_base_pose_pub.publish(goal_pose)
-
-    def reset_pr2_base(self):
-        p = PoseStamped()
-        p.header.frame_id = self.map
-        p.pose.orientation.w = 1
-        self.move_pr2_base(p)
 
     def add_waypoint(self):
         self.wrapper.add_cmd()
@@ -383,3 +329,84 @@ class GiskardTestWrapper(object):
                                                                                                   cpi[
                                                                                                       link].contact_distance,
                                                                                                   distance_threshold)
+
+class PR2(GiskardTestWrapper):
+    def __init__(self):
+        rospy.set_param(u'~enable_gui', False)
+        rospy.set_param(u'~debug', True)
+        rospy.set_param(u'~tree_tick_rate', .1)
+        rospy.set_param(u'~map_frame', u'map')
+        rospy.set_param(u'~joint_convergence_threshold', 0.002)
+        rospy.set_param(u'~wiggle_precision_threshold', 4)
+        rospy.set_param(u'~sample_period', 0.1)
+        rospy.set_param(u'~default_joint_vel_limit', 10)
+        rospy.set_param(u'~default_collision_avoidance_distance', 0.05)
+        rospy.set_param(u'~fill_velocity_values', False)
+        rospy.set_param(u'~nWSR', u'None')
+        rospy.set_param(u'~root_link', u'base_footprint')
+        rospy.set_param(u'~enable_collision_marker', True)
+        # rospy.set_param(u'~enable_self_collision', True)
+        rospy.set_param(u'~path_to_data_folder', u'../data/pr2/')
+        rospy.set_param(u'~collision_time_threshold', 10)
+        rospy.set_param(u'~max_traj_length', 30)
+        self.r_tip = u'r_gripper_tool_frame'
+        self.l_tip = u'l_gripper_tool_frame'
+        super(PR2, self).__init__()
+
+    def get_l_gripper_links(self):
+        return [u'l_gripper_l_finger_tip_link', u'l_gripper_r_finger_tip_link', u'l_gripper_l_finger_link',
+                u'l_gripper_r_finger_link', u'l_gripper_r_finger_link', u'l_gripper_palm_link']
+
+    def get_r_gripper_links(self):
+        return [u'r_gripper_l_finger_tip_link', u'r_gripper_r_finger_tip_link', u'r_gripper_l_finger_link',
+                u'r_gripper_r_finger_link', u'r_gripper_r_finger_link', u'r_gripper_palm_link']
+
+    def get_r_upper_arm(self):
+        return [u'r_shoulder_lift_link', u'r_upper_arm_roll_link', u'r_upper_arm_link']
+
+    def get_r_forearm_links(self):
+        return [u'r_wrist_flex_link', u'r_wrist_roll_link', u'r_forearm_roll_link', u'r_forearm_link',
+                u'r_forearm_link']
+
+    def get_allow_l_gripper(self, body_b=u'box'):
+        links = self.get_l_gripper_links()
+        return [CollisionEntry(CollisionEntry.ALLOW_COLLISION, 0, [link], body_b, []) for link in links]
+
+    def get_l_gripper_collision_entries(self, body_b=u'box', distance=0, action=CollisionEntry.ALLOW_COLLISION):
+        links = self.get_l_gripper_links()
+        return [CollisionEntry(action, distance, [link], body_b, []) for link in links]
+
+    def move_pr2_base(self, goal_pose):
+        """
+        :type goal_pose: PoseStamped
+        """
+        self.simple_base_pose_pub.publish(goal_pose)
+
+    def reset_pr2_base(self):
+        p = PoseStamped()
+        p.header.frame_id = self.map
+        p.pose.orientation.w = 1
+        self.move_pr2_base(p)
+
+class Donbot(GiskardTestWrapper):
+    def __init__(self, default_root=u'base_link'):
+        rospy.set_param(u'~enable_gui', False)
+        rospy.set_param(u'~debug', True)
+        rospy.set_param(u'~tree_tick_rate', .1)
+        rospy.set_param(u'~map_frame', u'map')
+        rospy.set_param(u'~joint_convergence_threshold', 0.002)
+        rospy.set_param(u'~wiggle_precision_threshold', 4)
+        rospy.set_param(u'~sample_period', 0.1)
+        rospy.set_param(u'~default_joint_vel_limit', 10)
+        rospy.set_param(u'~default_collision_avoidance_distance', 0.05)
+        rospy.set_param(u'~fill_velocity_values', False)
+        rospy.set_param(u'~nWSR', u'None')
+        rospy.set_param(u'~root_link', u'base_footprint')
+        rospy.set_param(u'~enable_collision_marker', True)
+        # rospy.set_param(u'~enable_self_collision', True)
+        rospy.set_param(u'~path_to_data_folder', u'../data/pr2/')
+        rospy.set_param(u'~collision_time_threshold', 10)
+        rospy.set_param(u'~max_traj_length', 30)
+        self.camera_tip = u'camera_link'
+        self.gripper_tip = u'gripper_tool_frame'
+        super(Donbot, self).__init__(default_root)

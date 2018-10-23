@@ -86,6 +86,7 @@ class PluginBehavior(GiskardBehavior):
         return self.my_status == Status.RUNNING
 
     def terminate(self, new_status):
+        print('terminated')
         with self.status_lock:
             self.set_status(Status.FAILURE)
         self.update_thread.join()

@@ -52,7 +52,7 @@ class CollisionCancel(GiskardBehavior):
         return super(CollisionCancel, self).setup(timeout)
 
     def initialise(self):
-        # TODO figure out a clean why of deciding how is responsible for godmap cleanup
+        # TODO figure out a clean why of deciding who is responsible for godmap cleanup
         self.god_map.safe_set_data([self.closest_point_identifier], None)
         super(CollisionCancel, self).initialise()
 

@@ -55,8 +55,7 @@ class PyBulletMonitor(PybulletPlugin):
         self.robot_name = u'robby'
         self.map_frame = map_frame
         self.root_link = root_link
-        super(PyBulletMonitor, self).__init__(pybullet_identifier, controlled_joints_identifier, path_to_data_folder,
-                                              gui)
+        super(PyBulletMonitor, self).__init__(pybullet_identifier, controlled_joints_identifier, path_to_data_folder, gui)
         self.world = self.god_map.safe_get_data([self.pybullet_identifier])
 
     def update(self):
@@ -75,11 +74,10 @@ class PyBulletMonitor(PybulletPlugin):
 
 
 class PyBulletUpdatePlugin(PybulletPlugin):
-    # TODO reject changed if plugin not active or something
+    # TODO reject changes if plugin not active or something
     def __init__(self, pybullet_identifier, controlled_joints_identifier, robot_description_identifier,
                  path_to_data_folder='', gui=False):
-        super(PyBulletUpdatePlugin, self).__init__(pybullet_identifier, controlled_joints_identifier,
-                                                   path_to_data_folder, gui)
+        super(PyBulletUpdatePlugin, self).__init__(pybullet_identifier, controlled_joints_identifier, path_to_data_folder, gui)
         self.robot_description_identifier = robot_description_identifier
         self.global_reference_frame_name = 'map'
         self.lock = Lock()
@@ -225,13 +223,11 @@ class PyBulletUpdatePlugin(PybulletPlugin):
 
 
 class CollisionChecker(PybulletPlugin):
-    def __init__(self, collision_goal_identifier, controllable_links_identifier, pybullet_identifier,
-                 controlled_joints_identifier,
+    def __init__(self, collision_goal_identifier, controllable_links_identifier, pybullet_identifier, controlled_joints_identifier,
                  closest_point_identifier, default_collision_avoidance_distance,
                  map_frame, root_link,
                  path_to_data_folder='', gui=False):
-        super(CollisionChecker, self).__init__(pybullet_identifier, controlled_joints_identifier, path_to_data_folder,
-                                               gui)
+        super(CollisionChecker, self).__init__(pybullet_identifier, controlled_joints_identifier, path_to_data_folder, gui)
         self.collision_goal_identifier = collision_goal_identifier
         self.controllable_links_identifier = controllable_links_identifier
         self.closest_point_identifier = closest_point_identifier

@@ -6,7 +6,6 @@ from giskardpy.data_types import Trajectory
 
 
 class NewLogTrajPlugin(NewPluginBase):
-    # TODO split log and interrupt conditions
     def __init__(self, trajectory_identifier, joint_state_identifier, time_identifier):
         """
         :type trajectory_identifier: str

@@ -31,7 +31,8 @@ JointInfo = namedtuple(u'JointInfo', [u'joint_index', u'joint_name', u'joint_typ
 
 ContactInfo = namedtuple(u'ContactInfo', [u'contact_flag', u'body_unique_id_a', u'body_unique_id_b', u'link_index_a',
                                          u'link_index_b', u'position_on_a', u'position_on_b', u'contact_normal_on_b',
-                                         u'contact_distance', u'normal_force'])
+                                         u'contact_distance', u'normal_force', u'lateralFriction1', u'lateralFrictionDir1',
+                                          u'lateralFriction2', u'lateralFrictionDir2'])
 
 
 def resolve_ros_iris(input_urdf):

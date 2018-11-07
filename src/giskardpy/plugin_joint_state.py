@@ -1,7 +1,6 @@
 from Queue import Empty, Queue
 
 import rospy
-from iai_wsg_50_msgs.msg import Status
 from py_trees import Status
 
 from sensor_msgs.msg import JointState

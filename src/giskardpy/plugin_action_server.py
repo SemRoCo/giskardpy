@@ -23,7 +23,7 @@ class ActionServerHandler(object):
         self.result_queue = Queue(1)
         self._as = actionlib.SimpleActionServer(action_name, action_type,
                                                 execute_cb=self.execute_cb, auto_start=False)
-        self._as.register_preempt_callback(self.cancel_cb)
+        # self._as.register_preempt_callback(self.cancel_cb)
         self._as.start()
 
 
@@ -39,7 +39,7 @@ class ActionServerHandler(object):
     def get_goal(self):
         try:
             goal = self.goal_queue.get_nowait()
-            self.canceled = False
+            # self.canceled = False
             return goal
         except Empty:
             return None
@@ -47,14 +47,14 @@ class ActionServerHandler(object):
     def has_goal(self):
         return not self.goal_queue.empty()
 
-    def cancel_cb(self):
-        self.canceled = True
-        self.get_goal() # clear old goal
+    # def cancel_cb(self):
+    #     self.canceled = True
+    #     self.get_goal() # clear old goal
 
-    def was_last_goal_canceled(self):
-        # TODO test me
-        r = self.canceled
-        return r
+    # def was_last_goal_canceled(self):
+    #     # TODO test me
+    #     r = self.canceled
+    #     return r
 
 
     def send_feedback(self):
@@ -75,6 +75,8 @@ class ActionServerHandler(object):
             self._as.set_succeeded(result)
         self.result_queue.put(call_me_now)
 
+    def is_preempt_requested(self):
+        return self._as.is_preempt_requested()
 
 class ActionServerBehavior(GiskardBehavior):
     def __init__(self, name, as_name, action_type=None):
@@ -84,7 +86,7 @@ class ActionServerBehavior(GiskardBehavior):
         super(ActionServerBehavior, self).__init__(name)
 
     def setup(self, timeout):
-        # TODO handle timeout
+        # TODO handle timeout8
         self.as_handler = Blackboard().get(self.as_name)
         if self.as_handler is None:
             self.as_handler = ActionServerHandler(self.as_name, self.action_type)
@@ -115,7 +117,7 @@ class GetGoal(ActionServerBehavior):
 
 class GoalCanceled(ActionServerBehavior):
     def update(self):
-        if self.get_as().was_last_goal_canceled() or Blackboard().get('exception') is not None:
+        if self.get_as().is_preempt_requested() or Blackboard().get('exception') is not None:
             return Status.SUCCESS
         else:
             return Status.FAILURE
@@ -128,7 +130,7 @@ class SendResult(ActionServerBehavior):
         Blackboard().set('exception', None)
         result = MoveResult()
         result.error_code = self.exception_to_error_code(e)
-        if self.get_as().was_last_goal_canceled() or not result.error_code == MoveResult.SUCCESS:
+        if self.get_as().is_preempt_requested() or not result.error_code == MoveResult.SUCCESS:
             self.get_as().send_preempted(result)
         else:
             self.get_as().send_result(result)

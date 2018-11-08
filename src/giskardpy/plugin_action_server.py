@@ -32,10 +32,8 @@ class ActionServerHandler(object):
         """
         :type goal: MoveGoal
         """
-        print('execute called')
         self.goal_queue.put(goal)
         self.result_queue.get()()
-        print('execute finished')
 
     def get_goal(self):
         try:

@@ -79,7 +79,7 @@ class PyBulletUpdatePlugin(PybulletPlugin):
                  path_to_data_folder='', gui=False):
         super(PyBulletUpdatePlugin, self).__init__(pybullet_identifier, controlled_joints_identifier, path_to_data_folder, gui)
         self.robot_description_identifier = robot_description_identifier
-        self.global_reference_frame_name = 'map'
+        self.global_reference_frame_name = u'map'
         self.lock = Lock()
         self.object_js_subs = {}  # JointState subscribers for articulated world objects
         self.object_joint_states = {}  # JointStates messages for articulated world objects
@@ -317,6 +317,13 @@ class CollisionChecker(PybulletPlugin):
         ma.markers.append(m)
         self.pub_collision_marker.publish(ma)
 
+    def allow_collision_with_plane(self):
+        # TODO instead of ignoring plane collision by default, figure out that some collision are unavoidable?
+        ce = CollisionEntry()
+        ce.type = CollisionEntry.ALLOW_COLLISION
+        ce.body_b = u'plane'
+        return ce
+
     def collision_goals_to_collision_matrix(self, collision_goals):
         """
         :param collision_goals: list of CollisionEntry
@@ -324,13 +331,14 @@ class CollisionChecker(PybulletPlugin):
         :return: dict mapping (robot_link, body_b, link_b) -> min allowed distance
         :rtype: dict
         """
+        # TODO split this into smaller functions
         if collision_goals is None:
             collision_goals = []
         collision_matrix = self.world.get_robot().get_self_collision_matrix()
-        # if self.enable_self_collision:
         min_allowed_distance = collision_matrix
-        # else:
-        #     min_allowed_distance = {}
+
+        collision_goals.insert(0, self.allow_collision_with_plane())
+
         if len([x for x in collision_goals if x.type in [CollisionEntry.AVOID_ALL_COLLISIONS,
                                                          CollisionEntry.ALLOW_ALL_COLLISIONS]]) == 0:
             # add avoid all collision if there is no other avoid or allow all

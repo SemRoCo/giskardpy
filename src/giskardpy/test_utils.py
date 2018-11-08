@@ -212,8 +212,12 @@ class GiskardTestWrapper(object):
         np.testing.assert_array_almost_equal(msg_to_list(goal_in_base.pose.position),
                                              msg_to_list(current_pose.pose.position), decimal=3)
 
-        np.testing.assert_array_almost_equal(msg_to_list(goal_in_base.pose.orientation),
-                                             msg_to_list(current_pose.pose.orientation), decimal=2)
+        try:
+            np.testing.assert_array_almost_equal(msg_to_list(goal_in_base.pose.orientation),
+                                                 msg_to_list(current_pose.pose.orientation), decimal=2)
+        except AssertionError:
+            np.testing.assert_array_almost_equal(msg_to_list(goal_in_base.pose.orientation),
+                                                 -np.array(msg_to_list(current_pose.pose.orientation)), decimal=2)
 
     #
     # GENERAL GOAL STUFF ###############################################################################################
@@ -330,6 +334,18 @@ class GiskardTestWrapper(object):
                                                                                                       link].contact_distance,
                                                                                                   distance_threshold)
 
+    def move_base(self, goal_pose):
+        """
+        :type goal_pose: PoseStamped
+        """
+        self.simple_base_pose_pub.publish(goal_pose)
+
+    def reset_base(self):
+        p = PoseStamped()
+        p.header.frame_id = self.map
+        p.pose.orientation.w = 1
+        self.move_base(p)
+
 class PR2(GiskardTestWrapper):
     def __init__(self):
         rospy.set_param(u'~enable_gui', False)
@@ -396,7 +412,7 @@ class Donbot(GiskardTestWrapper):
         rospy.set_param(u'~map_frame', u'map')
         rospy.set_param(u'~joint_convergence_threshold', 0.002)
         rospy.set_param(u'~wiggle_precision_threshold', 4)
-        rospy.set_param(u'~sample_period', 0.1)
+        rospy.set_param(u'~sample_period', 0.05)
         rospy.set_param(u'~default_joint_vel_limit', 10)
         rospy.set_param(u'~default_collision_avoidance_distance', 0.05)
         rospy.set_param(u'~fill_velocity_values', False)

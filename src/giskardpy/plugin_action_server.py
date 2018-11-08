@@ -10,6 +10,7 @@ from py_trees import Blackboard, Status
 from giskardpy.exceptions import MAX_NWSR_REACHEDException, QPSolverException, SolverTimeoutError, InsolvableException, \
     SymengineException, PathCollisionException, UnknownBodyException
 from giskardpy.plugin import GiskardBehavior
+from giskardpy.utils import plot_trajectory
 
 ERROR_CODE_TO_NAME = {getattr(MoveResult, x): x for x in dir(MoveResult) if x.isupper()}
 
@@ -46,16 +47,6 @@ class ActionServerHandler(object):
 
     def has_goal(self):
         return not self.goal_queue.empty()
-
-    # def cancel_cb(self):
-    #     self.canceled = True
-    #     self.get_goal() # clear old goal
-
-    # def was_last_goal_canceled(self):
-    #     # TODO test me
-    #     r = self.canceled
-    #     return r
-
 
     def send_feedback(self):
         # TODO
@@ -124,6 +115,13 @@ class GoalCanceled(ActionServerBehavior):
 
 
 class SendResult(ActionServerBehavior):
+    def __init__(self, name, as_name, trajectory_identifier, controlled_joints_identifier, path_to_data_folder,
+                 action_type=None):
+        self.trajectory_identifier = trajectory_identifier
+        self.controlled_joints_identifier = controlled_joints_identifier
+        self.path_to_data_folder = path_to_data_folder
+        super(SendResult, self).__init__(name, as_name, action_type)
+
     def update(self):
         # TODO get result from god map or blackboard
         e = Blackboard().get('exception')
@@ -131,10 +129,17 @@ class SendResult(ActionServerBehavior):
         result = MoveResult()
         result.error_code = self.exception_to_error_code(e)
         if self.get_as().is_preempt_requested() or not result.error_code == MoveResult.SUCCESS:
+            self.plot_traj()
             self.get_as().send_preempted(result)
         else:
+            self.plot_traj()
             self.get_as().send_result(result)
         return Status.SUCCESS
+
+    def plot_traj(self):
+        trajectory = self.get_god_map().safe_get_data([self.trajectory_identifier])
+        controlled_joints = self.get_god_map().safe_get_data([self.controlled_joints_identifier])
+        plot_trajectory(trajectory, controlled_joints, self.path_to_data_folder)
 
     def exception_to_error_code(self, exception):
         """

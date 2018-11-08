@@ -2,6 +2,7 @@ from __future__ import division
 
 from collections import defaultdict, OrderedDict
 import numpy as np
+from itertools import product
 from numpy import pi
 from geometry_msgs.msg import PointStamped, Point, Vector3Stamped, Vector3, Pose, PoseStamped, QuaternionStamped, \
     Quaternion
@@ -12,7 +13,7 @@ from giskardpy.data_types import SingleJointState
 from giskardpy.data_types import ClosestPointInfo
 from contextlib import contextmanager
 import sys, os
-
+import pylab as plt
 
 @contextmanager
 def suppress_stderr():
@@ -275,3 +276,43 @@ def msg_to_list(thing):
                 thing.orientation.y,
                 thing.orientation.z,
                 thing.orientation.w]
+
+
+def plot_trajectory(tj, controlled_joints, path_to_data_folder):
+    """
+    :type tj: Trajectory
+    :param controlled_joints: only joints in this list will be added to the plot
+    :type controlled_joints: list
+    """
+    colors = [u'b', u'g', u'r', u'c', u'm', u'y', u'k']
+    line_styles = [u'', u'--', u'-.']
+    fmts = [u''.join(x) for x in product(line_styles, colors)]
+    positions = []
+    velocities = []
+    times = []
+    names = [x for x in tj._points[0.0].keys() if x in controlled_joints]
+    for time, point in tj.items():
+        positions.append([v.position for j, v in point.items() if j in controlled_joints])
+        velocities.append([v.velocity for j, v in point.items() if j in controlled_joints])
+        times.append(time)
+    positions = np.array(positions)
+    velocities = np.array(velocities).T
+    times = np.array(times)
+
+    f, (ax1, ax2) = plt.subplots(2, sharex=True)
+    ax1.set_title(u'position')
+    ax2.set_title(u'velocity')
+    # positions -= positions.mean(axis=0)
+    for i, position in enumerate(positions.T):
+        ax1.plot(times, position, fmts[i], label=names[i])
+        ax2.plot(times, velocities[i], fmts[i])
+    box = ax1.get_position()
+    # ax1.set_ylim(-3, 1)
+    ax1.set_position([box.x0, box.y0, box.width * 0.6, box.height])
+    box = ax2.get_position()
+    ax2.set_position([box.x0, box.y0, box.width * 0.6, box.height])
+
+    # Put a legend to the right of the current axis
+    ax1.legend(loc=u'center', bbox_to_anchor=(1.45, 0))
+
+    plt.savefig(path_to_data_folder + u'trajectory.pdf')

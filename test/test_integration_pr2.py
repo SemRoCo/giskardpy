@@ -16,7 +16,7 @@ from transforms3d.quaternions import axangle2quat
 
 from giskardpy.python_interface import GiskardWrapper
 from giskardpy.symengine_wrappers import quaternion_from_axis_angle
-from giskardpy.test_utils import GiskardTestWrapper
+from giskardpy.test_utils import PR2
 from giskardpy.tfwrapper import transform_pose, lookup_transform, init as tf_init
 from giskardpy.utils import msg_to_list
 
@@ -81,7 +81,7 @@ def ros(request):
 
 @pytest.fixture(scope=u'module')
 def giskard(request, ros):
-    c = GiskardTestWrapper()
+    c = PR2()
     request.addfinalizer(c.tear_down)
     return c
 
@@ -89,18 +89,18 @@ def giskard(request, ros):
 @pytest.fixture()
 def resetted_giskard(giskard):
     """
-    :type giskard: GiskardTestWrapper
+    :type giskard: PR2
     """
     print(u'resetting giskard')
     giskard.clear_world()
-    giskard.reset_pr2_base()
+    giskard.reset_base()
     return giskard
 
 
 @pytest.fixture()
 def zero_pose(resetted_giskard):
     """
-    :type giskard: GiskardTestWrapper
+    :type giskard: PR2
     """
     resetted_giskard.set_joint_goal(default_pose)
     resetted_giskard.allow_all_collisions()
@@ -119,8 +119,8 @@ def pocky_pose_setup(resetted_giskard):
 @pytest.fixture()
 def box_setup(pocky_pose_setup):
     """
-    :type pocky_pose_setup: GiskardTestWrapper
-    :rtype: GiskardTestWrapper
+    :type pocky_pose_setup: PR2
+    :rtype: PR2
     """
     pocky_pose_setup.add_box(position=[1.2,0,0.5])
     return pocky_pose_setup
@@ -128,8 +128,8 @@ def box_setup(pocky_pose_setup):
 @pytest.fixture()
 def fake_table_setup(zero_pose):
     """
-    :type zero_pose: GiskardTestWrapper
-    :rtype: GiskardTestWrapper
+    :type zero_pose: PR2
+    :rtype: PR2
     """
     zero_pose.add_box(position=[.9,0,0.2])
     return zero_pose
@@ -148,14 +148,14 @@ def kitchen_setup(zero_pose):
 class TestJointGoals(object):
     def test_joint_movement1(self, zero_pose):
         """
-        :type zero_pose: GiskardTestWrapper
+        :type zero_pose: PR2
         """
         zero_pose.allow_self_collision()
         zero_pose.send_and_check_joint_goal(pocky_pose)
 
     def test_partial_joint_state_goal1(self, zero_pose):
         """
-        :type zero_pose: GiskardTestWrapper
+        :type zero_pose: PR2
         """
         zero_pose.allow_self_collision()
         js = dict(pocky_pose.items()[:3])
@@ -163,7 +163,7 @@ class TestJointGoals(object):
 
     def test_continuous_joint1(self, zero_pose):
         """
-        :type zero_pose: GiskardTestWrapper
+        :type zero_pose: PR2
         """
         zero_pose.allow_self_collision()
         js = {u'r_wrist_roll_joint': -pi,
@@ -172,7 +172,7 @@ class TestJointGoals(object):
 
     def test_undefined_type(self, zero_pose):
         """
-        :type zero_pose: GiskardTestWrapper
+        :type zero_pose: PR2
         """
         zero_pose.allow_self_collision()
         goal = MoveActionGoal()
@@ -182,7 +182,7 @@ class TestJointGoals(object):
 
     def test_empty_goal(self, zero_pose):
         """
-        :type zero_pose: GiskardTestWrapper
+        :type zero_pose: PR2
         """
         zero_pose.allow_self_collision()
         goal = MoveActionGoal()
@@ -193,7 +193,7 @@ class TestJointGoals(object):
 class TestCartGoals(object):
     def test_cart_goal_1eef(self, zero_pose):
         """
-        :type zero_pose: GiskardTestWrapper
+        :type zero_pose: PR2
         """
         p = PoseStamped()
         p.header.stamp = rospy.get_rostime()
@@ -205,7 +205,7 @@ class TestCartGoals(object):
 
     def test_cart_goal_2eef(self, zero_pose):
         """
-        :type zero_pose: GiskardTestWrapper
+        :type zero_pose: PR2
         """
         # FIXME? eef don't move at the same time
         r_goal = PoseStamped()
@@ -227,7 +227,7 @@ class TestCartGoals(object):
 
     def test_weird_wiggling(self, zero_pose):
         """
-        :type zero_pose: GiskardTestWrapper
+        :type zero_pose: PR2
         """
 
         # FIXME get rid of wiggling
@@ -261,7 +261,7 @@ class TestCartGoals(object):
 
     def test_hot_init_failed(self, zero_pose):
         """
-        :type zero_pose: GiskardTestWrapper
+        :type zero_pose: PR2
         """
         r_goal = PoseStamped()
         r_goal.header.frame_id = zero_pose.r_tip
@@ -297,7 +297,7 @@ class TestCartGoals(object):
 
     def test_endless_wiggling(self, zero_pose):
         """
-        :type zero_pose: GiskardTestWrapper
+        :type zero_pose: PR2
         """
         goal_js = {
             u'r_upper_arm_roll_joint': -0.0812729778068,
@@ -322,7 +322,7 @@ class TestCartGoals(object):
 
     def test_root_link_not_equal_chain_root(self, zero_pose):
         """
-        :type zero_pose: GiskardTestWrapper
+        :type zero_pose: PR2
         """
         p = PoseStamped()
         p.header.stamp = rospy.get_rostime()
@@ -337,7 +337,7 @@ class TestCartGoals(object):
 
     # def test_waypoints(self, zero_pose):
     #     """
-    #     :type zero_pose: GiskardTestWrapper
+    #     :type zero_pose: PR2
     #     """
     # FIXME
     #     p = PoseStamped()
@@ -369,14 +369,14 @@ class TestCartGoals(object):
 class TestCollisionAvoidanceGoals(object):
     def test_add_box(self, zero_pose):
         """
-        :type zero_pose: GiskardTestWrapper
+        :type zero_pose: PR2
         """
         object_name = u'muh'
         zero_pose.add_box(object_name, position=[1.2, 0, 1.6])
 
     def test_add_remove_sphere(self, zero_pose):
         """
-        :type zero_pose: GiskardTestWrapper
+        :type zero_pose: PR2
         """
         object_name = u'muh'
         zero_pose.add_sphere(object_name, position=[1.2, 0, 1.6])
@@ -384,7 +384,7 @@ class TestCollisionAvoidanceGoals(object):
 
     def test_add_remove_cylinder(self, zero_pose):
         """
-        :type zero_pose: GiskardTestWrapper
+        :type zero_pose: PR2
         """
         object_name = u'muh'
         zero_pose.add_cylinder(object_name, position=[1.2, 0, 1.6])
@@ -392,20 +392,20 @@ class TestCollisionAvoidanceGoals(object):
 
     def test_add_urdf_body(self, kitchen_setup):
         """
-        :type kitchen_setup: GiskardTestWrapper
+        :type kitchen_setup: PR2
         """
         kitchen_setup.remove_object(u'kitchen')
 
     def test_attach_box(self, zero_pose):
         """
-        :type zero_pose: GiskardTestWrapper
+        :type zero_pose: PR2
         """
         pocky = u'http://muh#pocky'
         zero_pose.attach_box(pocky, [0.1, 0.02, 0.02], zero_pose.r_tip, [0.05, 0, 0])
 
     def test_attach_existing_box(self, zero_pose):
         """
-        :type zero_pose: GiskardTestWrapper
+        :type zero_pose: PR2
         """
         pocky = u'http://muh#pocky'
         zero_pose.add_box(pocky, [0.1, 0.02, 0.02], zero_pose.r_tip, [0.05, 0, 0])
@@ -413,7 +413,7 @@ class TestCollisionAvoidanceGoals(object):
 
     def test_attach_to_nonexistant_robot_link(self, zero_pose):
         """
-        :type zero_pose: GiskardTestWrapper
+        :type zero_pose: PR2
         """
         pocky = u'http://muh#pocky'
         zero_pose.attach_box(pocky, [0.1, 0.02, 0.02], u'', [0.05, 0, 0],
@@ -421,7 +421,7 @@ class TestCollisionAvoidanceGoals(object):
 
     def test_add_remove_object(self, zero_pose):
         """
-        :type zero_pose: GiskardTestWrapper
+        :type zero_pose: PR2
         """
         object_name = u'muh'
         zero_pose.add_box(object_name, position=[1.2, 0, 1.6])
@@ -429,20 +429,20 @@ class TestCollisionAvoidanceGoals(object):
 
     def test_invalid_update_world(self, zero_pose):
         """
-        :type zero_pose: GiskardTestWrapper
+        :type zero_pose: PR2
         """
         req = UpdateWorldRequest(42, WorldBody(), True, PoseStamped())
         assert zero_pose.wrapper.update_world.call(req).error_codes == UpdateWorldResponse.INVALID_OPERATION
 
     def test_missing_body_error(self, zero_pose):
         """
-        :type zero_pose: GiskardTestWrapper
+        :type zero_pose: PR2
         """
         zero_pose.remove_object(u'muh', expected_response=UpdateWorldResponse.MISSING_BODY_ERROR)
 
     def test_corrupt_shape_error(self, zero_pose):
         """
-        :type zero_pose: GiskardTestWrapper
+        :type zero_pose: PR2
         """
         req = UpdateWorldRequest(UpdateWorldRequest.ADD, WorldBody(type=WorldBody.PRIMITIVE_BODY,
                                                                    shape=SolidPrimitive(type=42)), True, PoseStamped())
@@ -450,7 +450,7 @@ class TestCollisionAvoidanceGoals(object):
 
     def test_unsupported_options(self, kitchen_setup):
         """
-        :type kitchen_setup: GiskardTestWrapper
+        :type kitchen_setup: PR2
         """
         wb = WorldBody()
         pose = PoseStamped()
@@ -465,7 +465,7 @@ class TestCollisionAvoidanceGoals(object):
 
     def test_link_b_set_but_body_b_not(self, box_setup):
         """
-        :type box_setup: GiskardTestWrapper
+        :type box_setup: PR2
         """
         ce = CollisionEntry()
         ce.type = CollisionEntry.AVOID_COLLISION
@@ -475,7 +475,7 @@ class TestCollisionAvoidanceGoals(object):
 
     def test_unknown_robot_link(self, box_setup):
         """
-        :type box_setup: GiskardTestWrapper
+        :type box_setup: PR2
         """
         ce = CollisionEntry()
         ce.type = CollisionEntry.AVOID_COLLISION
@@ -485,7 +485,7 @@ class TestCollisionAvoidanceGoals(object):
 
     def test_unknown_body_b(self, box_setup):
         """
-        :type box_setup: GiskardTestWrapper
+        :type box_setup: PR2
         """
         ce = CollisionEntry()
         ce.type = CollisionEntry.AVOID_COLLISION
@@ -495,7 +495,7 @@ class TestCollisionAvoidanceGoals(object):
 
     def test_unknown_link_b(self, box_setup):
         """
-        :type box_setup: GiskardTestWrapper
+        :type box_setup: PR2
         """
         ce = CollisionEntry()
         ce.type = CollisionEntry.AVOID_COLLISION
@@ -506,7 +506,7 @@ class TestCollisionAvoidanceGoals(object):
 
     def test_base_link_in_collision(self, zero_pose):
         """
-        :type zero_pose: GiskardTestWrapper
+        :type zero_pose: PR2
         """
         zero_pose.allow_self_collision()
         zero_pose.add_box(position=[0, 0, -0.2])
@@ -514,7 +514,7 @@ class TestCollisionAvoidanceGoals(object):
 
     def test_unknown_object1(self, box_setup):
         """
-        :type box_setup: GiskardTestWrapper
+        :type box_setup: PR2
         """
         p = PoseStamped()
         p.header.frame_id = box_setup.r_tip
@@ -555,14 +555,14 @@ class TestCollisionAvoidanceGoals(object):
 
     def test_allow_self_collision(self, zero_pose):
         """
-        :type zero_pose: GiskardTestWrapper
+        :type zero_pose: PR2
         """
         zero_pose.check_cpi_geq(zero_pose.get_r_gripper_links(), 0.1)
         zero_pose.check_cpi_geq(zero_pose.get_l_gripper_links(), 0.1)
 
     def test_allow_self_collision2(self, zero_pose):
         """
-        :type zero_pose: GiskardTestWrapper
+        :type zero_pose: PR2
         """
         goal_js = {
             u'l_elbow_flex_joint': -1.43286344265,
@@ -589,7 +589,7 @@ class TestCollisionAvoidanceGoals(object):
 
     def test_allow_self_collision3(self, zero_pose):
         """
-        :type zero_pose: GiskardTestWrapper
+        :type zero_pose: PR2
         """
         goal_js = {
             u'l_elbow_flex_joint': -1.43286344265,
@@ -624,7 +624,7 @@ class TestCollisionAvoidanceGoals(object):
 
     def test_avoid_self_collision(self, zero_pose):
         """
-        :type zero_pose: GiskardTestWrapper
+        :type zero_pose: PR2
         """
         goal_js = {
             u'l_elbow_flex_joint': -1.43286344265,
@@ -649,7 +649,7 @@ class TestCollisionAvoidanceGoals(object):
 
     def test_avoid_collision(self, box_setup):
         """
-        :type box_setup: GiskardTestWrapper
+        :type box_setup: PR2
         """
         ce = CollisionEntry()
         ce.type = CollisionEntry.AVOID_COLLISION
@@ -662,7 +662,7 @@ class TestCollisionAvoidanceGoals(object):
 
     def test_allow_collision(self, box_setup):
         """
-        :type box_setup: GiskardTestWrapper
+        :type box_setup: PR2
         """
         p = PoseStamped()
         p.header.frame_id = box_setup.r_tip
@@ -684,7 +684,7 @@ class TestCollisionAvoidanceGoals(object):
 
     def test_avoid_collision2(self, box_setup):
         """
-        :type box_setup: GiskardTestWrapper
+        :type box_setup: PR2
         """
         p = PoseStamped()
         p.header.frame_id = box_setup.r_tip
@@ -706,7 +706,7 @@ class TestCollisionAvoidanceGoals(object):
 
     def test_avoid_collision_with_far_object(self, pocky_pose_setup):
         """
-        :type pocky_pose_setup: GiskardTestWrapper
+        :type pocky_pose_setup: PR2
         """
         pocky_pose_setup.add_box(position=[25, 25, 25])
         p = PoseStamped()
@@ -727,7 +727,7 @@ class TestCollisionAvoidanceGoals(object):
 
     def test_avoid_all_collision(self, box_setup):
         """
-        :type box_setup: GiskardTestWrapper
+        :type box_setup: PR2
         """
         p = PoseStamped()
         p.header.frame_id = box_setup.r_tip
@@ -747,7 +747,7 @@ class TestCollisionAvoidanceGoals(object):
 
     def test_get_out_of_collision(self, box_setup):
         """
-        :type box_setup: GiskardTestWrapper
+        :type box_setup: PR2
         """
         p = PoseStamped()
         p.header.frame_id = box_setup.r_tip
@@ -780,7 +780,7 @@ class TestCollisionAvoidanceGoals(object):
 
     def test_allow_collision_gripper(self, box_setup):
         """
-        :type box_setup: GiskardTestWrapper
+        :type box_setup: PR2
         """
         ces = box_setup.get_allow_l_gripper(u'box')
         box_setup.add_collision_entries(ces)
@@ -795,7 +795,7 @@ class TestCollisionAvoidanceGoals(object):
 
     def test_attached_collision1(self, box_setup):
         """
-        :type box_setup: GiskardTestWrapper
+        :type box_setup: PR2
         """
         attached_link_name = u'pocky'
         box_setup.attach_box(attached_link_name, [0.1, 0.02, 0.02], box_setup.r_tip, [0.05, 0, 0])
@@ -813,7 +813,7 @@ class TestCollisionAvoidanceGoals(object):
 
     def test_attached_collision_avoidance(self, box_setup):
         """
-        :type box_setup: GiskardTestWrapper
+        :type box_setup: PR2
         """
         pocky = 'http://muh#pocky'
         box_setup.attach_box(pocky, [0.1, 0.02, 0.02], box_setup.r_tip, [0.05, 0, 0])
@@ -836,7 +836,7 @@ class TestCollisionAvoidanceGoals(object):
 
     # def test_collision_during_planning1(self, box_setup):
     #     """
-    #     :type box_setup: GiskardTestWrapper
+    #     :type box_setup: PR2
     #     """
     # FIXME feature not implemented
     #     # FIXME sometimes says endless wiggle detected
@@ -855,7 +855,7 @@ class TestCollisionAvoidanceGoals(object):
 
     # def test_collision_during_planning2(self, box_setup):
     #     """
-    #     :type box_setup: GiskardTestWrapper
+    #     :type box_setup: PR2
     #     """
     # FIXME feature not implemented
     #     # FIXME sometimes says endless wiggle detected
@@ -878,7 +878,7 @@ class TestCollisionAvoidanceGoals(object):
 
     def test_avoid_collision_gripper(self, box_setup):
         """
-        :type box_setup: GiskardTestWrapper
+        :type box_setup: PR2
         """
         box_setup.allow_all_collisions()
         ces = box_setup.get_l_gripper_collision_entries(u'box', 0.05, CollisionEntry.AVOID_COLLISION)
@@ -894,7 +894,7 @@ class TestCollisionAvoidanceGoals(object):
 
     # def test_grasping(self, fake_table_setup):
     #     """
-    #     :type fake_table_setup: GiskardTestWrapper
+    #     :type fake_table_setup: PR2
     #     """
     #     pocky = u'http://muh#pocky'
     #     fake_table_setup.add_box(pocky, [0.02, 0.02, 0.1], u'map', [.5, -0.1, .77])
@@ -911,20 +911,20 @@ class TestCollisionAvoidanceGoals(object):
     #
     # def test_end_state_collision(self, box_setup):
     #     """
-    #     :type box_setup: GiskardTestWrapper
+    #     :type box_setup: PR2
     #     """
     #     # TODO endstate impossible as long as we check for path collision?
     #     pass
 
     # def test_filled_vel_values(self, box_setup):
     #     """
-    #     :type box_setup: GiskardTestWrapper
+    #     :type box_setup: PR2
     #     """
     #     pass
     #
     # def test_undefined_goal(self, box_setup):
     #     """
-    #     :type box_setup: GiskardTestWrapper
+    #     :type box_setup: PR2
     #     """
     #     pass
 
@@ -938,7 +938,7 @@ class TestCollisionAvoidanceGoals(object):
     #     base_pose.header.frame_id = 'map'
     #     base_pose.pose.position = Point(-1.010, -0.152, 0.000)
     #     base_pose.pose.orientation = Quaternion(0.000, 0.000, -0.707, 0.707)
-    #     self.move_pr2_base(base_pose)
+    #     self.move_base(base_pose)
     #
     #     goal_js = {
     #         'r_elbow_flex_joint': -1.43322543123,
@@ -976,7 +976,7 @@ class TestCollisionAvoidanceGoals(object):
     #     base_pose.header.frame_id = 'map'
     #     base_pose.pose.position = Point(0.365, 0.368, 0.000)
     #     base_pose.pose.orientation = Quaternion(0.000, 0.000, -0.007, 1.000)
-    #     self.move_pr2_base(base_pose)
+    #     self.move_base(base_pose)
     #
     #     self.giskard.allow_all_collisions()
     #     self.set_and_check_js_goal(gaya_pose)

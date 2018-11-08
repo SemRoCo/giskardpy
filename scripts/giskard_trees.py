@@ -47,7 +47,7 @@ def grow_tree():
     debug = rospy.get_param(u'~debug')
     if debug:
         giskardpy.PRINT_LEVEL = DEBUG
-    tree_tick_rate = rospy.get_param(u'~tree_tick_rate')
+    # tree_tick_rate = rospy.get_param(u'~tree_tick_rate')
     joint_convergence_threshold = rospy.get_param(u'~joint_convergence_threshold')
     wiggle_precision_threshold = rospy.get_param(u'~wiggle_precision_threshold')
     sample_period = rospy.get_param(u'~sample_period')
@@ -124,7 +124,7 @@ def grow_tree():
     actual_planning.add_plugin(u'controller', ControllerPlugin(robot_description_identifier, js_identifier,
                                                                path_to_data_folder, next_cmd_identifier,
                                                                soft_constraint_identifier, controlled_joints_identifier,
-                                                               nWSR))
+                                                               default_joint_vel_limit, nWSR))
     actual_planning.add_plugin(u'log', NewLogTrajPlugin(trajectory_identifier, js_identifier, time_identifier))
     actual_planning.add_plugin(u'goal reached', GoalReachedPlugin(js_identifier, time_identifier,
                                                                   joint_convergence_threshold))
@@ -146,10 +146,11 @@ def grow_tree():
                                      robot_description_identifier, js_identifier, cartesian_goal_identifier,
                                      controlled_joints_identifier, controllable_links_identifier,
                                      fk_identifier, pyfunction_identifier, closest_point_identifier,
-                                     soft_constraint_identifier, collision_goal_identifier))
+                                     soft_constraint_identifier, collision_goal_identifier, default_joint_vel_limit))
     root.add_child(planning)
     root.add_child(publish_result)
-    root.add_child(SendResult(u'send result', action_server_name))
+    root.add_child(SendResult(u'send result', action_server_name, trajectory_identifier, controlled_joints_identifier,
+                              path_to_data_folder))
 
     tree = BehaviourTree(root)
 

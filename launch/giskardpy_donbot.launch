@@ -6,11 +6,11 @@
     <param name="path_to_data_folder" value="$(find giskardpy)/data/donbot" />
     <param name="enable_gui" value="$(arg gui)"/>
     <rosparam param="map_frame">map</rosparam>
-    <rosparam param="joint_convergence_threshold">0.02</rosparam>
+    <rosparam param="joint_convergence_threshold">0.001</rosparam>
     <rosparam param="wiggle_precision_threshold">5</rosparam>
     <rosparam param="max_traj_length">30</rosparam>
-    <rosparam param="sample_period">0.1</rosparam>
-    <rosparam param="default_joint_vel_limit">0.5</rosparam>
+    <rosparam param="sample_period">0.05</rosparam>
+    <rosparam param="default_joint_vel_limit">0.25</rosparam>
     <rosparam param="default_collision_avoidance_distance">0.05</rosparam>
     <rosparam param="fill_velocity_values">False</rosparam>
     <rosparam param="nWSR">None</rosparam> <!-- None results in a nWSR estimation thats fine most of the time -->
@@ -25,7 +25,7 @@
     <rosparam param="enable_self_collision">False</rosparam>
     <rosparam param="interactive_marker_chains">
      - [base_footprint, gripper_tool_frame]
-     - [base_footprint, camera_link]
+     - [base_link, camera_link]
     </rosparam>
   </node>
 

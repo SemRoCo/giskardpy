@@ -2,7 +2,7 @@ from py_trees import Status
 
 from giskardpy.exceptions import PathCollisionException, InsolvableException
 from giskardpy.plugin import GiskardBehavior, NewPluginBase
-from giskardpy.utils import closest_point_constraint_violated
+from giskardpy.utils import closest_point_constraint_violated, plot_trajectory
 
 
 class WiggleCancel(NewPluginBase):

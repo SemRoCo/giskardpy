@@ -4,6 +4,8 @@ from collections import defaultdict, OrderedDict
 import numpy as np
 from itertools import product
 from numpy import pi
+
+import errno
 from geometry_msgs.msg import PointStamped, Point, Vector3Stamped, Vector3, Pose, PoseStamped, QuaternionStamped, \
     Quaternion
 from sensor_msgs.msg import JointState
@@ -277,6 +279,13 @@ def msg_to_list(thing):
                 thing.orientation.z,
                 thing.orientation.w]
 
+def create_path(path):
+    if not os.path.exists(os.path.dirname(path)):
+        try:
+            os.makedirs(os.path.dirname(path))
+        except OSError as exc:  # Guard against race condition
+            if exc.errno != errno.EEXIST:
+                raise
 
 def plot_trajectory(tj, controlled_joints, path_to_data_folder):
     """

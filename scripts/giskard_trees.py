@@ -28,6 +28,8 @@ from giskardpy.plugin_send_trajectory import SendTrajectory
 
 
 # TODO sync with param server behavior?
+from giskardpy.utils import create_path
+
 
 def ini(param_name, robot_description_identifier, controlled_joints_identifier):
     urdf = rospy.get_param(param_name)
@@ -155,7 +157,6 @@ def grow_tree():
     tree = BehaviourTree(root)
 
     if debug:
-        # TODO create data folder if it does not exist
         def post_tick(snapshot_visitor, behaviour_tree):
             print(u'\n' + py_trees.display.ascii_tree(behaviour_tree.root,
                                                       snapshot_information=snapshot_visitor))
@@ -163,7 +164,9 @@ def grow_tree():
         snapshot_visitor = py_trees.visitors.SnapshotVisitor()
         tree.add_post_tick_handler(functools.partial(post_tick, snapshot_visitor))
         tree.visitors.append(snapshot_visitor)
-        render_dot_tree(root, name=path_to_data_folder + u'/tree')
+        path = path_to_data_folder + u'/tree'
+        create_path(path)
+        render_dot_tree(root, name=path)
 
     blackboard.time = time()
 

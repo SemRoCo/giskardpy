@@ -27,7 +27,8 @@ from giskardpy.plugin_pybullet import PyBulletMonitor, PyBulletUpdatePlugin, Col
 from giskardpy.plugin_send_trajectory import SendTrajectory
 
 
-# TODO sync with param server behavior?
+# TODO add transform3d to package xml
+# TODO add pytest to package xml
 from giskardpy.utils import create_path
 
 

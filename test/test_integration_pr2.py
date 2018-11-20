@@ -811,18 +811,18 @@ class TestCollisionAvoidanceGoals(object):
         box_setup.check_cpi_geq([attached_link_name], 0.048)
         box_setup.remove_object(attached_link_name)
 
-    def test_attached_collision_avoidance(self, box_setup):
+    def test_attached_collision_allow(self, box_setup):
         """
         :type box_setup: PR2
         """
-        pocky = 'http://muh#pocky'
+        pocky = u'http://muh#pocky'
         box_setup.attach_box(pocky, [0.1, 0.02, 0.02], box_setup.r_tip, [0.05, 0, 0])
 
         ces = []
         ce = CollisionEntry()
         ce.type = CollisionEntry.ALLOW_COLLISION
         ce.robot_links = [pocky]
-        ce.body_b = 'box'
+        ce.body_b = u'box'
         ces.append(ce)
         box_setup.add_collision_entries(ces)
 

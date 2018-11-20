@@ -1,7 +1,7 @@
 import rospy
 from actionlib import SimpleActionClient
 from geometry_msgs.msg import PoseStamped, Point, Quaternion
-from giskard_msgs.msg import MoveAction, MoveCmd, Controller, MoveGoal, WorldBody, CollisionEntry
+from giskard_msgs.msg import MoveAction, MoveCmd, Controller, MoveGoal, WorldBody, CollisionEntry, MoveResult
 from giskard_msgs.srv import UpdateWorld, UpdateWorldRequest, UpdateWorldResponse
 from sensor_msgs.msg import JointState
 from shape_msgs.msg import SolidPrimitive
@@ -14,7 +14,7 @@ class GiskardWrapper(object):
         if giskard_topic is not None:
             self.client = SimpleActionClient(giskard_topic, MoveAction)
             self.update_world = rospy.ServiceProxy(u'{}/update_world'.format(ns), UpdateWorld)
-            self.marker_pub = rospy.Publisher('visualization_marker_array', MarkerArray, queue_size=10)
+            self.marker_pub = rospy.Publisher(u'visualization_marker_array', MarkerArray, queue_size=10)
             rospy.wait_for_service(u'{}/update_world'.format(ns))
             self.client.wait_for_server()
         self.tip_to_root = {}
@@ -92,7 +92,37 @@ class GiskardWrapper(object):
     def set_collision_entries(self, collisions):
         self.cmd_seq[-1].collisions.extend(collisions)
 
+    def allow_collision(self, robot_links=None, body_b=u'', link_bs=None):
+        """
+        :param robot_links: list of robot link names as str, None or empty list means all
+        :type robot_links: list
+        :param body_b: name of the other body, use the robots name to modify self collision behavior, empty string means all bodies
+        :type body_b: str
+        :param link_bs: list of link name of body_b, None or empty list means all
+        :type link_bs: list
+        """
+        if robot_links is None:
+            robot_links = []
+        if link_bs is None:
+            link_bs = []
+        collision_entry = CollisionEntry()
+        collision_entry.type = CollisionEntry.ALLOW_COLLISION
+        collision_entry.robot_links = [str(x) for x in robot_links]
+        collision_entry.body_b = str(body_b)
+        collision_entry.link_bs = [str(x) for x in link_bs]
+        self.set_collision_entries([collision_entry])
+
     def avoid_collision(self, min_dist, robot_links=None, body_b=u'', link_bs=None):
+        """
+        :param min_dist: the distance giskard is trying to keep between specified links
+        :type min_dist: float
+        :param robot_links: list of robot link names as str, None or empty list means all
+        :type robot_links: list
+        :param body_b: name of the other body, use the robots name to modify self collision behavior, empty string means all bodies
+        :type body_b: str
+        :param link_bs: list of link name of body_b, None or empty list means all
+        :type link_bs: list
+        """
         if robot_links is None:
             robot_links = []
         if link_bs is None:
@@ -106,11 +136,19 @@ class GiskardWrapper(object):
         self.set_collision_entries([collision_entry])
 
     def allow_all_collisions(self):
+        """
+        Allows all collisions for next goal.
+        """
         collision_entry = CollisionEntry()
         collision_entry.type = CollisionEntry.ALLOW_ALL_COLLISIONS
         self.set_collision_entries([collision_entry])
 
     def avoid_all_collisions(self, distance=0.05):
+        """
+        Avoids all collisions for next goal.
+        :param distance: the distance that giskard is trying to keep from all objects
+        :type distance: float
+        """
         collision_entry = CollisionEntry()
         collision_entry.type = CollisionEntry.AVOID_ALL_COLLISIONS
         collision_entry.min_dist = distance
@@ -122,13 +160,18 @@ class GiskardWrapper(object):
         self.cmd_seq.append(move_cmd)
 
     def clear_cmds(self):
+        """
+        Removes all move commands from the current goal, collision entries are left untouched.
+        """
         self.cmd_seq = []
         self.add_cmd()
 
     def plan_and_execute(self, wait=True):
         """
-        :return:
-        :rtype: giskard_msgs.msg._MoveResult.MoveResult
+        :param wait: this function block if wait=True
+        :type wait: bool
+        :return: result from giskard
+        :rtype: MoveResult
         """
         goal = self._get_goal()
         if wait:
@@ -151,6 +194,11 @@ class GiskardWrapper(object):
         self.client.cancel_goal()
 
     def get_result(self,  timeout=rospy.Duration()):
+        """
+        Waits for giskardpy result and returns it. Only used when plan_and_execute was called with wait=False
+        :type timeout: rospy.Duration
+        :rtype: MoveResult
+        """
         self.client.wait_for_result(timeout)
         return self.client.get_result()
 

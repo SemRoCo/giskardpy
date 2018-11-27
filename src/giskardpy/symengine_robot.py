@@ -205,7 +205,10 @@ class Robot(object):
         """
         # TODO use min of safety and normal limits
         joint = self._urdf_robot.joint_map[joint_names]
-        if joint.safety_controller is not None:
+        if self.is_joint_continuous(joint_names):
+            lower_limit = None
+            upper_limit = None
+        elif joint.safety_controller is not None:
             lower_limit = joint.safety_controller.soft_lower_limit
             upper_limit = joint.safety_controller.soft_upper_limit
         else:

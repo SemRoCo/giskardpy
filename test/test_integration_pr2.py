@@ -1,24 +1,24 @@
-import shutil
-import rospkg
-from multiprocessing import Queue
-from threading import Thread
-import numpy as np
+# import shutil
+# import rospkg
+# from multiprocessing import Queue
+# from threading import Thread
+# import numpy as np
 import pytest
 import rospy
 from numpy import pi
-from angles import normalize_angle, normalize_angle_positive, shortest_angular_distance
+# from angles import normalize_angle, normalize_angle_positive, shortest_angular_distance
 from geometry_msgs.msg import PoseStamped, Point, Quaternion
 from giskard_msgs.msg import MoveActionResult, CollisionEntry, MoveActionGoal, MoveResult, WorldBody, MoveGoal
 from giskard_msgs.srv import UpdateWorldResponse, UpdateWorldRequest
-from sensor_msgs.msg import JointState
+# from sensor_msgs.msg import JointState
 from shape_msgs.msg import SolidPrimitive
-from transforms3d.quaternions import axangle2quat
+# from transforms3d.quaternions import axangle2quat
 
-from giskardpy.python_interface import GiskardWrapper
-from giskardpy.symengine_wrappers import quaternion_from_axis_angle
+# from giskardpy.python_interface import GiskardWrapper
+# from giskardpy.symengine_wrappers import quaternion_from_axis_angle
 from giskardpy.test_utils import PR2
 from giskardpy.tfwrapper import transform_pose, lookup_transform, init as tf_init
-from giskardpy.utils import msg_to_list
+# from giskardpy.utils import msg_to_list
 
 # TODO roslaunch iai_pr2_sim ros_control_sim.launch
 # TODO roslaunch iai_kitchen upload_kitchen_obj.launch

@@ -29,6 +29,7 @@ from giskardpy.plugin_send_trajectory import SendTrajectory
 
 # TODO add transform3d to package xml
 # TODO add pytest to package xml
+# TODO move to src folder
 from giskardpy.utils import create_path
 
 

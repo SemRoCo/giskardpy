@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 
+from __future__ import division
 import rospy
 import random
-
 from Tkinter import *
 from giskardpy.python_interface import GiskardWrapper
 import xml.dom.minidom
@@ -12,7 +12,7 @@ from control_msgs.msg import JointTrajectoryControllerState
 
 
 def get_param(name, value=None):
-    private = "~%s" % name
+    private = "{}".format(name)
     if rospy.has_param(private):
         return rospy.get_param(private)
     elif rospy.has_param(name):
@@ -26,7 +26,6 @@ class JointGoalPublisher(object):
         """
         reads the controllable joints from a collada
         :param robot:
-        :return:
         """
         robot = robot.getElementsByTagName('kinematics_model')[0].getElementsByTagName('technique_common')[0]
         for child in robot.childNodes:
@@ -58,7 +57,6 @@ class JointGoalPublisher(object):
         """
         reads the controllable joints from a urdf
         :param robot:
-        :return:
         """
         robot = robot.getElementsByTagName('robot')[0]
         # Find all non-fixed joints that are controlled by giskard
@@ -133,7 +131,6 @@ class JointGoalPublisher(object):
         sends a joint goal to giskard
         :param goal:
         :type goal: dict
-        :return:
         """
         self.giskard_wrapper.set_joint_goal(goal)
         self.giskard_wrapper.plan_and_execute()
@@ -147,8 +144,8 @@ class JointGoalPublisher(object):
         self.free_joints = {}
         self.joint_list = [] # for maintaining the original order of the joints
         self.dependent_joints = get_param("dependent_joints", {})
-        self.use_mimic = get_param('use_mimic_tags', True)
-        self.use_small = get_param('use_smallest_joint_limits', True)
+        self.use_mimic = get_param('~use_mimic_tags', True)
+        self.use_small = get_param('~use_smallest_joint_limits', True)
 
         self.zeros = get_param("zeros")
 
@@ -181,6 +178,7 @@ class JointGoalPublisherGui(Frame):
         self.master = master
         self.jgp = jgp
         self.joint_map = {}
+        self.collision_distance = get_param('~collision_distance', 0.1)
         self.allow_self_collision = IntVar(value=1)
 
         self.master.title("Giskard Joint Goal Publisher")
@@ -231,24 +229,21 @@ class JointGoalPublisherGui(Frame):
     def send_goal(self):
         """
         sends a joint goal with the joint states set in the sliders
-        :return:
         """
         goal_dict = {}
-        for key in self.sliders.keys():
-            goal_dict[key] = self.sliders[key].get()
+        for key, value in self.sliders.items():
+            goal_dict[key] = value.get()
 
         if self.allow_self_collision.get():
             jgp.giskard_wrapper.disable_self_collision()
         else:
-            jgp.giskard_wrapper.avoid_collision(0.1, body_b=jgp.giskard_wrapper.robot_name)
-            print(jgp.giskard_wrapper.robot_name)
+            jgp.giskard_wrapper.avoid_collision(self.collision_distance, body_b=jgp.giskard_wrapper.robot_name)
 
         self.jgp.send_goal(goal_dict)
 
     def randomize(self):
         """
         sets every slider to a random value
-        :return:
         """
         for key in self.sliders.keys():
             val = random.uniform(self.jgp.free_joints[key]['min'], self.jgp.free_joints[key]['max'])
@@ -257,19 +252,17 @@ class JointGoalPublisherGui(Frame):
     def reset_sliders(self):
         """
         sets the value of every slider to its zerovalue
-        :return:
         """
-        for key in self.sliders.keys():
+        for key in self.sliders:
             self.sliders[key].set(self.jgp.free_joints[key]['zero'])
 
     def current_joint_states(self):
         """
         sets the value of every slider to its corresponding current joint state
-        :return:
         """
         msg = rospy.wait_for_message(u'joint_states', JointState)
         for i in range(len(msg.name)):
-            if msg.name[i] in self.sliders.keys():
+            if msg.name[i] in self.sliders:
                 self.sliders[msg.name[i]].set(msg.position[i])
 
 

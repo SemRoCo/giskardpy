@@ -12,7 +12,7 @@ class SymEngineController(object):
     """
     This class handles constraints and computes joint commands using symengine and qpOases.
     """
-    # TODO should anybody how uses this card know about constrains?
+    # TODO should anybody who uses this class know about constraints?
 
     def __init__(self, robot, path_to_functions):
         """
@@ -26,6 +26,7 @@ class SymEngineController(object):
         self.hard_constraints = {}
         self.joint_constraints = {}
         self.soft_constraints = {}
+        self.free_symbols = None
         self.qp_problem_builder = None
 
     def set_controlled_joints(self, joint_names):
@@ -49,6 +50,10 @@ class SymEngineController(object):
             warnings.warn('use of free_symbols deprecated', DeprecationWarning)
         # TODO bug if soft constraints get replaced, actual amount does not change.
         last_number_of_constraints = len(self.soft_constraints)
+        if free_symbols is not None:
+            if self.free_symbols is None:
+                self.free_symbols = set()
+            self.free_symbols.update(free_symbols)
         self.soft_constraints.update(soft_constraints)
         if last_number_of_constraints != len(self.soft_constraints):
             self.qp_problem_builder = None
@@ -63,7 +68,7 @@ class SymEngineController(object):
                                                   self.hard_constraints,
                                                   self.soft_constraints,
                                                   self.joint_to_symbols_str.values(),
-                                                  None,
+                                                  self.free_symbols,
                                                   path_to_functions)
 
     def get_cmd(self, substitutions, nWSR=None):

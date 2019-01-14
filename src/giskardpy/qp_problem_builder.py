@@ -1,4 +1,5 @@
 import pickle
+import warnings
 from collections import OrderedDict, namedtuple
 import numpy as np
 from time import time
@@ -32,6 +33,8 @@ class QProblemBuilder(object):
         :param path_to_functions: location where the compiled functions can be safed.
         :type path_to_functions: str
         """
+        if free_symbols is not None:
+            warnings.warn('use of free_symbols deprecated', DeprecationWarning)
         assert (not len(controlled_joint_symbols) > len(joint_constraints_dict))
         assert (not len(controlled_joint_symbols) < len(joint_constraints_dict))
         assert (len(hard_constraints_dict) <= len(controlled_joint_symbols))

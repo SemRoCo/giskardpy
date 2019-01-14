@@ -367,7 +367,7 @@ class ControllerPlugin(NewRobotPlugin):
             self.soft_constraints = copy(new_soft_constraints)
             self.controller = SymEngineController(self.robot, self.path_to_functions)
             self.controller.set_controlled_joints(self.controlled_joints)
-            self.controller.update_soft_constraints(self.soft_constraints, self.get_god_map().get_registered_symbols())
+            self.controller.update_soft_constraints(self.soft_constraints)
 
     def update(self):
         expr = self.god_map.get_symbol_map()

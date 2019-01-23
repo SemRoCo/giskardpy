@@ -35,8 +35,13 @@ def robot_urdfs():
     # return st.sampled_from([u'pr2.urdf'])
 
 
-def angle(*args, **kwargs):
-    return st.builds(normalize_angle, limited_float(*args, **kwargs))
+# def angle(*args, **kwargs):
+#     return st.builds(normalize_angle, limited_float(*args, **kwargs))
+
+def angle():
+    return st.floats(-np.pi, np.pi)
+    # q = quaternion()
+    # return (2 * np.arccos(q[-1]))
 
 
 def keys_values(max_length=10, value_type=st.floats(allow_nan=False)):
@@ -44,9 +49,9 @@ def keys_values(max_length=10, value_type=st.floats(allow_nan=False)):
 
 def compare_axis_angle(angle1, axis1, angle2, axis2):
     if np.isclose(axis1, axis2).all():
-        assert np.isclose(angle1, angle2), '{} != {}'.format(angle, angle2)
+        assert np.isclose(angle1, angle2), '{} != {}'.format(angle1, angle2)
     elif np.isclose(axis1, -axis2).all():
-        assert np.isclose(angle1, abs(angle2-2*pi)), '{} != {}'.format(angle, angle2)
+        assert np.isclose(angle1, abs(angle2-2*pi)), '{} != {}'.format(angle1, angle2)
 
 
 @composite
@@ -420,7 +425,7 @@ class Donbot(GiskardTestWrapper):
         rospy.set_param(u'~root_link', u'base_footprint')
         rospy.set_param(u'~enable_collision_marker', True)
         # rospy.set_param(u'~enable_self_collision', True)
-        rospy.set_param(u'~path_to_data_folder', u'../data/pr2/')
+        rospy.set_param(u'~path_to_data_folder', u'../data/donbot/')
         rospy.set_param(u'~collision_time_threshold', 10)
         rospy.set_param(u'~max_traj_length', 30)
         self.camera_tip = u'camera_link'

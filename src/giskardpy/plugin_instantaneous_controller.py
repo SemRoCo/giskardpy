@@ -12,7 +12,7 @@ from giskardpy.input_system import FrameInput, Point3Input, Vector3Input, \
 from giskardpy.plugin_action_server import GetGoal
 from giskardpy.plugin_robot import NewRobotPlugin
 from giskardpy.symengine_controller import SymEngineController, position_conv, rotation_conv, \
-    link_to_link_avoidance, joint_position, continuous_joint_position
+    link_to_link_avoidance, joint_position, continuous_joint_position, rotation_conv_slerp
 import symengine_wrappers as sw
 from giskardpy.tfwrapper import transform_pose
 
@@ -139,15 +139,15 @@ class GoalToConstraints(GetGoal, NewRobotPlugin):
         max_speed_key = [self._goal_identifier, str(type), (root, tip), u'max_speed']
         max_speed = self.god_map.to_symbol(max_speed_key)
 
-        if type == Controller.TRANSLATION_3D:
-            return position_conv(goal_input.get_position(),
-                                 sw.position_of(self.get_robot().get_fk_expression(root, tip)),
-                                 weights=weight,
-                                 trans_gain=p_gain,
-                                 max_trans_speed=max_speed,
-                                 ns=u'{}/{}'.format(root, tip))
-        elif type == Controller.ROTATION_3D:
-            return rotation_conv(goal_input.get_rotation(),
+        # if type == Controller.TRANSLATION_3D:
+        #     return position_conv(goal_input.get_position(),
+        #                          sw.position_of(self.get_robot().get_fk_expression(root, tip)),
+        #                          weights=weight,
+        #                          trans_gain=p_gain,
+        #                          max_trans_speed=max_speed,
+        #                          ns=u'{}/{}'.format(root, tip))
+        if type == Controller.ROTATION_3D:
+            return rotation_conv_slerp(goal_input.get_rotation(),
                                  sw.rotation_of(self.get_robot().get_fk_expression(root, tip)),
                                  current_input.get_rotation(),
                                  weights=weight,

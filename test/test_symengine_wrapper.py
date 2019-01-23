@@ -15,6 +15,7 @@ from tf.transformations import quaternion_matrix, quaternion_about_axis, quatern
 from numpy import pi
 
 from transforms3d.axangles import mat2axangle
+from transforms3d.derivations.angle_axes import angle_axis2mat
 from transforms3d.euler import euler2mat, axangle2euler, euler2axangle
 
 import giskardpy.symengine_wrappers as spw
@@ -25,12 +26,53 @@ from giskardpy.test_utils import limited_float, SMALL_NUMBER, unit_vector, quate
 PKG = 'giskardpy'
 
 
+def speed_up_and_execute(f, params):
+    symbols = []
+    input = []
+    class next_symbol(object):
+        symbol_counter = 0
+        def __call__(self):
+            self.symbol_counter += 1
+            return spw.Symbol('a{}'.format(self.symbol_counter))
+
+    ns = next_symbol()
+    symbol_params = []
+    for i, param in enumerate(params):
+        if isinstance(param, np.ndarray):
+            l2 = []
+            for j in range(param.shape[0]):
+                l1 = []
+                for k in range(param.shape[1]):
+                    s = ns()
+                    symbols.append(s)
+                    input.append(param[j,k])
+                    l1.append(s)
+                l2.append(l1)
+            p = spw.Matrix(l2)
+            symbol_params.append(p)
+        else:
+            s = ns()
+            symbols.append(s)
+            input.append(param)
+            symbol_params.append(s)
+    slow_f = spw.Matrix([f(*symbol_params)])
+    fast_f = spw.speed_up(slow_f, symbols)
+    subs = {str(symbols[i]): input[i] for i in range(len(symbols))}
+    # slow_f.subs()
+    result = fast_f(**subs).T
+    if result.shape[1] == 1:
+        return result.T[0]
+    else:
+        return result[0]
+
+
 class TestSympyWrapper(unittest.TestCase):
 
     # fails if numbers too small or big
     @given(limited_float(outer_limit=1e10))
     def test_abs(self, f1):
         self.assertAlmostEqual(spw.diffable_abs(f1), abs(f1), places=7)
+        self.assertAlmostEqual(speed_up_and_execute(spw.diffable_abs, [f1]), abs(f1), places=7)
 
     # fails if numbers too small or big
     @given(limited_float(min_dist_to_zero=SMALL_NUMBER))
@@ -411,6 +453,24 @@ class TestSympyWrapper(unittest.TestCase):
         self.assertTrue(np.isclose(axis, axis2).all(), msg='{} != {}'.format(axis, axis2))
 
     # fails if numbers too big or too small
+    @given(unit_vector(length=3),
+           angle())
+    def test_axis_angle_from_matrix_stable(self, axis, angle):
+        axis2, angle2 = spw.axis_angle_from_matrix_stable(spw.rotation_matrix_from_axis_angle(axis, angle))
+        angle2 = float(angle2)
+        axis2 = np.array(axis2).astype(float).T[0]
+        if angle < 0:
+            angle = -angle
+            axis = [-x for x in axis]
+        if angle2 < 0:
+            angle2 = -angle2
+            axis2 *= -1
+        if angle == 0:
+            axis = [0,0,1]
+        self.assertTrue(np.isclose(angle, angle2), msg='{} != {}'.format(angle, angle2))
+        self.assertTrue(np.isclose(axis, axis2).all(), msg='{} != {}'.format(axis, axis2))
+
+    # fails if numbers too big or too small
     # TODO buggy
     # @given(unit_vector(length=4, elements=float_nonan_noinf_nobig_nosmall))
     # def test_axis_angle_from_quaternion1(self, q):
@@ -506,8 +566,22 @@ class TestSympyWrapper(unittest.TestCase):
     def test_quaternion_from_matrix(self, q):
         matrix = quaternion_matrix(q)
         q2 = quaternion_from_matrix(matrix)
+        q1 = speed_up_and_execute(spw.quaternion_from_matrix, [matrix])
+        q1_2 = np.array([x.evalf(real=True) for x in spw.quaternion_from_matrix(matrix)]).astype(float)
+        self.assertTrue(np.isclose(q1, q2).all() or np.isclose(q1, -q2).all(), msg='{} != {} | {}'.format(q, q1, q1_2))
+        self.assertTrue(np.isclose(q1_2, q2).all() or np.isclose(q1_2, -q2).all(), msg='{} != {}'.format(q, q1_2))
+
+    # fails if numbers too big or too small
+    @given(quaternion())
+    def test_quaternion_from_matrix2(self, q):
+        matrix = quaternion_matrix(q)
+        angle = (spw.trace(matrix[:3, :3]) - 1) / 2
+        angle = np.arccos(angle)
+        assume(angle > 0.01)
+        assume(angle < np.pi-0.01)
+        q2 = np.array(spw.quaternion_from_axis_angle(*spw.axis_angle_from_matrix(matrix))).astype(float).T
         q1 = np.array(spw.quaternion_from_matrix(matrix.tolist())).astype(float).T
-        self.assertTrue(np.isclose(q1, q2).all() or np.isclose(q1, -q2).all(), msg='{} != {}'.format(q, q2))
+        self.assertTrue(np.isclose(q1, q2).all() or np.isclose(q1, -q2).all(), msg='{} != {}'.format(q, q1))
 
     # fails if numbers too big or too small
     @given(quaternion(),

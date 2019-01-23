@@ -177,7 +177,7 @@ class CompiledFunction(object):
             # TODO nan to num is kinda dangerous
             return np.nan_to_num(out).reshape(self.shape)
         except KeyError as e:
-            msg = u'KeyError: {}\ntry deleting the last loaded compiler to trigger recompilation'.format(e.message)
+            msg = u'KeyError: {}\ntry deleting the data folder to trigger recompilation'.format(e.message)
             raise SymengineException(msg)
 
 
@@ -525,6 +525,28 @@ def axis_angle_from_matrix(rotation_matrix):
     axis = sp.Matrix([x / n, y / n, z / n])
     return axis, angle
 
+def axis_angle_from_matrix_stable(rotation_matrix):
+    """
+    :param rotation_matrix: 4x4 or 3x3 Matrix
+    :type rotation_matrix: Matrix
+    :return: 3x1 Matrix, angle
+    :rtype: (Matrix, Union[float, Symbol])
+    """
+    rm = rotation_matrix
+    angle = (trace(rm[:3, :3]) - 1) / 2
+    angle = diffable_min_fast(angle, 1)
+    angle = diffable_max_fast(angle, -1)
+    angle = sp.acos(angle)
+    x = (rm[2, 1] - rm[1, 2])
+    y = (rm[0, 2] - rm[2, 0])
+    z = (rm[1, 0] - rm[0, 1])
+    n = sp.sqrt(x * x + y * y + z * z)
+    m = if_eq_zero(n, 1, n)
+    axis = sp.Matrix([if_eq_zero(n, 0, x / m),
+                      if_eq_zero(n, 0, y / m),
+                      if_eq_zero(n, 1, z / m)])
+    return axis, angle
+
 
 def axis_angle_from_quaternion(x, y, z, w):
     """
@@ -639,8 +661,13 @@ def quaternion_from_matrix(matrix):
     :return: 4x1 Matrix
     :rtype: Matrix
     """
+    return quaternion_from_axis_angle(*axis_angle_from_matrix(matrix))
+    # return quaternion_from_rpy(*rpy_from_matrix(matrix))
     q = Matrix([0, 0, 0, 0])
-    M = Matrix(matrix)
+    if isinstance(matrix, np.ndarray):
+        M = Matrix(matrix.tolist())
+    else:
+        M = Matrix(matrix)
     t = trace(M)
 
     if0 = t - M[3, 3]
@@ -754,7 +781,7 @@ def diffable_slerp(q1, q2, t):
     :type q1: Matrix
     :param q2: 4x1 Matrix
     :type q2: Matrix
-    :param t: 4x1 Matrix
+    :param t: float, 0-1
     :type t:  Union[float, Symbol]
     :return: 4x1 Matrix; Return spherical linear interpolation between two quaternions.
     :rtype: Matrix

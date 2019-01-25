@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+from datetime import datetime
 from itertools import product
 
 import rospy
@@ -7,6 +8,7 @@ import pylab as plt
 from control_msgs.msg import FollowJointTrajectoryActionGoal
 from trajectory_msgs.msg import JointTrajectoryPoint
 import numpy as np
+
 
 # def plot_trajectory(tj, controlled_joints):
 #     """
@@ -61,7 +63,7 @@ def cb(data):
     velocities = []
     times = []
     names = traj.joint_names
-    for jtp in traj.points: #type: JointTrajectoryPoint
+    for jtp in traj.points:  # type: JointTrajectoryPoint
         positions.append(jtp.positions)
         if len(jtp.velocities) > 0:
             velocities.append(jtp.velocities)
@@ -78,7 +80,7 @@ def cb(data):
         if len(velocities) > 0:
             ax2.plot(times, velocities[:, i], fmts[i])
     box = ax1.get_position()
-    ax1.set_ylim(-3, 1)
+    # ax1.set_ylim(-2, 2)
     ax1.set_position([box.x0, box.y0, box.width * 0.6, box.height])
     box = ax2.get_position()
     ax2.set_position([box.x0, box.y0, box.width * 0.6, box.height])
@@ -87,7 +89,10 @@ def cb(data):
     ax1.legend(loc=u'center', bbox_to_anchor=(1.45, 0))
     ax1.grid()
     ax2.grid()
-    plt.savefig(u'trajectory.pdf')
+    now = datetime.now()
+    plt.savefig(
+        u'trajectory_{}-{}-{}-{}-{}-{}.pdf'.format(now.year, now.month, now.day, now.hour, now.minute, now.second))
+    print(u'saved trajectory')
     # plt.show()
 
 

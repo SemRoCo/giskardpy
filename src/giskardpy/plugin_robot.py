@@ -6,7 +6,7 @@ from giskardpy.utils import urdfs_equal
 
 class NewRobotPlugin(NewPluginBase):
 
-    def __init__(self, robot_description_identifier, js_identifier, default_joint_vel_limit=1):
+    def __init__(self, robot_description_identifier, js_identifier, default_joint_vel_limit):
         """
         :type robot_description_identifier: str
         :type js_identifier: str

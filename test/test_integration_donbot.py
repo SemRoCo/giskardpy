@@ -215,30 +215,19 @@ class TestCartGoals(object):
         """
         :type zero_pose: Donbot
         """
-        # start_pose = {
-        #     u'ur5_elbow_joint': 2.14547738764,
-        #     u'ur5_shoulder_lift_joint': -1.177280122,
-        #     u'ur5_shoulder_pan_joint': -1.8550731481,
-        #     u'ur5_wrist_1_joint': -3.70994178242,
-        #     u'ur5_wrist_2_joint': -1.30010203311,
-        #     u'ur5_wrist_3_joint': 1.45079807832,
-        # }
-        #
-        # zero_pose.allow_self_collision()
-        # zero_pose.send_and_check_joint_goal(start_pose)
 
         goal_pose = PoseStamped()
         goal_pose.header.frame_id = u'base_link'
-        goal_pose.pose.position.x = 0.341
+        goal_pose.pose.position.x = 0.212
         goal_pose.pose.position.y = -0.314
         goal_pose.pose.position.z = 0.873
-        goal_pose.pose.orientation.x = 0
-        goal_pose.pose.orientation.y = 0
-        goal_pose.pose.orientation.z = 0
-        goal_pose.pose.orientation.w = 1
+        goal_pose.pose.orientation.x = 0.004
+        goal_pose.pose.orientation.y = 0.02
+        goal_pose.pose.orientation.z = 0.435
+        goal_pose.pose.orientation.w = .9
 
         zero_pose.allow_self_collision()
-        zero_pose.set_and_check_cart_goal(zero_pose.default_root, zero_pose.camera_tip, goal_pose)
+        zero_pose.set_and_check_cart_goal(zero_pose.default_root, zero_pose.gripper_tip, goal_pose)
 
 #     def test_cart_goal_2eef(self, zero_pose):
 #         """

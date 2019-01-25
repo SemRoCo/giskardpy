@@ -15,6 +15,8 @@ from giskardpy.symengine_controller import SymEngineController, position_conv, r
     link_to_link_avoidance, joint_position, continuous_joint_position, rotation_conv_slerp
 import symengine_wrappers as sw
 from giskardpy.tfwrapper import transform_pose
+import numpy as np
+
 
 # TODO plan only not supported
 # TODO waypoints not supported
@@ -139,15 +141,15 @@ class GoalToConstraints(GetGoal, NewRobotPlugin):
         max_speed_key = [self._goal_identifier, str(type), (root, tip), u'max_speed']
         max_speed = self.god_map.to_symbol(max_speed_key)
 
-        # if type == Controller.TRANSLATION_3D:
-        #     return position_conv(goal_input.get_position(),
-        #                          sw.position_of(self.get_robot().get_fk_expression(root, tip)),
-        #                          weights=weight,
-        #                          trans_gain=p_gain,
-        #                          max_trans_speed=max_speed,
-        #                          ns=u'{}/{}'.format(root, tip))
+        if type == Controller.TRANSLATION_3D:
+            return position_conv(goal_input.get_position(),
+                                 sw.position_of(self.get_robot().get_fk_expression(root, tip)),
+                                 weights=weight,
+                                 trans_gain=p_gain,
+                                 max_trans_speed=max_speed,
+                                 ns=u'{}/{}'.format(root, tip))
         if type == Controller.ROTATION_3D:
-            return rotation_conv_slerp(goal_input.get_rotation(),
+            return rotation_conv(goal_input.get_rotation(),
                                  sw.rotation_of(self.get_robot().get_fk_expression(root, tip)),
                                  current_input.get_rotation(),
                                  weights=weight,
@@ -161,6 +163,7 @@ class GoalToConstraints(GetGoal, NewRobotPlugin):
         """
         to self.controller and saves functions for continuous joints in god map.
         """
+        return
         pyfunctions = {}
         for joint_name in self.controlled_joints:
 
@@ -217,8 +220,7 @@ class GoalToConstraints(GetGoal, NewRobotPlugin):
                                                            contact_normal.get_expression(),
                                                            min_dist))
 
-        # self.controller.update_soft_constraints(soft_constraints, self.god_map.get_registered_symbols())
-        self.soft_constraints.update(soft_constraints)
+        # self.soft_constraints.update(soft_constraints)
 
     def set_unused_joint_goals_to_current(self):
         """
@@ -227,14 +229,15 @@ class GoalToConstraints(GetGoal, NewRobotPlugin):
         joint_goal = self.god_map.safe_get_data([self._goal_identifier, str(Controller.JOINT)])
         for joint_name in self.controlled_joints:
             if joint_name not in joint_goal:
-                joint_goal[joint_name] = {u'weight': 0.0,
+                joint_goal[joint_name] = {u'weight': 1.0,
                                           u'p_gain': 10,
                                           u'max_speed': self.get_robot().default_joint_velocity_limit,
                                           u'position': self.god_map.safe_get_data([self._joint_states_identifier,
                                                                                    joint_name,
-                                                                              u'position'])}
-                if joint_name not in self.used_joints:
-                    joint_goal[joint_name][u'weight'] = 1
+                                                                                   u'position'])}
+                if joint_name in self.used_joints:
+                    joint_goal[joint_name][u'weight'] = 0.
+                    joint_goal[joint_name][u'p_gain'] = 0.
 
         self.god_map.safe_set_data([self._goal_identifier, str(Controller.JOINT)], joint_goal)
 
@@ -337,6 +340,16 @@ def cart_controller_to_goal(controller):
     root = controller.root_link
     tip = controller.tip_link
     controller.goal_pose = transform_pose(root, controller.goal_pose)
+    # make sure rotation is normalized quaternion
+    rotation = np.array([controller.goal_pose.pose.orientation.x,
+                         controller.goal_pose.pose.orientation.y,
+                         controller.goal_pose.pose.orientation.z,
+                         controller.goal_pose.pose.orientation.w])
+    normalized_rotation = rotation / np.linalg.norm(rotation)
+    controller.goal_pose.pose.orientation.x = normalized_rotation[0]
+    controller.goal_pose.pose.orientation.y = normalized_rotation[1]
+    controller.goal_pose.pose.orientation.z = normalized_rotation[2]
+    controller.goal_pose.pose.orientation.w = normalized_rotation[3]
     goals[root, tip] = controller
     return goals
 

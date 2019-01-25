@@ -38,6 +38,9 @@ def robot_urdfs():
 # def angle(*args, **kwargs):
 #     return st.builds(normalize_angle, limited_float(*args, **kwargs))
 
+def angle_positive():
+    return st.floats(np.pi, 2*np.pi)
+
 def angle():
     return st.floats(-np.pi, np.pi)
     # q = quaternion()
@@ -418,7 +421,7 @@ class Donbot(GiskardTestWrapper):
         rospy.set_param(u'~joint_convergence_threshold', 0.002)
         rospy.set_param(u'~wiggle_precision_threshold', 4)
         rospy.set_param(u'~sample_period', 0.05)
-        rospy.set_param(u'~default_joint_vel_limit', 10)
+        rospy.set_param(u'~default_joint_vel_limit', 0.25)
         rospy.set_param(u'~default_collision_avoidance_distance', 0.05)
         rospy.set_param(u'~fill_velocity_values', False)
         rospy.set_param(u'~nWSR', u'None')

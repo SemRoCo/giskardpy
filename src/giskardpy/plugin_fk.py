@@ -13,7 +13,7 @@ class NewFkPlugin(NewRobotPlugin):
         self.fk_identifier = fk_identifier
         self.fk = None
         self.robot = None
-        super(NewFkPlugin, self).__init__(robot_description_identifier, js_identifier)
+        super(NewFkPlugin, self).__init__(robot_description_identifier, js_identifier, 0)
 
     def initialize(self):
         super(NewFkPlugin, self).initialize()

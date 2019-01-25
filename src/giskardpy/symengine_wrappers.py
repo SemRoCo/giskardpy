@@ -130,7 +130,7 @@ def if_greater_eq_zero(condition, if_result, else_result):
     return if_greater_zero(-condition, else_result, if_result)
 
 
-def if_eq_zero(condition, if_result, else_result):
+def diffable_if_eq_zero(condition, if_result, else_result):
     """
     A short expression which can be compiled quickly.
     !Returns shit if condition is very close to but not equal to zero!
@@ -144,6 +144,19 @@ def if_eq_zero(condition, if_result, else_result):
     condition = diffable_abs(diffable_sign(condition))
     return (1 - condition) * if_result + condition * else_result
 
+def if_eq_zero(condition, if_result, else_result):
+    """
+    A short expression which can be compiled quickly.
+    !Returns shit if condition is very close to but not equal to zero!
+    !Returns shit if if_result is outside of [-1e8,1e8]!
+    :type condition: Union[float, Symbol]
+    :type if_result: Union[float, Symbol]
+    :type else_result: Union[float, Symbol]
+    :return: if_result if condition == 0 else else_result
+    :rtype: Union[float, Symbol]
+    """
+    condition = sp.Abs(diffable_sign(condition))
+    return (1 - condition) * if_result + condition * else_result
 
 def safe_compiled_function(f, file_name):
     create_path(file_name)
@@ -505,7 +518,7 @@ def rotation_distance(rotation_matrix1, rotation_matrix2):
     return sp.acos(v)
 
 
-def axis_angle_from_matrix(rotation_matrix):
+def diffable_axis_angle_from_matrix(rotation_matrix):
     """
     :param rotation_matrix: 4x4 or 3x3 Matrix
     :type rotation_matrix: Matrix
@@ -523,9 +536,12 @@ def axis_angle_from_matrix(rotation_matrix):
     n = sp.sqrt(x * x + y * y + z * z)
 
     axis = sp.Matrix([x / n, y / n, z / n])
+    axis *= angle
+    angle = diffable_abs(angle)
+    axis /= angle
     return axis, angle
 
-def axis_angle_from_matrix_stable(rotation_matrix):
+def diffable_axis_angle_from_matrix_stable(rotation_matrix):
     """
     :param rotation_matrix: 4x4 or 3x3 Matrix
     :type rotation_matrix: Matrix
@@ -541,12 +557,39 @@ def axis_angle_from_matrix_stable(rotation_matrix):
     y = (rm[0, 2] - rm[2, 0])
     z = (rm[1, 0] - rm[0, 1])
     n = sp.sqrt(x * x + y * y + z * z)
+    m = diffable_if_eq_zero(n, 1, n)
+    axis = sp.Matrix([diffable_if_eq_zero(n, 0, x / m),
+                      diffable_if_eq_zero(n, 0, y / m),
+                      diffable_if_eq_zero(n, 1, z / m)])
+    sign = diffable_sign(angle)
+    axis *= sign
+    angle = sign * angle
+    return axis, angle
+
+def axis_angle_from_matrix(rotation_matrix):
+    """
+    :param rotation_matrix: 4x4 or 3x3 Matrix
+    :type rotation_matrix: Matrix
+    :return: 3x1 Matrix, angle
+    :rtype: (Matrix, Union[float, Symbol])
+    """
+    rm = rotation_matrix
+    angle = (trace(rm[:3, :3]) - 1) / 2
+    angle = sp.Min(angle, 1)
+    angle = sp.Max(angle, -1)
+    angle = sp.acos(angle)
+    x = (rm[2, 1] - rm[1, 2])
+    y = (rm[0, 2] - rm[2, 0])
+    z = (rm[1, 0] - rm[0, 1])
+    n = sp.sqrt(x * x + y * y + z * z)
     m = if_eq_zero(n, 1, n)
     axis = sp.Matrix([if_eq_zero(n, 0, x / m),
                       if_eq_zero(n, 0, y / m),
                       if_eq_zero(n, 1, z / m)])
+    sign = diffable_sign(angle)
+    axis *= sign
+    angle = sign * angle
     return axis, angle
-
 
 def axis_angle_from_quaternion(x, y, z, w):
     """
@@ -589,7 +632,7 @@ def axis_angle_from_rpy(roll, pitch, yaw):
     :return: 3x1 Matrix, angle
     :rtype: (Matrix, Union[float, Symbol])
     """
-    return axis_angle_from_matrix(rotation_matrix_from_rpy(roll, pitch, yaw))
+    return diffable_axis_angle_from_matrix(rotation_matrix_from_rpy(roll, pitch, yaw))
 
 
 _EPS = np.finfo(float).eps * 4.0
@@ -661,7 +704,7 @@ def quaternion_from_matrix(matrix):
     :return: 4x1 Matrix
     :rtype: Matrix
     """
-    return quaternion_from_axis_angle(*axis_angle_from_matrix(matrix))
+    return quaternion_from_axis_angle(*diffable_axis_angle_from_matrix_stable(matrix))
     # return quaternion_from_rpy(*rpy_from_matrix(matrix))
     q = Matrix([0, 0, 0, 0])
     if isinstance(matrix, np.ndarray):
@@ -802,10 +845,13 @@ def diffable_slerp(q1, q2, t):
 
     sin_half_theta = sqrt(1.0 - cos_half_theta * cos_half_theta)
     # prevent /0
-    sin_half_theta = if_eq_zero(sin_half_theta, 1, sin_half_theta)
+    sin_half_theta = diffable_if_eq_zero(sin_half_theta, 1, sin_half_theta)
     if2 = 0.001 - diffable_abs(sin_half_theta)
 
     ratio_a = sin((1.0 - t) * half_theta) / sin_half_theta
     ratio_b = sin(t * half_theta) / sin_half_theta
     return if_greater_eq_zero(if1, sp.Matrix(q1),
                               if_greater_zero(if2, 0.5 * q1 + 0.5 * q2, ratio_a * q1 + ratio_b * q2))
+
+def to_numpy(matrix):
+    return np.array(matrix.tolist()).astype(float).reshape(matrix.shape)

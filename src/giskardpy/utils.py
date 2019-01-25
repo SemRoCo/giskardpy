@@ -293,6 +293,8 @@ def plot_trajectory(tj, controlled_joints, path_to_data_folder):
     :param controlled_joints: only joints in this list will be added to the plot
     :type controlled_joints: list
     """
+    if len(tj._points) <= 0:
+        return
     colors = [u'b', u'g', u'r', u'c', u'm', u'y', u'k']
     line_styles = [u'', u'--', u'-.']
     fmts = [u''.join(x) for x in product(line_styles, colors)]
@@ -323,5 +325,7 @@ def plot_trajectory(tj, controlled_joints, path_to_data_folder):
 
     # Put a legend to the right of the current axis
     ax1.legend(loc=u'center', bbox_to_anchor=(1.45, 0))
+    ax1.grid()
+    ax2.grid()
 
     plt.savefig(path_to_data_folder + u'trajectory.pdf')

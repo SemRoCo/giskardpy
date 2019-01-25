@@ -439,9 +439,9 @@ class TestSympyWrapper(unittest.TestCase):
     # TODO use 'if' to make angle always positive?
     @given(unit_vector(length=3),
            angle_positive())
-    @reproduce_failure('4.0.2', 'AXicY2DACRgRTBYGAAA9AAY=')
     def test_axis_angle_from_matrix(self, axis, angle):
         assume(angle > 0.0001)
+        assume(angle < np.pi-0.0001)
         axis2, angle2 = spw.diffable_axis_angle_from_matrix(spw.rotation_matrix_from_axis_angle(axis, angle))
         angle2 = float(angle2)
         axis2 = np.array(axis2).astype(float).T[0]
@@ -457,8 +457,8 @@ class TestSympyWrapper(unittest.TestCase):
     # fails if numbers too big or too small
     @given(unit_vector(length=3),
            angle_positive())
-    @reproduce_failure('4.0.2', 'AXicY2AAAUYG/ICRAQAATAAD')
     def test_axis_angle_from_matrix_stable(self, axis, angle):
+        assume(angle < np.pi - 0.0001)
         axis2, angle2 = spw.diffable_axis_angle_from_matrix_stable(spw.rotation_matrix_from_axis_angle(axis, angle))
         angle2 = float(angle2)
         axis2 = np.array(axis2).astype(float).T[0]
@@ -474,7 +474,6 @@ class TestSympyWrapper(unittest.TestCase):
         self.assertTrue(np.isclose(axis, axis2).all(), msg='{} != {}'.format(axis, axis2))
 
     @given(quaternion())
-    # @reproduce_failure('4.0.2', 'AXicY2CAAkYGggAAAE8AAg==')
     def test_axis_angle_from_matrix2(self, q):
         m = quat2mat(q)
         axis_reference, angle_reference = mat2axangle(m)

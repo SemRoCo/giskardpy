@@ -148,7 +148,7 @@ class GoalToConstraints(GetGoal, NewRobotPlugin):
                                  trans_gain=p_gain,
                                  max_trans_speed=max_speed,
                                  ns=u'{}/{}'.format(root, tip))
-        if type == Controller.ROTATION_3D:
+        elif type == Controller.ROTATION_3D:
             return rotation_conv(goal_input.get_rotation(),
                                  sw.rotation_of(self.get_robot().get_fk_expression(root, tip)),
                                  current_input.get_rotation(),
@@ -163,7 +163,6 @@ class GoalToConstraints(GetGoal, NewRobotPlugin):
         """
         to self.controller and saves functions for continuous joints in god map.
         """
-        return
         pyfunctions = {}
         for joint_name in self.controlled_joints:
 
@@ -220,7 +219,7 @@ class GoalToConstraints(GetGoal, NewRobotPlugin):
                                                            contact_normal.get_expression(),
                                                            min_dist))
 
-        # self.soft_constraints.update(soft_constraints)
+        self.soft_constraints.update(soft_constraints)
 
     def set_unused_joint_goals_to_current(self):
         """
@@ -341,6 +340,7 @@ def cart_controller_to_goal(controller):
     tip = controller.tip_link
     controller.goal_pose = transform_pose(root, controller.goal_pose)
     # make sure rotation is normalized quaternion
+    # TODO make a function out of this
     rotation = np.array([controller.goal_pose.pose.orientation.x,
                          controller.goal_pose.pose.orientation.y,
                          controller.goal_pose.pose.orientation.z,

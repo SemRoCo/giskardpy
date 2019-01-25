@@ -2,7 +2,7 @@
 
   <arg name="gui" default="false" />
 
-  <node pkg="giskardpy" type="giskard_trees.py" name="giskard222" output="screen">
+  <node pkg="giskardpy" type="giskard_trees.py" name="giskard" output="screen">
     <param name="path_to_data_folder" value="$(find giskardpy)/data/hsr" />
     <param name="enable_gui" value="$(arg gui)"/>
     <rosparam param="map_frame">map</rosparam>
@@ -19,9 +19,10 @@
     <rosparam param="collision_time_threshold">15</rosparam>
     <rosparam param="debug">True</rosparam>
     <rosparam param="tree_tick_rate">1</rosparam>
-    <remap from="/whole_body_controller/state" to="/hsrb/arm_trajectory_controller/state"/>
-    <remap from="/whole_body_controller/follow_joint_trajectory" to="/hsrb/arm_trajectory_controller/follow_joint_trajectory"/>
-    <remap from="/joint_states" to="/hsrb/joint_states"/>
+    <!-- remaps for real hsr -->
+    <!-- <remap from="/whole_body_controller/state" to="/hsrb/arm_trajectory_controller/state"/> -->
+    <!-- <remap from="/whole_body_controller/follow_joint_trajectory" to="/hsrb/arm_trajectory_controller/follow_joint_trajectory"/> -->
+    <!-- <remap from="/joint_states" to="/hsrb/joint_states"/> -->
   </node>
 
   <node pkg="giskardpy" type="interactive_marker.py" name="giskard_interactive_marker" output="screen">

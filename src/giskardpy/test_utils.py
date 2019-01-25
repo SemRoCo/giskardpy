@@ -35,16 +35,11 @@ def robot_urdfs():
     # return st.sampled_from([u'pr2.urdf'])
 
 
-# def angle(*args, **kwargs):
-#     return st.builds(normalize_angle, limited_float(*args, **kwargs))
-
 def angle_positive():
-    return st.floats(np.pi, 2*np.pi)
+    return st.floats(0, 2*np.pi)
 
 def angle():
     return st.floats(-np.pi, np.pi)
-    # q = quaternion()
-    # return (2 * np.arccos(q[-1]))
 
 
 def keys_values(max_length=10, value_type=st.floats(allow_nan=False)):

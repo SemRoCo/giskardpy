@@ -211,9 +211,7 @@ def rotation_conv(goal_rotation, current_rotation, current_evaluated_rotation, w
     hack = sw.rotation_matrix_from_axis_angle([0, 0, 1], 0.0001)
 
     axis, angle = sw.diffable_axis_angle_from_matrix((current_rotation.T * (current_evaluated_rotation * hack)).T)
-    # axis, angle = sw.axis_angle_from_matrix(current_rotation.T)
     c_aa = (axis * angle)
-    c_aa = c_aa
 
     soft_constraints[u'align {} rotation 0'.format(ns)] = SoftConstraint(lower=r_rot_control[0],
                                                                          upper=r_rot_control[0],
@@ -227,25 +225,6 @@ def rotation_conv(goal_rotation, current_rotation, current_evaluated_rotation, w
                                                                          upper=r_rot_control[2],
                                                                          weight=weights,
                                                                          expression=c_aa[2])
-    add_debug_constraint(soft_constraints, 'angle', capped_angle)
-    add_debug_constraint(soft_constraints, 'c 00', current_rotation[0,0])
-    add_debug_constraint(soft_constraints, 'c 01', current_rotation[0,1])
-    add_debug_constraint(soft_constraints, 'c 02', current_rotation[0,2])
-    add_debug_constraint(soft_constraints, 'c 10', current_rotation[1,0])
-    add_debug_constraint(soft_constraints, 'c 11', current_rotation[1,1])
-    add_debug_constraint(soft_constraints, 'c 12', current_rotation[1,2])
-    add_debug_constraint(soft_constraints, 'c 20', current_rotation[2,0])
-    add_debug_constraint(soft_constraints, 'c 21', current_rotation[2,1])
-    add_debug_constraint(soft_constraints, 'c 22', current_rotation[2,2])
-    add_debug_constraint(soft_constraints, 'g 00', goal_rotation[0,0])
-    add_debug_constraint(soft_constraints, 'g 01', goal_rotation[0,1])
-    add_debug_constraint(soft_constraints, 'g 02', goal_rotation[0,2])
-    add_debug_constraint(soft_constraints, 'g 10', goal_rotation[1,0])
-    add_debug_constraint(soft_constraints, 'g 11', goal_rotation[1,1])
-    add_debug_constraint(soft_constraints, 'g 12', goal_rotation[1,2])
-    add_debug_constraint(soft_constraints, 'g 20', goal_rotation[2,0])
-    add_debug_constraint(soft_constraints, 'g 21', goal_rotation[2,1])
-    add_debug_constraint(soft_constraints, 'g 22', goal_rotation[2,2])
     return soft_constraints
 
 

@@ -51,7 +51,7 @@ class QProblemBuilder(object):
 
         self.qp_solver = QPSolver(len(self.joint_constraints_dict) + len(self.soft_constraints_dict),
                                   len(self.hard_constraints_dict) + len(self.soft_constraints_dict))
-        self.lbAs = None
+        self.lbAs = None # for debugging purposes
 
     # @profile
     def make_matrices(self):
@@ -203,7 +203,7 @@ class QProblemBuilder(object):
         if xdot_full is None:
             return None
         # TODO enable debug print in an elegant way, preferably without slowing anything down
-        self.debug_print(np_H, np_A, np_lb, np_ub, np_lbA, np_ubA, xdot_full)
+        # self.debug_print(np_H, np_A, np_lb, np_ub, np_lbA, np_ubA, xdot_full)
         return OrderedDict((observable, xdot_full[i]) for i, observable in enumerate(self.controlled_joints))
 
 

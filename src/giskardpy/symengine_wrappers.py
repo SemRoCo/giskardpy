@@ -520,12 +520,14 @@ def rotation_distance(rotation_matrix1, rotation_matrix2):
 
 def diffable_axis_angle_from_matrix(rotation_matrix):
     """
+    MAKE SURE MATRIX IS NORMALIZED
     :param rotation_matrix: 4x4 or 3x3 Matrix
     :type rotation_matrix: Matrix
     :return: 3x1 Matrix, angle
     :rtype: (Matrix, Union[float, Symbol])
     """
     # TODO nan if angle 0
+    # TODO buggy when angle == pi
     # TODO use 'if' to make angle always positive?
     rm = rotation_matrix
     angle = (trace(rm[:3, :3]) - 1) / 2
@@ -536,9 +538,6 @@ def diffable_axis_angle_from_matrix(rotation_matrix):
     n = sp.sqrt(x * x + y * y + z * z)
 
     axis = sp.Matrix([x / n, y / n, z / n])
-    axis *= angle
-    angle = diffable_abs(angle)
-    axis /= angle
     return axis, angle
 
 def diffable_axis_angle_from_matrix_stable(rotation_matrix):
@@ -548,6 +547,7 @@ def diffable_axis_angle_from_matrix_stable(rotation_matrix):
     :return: 3x1 Matrix, angle
     :rtype: (Matrix, Union[float, Symbol])
     """
+    # TODO buggy when angle == pi
     rm = rotation_matrix
     angle = (trace(rm[:3, :3]) - 1) / 2
     angle = diffable_min_fast(angle, 1)
@@ -561,9 +561,6 @@ def diffable_axis_angle_from_matrix_stable(rotation_matrix):
     axis = sp.Matrix([diffable_if_eq_zero(n, 0, x / m),
                       diffable_if_eq_zero(n, 0, y / m),
                       diffable_if_eq_zero(n, 1, z / m)])
-    sign = diffable_sign(angle)
-    axis *= sign
-    angle = sign * angle
     return axis, angle
 
 def axis_angle_from_matrix(rotation_matrix):
@@ -632,6 +629,7 @@ def axis_angle_from_rpy(roll, pitch, yaw):
     :return: 3x1 Matrix, angle
     :rtype: (Matrix, Union[float, Symbol])
     """
+    # TODO maybe go over quaternion instead of matrix
     return diffable_axis_angle_from_matrix(rotation_matrix_from_rpy(roll, pitch, yaw))
 
 
@@ -706,54 +704,54 @@ def quaternion_from_matrix(matrix):
     """
     return quaternion_from_axis_angle(*diffable_axis_angle_from_matrix_stable(matrix))
     # return quaternion_from_rpy(*rpy_from_matrix(matrix))
-    q = Matrix([0, 0, 0, 0])
-    if isinstance(matrix, np.ndarray):
-        M = Matrix(matrix.tolist())
-    else:
-        M = Matrix(matrix)
-    t = trace(M)
-
-    if0 = t - M[3, 3]
-
-    if1 = M[1, 1] - M[0, 0]
-
-    m_i_i = if_greater_zero(if1, M[1, 1], M[0, 0])
-    m_i_j = if_greater_zero(if1, M[1, 2], M[0, 1])
-    m_i_k = if_greater_zero(if1, M[1, 0], M[0, 2])
-
-    m_j_i = if_greater_zero(if1, M[2, 1], M[1, 0])
-    m_j_j = if_greater_zero(if1, M[2, 2], M[1, 1])
-    m_j_k = if_greater_zero(if1, M[2, 0], M[1, 2])
-
-    m_k_i = if_greater_zero(if1, M[0, 1], M[2, 0])
-    m_k_j = if_greater_zero(if1, M[0, 2], M[2, 1])
-    m_k_k = if_greater_zero(if1, M[0, 0], M[2, 2])
-
-    if2 = M[2, 2] - m_i_i
-
-    m_i_i = if_greater_zero(if2, M[2, 2], m_i_i)
-    m_i_j = if_greater_zero(if2, M[2, 0], m_i_j)
-    m_i_k = if_greater_zero(if2, M[2, 1], m_i_k)
-
-    m_j_i = if_greater_zero(if2, M[0, 2], m_j_i)
-    m_j_j = if_greater_zero(if2, M[0, 0], m_j_j)
-    m_j_k = if_greater_zero(if2, M[0, 1], m_j_k)
-
-    m_k_i = if_greater_zero(if2, M[1, 2], m_k_i)
-    m_k_j = if_greater_zero(if2, M[1, 0], m_k_j)
-    m_k_k = if_greater_zero(if2, M[1, 1], m_k_k)
-
-    t = if_greater_zero(if0, t, m_i_i - (m_j_j + m_k_k) + M[3, 3])
-    q[0] = if_greater_zero(if0, M[2, 1] - M[1, 2],
-                           if_greater_zero(if2, m_i_j + m_j_i, if_greater_zero(if1, m_k_i + m_i_k, t)))
-    q[1] = if_greater_zero(if0, M[0, 2] - M[2, 0],
-                           if_greater_zero(if2, m_k_i + m_i_k, if_greater_zero(if1, t, m_i_j + m_j_i)))
-    q[2] = if_greater_zero(if0, M[1, 0] - M[0, 1],
-                           if_greater_zero(if2, t, if_greater_zero(if1, m_i_j + m_j_i, m_k_i + m_i_k)))
-    q[3] = if_greater_zero(if0, t, m_k_j - m_j_k)
-
-    q *= 0.5 / sp.sqrt(t * M[3, 3])
-    return q
+    # q = Matrix([0, 0, 0, 0])
+    # if isinstance(matrix, np.ndarray):
+    #     M = Matrix(matrix.tolist())
+    # else:
+    #     M = Matrix(matrix)
+    # t = trace(M)
+    #
+    # if0 = t - M[3, 3]
+    #
+    # if1 = M[1, 1] - M[0, 0]
+    #
+    # m_i_i = if_greater_zero(if1, M[1, 1], M[0, 0])
+    # m_i_j = if_greater_zero(if1, M[1, 2], M[0, 1])
+    # m_i_k = if_greater_zero(if1, M[1, 0], M[0, 2])
+    #
+    # m_j_i = if_greater_zero(if1, M[2, 1], M[1, 0])
+    # m_j_j = if_greater_zero(if1, M[2, 2], M[1, 1])
+    # m_j_k = if_greater_zero(if1, M[2, 0], M[1, 2])
+    #
+    # m_k_i = if_greater_zero(if1, M[0, 1], M[2, 0])
+    # m_k_j = if_greater_zero(if1, M[0, 2], M[2, 1])
+    # m_k_k = if_greater_zero(if1, M[0, 0], M[2, 2])
+    #
+    # if2 = M[2, 2] - m_i_i
+    #
+    # m_i_i = if_greater_zero(if2, M[2, 2], m_i_i)
+    # m_i_j = if_greater_zero(if2, M[2, 0], m_i_j)
+    # m_i_k = if_greater_zero(if2, M[2, 1], m_i_k)
+    #
+    # m_j_i = if_greater_zero(if2, M[0, 2], m_j_i)
+    # m_j_j = if_greater_zero(if2, M[0, 0], m_j_j)
+    # m_j_k = if_greater_zero(if2, M[0, 1], m_j_k)
+    #
+    # m_k_i = if_greater_zero(if2, M[1, 2], m_k_i)
+    # m_k_j = if_greater_zero(if2, M[1, 0], m_k_j)
+    # m_k_k = if_greater_zero(if2, M[1, 1], m_k_k)
+    #
+    # t = if_greater_zero(if0, t, m_i_i - (m_j_j + m_k_k) + M[3, 3])
+    # q[0] = if_greater_zero(if0, M[2, 1] - M[1, 2],
+    #                        if_greater_zero(if2, m_i_j + m_j_i, if_greater_zero(if1, m_k_i + m_i_k, t)))
+    # q[1] = if_greater_zero(if0, M[0, 2] - M[2, 0],
+    #                        if_greater_zero(if2, m_k_i + m_i_k, if_greater_zero(if1, t, m_i_j + m_j_i)))
+    # q[2] = if_greater_zero(if0, M[1, 0] - M[0, 1],
+    #                        if_greater_zero(if2, t, if_greater_zero(if1, m_i_j + m_j_i, m_k_i + m_i_k)))
+    # q[3] = if_greater_zero(if0, t, m_k_j - m_j_k)
+    #
+    # q *= 0.5 / sp.sqrt(t * M[3, 3])
+    # return q
 
 
 def quaternion_multiply(q1, q2):

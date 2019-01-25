@@ -50,7 +50,7 @@ class QPSolver(object):
         number_of_retries = 2
         while number_of_retries > 0:
             if nWSR is None:
-                nWSR = np.array([100])
+                nWSR = np.array([sum(A.shape)*2])
             else:
                 nWSR = np.array([nWSR])
             number_of_retries -= 1

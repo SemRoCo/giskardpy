@@ -811,6 +811,53 @@ class TestCollisionAvoidanceGoals(object):
         box_setup.check_cpi_geq([attached_link_name], 0.048)
         box_setup.remove_object(attached_link_name)
 
+    def test_attached_collision2(self, zero_pose):
+        """
+        :type box_setup: PR2
+        """
+
+        collision_pose = {
+            u'l_elbow_flex_joint': - 1.1343683863086362,
+            u'l_forearm_roll_joint': 7.517553513504836,
+            u'l_shoulder_lift_joint': 0.5726770101613905,
+            u'l_shoulder_pan_joint': 0.1592669164939349,
+            u'l_upper_arm_roll_joint': 0.5532568387077381,
+            u'l_wrist_flex_joint': - 1.215660155912625,
+            u'l_wrist_roll_joint': 4.249300323527076,
+            u'r_elbow_flex_joint': 0.0,
+            u'r_forearm_roll_joint': 0.0,
+            u'r_shoulder_lift_joint': 0.0,
+            u'r_shoulder_pan_joint': 0.0,
+            u'r_upper_arm_roll_joint': 0.0,
+            u'r_wrist_flex_joint': 0.0,
+            u'r_wrist_roll_joint': 0.0,
+            u'r_elbow_flex_joint': 0.0,
+            u'r_wrist_flex_joint': 0.0,
+            u'torso_lift_joint': 0.2}
+
+        zero_pose.set_joint_goal(collision_pose)
+        zero_pose.send_goal()
+
+        zero_pose.avoid_all_collisions()
+
+        attached_link_name = u'pocky'
+        zero_pose.attach_box(attached_link_name, [0.1, 0.02, 0.02], zero_pose.l_tip, [0.05, 0, 0])
+
+        zero_pose.set_joint_goal({u'torso_lift_joint': 0.2})
+
+        p = PoseStamped()
+        p.header.frame_id = zero_pose.l_tip
+        p.header.stamp = rospy.get_rostime()
+        p.pose.position.z = 0.20
+        p.pose.orientation.w = 1
+        zero_pose.set_cart_goal(zero_pose.default_root, zero_pose.l_tip, p)
+        zero_pose.send_goal()
+
+        #zero_pose.set_and_check_cart_goal(zero_pose.default_root, zero_pose.r_tip, p)
+        zero_pose.check_cpi_geq(zero_pose.get_l_gripper_links(), 0.048)
+        zero_pose.check_cpi_geq([attached_link_name], 0.048)
+        zero_pose.remove_object(attached_link_name)
+
     def test_attached_collision_allow(self, box_setup):
         """
         :type box_setup: PR2

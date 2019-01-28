@@ -37,7 +37,7 @@ class GiskardWrapper(object):
         self.set_rotation_goal(root, tip, pose_stamped)
 
 
-    def set_tranlation_goal(self, root, tip, pose_stamped, p_gain=3, max_speed=0.2):
+    def set_tranlation_goal(self, root, tip, pose_stamped, p_gain=3, max_speed=0.1):
         """
         :param tip:
         :type tip: str
@@ -54,7 +54,7 @@ class GiskardWrapper(object):
         controller.p_gain = p_gain
         self.cmd_seq[-1].controllers.append(controller)
 
-    def set_rotation_goal(self, root, tip, pose_stamped, p_gain=3, max_speed=0.2):
+    def set_rotation_goal(self, root, tip, pose_stamped, p_gain=3, max_speed=1.0):
         """
         :param tip:
         :type tip: str

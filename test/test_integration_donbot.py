@@ -136,16 +136,7 @@ class TestJointGoals(object):
         :type zero_pose: Donbot
         """
         zero_pose.allow_self_collision()
-        js = dict(pocky_pose.items()[:3])
-        zero_pose.send_and_check_joint_goal(js)
-
-    def test_continuous_joint1(self, zero_pose):
-        """
-        :type zero_pose: Donbot
-        """
-        zero_pose.allow_self_collision()
-        js = {u'r_wrist_roll_joint': -pi,
-              u'l_wrist_roll_joint': 3.5 * pi, }
+        js = dict(floor_detection_pose.items()[:3])
         zero_pose.send_and_check_joint_goal(js)
 
     def test_undefined_type(self, zero_pose):

@@ -207,7 +207,7 @@ class TestCartGoals(object):
         """
         :type zero_pose: PR2
         """
-        # FIXME? eef don't move at the same time
+        # FIXME
         r_goal = PoseStamped()
         r_goal.header.frame_id = zero_pose.r_tip
         r_goal.header.stamp = rospy.get_rostime()
@@ -729,6 +729,7 @@ class TestCollisionAvoidanceGoals(object):
         """
         :type box_setup: PR2
         """
+        # FIXME
         p = PoseStamped()
         p.header.frame_id = box_setup.r_tip
         p.pose.position = Point(0.1, 0, 0)

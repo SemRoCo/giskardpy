@@ -186,7 +186,7 @@ class GiskardTestWrapper(object):
                 goal = expected[joint_name]
                 current = current_joint_state.position[i]
                 if self.robot.is_joint_continuous(joint_name):
-                    np.testing.assert_almost_equal(shortest_angular_distance(goal, current), 0)
+                    np.testing.assert_almost_equal(shortest_angular_distance(goal, current), 0, decimal=6)
                 else:
                     np.testing.assert_almost_equal(goal, current, 2)
 
@@ -351,11 +351,11 @@ class GiskardTestWrapper(object):
 
 class PR2(GiskardTestWrapper):
     def __init__(self):
-        rospy.set_param(u'~enable_gui', False)
+        rospy.set_param(u'~enable_gui', True)
         rospy.set_param(u'~debug', True)
         rospy.set_param(u'~tree_tick_rate', .1)
         rospy.set_param(u'~map_frame', u'map')
-        rospy.set_param(u'~joint_convergence_threshold', 0.002)
+        rospy.set_param(u'~joint_convergence_threshold', 0.001)
         rospy.set_param(u'~wiggle_precision_threshold', 4)
         rospy.set_param(u'~sample_period', 0.1)
         rospy.set_param(u'~default_joint_vel_limit', 10)

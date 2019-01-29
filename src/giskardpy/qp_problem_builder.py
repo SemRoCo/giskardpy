@@ -51,7 +51,7 @@ class QProblemBuilder(object):
 
         self.qp_solver = QPSolver(len(self.joint_constraints_dict) + len(self.soft_constraints_dict),
                                   len(self.hard_constraints_dict) + len(self.soft_constraints_dict))
-        self.lbAs = None # for debugging purposes
+        self.lbAs = None  # for debugging purposes
 
     # @profile
     def make_matrices(self):
@@ -82,13 +82,11 @@ class QProblemBuilder(object):
             ubA.append(c.upper)
             lb.append(-BIG_NUMBER)
             ub.append(BIG_NUMBER)
-            assert not isinstance(c.lower, spw.Matrix), u'Matrices are not allowed as soft constraint limits'
             assert not isinstance(c.expression, spw.Matrix), u'Matrices are not allowed as soft constraint expression'
             soft_expressions.append(c.expression)
 
         self.cython_big_ass_M = load_compiled_function(self.path_to_functions)
         self.np_g = np.zeros(len(weights))
-        assert len(soft_expressions) + len(hard_expressions) == len(lbA)
 
         if self.cython_big_ass_M is None:
             print(u'new controller requested; compiling')
@@ -204,7 +202,7 @@ class QProblemBuilder(object):
         if xdot_full is None:
             return None
         # TODO enable debug print in an elegant way, preferably without slowing anything down
-        self.debug_print(np_H, np_A, np_lb, np_ub, np_lbA, np_ubA, xdot_full)
+        # self.debug_print(np_H, np_A, np_lb, np_ub, np_lbA, np_ubA, xdot_full)
         return OrderedDict((observable, xdot_full[i]) for i, observable in enumerate(self.controlled_joints))
 
 

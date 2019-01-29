@@ -47,7 +47,7 @@ class Robot(object):
         :type default_joint_vel_limit: float
         """
         self.default_joint_velocity_limit = default_joint_vel_limit
-        self.default_weight = 0.001
+        self.default_weight = 0.0001
         self.fks = {}
         self._joint_to_frame = {}
         self.joint_to_symbol_map = keydefaultdict(lambda x: spw.Symbol(x))

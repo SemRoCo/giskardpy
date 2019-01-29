@@ -166,17 +166,17 @@ def position_conv(goal_position, current_position, weights=1, trans_gain=3, max_
     trans_control = trans_error_vector / trans_error * trans_scale
 
     soft_constraints[u'position x: {}'.format(ns)] = SoftConstraint(lower=trans_control[0],
-                                                                         upper=trans_control[0],
-                                                                         weight=weights,
-                                                                         expression=current_position[0])
+                                                                    upper=trans_control[0],
+                                                                    weight=weights,
+                                                                    expression=current_position[0])
     soft_constraints[u'position y: {}'.format(ns)] = SoftConstraint(lower=trans_control[1],
-                                                                         upper=trans_control[1],
-                                                                         weight=weights,
-                                                                         expression=current_position[1])
+                                                                    upper=trans_control[1],
+                                                                    weight=weights,
+                                                                    expression=current_position[1])
     soft_constraints[u'position z: {}'.format(ns)] = SoftConstraint(lower=trans_control[2],
-                                                                         upper=trans_control[2],
-                                                                         weight=weights,
-                                                                         expression=current_position[2])
+                                                                    upper=trans_control[2],
+                                                                    weight=weights,
+                                                                    expression=current_position[2])
 
     return soft_constraints
 
@@ -202,9 +202,9 @@ def rotation_conv(goal_rotation, current_rotation, current_evaluated_rotation, w
     :rtype: dict
     """
     soft_constraints = OrderedDict()
-    axis, angle = sw.axis_angle_from_matrix((current_rotation.T * goal_rotation))
+    axis, angle = sw.diffable_axis_angle_from_matrix((current_rotation.T * goal_rotation))
 
-    capped_angle = sw.Min(rot_gain * angle, max_rot_speed)
+    capped_angle = sw.diffable_max_fast(sw.diffable_min_fast(rot_gain * angle, max_rot_speed), -max_rot_speed)
 
     r_rot_control = axis * capped_angle
 
@@ -214,17 +214,17 @@ def rotation_conv(goal_rotation, current_rotation, current_evaluated_rotation, w
     c_aa = (axis * angle)
 
     soft_constraints[u'rotation 0: {}'.format(ns)] = SoftConstraint(lower=r_rot_control[0],
-                                                                         upper=r_rot_control[0],
-                                                                         weight=weights,
-                                                                         expression=c_aa[0])
+                                                                    upper=r_rot_control[0],
+                                                                    weight=weights,
+                                                                    expression=c_aa[0])
     soft_constraints[u'rotation 1: {}'.format(ns)] = SoftConstraint(lower=r_rot_control[1],
-                                                                         upper=r_rot_control[1],
-                                                                         weight=weights,
-                                                                         expression=c_aa[1])
+                                                                    upper=r_rot_control[1],
+                                                                    weight=weights,
+                                                                    expression=c_aa[1])
     soft_constraints[u'rotation 2: {}'.format(ns)] = SoftConstraint(lower=r_rot_control[2],
-                                                                         upper=r_rot_control[2],
-                                                                         weight=weights,
-                                                                         expression=c_aa[2])
+                                                                    upper=r_rot_control[2],
+                                                                    weight=weights,
+                                                                    expression=c_aa[2])
     return soft_constraints
 
 
@@ -268,23 +268,22 @@ def rotation_conv_slerp(goal_rotation, current_rotation, current_evaluated_rotat
     hack = sw.rotation_matrix_from_axis_angle([0, 0, 1], 0.0001)
     axis, angle = sw.diffable_axis_angle_from_matrix((current_rotation.T * (current_evaluated_rotation * hack)).T)
     c_aa = (axis * angle)
-    c_aa = current_evaluated_rotation[:3,:3] * c_aa
+    c_aa = current_evaluated_rotation[:3, :3] * c_aa
 
     soft_constraints[u'rotation 0: {}'.format(ns)] = SoftConstraint(lower=r_rot_control[0],
-                                                                         upper=r_rot_control[0],
-                                                                         weight=weights,
-                                                                         expression=c_aa[0])
+                                                                    upper=r_rot_control[0],
+                                                                    weight=weights,
+                                                                    expression=c_aa[0])
     soft_constraints[u'rotation 1: {}'.format(ns)] = SoftConstraint(lower=r_rot_control[1],
-                                                                         upper=r_rot_control[1],
-                                                                         weight=weights,
-                                                                         expression=c_aa[1])
+                                                                    upper=r_rot_control[1],
+                                                                    weight=weights,
+                                                                    expression=c_aa[1])
     soft_constraints[u'rotation 2: {}'.format(ns)] = SoftConstraint(lower=r_rot_control[2],
-                                                                         upper=r_rot_control[2],
-                                                                         weight=weights,
-                                                                         expression=c_aa[2])
+                                                                    upper=r_rot_control[2],
+                                                                    weight=weights,
+                                                                    expression=c_aa[2])
     # add_debug_constraint(soft_constraints, 'q2', q2)
     return soft_constraints
-
 
 
 def link_to_link_avoidance(link_name, current_pose, current_pose_eval, point_on_link, other_point, contact_normal,

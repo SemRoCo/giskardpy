@@ -366,7 +366,7 @@ class PR2(GiskardTestWrapper):
         rospy.set_param(u'~enable_collision_marker', True)
         # rospy.set_param(u'~enable_self_collision', True)
         rospy.set_param(u'~path_to_data_folder', u'../data/pr2/')
-        rospy.set_param(u'~collision_time_threshold', 15)
+        rospy.set_param(u'~collision_time_threshold', 10)
         rospy.set_param(u'~max_traj_length', 30)
         self.r_tip = u'r_gripper_tool_frame'
         self.l_tip = u'l_gripper_tool_frame'

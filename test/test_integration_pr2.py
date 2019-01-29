@@ -207,7 +207,6 @@ class TestCartGoals(object):
         """
         :type zero_pose: PR2
         """
-        # FIXME
         r_goal = PoseStamped()
         r_goal.header.frame_id = zero_pose.r_tip
         r_goal.header.stamp = rospy.get_rostime()
@@ -230,7 +229,6 @@ class TestCartGoals(object):
         :type zero_pose: PR2
         """
 
-        # FIXME get rid of wiggling
         goal_js = {
             u'l_upper_arm_roll_joint': 1.63487737202,
             u'l_shoulder_pan_joint': 1.36222920328,
@@ -248,7 +246,7 @@ class TestCartGoals(object):
         p.header.stamp = rospy.get_rostime()
         p.pose.position.x = -0.1
         p.pose.orientation.w = 1
-        zero_pose.allow_all_collisions()
+        # zero_pose.allow_all_collisions()
         zero_pose.set_and_check_cart_goal(zero_pose.default_root, zero_pose.l_tip, p)
 
         p = PoseStamped()
@@ -256,7 +254,7 @@ class TestCartGoals(object):
         p.header.stamp = rospy.get_rostime()
         p.pose.position.x = 0.2
         p.pose.orientation.w = 1
-        zero_pose.allow_all_collisions()
+        # zero_pose.allow_all_collisions()
         zero_pose.set_and_check_cart_goal(zero_pose.default_root, zero_pose.l_tip, p)
 
     def test_hot_init_failed(self, zero_pose):

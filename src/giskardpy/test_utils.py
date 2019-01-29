@@ -258,6 +258,12 @@ class GiskardTestWrapper(object):
     #
     # BULLET WORLD #####################################################################################################
     #
+    def get_world(self):
+        """
+        :rtype: PyBulletWorld
+        """
+        return self.world
+
     def clear_world(self):
         assert self.wrapper.clear_world().error_codes == UpdateWorldResponse.SUCCESS
         assert len(self.world.get_object_names()) == 1
@@ -305,8 +311,13 @@ class GiskardTestWrapper(object):
 
     def attach_box(self, name=u'box', size=None, frame_id=None, position=None, orientation=None,
                    expected_response=UpdateWorldResponse.SUCCESS):
+        old_collision_matrix = self.world.get_robot().get_self_collision_matrix()
         assert self.wrapper.attach_box(name, size, frame_id, position, orientation).error_codes == expected_response
         assert not self.world.has_object(name)
+        assert len(old_collision_matrix.difference(self.world.get_robot().get_self_collision_matrix())) == 0
+
+    def detach_object(self, name):
+        self.wrapper.de
 
     def get_cpi(self, distance_threshold):
         collision_goals = [CollisionEntry(type=CollisionEntry.AVOID_ALL_COLLISIONS, min_dist=distance_threshold)]

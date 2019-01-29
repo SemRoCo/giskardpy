@@ -23,6 +23,7 @@ def transform(draw):
 
 
 class TestPyBulletWorld(RuleBasedStateMachine):
+    # FIXME
     def __init__(self):
         super(TestPyBulletWorld, self).__init__()
         self.world = PyBulletWorld()

@@ -16,25 +16,28 @@ from giskardpy import DEBUG
 from giskardpy.god_map import GodMap
 from giskardpy.plugin import PluginBehavior, SuccessPlugin
 from giskardpy.plugin_action_server import GoalReceived, SendResult, GoalCanceled
-from giskardpy.plugin_fk import NewFkPlugin
+from giskardpy.plugin_cleanup import CleanUp
+from giskardpy.plugin_fk import FkPlugin
 from giskardpy.plugin_goal_reached import GoalReachedPlugin
 from giskardpy.plugin_instantaneous_controller import GoalToConstraints, ControllerPlugin
 from giskardpy.plugin_interrupts import CollisionCancel, WiggleCancel
-from giskardpy.plugin_joint_state import JointStatePlugin2
+from giskardpy.plugin_joint_state import JointStatePlugin
 from giskardpy.plugin_kinematic_sim import NewKinSimPlugin
 from giskardpy.plugin_log_trajectory import NewLogTrajPlugin
 from giskardpy.plugin_pybullet import PyBulletMonitor, PyBulletUpdatePlugin, CollisionChecker
 from giskardpy.plugin_send_trajectory import SendTrajectory
+from giskardpy.utils import create_path, resolve_ros_iris
 
 
 # TODO add transform3d to package xml
 # TODO add pytest to package xml
 # TODO move to src folder
-from giskardpy.utils import create_path
 
 
 def ini(param_name, robot_description_identifier, controlled_joints_identifier):
+    # TODO this should be part of sync
     urdf = rospy.get_param(param_name)
+    urdf = resolve_ros_iris(urdf)
     Blackboard().god_map.safe_set_data([robot_description_identifier], urdf)
 
     msg = rospy.wait_for_message(u'/whole_body_controller/state',
@@ -91,8 +94,8 @@ def grow_tree():
 
     # ----------------------------------------------
     sync = PluginBehavior(u'sync')
-    sync.add_plugin(u'js', JointStatePlugin2(js_identifier))
-    sync.add_plugin(u'fk', NewFkPlugin(fk_identifier, js_identifier, robot_description_identifier))
+    sync.add_plugin(u'js', JointStatePlugin(js_identifier))
+    sync.add_plugin(u'fk', FkPlugin(fk_identifier, js_identifier, robot_description_identifier))
     sync.add_plugin(u'pw', PyBulletMonitor(js_identifier, pybullet_identifier, controlled_joints_identifier,
                                            map_frame, root_link, path_to_data_folder, gui))
     sync.add_plugin(u'in sync', SuccessPlugin())
@@ -100,8 +103,8 @@ def grow_tree():
     wait_for_goal = Selector(u'wait for goal')
     wait_for_goal.add_child(GoalReceived(u'has goal', action_server_name, MoveAction))
     monitor = PluginBehavior(u'monitor')
-    monitor.add_plugin(u'js', JointStatePlugin2(js_identifier))
-    monitor.add_plugin(u'fk', NewFkPlugin(fk_identifier, js_identifier, robot_description_identifier))
+    monitor.add_plugin(u'js', JointStatePlugin(js_identifier))
+    monitor.add_plugin(u'fk', FkPlugin(fk_identifier, js_identifier, robot_description_identifier))
     monitor.add_plugin(u'pw', PyBulletMonitor(js_identifier, pybullet_identifier, controlled_joints_identifier,
                                               map_frame, root_link, path_to_data_folder, gui))
     monitor.add_plugin(u'pybullet updater', PyBulletUpdatePlugin(pybullet_identifier, controlled_joints_identifier,
@@ -117,7 +120,7 @@ def grow_tree():
     actual_planning = PluginBehavior(u'planning', sleep=0)
     actual_planning.add_plugin(u'kin sim', NewKinSimPlugin(js_identifier, next_cmd_identifier,
                                                            time_identifier, sample_period))
-    actual_planning.add_plugin(u'fk', NewFkPlugin(fk_identifier, js_identifier, robot_description_identifier))
+    actual_planning.add_plugin(u'fk', FkPlugin(fk_identifier, js_identifier, robot_description_identifier))
     actual_planning.add_plugin(u'pw', PyBulletMonitor(js_identifier, pybullet_identifier, controlled_joints_identifier,
                                                       map_frame, root_link, path_to_data_folder, gui))
     actual_planning.add_plugin(u'coll', CollisionChecker(collision_goal_identifier, controllable_links_identifier,
@@ -136,6 +139,7 @@ def grow_tree():
     planning.add_child(actual_planning)
     # ----------------------------------------------
 
+
     # ----------------------------------------------
     publish_result = failure_is_success(Selector)(u'move robot')
     publish_result.add_child(GoalCanceled(u'goal canceled', action_server_name))
@@ -152,6 +156,7 @@ def grow_tree():
                                      fk_identifier, pyfunction_identifier, closest_point_identifier,
                                      soft_constraint_identifier, collision_goal_identifier, default_joint_vel_limit))
     root.add_child(planning)
+    root.add_child(CleanUp(u'cleanup', closest_point_identifier))
     root.add_child(publish_result)
     root.add_child(SendResult(u'send result', action_server_name, trajectory_identifier, controlled_joints_identifier,
                               path_to_data_folder))

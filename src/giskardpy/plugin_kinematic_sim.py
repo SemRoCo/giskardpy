@@ -29,6 +29,7 @@ class NewKinSimPlugin(NewPluginBase):
         motor_commands = self.god_map.safe_get_data([self.next_cmd_identifier])
         current_js = self.god_map.safe_get_data([self.js_identifier])
         if motor_commands is not None:
+            asdf = {k:v for k,v in motor_commands.items() if v > 0.199}
             self.next_js = OrderedDict()
             for joint_name, sjs in current_js.items():
                 if joint_name in motor_commands:

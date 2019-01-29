@@ -35,8 +35,11 @@ def robot_urdfs():
     # return st.sampled_from([u'pr2.urdf'])
 
 
-def angle(*args, **kwargs):
-    return st.builds(normalize_angle, limited_float(*args, **kwargs))
+def angle_positive():
+    return st.floats(0, 2*np.pi)
+
+def angle():
+    return st.floats(-np.pi, np.pi)
 
 
 def keys_values(max_length=10, value_type=st.floats(allow_nan=False)):
@@ -44,9 +47,9 @@ def keys_values(max_length=10, value_type=st.floats(allow_nan=False)):
 
 def compare_axis_angle(angle1, axis1, angle2, axis2):
     if np.isclose(axis1, axis2).all():
-        assert np.isclose(angle1, angle2), '{} != {}'.format(angle, angle2)
+        assert np.isclose(angle1, angle2), '{} != {}'.format(angle1, angle2)
     elif np.isclose(axis1, -axis2).all():
-        assert np.isclose(angle1, abs(angle2-2*pi)), '{} != {}'.format(angle, angle2)
+        assert np.isclose(angle1, abs(angle2-2*pi)), '{} != {}'.format(angle1, angle2)
 
 
 @composite
@@ -183,7 +186,7 @@ class GiskardTestWrapper(object):
                 goal = expected[joint_name]
                 current = current_joint_state.position[i]
                 if self.robot.is_joint_continuous(joint_name):
-                    np.testing.assert_almost_equal(shortest_angular_distance(goal, current), 0)
+                    np.testing.assert_almost_equal(shortest_angular_distance(goal, current), 0, decimal=6)
                 else:
                     np.testing.assert_almost_equal(goal, current, 2)
 
@@ -255,6 +258,12 @@ class GiskardTestWrapper(object):
     #
     # BULLET WORLD #####################################################################################################
     #
+    def get_world(self):
+        """
+        :rtype: PyBulletWorld
+        """
+        return self.world
+
     def clear_world(self):
         assert self.wrapper.clear_world().error_codes == UpdateWorldResponse.SUCCESS
         assert len(self.world.get_object_names()) == 1
@@ -302,8 +311,13 @@ class GiskardTestWrapper(object):
 
     def attach_box(self, name=u'box', size=None, frame_id=None, position=None, orientation=None,
                    expected_response=UpdateWorldResponse.SUCCESS):
+        old_collision_matrix = self.world.get_robot().get_self_collision_matrix()
         assert self.wrapper.attach_box(name, size, frame_id, position, orientation).error_codes == expected_response
         assert not self.world.has_object(name)
+        assert len(old_collision_matrix.difference(self.world.get_robot().get_self_collision_matrix())) == 0
+
+    def detach_object(self, name):
+        self.wrapper.de
 
     def get_cpi(self, distance_threshold):
         collision_goals = [CollisionEntry(type=CollisionEntry.AVOID_ALL_COLLISIONS, min_dist=distance_threshold)]
@@ -352,7 +366,7 @@ class PR2(GiskardTestWrapper):
         rospy.set_param(u'~debug', True)
         rospy.set_param(u'~tree_tick_rate', .1)
         rospy.set_param(u'~map_frame', u'map')
-        rospy.set_param(u'~joint_convergence_threshold', 0.002)
+        rospy.set_param(u'~joint_convergence_threshold', 0.001)
         rospy.set_param(u'~wiggle_precision_threshold', 4)
         rospy.set_param(u'~sample_period', 0.1)
         rospy.set_param(u'~default_joint_vel_limit', 10)
@@ -413,14 +427,14 @@ class Donbot(GiskardTestWrapper):
         rospy.set_param(u'~joint_convergence_threshold', 0.002)
         rospy.set_param(u'~wiggle_precision_threshold', 4)
         rospy.set_param(u'~sample_period', 0.05)
-        rospy.set_param(u'~default_joint_vel_limit', 10)
+        rospy.set_param(u'~default_joint_vel_limit', 0.25)
         rospy.set_param(u'~default_collision_avoidance_distance', 0.05)
         rospy.set_param(u'~fill_velocity_values', False)
         rospy.set_param(u'~nWSR', u'None')
         rospy.set_param(u'~root_link', u'base_footprint')
         rospy.set_param(u'~enable_collision_marker', True)
         # rospy.set_param(u'~enable_self_collision', True)
-        rospy.set_param(u'~path_to_data_folder', u'../data/pr2/')
+        rospy.set_param(u'~path_to_data_folder', u'../data/donbot/')
         rospy.set_param(u'~collision_time_threshold', 10)
         rospy.set_param(u'~max_traj_length', 30)
         self.camera_tip = u'camera_link'

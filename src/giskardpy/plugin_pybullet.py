@@ -1,4 +1,5 @@
 import traceback
+from copy import copy
 from itertools import product
 
 import rospy
@@ -59,6 +60,10 @@ class PyBulletMonitor(PybulletPlugin):
         self.world = self.god_map.safe_get_data([self.pybullet_identifier])
 
     def update(self):
+        """
+        updates robot position in pybullet
+        :return:
+        """
         js = self.god_map.safe_get_data([self.js_identifier])
         if js is not None:
             self.world.set_robot_joint_state(js)
@@ -210,7 +215,7 @@ class PyBulletUpdatePlugin(PybulletPlugin):
 
     def update(self):
         """
-        Computes closest point info for all robot links and safes it to the god map.
+        updated urdf in god map and updates pybullet object joint states
         """
         with self.lock:
             # TODO only update urdf if it has changed
@@ -324,6 +329,9 @@ class CollisionChecker(PybulletPlugin):
         ce.body_b = u'plane'
         return ce
 
+    def collision_matrix_to_min_dist_dict(self, collision_matrix, robot_name, min_dist):
+        return {(link1, robot_name, link2): min_dist for link1, link2 in collision_matrix}
+
     def collision_goals_to_collision_matrix(self, collision_goals):
         """
         :param collision_goals: list of CollisionEntry
@@ -334,7 +342,10 @@ class CollisionChecker(PybulletPlugin):
         # TODO split this into smaller functions
         if collision_goals is None:
             collision_goals = []
-        collision_matrix = self.world.get_robot().get_self_collision_matrix()
+        #FIXME
+        collision_matrix = self.collision_matrix_to_min_dist_dict(self.world.get_robot().get_self_collision_matrix(),
+                                                                  self.world.get_robot().name,
+                                                                  self.default_collision_avoidance_distance)
         min_allowed_distance = collision_matrix
 
         collision_goals.insert(0, self.allow_collision_with_plane())

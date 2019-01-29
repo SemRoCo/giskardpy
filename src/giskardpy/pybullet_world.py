@@ -1,12 +1,11 @@
 import pickle
 import pybullet as p
-import rospkg
 import string
 import random
 import os
 from collections import namedtuple, OrderedDict, defaultdict
 from copy import copy
-from itertools import combinations, product
+from itertools import combinations
 from pybullet import JOINT_REVOLUTE, JOINT_PRISMATIC, JOINT_PLANAR, JOINT_SPHERICAL
 
 import errno
@@ -18,7 +17,7 @@ from giskardpy.exceptions import UnknownBodyException, RobotExistsException, Dup
 from giskardpy.data_types import SingleJointState, Transform, Point, Quaternion
 import numpy as np
 
-from giskardpy.utils import keydefaultdict, suppress_stdout, NullContextManager
+from giskardpy.utils import keydefaultdict, suppress_stdout, NullContextManager, resolve_ros_iris
 
 from giskardpy.object import UrdfObject, FixedJoint, to_urdf_string, BoxShape, \
     CollisionProperty, remove_outer_tag
@@ -33,27 +32,6 @@ ContactInfo = namedtuple(u'ContactInfo', [u'contact_flag', u'body_unique_id_a', 
                                          u'link_index_b', u'position_on_a', u'position_on_b', u'contact_normal_on_b',
                                          u'contact_distance', u'normal_force', u'lateralFriction1', u'lateralFrictionDir1',
                                           u'lateralFriction2', u'lateralFrictionDir2'])
-
-
-def resolve_ros_iris(input_urdf):
-    """
-    Replace all instances of ROS IRIs with a urdf string with global paths in the file system.
-    :param input_urdf: URDF in which the ROS IRIs shall be replaced.
-    :type input_urdf: str
-    :return: URDF with replaced ROS IRIs.
-    :rtype: str
-    """
-    rospack = rospkg.RosPack()
-    output_urdf = u''
-    for line in input_urdf.split(u'\n'):
-        if u'package://' in line:
-            package_name = line.split(u'package://', 1)[-1].split(u'/', 1)[0]
-            real_path = rospack.get_path(package_name)
-            output_urdf += line.replace(package_name, real_path)
-        else:
-            output_urdf += line
-        output_urdf += u'\n'
-    return output_urdf
 
 
 def write_urdf_to_disc(filename, urdf_string):
@@ -120,34 +98,37 @@ class PyBulletRobot(object):
         """
         self.path_to_data_folder = path_to_data_folder + u'collision_matrix/'
         self.name = name
-        self.original_urdf = resolve_ros_iris(urdf)
-        self.id = load_urdf_string_into_bullet(self.original_urdf, base_pose)
-        self.init_js_info()
+        # TODO i think resolve iris can be removed because I do this at the start
+        self.base_urdf = resolve_ros_iris(urdf)
+        self.id = load_urdf_string_into_bullet(self.base_urdf, base_pose)
+        self.sync_with_bullet()
         self.attached_objects = {}
         self.controlled_joints = controlled_joints
         if calc_self_collision_matrix:
             if not self.load_self_collision_matrix():
-                self.possible_collisions = self.calc_self_collision_matrix(set(combinations(self.joint_id_to_info.keys(), 2)))
+                self.init_self_collision_matrix()
                 self.save_self_collision_matrix()
-            self.calc_other_stuff(0.05)
         else:
-            self.possible_collisions = set()
+            self.self_collision_matrix = set()
+
+    def init_self_collision_matrix(self):
+        self.self_collision_matrix = self.calc_collision_matrix(set(combinations(self.get_link_names(), 2)))
 
     def load_self_collision_matrix(self):
         """
         :rtype: bool
         """
-        urdf_hash = hashlib.md5(self.original_urdf).hexdigest()
+        urdf_hash = hashlib.md5(self.base_urdf).hexdigest()
         path = self.path_to_data_folder + urdf_hash
         if os.path.isfile(path):
             with open(path) as f:
-                self.possible_collisions = pickle.load(f)
+                self.self_collision_matrix = pickle.load(f)
                 print(u'loaded self collision matrix {}'.format(urdf_hash))
                 return True
         return False
 
     def save_self_collision_matrix(self):
-        urdf_hash = hashlib.md5(self.original_urdf).hexdigest()
+        urdf_hash = hashlib.md5(self.base_urdf).hexdigest()
         path = self.path_to_data_folder + urdf_hash
         if not os.path.exists(os.path.dirname(path)):
             try:
@@ -159,7 +140,7 @@ class PyBulletRobot(object):
                     raise
         with open(path, u'w') as file:
             print(u'saved self collision matrix {}'.format(path))
-            pickle.dump(self.possible_collisions, file)
+            pickle.dump(self.self_collision_matrix, file)
 
     def get_attached_objects(self):
         """
@@ -196,7 +177,10 @@ class PyBulletRobot(object):
         [position, orientation] = p.getBasePositionAndOrientation(self.id)
         return Transform(Point(*position), Quaternion(*orientation))
 
-    def init_js_info(self):
+    def sync_with_bullet(self):
+        """
+        Syncs joint and link infos with bullet
+        """
         self.joint_id_map = {}
         self.link_name_to_id = {}
         self.link_id_to_name = {}
@@ -219,10 +203,9 @@ class PyBulletRobot(object):
 
     def get_self_collision_matrix(self):
         """
-        :return: (robot_link, body_b, link_b) -> min allowed distance
+        :return: (link1, link2) -> min allowed distance
         """
-        return copy(self.collision_matrix)
-
+        return self.self_collision_matrix
 
     def get_joint_states(self):
         mjs = dict()
@@ -234,58 +217,73 @@ class PyBulletRobot(object):
                 mjs[sjs.name] = sjs
         return mjs
 
-    def calc_self_collision_matrix(self, combis, d=0.05, d2=0.0, num_rnd_tries=1000):
+    def calc_collision_matrix(self, link_combinations, d=0.05, d2=0.0, num_rnd_tries=1000):
+        """
+        :param link_combinations: set with link name tuples
+        :type link_combinations: set
+        :param d: distance threshold to detect links that are always in collision
+        :type d: float
+        :param d2: distance threshold to find links that are sometimes in collision
+        :type d2: float
+        :param num_rnd_tries:
+        :type num_rnd_tries: int
+        :return: set of link name tuples which are sometimes in collision.
+        :rtype: set
+        """
         # TODO computational expansive because of too many collision checks
         print(u'calculating self collision matrix')
         seed(1337)
         always = set()
 
         # find meaningless self-collisions
-        for link_a, link_b in combis:
-            if self.joint_id_to_info[link_a].parent_index == link_b or \
-                    self.joint_id_to_info[link_b].parent_index == link_a:
-                always.add((link_a, link_b))
-        rest = combis.difference(always)
-        always = always.union(self._check_all_collisions(rest, d, self.get_zero_joint_state()))
+        for link_name_a, link_name_b in link_combinations:
+            if self.get_parent_link_name(link_name_a) == link_name_b or \
+                self.get_parent_link_name(link_name_b) == link_name_a:
+            # if self.joint_id_to_info[link_name_a].parent_index == link_name_b or \
+            #         self.joint_id_to_info[link_name_b].parent_index == link_name_a:
+                always.add((link_name_a, link_name_b))
+        rest = link_combinations.difference(always)
+        self.set_joint_state(self.get_zero_joint_state())
+        always = always.union(self._check_collisions(rest, d))
         rest = rest.difference(always)
 
         # find meaningful self-collisions
-        sometimes = self._check_all_collisions(rest, d2, self.get_min_joint_state())
+        self.set_joint_state(self.get_min_joint_state())
+        sometimes = self._check_collisions(rest, d2)
         rest = rest.difference(sometimes)
-        sometimes2 = self._check_all_collisions(rest, d2, self.get_max_joint_state())
+        self.set_joint_state(self.get_max_joint_state())
+        sometimes2 = self._check_collisions(rest, d2)
         rest = rest.difference(sometimes2)
         sometimes = sometimes.union(sometimes2)
         for i in range(num_rnd_tries):
-            sometimes2 = self._check_all_collisions(rest, d2, self.get_rnd_joint_state())
+            self.set_joint_state(self.get_rnd_joint_state())
+            sometimes2 = self._check_collisions(rest, d2)
             if len(sometimes2) > 0:
                 rest = rest.difference(sometimes2)
                 sometimes = sometimes.union(sometimes2)
         return sometimes
 
-    def calc_other_stuff(self, min_dist=0.05):
-        self.collision_matrix = {}
-        self.link_to_possible_collisions = defaultdict(set)
-        for (link_a_id, link_b_id) in self.possible_collisions:
-            link_a = self.link_id_to_name[link_a_id]
-            link_b = self.link_id_to_name[link_b_id]
-
-            key = (link_a, self.name, link_b)
-            self.collision_matrix[key] = min_dist
-            key = (link_b, self.name, link_a)
-            self.collision_matrix[key] = min_dist
-            self.link_to_possible_collisions[link_a].add(link_b)
-            self.link_to_possible_collisions[link_b].add(link_a)
+    def get_parent_link_name(self, child_link_name):
+        return self.joint_id_to_info[self.get_link_id(child_link_name)].parent_index
 
     def get_possible_collisions(self, link):
-        return self.link_to_possible_collisions[link]
+        # TODO speed up by saving this
+        possible_collisions = set()
+        for link1, link2 in self.get_self_collision_matrix():
+            if link == link1:
+                possible_collisions.add(link2)
+            elif link == link2:
+                possible_collisions.add(link1)
+        return possible_collisions
 
-    def _check_all_collisions(self, test_links, d, js):
-        self.set_joint_state(js)
-        sometimes = set()
-        for link_a, link_b in test_links:
-            if len(p.getClosestPoints(self.id, self.id, d, link_a, link_b)) > 0:
-                sometimes.add((link_a, link_b))
-        return sometimes
+    def _check_collisions(self, link_combinations, d):
+        in_collision = set()
+        for link_name_1, link_name_2 in link_combinations:
+            link_id_1 = self.get_link_id(link_name_1)
+            link_id_2 = self.get_link_id(link_name_2)
+            if len(p.getClosestPoints(self.id, self.id, d, link_id_1, link_id_2)) > 0:
+                in_collision.add((link_name_1, link_name_2))
+        return in_collision
 
     def get_zero_joint_state(self):
         return self.generate_joint_state(lambda x: 0)
@@ -329,8 +327,25 @@ class PyBulletRobot(object):
     def get_link_ids(self):
         return self.link_id_to_name.keys()
 
-    def get_link_id_to_name(self, id):
-        return self.link_id_to_name[id]
+    def get_link_name(self, link_id):
+        """
+        :type link_id: int 
+        :rtype: str 
+        """
+        return self.link_id_to_name[link_id]
+
+    def get_link_id(self, link_name):
+        """
+        :type link_name: str
+        :rtype: int
+        """
+        return self.link_name_to_id[link_name]
+
+    def get_link_id_to_names(self):
+        """
+        :rtype: dict
+        """
+        return self.link_id_to_name
 
     def has_attached_object(self, object_name):
         """
@@ -339,19 +354,6 @@ class PyBulletRobot(object):
         :rtype: bool
         """
         return object_name in self.attached_objects.keys()
-
-    # def attach_pybullet_robot(self, object, parent_link_name, transform):
-    #     """
-    #
-    #     :param object:
-    #     :type object: PyBulletRobot
-    #     :param parent_link_name:
-    #     :type parent_link_name: str
-    #     :param transform:
-    #     :type transform: Transform
-    #     :return:
-    #     """
-    #     object.name
 
     def attach_object(self, object_, parent_link_name, transform):
         """
@@ -369,51 +371,48 @@ class PyBulletRobot(object):
             raise DuplicateNameException(
                 u'An object \'{}\' has already been attached to the robot.'.format(object_.name))
 
-        # salvage last joint state and base pose
-        joint_state = self.get_joint_states()
-        base_pose = self.get_base_pose()
-
-        # salvage last collision matrix, and save collisions as pairs of link names
-        collision_matrix = set()
-        for collision in self.possible_collisions:
-            collision_matrix.add((self.link_id_to_name[collision[0]], self.link_id_to_name[collision[1]]))
-
         # assemble and store URDF string of new link and fixed joint
+        self.extend_urdf(object_, transform, parent_link_name)
+
+        # remove last robot and load new robot from new URDF
+        self.sync_urdf_with_bullet()
+
+        # update the collision matrix for the newly attached object
+        self.add_self_collision_entries(object_.name)
+        print(u'object {} attached to {} in pybullet world'.format(object_.name, self.name))
+
+    def add_self_collision_entries(self, object_name):
+        link_pairs = {(object_name, link_name) for link_name in self.get_link_names()}
+        link_pairs.remove((object_name, object_name))
+        self_collision_with_object = self.calc_collision_matrix(link_pairs)
+        self.self_collision_matrix.update(self_collision_with_object)
+
+    def remove_self_collision_entries(self, object_name):
+        self.self_collision_matrix = {(link1, link2) for link1, link2 in self.get_self_collision_matrix()
+                                      if link1 != object_name and link2 != object_name}
+
+    def extend_urdf(self, object_, transform, parent_link_name):
         new_joint = FixedJoint(u'{}_joint'.format(object_.name), transform, parent_link_name,
                                object_.name)
         self.attached_objects[object_.name] = u'{}{}'.format(to_urdf_string(new_joint),
                                                              remove_outer_tag(object_.get_urdf()))
 
-        new_urdf_string = self.get_urdf()
-
-        # remove last robot and load new robot from new URDF
+    def sync_urdf_with_bullet(self):
+        joint_state = self.get_joint_states()
+        base_pose = self.get_base_pose()
         p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 0)
         p.removeBody(self.id)
-        self.id = load_urdf_string_into_bullet(new_urdf_string, base_pose)
+        self.id = load_urdf_string_into_bullet(self.get_urdf(), base_pose)
         p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 1)
-
-        # reload joint info and last joint state
-        self.init_js_info()
+        self.sync_with_bullet()
         self.set_joint_state(joint_state)
-
-        # reload last collision matrix as pairs of link IDs
-        self.possible_collisions = set()
-        for collision in collision_matrix:
-            self.possible_collisions.add((self.link_name_to_id[collision[0]], self.link_name_to_id[collision[1]]))
-
-        # update the collision matrix for the newly attached object
-        object_id = self.link_name_to_id[object_.name]
-        link_pairs = {(object_id, link_id) for link_id in self.joint_id_to_info.keys()}
-        new_collisions = self.calc_self_collision_matrix(link_pairs)
-        self.possible_collisions.union(new_collisions)
-        print(u'object {} attached to {} in pybullet world'.format(object_.name, self.name))
 
     def get_urdf(self):
         """
         :rtype: str
         """
         # for each attached object, insert the corresponding URDF sub-string into the original URDF string
-        new_urdf_string = self.original_urdf
+        new_urdf_string = self.base_urdf
         for sub_string in self.attached_objects.values():
             new_urdf_string = new_urdf_string.replace(u'</robot>', u'{}</robot>'.format(sub_string))
         return new_urdf_string
@@ -428,38 +427,10 @@ class PyBulletRobot(object):
             # TODO: choose better exception type
             raise RuntimeError(u"No object '{}' has been attached to the robot.".format(object_name))
 
-        # salvage last joint state and base pose
-        base_pose = self.get_base_pose()
-        joint_state = self.get_joint_states()
-
-        # salvage last collision matrix, and save collisions as pairs of link names
-        collision_matrix = set()
-        for collision in self.possible_collisions:
-            collision_matrix.add((self.link_id_to_name[collision[0]], self.link_id_to_name[collision[1]]))
-
-        # remove all collision entries related to the object that shall be detached
-        collision_matrix = filter((lambda (collision): object_name not in collision), collision_matrix)
-
-        # forget about the object that shall be detached
         del (self.attached_objects[object_name])
 
-        # for each attached object, insert the corresponding URDF sub-string into the original URDF string
-        new_urdf_string = self.get_urdf()
-
-        # remove last robot and load new robot from new URDF
-        p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 0)
-        p.removeBody(self.id)
-        self.id = load_urdf_string_into_bullet(new_urdf_string, base_pose)
-        p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 1)
-
-        # reload joint info and last joint state
-        self.init_js_info()
-        self.set_joint_state(joint_state)
-
-        # reload last collision matrix as pairs of link IDs
-        self.possible_collisions = set()
-        for collision in collision_matrix:
-            self.possible_collisions.add((self.link_name_to_id[collision[0]], self.link_name_to_id[collision[1]]))
+        self.sync_urdf_with_bullet()
+        self.remove_self_collision_entries(object_name)
         print(u'object {} detachted from {} in pybullet world'.format(object_name, self.name))
 
     def detach_all_objects(self):
@@ -467,36 +438,10 @@ class PyBulletRobot(object):
         Detaches all object that have been attached to the robot.
         """
         if self.attached_objects:
-            # salvage last joint state and base pose
-            base_pose = self.get_base_pose()
-            joint_state = self.get_joint_states()
-
-            # salvage last collision matrix, and save collisions as pairs of link names
-            collision_matrix = set()
-            for collision in self.possible_collisions:
-                collision_matrix.add((self.link_id_to_name[collision[0]], self.link_id_to_name[collision[1]]))
-
-            # remove all collision entries related to attached objects
-            for object_name in self.attached_objects.keys():
-                collision_matrix = filter((lambda (collision): object_name not in collision), collision_matrix)
-
-            # remove last robot and reload with original URDF
-            p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 0)
-            p.removeBody(self.id)
-            self.id = load_urdf_string_into_bullet(self.original_urdf, base_pose)
-            p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 1)
-
-            # reload joint info and last joint state
-            self.init_js_info()
-            self.set_joint_state(joint_state)
-
-            # reload original collision matrix
-            self.possible_collisions = set()
-            for collision in collision_matrix:
-                self.possible_collisions.add((self.link_name_to_id[collision[0]], self.link_name_to_id[collision[1]]))
-
-            # forget about previously attached objects
+            for attached_object in self.attached_objects:
+                self.remove_self_collision_entries(attached_object)
             self.attached_objects = {}
+            self.sync_urdf_with_bullet()
 
     def __str__(self):
         return u'{}/{}'.format(self.name, self.id)
@@ -691,7 +636,6 @@ class PyBulletWorld(object):
         :return: (robot_link, body_b, link_b) -> ContactInfo
         :rtype: dict
         """
-        # TODO merge self collisions with normal collision loop
         # TODO I think I have to multiply distance with something
         collisions = defaultdict(lambda: None)
         for k, distance in cut_off_distances.items():

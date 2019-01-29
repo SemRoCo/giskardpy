@@ -207,7 +207,6 @@ class TestCartGoals(object):
         """
         :type zero_pose: PR2
         """
-        # FIXME? eef don't move at the same time
         r_goal = PoseStamped()
         r_goal.header.frame_id = zero_pose.r_tip
         r_goal.header.stamp = rospy.get_rostime()
@@ -229,8 +228,6 @@ class TestCartGoals(object):
         """
         :type zero_pose: PR2
         """
-
-        # FIXME get rid of wiggling
         goal_js = {
             u'l_upper_arm_roll_joint': 1.63487737202,
             u'l_shoulder_pan_joint': 1.36222920328,
@@ -248,7 +245,7 @@ class TestCartGoals(object):
         p.header.stamp = rospy.get_rostime()
         p.pose.position.x = -0.1
         p.pose.orientation.w = 1
-        zero_pose.allow_all_collisions()
+        # zero_pose.allow_all_collisions()
         zero_pose.set_and_check_cart_goal(zero_pose.default_root, zero_pose.l_tip, p)
 
         p = PoseStamped()
@@ -256,7 +253,7 @@ class TestCartGoals(object):
         p.header.stamp = rospy.get_rostime()
         p.pose.position.x = 0.2
         p.pose.orientation.w = 1
-        zero_pose.allow_all_collisions()
+        # zero_pose.allow_all_collisions()
         zero_pose.set_and_check_cart_goal(zero_pose.default_root, zero_pose.l_tip, p)
 
     def test_hot_init_failed(self, zero_pose):
@@ -402,6 +399,14 @@ class TestCollisionAvoidanceGoals(object):
         """
         pocky = u'http://muh#pocky'
         zero_pose.attach_box(pocky, [0.1, 0.02, 0.02], zero_pose.r_tip, [0.05, 0, 0])
+
+    def test_attach_remove_box(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        pocky = u'http://muh#pocky'
+        zero_pose.attach_box(pocky, [0.1, 0.02, 0.02], zero_pose.r_tip, [0.05, 0, 0])
+        zero_pose.remove_object(pocky)
 
     def test_attach_existing_box(self, zero_pose):
         """
@@ -811,7 +816,7 @@ class TestCollisionAvoidanceGoals(object):
         box_setup.check_cpi_geq([attached_link_name], 0.048)
         box_setup.remove_object(attached_link_name)
 
-    def test_attached_collision2(self, zero_pose):
+    def test_attached_self_collision(self, zero_pose):
         """
         :type box_setup: PR2
         """
@@ -824,7 +829,6 @@ class TestCollisionAvoidanceGoals(object):
             u'l_upper_arm_roll_joint': 0.5532568387077381,
             u'l_wrist_flex_joint': - 1.215660155912625,
             u'l_wrist_roll_joint': 4.249300323527076,
-            u'r_elbow_flex_joint': 0.0,
             u'r_forearm_roll_joint': 0.0,
             u'r_shoulder_lift_joint': 0.0,
             u'r_shoulder_pan_joint': 0.0,
@@ -832,13 +836,12 @@ class TestCollisionAvoidanceGoals(object):
             u'r_wrist_flex_joint': 0.0,
             u'r_wrist_roll_joint': 0.0,
             u'r_elbow_flex_joint': 0.0,
-            u'r_wrist_flex_joint': 0.0,
             u'torso_lift_joint': 0.2}
 
         zero_pose.set_joint_goal(collision_pose)
         zero_pose.send_goal()
 
-        zero_pose.avoid_all_collisions()
+        # zero_pose.avoid_all_collisions()
 
         attached_link_name = u'pocky'
         zero_pose.attach_box(attached_link_name, [0.1, 0.02, 0.02], zero_pose.l_tip, [0.05, 0, 0])
@@ -853,7 +856,6 @@ class TestCollisionAvoidanceGoals(object):
         zero_pose.set_cart_goal(zero_pose.default_root, zero_pose.l_tip, p)
         zero_pose.send_goal()
 
-        #zero_pose.set_and_check_cart_goal(zero_pose.default_root, zero_pose.r_tip, p)
         zero_pose.check_cpi_geq(zero_pose.get_l_gripper_links(), 0.048)
         zero_pose.check_cpi_geq([attached_link_name], 0.048)
         zero_pose.remove_object(attached_link_name)

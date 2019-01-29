@@ -88,7 +88,11 @@ class PluginBehavior(GiskardBehavior):
     def terminate(self, new_status):
         with self.status_lock:
             self.set_status(Status.FAILURE)
-        self.update_thread.join()
+        try:
+            self.update_thread.join()
+        except Exception as e:
+            # FIXME sometimes terminate gets called without init being called
+            raise Exception('asdf')
         self.stop_plugins()
         super(PluginBehavior, self).terminate(new_status)
 

@@ -4,7 +4,7 @@ from giskardpy.symengine_robot import Robot
 from giskardpy.utils import urdfs_equal
 
 
-class NewRobotPlugin(NewPluginBase):
+class RobotPlugin(NewPluginBase):
 
     def __init__(self, robot_description_identifier, js_identifier, default_joint_vel_limit):
         """
@@ -12,7 +12,7 @@ class NewRobotPlugin(NewPluginBase):
         :type js_identifier: str
         :type default_joint_vel_limit: float
         """
-        super(NewRobotPlugin, self).__init__()
+        super(RobotPlugin, self).__init__()
         self._robot_description_identifier = robot_description_identifier
         self._joint_states_identifier = js_identifier
         self.default_joint_vel_limit = default_joint_vel_limit

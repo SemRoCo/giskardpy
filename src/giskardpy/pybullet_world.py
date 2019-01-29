@@ -1,12 +1,11 @@
 import pickle
 import pybullet as p
-import rospkg
 import string
 import random
 import os
 from collections import namedtuple, OrderedDict, defaultdict
 from copy import copy
-from itertools import combinations, product
+from itertools import combinations
 from pybullet import JOINT_REVOLUTE, JOINT_PRISMATIC, JOINT_PLANAR, JOINT_SPHERICAL
 
 import errno
@@ -18,7 +17,7 @@ from giskardpy.exceptions import UnknownBodyException, RobotExistsException, Dup
 from giskardpy.data_types import SingleJointState, Transform, Point, Quaternion
 import numpy as np
 
-from giskardpy.utils import keydefaultdict, suppress_stdout, NullContextManager
+from giskardpy.utils import keydefaultdict, suppress_stdout, NullContextManager, resolve_ros_iris
 
 from giskardpy.object import UrdfObject, FixedJoint, to_urdf_string, BoxShape, \
     CollisionProperty, remove_outer_tag
@@ -33,27 +32,6 @@ ContactInfo = namedtuple(u'ContactInfo', [u'contact_flag', u'body_unique_id_a', 
                                          u'link_index_b', u'position_on_a', u'position_on_b', u'contact_normal_on_b',
                                          u'contact_distance', u'normal_force', u'lateralFriction1', u'lateralFrictionDir1',
                                           u'lateralFriction2', u'lateralFrictionDir2'])
-
-
-def resolve_ros_iris(input_urdf):
-    """
-    Replace all instances of ROS IRIs with a urdf string with global paths in the file system.
-    :param input_urdf: URDF in which the ROS IRIs shall be replaced.
-    :type input_urdf: str
-    :return: URDF with replaced ROS IRIs.
-    :rtype: str
-    """
-    rospack = rospkg.RosPack()
-    output_urdf = u''
-    for line in input_urdf.split(u'\n'):
-        if u'package://' in line:
-            package_name = line.split(u'package://', 1)[-1].split(u'/', 1)[0]
-            real_path = rospack.get_path(package_name)
-            output_urdf += line.replace(package_name, real_path)
-        else:
-            output_urdf += line
-        output_urdf += u'\n'
-    return output_urdf
 
 
 def write_urdf_to_disc(filename, urdf_string):
@@ -120,6 +98,7 @@ class PyBulletRobot(object):
         """
         self.path_to_data_folder = path_to_data_folder + u'collision_matrix/'
         self.name = name
+        # TODO i think resolve iris can be removed because I do this at the start
         self.original_urdf = resolve_ros_iris(urdf)
         self.id = load_urdf_string_into_bullet(self.original_urdf, base_pose)
         self.init_js_info()

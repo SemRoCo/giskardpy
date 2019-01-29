@@ -4,19 +4,19 @@ from tf.transformations import quaternion_from_matrix
 
 import symengine_wrappers as sw
 from giskardpy import BACKEND
-from giskardpy.plugin_robot import NewRobotPlugin
+from giskardpy.plugin_robot import RobotPlugin
 from giskardpy.utils import keydefaultdict
 
 
-class NewFkPlugin(NewRobotPlugin):
+class FkPlugin(RobotPlugin):
     def __init__(self, fk_identifier, js_identifier, robot_description_identifier):
         self.fk_identifier = fk_identifier
         self.fk = None
         self.robot = None
-        super(NewFkPlugin, self).__init__(robot_description_identifier, js_identifier, 0)
+        super(FkPlugin, self).__init__(robot_description_identifier, js_identifier, 0)
 
     def initialize(self):
-        super(NewFkPlugin, self).initialize()
+        super(FkPlugin, self).initialize()
         if self.was_urdf_updated():
             free_symbols = self.god_map.get_registered_symbols()
 

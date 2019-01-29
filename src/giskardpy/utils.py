@@ -1,5 +1,6 @@
 from __future__ import division
 
+import rospkg
 from collections import defaultdict, OrderedDict
 import numpy as np
 from itertools import product
@@ -329,3 +330,25 @@ def plot_trajectory(tj, controlled_joints, path_to_data_folder):
     ax2.grid()
 
     plt.savefig(path_to_data_folder + u'trajectory.pdf')
+
+
+def resolve_ros_iris(input_urdf):
+    """
+    Replace all instances of ROS IRIs with a urdf string with global paths in the file system.
+    :param input_urdf: URDF in which the ROS IRIs shall be replaced.
+    :type input_urdf: str
+    :return: URDF with replaced ROS IRIs.
+    :rtype: str
+    """
+    rospack = rospkg.RosPack()
+    output_urdf = u''
+    for line in input_urdf.split(u'\n'):
+        if u'package://' in line:
+            prefix, suffix = line.split(u'package://', 1)
+            package_name, suffix = suffix.split(u'/', 1)
+            real_path = rospack.get_path(package_name)
+            output_urdf += '{}{}/{}'.format(prefix, real_path, suffix)
+        else:
+            output_urdf += line
+        output_urdf += u'\n'
+    return output_urdf

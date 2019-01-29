@@ -9,7 +9,7 @@ from giskardpy.plugin import NewPluginBase
 from giskardpy.utils import to_joint_state_dict
 
 
-class JointStatePlugin2(NewPluginBase):
+class JointStatePlugin(NewPluginBase):
     """
     Listens to a joint state topic, transforms it into a dict and writes it to the got map.
     Gets replace with a kinematic sim plugin during a parallel universe.
@@ -19,7 +19,7 @@ class JointStatePlugin2(NewPluginBase):
         """
         :type js_identifier: str
         """
-        super(JointStatePlugin2, self).__init__()
+        super(JointStatePlugin, self).__init__()
         self.js_identifier = js_identifier
         self.mjs = None
         self.lock = Queue(maxsize=1)

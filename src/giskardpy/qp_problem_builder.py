@@ -180,6 +180,7 @@ class QProblemBuilder(object):
             self.lbAs = p_lbA
         else:
             self.lbAs = self.lbAs.T.append(p_lbA.T, ignore_index=True).T
+            # self.lbAs.T[[c for c in self.lbAs.T.columns if 'dist' in c]].plot()
         pass
 
     def get_cmd(self, substitutions, nWSR=None):

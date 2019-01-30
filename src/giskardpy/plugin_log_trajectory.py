@@ -1,14 +1,14 @@
 import numpy as np
 import pylab as plt
 from itertools import product
-from giskardpy.plugin import NewPluginBase
+from giskardpy.plugin import PluginBase
 from giskardpy.data_types import Trajectory
 
 
 def diff(p1, p2):
     pass
 
-class NewLogTrajPlugin(NewPluginBase):
+class NewLogTrajPlugin(PluginBase):
     def __init__(self, trajectory_identifier, joint_state_identifier, time_identifier):
         """
         :type trajectory_identifier: str

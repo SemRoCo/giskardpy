@@ -2,10 +2,10 @@ import numpy as np
 
 from py_trees import Status
 
-from giskardpy.plugin import NewPluginBase
+from giskardpy.plugin import PluginBase
 
 
-class GoalReachedPlugin(NewPluginBase):
+class GoalReachedPlugin(PluginBase):
     def __init__(self, joint_state_identifier, time_identifier, joint_convergence_threshold):
         super(GoalReachedPlugin, self).__init__()
         self.joint_state_identifier = joint_state_identifier

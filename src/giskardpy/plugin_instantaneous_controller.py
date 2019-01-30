@@ -24,9 +24,10 @@ class GoalToConstraints(GetGoal, RobotPlugin):
     def __init__(self, name, as_name, root_link, robot_description_identifier, js_identifier, goal_identifier,
                  controlled_joints_identifier, controllable_links_identifier, fk_identifier, pyfunction_identifier,
                  closest_point_identifier, soft_constraint_identifier, collision_goal_identifier,
-                 default_joint_vel_limit, default_joint_weight):
+                 default_joint_weight_identifier, default_joint_vel_limit, default_joint_weight):
         GetGoal.__init__(self, name, as_name)
-        RobotPlugin.__init__(self, robot_description_identifier, js_identifier, default_joint_vel_limit, default_joint_weight)
+        RobotPlugin.__init__(self, robot_description_identifier, js_identifier, default_joint_weight_identifier,
+                             default_joint_vel_limit, default_joint_weight)
         self.soft_constraint_identifier = soft_constraint_identifier
         self._goal_identifier = goal_identifier
         self.controlled_joints_identifier = controlled_joints_identifier
@@ -356,9 +357,10 @@ def cart_controller_to_goal(controller):
 
 class ControllerPlugin(RobotPlugin):
     def __init__(self, robot_description_identifier, js_identifier, path_to_functions, next_cmd_identifier,
-                 soft_constraint_identifier, controlled_joints_identifier, default_joint_vel_limit, default_joint_weight,
-                 nWSR=None):
-        super(ControllerPlugin, self).__init__(robot_description_identifier, js_identifier, default_joint_vel_limit,
+                 soft_constraint_identifier, controlled_joints_identifier, default_joint_weight_identifier,
+                 default_joint_vel_limit, default_joint_weight, nWSR=None):
+        super(ControllerPlugin, self).__init__(robot_description_identifier, js_identifier,
+                                               default_joint_weight_identifier, default_joint_vel_limit,
                                                default_joint_weight)
         self.soft_constraint_identifier = soft_constraint_identifier
         self.path_to_functions = path_to_functions

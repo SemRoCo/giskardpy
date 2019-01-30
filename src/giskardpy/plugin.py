@@ -6,7 +6,7 @@ import rospy
 from py_trees import Behaviour, Blackboard, Status
 
 
-class NewPluginBase(object):
+class PluginBase(object):
     def __init__(self):
         self.god_map = Blackboard().god_map
 
@@ -129,6 +129,6 @@ class PluginBehavior(GiskardBehavior):
             # TODO make 'exception' string a parameter somewhere
             Blackboard().set('exception', e)
 
-class SuccessPlugin(NewPluginBase):
+class SuccessPlugin(PluginBase):
     def update(self):
         return Status.SUCCESS

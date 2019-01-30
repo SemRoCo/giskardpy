@@ -16,14 +16,14 @@ from visualization_msgs.msg import Marker, MarkerArray
 from giskardpy.exceptions import CorruptShapeException, UnknownBodyException, \
     UnsupportedOptionException, DuplicateNameException, PhysicsWorldException
 from giskardpy.object import to_marker, world_body_to_urdf_object, from_pose_msg
-from giskardpy.plugin import NewPluginBase
+from giskardpy.plugin import PluginBase
 from giskardpy.pybullet_world import PyBulletWorld, ContactInfo
 from giskardpy.tfwrapper import transform_pose, lookup_transform, transform_point, transform_vector
 from giskardpy.data_types import ClosestPointInfo
 from giskardpy.utils import keydefaultdict, to_joint_state_dict, to_point_stamped, to_vector3_stamped, msg_to_list
 
 
-class PybulletPlugin(NewPluginBase):
+class PybulletPlugin(PluginBase):
     def __init__(self, pybullet_identifier, controlled_joints_identifier, path_to_data_folder='', gui=False):
         self.pybullet_identifier = pybullet_identifier
         self.controlled_joints_identifier = controlled_joints_identifier

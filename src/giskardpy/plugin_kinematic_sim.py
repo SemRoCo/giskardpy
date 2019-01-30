@@ -1,10 +1,10 @@
 from collections import OrderedDict
 
 from giskardpy.data_types import SingleJointState
-from giskardpy.plugin import NewPluginBase
+from giskardpy.plugin import PluginBase
 
 
-class NewKinSimPlugin(NewPluginBase):
+class NewKinSimPlugin(PluginBase):
     def __init__(self, js_identifier, next_cmd_identifier, time_identifier, sample_period):
         """
         :type js_identifier: str

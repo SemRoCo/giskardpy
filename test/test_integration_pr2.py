@@ -1030,7 +1030,7 @@ class TestCollisionAvoidanceGoals(object):
     #     p.pose.position = Point(0.69, -0.374, 0.82)
     #     p.pose.orientation = Quaternion(-0.010, 0.719, 0.006, 0.695)
     #     self.set_and_check_cart_goal(self.default_root, self.r_tip, p)
-    #
+
     #
     # def test_pick_up_spoon(self):
     #     base_pose = PoseStamped()

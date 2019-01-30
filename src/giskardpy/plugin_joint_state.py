@@ -5,11 +5,11 @@ from py_trees import Status
 
 from sensor_msgs.msg import JointState
 
-from giskardpy.plugin import NewPluginBase
+from giskardpy.plugin import PluginBase
 from giskardpy.utils import to_joint_state_dict
 
 
-class JointStatePlugin(NewPluginBase):
+class JointStatePlugin(PluginBase):
     """
     Listens to a joint state topic, transforms it into a dict and writes it to the got map.
     Gets replace with a kinematic sim plugin during a parallel universe.

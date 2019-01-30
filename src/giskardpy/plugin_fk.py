@@ -4,16 +4,16 @@ from tf.transformations import quaternion_from_matrix
 
 import symengine_wrappers as sw
 from giskardpy import BACKEND
-from giskardpy.plugin_robot import RobotPlugin
+from giskardpy.plugin_robot import RobotPlugin, RobotKinPlugin
 from giskardpy.utils import keydefaultdict
 
 
-class FkPlugin(RobotPlugin):
+class FkPlugin(RobotKinPlugin):
     def __init__(self, fk_identifier, js_identifier, robot_description_identifier):
         self.fk_identifier = fk_identifier
         self.fk = None
         self.robot = None
-        super(FkPlugin, self).__init__(robot_description_identifier, js_identifier, 0, 0)
+        super(FkPlugin, self).__init__(robot_description_identifier, js_identifier)
 
     def initialize(self):
         super(FkPlugin, self).initialize()

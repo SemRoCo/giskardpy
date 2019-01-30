@@ -1,11 +1,11 @@
 from py_trees import Status
 
 from giskardpy.exceptions import PathCollisionException, InsolvableException
-from giskardpy.plugin import GiskardBehavior, NewPluginBase
+from giskardpy.plugin import GiskardBehavior, PluginBase
 from giskardpy.utils import closest_point_constraint_violated, plot_trajectory
 
 
-class WiggleCancel(NewPluginBase):
+class WiggleCancel(PluginBase):
     def __init__(self, wiggle_precision_threshold, joint_state_identifier, time_identifier):
         self.joint_state_identifier = joint_state_identifier
         self.wiggle_precision = wiggle_precision_threshold

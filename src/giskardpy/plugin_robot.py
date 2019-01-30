@@ -6,7 +6,7 @@ from giskardpy.utils import urdfs_equal
 
 class RobotPlugin(NewPluginBase):
 
-    def __init__(self, robot_description_identifier, js_identifier, default_joint_vel_limit):
+    def __init__(self, robot_description_identifier, js_identifier, default_joint_vel_limit, default_joint_weight):
         """
         :type robot_description_identifier: str
         :type js_identifier: str
@@ -16,6 +16,7 @@ class RobotPlugin(NewPluginBase):
         self._robot_description_identifier = robot_description_identifier
         self._joint_states_identifier = js_identifier
         self.default_joint_vel_limit = default_joint_vel_limit
+        self.default_joint_weight = default_joint_weight
         self.robot = None
         self.__urdf_updated = True
         self.controlled_joints = set()
@@ -45,7 +46,7 @@ class RobotPlugin(NewPluginBase):
 
     def init_robot(self):
         urdf = self.god_map.safe_get_data([self._robot_description_identifier])
-        self.robot = Robot(urdf, self.default_joint_vel_limit)
+        self.robot = Robot(urdf, self.default_joint_vel_limit, self.default_joint_weight)
         current_joints = JointStatesInput(self.god_map.to_symbol,
                                           self.get_robot().get_joint_names_controllable(),
                                           [self._joint_states_identifier],

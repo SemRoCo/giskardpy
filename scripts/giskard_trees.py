@@ -59,6 +59,7 @@ def grow_tree():
     wiggle_precision_threshold = rospy.get_param(u'~wiggle_precision_threshold')
     sample_period = rospy.get_param(u'~sample_period')
     default_joint_vel_limit = rospy.get_param(u'~default_joint_vel_limit')
+    default_joint_weight = rospy.get_param(u'~default_joint_weight')
     default_collision_avoidance_distance = rospy.get_param(u'~default_collision_avoidance_distance')
     fill_velocity_values = rospy.get_param(u'~fill_velocity_values')
     nWSR = rospy.get_param(u'~nWSR')
@@ -131,7 +132,7 @@ def grow_tree():
     actual_planning.add_plugin(u'controller', ControllerPlugin(robot_description_identifier, js_identifier,
                                                                path_to_data_folder, next_cmd_identifier,
                                                                soft_constraint_identifier, controlled_joints_identifier,
-                                                               default_joint_vel_limit, nWSR))
+                                                               default_joint_vel_limit, default_joint_weight, nWSR))
     actual_planning.add_plugin(u'log', NewLogTrajPlugin(trajectory_identifier, js_identifier, time_identifier))
     actual_planning.add_plugin(u'goal reached', GoalReachedPlugin(js_identifier, time_identifier,
                                                                   joint_convergence_threshold))
@@ -154,7 +155,8 @@ def grow_tree():
                                      robot_description_identifier, js_identifier, cartesian_goal_identifier,
                                      controlled_joints_identifier, controllable_links_identifier,
                                      fk_identifier, pyfunction_identifier, closest_point_identifier,
-                                     soft_constraint_identifier, collision_goal_identifier, default_joint_vel_limit))
+                                     soft_constraint_identifier, collision_goal_identifier, default_joint_vel_limit,
+                                     default_joint_weight))
     root.add_child(planning)
     root.add_child(CleanUp(u'cleanup', closest_point_identifier))
     root.add_child(publish_result)

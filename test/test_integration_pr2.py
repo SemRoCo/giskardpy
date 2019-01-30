@@ -203,6 +203,18 @@ class TestCartGoals(object):
         zero_pose.allow_self_collision()
         zero_pose.set_and_check_cart_goal(zero_pose.default_root, zero_pose.r_tip, p)
 
+    def test_cart_goal_1eef2(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        p = PoseStamped()
+        p.header.stamp = rospy.get_rostime()
+        p.header.frame_id = zero_pose.default_root
+        p.pose.position = Point(0.599, -0.009, 0.983)
+        p.pose.orientation = Quaternion(0.524, -0.495, 0.487, -0.494)
+        zero_pose.allow_self_collision()
+        zero_pose.set_and_check_cart_goal(zero_pose.default_root, zero_pose.l_tip, p)
+
     def test_cart_goal_2eef(self, zero_pose):
         """
         :type zero_pose: PR2
@@ -315,7 +327,7 @@ class TestCartGoals(object):
         p.pose.orientation.w = 1
         # self.giskard.allow_all_collisions()
         zero_pose.set_cart_goal(zero_pose.default_root, zero_pose.r_tip, p)
-        zero_pose.send_and_check_goal(expected_error_code=MoveResult.INSOLVABLE)
+        zero_pose.send_and_check_goal()
 
     def test_root_link_not_equal_chain_root(self, zero_pose):
         """

@@ -11,6 +11,7 @@
     <rosparam param="max_traj_length">30</rosparam>
     <rosparam param="sample_period">0.05</rosparam>
     <rosparam param="default_joint_vel_limit">0.25</rosparam>
+    <rosparam param="default_joint_weight">0.001</rosparam>
     <rosparam param="default_collision_avoidance_distance">0.05</rosparam>
     <rosparam param="fill_velocity_values">False</rosparam>
     <rosparam param="nWSR">None</rosparam> <!-- None results in a nWSR estimation thats fine most of the time -->

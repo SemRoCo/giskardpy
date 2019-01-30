@@ -268,7 +268,7 @@ def rotation_conv_slerp(goal_rotation, current_rotation, current_evaluated_rotat
     hack = sw.rotation_matrix_from_axis_angle([0, 0, 1], 0.0001)
     axis, angle = sw.diffable_axis_angle_from_matrix((current_rotation.T * (current_evaluated_rotation * hack)).T)
     c_aa = (axis * angle)
-    c_aa = current_evaluated_rotation[:3, :3] * c_aa
+    # c_aa = current_evaluated_rotation[:3, :3] * c_aa
 
     soft_constraints[u'rotation 0: {}'.format(ns)] = SoftConstraint(lower=r_rot_control[0],
                                                                     upper=r_rot_control[0],

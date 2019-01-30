@@ -840,7 +840,7 @@ class TestCollisionAvoidanceGoals(object):
 
         zero_pose.set_joint_goal(collision_pose)
         zero_pose.send_goal()
-
+fff
         # zero_pose.avoid_all_collisions()
 
         attached_link_name = u'pocky'

@@ -18,6 +18,7 @@ from shape_msgs.msg import SolidPrimitive
 # from giskardpy.symengine_wrappers import quaternion_from_axis_angle
 from giskardpy.test_utils import PR2
 from giskardpy.tfwrapper import transform_pose, lookup_transform, init as tf_init
+
 # from giskardpy.utils import msg_to_list
 
 # TODO roslaunch iai_pr2_sim ros_control_sim.launch
@@ -122,8 +123,9 @@ def box_setup(pocky_pose_setup):
     :type pocky_pose_setup: PR2
     :rtype: PR2
     """
-    pocky_pose_setup.add_box(position=[1.2,0,0.5])
+    pocky_pose_setup.add_box(position=[1.2, 0, 0.5])
     return pocky_pose_setup
+
 
 @pytest.fixture()
 def fake_table_setup(zero_pose):
@@ -131,7 +133,7 @@ def fake_table_setup(zero_pose):
     :type zero_pose: PR2
     :rtype: PR2
     """
-    zero_pose.add_box(position=[.9,0,0.2])
+    zero_pose.add_box(position=[.9, 0, 0.2])
     return zero_pose
 
 
@@ -189,6 +191,7 @@ class TestJointGoals(object):
         goal.goal.type = MoveGoal.PLAN_AND_EXECUTE
         result = zero_pose.send_goal(goal)
         assert result.error_code == MoveResult.INSOLVABLE
+
 
 class TestCartGoals(object):
     def test_cart_goal_1eef(self, zero_pose):
@@ -968,7 +971,6 @@ class TestCollisionAvoidanceGoals(object):
     #     fake_table_setup.set_and_check_cart_goal(fake_table_setup.default_root, fake_table_setup.r_tip, goal_pose)
     #     pass
 
-
     #
     # def test_end_state_collision(self, box_setup):
     #     """
@@ -992,6 +994,58 @@ class TestCollisionAvoidanceGoals(object):
     # TODO test plan only
 
     # TODO test translation and orientation goal in different frame
+
+    def test_pickup_box(self, kitchen_setup):
+        """
+        :type kitchen_setup: PR2
+        :return:
+        """
+        # setup
+        goal_js = {u'torso_lift_joint': 0.300064623019,
+                   u'r_upper_arm_roll_joint': -1.46335011257,
+                   u'r_shoulder_pan_joint': -1.71258744959,
+                   u'r_shoulder_lift_joint': -0.256729037039,
+                   u'r_forearm_roll_joint': -54.7823837358,
+                   u'r_elbow_flex_joint': -2.1207193579,
+                   u'r_wrist_flex_joint': -0.100010762609,
+                   u'r_wrist_roll_joint': -18.7985635758,
+                   u'l_upper_arm_roll_joint': 1.47676751322,
+                   u'l_shoulder_pan_joint': 0.122941087033,
+                   u'l_shoulder_lift_joint': -0.0229720923255,
+                   u'l_forearm_roll_joint': -4.69330406266,
+                   u'l_elbow_flex_joint': -1.15162421589,
+                   u'l_wrist_flex_joint': -1.66449857718,
+                   u'l_wrist_roll_joint': -129.794776671}
+        kitchen_setup.send_and_check_joint_goal(goal_js)
+
+        base_pose = PoseStamped()
+        base_pose.header.frame_id = u'map'
+        base_pose.pose.position = Point(0.743, 0.586, 0.000)
+        base_pose.pose.orientation.w = 1
+        kitchen_setup.move_pr2_base(base_pose)
+
+        # grasp
+        attached_link_name = u'edekabowl'
+        kitchen_setup.attach_box(attached_link_name, [0.15, 0.15, 0.07], kitchen_setup.l_tip,
+                                 [0.01716, 0.0699, -0.00189],
+                                 [0.4978, 0.496, -0.5023, -0.5036])
+        cpi = kitchen_setup.get_cpi(0.05)
+        # cpi.
+
+        # post grasp
+        pregrasp_pose = PoseStamped()
+        pregrasp_pose.header.frame_id = u'base_footprint'
+        pregrasp_pose.pose.position.x = 0.611175722907
+        pregrasp_pose.pose.position.y = -0.0244662287535
+        pregrasp_pose.pose.position.z = 1.10803325995
+        pregrasp_pose.pose.orientation.x = -0.0128682380997
+        pregrasp_pose.pose.orientation.y = -0.710292569338
+        pregrasp_pose.pose.orientation.z = 0.0148339707762
+        pregrasp_pose.pose.orientation.w = -0.703632573456
+        kitchen_setup.avoid_all_collisions(0.05)
+        kitchen_setup.set_and_check_cart_goal(kitchen_setup.default_root, kitchen_setup.l_tip, pregrasp_pose)
+        kitchen_setup.check_cpi_geq([u'edekabowl'], )
+
 
     #
     # def test_place_spoon1(self):

@@ -348,7 +348,7 @@ class CollisionChecker(PybulletPlugin):
                                                                   self.default_collision_avoidance_distance)
         min_allowed_distance = collision_matrix
 
-        collision_goals.insert(0, self.allow_collision_with_plane())
+        collision_goals.insert(0, self.allow_collision_with_plane()) # FIXME shouldn't this be the last entry?
 
         if len([x for x in collision_goals if x.type in [CollisionEntry.AVOID_ALL_COLLISIONS,
                                                          CollisionEntry.ALLOW_ALL_COLLISIONS]]) == 0:

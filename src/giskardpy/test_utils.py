@@ -212,8 +212,11 @@ class GiskardTestWrapper(object):
         self.wrapper.set_cart_goal(root, tip, goal_pose)
 
     def set_and_check_cart_goal(self, root, tip, goal_pose):
+        goal_pose = transform_pose(u'base_footprint', goal_pose)
         self.set_cart_goal(root, tip, goal_pose)
+        self.loop_once()
         self.send_and_check_goal()
+        self.loop_once()
         self.check_cart_goal(tip, goal_pose)
 
     def check_cart_goal(self, tip, goal_pose):
@@ -243,7 +246,9 @@ class GiskardTestWrapper(object):
             goal = MoveActionGoal()
             goal.goal = self.wrapper._get_goal()
         i = 0
+        self.loop_once()
         t1 = Thread(target=self.get_as()._as.action_server.internal_goal_callback, args=(goal,))
+        self.loop_once()
         t1.start()
         while self.results.empty():
             self.loop_once()
@@ -306,6 +311,7 @@ class GiskardTestWrapper(object):
 
     def avoid_all_collisions(self, distance=0.5):
         self.wrapper.avoid_all_collisions(distance)
+        self.loop_once()
 
     def enable_self_collision(self):
         pass
@@ -321,9 +327,10 @@ class GiskardTestWrapper(object):
         old_collision_matrix = self.get_world().get_robot().get_self_collision_matrix()
         assert self.wrapper.attach_box(name, size, frame_id, position, orientation).error_codes == expected_response
         self.loop_once()
-        assert name in self.get_controllable_links()
+        # assert name in self.get_controllable_links()
         assert not self.get_world().has_object(name)
         assert len(old_collision_matrix.difference(self.get_world().get_robot().get_self_collision_matrix())) == 0
+        self.loop_once()
 
     def get_cpi(self, distance_threshold):
         collision_goals = [CollisionEntry(type=CollisionEntry.AVOID_ALL_COLLISIONS, min_dist=distance_threshold)]

@@ -24,13 +24,14 @@ from giskardpy.object import UrdfObject, FixedJoint, to_urdf_string, BoxShape, \
 import hashlib
 
 JointInfo = namedtuple(u'JointInfo', [u'joint_index', u'joint_name', u'joint_type', u'q_index', u'u_index', u'flags',
-                                     u'joint_damping', u'joint_friction', u'joint_lower_limit', u'joint_upper_limit',
-                                     u'joint_max_force', u'joint_max_velocity', u'link_name', u'joint_axis',
-                                     u'parent_frame_pos', u'parent_frame_orn', u'parent_index'])
+                                      u'joint_damping', u'joint_friction', u'joint_lower_limit', u'joint_upper_limit',
+                                      u'joint_max_force', u'joint_max_velocity', u'link_name', u'joint_axis',
+                                      u'parent_frame_pos', u'parent_frame_orn', u'parent_index'])
 
 ContactInfo = namedtuple(u'ContactInfo', [u'contact_flag', u'body_unique_id_a', u'body_unique_id_b', u'link_index_a',
-                                         u'link_index_b', u'position_on_a', u'position_on_b', u'contact_normal_on_b',
-                                         u'contact_distance', u'normal_force', u'lateralFriction1', u'lateralFrictionDir1',
+                                          u'link_index_b', u'position_on_a', u'position_on_b', u'contact_normal_on_b',
+                                          u'contact_distance', u'normal_force', u'lateralFriction1',
+                                          u'lateralFrictionDir1',
                                           u'lateralFriction2', u'lateralFrictionDir2'])
 
 
@@ -84,9 +85,11 @@ class PyBulletRobot(object):
     """
     Keeps track of and offers convenience functions for an urdf object in bullet.
     """
-    #TODO maybe merge symengine robot with this class?
+    # TODO maybe merge symengine robot with this class?
     base_link_name = u'base'
-    def __init__(self, name, urdf, controlled_joints, base_pose=Transform(), calc_self_collision_matrix=True, path_to_data_folder=''):
+
+    def __init__(self, name, urdf, controlled_joints, base_pose=Transform(), calc_self_collision_matrix=True,
+                 path_to_data_folder=''):
         """
         :type name: str
         :param urdf: Path to URDF file, or content of already loaded URDF file.
@@ -238,9 +241,9 @@ class PyBulletRobot(object):
         # find meaningless self-collisions
         for link_name_a, link_name_b in link_combinations:
             if self.get_parent_link_name(link_name_a) == link_name_b or \
-                self.get_parent_link_name(link_name_b) == link_name_a:
-            # if self.joint_id_to_info[link_name_a].parent_index == link_name_b or \
-            #         self.joint_id_to_info[link_name_b].parent_index == link_name_a:
+                    self.get_parent_link_name(link_name_b) == link_name_a:
+                # if self.joint_id_to_info[link_name_a].parent_index == link_name_b or \
+                #         self.joint_id_to_info[link_name_b].parent_index == link_name_a:
                 always.add((link_name_a, link_name_b))
         rest = link_combinations.difference(always)
         self.set_joint_state(self.get_zero_joint_state())
@@ -451,6 +454,7 @@ class PyBulletWorld(object):
     """
     Wraps around the shitty pybullet api.
     """
+
     def __init__(self, enable_gui=False, path_to_data_folder=u''):
         """
         :type enable_gui: bool
@@ -647,12 +651,45 @@ class PyBulletWorld(object):
             else:
                 object_id = self.get_object_id(body_b)
                 link_b_id = self.get_object(body_b).link_name_to_id[link_b]
+            # FIXME redundant checks for robot link pairs
             contacts = [ContactInfo(*x) for x in p.getClosestPoints(self._robot.id, object_id,
-                                                                    distance*3,
+                                                                    distance * 3,
                                                                     robot_link_id, link_b_id)]
             if len(contacts) > 0:
                 collisions.update({k: min(contacts, key=lambda x: x.contact_distance)})
+                # asdf = self.should_switch(contacts[0])
+                pass
+        for k, v in collisions.items():  # type: (str, ContactInfo)
+            if self.should_switch(v):
+                collisions[k] = ContactInfo(v.contact_flag,
+                                            v.body_unique_id_a, v.body_unique_id_b,
+                                            v.link_index_a, v.link_index_b,
+                                            v.position_on_b, v.position_on_a,
+                                            (-np.array(v.contact_normal_on_b)).tolist(), v.contact_distance,
+                                            v.normal_force,
+                                            v.lateralFriction1, v.lateralFrictionDir1, v.lateralFriction2,
+                                            v.lateralFrictionDir2)
         return collisions
+
+    def should_switch(self, contact_info):
+        """
+        :type contact_info: ContactInfo
+        :return:
+        """
+        contact_info2 = ContactInfo(*min(p.getClosestPoints(contact_info.body_unique_id_b,
+                                                            contact_info.body_unique_id_a,
+                                                            abs(contact_info.contact_distance) * 1.05,
+                                                            contact_info.link_index_b, contact_info.link_index_a),
+                                         key=lambda x: x[8]))
+        if not np.isclose(contact_info2.contact_normal_on_b, contact_info.contact_normal_on_b).all():
+            return False
+        # pa = np.array(contact_info.position_on_a)
+        # pb = np.array(contact_info.position_on_b)
+        # n = np.array(contact_info.contact_normal_on_b)
+        # dist = np.linalg.norm(pa-pb)
+        # body_b, link_b, fraction, position, normal = p.rayTest(pb, pb+n)[0]
+        return contact_info.link_index_a > contact_info.link_index_b
+        # return body_b != contact_info.body_unique_id_a
 
     def activate_viewer(self):
         if self._gui:

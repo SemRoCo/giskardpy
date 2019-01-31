@@ -15,6 +15,8 @@ from giskard_msgs.srv import UpdateWorld, UpdateWorldResponse, UpdateWorldReques
 from visualization_msgs.msg import Marker, MarkerArray
 from giskardpy.exceptions import CorruptShapeException, UnknownBodyException, \
     UnsupportedOptionException, DuplicateNameException, PhysicsWorldException
+from giskardpy.identifier import pybullet_identifier, controlled_joints_identifier, js_identifier, \
+    robot_description_identifier, collision_goal_identifier, closest_point_identifier, controllable_links_identifier
 from giskardpy.object import to_marker, world_body_to_urdf_object, from_pose_msg
 from giskardpy.plugin import PluginBase
 from giskardpy.pybullet_world import PyBulletWorld, ContactInfo
@@ -24,9 +26,7 @@ from giskardpy.utils import keydefaultdict, to_joint_state_dict, to_point_stampe
 
 
 class PybulletPlugin(PluginBase):
-    def __init__(self, pybullet_identifier, controlled_joints_identifier, path_to_data_folder='', gui=False):
-        self.pybullet_identifier = pybullet_identifier
-        self.controlled_joints_identifier = controlled_joints_identifier
+    def __init__(self, path_to_data_folder='', gui=False):
         self.path_to_data_folder = path_to_data_folder
         self.gui = gui
         # TODO find a non hacky way to get robot name from urdf
@@ -34,15 +34,15 @@ class PybulletPlugin(PluginBase):
         super(PybulletPlugin, self).__init__()
 
     def setup(self):
-        self.world = self.get_god_map().safe_get_data([self.pybullet_identifier])
-        self.controlled_joints = self.get_god_map().safe_get_data([self.controlled_joints_identifier])
+        self.world = self.get_god_map().safe_get_data([pybullet_identifier])
+        self.controlled_joints = self.get_god_map().safe_get_data([controlled_joints_identifier])
         if self.world is None:
             self.world = PyBulletWorld(enable_gui=self.gui, path_to_data_folder=self.path_to_data_folder)
             self.world.activate_viewer()
             # TODO get robot description from god map
             urdf = rospy.get_param(u'robot_description')
             self.world.spawn_robot_from_urdf(self.robot_name, urdf, self.controlled_joints)
-            self.god_map.safe_set_data([self.pybullet_identifier], self.world)
+            self.god_map.safe_set_data([pybullet_identifier], self.world)
 
 
 class PyBulletMonitor(PybulletPlugin):
@@ -50,21 +50,19 @@ class PyBulletMonitor(PybulletPlugin):
     Syncs pybullet with god map.
     """
 
-    def __init__(self, js_identifier, pybullet_identifier, controlled_joints_identifier, map_frame, root_link,
-                 path_to_data_folder='', gui=False):
-        self.js_identifier = js_identifier
+    def __init__(self, map_frame, root_link, path_to_data_folder='', gui=False):
         self.robot_name = u'robby'
         self.map_frame = map_frame
         self.root_link = root_link
-        super(PyBulletMonitor, self).__init__(pybullet_identifier, controlled_joints_identifier, path_to_data_folder, gui)
-        self.world = self.god_map.safe_get_data([self.pybullet_identifier])
+        super(PyBulletMonitor, self).__init__(path_to_data_folder, gui)
+        self.world = self.god_map.safe_get_data([pybullet_identifier])
 
     def update(self):
         """
         updates robot position in pybullet
         :return:
         """
-        js = self.god_map.safe_get_data([self.js_identifier])
+        js = self.god_map.safe_get_data([js_identifier])
         if js is not None:
             self.world.set_robot_joint_state(js)
         p = lookup_transform(self.map_frame, self.root_link)
@@ -80,10 +78,8 @@ class PyBulletMonitor(PybulletPlugin):
 
 class PyBulletUpdatePlugin(PybulletPlugin):
     # TODO reject changes if plugin not active or something
-    def __init__(self, pybullet_identifier, controlled_joints_identifier, robot_description_identifier,
-                 path_to_data_folder='', gui=False):
-        super(PyBulletUpdatePlugin, self).__init__(pybullet_identifier, controlled_joints_identifier, path_to_data_folder, gui)
-        self.robot_description_identifier = robot_description_identifier
+    def __init__(self, path_to_data_folder='', gui=False):
+        super(PyBulletUpdatePlugin, self).__init__(path_to_data_folder, gui)
         self.global_reference_frame_name = u'map'
         self.lock = Lock()
         self.object_js_subs = {}  # JointState subscribers for articulated world objects
@@ -219,7 +215,7 @@ class PyBulletUpdatePlugin(PybulletPlugin):
         """
         with self.lock:
             # TODO only update urdf if it has changed
-            self.god_map.safe_set_data([self.robot_description_identifier], self.world.get_robot().get_urdf())
+            self.god_map.safe_set_data([robot_description_identifier], self.world.get_robot().get_urdf())
 
             for object_name, object_joint_state in self.object_joint_states.items():
                 self.world.get_object(object_name).set_joint_state(object_joint_state)
@@ -228,14 +224,8 @@ class PyBulletUpdatePlugin(PybulletPlugin):
 
 
 class CollisionChecker(PybulletPlugin):
-    def __init__(self, collision_goal_identifier, controllable_links_identifier, pybullet_identifier, controlled_joints_identifier,
-                 closest_point_identifier, default_collision_avoidance_distance,
-                 map_frame, root_link,
-                 path_to_data_folder='', gui=False):
-        super(CollisionChecker, self).__init__(pybullet_identifier, controlled_joints_identifier, path_to_data_folder, gui)
-        self.collision_goal_identifier = collision_goal_identifier
-        self.controllable_links_identifier = controllable_links_identifier
-        self.closest_point_identifier = closest_point_identifier
+    def __init__(self, default_collision_avoidance_distance, map_frame, root_link, path_to_data_folder='', gui=False):
+        super(CollisionChecker, self).__init__(path_to_data_folder, gui)
         self.default_collision_avoidance_distance = default_collision_avoidance_distance
         self.map_frame = map_frame
         self.robot_root = root_link
@@ -254,9 +244,9 @@ class CollisionChecker(PybulletPlugin):
         rospy.sleep(.5)
 
     def initialize(self):
-        collision_goals = self.god_map.safe_get_data([self.collision_goal_identifier])
+        collision_goals = self.god_map.safe_get_data([collision_goal_identifier])
         self.collision_matrix = self.collision_goals_to_collision_matrix(collision_goals)
-        self.god_map.safe_set_data([self.closest_point_identifier], None)
+        self.god_map.safe_set_data([closest_point_identifier], None)
         super(CollisionChecker, self).initialize()
 
     def update(self):
@@ -272,7 +262,7 @@ class CollisionChecker(PybulletPlugin):
             if self.marker:
                 self.publish_cpi_markers(closest_point)
 
-            self.god_map.safe_set_data([self.closest_point_identifier], closest_point)
+            self.god_map.safe_set_data([closest_point_identifier], closest_point)
         return super(CollisionChecker, self).update()
 
     def enable_marker_cb(self, setbool):
@@ -356,7 +346,7 @@ class CollisionChecker(PybulletPlugin):
             collision_goals.insert(0, CollisionEntry(type=CollisionEntry.AVOID_ALL_COLLISIONS,
                                                      min_dist=self.default_collision_avoidance_distance))
 
-        controllable_links = self.god_map.safe_get_data([self.controllable_links_identifier])
+        controllable_links = self.god_map.safe_get_data([controllable_links_identifier])
 
         for collision_entry in collision_goals:  # type: CollisionEntry
             if collision_entry.type in [CollisionEntry.ALLOW_ALL_COLLISIONS,

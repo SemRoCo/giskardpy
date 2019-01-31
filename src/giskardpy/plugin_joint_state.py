@@ -5,6 +5,7 @@ from py_trees import Status
 
 from sensor_msgs.msg import JointState
 
+from giskardpy.identifier import js_identifier
 from giskardpy.plugin import PluginBase
 from giskardpy.utils import to_joint_state_dict
 
@@ -15,12 +16,11 @@ class JointStatePlugin(PluginBase):
     Gets replace with a kinematic sim plugin during a parallel universe.
     """
 
-    def __init__(self, js_identifier):
+    def __init__(self):
         """
         :type js_identifier: str
         """
         super(JointStatePlugin, self).__init__()
-        self.js_identifier = js_identifier
         self.mjs = None
         self.lock = Queue(maxsize=1)
 
@@ -40,7 +40,7 @@ class JointStatePlugin(PluginBase):
             self.mjs = to_joint_state_dict(js)
         except Empty:
             pass
-        self.god_map.safe_set_data([self.js_identifier], self.mjs)
+        self.god_map.safe_set_data([js_identifier], self.mjs)
         return None
 
     def setup(self):

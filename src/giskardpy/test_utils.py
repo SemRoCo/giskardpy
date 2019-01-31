@@ -132,7 +132,6 @@ class GiskardTestWrapper(object):
         rospy.sleep(1)
         self.wrapper = GiskardWrapper(ns=u'tests')
         self.results = Queue(100)
-        self.robot = self.tree.root.children[0]._plugins[u'fk'].robot
         self.joint_limits = {joint_name: self.robot.get_joint_lower_upper_limit(joint_name) for joint_name in
                              self.get_controlled_joint_names() if self.robot.is_joint_controllable(joint_name)}
         # self.world = self.get_god_map().safe_get_data([u'pybullet_world'])  # type: PyBulletWorld
@@ -141,6 +140,8 @@ class GiskardTestWrapper(object):
         self.map = u'map'
         self.simple_base_pose_pub = rospy.Publisher(u'/move_base_simple/goal', PoseStamped, queue_size=10)
         rospy.sleep(1)
+
+    
 
     def get_god_map(self):
         """

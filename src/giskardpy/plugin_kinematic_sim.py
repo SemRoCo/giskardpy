@@ -1,11 +1,12 @@
 from collections import OrderedDict
 
 from giskardpy.data_types import SingleJointState
+from giskardpy.identifier import time_identifier, js_identifier, next_cmd_identifier
 from giskardpy.plugin import PluginBase
 
 
-class NewKinSimPlugin(PluginBase):
-    def __init__(self, js_identifier, next_cmd_identifier, time_identifier, sample_period):
+class KinSimPlugin(PluginBase):
+    def __init__(self, sample_period):
         """
         :type js_identifier: str
         :type next_cmd_identifier: str
@@ -13,23 +14,19 @@ class NewKinSimPlugin(PluginBase):
         :param sample_period: the time difference in s between each step.
         :type sample_period: float
         """
-        self.js_identifier = js_identifier
-        self.next_cmd_identifier = next_cmd_identifier
-        self.time_identifier = time_identifier
         self.frequency = sample_period
-        super(NewKinSimPlugin, self).__init__()
+        super(KinSimPlugin, self).__init__()
 
     def initialize(self):
         self.next_js = None
         self.time = -self.frequency
-        super(NewKinSimPlugin, self).initialize()
+        super(KinSimPlugin, self).initialize()
 
     def update(self):
         self.time += self.frequency
-        motor_commands = self.god_map.safe_get_data([self.next_cmd_identifier])
-        current_js = self.god_map.safe_get_data([self.js_identifier])
+        motor_commands = self.god_map.safe_get_data([next_cmd_identifier])
+        current_js = self.god_map.safe_get_data([js_identifier])
         if motor_commands is not None:
-            asdf = {k:v for k,v in motor_commands.items() if v > 0.199}
             self.next_js = OrderedDict()
             for joint_name, sjs in current_js.items():
                 if joint_name in motor_commands:
@@ -38,8 +35,8 @@ class NewKinSimPlugin(PluginBase):
                     cmd = 0.0
                 self.next_js[joint_name] = SingleJointState(sjs.name, sjs.position + cmd * self.frequency, velocity=cmd)
         if self.next_js is not None:
-            self.god_map.safe_set_data([self.js_identifier], self.next_js)
+            self.god_map.safe_set_data([js_identifier], self.next_js)
         else:
-            self.god_map.safe_set_data([self.js_identifier], current_js)
-        self.god_map.safe_set_data([self.time_identifier], self.time)
-        return super(NewKinSimPlugin, self).update()
+            self.god_map.safe_set_data([js_identifier], current_js)
+        self.god_map.safe_set_data([time_identifier], self.time)
+        return super(KinSimPlugin, self).update()

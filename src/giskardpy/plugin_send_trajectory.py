@@ -6,17 +6,17 @@ from control_msgs.msg import FollowJointTrajectoryAction, FollowJointTrajectoryG
 from py_trees_ros.actions import ActionClient
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 
+from giskardpy.identifier import trajectory_identifier
 from giskardpy.plugin import GiskardBehavior
 
 
 class SendTrajectory(ActionClient, GiskardBehavior):
     error_code_to_str = {value: name for name, value in vars(FollowJointTrajectoryResult).items() if isinstance(value, int)}
 
-    def __init__(self, name, trajectory_identifier, fill_velocity_values,
+    def __init__(self, name, fill_velocity_values,
                  action_namespace=u'/whole_body_controller/follow_joint_trajectory'):
         GiskardBehavior.__init__(self, name)
         ActionClient.__init__(self, name, FollowJointTrajectoryAction, None, action_namespace)
-        self.trajectory_identifier = trajectory_identifier
         self.fill_velocity_values = fill_velocity_values
 
     def setup(self, timeout):
@@ -27,7 +27,7 @@ class SendTrajectory(ActionClient, GiskardBehavior):
 
     def initialise(self):
         super(SendTrajectory, self).initialise()
-        trajectory = self.get_god_map().safe_get_data([self.trajectory_identifier])
+        trajectory = self.get_god_map().safe_get_data([trajectory_identifier])
         # self.get_god_map().safe_set_data([self.trajectory_identifier], None)
         goal = FollowJointTrajectoryGoal()
         goal.trajectory = self.traj_to_msg(trajectory)

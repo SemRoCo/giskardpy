@@ -17,6 +17,7 @@ from py_trees import Blackboard
 from sensor_msgs.msg import JointState
 
 from giskard_trees import grow_tree
+from giskardpy.identifier import robot_identifier
 from giskardpy.plugin_pybullet import CollisionChecker
 from giskardpy.pybullet_world import PyBulletWorld
 from giskardpy.python_interface import GiskardWrapper
@@ -132,8 +133,8 @@ class GiskardTestWrapper(object):
         rospy.sleep(1)
         self.wrapper = GiskardWrapper(ns=u'tests')
         self.results = Queue(100)
-        self.joint_limits = {joint_name: self.robot.get_joint_lower_upper_limit(joint_name) for joint_name in
-                             self.get_controlled_joint_names() if self.robot.is_joint_controllable(joint_name)}
+        self.joint_limits = {joint_name: self.get_robot().get_joint_lower_upper_limit(joint_name) for joint_name in
+                             self.get_controlled_joint_names() if self.get_robot().is_joint_controllable(joint_name)}
         # self.world = self.get_god_map().safe_get_data([u'pybullet_world'])  # type: PyBulletWorld
         self.world_plugin = self.tree.root.children[3].children[2]._plugins[u'coll'] # type: CollisionChecker
         self.default_root = default_root
@@ -141,7 +142,8 @@ class GiskardTestWrapper(object):
         self.simple_base_pose_pub = rospy.Publisher(u'/move_base_simple/goal', PoseStamped, queue_size=10)
         rospy.sleep(1)
 
-    
+    def get_robot(self):
+        return self.get_god_map().safe_get_data([robot_identifier])
 
     def get_god_map(self):
         """
@@ -193,7 +195,7 @@ class GiskardTestWrapper(object):
             if joint_name in expected:
                 goal = expected[joint_name]
                 current = current_joint_state.position[i]
-                if self.robot.is_joint_continuous(joint_name):
+                if self.get_robot().is_joint_continuous(joint_name):
                     np.testing.assert_almost_equal(shortest_angular_distance(goal, current), 0, decimal=6)
                 else:
                     np.testing.assert_almost_equal(goal, current, 2)
@@ -213,8 +215,11 @@ class GiskardTestWrapper(object):
         self.wrapper.set_cart_goal(root, tip, goal_pose)
 
     def set_and_check_cart_goal(self, root, tip, goal_pose):
+        goal_pose = transform_pose(u'base_footprint', goal_pose)
         self.set_cart_goal(root, tip, goal_pose)
+        self.loop_once()
         self.send_and_check_goal()
+        self.loop_once()
         self.check_cart_goal(tip, goal_pose)
 
     def check_cart_goal(self, tip, goal_pose):
@@ -244,7 +249,9 @@ class GiskardTestWrapper(object):
             goal = MoveActionGoal()
             goal.goal = self.wrapper._get_goal()
         i = 0
+        self.loop_once()
         t1 = Thread(target=self.get_as()._as.action_server.internal_goal_callback, args=(goal,))
+        self.loop_once()
         t1.start()
         while self.results.empty():
             self.loop_once()
@@ -274,7 +281,7 @@ class GiskardTestWrapper(object):
 
     def clear_world(self):
         assert self.wrapper.clear_world().error_codes == UpdateWorldResponse.SUCCESS
-        assert len(self.get_world().get_object_names()) == 1
+        assert len(self.get_world().get_object_names()) == 2
         assert len(self.get_world().get_robot().get_attached_objects()) == 0
         assert self.get_world().has_object(u'plane')
 
@@ -307,6 +314,7 @@ class GiskardTestWrapper(object):
 
     def avoid_all_collisions(self, distance=0.5):
         self.wrapper.avoid_all_collisions(distance)
+        self.loop_once()
 
     def enable_self_collision(self):
         pass
@@ -322,9 +330,10 @@ class GiskardTestWrapper(object):
         old_collision_matrix = self.get_world().get_robot().get_self_collision_matrix()
         assert self.wrapper.attach_box(name, size, frame_id, position, orientation).error_codes == expected_response
         self.loop_once()
-        assert name in self.get_controllable_links()
+        # assert name in self.get_controllable_links()
         assert not self.get_world().has_object(name)
         assert len(old_collision_matrix.difference(self.get_world().get_robot().get_self_collision_matrix())) == 0
+        self.loop_once()
 
     def get_cpi(self, distance_threshold):
         collision_goals = [CollisionEntry(type=CollisionEntry.AVOID_ALL_COLLISIONS, min_dist=distance_threshold)]

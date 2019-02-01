@@ -20,17 +20,18 @@ import numpy as np
 from giskardpy.utils import keydefaultdict, suppress_stdout, NullContextManager, resolve_ros_iris
 
 from giskardpy.object import UrdfObject, FixedJoint, to_urdf_string, BoxShape, \
-    CollisionProperty, remove_outer_tag
+    CollisionProperty, remove_outer_tag, SphereShape
 import hashlib
 
 JointInfo = namedtuple(u'JointInfo', [u'joint_index', u'joint_name', u'joint_type', u'q_index', u'u_index', u'flags',
-                                     u'joint_damping', u'joint_friction', u'joint_lower_limit', u'joint_upper_limit',
-                                     u'joint_max_force', u'joint_max_velocity', u'link_name', u'joint_axis',
-                                     u'parent_frame_pos', u'parent_frame_orn', u'parent_index'])
+                                      u'joint_damping', u'joint_friction', u'joint_lower_limit', u'joint_upper_limit',
+                                      u'joint_max_force', u'joint_max_velocity', u'link_name', u'joint_axis',
+                                      u'parent_frame_pos', u'parent_frame_orn', u'parent_index'])
 
 ContactInfo = namedtuple(u'ContactInfo', [u'contact_flag', u'body_unique_id_a', u'body_unique_id_b', u'link_index_a',
-                                         u'link_index_b', u'position_on_a', u'position_on_b', u'contact_normal_on_b',
-                                         u'contact_distance', u'normal_force', u'lateralFriction1', u'lateralFrictionDir1',
+                                          u'link_index_b', u'position_on_a', u'position_on_b', u'contact_normal_on_b',
+                                          u'contact_distance', u'normal_force', u'lateralFriction1',
+                                          u'lateralFrictionDir1',
                                           u'lateralFriction2', u'lateralFrictionDir2'])
 
 
@@ -84,9 +85,11 @@ class PyBulletRobot(object):
     """
     Keeps track of and offers convenience functions for an urdf object in bullet.
     """
-    #TODO maybe merge symengine robot with this class?
+    # TODO maybe merge symengine robot with this class?
     base_link_name = u'base'
-    def __init__(self, name, urdf, controlled_joints, base_pose=Transform(), calc_self_collision_matrix=True, path_to_data_folder=''):
+
+    def __init__(self, name, urdf, controlled_joints, base_pose=Transform(), calc_self_collision_matrix=True,
+                 path_to_data_folder=''):
         """
         :type name: str
         :param urdf: Path to URDF file, or content of already loaded URDF file.
@@ -238,9 +241,9 @@ class PyBulletRobot(object):
         # find meaningless self-collisions
         for link_name_a, link_name_b in link_combinations:
             if self.get_parent_link_name(link_name_a) == link_name_b or \
-                self.get_parent_link_name(link_name_b) == link_name_a:
-            # if self.joint_id_to_info[link_name_a].parent_index == link_name_b or \
-            #         self.joint_id_to_info[link_name_b].parent_index == link_name_a:
+                    self.get_parent_link_name(link_name_b) == link_name_a:
+                # if self.joint_id_to_info[link_name_a].parent_index == link_name_b or \
+                #         self.joint_id_to_info[link_name_b].parent_index == link_name_a:
                 always.add((link_name_a, link_name_b))
         rest = link_combinations.difference(always)
         self.set_joint_state(self.get_zero_joint_state())
@@ -451,6 +454,7 @@ class PyBulletWorld(object):
     """
     Wraps around the shitty pybullet api.
     """
+
     def __init__(self, enable_gui=False, path_to_data_folder=u''):
         """
         :type enable_gui: bool
@@ -647,12 +651,53 @@ class PyBulletWorld(object):
             else:
                 object_id = self.get_object_id(body_b)
                 link_b_id = self.get_object(body_b).link_name_to_id[link_b]
+            # FIXME redundant checks for robot link pairs
             contacts = [ContactInfo(*x) for x in p.getClosestPoints(self._robot.id, object_id,
-                                                                    distance*3,
+                                                                    distance * 3,
                                                                     robot_link_id, link_b_id)]
             if len(contacts) > 0:
                 collisions.update({k: min(contacts, key=lambda x: x.contact_distance)})
+                # asdf = self.should_switch(contacts[0])
+                pass
         return collisions
+
+    def should_flip_contact_info(self, contact_info):
+        """
+        :type contact_info: ContactInfo
+        :rtype: bool
+        """
+        contact_info2 = ContactInfo(*min(p.getClosestPoints(contact_info.body_unique_id_b,
+                                                            contact_info.body_unique_id_a,
+                                                            abs(contact_info.contact_distance) * 1.05,
+                                                            contact_info.link_index_b, contact_info.link_index_a),
+                                         key=lambda x: x[8]))
+        if not np.isclose(contact_info2.contact_normal_on_b, contact_info.contact_normal_on_b).all():
+            return False
+        pa = np.array(contact_info.position_on_a)
+        # pb = np.array(contact_info.position_on_b)
+
+        self.move_hack(pa)
+        try:
+            contact_info3 = ContactInfo(*[x for x in p.getClosestPoints(self.get_object_id(u'pybullet_sucks'),
+                                                                        contact_info.body_unique_id_a, 0.001) if
+                                          np.allclose(x[8], -0.005)][0])
+            if contact_info3.body_unique_id_b == contact_info.body_unique_id_a and \
+                    contact_info3.link_index_b == contact_info.link_index_a:
+                return False
+        except Exception as e:
+            return True
+        return True
+
+    def flip_contact_info(self, contact_info):
+        return ContactInfo(contact_info.contact_flag,
+                           contact_info.body_unique_id_a, contact_info.body_unique_id_b,
+                           contact_info.link_index_a, contact_info.link_index_b,
+                           contact_info.position_on_b, contact_info.position_on_a,
+                           (-np.array(contact_info.contact_normal_on_b)).tolist(), contact_info.contact_distance,
+                           contact_info.normal_force,
+                           contact_info.lateralFriction1, contact_info.lateralFrictionDir1,
+                           contact_info.lateralFriction2,
+                           contact_info.lateralFrictionDir2)
 
     def activate_viewer(self):
         if self._gui:
@@ -662,11 +707,13 @@ class PyBulletWorld(object):
             self.physicsClient = p.connect(p.DIRECT)  # or p.DIRECT for non-graphical version
         p.setGravity(0, 0, -9.8)
         self.add_ground_plane()
+        self.add_pybullet_bug_fix_hack()
 
     def clear_world(self):
         self.delete_all_objects()
         self.delete_robot()
         self.add_ground_plane()
+        self.add_pybullet_bug_fix_hack()
 
     def deactivate_viewer(self):
         p.disconnect()
@@ -680,6 +727,19 @@ class PyBulletWorld(object):
             self.spawn_urdf_object(UrdfObject(name=name,
                                               collision_props=[CollisionProperty(geometry=BoxShape(30, 30, 10))]),
                                    Transform(translation=Point(0, 0, -5)))
+
+    def add_pybullet_bug_fix_hack(self, name=u'pybullet_sucks'):
+        """
+        Adds a ground plane to the Bullet World.
+        """
+        # like in the PyBullet examples: spawn a big collision box in the origin
+        if not self.has_object(name):
+            self.spawn_urdf_object(UrdfObject(name=name,
+                                              collision_props=[CollisionProperty(geometry=SphereShape(0.005))]),
+                                   Transform(translation=Point(10, 10, -10)))
+
+    def move_hack(self, position):
+        self.get_object(u'pybullet_sucks').set_base_pose(position)
 
     def deactivate_rendering(self):
         p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 0)

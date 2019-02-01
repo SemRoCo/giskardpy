@@ -65,6 +65,26 @@ default_pose = {u'r_elbow_flex_joint': -0.15,
                 u'head_pan_joint': 0,
                 u'head_tilt_joint': 0}
 
+pick_up_pose = {
+    u'head_pan_joint': -2.46056758502e-16,
+    u'head_tilt_joint': -1.97371778181e-16,
+    u'l_elbow_flex_joint': -0.962150355946,
+    u'l_forearm_roll_joint': 1.44894622393,
+    u'l_shoulder_lift_joint': -0.273579583084,
+    u'l_shoulder_pan_joint': 0.0695426768038,
+    u'l_upper_arm_roll_joint': 1.3591238067,
+    u'l_wrist_flex_joint': -1.9004529902,
+    u'l_wrist_roll_joint': 2.23732576003,
+    u'r_elbow_flex_joint': -2.1207193579,
+    u'r_forearm_roll_joint': 1.76628402882,
+    u'r_shoulder_lift_joint': -0.256729037039,
+    u'r_shoulder_pan_joint': -1.71258744959,
+    u'r_upper_arm_roll_joint': -1.46335011257,
+    u'r_wrist_flex_joint': -0.100010762609,
+    u'r_wrist_roll_joint': 0.0509923457388,
+    u'torso_lift_joint': 0.321791330751,
+}
+
 
 @pytest.fixture(scope=u'module')
 def ros(request):
@@ -138,13 +158,15 @@ def fake_table_setup(zero_pose):
 
 
 @pytest.fixture()
-def kitchen_setup(zero_pose):
+def kitchen_setup(resetted_giskard):
+    resetted_giskard.allow_all_collisions()
+    resetted_giskard.send_and_check_joint_goal(pick_up_pose)
     object_name = u'kitchen'
-    zero_pose.add_urdf(object_name,
-                       rospy.get_param(u'kitchen_description'),
-                       u'/kitchen/joint_states',
-                       lookup_transform(u'map', u'iai_kitchen/world'))
-    return zero_pose
+    resetted_giskard.add_urdf(object_name,
+                              rospy.get_param(u'kitchen_description'),
+                              u'/kitchen/joint_states',
+                              lookup_transform(u'map', u'iai_kitchen/world'))
+    return resetted_giskard
 
 
 class TestJointGoals(object):
@@ -414,6 +436,23 @@ class TestCollisionAvoidanceGoals(object):
         """
         pocky = u'http://muh#pocky'
         zero_pose.attach_box(pocky, [0.1, 0.02, 0.02], zero_pose.r_tip, [0.05, 0, 0])
+
+    def test_attach_box_as_eef(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        pocky = u'http://muh#pocky'
+        zero_pose.attach_box(pocky, [0.1, 0.02, 0.02], zero_pose.r_tip, [0.05, 0, 0], [1, 0, 0, 0])
+        p = PoseStamped()
+        p.header.frame_id = zero_pose.r_tip
+        p.pose.orientation.w = 1
+        # rospy.sleep(5)
+        for i in range(20):
+            zero_pose.loop_once()
+            rospy.sleep(0.1)
+
+        # zero_pose.set_and_check_cart_goal(zero_pose.default_root, zero_pose.l_tip, p)
+        zero_pose.set_and_check_cart_goal(zero_pose.default_root, pocky, p)
 
     def test_attach_remove_box(self, zero_pose):
         """
@@ -1000,23 +1039,55 @@ class TestCollisionAvoidanceGoals(object):
         :type kitchen_setup: PR2
         :return:
         """
-        # setup
-        goal_js = {u'torso_lift_joint': 0.300064623019,
-                   u'r_upper_arm_roll_joint': -1.46335011257,
-                   u'r_shoulder_pan_joint': -1.71258744959,
-                   u'r_shoulder_lift_joint': -0.256729037039,
-                   u'r_forearm_roll_joint': -54.7823837358,
-                   u'r_elbow_flex_joint': -2.1207193579,
-                   u'r_wrist_flex_joint': -0.100010762609,
-                   u'r_wrist_roll_joint': -18.7985635758,
-                   u'l_upper_arm_roll_joint': 1.47676751322,
-                   u'l_shoulder_pan_joint': 0.122941087033,
-                   u'l_shoulder_lift_joint': -0.0229720923255,
-                   u'l_forearm_roll_joint': -4.69330406266,
-                   u'l_elbow_flex_joint': -1.15162421589,
-                   u'l_wrist_flex_joint': -1.66449857718,
-                   u'l_wrist_roll_joint': -129.794776671}
-        kitchen_setup.send_and_check_joint_goal(goal_js)
+
+        base_pose = PoseStamped()
+        base_pose.header.frame_id = u'map'
+        base_pose.pose.position = Point(0.743, 0.586, 0.000)
+        base_pose.pose.orientation.w = 1
+        kitchen_setup.move_pr2_base(base_pose)
+        attached_link_name = u'edekabowl'
+        kitchen_setup.add_box(attached_link_name, [.15, .15, .07], u'map', [1.35, 0.561, 0.9])
+
+        p = PoseStamped()
+        p.header.frame_id = kitchen_setup.l_tip
+        p.pose.position.x = 0.2
+        p.pose.orientation.w = 1
+        kitchen_setup.allow_all_collisions()
+        kitchen_setup.set_and_check_cart_goal(kitchen_setup.default_root, kitchen_setup.l_tip, p)
+
+
+        # grasp
+        kitchen_setup.attach_box(attached_link_name, frame_id=kitchen_setup.l_tip)
+        for i in range(20):
+            kitchen_setup.loop_once()
+            rospy.sleep(0.1)
+
+        # post grasp
+        p = PoseStamped()
+        p.header.frame_id = kitchen_setup.l_tip
+        p.pose.position.x = -0.2
+        p.pose.orientation.w = 1
+        kitchen_setup.avoid_all_collisions(0.05)
+        ces = []
+        ces.append(CollisionEntry(type=CollisionEntry.ALLOW_COLLISION,
+                                  robot_links=kitchen_setup.get_l_gripper_links(),
+                                  body_b=u'kitchen',
+                                  link_bs=[]))
+        # kitchen_setup.add_collision_entries(ces)
+        kitchen_setup.set_and_check_cart_goal(kitchen_setup.default_root, kitchen_setup.l_tip, p)
+        kitchen_setup.remove_object(attached_link_name)
+
+        p = PoseStamped()
+        p.header.frame_id = kitchen_setup.l_tip
+        p.pose.position.y = -0.1
+        p.pose.orientation.w = 1
+        kitchen_setup.set_and_check_cart_goal(kitchen_setup.default_root, kitchen_setup.l_tip, p)
+
+    def test_hand_in_kitchen(self, kitchen_setup):
+        """
+        :type kitchen_setup: PR2
+        :return:
+        """
 
         base_pose = PoseStamped()
         base_pose.header.frame_id = u'map'
@@ -1025,11 +1096,20 @@ class TestCollisionAvoidanceGoals(object):
         kitchen_setup.move_pr2_base(base_pose)
 
         # grasp
-        attached_link_name = u'edekabowl'
-        kitchen_setup.attach_box(attached_link_name, [0.15, 0.15, 0.07], kitchen_setup.l_tip,
-                                 [0.01716, 0.0699, -0.00189],
-                                 [0.4978, 0.496, -0.5023, -0.5036])
-        cpi = kitchen_setup.get_cpi(0.05)
+        p = PoseStamped()
+        p.header.frame_id = kitchen_setup.l_tip
+        p.pose.position.x = 0.09
+        p.pose.orientation.w = 1
+        kitchen_setup.allow_all_collisions()
+        kitchen_setup.set_and_check_cart_goal(kitchen_setup.default_root, kitchen_setup.l_tip, p)
+
+        # p = PoseStamped()
+        # p.header.frame_id = kitchen_setup.l_tip
+        # p.pose.position.x = -0.1
+        # p.pose.orientation.w = 1
+        # kitchen_setup.avoid_all_collisions(0.05)
+        # kitchen_setup.set_and_check_cart_goal(kitchen_setup.default_root, kitchen_setup.l_tip, p)
+        # cpi = kitchen_setup.get_cpi(0.05)
         # cpi.
 
         # post grasp
@@ -1044,8 +1124,7 @@ class TestCollisionAvoidanceGoals(object):
         pregrasp_pose.pose.orientation.w = -0.703632573456
         kitchen_setup.avoid_all_collisions(0.05)
         kitchen_setup.set_and_check_cart_goal(kitchen_setup.default_root, kitchen_setup.l_tip, pregrasp_pose)
-        kitchen_setup.check_cpi_geq([u'edekabowl'], )
-
+        # kitchen_setup.check_cpi_geq([u'edekabowl'], )
 
     #
     # def test_place_spoon1(self):

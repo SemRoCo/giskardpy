@@ -42,12 +42,13 @@ class GoalToConstraints(GetGoal, RobotPlugin):
         RobotPlugin.initialize(self)
         self.get_god_map().safe_set_data([collision_goal_identifier], None)
 
+
     def terminate(self, new_status):
         super(GoalToConstraints, self).terminate(new_status)
 
     def update(self):
         # TODO make this interruptable
-        self.update_controlled_joints_and_links(controlled_joints_identifier, controllable_links_identifier)
+        # self.update_controlled_joints_and_links(controlled_joints_identifier, controllable_links_identifier)
 
         goal_msg = self.get_goal()  # type: MoveGoal
         if len(goal_msg.cmd_seq) == 0:
@@ -57,10 +58,12 @@ class GoalToConstraints(GetGoal, RobotPlugin):
             self.raise_to_blackboard(InsolvableException(u'only plan and execute is supported'))
             return Status.SUCCESS
 
-        if self.was_urdf_updated():
-            # TODO do this somewhere else?
-            self.add_js_controller_soft_constraints()
-            self.add_collision_avoidance_soft_constraints()
+        # if self.was_urdf_updated():
+        #     # TODO do this somewhere else?
+        #     self.add_js_controller_soft_constraints()
+        #     self.add_collision_avoidance_soft_constraints()
+        self.add_js_controller_soft_constraints()
+        self.add_collision_avoidance_soft_constraints()
 
         # TODO handle multiple cmds
         move_cmd = goal_msg.cmd_seq[0]  # type: MoveCmd
@@ -156,7 +159,7 @@ class GoalToConstraints(GetGoal, RobotPlugin):
         to self.controller and saves functions for continuous joints in god map.
         """
         pyfunctions = {}
-        for joint_name in self.controlled_joints:
+        for joint_name in self.get_controlled_joints():
 
             joint_current_expr = self.get_expr_joint_current_position(joint_name)
             goal_joint_expr = self.get_expr_joint_goal_position(joint_name)
@@ -358,7 +361,6 @@ class ControllerPlugin(RobotPlugin):
 
     def initialize(self):
         super(ControllerPlugin, self).initialize()
-        self.update_controlled_joints_and_links(controlled_joints_identifier)
         self.init_controller()
         self.next_cmd = {}
 
@@ -366,8 +368,8 @@ class ControllerPlugin(RobotPlugin):
         new_soft_constraints = self.god_map.safe_get_data([soft_constraint_identifier])
         if self.soft_constraints is None or set(self.soft_constraints.keys()) != set(new_soft_constraints.keys()):
             self.soft_constraints = copy(new_soft_constraints)
-            self.controller = SymEngineController(self.robot, self.path_to_functions)
-            self.controller.set_controlled_joints(self.controlled_joints)
+            self.controller = SymEngineController(self.get_robot(), self.path_to_functions)
+            self.controller.set_controlled_joints(self.get_controlled_joints())
             self.controller.update_soft_constraints(self.soft_constraints)
 
     def update(self):

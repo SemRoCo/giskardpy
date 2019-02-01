@@ -20,7 +20,7 @@ import numpy as np
 from giskardpy.utils import keydefaultdict, suppress_stdout, NullContextManager, resolve_ros_iris
 
 from giskardpy.object import UrdfObject, FixedJoint, to_urdf_string, BoxShape, \
-    CollisionProperty, remove_outer_tag
+    CollisionProperty, remove_outer_tag, SphereShape
 import hashlib
 
 JointInfo = namedtuple(u'JointInfo', [u'joint_index', u'joint_name', u'joint_type', u'q_index', u'u_index', u'flags',
@@ -659,22 +659,12 @@ class PyBulletWorld(object):
                 collisions.update({k: min(contacts, key=lambda x: x.contact_distance)})
                 # asdf = self.should_switch(contacts[0])
                 pass
-        for k, v in collisions.items():  # type: (str, ContactInfo)
-            if self.should_switch(v):
-                collisions[k] = ContactInfo(v.contact_flag,
-                                            v.body_unique_id_a, v.body_unique_id_b,
-                                            v.link_index_a, v.link_index_b,
-                                            v.position_on_b, v.position_on_a,
-                                            (-np.array(v.contact_normal_on_b)).tolist(), v.contact_distance,
-                                            v.normal_force,
-                                            v.lateralFriction1, v.lateralFrictionDir1, v.lateralFriction2,
-                                            v.lateralFrictionDir2)
         return collisions
 
-    def should_switch(self, contact_info):
+    def should_flip_contact_info(self, contact_info):
         """
         :type contact_info: ContactInfo
-        :return:
+        :rtype: bool
         """
         contact_info2 = ContactInfo(*min(p.getClosestPoints(contact_info.body_unique_id_b,
                                                             contact_info.body_unique_id_a,
@@ -683,13 +673,31 @@ class PyBulletWorld(object):
                                          key=lambda x: x[8]))
         if not np.isclose(contact_info2.contact_normal_on_b, contact_info.contact_normal_on_b).all():
             return False
-        # pa = np.array(contact_info.position_on_a)
+        pa = np.array(contact_info.position_on_a)
         # pb = np.array(contact_info.position_on_b)
-        # n = np.array(contact_info.contact_normal_on_b)
-        # dist = np.linalg.norm(pa-pb)
-        # body_b, link_b, fraction, position, normal = p.rayTest(pb, pb+n)[0]
-        return contact_info.link_index_a > contact_info.link_index_b
-        # return body_b != contact_info.body_unique_id_a
+
+        self.move_hack(pa)
+        try:
+            contact_info3 = ContactInfo(*[x for x in p.getClosestPoints(self.get_object_id(u'pybullet_sucks'),
+                                                                        contact_info.body_unique_id_a, 0.001) if
+                                          np.allclose(x[8], -0.005)][0])
+            if contact_info3.body_unique_id_b == contact_info.body_unique_id_a and \
+                    contact_info3.link_index_b == contact_info.link_index_a:
+                return False
+        except Exception as e:
+            return True
+        return True
+
+    def flip_contact_info(self, contact_info):
+        return ContactInfo(contact_info.contact_flag,
+                           contact_info.body_unique_id_a, contact_info.body_unique_id_b,
+                           contact_info.link_index_a, contact_info.link_index_b,
+                           contact_info.position_on_b, contact_info.position_on_a,
+                           (-np.array(contact_info.contact_normal_on_b)).tolist(), contact_info.contact_distance,
+                           contact_info.normal_force,
+                           contact_info.lateralFriction1, contact_info.lateralFrictionDir1,
+                           contact_info.lateralFriction2,
+                           contact_info.lateralFrictionDir2)
 
     def activate_viewer(self):
         if self._gui:
@@ -699,11 +707,13 @@ class PyBulletWorld(object):
             self.physicsClient = p.connect(p.DIRECT)  # or p.DIRECT for non-graphical version
         p.setGravity(0, 0, -9.8)
         self.add_ground_plane()
+        self.add_pybullet_bug_fix_hack()
 
     def clear_world(self):
         self.delete_all_objects()
         self.delete_robot()
         self.add_ground_plane()
+        self.add_pybullet_bug_fix_hack()
 
     def deactivate_viewer(self):
         p.disconnect()
@@ -717,6 +727,19 @@ class PyBulletWorld(object):
             self.spawn_urdf_object(UrdfObject(name=name,
                                               collision_props=[CollisionProperty(geometry=BoxShape(30, 30, 10))]),
                                    Transform(translation=Point(0, 0, -5)))
+
+    def add_pybullet_bug_fix_hack(self, name=u'pybullet_sucks'):
+        """
+        Adds a ground plane to the Bullet World.
+        """
+        # like in the PyBullet examples: spawn a big collision box in the origin
+        if not self.has_object(name):
+            self.spawn_urdf_object(UrdfObject(name=name,
+                                              collision_props=[CollisionProperty(geometry=SphereShape(0.005))]),
+                                   Transform(translation=Point(10, 10, -10)))
+
+    def move_hack(self, position):
+        self.get_object(u'pybullet_sucks').set_base_pose(position)
 
     def deactivate_rendering(self):
         p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 0)

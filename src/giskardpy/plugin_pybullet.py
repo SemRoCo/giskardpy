@@ -1,7 +1,7 @@
 import traceback
 from copy import copy
 from itertools import product
-
+import numpy as np
 import rospy
 from geometry_msgs.msg import Point, Vector3
 from giskard_msgs.msg import CollisionEntry, WorldBody
@@ -56,7 +56,8 @@ class PyBulletMonitor(PybulletPlugin):
         self.robot_name = u'robby'
         self.map_frame = map_frame
         self.root_link = root_link
-        super(PyBulletMonitor, self).__init__(pybullet_identifier, controlled_joints_identifier, path_to_data_folder, gui)
+        super(PyBulletMonitor, self).__init__(pybullet_identifier, controlled_joints_identifier, path_to_data_folder,
+                                              gui)
         self.world = self.god_map.safe_get_data([self.pybullet_identifier])
 
     def update(self):
@@ -82,7 +83,8 @@ class PyBulletUpdatePlugin(PybulletPlugin):
     # TODO reject changes if plugin not active or something
     def __init__(self, pybullet_identifier, controlled_joints_identifier, robot_description_identifier,
                  path_to_data_folder='', gui=False):
-        super(PyBulletUpdatePlugin, self).__init__(pybullet_identifier, controlled_joints_identifier, path_to_data_folder, gui)
+        super(PyBulletUpdatePlugin, self).__init__(pybullet_identifier, controlled_joints_identifier,
+                                                   path_to_data_folder, gui)
         self.robot_description_identifier = robot_description_identifier
         self.global_reference_frame_name = u'map'
         self.lock = Lock()
@@ -199,7 +201,7 @@ class PyBulletUpdatePlugin(PybulletPlugin):
     def clear_world(self):
         self.pub_collision_marker.publish(MarkerArray([Marker(action=Marker.DELETEALL)]))
         for object_name in self.world.get_object_names():
-            if object_name != u'plane':  # TODO get rid of this hard coded special case
+            if object_name != u'plane' and object_name != u'pybullet_sucks':  # TODO get rid of this hard coded special case
                 self.remove_object(object_name)
         self.world.get_robot().detach_all_objects()
 
@@ -228,11 +230,13 @@ class PyBulletUpdatePlugin(PybulletPlugin):
 
 
 class CollisionChecker(PybulletPlugin):
-    def __init__(self, collision_goal_identifier, controllable_links_identifier, pybullet_identifier, controlled_joints_identifier,
+    def __init__(self, collision_goal_identifier, controllable_links_identifier, pybullet_identifier,
+                 controlled_joints_identifier,
                  closest_point_identifier, default_collision_avoidance_distance,
                  map_frame, root_link,
                  path_to_data_folder='', gui=False):
-        super(CollisionChecker, self).__init__(pybullet_identifier, controlled_joints_identifier, path_to_data_folder, gui)
+        super(CollisionChecker, self).__init__(pybullet_identifier, controlled_joints_identifier, path_to_data_folder,
+                                               gui)
         self.collision_goal_identifier = collision_goal_identifier
         self.controllable_links_identifier = controllable_links_identifier
         self.closest_point_identifier = closest_point_identifier
@@ -324,9 +328,15 @@ class CollisionChecker(PybulletPlugin):
 
     def allow_collision_with_plane(self):
         # TODO instead of ignoring plane collision by default, figure out that some collision are unavoidable?
+        return self.allow_collision_with_object(u'plane')
+
+    def allow_collision_with_pybullet_hack(self):
+        return self.allow_collision_with_object(u'pybullet_sucks')
+
+    def allow_collision_with_object(self, name):
         ce = CollisionEntry()
         ce.type = CollisionEntry.ALLOW_COLLISION
-        ce.body_b = u'plane'
+        ce.body_b = name
         return ce
 
     def collision_matrix_to_min_dist_dict(self, collision_matrix, robot_name, min_dist):
@@ -342,13 +352,14 @@ class CollisionChecker(PybulletPlugin):
         # TODO split this into smaller functions
         if collision_goals is None:
             collision_goals = []
-        #FIXME
+        # FIXME
         collision_matrix = self.collision_matrix_to_min_dist_dict(self.world.get_robot().get_self_collision_matrix(),
                                                                   self.world.get_robot().name,
                                                                   self.default_collision_avoidance_distance)
         min_allowed_distance = collision_matrix
 
-        collision_goals.insert(0, self.allow_collision_with_plane()) # FIXME shouldn't this be the last entry?
+        collision_goals.insert(0, self.allow_collision_with_plane())  # FIXME shouldn't this be the last entry?
+        collision_goals.append(self.allow_collision_with_pybullet_hack())  # FIXME shouldn't this be the last entry?
 
         if len([x for x in collision_goals if x.type in [CollisionEntry.AVOID_ALL_COLLISIONS,
                                                          CollisionEntry.ALLOW_ALL_COLLISIONS]]) == 0:
@@ -455,28 +466,33 @@ class CollisionChecker(PybulletPlugin):
                                                                   self.default_collision_avoidance_distance,
                                                                   k,
                                                                   '',
-                                                                  (1, 0, 0)))
-        for key, collision_info in collisions.items():  # type: ((str, str, str), ContactInfo)
-            if collision_info is None:
+                                                                  (1, 0, 0), k))
+        for key, contact_info in collisions.items():  # type: ((str, str, str), ContactInfo)
+            if contact_info is None:
                 continue
             link1 = key[0]
             a_in_robot_root = msg_to_list(transform_point(self.robot_root,
                                                           to_point_stamped(self.map_frame,
-                                                                           collision_info.position_on_a)))
+                                                                           contact_info.position_on_a)))
             b_in_robot_root = msg_to_list(transform_point(self.robot_root,
                                                           to_point_stamped(self.map_frame,
-                                                                           collision_info.position_on_b)))
+                                                                           contact_info.position_on_b)))
             n_in_robot_root = msg_to_list(transform_vector(self.robot_root,
                                                            to_vector3_stamped(self.map_frame,
-                                                                              collision_info.contact_normal_on_b)))
+                                                                              contact_info.contact_normal_on_b)))
             try:
-                cpi = ClosestPointInfo(a_in_robot_root, b_in_robot_root, collision_info.contact_distance,
+                cpi = ClosestPointInfo(a_in_robot_root, b_in_robot_root, contact_info.contact_distance,
                                        min_allowed_distance[key], key[0], u'{} - {}'.format(key[1], key[2]),
-                                       n_in_robot_root)
+                                       n_in_robot_root, key)
             except KeyError:
                 continue
             if link1 in closest_point:
                 closest_point[link1] = min(closest_point[link1], cpi, key=lambda x: x.contact_distance)
             else:
                 closest_point[link1] = cpi
+        for key, cpi in closest_point.items():  # type: (str, ClosestPointInfo)
+            if self.world.should_flip_contact_info(collisions[cpi.old_key]):
+                closest_point[key] = ClosestPointInfo(cpi.position_on_b, cpi.position_on_a, cpi.contact_distance,
+                                                      cpi.min_dist, cpi.link_a, cpi.link_b,
+                                                      -np.array(cpi.contact_normal), key)
         return closest_point

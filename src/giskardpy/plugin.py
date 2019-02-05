@@ -57,6 +57,9 @@ class PluginBehavior(GiskardBehavior):
         self.sleep = sleep
         super(PluginBehavior, self).__init__(name)
 
+    def get_plugins(self):
+        return self._plugins
+
     def add_plugin(self, name, plugin):
         """Registers a plugin with the process manager. The name needs to be unique."""
         if name in self._plugins:

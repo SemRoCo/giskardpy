@@ -8,7 +8,6 @@ from giskard_msgs.msg import MoveAction
 from py_trees import Sequence, Selector, BehaviourTree, Blackboard
 import py_trees
 from py_trees.behaviours import SuccessEveryN
-from py_trees.display import render_dot_tree
 from py_trees.meta import running_is_failure, success_is_running, failure_is_success
 
 import giskardpy
@@ -26,7 +25,7 @@ from giskardpy.plugin_kinematic_sim import NewKinSimPlugin
 from giskardpy.plugin_log_trajectory import NewLogTrajPlugin
 from giskardpy.plugin_pybullet import PyBulletMonitor, PyBulletUpdatePlugin, CollisionChecker
 from giskardpy.plugin_send_trajectory import SendTrajectory
-from giskardpy.utils import create_path, resolve_ros_iris
+from giskardpy.utils import create_path, resolve_ros_iris, render_dot_tree
 
 
 # TODO add transform3d to package xml

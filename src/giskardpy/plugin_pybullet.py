@@ -3,7 +3,7 @@ from copy import copy
 from itertools import product
 import numpy as np
 import rospy
-from geometry_msgs.msg import Point, Vector3
+from geometry_msgs.msg import Point, Vector3, PoseStamped
 from giskard_msgs.msg import CollisionEntry, WorldBody
 from multiprocessing import Lock
 
@@ -113,6 +113,9 @@ class PyBulletUpdatePlugin(PybulletPlugin):
                 if req.operation is UpdateWorldRequest.ADD:
                     if req.rigidly_attached:
                         self.attach_object(req)
+                        req.operation = UpdateWorldRequest.REMOVE
+                        self.publish_object_as_marker(req)
+                        req.operation = UpdateWorldRequest.ADD
                     else:
                         self.add_object(req)
 
@@ -170,9 +173,20 @@ class PyBulletUpdatePlugin(PybulletPlugin):
         if req.pose.header.frame_id not in self.world.get_robot().get_link_names():
             raise CorruptShapeException(u'robot link \'{}\' does not exist'.format(req.pose.header.frame_id))
         if self.world.has_object(req.body.name):
+            p_map = self.world.get_object(req.body.name).get_base_pose()
+            p = PoseStamped()
+            p.header.frame_id = u'map'
+            p.pose.position.x = p_map.translation.x
+            p.pose.position.y = p_map.translation.y
+            p.pose.position.z = p_map.translation.z
+            p.pose.orientation.x = p_map.rotation.x
+            p.pose.orientation.y = p_map.rotation.y
+            p.pose.orientation.z = p_map.rotation.z
+            p.pose.orientation.w = p_map.rotation.w
+            p = transform_pose(req.pose.header.frame_id, p)
             self.world.attach_object(req.body,
                                      req.pose.header.frame_id,
-                                     from_pose_msg(req.pose.pose))
+                                     from_pose_msg(p.pose))
         else:
             self.world.attach_object(world_body_to_urdf_object(req.body),
                                      req.pose.header.frame_id,

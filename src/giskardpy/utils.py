@@ -294,6 +294,7 @@ def plot_trajectory(tj, controlled_joints, path_to_data_folder):
     :param controlled_joints: only joints in this list will be added to the plot
     :type controlled_joints: list
     """
+    return
     if len(tj._points) <= 0:
         return
     colors = [u'b', u'g', u'r', u'c', u'm', u'y', u'k']

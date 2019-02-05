@@ -458,6 +458,7 @@ class TestCollisionAvoidanceGoals(object):
         pocky = u'http://muh#pocky'
         zero_pose.add_box(pocky, [0.1, 0.02, 0.02], zero_pose.r_tip, [0.05, 0, 0])
         zero_pose.attach_box(pocky, frame_id=zero_pose.r_tip)
+        # TODO test if object is on correct pose
 
     def test_attach_to_nonexistant_robot_link(self, zero_pose):
         """

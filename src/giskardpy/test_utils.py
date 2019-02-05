@@ -375,7 +375,7 @@ class GiskardTestWrapper(object):
 
 class PR2(GiskardTestWrapper):
     def __init__(self):
-        rospy.set_param(u'~enable_gui', True)
+        rospy.set_param(u'~enable_gui', False)
         rospy.set_param(u'~debug', True)
         rospy.set_param(u'~tree_tick_rate', .1)
         rospy.set_param(u'~map_frame', u'map')

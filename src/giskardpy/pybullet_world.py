@@ -420,6 +420,9 @@ class PyBulletRobot(object):
             new_urdf_string = new_urdf_string.replace(u'</robot>', u'{}</robot>'.format(sub_string))
         return new_urdf_string
 
+    # def as_urdf_object(self):
+    #     return urdfob
+
     def detach_object(self, object_name):
         """
         Detaches an attached object from the robot.
@@ -538,6 +541,12 @@ class PyBulletWorld(object):
         self.spawn_object_from_urdf_str(urdf_object.name, to_urdf_string(urdf_object), base_pose)
 
     def attach_object(self, object_, parent_link, transform):
+        """
+        :type object_: UrdfObject
+        :type parent_link: str
+        :param transform:
+        :return:
+        """
         if self.has_object(object_.name):
             object_ = self.get_object(object_.name)
             self.delete_object(object_.name)

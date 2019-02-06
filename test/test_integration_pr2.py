@@ -65,6 +65,21 @@ default_pose = {u'r_elbow_flex_joint': -0.15,
                 u'head_pan_joint': 0,
                 u'head_tilt_joint': 0}
 
+gaya_pose = {u'r_shoulder_pan_joint': -1.7125,
+             u'r_shoulder_lift_joint': -0.25672,
+             u'r_upper_arm_roll_joint': -1.46335,
+             u'r_elbow_flex_joint': -2.12216,
+             u'r_forearm_roll_joint': 1.76632,
+             u'r_wrist_flex_joint': -0.10001,
+             u'r_wrist_roll_joint': 0.05106,
+             u'l_shoulder_pan_joint': 1.9652,
+             u'l_shoulder_lift_joint': - 0.26499,
+             u'l_upper_arm_roll_joint': 1.3837,
+             u'l_elbow_flex_joint': - 2.1224,
+             u'l_forearm_roll_joint': 16.99,
+             u'l_wrist_flex_joint': - 0.10001,
+             u'l_wrist_roll_joint': 0}
+
 pick_up_pose = {
     u'head_pan_joint': -2.46056758502e-16,
     u'head_tilt_joint': -1.97371778181e-16,
@@ -160,7 +175,7 @@ def fake_table_setup(zero_pose):
 @pytest.fixture()
 def kitchen_setup(resetted_giskard):
     resetted_giskard.allow_all_collisions()
-    resetted_giskard.send_and_check_joint_goal(pick_up_pose)
+    resetted_giskard.send_and_check_joint_goal(gaya_pose)
     object_name = u'kitchen'
     resetted_giskard.add_urdf(object_name,
                               rospy.get_param(u'kitchen_description'),
@@ -1044,46 +1059,65 @@ class TestCollisionAvoidanceGoals(object):
 
         base_pose = PoseStamped()
         base_pose.header.frame_id = u'map'
-        base_pose.pose.position = Point(0.743, 0.586, 0.000)
-        base_pose.pose.orientation.w = 1
+        base_pose.pose.position = Point(0.760, 0.480, 0.000)
+        base_pose.pose.orientation = Quaternion(0.000, 0.000, 0.230, 0.973)
         kitchen_setup.move_pr2_base(base_pose)
         attached_link_name = u'edekabowl'
-        kitchen_setup.add_box(attached_link_name, [.15, .15, .07], u'map', [1.35, 0.561, 0.9])
+        kitchen_setup.add_box(attached_link_name, [.145, .145, .072], u'map',
+                              [1.39985, 0.799920, 0.888],
+                              [-0.0037, -0.00476, 0.3921, 0.9198])
 
-        p = PoseStamped()
-        p.header.frame_id = kitchen_setup.l_tip
-        p.pose.position.x = 0.2
-        p.pose.orientation.w = 1
-        kitchen_setup.allow_all_collisions()
-        kitchen_setup.set_and_check_cart_goal(kitchen_setup.default_root, kitchen_setup.l_tip, p)
+        pick_pose = PoseStamped()
+        pick_pose.header.frame_id = u'base_footprint'
+        pick_pose.pose.position = Point(0.649, -0.023, 0.918)
+        pick_pose.pose.orientation = Quaternion(0.407, 0.574, -0.408, 0.582)
 
+        # pregrasp
+        pick_pose.pose.position.z += 0.2
+        kitchen_setup.set_and_check_cart_goal(kitchen_setup.default_root, kitchen_setup.l_tip, pick_pose)
 
         # grasp
+        pick_pose.pose.position.z -= 0.2
+        kitchen_setup.allow_all_collisions()
+        kitchen_setup.set_and_check_cart_goal(kitchen_setup.default_root, kitchen_setup.l_tip, pick_pose)
         kitchen_setup.attach_box(attached_link_name, frame_id=kitchen_setup.l_tip)
-        for i in range(20):
-            kitchen_setup.loop_once()
-            rospy.sleep(0.1)
 
         # post grasp
-        p = PoseStamped()
-        p.header.frame_id = kitchen_setup.l_tip
-        p.pose.position.x = -0.2
-        p.pose.orientation.w = 1
+        pick_pose.pose.position.z += 0.2
         kitchen_setup.avoid_all_collisions(0.05)
-        ces = []
-        ces.append(CollisionEntry(type=CollisionEntry.ALLOW_COLLISION,
-                                  robot_links=kitchen_setup.get_l_gripper_links(),
-                                  body_b=u'kitchen',
-                                  link_bs=[]))
+        # ces = []
+        # ces.append(CollisionEntry(type=CollisionEntry.ALLOW_COLLISION,
+        #                           robot_links=kitchen_setup.get_l_gripper_links(),
+        #                           body_b=u'kitchen',
+        #                           link_bs=[]))
         # kitchen_setup.add_collision_entries(ces)
-        kitchen_setup.set_and_check_cart_goal(kitchen_setup.default_root, kitchen_setup.l_tip, p)
-        kitchen_setup.remove_object(attached_link_name)
+        kitchen_setup.set_and_check_cart_goal(kitchen_setup.default_root, kitchen_setup.l_tip, pick_pose)
+        # kitchen_setup.remove_object(attached_link_name)
+        kitchen_setup.send_and_check_joint_goal(gaya_pose)
 
-        p = PoseStamped()
-        p.header.frame_id = kitchen_setup.l_tip
-        p.pose.position.y = -0.1
-        p.pose.orientation.w = 1
-        kitchen_setup.set_and_check_cart_goal(kitchen_setup.default_root, kitchen_setup.l_tip, p)
+        # place============================
+        base_pose.pose.position = Point(-0.200, 1.120, 0.000)
+        base_pose.pose.orientation = Quaternion(0.000, 0.000, 0.994, -0.105)
+        kitchen_setup.move_pr2_base(base_pose)
+
+        # pre place
+        place_pose = PoseStamped()
+        place_pose.header.frame_id = u'base_footprint'
+        place_pose.pose.position = Point(0.587, 0.068, 0.920)
+        place_pose.pose.orientation = Quaternion(0.703, -0.074, -0.703, -0.074)
+        pick_pose.pose.position.z += 0.2
+        kitchen_setup.set_and_check_cart_goal(kitchen_setup.default_root, kitchen_setup.l_tip, place_pose)
+
+        # place
+        pick_pose.pose.position.z -= 0.2
+        kitchen_setup.avoid_all_collisions(0.)
+        kitchen_setup.set_and_check_cart_goal(kitchen_setup.default_root, kitchen_setup.l_tip, place_pose)
+
+        # post place
+        pick_pose.pose.position.z += 0.2
+        kitchen_setup.avoid_all_collisions(0.)
+        kitchen_setup.set_and_check_cart_goal(kitchen_setup.default_root, kitchen_setup.l_tip, place_pose)
+        # kitchen_setup.de
 
     def test_hand_in_kitchen(self, kitchen_setup):
         """

@@ -82,16 +82,16 @@ def grow_tree():
     # ----------------------------------------------
     sync = PluginBehavior(u'sync')
     sync.add_plugin(u'js', JointStatePlugin())
+    sync.add_plugin(u'pm', PyBulletMonitor(map_frame, root_link, path_to_data_folder, gui))
     sync.add_plugin(u'fk', FkPlugin())
-    sync.add_plugin(u'pw', PyBulletMonitor(map_frame, root_link, path_to_data_folder, gui))
     sync.add_plugin(u'in sync', SuccessPlugin())
     # ----------------------------------------------
     wait_for_goal = Selector(u'wait for goal')
     wait_for_goal.add_child(GoalReceived(u'has goal', action_server_name, MoveAction))
     monitor = PluginBehavior(u'monitor')
     monitor.add_plugin(u'js', JointStatePlugin())
+    monitor.add_plugin(u'pm', PyBulletMonitor(map_frame, root_link, path_to_data_folder, gui))
     monitor.add_plugin(u'fk', FkPlugin())
-    monitor.add_plugin(u'pw', PyBulletMonitor(map_frame, root_link, path_to_data_folder, gui))
     monitor.add_plugin(u'pybullet updater', PyBulletUpdatePlugin(path_to_data_folder, gui))
     wait_for_goal.add_child(monitor)
     # ----------------------------------------------
@@ -102,7 +102,7 @@ def grow_tree():
     actual_planning = PluginBehavior(u'planning', sleep=0)
     actual_planning.add_plugin(u'kin sim', KinSimPlugin(sample_period))
     actual_planning.add_plugin(u'fk', FkPlugin())
-    actual_planning.add_plugin(u'pw', PyBulletMonitor(map_frame, root_link, path_to_data_folder, gui))
+    actual_planning.add_plugin(u'pm', PyBulletMonitor(map_frame, root_link, path_to_data_folder, gui))
     actual_planning.add_plugin(u'coll', CollisionChecker(default_collision_avoidance_distance, map_frame, root_link,
                                                          path_to_data_folder, gui))
     actual_planning.add_plugin(u'controller', ControllerPlugin(path_to_data_folder, default_joint_vel_limit,

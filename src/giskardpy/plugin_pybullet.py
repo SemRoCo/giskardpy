@@ -74,6 +74,8 @@ class PyBulletMonitor(PybulletPlugin):
                                                           p.pose.orientation.y,
                                                           p.pose.orientation.z,
                                                           p.pose.orientation.w])
+        # TODO make sure this doesn't cause multi threading problems
+        self.god_map.safe_set_data([robot_description_identifier], self.world.get_robot().get_urdf())
         return None
 
 
@@ -112,10 +114,26 @@ class PyBulletUpdatePlugin(PybulletPlugin):
             try:
                 if req.operation is UpdateWorldRequest.ADD:
                     if req.rigidly_attached:
+                        # get object pose
+                        if self.world.has_object(req.body.name):
+                            p_map = self.world.get_object(req.body.name).get_base_pose()
+                            # self.world.get_object(req.body.name).ge
+                            p = PoseStamped()
+                            p.header.frame_id = u'map'
+                            p.pose.position.x = p_map.translation.x
+                            p.pose.position.y = p_map.translation.y
+                            p.pose.position.z = p_map.translation.z
+                            p.pose.orientation.x = p_map.rotation.x
+                            p.pose.orientation.y = p_map.rotation.y
+                            p.pose.orientation.z = p_map.rotation.z
+                            p.pose.orientation.w = p_map.rotation.w
+                            p = transform_pose(req.pose.header.frame_id, p)
+                            req.pose.pose = p.pose
+
                         self.attach_object(req)
-                        req.operation = UpdateWorldRequest.REMOVE
-                        self.publish_object_as_marker(req)
-                        req.operation = UpdateWorldRequest.ADD
+                        # req.operation = UpdateWorldRequest.REMOVE
+                        # self.publish_object_as_marker(req)
+                        # req.operation = UpdateWorldRequest.ADD
                     else:
                         self.add_object(req)
 
@@ -173,20 +191,9 @@ class PyBulletUpdatePlugin(PybulletPlugin):
         if req.pose.header.frame_id not in self.world.get_robot().get_link_names():
             raise CorruptShapeException(u'robot link \'{}\' does not exist'.format(req.pose.header.frame_id))
         if self.world.has_object(req.body.name):
-            p_map = self.world.get_object(req.body.name).get_base_pose()
-            p = PoseStamped()
-            p.header.frame_id = u'map'
-            p.pose.position.x = p_map.translation.x
-            p.pose.position.y = p_map.translation.y
-            p.pose.position.z = p_map.translation.z
-            p.pose.orientation.x = p_map.rotation.x
-            p.pose.orientation.y = p_map.rotation.y
-            p.pose.orientation.z = p_map.rotation.z
-            p.pose.orientation.w = p_map.rotation.w
-            p = transform_pose(req.pose.header.frame_id, p)
             self.world.attach_object(req.body,
                                      req.pose.header.frame_id,
-                                     from_pose_msg(p.pose))
+                                     from_pose_msg(req.pose.pose))
         else:
             self.world.attach_object(world_body_to_urdf_object(req.body),
                                      req.pose.header.frame_id,
@@ -230,7 +237,7 @@ class PyBulletUpdatePlugin(PybulletPlugin):
         """
         with self.lock:
             # TODO only update urdf if it has changed
-            self.god_map.safe_set_data([robot_description_identifier], self.world.get_robot().get_urdf())
+
 
             for object_name, object_joint_state in self.object_joint_states.items():
                 self.world.get_object(object_name).set_joint_state(object_joint_state)

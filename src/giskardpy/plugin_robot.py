@@ -1,7 +1,9 @@
+from py_trees import Status
+
 from giskardpy.identifier import robot_description_identifier, default_joint_weight_identifier, js_identifier, \
     robot_identifier, controlled_joints_identifier, controllable_links_identifier, default_joint_vel_identifier
 from giskardpy.input_system import JointStatesInput
-from giskardpy.plugin import PluginBase
+from giskardpy.plugin import PluginBase, GiskardBehavior
 from giskardpy.symengine_robot import Robot
 from giskardpy.utils import urdfs_equal
 
@@ -84,6 +86,18 @@ class RobotPlugin(PluginBase):
 
 
 
-class RobotKinPlugin(RobotPlugin):
-    def __init__(self):
-        super(RobotKinPlugin, self).__init__(0, 0)
+class RobotBehavior(GiskardBehavior):
+    def __init__(self, name):
+        super(RobotBehavior, self).__init__(name)
+
+    def setup(self, timeout):
+        return super(RobotBehavior, self).setup(timeout)
+
+    def initialise(self):
+        super(RobotBehavior, self).initialise()
+
+    def update(self):
+        return super(RobotBehavior, self).update()
+
+    def stop(self, new_status=Status.INVALID):
+        super(RobotBehavior, self).stop(new_status)

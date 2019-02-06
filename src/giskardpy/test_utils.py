@@ -129,7 +129,7 @@ class GiskardTestWrapper(object):
         self.sub_result = rospy.Subscriber(u'/giskardpy/command/result', MoveActionResult, self.cb, queue_size=100)
 
         self.tree = grow_tree()
-        self.tree.tick()
+        self.loop_once()
         rospy.sleep(1)
         self.wrapper = GiskardWrapper(ns=u'tests')
         self.results = Queue(100)
@@ -140,7 +140,13 @@ class GiskardTestWrapper(object):
         self.default_root = default_root
         self.map = u'map'
         self.simple_base_pose_pub = rospy.Publisher(u'/move_base_simple/goal', PoseStamped, queue_size=10)
+        self.tick_rate = .3
         rospy.sleep(1)
+
+    def wait_for_synced(self):
+        while self.tree.tip().name == u'sync':
+            self.loop_once()
+            rospy.sleep(self.tick_rate)
 
     def get_robot(self):
         return self.get_god_map().safe_get_data([robot_identifier])
@@ -178,7 +184,6 @@ class GiskardTestWrapper(object):
     def tear_down(self):
         rospy.sleep(1)
         print(u'stopping plugins')
-        # self.tree.destroy(
 
     #
     # JOINT GOAL STUFF #################################################################################################
@@ -255,9 +260,7 @@ class GiskardTestWrapper(object):
         t1.start()
         while self.results.empty():
             self.loop_once()
-            # if i >= 100:
-            #     assert False, 'planning took too long'
-            rospy.sleep(.5)
+            rospy.sleep(self.tick_rate)
             i += 1
         t1.join()
         self.loop_once()
@@ -329,8 +332,8 @@ class GiskardTestWrapper(object):
                    expected_response=UpdateWorldResponse.SUCCESS):
         old_collision_matrix = self.get_world().get_robot().get_self_collision_matrix()
         assert self.wrapper.attach_box(name, size, frame_id, position, orientation).error_codes == expected_response
-        self.loop_once()
-        # assert name in self.get_controllable_links()
+        self.wait_for_synced()
+        assert name in self.get_controllable_links()
         assert not self.get_world().has_object(name)
         assert len(old_collision_matrix.difference(self.get_world().get_robot().get_self_collision_matrix())) == 0
         self.loop_once()

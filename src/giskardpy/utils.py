@@ -2,12 +2,16 @@ from __future__ import division
 
 import pydot
 import rospkg
+import subprocess
+import xml
 from collections import defaultdict, OrderedDict
 import numpy as np
 from itertools import product, chain
 from numpy import pi
 
 import errno
+from os import tmpfile
+
 from geometry_msgs.msg import PointStamped, Point, Vector3Stamped, Vector3, Pose, PoseStamped, QuaternionStamped, \
     Quaternion
 from py_trees import common, Chooser, Selector, Sequence, Behaviour
@@ -339,7 +343,7 @@ def plot_trajectory(tj, controlled_joints, path_to_data_folder):
     plt.savefig(path_to_data_folder + u'trajectory.pdf')
 
 
-def resolve_ros_iris(input_urdf):
+def resolve_ros_iris_in_urdf(input_urdf):
     """
     Replace all instances of ROS IRIs with a urdf string with global paths in the file system.
     :param input_urdf: URDF in which the ROS IRIs shall be replaced.
@@ -347,19 +351,56 @@ def resolve_ros_iris(input_urdf):
     :return: URDF with replaced ROS IRIs.
     :rtype: str
     """
-    rospack = rospkg.RosPack()
     output_urdf = u''
     for line in input_urdf.split(u'\n'):
-        if u'package://' in line:
-            prefix, suffix = line.split(u'package://', 1)
-            package_name, suffix = suffix.split(u'/', 1)
-            real_path = rospack.get_path(package_name)
-            output_urdf += '{}{}/{}'.format(prefix, real_path, suffix)
-        else:
-            output_urdf += line
+        output_urdf += resolve_ros_iris(line)
         output_urdf += u'\n'
     return output_urdf
 
+rospack = rospkg.RosPack()
+def resolve_ros_iris(path):
+    if u'package://' in path:
+        split = path.split(u'package://')
+        prefix = split[0]
+        result = prefix
+        for suffix in split[1:]:
+            package_name, suffix = suffix.split(u'/', 1)
+            real_path = rospack.get_path(package_name)
+            result += u'{}/{}'.format(real_path, suffix)
+        return result
+    else:
+        return path
+
+def convert_dae_to_obj(path):
+    path = path.replace(u'\'', u'')
+    file_name = path.split(u'/')[-1]
+    name, file_format = file_name.split(u'.')
+    if u'dae' in file_format:
+        input_path = resolve_ros_iris(path)
+        new_path = u'/tmp/giskardpy/{}.obj'.format(name)
+        create_path(new_path)
+        try:
+            subprocess.check_call([u'meshlabserver', u'-i', input_path, u'-o', new_path])
+        except Exception as e:
+            print(u'meshlab not installed, can\'t convert dae to obj')
+        return new_path
+    return path
+
+def write_to_tmp(filename, urdf_string):
+    """
+    Writes a URDF string into a temporary file on disc. Used to deliver URDFs to PyBullet that only loads file.
+    :param filename: Name of the temporary file without any path information, e.g. 'pr2.urdf'
+    :type filename: str
+    :param urdf_string: URDF as an XML string that shall be written to disc.
+    :type urdf_string: str
+    :return: Complete path to where the urdf was written, e.g. '/tmp/pr2.urdf'
+    :rtype: str
+    """
+    new_path = u'/tmp/giskardpy/{}'.format(filename)
+    create_path(new_path)
+    with open(new_path, u'w') as o:
+        o.write(urdf_string)
+    return new_path
 
 def render_dot_tree(root, visibility_level=common.VisibilityLevel.DETAIL, name=None):
     """

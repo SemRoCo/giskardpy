@@ -25,7 +25,7 @@ from giskardpy.plugin_kinematic_sim import NewKinSimPlugin
 from giskardpy.plugin_log_trajectory import NewLogTrajPlugin
 from giskardpy.plugin_pybullet import PyBulletMonitor, PyBulletUpdatePlugin, CollisionChecker
 from giskardpy.plugin_send_trajectory import SendTrajectory
-from giskardpy.utils import create_path, resolve_ros_iris, render_dot_tree
+from giskardpy.utils import create_path, resolve_ros_iris_in_urdf, render_dot_tree
 
 
 # TODO add transform3d to package xml
@@ -36,7 +36,7 @@ from giskardpy.utils import create_path, resolve_ros_iris, render_dot_tree
 def ini(param_name, robot_description_identifier, controlled_joints_identifier):
     # TODO this should be part of sync
     urdf = rospy.get_param(param_name)
-    urdf = resolve_ros_iris(urdf)
+    urdf = resolve_ros_iris_in_urdf(urdf)
     Blackboard().god_map.safe_set_data([robot_description_identifier], urdf)
 
     msg = rospy.wait_for_message(u'/whole_body_controller/state',

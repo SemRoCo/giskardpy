@@ -10,7 +10,7 @@ if __name__ == '__main__':
         name = rospy.get_param('~name')
         result = giskard.add_box(name=name,
                                  size=rospy.get_param('~size', (1, 1, 1)),
-                                 frame_id=rospy.get_param('~frame', 'map'),
+                                 frame_id=rospy.get_param('~frame_id', 'map'),
                                  position=rospy.get_param('~position', (0, 0, 0)),
                                  orientation=rospy.get_param('~orientation', (0, 0, 0, 1)))
         rospy.sleep(0.5)

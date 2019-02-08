@@ -290,6 +290,22 @@ class GiskardWrapper(object):
         req = UpdateWorldRequest(UpdateWorldRequest.ADD, box, True, pose)
         return self.update_world.call(req)
 
+    def attach_object(self, name, link_frame_id):
+        """
+        :param name:
+        :param size:
+        :param frame_id:
+        :param position:
+        :param orientation:
+        :rtype: UpdateWorldResponse
+        """
+        req = UpdateWorldRequest()
+        req.rigidly_attached = True
+        req.body.name = name
+        req.pose.header.frame_id = link_frame_id
+        req.operation = UpdateWorldRequest.ADD
+        return self.update_world.call(req)
+
     def add_urdf(self, name, urdf, js_topic, pose):
         urdf_body = WorldBody()
         urdf_body.name = str(name)

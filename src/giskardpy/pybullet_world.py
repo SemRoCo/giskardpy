@@ -17,10 +17,11 @@ from giskardpy.exceptions import UnknownBodyException, RobotExistsException, Dup
 from giskardpy.data_types import SingleJointState, Transform, Point, Quaternion
 import numpy as np
 
-from giskardpy.utils import keydefaultdict, suppress_stdout, NullContextManager, resolve_ros_iris
+from giskardpy.utils import keydefaultdict, suppress_stdout, NullContextManager, resolve_ros_iris_in_urdf, \
+    write_to_tmp
 
 from giskardpy.object import UrdfObject, FixedJoint, to_urdf_string, BoxShape, \
-    CollisionProperty, remove_outer_tag, SphereShape
+    CollisionProperty, remove_outer_tag, SphereShape, VisualProperty, MaterialProperty, ColorRgba
 import hashlib
 
 JointInfo = namedtuple(u'JointInfo', [u'joint_index', u'joint_name', u'joint_type', u'q_index', u'u_index', u'flags',
@@ -35,20 +36,7 @@ ContactInfo = namedtuple(u'ContactInfo', [u'contact_flag', u'body_unique_id_a', 
                                           u'lateralFriction2', u'lateralFrictionDir2'])
 
 
-def write_urdf_to_disc(filename, urdf_string):
-    """
-    Writes a URDF string into a temporary file on disc. Used to deliver URDFs to PyBullet that only loads file.
-    :param filename: Name of the temporary file without any path information, e.g. 'pr2.urdf'
-    :type filename: str
-    :param urdf_string: URDF as an XML string that shall be written to disc.
-    :type urdf_string: str
-    :return: Complete path to where the urdf was written, e.g. '/tmp/pr2.urdf'
-    :rtype: str
-    """
-    new_path = u'/tmp/{}'.format(filename)
-    with open(new_path, u'w') as o:
-        o.write(urdf_string)
-    return new_path
+
 
 
 def random_string(size=6):
@@ -72,7 +60,7 @@ def load_urdf_string_into_bullet(urdf_string, pose):
     :return: internal PyBullet id of the loaded urdf
     :rtype: intload_urdf_string_into_bullet
     """
-    filename = write_urdf_to_disc(u'{}.urdf'.format(random_string()), urdf_string)
+    filename = write_to_tmp(u'{}.urdf'.format(random_string()), urdf_string)
     with NullContextManager() if giskardpy.PRINT_LEVEL == DEBUG else suppress_stdout():
         id = p.loadURDF(filename, [pose.translation.x, pose.translation.y, pose.translation.z],
                         [pose.rotation.x, pose.rotation.y, pose.rotation.z, pose.rotation.w],
@@ -102,7 +90,7 @@ class PyBulletRobot(object):
         self.path_to_data_folder = path_to_data_folder + u'collision_matrix/'
         self.name = name
         # TODO i think resolve iris can be removed because I do this at the start
-        self.base_urdf = resolve_ros_iris(urdf)
+        self.base_urdf = resolve_ros_iris_in_urdf(urdf)
         self.id = load_urdf_string_into_bullet(self.base_urdf, base_pose)
         self.sync_with_bullet()
         self.attached_objects = {}
@@ -734,7 +722,10 @@ class PyBulletWorld(object):
         # like in the PyBullet examples: spawn a big collision box in the origin
         if not self.has_object(name):
             self.spawn_urdf_object(UrdfObject(name=name,
-                                              collision_props=[CollisionProperty(geometry=BoxShape(30, 30, 10))]),
+                                              visual_props=[VisualProperty(geometry=BoxShape(100, 100, 10),
+                                                                           material=MaterialProperty(u'white',
+                                                                                                     ColorRgba(.8,.8,.8,1)))],
+                                              collision_props=[CollisionProperty(geometry=BoxShape(100, 100, 10))]),
                                    Transform(translation=Point(0, 0, -5)))
 
     def add_pybullet_bug_fix_hack(self, name=u'pybullet_sucks'):

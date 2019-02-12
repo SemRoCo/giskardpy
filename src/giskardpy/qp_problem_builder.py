@@ -51,6 +51,7 @@ class QProblemBuilder(object):
 
         self.qp_solver = QPSolver(len(self.joint_constraints_dict) + len(self.soft_constraints_dict),
                                   len(self.hard_constraints_dict) + len(self.soft_constraints_dict))
+        self.lbAs = None  # for debugging purposes
 
     # @profile
     def make_matrices(self):
@@ -165,14 +166,19 @@ class QProblemBuilder(object):
             ubA.append(key)
             weights.append(key)
             xdot.append(key)
-        p_lb = pd.DataFrame(np_lb[:-len(self.soft_constraints_dict)], lb)
-        p_ub = pd.DataFrame(np_ub[:-len(self.soft_constraints_dict)], ub)
-        p_lbA = pd.DataFrame(np_lbA, lbA)
-        p_ubA = pd.DataFrame(np_ubA, ubA)
-        p_weights = pd.DataFrame(np_H.dot(np.ones(np_H.shape[0])), weights)
+        p_lb = pd.DataFrame(np_lb[:-len(self.soft_constraints_dict)], lb).sort_index()
+        p_ub = pd.DataFrame(np_ub[:-len(self.soft_constraints_dict)], ub).sort_index()
+        p_lbA = pd.DataFrame(np_lbA, lbA).sort_index()
+        p_ubA = pd.DataFrame(np_ubA, ubA).sort_index()
+        p_weights = pd.DataFrame(np_H.dot(np.ones(np_H.shape[0])), weights).sort_index()
         if xdot_full is not None:
-            p_xdot = pd.DataFrame(xdot_full, xdot)
-        p_A = pd.DataFrame(np_A, lbA, weights)
+            p_xdot = pd.DataFrame(xdot_full, xdot).sort_index()
+        p_A = pd.DataFrame(np_A, lbA, weights).sort_index()
+        if self.lbAs is None:
+            self.lbAs = p_lbA
+        else:
+            self.lbAs = self.lbAs.T.append(p_lbA.T, ignore_index=True).T
+            # self.lbAs.T[[c for c in self.lbAs.T.columns if 'dist' in c]].plot()
         pass
 
     def get_cmd(self, substitutions, nWSR=None):
@@ -191,7 +197,7 @@ class QProblemBuilder(object):
         np_ub = np.array(np_big_ass_M[self.shape1:, -1])
         np_lbA = np.array(np_big_ass_M[:self.shape1, -2])
         np_ubA = np.array(np_big_ass_M[:self.shape1, -1])
-        self.debug_print(np_H, np_A, np_lb, np_ub, np_lbA, np_ubA)
+        # self.debug_print(np_H, np_A, np_lb, np_ub, np_lbA, np_ubA)
         xdot_full = self.qp_solver.solve(np_H, self.np_g, np_A, np_lb, np_ub, np_lbA, np_ubA, nWSR)
         if xdot_full is None:
             return None

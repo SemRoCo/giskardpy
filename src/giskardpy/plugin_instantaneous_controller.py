@@ -10,21 +10,23 @@ from giskardpy.exceptions import InsolvableException
 from giskardpy.input_system import FrameInput, Point3Input, Vector3Input, \
     ShortestAngularDistanceInput
 from giskardpy.plugin_action_server import GetGoal
-from giskardpy.plugin_robot import NewRobotPlugin
+from giskardpy.plugin_robot import RobotPlugin
 from giskardpy.symengine_controller import SymEngineController, position_conv, rotation_conv, \
-    link_to_link_avoidance, joint_position, continuous_joint_position
+    link_to_link_avoidance, joint_position, continuous_joint_position, rotation_conv_slerp
 import symengine_wrappers as sw
 from giskardpy.tfwrapper import transform_pose
+import numpy as np
+
 
 # TODO plan only not supported
 # TODO waypoints not supported
-class GoalToConstraints(GetGoal, NewRobotPlugin):
+class GoalToConstraints(GetGoal, RobotPlugin):
     def __init__(self, name, as_name, root_link, robot_description_identifier, js_identifier, goal_identifier,
                  controlled_joints_identifier, controllable_links_identifier, fk_identifier, pyfunction_identifier,
                  closest_point_identifier, soft_constraint_identifier, collision_goal_identifier,
                  default_joint_vel_limit):
         GetGoal.__init__(self, name, as_name)
-        NewRobotPlugin.__init__(self, robot_description_identifier, js_identifier, default_joint_vel_limit)
+        RobotPlugin.__init__(self, robot_description_identifier, js_identifier, default_joint_vel_limit)
         self.soft_constraint_identifier = soft_constraint_identifier
         self._goal_identifier = goal_identifier
         self.controlled_joints_identifier = controlled_joints_identifier
@@ -45,7 +47,7 @@ class GoalToConstraints(GetGoal, NewRobotPlugin):
         return super(GoalToConstraints, self).setup(timeout)
 
     def initialise(self):
-        NewRobotPlugin.initialize(self)
+        RobotPlugin.initialize(self)
         self.get_god_map().safe_set_data([self._goal_identifier], None)
 
     def terminate(self, new_status):
@@ -217,7 +219,6 @@ class GoalToConstraints(GetGoal, NewRobotPlugin):
                                                            contact_normal.get_expression(),
                                                            min_dist))
 
-        # self.controller.update_soft_constraints(soft_constraints, self.god_map.get_registered_symbols())
         self.soft_constraints.update(soft_constraints)
 
     def set_unused_joint_goals_to_current(self):
@@ -227,14 +228,15 @@ class GoalToConstraints(GetGoal, NewRobotPlugin):
         joint_goal = self.god_map.safe_get_data([self._goal_identifier, str(Controller.JOINT)])
         for joint_name in self.controlled_joints:
             if joint_name not in joint_goal:
-                joint_goal[joint_name] = {u'weight': 0.0,
-                                          u'p_gain': 10,
+                joint_goal[joint_name] = {u'weight': 0,
+                                          u'p_gain': 0,
                                           u'max_speed': self.get_robot().default_joint_velocity_limit,
                                           u'position': self.god_map.safe_get_data([self._joint_states_identifier,
                                                                                    joint_name,
-                                                                              u'position'])}
+                                                                                   u'position'])}
                 if joint_name not in self.used_joints:
                     joint_goal[joint_name][u'weight'] = 1
+                    joint_goal[joint_name][u'p_gain'] = 10.
 
         self.god_map.safe_set_data([self._goal_identifier, str(Controller.JOINT)], joint_goal)
 
@@ -337,11 +339,22 @@ def cart_controller_to_goal(controller):
     root = controller.root_link
     tip = controller.tip_link
     controller.goal_pose = transform_pose(root, controller.goal_pose)
+    # make sure rotation is normalized quaternion
+    # TODO make a function out of this
+    rotation = np.array([controller.goal_pose.pose.orientation.x,
+                         controller.goal_pose.pose.orientation.y,
+                         controller.goal_pose.pose.orientation.z,
+                         controller.goal_pose.pose.orientation.w])
+    normalized_rotation = rotation / np.linalg.norm(rotation)
+    controller.goal_pose.pose.orientation.x = normalized_rotation[0]
+    controller.goal_pose.pose.orientation.y = normalized_rotation[1]
+    controller.goal_pose.pose.orientation.z = normalized_rotation[2]
+    controller.goal_pose.pose.orientation.w = normalized_rotation[3]
     goals[root, tip] = controller
     return goals
 
 
-class ControllerPlugin(NewRobotPlugin):
+class ControllerPlugin(RobotPlugin):
     def __init__(self, robot_description_identifier, js_identifier, path_to_functions, next_cmd_identifier,
                  soft_constraint_identifier, controlled_joints_identifier, default_joint_vel_limit, nWSR=None):
         super(ControllerPlugin, self).__init__(robot_description_identifier, js_identifier, default_joint_vel_limit)

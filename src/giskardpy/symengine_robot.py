@@ -37,7 +37,7 @@ TRANSLATIONAL_JOINT_TYPES = [u'prismatic']
 class Robot(object):
     # TODO split urdf part into separate file?
     # TODO remove slow shit from init?
-    def __init__(self, urdf, default_joint_vel_limit=1):
+    def __init__(self, urdf, default_joint_vel_limit):
         """
         :param urdf:
         :type urdf: str

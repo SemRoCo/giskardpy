@@ -57,6 +57,9 @@ class PluginBehavior(GiskardBehavior):
         self.sleep = sleep
         super(PluginBehavior, self).__init__(name)
 
+    def get_plugins(self):
+        return self._plugins
+
     def add_plugin(self, name, plugin):
         """Registers a plugin with the process manager. The name needs to be unique."""
         if name in self._plugins:
@@ -88,7 +91,11 @@ class PluginBehavior(GiskardBehavior):
     def terminate(self, new_status):
         with self.status_lock:
             self.set_status(Status.FAILURE)
-        self.update_thread.join()
+        try:
+            self.update_thread.join()
+        except Exception as e:
+            # FIXME sometimes terminate gets called without init being called
+            raise Exception('asdf')
         self.stop_plugins()
         super(PluginBehavior, self).terminate(new_status)
 

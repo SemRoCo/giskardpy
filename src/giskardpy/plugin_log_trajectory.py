@@ -5,6 +5,9 @@ from giskardpy.plugin import NewPluginBase
 from giskardpy.data_types import Trajectory
 
 
+def diff(p1, p2):
+    pass
+
 class NewLogTrajPlugin(NewPluginBase):
     def __init__(self, trajectory_identifier, joint_state_identifier, time_identifier):
         """
@@ -35,4 +38,5 @@ class NewLogTrajPlugin(NewPluginBase):
         self.god_map.safe_set_data([self.trajectory_identifier], trajectory)
 
         return super(NewLogTrajPlugin, self).update()
+
 

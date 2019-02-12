@@ -1,13 +1,21 @@
 from __future__ import division
 
+import pydot
+import rospkg
+import subprocess
+import xml
 from collections import defaultdict, OrderedDict
 import numpy as np
-from itertools import product
+from itertools import product, chain
 from numpy import pi
 
 import errno
+from os import tmpfile
+
 from geometry_msgs.msg import PointStamped, Point, Vector3Stamped, Vector3, Pose, PoseStamped, QuaternionStamped, \
     Quaternion
+from py_trees import common, Chooser, Selector, Sequence, Behaviour
+from py_trees.composites import Parallel
 from sensor_msgs.msg import JointState
 from tf.transformations import quaternion_multiply, quaternion_conjugate
 
@@ -16,6 +24,9 @@ from giskardpy.data_types import ClosestPointInfo
 from contextlib import contextmanager
 import sys, os
 import pylab as plt
+
+from giskardpy.plugin import PluginBehavior, NewPluginBase
+
 
 @contextmanager
 def suppress_stderr():
@@ -293,6 +304,9 @@ def plot_trajectory(tj, controlled_joints, path_to_data_folder):
     :param controlled_joints: only joints in this list will be added to the plot
     :type controlled_joints: list
     """
+    return
+    if len(tj._points) <= 0:
+        return
     colors = [u'b', u'g', u'r', u'c', u'm', u'y', u'k']
     line_styles = [u'', u'--', u'-.']
     fmts = [u''.join(x) for x in product(line_styles, colors)]
@@ -323,5 +337,181 @@ def plot_trajectory(tj, controlled_joints, path_to_data_folder):
 
     # Put a legend to the right of the current axis
     ax1.legend(loc=u'center', bbox_to_anchor=(1.45, 0))
+    ax1.grid()
+    ax2.grid()
 
     plt.savefig(path_to_data_folder + u'trajectory.pdf')
+
+
+def resolve_ros_iris_in_urdf(input_urdf):
+    """
+    Replace all instances of ROS IRIs with a urdf string with global paths in the file system.
+    :param input_urdf: URDF in which the ROS IRIs shall be replaced.
+    :type input_urdf: str
+    :return: URDF with replaced ROS IRIs.
+    :rtype: str
+    """
+    output_urdf = u''
+    for line in input_urdf.split(u'\n'):
+        output_urdf += resolve_ros_iris(line)
+        output_urdf += u'\n'
+    return output_urdf
+
+rospack = rospkg.RosPack()
+def resolve_ros_iris(path):
+    if u'package://' in path:
+        split = path.split(u'package://')
+        prefix = split[0]
+        result = prefix
+        for suffix in split[1:]:
+            package_name, suffix = suffix.split(u'/', 1)
+            real_path = rospack.get_path(package_name)
+            result += u'{}/{}'.format(real_path, suffix)
+        return result
+    else:
+        return path
+
+def convert_dae_to_obj(path):
+    path = path.replace(u'\'', u'')
+    file_name = path.split(u'/')[-1]
+    name, file_format = file_name.split(u'.')
+    if u'dae' in file_format:
+        input_path = resolve_ros_iris(path)
+        new_path = u'/tmp/giskardpy/{}.obj'.format(name)
+        create_path(new_path)
+        try:
+            subprocess.check_call([u'meshlabserver', u'-i', input_path, u'-o', new_path])
+        except Exception as e:
+            print(u'meshlab not installed, can\'t convert dae to obj')
+        return new_path
+    return path
+
+def write_to_tmp(filename, urdf_string):
+    """
+    Writes a URDF string into a temporary file on disc. Used to deliver URDFs to PyBullet that only loads file.
+    :param filename: Name of the temporary file without any path information, e.g. 'pr2.urdf'
+    :type filename: str
+    :param urdf_string: URDF as an XML string that shall be written to disc.
+    :type urdf_string: str
+    :return: Complete path to where the urdf was written, e.g. '/tmp/pr2.urdf'
+    :rtype: str
+    """
+    new_path = u'/tmp/giskardpy/{}'.format(filename)
+    create_path(new_path)
+    with open(new_path, u'w') as o:
+        o.write(urdf_string)
+    return new_path
+
+def render_dot_tree(root, visibility_level=common.VisibilityLevel.DETAIL, name=None):
+    """
+    Render the dot tree to .dot, .svg, .png. files in the current
+    working directory. These will be named with the root behaviour name.
+
+    Args:
+        root (:class:`~py_trees.behaviour.Behaviour`): the root of a tree, or subtree
+        visibility_level (:class`~py_trees.common.VisibilityLevel`): collapse subtrees at or under this level
+        name (:obj:`str`): name to use for the created files (defaults to the root behaviour name)
+
+    Example:
+
+        Render a simple tree to dot/svg/png file:
+
+        .. graphviz:: dot/sequence.dot
+
+        .. code-block:: python
+
+            root = py_trees.composites.Sequence("Sequence")
+            for job in ["Action 1", "Action 2", "Action 3"]:
+                success_after_two = py_trees.behaviours.Count(name=job,
+                                                              fail_until=0,
+                                                              running_until=1,
+                                                              success_until=10)
+                root.add_child(success_after_two)
+            py_trees.display.render_dot_tree(root)
+
+    .. tip::
+
+        A good practice is to provide a command line argument for optional rendering of a program so users
+        can quickly visualise what tree the program will execute.
+    """
+    graph = generate_pydot_graph(root, visibility_level)
+    filename_wo_extension = root.name.lower().replace(" ", "_") if name is None else name
+    print("Writing %s.dot/svg/png" % filename_wo_extension)
+    graph.write(filename_wo_extension + '.dot')
+    graph.write_png(filename_wo_extension + '.png')
+    graph.write_svg(filename_wo_extension + '.svg')
+
+def generate_pydot_graph(root, visibility_level):
+    """
+    Generate the pydot graph - this is usually the first step in
+    rendering the tree to file. See also :py:func:`render_dot_tree`.
+
+    Args:
+        root (:class:`~py_trees.behaviour.Behaviour`): the root of a tree, or subtree
+        visibility_level (:class`~py_trees.common.VisibilityLevel`): collapse subtrees at or under this level
+
+    Returns:
+        pydot.Dot: graph
+    """
+    def get_node_attributes(node, visibility_level):
+        blackbox_font_colours = {common.BlackBoxLevel.DETAIL: "dodgerblue",
+                                 common.BlackBoxLevel.COMPONENT: "lawngreen",
+                                 common.BlackBoxLevel.BIG_PICTURE: "white"
+                                 }
+        if isinstance(node, Chooser):
+            attributes = ('doubleoctagon', 'cyan', 'black')  # octagon
+        elif isinstance(node, Selector):
+            attributes = ('octagon', 'cyan', 'black')  # octagon
+        elif isinstance(node, Sequence):
+            attributes = ('box', 'orange', 'black')
+        elif isinstance(node, Parallel):
+            attributes = ('note', 'gold', 'black')
+        elif isinstance(node, PluginBehavior):
+            attributes = ('box', 'green', 'black')
+        elif isinstance(node, NewPluginBase) or node.children != []:
+            attributes = ('ellipse', 'ghostwhite', 'black')  # encapsulating behaviour (e.g. wait)
+        else:
+            attributes = ('ellipse', 'gray', 'black')
+        if not isinstance(node, NewPluginBase) and node.blackbox_level != common.BlackBoxLevel.NOT_A_BLACKBOX:
+            attributes = (attributes[0], 'gray20', blackbox_font_colours[node.blackbox_level])
+        return attributes
+
+    fontsize = 11
+    graph = pydot.Dot(graph_type='digraph')
+    graph.set_name(root.name.lower().replace(" ", "_"))
+    # fonts: helvetica, times-bold, arial (times-roman is the default, but this helps some viewers, like kgraphviewer)
+    graph.set_graph_defaults(fontname='times-roman')
+    graph.set_node_defaults(fontname='times-roman')
+    graph.set_edge_defaults(fontname='times-roman')
+    (node_shape, node_colour, node_font_colour) = get_node_attributes(root, visibility_level)
+    node_root = pydot.Node(root.name, shape=node_shape, style="filled", fillcolor=node_colour, fontsize=fontsize, fontcolor=node_font_colour)
+    graph.add_node(node_root)
+    names = [root.name]
+
+    def add_edges(root, root_dot_name, visibility_level):
+        if visibility_level < root.blackbox_level:
+            if isinstance(root, PluginBehavior):
+                childrens = []
+                names2 = []
+                for name, children in root.get_plugins().items():
+                    childrens.append(children)
+                    names2.append(name)
+            else:
+                childrens = root.children
+                names2 = [c.name for c in childrens]
+            for name, c in zip(names2, childrens):
+                (node_shape, node_colour, node_font_colour) = get_node_attributes(c, visibility_level)
+                proposed_dot_name = name
+                while proposed_dot_name in names:
+                    proposed_dot_name = proposed_dot_name + "*"
+                names.append(proposed_dot_name)
+                node = pydot.Node(proposed_dot_name, shape=node_shape, style="filled", fillcolor=node_colour, fontsize=fontsize, fontcolor=node_font_colour)
+                graph.add_node(node)
+                edge = pydot.Edge(root_dot_name, proposed_dot_name)
+                graph.add_edge(edge)
+                if (isinstance(c, PluginBehavior) and c.get_plugins() != []) or \
+                        (isinstance(c, Behaviour) and c.children != []):
+                    add_edges(c, proposed_dot_name, visibility_level)
+
+    add_edges(root, root.name, visibility_level)
+    return graph

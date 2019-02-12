@@ -25,7 +25,7 @@ def hacky_urdf_parser_fix(urdf_str):
             continue
         if not delete:
             fixed_urdf += line + '\n'
-    return fixed_urdf
+    return fixed_urdf.encode('utf-8')
 
 
 JOINT_TYPES = [u'fixed', u'revolute', u'continuous', u'prismatic']

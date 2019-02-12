@@ -134,7 +134,7 @@ class GiskardTestWrapper(object):
         self.joint_limits = {joint_name: self.robot.get_joint_lower_upper_limit(joint_name) for joint_name in
                              self.controlled_joints if self.robot.is_joint_controllable(joint_name)}
         self.world = Blackboard().god_map.safe_get_data([u'pybullet_world'])  # type: PyBulletWorld
-        self.world_plugin = self.tree.root.children[3].children[2]._plugins[u'coll'] # type: CollisionChecker
+        self.world_plugin = self.tree.root.children[3].children[3]._plugins[u'coll'] # type: CollisionChecker
         self.default_root = default_root
         self.map = u'map'
         self.simple_base_pose_pub = rospy.Publisher(u'/move_base_simple/goal', PoseStamped, queue_size=10)

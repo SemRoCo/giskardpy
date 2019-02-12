@@ -25,6 +25,7 @@ from giskardpy.plugin_kinematic_sim import NewKinSimPlugin
 from giskardpy.plugin_log_trajectory import NewLogTrajPlugin
 from giskardpy.plugin_pybullet import PyBulletMonitor, PyBulletUpdatePlugin, CollisionChecker
 from giskardpy.plugin_send_trajectory import SendTrajectory
+from giskardpy.visualization import VisualizationBehavior
 
 
 # TODO add transform3d to package xml
@@ -113,6 +114,7 @@ def grow_tree():
     planning.add_child(GoalCanceled(u'goal canceled', action_server_name))
     planning.add_child(CollisionCancel(u'in collision', collision_time_threshold, time_identifier,
                                        closest_point_identifier))
+    planning.add_child(VisualizationBehavior(u'visualization'))
 
     actual_planning = PluginBehavior(u'planning', sleep=0)
     actual_planning.add_plugin(u'kin sim', NewKinSimPlugin(js_identifier, next_cmd_identifier,

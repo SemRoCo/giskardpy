@@ -1078,19 +1078,14 @@ class TestCollisionAvoidanceGoals(object):
 
         # grasp
         pick_pose.pose.position.z -= 0.2
-        kitchen_setup.allow_all_collisions()
+        kitchen_setup.avoid_collision(kitchen_setup.get_l_gripper_links(), u'kitchen', [], 0)
+        kitchen_setup.allow_collision(kitchen_setup.get_l_gripper_links(), attached_link_name, [])
         kitchen_setup.set_and_check_cart_goal(kitchen_setup.default_root, kitchen_setup.l_tip, pick_pose)
         kitchen_setup.attach_box(attached_link_name, frame_id=kitchen_setup.l_tip)
 
         # post grasp
         pick_pose.pose.position.z += 0.2
         kitchen_setup.avoid_all_collisions(0.05)
-        # ces = []
-        # ces.append(CollisionEntry(type=CollisionEntry.ALLOW_COLLISION,
-        #                           robot_links=kitchen_setup.get_l_gripper_links(),
-        #                           body_b=u'kitchen',
-        #                           link_bs=[]))
-        # kitchen_setup.add_collision_entries(ces)
         kitchen_setup.set_and_check_cart_goal(kitchen_setup.default_root, kitchen_setup.l_tip, pick_pose)
         # kitchen_setup.remove_object(attached_link_name)
         kitchen_setup.send_and_check_joint_goal(gaya_pose)
@@ -1105,16 +1100,18 @@ class TestCollisionAvoidanceGoals(object):
         place_pose.header.frame_id = u'base_footprint'
         place_pose.pose.position = Point(0.587, 0.068, 0.920)
         place_pose.pose.orientation = Quaternion(0.703, -0.074, -0.703, -0.074)
-        pick_pose.pose.position.z += 0.2
+        place_pose.pose.position.z += 0.2
         kitchen_setup.set_and_check_cart_goal(kitchen_setup.default_root, kitchen_setup.l_tip, place_pose)
 
         # place
-        pick_pose.pose.position.z -= 0.2
+        place_pose.pose.position.z -= 0.2
         kitchen_setup.avoid_all_collisions(0.)
-        kitchen_setup.set_and_check_cart_goal(kitchen_setup.default_root, kitchen_setup.l_tip, place_pose)
+        kitchen_setup.set_cart_goal(kitchen_setup.default_root, kitchen_setup.l_tip, place_pose)
+        kitchen_setup.send_goal()
 
         # post place
-        pick_pose.pose.position.z += 0.2
+        kitchen_setup.remove_object(attached_link_name)
+        place_pose.pose.position.z += 0.2
         kitchen_setup.avoid_all_collisions(0.)
         kitchen_setup.set_and_check_cart_goal(kitchen_setup.default_root, kitchen_setup.l_tip, place_pose)
         # kitchen_setup.de

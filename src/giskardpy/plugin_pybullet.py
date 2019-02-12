@@ -116,7 +116,9 @@ class PyBulletUpdatePlugin(PybulletPlugin):
                     if req.rigidly_attached:
                         # get object pose
                         if self.world.has_object(req.body.name):
-                            p_map = self.world.get_object(req.body.name).get_base_pose()
+                            o = self.world.get_object(req.body.name)
+                            m = o.as_marker_msg()
+                            p_map = o.get_base_pose()
                             # self.world.get_object(req.body.name).ge
                             p = PoseStamped()
                             p.header.frame_id = u'map'
@@ -129,7 +131,11 @@ class PyBulletUpdatePlugin(PybulletPlugin):
                             p.pose.orientation.w = p_map.rotation.w
                             p = transform_pose(req.pose.header.frame_id, p)
                             req.pose.pose = p.pose
-
+                            m.pose = p.pose
+                            m.header.frame_id = req.pose.header.frame_id
+                            self.pub_collision_marker.publish(MarkerArray([m]))
+                            self.attach_object(req)
+                            return UpdateWorldResponse()
                         self.attach_object(req)
                         # req.operation = UpdateWorldRequest.REMOVE
                         # self.publish_object_as_marker(req)

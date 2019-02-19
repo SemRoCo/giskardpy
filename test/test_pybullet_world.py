@@ -27,7 +27,7 @@ class TestPyBulletWorld(RuleBasedStateMachine):
     def __init__(self):
         super(TestPyBulletWorld, self).__init__()
         self.world = PyBulletWorld()
-        self.world.activate_viewer()
+        self.world.setup()
 
     object_names = Bundle(u'object_names')
     robot_names = Bundle(u'robot_names')
@@ -107,7 +107,7 @@ class TestPyBulletWorld(RuleBasedStateMachine):
 
     @rule()
     def delete_robot(self):
-        self.world.delete_robot()
+        self.world.remove_robot()
         assert not self.world.has_robot()
         assert self.world.get_robot() is None
 
@@ -133,7 +133,7 @@ class TestPyBulletWorld(RuleBasedStateMachine):
     @rule()
     def clear_world(self):
 
-        self.world.clear_world()
+        self.world.soft_reset()
         assert 1 == p.getNumBodies()
 
     def teardown(self):

@@ -38,10 +38,10 @@ class PybulletPlugin(PluginBase):
         self.controlled_joints = self.get_god_map().safe_get_data([controlled_joints_identifier])
         if self.world is None:
             self.world = PyBulletWorld(enable_gui=self.gui, path_to_data_folder=self.path_to_data_folder)
-            self.world.activate_viewer()
+            self.world.setup()
             # TODO get robot description from god map
             urdf = rospy.get_param(u'robot_description')
-            self.world.spawn_robot_from_urdf(self.robot_name, urdf, self.controlled_joints)
+            self.world.add_robot(self.robot_name, urdf, self.controlled_joints)
             self.god_map.safe_set_data([pybullet_identifier], self.world)
 
 

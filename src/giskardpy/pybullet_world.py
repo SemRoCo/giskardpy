@@ -22,12 +22,15 @@ from giskardpy.exceptions import UnknownBodyException, RobotExistsException, Dup
 from giskardpy.data_types import SingleJointState, Transform, Point, Quaternion
 import numpy as np
 
+from giskardpy.urdf_object import NewURDFObject
 from giskardpy.utils import keydefaultdict, suppress_stdout, NullContextManager, resolve_ros_iris_in_urdf, \
     write_to_tmp
 
-from giskardpy.object import UrdfObject, FixedJoint, to_urdf_string, BoxShape, \
-    CollisionProperty, remove_outer_tag, SphereShape, VisualProperty, MaterialProperty, ColorRgba
+# from giskardpy.object import UrdfObject, FixedJoint, to_urdf_string, BoxShape, \
+#     CollisionProperty, remove_outer_tag, SphereShape, VisualProperty, MaterialProperty, ColorRgba
 import hashlib
+
+from giskardpy.world import WorldObject, World
 
 JointInfo = namedtuple(u'JointInfo', [u'joint_index', u'joint_name', u'joint_type', u'q_index', u'u_index', u'flags',
                                       u'joint_damping', u'joint_friction', u'joint_lower_limit', u'joint_upper_limit',
@@ -74,7 +77,7 @@ def load_urdf_string_into_bullet(urdf_string, pose):
     return id
 
 
-class PyBulletRobot(object):
+class PyBulletRobot(WorldObject):
     """
     Keeps track of and offers convenience functions for an urdf object in bullet.
     """
@@ -475,7 +478,7 @@ class PyBulletRobot(object):
         return u'{}/{}'.format(self.name, self.id)
 
 
-class PyBulletWorld(object):
+class PyBulletWorld(World):
     """
     Wraps around the shitty pybullet api.
     """
@@ -486,26 +489,27 @@ class PyBulletWorld(object):
         :param path_to_data_folder: location where compiled collision matrices are stored
         :type path_to_data_folder: str
         """
+        super(PyBulletWorld, self).__init__()
         self._gui = enable_gui
         self._object_names_to_objects = {}
         self._object_id_to_name = {}
         self._robot = None
         self.path_to_data_folder = path_to_data_folder
 
-    def spawn_robot_from_urdf_file(self, robot_name, urdf_file, controlled_joints, base_pose=Transform()):
-        """
-        Spawns a new robot into the world, reading its URDF from disc.
-        :param robot_name: Name of the new robot to spawn.
-        :type robot_name: str
-        :param urdf_file: Valid and existing filename of the URDF to load, e.g. '/home/foo/bar/pr2.urdf'
-        :type urdf_file: str
-        :param base_pose: Pose at which to spawn the robot.
-        :type base_pose: Transform
-        """
-        with open(urdf_file, u'r') as f:
-            self.spawn_robot_from_urdf(robot_name, f.read(), controlled_joints, base_pose)
+    # def spawn_robot_from_urdf_file(self, robot_name, urdf_file, controlled_joints, base_pose=Transform()):
+    #     """
+    #     Spawns a new robot into the world, reading its URDF from disc.
+    #     :param robot_name: Name of the new robot to spawn.
+    #     :type robot_name: str
+    #     :param urdf_file: Valid and existing filename of the URDF to load, e.g. '/home/foo/bar/pr2.urdf'
+    #     :type urdf_file: str
+    #     :param base_pose: Pose at which to spawn the robot.
+    #     :type base_pose: Transform
+    #     """
+    #     with open(urdf_file, u'r') as f:
+    #         self.spawn_robot_from_urdf(robot_name, f.read(), controlled_joints, base_pose)
 
-    def spawn_robot_from_urdf(self, robot_name, urdf, controlled_joints, base_pose=Transform()):
+    def add_robot(self, urdf_object, controlled_joints, base_pose=Transform()):
         """
         :type robot_name: str
         :param urdf: URDF to spawn as loaded XML string.
@@ -514,11 +518,12 @@ class PyBulletWorld(object):
         """
         if self.has_robot():
             raise RobotExistsException(u'A robot is already loaded')
-        if self.has_object(robot_name):
+        if self.has_object(self.robot_name):
             raise DuplicateNameException(
-                u'can\'t add robot; object with name "{}" already exists'.format(robot_name))
+                u'can\'t add robot; object with name "{}" already exists'.format(self.robot_name))
+        self.robot = urdf_object
         self.deactivate_rendering()
-        self._robot = PyBulletRobot(robot_name, urdf, controlled_joints, base_pose,
+        self.robot = PyBulletRobot(self.robot_name, urdf_object, controlled_joints, base_pose,
                                     path_to_data_folder=self.path_to_data_folder)
         self.activate_rendering()
 
@@ -571,43 +576,13 @@ class PyBulletWorld(object):
         """
         if self.has_object(object_.name):
             object_ = self.get_object(object_.name)
+            # self.get_robot().attach_urdf(object_, parent_link)
+            # TODO
+            transform = None
             self.delete_object(object_.name)
             # raise DuplicateNameException(
             #     u'Can\'t attach existing object \'{}\'.'.format(object.name))
-        self.get_robot().attach_object(object_, parent_link, transform)
-
-    def has_robot(self):
-        """
-        :rtype: bool
-        """
-        return self._robot is not None
-
-    def has_object(self, object_name):
-        """
-        Checks for objects with the same name.
-        :type object_name: str
-        :rtype: bool
-        """
-        return object_name in self._object_names_to_objects
-
-    def get_robot(self):
-        """
-        :rtype: PyBulletRobot
-        """
-        return self._robot
-
-    def get_object(self, name):
-        """
-        :type name: str
-        :rtype: PyBulletRobot
-        """
-        return self._object_names_to_objects[name]
-
-    def get_object_names(self):
-        """
-        :rtype: list
-        """
-        return list(self._object_names_to_objects.keys())
+        self.get_robot().attach_urdf(object_, parent_link, transform)
 
     def get_object_id(self, name):
         return self._object_names_to_objects[name].id
@@ -631,8 +606,8 @@ class PyBulletWorld(object):
         """
         self.get_object(object_name).set_joint_state(joint_state)
 
-    def delete_robot(self):
-        if self._robot is not None:
+    def remove_robot(self):
+        if not self.has_robot():
             p.removeBody(self._robot.id)
             self._robot = None
 
@@ -650,15 +625,15 @@ class PyBulletWorld(object):
         del (self._object_names_to_objects[object_name])
         print(u'object {} deleted from pybullet world'.format(object_name))
 
-    def delete_all_objects(self, remaining_objects=(u'plane',)):
-        """
-        Deletes all objects in world. Optionally, one can specify a list of objects that shall remain in the world.
-        :param remaining_objects: Names of objects that shall remain in the world.
-        :type remaining_objects: list
-        """
-        for object_name in self.get_object_names():
-            if not object_name in remaining_objects:
-                self.delete_object(object_name)
+    # def delete_all_objects(self, remaining_objects=(u'plane',)):
+    #     """
+    #     Deletes all objects in world. Optionally, one can specify a list of objects that shall remain in the world.
+    #     :param remaining_objects: Names of objects that shall remain in the world.
+    #     :type remaining_objects: list
+    #     """
+    #     for object_name in self.get_object_names():
+    #         if not object_name in remaining_objects:
+    #             self.delete_object(object_name)
 
     def check_collisions(self, cut_off_distances):
         """
@@ -730,7 +705,7 @@ class PyBulletWorld(object):
                            contact_info.lateralFriction2,
                            contact_info.lateralFrictionDir2)
 
-    def activate_viewer(self):
+    def setup(self):
         if self._gui:
             # TODO expose opengl2 option for gui?
             self.physicsClient = p.connect(p.GUI, options=u'--opengl2')  # or p.DIRECT for non-graphical version
@@ -740,9 +715,8 @@ class PyBulletWorld(object):
         self.add_ground_plane()
         self.add_pybullet_bug_fix_hack()
 
-    def clear_world(self):
-        self.delete_all_objects()
-        self.delete_robot()
+    def soft_reset(self):
+        super(PyBulletWorld, self).soft_reset()
         self.add_ground_plane()
         self.add_pybullet_bug_fix_hack()
 
@@ -753,24 +727,24 @@ class PyBulletWorld(object):
         """
         Adds a ground plane to the Bullet World.
         """
-        # like in the PyBullet examples: spawn a big collision box in the origin
         if not self.has_object(name):
-            self.spawn_urdf_object(UrdfObject(name=name,
-                                              visual_props=[VisualProperty(geometry=BoxShape(100, 100, 10),
-                                                                           material=MaterialProperty(u'white',
-                                                                                                     ColorRgba(.8,.8,.8,1)))],
-                                              collision_props=[CollisionProperty(geometry=BoxShape(100, 100, 10))]),
-                                   Transform(translation=Point(0, 0, -5)))
+            plane = NewURDFObject.from_urdf_file(self.path_to_data_folder + u'/urdf/plane.urdf')
+            self.add_object(name, plane)
+            # self.spawn_urdf_object(UrdfObject(name=name,
+            #                                   visual_props=[VisualProperty(geometry=BoxShape(100, 100, 10),
+            #                                                                material=MaterialProperty(u'white',
+            #                                                                                          ColorRgba(.8,.8,.8,1)))],
+            #                                   collision_props=[CollisionProperty(geometry=BoxShape(100, 100, 10))]),
+            #                        Transform(translation=Point(0, 0, -5)))
 
     def add_pybullet_bug_fix_hack(self, name=u'pybullet_sucks'):
-        """
-        Adds a ground plane to the Bullet World.
-        """
-        # like in the PyBullet examples: spawn a big collision box in the origin
         if not self.has_object(name):
-            self.spawn_urdf_object(UrdfObject(name=name,
-                                              collision_props=[CollisionProperty(geometry=SphereShape(0.005))]),
-                                   Transform(translation=Point(10, 10, -10)))
+            plane = NewURDFObject.from_urdf_file(self.path_to_data_folder + u'/urdf/tiny_ball.urdf')
+            self.add_object(name, plane)
+        # if not self.has_object(name):
+        #     self.spawn_urdf_object(UrdfObject(name=name,
+        #                                       collision_props=[CollisionProperty(geometry=SphereShape(0.005))]),
+        #                            Transform(translation=Point(10, 10, -10)))
 
     def move_hack(self, position):
         self.get_object(u'pybullet_sucks').set_base_pose(position)

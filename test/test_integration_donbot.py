@@ -68,7 +68,7 @@ def resetted_giskard(giskard):
     :type giskard: Donbot
     """
     print(u'resetting giskard')
-    giskard.clear_world()
+    giskard.soft_reset()
     giskard.reset_base()
     return giskard
 

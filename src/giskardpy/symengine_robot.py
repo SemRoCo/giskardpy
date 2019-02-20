@@ -361,6 +361,10 @@ class Robot(object):
                    isinstance(geo, Mesh)
         return False
 
+    def has_link_visuals(self, link_name):
+        link = self._urdf_robot.link_map[link_name]
+        return link.visual is not None
+
     def get_urdf(self):
         return self.urdf
 

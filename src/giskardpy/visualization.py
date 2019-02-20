@@ -1,6 +1,5 @@
 from plugin import GiskardBehavior
 import py_trees
-#import roslib; roslib.load_manifest('urdfdom_py')
 from urdf_parser_py.urdf import URDF, Box, Mesh, Cylinder, Sphere
 from interactive_markers.menu_handler import *
 from visualization_msgs.msg import *
@@ -28,14 +27,11 @@ class VisualizationBehavior(GiskardBehavior):
         self.fk_dict = self.get_god_map().get_data(['fk'])
         markers = []
         for index, link in enumerate(self.robot._urdf_robot.links):
-            if not self.robot.has_link_collision(link.name, 0.1, 0.1):
+            if not self.robot.has_link_visuals(link.name):
                 continue
-            #if len(link.visuals) <= 0:
-            #    continue
 
             marker = Marker()
-            link_type = type(link.visuals[0].geometry)
-
+            link_type = type(link.visual.geometry)
 
             if link_type == Mesh:
                 marker.type = Marker.MESH_RESOURCE

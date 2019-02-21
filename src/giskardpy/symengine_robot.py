@@ -25,7 +25,7 @@ def hacky_urdf_parser_fix(urdf_str):
             continue
         if not delete:
             fixed_urdf += line + '\n'
-    return fixed_urdf
+    return fixed_urdf.encode('utf-8')
 
 
 JOINT_TYPES = [u'fixed', u'revolute', u'continuous', u'prismatic']
@@ -360,6 +360,10 @@ class Robot(object):
                                                   cylinder_surface(geo.radius, geo.length) > surface_threshold) or \
                    isinstance(geo, Mesh)
         return False
+
+    def has_link_visuals(self, link_name):
+        link = self._urdf_robot.link_map[link_name]
+        return link.visual is not None
 
     def get_urdf(self):
         return self.urdf

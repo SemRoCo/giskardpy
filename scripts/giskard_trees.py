@@ -8,7 +8,7 @@ from giskard_msgs.msg import MoveAction
 from py_trees import Sequence, Selector, BehaviourTree, Blackboard
 import py_trees
 from py_trees.behaviours import SuccessEveryN
-from py_trees.meta import running_is_failure, success_is_running, failure_is_success
+from py_trees.meta import running_is_failure, success_is_running, failure_is_success, success_is_failure
 
 import giskardpy
 from giskardpy import DEBUG
@@ -25,6 +25,7 @@ from giskardpy.plugin_kinematic_sim import NewKinSimPlugin
 from giskardpy.plugin_log_trajectory import NewLogTrajPlugin
 from giskardpy.plugin_pybullet import PyBulletMonitor, PyBulletUpdatePlugin, CollisionChecker
 from giskardpy.plugin_send_trajectory import SendTrajectory
+from giskardpy.visualization import VisualizationBehavior
 from giskardpy.utils import create_path, resolve_ros_iris_in_urdf, render_dot_tree
 
 
@@ -50,6 +51,7 @@ def grow_tree():
 
     gui = rospy.get_param(u'~enable_gui')
     map_frame = rospy.get_param(u'~map_frame')
+    enable_visualization = rospy.get_param(u'/giskard/enable_visualization')
     debug = rospy.get_param(u'~debug')
     if debug:
         giskardpy.PRINT_LEVEL = DEBUG
@@ -115,6 +117,7 @@ def grow_tree():
     planning.add_child(GoalCanceled(u'goal canceled', action_server_name))
     planning.add_child(CollisionCancel(u'in collision', collision_time_threshold, time_identifier,
                                        closest_point_identifier))
+    planning.add_child(success_is_failure(VisualizationBehavior)(u'visualization', enable_visualization))
 
     actual_planning = PluginBehavior(u'planning', sleep=0)
     actual_planning.add_plugin(u'kin sim', NewKinSimPlugin(js_identifier, next_cmd_identifier,

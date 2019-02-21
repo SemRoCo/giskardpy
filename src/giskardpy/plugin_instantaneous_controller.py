@@ -81,7 +81,11 @@ class GoalToConstraints(GetGoal, RobotPlugin):
             else:
                 self.raise_to_blackboard(InsolvableException(u'unsupported controller type'))
                 return Status.SUCCESS
-        shit = cmd_to_goals(move_cmd)
+        try:
+            shit = cmd_to_goals(move_cmd)
+        except AttributeError:
+            self.raise_to_blackboard(InsolvableException(u'couldn\'t transform goal'))
+            return Status.SUCCESS
         self.god_map.safe_set_data([self._goal_identifier], shit)
 
         self.set_unused_joint_goals_to_current()

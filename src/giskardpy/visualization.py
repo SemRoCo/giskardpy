@@ -35,28 +35,37 @@ class VisualizationBehavior(GiskardBehavior):
 
             if link_type == Mesh:
                 marker.type = Marker.MESH_RESOURCE
-                marker.mesh_resource = link.visuals[0].geometry.filename
-                marker.scale.x = 1.0
-                marker.scale.z = 1.0
-                marker.scale.y = 1.0
+                marker.mesh_resource = link.visual.geometry.filename
+                if link.visual.geometry.scale is None:
+                    marker.scale.x = 1.0
+                    marker.scale.z = 1.0
+                    marker.scale.y = 1.0
+                else:
+                    marker.scale.x = link.visual.geometry.scale[0]
+                    marker.scale.z = link.visual.geometry.scale[1]
+                    marker.scale.y = link.visual.geometry.scale[2]
                 marker.mesh_use_embedded_materials = True
             elif link_type == Box:
                 marker.type = Marker.CUBE
-                marker.scale.x = link.visuals[0].geometry.size[0]
-                marker.scale.y = link.visuals[0].geometry.size[1]
-                marker.scale.z = link.visuals[0].geometry.size[2]
+                marker.scale.x = link.visual.geometry.size[0]
+                marker.scale.y = link.visual.geometry.size[1]
+                marker.scale.z = link.visual.geometry.size[2]
             elif link_type == Cylinder:
                 marker.type = Marker.CYLINDER
-                marker.scale.x = link.visuals[0].geometry.radius
-                marker.scale.y = link.visuals[0].geometry.radius
-                marker.scale.z = link.visuals[0].geometry.length
+                marker.scale.x = link.visual.geometry.radius
+                marker.scale.y = link.visual.geometry.radius
+                marker.scale.z = link.visual.geometry.length
             elif link_type == Sphere:
                 marker.type = Marker.SPHERE
-                marker.scale.x = link.visuals[0].geometry.radius
-                marker.scale.y = link.visuals[0].geometry.radius
-                marker.scale.z = link.visuals[0].geometry.radius
+                marker.scale.x = link.visual.geometry.radius
+                marker.scale.y = link.visual.geometry.radius
+                marker.scale.z = link.visual.geometry.radius
             else:
                 continue
+
+            marker.scale.x *= 0.99
+            marker.scale.y *= 0.99
+            marker.scale.z *= 0.99
 
             link_in_base = self.fk_dict[self.robot_base, link.name]
             marker.header.frame_id = self.robot_base

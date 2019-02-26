@@ -24,6 +24,7 @@ from giskardpy.data_types import ClosestPointInfo
 from contextlib import contextmanager
 import sys, os
 import pylab as plt
+import pkg_resources
 
 from giskardpy.plugin import PluginBehavior, NewPluginBase
 
@@ -515,3 +516,77 @@ def generate_pydot_graph(root, visibility_level):
 
     add_edges(root, root.name, visibility_level)
     return graph
+
+
+
+def rospkg_exits(name):
+    """
+    checks whether a ros package with the given name and version exits
+    :param name: the name and version of the ros package in requirements format e.g. giskard_msgs<=0.1.0
+    :return: True if it exits else False
+    """
+    r = rospkg.RosPack()
+    try:
+        l = name.split('=')
+        if l[0].endswith('<'):
+            m = r.get_manifest(l[0][:-1])
+            version_m = m.version.split('.')
+            version_d = l[len(l) - 1].split('.')
+            k = max(len(version_m), len(version_d))
+            for i in range(k):
+                if version_m[i] < version_d[i]:
+                    return True
+                elif version_m[i] > version_d[i]:
+                    print("found ROS package " + l[0][:-1] + "==" + str(
+                        m.version) + " but " + name + " is required")
+                    return False
+            return True
+        elif l[0].endswith('>'):
+            m = r.get_manifest(l[0][:-1])
+            version_m = m.version.split('.')
+            version_d = l[len(l) - 1].split('.')
+            k = max(len(version_m), len(version_d))
+            for i in range(k):
+                if version_m[i] > version_d[i]:
+                    return True
+                elif version_m[i] < version_d[i]:
+                    print("found ROS package " + l[0][:-1] + "==" + str(
+                        m.version) + " but " + name + " is required")
+                    return False
+            return True
+        else:
+            m = r.get_manifest(l[0])
+            version_m = m.version.split('.')
+            version_d = l[len(l)-1].split('.')
+            if(len(version_m) != len(version_d)):
+                print("found ROS package " + l[0] + "==" + str(m.version) + " but " + name + " is required")
+                return False
+            for i in range(len(version_m)):
+                if version_m[i] != version_d[i]:
+                    print("found ROS package " + l[0] + "==" + str(m.version) + " but " + name + " is required")
+                    return False
+            return True
+
+    except Exception as e:
+        print(name + " not found")
+        return False
+
+def check_dependencies():
+    """
+    Checks whether the dependencies specified in the dependency.txt in the root folder of giskardpy are installed. If a
+    dependecy is not installed a message is printed.
+    """
+    r = rospkg.RosPack()
+
+    with open(r.get_path('giskardpy') + '/dependencies.txt') as f:
+        dependencies = f.readlines()
+
+    dependencies = [x.strip() for x in dependencies]
+
+    for d in dependencies:
+        try:
+            pkg_resources.require(d)
+        except pkg_resources.DistributionNotFound as e:
+            rospkg_exits(d)
+        except pkg_resources.VersionConflict as e:
+            print('require ' + str(e.req) + ' but found ' + str(e.dist))

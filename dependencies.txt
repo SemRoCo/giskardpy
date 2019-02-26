@@ -1,0 +1,9 @@
+symengine>=0.3.1.dev1
+numpy==1.15.4
+urdfdom-py==0.4.0
+rosunit==1.14.4
+cython==0.26.1
+qpoases==3.1.0
+giskard_msgs==0.1.0
+py_trees_ros==0.5.14
+py_trees==0.6.1

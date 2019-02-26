@@ -7,7 +7,7 @@ from control_msgs.msg import JointTrajectoryControllerState
 from giskard_msgs.msg import MoveAction
 from py_trees import Sequence, Selector, BehaviourTree, Blackboard
 import py_trees
-from py_trees.behaviours import SuccessEveryN
+from py_trees.behaviours import SuccessEveryN, Success
 from py_trees.meta import running_is_failure, success_is_running, failure_is_success, success_is_failure
 
 import giskardpy

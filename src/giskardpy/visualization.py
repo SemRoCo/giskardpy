@@ -14,7 +14,7 @@ class VisualizationBehavior(GiskardBehavior):
     def setup(self, timeout):
         self.robot_d = rospy.get_param(u'/robot_description') #self.get_god_map().get_data(['robot_description'])
         self.robot = Robot(self.robot_d, 1.0)#URDF.from_xml_string(hacky_urdf_parser_fix(self.robot_d))
-        self.publisher = rospy.Publisher('giskard_visualization', MarkerArray, queue_size=1)
+        self.publisher = rospy.Publisher('~visualization_marker_array', MarkerArray, queue_size=1)
         self.num_markers = len(self.robot._urdf_robot.links)
         self.robot_base = self.robot._urdf_robot.get_root()
         return True

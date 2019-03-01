@@ -3,6 +3,7 @@ from geometry_msgs.msg import PoseStamped, Pose, Point, Quaternion
 from giskard_msgs.msg import WorldBody
 
 from giskardpy.exceptions import DuplicateNameException
+from giskardpy.test_utils import pr2_urdf, donbot_urdf, boxy_urdf
 from giskardpy.urdf_object import URDFObject
 from giskardpy.utils import make_world_body_box, make_world_body_sphere, make_world_body_cylinder, make_urdf_world_body
 
@@ -10,22 +11,35 @@ from giskardpy.utils import make_world_body_box, make_world_body_sphere, make_wo
 @pytest.fixture()
 def parsed_pr2():
     """
-    :rtype: URDFObject
+    :rtype: Robot
     """
-    return URDFObject.from_urdf_file(u'urdfs/pr2.urdf')
+    r = URDFObject(pr2_urdf())
+    r.reinitialize()
+    return r
 
+@pytest.fixture()
+def parsed_donbot():
+    """
+    :rtype: Robot
+    """
+    r = URDFObject(donbot_urdf())
+    r.reinitialize()
+    return r
 
+@pytest.fixture()
+def parsed_boxy():
+    """
+    :rtype: Robot
+    """
+    r = URDFObject(boxy_urdf())
+    r.reinitialize()
+    return r
 @pytest.fixture()
 def parsed_base_bot():
     """
     :rtype: URDFObject
     """
     return URDFObject.from_urdf_file(u'urdfs/2d_base_bot.urdf')
-
-def pr2_urdf():
-    with open(u'urdfs/pr2.urdf', u'r') as f:
-        urdf_string = f.read()
-    return urdf_string
 
 class TestUrdfObject(object):
     def test_urdf_from_str(self, parsed_pr2):
@@ -248,6 +262,178 @@ class TestUrdfObject(object):
 
     def test_get_sub_tree_link_names_with_collision(self):
         pass
+
+    def test_get_sub_tree_link_names_with_collision_boxy(self, parsed_boxy):
+        expected = {u'left_arm_2_joint': {u'left_gripper_finger_left_link', u'left_arm_6_link',
+                                          u'left_gripper_gripper_left_link', u'left_arm_5_link',
+                                          u'left_gripper_base_link', u'left_arm_7_link',
+                                          u'left_gripper_finger_right_link', u'left_arm_3_link', u'left_arm_4_link',
+                                          u'left_gripper_gripper_right_link'},
+                    u'neck_joint_end': {u'neck_look_target'},
+                    u'neck_wrist_1_joint': {u'neck_look_target', u'neck_adapter_iso50_kinect2_frame_in',
+                                            u'neck_wrist_3_link', u'neck_wrist_2_link', u'neck_ee_link',
+                                            u'head_mount_kinect2_rgb_optical_frame', u'neck_wrist_1_link'},
+                    u'right_arm_2_joint': {u'right_gripper_finger_right_link', u'right_arm_3_link', u'right_arm_5_link',
+                                           u'right_gripper_gripper_right_link', u'right_gripper_gripper_left_link',
+                                           u'right_arm_6_link', u'right_gripper_base_link', u'right_arm_4_link',
+                                           u'right_arm_7_link', u'right_gripper_finger_left_link'},
+                    u'right_arm_4_joint': {u'right_gripper_finger_right_link', u'right_arm_5_link',
+                                           u'right_gripper_gripper_right_link', u'right_gripper_base_link',
+                                           u'right_arm_6_link', u'right_gripper_gripper_left_link', u'right_arm_7_link',
+                                           u'right_gripper_finger_left_link'},
+                    u'neck_wrist_3_joint': {u'neck_look_target', u'neck_adapter_iso50_kinect2_frame_in',
+                                            u'neck_ee_link', u'head_mount_kinect2_rgb_optical_frame',
+                                            u'neck_wrist_3_link'},
+                    u'right_arm_3_joint': {u'right_gripper_finger_right_link', u'right_arm_5_link',
+                                           u'right_gripper_gripper_right_link', u'right_gripper_base_link',
+                                           u'right_arm_6_link', u'right_gripper_gripper_left_link', u'right_arm_4_link',
+                                           u'right_arm_7_link', u'right_gripper_finger_left_link'},
+                    u'right_gripper_base_gripper_right_joint': {u'right_gripper_finger_right_link',
+                                                                u'right_gripper_gripper_right_link'},
+                    u'left_gripper_base_gripper_right_joint': {u'left_gripper_gripper_right_link',
+                                                               u'left_gripper_finger_right_link'},
+                    u'left_arm_0_joint': {u'left_gripper_finger_left_link', u'left_arm_6_link',
+                                          u'left_gripper_gripper_left_link', u'left_arm_5_link',
+                                          u'left_gripper_base_link', u'left_arm_1_link', u'left_arm_7_link',
+                                          u'left_gripper_finger_right_link', u'left_arm_3_link', u'left_arm_4_link',
+                                          u'left_arm_2_link', u'left_gripper_gripper_right_link'},
+                    u'right_gripper_base_gripper_left_joint': {u'right_gripper_gripper_left_link',
+                                                               u'right_gripper_finger_left_link'},
+                    u'left_arm_4_joint': {u'left_gripper_finger_left_link', u'left_arm_6_link',
+                                          u'left_gripper_gripper_left_link', u'left_arm_5_link',
+                                          u'left_gripper_base_link', u'left_arm_7_link',
+                                          u'left_gripper_finger_right_link', u'left_gripper_gripper_right_link'},
+                    u'left_arm_6_joint': {u'left_gripper_finger_left_link', u'left_gripper_gripper_left_link',
+                                          u'left_gripper_base_link', u'left_arm_7_link',
+                                          u'left_gripper_finger_right_link', u'left_gripper_gripper_right_link'},
+                    u'right_arm_1_joint': {u'right_gripper_finger_right_link', u'right_arm_3_link', u'right_arm_5_link',
+                                           u'right_gripper_gripper_right_link', u'right_arm_2_link',
+                                           u'right_gripper_gripper_left_link', u'right_arm_6_link',
+                                           u'right_gripper_base_link', u'right_arm_4_link', u'right_arm_7_link',
+                                           u'right_gripper_finger_left_link'},
+                    u'left_arm_1_joint': {u'left_gripper_finger_left_link', u'left_arm_6_link',
+                                          u'left_gripper_gripper_left_link', u'left_arm_5_link',
+                                          u'left_gripper_base_link', u'left_arm_7_link',
+                                          u'left_gripper_finger_right_link', u'left_arm_3_link', u'left_arm_4_link',
+                                          u'left_arm_2_link', u'left_gripper_gripper_right_link'},
+                    u'neck_wrist_2_joint': {u'neck_look_target', u'neck_adapter_iso50_kinect2_frame_in',
+                                            u'neck_wrist_3_link', u'neck_wrist_2_link', u'neck_ee_link',
+                                            u'head_mount_kinect2_rgb_optical_frame'},
+                    u'triangle_base_joint': {u'left_arm_3_link', u'left_gripper_gripper_left_link', u'left_arm_5_link',
+                                             u'left_gripper_base_link', u'left_gripper_finger_right_link',
+                                             u'left_arm_2_link', u'right_gripper_finger_right_link',
+                                             u'left_gripper_finger_left_link', u'right_arm_3_link',
+                                             u'calib_right_arm_base_link', u'triangle_base_link', u'right_arm_4_link',
+                                             u'right_gripper_finger_left_link', u'left_arm_6_link',
+                                             u'calib_left_arm_base_link', u'right_gripper_base_link',
+                                             u'right_gripper_gripper_right_link', u'left_arm_1_link',
+                                             u'left_arm_7_link', u'right_gripper_gripper_left_link',
+                                             u'right_arm_1_link', u'left_arm_4_link', u'right_arm_5_link',
+                                             u'right_arm_2_link', u'right_arm_6_link', u'right_arm_7_link',
+                                             u'left_gripper_gripper_right_link'},
+                    u'neck_elbow_joint': {u'neck_look_target', u'neck_adapter_iso50_kinect2_frame_in',
+                                          u'neck_forearm_link', u'neck_wrist_3_link', u'neck_wrist_2_link',
+                                          u'neck_ee_link', u'head_mount_kinect2_rgb_optical_frame',
+                                          u'neck_wrist_1_link'},
+                    u'right_arm_5_joint': {u'right_gripper_finger_right_link', u'right_gripper_gripper_right_link',
+                                           u'right_gripper_base_link', u'right_arm_6_link',
+                                           u'right_gripper_gripper_left_link', u'right_arm_7_link',
+                                           u'right_gripper_finger_left_link'},
+                    u'left_arm_3_joint': {u'left_gripper_finger_left_link', u'left_arm_6_link',
+                                          u'left_gripper_gripper_left_link', u'left_arm_5_link',
+                                          u'left_gripper_base_link', u'left_arm_7_link',
+                                          u'left_gripper_finger_right_link', u'left_arm_4_link',
+                                          u'left_gripper_gripper_right_link'},
+                    u'neck_shoulder_pan_joint': {u'neck_upper_arm_link', u'neck_look_target',
+                                                 u'neck_adapter_iso50_kinect2_frame_in', u'neck_forearm_link',
+                                                 u'neck_wrist_3_link', u'neck_wrist_2_link', u'neck_shoulder_link',
+                                                 u'head_mount_kinect2_rgb_optical_frame', u'neck_wrist_1_link',
+                                                 u'neck_ee_link'},
+                    u'right_arm_0_joint': {u'right_gripper_finger_right_link', u'right_arm_3_link', u'right_arm_5_link',
+                                           u'right_gripper_gripper_right_link', u'right_arm_2_link',
+                                           u'right_gripper_gripper_left_link', u'right_arm_6_link',
+                                           u'right_gripper_base_link', u'right_arm_1_link', u'right_arm_4_link',
+                                           u'right_arm_7_link', u'right_gripper_finger_left_link'},
+                    u'neck_shoulder_lift_joint': {u'neck_upper_arm_link', u'neck_look_target',
+                                                  u'neck_adapter_iso50_kinect2_frame_in', u'neck_forearm_link',
+                                                  u'neck_wrist_3_link', u'neck_wrist_2_link', u'neck_ee_link',
+                                                  u'head_mount_kinect2_rgb_optical_frame', u'neck_wrist_1_link'},
+                    u'left_arm_5_joint': {u'left_gripper_finger_left_link', u'left_arm_6_link',
+                                          u'left_gripper_gripper_left_link', u'left_gripper_base_link',
+                                          u'left_arm_7_link', u'left_gripper_finger_right_link',
+                                          u'left_gripper_gripper_right_link'},
+                    u'left_gripper_base_gripper_left_joint': {u'left_gripper_finger_left_link',
+                                                              u'left_gripper_gripper_left_link'},
+                    u'right_arm_6_joint': {u'right_gripper_finger_right_link', u'right_gripper_gripper_right_link',
+                                           u'right_gripper_base_link', u'right_gripper_gripper_left_link',
+                                           u'right_arm_7_link', u'right_gripper_finger_left_link'}}
+        for joint in parsed_boxy.get_joint_names_controllable():
+            assert set(parsed_boxy.get_sub_tree_link_names_with_collision(joint)).difference(expected[joint]) == set()
+
+
+    def test_get_sub_tree_link_names_with_collision_pr2(self, parsed_pr2):
+        expected = {u'l_shoulder_pan_joint': {u'l_shoulder_pan_link', u'l_shoulder_lift_link', u'l_upper_arm_roll_link', u'l_upper_arm_link', u'l_elbow_flex_link', u'l_forearm_roll_link', u'l_forearm_link', u'l_wrist_flex_link', u'l_wrist_roll_link', u'l_gripper_palm_link', u'l_gripper_l_finger_link', u'l_gripper_r_finger_link', u'l_gripper_l_finger_tip_link', u'l_gripper_r_finger_tip_link'},
+                    u'br_caster_l_wheel_joint': {u'br_caster_l_wheel_link'},
+                    u'r_gripper_l_finger_tip_joint': {u'r_gripper_l_finger_tip_link'},
+                    u'r_elbow_flex_joint': {u'r_elbow_flex_link', u'r_forearm_roll_link', u'r_forearm_link', u'r_wrist_flex_link', u'r_wrist_roll_link', u'r_gripper_palm_link', u'r_gripper_l_finger_link', u'r_gripper_r_finger_link', u'r_gripper_l_finger_tip_link', u'r_gripper_r_finger_tip_link'},
+                    u'torso_lift_joint': {u'torso_lift_link', u'head_pan_link', u'laser_tilt_mount_link', u'r_shoulder_pan_link', u'l_shoulder_pan_link', u'head_tilt_link', u'r_shoulder_lift_link', u'l_shoulder_lift_link', u'head_plate_frame', u'r_upper_arm_roll_link', u'l_upper_arm_roll_link', u'r_upper_arm_link', u'l_upper_arm_link', u'r_elbow_flex_link', u'l_elbow_flex_link', u'r_forearm_roll_link', u'l_forearm_roll_link', u'r_forearm_link', u'l_forearm_link', u'r_wrist_flex_link', u'l_wrist_flex_link', u'r_wrist_roll_link', u'l_wrist_roll_link', u'r_gripper_palm_link', u'r_gripper_l_finger_link', u'r_gripper_r_finger_link', u'r_gripper_l_finger_tip_link', u'r_gripper_r_finger_tip_link', u'l_gripper_palm_link', u'l_gripper_l_finger_link', u'l_gripper_r_finger_link', u'l_gripper_l_finger_tip_link', u'l_gripper_r_finger_tip_link'},
+                    u'r_gripper_l_finger_joint': {u'r_gripper_l_finger_link', u'r_gripper_l_finger_tip_link'},
+                    u'r_forearm_roll_joint': {u'r_forearm_roll_link', u'r_forearm_link', u'r_wrist_flex_link', u'r_wrist_roll_link', u'r_gripper_palm_link', u'r_gripper_l_finger_link', u'r_gripper_r_finger_link', u'r_gripper_l_finger_tip_link', u'r_gripper_r_finger_tip_link'},
+                    u'l_gripper_r_finger_tip_joint': {u'l_gripper_r_finger_tip_link'},
+                    u'r_shoulder_lift_joint': {u'r_shoulder_lift_link', u'r_upper_arm_roll_link', u'r_upper_arm_link', u'r_elbow_flex_link', u'r_forearm_roll_link', u'r_forearm_link', u'r_wrist_flex_link', u'r_wrist_roll_link', u'r_gripper_palm_link', u'r_gripper_l_finger_link', u'r_gripper_r_finger_link', u'r_gripper_l_finger_tip_link', u'r_gripper_r_finger_tip_link'},
+                    u'fl_caster_rotation_joint': {u'fl_caster_rotation_link', u'fl_caster_l_wheel_link', u'fl_caster_r_wheel_link'},
+                    u'l_gripper_motor_screw_joint': set(),
+                    u'r_wrist_roll_joint': {u'r_wrist_roll_link', u'r_gripper_palm_link', u'r_gripper_l_finger_link', u'r_gripper_r_finger_link', u'r_gripper_l_finger_tip_link', u'r_gripper_r_finger_tip_link'},
+                    u'r_gripper_motor_slider_joint': set(),
+                    u'l_forearm_roll_joint': {u'l_forearm_roll_link', u'l_forearm_link', u'l_wrist_flex_link', u'l_wrist_roll_link', u'l_gripper_palm_link', u'l_gripper_l_finger_link', u'l_gripper_r_finger_link', u'l_gripper_l_finger_tip_link', u'l_gripper_r_finger_tip_link'},
+                    u'r_gripper_joint': set(),
+                    u'bl_caster_rotation_joint': {u'bl_caster_rotation_link', u'bl_caster_l_wheel_link', u'bl_caster_r_wheel_link'},
+                    u'fl_caster_r_wheel_joint': {u'fl_caster_r_wheel_link'},
+                    u'l_shoulder_lift_joint': {u'l_shoulder_lift_link', u'l_upper_arm_roll_link', u'l_upper_arm_link', u'l_elbow_flex_link', u'l_forearm_roll_link', u'l_forearm_link', u'l_wrist_flex_link', u'l_wrist_roll_link', u'l_gripper_palm_link', u'l_gripper_l_finger_link', u'l_gripper_r_finger_link', u'l_gripper_l_finger_tip_link', u'l_gripper_r_finger_tip_link'},
+                    u'head_pan_joint': {u'head_pan_link', u'head_tilt_link', u'head_plate_frame'},
+                    u'head_tilt_joint': {u'head_tilt_link', u'head_plate_frame'},
+                    u'fr_caster_l_wheel_joint': {u'fr_caster_l_wheel_link'},
+                    u'fl_caster_l_wheel_joint': {u'fl_caster_l_wheel_link'},
+                    u'l_gripper_motor_slider_joint': set(),
+                    u'br_caster_r_wheel_joint': {u'br_caster_r_wheel_link'},
+                    u'r_gripper_motor_screw_joint': set(),
+                    u'r_upper_arm_roll_joint': {u'r_upper_arm_roll_link', u'r_upper_arm_link', u'r_elbow_flex_link', u'r_forearm_roll_link', u'r_forearm_link', u'r_wrist_flex_link', u'r_wrist_roll_link', u'r_gripper_palm_link', u'r_gripper_l_finger_link', u'r_gripper_r_finger_link', u'r_gripper_l_finger_tip_link', u'r_gripper_r_finger_tip_link'},
+                    u'fr_caster_rotation_joint': {u'fr_caster_rotation_link', u'fr_caster_l_wheel_link', u'fr_caster_r_wheel_link'},
+                    u'torso_lift_motor_screw_joint': set(),
+                    u'bl_caster_l_wheel_joint': {u'bl_caster_l_wheel_link'},
+                    u'r_wrist_flex_joint': {u'r_wrist_flex_link', u'r_wrist_roll_link', u'r_gripper_palm_link', u'r_gripper_l_finger_link', u'r_gripper_r_finger_link', u'r_gripper_l_finger_tip_link', u'r_gripper_r_finger_tip_link'},
+                    u'r_gripper_r_finger_tip_joint': {u'r_gripper_r_finger_tip_link'},
+                    u'l_elbow_flex_joint': {u'l_elbow_flex_link', u'l_forearm_roll_link', u'l_forearm_link', u'l_wrist_flex_link', u'l_wrist_roll_link', u'l_gripper_palm_link', u'l_gripper_l_finger_link', u'l_gripper_r_finger_link', u'l_gripper_l_finger_tip_link', u'l_gripper_r_finger_tip_link'},
+                    u'laser_tilt_mount_joint': {u'laser_tilt_mount_link'},
+                    u'r_shoulder_pan_joint': {u'r_shoulder_pan_link', u'r_shoulder_lift_link', u'r_upper_arm_roll_link', u'r_upper_arm_link', u'r_elbow_flex_link', u'r_forearm_roll_link', u'r_forearm_link', u'r_wrist_flex_link', u'r_wrist_roll_link', u'r_gripper_palm_link', u'r_gripper_l_finger_link', u'r_gripper_r_finger_link', u'r_gripper_l_finger_tip_link', u'r_gripper_r_finger_tip_link'},
+                    u'fr_caster_r_wheel_joint': {u'fr_caster_r_wheel_link'},
+                    u'l_wrist_roll_joint': {u'l_wrist_roll_link', u'l_gripper_palm_link', u'l_gripper_l_finger_link', u'l_gripper_r_finger_link', u'l_gripper_l_finger_tip_link', u'l_gripper_r_finger_tip_link'},
+                    u'r_gripper_r_finger_joint': {u'r_gripper_r_finger_link', u'r_gripper_r_finger_tip_link'},
+                    u'bl_caster_r_wheel_joint': {u'bl_caster_r_wheel_link'},
+                    u'l_gripper_joint': set(),
+                    u'l_gripper_l_finger_tip_joint': {u'l_gripper_l_finger_tip_link'},
+                    u'br_caster_rotation_joint': {u'br_caster_rotation_link', u'br_caster_l_wheel_link', u'br_caster_r_wheel_link'},
+                    u'l_gripper_l_finger_joint': {u'l_gripper_l_finger_link', u'l_gripper_l_finger_tip_link'},
+                    u'l_wrist_flex_joint': {u'l_wrist_flex_link', u'l_wrist_roll_link', u'l_gripper_palm_link', u'l_gripper_l_finger_link', u'l_gripper_r_finger_link', u'l_gripper_l_finger_tip_link', u'l_gripper_r_finger_tip_link'},
+                    u'l_upper_arm_roll_joint': {u'l_upper_arm_roll_link', u'l_upper_arm_link', u'l_elbow_flex_link', u'l_forearm_roll_link', u'l_forearm_link', u'l_wrist_flex_link', u'l_wrist_roll_link', u'l_gripper_palm_link', u'l_gripper_l_finger_link', u'l_gripper_r_finger_link', u'l_gripper_l_finger_tip_link', u'l_gripper_r_finger_tip_link'},
+                    u'l_gripper_r_finger_joint': {u'l_gripper_r_finger_link', u'l_gripper_r_finger_tip_link'}}
+        for joint in parsed_pr2.get_joint_names_controllable():
+            assert set(parsed_pr2.get_sub_tree_link_names_with_collision(joint)).difference(expected[joint]) == set()
+
+    def test_get_sub_tree_link_names_with_collision_donbot(self, parsed_donbot):
+        expected = {u'ur5_wrist_3_joint': {u'ur5_wrist_3_link', u'ur5_ee_link', u'gripper_base_link', u'gripper_gripper_left_link', u'gripper_finger_left_link', u'gripper_gripper_right_link', u'gripper_finger_right_link'},
+                    u'ur5_elbow_joint': {u'ur5_forearm_link', u'ur5_wrist_1_link', u'ur5_wrist_2_link', u'ur5_wrist_3_link', u'ur5_ee_link', u'gripper_base_link', u'gripper_gripper_left_link', u'gripper_finger_left_link', u'gripper_gripper_right_link', u'gripper_finger_right_link'},
+                    u'ur5_wrist_1_joint': {u'ur5_wrist_1_link', u'ur5_wrist_2_link', u'ur5_wrist_3_link', u'ur5_ee_link', u'gripper_base_link', u'gripper_gripper_left_link', u'gripper_finger_left_link', u'gripper_gripper_right_link', u'gripper_finger_right_link'},
+                    u'odom_z_joint': {u'base_link', u'plate', u'ur5_base_link', u'ur5_shoulder_link', u'ur5_upper_arm_link', u'ur5_forearm_link', u'ur5_wrist_1_link', u'ur5_wrist_2_link', u'ur5_wrist_3_link', u'ur5_ee_link', u'gripper_base_link', u'gripper_gripper_left_link', u'gripper_finger_left_link', u'gripper_gripper_right_link', u'gripper_finger_right_link'},
+                    u'ur5_shoulder_lift_joint': {u'ur5_upper_arm_link', u'ur5_forearm_link', u'ur5_wrist_1_link', u'ur5_wrist_2_link', u'ur5_wrist_3_link', u'ur5_ee_link', u'gripper_base_link', u'gripper_gripper_left_link', u'gripper_finger_left_link', u'gripper_gripper_right_link', u'gripper_finger_right_link'},
+                    u'odom_y_joint': {u'base_link', u'plate', u'ur5_base_link', u'ur5_shoulder_link', u'ur5_upper_arm_link', u'ur5_forearm_link', u'ur5_wrist_1_link', u'ur5_wrist_2_link', u'ur5_wrist_3_link', u'ur5_ee_link', u'gripper_base_link', u'gripper_gripper_left_link', u'gripper_finger_left_link', u'gripper_gripper_right_link', u'gripper_finger_right_link'},
+                    u'ur5_wrist_2_joint': {u'ur5_wrist_2_link', u'ur5_wrist_3_link', u'ur5_ee_link', u'gripper_base_link', u'gripper_gripper_left_link', u'gripper_finger_left_link', u'gripper_gripper_right_link', u'gripper_finger_right_link'},
+                    u'odom_x_joint': {u'base_link', u'plate', u'ur5_base_link', u'ur5_shoulder_link', u'ur5_upper_arm_link', u'ur5_forearm_link', u'ur5_wrist_1_link', u'ur5_wrist_2_link', u'ur5_wrist_3_link', u'ur5_ee_link', u'gripper_base_link', u'gripper_gripper_left_link', u'gripper_finger_left_link', u'gripper_gripper_right_link', u'gripper_finger_right_link'},
+                    u'ur5_shoulder_pan_joint': {u'ur5_shoulder_link', u'ur5_upper_arm_link', u'ur5_forearm_link', u'ur5_wrist_1_link', u'ur5_wrist_2_link', u'ur5_wrist_3_link', u'ur5_ee_link', u'gripper_base_link', u'gripper_gripper_left_link', u'gripper_finger_left_link', u'gripper_gripper_right_link', u'gripper_finger_right_link'},
+                    u'gripper_joint': {u'gripper_gripper_right_link', u'gripper_finger_right_link'}}
+        for joint in parsed_donbot.get_joint_names_controllable():
+            assert set(parsed_donbot.get_sub_tree_link_names_with_collision(joint)).difference(expected[joint]) == set()
+
 
     def test_has_link_collision(self):
         pass

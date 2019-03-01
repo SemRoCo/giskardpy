@@ -104,6 +104,20 @@ def pr2_joint_state(draw):
     pr2 = Robot.from_urdf_file(u'../test/urdfs/pr2.urdf')
     return draw(rnd_joint_state(*pr2.get_joint_limits()))
 
+def pr2_urdf():
+    with open(u'urdfs/pr2.urdf', u'r') as f:
+        urdf_string = f.read()
+    return urdf_string
+
+def donbot_urdf():
+    with open(u'urdfs/iai_donbot.urdf', u'r') as f:
+        urdf_string = f.read()
+    return urdf_string
+
+def boxy_urdf():
+    with open(u'urdfs/boxy.urdf', u'r') as f:
+        urdf_string = f.read()
+    return urdf_string
 
 def limited_float(outer_limit=BIG_NUMBER, min_dist_to_zero=None):
     # f = st.floats(allow_nan=False, allow_infinity=False, max_value=outer_limit, min_value=-outer_limit)

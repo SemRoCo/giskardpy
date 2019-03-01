@@ -64,7 +64,7 @@ class URDFObject(object):
         """
         with open(urdf_file, 'r') as f:
             urdf_string = f.read()
-        self = cls(urdf_string, )
+        self = cls(urdf_string)
         return self
 
     @classmethod

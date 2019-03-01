@@ -17,7 +17,7 @@ from giskardpy.exceptions import CorruptShapeException, UnknownBodyException, \
     UnsupportedOptionException, DuplicateNameException, PhysicsWorldException
 from giskardpy.identifier import pybullet_identifier, controlled_joints_identifier, js_identifier, \
     robot_description_identifier, collision_goal_identifier, closest_point_identifier, controllable_links_identifier
-from giskardpy.object import to_marker, world_body_to_urdf_object, from_pose_msg
+from giskardpy.object import to_marker
 from giskardpy.plugin import PluginBase
 from giskardpy.pybullet_world import PyBulletWorld, ContactInfo
 from giskardpy.tfwrapper import transform_pose, lookup_transform, transform_point, transform_vector

@@ -1,7 +1,6 @@
 import hashlib
 from collections import namedtuple, OrderedDict
 import symengine_wrappers as spw
-from urdf_parser_py.urdf import URDF, Box, Sphere, Mesh, Cylinder
 
 from giskardpy import WorldObjImpl
 from giskardpy.qp_problem_builder import HardConstraint, JointConstraint
@@ -12,9 +11,7 @@ from giskardpy.utils import cube_volume, cube_surface, sphere_volume, cylinder_v
 Joint = namedtuple('Joint', ['symbol', 'velocity_limit', 'lower', 'upper', 'type', 'frame'])
 
 class Robot(WorldObjImpl):
-    # TODO split urdf part into separate file?
-    # TODO remove slow shit from init?
-    def __init__(self, urdf, default_joint_vel_limit, default_joint_weight, name, controlled_joints):
+    def __init__(self, urdf, default_joint_vel_limit, default_joint_weight, controlled_joints):
         """
         :param urdf:
         :type urdf: str
@@ -23,7 +20,7 @@ class Robot(WorldObjImpl):
         :param default_joint_vel_limit: all velocity limits which are undefined or higher than this will be set to this
         :type default_joint_vel_limit: Symbol
         """
-        super(Robot, self).__init__(name, urdf, controlled_joints)
+        super(Robot, self).__init__(urdf, controlled_joints)
         self.default_joint_velocity_limit = default_joint_vel_limit
         self.default_weight = default_joint_weight
         self.fks = {}

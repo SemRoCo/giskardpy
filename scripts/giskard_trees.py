@@ -11,7 +11,6 @@ from py_trees.behaviours import SuccessEveryN
 from py_trees.meta import running_is_failure, success_is_running, failure_is_success
 
 import giskardpy
-from giskardpy import DEBUG
 from giskardpy.god_map import GodMap
 from giskardpy.identifier import robot_description_identifier, controlled_joints_identifier
 from giskardpy.plugin import PluginBehavior, SuccessPlugin
@@ -52,8 +51,8 @@ def grow_tree():
     gui = rospy.get_param(u'~enable_gui')
     map_frame = rospy.get_param(u'~map_frame')
     debug = rospy.get_param(u'~debug')
-    if debug:
-        giskardpy.PRINT_LEVEL = DEBUG
+    # if debug:
+    #     giskardpy.PRINT_LEVEL = DEBUG
     # tree_tick_rate = rospy.get_param(u'~tree_tick_rate')
     joint_convergence_threshold = rospy.get_param(u'~joint_convergence_threshold')
     wiggle_precision_threshold = rospy.get_param(u'~wiggle_precision_threshold')

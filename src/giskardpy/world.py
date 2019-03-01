@@ -1,15 +1,15 @@
 from geometry_msgs.msg import PoseStamped
 
 from giskardpy.exceptions import RobotExistsException, DuplicateNameException
-# from giskardpy.symengine_robot import Robot
+from giskardpy.symengine_robot import Robot
 from giskardpy.urdf_object import URDFObject
+from giskardpy.world_object import WorldObject
 
 
 class World(object):
     def __init__(self):
         self.objects = {}
-        self.robot = None
-        self.robot_name = u'robby'
+        self.robot = None # type: Robot
 
     # General ----------------------------------------------------------------------------------------------------------
 
@@ -31,13 +31,23 @@ class World(object):
 
     # Objects ----------------------------------------------------------------------------------------------------------
 
-    def add_object(self, name, urdf_object):
-        if not self.has_object(name):
-            self.objects[name] = urdf_object
-        else:
-            raise KeyError(u'object with that name already exists')
+    def add_object(self, object_):
+        """
+        :type object_: URDFObject
+        """
+        if not isinstance(object_, URDFObject):
+            object_ = WorldObject(object_.get_urdf())
+        if self.has_robot() and self.get_robot().get_name() == object_.get_name():
+            raise DuplicateNameException(u'object and robot have the same name')
+        if self.has_object(object_.get_name()):
+            raise DuplicateNameException(u'object with that name already exists')
+        self.objects[object_.get_name()] = object_
 
     def get_object(self, name):
+        """
+        :type name: str
+        :rtype: WorldObject
+        """
         return self.objects[name]
 
     def get_objects(self):
@@ -55,7 +65,7 @@ class World(object):
         :type name: str
         :rtype: bool
         """
-        return name in self.objects
+        return name in self.get_objects()
 
     def set_object_joint_state(self, name, joint_state):
         """
@@ -76,13 +86,13 @@ class World(object):
 
     def add_robot(self, robot, controlled_joints=None, base_pose=None):
         """
-        :type robot: Robot
+        :type robot: giskardpy.world_object.WorldObject
         :type controlled_joints: list
         :type base_pose: PoseStamped
         """
         if self.has_robot():
             raise RobotExistsException(u'A robot is already loaded')
-        if self.has_object(self.robot_name):
+        if self.has_object(robot.get_name()):
             raise DuplicateNameException(
                 u'can\'t add robot; object with name "{}" already exists'.format(self.robot_name))
         self.robot = robot
@@ -108,28 +118,4 @@ class World(object):
         self.robot.set_joint_state(joint_state)
 
     def remove_robot(self):
-        """
-        :rtype: bool
-        """
         self.robot = None
-        return True
-
-
-class WorldObject(URDFObject):
-    def __init__(self, urdf):
-        super(WorldObject, self).__init__(urdf)
-
-    def set_base_pose(self):
-        pass
-
-    def get_base_pose(self):
-        pass
-
-    def set_joint_state(self, joint_state):
-        pass
-
-    def get_joint_state(self):
-        pass
-
-    def get_self_collision_matrix(self):
-        pass

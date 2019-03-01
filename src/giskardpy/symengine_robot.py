@@ -3,18 +3,18 @@ from collections import namedtuple, OrderedDict
 import symengine_wrappers as spw
 from urdf_parser_py.urdf import URDF, Box, Sphere, Mesh, Cylinder
 
+from giskardpy import WorldObjImpl
 from giskardpy.qp_problem_builder import HardConstraint, JointConstraint
-from giskardpy.urdf_object import NewURDFObject
+from giskardpy.urdf_object import URDFObject
 from giskardpy.utils import cube_volume, cube_surface, sphere_volume, cylinder_volume, cylinder_surface, keydefaultdict, \
     suppress_stdout, suppress_stderr
 
 Joint = namedtuple('Joint', ['symbol', 'velocity_limit', 'lower', 'upper', 'type', 'frame'])
 
-
-class Robot(NewURDFObject):
+class Robot(WorldObjImpl):
     # TODO split urdf part into separate file?
     # TODO remove slow shit from init?
-    def __init__(self, urdf, default_joint_vel_limit, default_joint_weight):
+    def __init__(self, urdf, default_joint_vel_limit, default_joint_weight, name, controlled_joints):
         """
         :param urdf:
         :type urdf: str
@@ -23,33 +23,14 @@ class Robot(NewURDFObject):
         :param default_joint_vel_limit: all velocity limits which are undefined or higher than this will be set to this
         :type default_joint_vel_limit: Symbol
         """
+        super(Robot, self).__init__(name, urdf, controlled_joints)
         self.default_joint_velocity_limit = default_joint_vel_limit
         self.default_weight = default_joint_weight
         self.fks = {}
         self._joint_to_frame = {}
         self.joint_to_symbol_map = keydefaultdict(lambda x: spw.Symbol(x))
-        self.urdf = urdf
-        with suppress_stderr():
-            self._urdf_robot = URDF.from_xml_string(hacky_urdf_parser_fix(self.urdf))
 
-    @classmethod
-    def from_urdf_file(cls, urdf_file, joints_to_symbols_map=None, default_joint_vel_limit=1):
-        """
-        :param urdf_file: path to urdf file
-        :type urdf_file: str
-        :param joints_to_symbols_map: maps urdf joint names to symbols
-        :type joints_to_symbols_map: dict
-        :param default_joint_vel_limit: all velocity limits which are undefined or higher than this will be set to this
-        :type default_joint_vel_limit: float
-        :rtype: Robot
-        """
-        with open(urdf_file, 'r') as f:
-            urdf_string = f.read()
-        self = cls(urdf_string, default_joint_vel_limit)
-        self.parse_urdf(joints_to_symbols_map)
-        return self
-
-    def parse_urdf(self, joints_to_symbols_map=None):
+    def reinitialize(self, joints_to_symbols_map=None):
         """
         :param joints_to_symbols_map: maps urdf joint names to symbols
         :type joints_to_symbols_map: dict
@@ -79,9 +60,9 @@ class Robot(NewURDFObject):
                 # TODO more specific exception
                 raise Exception(u'Joint type "{}" is not supported by urdf parser.'.format(urdf_joint.type))
 
-            if urdf_joint.type in ROTATIONAL_JOINT_TYPES:
+            if self.is_rotational_joint(joint_name):
                 joint_frame *= spw.rotation_matrix_from_axis_angle(spw.vector3(*urdf_joint.axis), joint_symbol)
-            elif urdf_joint.type in TRANSLATIONAL_JOINT_TYPES:
+            elif self.is_translational_joint(joint_name):
                 joint_frame *= spw.translation3(*(spw.point3(*urdf_joint.axis) * joint_symbol)[:3])
 
             self._joint_to_frame[joint_name] = joint_frame
@@ -93,7 +74,7 @@ class Robot(NewURDFObject):
         self.hard_constraints = OrderedDict()
         self.joint_constraints = OrderedDict()
         for i, joint_name in enumerate(self.get_joint_names_controllable()):
-            lower_limit, upper_limit = self.get_joint_lower_upper_limit(joint_name)
+            lower_limit, upper_limit = self.get_joint_limits(joint_name)
             joint_symbol = self.get_joint_symbol(joint_name)
             velocity_limit = self.get_joint_velocity_limit_expr(joint_name)
 
@@ -120,7 +101,7 @@ class Robot(NewURDFObject):
             self.fks[root_link, tip_link] = fk
         return self.fks[root_link, tip_link]
 
-    # JOINT FUNCITONS
+    # JOINT FUNCTIONS
 
     def get_joint_symbols(self):
         """

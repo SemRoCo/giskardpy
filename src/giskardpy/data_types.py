@@ -32,34 +32,34 @@ class SingleJointState(object):
 #         return self._states.items()
 
 
-class Point(object):
-    def __init__(self, x=0.0, y=0.0, z=0.0):
-        self.x = x
-        self.y = y
-        self.z = z
-
-    def __repr__(self):
-        return u'{}(x={}, y={}, z={})'.format(self.__class__.__name__, self.x, self.y, self.z)
-
-
-class Quaternion(object):
-    def __init__(self, x=0.0, y=0.0, z=0.0, w=1.0):
-        self.x = x
-        self.y = y
-        self.z = z
-        self.w = w
-
-    def __repr__(self):
-        return u'{}(x={}, y={}, z={}, w={})'.format(self.__class__.__name__, self.x, self.y, self.z, self.w)
-
-
-class Transform(object):
-    def __init__(self, translation=Point(), rotation=Quaternion()):
-        self.translation = translation
-        self.rotation = rotation
-
-    def __repr__(self):
-        return u'{}(translation={}, rotation={})'.format(self.__class__.__name__, self.translation, self.rotation)
+# class Point(object):
+#     def __init__(self, x=0.0, y=0.0, z=0.0):
+#         self.x = x
+#         self.y = y
+#         self.z = z
+#
+#     def __repr__(self):
+#         return u'{}(x={}, y={}, z={})'.format(self.__class__.__name__, self.x, self.y, self.z)
+#
+#
+# class Quaternion(object):
+#     def __init__(self, x=0.0, y=0.0, z=0.0, w=1.0):
+#         self.x = x
+#         self.y = y
+#         self.z = z
+#         self.w = w
+#
+#     def __repr__(self):
+#         return u'{}(x={}, y={}, z={}, w={})'.format(self.__class__.__name__, self.x, self.y, self.z, self.w)
+#
+#
+# class Transform(object):
+#     def __init__(self, translation=Point(), rotation=Quaternion()):
+#         self.translation = translation
+#         self.rotation = rotation
+#
+#     def __repr__(self):
+#         return u'{}(translation={}, rotation={})'.format(self.__class__.__name__, self.translation, self.rotation)
 
 
 # class Stamped(object):

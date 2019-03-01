@@ -207,7 +207,7 @@ class PyBulletUpdatePlugin(PybulletPlugin):
 
     def remove_object(self, name):
         if self.world.has_object(name):
-            self.world.delete_object(name)
+            self.world.remove_object(name)
             if self.object_js_subs.has_key(name):
                 self.object_js_subs[name].unregister()
                 del (self.object_js_subs[name])
@@ -215,7 +215,7 @@ class PyBulletUpdatePlugin(PybulletPlugin):
                     del (self.object_joint_states[name])
                 except:
                     pass
-        elif self.world.get_robot().has_attached_object(name):
+        elif self.world.get_robot().can_attach_object(name):
             self.world.get_robot().detach_object(name)
         else:
             raise UnknownBodyException(u'Cannot delete unknown object {}'.format(name))
@@ -505,7 +505,7 @@ class CollisionChecker(PybulletPlugin):
             else:
                 closest_point[link1] = cpi
         for key, cpi in closest_point.items():  # type: (str, ClosestPointInfo)
-            if self.world.should_flip_contact_info(collisions[cpi.old_key]):
+            if self.world.__should_flip_contact_info(collisions[cpi.old_key]):
                 closest_point[key] = ClosestPointInfo(cpi.position_on_b, cpi.position_on_a, cpi.contact_distance,
                                                       cpi.min_dist, cpi.link_a, cpi.link_b,
                                                       -np.array(cpi.contact_normal), key)

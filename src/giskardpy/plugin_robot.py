@@ -58,7 +58,7 @@ class RobotPlugin(PluginBase):
                                           self.get_robot().get_joint_names_controllable(),
                                           [js_identifier],
                                           [u'position'])
-        self.get_robot().parse_urdf(current_joints.joint_map)
+        self.get_robot().reinitialize(current_joints.joint_map)
         self.update_controlled_joints_and_links()
 
     def get_controlled_joints(self):

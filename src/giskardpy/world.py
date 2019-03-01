@@ -1,8 +1,35 @@
+from geometry_msgs.msg import PoseStamped
+
+from giskardpy.exceptions import RobotExistsException, DuplicateNameException
+# from giskardpy.symengine_robot import Robot
+from giskardpy.urdf_object import URDFObject
+
+
 class World(object):
     def __init__(self):
         self.objects = {}
         self.robot = None
         self.robot_name = u'robby'
+
+    # General ----------------------------------------------------------------------------------------------------------
+
+    def soft_reset(self):
+        """
+        keeps robot and other important objects like ground plane
+        """
+        self.remove_all_objects()
+
+    def hard_reset(self):
+        """
+        removes everything
+        """
+        self.soft_reset()
+        self.remove_robot()
+
+    def check_collisions(self, cut_off_distances):
+        pass
+
+    # Objects ----------------------------------------------------------------------------------------------------------
 
     def add_object(self, name, urdf_object):
         if not self.has_object(name):
@@ -10,12 +37,8 @@ class World(object):
         else:
             raise KeyError(u'object with that name already exists')
 
-    def remove_object(self, name):
-        if self.has_object(name):
-            del(self.objects[name])
-
-    def remove_all_objects(self):
-        self.objects = {}
+    def get_object(self, name):
+        return self.objects[name]
 
     def get_objects(self):
         return self.objects
@@ -26,9 +49,6 @@ class World(object):
         """
         return list(self.objects.keys())
 
-    def get_object(self, name):
-        return self.objects[name]
-
     def has_object(self, name):
         """
         Checks for objects with the same name.
@@ -37,17 +57,41 @@ class World(object):
         """
         return name in self.objects
 
+    def set_object_joint_state(self, name, joint_state):
+        """
+        :type name: str
+        :param joint_state: joint name -> SingleJointState
+        :type joint_state: dict
+        """
+        self.get_object(name).set_joint_state(joint_state)
+
+    def remove_object(self, name):
+        if self.has_object(name):
+            del (self.objects[name])
+
+    def remove_all_objects(self):
+        self.objects = {}
+
+    # Robot ------------------------------------------------------------------------------------------------------------
+
+    def add_robot(self, robot, controlled_joints=None, base_pose=None):
+        """
+        :type robot: Robot
+        :type controlled_joints: list
+        :type base_pose: PoseStamped
+        """
+        if self.has_robot():
+            raise RobotExistsException(u'A robot is already loaded')
+        if self.has_object(self.robot_name):
+            raise DuplicateNameException(
+                u'can\'t add robot; object with name "{}" already exists'.format(self.robot_name))
+        self.robot = robot
+
     def get_robot(self):
         """
-        :rtype: WorldObject
+        :rtype: Robot
         """
         return self.robot
-
-    def add_robot(self, urdf_object, controlled_joints, base_pose):
-        self.robot = urdf_object
-
-    def remove_robot(self):
-        self.robot = None
 
     def has_robot(self):
         """
@@ -55,44 +99,37 @@ class World(object):
         """
         return self.robot is not None
 
-    def hard_reset(self):
+    def set_robot_joint_state(self, joint_state):
         """
-        removes everything
+        Set the current joint state readings for a robot in the world.
+        :param joint_state: joint name -> SingleJointState
+        :type joint_state: dict
         """
-        self.soft_reset()
-        self.remove_robot()
+        self.robot.set_joint_state(joint_state)
 
-    def soft_reset(self):
+    def remove_robot(self):
         """
-        keeps robot and other important objects like ground plane
+        :rtype: bool
         """
-        self.remove_all_objects()
+        self.robot = None
+        return True
 
-    def check_collisions(self, cut_off_distances):
+
+class WorldObject(URDFObject):
+    def __init__(self, urdf):
+        super(WorldObject, self).__init__(urdf)
+
+    def set_base_pose(self):
         pass
 
-class WorldObject(object):
-    def __init__(self, urdf_object):
-        # TODO why not inherit from urdf object?
-        self.urdf_object = urdf_object
-
-    def get_pose(self):
+    def get_base_pose(self):
         pass
 
-    def get_configuration(self):
+    def set_joint_state(self, joint_state):
+        pass
+
+    def get_joint_state(self):
         pass
 
     def get_self_collision_matrix(self):
-        pass
-
-    def get_urdf_object(self):
-        """
-        :rtype: giskardpy.urdf_object.NewURDFObject
-        """
-        return self.urdf_object
-
-    def set_pose(self):
-        pass
-
-    def set_configuration(self):
         pass

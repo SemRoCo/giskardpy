@@ -6,7 +6,7 @@ from giskard_msgs.srv import UpdateWorld, UpdateWorldRequest, UpdateWorldRespons
 from sensor_msgs.msg import JointState
 from shape_msgs.msg import SolidPrimitive
 from visualization_msgs.msg import MarkerArray
-from giskardpy.utils import dict_to_joint_states
+from giskardpy.utils import dict_to_joint_states, make_world_body_box
 
 
 class GiskardWrapper(object):
@@ -221,19 +221,9 @@ class GiskardWrapper(object):
         req = UpdateWorldRequest(UpdateWorldRequest.REMOVE, object, False, PoseStamped())
         return self.update_world.call(req)
 
-    def make_box(self, name=u'box', size=(1,1,1)):
-        box = WorldBody()
-        box.type = WorldBody.PRIMITIVE_BODY
-        box.name = str(name)
-        box.shape.type = SolidPrimitive.BOX
-        if size is not None:
-            box.shape.dimensions.append(size[0])
-            box.shape.dimensions.append(size[1])
-            box.shape.dimensions.append(size[2])
-        return box
 
     def add_box(self, name=u'box', size=(1, 1, 1), frame_id=u'map', position=(0, 0, 0), orientation=(0, 0, 0, 1)):
-        box = self.make_box(name, size)
+        box = make_world_body_box(name, size[0], size[1], size[2])
         pose = PoseStamped()
         pose.header.stamp = rospy.Time.now()
         pose.header.frame_id = str(frame_id)
@@ -280,7 +270,7 @@ class GiskardWrapper(object):
         :type orientation: list
         :rtype: UpdateWorldResponse
         """
-        box = self.make_box(name, size)
+        box = make_world_body_box(name, size[0], size[1], size[2])
         pose = PoseStamped()
         pose.header.stamp = rospy.Time.now()
         pose.header.frame_id = str(frame_id) if frame_id is not None else u'map'

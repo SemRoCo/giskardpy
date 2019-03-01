@@ -150,7 +150,7 @@ class GiskardTestWrapper(object):
         rospy.sleep(1)
         self.wrapper = GiskardWrapper(ns=u'tests')
         self.results = Queue(100)
-        self.joint_limits = {joint_name: self.get_robot().get_joint_lower_upper_limit(joint_name) for joint_name in
+        self.joint_limits = {joint_name: self.get_robot().get_joint_limits(joint_name) for joint_name in
                              self.get_controlled_joint_names() if self.get_robot().is_joint_controllable(joint_name)}
         # self.world = self.get_god_map().safe_get_data([u'pybullet_world'])  # type: PyBulletWorld
         self.world_plugin = self.tree.root.children[3].children[2]._plugins[u'coll']  # type: CollisionChecker

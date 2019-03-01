@@ -14,9 +14,11 @@ from os import tmpfile
 
 from geometry_msgs.msg import PointStamped, Point, Vector3Stamped, Vector3, Pose, PoseStamped, QuaternionStamped, \
     Quaternion
+from giskard_msgs.msg import WorldBody
 from py_trees import common, Chooser, Selector, Sequence, Behaviour
 from py_trees.composites import Parallel
 from sensor_msgs.msg import JointState
+from shape_msgs.msg import SolidPrimitive
 from tf.transformations import quaternion_multiply, quaternion_conjugate
 
 from giskardpy.data_types import SingleJointState
@@ -515,3 +517,48 @@ def generate_pydot_graph(root, visibility_level):
 
     add_edges(root, root.name, visibility_level)
     return graph
+
+def remove_outer_tag(xml):
+    """
+    :param xml:
+    :type xml: str
+    :return:
+    :rtype: str
+    """
+    return xml.split('>', 1)[1].rsplit('<',1)[0]
+
+
+def make_world_body_box(name=u'box', x_length=1, y_length=1, z_length=1):
+    box = WorldBody()
+    box.type = WorldBody.PRIMITIVE_BODY
+    box.name = str(name)
+    box.shape.type = SolidPrimitive.BOX
+    box.shape.dimensions.append(x_length)
+    box.shape.dimensions.append(y_length)
+    box.shape.dimensions.append(z_length)
+    return box
+
+def make_world_body_sphere(name=u'sphere', radius=1):
+    sphere = WorldBody()
+    sphere.type = WorldBody.PRIMITIVE_BODY
+    sphere.name = str(name)
+    sphere.shape.type = SolidPrimitive.SPHERE
+    sphere.shape.dimensions.append(radius)
+    return sphere
+
+def make_world_body_cylinder(name=u'cylinder', height=1, radius=1):
+    cylinder = WorldBody()
+    cylinder.type = WorldBody.PRIMITIVE_BODY
+    cylinder.name = str(name)
+    cylinder.shape.type = SolidPrimitive.CYLINDER
+    cylinder.shape.dimensions = [0,0]
+    cylinder.shape.dimensions[SolidPrimitive.CYLINDER_HEIGHT] = height
+    cylinder.shape.dimensions[SolidPrimitive.CYLINDER_RADIUS] = radius
+    return cylinder
+
+def make_urdf_world_body(name, urdf):
+    wb = WorldBody()
+    wb.name = name
+    wb.type = wb.URDF_BODY
+    wb.urdf = urdf
+    return wb

@@ -115,7 +115,7 @@ class TestPyBulletWorld(RuleBasedStateMachine):
     def delete_object(self, name):
         object_existed = self.world.has_object(name)
         try:
-            self.world.delete_object(name),
+            self.world.remove_object(name),
         except UnknownBodyException:
             assert not object_existed
 
@@ -137,7 +137,7 @@ class TestPyBulletWorld(RuleBasedStateMachine):
         assert 1 == p.getNumBodies()
 
     def teardown(self):
-        self.world.deactivate_viewer()
+        self.world.__deactivate_viewer()
 
 
 TestTrees = TestPyBulletWorld.TestCase

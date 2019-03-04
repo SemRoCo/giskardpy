@@ -8,6 +8,8 @@ from collections import defaultdict, OrderedDict
 import numpy as np
 from itertools import product, chain
 from numpy import pi
+from rospy import logwarn
+import re
 
 import errno
 from os import tmpfile
@@ -519,57 +521,104 @@ def generate_pydot_graph(root, visibility_level):
 
 
 
-def rospkg_exits(name):
+def compare_version(version1, operator, version2):
     """
-    checks whether a ros package with the given name and version exits
-    :param name: the name and version of the ros package in requirements format e.g. giskard_msgs<=0.1.0
-    :return: True if it exits else False
+    compares two version numbers by means of the given operator
+    :param version1: version number 1 e.g. 0.1.0
+    :type version1: str
+    :param operator: ==,<=,>=,<,>
+    :type operator: str
+    :param version2: version number 1 e.g. 3.2.0
+    :type version2: str
+    :return:
+    """
+    version1 = version1.split('.')
+    version2 = version2.split('.')
+    if operator == '==':
+        if (len(version1) != len(version2)):
+            return False
+        for i in range(len(version1)):
+            if version1[i] != version2[i]:
+                return False
+        return True
+    elif operator == '<=':
+        k = min(len(version1), len(version2))
+        for i in range(k):
+            if version1[i] > version2[i]:
+                return True
+            elif version1[i] < version2[i]:
+                return False
+        if len(version1) < len(version2):
+            return False
+        else:
+            return True
+    elif operator == '>=':
+        k = min(len(version1), len(version2))
+        for i in range(k):
+            if version1[i] < version2[i]:
+                return True
+            elif version1[i] > version2[i]:
+                return False
+        if len(version1) > len(version2):
+            return False
+        else:
+            return True
+    elif operator == '<':
+        k = min(len(version1), len(version2))
+        for i in range(k):
+            if version1[i] > version2[i]:
+                return True
+            elif version1[i] < version2[i]:
+                return False
+        if len(version1) < len(version2):
+            return False
+        else:
+            return True
+    elif operator == '>':
+        k = min(len(version1), len(version2))
+        for i in range(k):
+            if version1[i] < version2[i]:
+                return True
+            elif version1[i] > version2[i]:
+                return False
+        if len(version1) > len(version2):
+            return False
+        else:
+            return True
+    else:
+        return False
+
+
+def rospkg_exists(name):
+    """
+       checks whether a ros package with the given name and version exists
+       :param name: the name and version of the ros package in requirements format e.g. giskard_msgs<=0.1.0
+       :type name: str
+       :return: True if it exits else False
     """
     r = rospkg.RosPack()
+    name = name.replace(' ', '')
+    version_list = name.split(',')
+    version_entry1 = re.split('(==|>=|<=|<|>)', version_list[0])
+    package_name=version_entry1[0]
     try:
-        l = name.split('=')
-        if l[0].endswith('<'):
-            m = r.get_manifest(l[0][:-1])
-            version_m = m.version.split('.')
-            version_d = l[len(l) - 1].split('.')
-            k = max(len(version_m), len(version_d))
-            for i in range(k):
-                if version_m[i] < version_d[i]:
-                    return True
-                elif version_m[i] > version_d[i]:
-                    print("found ROS package " + l[0][:-1] + "==" + str(
-                        m.version) + " but " + name + " is required")
-                    return False
-            return True
-        elif l[0].endswith('>'):
-            m = r.get_manifest(l[0][:-1])
-            version_m = m.version.split('.')
-            version_d = l[len(l) - 1].split('.')
-            k = max(len(version_m), len(version_d))
-            for i in range(k):
-                if version_m[i] > version_d[i]:
-                    return True
-                elif version_m[i] < version_d[i]:
-                    print("found ROS package " + l[0][:-1] + "==" + str(
-                        m.version) + " but " + name + " is required")
-                    return False
-            return True
-        else:
-            m = r.get_manifest(l[0])
-            version_m = m.version.split('.')
-            version_d = l[len(l)-1].split('.')
-            if(len(version_m) != len(version_d)):
-                print("found ROS package " + l[0] + "==" + str(m.version) + " but " + name + " is required")
-                return False
-            for i in range(len(version_m)):
-                if version_m[i] != version_d[i]:
-                    print("found ROS package " + l[0] + "==" + str(m.version) + " but " + name + " is required")
-                    return False
-            return True
-
+        m = r.get_manifest(package_name)
     except Exception as e:
-        print(name + " not found")
+        logwarn('package {name} not found'.format(name=name))
         return False
+    if len(version_entry1) == 1:
+        return True
+    if not compare_version(version_entry1[2], version_entry1[1], m.version):
+        logwarn('found ROS package {installed_name}=={installed_version} but {r} is required}'.format(installed_name=package_name, installed_version=str(m.version), r=name))
+        return False
+    for entry in version_list[1:]:
+        operator_and_version = re.split('(==|>=|<=|<|>)', entry)
+        if not compare_version(operator_and_version[2], operator_and_version[1], m.version):
+            logwarn('found ROS package {installed_name}=={installed_version} but {r} is required}'.format(installed_name=package_name, installed_version=str(m.version), r=name))
+            return False
+
+    return True
+
 
 def check_dependencies():
     """
@@ -581,12 +630,13 @@ def check_dependencies():
     with open(r.get_path('giskardpy') + '/dependencies.txt') as f:
         dependencies = f.readlines()
 
+    dependencies = [x.split('#')[0] for x in dependencies]
     dependencies = [x.strip() for x in dependencies]
 
     for d in dependencies:
         try:
             pkg_resources.require(d)
         except pkg_resources.DistributionNotFound as e:
-            rospkg_exits(d)
+            rospkg_exists(d)
         except pkg_resources.VersionConflict as e:
-            print('require ' + str(e.req) + ' but found ' + str(e.dist))
+            logwarn('found {version_f} but version {version_r} is required'.format(version_r=str(e.req), version_f=str(e.dist)))

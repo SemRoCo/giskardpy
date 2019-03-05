@@ -1,10 +1,8 @@
 import pybullet as p
-import string
-import random
 from collections import namedtuple, OrderedDict, defaultdict
 from itertools import combinations
 from pybullet import JOINT_REVOLUTE, JOINT_PRISMATIC, JOINT_PLANAR, JOINT_SPHERICAL
-
+import os
 import errno
 
 from geometry_msgs.msg import Vector3, PoseStamped, Point, Quaternion
@@ -19,6 +17,8 @@ from giskardpy.exceptions import UnknownBodyException, RobotExistsException, Dup
 from giskardpy.data_types import SingleJointState
 import numpy as np
 
+from giskardpy.pybullet_world_object import PyBulletWorldObject
+from giskardpy.pybullet_wrapper import ContactInfo, deactivate_rendering, activate_rendering
 from giskardpy.urdf_object import URDFObject
 from giskardpy.utils import keydefaultdict, suppress_stdout, NullContextManager, resolve_ros_iris_in_urdf, \
     write_to_tmp
@@ -26,55 +26,18 @@ import hashlib
 
 from giskardpy.world import World
 
-JointInfo = namedtuple(u'JointInfo', [u'joint_index', u'joint_name', u'joint_type', u'q_index', u'u_index', u'flags',
-                                      u'joint_damping', u'joint_friction', u'joint_lower_limit', u'joint_upper_limit',
-                                      u'joint_max_force', u'joint_max_velocity', u'link_name', u'joint_axis',
-                                      u'parent_frame_pos', u'parent_frame_orn', u'parent_index'])
-
-ContactInfo = namedtuple(u'ContactInfo', [u'contact_flag', u'body_unique_id_a', u'body_unique_id_b', u'link_index_a',
-                                          u'link_index_b', u'position_on_a', u'position_on_b', u'contact_normal_on_b',
-                                          u'contact_distance', u'normal_force', u'lateralFriction1',
-                                          u'lateralFrictionDir1',
-                                          u'lateralFriction2', u'lateralFrictionDir2'])
 
 # TODO globally define map
 MAP = u'map'
 
 
 
-def random_string(size=6):
-    """
-    Creates and returns a random string.
-    :param size: Number of characters that the string shall contain.
-    :type size: int
-    :return: Generated random sequence of chars.
-    :rtype: str
-    """
-    return u''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(size))
-
-
-# def load_urdf_string_into_bullet(urdf_string, pose):
-#     """
-#     Loads a URDF string into the bullet world.
-#     :param urdf_string: XML string of the URDF to load.
-#     :type urdf_string: str
-#     :param pose: Pose at which to load the URDF into the world.
-#     :type pose: Transform
-#     :return: internal PyBullet id of the loaded urdf
-#     :rtype: intload_urdf_string_into_bullet
-#     """
-#     filename = write_to_tmp(u'{}.urdf'.format(random_string()), urdf_string)
-#     with NullContextManager() if giskardpy.PRINT_LEVEL == DEBUG else suppress_stdout():
-#         id = p.loadURDF(filename, [pose.translation.x, pose.translation.y, pose.translation.z],
-#                         [pose.rotation.x, pose.rotation.y, pose.rotation.z, pose.rotation.w],
-#                         flags=p.URDF_USE_SELF_COLLISION_EXCLUDE_PARENT)
-#     os.remove(filename)
-#     return id
-
 class PyBulletWorld(World):
     """
     Wraps around the shitty pybullet api.
     """
+    ground_plane_name = u'ground_plane'
+    hack_name = u'pybullet_hack'
 
     def __init__(self, enable_gui=False, path_to_data_folder=u''):
         """
@@ -109,10 +72,9 @@ class PyBulletWorld(World):
         :type urdf: str
         :type base_pose: Transform
         """
-        self.__deactivate_rendering()
+        # deactivate_rendering()
         super(PyBulletWorld, self).add_robot(robot, controlled_joints, base_pose)
-        # FIXME sync bullet
-        self.__activate_rendering()
+        # activate_rendering()
 
     # def spawn_object_from_urdf_str(self, name, urdf, base_pose=None):
     #     """
@@ -177,24 +139,25 @@ class PyBulletWorld(World):
     # def get_object_name(self, id):
     #     return self._object_id_to_name[id]
 
-    def remove_robot(self):
-        if not self.has_robot():
-            p.removeBody(self._robot.id)
-            self._robot = None
+    # def remove_robot(self):
+    #     if not self.has_robot():
+    #         p.removeBody(self._robot.id)
+    #         self._robot = None
 
     def remove_object(self, name):
         """
         Deletes an object with a specific name from the world.
         :type name: str
         """
-        if not self.has_object(name):
-            raise UnknownBodyException(u'Cannot delete unknown object {}'.format(name))
-        self.__deactivate_rendering()
-        p.removeBody(self.__get_pybullet_object_id(name))
-        self.__activate_rendering()
-        del (self._object_id_to_name[self.__get_pybullet_object_id(name)])
-        del (self._object_names_to_objects[name])
-        print(u'object {} deleted from pybullet world'.format(name))
+        super(PyBulletWorld, self).remove_object(name)
+        # if not self.has_object(name):
+        #     raise UnknownBodyException(u'Cannot delete unknown object {}'.format(name))
+        # self.__deactivate_rendering()
+        # p.removeBody(self.__get_pybullet_object_id(name))
+        # self.__activate_rendering()
+        # del (self._object_id_to_name[self.__get_pybullet_object_id(name)])
+        # del (self._object_names_to_objects[name])
+        # print(u'object {} deleted from pybullet world'.format(name))
 
     # def delete_all_objects(self, remaining_objects=(u'plane',)):
     #     """
@@ -277,12 +240,6 @@ class PyBulletWorld(World):
                            contact_info.lateralFrictionDir2)
 
     def setup(self):
-        if self._gui:
-            # TODO expose opengl2 option for gui?
-            self.physicsClient = p.connect(p.GUI, options=u'--opengl2')  # or p.DIRECT for non-graphical version
-        else:
-            self.physicsClient = p.connect(p.DIRECT)  # or p.DIRECT for non-graphical version
-        p.setGravity(0, 0, -9.8)
         self.__add_ground_plane()
         self.__add_pybullet_bug_fix_hack()
 
@@ -291,41 +248,30 @@ class PyBulletWorld(World):
         self.__add_ground_plane()
         self.__add_pybullet_bug_fix_hack()
 
-    def __deactivate_viewer(self):
-        p.disconnect()
-
-    def __add_ground_plane(self, name=u'plane'):
+    def __add_ground_plane(self):
         """
         Adds a ground plane to the Bullet World.
         """
-        if not self.has_object(name):
-            plane = URDFObject.from_urdf_file(self.path_to_data_folder + u'/urdf/plane.urdf')
-            self.add_object(name, plane)
-            # self.spawn_urdf_object(UrdfObject(name=name,
-            #                                   visual_props=[VisualProperty(geometry=BoxShape(100, 100, 10),
-            #                                                                material=MaterialProperty(u'white',
-            #                                                                                          ColorRgba(.8,.8,.8,1)))],
-            #                                   collision_props=[CollisionProperty(geometry=BoxShape(100, 100, 10))]),
-            #                        Transform(translation=Point(0, 0, -5)))
+        if not self.has_object(self.ground_plane_name):
+            plane = PyBulletWorldObject.from_urdf_file(self.path_to_data_folder + u'/urdf/ground_plane.urdf')
+            plane.set_name(self.ground_plane_name)
+            self.add_object(plane)
 
-    def __add_pybullet_bug_fix_hack(self, name=u'pybullet_sucks'):
-        if not self.has_object(name):
-            plane = URDFObject.from_urdf_file(self.path_to_data_folder + u'/urdf/tiny_ball.urdf')
-            self.add_object(name, plane)
-        # if not self.has_object(name):
-        #     self.spawn_urdf_object(UrdfObject(name=name,
-        #                                       collision_props=[CollisionProperty(geometry=SphereShape(0.005))]),
-        #                            Transform(translation=Point(10, 10, -10)))
+
+    def __add_pybullet_bug_fix_hack(self):
+        if not self.has_object(self.hack_name):
+            plane = PyBulletWorldObject.from_urdf_file(self.path_to_data_folder + u'/urdf/tiny_ball.urdf')
+            plane.set_name(self.hack_name)
+            self.add_object(plane)
 
     def __move_hack(self, position):
-        self.get_object(u'pybullet_sucks').set_base_pose(position)
+        self.get_object(self.hack_name).set_base_pose(position)
 
-    def __deactivate_rendering(self):
-        p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 0)
-        p.configureDebugVisualizer(p.COV_ENABLE_TINY_RENDERER, 0)
-        p.configureDebugVisualizer(p.COV_ENABLE_GUI, 0)
+    def get_objects(self):
+        objects = super(PyBulletWorld, self).get_objects()
+        hidden_objects = [self.ground_plane_name, self.hack_name]
+        return {k:v for k,v in objects.items() if k not in hidden_objects}
 
-    def __activate_rendering(self):
-        p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 1)
+
 
 

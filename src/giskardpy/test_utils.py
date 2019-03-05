@@ -101,11 +101,16 @@ def rnd_joint_state2(draw, joint_limits):
 
 @composite
 def pr2_joint_state(draw):
-    pr2 = Robot.from_urdf_file(u'../test/urdfs/pr2.urdf')
+    pr2 = Robot.from_urdf_file(pr2_urdf())
     return draw(rnd_joint_state(*pr2.get_joint_limits()))
 
 def pr2_urdf():
     with open(u'urdfs/pr2.urdf', u'r') as f:
+        urdf_string = f.read()
+    return urdf_string
+
+def base_bot_urdf():
+    with open(u'urdfs/2d_base_bot.urdf', u'r') as f:
         urdf_string = f.read()
     return urdf_string
 

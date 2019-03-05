@@ -38,7 +38,7 @@ TRANSLATIONAL_JOINT_TYPES = [u'prismatic']
 
 
 class URDFObject(object):
-    def __init__(self, urdf):
+    def __init__(self, urdf, *args, **kwargs):
         """
         :param urdf:
         :type urdf: str
@@ -52,7 +52,7 @@ class URDFObject(object):
             self._urdf_robot = up.URDF.from_xml_string(hacky_urdf_parser_fix(urdf))  # type: up.Robot
 
     @classmethod
-    def from_urdf_file(cls, urdf_file):
+    def from_urdf_file(cls, urdf_file, *args, **kwargs):
         """
         :param urdf_file: path to urdf file
         :type urdf_file: str
@@ -60,18 +60,18 @@ class URDFObject(object):
         :type joints_to_symbols_map: dict
         :param default_joint_vel_limit: all velocity limits which are undefined or higher than this will be set to this
         :type default_joint_vel_limit: float
-        :rtype: up.Robot
+        :rtype: cls
         """
         with open(urdf_file, 'r') as f:
             urdf_string = f.read()
-        self = cls(urdf_string)
+        self = cls(urdf_string, *args, **kwargs)
         return self
 
     @classmethod
-    def from_world_body(cls, world_body):
+    def from_world_body(cls, world_body, *args, **kwargs):
         """
         :type world_body: giskard_msgs.msg._WorldBody.WorldBody
-        :return:
+        :rtype: URDFObject
         """
         links = []
         joints = []
@@ -81,7 +81,8 @@ class URDFObject(object):
             elif world_body.shape.type == world_body.shape.SPHERE:
                 geometry = up.Sphere(world_body.shape.dimensions[0])
             elif world_body.shape.type == world_body.shape.CYLINDER:
-                geometry = up.Cylinder(world_body.shape.dimensions)
+                geometry = up.Cylinder(world_body.shape.dimensions[world_body.shape.CYLINDER_RADIUS],
+                                       world_body.shape.dimensions[world_body.shape.CYLINDER_HEIGHT])
             elif world_body.shape.type == world_body.shape.CONE:
                 raise TypeError(u'primitive shape cone not supported')
             elif world_body.type == world_body.MESH_BODY:
@@ -93,25 +94,40 @@ class URDFObject(object):
                            collision=up.Collision(geometry))
             links.append(link)
         elif world_body.type == world_body.URDF_BODY:
-            return cls(world_body.urdf)
+            o = cls(world_body.urdf, *args, **kwargs)
+            o.set_name(world_body.name)
+            return o
         else:
             raise TypeError(u'world body type \'{}\' not supported'.format(world_body.type))
-        return URDFObject.from_parts(world_body.name, links, joints)
+        return cls.from_parts(world_body.name, links, joints, *args, **kwargs)
 
     @classmethod
-    def from_parts(cls, robot_name, links, joints):
+    def from_parts(cls, robot_name, links, joints, *args, **kwargs):
+        """
+        :param robot_name:
+        :param links:
+        :param joints:
+        :rtype: URDFObject
+        """
         r = up.Robot(robot_name)
         for link in links:
             r.add_link(link)
         for joint in joints:
             r.add_joint(joint)
-        return cls(r.to_xml_string())
+        return cls(r.to_xml_string(), *args, **kwargs)
 
     def get_name(self):
         """
         :rtype: str
         """
         return self._urdf_robot.name
+
+    def set_name(self, name):
+        self._urdf_robot.name = name
+        self.reinitialize()
+
+    def get_urdf_robot(self):
+        return self._urdf_robot
 
     # JOINT FUNCITONS
 
@@ -318,6 +334,10 @@ class URDFObject(object):
                 u'can not attach \'{}\' to non existent parent link \'{}\' of \'{}\''.format(urdf_object.get_name(),
                                                                                              parent_link,
                                                                                              self.get_name()))
+        if len(set(urdf_object.get_link_names()).intersection(set(self.get_link_names()))) != 0:
+            raise DuplicateNameException(u'can not merge urdfs that share link names')
+        if len(set(urdf_object.get_joint_names()).intersection(set(self.get_joint_names()))) != 0:
+            raise DuplicateNameException(u'can not merge urdfs that share joint names')
 
         joint = up.Joint(self.robot_name_to_root_joint(urdf_object.get_name()),
                          parent=parent_link,

@@ -1,146 +1,161 @@
-import unittest
-
-from hypothesis.strategies import composite
-
-from giskardpy.exceptions import UnknownBodyException, RobotExistsException, DuplicateNameException
-from giskardpy.object import UrdfObject, Box, Sphere, Cylinder
-from giskardpy.pybullet_world import PyBulletWorld
 import pybullet as p
-import hypothesis.strategies as st
-from hypothesis.stateful import Bundle, RuleBasedStateMachine, rule, invariant
-from giskardpy.data_types import SingleJointState, Transform, Point, Quaternion
-from giskardpy.test_utils import variable_name, robot_urdfs
+import pytest
+
+import test_urdf_object
+from giskardpy.pybullet_world import PyBulletWorld
+from giskardpy.pybullet_world_object import PyBulletWorldObject
+import giskardpy.pybullet_wrapper as pbw
+from giskardpy.test_utils import pr2_urdf, base_bot_urdf, donbot_urdf, boxy_urdf
+from giskardpy.world_object import WorldObject
+import test_world
 
 
-def small_float():
-    return st.floats(min_value=-100, max_value=100, allow_nan=False, allow_infinity=False)
-
-@composite
-def transform(draw):
-    p = Point(draw(small_float()), draw(small_float()), draw(small_float()))
-    q = Quaternion(draw(small_float()), draw(small_float()), draw(small_float()), draw(small_float()))
-    return Transform(p, q)
 
 
-class TestPyBulletWorld(RuleBasedStateMachine):
-    # FIXME
-    def __init__(self):
-        super(TestPyBulletWorld, self).__init__()
-        self.world = PyBulletWorld()
-        self.world.setup()
+@pytest.fixture(scope=u'module')
+def pybullet(request):
+    print(u'starting pybullet')
+    pbw.start_pybullet(False)
 
-    object_names = Bundle(u'object_names')
-    robot_names = Bundle(u'robot_names')
+    def kill_pybullet():
+        print(u'shutdown pybullet')
+        pbw.stop_pybullet()
 
-    @invariant()
-    def keeping_track_of_bodies(self):
-        assert len(self.world.get_object_names()) + self.world.has_robot() == p.getNumBodies()
+    request.addfinalizer(kill_pybullet)
 
-    @rule(target=object_names,
-          name=variable_name(),
-          length=small_float(),
-          width=small_float(),
-          height=small_float(),
-          base_pose=transform())
-    def add_box(self, name, length, width, height, base_pose):
-        robot_existed = self.world.has_robot()
-        object_existed = name in self.world.get_object_names()
+@pytest.fixture()
+def resetted_pybullet(pybullet):
+    """
+    :rtype: WorldObject
+    """
+    pbw.clear_pybullet()
+    return pybullet
 
-        object = Box(name, length, width, height)
-        try:
-            self.world.spawn_urdf_object(object, base_pose)
-            assert name in self.world.get_object_names()
-        except DuplicateNameException:
-            assert object_existed or robot_existed
-        return name
-
-    @rule(target=object_names,
-          name=variable_name(),
-          radius=small_float(),
-          base_pose=transform())
-    def add_sphere(self, name, radius, base_pose):
-        robot_existed = self.world.has_robot()
-        object_existed = self.world.has_object(name)
-
-        object = Sphere(name, radius)
-        try:
-            self.world.spawn_urdf_object(object, base_pose)
-            assert self.world.has_object(name)
-        except DuplicateNameException:
-            assert object_existed or robot_existed
-        return name
-
-    @rule(target=object_names,
-          name=variable_name(),
-          radius=small_float(),
-          length=small_float(),
-          base_pose=transform())
-    def add_cylinder(self, name, radius, length, base_pose):
-        robot_existed = self.world.has_robot()
-        object_existed = self.world.has_object(name)
-        object = Cylinder(name, radius, length)
-        try:
-            self.world.spawn_urdf_object(object, base_pose)
-            assert self.world.has_object(name)
-        except DuplicateNameException:
-            assert object_existed or robot_existed
-        return name
-
-    @rule(target=robot_names,
-          name=variable_name(),
-          robot_urdf=robot_urdfs(),
-          base_pose=transform())
-    def spawn_robot(self, name, robot_urdf, base_pose):
-        robot_existed = self.world.has_robot()
-        object_existed = self.world.has_object(name)
-        try:
-            self.world.spawn_robot_from_urdf_file(name, robot_urdf, base_pose)
-            assert self.world.has_robot()
-            assert self.world.get_robot().name == name
-        except RobotExistsException:
-            assert robot_existed
-            assert self.world.has_robot()
-        except DuplicateNameException:
-            assert object_existed
-            assert not self.world.has_robot()
-        return name
-
-    @rule()
-    def delete_robot(self):
-        self.world.remove_robot()
-        assert not self.world.has_robot()
-        assert self.world.get_robot() is None
-
-    @rule(name=object_names)
-    def delete_object(self, name):
-        object_existed = self.world.has_object(name)
-        try:
-            self.world.remove_object(name),
-        except UnknownBodyException:
-            assert not object_existed
-
-        assert not self.world.has_object(name)
-
-    @rule(remaining_objects=st.lists(object_names))
-    def delete_all_objects(self, remaining_objects):
-        old_objects = set(self.world.get_object_names())
-        self.world.delete_all_objects(remaining_objects)
-        for object_name in remaining_objects:
-            if object_name in old_objects:
-                assert self.world.has_object(object_name)
-        assert len(self.world.get_object_names()) == len(old_objects.intersection(set(remaining_objects)))
-
-    @rule()
-    def clear_world(self):
-
-        self.world.soft_reset()
-        assert 1 == p.getNumBodies()
-
-    def teardown(self):
-        self.world.__deactivate_viewer()
+@pytest.fixture()
+def parsed_pr2(resetted_pybullet):
+    """
+    :rtype: WorldObject
+    """
+    return PyBulletWorldObject(pr2_urdf())
 
 
-TestTrees = TestPyBulletWorld.TestCase
+@pytest.fixture()
+def parsed_base_bot(resetted_pybullet):
+    """
+    :rtype: WorldObject
+    """
+    return PyBulletWorldObject(base_bot_urdf())
 
-if __name__ == '__main__':
-    unittest.main()
+@pytest.fixture()
+def parsed_donbot(resetted_pybullet):
+    """
+    :rtype: Robot
+    """
+    return PyBulletWorldObject(donbot_urdf())
+
+@pytest.fixture()
+def parsed_boxy(resetted_pybullet):
+    """
+    :rtype: Robot
+    """
+    return PyBulletWorldObject(boxy_urdf())
+
+@pytest.fixture()
+def empty_world(pybullet):
+    """
+    :rtype: PyBulletWorld
+    """
+    pbw.clear_pybullet()
+    pw = PyBulletWorld(path_to_data_folder=u'../data')
+    pw.setup()
+    return pw
+
+@pytest.fixture()
+def world_with_pr2(empty_world, parsed_pr2):
+    """
+    :rtype: PyBulletWorld
+    """
+    empty_world.add_robot(parsed_pr2)
+    return empty_world
+
+def assert_num_pybullet_objects(num):
+    assert p.getNumBodies() == num, pbw.print_body_names()
+
+class TestPyBulletWorldObject(test_world.TestWorldObj):
+    cls = PyBulletWorldObject
+    def test_create_object(self, parsed_base_bot):
+        assert_num_pybullet_objects(1)
+        assert u'pointy' in pbw.get_body_names()
+
+    def test_detach_object(self, parsed_base_bot):
+        super(TestPyBulletWorldObject, self).test_detach_object(parsed_base_bot)
+
+
+# def test_robot(self, pybullet):
+    #     pr2 =
+    #     assert len(empty_world.get_objects()) == 0
+    #     assert not empty_world.has_robot()
+    #     pr2 = WorldObject(pr2_urdf())
+    #     empty_world.add_robot(pr2)
+    #     assert empty_world.has_robot()
+    #     assert pr2 == empty_world.get_robot()
+
+
+class TestPyBulletWorld(test_world.TestWorld):
+    cls = PyBulletWorldObject
+
+    def test_add_robot(self, empty_world):
+        super(TestPyBulletWorld, self).test_add_robot(empty_world)
+        assert_num_pybullet_objects(3)
+
+    def test_add_object(self, empty_world):
+        super(TestPyBulletWorld, self).test_add_object(empty_world)
+        assert_num_pybullet_objects(3)
+
+    def test_add_object_twice(self, empty_world):
+        super(TestPyBulletWorld, self).test_add_object_twice(empty_world)
+        assert_num_pybullet_objects(3)
+
+    def test_add_object_with_robot_name(self, world_with_pr2):
+        super(TestPyBulletWorld, self).test_add_object_with_robot_name(world_with_pr2)
+        assert_num_pybullet_objects(3)
+
+    def test_hard_reset1(self, world_with_pr2):
+        super(TestPyBulletWorld, self).test_hard_reset1(world_with_pr2)
+        assert_num_pybullet_objects(2)
+
+    def test_hard_reset2(self, world_with_pr2):
+        super(TestPyBulletWorld, self).test_hard_reset2(world_with_pr2)
+        assert_num_pybullet_objects(2)
+
+    def test_soft_reset1(self, world_with_pr2):
+        super(TestPyBulletWorld, self).test_soft_reset1(world_with_pr2)
+        assert_num_pybullet_objects(3)
+
+    def test_soft_reset2(self, world_with_pr2):
+        super(TestPyBulletWorld, self).test_soft_reset2(world_with_pr2)
+        assert_num_pybullet_objects(3)
+
+    def test_remove_object1(self, world_with_pr2):
+        super(TestPyBulletWorld, self).test_remove_object1(world_with_pr2)
+        assert_num_pybullet_objects(3)
+
+    def test_remove_object2(self, world_with_pr2):
+        super(TestPyBulletWorld, self).test_remove_object2(world_with_pr2)
+        assert_num_pybullet_objects(3)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

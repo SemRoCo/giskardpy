@@ -3,10 +3,9 @@ from geometry_msgs.msg import PoseStamped, Pose, Point, Quaternion
 from giskard_msgs.msg import WorldBody
 
 from giskardpy.exceptions import DuplicateNameException
-from giskardpy.test_utils import pr2_urdf, donbot_urdf, boxy_urdf
+from giskardpy.test_utils import pr2_urdf, donbot_urdf, boxy_urdf, base_bot_urdf
 from giskardpy.urdf_object import URDFObject
 from giskardpy.utils import make_world_body_box, make_world_body_sphere, make_world_body_cylinder, make_urdf_world_body
-
 
 @pytest.fixture()
 def parsed_pr2():
@@ -14,7 +13,6 @@ def parsed_pr2():
     :rtype: Robot
     """
     r = URDFObject(pr2_urdf())
-    r.reinitialize()
     return r
 
 @pytest.fixture()
@@ -23,7 +21,6 @@ def parsed_donbot():
     :rtype: Robot
     """
     r = URDFObject(donbot_urdf())
-    r.reinitialize()
     return r
 
 @pytest.fixture()
@@ -32,23 +29,24 @@ def parsed_boxy():
     :rtype: Robot
     """
     r = URDFObject(boxy_urdf())
-    r.reinitialize()
     return r
+
 @pytest.fixture()
 def parsed_base_bot():
     """
-    :rtype: URDFObject
+    :rtype: tested_class
     """
-    return URDFObject.from_urdf_file(u'urdfs/2d_base_bot.urdf')
+    return URDFObject(base_bot_urdf())
 
 class TestUrdfObject(object):
+    cls = URDFObject
     def test_urdf_from_str(self, parsed_pr2):
-        pr2 = URDFObject(pr2_urdf())
+        pr2 = self.cls(pr2_urdf())
         assert pr2 == parsed_pr2
 
     def test_urdf_from_file(self, parsed_pr2):
         """
-        :type parsed_pr2: URDFObject
+        :type parsed_pr2: tested_class
         """
         assert len(parsed_pr2.get_joint_names()) == 96
         assert len(parsed_pr2.get_link_names()) == 97
@@ -56,19 +54,19 @@ class TestUrdfObject(object):
 
     def test_from_world_body_box(self):
         wb = make_world_body_box()
-        urdf_obj = URDFObject.from_world_body(wb)
+        urdf_obj = self.cls.from_world_body(wb)
         assert len(urdf_obj.get_link_names()) == 1
         assert len(urdf_obj.get_joint_names()) == 0
 
     def test_from_world_body_sphere(self):
         wb = make_world_body_sphere()
-        urdf_obj = URDFObject.from_world_body(wb)
+        urdf_obj = self.cls.from_world_body(wb)
         assert len(urdf_obj.get_link_names()) == 1
         assert len(urdf_obj.get_joint_names()) == 0
 
     def test_from_world_body_cylinder(self):
         wb = make_world_body_cylinder()
-        urdf_obj = URDFObject.from_world_body(wb)
+        urdf_obj = self.cls.from_world_body(wb)
         assert len(urdf_obj.get_link_names()) == 1
         assert len(urdf_obj.get_joint_names()) == 0
 
@@ -83,13 +81,13 @@ class TestUrdfObject(object):
 
     def test_from_world_body_urdf(self):
         wb = make_urdf_world_body(u'pr2', pr2_urdf())
-        urdf_obj = URDFObject.from_world_body(wb)
+        urdf_obj = self.cls.from_world_body(wb)
         assert len(urdf_obj.get_joint_names()) == 96
         assert len(urdf_obj.get_link_names()) == 97
 
     def test_from_world_body_mesh(self):
         wb = make_world_body_cylinder()
-        urdf_obj = URDFObject.from_world_body(wb)
+        urdf_obj = self.cls.from_world_body(wb)
         assert len(urdf_obj.get_link_names()) == 1
         assert len(urdf_obj.get_joint_names()) == 0
 
@@ -108,7 +106,7 @@ class TestUrdfObject(object):
         num_of_links_before = len(parsed_pr2.get_link_names())
         num_of_joints_before = len(parsed_pr2.get_joint_names())
         link_chain_before = len(parsed_pr2.get_links_from_sub_tree(u'torso_lift_joint'))
-        box = URDFObject.from_world_body(make_world_body_box())
+        box = self.cls.from_world_body(make_world_body_box())
         p = Pose()
         p.position = Point(0, 0, 0)
         p.orientation = Quaternion(0, 0, 0, 1)
@@ -121,18 +119,36 @@ class TestUrdfObject(object):
     def test_attach_urdf_object2(self, parsed_base_bot):
         links_before = set(parsed_base_bot.get_link_names())
         joints_before = set(parsed_base_bot.get_joint_names())
-        pr2 = make_urdf_world_body(u'pr2', pr2_urdf())
-        pr2_obj = URDFObject.from_world_body(pr2)
+        donbot = make_urdf_world_body(u'mustafa', donbot_urdf())
+        donbot_obj = self.cls.from_world_body(donbot)
         p = Pose()
         p.position = Point(0, 0, 0)
         p.orientation = Quaternion(0, 0, 0, 1)
-        parsed_base_bot.attach_urdf_object(pr2_obj, u'eef', p)
-        assert pr2_obj.get_root() in parsed_base_bot.get_link_names()
-        assert set(parsed_base_bot.get_link_names()).difference(links_before.union(set(pr2_obj.get_link_names()))) == set()
-        assert set(parsed_base_bot.get_joint_names()).difference(joints_before.union(set(pr2_obj.get_joint_names()))) == {u'pr2'}
+        parsed_base_bot.attach_urdf_object(donbot_obj, u'eef', p)
+        assert donbot_obj.get_root() in parsed_base_bot.get_link_names()
+        assert set(parsed_base_bot.get_link_names()).difference(links_before.union(set(donbot_obj.get_link_names()))) == set()
+        assert set(parsed_base_bot.get_joint_names()).difference(joints_before.union(set(donbot_obj.get_joint_names()))) == {u'mustafa'}
+        links = [l.name for l in parsed_base_bot.get_urdf_robot().links]
+        assert len(links) == len(set(links))
+        joints = [j.name for j in parsed_base_bot.get_urdf_robot().joints]
+        assert len(joints) == len(set(joints))
+
+    #TODO test is the tree is valid
+
+    def test_attach_urdf_object3(self, parsed_donbot):
+        pr2 = make_urdf_world_body(u'pr2', pr2_urdf())
+        pr2_obj = self.cls.from_world_body(pr2)
+        p = Pose()
+        p.position = Point(0, 0, 0)
+        p.orientation = Quaternion(0, 0, 0, 1)
+        try:
+            parsed_donbot.attach_urdf_object(pr2_obj, u'eef', p)
+            assert False, u'expected exception'
+        except Exception:
+            assert True
 
     def test_attach_twice(self, parsed_pr2):
-        box = URDFObject.from_world_body(make_world_body_box())
+        box = self.cls.from_world_body(make_world_body_box())
         p = Pose()
         p.position = Point(0, 0, 0)
         p.orientation = Quaternion(0, 0, 0, 1)
@@ -144,7 +160,7 @@ class TestUrdfObject(object):
             assert True
 
     def test_attach_to_non_existing_link(self, parsed_base_bot):
-        box = URDFObject.from_world_body(make_world_body_box())
+        box = self.cls.from_world_body(make_world_body_box())
         p = Pose()
         p.position = Point(0, 0, 0)
         p.orientation = Quaternion(0, 0, 0, 1)
@@ -155,7 +171,7 @@ class TestUrdfObject(object):
             assert True
 
     def test_attach_obj_with_joint_name(self, parsed_base_bot):
-        box = URDFObject.from_world_body(make_world_body_box(u'rot_z'))
+        box = self.cls.from_world_body(make_world_body_box(u'rot_z'))
         p = Pose()
         p.position = Point(0, 0, 0)
         p.orientation = Quaternion(0, 0, 0, 1)
@@ -166,7 +182,7 @@ class TestUrdfObject(object):
             assert True
 
     def test_attach_obj_with_link_name(self, parsed_base_bot):
-        box = URDFObject.from_world_body(make_world_body_box(u'eef'))
+        box = self.cls.from_world_body(make_world_body_box(u'eef'))
         p = Pose()
         p.position = Point(0, 0, 0)
         p.orientation = Quaternion(0, 0, 0, 1)
@@ -178,7 +194,7 @@ class TestUrdfObject(object):
 
     def test_detach_object(self, parsed_base_bot):
         """
-        :type parsed_base_bot: URDFObject
+        :type parsed_base_bot: self.cls
         """
         parsed_base_bot.detach_sub_tree(u'rot_z')
         assert len(parsed_base_bot.get_link_names()) == 3
@@ -192,7 +208,7 @@ class TestUrdfObject(object):
         assert len(parsed_pr2.get_joint_names()) == 72
 
     def test_attach_detach(self, parsed_pr2):
-        box = URDFObject.from_world_body(make_world_body_box())
+        box = self.cls.from_world_body(make_world_body_box())
         p = Pose()
         p.position = Point(0, 0, 0)
         p.orientation = Quaternion(0, 0, 0, 1)

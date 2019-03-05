@@ -2,7 +2,7 @@ import hashlib
 from collections import namedtuple, OrderedDict
 import symengine_wrappers as spw
 
-from giskardpy import WorldObjImpl
+from giskardpy.pybullet_world_object import PyBulletWorldObject
 from giskardpy.qp_problem_builder import HardConstraint, JointConstraint
 from giskardpy.urdf_object import URDFObject
 from giskardpy.utils import cube_volume, cube_surface, sphere_volume, cylinder_volume, cylinder_surface, keydefaultdict, \
@@ -10,7 +10,7 @@ from giskardpy.utils import cube_volume, cube_surface, sphere_volume, cylinder_v
 
 Joint = namedtuple('Joint', ['symbol', 'velocity_limit', 'lower', 'upper', 'type', 'frame'])
 
-class Robot(WorldObjImpl):
+class Robot(PyBulletWorldObject):
     def __init__(self, urdf, default_joint_vel_limit, default_joint_weight, controlled_joints):
         """
         :param urdf:

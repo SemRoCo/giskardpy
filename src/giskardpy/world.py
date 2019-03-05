@@ -94,7 +94,7 @@ class World(object):
             raise RobotExistsException(u'A robot is already loaded')
         if self.has_object(robot.get_name()):
             raise DuplicateNameException(
-                u'can\'t add robot; object with name "{}" already exists'.format(self.robot_name))
+                u'can\'t add robot; object with name "{}" already exists'.format(robot.get_name()))
         self.robot = robot
 
     def get_robot(self):

@@ -5,15 +5,14 @@ ERROR = 2
 PRINT_LEVEL = NORMAL
 
 
+MAP = u'map'
 
 # BACKEND = None
 # BACKEND = 'cse'
 # BACKEND = 'numpy'
 # BACKEND = 'cython'
-from giskardpy.pybullet_world_object import PyBulletWorldObj
 
 BACKEND = 'llvm'
 # BACKEND = 'lambda'
 
-WorldObjImpl = PyBulletWorldObj
 

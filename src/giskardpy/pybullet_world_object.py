@@ -1,16 +1,23 @@
+from collections import OrderedDict
+
+from geometry_msgs.msg import PoseStamped, Point, Quaternion
+
+from giskardpy import MAP
+from giskardpy.data_types import SingleJointState
+from giskardpy.pybullet_wrapper import load_urdf_string_into_bullet, JointInfo, pybullet_pose_to_msg, \
+    deactivate_rendering, activate_rendering, msg_to_pybullet_pose
 from giskardpy.utils import resolve_ros_iris_in_urdf
 from giskardpy.world_object import WorldObject
+import pybullet as p
 
-
-class PyBulletWorldObj(WorldObject):
+class PyBulletWorldObject(WorldObject):
     """
     Keeps track of and offers convenience functions for an urdf object in bullet.
     """
-    # TODO maybe merge symengine robot with this class?
     base_link_name = u'base'
-    pass
+
     def __init__(self, urdf, controlled_joints=None, base_pose=None, calc_self_collision_matrix=False,
-                 path_to_data_folder=''):
+                 path_to_data_folder=u''):
         """
         :type name: str
         :param urdf: Path to URDF file, or content of already loaded URDF file.
@@ -20,22 +27,63 @@ class PyBulletWorldObj(WorldObject):
         :param path_to_data_folder: where the self collision matrix is stored
         :type path_to_data_folder: str
         """
-        super(PyBulletWorldObj, self).__init__(urdf)
-        # self.path_to_data_folder = path_to_data_folder + u'collision_matrix/'
-        # # self.name = name
-        # # TODO i think resolve iris can be removed because I do this at the start
-        # self.resolved_urdf = resolve_ros_iris_in_urdf(urdf)
-        # self.id = load_urdf_string_into_bullet(self.resolved_urdf, base_pose)
-        # self.__sync_with_bullet()
-        # self.attached_objects = {}
-        # self.controlled_joints = controlled_joints
-        # if calc_self_collision_matrix:
-        #     if not self.load_self_collision_matrix():
-        #         self.init_self_collision_matrix()
-        #         self.save_self_collision_matrix()
-        # else:
-        #     self.self_collision_matrix = set()
-    #
+        self.path_to_data_folder = path_to_data_folder + u'collision_matrix/'
+        self.id = None
+        super(WorldObject, self).__init__(urdf)
+        self.reinitialize()
+        self.__sync_with_bullet()
+        if base_pose is not None:
+            self.set_base_pose(base_pose)
+        self.controlled_joints = controlled_joints
+        if calc_self_collision_matrix:
+            if not self.load_self_collision_matrix():
+                self.init_self_collision_matrix()
+                self.save_self_collision_matrix()
+        else:
+            self.self_collision_matrix = set()
+
+    def __sync_with_bullet(self):
+        """
+        Syncs joint and link infos with bullet
+        """
+
+        self.joint_id_map = {}
+        self.link_name_to_id = {}
+        self.link_id_to_name = {}
+        self.joint_name_to_info = OrderedDict()
+        self.joint_id_to_info = OrderedDict()
+        self.joint_name_to_info[self.base_link_name] = JointInfo(*([-1, self.base_link_name] + [None] * 10 +
+                                                                   [self.base_link_name] + [None] * 4))
+        self.joint_id_to_info[-1] = JointInfo(*([-1, self.base_link_name] + [None] * 10 +
+                                                [self.base_link_name] + [None] * 4))
+        self.link_id_to_name[-1] = self.base_link_name
+        self.link_name_to_id[self.base_link_name] = -1
+        for joint_index in range(p.getNumJoints(self.id)):
+            joint_info = JointInfo(*p.getJointInfo(self.id, joint_index))
+            self.joint_name_to_info[joint_info.joint_name] = joint_info
+            self.joint_id_to_info[joint_info.joint_index] = joint_info
+            self.joint_id_map[joint_index] = joint_info.joint_name
+            self.joint_id_map[joint_info.joint_name] = joint_index
+            self.link_name_to_id[joint_info.link_name] = joint_index
+            self.link_id_to_name[joint_index] = joint_info.link_name
+
+    def reinitialize(self):
+        super(PyBulletWorldObject, self).reinitialize()
+        deactivate_rendering()
+        joint_state = None
+        base_pose = None
+        if self.id is not None:
+            joint_state = self.get_joint_state()
+            base_pose = self.get_base_pose()
+            p.removeBody(self.id)
+        self.id = load_urdf_string_into_bullet(self.get_urdf(), base_pose)
+        self.__sync_with_bullet()
+        if joint_state is not None:
+            joint_state = {k:v for k,v in joint_state.items() if k in self.get_joint_names()}
+            self.set_joint_state(joint_state)
+        activate_rendering()
+
+
     # def init_self_collision_matrix(self):
     #     self.self_collision_matrix = self.calc_collision_matrix(set(combinations(self.get_link_names(), 2)))
     #
@@ -67,27 +115,28 @@ class PyBulletWorldObj(WorldObject):
     #         print(u'saved self collision matrix {}'.format(path))
     #         pickle.dump(self.self_collision_matrix, file)
     #
-    #
-    # def set_joint_state(self, joint_state):
-    #     """
-    #
-    #     :param joint_state:
-    #     :type joint_state: dict
-    #     :return:
-    #     """
-    #     for joint_name, singe_joint_state in joint_state.items():
-    #         p.resetJointState(self.id, self.joint_name_to_info[joint_name].joint_index, singe_joint_state.position)
-    #
-    # def set_base_pose(self, position=(0, 0, 0), orientation=(0, 0, 0, 1)):
-    #     """
-    #     Set base pose in bullet world frame.
-    #     :param position:
-    #     :type position: list
-    #     :param orientation:
-    #     :type orientation: list
-    #     """
-    #     p.resetBasePositionAndOrientation(self.id, position, orientation)
-    #
+
+    def set_joint_state(self, joint_state):
+        """
+
+        :param joint_state:
+        :type joint_state: dict
+        :return:
+        """
+        for joint_name, singe_joint_state in joint_state.items():
+            p.resetJointState(self.id, self.joint_name_to_info[joint_name].joint_index, singe_joint_state.position)
+
+    def set_base_pose(self, pose):
+        """
+        Set base pose in bullet world frame.
+        :param position:
+        :type position: list
+        :param orientation:
+        :type orientation: list
+        """
+        position, orientation = msg_to_pybullet_pose(pose)
+        p.resetBasePositionAndOrientation(self.id, position, orientation)
+
     # # def as_marker_msg(self, ns=u'', id=1):
     # # FIXME
     # #     # TODO put this into util or objects
@@ -117,61 +166,31 @@ class PyBulletWorldObj(WorldObject):
     # #     m.color = ColorRGBA(0, 1, 0, 0.8)
     # #     m.frame_locked = True
     # #     return m
-    #
-    # def get_base_pose(self):
-    #     """
-    #     Retrieves the current base pose of the robot in the PyBullet world.
-    #     :return: Base pose of the robot in the world.
-    #     :rtype: Transform
-    #     """
-    #     #FIXME
-    #     [position, orientation] = p.getBasePositionAndOrientation(self.id)
-    #     base_pose = PoseStamped()
-    #     base_pose.header.frame_id = MAP
-    #     base_pose.pose.position = Point(*position)
-    #     base_pose.pose.orientation = Quaternion(*orientation)
-    #     return base_pose
-    #
-    # def __sync_with_bullet(self):
-    #     """
-    #     Syncs joint and link infos with bullet
-    #     """
-    #     self.joint_id_map = {}
-    #     self.link_name_to_id = {}
-    #     self.link_id_to_name = {}
-    #     self.joint_name_to_info = OrderedDict()
-    #     self.joint_id_to_info = OrderedDict()
-    #     self.joint_name_to_info[self.base_link_name] = JointInfo(*([-1, self.base_link_name] + [None] * 10 +
-    #                                                                [self.base_link_name] + [None] * 4))
-    #     self.joint_id_to_info[-1] = JointInfo(*([-1, self.base_link_name] + [None] * 10 +
-    #                                             [self.base_link_name] + [None] * 4))
-    #     self.link_id_to_name[-1] = self.base_link_name
-    #     self.link_name_to_id[self.base_link_name] = -1
-    #     for joint_index in range(p.getNumJoints(self.id)):
-    #         joint_info = JointInfo(*p.getJointInfo(self.id, joint_index))
-    #         self.joint_name_to_info[joint_info.joint_name] = joint_info
-    #         self.joint_id_to_info[joint_info.joint_index] = joint_info
-    #         self.joint_id_map[joint_index] = joint_info.joint_name
-    #         self.joint_id_map[joint_info.joint_name] = joint_index
-    #         self.link_name_to_id[joint_info.link_name] = joint_index
-    #         self.link_id_to_name[joint_index] = joint_info.link_name
-    #
+
+    def get_base_pose(self):
+        """
+        Retrieves the current base pose of the robot in the PyBullet world.
+        :return: Base pose of the robot in the world.
+        :rtype: Transform
+        """
+        return pybullet_pose_to_msg(p.getBasePositionAndOrientation(self.id))
+
     # def get_self_collision_matrix(self):
     #     """
     #     :return: (link1, link2) -> min allowed distance
     #     """
     #     return self.self_collision_matrix
-    #
-    # def get_joint_state(self):
-    #     mjs = dict()
-    #     for joint_info in self.joint_name_to_info.values():
-    #         if joint_info.joint_type in [p.JOINT_REVOLUTE, p.JOINT_PRISMATIC]:
-    #             sjs = SingleJointState()
-    #             sjs.name = joint_info.joint_name
-    #             sjs.position = p.getJointState(self.id, joint_info.joint_index)[0]
-    #             mjs[sjs.name] = sjs
-    #     return mjs
-    #
+
+    def get_joint_state(self):
+        mjs = {}
+        for joint_info in self.joint_name_to_info.values():
+            if joint_info.joint_type in [p.JOINT_REVOLUTE, p.JOINT_PRISMATIC]:
+                sjs = SingleJointState()
+                sjs.name = joint_info.joint_name
+                sjs.position = p.getJointState(self.id, joint_info.joint_index)[0]
+                mjs[sjs.name] = sjs
+        return mjs
+
     # def calc_collision_matrix(self, link_combinations, d=0.05, d2=0.0, num_rnd_tries=1000):
     #     """
     #     :param link_combinations: set with link name tuples
@@ -239,22 +258,22 @@ class PyBulletWorldObj(WorldObject):
     #         if len(p.getClosestPoints(self.id, self.id, d, link_id_1, link_id_2)) > 0:
     #             in_collision.add((link_name_1, link_name_2))
     #     return in_collision
-    #
-    # def attach_urdf_object(self, urdf_object, parent_link, pose):
-    #     super(WorldObject, self).attach_urdf_object(urdf_object, parent_link, pose)
-    #     # self._urdf_robot = up.URDF.from_xml_string(self.get_urdf())
-    #
-    #     # assemble and store URDF string of new link and fixed joint
-    #     # self.extend_urdf(urdf, transform, parent_link)
-    #
-    #     # # remove last robot and load new robot from new URDF
-    #     # self.sync_urdf_with_bullet()
-    #     #
-    #     # # update the collision matrix for the newly attached object
-    #     # self.add_self_collision_entries(urdf_object.get_name())
-    #     # print(u'object {} attached to {} in pybullet world'.format(urdf_object.get_name(), self.name))
-    #
-    #
+
+    def attach_urdf_object(self, urdf_object, parent_link, pose):
+        super(WorldObject, self).attach_urdf_object(urdf_object, parent_link, pose)
+        # self._urdf_robot = up.URDF.from_xml_string(self.get_urdf())
+
+        # assemble and store URDF string of new link and fixed joint
+        # self.extend_urdf(urdf, transform, parent_link)
+
+        # # remove last robot and load new robot from new URDF
+        # self.sync_urdf_with_bullet()
+        #
+        # # update the collision matrix for the newly attached object
+        # self.add_self_collision_entries(urdf_object.get_name())
+        # print(u'object {} attached to {} in pybullet world'.format(urdf_object.get_name(), self.name))
+
+
     # def get_zero_joint_state(self):
     #     return self.generate_joint_state(lambda x: 0)
     #
@@ -290,15 +309,17 @@ class PyBulletWorldObj(WorldObject):
     #             sjs.position = f(joint_info)
     #             js[joint_name] = sjs
     #     return js
-    #
-    # def __get_pybullet_link_id(self, link_name):
-    #     """
-    #     :type link_name: str
-    #     :rtype: int
-    #     """
-    #     return self.link_name_to_id[link_name]
-    #
-    #
+
+    def __get_pybullet_link_id(self, link_name):
+        """
+        :type link_name: str
+        :rtype: int
+        """
+        return self.link_name_to_id[link_name]
+
+    def detach_sub_tree(self, joint_name):
+        super(PyBulletWorldObject, self).detach_sub_tree(joint_name)
+
     # # def has_attached_object(self, object_name):
     # #     """
     # #     Checks whether an object with this name has already been attached to the robot.
@@ -306,34 +327,7 @@ class PyBulletWorldObj(WorldObject):
     # #     :rtype: bool
     # #     """
     # #     return object_name in self.attached_objects.keys()
-    #
-    # # def attach_object(self, object_, parent_link_name, transform):
-    # #     """
-    # #     Rigidly attach another object to the robot.
-    # #     :param object_: Object that shall be attached to the robot.
-    # #     :type object_: UrdfObject
-    # #     :param parent_link_name: Name of the link to which the object shall be attached.
-    # #     :type parent_link_name: str
-    # #     :param transform: Hom. transform between the reference frames of the parent link and the object.
-    # #     :type transform: Transform
-    # #     """
-    # #FIXME
-    # #     # TODO should only be called through world because this class does not know which objects exist
-    # #     if self.has_attached_object(object_.name):
-    # #         # TODO: choose better exception type
-    # #         raise DuplicateNameException(
-    # #             u'An object \'{}\' has already been attached to the robot.'.format(object_.name))
-    # #
-    # #     # assemble and store URDF string of new link and fixed joint
-    # #     self.extend_urdf(object_, transform, parent_link_name)
-    # #
-    # #     # remove last robot and load new robot from new URDF
-    # #     self.sync_urdf_with_bullet()
-    # #
-    # #     # update the collision matrix for the newly attached object
-    # #     self.add_self_collision_entries(object_.name)
-    # #     print(u'object {} attached to {} in pybullet world'.format(object_.name, self.name))
-    #
+
     # def add_self_collision_entries(self, object_name):
     #     link_pairs = {(object_name, link_name) for link_name in self.get_link_names()}
     #     link_pairs.remove((object_name, object_name))
@@ -349,17 +343,8 @@ class PyBulletWorldObj(WorldObject):
     # #                            object_.name)
     # #     self.attached_objects[object_.name] = u'{}{}'.format(to_urdf_string(new_joint),
     # #                                                          remove_outer_tag(object_.get_urdf()))
-    #
-    # def sync_urdf_with_bullet(self):
-    #     joint_state = self.get_joint_state()
-    #     base_pose = self.get_base_pose()
-    #     p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 0)
-    #     p.removeBody(self.id)
-    #     self.id = load_urdf_string_into_bullet(self.get_urdf(), base_pose)
-    #     p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 1)
-    #     self.__sync_with_bullet()
-    #     self.set_joint_state(joint_state)
-    #
+
+
     # # def get_urdf(self):
     # #     """
     # #     :rtype: str
@@ -373,23 +358,25 @@ class PyBulletWorldObj(WorldObject):
     # # def as_urdf_object(self):
     # #     return urdfob
     # #
-    # # def detach_object(self, object_name):
-    # #     """
-    # #     Detaches an attached object from the robot.
-    # #     :param object_name: Name of the object that shall be detached from the robot.
-    # #     :type object_name: str
-    # #     """
-    # #FIXME
-    # #     if not self.has_attached_object(object_name):
-    # #         # TODO: choose better exception type
-    # #         raise RuntimeError(u"No object '{}' has been attached to the robot.".format(object_name))
-    # #
-    # #     del (self.attached_objects[object_name])
-    # #
-    # #     self.sync_urdf_with_bullet()
-    # #     self.remove_self_collision_entries(object_name)
-    # #     print(u'object {} detachted from {} in pybullet world'.format(object_name, self.name))
+    # def detach_object(self, object_name):
+    #     """
+    #     Detaches an attached object from the robot.
+    #     :param object_name: Name of the object that shall be detached from the robot.
+    #     :type object_name: str
+    #     """
+    # # FIXME
+    #     if not self.has_attached_object(object_name):
+    #         # TODO: choose better exception type
+    #         raise RuntimeError(u"No object '{}' has been attached to the robot.".format(object_name))
     #
+    #     del (self.attached_objects[object_name])
+    #
+    #     self.sync_urdf_with_bullet()
+    #     self.remove_self_collision_entries(object_name)
+    #     print(u'object {} detachted from {} in pybullet world'.format(object_name, self.name))
+
+
+
     # # def detach_all_objects(self):
     # #     """
     # #     Detaches all object that have been attached to the robot.

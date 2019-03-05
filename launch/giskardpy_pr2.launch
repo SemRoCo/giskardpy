@@ -18,9 +18,9 @@
     <rosparam param="root_link">base_footprint</rosparam>
     <rosparam param="enable_collision_marker">True</rosparam>
     <rosparam param="collision_time_threshold">15</rosparam>
-    <rosparam param="debug">True</rosparam>
-    <rosparam param="tree_tick_rate">1</rosparam>
-    <rosparam param="enable_visualization">False</rosparam>
+    <rosparam param="debug">False</rosparam>
+    <rosparam param="tree_tick_rate">0.1</rosparam>
+    <rosparam param="enable_visualization">True</rosparam>
   </node>
 
   <node pkg="giskardpy" type="interactive_marker.py" name="giskard_interactive_marker" output="screen">

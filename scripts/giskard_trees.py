@@ -27,7 +27,7 @@ from giskardpy.plugin_log_trajectory import LogTrajPlugin
 from giskardpy.plugin_pybullet import PyBulletMonitor, PyBulletUpdatePlugin, CollisionChecker
 from giskardpy.plugin_send_trajectory import SendTrajectory
 from giskardpy.visualization import VisualizationBehavior
-from giskardpy.utils import create_path, resolve_ros_iris_in_urdf, render_dot_tree
+from giskardpy.utils import create_path, resolve_ros_iris_in_urdf, render_dot_tree, check_dependencies
 
 
 # TODO add transform3d to package xml
@@ -155,6 +155,7 @@ def grow_tree():
 
 if __name__ == u'__main__':
     rospy.init_node(u'giskard')
+    check_dependencies()
     tree_tick_rate = rospy.get_param(u'~tree_tick_rate')
     tree = grow_tree()
     while not rospy.is_shutdown():

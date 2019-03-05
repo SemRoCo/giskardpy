@@ -6,7 +6,7 @@ import rospy
 from py_trees import Behaviour, Blackboard, Status
 
 
-class NewPluginBase(object):
+class PluginBase(object):
     def __init__(self):
         self.god_map = Blackboard().god_map
 
@@ -55,6 +55,7 @@ class PluginBehavior(GiskardBehavior):
         self.set_status(Status.INVALID)
         self.status_lock = Lock()
         self.sleep = sleep
+        self.looped_once = False
         super(PluginBehavior, self).__init__(name)
 
     def get_plugins(self):
@@ -75,6 +76,7 @@ class PluginBehavior(GiskardBehavior):
             plugin.setup()
 
     def initialise(self):
+        self.looped_once = False
         with self.status_lock:
             self.set_status(Status.RUNNING)
         self.update_thread = Thread(target=self.loop_over_plugins)
@@ -95,7 +97,7 @@ class PluginBehavior(GiskardBehavior):
             self.update_thread.join()
         except Exception as e:
             # FIXME sometimes terminate gets called without init being called
-            raise Exception('asdf')
+            raise Exception('terminate was called before init')
         self.stop_plugins()
         super(PluginBehavior, self).terminate(new_status)
 
@@ -127,11 +129,12 @@ class PluginBehavior(GiskardBehavior):
                         if not self.is_running():
                             return
                     rospy.sleep(self.sleep)
+                self.looped_once = True
         except Exception as e:
             traceback.print_exc()
             # TODO make 'exception' string a parameter somewhere
             Blackboard().set('exception', e)
 
-class SuccessPlugin(NewPluginBase):
+class SuccessPlugin(PluginBase):
     def update(self):
         return Status.SUCCESS

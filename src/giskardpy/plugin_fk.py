@@ -4,20 +4,25 @@ from tf.transformations import quaternion_from_matrix
 
 import symengine_wrappers as sw
 from giskardpy import BACKEND
+from giskardpy.identifier import fk_identifier
 from giskardpy.plugin_robot import RobotPlugin
 from giskardpy.utils import keydefaultdict
 
 
 class FkPlugin(RobotPlugin):
-    def __init__(self, fk_identifier, js_identifier, robot_description_identifier):
-        self.fk_identifier = fk_identifier
+    def __init__(self):
         self.fk = None
         self.robot = None
-        super(FkPlugin, self).__init__(robot_description_identifier, js_identifier, 0)
+        self.num_links = 0
+        super(FkPlugin, self).__init__()
 
     def initialize(self):
         super(FkPlugin, self).initialize()
-        if self.was_urdf_updated():
+        # FIXME this is not necessarily enough to figure out if the urdf was updated
+        self.robot = self.get_robot()
+        num_links = len(self.robot.get_link_names())
+        if self.num_links == 0 or num_links != self.num_links:
+            self.num_links = num_links
             free_symbols = self.god_map.get_registered_symbols()
 
             def on_demand_fk(key):
@@ -52,5 +57,5 @@ class FkPlugin(RobotPlugin):
             return p
 
         fks = keydefaultdict(on_demand_fk_evaluated)
-        self.god_map.safe_set_data([self.fk_identifier], fks)
+        self.god_map.safe_set_data([fk_identifier], fks)
         return None

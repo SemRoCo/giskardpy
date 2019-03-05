@@ -273,11 +273,11 @@ class GiskardWrapper(object):
 
     def attach_box(self, name=u'box', size=None, frame_id=None, position=None, orientation=None):
         """
-        :param name:
-        :param size:
-        :param frame_id:
-        :param position:
-        :param orientation:
+        :type name: str
+        :type size: list
+        :type frame_id: str
+        :type position: list
+        :type orientation: list
         :rtype: UpdateWorldResponse
         """
         box = self.make_box(name, size)
@@ -292,12 +292,9 @@ class GiskardWrapper(object):
 
     def attach_object(self, name, link_frame_id):
         """
-        :param name:
-        :param size:
-        :param frame_id:
-        :param position:
-        :param orientation:
-        :rtype: UpdateWorldResponse
+        :type name: str
+        :type link_frame_id: str
+        :return: UpdateWorldResponse
         """
         req = UpdateWorldRequest()
         req.rigidly_attached = True

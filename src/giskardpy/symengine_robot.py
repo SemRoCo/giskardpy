@@ -37,17 +37,17 @@ TRANSLATIONAL_JOINT_TYPES = [u'prismatic']
 class Robot(object):
     # TODO split urdf part into separate file?
     # TODO remove slow shit from init?
-    def __init__(self, urdf, default_joint_vel_limit):
+    def __init__(self, urdf, default_joint_vel_limit, default_joint_weight):
         """
         :param urdf:
         :type urdf: str
         :param joints_to_symbols_map: maps urdf joint names to symbols
         :type joints_to_symbols_map: dict
         :param default_joint_vel_limit: all velocity limits which are undefined or higher than this will be set to this
-        :type default_joint_vel_limit: float
+        :type default_joint_vel_limit: Symbol
         """
         self.default_joint_velocity_limit = default_joint_vel_limit
-        self.default_weight = 0.0001
+        self.default_weight = default_joint_weight
         self.fks = {}
         self._joint_to_frame = {}
         self.joint_to_symbol_map = keydefaultdict(lambda x: spw.Symbol(x))
@@ -124,7 +124,7 @@ class Robot(object):
         for i, joint_name in enumerate(self.get_joint_names_controllable()):
             lower_limit, upper_limit = self.get_joint_lower_upper_limit(joint_name)
             joint_symbol = self.get_joint_symbol(joint_name)
-            velocity_limit = self.get_joint_velocity_limit(joint_name)
+            velocity_limit = self.get_joint_velocity_limit_expr(joint_name)
 
             if lower_limit is not None and upper_limit is not None:
                 self.hard_constraints[joint_name] = HardConstraint(lower=lower_limit - joint_symbol,
@@ -220,7 +220,7 @@ class Robot(object):
                 upper_limit = None
         return lower_limit, upper_limit
 
-    def get_joint_velocity_limit(self, joint_name):
+    def get_joint_velocity_limit_expr(self, joint_name):
         """
         :param joint_name: name of the joint in the urdf
         :type joint_name: str
@@ -231,16 +231,7 @@ class Robot(object):
         if limit is None or limit.velocity is None:
             return self.default_joint_velocity_limit
         else:
-            return min(limit.velocity, self.default_joint_velocity_limit)
-
-    # def get_joint_velocity_limit_symbol(self, joint_name):
-    #     symbol = spw.Symbol()
-    #     limit = self._urdf_robot.joint_map[joint_name].limit
-    #     if limit is None or limit.velocity is None:
-    #         limit = spw.diffable_min_fast(self.default_joint_velocity_limit,
-    #     else:
-    #         return min(limit.velocity, self.default_joint_velocity_limit)
-    #     return spw.diffable_min_fast()
+            return spw.Min(limit.velocity, self.default_joint_velocity_limit)
 
     def get_joint_frame(self, joint_name):
         """

@@ -9,7 +9,12 @@ from itertools import combinations
 from pybullet import JOINT_REVOLUTE, JOINT_PRISMATIC, JOINT_PLANAR, JOINT_SPHERICAL
 
 import errno
+
+from geometry_msgs.msg import Vector3
 from numpy.random.mtrand import seed
+from std_msgs.msg import ColorRGBA
+from urdf_parser_py.urdf import URDF, Box, Sphere, Cylinder
+from visualization_msgs.msg import Marker
 
 import giskardpy
 from giskardpy import DEBUG
@@ -158,6 +163,35 @@ class PyBulletRobot(object):
         :type orientation: list
         """
         p.resetBasePositionAndOrientation(self.id, position, orientation)
+
+    def as_marker_msg(self, ns=u'', id=1):
+        # TODO put this into util or objects
+        parsed_urdf = URDF.from_xml_string(self.get_urdf())
+        if len(parsed_urdf.joints) != 0 or len(parsed_urdf.links) != 1:
+            raise Exception(u'can\'t attach urdf with joints')
+        link = parsed_urdf.links[0]
+        m = Marker()
+        m.ns = u'{}/{}'.format(ns, self.name)
+        m.id = id
+        geometry = link.visual.geometry
+        if isinstance(geometry, Box):
+            m.type = Marker.CUBE
+            m.scale = Vector3(*geometry.size)
+        elif isinstance(geometry, Sphere):
+            m.type = Marker.SPHERE
+            m.scale = Vector3(geometry.radius,
+                              geometry.radius,
+                              geometry.radius)
+        elif isinstance(geometry, Cylinder):
+            m.type = Marker.CYLINDER
+            m.scale = Vector3(geometry.radius,
+                              geometry.radius,
+                              geometry.length)
+        else:
+            raise Exception(u'world body type {} can\'t be converted to marker'.format(geometry.__class__.__name__))
+        m.color = ColorRGBA(0, 1, 0, 0.8)
+        m.frame_locked = True
+        return m
 
     def get_base_pose(self):
         """
@@ -408,6 +442,9 @@ class PyBulletRobot(object):
             new_urdf_string = new_urdf_string.replace(u'</robot>', u'{}</robot>'.format(sub_string))
         return new_urdf_string
 
+    # def as_urdf_object(self):
+    #     return urdfob
+
     def detach_object(self, object_name):
         """
         Detaches an attached object from the robot.
@@ -526,6 +563,12 @@ class PyBulletWorld(object):
         self.spawn_object_from_urdf_str(urdf_object.name, to_urdf_string(urdf_object), base_pose)
 
     def attach_object(self, object_, parent_link, transform):
+        """
+        :type object_: UrdfObject
+        :type parent_link: str
+        :param transform:
+        :return:
+        """
         if self.has_object(object_.name):
             object_ = self.get_object(object_.name)
             self.delete_object(object_.name)

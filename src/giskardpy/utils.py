@@ -25,7 +25,7 @@ from contextlib import contextmanager
 import sys, os
 import pylab as plt
 
-from giskardpy.plugin import PluginBehavior, NewPluginBase
+from giskardpy.plugin import PluginBehavior, PluginBase
 
 
 @contextmanager
@@ -468,11 +468,11 @@ def generate_pydot_graph(root, visibility_level):
             attributes = ('note', 'gold', 'black')
         elif isinstance(node, PluginBehavior):
             attributes = ('box', 'green', 'black')
-        elif isinstance(node, NewPluginBase) or node.children != []:
+        elif isinstance(node, PluginBase) or node.children != []:
             attributes = ('ellipse', 'ghostwhite', 'black')  # encapsulating behaviour (e.g. wait)
         else:
             attributes = ('ellipse', 'gray', 'black')
-        if not isinstance(node, NewPluginBase) and node.blackbox_level != common.BlackBoxLevel.NOT_A_BLACKBOX:
+        if not isinstance(node, PluginBase) and node.blackbox_level != common.BlackBoxLevel.NOT_A_BLACKBOX:
             attributes = (attributes[0], 'gray20', blackbox_font_colours[node.blackbox_level])
         return attributes
 

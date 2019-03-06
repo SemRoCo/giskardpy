@@ -8,6 +8,8 @@ from geometry_msgs.msg import Pose, PoseStamped, Point, Quaternion
 
 import giskardpy
 from giskardpy import DEBUG, MAP
+from giskardpy.exceptions import DuplicateNameException
+from giskardpy.urdf_object import URDFObject
 from giskardpy.utils import write_to_tmp, NullContextManager, suppress_stdout, resolve_ros_iris_in_urdf
 
 JointInfo = namedtuple(u'JointInfo', [u'joint_index', u'joint_name', u'joint_type', u'q_index', u'u_index', u'flags',
@@ -48,6 +50,9 @@ def load_urdf_string_into_bullet(urdf_string, pose=None):
         pose.orientation.w = 1
     if isinstance(pose, PoseStamped):
         pose = pose.pose
+    object_name = URDFObject(urdf_string).get_name()
+    if object_name in get_body_names():
+        raise DuplicateNameException(u'an object with name \'{}\' already exists in pybullet'.format(object_name))
     resolved_urdf = resolve_ros_iris_in_urdf(urdf_string)
     filename = write_to_tmp(u'{}.urdf'.format(random_string()), resolved_urdf)
     with NullContextManager() if giskardpy.PRINT_LEVEL == DEBUG else suppress_stdout():
@@ -111,7 +116,7 @@ def clear_pybullet():
     p.resetSimulation()
 
 def get_body_names():
-    return [p.getBodyInfo(i)[1] for i in range(p.getNumBodies())]
+    return [p.getBodyInfo(p.getBodyUniqueId(i))[1] for i in range(p.getNumBodies())]
 
 def print_body_names():
     print(get_body_names())

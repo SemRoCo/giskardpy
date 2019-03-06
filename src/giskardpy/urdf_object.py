@@ -1,10 +1,12 @@
 from collections import namedtuple
 from itertools import chain
 
-from geometry_msgs.msg import Pose
+from geometry_msgs.msg import Pose, Vector3
 from giskard_msgs.msg import WorldBody
 import urdf_parser_py.urdf as up
+from std_msgs.msg import ColorRGBA
 from tf.transformations import euler_from_quaternion
+from visualization_msgs.msg import Marker
 
 from giskardpy.exceptions import DuplicateNameException
 from giskardpy.utils import cube_volume, cube_surface, sphere_volume, cylinder_volume, cylinder_surface, \
@@ -47,9 +49,9 @@ class URDFObject(object):
         :param default_joint_vel_limit: all velocity limits which are undefined or higher than this will be set to this
         :type default_joint_vel_limit: Symbol
         """
-        self.original_urdf = urdf
+        self.original_urdf = hacky_urdf_parser_fix(urdf)
         with suppress_stderr():
-            self._urdf_robot = up.URDF.from_xml_string(hacky_urdf_parser_fix(urdf))  # type: up.Robot
+            self._urdf_robot = up.URDF.from_xml_string(self.original_urdf)  # type: up.Robot
 
     @classmethod
     def from_urdf_file(cls, urdf_file, *args, **kwargs):
@@ -115,6 +117,14 @@ class URDFObject(object):
         for joint in joints:
             r.add_joint(joint)
         return cls(r.to_xml_string(), *args, **kwargs)
+
+    @classmethod
+    def from_urdf_object(cls, urdf_object, *args, **kwargs):
+        """
+        :type urdf_object: URDFObject
+        :rtype: cls
+        """
+        return cls(urdf_object.get_urdf(), *args, **kwargs)
 
     def get_name(self):
         """
@@ -366,6 +376,18 @@ class URDFObject(object):
             self._urdf_robot.remove_aggregate(self.get_urdf_joint(joint))
         self.reinitialize()
 
+
+    def reset(self):
+        """
+        Detaches all object that have been attached to the robot.
+        """
+        self._urdf_robot = up.URDF.from_xml_string(self.original_urdf)
+        self.reinitialize()
+
+    def __str__(self):
+        return self.get_name()
+
+
     def reinitialize(self):
         self._urdf_robot = up.URDF.from_xml_string(self.get_urdf())
 
@@ -374,7 +396,15 @@ class URDFObject(object):
         return u'{}'.format(name)
 
     def get_parent_link_name(self, child_link_name):
-        return self._urdf_robot.parent_map[child_link_name][1]
+        if child_link_name in self._urdf_robot.parent_map:
+            return self._urdf_robot.parent_map[child_link_name][1]
+
+    def are_linked(self, link_a, link_b):
+        return link_a == self.get_parent_link_name(link_b) or \
+               (link_b == self.get_parent_link_name(link_a))
+
+    def get_controllable_joints(self):
+        return [joint_name for joint_name in self.get_joint_names() if self.is_joint_controllable(joint_name)]
 
     def __eq__(self, o):
         """
@@ -382,3 +412,89 @@ class URDFObject(object):
         :rtype: bool
         """
         return o.get_urdf() == self.get_urdf()
+
+    def has_link_visuals(self, link_name):
+        link = self._urdf_robot.link_map[link_name]
+        return link.visual is not None
+
+    # def as_marker_msg(self, ns=u'', id=1):
+    #     link = parsed_urdf.links[0]
+    #     m = Marker()
+    #     m.ns = u'{}/{}'.format(ns, self.get_name())
+    #     m.id = id
+    #     geometry = link.visual.geometry
+    #     if isinstance(geometry, Box):
+    #         m.type = Marker.CUBE
+    #         m.scale = Vector3(*geometry.size)
+    #     elif isinstance(geometry, Sphere):
+    #         m.type = Marker.SPHERE
+    #         m.scale = Vector3(geometry.radius,
+    #                           geometry.radius,
+    #                           geometry.radius)
+    #     elif isinstance(geometry, Cylinder):
+    #         m.type = Marker.CYLINDER
+    #         m.scale = Vector3(geometry.radius,
+    #                           geometry.radius,
+    #                           geometry.length)
+    #     else:
+    #         raise Exception(u'world body type {} can\'t be converted to marker'.format(geometry.__class__.__name__))
+    #
+    #     self.fk_dict = self.get_god_map().get_data(['fk'])
+    #     markers = []
+    #     for index, link in enumerate(self.get_link_names()):
+    #         if not self.has_link_visuals(link.name):
+    #             continue
+    #         marker = Marker()
+    #         m.ns = u'{}/{}'.format(ns, self.get_name())
+    #         m.id = index
+    #         link_type = type(link.visual.geometry)
+    #
+    #         if link_type == up.Mesh:
+    #             marker.type = Marker.MESH_RESOURCE
+    #             marker.mesh_resource = link.visual.geometry.filename
+    #             if link.visual.geometry.scale is None:
+    #                 marker.scale.x = 1.0
+    #                 marker.scale.z = 1.0
+    #                 marker.scale.y = 1.0
+    #             else:
+    #                 marker.scale.x = link.visual.geometry.scale[0]
+    #                 marker.scale.z = link.visual.geometry.scale[1]
+    #                 marker.scale.y = link.visual.geometry.scale[2]
+    #             marker.mesh_use_embedded_materials = True
+    #         elif link_type == up.Box:
+    #             marker.type = Marker.CUBE
+    #             marker.scale = Vector3(*link.visual.geometry)
+    #         elif link_type == up.Cylinder:
+    #             marker.type = Marker.CYLINDER
+    #             marker.scale.x = link.visual.geometry.radius
+    #             marker.scale.y = link.visual.geometry.radius
+    #             marker.scale.z = link.visual.geometry.length
+    #         elif link_type == up.Sphere:
+    #             marker.type = Marker.SPHERE
+    #             marker.scale.x = link.visual.geometry.radius
+    #             marker.scale.y = link.visual.geometry.radius
+    #             marker.scale.z = link.visual.geometry.radius
+    #         else:
+    #             continue
+    #
+    #         marker.scale.x *= 0.99
+    #         marker.scale.y *= 0.99
+    #         marker.scale.z *= 0.99
+    #
+    #         link_in_base = self.fk_dict[self.get_root(), link.name]
+    #         marker.header.frame_id = self.get_root()
+    #         marker.action = Marker.ADD
+    #         marker.id = index
+    #         marker.ns = u'planning_visualization'
+    #         marker.pose = link_in_base.pose
+    #         marker.color.a = 0.5
+    #         marker.color.r = 1.0
+    #         marker.color.g = 1.0
+    #         marker.color.b = 1.0
+    #
+    #
+    #         markers.append(marker)
+    #
+    #     m.color = ColorRGBA(0, 1, 0, 0.8)
+    #     m.frame_locked = True
+    #     return m

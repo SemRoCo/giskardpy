@@ -1,4 +1,6 @@
 import pybullet as p
+import shutil
+
 import pytest
 
 import test_urdf_object
@@ -13,7 +15,7 @@ import test_world
 
 
 @pytest.fixture(scope=u'module')
-def pybullet(request):
+def module_setup(request):
     print(u'starting pybullet')
     pbw.start_pybullet(False)
 
@@ -24,15 +26,19 @@ def pybullet(request):
     request.addfinalizer(kill_pybullet)
 
 @pytest.fixture()
-def resetted_pybullet(pybullet):
+def function_setup(request, module_setup):
     """
     :rtype: WorldObject
     """
     pbw.clear_pybullet()
-    return pybullet
+    def kill_pybullet():
+        print(u'resetting pybullet')
+        pbw.clear_pybullet()
+
+    request.addfinalizer(kill_pybullet)
 
 @pytest.fixture()
-def parsed_pr2(resetted_pybullet):
+def parsed_pr2(function_setup):
     """
     :rtype: WorldObject
     """
@@ -40,28 +46,28 @@ def parsed_pr2(resetted_pybullet):
 
 
 @pytest.fixture()
-def parsed_base_bot(resetted_pybullet):
+def parsed_base_bot(function_setup):
     """
     :rtype: WorldObject
     """
     return PyBulletWorldObject(base_bot_urdf())
 
 @pytest.fixture()
-def parsed_donbot(resetted_pybullet):
+def parsed_donbot(function_setup):
     """
     :rtype: Robot
     """
     return PyBulletWorldObject(donbot_urdf())
 
 @pytest.fixture()
-def parsed_boxy(resetted_pybullet):
+def parsed_boxy(function_setup):
     """
     :rtype: Robot
     """
     return PyBulletWorldObject(boxy_urdf())
 
 @pytest.fixture()
-def empty_world(pybullet):
+def empty_world(function_setup):
     """
     :rtype: PyBulletWorld
     """
@@ -71,12 +77,28 @@ def empty_world(pybullet):
     return pw
 
 @pytest.fixture()
-def world_with_pr2(empty_world, parsed_pr2):
+def world_with_pr2(empty_world):
     """
     :rtype: PyBulletWorld
     """
-    empty_world.add_robot(parsed_pr2)
+    pr2 = WorldObject(pr2_urdf())
+    empty_world.add_robot(pr2)
     return empty_world
+
+@pytest.fixture()
+def test_folder(request):
+    """
+    :rtype: World
+    """
+    folder_name = u'tmp_data/'
+    def kill_pybullet():
+        try:
+            shutil.rmtree(folder_name)
+        except Exception:
+            pass
+
+    request.addfinalizer(kill_pybullet)
+    return folder_name
 
 def assert_num_pybullet_objects(num):
     assert p.getNumBodies() == num, pbw.print_body_names()
@@ -87,22 +109,13 @@ class TestPyBulletWorldObject(test_world.TestWorldObj):
         assert_num_pybullet_objects(1)
         assert u'pointy' in pbw.get_body_names()
 
-    def test_detach_object(self, parsed_base_bot):
-        super(TestPyBulletWorldObject, self).test_detach_object(parsed_base_bot)
+    def test_safe_load_collision_matrix(self, parsed_pr2, test_folder):
+        super(TestPyBulletWorldObject, self).test_safe_load_collision_matrix(parsed_pr2, test_folder)
 
-
-# def test_robot(self, pybullet):
-    #     pr2 =
-    #     assert len(empty_world.get_objects()) == 0
-    #     assert not empty_world.has_robot()
-    #     pr2 = WorldObject(pr2_urdf())
-    #     empty_world.add_robot(pr2)
-    #     assert empty_world.has_robot()
-    #     assert pr2 == empty_world.get_robot()
 
 
 class TestPyBulletWorld(test_world.TestWorld):
-    cls = PyBulletWorldObject
+    cls = WorldObject
 
     def test_add_robot(self, empty_world):
         super(TestPyBulletWorld, self).test_add_robot(empty_world)
@@ -142,8 +155,11 @@ class TestPyBulletWorld(test_world.TestWorld):
 
     def test_remove_object2(self, world_with_pr2):
         super(TestPyBulletWorld, self).test_remove_object2(world_with_pr2)
-        assert_num_pybullet_objects(3)
+        assert_num_pybullet_objects(4)
 
+    def test_attach_existing_obj_to_robot(self, world_with_pr2):
+        super(TestPyBulletWorld, self).test_attach_existing_obj_to_robot(world_with_pr2)
+        assert_num_pybullet_objects(3)
 
 
 

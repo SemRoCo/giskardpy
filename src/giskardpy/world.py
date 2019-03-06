@@ -18,6 +18,8 @@ class World(object):
         keeps robot and other important objects like ground plane
         """
         self.remove_all_objects()
+        if self.robot is not None:
+            self.robot.reset()
 
     def hard_reset(self):
         """
@@ -35,8 +37,6 @@ class World(object):
         """
         :type object_: URDFObject
         """
-        if not isinstance(object_, URDFObject):
-            object_ = WorldObject(object_.get_urdf())
         if self.has_robot() and self.get_robot().get_name() == object_.get_name():
             raise DuplicateNameException(u'object and robot have the same name')
         if self.has_object(object_.get_name()):
@@ -77,6 +77,7 @@ class World(object):
 
     def remove_object(self, name):
         if self.has_object(name):
+            self.objects[name].suicide()
             del (self.objects[name])
 
     def remove_all_objects(self):
@@ -119,3 +120,11 @@ class World(object):
 
     def remove_robot(self):
         self.robot = None
+
+    def attach_existing_obj_to_robot(self, name, link, pose):
+        """
+        :param name: name of the existing object
+        :type name: name
+        """
+        self.robot.attach_urdf_object(self.get_object(name), link, pose)
+        self.remove_object(name)

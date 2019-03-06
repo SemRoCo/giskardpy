@@ -7,8 +7,19 @@ from giskardpy.test_utils import pr2_urdf, donbot_urdf, boxy_urdf, base_bot_urdf
 from giskardpy.urdf_object import URDFObject
 from giskardpy.utils import make_world_body_box, make_world_body_sphere, make_world_body_cylinder, make_urdf_world_body
 
+@pytest.fixture(scope=u'module')
+def module_setup(request):
+    pass
+
 @pytest.fixture()
-def parsed_pr2():
+def function_setup(request, module_setup):
+    """
+    :rtype: WorldObject
+    """
+    pass
+
+@pytest.fixture()
+def parsed_pr2(function_setup):
     """
     :rtype: Robot
     """
@@ -16,7 +27,7 @@ def parsed_pr2():
     return r
 
 @pytest.fixture()
-def parsed_donbot():
+def parsed_donbot(function_setup):
     """
     :rtype: Robot
     """
@@ -24,7 +35,7 @@ def parsed_donbot():
     return r
 
 @pytest.fixture()
-def parsed_boxy():
+def parsed_boxy(function_setup):
     """
     :rtype: Robot
     """
@@ -32,7 +43,7 @@ def parsed_boxy():
     return r
 
 @pytest.fixture()
-def parsed_base_bot():
+def parsed_base_bot(function_setup):
     """
     :rtype: tested_class
     """
@@ -40,10 +51,6 @@ def parsed_base_bot():
 
 class TestUrdfObject(object):
     cls = URDFObject
-    def test_urdf_from_str(self, parsed_pr2):
-        pr2 = self.cls(pr2_urdf())
-        assert pr2 == parsed_pr2
-
     def test_urdf_from_file(self, parsed_pr2):
         """
         :type parsed_pr2: tested_class
@@ -52,40 +59,40 @@ class TestUrdfObject(object):
         assert len(parsed_pr2.get_link_names()) == 97
         assert parsed_pr2.get_name() == u'pr2'
 
-    def test_from_world_body_box(self):
+    def test_from_world_body_box(self, function_setup):
         wb = make_world_body_box()
         urdf_obj = self.cls.from_world_body(wb)
         assert len(urdf_obj.get_link_names()) == 1
         assert len(urdf_obj.get_joint_names()) == 0
 
-    def test_from_world_body_sphere(self):
+    def test_from_world_body_sphere(self, function_setup):
         wb = make_world_body_sphere()
         urdf_obj = self.cls.from_world_body(wb)
         assert len(urdf_obj.get_link_names()) == 1
         assert len(urdf_obj.get_joint_names()) == 0
 
-    def test_from_world_body_cylinder(self):
+    def test_from_world_body_cylinder(self, function_setup):
         wb = make_world_body_cylinder()
         urdf_obj = self.cls.from_world_body(wb)
         assert len(urdf_obj.get_link_names()) == 1
         assert len(urdf_obj.get_joint_names()) == 0
 
-    def test_from_world_body_cone(self):
+    def test_from_world_body_cone(self, function_setup):
         pass
 
-    def test_from_world_body_invalid_primitive_type(self):
+    def test_from_world_body_invalid_primitive_type(self, function_setup):
         pass
 
-    def test_form_world_body_unsupported_type(self):
+    def test_form_world_body_unsupported_type(self, function_setup):
         pass
 
-    def test_from_world_body_urdf(self):
+    def test_from_world_body_urdf(self, function_setup):
         wb = make_urdf_world_body(u'pr2', pr2_urdf())
         urdf_obj = self.cls.from_world_body(wb)
         assert len(urdf_obj.get_joint_names()) == 96
         assert len(urdf_obj.get_link_names()) == 97
 
-    def test_from_world_body_mesh(self):
+    def test_from_world_body_mesh(self, function_setup):
         wb = make_world_body_cylinder()
         urdf_obj = self.cls.from_world_body(wb)
         assert len(urdf_obj.get_link_names()) == 1
@@ -192,6 +199,10 @@ class TestUrdfObject(object):
         except DuplicateNameException as e:
             assert True
 
+    def test_attach5(self):
+        # TODO test that attach an object which has the same name as on of its links or joints
+        pass
+
     def test_detach_object(self, parsed_base_bot):
         """
         :type parsed_base_bot: self.cls
@@ -206,6 +217,28 @@ class TestUrdfObject(object):
         parsed_pr2.detach_sub_tree(u'l_shoulder_pan_joint')
         assert len(parsed_pr2.get_link_names()) == 73
         assert len(parsed_pr2.get_joint_names()) == 72
+
+    def test_reset1(self, parsed_pr2):
+        links_before = set(parsed_pr2.get_link_names())
+        joints_before = set(parsed_pr2.get_joint_names())
+        parsed_pr2.detach_sub_tree(u'l_shoulder_pan_joint')
+        parsed_pr2.reset()
+        assert set(parsed_pr2.get_link_names()) == links_before
+        assert set(parsed_pr2.get_joint_names()) == joints_before
+
+    def test_reset2(self, parsed_pr2):
+        links_before = set(parsed_pr2.get_link_names())
+        joints_before = set(parsed_pr2.get_joint_names())
+
+        box = self.cls.from_world_body(make_world_body_box())
+        p = Pose()
+        p.position = Point(0, 0, 0)
+        p.orientation = Quaternion(0, 0, 0, 1)
+        parsed_pr2.attach_urdf_object(box, u'l_gripper_tool_frame', p)
+
+        parsed_pr2.reset()
+        assert set(parsed_pr2.get_link_names()) == links_before
+        assert set(parsed_pr2.get_joint_names()) == joints_before
 
     def test_attach_detach(self, parsed_pr2):
         box = self.cls.from_world_body(make_world_body_box())

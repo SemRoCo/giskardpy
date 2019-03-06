@@ -1,3 +1,6 @@
+import os
+import shutil
+
 import pytest
 from geometry_msgs.msg import PoseStamped, Pose, Point, Quaternion
 from giskard_msgs.msg import WorldBody
@@ -10,8 +13,20 @@ from giskardpy.utils import make_world_body_box, make_world_body_sphere, make_wo
 from giskardpy.world import World
 from giskardpy.world_object import WorldObject
 
+
+@pytest.fixture(scope=u'module')
+def module_setup(request):
+    pass
+
 @pytest.fixture()
-def parsed_pr2():
+def function_setup(request, module_setup):
+    """
+    :rtype: WorldObject
+    """
+    pass
+
+@pytest.fixture()
+def parsed_pr2(function_setup):
     """
     :rtype: WorldObject
     """
@@ -19,28 +34,28 @@ def parsed_pr2():
 
 
 @pytest.fixture()
-def parsed_base_bot():
+def parsed_base_bot(function_setup):
     """
     :rtype: WorldObject
     """
     return WorldObject(base_bot_urdf())
 
 @pytest.fixture()
-def parsed_donbot():
+def parsed_donbot(function_setup):
     """
     :rtype: Robot
     """
     return WorldObject(donbot_urdf())
 
 @pytest.fixture()
-def parsed_boxy():
+def parsed_boxy(function_setup):
     """
     :rtype: Robot
     """
     return WorldObject(boxy_urdf())
 
 @pytest.fixture()
-def empty_world():
+def empty_world(function_setup):
     """
     :rtype: World
     """
@@ -55,10 +70,29 @@ def world_with_pr2(parsed_pr2):
     w.add_robot(parsed_pr2)
     return w
 
+@pytest.fixture()
+def test_folder(request):
+    """
+    :rtype: World
+    """
+    folder_name = u'tmp_data/'
+    def kill_pybullet():
+        shutil.rmtree(folder_name)
+
+    request.addfinalizer(kill_pybullet)
+    return folder_name
+
 class TestWorldObj(test_urdf_object.TestUrdfObject):
     cls = WorldObject
     def test_from_urdf_file(self, parsed_pr2):
         assert isinstance(parsed_pr2, WorldObject)
+
+    def test_safe_load_collision_matrix(self, parsed_pr2, test_folder):
+        parsed_pr2.init_self_collision_matrix()
+        scm = parsed_pr2.get_self_collision_matrix()
+        parsed_pr2.safe_self_collision_matrix(test_folder)
+        parsed_pr2.load_self_collision_matrix(test_folder)
+        assert scm == parsed_pr2.get_self_collision_matrix()
 
 class TestWorld(object):
     cls = WorldObject
@@ -101,6 +135,18 @@ class TestWorld(object):
             assert True
         assert world_with_pr2.has_robot()
         assert len(world_with_pr2.get_objects()) == 0
+
+    def test_attach_existing_obj_to_robot(self, world_with_pr2):
+        box = self.cls.from_world_body(make_world_body_box())
+        world_with_pr2.add_object(box)
+        p = Pose()
+        p.orientation.w = 1
+        links_before = set(world_with_pr2.get_robot().get_link_names())
+        joints_before = set(world_with_pr2.get_robot().get_joint_names())
+        world_with_pr2.attach_existing_obj_to_robot(u'box', u'l_gripper_tool_frame', p)
+        assert u'box' not in world_with_pr2.get_object_names()
+        assert set(world_with_pr2.get_robot().get_link_names()).difference(links_before) == {u'box'}
+        assert set(world_with_pr2.get_robot().get_joint_names()).difference(joints_before) == {u'box'}
 
     def test_hard_reset1(self, world_with_pr2):
         world_with_pr2.hard_reset()

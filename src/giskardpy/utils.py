@@ -562,3 +562,10 @@ def make_urdf_world_body(name, urdf):
     wb.type = wb.URDF_BODY
     wb.urdf = urdf
     return wb
+
+def is_iterable(qwe):
+    try:
+        iter(qwe)
+    except TypeError:
+        return False
+    return True

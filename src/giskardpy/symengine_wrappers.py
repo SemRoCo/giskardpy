@@ -5,7 +5,7 @@ from warnings import warn
 import errno
 import symengine as sp
 from symengine import Matrix, Symbol, eye, sympify, diag, zeros, lambdify, Abs, Max, Min, sin, cos, tan, acos, asin, \
-    atan, atan2, nan, sqrt, log, tanh, var
+    atan, atan2, nan, sqrt, log, tanh, var, floor
 import numpy as np
 from numpy import pi
 
@@ -144,6 +144,7 @@ def diffable_if_eq_zero(condition, if_result, else_result):
     condition = diffable_abs(diffable_sign(condition))
     return (1 - condition) * if_result + condition * else_result
 
+
 def if_eq_zero(condition, if_result, else_result):
     """
     A short expression which can be compiled quickly.
@@ -158,11 +159,12 @@ def if_eq_zero(condition, if_result, else_result):
     condition = sp.Abs(diffable_sign(condition))
     return (1 - condition) * if_result + condition * else_result
 
+
 def safe_compiled_function(f, file_name):
     create_path(file_name)
     with open(file_name, 'w') as file:
-        print('saved {}'.format(file_name))
         pickle.dump(f, file)
+        print(u'saved {}'.format(file_name))
 
 
 def load_compiled_function(file_name):
@@ -172,7 +174,8 @@ def load_compiled_function(file_name):
                 fast_f = pickle.load(file)
                 return fast_f
         except EOFError as e:
-            raise EOFError(u'{} corrupted, pls delete'.format(file_name))
+            os.remove(file_name)
+            print(u'{} deleted because it was corrupted'.format(file_name))
 
 
 class CompiledFunction(object):
@@ -540,6 +543,7 @@ def diffable_axis_angle_from_matrix(rotation_matrix):
     axis = sp.Matrix([x / n, y / n, z / n])
     return axis, angle
 
+
 def diffable_axis_angle_from_matrix_stable(rotation_matrix):
     """
     :param rotation_matrix: 4x4 or 3x3 Matrix
@@ -562,6 +566,7 @@ def diffable_axis_angle_from_matrix_stable(rotation_matrix):
                       diffable_if_eq_zero(n, 0, y / m),
                       diffable_if_eq_zero(n, 1, z / m)])
     return axis, angle
+
 
 def axis_angle_from_matrix(rotation_matrix):
     """
@@ -587,6 +592,7 @@ def axis_angle_from_matrix(rotation_matrix):
     axis *= sign
     angle = sign * angle
     return axis, angle
+
 
 def axis_angle_from_quaternion(x, y, z, w):
     """
@@ -815,6 +821,39 @@ def euclidean_distance(v1, v2):
     return norm(v1 - v2)
 
 
+def fmod(a, b):
+    return a - b * floor(a / b)
+
+
+def normalize_angle_positive(angle):
+    """
+    Normalizes the angle to be 0 to 2*pi
+    It takes and returns radians.
+    """
+    return fmod(fmod(angle, 2.0 * pi) + 2.0 * pi, 2.0 * pi)
+
+
+def normalize_angle(angle):
+    """
+    Normalizes the angle to be -pi to +pi
+    It takes and returns radians.
+    """
+    a = normalize_angle_positive(angle)
+    condition = a - pi
+    return if_greater_zero(condition, a - 2 * pi, a)
+
+
+def shortest_angular_distance(from_angle, to_angle):
+    """
+    Given 2 angles, this returns the shortest angular
+    difference.  The inputs and ouputs are of course radians.
+
+    The result would always be -pi <= result <= pi. Adding the result
+    to "from" will always get you an equivelent angle to "to".
+    """
+    return normalize_angle(to_angle - from_angle)
+
+
 def diffable_slerp(q1, q2, t):
     """
     !takes a long time to compile!
@@ -850,6 +889,7 @@ def diffable_slerp(q1, q2, t):
     ratio_b = sin(t * half_theta) / sin_half_theta
     return if_greater_eq_zero(if1, sp.Matrix(q1),
                               if_greater_zero(if2, 0.5 * q1 + 0.5 * q2, ratio_a * q1 + ratio_b * q2))
+
 
 def to_numpy(matrix):
     return np.array(matrix.tolist()).astype(float).reshape(matrix.shape)

@@ -9,7 +9,7 @@ class CleanUp(GiskardBehavior):
         super(CleanUp, self).__init__(name)
 
     def initialise(self):
-        self.god_map.safe_set_data([closest_point_identifier], None)
+        self.get_god_map().safe_set_data(closest_point_identifier, None)
 
     def update(self):
         return Status.SUCCESS

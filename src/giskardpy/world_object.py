@@ -6,7 +6,10 @@ import pickle
 from itertools import combinations
 from random import seed
 
+from geometry_msgs.msg import Pose, Quaternion
+
 from giskardpy.data_types import SingleJointState
+from giskardpy.tfwrapper import msg_to_kdl
 from giskardpy.urdf_object import URDFObject
 
 
@@ -14,7 +17,12 @@ class WorldObject(URDFObject):
     def __init__(self, urdf, base_pose=None, controlled_joints=None, *args, **kwargs):
         super(WorldObject, self).__init__(urdf, *args, **kwargs)
         self.controlled_joints = controlled_joints
-        self.set_base_pose(base_pose)
+        if base_pose is None:
+            p = Pose()
+            p.orientation.w = 1
+            self.base_pose = p
+        self.joint_state = {}
+        self._self_collision_matrix = {}
 
     @classmethod
     def from_urdf_file(cls, urdf_file, *args, **kwargs):
@@ -28,21 +36,42 @@ class WorldObject(URDFObject):
     def from_parts(cls, robot_name, links, joints, *args, **kwargs):
         return super(WorldObject, cls).from_parts(robot_name, links, joints, *args, **kwargs)
 
-    def set_base_pose(self, pose):
+    @property
+    def joint_state(self):
+        return self._js
+
+    @joint_state.setter
+    def joint_state(self, value):
+        self._js = value
+
+    @property
+    def base_pose(self):
+        return self._base_pose
+
+    @base_pose.setter
+    def base_pose(self, value):
         """
-        :param pose:
+        :type value: Pose
         :return:
         """
-        pass
+        orientation_vector = np.array([value.orientation.x,
+                                       value.orientation.y,
+                                       value.orientation.z,
+                                       value.orientation.w])
+        self._base_pose = value
+        self._base_pose.orientation = Quaternion(*orientation_vector/np.linalg.norm(orientation_vector))
+        self.T_base___map = msg_to_kdl(self._base_pose).Inverse()
 
-    def get_base_pose(self):
-        pass
+    @property
+    def controlled_joints(self):
+        # FIXME reinitialize does not handle newly added or removed controllable joints
+        if self._controlled_joints is None:
+            self._controlled_joints = self.get_controllable_joints()
+        return self._controlled_joints
 
-    def set_joint_state(self, joint_state):
-        pass
-
-    def get_joint_state(self):
-        pass
+    @controlled_joints.setter
+    def controlled_joints(self, value):
+        self._controlled_joints = value
 
     def suicide(self):
         pass
@@ -50,18 +79,17 @@ class WorldObject(URDFObject):
     def __del__(self):
         self.suicide()
 
-    def get_controlled_joints(self):
-        # FIXME reinitialize does not handle newly added or removed controllable joints
-        if self.controlled_joints is None:
-            self.controlled_joints = self.get_controllable_joints()
-        return self.controlled_joints
-
+    def get_controlled_links(self):
+        controllable_links = set()
+        for joint_name in self.controlled_joints:
+            controllable_links.update(self.get_sub_tree_link_names_with_collision(joint_name))
+        return controllable_links
 
     def get_self_collision_matrix(self):
         """
         :return: (link1, link2) -> min allowed distance
         """
-        return self.self_collision_matrix
+        return self._self_collision_matrix
 
     def calc_collision_matrix(self, link_combinations, d=0.05, d2=0.0, num_rnd_tries=1000):
         """
@@ -86,20 +114,20 @@ class WorldObject(URDFObject):
             if self.are_linked(link_a, link_b):
                 always.add((link_a, link_b))
         rest = link_combinations.difference(always)
-        self.set_joint_state(self.get_zero_joint_state())
+        self.joint_state = self.get_zero_joint_state()
         always = always.union(self.check_collisions(rest, d))
         rest = rest.difference(always)
 
         # find meaningful self-collisions
-        self.set_joint_state(self.get_min_joint_state())
+        self.joint_state = self.get_min_joint_state()
         sometimes = self.check_collisions(rest, d2)
         rest = rest.difference(sometimes)
-        self.set_joint_state(self.get_max_joint_state())
+        self.joint_state = self.get_max_joint_state()
         sometimes2 = self.check_collisions(rest, d2)
         rest = rest.difference(sometimes2)
         sometimes = sometimes.union(sometimes2)
         for i in range(num_rnd_tries):
-            self.set_joint_state(self.get_rnd_joint_state())
+            self.joint_state = self.get_rnd_joint_state()
             sometimes2 = self.check_collisions(rest, d2)
             if len(sometimes2) > 0:
                 rest = rest.difference(sometimes2)
@@ -134,8 +162,9 @@ class WorldObject(URDFObject):
         def f(joint_name):
             _, upper_limit = self.get_joint_limits(joint_name)
             if upper_limit is None:
-                return np.pi*2
+                return np.pi * 2
             return upper_limit
+
         return self.generate_joint_state(f)
 
     def get_min_joint_state(self):
@@ -163,44 +192,44 @@ class WorldObject(URDFObject):
         :param f: lambda joint_info: float
         :return:
         """
+        # TODO possible optimization, if some joints are not controlled, the collision matrix might get smaller
         js = {}
-        for joint_name in self.get_controlled_joints():
-            if self.is_joint_controllable(joint_name):
-                sjs = SingleJointState()
-                sjs.name = joint_name
-                sjs.position = f(joint_name)
-                js[joint_name] = sjs
+        for joint_name in self.get_controllable_joints():
+            sjs = SingleJointState()
+            sjs.name = joint_name
+            sjs.position = f(joint_name)
+            js[joint_name] = sjs
         return js
 
     def add_self_collision_entries(self, object_name):
         link_pairs = {(object_name, link_name) for link_name in self.get_link_names()}
         link_pairs.remove((object_name, object_name))
         self_collision_with_object = self.calc_collision_matrix(link_pairs)
-        self.self_collision_matrix.update(self_collision_with_object)
+        self._self_collision_matrix.update(self_collision_with_object)
 
     def remove_self_collision_entries(self, object_name):
-        self.self_collision_matrix = {(link1, link2) for link1, link2 in self.get_self_collision_matrix()
-                                      if link1 != object_name and link2 != object_name}
+        self._self_collision_matrix = {(link1, link2) for link1, link2 in self.get_self_collision_matrix()
+                                       if link1 != object_name and link2 != object_name}
 
     def init_self_collision_matrix(self):
-        self.self_collision_matrix = self.calc_collision_matrix(set(combinations(self.get_link_names(), 2)))
+        self._self_collision_matrix = self.calc_collision_matrix(set(combinations(self.get_link_names(), 2)))
 
     def load_self_collision_matrix(self, path):
         """
         :rtype: bool
         """
         urdf_hash = hashlib.md5(self.get_urdf()).hexdigest()
-        path = path + urdf_hash
+        path = u'{}/{}/{}'.format(path, self.get_name(), urdf_hash)
         if os.path.isfile(path):
             with open(path) as f:
-                self.self_collision_matrix = pickle.load(f)
+                self._self_collision_matrix = pickle.load(f)
                 print(u'loaded self collision matrix {}'.format(urdf_hash))
                 return True
         return False
 
     def safe_self_collision_matrix(self, path):
         urdf_hash = hashlib.md5(self.get_urdf()).hexdigest()
-        path = path + urdf_hash
+        path = u'{}/{}/{}'.format(path, self.get_name(), urdf_hash)
         if not os.path.exists(os.path.dirname(path)):
             try:
                 dir_name = os.path.dirname(path)
@@ -211,4 +240,5 @@ class WorldObject(URDFObject):
                     raise
         with open(path, u'w') as file:
             print(u'saved self collision matrix {}'.format(path))
-            pickle.dump(self.self_collision_matrix, file)
+            pickle.dump(self._self_collision_matrix, file)
+

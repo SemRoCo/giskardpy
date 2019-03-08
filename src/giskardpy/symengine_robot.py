@@ -1,17 +1,23 @@
-import hashlib
 from collections import namedtuple, OrderedDict
 import symengine_wrappers as spw
+from giskardpy import BACKEND, WORLD_IMPLEMENTATION
 
 from giskardpy.pybullet_world_object import PyBulletWorldObject
 from giskardpy.qp_problem_builder import HardConstraint, JointConstraint
-from giskardpy.urdf_object import URDFObject
-from giskardpy.utils import cube_volume, cube_surface, sphere_volume, cylinder_volume, cylinder_surface, keydefaultdict, \
+from giskardpy.utils import keydefaultdict, \
     suppress_stdout, suppress_stderr
+from giskardpy.world_object import WorldObject
 
-Joint = namedtuple('Joint', ['symbol', 'velocity_limit', 'lower', 'upper', 'type', 'frame'])
+Joint = namedtuple(u'Joint', [u'symbol', u'velocity_limit', u'lower', u'upper', u'type', u'frame'])
 
-class Robot(PyBulletWorldObject):
-    def __init__(self, urdf, default_joint_vel_limit, default_joint_weight, controlled_joints):
+if WORLD_IMPLEMENTATION == u'pybullet':
+    Backend=PyBulletWorldObject
+else:
+    Backend=WorldObject
+
+class Robot(Backend):
+    def __init__(self, urdf, base_pose, controlled_joints, default_joint_vel_limit,
+                 default_joint_weight, *args, **kwargs):
         """
         :param urdf:
         :type urdf: str
@@ -20,22 +26,34 @@ class Robot(PyBulletWorldObject):
         :param default_joint_vel_limit: all velocity limits which are undefined or higher than this will be set to this
         :type default_joint_vel_limit: Symbol
         """
-        super(Robot, self).__init__(urdf, controlled_joints)
-        self.default_joint_velocity_limit = default_joint_vel_limit
-        self.default_weight = default_joint_weight
-        self.fks = {}
+        self._fk_expressions = {}
+        self._fks = {}
         self._joint_to_frame = {}
-        self.joint_to_symbol_map = keydefaultdict(lambda x: spw.Symbol(x))
+        self._default_joint_velocity_limit = default_joint_vel_limit
+        self._default_weight = default_joint_weight
+        self._joint_to_symbol_map = keydefaultdict(lambda x: spw.Symbol(x))
+        super(Robot, self).__init__(urdf, base_pose, controlled_joints, *args, **kwargs)
+        self.reinitialize()
+
+    @property
+    def hard_constraints(self):
+        return self._hard_constraints
+
+    @property
+    def joint_constraints(self):
+        return self._joint_constraints
 
     def reinitialize(self, joints_to_symbols_map=None):
         """
         :param joints_to_symbols_map: maps urdf joint names to symbols
         :type joints_to_symbols_map: dict
         """
+        super(Robot, self).reinitialize()
         if joints_to_symbols_map is not None:
-            self.joint_to_symbol_map.update(joints_to_symbols_map)
+            self._joint_to_symbol_map.update(joints_to_symbols_map)
         self._create_frames_expressions()
         self._create_constraints()
+        self._fks = {}
 
     def _create_frames_expressions(self):
         for joint_name, urdf_joint in self._urdf_robot.joint_map.items():
@@ -68,21 +86,21 @@ class Robot(PyBulletWorldObject):
         """
         Creates hard and joint constraints.
         """
-        self.hard_constraints = OrderedDict()
-        self.joint_constraints = OrderedDict()
+        self._hard_constraints = OrderedDict()
+        self._joint_constraints = OrderedDict()
         for i, joint_name in enumerate(self.get_joint_names_controllable()):
             lower_limit, upper_limit = self.get_joint_limits(joint_name)
             joint_symbol = self.get_joint_symbol(joint_name)
             velocity_limit = self.get_joint_velocity_limit_expr(joint_name)
 
             if lower_limit is not None and upper_limit is not None:
-                self.hard_constraints[joint_name] = HardConstraint(lower=lower_limit - joint_symbol,
-                                                                   upper=upper_limit - joint_symbol,
-                                                                   expression=joint_symbol)
+                self._hard_constraints[joint_name] = HardConstraint(lower=lower_limit - joint_symbol,
+                                                                    upper=upper_limit - joint_symbol,
+                                                                    expression=joint_symbol)
 
-            self.joint_constraints[joint_name] = JointConstraint(lower=-velocity_limit,
-                                                                 upper=velocity_limit,
-                                                                 weight=self.default_weight)
+            self._joint_constraints[joint_name] = JointConstraint(lower=-velocity_limit,
+                                                                  upper=velocity_limit,
+                                                                  weight=self._default_weight)
 
     def get_fk_expression(self, root_link, tip_link):
         """
@@ -91,12 +109,23 @@ class Robot(PyBulletWorldObject):
         :return: 4d matrix describing the transformation from root_link to tip_link
         :rtype: spw.Matrix
         """
-        if (root_link, tip_link) not in self.fks:
+        if (root_link, tip_link) not in self._fk_expressions:
             fk = spw.eye(4)
             for joint_name in self.get_joint_names_from_chain(root_link, tip_link):
                 fk *= self.get_joint_frame(joint_name)
-            self.fks[root_link, tip_link] = fk
-        return self.fks[root_link, tip_link]
+            self._fk_expressions[root_link, tip_link] = fk
+        return self._fk_expressions[root_link, tip_link]
+
+    def get_fk(self, root, tip):
+        return self._fks[root, tip](**self.joint_state)
+
+    def init_fast_fks(self):
+        def f(key):
+            root, tip = key
+            fk = self.get_fk_expression(root, tip)
+            self._fks[root, tip] = spw.speed_up(fk, fk.free_symbols, backend=BACKEND)
+        self._fks = keydefaultdict(f)
+
 
     # JOINT FUNCTIONS
 
@@ -116,9 +145,9 @@ class Robot(PyBulletWorldObject):
         """
         limit = self._urdf_robot.joint_map[joint_name].limit
         if limit is None or limit.velocity is None:
-            return self.default_joint_velocity_limit
+            return self._default_joint_velocity_limit
         else:
-            return spw.Min(limit.velocity, self.default_joint_velocity_limit)
+            return spw.Min(limit.velocity, self._default_joint_velocity_limit)
 
     def get_joint_frame(self, joint_name):
         """
@@ -135,4 +164,7 @@ class Robot(PyBulletWorldObject):
         :type joint_name: str
         :rtype: spw.Symbol
         """
-        return self.joint_to_symbol_map[joint_name]
+        return self._joint_to_symbol_map[joint_name]
+
+
+

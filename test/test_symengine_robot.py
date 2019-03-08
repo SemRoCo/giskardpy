@@ -1,4 +1,9 @@
-import unittest
+
+import giskardpy
+
+giskardpy.WORLD_IMPLEMENTATION = None
+
+import shutil
 from collections import OrderedDict
 
 import PyKDL
@@ -6,47 +11,64 @@ import pytest
 from urdf_parser_py.urdf import URDF
 
 from giskardpy.symengine_robot import Robot
-from giskardpy.test_utils import pr2_joint_state, rnd_joint_state, pr2_urdf, donbot_urdf, boxy_urdf
+from utils_for_tests import rnd_joint_state, pr2_urdf, donbot_urdf, boxy_urdf, base_bot_urdf
 from giskardpy.urdf_object import hacky_urdf_parser_fix
 from kdl_parser import kdl_tree_from_urdf_model
 import numpy as np
-import giskardpy.symengine_wrappers as sw
-from hypothesis import given, reproduce_failure, assume
-import hypothesis.strategies as st
+from hypothesis import given
 
 PKG = u'giskardpy'
 
 np.random.seed(23)
 
+@pytest.fixture(scope=u'module')
+def module_setup(request):
+    pass
 
 @pytest.fixture()
-def parsed_pr2():
+def function_setup(request, module_setup):
+    pass
+
+@pytest.fixture()
+def parsed_pr2(function_setup):
     """
     :rtype: Robot
     """
-    r = Robot(pr2_urdf(), 0, 0, [])
-    r.reinitialize()
-    return r
+    return Robot(pr2_urdf(),0,0,[])
 
 
 @pytest.fixture()
-def parsed_donbot():
+def parsed_base_bot(function_setup):
     """
     :rtype: Robot
     """
-    r = Robot(donbot_urdf(), 0, 0, [])
-    r.reinitialize()
-    return r
-
+    return Robot(base_bot_urdf(),0,0,[])
 
 @pytest.fixture()
-def parsed_boxy():
+def parsed_donbot(function_setup):
     """
     :rtype: Robot
     """
-    r = Robot(boxy_urdf(), 0, 0, [])
-    r.reinitialize()
-    return r
+    return Robot(donbot_urdf(),0,0,[])
+
+@pytest.fixture()
+def parsed_boxy(function_setup):
+    """
+    :rtype: Robot
+    """
+    return Robot(boxy_urdf(),0,0,[])
+
+@pytest.fixture()
+def test_folder(request):
+    """
+    :rtype: World
+    """
+    folder_name = u'tmp_data/'
+    def kill_pybullet():
+        shutil.rmtree(folder_name)
+
+    request.addfinalizer(kill_pybullet)
+    return folder_name
 
 
 def trajectory_rollout(controller, goal, time_limit=10, frequency=100, precision=0.0025):
@@ -142,15 +164,20 @@ class TestSymengineController(object):
 
     @given(rnd_joint_state(pr2_joint_limits))
     def test_pr2_fk1(self, parsed_pr2, js):
+        """
+        :type parsed_pr2: Robot
+        :type js:
+        :return:
+        """
         kdl = KDL(pr2_urdf())
         root = u'base_link'
         tips = [u'l_gripper_tool_frame', u'r_gripper_tool_frame']
         for tip in tips:
             kdl_r = kdl.get_robot(root, tip)
             kdl_fk = kdl_r.fk_np(js)
-            symengine_fk = parsed_pr2.get_fk_expression(root, tip).subs(js)
+            symengine_fk = parsed_pr2.calc_fk(root, tip, js)
             np.testing.assert_array_almost_equal(kdl_fk, symengine_fk, decimal=3)
-            np.testing.assert_array_almost_equal(kdl_r.fk_np_inv(js), sw.inverse_frame(symengine_fk), decimal=3)
+            # np.testing.assert_array_almost_equal(kdl_r.fk_np_inv(js), sw.inverse_frame(symengine_fk), decimal=3)
 
     @given(rnd_joint_state(donbot_joint_limits))
     def test_donbot_fk1(self, parsed_donbot, js):
@@ -160,9 +187,8 @@ class TestSymengineController(object):
         for tip in tips:
             kdl_r = kdl.get_robot(root, tip)
             kdl_fk = kdl_r.fk_np(js)
-            symengine_fk = parsed_donbot.get_fk_expression(root, tip).subs(js)
+            symengine_fk = parsed_donbot.calc_fk(root, tip, js)
             np.testing.assert_array_almost_equal(kdl_fk, symengine_fk, decimal=3)
-            np.testing.assert_array_almost_equal(kdl_r.fk_np_inv(js), sw.inverse_frame(symengine_fk), decimal=3)
 
     @given(rnd_joint_state(boxy_joint_limits))
     def test_donbot_fk1(self, parsed_boxy, js):
@@ -172,9 +198,8 @@ class TestSymengineController(object):
         for tip in tips:
             kdl_r = kdl.get_robot(root, tip)
             kdl_fk = kdl_r.fk_np(js)
-            symengine_fk = parsed_boxy.get_fk_expression(root, tip).subs(js)
+            symengine_fk = parsed_boxy.calc_fk(root, tip, js)
             np.testing.assert_array_almost_equal(kdl_fk, symengine_fk, decimal=3)
-            np.testing.assert_array_almost_equal(kdl_r.fk_np_inv(js), sw.inverse_frame(symengine_fk), decimal=3)
 
     def test_get_controllable_joint_names_pr2(self, parsed_pr2):
         expected = {u'l_shoulder_pan_joint', u'br_caster_l_wheel_joint', u'r_gripper_l_finger_tip_joint',

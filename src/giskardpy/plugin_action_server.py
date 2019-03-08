@@ -9,7 +9,7 @@ from py_trees import Blackboard, Status
 
 from giskardpy.exceptions import MAX_NWSR_REACHEDException, QPSolverException, SolverTimeoutError, InsolvableException, \
     SymengineException, PathCollisionException, UnknownBodyException
-from giskardpy.identifier import trajectory_identifier, controlled_joints_identifier
+from giskardpy.identifier import trajectory_identifier
 from giskardpy.plugin import GiskardBehavior
 from giskardpy.utils import plot_trajectory
 
@@ -133,8 +133,8 @@ class SendResult(ActionServerBehavior):
         return Status.SUCCESS
 
     def plot_traj(self):
-        trajectory = self.get_god_map().safe_get_data([trajectory_identifier])
-        controlled_joints = self.get_god_map().safe_get_data([controlled_joints_identifier])
+        trajectory = self.get_god_map().safe_get_data(trajectory_identifier)
+        controlled_joints = self.get_robot().controlled_joints
         plot_trajectory(trajectory, controlled_joints, self.path_to_data_folder)
 
     def exception_to_error_code(self, exception):

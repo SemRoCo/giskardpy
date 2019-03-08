@@ -5,6 +5,8 @@ from threading import Thread
 import rospy
 from py_trees import Behaviour, Blackboard, Status
 
+from giskardpy.identifier import world_identifier, robot_identifier
+
 
 class PluginBase(object):
     def __init__(self):
@@ -34,6 +36,18 @@ class PluginBase(object):
         """
         return self.god_map
 
+    def get_world(self):
+        """
+        :rtype: giskardpy.world.World
+        """
+        return self.get_god_map().safe_get_data(world_identifier)
+
+    def get_robot(self):
+        """
+        :rtype: giskardpy.symengine_robot.Robot
+        """
+        return self.get_god_map().safe_get_data(robot_identifier)
+
 class GiskardBehavior(Behaviour):
     def __init__(self, name):
         self.god_map = Blackboard().god_map
@@ -44,6 +58,18 @@ class GiskardBehavior(Behaviour):
         :rtype: giskardpy.god_map.GodMap
         """
         return self.god_map
+
+    def get_world(self):
+        """
+        :rtype: giskardpy.world.World
+        """
+        return self.get_god_map().safe_get_data(world_identifier)
+
+    def get_robot(self):
+        """
+        :rtype: giskardpy.symengine_robot.Robot
+        """
+        return self.get_god_map().safe_get_data(robot_identifier)
 
     def raise_to_blackboard(self, exception):
         Blackboard().set('exception', exception)

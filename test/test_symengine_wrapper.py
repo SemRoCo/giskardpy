@@ -1,7 +1,7 @@
 import unittest
 
-from angles import normalize_angle
-from hypothesis import given, reproduce_failure, assume
+from angles import shortest_angular_distance
+from hypothesis import given, assume
 import hypothesis.strategies as st
 
 import numpy as np
@@ -9,19 +9,16 @@ import numpy as np
 import PyKDL
 
 from tf.transformations import quaternion_matrix, quaternion_about_axis, quaternion_from_euler, euler_matrix, \
-    rotation_matrix, quaternion_multiply, quaternion_conjugate, random_quaternion, quaternion_from_matrix, \
-    quaternion_slerp, rotation_from_matrix, euler_from_matrix
-
-from numpy import pi
+    rotation_matrix, quaternion_multiply, quaternion_conjugate, quaternion_from_matrix, \
+    quaternion_slerp
 
 from transforms3d.axangles import mat2axangle
 from transforms3d.derivations.angle_axes import angle_axis2mat
-from transforms3d.euler import euler2mat, axangle2euler, euler2axangle
-from transforms3d.quaternions import quat2mat, axangle2quat
+from transforms3d.euler import euler2axangle
+from transforms3d.quaternions import quat2mat
 
 import giskardpy.symengine_wrappers as spw
-from giskardpy import BACKEND
-from giskardpy.test_utils import limited_float, SMALL_NUMBER, unit_vector, quaternion, vector, \
+from utils_for_tests import limited_float, SMALL_NUMBER, unit_vector, quaternion, vector, \
     pykdl_frame_to_numpy, lists_of_same_length, angle, compare_axis_angle, angle_positive
 
 PKG = 'giskardpy'
@@ -646,6 +643,15 @@ class TestSympyWrapper(unittest.TestCase):
         self.assertTrue(np.isclose(r1, r2, atol=1e-3).all() or
                         np.isclose(r1, -r2, atol=1e-3).all(),
                         msg='q1={} q2={} t={}\n{} != {}'.format(q1, q2, t, r1, r2))
+
+
+    # fails if numbers too big or too small
+    @given(limited_float(outer_limit=1e5),
+           limited_float(outer_limit=1e5))
+    def test_slerp2(self, angle1, angle2):
+        distance = spw.shortest_angular_distance(angle1, angle2)
+        ref_distance = shortest_angular_distance(angle1, angle2)
+        np.testing.assert_almost_equal(distance, ref_distance)
 
 
 if __name__ == '__main__':

@@ -34,7 +34,7 @@ class QProblemBuilder(object):
         :type path_to_functions: str
         """
         if free_symbols is not None:
-            warnings.warn('use of free_symbols deprecated', DeprecationWarning)
+            warnings.warn(u'use of free_symbols deprecated', DeprecationWarning)
         assert (not len(controlled_joint_symbols) > len(joint_constraints_dict))
         assert (not len(controlled_joint_symbols) < len(joint_constraints_dict))
         assert (len(hard_constraints_dict) <= len(controlled_joint_symbols))

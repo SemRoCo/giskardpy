@@ -406,6 +406,7 @@ class URDFObject(object):
     def get_controllable_joints(self):
         return [joint_name for joint_name in self.get_joint_names() if self.is_joint_controllable(joint_name)]
 
+
     def __eq__(self, o):
         """
         :type o: URDFObject

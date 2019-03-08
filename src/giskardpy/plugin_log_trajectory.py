@@ -26,15 +26,15 @@ class LogTrajPlugin(PluginBase):
         self.stop_universe = False
         self.past_joint_states = set()
         self.trajectory = Trajectory()
-        self.god_map.safe_set_data([trajectory_identifier], self.trajectory)
+        self.get_god_map().safe_set_data(trajectory_identifier, self.trajectory)
         super(LogTrajPlugin, self).initialize()
 
     def update(self):
-        current_js = self.god_map.safe_get_data([js_identifier])
-        time = self.god_map.safe_get_data([time_identifier])
-        trajectory = self.god_map.safe_get_data([trajectory_identifier])
+        current_js = self.get_god_map().safe_get_data(js_identifier)
+        time = self.get_god_map().safe_get_data(time_identifier)
+        trajectory = self.get_god_map().safe_get_data(trajectory_identifier)
         trajectory.set(time, current_js)
-        self.god_map.safe_set_data([trajectory_identifier], trajectory)
+        self.get_god_map().safe_set_data(trajectory_identifier, trajectory)
 
         return super(LogTrajPlugin, self).update()
 

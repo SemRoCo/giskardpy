@@ -4,7 +4,7 @@ import pickle
 from collections import OrderedDict
 
 import errno
-from geometry_msgs.msg import PoseStamped, Point, Quaternion
+from geometry_msgs.msg import PoseStamped, Point, Quaternion, Pose
 
 from giskardpy import MAP
 from giskardpy.data_types import SingleJointState
@@ -21,8 +21,8 @@ class PyBulletWorldObject(WorldObject):
     """
     base_link_name = u'base'
 
-    def __init__(self, urdf, controlled_joints=None, base_pose=None, calc_self_collision_matrix=False,
-                 path_to_data_folder=u''):
+    def __init__(self, urdf, base_pose=None, controlled_joints=None, calc_self_collision_matrix=False,
+                 path_to_data_folder=u'', *args, **kwargs):
         """
         :type name: str
         :param urdf: Path to URDF file, or content of already loaded URDF file.
@@ -33,19 +33,41 @@ class PyBulletWorldObject(WorldObject):
         :type path_to_data_folder: str
         """
         self.path_to_data_folder = path_to_data_folder + u'collision_matrix/'
-        self.id = None
-        super(WorldObject, self).__init__(urdf)
+        self._pybullet_id = None
+        super(PyBulletWorldObject, self).__init__(urdf, *args, **kwargs)
         self.reinitialize()
-        self.__sync_with_bullet()
-        if base_pose is not None:
-            self.set_base_pose(base_pose)
-        self.controlled_joints = controlled_joints
+        if base_pose is None:
+            p = Pose()
+            p.orientation.w = 1
+            self.base_pose = p
         if calc_self_collision_matrix:
-            if not self.load_self_collision_matrix():
+            if not self.load_self_collision_matrix(self.path_to_data_folder):
                 self.init_self_collision_matrix()
-                self.safe_self_collision_matrix()
+                self.safe_self_collision_matrix(self.path_to_data_folder)
         else:
             self.self_collision_matrix = set()
+
+    @WorldObject.joint_state.setter
+    def joint_state(self, value):
+        """
+        :param joint_state:
+        :type joint_state: dict
+        :return:
+        """
+        self._js = value
+        for joint_name, singe_joint_state in value.items():
+            p.resetJointState(self._pybullet_id, self.joint_name_to_info[joint_name].joint_index, singe_joint_state.position)
+
+    @WorldObject.base_pose.setter
+    def base_pose(self, value):
+        if self._pybullet_id is not None:
+            self._base_pose = value
+            WorldObject.base_pose.fset(self, value)
+            position, orientation = msg_to_pybullet_pose(value)
+            p.resetBasePositionAndOrientation(self._pybullet_id, position, orientation)
+
+    def get_pybullet_id(self):
+        return self._pybullet_id
 
     def __sync_with_bullet(self):
         """
@@ -63,8 +85,8 @@ class PyBulletWorldObject(WorldObject):
                                                 [self.base_link_name] + [None] * 4))
         self.link_id_to_name[-1] = self.base_link_name
         self.link_name_to_id[self.base_link_name] = -1
-        for joint_index in range(p.getNumJoints(self.id)):
-            joint_info = JointInfo(*p.getJointInfo(self.id, joint_index))
+        for joint_index in range(p.getNumJoints(self._pybullet_id)):
+            joint_info = JointInfo(*p.getJointInfo(self._pybullet_id, joint_index))
             self.joint_name_to_info[joint_info.joint_name] = joint_info
             self.joint_id_to_info[joint_info.joint_index] = joint_info
             self.joint_id_map[joint_index] = joint_info.joint_name
@@ -79,43 +101,22 @@ class PyBulletWorldObject(WorldObject):
         deactivate_rendering()
         joint_state = None
         base_pose = None
-        if self.id is not None:
-            joint_state = self.get_joint_state()
-            base_pose = self.get_base_pose()
+        if self._pybullet_id is not None:
+            joint_state = self.joint_state
+            base_pose = self.base_pose
             self.suicide()
-        self.id = load_urdf_string_into_bullet(self.get_urdf(), base_pose)
+        self._pybullet_id = load_urdf_string_into_bullet(self.get_urdf(), base_pose)
         self.__sync_with_bullet()
         if joint_state is not None:
             joint_state = {k: v for k, v in joint_state.items() if k in self.get_joint_names()}
-            self.set_joint_state(joint_state)
+            self.joint_state = joint_state
         activate_rendering()
 
     def suicide(self):
-        p.removeBody(self.id)
+        p.removeBody(self._pybullet_id)
 
     def __del__(self):
         self.suicide()
-
-    def set_joint_state(self, joint_state):
-        """
-
-        :param joint_state:
-        :type joint_state: dict
-        :return:
-        """
-        for joint_name, singe_joint_state in joint_state.items():
-            p.resetJointState(self.id, self.joint_name_to_info[joint_name].joint_index, singe_joint_state.position)
-
-    def set_base_pose(self, pose):
-        """
-        Set base pose in bullet world frame.
-        :param position:
-        :type position: list
-        :param orientation:
-        :type orientation: list
-        """
-        position, orientation = msg_to_pybullet_pose(pose)
-        p.resetBasePositionAndOrientation(self.id, position, orientation)
 
     def get_base_pose(self):
         """
@@ -123,20 +124,20 @@ class PyBulletWorldObject(WorldObject):
         :return: Base pose of the robot in the world.
         :rtype: Transform
         """
-        return pybullet_pose_to_msg(p.getBasePositionAndOrientation(self.id))
+        return pybullet_pose_to_msg(p.getBasePositionAndOrientation(self._pybullet_id))
 
-    def get_joint_state(self):
-        mjs = {}
-        for joint_info in self.joint_name_to_info.values():
-            # FIXME? why no continuous?
-            if joint_info.joint_type in [p.JOINT_REVOLUTE, p.JOINT_PRISMATIC]:
-                sjs = SingleJointState()
-                sjs.name = joint_info.joint_name
-                sjs.position = p.getJointState(self.id, joint_info.joint_index)[0]
-                mjs[sjs.name] = sjs
-        return mjs
+    # def get_joint_state(self):
+    #     mjs = {}
+    #     for joint_info in self.joint_name_to_info.values():
+    #         # FIXME? why no continuous?
+    #         if joint_info.joint_type in [p.JOINT_REVOLUTE, p.JOINT_PRISMATIC]:
+    #             sjs = SingleJointState()
+    #             sjs.name = joint_info.joint_name
+    #             sjs.position = p.getJointState(self.id, joint_info.joint_index)[0]
+    #             mjs[sjs.name] = sjs
+    #     return mjs
 
-    def __get_pybullet_link_id(self, link_name):
+    def get_pybullet_link_id(self, link_name):
         """
         :type link_name: str
         :rtype: int
@@ -144,6 +145,6 @@ class PyBulletWorldObject(WorldObject):
         return self.link_name_to_id[link_name]
 
     def in_collision(self, link_a, link_b, distance):
-        link_id_a = self.__get_pybullet_link_id(link_a)
-        link_id_b = self.__get_pybullet_link_id(link_b)
-        return len(p.getClosestPoints(self.id, self.id, distance, link_id_a, link_id_b)) > 0
+        link_id_a = self.get_pybullet_link_id(link_a)
+        link_id_b = self.get_pybullet_link_id(link_b)
+        return len(p.getClosestPoints(self._pybullet_id, self._pybullet_id, distance, link_id_a, link_id_b)) > 0

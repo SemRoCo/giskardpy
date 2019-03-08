@@ -4,6 +4,9 @@ from multiprocessing import Lock
 import symengine_wrappers as sw
 from copy import copy
 
+from giskardpy.utils import is_iterable
+
+
 class GodMap(object):
     """
     Data structure used by plugins to exchange information.
@@ -26,7 +29,6 @@ class GodMap(object):
         return god_map_copy
 
     def __enter__(self):
-        print('acquired')
         self.lock.acquire()
         return self
 
@@ -45,7 +47,10 @@ class GodMap(object):
             raise AttributeError()
         if callable(identifier):
             # TODO this solution calls identifier multiple times if the result is an array, make it faster
-            return self._get_member(identifier(self), member)
+            if is_iterable(member) and not isinstance(member, str) and not isinstance(member, unicode):
+                return identifier(*member)
+            else:
+                return identifier(member)
         try:
             return identifier[member]
         except TypeError:
@@ -74,8 +79,6 @@ class GodMap(object):
                 result = self._get_member(result, member)
             except AttributeError:
                 result = self.default_value
-            except TypeError:
-                pass
             except KeyError as e:
                 # TODO is this really a good idea?
                 # traceback.print_exc()

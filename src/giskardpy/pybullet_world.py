@@ -14,7 +14,7 @@ from visualization_msgs.msg import Marker
 import giskardpy
 # from giskardpy import DEBUG
 from giskardpy.exceptions import UnknownBodyException, RobotExistsException, DuplicateNameException
-from giskardpy.data_types import SingleJointState
+from giskardpy.data_types import SingleJointState, ClosestPointInfo
 import numpy as np
 
 from giskardpy.pybullet_world_object import PyBulletWorldObject
@@ -27,12 +27,10 @@ import hashlib
 
 from giskardpy.world import World
 
-
 # TODO globally define map
 from giskardpy.world_object import WorldObject
 
 MAP = u'map'
-
 
 
 class PyBulletWorld(World):
@@ -41,6 +39,7 @@ class PyBulletWorld(World):
     """
     ground_plane_name = u'ground_plane'
     hack_name = u'pybullet_hack'
+    hidden_objects = [ground_plane_name, hack_name]
 
     def __init__(self, enable_gui=False, path_to_data_folder=u''):
         """
@@ -54,9 +53,9 @@ class PyBulletWorld(World):
         self._object_id_to_name = {}
         self._robot = None
         self.path_to_data_folder = path_to_data_folder
+        self.setup()
 
-
-    def add_robot(self, robot, controlled_joints=None, base_pose=None):
+    def add_robot(self, robot, base_pose, controlled_joints, default_joint_vel_limit, default_joint_weight):
         """
         :type robot: giskardpy.world_object.WorldObject
         :param controlled_joints:
@@ -65,9 +64,9 @@ class PyBulletWorld(World):
         """
         if isinstance(robot, PyBulletWorldObject):
             raise TypeError(u'don\t use PyBulletWorldObjects!')
-        super(PyBulletWorld, self).add_robot(robot, controlled_joints, base_pose)
-        self.robot = PyBulletWorldObject.from_urdf_object(robot)
-
+        super(PyBulletWorld, self).add_robot(robot, base_pose, controlled_joints, default_joint_vel_limit,
+                                             default_joint_weight)
+        # self._robot = PyBulletWorldObject.from_urdf_object(robot)
 
     # def attach_object(self, object_, parent_link, transform):
     #     """
@@ -111,13 +110,13 @@ class PyBulletWorld(World):
         collisions = defaultdict(lambda: None)
         for k, distance in cut_off_distances.items():
             (robot_link, body_b, link_b) = k
-            robot_link_id = self.get_robot().link_name_to_id[robot_link]
-            if self.get_robot().name == body_b:
-                object_id = self.get_robot().id
-                link_b_id = self.get_robot().link_name_to_id[link_b]
+            robot_link_id = self.robot.get_pybullet_link_id(robot_link)
+            if self.robot.get_name() == body_b:
+                object_id = self.robot.get_pybullet_id()
+                link_b_id = self.robot.get_pybullet_link_id(link_b)
             else:
                 object_id = self.__get_pybullet_object_id(body_b)
-                link_b_id = self.get_object(body_b).link_name_to_id[link_b]
+                link_b_id = self.get_object(body_b).get_pybullet_link_id(link_b)
             # FIXME redundant checks for robot link pairs
             contacts = [ContactInfo(*x) for x in p.getClosestPoints(self._robot.id, object_id,
                                                                     distance * 3,
@@ -145,9 +144,10 @@ class PyBulletWorld(World):
 
         self.__move_hack(pa)
         try:
-            contact_info3 = ContactInfo(*[x for x in p.getClosestPoints(self.__get_pybullet_object_id(u'pybullet_sucks'),
-                                                                        contact_info.body_unique_id_a, 0.001) if
-                                          np.allclose(x[8], -0.005)][0])
+            contact_info3 = ContactInfo(
+                *[x for x in p.getClosestPoints(self.__get_pybullet_object_id(u'pybullet_sucks'),
+                                                contact_info.body_unique_id_a, 0.001) if
+                  np.allclose(x[8], -0.005)][0])
             if contact_info3.body_unique_id_b == contact_info.body_unique_id_a and \
                     contact_info3.link_index_b == contact_info.link_index_a:
                 return False
@@ -184,7 +184,6 @@ class PyBulletWorld(World):
             plane.set_name(self.ground_plane_name)
             self.add_object(plane)
 
-
     def __add_pybullet_bug_fix_hack(self):
         if not self.has_object(self.hack_name):
             plane = WorldObject.from_urdf_file(self.path_to_data_folder + u'/urdf/tiny_ball.urdf')
@@ -192,12 +191,14 @@ class PyBulletWorld(World):
             self.add_object(plane)
 
     def __move_hack(self, position):
-        self.get_object(self.hack_name).set_base_pose(position)
+        self.get_object(self.hack_name).base_pose = position
 
     def get_objects(self):
         objects = super(PyBulletWorld, self).get_objects()
-        hidden_objects = [self.ground_plane_name, self.hack_name]
-        return {k:v for k,v in objects.items() if k not in hidden_objects}
+        return {k: v for k, v in objects.items() if k not in self.hidden_objects}
+
+    def get_object_names(self):
+        return [x for x in super(PyBulletWorld, self).get_object_names() if x not in self.hidden_objects]
 
     def add_object(self, object_):
         """
@@ -207,7 +208,19 @@ class PyBulletWorld(World):
         object_ = PyBulletWorldObject.from_urdf_object(object_)
         return super(PyBulletWorld, self).add_object(object_)
 
-
-
-
-
+    def collisions_to_closest_point(self, collisions, min_allowed_distance):
+        """
+        :param collisions: (robot_link, body_b, link_b) -> ContactInfo
+        :type collisions: dict
+        :param min_allowed_distance: (robot_link, body_b, link_b) -> min allowed distance
+        :type min_allowed_distance: dict
+        :return: robot_link -> ClosestPointInfo of closest thing
+        :rtype: dict
+        """
+        closest_point = super(PyBulletWorld, self).collisions_to_closest_point(collisions, min_allowed_distance)
+        for key, cpi in closest_point.items():  # type: (str, ClosestPointInfo)
+            if self.__should_flip_contact_info(collisions[cpi.old_key]):
+                closest_point[key] = ClosestPointInfo(cpi.position_on_b, cpi.position_on_a, cpi.contact_distance,
+                                                      cpi.min_dist, cpi.link_a, cpi.link_b,
+                                                      -np.array(cpi.contact_normal), key)
+        return closest_point

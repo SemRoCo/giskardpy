@@ -1,9 +1,8 @@
 import pytest
-from geometry_msgs.msg import PoseStamped, Pose, Point, Quaternion
-from giskard_msgs.msg import WorldBody
+from geometry_msgs.msg import Pose, Point, Quaternion
 
 from giskardpy.exceptions import DuplicateNameException
-from giskardpy.test_utils import pr2_urdf, donbot_urdf, boxy_urdf, base_bot_urdf
+from utils_for_tests import pr2_urdf, donbot_urdf, boxy_urdf, base_bot_urdf
 from giskardpy.urdf_object import URDFObject
 from giskardpy.utils import make_world_body_box, make_world_body_sphere, make_world_body_cylinder, make_urdf_world_body
 

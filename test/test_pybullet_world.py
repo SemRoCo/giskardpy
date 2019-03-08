@@ -3,11 +3,10 @@ import shutil
 
 import pytest
 
-import test_urdf_object
 from giskardpy.pybullet_world import PyBulletWorld
 from giskardpy.pybullet_world_object import PyBulletWorldObject
 import giskardpy.pybullet_wrapper as pbw
-from giskardpy.test_utils import pr2_urdf, base_bot_urdf, donbot_urdf, boxy_urdf
+from utils_for_tests import pr2_urdf, base_bot_urdf, donbot_urdf, boxy_urdf
 from giskardpy.world_object import WorldObject
 import test_world
 
@@ -73,17 +72,28 @@ def empty_world(function_setup):
     """
     pbw.clear_pybullet()
     pw = PyBulletWorld(path_to_data_folder=u'../data')
-    pw.setup()
     return pw
 
 @pytest.fixture()
-def world_with_pr2(empty_world):
+def world_with_pr2(function_setup):
     """
-    :rtype: PyBulletWorld
+    :rtype: World
     """
+    w = PyBulletWorld(path_to_data_folder=u'../data')
     pr2 = WorldObject(pr2_urdf())
-    empty_world.add_robot(pr2)
-    return empty_world
+    w.add_robot(pr2, None, pr2.controlled_joints, 0, 0)
+    return w
+
+@pytest.fixture()
+def world_with_donbot(parsed_donbot):
+    """
+    :type parsed_donbot: WorldObject
+    :rtype: World
+    """
+    w = PyBulletWorld(path_to_data_folder=u'../data')
+    donbot = WorldObject(pr2_urdf())
+    w.add_robot(donbot, None, donbot.controlled_joints, 0, 0)
+    return w
 
 @pytest.fixture()
 def test_folder(request):
@@ -109,8 +119,8 @@ class TestPyBulletWorldObject(test_world.TestWorldObj):
         assert_num_pybullet_objects(1)
         assert u'pointy' in pbw.get_body_names()
 
-    def test_safe_load_collision_matrix(self, parsed_pr2, test_folder):
-        super(TestPyBulletWorldObject, self).test_safe_load_collision_matrix(parsed_pr2, test_folder)
+    def test_safe_load_collision_matrix(self, parsed_donbot, test_folder):
+        super(TestPyBulletWorldObject, self).test_safe_load_collision_matrix(parsed_donbot, test_folder)
 
 
 
@@ -158,7 +168,7 @@ class TestPyBulletWorld(test_world.TestWorld):
         assert_num_pybullet_objects(4)
 
     def test_attach_existing_obj_to_robot(self, world_with_pr2):
-        super(TestPyBulletWorld, self).test_attach_existing_obj_to_robot(world_with_pr2)
+        super(TestPyBulletWorld, self).test_attach_existing_obj_to_robot1(world_with_pr2)
         assert_num_pybullet_objects(3)
 
 

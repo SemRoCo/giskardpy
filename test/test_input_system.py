@@ -1,14 +1,12 @@
 import unittest
 from itertools import chain
 
-from hypothesis import given, reproduce_failure, assume
+from hypothesis import given
 import hypothesis.strategies as st
 
 from giskardpy.god_map import GodMap
 from giskardpy.input_system import JointStatesInput, Point3Input, Vector3Input, FrameInput
-from giskardpy.test_utils import variable_name
-import giskardpy.symengine_wrappers as spw
-
+from utils_for_tests import variable_name
 
 PKG = u'giskardpy'
 

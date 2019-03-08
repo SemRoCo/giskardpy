@@ -15,4 +15,6 @@ MAP = u'map'
 BACKEND = 'llvm'
 # BACKEND = 'lambda'
 
+WORLD_IMPLEMENTATION = u'pybullet'
+
 

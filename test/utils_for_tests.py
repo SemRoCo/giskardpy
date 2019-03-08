@@ -17,7 +17,7 @@ from py_trees import Blackboard
 from sensor_msgs.msg import JointState
 
 from giskard_trees import grow_tree
-from giskardpy.identifier import robot_identifier
+from giskardpy.identifier import robot_identifier, world_identifier
 from giskardpy.plugin_pybullet import CollisionChecker
 from giskardpy.pybullet_world import PyBulletWorld
 from giskardpy.python_interface import GiskardWrapper
@@ -169,11 +169,11 @@ class GiskardTestWrapper(object):
         rospy.sleep(1)
         self.wrapper = GiskardWrapper(ns=u'tests')
         self.results = Queue(100)
-        self.joint_limits = {joint_name: self.get_robot().get_joint_limits(joint_name) for joint_name in
-                             self.get_controlled_joint_names() if self.get_robot().is_joint_controllable(joint_name)}
+        # self.joint_limits = {joint_name: self.get_robot().get_joint_limits(joint_name) for joint_name in
+        #                      self.get_controlled_joint_names() if self.get_robot().is_joint_controllable(joint_name)}
         # self.world = self.get_god_map().safe_get_data([u'pybullet_world'])  # type: PyBulletWorld
-        self.world_plugin = self.tree.root.children[3].children[2]._plugins[u'coll']  # type: CollisionChecker
-        self.default_root = default_root
+        # self.world_plugin = self.tree.root.children[3].children[2]._plugins[u'coll']  # type: CollisionChecker
+        self.default_root = self.get_robot().get_root()
         self.map = u'map'
         self.simple_base_pose_pub = rospy.Publisher(u'/move_base_simple/goal', PoseStamped, queue_size=10)
         self.tick_rate = .3
@@ -185,7 +185,10 @@ class GiskardTestWrapper(object):
             rospy.sleep(self.tick_rate)
 
     def get_robot(self):
-        return self.get_god_map().safe_get_data([robot_identifier])
+        """
+        :rtype: Robot
+        """
+        return self.get_god_map().safe_get_data(robot_identifier)
 
     def get_god_map(self):
         """
@@ -319,13 +322,13 @@ class GiskardTestWrapper(object):
         """
         :rtype: PyBulletWorld
         """
-        return self.get_god_map().safe_get_data([u'pybullet_world'])
+        return self.get_god_map().safe_get_data(world_identifier)
 
     def clear_world(self):
         assert self.wrapper.clear_world().error_codes == UpdateWorldResponse.SUCCESS
-        assert len(self.get_world().get_object_names()) == 2
-        assert len(self.get_world().get_robot().get_attached_objects()) == 0
-        assert self.get_world().has_object(u'plane')
+        assert len(self.get_world().get_object_names()) == 0
+        # assert len(self.get_robot().get_attached_objects()) == 0
+        # assert self.get_world().has_object(u'plane')
 
     def remove_object(self, name, expected_response=UpdateWorldResponse.SUCCESS):
         r = self.wrapper.remove_object(name)
@@ -399,7 +402,7 @@ class GiskardTestWrapper(object):
 
     def attach_box(self, name=u'box', size=None, frame_id=None, position=None, orientation=None,
                    expected_response=UpdateWorldResponse.SUCCESS):
-        old_collision_matrix = self.get_world().get_robot().get_self_collision_matrix()
+        old_collision_matrix = self.get_robot().get_self_collision_matrix()
         r = self.wrapper.attach_box(name, size, frame_id, position, orientation)
         assert r.error_codes == expected_response, \
         u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
@@ -413,9 +416,10 @@ class GiskardTestWrapper(object):
     def get_cpi(self, distance_threshold):
         collision_goals = [CollisionEntry(type=CollisionEntry.AVOID_ALL_COLLISIONS, min_dist=distance_threshold)]
 
-        collision_matrix = self.world_plugin.collision_goals_to_collision_matrix(collision_goals)
+        #FIXME
+        collision_matrix = self.get_world().collision_goals_to_collision_matrix(collision_goals, 0.0)
         collisions = self.get_world().check_collisions(collision_matrix)
-        return self.world_plugin.collisions_to_closest_point(collisions, collision_matrix)
+        return self.get_world().collisions_to_closest_point(collisions, collision_matrix)
 
     def check_cpi_geq(self, links, distance_threshold):
         cpi = self.get_cpi(distance_threshold)
@@ -454,9 +458,9 @@ class GiskardTestWrapper(object):
 
 class PR2(GiskardTestWrapper):
     def __init__(self):
-        rospy.set_param(u'~enable_gui', True)
-        rospy.set_param(u'~debug', True)
-        rospy.set_param(u'~tree_tick_rate', .1)
+        rospy.set_param(u'~enable_gui', False)
+        rospy.set_param(u'~debug', False)
+        rospy.set_param(u'~tree_tick_rate', .5)
         rospy.set_param(u'~map_frame', u'map')
         rospy.set_param(u'~joint_convergence_threshold', 0.001)
         rospy.set_param(u'~wiggle_precision_threshold', 4)
@@ -469,7 +473,7 @@ class PR2(GiskardTestWrapper):
         rospy.set_param(u'~root_link', u'base_footprint')
         rospy.set_param(u'~enable_collision_marker', True)
         # rospy.set_param(u'~enable_self_collision', True)
-        rospy.set_param(u'~path_to_data_folder', u'../data/pr2/')
+        rospy.set_param(u'~path_to_data_folder', u'../data/')
         rospy.set_param(u'~collision_time_threshold', 10)
         rospy.set_param(u'~max_traj_length', 30)
         self.r_tip = u'r_gripper_tool_frame'
@@ -529,7 +533,7 @@ class Donbot(GiskardTestWrapper):
         rospy.set_param(u'~root_link', u'base_footprint')
         rospy.set_param(u'~enable_collision_marker', True)
         # rospy.set_param(u'~enable_self_collision', True)
-        rospy.set_param(u'~path_to_data_folder', u'../data/donbot/')
+        rospy.set_param(u'~path_to_data_folder', u'../data/')
         rospy.set_param(u'~collision_time_threshold', 10)
         rospy.set_param(u'~max_traj_length', 30)
         self.camera_tip = u'camera_link'

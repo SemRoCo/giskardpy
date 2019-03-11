@@ -210,12 +210,12 @@ def speed_up(function, parameters, backend=u'llvm'):
             return constant_result
     else:
         if backend == u'llvm':
-            try:
-                fast_f = Lambdify(list(parameters), function, backend=backend, cse=True, real=True)
-            except RuntimeError as e:
-                warn(u'WARNING RuntimeError: "{}" during lambdify with LLVM backend, fallback to numpy'.format(e),
-                     RuntimeWarning)
-                backend = u'lambda'
+            # try:
+            fast_f = Lambdify(list(parameters), function, backend=backend, cse=True, real=True)
+            # except RuntimeError as e:
+            #     warn(u'WARNING RuntimeError: "{}" during lambdify with LLVM backend, fallback to numpy'.format(e),
+            #          RuntimeWarning)
+            #     backend = u'lambda'
         if backend == u'lambda':
             try:
                 fast_f = Lambdify(list(parameters), function, backend=u'lambda', cse=True, real=True)
@@ -819,6 +819,11 @@ def euclidean_distance(v1, v2):
     :rtype: Union[float, Symbol]
     """
     return norm(v1 - v2)
+
+
+# def floor(a):
+#     a += VERY_SMALL_NUMBER
+#     return (a - 0.5) - (sp.atan(sp.tan(np.pi * (a - 0.5)))) / (pi)
 
 
 def fmod(a, b):

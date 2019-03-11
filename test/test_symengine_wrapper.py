@@ -648,10 +648,12 @@ class TestSympyWrapper(unittest.TestCase):
     # fails if numbers too big or too small
     @given(limited_float(outer_limit=1e5),
            limited_float(outer_limit=1e5))
-    def test_slerp2(self, angle1, angle2):
+    def test_shorted_angular_distance(self, angle1, angle2):
         distance = spw.shortest_angular_distance(angle1, angle2)
         ref_distance = shortest_angular_distance(angle1, angle2)
         np.testing.assert_almost_equal(distance, ref_distance)
+        self.assertAlmostEqual(speed_up_and_execute(spw.shortest_angular_distance, [angle1, angle2]),
+                               ref_distance, places=7)
 
 
 if __name__ == '__main__':

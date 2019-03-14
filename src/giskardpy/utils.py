@@ -19,7 +19,7 @@ from py_trees import common, Chooser, Selector, Sequence, Behaviour
 from py_trees.composites import Parallel
 from sensor_msgs.msg import JointState
 from shape_msgs.msg import SolidPrimitive
-from tf.transformations import quaternion_multiply, quaternion_conjugate
+from tf.transformations import quaternion_multiply, quaternion_conjugate, quaternion_matrix, quaternion_from_matrix
 
 from giskardpy.data_types import SingleJointState
 from giskardpy.data_types import ClosestPointInfo
@@ -572,3 +572,11 @@ def is_iterable(qwe):
     except TypeError:
         return False
     return True
+
+def homo_matrix_to_pose(m):
+    p = Pose()
+    p.position.x = m[3,0]
+    p.position.y = m[3,1]
+    p.position.z = m[3,2]
+    p.orientation = Quaternion(*quaternion_from_matrix(m))
+    return p

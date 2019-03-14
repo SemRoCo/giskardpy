@@ -1,11 +1,14 @@
 from collections import namedtuple, OrderedDict
+
+from geometry_msgs.msg import PoseStamped
+
 import symengine_wrappers as spw
 from giskardpy import BACKEND, WORLD_IMPLEMENTATION
 
 from giskardpy.pybullet_world_object import PyBulletWorldObject
 from giskardpy.qp_problem_builder import HardConstraint, JointConstraint
 from giskardpy.utils import keydefaultdict, \
-    suppress_stdout, suppress_stderr
+    suppress_stdout, suppress_stderr, homo_matrix_to_pose
 from giskardpy.world_object import WorldObject
 
 Joint = namedtuple(u'Joint', [u'symbol', u'velocity_limit', u'lower', u'upper', u'type', u'frame'])
@@ -51,9 +54,10 @@ class Robot(Backend):
         super(Robot, self).reinitialize()
         if joints_to_symbols_map is not None:
             self._joint_to_symbol_map.update(joints_to_symbols_map)
+        self._fk_expressions = {}
         self._create_frames_expressions()
         self._create_constraints()
-        self._fks = {}
+        self.init_fast_fks()
 
     def _create_frames_expressions(self):
         for joint_name, urdf_joint in self._urdf_robot.joint_map.items():
@@ -117,13 +121,18 @@ class Robot(Backend):
         return self._fk_expressions[root_link, tip_link]
 
     def get_fk(self, root, tip):
-        return self._fks[root, tip](**self.joint_state)
+        a = {str(self._joint_to_symbol_map[k]): v.position for k, v in self.joint_state.items()}
+        return self._fks[root, tip](**a)
 
     def init_fast_fks(self):
         def f(key):
             root, tip = key
             fk = self.get_fk_expression(root, tip)
-            self._fks[root, tip] = spw.speed_up(fk, fk.free_symbols, backend=BACKEND)
+            m = spw.speed_up(fk, fk.free_symbols, backend=BACKEND)
+            p = PoseStamped()
+            p.header.frame_id = root
+            p.pose = homo_matrix_to_pose(m)
+            return p
         self._fks = keydefaultdict(f)
 
 

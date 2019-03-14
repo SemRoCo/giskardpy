@@ -25,7 +25,6 @@ import numpy as np
 class GoalToConstraints(GetGoal):
     def __init__(self, name, as_name, root_link):
         GetGoal.__init__(self, name, as_name)
-        self.root = root_link
         self.soft_constraints = {}
         self.used_joints = set()
 
@@ -189,11 +188,11 @@ class GoalToConstraints(GetGoal):
                                             prefix=closest_point_identifier + [link, u'position_on_b'])
             current_input = FrameInput(self.god_map.to_symbol,
                                        translation_prefix=fk_identifier +
-                                                           [(self.root, link),
+                                                           [(self.get_robot().get_root(), link),
                                                            u'pose',
                                                            u'position'],
                                        rotation_prefix=fk_identifier +
-                                                        [(self.root, link),
+                                                        [(self.get_robot().get_root(), link),
                                                         u'pose',
                                                         u'orientation'])
             min_dist = self.god_map.to_symbol(closest_point_identifier + [link, u'min_dist'])
@@ -201,7 +200,7 @@ class GoalToConstraints(GetGoal):
                                           prefix=closest_point_identifier + [link, u'contact_normal'])
 
             soft_constraints.update(link_to_link_avoidance(link,
-                                                           self.get_robot().get_fk_expression(self.root, link),
+                                                           self.get_robot().get_fk_expression(self.get_robot().get_root(), link),
                                                            current_input.get_frame(),
                                                            point_on_link_input.get_expression(),
                                                            other_point_input.get_expression(),
@@ -215,7 +214,7 @@ class GoalToConstraints(GetGoal):
         Sets the goal for all joints which are not used in another goal to their current position.
         """
         joint_goal = self.get_god_map().safe_get_data(cartesian_goal_identifier +[str(Controller.JOINT)])
-        for joint_name in self.controlled_joints:
+        for joint_name in self.get_robot().controlled_joints:
             if joint_name not in joint_goal:
                 joint_goal[joint_name] = {u'weight': 0,
                                           u'p_gain': 0,

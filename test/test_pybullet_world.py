@@ -119,10 +119,6 @@ class TestPyBulletWorldObject(test_world.TestWorldObj):
         assert_num_pybullet_objects(1)
         assert u'pointy' in pbw.get_body_names()
 
-    def test_safe_load_collision_matrix(self, parsed_donbot, test_folder):
-        super(TestPyBulletWorldObject, self).test_safe_load_collision_matrix(parsed_donbot, test_folder)
-
-
 
 class TestPyBulletWorld(test_world.TestWorld):
     cls = WorldObject

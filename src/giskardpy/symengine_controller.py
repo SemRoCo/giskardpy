@@ -129,14 +129,16 @@ def continuous_joint_position(current_joint, joint_goal, weight, p_gain, max_spe
     # TODO almost the same as joint_position
     soft_constraints = OrderedDict()
 
-    err = sw.shortest_angular_distance(joint_goal, current_joint)
+    err = sw.shortest_angular_distance(current_joint, joint_goal)
     capped_err = sw.diffable_max_fast(sw.diffable_min_fast(p_gain * err, max_speed), -max_speed)
 
     soft_constraints[constraint_name] = SoftConstraint(lower=capped_err,
                                                        upper=capped_err,
                                                        weight=weight,
                                                        expression=current_joint)
-    # add_debug_constraint(soft_constraints, '{} //change//'.format(name), change)
+    add_debug_constraint(soft_constraints, '{} //change//'.format(constraint_name), err)
+    add_debug_constraint(soft_constraints, '{} //curr//'.format(constraint_name), current_joint)
+    add_debug_constraint(soft_constraints, '{} //goal//'.format(constraint_name), joint_goal)
     # add_debug_constraint(soft_constraints, '{} //max_speed//'.format(name), max_speed)
     return soft_constraints
 

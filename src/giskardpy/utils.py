@@ -306,7 +306,7 @@ def plot_trajectory(tj, controlled_joints, path_to_data_folder):
     :param controlled_joints: only joints in this list will be added to the plot
     :type controlled_joints: list
     """
-    return
+    # return
     if len(tj._points) <= 0:
         return
     colors = [u'b', u'g', u'r', u'c', u'm', u'y', u'k']
@@ -332,7 +332,10 @@ def plot_trajectory(tj, controlled_joints, path_to_data_folder):
         ax1.plot(times, position, fmts[i], label=names[i])
         ax2.plot(times, velocities[i], fmts[i])
     box = ax1.get_position()
-    # ax1.set_ylim(-3, 1)
+    diff = abs(positions.max()-positions.min())*0.1
+    ax1.set_ylim(positions.min()-diff, positions.max()+diff)
+    diff = abs(velocities.max()-velocities.min())*0.1
+    ax2.set_ylim(velocities.min()-diff, velocities.max()+diff)
     ax1.set_position([box.x0, box.y0, box.width * 0.6, box.height])
     box = ax2.get_position()
     ax2.set_position([box.x0, box.y0, box.width * 0.6, box.height])

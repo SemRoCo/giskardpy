@@ -126,6 +126,11 @@ class TestWorldObj(test_urdf_object.TestUrdfObject):
         parsed_pr2.joint_state = js
         assert parsed_pr2.joint_state == js
 
+    def test_controlled_joints(self, function_setup):
+        controlled_joints = [u'torso_lift_joint']
+        wo = self.cls(pr2_urdf(), controlled_joints=controlled_joints)
+        assert wo.controlled_joints == controlled_joints
+
 class TestWorld(object):
     cls = WorldObject
     def test_add_robot(self, empty_world):

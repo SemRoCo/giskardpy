@@ -80,10 +80,10 @@ class GodMap(object):
             except AttributeError:
                 result = self.default_value
             except KeyError as e:
-                # TODO is this really a good idea?
                 # traceback.print_exc()
-                # raise KeyError(key)
-                result = self.default_value
+                raise KeyError(identifier)
+                # TODO is this really a good idea?
+                # result = self.default_value
         if callable(result):
             return result(self)
         else:

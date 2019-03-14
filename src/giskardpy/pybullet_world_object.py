@@ -34,7 +34,12 @@ class PyBulletWorldObject(WorldObject):
         """
         self.path_to_data_folder = path_to_data_folder + u'collision_matrix/'
         self._pybullet_id = None
-        super(PyBulletWorldObject, self).__init__(urdf, *args, **kwargs)
+        super(PyBulletWorldObject, self).__init__(urdf,
+                                                  base_pose=base_pose,
+                                                  controlled_joints=controlled_joints,
+                                                  calc_self_collision_matrix=calc_self_collision_matrix,
+                                                  path_to_data_folder=path_to_data_folder,
+                                                  *args, **kwargs)
         self.reinitialize()
         if base_pose is None:
             p = Pose()

@@ -3,9 +3,9 @@ import pickle
 from warnings import warn
 
 import errno
-import symengine as sp
+import symengine as se
 from symengine import Matrix, Symbol, eye, sympify, diag, zeros, lambdify, Abs, Max, Min, sin, cos, tan, acos, asin, \
-    atan, atan2, nan, sqrt, log, tanh, var, floor
+    atan, atan2, nan, sqrt, log, tanh, var, floor, Piecewise, sign
 import numpy as np
 from numpy import pi
 
@@ -18,6 +18,7 @@ pathSeparator = '_'
 
 # VERY_SMALL_NUMBER = 2.22507385851e-308
 VERY_SMALL_NUMBER = 1e-100
+SMALL_NUMBER = 1e-10
 
 
 def diffable_abs(x):
@@ -26,7 +27,7 @@ def diffable_abs(x):
     :return: abs(x)
     :rtype: Union[float, Symbol]
     """
-    return sp.sqrt(x ** 2)
+    return se.sqrt(x ** 2)
 
 
 def diffable_sign(x):
@@ -71,7 +72,7 @@ def diffable_max(x, y):
     :return: max(x, y)
     :rtype: Union[float, Symbol]
     """
-    return if_greater_zero(x - y, x, y)
+    return diffable_if_greater_zero(x - y, x, y)
 
 
 def diffable_min_fast(x, y):
@@ -94,10 +95,10 @@ def diffable_min(x, y):
     :return: min(x, y)
     :rtype: Union[float, Symbol]
     """
-    return if_greater_zero(y - x, x, y)
+    return diffable_if_greater_zero(y - x, x, y)
 
 
-def if_greater_zero(condition, if_result, else_result):
+def diffable_if_greater_zero(condition, if_result, else_result):
     """
     !takes a long time to compile!
     !Returns shit if condition is very close to but not equal to zero!
@@ -117,7 +118,7 @@ def if_greater_zero(condition, if_result, else_result):
     return _if + _else  # if_result or else_result
 
 
-def if_greater_eq_zero(condition, if_result, else_result):
+def diffable_if_greater_eq_zero(condition, if_result, else_result):
     """
     !takes a long time to compile!
     !Returns shit if condition is very close to but not equal to zero!
@@ -127,7 +128,7 @@ def if_greater_eq_zero(condition, if_result, else_result):
     :return: if_result if condition >= 0 else else_result
     :rtype: Union[float, Symbol]
     """
-    return if_greater_zero(-condition, else_result, if_result)
+    return diffable_if_greater_zero(-condition, else_result, if_result)
 
 
 def diffable_if_eq_zero(condition, if_result, else_result):
@@ -145,18 +146,40 @@ def diffable_if_eq_zero(condition, if_result, else_result):
     return (1 - condition) * if_result + condition * else_result
 
 
+def if_greater_zero(condition, if_result, else_result):
+    """
+    :type condition: Union[float, Symbol]
+    :type if_result: Union[float, Symbol]
+    :type else_result: Union[float, Symbol]
+    :return: if_result if condition > 0 else else_result
+    :rtype: Union[float, Symbol]
+    """
+    return Piecewise([if_result, condition > 0], [else_result, True])
+
+
+def if_greater_eq_zero(condition, if_result, else_result):
+    """
+    !takes a long time to compile!
+    !Returns shit if condition is very close to but not equal to zero!
+    :type condition: Union[float, Symbol]
+    :type if_result: Union[float, Symbol]
+    :type else_result: Union[float, Symbol]
+    :return: if_result if condition >= 0 else else_result
+    :rtype: Union[float, Symbol]
+    """
+    return if_greater_zero(-condition, else_result, if_result)
+
+
 def if_eq_zero(condition, if_result, else_result):
     """
     A short expression which can be compiled quickly.
-    !Returns shit if condition is very close to but not equal to zero!
-    !Returns shit if if_result is outside of [-1e8,1e8]!
     :type condition: Union[float, Symbol]
     :type if_result: Union[float, Symbol]
     :type else_result: Union[float, Symbol]
     :return: if_result if condition == 0 else else_result
     :rtype: Union[float, Symbol]
     """
-    condition = sp.Abs(diffable_sign(condition))
+    condition = se.Abs(sign(condition))
     return (1 - condition) * if_result + condition * else_result
 
 
@@ -249,11 +272,11 @@ def cross(u, v):
     if len(u) != len(v):
         raise ValueError('lengths {} and {} don\' align'.format(len(u), len(v)))
     if len(u) == 3:
-        return sp.Matrix([u[1] * v[2] - u[2] * v[1],
+        return se.Matrix([u[1] * v[2] - u[2] * v[1],
                           u[2] * v[0] - u[0] * v[2],
                           u[0] * v[1] - u[1] * v[0]])
     if len(u) == 4:
-        return sp.Matrix([u[1] * v[2] - u[2] * v[1],
+        return se.Matrix([u[1] * v[2] - u[2] * v[1],
                           u[2] * v[0] - u[0] * v[2],
                           u[0] * v[1] - u[1] * v[0],
                           0])
@@ -266,7 +289,7 @@ def vector3(x, y, z):
     :param z: Union[float, Symbol]
     :rtype: Matrix
     """
-    return sp.Matrix([x, y, z, 0])
+    return se.Matrix([x, y, z, 0])
 
 
 unitX = vector3(1, 0, 0)
@@ -281,7 +304,7 @@ def point3(x, y, z):
     :param z: Union[float, Symbol]
     :rtype: Matrix
     """
-    return sp.Matrix([x, y, z, 1])
+    return se.Matrix([x, y, z, 1])
 
 
 def norm(v):
@@ -293,7 +316,7 @@ def norm(v):
     r = 0
     for x in v:
         r += x ** 2
-    return sp.sqrt(r)
+    return se.sqrt(r)
 
 
 def scale(v, a):
@@ -326,7 +349,7 @@ def translation3(x, y, z):
          [0,0,0,1]]
     :rtype: Matrix
     """
-    r = sp.eye(4)
+    r = se.eye(4)
     r[0, 3] = x
     r[1, 3] = y
     r[2, 3] = z
@@ -345,16 +368,16 @@ def rotation_matrix_from_rpy(roll, pitch, yaw):
     """
     # TODO don't split this into 3 matrices
 
-    rx = sp.Matrix([[1, 0, 0, 0],
-                    [0, sp.cos(roll), -sp.sin(roll), 0],
-                    [0, sp.sin(roll), sp.cos(roll), 0],
+    rx = se.Matrix([[1, 0, 0, 0],
+                    [0, se.cos(roll), -se.sin(roll), 0],
+                    [0, se.sin(roll), se.cos(roll), 0],
                     [0, 0, 0, 1]])
-    ry = sp.Matrix([[sp.cos(pitch), 0, sp.sin(pitch), 0],
+    ry = se.Matrix([[se.cos(pitch), 0, se.sin(pitch), 0],
                     [0, 1, 0, 0],
-                    [-sp.sin(pitch), 0, sp.cos(pitch), 0],
+                    [-se.sin(pitch), 0, se.cos(pitch), 0],
                     [0, 0, 0, 1]])
-    rz = sp.Matrix([[sp.cos(yaw), -sp.sin(yaw), 0, 0],
-                    [sp.sin(yaw), sp.cos(yaw), 0, 0],
+    rz = se.Matrix([[se.cos(yaw), -se.sin(yaw), 0, 0],
+                    [se.sin(yaw), se.cos(yaw), 0, 0],
                     [0, 0, 1, 0],
                     [0, 0, 0, 1]])
     return (rz * ry * rx)
@@ -370,8 +393,8 @@ def rotation_matrix_from_axis_angle(axis, angle):
     :return: 4x4 Matrix
     :rtype: Matrix
     """
-    ct = sp.cos(angle)
-    st = sp.sin(angle)
+    ct = se.cos(angle)
+    st = se.sin(angle)
     vt = 1 - ct
     m_vt_0 = vt * axis[0]
     m_vt_1 = vt * axis[1]
@@ -382,7 +405,7 @@ def rotation_matrix_from_axis_angle(axis, angle):
     m_vt_0_1 = m_vt_0 * axis[1]
     m_vt_0_2 = m_vt_0 * axis[2]
     m_vt_1_2 = m_vt_1 * axis[2]
-    return sp.Matrix([[ct + m_vt_0 * axis[0], -m_st_2 + m_vt_0_1, m_st_1 + m_vt_0_2, 0],
+    return se.Matrix([[ct + m_vt_0 * axis[0], -m_st_2 + m_vt_0_1, m_st_1 + m_vt_0_2, 0],
                       [m_st_2 + m_vt_0_1, ct + m_vt_1 * axis[1], -m_st_0 + m_vt_1_2, 0],
                       [-m_st_1 + m_vt_0_2, m_st_0 + m_vt_1_2, ct + m_vt_2 * axis[2], 0],
                       [0, 0, 0, 1]])
@@ -403,7 +426,7 @@ def rotation_matrix_from_quaternion(x, y, z, w):
     y2 = y * y
     z2 = z * z
     w2 = w * w
-    return sp.Matrix([[w2 + x2 - y2 - z2, 2 * x * y - 2 * w * z, 2 * x * z + 2 * w * y, 0],
+    return se.Matrix([[w2 + x2 - y2 - z2, 2 * x * y - 2 * w * z, 2 * x * z + 2 * w * y, 0],
                       [2 * x * y + 2 * w * z, w2 - x2 + y2 - z2, 2 * y * z - 2 * w * x, 0],
                       [2 * x * z - 2 * w * y, 2 * y * z + 2 * w * x, w2 - x2 - y2 + z2, 0],
                       [0, 0, 0, 1]])
@@ -459,7 +482,7 @@ def inverse_frame(frame):
     :return: 4x4 Matrix
     :rtype: Matrix
     """
-    inv = sp.eye(4)
+    inv = se.eye(4)
     inv[:3, :3] = frame[:3, :3].T
     inv[:3, 3] = -inv[:3, :3] * frame[:3, 3]
     return inv
@@ -482,7 +505,7 @@ def translation_of(frame):
     :return: 4x4 Matrix; sets the rotation part of a frame to identity
     :rtype: Matrix
     """
-    return sp.eye(3).col_join(sp.Matrix([[0] * 3])).row_join(frame[:4, 3:])
+    return se.eye(3).col_join(se.Matrix([[0] * 3])).row_join(frame[:4, 3:])
 
 
 def rotation_of(frame):
@@ -492,7 +515,7 @@ def rotation_of(frame):
     :return: 4x4 Matrix; sets the translation part of a frame to 0
     :rtype: Matrix
     """
-    return frame[:4, :3].row_join(sp.Matrix([0, 0, 0, 1]))
+    return frame[:4, :3].row_join(se.Matrix([0, 0, 0, 1]))
 
 
 def trace(matrix):
@@ -518,7 +541,7 @@ def rotation_distance(rotation_matrix1, rotation_matrix2):
     v = (trace(difference[:3, :3]) - 1) / 2
     # v = Max(-1, v)
     # v = Min(1, v)
-    return sp.acos(v)
+    return se.acos(v)
 
 
 def diffable_axis_angle_from_matrix(rotation_matrix):
@@ -534,13 +557,13 @@ def diffable_axis_angle_from_matrix(rotation_matrix):
     # TODO use 'if' to make angle always positive?
     rm = rotation_matrix
     angle = (trace(rm[:3, :3]) - 1) / 2
-    angle = sp.acos(angle)
+    angle = se.acos(angle)
     x = (rm[2, 1] - rm[1, 2])
     y = (rm[0, 2] - rm[2, 0])
     z = (rm[1, 0] - rm[0, 1])
-    n = sp.sqrt(x * x + y * y + z * z)
+    n = se.sqrt(x * x + y * y + z * z)
 
-    axis = sp.Matrix([x / n, y / n, z / n])
+    axis = se.Matrix([x / n, y / n, z / n])
     return axis, angle
 
 
@@ -556,13 +579,13 @@ def diffable_axis_angle_from_matrix_stable(rotation_matrix):
     angle = (trace(rm[:3, :3]) - 1) / 2
     angle = diffable_min_fast(angle, 1)
     angle = diffable_max_fast(angle, -1)
-    angle = sp.acos(angle)
+    angle = se.acos(angle)
     x = (rm[2, 1] - rm[1, 2])
     y = (rm[0, 2] - rm[2, 0])
     z = (rm[1, 0] - rm[0, 1])
-    n = sp.sqrt(x * x + y * y + z * z)
+    n = se.sqrt(x * x + y * y + z * z)
     m = diffable_if_eq_zero(n, 1, n)
-    axis = sp.Matrix([diffable_if_eq_zero(n, 0, x / m),
+    axis = se.Matrix([diffable_if_eq_zero(n, 0, x / m),
                       diffable_if_eq_zero(n, 0, y / m),
                       diffable_if_eq_zero(n, 1, z / m)])
     return axis, angle
@@ -577,15 +600,15 @@ def axis_angle_from_matrix(rotation_matrix):
     """
     rm = rotation_matrix
     angle = (trace(rm[:3, :3]) - 1) / 2
-    angle = sp.Min(angle, 1)
-    angle = sp.Max(angle, -1)
-    angle = sp.acos(angle)
+    angle = se.Min(angle, 1)
+    angle = se.Max(angle, -1)
+    angle = se.acos(angle)
     x = (rm[2, 1] - rm[1, 2])
     y = (rm[0, 2] - rm[2, 0])
     z = (rm[1, 0] - rm[0, 1])
-    n = sp.sqrt(x * x + y * y + z * z)
+    n = se.sqrt(x * x + y * y + z * z)
     m = if_eq_zero(n, 1, n)
-    axis = sp.Matrix([if_eq_zero(n, 0, x / m),
+    axis = se.Matrix([if_eq_zero(n, 0, x / m),
                       if_eq_zero(n, 0, y / m),
                       if_eq_zero(n, 1, z / m)])
     sign = diffable_sign(angle)
@@ -604,12 +627,12 @@ def axis_angle_from_quaternion(x, y, z, w):
     :rtype: Matrix
     """
     # TODO buggy, angle goes from 0 - 2*pi instead of -pi - +pi
-    w2 = sp.sqrt(1 - w ** 2)
-    angle = (2 * sp.acos(w))
+    w2 = se.sqrt(1 - w ** 2)
+    angle = (2 * se.acos(w))
     x = x / w2
     y = y / w2
     z = z / w2
-    return sp.Matrix([x, y, z]), angle
+    return se.Matrix([x, y, z]), angle
 
 
 def quaternion_from_axis_angle(axis, angle):
@@ -621,10 +644,10 @@ def quaternion_from_axis_angle(axis, angle):
     :rtype: Matrix
     """
     half_angle = angle / 2
-    return sp.Matrix([axis[0] * sp.sin(half_angle),
-                      axis[1] * sp.sin(half_angle),
-                      axis[2] * sp.sin(half_angle),
-                      sp.cos(half_angle)])
+    return se.Matrix([axis[0] * se.sin(half_angle),
+                      axis[1] * se.sin(half_angle),
+                      axis[2] * se.sin(half_angle),
+                      se.cos(half_angle)])
 
 
 def axis_angle_from_rpy(roll, pitch, yaw):
@@ -656,15 +679,15 @@ def rpy_from_matrix(rotation_matrix):
 
     cy = sqrt(rotation_matrix[i, i] * rotation_matrix[i, i] + rotation_matrix[j, i] * rotation_matrix[j, i])
     if0 = cy - _EPS
-    ax = if_greater_zero(if0,
-                         atan2(rotation_matrix[k, j], rotation_matrix[k, k]),
-                         atan2(-rotation_matrix[j, k], rotation_matrix[j, j]))
-    ay = if_greater_zero(if0,
-                         atan2(-rotation_matrix[k, i], cy),
-                         atan2(-rotation_matrix[k, i], cy))
-    az = if_greater_zero(if0,
-                         atan2(rotation_matrix[j, i], rotation_matrix[i, i]),
-                         0)
+    ax = diffable_if_greater_zero(if0,
+                                  atan2(rotation_matrix[k, j], rotation_matrix[k, k]),
+                                  atan2(-rotation_matrix[j, k], rotation_matrix[j, j]))
+    ay = diffable_if_greater_zero(if0,
+                                  atan2(-rotation_matrix[k, i], cy),
+                                  atan2(-rotation_matrix[k, i], cy))
+    az = diffable_if_greater_zero(if0,
+                                  atan2(rotation_matrix[j, i], rotation_matrix[i, i]),
+                                  0)
     return ax, ay, az
 
 
@@ -680,12 +703,12 @@ def quaternion_from_rpy(roll, pitch, yaw):
     pitch_half = pitch / 2.0
     yaw_half = yaw / 2.0
 
-    c_roll = sp.cos(roll_half)
-    s_roll = sp.sin(roll_half)
-    c_pitch = sp.cos(pitch_half)
-    s_pitch = sp.sin(pitch_half)
-    c_yaw = sp.cos(yaw_half)
-    s_yaw = sp.sin(yaw_half)
+    c_roll = se.cos(roll_half)
+    s_roll = se.sin(roll_half)
+    c_pitch = se.cos(pitch_half)
+    s_pitch = se.sin(pitch_half)
+    c_yaw = se.cos(yaw_half)
+    s_yaw = se.sin(yaw_half)
 
     cc = c_roll * c_yaw
     cs = c_roll * s_yaw
@@ -697,7 +720,7 @@ def quaternion_from_rpy(roll, pitch, yaw):
     z = c_pitch * cs - s_pitch * sc
     w = c_pitch * cc + s_pitch * ss
 
-    return sp.Matrix([x, y, z, w])
+    return se.Matrix([x, y, z, w])
 
 
 def quaternion_from_matrix(matrix):
@@ -721,42 +744,45 @@ def quaternion_from_matrix(matrix):
 
     if1 = M[1, 1] - M[0, 0]
 
-    m_i_i = if_greater_zero(if1, M[1, 1], M[0, 0])
-    m_i_j = if_greater_zero(if1, M[1, 2], M[0, 1])
-    m_i_k = if_greater_zero(if1, M[1, 0], M[0, 2])
+    m_i_i = diffable_if_greater_zero(if1, M[1, 1], M[0, 0])
+    m_i_j = diffable_if_greater_zero(if1, M[1, 2], M[0, 1])
+    m_i_k = diffable_if_greater_zero(if1, M[1, 0], M[0, 2])
 
-    m_j_i = if_greater_zero(if1, M[2, 1], M[1, 0])
-    m_j_j = if_greater_zero(if1, M[2, 2], M[1, 1])
-    m_j_k = if_greater_zero(if1, M[2, 0], M[1, 2])
+    m_j_i = diffable_if_greater_zero(if1, M[2, 1], M[1, 0])
+    m_j_j = diffable_if_greater_zero(if1, M[2, 2], M[1, 1])
+    m_j_k = diffable_if_greater_zero(if1, M[2, 0], M[1, 2])
 
-    m_k_i = if_greater_zero(if1, M[0, 1], M[2, 0])
-    m_k_j = if_greater_zero(if1, M[0, 2], M[2, 1])
-    m_k_k = if_greater_zero(if1, M[0, 0], M[2, 2])
+    m_k_i = diffable_if_greater_zero(if1, M[0, 1], M[2, 0])
+    m_k_j = diffable_if_greater_zero(if1, M[0, 2], M[2, 1])
+    m_k_k = diffable_if_greater_zero(if1, M[0, 0], M[2, 2])
 
     if2 = M[2, 2] - m_i_i
 
-    m_i_i = if_greater_zero(if2, M[2, 2], m_i_i)
-    m_i_j = if_greater_zero(if2, M[2, 0], m_i_j)
-    m_i_k = if_greater_zero(if2, M[2, 1], m_i_k)
+    m_i_i = diffable_if_greater_zero(if2, M[2, 2], m_i_i)
+    m_i_j = diffable_if_greater_zero(if2, M[2, 0], m_i_j)
+    m_i_k = diffable_if_greater_zero(if2, M[2, 1], m_i_k)
 
-    m_j_i = if_greater_zero(if2, M[0, 2], m_j_i)
-    m_j_j = if_greater_zero(if2, M[0, 0], m_j_j)
-    m_j_k = if_greater_zero(if2, M[0, 1], m_j_k)
+    m_j_i = diffable_if_greater_zero(if2, M[0, 2], m_j_i)
+    m_j_j = diffable_if_greater_zero(if2, M[0, 0], m_j_j)
+    m_j_k = diffable_if_greater_zero(if2, M[0, 1], m_j_k)
 
-    m_k_i = if_greater_zero(if2, M[1, 2], m_k_i)
-    m_k_j = if_greater_zero(if2, M[1, 0], m_k_j)
-    m_k_k = if_greater_zero(if2, M[1, 1], m_k_k)
+    m_k_i = diffable_if_greater_zero(if2, M[1, 2], m_k_i)
+    m_k_j = diffable_if_greater_zero(if2, M[1, 0], m_k_j)
+    m_k_k = diffable_if_greater_zero(if2, M[1, 1], m_k_k)
 
-    t = if_greater_zero(if0, t, m_i_i - (m_j_j + m_k_k) + M[3, 3])
-    q[0] = if_greater_zero(if0, M[2, 1] - M[1, 2],
-                           if_greater_zero(if2, m_i_j + m_j_i, if_greater_zero(if1, m_k_i + m_i_k, t)))
-    q[1] = if_greater_zero(if0, M[0, 2] - M[2, 0],
-                           if_greater_zero(if2, m_k_i + m_i_k, if_greater_zero(if1, t, m_i_j + m_j_i)))
-    q[2] = if_greater_zero(if0, M[1, 0] - M[0, 1],
-                           if_greater_zero(if2, t, if_greater_zero(if1, m_i_j + m_j_i, m_k_i + m_i_k)))
-    q[3] = if_greater_zero(if0, t, m_k_j - m_j_k)
+    t = diffable_if_greater_zero(if0, t, m_i_i - (m_j_j + m_k_k) + M[3, 3])
+    q[0] = diffable_if_greater_zero(if0, M[2, 1] - M[1, 2],
+                                    diffable_if_greater_zero(if2, m_i_j + m_j_i,
+                                                             diffable_if_greater_zero(if1, m_k_i + m_i_k, t)))
+    q[1] = diffable_if_greater_zero(if0, M[0, 2] - M[2, 0],
+                                    diffable_if_greater_zero(if2, m_k_i + m_i_k,
+                                                             diffable_if_greater_zero(if1, t, m_i_j + m_j_i)))
+    q[2] = diffable_if_greater_zero(if0, M[1, 0] - M[0, 1],
+                                    diffable_if_greater_zero(if2, t, diffable_if_greater_zero(if1, m_i_j + m_j_i,
+                                                                                              m_k_i + m_i_k)))
+    q[3] = diffable_if_greater_zero(if0, t, m_k_j - m_j_k)
 
-    q *= 0.5 / sp.sqrt(t * M[3, 3])
+    q *= 0.5 / se.sqrt(t * M[3, 3])
     return q
 
 
@@ -771,7 +797,7 @@ def quaternion_multiply(q1, q2):
     """
     x0, y0, z0, w0 = q2
     x1, y1, z1, w1 = q1
-    return sp.Matrix([x1 * w0 + y1 * z0 - z1 * y0 + w1 * x0,
+    return se.Matrix([x1 * w0 + y1 * z0 - z1 * y0 + w1 * x0,
                       -x1 * z0 + y1 * w0 + z1 * x0 + w1 * y0,
                       x1 * y0 - y1 * x0 + z1 * w0 + w1 * z0,
                       -x1 * x0 - y1 * y0 - z1 * z0 + w1 * w0])
@@ -784,7 +810,7 @@ def quaternion_conjugate(quaternion):
     :return: 4x1 Matrix
     :rtype: Matrix
     """
-    return sp.Matrix([-quaternion[0], -quaternion[1], -quaternion[2], quaternion[3]])
+    return se.Matrix([-quaternion[0], -quaternion[1], -quaternion[2], quaternion[3]])
 
 
 def quaternion_diff(q0, q1):
@@ -827,7 +853,11 @@ def euclidean_distance(v1, v2):
 
 
 def fmod(a, b):
-    return a - b * floor(a / b)
+    s = sign(a)
+    a = Abs(a)
+    b = Abs(b)
+    f1 = a - (b * floor(a / b))
+    return s * se.Piecewise([0, Abs(a - b) < SMALL_NUMBER], [f1, True])
 
 
 def normalize_angle_positive(angle):
@@ -844,8 +874,7 @@ def normalize_angle(angle):
     It takes and returns radians.
     """
     a = normalize_angle_positive(angle)
-    condition = a - pi
-    return if_greater_zero(condition, a - 2 * pi, a)
+    return Piecewise([a - 2.0 * pi, a > pi], [a, True])
 
 
 def shortest_angular_distance(from_angle, to_angle):
@@ -874,8 +903,8 @@ def diffable_slerp(q1, q2, t):
     cos_half_theta = dot(q1, q2)
 
     if0 = -cos_half_theta
-    q2 = if_greater_zero(if0, -q2, q2)
-    cos_half_theta = if_greater_zero(if0, -cos_half_theta, cos_half_theta)
+    q2 = diffable_if_greater_zero(if0, -q2, q2)
+    cos_half_theta = diffable_if_greater_zero(if0, -cos_half_theta, cos_half_theta)
 
     if1 = diffable_abs(cos_half_theta) - 1.0
 
@@ -892,9 +921,29 @@ def diffable_slerp(q1, q2, t):
 
     ratio_a = sin((1.0 - t) * half_theta) / sin_half_theta
     ratio_b = sin(t * half_theta) / sin_half_theta
-    return if_greater_eq_zero(if1, sp.Matrix(q1),
-                              if_greater_zero(if2, 0.5 * q1 + 0.5 * q2, ratio_a * q1 + ratio_b * q2))
+    return diffable_if_greater_eq_zero(if1, se.Matrix(q1),
+                                       diffable_if_greater_zero(if2, 0.5 * q1 + 0.5 * q2, ratio_a * q1 + ratio_b * q2))
 
 
 def to_numpy(matrix):
     return np.array(matrix.tolist()).astype(float).reshape(matrix.shape)
+
+
+# -----------------------------------------------------------------------------------------------------------------------
+
+if __name__ == u'__main__':
+    a = se.Symbol('a')
+    b = se.Symbol('b')
+
+    x1 = 2 * pi
+    y1 = 237.0
+
+    f = fmod(fmod(a, 2.0 * pi) + 2.0 * pi, 2.0 * pi)
+    # f = normalize_angle(a)
+
+    print('\nlambda')
+    print(se.Lambdify([a, b], f, backend='lambda', real=True)(x1, y1))
+    print('\nllvm')
+    print(se.Lambdify([a, b], f, backend='llvm', real=True)(x1, y1))
+    # print('\nref')
+    # print(nor)

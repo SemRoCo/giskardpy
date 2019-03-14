@@ -1,7 +1,7 @@
 world_identifier = [u'world']
 robot_identifier = world_identifier + [u'robot']
 fk_identifier = robot_identifier + [u'get_fk']
-js_identifier = robot_identifier + [u'js']
+js_identifier = robot_identifier + [u'joint_state']
 data_folder_identifier = [u'asdf']
 
 

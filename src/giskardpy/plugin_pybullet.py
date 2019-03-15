@@ -41,8 +41,8 @@ from giskardpy.world_object import WorldObject
 #         self.world = PyBulletWorld(enable_gui=self.gui, path_to_data_folder=self.path_to_data_folder)
 #         self.world.setup()
 #         # TODO get robot description from god map
-#         urdf = rospy.get_param(u'robot_description')
-#         self.world.add_robot(self.robot_name, urdf, self.controlled_joints)
+#         urdfs = rospy.get_param(u'robot_description')
+#         self.world.add_robot(self.robot_name, urdfs, self.controlled_joints)
 #         self.god_map.safe_set_data([pybullet_identifier], self.world)
 
 
@@ -93,12 +93,21 @@ class PyBulletUpdatePlugin(PluginBase):
         self.srv_update_world = rospy.Service(u'~update_world', UpdateWorld, self.update_world_cb)
         self.pub_collision_marker = rospy.Publisher(u'~visualization_marker_array', MarkerArray, queue_size=1)
 
-    def publish_object_as_marker(self, req):
+    def publish_object_as_marker(self, object_):
+        """
+        :type object_: WorldObject
+        """
         try:
-            ma = to_marker(req)
+            ma = MarkerArray()
+            m = object_.as_marker_msg(ns=u'world')
+            m.header.frame_id = self.global_reference_frame_name
+            ma.markers.append(m)
             self.pub_collision_marker.publish(ma)
         except:
             pass
+
+    def delete_markers(self):
+        self.pub_collision_marker.publish(MarkerArray([Marker(action=Marker.DELETEALL)]))
 
     def update_world_cb(self, req):
         """
@@ -169,7 +178,7 @@ class PyBulletUpdatePlugin(PluginBase):
         world_object = WorldObject.from_world_body(world_body)
         self.get_world().add_object(world_object)
         self.get_world().set_object_pose(world_body.name, global_pose)
-
+        self.publish_object_as_marker(self.get_world().get_object(world_body.name))
         # SUB-CASE: If it is an articulated object, open up a joint state subscriber
         # FIXME
         # if world_body.joint_state_topic:
@@ -208,7 +217,7 @@ class PyBulletUpdatePlugin(PluginBase):
         #     raise UnknownBodyException(u'Cannot delete unknown object {}'.format(name))
 
     def clear_world(self):
-        self.pub_collision_marker.publish(MarkerArray([Marker(action=Marker.DELETEALL)]))
+        self.delete_markers()
         self.get_world().soft_reset()
         # for object_name in self.world.get_object_names():
         #     if object_name != u'plane' and object_name != u'pybullet_sucks':  # TODO get rid of this hard coded special case
@@ -227,7 +236,7 @@ class PyBulletUpdatePlugin(PluginBase):
 
     def update(self):
         """
-        updated urdf in god map and updates pybullet object joint states
+        updated urdfs in god map and updates pybullet object joint states
         """
         with self.lock:
             pass

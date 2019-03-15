@@ -42,7 +42,7 @@ def load_urdf_string_into_bullet(urdf_string, pose=None):
     :type urdf_string: str
     :param pose: Pose at which to load the URDF into the world.
     :type pose: Pose
-    :return: internal PyBullet id of the loaded urdf
+    :return: internal PyBullet id of the loaded urdfs
     :rtype: intload_urdf_string_into_bullet
     """
     if pose is None:
@@ -54,12 +54,13 @@ def load_urdf_string_into_bullet(urdf_string, pose=None):
     if object_name in get_body_names():
         raise DuplicateNameException(u'an object with name \'{}\' already exists in pybullet'.format(object_name))
     resolved_urdf = resolve_ros_iris_in_urdf(urdf_string)
-    filename = write_to_tmp(u'{}.urdf'.format(random_string()), resolved_urdf)
+    filename = write_to_tmp(u'{}.urdfs'.format(random_string()), resolved_urdf)
     with NullContextManager() if giskardpy.PRINT_LEVEL == DEBUG else suppress_stdout():
         id = p.loadURDF(filename, [pose.position.x, pose.position.y, pose.position.z],
                         [pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w],
                         flags=p.URDF_USE_SELF_COLLISION_EXCLUDE_PARENT)
     os.remove(filename)
+    print(u'added {} to pybullet'.format(object_name))
     return id
 
 
@@ -113,6 +114,7 @@ def msg_to_pybullet_pose(msg):
     return position, orientation
 
 def clear_pybullet():
+    print(u'cleared pybullet')
     p.resetSimulation()
 
 def get_body_names():

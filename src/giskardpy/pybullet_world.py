@@ -47,15 +47,15 @@ class PyBulletWorld(World):
         :param path_to_data_folder: location where compiled collision matrices are stored
         :type path_to_data_folder: str
         """
-        super(PyBulletWorld, self).__init__()
+        super(PyBulletWorld, self).__init__(path_to_data_folder)
         self._gui = enable_gui
         self._object_names_to_objects = {}
         self._object_id_to_name = {}
         self._robot = None
-        self.path_to_data_folder = path_to_data_folder
         self.setup()
 
-    def add_robot(self, robot, base_pose, controlled_joints, default_joint_vel_limit, default_joint_weight):
+    def add_robot(self, robot, base_pose, controlled_joints, default_joint_vel_limit, default_joint_weight,
+                  calc_self_collision_matrix):
         """
         :type robot: giskardpy.world_object.WorldObject
         :param controlled_joints:
@@ -65,8 +65,7 @@ class PyBulletWorld(World):
         if isinstance(robot, PyBulletWorldObject):
             raise TypeError(u'don\t use PyBulletWorldObjects!')
         super(PyBulletWorld, self).add_robot(robot, base_pose, controlled_joints, default_joint_vel_limit,
-                                             default_joint_weight)
-        # self._robot = PyBulletWorldObject.from_urdf_object(robot)
+                                             default_joint_weight, calc_self_collision_matrix)
 
     # def attach_object(self, object_, parent_link, transform):
     #     """
@@ -87,13 +86,6 @@ class PyBulletWorld(World):
 
     def __get_pybullet_object_id(self, name):
         return self._object_names_to_objects[name].id
-
-    def remove_object(self, name):
-        """
-        Deletes an object with a specific name from the world.
-        :type name: str
-        """
-        super(PyBulletWorld, self).remove_object(name)
 
     def check_collisions(self, cut_off_distances):
         """
@@ -180,13 +172,13 @@ class PyBulletWorld(World):
         Adds a ground plane to the Bullet World.
         """
         if not self.has_object(self.ground_plane_name):
-            plane = WorldObject.from_urdf_file(self.path_to_data_folder + u'/urdf/ground_plane.urdf')
+            plane = WorldObject.from_urdf_file(u'../test/urdfs/ground_plane.urdf')
             plane.set_name(self.ground_plane_name)
             self.add_object(plane)
 
     def __add_pybullet_bug_fix_hack(self):
         if not self.has_object(self.hack_name):
-            plane = WorldObject.from_urdf_file(self.path_to_data_folder + u'/urdf/tiny_ball.urdf')
+            plane = WorldObject.from_urdf_file(u'../test/urdfs/tiny_ball.urdf')
             plane.set_name(self.hack_name)
             self.add_object(plane)
 
@@ -224,3 +216,8 @@ class PyBulletWorld(World):
                                                       cpi.min_dist, cpi.link_a, cpi.link_b,
                                                       -np.array(cpi.contact_normal), key)
         return closest_point
+
+    def remove_robot(self):
+        self.robot.suicide()
+        super(PyBulletWorld, self).remove_robot()
+

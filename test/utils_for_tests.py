@@ -3,7 +3,7 @@ from threading import Thread
 
 import rospy
 from angles import normalize_angle, shortest_angular_distance
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import PoseStamped, Pose, Point, Quaternion
 from giskard_msgs.msg import MoveActionResult, CollisionEntry, MoveActionGoal, MoveResult
 from giskard_msgs.srv import UpdateWorldResponse
 from hypothesis import given, reproduce_failure, assume
@@ -47,8 +47,8 @@ def move_result_error_code(code):
 
 
 def robot_urdfs():
-    return st.sampled_from([u'urdfs/pr2.urdf', u'urdfs/boxy.urdf', u'urdfs/iai_donbot.urdf'])
-    # return st.sampled_from([u'pr2.urdf'])
+    return st.sampled_from([u'urdfs/pr2.urdfs', u'urdfs/boxy.urdfs', u'urdfs/iai_donbot.urdfs'])
+    # return st.sampled_from([u'pr2.urdfs'])
 
 
 def angle_positive():
@@ -209,10 +209,10 @@ class GiskardTestWrapper(object):
         """
         :rtype: dict
         """
-        return self.get_god_map().safe_get_data([u'controlled_joints'])
+        return self.get_robot().controlled_joints
 
     def get_controllable_links(self):
-        return self.get_god_map().safe_get_data([u'controllable_links'])
+        return self.get_robot().get_controlled_links()
 
     def get_current_joint_state(self):
         """
@@ -344,7 +344,11 @@ class GiskardTestWrapper(object):
         assert r.error_codes == UpdateWorldResponse.SUCCESS, \
             u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
                                             update_world_error_code(UpdateWorldResponse.SUCCESS))
+        p = Pose()
+        p.position = Point(*position)
+        p.orientation = Quaternion(*orientation)
         assert self.get_world().has_object(name)
+        assert self.get_world().get_object(name).base_pose == p
 
     def add_sphere(self, name=u'sphere', position=(1.2, 0, 0.5)):
         r = self.wrapper.add_sphere(name=name, position=position)
@@ -410,7 +414,7 @@ class GiskardTestWrapper(object):
         self.wait_for_synced()
         assert name in self.get_controllable_links()
         assert not self.get_world().has_object(name)
-        assert len(old_collision_matrix.difference(self.get_world().get_robot().get_self_collision_matrix())) == 0
+        assert len(old_collision_matrix.difference(self.get_robot().get_self_collision_matrix())) == 0
         self.loop_once()
 
     def get_cpi(self, distance_threshold):

@@ -129,7 +129,7 @@ class KDL(object):
             return np.array(r)
 
     def __init__(self, urdf):
-        if urdf.endswith(u'.urdf'):
+        if urdf.endswith(u'.urdfs'):
             with open(urdf, u'r') as file:
                 urdf = file.read()
         r = URDF.from_xml_string(hacky_urdf_parser_fix(urdf))

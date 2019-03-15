@@ -4,7 +4,6 @@ import numpy as np
 import errno
 import pickle
 from itertools import combinations
-from random import seed
 
 from geometry_msgs.msg import Pose, Quaternion
 
@@ -14,15 +13,16 @@ from giskardpy.urdf_object import URDFObject
 
 
 class WorldObject(URDFObject):
-    def __init__(self, urdf, base_pose=None, controlled_joints=None, *args, **kwargs):
+    def __init__(self, urdf, base_pose=None, controlled_joints=None, path_to_data_folder=u'', *args, **kwargs):
         super(WorldObject, self).__init__(urdf, *args, **kwargs)
+        self.path_to_data_folder = path_to_data_folder + u'collision_matrix/'
         self.controlled_joints = controlled_joints
         if base_pose is None:
             p = Pose()
             p.orientation.w = 1
             self.base_pose = p
         self.joint_state = {}
-        self._self_collision_matrix = {}
+        self._self_collision_matrix = set()
 
     @classmethod
     def from_urdf_file(cls, urdf_file, *args, **kwargs):
@@ -59,7 +59,7 @@ class WorldObject(URDFObject):
                                        value.orientation.z,
                                        value.orientation.w])
         self._base_pose = value
-        self._base_pose.orientation = Quaternion(*orientation_vector/np.linalg.norm(orientation_vector))
+        self._base_pose.orientation = Quaternion(*orientation_vector / np.linalg.norm(orientation_vector))
         self.T_base___map = msg_to_kdl(self._base_pose).Inverse()
 
     @property
@@ -106,7 +106,7 @@ class WorldObject(URDFObject):
         """
         # TODO computational expansive because of too many collision checks
         print(u'calculating self collision matrix')
-        seed(1337)
+        np.random.seed(1337)
         always = set()
 
         # find meaningless self-collisions
@@ -152,7 +152,7 @@ class WorldObject(URDFObject):
         return in_collision
 
     def in_collision(self, link_a, link_b, distance):
-        return False
+        return self.are_linked(link_a, link_b)
 
     def get_zero_joint_state(self):
         # FIXME 0 might not be a valid joint value
@@ -211,8 +211,16 @@ class WorldObject(URDFObject):
         self._self_collision_matrix = {(link1, link2) for link1, link2 in self.get_self_collision_matrix()
                                        if link1 != object_name and link2 != object_name}
 
-    def init_self_collision_matrix(self):
-        self._self_collision_matrix = self.calc_collision_matrix(set(combinations(self.get_link_names(), 2)))
+    def update_self_collision_matrix(self, added_links=None, removed_links=None):
+        if not self.load_self_collision_matrix(self.path_to_data_folder):
+            if added_links is None:
+                added_links = set()
+            if removed_links is None:
+                removed_links = set()
+            self._self_collision_matrix = {x for x in self._self_collision_matrix if x[0] not in removed_links and
+                                           x[1] not in removed_links}
+            self._self_collision_matrix.update(self.calc_collision_matrix(added_links))
+            self.safe_self_collision_matrix(self.path_to_data_folder)
 
     def load_self_collision_matrix(self, path):
         """
@@ -241,4 +249,18 @@ class WorldObject(URDFObject):
         with open(path, u'w') as file:
             print(u'saved self collision matrix {}'.format(path))
             pickle.dump(self._self_collision_matrix, file)
+
+    def as_marker_msg(self, ns=u'', id=1):
+        m = super(WorldObject, self).as_marker_msg(ns, id)
+        m.pose = self.base_pose
+        return m
+
+    def attach_urdf_object(self, urdf_object, parent_link, pose):
+        super(WorldObject, self).attach_urdf_object(urdf_object, parent_link, pose)
+        object_name = urdf_object.get_name()
+        self.update_self_collision_matrix(added_links={(object_name, x) for x in self.get_link_names()})
+
+    def detach_sub_tree(self, joint_name):
+        sub_tree = super(WorldObject, self).detach_sub_tree(joint_name)
+        self.update_self_collision_matrix(removed_links=sub_tree.get_link_names())
 

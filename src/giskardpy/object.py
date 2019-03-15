@@ -50,7 +50,7 @@ def world_body_to_marker_msg(world_body, id=1, ns=u''):
     m.ns = u'{}/{}'.format(ns, world_body.name)
     m.id = id
     if world_body.type == WorldBody.URDF_BODY:
-        raise Exception(u'can\'t convert urdf body world object to marker array')
+        raise Exception(u'can\'t convert urdfs body world object to marker array')
     elif world_body.type == WorldBody.PRIMITIVE_BODY:
         if world_body.shape.type == SolidPrimitive.BOX:
             m.type = Marker.CUBE

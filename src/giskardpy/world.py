@@ -14,9 +14,12 @@ from giskardpy.world_object import WorldObject
 
 
 class World(object):
-    def __init__(self):
+    def __init__(self, path_to_data_folder=u''):
         self._objects = {}
         self._robot = None  # type: Robot
+        if path_to_data_folder is None:
+            path_to_data_folder = u''
+        self._path_to_data_folder = path_to_data_folder
 
     # General ----------------------------------------------------------------------------------------------------------
 
@@ -49,6 +52,7 @@ class World(object):
         if self.has_object(object_.get_name()):
             raise DuplicateNameException(u'object with that name already exists')
         self._objects[object_.get_name()] = object_
+        print(u'added object {} to world'.format(object_.get_name()))
 
     def set_object_pose(self, name, pose):
         """
@@ -92,14 +96,18 @@ class World(object):
     def remove_object(self, name):
         if self.has_object(name):
             self._objects[name].suicide()
+            print(u'removed object {} to world'.format(name))
             del (self._objects[name])
 
     def remove_all_objects(self):
+        for object_ in self._objects.values():
+            object_.suicide()
         self._objects = {}
 
     # Robot ------------------------------------------------------------------------------------------------------------
 
-    def add_robot(self, robot, base_pose, controlled_joints, default_joint_vel_limit, default_joint_weight):
+    def add_robot(self, robot, base_pose, controlled_joints, default_joint_vel_limit, default_joint_weight,
+                  calc_self_collision_matrix):
         """
         :type robot: giskardpy.world_object.WorldObject
         :type controlled_joints: list
@@ -110,8 +118,8 @@ class World(object):
         if self.has_object(robot.get_name()):
             raise DuplicateNameException(
                 u'can\'t add robot; object with name "{}" already exists'.format(robot.get_name()))
-        self._robot = Robot.from_urdf_object(robot, base_pose, controlled_joints, default_joint_vel_limit,
-                                             default_joint_weight)
+        self._robot = Robot.from_urdf_object(robot, base_pose, controlled_joints,  self._path_to_data_folder,
+                                             default_joint_vel_limit, default_joint_weight, calc_self_collision_matrix)
 
     @property
     def robot(self):
@@ -162,7 +170,7 @@ class World(object):
         """
         # TODO split this into smaller functions
         robot_name = self.robot.get_name()
-        robot_links = self.robot.get_link_names()
+        robot_links = self.robot.get_link_names_with_collision()
 
         collision_matrix = self.get_robot_collision_matrix(min_dist)
         min_allowed_distance = collision_matrix
@@ -228,7 +236,7 @@ class World(object):
                 link_bs = collision_entry.link_bs
                 if body_b != robot_name:
                     if link_bs == []:
-                        link_bs = self.get_object(body_b).get_link_names()
+                        link_bs = self.get_object(body_b).get_link_names_with_collision()
                     elif link_bs != []:
                         for link_b in link_bs:
                             # TODO use sets and intersection to safe time

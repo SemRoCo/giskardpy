@@ -17,12 +17,11 @@ import pybullet as p
 
 class PyBulletWorldObject(WorldObject):
     """
-    Keeps track of and offers convenience functions for an urdf object in bullet.
+    Keeps track of and offers convenience functions for an urdfs object in bullet.
     """
     base_link_name = u'base'
 
-    def __init__(self, urdf, base_pose=None, controlled_joints=None, calc_self_collision_matrix=False,
-                 path_to_data_folder=u'', *args, **kwargs):
+    def __init__(self, urdf, base_pose=None, controlled_joints=None, path_to_data_folder=u'', *args, **kwargs):
         """
         :type name: str
         :param urdf: Path to URDF file, or content of already loaded URDF file.
@@ -32,12 +31,10 @@ class PyBulletWorldObject(WorldObject):
         :param path_to_data_folder: where the self collision matrix is stored
         :type path_to_data_folder: str
         """
-        self.path_to_data_folder = path_to_data_folder + u'collision_matrix/'
         self._pybullet_id = None
         super(PyBulletWorldObject, self).__init__(urdf,
                                                   base_pose=base_pose,
                                                   controlled_joints=controlled_joints,
-                                                  calc_self_collision_matrix=calc_self_collision_matrix,
                                                   path_to_data_folder=path_to_data_folder,
                                                   *args, **kwargs)
         self.reinitialize()
@@ -45,12 +42,7 @@ class PyBulletWorldObject(WorldObject):
             p = Pose()
             p.orientation.w = 1
             self.base_pose = p
-        if calc_self_collision_matrix:
-            if not self.load_self_collision_matrix(self.path_to_data_folder):
-                self.init_self_collision_matrix()
-                self.safe_self_collision_matrix(self.path_to_data_folder)
-        else:
-            self.self_collision_matrix = set()
+        self.self_collision_matrix = set()
 
     @WorldObject.joint_state.setter
     def joint_state(self, value):
@@ -119,6 +111,7 @@ class PyBulletWorldObject(WorldObject):
 
     def suicide(self):
         p.removeBody(self._pybullet_id)
+        print(u'removed {} from pybullet'.format(self.get_name()))
 
     def __del__(self):
         self.suicide()

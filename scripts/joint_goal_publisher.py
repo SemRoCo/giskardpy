@@ -55,7 +55,7 @@ class JointGoalPublisher(object):
 
     def init_urdf(self, robot):
         """
-        reads the controllable joints from a urdf
+        reads the controllable joints from a urdfs
         :param robot:
         """
         robot = robot.getElementsByTagName('robot')[0]

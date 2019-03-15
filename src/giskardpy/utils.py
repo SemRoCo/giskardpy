@@ -350,7 +350,7 @@ def plot_trajectory(tj, controlled_joints, path_to_data_folder):
 
 def resolve_ros_iris_in_urdf(input_urdf):
     """
-    Replace all instances of ROS IRIs with a urdf string with global paths in the file system.
+    Replace all instances of ROS IRIs with a urdfs string with global paths in the file system.
     :param input_urdf: URDF in which the ROS IRIs shall be replaced.
     :type input_urdf: str
     :return: URDF with replaced ROS IRIs.
@@ -394,11 +394,11 @@ def convert_dae_to_obj(path):
 def write_to_tmp(filename, urdf_string):
     """
     Writes a URDF string into a temporary file on disc. Used to deliver URDFs to PyBullet that only loads file.
-    :param filename: Name of the temporary file without any path information, e.g. 'pr2.urdf'
+    :param filename: Name of the temporary file without any path information, e.g. 'pr2.urdfs'
     :type filename: str
     :param urdf_string: URDF as an XML string that shall be written to disc.
     :type urdf_string: str
-    :return: Complete path to where the urdf was written, e.g. '/tmp/pr2.urdf'
+    :return: Complete path to where the urdfs was written, e.g. '/tmp/pr2.urdfs'
     :rtype: str
     """
     new_path = u'/tmp/giskardpy/{}'.format(filename)

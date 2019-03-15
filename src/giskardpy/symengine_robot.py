@@ -1,4 +1,5 @@
 from collections import namedtuple, OrderedDict
+from itertools import combinations
 
 from geometry_msgs.msg import PoseStamped
 
@@ -20,12 +21,12 @@ else:
 
 
 class Robot(Backend):
-    def __init__(self, urdf, base_pose, controlled_joints, default_joint_vel_limit,
-                 default_joint_weight, *args, **kwargs):
+    def __init__(self, urdf, base_pose=None, controlled_joints=None, path_to_data_folder=u'', default_joint_vel_limit=0,
+                 default_joint_weight=0, calc_self_collision_matrix=True, *args, **kwargs):
         """
         :param urdf:
         :type urdf: str
-        :param joints_to_symbols_map: maps urdf joint names to symbols
+        :param joints_to_symbols_map: maps urdfs joint names to symbols
         :type joints_to_symbols_map: dict
         :param default_joint_vel_limit: all velocity limits which are undefined or higher than this will be set to this
         :type default_joint_vel_limit: Symbol
@@ -36,8 +37,10 @@ class Robot(Backend):
         self._default_joint_velocity_limit = default_joint_vel_limit
         self._default_weight = default_joint_weight
         self._joint_to_symbol_map = keydefaultdict(lambda x: spw.Symbol(x))
-        super(Robot, self).__init__(urdf, base_pose, controlled_joints, *args, **kwargs)
+        self._calc_self_collision_matrix = calc_self_collision_matrix
+        super(Robot, self).__init__(urdf, base_pose, controlled_joints, path_to_data_folder, *args, **kwargs)
         self.reinitialize()
+        self.update_self_collision_matrix(added_links=set(combinations(self.get_link_names_with_collision(), 2)))
 
     @property
     def hard_constraints(self):
@@ -49,7 +52,7 @@ class Robot(Backend):
 
     def reinitialize(self, joints_to_symbols_map=None):
         """
-        :param joints_to_symbols_map: maps urdf joint names to symbols
+        :param joints_to_symbols_map: maps urdfs joint names to symbols
         :type joints_to_symbols_map: dict
         """
         super(Robot, self).reinitialize()
@@ -59,6 +62,10 @@ class Robot(Backend):
         self._create_frames_expressions()
         self._create_constraints()
         self.init_fast_fks()
+
+    def update_self_collision_matrix(self, added_links=None, removed_links=None):
+        if self._calc_self_collision_matrix:
+            super(Robot, self).update_self_collision_matrix(added_links, removed_links)
 
     def _create_frames_expressions(self):
         for joint_name, urdf_joint in self._urdf_robot.joint_map.items():
@@ -78,7 +85,7 @@ class Robot(Backend):
                     joint_frame = spw.eye(4)
             else:
                 # TODO more specific exception
-                raise Exception(u'Joint type "{}" is not supported by urdf parser.'.format(urdf_joint.type))
+                raise Exception(u'Joint type "{}" is not supported by urdfs parser.'.format(urdf_joint.type))
 
             if self.is_rotational_joint(joint_name):
                 joint_frame *= spw.rotation_matrix_from_axis_angle(spw.vector3(*urdf_joint.axis), joint_symbol)
@@ -142,16 +149,16 @@ class Robot(Backend):
 
     def get_joint_symbols(self):
         """
-        :return: dict mapping urdf joint name to symbol
+        :return: dict mapping urdfs joint name to symbol
         :rtype: dict
         """
         return {joint_name: self.get_joint_symbol(joint_name) for joint_name in self.get_joint_names_controllable()}
 
     def get_joint_velocity_limit_expr(self, joint_name):
         """
-        :param joint_name: name of the joint in the urdf
+        :param joint_name: name of the joint in the urdfs
         :type joint_name: str
-        :return: minimum of default velocity limit and limit specified in urdf
+        :return: minimum of default velocity limit and limit specified in urdfs
         :rtype: float
         """
         limit = self._urdf_robot.joint_map[joint_name].limit
@@ -162,7 +169,7 @@ class Robot(Backend):
 
     def get_joint_frame(self, joint_name):
         """
-        :param joint_name: name of the joint in the urdf
+        :param joint_name: name of the joint in the urdfs
         :type joint_name: str
         :return: matrix expression describing the transformation caused by this joint
         :rtype: spw.Matrix
@@ -171,8 +178,10 @@ class Robot(Backend):
 
     def get_joint_symbol(self, joint_name):
         """
-        :param joint_name: name of the joint in the urdf
+        :param joint_name: name of the joint in the urdfs
         :type joint_name: str
         :rtype: spw.Symbol
         """
         return self._joint_to_symbol_map[joint_name]
+
+

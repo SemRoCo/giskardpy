@@ -16,7 +16,7 @@ Joint = namedtuple('Joint', ['symbol', 'velocity_limit', 'lower', 'upper', 'type
 
 
 def hacky_urdf_parser_fix(urdf_str):
-    # TODO this function is inefficient but the tested urdf's aren't big enough for it to be a problem
+    # TODO this function is inefficient but the tested urdfs's aren't big enough for it to be a problem
     fixed_urdf = ''
     delete = False
     black_list = ['transmission', 'gazebo']
@@ -44,7 +44,7 @@ class URDFObject(object):
         """
         :param urdf:
         :type urdf: str
-        :param joints_to_symbols_map: maps urdf joint names to symbols
+        :param joints_to_symbols_map: maps urdfs joint names to symbols
         :type joints_to_symbols_map: dict
         :param default_joint_vel_limit: all velocity limits which are undefined or higher than this will be set to this
         :type default_joint_vel_limit: Symbol
@@ -56,9 +56,9 @@ class URDFObject(object):
     @classmethod
     def from_urdf_file(cls, urdf_file, *args, **kwargs):
         """
-        :param urdf_file: path to urdf file
+        :param urdf_file: path to urdfs file
         :type urdf_file: str
-        :param joints_to_symbols_map: maps urdf joint names to symbols
+        :param joints_to_symbols_map: maps urdfs joint names to symbols
         :type joints_to_symbols_map: dict
         :param default_joint_vel_limit: all velocity limits which are undefined or higher than this will be set to this
         :type default_joint_vel_limit: float
@@ -181,7 +181,7 @@ class URDFObject(object):
     def get_joint_limits(self, joint_names):
         """
         Returns joint limits specified in the safety controller entry if given, else returns the normal limits.
-        :param joint_name: name of the joint in the urdf
+        :param joint_name: name of the joint in the urdfs
         :type joint_names: str
         :return: lower limit, upper limit or None if not applicable
         :rtype: float, float
@@ -198,7 +198,7 @@ class URDFObject(object):
 
     def is_joint_controllable(self, name):
         """
-        :param name: name of the joint in the urdf
+        :param name: name of the joint in the urdfs
         :type name: str
         :return: True if joint type is revolute, continuous or prismatic
         :rtype: bool
@@ -208,7 +208,7 @@ class URDFObject(object):
 
     def is_joint_mimic(self, name):
         """
-        :param name: name of the joint in the urdf
+        :param name: name of the joint in the urdfs
         :type name: str
         :rtype: bool
         """
@@ -217,7 +217,7 @@ class URDFObject(object):
 
     def is_joint_continuous(self, name):
         """
-        :param name: name of the joint in the urdf
+        :param name: name of the joint in the urdfs
         :type name: str
         :rtype: bool
         """
@@ -265,6 +265,9 @@ class URDFObject(object):
         """
         sub_tree = self.get_links_from_sub_tree(root_joint)
         return [link_name for link_name in sub_tree if self.has_link_collision(link_name)]
+
+    def get_link_names_with_collision(self):
+        return [link_name for link_name in self.get_link_names() if self.has_link_collision(link_name)]
 
     def get_links_from_sub_tree(self, joint_name):
         return self.get_sub_tree_at_joint(joint_name).get_link_names()
@@ -366,15 +369,18 @@ class URDFObject(object):
         for l in urdf_object._urdf_robot.links:
             self._urdf_robot.add_link(l)
         self.reinitialize()
-        pass
 
     def detach_sub_tree(self, joint_name):
+        """
+        :rtype: URDFObject
+        """
         sub_tree = self.get_sub_tree_at_joint(joint_name)
         for link in sub_tree.get_link_names():
             self._urdf_robot.remove_aggregate(self.get_urdf_link(link))
         for joint in chain([joint_name], sub_tree.get_joint_names()):
             self._urdf_robot.remove_aggregate(self.get_urdf_joint(joint))
         self.reinitialize()
+        return sub_tree
 
 
     def reset(self):
@@ -418,84 +424,93 @@ class URDFObject(object):
         link = self._urdf_robot.link_map[link_name]
         return link.visual is not None
 
-    # def as_marker_msg(self, ns=u'', id=1):
-    #     link = parsed_urdf.links[0]
-    #     m = Marker()
-    #     m.ns = u'{}/{}'.format(ns, self.get_name())
-    #     m.id = id
-    #     geometry = link.visual.geometry
-    #     if isinstance(geometry, Box):
-    #         m.type = Marker.CUBE
-    #         m.scale = Vector3(*geometry.size)
-    #     elif isinstance(geometry, Sphere):
-    #         m.type = Marker.SPHERE
-    #         m.scale = Vector3(geometry.radius,
-    #                           geometry.radius,
-    #                           geometry.radius)
-    #     elif isinstance(geometry, Cylinder):
-    #         m.type = Marker.CYLINDER
-    #         m.scale = Vector3(geometry.radius,
-    #                           geometry.radius,
-    #                           geometry.length)
-    #     else:
-    #         raise Exception(u'world body type {} can\'t be converted to marker'.format(geometry.__class__.__name__))
-    #
-    #     self.fk_dict = self.get_god_map().get_data(['fk'])
-    #     markers = []
-    #     for index, link in enumerate(self.get_link_names()):
-    #         if not self.has_link_visuals(link.name):
-    #             continue
-    #         marker = Marker()
-    #         m.ns = u'{}/{}'.format(ns, self.get_name())
-    #         m.id = index
-    #         link_type = type(link.visual.geometry)
-    #
-    #         if link_type == up.Mesh:
-    #             marker.type = Marker.MESH_RESOURCE
-    #             marker.mesh_resource = link.visual.geometry.filename
-    #             if link.visual.geometry.scale is None:
-    #                 marker.scale.x = 1.0
-    #                 marker.scale.z = 1.0
-    #                 marker.scale.y = 1.0
-    #             else:
-    #                 marker.scale.x = link.visual.geometry.scale[0]
-    #                 marker.scale.z = link.visual.geometry.scale[1]
-    #                 marker.scale.y = link.visual.geometry.scale[2]
-    #             marker.mesh_use_embedded_materials = True
-    #         elif link_type == up.Box:
-    #             marker.type = Marker.CUBE
-    #             marker.scale = Vector3(*link.visual.geometry)
-    #         elif link_type == up.Cylinder:
-    #             marker.type = Marker.CYLINDER
-    #             marker.scale.x = link.visual.geometry.radius
-    #             marker.scale.y = link.visual.geometry.radius
-    #             marker.scale.z = link.visual.geometry.length
-    #         elif link_type == up.Sphere:
-    #             marker.type = Marker.SPHERE
-    #             marker.scale.x = link.visual.geometry.radius
-    #             marker.scale.y = link.visual.geometry.radius
-    #             marker.scale.z = link.visual.geometry.radius
-    #         else:
-    #             continue
-    #
-    #         marker.scale.x *= 0.99
-    #         marker.scale.y *= 0.99
-    #         marker.scale.z *= 0.99
-    #
-    #         link_in_base = self.fk_dict[self.get_root(), link.name]
-    #         marker.header.frame_id = self.get_root()
-    #         marker.action = Marker.ADD
-    #         marker.id = index
-    #         marker.ns = u'planning_visualization'
-    #         marker.pose = link_in_base.pose
-    #         marker.color.a = 0.5
-    #         marker.color.r = 1.0
-    #         marker.color.g = 1.0
-    #         marker.color.b = 1.0
-    #
-    #
-    #         markers.append(marker)
-    #
-    #     m.color = ColorRGBA(0, 1, 0, 0.8)
-    #     m.frame_locked = True
-    #     return m
+    def as_marker_msg(self, ns=u'', id=1):
+        """
+        :param ns:
+        :param id:
+        :rtype: Marker
+        """
+        if len(self.get_link_names()) > 1:
+            raise TypeError(u'only urdfs objects with a single link can be turned into marker')
+        link = self.get_urdf_link(self.get_link_names()[0])
+        m = Marker()
+        m.ns = u'{}/{}'.format(ns, self.get_name())
+        m.id = id
+        geometry = link.visual.geometry
+        if isinstance(geometry, up.Box):
+            m.type = Marker.CUBE
+            m.scale = Vector3(*geometry.size)
+        elif isinstance(geometry, up.Sphere):
+            m.type = Marker.SPHERE
+            m.scale = Vector3(geometry.radius,
+                              geometry.radius,
+                              geometry.radius)
+        elif isinstance(geometry, up.Cylinder):
+            m.type = Marker.CYLINDER
+            m.scale = Vector3(geometry.radius,
+                              geometry.radius,
+                              geometry.length)
+        else:
+            raise Exception(u'world body type {} can\'t be converted to marker'.format(geometry.__class__.__name__))
+        m.color = ColorRGBA(0,1,0,0.5)
+        return m
+
+        # self.fk_dict = self.get_god_map().get_data(['fk'])
+        # markers = []
+        # for index, link in enumerate(self.get_link_names()):
+        #     if not self.has_link_visuals(link.name):
+        #         continue
+        #     marker = Marker()
+        #     m.ns = u'{}/{}'.format(ns, self.get_name())
+        #     m.id = index
+        #     link_type = type(link.visual.geometry)
+        #
+        #     if link_type == up.Mesh:
+        #         marker.type = Marker.MESH_RESOURCE
+        #         marker.mesh_resource = link.visual.geometry.filename
+        #         if link.visual.geometry.scale is None:
+        #             marker.scale.x = 1.0
+        #             marker.scale.z = 1.0
+        #             marker.scale.y = 1.0
+        #         else:
+        #             marker.scale.x = link.visual.geometry.scale[0]
+        #             marker.scale.z = link.visual.geometry.scale[1]
+        #             marker.scale.y = link.visual.geometry.scale[2]
+        #         marker.mesh_use_embedded_materials = True
+        #     elif link_type == up.Box:
+        #         marker.type = Marker.CUBE
+        #         marker.scale = Vector3(*link.visual.geometry)
+        #     elif link_type == up.Cylinder:
+        #         marker.type = Marker.CYLINDER
+        #         marker.scale.x = link.visual.geometry.radius
+        #         marker.scale.y = link.visual.geometry.radius
+        #         marker.scale.z = link.visual.geometry.length
+        #     elif link_type == up.Sphere:
+        #         marker.type = Marker.SPHERE
+        #         marker.scale.x = link.visual.geometry.radius
+        #         marker.scale.y = link.visual.geometry.radius
+        #         marker.scale.z = link.visual.geometry.radius
+        #     else:
+        #         continue
+        #
+        #     marker.scale.x *= 0.99
+        #     marker.scale.y *= 0.99
+        #     marker.scale.z *= 0.99
+        #
+        #     link_in_base = self.fk_dict[self.get_root(), link.name]
+        #     marker.header.frame_id = self.get_root()
+        #     marker.action = Marker.ADD
+        #     marker.id = index
+        #     marker.ns = u'planning_visualization'
+        #     marker.pose = link_in_base.pose
+        #     marker.color.a = 0.5
+        #     marker.color.r = 1.0
+        #     marker.color.g = 1.0
+        #     marker.color.b = 1.0
+        #
+        #
+        #     markers.append(marker)
+        #
+        # m.color = ColorRGBA(0, 1, 0, 0.8)
+        # m.frame_locked = True
+        # return m

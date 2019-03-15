@@ -53,6 +53,9 @@ class QProblemBuilder(object):
                                   len(self.hard_constraints_dict) + len(self.soft_constraints_dict))
         self.lbAs = None  # for debugging purposes
 
+    def get_expr(self):
+        return self.cython_big_ass_M.str_params
+
     # @profile
     def make_matrices(self):
         """

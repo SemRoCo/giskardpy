@@ -82,14 +82,13 @@ class SymEngineController(object):
         :return: maps joint names to command
         :rtype: dict
         """
-        try:
-            next_cmd = self.qp_problem_builder.get_cmd(substitutions, nWSR)
-            if next_cmd is None:
-                pass
-            return {name: next_cmd[symbol] for name, symbol in self.joint_to_symbols_str.items()}
-        except AttributeError:
-            self.compile()
-            return self.get_cmd(substitutions, nWSR)
+        next_cmd = self.qp_problem_builder.get_cmd(substitutions, nWSR)
+        if next_cmd is None:
+            pass
+        return {name: next_cmd[symbol] for name, symbol in self.joint_to_symbols_str.items()}
+
+    def get_expr(self):
+        return self.qp_problem_builder.get_expr()
 
 
 def joint_position(current_joint, joint_goal, weight, p_gain, max_speed, name):

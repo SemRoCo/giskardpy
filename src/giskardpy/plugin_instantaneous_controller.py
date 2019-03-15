@@ -352,9 +352,10 @@ class ControllerPlugin(PluginBase):
                                                   u'{}/{}/'.format(self.path_to_functions, self.get_robot().get_name()))
             self.controller.set_controlled_joints(self.get_robot().controlled_joints)
             self.controller.update_soft_constraints(self.soft_constraints)
+            self.controller.compile()
 
     def update(self):
-        expr = self.god_map.get_symbol_map()
+        expr = self.god_map.get_symbol_map(self.controller.get_expr())
         next_cmd = self.controller.get_cmd(expr, self.nWSR)
         self.next_cmd.update(next_cmd)
 

@@ -14,9 +14,10 @@ from giskardpy.world_object import WorldObject
 Joint = namedtuple(u'Joint', [u'symbol', u'velocity_limit', u'lower', u'upper', u'type', u'frame'])
 
 if WORLD_IMPLEMENTATION == u'pybullet':
-    Backend=PyBulletWorldObject
+    Backend = PyBulletWorldObject
 else:
-    Backend=WorldObject
+    Backend = WorldObject
+
 
 class Robot(Backend):
     def __init__(self, urdf, base_pose, controlled_joints, default_joint_vel_limit,
@@ -122,19 +123,20 @@ class Robot(Backend):
 
     def get_fk(self, root, tip):
         a = {str(self._joint_to_symbol_map[k]): v.position for k, v in self.joint_state.items()}
-        return self._fks[root, tip](**a)
+        homo_m = self._fks[root, tip](**a)
+        p = PoseStamped()
+        p.header.frame_id = root
+        p.pose = homo_matrix_to_pose(homo_m)
+        return p
 
     def init_fast_fks(self):
         def f(key):
             root, tip = key
             fk = self.get_fk_expression(root, tip)
             m = spw.speed_up(fk, fk.free_symbols, backend=BACKEND)
-            p = PoseStamped()
-            p.header.frame_id = root
-            p.pose = homo_matrix_to_pose(m)
-            return p
-        self._fks = keydefaultdict(f)
+            return m
 
+        self._fks = keydefaultdict(f)
 
     # JOINT FUNCTIONS
 
@@ -174,6 +176,3 @@ class Robot(Backend):
         :rtype: spw.Symbol
         """
         return self._joint_to_symbol_map[joint_name]
-
-
-

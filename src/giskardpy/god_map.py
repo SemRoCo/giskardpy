@@ -83,9 +83,10 @@ class GodMap(object):
                 result = self.default_value
             except KeyError as e:
                 # traceback.print_exc()
-                raise KeyError(identifier)
+                # raise KeyError(identifier)
                 # TODO is this really a good idea?
-                # result = self.default_value
+                # I do this because it automatically sets weights for unused goals to 0
+                result = self.default_value
         if callable(result):
             return result(self)
         else:
@@ -114,14 +115,15 @@ class GodMap(object):
             self.expr_to_key[str(expr)] = identifier_parts
         return self.key_to_expr[identifier]
 
-    def get_symbol_map(self):
+    def get_symbol_map(self, exprs):
         """
         :return: a dict which maps all registered expressions to their values or 0 if there is no number entry
         :rtype: dict
         """
         #TODO potential speedup by only updating entries that have changed
         with self.lock:
-            return {expr: self.get_data(key) for expr, key in self.expr_to_key.items()}
+
+            return {expr: self.get_data(self.expr_to_key[expr]) for expr in exprs}
 
     def get_registered_symbols(self):
         """

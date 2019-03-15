@@ -22,7 +22,7 @@ from giskardpy.plugin_pybullet import CollisionChecker
 from giskardpy.pybullet_world import PyBulletWorld
 from giskardpy.python_interface import GiskardWrapper
 from giskardpy.symengine_robot import Robot
-from giskardpy.tfwrapper import transform_pose, lookup_transform
+from giskardpy.tfwrapper import transform_pose, lookup_transform, lookup_pose
 from giskardpy.utils import msg_to_list
 
 BIG_NUMBER = 1e100
@@ -268,7 +268,7 @@ class GiskardTestWrapper(object):
 
     def check_cart_goal(self, tip, goal_pose):
         goal_in_base = transform_pose(u'base_footprint', goal_pose)
-        current_pose = lookup_transform(u'base_footprint', tip)
+        current_pose = lookup_pose(u'base_footprint', tip)
         np.testing.assert_array_almost_equal(msg_to_list(goal_in_base.pose.position),
                                              msg_to_list(current_pose.pose.position), decimal=3)
 

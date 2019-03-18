@@ -9,7 +9,7 @@ from py_trees import Status
 from giskardpy.exceptions import InsolvableException
 from giskardpy.identifier import soft_constraint_identifier, next_cmd_identifier, \
     collision_goal_identifier, fk_identifier, \
-    closest_point_identifier, js_identifier, cartesian_goal_identifier
+    closest_point_identifier, js_identifier, cartesian_goal_identifier, default_joint_vel_identifier
 from giskardpy.input_system import FrameInput, Point3Input, Vector3Input
 from giskardpy.plugin import PluginBase
 from giskardpy.plugin_action_server import GetGoal
@@ -222,7 +222,7 @@ class GoalToConstraints(GetGoal):
             if joint_name not in joint_goal:
                 joint_goal[joint_name] = {u'weight': 0,
                                           u'p_gain': 0,
-                                          u'max_speed': self.get_robot()._default_joint_velocity_limit,
+                                          u'max_speed': self.get_god_map().safe_get_data(default_joint_vel_identifier),
                                           u'position': self.get_god_map().safe_get_data(js_identifier +
                                                                                    [joint_name,
                                                                                    u'position'])}

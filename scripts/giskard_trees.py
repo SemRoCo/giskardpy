@@ -12,7 +12,8 @@ import py_trees
 from py_trees.meta import running_is_failure, success_is_running, failure_is_success, success_is_failure
 
 from giskardpy.god_map import GodMap
-from giskardpy.identifier import world_identifier, robot_identifier, js_identifier
+from giskardpy.identifier import world_identifier, robot_identifier, js_identifier, default_joint_weight_identifier, \
+    default_joint_vel_identifier
 from giskardpy.input_system import JointStatesInput
 from giskardpy.plugin import PluginBehavior, SuccessPlugin
 from giskardpy.plugin_action_server import GoalReceived, SendResult, GoalCanceled
@@ -43,9 +44,16 @@ def initialize_blackboard(urdf, default_joint_vel_limit, default_joint_weight, p
 
     blackboard = Blackboard
     blackboard.god_map = GodMap()
+
+    blackboard.god_map.safe_set_data(default_joint_weight_identifier, default_joint_weight)
+    blackboard.god_map.safe_set_data(default_joint_vel_identifier, default_joint_vel_limit)
+
+    default_joint_weight = blackboard.god_map.to_symbol(default_joint_weight_identifier)
+    default_joint_vel = blackboard.god_map.to_symbol(default_joint_vel_identifier)
+
     world = PyBulletWorld(gui, path_to_data_folder)
     robot = WorldObject(urdf, None, controlled_joints)
-    world.add_robot(robot, None, controlled_joints, default_joint_vel_limit, default_joint_weight, True)
+    world.add_robot(robot, None, controlled_joints, default_joint_vel, default_joint_weight, True)
     js_input = JointStatesInput(blackboard.god_map.to_symbol, world.robot.get_controllable_joints(), js_identifier, suffix=[u'position'])
     world.robot.reinitialize(js_input.joint_map)
     blackboard.god_map.safe_set_data(world_identifier, world)

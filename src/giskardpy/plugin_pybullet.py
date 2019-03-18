@@ -21,6 +21,7 @@ from giskardpy.plugin import PluginBase
 from giskardpy.pybullet_world import PyBulletWorld, ContactInfo
 from giskardpy.tfwrapper import transform_pose, lookup_transform, transform_point, transform_vector
 from giskardpy.data_types import ClosestPointInfo
+from giskardpy.urdf_object import URDFObject
 from giskardpy.utils import keydefaultdict, to_joint_state_dict, to_point_stamped, to_vector3_stamped, msg_to_list, \
     make_urdf_world_body
 from giskardpy.world_object import WorldObject
@@ -93,14 +94,13 @@ class PyBulletUpdatePlugin(PluginBase):
         self.srv_update_world = rospy.Service(u'~update_world', UpdateWorld, self.update_world_cb)
         self.pub_collision_marker = rospy.Publisher(u'~visualization_marker_array', MarkerArray, queue_size=1)
 
-    def publish_object_as_marker(self, object_):
+    def publish_object_as_marker(self, m):
         """
         :type object_: WorldObject
         """
         try:
             ma = MarkerArray()
-            m = object_.as_marker_msg(ns=u'world')
-            m.header.frame_id = self.global_reference_frame_name
+            m.ns = u'world' + m.ns
             ma.markers.append(m)
             self.pub_collision_marker.publish(ma)
         except:
@@ -123,19 +123,7 @@ class PyBulletUpdatePlugin(PluginBase):
                 if req.operation is UpdateWorldRequest.ADD:
                     if req.rigidly_attached:
                         # get object pose
-                        if self.get_world().has_object(req.body.name):
-                            p = PoseStamped()
-                            p.header.frame_id = u'map'
-                            p.pose = self.get_world().get_object(req.body.name).base_pose
-                            p = transform_pose(req.pose.header.frame_id, p)
-                            self.get_world().attach_existing_obj_to_robot(req.body.name, req.pose.header.frame_id,
-                                                                          p.pose)
-                            return UpdateWorldResponse()
-                        else:
-                            world_object = WorldObject.from_world_body(req.body)
-                            self.get_world().robot.attach_urdf_object(world_object,
-                                                                      req.pose.header.frame_id,
-                                                                      req.pose.pose)
+                        self.attach_object(req)
                         # req.operation = UpdateWorldRequest.REMOVE
                         # self.publish_object_as_marker(req)
                         # req.operation = UpdateWorldRequest.ADD
@@ -159,6 +147,8 @@ class PyBulletUpdatePlugin(PluginBase):
                 return UpdateWorldResponse(UpdateWorldResponse.CORRUPT_SHAPE_ERROR, str(e))
             except UnknownBodyException as e:
                 return UpdateWorldResponse(UpdateWorldResponse.MISSING_BODY_ERROR, str(e))
+            except KeyError as e:
+                return UpdateWorldResponse(UpdateWorldResponse.MISSING_BODY_ERROR, str(e))
             except DuplicateNameException as e:
                 return UpdateWorldResponse(UpdateWorldResponse.DUPLICATE_BODY_ERROR, str(e))
             except UnsupportedOptionException as e:
@@ -178,7 +168,12 @@ class PyBulletUpdatePlugin(PluginBase):
         world_object = WorldObject.from_world_body(world_body)
         self.get_world().add_object(world_object)
         self.get_world().set_object_pose(world_body.name, global_pose)
-        self.publish_object_as_marker(self.get_world().get_object(world_body.name))
+        try:
+            m = self.get_world().get_object(world_body.name).as_marker_msg()
+            m.header.frame_id = self.global_reference_frame_name
+            self.publish_object_as_marker(m)
+        except:
+            pass
         # SUB-CASE: If it is an articulated object, open up a joint state subscriber
         # FIXME
         # if world_body.joint_state_topic:
@@ -186,21 +181,37 @@ class PyBulletUpdatePlugin(PluginBase):
         #     self.object_js_subs[world_body.name] = \
         #         rospy.Subscriber(world_body.joint_state_topic, JointState, callback, queue_size=1)
 
-    # def attach_object(self, req):
-    #     """
-    #     :type req: UpdateWorldRequest
-    #     """
-    #     if self.world.has_object(req.body.name):
-    #         self.world.attach_object(req.body,
-    #                                  req.pose.header.frame_id,
-    #                                  from_pose_msg(req.pose.pose))
-    #     else:
-    #         self.world.attach_object(world_body_to_urdf_object(req.body),
-    #                                  req.pose.header.frame_id,
-    #                                  from_pose_msg(req.pose.pose))
+    def attach_object(self, req):
+        """
+        :type req: UpdateWorldRequest
+        """
+        if self.get_world().has_object(req.body.name):
+            p = PoseStamped()
+            p.header.frame_id = self.global_reference_frame_name
+            p.pose = self.get_world().get_object(req.body.name).base_pose
+            p = transform_pose(req.pose.header.frame_id, p)
+            world_object = self.get_world().get_object(req.body.name)
+            self.get_world().attach_existing_obj_to_robot(req.body.name, req.pose.header.frame_id,
+                                                          p.pose)
+        else:
+            world_object = WorldObject.from_world_body(req.body)
+            self.get_world().robot.attach_urdf_object(world_object,
+                                                      req.pose.header.frame_id,
+                                                      req.pose.pose)
+        try:
+            m = world_object.as_marker_msg()
+            m.pose = req.pose.pose
+            m.header = req.pose.header
+            m.frame_locked = True
+            self.publish_object_as_marker(m)
+        except:
+            pass
 
     def remove_object(self, name):
         # FIXME update joint state publisher shit
+        m = self.get_world().get_object(name).as_marker_msg()
+        m.action = m.DELETE
+        self.publish_object_as_marker(m)
         self.get_world().remove_object(name)
         # if self.world.has_object(name):
         #     self.world.remove_object(name)

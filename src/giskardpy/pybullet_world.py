@@ -5,7 +5,7 @@ from pybullet import JOINT_REVOLUTE, JOINT_PRISMATIC, JOINT_PLANAR, JOINT_SPHERI
 import os
 import errno
 
-from geometry_msgs.msg import Vector3, PoseStamped, Point, Quaternion
+from geometry_msgs.msg import Vector3, PoseStamped, Point, Quaternion, Pose
 from numpy.random.mtrand import seed
 from std_msgs.msg import ColorRGBA
 from urdf_parser_py.urdf import URDF, Box, Sphere, Cylinder
@@ -85,7 +85,7 @@ class PyBulletWorld(World):
     #     self.get_robot().attach_urdf(object_, parent_link, transform)
 
     def __get_pybullet_object_id(self, name):
-        return self._object_names_to_objects[name].id
+        return self.get_object(name).get_pybullet_id()
 
     def check_collisions(self, cut_off_distances):
         """
@@ -110,7 +110,7 @@ class PyBulletWorld(World):
                 object_id = self.__get_pybullet_object_id(body_b)
                 link_b_id = self.get_object(body_b).get_pybullet_link_id(link_b)
             # FIXME redundant checks for robot link pairs
-            contacts = [ContactInfo(*x) for x in p.getClosestPoints(self._robot.id, object_id,
+            contacts = [ContactInfo(*x) for x in p.getClosestPoints(self.robot.get_pybullet_id(), object_id,
                                                                     distance * 3,
                                                                     robot_link_id, link_b_id)]
             if len(contacts) > 0:
@@ -134,7 +134,11 @@ class PyBulletWorld(World):
         pa = np.array(contact_info.position_on_a)
         # pb = np.array(contact_info.position_on_b)
 
-        self.__move_hack(pa)
+        new_p = Pose()
+        new_p.position = Point(*pa)
+        new_p.orientation.w = 1
+
+        self.__move_hack(new_p)
         try:
             contact_info3 = ContactInfo(
                 *[x for x in p.getClosestPoints(self.__get_pybullet_object_id(u'pybullet_sucks'),
@@ -182,8 +186,8 @@ class PyBulletWorld(World):
             plane.set_name(self.hack_name)
             self.add_object(plane)
 
-    def __move_hack(self, position):
-        self.get_object(self.hack_name).base_pose = position
+    def __move_hack(self, pose):
+        self.get_object(self.hack_name).base_pose = pose
 
     def get_objects(self):
         objects = super(PyBulletWorld, self).get_objects()

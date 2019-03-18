@@ -52,7 +52,7 @@ class World(object):
         if self.has_object(object_.get_name()):
             raise DuplicateNameException(u'object with that name already exists')
         self._objects[object_.get_name()] = object_
-        print(u'added object {} to world'.format(object_.get_name()))
+        print(u'--> added {} to world'.format(object_.get_name()))
 
     def set_object_pose(self, name, pose):
         """
@@ -64,7 +64,7 @@ class World(object):
     def get_object(self, name):
         """
         :type name: str
-        :rtype: WorldObject
+        :rtype: PBWO
         """
         return self._objects[name]
 
@@ -96,7 +96,7 @@ class World(object):
     def remove_object(self, name):
         if self.has_object(name):
             self._objects[name].suicide()
-            print(u'removed object {} to world'.format(name))
+            print(u'<-- removed object {} to world'.format(name))
             del (self._objects[name])
 
     def remove_all_objects(self):
@@ -277,7 +277,7 @@ class World(object):
         closest_point = keydefaultdict(lambda k: ClosestPointInfo((10, 0, 0),
                                                                   (0, 0, 0),
                                                                   1e9,
-                                                                  0,
+                                                                  1e9,
                                                                   k,
                                                                   '',
                                                                   (1, 0, 0), k))

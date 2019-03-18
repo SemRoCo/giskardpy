@@ -8,7 +8,7 @@ from std_msgs.msg import ColorRGBA
 from tf.transformations import euler_from_quaternion
 from visualization_msgs.msg import Marker
 
-from giskardpy.exceptions import DuplicateNameException
+from giskardpy.exceptions import DuplicateNameException, UnknownBodyException, CorruptShapeException
 from giskardpy.utils import cube_volume, cube_surface, sphere_volume, cylinder_volume, cylinder_surface, \
     suppress_stderr, remove_outer_tag
 
@@ -90,7 +90,7 @@ class URDFObject(object):
             elif world_body.type == world_body.MESH_BODY:
                 geometry = up.Mesh(world_body.mesh)
             else:
-                raise TypeError(u'primitive shape \'{}\' not supported'.format(world_body.shape.type))
+                raise CorruptShapeException(u'primitive shape \'{}\' not supported'.format(world_body.shape.type))
             link = up.Link(world_body.name,
                            visual=up.Visual(geometry, material=up.Material(u'green', color=up.Color(0, 1, 0, 1))),
                            collision=up.Collision(geometry))
@@ -100,7 +100,7 @@ class URDFObject(object):
             o.set_name(world_body.name)
             return o
         else:
-            raise TypeError(u'world body type \'{}\' not supported'.format(world_body.type))
+            raise CorruptShapeException(u'world body type \'{}\' not supported'.format(world_body.type))
         return cls.from_parts(world_body.name, links, joints, *args, **kwargs)
 
     @classmethod
@@ -343,7 +343,7 @@ class URDFObject(object):
             raise DuplicateNameException(
                 u'\'{}\' already has joint with name \'{}\'.'.format(self.get_name(), urdf_object.get_name()))
         if parent_link not in self.get_link_names():
-            raise KeyError(
+            raise UnknownBodyException(
                 u'can not attach \'{}\' to non existent parent link \'{}\' of \'{}\''.format(urdf_object.get_name(),
                                                                                              parent_link,
                                                                                              self.get_name()))

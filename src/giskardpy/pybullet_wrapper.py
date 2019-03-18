@@ -60,7 +60,6 @@ def load_urdf_string_into_bullet(urdf_string, pose=None):
                         [pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w],
                         flags=p.URDF_USE_SELF_COLLISION_EXCLUDE_PARENT)
     os.remove(filename)
-    print(u'added {} to pybullet'.format(object_name))
     return id
 
 
@@ -114,7 +113,6 @@ def msg_to_pybullet_pose(msg):
     return position, orientation
 
 def clear_pybullet():
-    print(u'cleared pybullet')
     p.resetSimulation()
 
 def get_body_names():

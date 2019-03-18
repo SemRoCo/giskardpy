@@ -44,7 +44,7 @@ def initialize_blackboard(urdf, default_joint_vel_limit, default_joint_weight, p
     blackboard.god_map = GodMap()
     world = PyBulletWorld(gui, path_to_data_folder)
     robot = WorldObject(urdf, None, controlled_joints)
-    world.add_robot(robot, None, controlled_joints, default_joint_vel_limit, default_joint_weight)
+    world.add_robot(robot, None, controlled_joints, default_joint_vel_limit, default_joint_weight, True)
     js_input = JointStatesInput(blackboard.god_map.to_symbol, world.robot.get_controllable_joints(), js_identifier, suffix=[u'position'])
     world.robot.reinitialize(js_input.joint_map)
     blackboard.god_map.safe_set_data(world_identifier, world)

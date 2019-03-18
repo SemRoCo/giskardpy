@@ -344,11 +344,20 @@ class GiskardTestWrapper(object):
         assert r.error_codes == UpdateWorldResponse.SUCCESS, \
             u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
                                             update_world_error_code(UpdateWorldResponse.SUCCESS))
-        p = Pose()
-        p.position = Point(*position)
-        p.orientation = Quaternion(*orientation)
+        p = PoseStamped()
+        p.header.frame_id = frame_id
+        p.pose.position = Point(*position)
+        p.pose.orientation = Quaternion(*orientation)
+        p = transform_pose(u'map', p)
+        o_p = self.get_world().get_object(name).base_pose
         assert self.get_world().has_object(name)
-        assert self.get_world().get_object(name).base_pose == p
+        assert np.allclose(p.pose.position.x, o_p.position.x)
+        assert np.allclose(p.pose.position.y, o_p.position.y)
+        assert np.allclose(p.pose.position.z, o_p.position.z)
+        assert np.allclose(p.pose.orientation.x, o_p.orientation.x)
+        assert np.allclose(p.pose.orientation.y, o_p.orientation.y)
+        assert np.allclose(p.pose.orientation.z, o_p.orientation.z)
+        assert np.allclose(p.pose.orientation.w, o_p.orientation.w)
 
     def add_sphere(self, name=u'sphere', position=(1.2, 0, 0.5)):
         r = self.wrapper.add_sphere(name=name, position=position)
@@ -406,15 +415,30 @@ class GiskardTestWrapper(object):
 
     def attach_box(self, name=u'box', size=None, frame_id=None, position=None, orientation=None,
                    expected_response=UpdateWorldResponse.SUCCESS):
-        old_collision_matrix = self.get_robot().get_self_collision_matrix()
+        scm = self.get_robot().get_self_collision_matrix()
         r = self.wrapper.attach_box(name, size, frame_id, position, orientation)
+        assert r.error_codes == expected_response, \
+        u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
+                                        update_world_error_code(expected_response))
+        if expected_response == UpdateWorldResponse.SUCCESS:
+            self.wait_for_synced()
+            assert name in self.get_controllable_links()
+            assert not self.get_world().has_object(name)
+            assert scm.difference(self.get_robot().get_self_collision_matrix()) == set()
+            assert len(scm) < len(self.get_robot().get_self_collision_matrix())
+        self.loop_once()
+
+    def attach_existing(self, name=u'box', frame_id=None, expected_response=UpdateWorldResponse.SUCCESS):
+        scm = self.get_robot().get_self_collision_matrix()
+        r = self.wrapper.attach_object(name, frame_id)
         assert r.error_codes == expected_response, \
         u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
                                         update_world_error_code(expected_response))
         self.wait_for_synced()
         assert name in self.get_controllable_links()
         assert not self.get_world().has_object(name)
-        assert len(old_collision_matrix.difference(self.get_robot().get_self_collision_matrix())) == 0
+        assert scm.difference(self.get_robot().get_self_collision_matrix()) == set()
+        assert len(scm) < len(self.get_robot().get_self_collision_matrix())
         self.loop_once()
 
     def get_cpi(self, distance_threshold):
@@ -443,8 +467,7 @@ class GiskardTestWrapper(object):
         for link in links:
             assert cpi[link].contact_distance <= distance_threshold, u'{} -- {}\n {} > {}'.format(link,
                                                                                                   cpi[link].link_b,
-                                                                                                  cpi[
-                                                                                                      link].contact_distance,
+                                                                                                  cpi[link].contact_distance,
                                                                                                   distance_threshold)
 
     def move_base(self, goal_pose):
@@ -477,7 +500,7 @@ class PR2(GiskardTestWrapper):
         rospy.set_param(u'~root_link', u'base_footprint')
         rospy.set_param(u'~enable_collision_marker', True)
         # rospy.set_param(u'~enable_self_collision', True)
-        rospy.set_param(u'~path_to_data_folder', u'../data/')
+        rospy.set_param(u'~path_to_data_folder', u'tmp_data/')
         rospy.set_param(u'~collision_time_threshold', 10)
         rospy.set_param(u'~max_traj_length', 30)
         self.r_tip = u'r_gripper_tool_frame'

@@ -91,7 +91,7 @@ class WorldObject(URDFObject):
         """
         return self._self_collision_matrix
 
-    def calc_collision_matrix(self, link_combinations, d=0.05, d2=0.0, num_rnd_tries=1000):
+    def calc_collision_matrix(self, link_combinations, d=0.05, d2=0.0, num_rnd_tries=2000):
         """
         :param link_combinations: set with link name tuples
         :type link_combinations: set
@@ -231,7 +231,7 @@ class WorldObject(URDFObject):
         if os.path.isfile(path):
             with open(path) as f:
                 self._self_collision_matrix = pickle.load(f)
-                print(u'loaded self collision matrix {}'.format(urdf_hash))
+                print(u'loaded self collision matrix {}'.format(path))
                 return True
         return False
 

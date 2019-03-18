@@ -3,6 +3,8 @@
 # from multiprocessing import Queue
 # from threading import Thread
 # import numpy as np
+import shutil
+
 import pytest
 import rospy
 from numpy import pi
@@ -17,7 +19,7 @@ from shape_msgs.msg import SolidPrimitive
 # from giskardpy.python_interface import GiskardWrapper
 # from giskardpy.symengine_wrappers import quaternion_from_axis_angle
 from utils_for_tests import PR2
-from giskardpy.tfwrapper import lookup_transform, init as tf_init
+from giskardpy.tfwrapper import lookup_transform, init as tf_init, lookup_pose
 
 # from giskardpy.utils import msg_to_list
 
@@ -100,17 +102,29 @@ pick_up_pose = {
     u'torso_lift_joint': 0.321791330751,
 }
 
+folder_name = u'tmp_data/'
+
 
 @pytest.fixture(scope=u'module')
 def ros(request):
+    try:
+        print(u'deleting tmp test folder')
+        shutil.rmtree(folder_name)
+    except Exception:
+        pass
+
     print(u'init ros')
-    # shutil.rmtree(u'../data/')
     rospy.init_node(u'tests')
     tf_init(60)
 
     def kill_ros():
         print(u'shutdown ros')
         rospy.signal_shutdown(u'die')
+        try:
+            print(u'deleting tmp test folder')
+            shutil.rmtree(folder_name)
+        except Exception:
+            pass
 
     request.addfinalizer(kill_ros)
 
@@ -180,7 +194,7 @@ def kitchen_setup(resetted_giskard):
     resetted_giskard.add_urdf(object_name,
                               rospy.get_param(u'kitchen_description'),
                               u'/kitchen/joint_states',
-                              lookup_transform(u'map', u'iai_kitchen/world'))
+                              lookup_pose(u'map', u'iai_kitchen/world'))
     return resetted_giskard
 
 
@@ -460,23 +474,23 @@ class TestCollisionAvoidanceGoals(object):
         pocky = u'http://muh#pocky'
         zero_pose.attach_box(pocky, [0.1, 0.02, 0.02], zero_pose.r_tip, [0.05, 0, 0])
 
-    def test_attach_box_as_eef(self, zero_pose):
-        """
-        :type zero_pose: PR2
-        """
-        # FIXME works but goal cant be checked
-        pocky = u'http://muh#pocky'
-        zero_pose.attach_box(pocky, [0.1, 0.02, 0.02], zero_pose.r_tip, [0.05, 0, 0], [1, 0, 0, 0])
-        p = PoseStamped()
-        p.header.frame_id = zero_pose.r_tip
-        p.pose.orientation.w = 1
-        # rospy.sleep(5)
-        for i in range(20):
-            zero_pose.loop_once()
-            rospy.sleep(0.1)
-
-        # zero_pose.set_and_check_cart_goal(zero_pose.default_root, zero_pose.l_tip, p)
-        zero_pose.set_and_check_cart_goal(zero_pose.default_root, pocky, p)
+    # def test_attach_box_as_eef(self, zero_pose):
+    #     """
+    #     :type zero_pose: PR2
+    #     """
+    #     # FIXME works but goal cant be checked
+    #     pocky = u'http://muh#pocky'
+    #     zero_pose.attach_box(pocky, [0.1, 0.02, 0.02], zero_pose.r_tip, [0.05, 0, 0], [1, 0, 0, 0])
+    #     p = PoseStamped()
+    #     p.header.frame_id = zero_pose.r_tip
+    #     p.pose.orientation.w = 1
+    #     # rospy.sleep(5)
+    #     for i in range(20):
+    #         zero_pose.loop_once()
+    #         rospy.sleep(0.1)
+    #
+    #     # zero_pose.set_and_check_cart_goal(zero_pose.default_root, zero_pose.l_tip, p)
+    #     zero_pose.set_and_check_cart_goal(zero_pose.default_root, pocky, p)
 
     def test_attach_remove_box(self, zero_pose):
         """
@@ -492,7 +506,7 @@ class TestCollisionAvoidanceGoals(object):
         """
         pocky = u'http://muh#pocky'
         zero_pose.add_box(pocky, [0.1, 0.02, 0.02], zero_pose.r_tip, [0.05, 0, 0])
-        zero_pose.attach_box(pocky, frame_id=zero_pose.r_tip)
+        zero_pose.attach_existing(pocky, frame_id=zero_pose.r_tip)
         # TODO test if object is on correct pose
 
     def test_attach_to_nonexistant_robot_link(self, zero_pose):
@@ -501,7 +515,7 @@ class TestCollisionAvoidanceGoals(object):
         """
         pocky = u'http://muh#pocky'
         zero_pose.attach_box(pocky, [0.1, 0.02, 0.02], u'', [0.05, 0, 0],
-                             expected_response=UpdateWorldResponse.CORRUPT_SHAPE_ERROR)
+                             expected_response=UpdateWorldResponse.MISSING_BODY_ERROR)
 
     def test_add_remove_object(self, zero_pose):
         """
@@ -510,6 +524,7 @@ class TestCollisionAvoidanceGoals(object):
         object_name = u'muh'
         zero_pose.add_box(object_name, position=[1.2, 0, 1.6])
         zero_pose.remove_object(object_name)
+        # FIXME marker does not get removed
 
     def test_invalid_update_world(self, zero_pose):
         """
@@ -710,6 +725,7 @@ class TestCollisionAvoidanceGoals(object):
         """
         :type zero_pose: PR2
         """
+        # FIXME
         goal_js = {
             u'l_elbow_flex_joint': -1.43286344265,
             u'l_forearm_roll_joint': 1.26465060073,
@@ -729,7 +745,7 @@ class TestCollisionAvoidanceGoals(object):
         p.pose.orientation.w = 1
         zero_pose.set_cart_goal(zero_pose.default_root, zero_pose.l_tip, p)
         zero_pose.send_goal()
-        zero_pose.check_cpi_geq(zero_pose.get_r_gripper_links(), 0.048)
+        zero_pose.check_cpi_geq(zero_pose.get_l_gripper_links(), 0.048)
 
     def test_avoid_collision(self, box_setup):
         """

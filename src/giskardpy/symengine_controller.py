@@ -325,9 +325,9 @@ def link_to_link_avoidance(link_name, current_pose, current_pose_eval, point_on_
                                                            weight=weight,
                                                            expression=dist)
     # add_debug_constraint(soft_constraints, '{} //debug dist//'.format(name), dist)
-    # add_debug_constraint(soft_constraints, '{} //debug n0//'.format(name), contact_normal[0])
-    # add_debug_constraint(soft_constraints, '{} //debug n1//'.format(name), contact_normal[1])
-    # add_debug_constraint(soft_constraints, '{} //debug n2//'.format(name), contact_normal[2])
+    add_debug_constraint(soft_constraints, '{} //debug n0//'.format(name), contact_normal[0])
+    add_debug_constraint(soft_constraints, '{} //debug n1//'.format(name), contact_normal[1])
+    add_debug_constraint(soft_constraints, '{} //debug n2//'.format(name), contact_normal[2])
     return soft_constraints
 
 

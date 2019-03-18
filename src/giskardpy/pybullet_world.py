@@ -141,7 +141,7 @@ class PyBulletWorld(World):
         self.__move_hack(new_p)
         try:
             contact_info3 = ContactInfo(
-                *[x for x in p.getClosestPoints(self.__get_pybullet_object_id(u'pybullet_sucks'),
+                *[x for x in p.getClosestPoints(self.__get_pybullet_object_id(self.hack_name),
                                                 contact_info.body_unique_id_a, 0.001) if
                   np.allclose(x[8], -0.005)][0])
             if contact_info3.body_unique_id_b == contact_info.body_unique_id_a and \

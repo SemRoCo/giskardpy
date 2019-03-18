@@ -171,7 +171,7 @@ def closest_point_constraint_violated(closest_point_infos, tolerance=0.9):
     """
     for link_name, cpi_info in closest_point_infos.items():  # type: (str, ClosestPointInfo)
         if cpi_info.contact_distance < cpi_info.min_dist * tolerance:
-            print(cpi_info.link_a, cpi_info.link_b, cpi_info.contact_distance)
+            print(u'collision constraints violated: {}'.format(cpi_info.link_a, cpi_info.link_b, cpi_info.contact_distance))
             return True
     return False
 

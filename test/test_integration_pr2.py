@@ -787,7 +787,7 @@ class TestCollisionAvoidanceGoals(object):
         collision_entry = CollisionEntry()
         collision_entry.type = CollisionEntry.ALLOW_COLLISION
         collision_entry.body_b = u'box'
-        collision_entry.link_bs = [u'base']
+        collision_entry.link_bs = [u'box']
         box_setup.wrapper.set_collision_entries([collision_entry])
 
         box_setup.allow_self_collision()

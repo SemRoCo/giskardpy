@@ -455,6 +455,48 @@ class URDFObject(object):
         m.color = ColorRGBA(0,1,0,0.5)
         return m
 
+    def link_as_marker(self, link_name):
+        marker = Marker()
+        geometry = self.get_urdf_link(link_name).visual.geometry
+
+        if isinstance(geometry, up.Mesh):
+            marker.type = Marker.MESH_RESOURCE
+            marker.mesh_resource = geometry.filename
+            if geometry.scale is None:
+                marker.scale.x = 1.0
+                marker.scale.z = 1.0
+                marker.scale.y = 1.0
+            else:
+                marker.scale.x = geometry.scale[0]
+                marker.scale.z = geometry.scale[1]
+                marker.scale.y = geometry.scale[2]
+            marker.mesh_use_embedded_materials = True
+        elif isinstance(geometry, up.Box):
+            marker.type = Marker.CUBE
+            marker.scale.x = geometry.size[0]
+            marker.scale.y = geometry.size[1]
+            marker.scale.z = geometry.size[2]
+        elif isinstance(geometry, up.Cylinder):
+            marker.type = Marker.CYLINDER
+            marker.scale.x = geometry.radius
+            marker.scale.y = geometry.radius
+            marker.scale.z = geometry.length
+        elif isinstance(geometry, up.Sphere):
+            marker.type = Marker.SPHERE
+            marker.scale.x = geometry.radius
+            marker.scale.y = geometry.radius
+            marker.scale.z = geometry.radius
+        else:
+            return None
+
+        marker.header.frame_id = self.get_root()
+        marker.action = Marker.ADD
+        marker.color.a = 0.5
+        marker.color.r = 1.0
+        marker.color.g = 1.0
+        marker.color.b = 1.0
+        return marker
+
         # self.fk_dict = self.get_god_map().get_data(['fk'])
         # markers = []
         # for index, link in enumerate(self.get_link_names()):

@@ -200,12 +200,12 @@ class QProblemBuilder(object):
         np_ub = np.array(np_big_ass_M[self.shape1:, -1])
         np_lbA = np.array(np_big_ass_M[:self.shape1, -2])
         np_ubA = np.array(np_big_ass_M[:self.shape1, -1])
-        # self.debug_print(np_H, np_A, np_lb, np_ub, np_lbA, np_ubA)
+        self.debug_print(np_H, np_A, np_lb, np_ub, np_lbA, np_ubA)
         xdot_full = self.qp_solver.solve(np_H, self.np_g, np_A, np_lb, np_ub, np_lbA, np_ubA, nWSR)
         if xdot_full is None:
             return None
         # TODO enable debug print in an elegant way, preferably without slowing anything down
-        # self.debug_print(np_H, np_A, np_lb, np_ub, np_lbA, np_ubA, xdot_full)
+        self.debug_print(np_H, np_A, np_lb, np_ub, np_lbA, np_ubA, xdot_full)
         return OrderedDict((observable, xdot_full[i]) for i, observable in enumerate(self.controlled_joints))
 
 

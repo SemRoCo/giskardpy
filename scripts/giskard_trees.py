@@ -9,7 +9,7 @@ from control_msgs.msg import JointTrajectoryControllerState
 from giskard_msgs.msg import MoveAction
 from py_trees import Sequence, Selector, BehaviourTree, Blackboard
 import py_trees
-from py_trees.meta import running_is_failure, success_is_running, failure_is_success
+from py_trees.meta import running_is_failure, success_is_running, failure_is_success, success_is_failure
 
 from giskardpy.god_map import GodMap
 from giskardpy.identifier import world_identifier, robot_identifier, js_identifier
@@ -25,8 +25,9 @@ from giskardpy.plugin_kinematic_sim import KinSimPlugin
 from giskardpy.plugin_log_trajectory import LogTrajPlugin
 from giskardpy.plugin_pybullet import PyBulletUpdatePlugin, CollisionChecker
 from giskardpy.plugin_send_trajectory import SendTrajectory
+from giskardpy.visualization import VisualizationBehavior
 from giskardpy.pybullet_world import PyBulletWorld
-from giskardpy.utils import create_path, render_dot_tree
+from giskardpy.utils import create_path, render_dot_tree, check_dependencies
 
 # TODO support joint states for other objects
 # TODO fix marker
@@ -53,6 +54,7 @@ def initialize_blackboard(urdf, default_joint_vel_limit, default_joint_weight, p
 def grow_tree():
     gui = rospy.get_param(u'~enable_gui')
     map_frame = rospy.get_param(u'~map_frame')
+    enable_visualization = rospy.get_param(u'~enable_visualization')
     debug = rospy.get_param(u'~debug')
     # if debug:
     #     giskardpy.PRINT_LEVEL = DEBUG
@@ -106,6 +108,7 @@ def grow_tree():
     planning = failure_is_success(Selector)(u'planning')
     planning.add_child(GoalCanceled(u'goal canceled', action_server_name))
     planning.add_child(CollisionCancel(u'in collision', collision_time_threshold))
+    planning.add_child(success_is_failure(VisualizationBehavior)(u'visualization', enable_visualization))
 
     actual_planning = PluginBehavior(u'planning', sleep=0)
     actual_planning.add_plugin(u'kin sim', KinSimPlugin(sample_period))
@@ -153,6 +156,7 @@ def grow_tree():
 
 if __name__ == u'__main__':
     rospy.init_node(u'giskard')
+    check_dependencies()
     tree_tick_rate = rospy.get_param(u'~tree_tick_rate')
     tree = grow_tree()
     while not rospy.is_shutdown():

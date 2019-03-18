@@ -2,8 +2,9 @@
 # import rospkg
 # from multiprocessing import Queue
 # from threading import Thread
-# import numpy as np
+import numpy as np
 import shutil
+from itertools import combinations
 
 import pytest
 import rospy
@@ -18,6 +19,7 @@ from shape_msgs.msg import SolidPrimitive
 
 # from giskardpy.python_interface import GiskardWrapper
 # from giskardpy.symengine_wrappers import quaternion_from_axis_angle
+from giskardpy.identifier import fk_identifier
 from utils_for_tests import PR2
 from giskardpy.tfwrapper import lookup_transform, init as tf_init, lookup_pose
 
@@ -109,7 +111,7 @@ folder_name = u'tmp_data/'
 def ros(request):
     try:
         print(u'deleting tmp test folder')
-        shutil.rmtree(folder_name)
+        # shutil.rmtree(folder_name)
     except Exception:
         pass
 
@@ -122,7 +124,7 @@ def ros(request):
         rospy.signal_shutdown(u'die')
         try:
             print(u'deleting tmp test folder')
-            shutil.rmtree(folder_name)
+            # shutil.rmtree(folder_name)
         except Exception:
             pass
 
@@ -197,6 +199,19 @@ def kitchen_setup(resetted_giskard):
                               lookup_pose(u'map', u'iai_kitchen/world'))
     return resetted_giskard
 
+class TestFk(object):
+    def test_fk1(self, zero_pose):
+        root = zero_pose.get_robot().get_root()
+        for link in zero_pose.get_robot().get_link_names():
+            fk1 = zero_pose.get_god_map().safe_get_data(fk_identifier+[(root, link)])
+            fk2 = lookup_pose(root, link)
+            np.testing.assert_almost_equal(fk1.pose.position.x, fk2.pose.position.x)
+            np.testing.assert_almost_equal(fk1.pose.position.y, fk2.pose.position.y)
+            np.testing.assert_almost_equal(fk1.pose.position.z, fk2.pose.position.z)
+            np.testing.assert_almost_equal(fk1.pose.orientation.x, fk2.pose.orientation.x)
+            np.testing.assert_almost_equal(fk1.pose.orientation.y, fk2.pose.orientation.y)
+            np.testing.assert_almost_equal(fk1.pose.orientation.z, fk2.pose.orientation.z)
+            np.testing.assert_almost_equal(fk1.pose.orientation.w, fk2.pose.orientation.w)
 
 class TestJointGoals(object):
     def test_joint_movement1(self, zero_pose):

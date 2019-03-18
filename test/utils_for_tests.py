@@ -172,7 +172,7 @@ class GiskardTestWrapper(object):
         # self.joint_limits = {joint_name: self.get_robot().get_joint_limits(joint_name) for joint_name in
         #                      self.get_controlled_joint_names() if self.get_robot().is_joint_controllable(joint_name)}
         # self.world = self.get_god_map().safe_get_data([u'pybullet_world'])  # type: PyBulletWorld
-        # self.world_plugin = self.tree.root.children[3].children[2]._plugins[u'coll']  # type: CollisionChecker
+        # self.world_plugin = self.tree.root.children[3].children[3]._plugins[u'coll']  # type: CollisionChecker
         self.default_root = self.get_robot().get_root()
         self.map = u'map'
         self.simple_base_pose_pub = rospy.Publisher(u'/move_base_simple/goal', PoseStamped, queue_size=10)
@@ -487,7 +487,8 @@ class PR2(GiskardTestWrapper):
     def __init__(self):
         rospy.set_param(u'~enable_gui', False)
         rospy.set_param(u'~debug', False)
-        rospy.set_param(u'~tree_tick_rate', .5)
+        rospy.set_param(u'~enable_visualization', False)
+        rospy.set_param(u'~tree_tick_rate', .01)
         rospy.set_param(u'~map_frame', u'map')
         rospy.set_param(u'~joint_convergence_threshold', 0.001)
         rospy.set_param(u'~wiggle_precision_threshold', 4)

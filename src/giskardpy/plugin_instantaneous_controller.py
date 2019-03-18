@@ -71,7 +71,11 @@ class GoalToConstraints(GetGoal):
             else:
                 self.raise_to_blackboard(InsolvableException(u'unsupported controller type'))
                 return Status.SUCCESS
-        shit = cmd_to_goals(move_cmd)
+        try:
+            shit = cmd_to_goals(move_cmd)
+        except AttributeError:
+            self.raise_to_blackboard(InsolvableException(u'couldn\'t transform goal'))
+            return Status.SUCCESS
         self.get_god_map().safe_set_data(cartesian_goal_identifier, shit)
 
         self.set_unused_joint_goals_to_current()
@@ -181,7 +185,7 @@ class GoalToConstraints(GetGoal):
         Adds a constraint for each link that pushed it away from its closest point.
         """
         soft_constraints = {}
-        for link in list(self.controllable_links):
+        for link in self.get_robot().get_controlled_links():
             point_on_link_input = Point3Input(self.god_map.to_symbol,
                                               prefix=closest_point_identifier + [link, u'position_on_a'])
             other_point_input = Point3Input(self.god_map.to_symbol,

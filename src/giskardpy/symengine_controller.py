@@ -135,9 +135,9 @@ def continuous_joint_position(current_joint, joint_goal, weight, p_gain, max_spe
                                                        upper=capped_err,
                                                        weight=weight,
                                                        expression=current_joint)
-    add_debug_constraint(soft_constraints, '{} //change//'.format(constraint_name), err)
-    add_debug_constraint(soft_constraints, '{} //curr//'.format(constraint_name), current_joint)
-    add_debug_constraint(soft_constraints, '{} //goal//'.format(constraint_name), joint_goal)
+    # add_debug_constraint(soft_constraints, '{} //change//'.format(constraint_name), err)
+    # add_debug_constraint(soft_constraints, '{} //curr//'.format(constraint_name), current_joint)
+    # add_debug_constraint(soft_constraints, '{} //goal//'.format(constraint_name), joint_goal)
     # add_debug_constraint(soft_constraints, '{} //max_speed//'.format(name), max_speed)
     return soft_constraints
 

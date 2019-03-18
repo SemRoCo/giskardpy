@@ -61,8 +61,8 @@ class GodMap(object):
                     return getattr(identifier, member)
                 except TypeError as e:
                     pass
-        except IndexError as e:
-            raise IndexError(u'{},{} | {}'.format(identifier, member, e))
+        except IndexError:
+            return identifier[int(member)]
 
     def get_data(self, identifier):
         """

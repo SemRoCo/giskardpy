@@ -22,7 +22,7 @@ from giskardpy.pybullet_wrapper import ContactInfo, deactivate_rendering, activa
     load_urdf_string_into_bullet
 from giskardpy.urdf_object import URDFObject
 from giskardpy.utils import keydefaultdict, suppress_stdout, NullContextManager, resolve_ros_iris_in_urdf, \
-    write_to_tmp
+    write_to_tmp, resolve_ros_iris
 import hashlib
 
 from giskardpy.world import World
@@ -176,13 +176,15 @@ class PyBulletWorld(World):
         Adds a ground plane to the Bullet World.
         """
         if not self.has_object(self.ground_plane_name):
-            plane = WorldObject.from_urdf_file(u'../test/urdfs/ground_plane.urdf')
+            path = resolve_ros_iris(u'package://giskardpy/test/urdfs/ground_plane.urdf')
+            plane = WorldObject.from_urdf_file(path)
             plane.set_name(self.ground_plane_name)
             self.add_object(plane)
 
     def __add_pybullet_bug_fix_hack(self):
         if not self.has_object(self.hack_name):
-            plane = WorldObject.from_urdf_file(u'../test/urdfs/tiny_ball.urdf')
+            path = resolve_ros_iris(u'package://giskardpy/test/urdfs/tiny_ball.urdf')
+            plane = WorldObject.from_urdf_file(path)
             plane.set_name(self.hack_name)
             self.add_object(plane)
 

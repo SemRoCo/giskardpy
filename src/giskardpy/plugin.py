@@ -123,7 +123,7 @@ class PluginBehavior(GiskardBehavior):
             self.update_thread.join()
         except Exception as e:
             # FIXME sometimes terminate gets called without init being called
-            raise Exception('terminate was called before init')
+            rospy.logwarn(u'terminate was called before init')
         self.stop_plugins()
         super(PluginBehavior, self).terminate(new_status)
 

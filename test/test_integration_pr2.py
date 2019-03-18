@@ -740,7 +740,6 @@ class TestCollisionAvoidanceGoals(object):
         """
         :type zero_pose: PR2
         """
-        # FIXME
         goal_js = {
             u'l_elbow_flex_joint': -1.43286344265,
             u'l_forearm_roll_joint': 1.26465060073,

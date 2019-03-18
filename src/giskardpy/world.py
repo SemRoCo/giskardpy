@@ -277,7 +277,7 @@ class World(object):
         closest_point = keydefaultdict(lambda k: ClosestPointInfo((10, 0, 0),
                                                                   (0, 0, 0),
                                                                   1e9,
-                                                                  1e9,
+                                                                  0.0,
                                                                   k,
                                                                   '',
                                                                   (1, 0, 0), k))

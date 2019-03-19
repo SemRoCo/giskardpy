@@ -113,6 +113,7 @@ class TestPyBulletRobot(test_world.TestRobot):
     # TODO test reset collision matrix
 
 
+
 class TestPyBulletWorld(test_world.TestWorld):
     cls = WorldObject
     world_cls = PyBulletWorld
@@ -164,9 +165,14 @@ class TestPyBulletWorld(test_world.TestWorld):
     def test_collision_goals_to_collision_matrix1(self, test_folder):
         world_with_donbot = self.make_world_with_donbot(test_folder)
         collision_matrix = world_with_donbot.collision_goals_to_collision_matrix([], 0.05)
-        assert len(collision_matrix) == 104
+        assert len(collision_matrix) == 106
         return world_with_donbot
 
+    def test_attach_detach_existing_obj_to_robot1(self, function_setup):
+        w = super(TestPyBulletWorld, self).test_attach_detach_existing_obj_to_robot1(function_setup)
+        assert_num_pybullet_objects(4)
+
+    # TODO test that has collision entries of robot links without collision geometry
 
 
 

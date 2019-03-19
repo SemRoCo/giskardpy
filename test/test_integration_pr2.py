@@ -863,6 +863,7 @@ class TestCollisionAvoidanceGoals(object):
         """
         :type box_setup: PR2
         """
+        # FIXME fails because weight of unused joints is set to 1 instead of 0
         p = PoseStamped()
         p.header.frame_id = box_setup.r_tip
         p.pose.position = Point(0.15, 0, 0)
@@ -904,7 +905,7 @@ class TestCollisionAvoidanceGoals(object):
         p.pose.position.x = 0.11
         p.pose.orientation.w = 1
         box_setup.set_and_check_cart_goal(box_setup.default_root, box_setup.l_tip, p)
-        # box_setup.check_cpi_leq(box_setup.get_l_gripper_links(), 0.0)
+        box_setup.check_cpi_leq(box_setup.get_l_gripper_links(), 0.0)
         box_setup.check_cpi_geq(box_setup.get_r_gripper_links(), 0.048)
 
     def test_attached_collision1(self, box_setup):

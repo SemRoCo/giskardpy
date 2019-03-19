@@ -5,9 +5,9 @@ from giskard_msgs.msg import CollisionEntry
 
 from giskardpy.data_types import ClosestPointInfo
 from giskardpy.exceptions import RobotExistsException, DuplicateNameException, PhysicsWorldException, \
-    UnknownBodyException
+    UnknownBodyException, UnsupportedOptionException
 from giskardpy.symengine_robot import Robot
-from giskardpy.tfwrapper import transform_pose, transform_point, transform_vector
+from giskardpy.tfwrapper import transform_pose, transform_point, transform_vector, msg_to_kdl, kdl_to_pose
 from giskardpy.urdf_object import URDFObject
 from giskardpy.utils import keydefaultdict, to_point_stamped, msg_to_list, to_vector3_stamped
 from giskardpy.world_object import WorldObject
@@ -64,7 +64,7 @@ class World(object):
     def get_object(self, name):
         """
         :type name: str
-        :rtype: PBWO
+        :rtype: WorldObject
         """
         return self._objects[name]
 
@@ -156,6 +156,19 @@ class World(object):
         self._robot.attach_urdf_object(self.get_object(name), link, pose)
         self.remove_object(name)
 
+    def detach(self, joint_name, from_obj=None):
+        if from_obj is None or self.robot.get_name() == from_obj:
+            # this only works because attached simple objects have joint names equal to their name
+            p = self.robot.get_fk(self.robot.get_root(), joint_name)
+            p_map = kdl_to_pose(self.robot.T_base___map * msg_to_kdl(p))
+
+            cut_off_obj = self.robot.detach_sub_tree(joint_name)
+        else:
+            raise UnsupportedOptionException(u'only detach from robot supported')
+        wo = WorldObject.from_urdf_object(cut_off_obj) # type: WorldObject
+        wo.base_pose = p_map
+        self.add_object(wo)
+
     def get_robot_collision_matrix(self, min_dist):
         robot_name = self.robot.get_name()
         collision_matrix = self.robot.get_self_collision_matrix()
@@ -211,7 +224,7 @@ class World(object):
                 robot_links = set(robot_links)
             else:
                 for robot_link in collision_entry.robot_links:
-                    if robot_link not in robot_links:
+                    if robot_link not in self.robot.get_link_names():
                         raise UnknownBodyException(u'robot_link \'{}\' unknown'.format(robot_link))
                 robot_links = set(collision_entry.robot_links)
 

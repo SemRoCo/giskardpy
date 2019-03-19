@@ -203,8 +203,11 @@ class PyBulletWorld(World):
         :type object_: giskardpy.world_object.WorldObject
         :return:
         """
-        object_ = PyBulletWorldObject.from_urdf_object(object_)
-        return super(PyBulletWorld, self).add_object(object_)
+        # TODO create from world object to avoid basepose and joint state getting lost?
+        pwo = PyBulletWorldObject.from_urdf_object(object_)
+        pwo.base_pose = object_.base_pose
+        pwo.joint_state = object_.joint_state
+        return super(PyBulletWorld, self).add_object(pwo)
 
     def collisions_to_closest_point(self, collisions, min_allowed_distance):
         """
@@ -226,4 +229,3 @@ class PyBulletWorld(World):
     def remove_robot(self):
         self.robot.suicide()
         super(PyBulletWorld, self).remove_robot()
-

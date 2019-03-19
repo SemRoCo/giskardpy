@@ -9,7 +9,7 @@ from geometry_msgs.msg import Pose
 from giskard_msgs.msg import CollisionEntry
 import test_urdf_object
 from giskardpy.exceptions import DuplicateNameException
-from utils_for_tests import pr2_urdf, donbot_urdf, boxy_urdf, base_bot_urdf
+from utils_for_tests import pr2_urdf, donbot_urdf, boxy_urdf, base_bot_urdf, compare_poses
 from giskardpy.utils import make_world_body_box
 from giskardpy.world import World
 from giskardpy.world_object import WorldObject
@@ -129,7 +129,7 @@ class TestWorld(object):
 
     def make_world_with_pr2(self, path_to_data_folder=None):
         """
-        :rtype: self.world_cls
+        :rtype: World
         """
         w = self.world_cls(path_to_data_folder=path_to_data_folder)
         r = self.cls(pr2_urdf())
@@ -138,7 +138,7 @@ class TestWorld(object):
 
     def make_world_with_donbot(self, path_to_data_folder=None):
         """
-        :rtype: self.world_cls
+        :rtype: World
         """
         w = self.world_cls(path_to_data_folder=path_to_data_folder)
         r = self.cls(donbot_urdf())
@@ -219,6 +219,28 @@ class TestWorld(object):
             assert False
         except KeyError:
             assert True
+        return world_with_pr2
+
+    def test_attach_detach_existing_obj_to_robot1(self, function_setup):
+        obj_name = u'box'
+        world_with_pr2 = self.make_world_with_pr2()
+        box = self.cls.from_world_body(make_world_body_box(name=obj_name))
+        world_with_pr2.add_object(box)
+        links_before = set(world_with_pr2.robot.get_link_names())
+        joints_before = set(world_with_pr2.robot.get_joint_names())
+        p = Pose()
+        p.orientation.w = 1
+        world_with_pr2.attach_existing_obj_to_robot(obj_name, u'l_gripper_tool_frame', p)
+        assert obj_name not in world_with_pr2.get_object_names()
+        assert set(world_with_pr2.robot.get_link_names()).difference(links_before) == {obj_name}
+        assert set(world_with_pr2.robot.get_joint_names()).difference(joints_before) == {obj_name}
+
+        world_with_pr2.detach(obj_name)
+        assert set(world_with_pr2.robot.get_link_names()).symmetric_difference(links_before) == set()
+        assert set(world_with_pr2.robot.get_joint_names()).symmetric_difference(joints_before) == set()
+        assert obj_name in world_with_pr2.get_object_names()
+        compare_poses(world_with_pr2.robot.get_fk(world_with_pr2.robot.get_root(), u'l_gripper_tool_frame').pose,
+                      world_with_pr2.get_object(obj_name).base_pose)
         return world_with_pr2
 
     def test_hard_reset1(self, function_setup):
@@ -436,7 +458,6 @@ class TestWorld(object):
         box2 = self.cls.from_world_body(make_world_body_box(name2))
         world_with_donbot.add_object(box)
         world_with_donbot.add_object(box2)
-
 
         ces = []
         ce = CollisionEntry()

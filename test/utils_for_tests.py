@@ -69,6 +69,18 @@ def compare_axis_angle(angle1, axis1, angle2, axis2):
     elif np.isclose(axis1, -axis2).all():
         assert np.isclose(angle1, abs(angle2 - 2 * pi)), '{} != {}'.format(angle1, angle2)
 
+def compare_poses(pose1, pose2):
+    """
+    :type pose1: Pose
+    :type pose2: Pose
+    """
+    np.testing.assert_almost_equal(pose1.position.x, pose2.position.x)
+    np.testing.assert_almost_equal(pose1.position.y, pose2.position.y)
+    np.testing.assert_almost_equal(pose1.position.z, pose2.position.z)
+    np.testing.assert_almost_equal(pose1.orientation.x, pose2.orientation.x)
+    np.testing.assert_almost_equal(pose1.orientation.y, pose2.orientation.y)
+    np.testing.assert_almost_equal(pose1.orientation.z, pose2.orientation.z)
+    np.testing.assert_almost_equal(pose1.orientation.w, pose2.orientation.w)
 
 @composite
 def variable_name(draw):

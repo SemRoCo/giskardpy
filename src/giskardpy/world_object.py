@@ -21,7 +21,8 @@ class WorldObject(URDFObject):
             p = Pose()
             p.orientation.w = 1
             self.base_pose = p
-        self.joint_state = {}
+        # FIXME using .joint_state creates a chicken egg problem in pybulletworldobject
+        self._js = self.get_zero_joint_state()
         self._self_collision_matrix = set()
 
     @classmethod
@@ -263,4 +264,4 @@ class WorldObject(URDFObject):
     def detach_sub_tree(self, joint_name):
         sub_tree = super(WorldObject, self).detach_sub_tree(joint_name)
         self.update_self_collision_matrix(removed_links=sub_tree.get_link_names())
-
+        return sub_tree

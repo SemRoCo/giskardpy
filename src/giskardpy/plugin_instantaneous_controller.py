@@ -228,7 +228,7 @@ class GoalToConstraints(GetGoal):
                                                                                    u'position'])}
                 if joint_name not in self.used_joints:
                     joint_goal[joint_name][u'weight'] = 1
-                    joint_goal[joint_name][u'p_gain'] = 10.
+                    joint_goal[joint_name][u'p_gain'] = 10. #FIXME don't hardcode this
 
         self.get_god_map().safe_set_data(cartesian_goal_identifier + [str(Controller.JOINT)], joint_goal)
 

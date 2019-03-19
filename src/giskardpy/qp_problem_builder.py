@@ -176,7 +176,7 @@ class QProblemBuilder(object):
         p_weights = pd.DataFrame(np_H.dot(np.ones(np_H.shape[0])), weights).sort_index()
         if xdot_full is not None:
             p_xdot = pd.DataFrame(xdot_full, xdot).sort_index()
-        p_A = pd.DataFrame(np_A, lbA, weights).sort_index()
+        p_A = pd.DataFrame(np_A, lbA, weights).sort_index(1).sort_index(0)
         if self.lbAs is None:
             self.lbAs = p_lbA
         else:

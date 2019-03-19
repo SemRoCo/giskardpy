@@ -349,7 +349,12 @@ class GiskardTestWrapper(object):
                                                 update_world_error_code(expected_response))
         assert not self.get_world().has_object(name)
 
-    # def detech_object(self, name, expected_response=UpdateWorldResponse.SUCCESS):
+    def detach_object(self, name, expected_response=UpdateWorldResponse.SUCCESS):
+        r = self.wrapper.detach_object(name)
+        assert r.error_codes == expected_response, \
+                u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
+                                                update_world_error_code(expected_response))
+        assert self.get_world().has_object(name)
 
     def add_box(self, name=u'box', size=(1, 1, 1), frame_id=u'map', position=(0, 0, 0), orientation=(0, 0, 0, 1)):
         r = self.wrapper.add_box(name, size, frame_id, position, orientation)

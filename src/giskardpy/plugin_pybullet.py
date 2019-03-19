@@ -137,6 +137,8 @@ class PyBulletUpdatePlugin(PluginBase):
                     self.add_object(req)
                 elif req.operation is UpdateWorldRequest.REMOVE_ALL:
                     self.clear_world()
+                elif req.operation is UpdateWorldRequest.DETACH:
+                    self.detach_object(req)
                 else:
                     return UpdateWorldResponse(UpdateWorldResponse.INVALID_OPERATION,
                                                u'Received invalid operation code: {}'.format(req.operation))
@@ -155,9 +157,9 @@ class PyBulletUpdatePlugin(PluginBase):
                 return UpdateWorldResponse(UpdateWorldResponse.UNSUPPORTED_OPTIONS, str(e))
             except Exception as e:
                 traceback.print_exc()
-                return UpdateWorldResponse(UpdateWorldResponse.UNSUPPORTED_OPTIONS,
-                                           u'{}: {}'.format(e.__class__.__name__,
-                                                            str(e)))
+            return UpdateWorldResponse(UpdateWorldResponse.UNSUPPORTED_OPTIONS,
+                                       u'{}: {}'.format(e.__class__.__name__,
+                                                        str(e)))
 
     def add_object(self, req):
         """
@@ -180,6 +182,16 @@ class PyBulletUpdatePlugin(PluginBase):
         #     callback = (lambda msg: self.object_js_cb(world_body.name, msg))
         #     self.object_js_subs[world_body.name] = \
         #         rospy.Subscriber(world_body.joint_state_topic, JointState, callback, queue_size=1)
+
+    def detach_object(self, req):
+        self.get_world().detach(req.body.name)
+        try:
+            m = self.get_world().get_object(req.body.name).as_marker_msg()
+            m.header.frame_id = self.global_reference_frame_name
+            self.publish_object_as_marker(m)
+        except:
+            pass
+
 
     def attach_object(self, req):
         """

@@ -924,7 +924,7 @@ class TestCollisionAvoidanceGoals(object):
         box_setup.set_and_check_cart_goal(box_setup.default_root, box_setup.r_tip, p)
         box_setup.check_cpi_geq(box_setup.get_l_gripper_links(), 0.048)
         box_setup.check_cpi_geq([attached_link_name], 0.048)
-        box_setup.remove_object(attached_link_name)
+        box_setup.detach_object(attached_link_name)
 
     def test_attached_self_collision(self, zero_pose):
         """

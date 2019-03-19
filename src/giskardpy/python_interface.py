@@ -293,6 +293,12 @@ class GiskardWrapper(object):
         req.operation = UpdateWorldRequest.ADD
         return self.update_world.call(req)
 
+    def detach_object(self, object_name):
+        req = UpdateWorldRequest()
+        req.body.name = object_name
+        req.operation = req.DETACH
+        return self.update_world.call(req)
+
     def add_urdf(self, name, urdf, js_topic, pose):
         urdf_body = WorldBody()
         urdf_body.name = str(name)

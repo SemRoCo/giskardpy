@@ -507,6 +507,7 @@ class PR2(GiskardTestWrapper):
         self.r_tip = u'r_gripper_tool_frame'
         self.l_tip = u'l_gripper_tool_frame'
         super(PR2, self).__init__()
+        self.default_root = u'base_link'
 
     def get_l_gripper_links(self):
         return [u'l_gripper_l_finger_tip_link', u'l_gripper_r_finger_tip_link', u'l_gripper_l_finger_link',

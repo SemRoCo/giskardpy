@@ -160,7 +160,7 @@ class World(object):
         if from_obj is None or self.robot.get_name() == from_obj:
             # this only works because attached simple objects have joint names equal to their name
             p = self.robot.get_fk(self.robot.get_root(), joint_name)
-            p_map = kdl_to_pose(self.robot.T_base___map * msg_to_kdl(p))
+            p_map = kdl_to_pose(self.robot.T_base___map.Inverse() * msg_to_kdl(p))
 
             cut_off_obj = self.robot.detach_sub_tree(joint_name)
         else:

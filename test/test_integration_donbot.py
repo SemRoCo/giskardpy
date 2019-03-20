@@ -86,7 +86,13 @@ def box_setup(pocky_pose_setup):
     :type pocky_pose_setup: Donbot
     :rtype: Donbot
     """
-    pocky_pose_setup.add_box(position=[1.2, 0, 0.5])
+    p = PoseStamped()
+    p.header.frame_id = u'map'
+    p.pose.position.x = 1.2
+    p.pose.position.y = 0
+    p.pose.position.z = 0.5
+    p.pose.orientation.w = 1
+    pocky_pose_setup.add_box(pose=p)
     return pocky_pose_setup
 
 
@@ -96,7 +102,13 @@ def fake_table_setup(zero_pose):
     :type zero_pose: Donbot
     :rtype: Donbot
     """
-    zero_pose.add_box(position=[.9, 0, 0.2])
+    p = PoseStamped()
+    p.header.frame_id = u'map'
+    p.pose.position.x = 0.9
+    p.pose.position.y = 0
+    p.pose.position.z = 0.2
+    p.pose.orientation.w = 1
+    zero_pose.add_box(pose=p)
     return zero_pose
 
 

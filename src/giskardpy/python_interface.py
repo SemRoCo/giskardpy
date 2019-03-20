@@ -222,39 +222,44 @@ class GiskardWrapper(object):
         return self.update_world.call(req)
 
 
-    def add_box(self, name=u'box', size=(1, 1, 1), frame_id=u'map', position=(0, 0, 0), orientation=(0, 0, 0, 1)):
+    def add_box(self, name=u'box', size=(1, 1, 1), frame_id=u'map', position=(0, 0, 0), orientation=(0, 0, 0, 1),
+                pose=None):
         box = make_world_body_box(name, size[0], size[1], size[2])
-        pose = PoseStamped()
-        pose.header.stamp = rospy.Time.now()
-        pose.header.frame_id = str(frame_id)
-        pose.pose.position = Point(*position)
-        pose.pose.orientation = Quaternion(*orientation)
+        if pose is None:
+            pose = PoseStamped()
+            pose.header.stamp = rospy.Time.now()
+            pose.header.frame_id = str(frame_id)
+            pose.pose.position = Point(*position)
+            pose.pose.orientation = Quaternion(*orientation)
         req = UpdateWorldRequest(UpdateWorldRequest.ADD, box, False, pose)
         return self.update_world.call(req)
 
-    def add_sphere(self, name=u'sphere', size=1, frame_id=u'map', position=(0,0,0), orientation=(0,0,0,1)):
+    def add_sphere(self, name=u'sphere', size=1, frame_id=u'map', position=(0,0,0), orientation=(0,0,0,1), pose=None):
         object = WorldBody()
         object.type = WorldBody.PRIMITIVE_BODY
         object.name = str(name)
-        pose = PoseStamped()
-        pose.header.stamp = rospy.Time.now()
-        pose.header.frame_id = str(frame_id)
-        pose.pose.position = Point(*position)
-        pose.pose.orientation = Quaternion(*orientation)
+        if pose is None:
+            pose = PoseStamped()
+            pose.header.stamp = rospy.Time.now()
+            pose.header.frame_id = str(frame_id)
+            pose.pose.position = Point(*position)
+            pose.pose.orientation = Quaternion(*orientation)
         object.shape.type = SolidPrimitive.SPHERE
         object.shape.dimensions.append(size)
         req = UpdateWorldRequest(UpdateWorldRequest.ADD, object, False, pose)
         return self.update_world.call(req)
 
-    def add_cylinder(self, name=u'cylinder', size=(1,1), frame_id=u'map', position=(0,0,0), orientation=(0,0,0,1)):
+    def add_cylinder(self, name=u'cylinder', size=(1,1), frame_id=u'map', position=(0,0,0), orientation=(0,0,0,1),
+                     pose=None):
         object = WorldBody()
         object.type = WorldBody.PRIMITIVE_BODY
         object.name = str(name)
-        pose = PoseStamped()
-        pose.header.stamp = rospy.Time.now()
-        pose.header.frame_id = str(frame_id)
-        pose.pose.position = Point(*position)
-        pose.pose.orientation = Quaternion(*orientation)
+        if pose is None:
+            pose = PoseStamped()
+            pose.header.stamp = rospy.Time.now()
+            pose.header.frame_id = str(frame_id)
+            pose.pose.position = Point(*position)
+            pose.pose.orientation = Quaternion(*orientation)
         object.shape.type = SolidPrimitive.CYLINDER
         object.shape.dimensions.append(size[0])
         object.shape.dimensions.append(size[1])

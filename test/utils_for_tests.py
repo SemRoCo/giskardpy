@@ -69,18 +69,18 @@ def compare_axis_angle(angle1, axis1, angle2, axis2):
     elif np.isclose(axis1, -axis2).all():
         assert np.isclose(angle1, abs(angle2 - 2 * pi)), '{} != {}'.format(angle1, angle2)
 
-def compare_poses(pose1, pose2):
+def compare_poses(pose1, pose2, decimal=3):
     """
     :type pose1: Pose
     :type pose2: Pose
     """
-    np.testing.assert_almost_equal(pose1.position.x, pose2.position.x)
-    np.testing.assert_almost_equal(pose1.position.y, pose2.position.y)
-    np.testing.assert_almost_equal(pose1.position.z, pose2.position.z)
-    np.testing.assert_almost_equal(pose1.orientation.x, pose2.orientation.x)
-    np.testing.assert_almost_equal(pose1.orientation.y, pose2.orientation.y)
-    np.testing.assert_almost_equal(pose1.orientation.z, pose2.orientation.z)
-    np.testing.assert_almost_equal(pose1.orientation.w, pose2.orientation.w)
+    np.testing.assert_almost_equal(pose1.position.x, pose2.position.x, decimal=decimal)
+    np.testing.assert_almost_equal(pose1.position.y, pose2.position.y, decimal=decimal)
+    np.testing.assert_almost_equal(pose1.position.z, pose2.position.z, decimal=decimal)
+    np.testing.assert_almost_equal(pose1.orientation.x, pose2.orientation.x, decimal=decimal)
+    np.testing.assert_almost_equal(pose1.orientation.y, pose2.orientation.y, decimal=decimal)
+    np.testing.assert_almost_equal(pose1.orientation.z, pose2.orientation.z, decimal=decimal)
+    np.testing.assert_almost_equal(pose1.orientation.w, pose2.orientation.w, decimal=decimal)
 
 @composite
 def variable_name(draw):
@@ -350,41 +350,38 @@ class GiskardTestWrapper(object):
         assert not self.get_world().has_object(name)
 
     def detach_object(self, name, expected_response=UpdateWorldResponse.SUCCESS):
+        p = self.get_robot().get_fk(self.get_robot().get_root(), name)
+        p = transform_pose(u'map', p)
         r = self.wrapper.detach_object(name)
         assert r.error_codes == expected_response, \
                 u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
                                                 update_world_error_code(expected_response))
         assert self.get_world().has_object(name)
+        compare_poses(self.get_world().get_object(name).base_pose, p.pose, decimal=2)
 
-    def add_box(self, name=u'box', size=(1, 1, 1), frame_id=u'map', position=(0, 0, 0), orientation=(0, 0, 0, 1)):
-        r = self.wrapper.add_box(name, size, frame_id, position, orientation)
+    def add_box(self, name=u'box', size=(1, 1, 1), pose=None):
+        r = self.wrapper.add_box(name, size, pose=pose)
         assert r.error_codes == UpdateWorldResponse.SUCCESS, \
             u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
                                             update_world_error_code(UpdateWorldResponse.SUCCESS))
-        p = PoseStamped()
-        p.header.frame_id = frame_id
-        p.pose.position = Point(*position)
-        p.pose.orientation = Quaternion(*orientation)
-        p = transform_pose(u'map', p)
+        # p = PoseStamped()
+        # p.header.frame_id = frame_id
+        # p.pose.position = Point(*position)
+        # p.pose.orientation = Quaternion(*orientation)
+        p = transform_pose(u'map', pose)
         o_p = self.get_world().get_object(name).base_pose
         assert self.get_world().has_object(name)
-        assert np.allclose(p.pose.position.x, o_p.position.x)
-        assert np.allclose(p.pose.position.y, o_p.position.y)
-        assert np.allclose(p.pose.position.z, o_p.position.z)
-        assert np.allclose(p.pose.orientation.x, o_p.orientation.x)
-        assert np.allclose(p.pose.orientation.y, o_p.orientation.y)
-        assert np.allclose(p.pose.orientation.z, o_p.orientation.z)
-        assert np.allclose(p.pose.orientation.w, o_p.orientation.w)
+        compare_poses(p.pose, o_p)
 
-    def add_sphere(self, name=u'sphere', position=(1.2, 0, 0.5)):
-        r = self.wrapper.add_sphere(name=name, position=position)
+    def add_sphere(self, name=u'sphere', pose=None):
+        r = self.wrapper.add_sphere(name=name, pose=pose)
         assert r.error_codes == UpdateWorldResponse.SUCCESS, \
             u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
                                             update_world_error_code(UpdateWorldResponse.SUCCESS))
         assert self.get_world().has_object(name)
 
-    def add_cylinder(self, name=u'cylinder', position=(1.2, 0, 0.5)):
-        r = self.wrapper.add_cylinder(name=name, position=position)
+    def add_cylinder(self, name=u'cylinder', pose=None):
+        r = self.wrapper.add_cylinder(name=name, pose=pose)
         assert r.error_codes == UpdateWorldResponse.SUCCESS, \
             u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
                                             update_world_error_code(UpdateWorldResponse.SUCCESS))
@@ -492,6 +489,8 @@ class GiskardTestWrapper(object):
         :type goal_pose: PoseStamped
         """
         self.simple_base_pose_pub.publish(goal_pose)
+        self.wait_for_synced()
+
 
     def reset_base(self):
         p = PoseStamped()
@@ -505,6 +504,7 @@ class PR2(GiskardTestWrapper):
         rospy.set_param(u'~enable_gui', False)
         rospy.set_param(u'~debug', False)
         rospy.set_param(u'~enable_visualization', False)
+        rospy.set_param(u'~enable_collision_marker', True)
         rospy.set_param(u'~tree_tick_rate', .01)
         rospy.set_param(u'~map_frame', u'map')
         rospy.set_param(u'~joint_convergence_threshold', 0.001)
@@ -516,7 +516,6 @@ class PR2(GiskardTestWrapper):
         rospy.set_param(u'~fill_velocity_values', False)
         rospy.set_param(u'~nWSR', u'None')
         rospy.set_param(u'~root_link', u'base_footprint')
-        rospy.set_param(u'~enable_collision_marker', True)
         # rospy.set_param(u'~enable_self_collision', True)
         rospy.set_param(u'~path_to_data_folder', u'tmp_data/')
         rospy.set_param(u'~collision_time_threshold', 10)

@@ -205,15 +205,18 @@ class PyBulletUpdatePlugin(PluginBase):
             world_object = self.get_world().get_object(req.body.name)
             self.get_world().attach_existing_obj_to_robot(req.body.name, req.pose.header.frame_id,
                                                           p.pose)
+            m = world_object.as_marker_msg()
+            m.header.frame_id = p.header.frame_id
+            m.pose = p.pose
         else:
             world_object = WorldObject.from_world_body(req.body)
             self.get_world().robot.attach_urdf_object(world_object,
                                                       req.pose.header.frame_id,
                                                       req.pose.pose)
-        try:
             m = world_object.as_marker_msg()
             m.pose = req.pose.pose
             m.header = req.pose.header
+        try:
             m.frame_locked = True
             self.publish_object_as_marker(m)
         except:

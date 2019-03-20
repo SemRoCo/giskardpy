@@ -20,7 +20,7 @@ from shape_msgs.msg import SolidPrimitive
 # from giskardpy.python_interface import GiskardWrapper
 # from giskardpy.symengine_wrappers import quaternion_from_axis_angle
 from giskardpy.identifier import fk_identifier
-from utils_for_tests import PR2
+from utils_for_tests import PR2, compare_poses
 from giskardpy.tfwrapper import lookup_transform, init as tf_init, lookup_pose
 
 # from giskardpy.utils import msg_to_list
@@ -174,7 +174,13 @@ def box_setup(pocky_pose_setup):
     :type pocky_pose_setup: PR2
     :rtype: PR2
     """
-    pocky_pose_setup.add_box(position=[1.2, 0, 0.5])
+    p = PoseStamped()
+    p.header.frame_id = u'map'
+    p.pose.position.x = 1.2
+    p.pose.position.y = 0
+    p.pose.position.z = 0.5
+    p.pose.orientation.w = 1
+    pocky_pose_setup.add_box(pose=p)
     return pocky_pose_setup
 
 
@@ -184,7 +190,13 @@ def fake_table_setup(zero_pose):
     :type zero_pose: PR2
     :rtype: PR2
     """
-    zero_pose.add_box(position=[.9, 0, 0.2])
+    p = PoseStamped()
+    p.header.frame_id = u'map'
+    p.pose.position.x = 0.9
+    p.pose.position.y = 0
+    p.pose.position.z = 0.2
+    p.pose.orientation.w = 1
+    zero_pose.add_box(pose=p)
     return zero_pose
 
 
@@ -458,14 +470,26 @@ class TestCollisionAvoidanceGoals(object):
         :type zero_pose: PR2
         """
         object_name = u'muh'
-        zero_pose.add_box(object_name, position=[1.2, 0, 1.6])
+        p = PoseStamped()
+        p.header.frame_id = u'map'
+        p.pose.position = Point(1.2, 0, 1.6)
+        p.pose.orientation = Quaternion(0.0, 0.0, 0.47942554, 0.87758256)
+        zero_pose.add_box(object_name, pose=p)
+        m = zero_pose.get_world().get_object(object_name).as_marker_msg()
+        compare_poses(m.pose, p.pose)
 
     def test_add_remove_sphere(self, zero_pose):
         """
         :type zero_pose: PR2
         """
         object_name = u'muh'
-        zero_pose.add_sphere(object_name, position=[1.2, 0, 1.6])
+        p = PoseStamped()
+        p.header.frame_id = u'map'
+        p.pose.position.x = 1.2
+        p.pose.position.y = 0
+        p.pose.position.z = 1.6
+        p.pose.orientation.w = 1
+        zero_pose.add_sphere(object_name, pose=p)
         zero_pose.remove_object(object_name)
 
     def test_add_remove_cylinder(self, zero_pose):
@@ -473,7 +497,13 @@ class TestCollisionAvoidanceGoals(object):
         :type zero_pose: PR2
         """
         object_name = u'muh'
-        zero_pose.add_cylinder(object_name, position=[1.2, 0, 1.6])
+        p = PoseStamped()
+        p.header.frame_id = u'map'
+        p.pose.position.x = 1.2
+        p.pose.position.y = 0
+        p.pose.position.z = 1.6
+        p.pose.orientation.w = 1
+        zero_pose.add_cylinder(object_name, pose=p)
         zero_pose.remove_object(object_name)
 
     def test_add_urdf_body(self, kitchen_setup):
@@ -513,6 +543,7 @@ class TestCollisionAvoidanceGoals(object):
         """
         pocky = u'http://muh#pocky'
         zero_pose.attach_box(pocky, [0.1, 0.02, 0.02], zero_pose.r_tip, [0.05, 0, 0])
+        zero_pose.detach_object(pocky)
         zero_pose.remove_object(pocky)
 
     def test_attach_existing_box(self, zero_pose):
@@ -520,9 +551,43 @@ class TestCollisionAvoidanceGoals(object):
         :type zero_pose: PR2
         """
         pocky = u'http://muh#pocky'
-        zero_pose.add_box(pocky, [0.1, 0.02, 0.02], zero_pose.r_tip, [0.05, 0, 0])
+        p = PoseStamped()
+        p.header.frame_id = zero_pose.r_tip
+        p.pose.position = Point(0.05, 0, 0)
+        p.pose.orientation = Quaternion(0., 0., 0.47942554, 0.87758256)
+        zero_pose.add_box(pocky, [0.1, 0.02, 0.02], pose=p)
         zero_pose.attach_existing(pocky, frame_id=zero_pose.r_tip)
-        # TODO test if object is on correct pose
+        relative_pose = zero_pose.get_robot().get_fk(zero_pose.r_tip, pocky).pose
+        compare_poses(p.pose, relative_pose)
+
+    def test_attach_existing_box2(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        pocky = u'http://muh#pocky'
+        old_p = PoseStamped()
+        old_p.header.frame_id = zero_pose.r_tip
+        old_p.pose.position = Point(0.05, 0, 0)
+        old_p.pose.orientation = Quaternion(0., 0., 0.47942554, 0.87758256)
+        zero_pose.add_box(pocky, [0.1, 0.02, 0.02], pose=old_p)
+        zero_pose.attach_existing(pocky, frame_id=zero_pose.r_tip)
+        relative_pose = zero_pose.get_robot().get_fk(zero_pose.r_tip, pocky).pose
+        compare_poses(old_p.pose, relative_pose)
+
+        p = PoseStamped()
+        p.header.frame_id = zero_pose.r_tip
+        p.pose.position.x = -0.1
+        p.pose.orientation.w = 1.0
+        zero_pose.set_and_check_cart_goal(zero_pose.default_root, zero_pose.r_tip, p)
+        p.header.frame_id = u'map'
+        p.pose.position.y = -1
+        p.pose.orientation = Quaternion(0, 0, 0.47942554, 0.87758256)
+        zero_pose.move_base(p)
+
+        zero_pose.detach_object(pocky)
+        # compare_poses(old_p.pose, new_pose)
+
+
 
     def test_attach_to_nonexistant_robot_link(self, zero_pose):
         """
@@ -537,7 +602,13 @@ class TestCollisionAvoidanceGoals(object):
         :type zero_pose: PR2
         """
         object_name = u'muh'
-        zero_pose.add_box(object_name, position=[1.2, 0, 1.6])
+        p = PoseStamped()
+        p.header.frame_id = u'map'
+        p.pose.position.x = 1.2
+        p.pose.position.y = 0
+        p.pose.position.z = 1.6
+        p.pose.orientation.w = 1
+        zero_pose.add_box(object_name, pose=p)
         zero_pose.remove_object(object_name)
         # FIXME marker does not get removed
 
@@ -623,7 +694,13 @@ class TestCollisionAvoidanceGoals(object):
         :type zero_pose: PR2
         """
         zero_pose.allow_self_collision()
-        zero_pose.add_box(position=[0, 0, -0.2])
+        p = PoseStamped()
+        p.header.frame_id = u'map'
+        p.pose.position.x = 0
+        p.pose.position.y = 0
+        p.pose.position.z = -0.2
+        p.pose.orientation.w = 1
+        zero_pose.add_box(pose=p)
         zero_pose.send_and_check_joint_goal(pocky_pose)
 
     def test_unknown_object1(self, box_setup):
@@ -822,7 +899,13 @@ class TestCollisionAvoidanceGoals(object):
         """
         :type pocky_pose_setup: PR2
         """
-        pocky_pose_setup.add_box(position=[25, 25, 25])
+        p = PoseStamped()
+        p.header.frame_id = u'map'
+        p.pose.position.x = 25
+        p.pose.position.y = 25
+        p.pose.position.z = 25
+        p.pose.orientation.w = 1
+        pocky_pose_setup.add_box(pose=p)
         p = PoseStamped()
         p.header.frame_id = pocky_pose_setup.r_tip
         p.pose.position = Point(0.1, 0, 0)
@@ -877,11 +960,11 @@ class TestCollisionAvoidanceGoals(object):
 
         box_setup.send_and_check_goal()
 
-        p = PoseStamped()
-        p.header.frame_id = box_setup.r_tip
-        p.pose.position = Point(0.1, 0, 0)
-        p.pose.orientation = Quaternion(0, 0, 0, 1)
-        box_setup.set_cart_goal(box_setup.default_root, box_setup.r_tip, p)
+        # p = PoseStamped()
+        # p.header.frame_id = box_setup.r_tip
+        # p.pose.position = Point(0.1, 0, 0)
+        # p.pose.orientation = Quaternion(0, 0, 0, 1)
+        # box_setup.set_cart_goal(box_setup.default_root, box_setup.r_tip, p)
 
         collision_entry = CollisionEntry()
         collision_entry.type = CollisionEntry.AVOID_ALL_COLLISIONS
@@ -954,7 +1037,7 @@ class TestCollisionAvoidanceGoals(object):
         # zero_pose.avoid_all_collisions()
 
         attached_link_name = u'pocky'
-        zero_pose.attach_box(attached_link_name, [0.1, 0.02, 0.02], zero_pose.l_tip, [0.05, 0, 0])
+        zero_pose.attach_box(attached_link_name, [0.08, 0.02, 0.02], zero_pose.l_tip, [0.04, 0, 0])
 
         zero_pose.set_joint_goal({u'torso_lift_joint': 0.2})
 
@@ -968,7 +1051,7 @@ class TestCollisionAvoidanceGoals(object):
 
         zero_pose.check_cpi_geq(zero_pose.get_l_gripper_links(), 0.048)
         zero_pose.check_cpi_geq([attached_link_name], 0.048)
-        zero_pose.remove_object(attached_link_name)
+        zero_pose.detach_object(attached_link_name)
 
     def test_attached_collision_allow(self, box_setup):
         """
@@ -1090,7 +1173,7 @@ class TestCollisionAvoidanceGoals(object):
 
     # TODO test translation and orientation goal in different frame
 
-    def test_pickup_box(self, kitchen_setup):
+    def test_pick_and_place(self, kitchen_setup):
         """
         :type kitchen_setup: PR2
         :return:
@@ -1102,9 +1185,11 @@ class TestCollisionAvoidanceGoals(object):
         base_pose.pose.orientation = Quaternion(0.000, 0.000, 0.230, 0.973)
         kitchen_setup.move_pr2_base(base_pose)
         attached_link_name = u'edekabowl'
-        kitchen_setup.add_box(attached_link_name, [.145, .145, .072], u'map',
-                              [1.39985, 0.799920, 0.888],
-                              [-0.0037, -0.00476, 0.3921, 0.9198])
+        p = PoseStamped()
+        p.header.frame_id = u'map'
+        p.pose.position = Point(1.39985, 0.799920, 0.888)
+        p.pose.orientation = Quaternion(-0.0037, -0.00476, 0.3921, 0.9198)
+        kitchen_setup.add_box(attached_link_name, [.145, .145, .072], pose=p)
 
         pick_pose = PoseStamped()
         pick_pose.header.frame_id = u'base_footprint'
@@ -1120,7 +1205,7 @@ class TestCollisionAvoidanceGoals(object):
         kitchen_setup.avoid_collision(kitchen_setup.get_l_gripper_links(), u'kitchen', [], 0)
         kitchen_setup.allow_collision(kitchen_setup.get_l_gripper_links(), attached_link_name, [])
         kitchen_setup.set_and_check_cart_goal(kitchen_setup.default_root, kitchen_setup.l_tip, pick_pose)
-        kitchen_setup.attach_box(attached_link_name, frame_id=kitchen_setup.l_tip)
+        kitchen_setup.attach_existing(attached_link_name, frame_id=kitchen_setup.l_tip)
 
         # post grasp
         pick_pose.pose.position.z += 0.2
@@ -1143,17 +1228,17 @@ class TestCollisionAvoidanceGoals(object):
         kitchen_setup.set_and_check_cart_goal(kitchen_setup.default_root, kitchen_setup.l_tip, place_pose)
 
         # place
-        place_pose.pose.position.z -= 0.2
+        place_pose.pose.position.z -= 0.19
         kitchen_setup.avoid_all_collisions(0.)
         kitchen_setup.set_cart_goal(kitchen_setup.default_root, kitchen_setup.l_tip, place_pose)
         kitchen_setup.send_goal()
+        rospy.sleep(1)
 
         # post place
-        kitchen_setup.remove_object(attached_link_name)
+        kitchen_setup.detach_object(attached_link_name)
         place_pose.pose.position.z += 0.2
         kitchen_setup.avoid_all_collisions(0.)
         kitchen_setup.set_and_check_cart_goal(kitchen_setup.default_root, kitchen_setup.l_tip, place_pose)
-        # kitchen_setup.de
 
     def test_hand_in_kitchen(self, kitchen_setup):
         """
@@ -1197,6 +1282,9 @@ class TestCollisionAvoidanceGoals(object):
         kitchen_setup.avoid_all_collisions(0.05)
         kitchen_setup.set_and_check_cart_goal(kitchen_setup.default_root, kitchen_setup.l_tip, pregrasp_pose)
         # kitchen_setup.check_cpi_geq([u'edekabowl'], )
+
+    def test_set_kitchen_joint_state(self):
+        pass
 
     #
     # def test_place_spoon1(self):

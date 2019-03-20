@@ -3,7 +3,7 @@ import os
 import numpy as np
 import errno
 import pickle
-from itertools import combinations
+from itertools import combinations, product
 
 from geometry_msgs.msg import Pose, Quaternion
 
@@ -258,8 +258,7 @@ class WorldObject(URDFObject):
 
     def attach_urdf_object(self, urdf_object, parent_link, pose):
         super(WorldObject, self).attach_urdf_object(urdf_object, parent_link, pose)
-        object_name = urdf_object.get_name()
-        self.update_self_collision_matrix(added_links={(object_name, x) for x in self.get_link_names()})
+        self.update_self_collision_matrix(added_links=set(product(self.get_link_names(), urdf_object.get_link_names())))
 
     def detach_sub_tree(self, joint_name):
         sub_tree = super(WorldObject, self).detach_sub_tree(joint_name)

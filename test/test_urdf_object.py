@@ -1,7 +1,7 @@
 import pytest
 from geometry_msgs.msg import Pose, Point, Quaternion
 
-from giskardpy.exceptions import DuplicateNameException
+from giskardpy.exceptions import DuplicateNameException, UnknownBodyException
 from utils_for_tests import pr2_urdf, donbot_urdf, boxy_urdf, base_bot_urdf
 from giskardpy.urdf_object import URDFObject
 from giskardpy.utils import make_world_body_box, make_world_body_sphere, make_world_body_cylinder, make_urdf_world_body
@@ -156,7 +156,7 @@ class TestUrdfObject(object):
         try:
             parsed_base_bot.attach_urdf_object(box, u'muh', p)
             assert False, u'didnt get expected exception'
-        except KeyError:
+        except UnknownBodyException:
             assert True
 
     def test_attach_obj_with_joint_name(self, function_setup):

@@ -5,7 +5,7 @@ giskardpy.WORLD_IMPLEMENTATION = None
 
 from giskardpy.symengine_robot import Robot
 import pytest
-from geometry_msgs.msg import Pose
+from geometry_msgs.msg import Pose, Point, Quaternion
 from giskard_msgs.msg import CollisionEntry
 import test_urdf_object
 from giskardpy.exceptions import DuplicateNameException
@@ -83,6 +83,27 @@ class TestWorldObj(test_urdf_object.TestUrdfObject):
         r.load_self_collision_matrix(test_folder)
         assert scm == r.get_self_collision_matrix()
 
+    def test_safe_load_collision_matrix2(self, test_folder):
+        r = self.cls(donbot_urdf(), path_to_data_folder=test_folder)
+        r.update_self_collision_matrix()
+        scm = r.get_self_collision_matrix()
+
+        box = self.cls.from_world_body(make_world_body_box())
+        p = Pose()
+        p.position = Point(0, 0, 0)
+        p.orientation = Quaternion(0, 0, 0, 1)
+        r.attach_urdf_object(box, u'gripper_tool_frame', p)
+        r.update_self_collision_matrix()
+        scm_with_obj = r.get_self_collision_matrix()
+
+        r.detach_sub_tree(box.get_name())
+        r.load_self_collision_matrix(test_folder)
+        assert scm == r.get_self_collision_matrix()
+
+        r.attach_urdf_object(box, u'gripper_tool_frame', p)
+        r.load_self_collision_matrix(test_folder)
+        assert scm_with_obj == r.get_self_collision_matrix()
+
     def test_base_pose1(self, function_setup):
         parsed_pr2 = self.cls(pr2_urdf())
         p = Pose()
@@ -121,7 +142,6 @@ class TestRobot(TestWorldObj):
         r = self.cls(donbot_urdf(), path_to_data_folder=test_folder, calc_self_collision_matrix=True)
         scm = r.get_self_collision_matrix()
         assert len(scm) == 0
-
 
 class TestWorld(object):
     cls = WorldObject

@@ -153,9 +153,9 @@ def grow_tree():
         snapshot_visitor = py_trees.visitors.SnapshotVisitor()
         tree.add_post_tick_handler(functools.partial(post_tick, snapshot_visitor))
         tree.visitors.append(snapshot_visitor)
-        path = path_to_data_folder + u'/tree'
-        create_path(path)
-        render_dot_tree(root, name=path)
+    path = path_to_data_folder + u'/tree'
+    create_path(path)
+    render_dot_tree(root, name=path)
 
     # TODO fail if monitor is not called once
     tree.setup(30)

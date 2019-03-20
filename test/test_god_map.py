@@ -1,5 +1,10 @@
+import giskardpy
+
+giskardpy.WORLD_IMPLEMENTATION = None
 import unittest
 from collections import namedtuple
+
+from geometry_msgs.msg import PoseStamped
 from hypothesis import given
 import hypothesis.strategies as st
 import giskardpy.symengine_wrappers as sw
@@ -233,7 +238,7 @@ class TestGodMap(unittest.TestCase):
         gm = GodMap()
         w = World()
         r = WorldObject(pr2_urdf())
-        w.add_robot(r)
+        w.add_robot(r, PoseStamped(), [], 0, 0, False)
         gm.safe_set_data([u'world'], w)
         assert r == gm.safe_get_data([u'world',u'robot'])
 

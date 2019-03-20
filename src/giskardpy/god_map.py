@@ -115,14 +115,15 @@ class GodMap(object):
             self.expr_to_key[str(expr)] = identifier_parts
         return self.key_to_expr[identifier]
 
-    def get_symbol_map(self, exprs):
+    def get_symbol_map(self, exprs=None):
         """
         :return: a dict which maps all registered expressions to their values or 0 if there is no number entry
         :rtype: dict
         """
         #TODO potential speedup by only updating entries that have changed
         with self.lock:
-
+            if exprs is None:
+                exprs = self.expr_to_key.keys()
             return {expr: self.get_data(self.expr_to_key[expr]) for expr in exprs}
 
     def get_registered_symbols(self):

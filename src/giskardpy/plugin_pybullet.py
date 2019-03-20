@@ -16,7 +16,6 @@ from visualization_msgs.msg import Marker, MarkerArray
 from giskardpy.exceptions import CorruptShapeException, UnknownBodyException, \
     UnsupportedOptionException, DuplicateNameException, PhysicsWorldException
 from giskardpy.identifier import collision_goal_identifier, closest_point_identifier
-from giskardpy.object import to_marker
 from giskardpy.plugin import PluginBase
 from giskardpy.pybullet_world import PyBulletWorld, ContactInfo
 from giskardpy.tfwrapper import transform_pose, lookup_transform, transform_point, transform_vector

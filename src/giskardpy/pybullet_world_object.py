@@ -1,16 +1,7 @@
-import hashlib
-import os
-import pickle
 from collections import OrderedDict
-
-import errno
 from geometry_msgs.msg import PoseStamped, Point, Quaternion, Pose
-
-from giskardpy import MAP
-from giskardpy.data_types import SingleJointState
 from giskardpy.pybullet_wrapper import load_urdf_string_into_bullet, JointInfo, pybullet_pose_to_msg, \
     deactivate_rendering, activate_rendering, msg_to_pybullet_pose
-from giskardpy.utils import resolve_ros_iris_in_urdf
 from giskardpy.world_object import WorldObject
 import pybullet as p
 
@@ -123,17 +114,6 @@ class PyBulletWorldObject(WorldObject):
         :rtype: Transform
         """
         return pybullet_pose_to_msg(p.getBasePositionAndOrientation(self._pybullet_id))
-
-    # def get_joint_state(self):
-    #     mjs = {}
-    #     for joint_info in self.joint_name_to_info.values():
-    #         # FIXME? why no continuous?
-    #         if joint_info.joint_type in [p.JOINT_REVOLUTE, p.JOINT_PRISMATIC]:
-    #             sjs = SingleJointState()
-    #             sjs.name = joint_info.joint_name
-    #             sjs.position = p.getJointState(self.id, joint_info.joint_index)[0]
-    #             mjs[sjs.name] = sjs
-    #     return mjs
 
     def get_pybullet_link_id(self, link_name):
         """

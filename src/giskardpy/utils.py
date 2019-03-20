@@ -3,7 +3,6 @@ from __future__ import division
 import pydot
 import rospkg
 import subprocess
-import xml
 from collections import defaultdict, OrderedDict
 import numpy as np
 from itertools import product, chain
@@ -12,7 +11,6 @@ from rospy import logwarn
 import re
 
 import errno
-from os import tmpfile
 
 from geometry_msgs.msg import PointStamped, Point, Vector3Stamped, Vector3, Pose, PoseStamped, QuaternionStamped, \
     Quaternion
@@ -83,28 +81,6 @@ def urdfs_equal(urdf1, urdf2):
     """
     # return hashlib.md5(urdf1).hexdigest() == hashlib.md5(urdf2).hexdigest()
     return urdf1 == urdf2
-
-
-# def slerp(q1, q2, t):
-#     cos_half_theta = np.dot(q1, q2)
-#
-#     if (cos_half_theta < 0):
-#         q2 = -q2
-#         cos_half_theta = -cos_half_theta
-#
-#     if (abs(cos_half_theta) >= 1.0):
-#         return q1
-#
-#     half_theta = math.acos(cos_half_theta)
-#     sin_half_theta = np.sqrt(1.0 - cos_half_theta * cos_half_theta)
-#
-#     if (abs(sin_half_theta) < 0.001):
-#         return 0.5 * q1 + 0.5 * q2
-#
-#     ratio_a = np.sin((1.0 - t) * half_theta) / sin_half_theta
-#     ratio_b = np.sin(t * half_theta) / sin_half_theta
-#
-#     return ratio_a * q1 + ratio_b * q2
 
 
 def sphere_volume(radius):

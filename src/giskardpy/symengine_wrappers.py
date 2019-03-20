@@ -2,7 +2,6 @@ import os
 import pickle
 from warnings import warn
 
-import errno
 import symengine as se
 from symengine import Matrix, Symbol, eye, sympify, diag, zeros, lambdify, Abs, Max, Min, sin, cos, tan, acos, asin, \
     atan, atan2, nan, sqrt, log, tanh, var, floor, Piecewise, sign
@@ -929,21 +928,3 @@ def to_numpy(matrix):
     return np.array(matrix.tolist()).astype(float).reshape(matrix.shape)
 
 
-# -----------------------------------------------------------------------------------------------------------------------
-
-if __name__ == u'__main__':
-    a = se.Symbol('a')
-    b = se.Symbol('b')
-
-    x1 = 2 * pi
-    y1 = 237.0
-
-    f = fmod(fmod(a, 2.0 * pi) + 2.0 * pi, 2.0 * pi)
-    # f = normalize_angle(a)
-
-    print('\nlambda')
-    print(se.Lambdify([a, b], f, backend='lambda', real=True)(x1, y1))
-    print('\nllvm')
-    print(se.Lambdify([a, b], f, backend='llvm', real=True)(x1, y1))
-    # print('\nref')
-    # print(nor)

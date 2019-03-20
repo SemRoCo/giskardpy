@@ -1,11 +1,7 @@
 from Queue import Empty, Queue
 
 import rospy
-from geometry_msgs.msg import Pose
-from py_trees import Status
-
 from sensor_msgs.msg import JointState
-
 from giskardpy.identifier import js_identifier
 from giskardpy.plugin import PluginBase
 from giskardpy.tfwrapper import lookup_transform, lookup_pose

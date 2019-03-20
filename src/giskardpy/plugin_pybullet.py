@@ -1,6 +1,4 @@
 import traceback
-from copy import copy
-from itertools import product
 import numpy as np
 import rospy
 from geometry_msgs.msg import Point, Vector3, PoseStamped
@@ -17,65 +15,10 @@ from giskardpy.exceptions import CorruptShapeException, UnknownBodyException, \
     UnsupportedOptionException, DuplicateNameException, PhysicsWorldException
 from giskardpy.identifier import collision_goal_identifier, closest_point_identifier
 from giskardpy.plugin import PluginBase
-from giskardpy.pybullet_world import PyBulletWorld, ContactInfo
 from giskardpy.tfwrapper import transform_pose, lookup_transform, transform_point, transform_vector
 from giskardpy.data_types import ClosestPointInfo
-from giskardpy.urdf_object import URDFObject
-from giskardpy.utils import keydefaultdict, to_joint_state_dict, to_point_stamped, to_vector3_stamped, msg_to_list, \
-    make_urdf_world_body
+from giskardpy.utils import keydefaultdict, to_joint_state_dict
 from giskardpy.world_object import WorldObject
-
-
-# class PybulletPlugin(PluginBase):
-#     pass
-# def __init__(self):
-# self.path_to_data_folder = path_to_data_folder
-# self.gui = gui
-# self.robot_name = rospy.get_param(u'robot_description').split('\n', 1)[1].split('" ', 1)[0].split('"')[1]
-# super(PybulletPlugin, self).__init__()
-
-# def setup(self):
-#     self.world = self.get_god_map().safe_get_data([pybullet_identifier])
-#     self.controlled_joints = self.get_god_map().safe_get_data([controlled_joints_identifier])
-#     if self.world is None:
-#         self.world = PyBulletWorld(enable_gui=self.gui, path_to_data_folder=self.path_to_data_folder)
-#         self.world.setup()
-#         # TODO get robot description from god map
-#         urdfs = rospy.get_param(u'robot_description')
-#         self.world.add_robot(self.robot_name, urdfs, self.controlled_joints)
-#         self.god_map.safe_set_data([pybullet_identifier], self.world)
-
-
-# class PyBulletMonitor(PybulletPlugin):
-#     """
-#     Syncs pybullet with god map.
-#     """
-#     pass
-# def __init__(self, map_frame, root_link):
-#     self.map_frame = map_frame
-#     self.root_link = root_link
-#     super(PyBulletMonitor, self).__init__()
-#     self.world = self.god_map.safe_get_data(world_identifier)
-
-# def update(self):
-#     """
-#     updates robot position in pybullet
-#     :return:
-#     """
-# js = self.god_map.safe_get_data([js_identifier])
-# if js is not None:
-#     self.world.set_robot_joint_state(js)
-# p = lookup_transform(self.map_frame, self.root_link)
-# self.world.get_robot().set_base_pose(position=[p.pose.position.x,
-#                                                p.pose.position.y,
-#                                                p.pose.position.z],
-#                                      orientation=[p.pose.orientation.x,
-#                                                   p.pose.orientation.y,
-#                                                   p.pose.orientation.z,
-#                                                   p.pose.orientation.w])
-# TODO make sure this doesn't cause multi threading problems
-# self.god_map.safe_set_data([robot_description_identifier], self.world.get_robot().get_urdf())
-# return None
 
 
 class PyBulletUpdatePlugin(PluginBase):
@@ -121,11 +64,7 @@ class PyBulletUpdatePlugin(PluginBase):
             try:
                 if req.operation is UpdateWorldRequest.ADD:
                     if req.rigidly_attached:
-                        # get object pose
                         self.attach_object(req)
-                        # req.operation = UpdateWorldRequest.REMOVE
-                        # self.publish_object_as_marker(req)
-                        # req.operation = UpdateWorldRequest.ADD
                     else:
                         self.add_object(req)
 
@@ -244,10 +183,6 @@ class PyBulletUpdatePlugin(PluginBase):
     def clear_world(self):
         self.delete_markers()
         self.get_world().soft_reset()
-        # for object_name in self.world.get_object_names():
-        #     if object_name != u'plane' and object_name != u'pybullet_sucks':  # TODO get rid of this hard coded special case
-        #         self.remove_object(object_name)
-        # self.world.get_robot().detach_all_objects()
 
     def object_js_cb(self, object_name, msg):
         """
@@ -353,21 +288,6 @@ class CollisionChecker(PluginBase):
                 if collision_info.contact_distance < red_threshold:
                     m.colors[-2] = ColorRGBA(1, 0, 0, 1)
                     m.colors[-1] = ColorRGBA(1, 0, 0, 1)
-            # else:
-            #     m.action = Marker.DELETE
         ma = MarkerArray()
         ma.markers.append(m)
         self.pub_collision_marker.publish(ma)
-
-    def allow_collision_with_plane(self):
-        # TODO instead of ignoring plane collision by default, figure out that some collision are unavoidable?
-        return self.allow_collision_with_object(u'plane')
-
-    def allow_collision_with_pybullet_hack(self):
-        return self.allow_collision_with_object(u'pybullet_sucks')
-
-    def allow_collision_with_object(self, name):
-        ce = CollisionEntry()
-        ce.type = CollisionEntry.ALLOW_COLLISION
-        ce.body_b = name
-        return ce

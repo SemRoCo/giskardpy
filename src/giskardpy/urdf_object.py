@@ -2,7 +2,6 @@ from collections import namedtuple
 from itertools import chain
 
 from geometry_msgs.msg import Pose, Vector3
-from giskard_msgs.msg import WorldBody
 import urdf_parser_py.urdf as up
 from std_msgs.msg import ColorRGBA
 from tf.transformations import euler_from_quaternion
@@ -496,63 +495,3 @@ class URDFObject(object):
         marker.color.g = 1.0
         marker.color.b = 1.0
         return marker
-
-        # self.fk_dict = self.get_god_map().get_data(['fk'])
-        # markers = []
-        # for index, link in enumerate(self.get_link_names()):
-        #     if not self.has_link_visuals(link.name):
-        #         continue
-        #     marker = Marker()
-        #     m.ns = u'{}/{}'.format(ns, self.get_name())
-        #     m.id = index
-        #     link_type = type(link.visual.geometry)
-        #
-        #     if link_type == up.Mesh:
-        #         marker.type = Marker.MESH_RESOURCE
-        #         marker.mesh_resource = link.visual.geometry.filename
-        #         if link.visual.geometry.scale is None:
-        #             marker.scale.x = 1.0
-        #             marker.scale.z = 1.0
-        #             marker.scale.y = 1.0
-        #         else:
-        #             marker.scale.x = link.visual.geometry.scale[0]
-        #             marker.scale.z = link.visual.geometry.scale[1]
-        #             marker.scale.y = link.visual.geometry.scale[2]
-        #         marker.mesh_use_embedded_materials = True
-        #     elif link_type == up.Box:
-        #         marker.type = Marker.CUBE
-        #         marker.scale = Vector3(*link.visual.geometry)
-        #     elif link_type == up.Cylinder:
-        #         marker.type = Marker.CYLINDER
-        #         marker.scale.x = link.visual.geometry.radius
-        #         marker.scale.y = link.visual.geometry.radius
-        #         marker.scale.z = link.visual.geometry.length
-        #     elif link_type == up.Sphere:
-        #         marker.type = Marker.SPHERE
-        #         marker.scale.x = link.visual.geometry.radius
-        #         marker.scale.y = link.visual.geometry.radius
-        #         marker.scale.z = link.visual.geometry.radius
-        #     else:
-        #         continue
-        #
-        #     marker.scale.x *= 0.99
-        #     marker.scale.y *= 0.99
-        #     marker.scale.z *= 0.99
-        #
-        #     link_in_base = self.fk_dict[self.get_root(), link.name]
-        #     marker.header.frame_id = self.get_root()
-        #     marker.action = Marker.ADD
-        #     marker.id = index
-        #     marker.ns = u'planning_visualization'
-        #     marker.pose = link_in_base.pose
-        #     marker.color.a = 0.5
-        #     marker.color.r = 1.0
-        #     marker.color.g = 1.0
-        #     marker.color.b = 1.0
-        #
-        #
-        #     markers.append(marker)
-        #
-        # m.color = ColorRGBA(0, 1, 0, 0.8)
-        # m.frame_locked = True
-        # return m

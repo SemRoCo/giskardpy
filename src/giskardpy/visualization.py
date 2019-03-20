@@ -1,10 +1,8 @@
 from giskardpy.identifier import fk_identifier
 from plugin import GiskardBehavior
 import py_trees
-from urdf_parser_py.urdf import URDF, Box, Mesh, Cylinder, Sphere
 from interactive_markers.menu_handler import *
 from visualization_msgs.msg import *
-from symengine_robot import Robot
 
 
 class VisualizationBehavior(GiskardBehavior):

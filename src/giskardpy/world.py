@@ -150,9 +150,6 @@ class World(object):
         :param name: name of the existing object
         :type name: name
         """
-        # relative_pose = PoseStamped()
-        # relative_pose.pose = self.get_object(name).base_pose
-        # relative_pose = transform_pose(link, relative_pose)
         self._robot.attach_urdf_object(self.get_object(name), link, pose)
         self.remove_object(name)
 

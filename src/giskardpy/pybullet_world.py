@@ -1,34 +1,20 @@
 import pybullet as p
 from collections import namedtuple, OrderedDict, defaultdict
-from itertools import combinations
-from pybullet import JOINT_REVOLUTE, JOINT_PRISMATIC, JOINT_PLANAR, JOINT_SPHERICAL
-import os
-import errno
 
 from geometry_msgs.msg import Vector3, PoseStamped, Point, Quaternion, Pose
-from numpy.random.mtrand import seed
-from std_msgs.msg import ColorRGBA
-from urdf_parser_py.urdf import URDF, Box, Sphere, Cylinder
-from visualization_msgs.msg import Marker
-
 import giskardpy
-# from giskardpy import DEBUG
-from giskardpy.exceptions import UnknownBodyException, RobotExistsException, DuplicateNameException
 from giskardpy.data_types import SingleJointState, ClosestPointInfo
 import numpy as np
 
 from giskardpy.pybullet_world_object import PyBulletWorldObject
-from giskardpy.pybullet_wrapper import ContactInfo, deactivate_rendering, activate_rendering, \
-    load_urdf_string_into_bullet
-from giskardpy.urdf_object import URDFObject
+from giskardpy.pybullet_wrapper import ContactInfo, deactivate_rendering, activate_rendering
 from giskardpy.utils import keydefaultdict, suppress_stdout, NullContextManager, resolve_ros_iris_in_urdf, \
     write_to_tmp, resolve_ros_iris
-import hashlib
 
+from giskardpy.world_object import WorldObject
 from giskardpy.world import World
 
 # TODO globally define map
-from giskardpy.world_object import WorldObject
 
 MAP = u'map'
 
@@ -66,23 +52,6 @@ class PyBulletWorld(World):
             raise TypeError(u'don\t use PyBulletWorldObjects!')
         super(PyBulletWorld, self).add_robot(robot, base_pose, controlled_joints, default_joint_vel_limit,
                                              default_joint_weight, calc_self_collision_matrix)
-
-    # def attach_object(self, object_, parent_link, transform):
-    #     """
-    #     :type object_: UrdfObject
-    #     :type parent_link: str
-    #     :param transform:
-    #     :return:
-    #     """
-    #     if self.has_object(object_.name):
-    #         object_ = self.get_object(object_.name)
-    #         # self.get_robot().attach_urdf(object_, parent_link)
-    #         # FIXME
-    #         transform = None
-    #         self.delete_object(object_.name)
-    #         # raise DuplicateNameException(
-    #         #     u'Can\'t attach existing object \'{}\'.'.format(object.name))
-    #     self.get_robot().attach_urdf(object_, parent_link, transform)
 
     def __get_pybullet_object_id(self, name):
         return self.get_object(name).get_pybullet_id()

@@ -24,7 +24,7 @@ from giskardpy.plugin_interrupts import CollisionCancel, WiggleCancel
 from giskardpy.plugin_configuration import ConfigurationPlugin
 from giskardpy.plugin_kinematic_sim import KinSimPlugin
 from giskardpy.plugin_log_trajectory import LogTrajPlugin
-from giskardpy.plugin_pybullet import PyBulletUpdatePlugin, CollisionChecker
+from giskardpy.plugin_pybullet import WorldUpdatePlugin, CollisionChecker
 from giskardpy.plugin_send_trajectory import SendTrajectory
 from giskardpy.visualization import VisualizationBehavior
 from giskardpy.pybullet_world import PyBulletWorld
@@ -100,18 +100,18 @@ def grow_tree():
     initialize_blackboard(urdf, default_joint_vel_limit, default_joint_weight, path_to_data_folder, gui)
 
     # ----------------------------------------------
+    wait_for_goal = Sequence(u'wait for goal')
+    # monitor = PluginBehavior(u'monitor')
+    # monitor.add_plugin(u'js', ConfigurationPlugin(map_frame))
+    # monitor.add_plugin(u'pybullet updater', WorldUpdatePlugin())
+    # wait_for_goal.add_child(monitor)
+    # ----------------------------------------------
     sync = PluginBehavior(u'sync')
     sync.add_plugin(u'js', ConfigurationPlugin(map_frame))
-    # sync.add_plugin(u'fk', FkPlugin())
+    sync.add_plugin(u'pybullet updater', WorldUpdatePlugin())
     sync.add_plugin(u'in sync', SuccessPlugin())
-    # ----------------------------------------------
-    wait_for_goal = Selector(u'wait for goal')
+    wait_for_goal.add_child(sync)
     wait_for_goal.add_child(GoalReceived(u'has goal', action_server_name, MoveAction))
-    monitor = PluginBehavior(u'monitor')
-    monitor.add_plugin(u'js', ConfigurationPlugin(map_frame))
-    # monitor.add_plugin(u'fk', FkPlugin())
-    monitor.add_plugin(u'pybullet updater', PyBulletUpdatePlugin())
-    wait_for_goal.add_child(monitor)
     # ----------------------------------------------
     planning = failure_is_success(Selector)(u'planning')
     planning.add_child(GoalCanceled(u'goal canceled', action_server_name))
@@ -120,7 +120,6 @@ def grow_tree():
 
     actual_planning = PluginBehavior(u'planning', sleep=0)
     actual_planning.add_plugin(u'kin sim', KinSimPlugin(sample_period))
-    # actual_planning.add_plugin(u'fk', FkPlugin())
     actual_planning.add_plugin(u'coll', CollisionChecker(default_collision_avoidance_distance, map_frame, root_link))
     actual_planning.add_plugin(u'controller', ControllerPlugin(path_to_data_folder, nWSR))
     actual_planning.add_plugin(u'log', LogTrajPlugin())
@@ -135,8 +134,8 @@ def grow_tree():
     publish_result.add_child(SendTrajectory(u'send traj', fill_velocity_values))
     # ----------------------------------------------
     root = Sequence(u'root')
-    root.add_child(sync)
     root.add_child(wait_for_goal)
+    # root.add_child(sync)
     root.add_child(GoalToConstraints(u'update constraints', action_server_name, root_link))
     root.add_child(planning)
     root.add_child(CleanUp(u'cleanup'))

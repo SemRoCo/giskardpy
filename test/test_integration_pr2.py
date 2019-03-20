@@ -202,6 +202,10 @@ def fake_table_setup(zero_pose):
 
 @pytest.fixture()
 def kitchen_setup(resetted_giskard):
+    """
+    :type resetted_giskard: GiskardTestWrapper
+    :return:
+    """
     resetted_giskard.allow_all_collisions()
     resetted_giskard.send_and_check_joint_goal(gaya_pose)
     object_name = u'kitchen'
@@ -209,6 +213,8 @@ def kitchen_setup(resetted_giskard):
                               rospy.get_param(u'kitchen_description'),
                               u'/kitchen/joint_states',
                               lookup_pose(u'map', u'iai_kitchen/world'))
+    js = {k: 0.0 for k in resetted_giskard.get_world().get_object(object_name).get_controllable_joints()}
+    resetted_giskard.set_kitchen_js(js)
     return resetted_giskard
 
 class TestFk(object):
@@ -1283,8 +1289,9 @@ class TestCollisionAvoidanceGoals(object):
         kitchen_setup.set_and_check_cart_goal(kitchen_setup.default_root, kitchen_setup.l_tip, pregrasp_pose)
         # kitchen_setup.check_cpi_geq([u'edekabowl'], )
 
-    def test_set_kitchen_joint_state(self):
-        pass
+    def test_set_kitchen_joint_state(self, kitchen_setup):
+        kitchen_js = {u'sink_area_left_upper_drawer_main_joint': 0.45}
+        kitchen_setup.set_kitchen_js(kitchen_js)
 
     #
     # def test_place_spoon1(self):
@@ -1375,3 +1382,5 @@ class TestCollisionAvoidanceGoals(object):
     #     p.pose.orientation.w = 1
     #     self.set_and_check_cart_goal(self.default_root, self.l_tip, p)
     #
+
+    # TODO test pickup tray

@@ -14,14 +14,18 @@ class ConfigurationPlugin(PluginBase):
     Gets replace with a kinematic sim plugin during a parallel universe.
     """
 
-    def __init__(self, map_frame):
+    def __init__(self, map_frame, joint_state_topic=u'joint_states'):
         """
         :type js_identifier: str
         """
         super(ConfigurationPlugin, self).__init__()
         self.mjs = None
         self.map_frame = map_frame
+        self.joint_state_topic = joint_state_topic
         self.lock = Queue(maxsize=1)
+
+    def setup(self):
+        self.joint_state_sub = rospy.Subscriber(self.joint_state_topic, JointState, self.cb, queue_size=1)
 
     def cb(self, data):
         try:
@@ -45,6 +49,3 @@ class ConfigurationPlugin(PluginBase):
 
         self.god_map.safe_set_data(js_identifier, self.mjs)
         return None
-
-    def setup(self):
-        self.joint_state_sub = rospy.Subscriber(u'joint_states', JointState, self.cb, queue_size=1)

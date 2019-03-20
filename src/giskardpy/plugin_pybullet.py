@@ -21,35 +21,42 @@ from giskardpy.utils import keydefaultdict, to_joint_state_dict
 from giskardpy.world_object import WorldObject
 
 
-class PyBulletUpdatePlugin(PluginBase):
+class WorldUpdatePlugin(PluginBase):
     # TODO reject changes if plugin not active or something
     def __init__(self):
-        super(PyBulletUpdatePlugin, self).__init__()
+        super(WorldUpdatePlugin, self).__init__()
         self.global_reference_frame_name = u'map'
         self.lock = Lock()
         self.object_js_subs = {}  # JointState subscribers for articulated world objects
         self.object_joint_states = {}  # JointStates messages for articulated world objects
 
     def setup(self):
-        super(PyBulletUpdatePlugin, self).setup()
+        super(WorldUpdatePlugin, self).setup()
         # TODO make service name a parameter
         self.srv_update_world = rospy.Service(u'~update_world', UpdateWorld, self.update_world_cb)
         self.pub_collision_marker = rospy.Publisher(u'~visualization_marker_array', MarkerArray, queue_size=1)
 
-    def publish_object_as_marker(self, m):
+    def update(self):
         """
-        :type object_: WorldObject
+        updated urdfs in god map and updates pybullet object joint states
         """
-        try:
-            ma = MarkerArray()
-            m.ns = u'world' + m.ns
-            ma.markers.append(m)
-            self.pub_collision_marker.publish(ma)
-        except:
+        with self.lock:
             pass
+            # TODO FIXME
+            for object_name, object_joint_state in self.object_joint_states.items():
+                self.get_world().get_object(object_name).joint_state = object_joint_state
 
-    def delete_markers(self):
-        self.pub_collision_marker.publish(MarkerArray([Marker(action=Marker.DELETEALL)]))
+        return super(WorldUpdatePlugin, self).update()
+
+    def object_js_cb(self, object_name, msg):
+        """
+        Callback message for ROS Subscriber on JointState to get states of articulated objects into world.
+        :param object_name: Name of the object for which the Joint State message is.
+        :type object_name: str
+        :param msg: Current state of the articulated object that shall be set in the world.
+        :type msg: JointState
+        """
+        self.object_joint_states[object_name] = to_joint_state_dict(msg)
 
     def update_world_cb(self, req):
         """
@@ -80,7 +87,6 @@ class PyBulletUpdatePlugin(PluginBase):
                 else:
                     return UpdateWorldResponse(UpdateWorldResponse.INVALID_OPERATION,
                                                u'Received invalid operation code: {}'.format(req.operation))
-                # self.publish_object_as_marker(req)
                 return UpdateWorldResponse()
             except CorruptShapeException as e:
                 traceback.print_exc()
@@ -115,11 +121,11 @@ class PyBulletUpdatePlugin(PluginBase):
         except:
             pass
         # SUB-CASE: If it is an articulated object, open up a joint state subscriber
-        # FIXME
-        # if world_body.joint_state_topic:
-        #     callback = (lambda msg: self.object_js_cb(world_body.name, msg))
-        #     self.object_js_subs[world_body.name] = \
-        #         rospy.Subscriber(world_body.joint_state_topic, JointState, callback, queue_size=1)
+        # FIXME also keep track of base pose
+        if world_body.joint_state_topic:
+            callback = (lambda msg: self.object_js_cb(world_body.name, msg))
+            self.object_js_subs[world_body.name] = \
+                rospy.Subscriber(world_body.joint_state_topic, JointState, callback, queue_size=1)
 
     def detach_object(self, req):
         self.get_world().detach(req.body.name)
@@ -129,7 +135,6 @@ class PyBulletUpdatePlugin(PluginBase):
             self.publish_object_as_marker(m)
         except:
             pass
-
 
     def attach_object(self, req):
         """
@@ -161,50 +166,36 @@ class PyBulletUpdatePlugin(PluginBase):
             pass
 
     def remove_object(self, name):
-        # FIXME update joint state publisher shit
         m = self.get_world().get_object(name).as_marker_msg()
         m.action = m.DELETE
         self.publish_object_as_marker(m)
         self.get_world().remove_object(name)
-        # if self.world.has_object(name):
-        #     self.world.remove_object(name)
-        #     if self.object_js_subs.has_key(name):
-        #         self.object_js_subs[name].unregister()
-        #         del (self.object_js_subs[name])
-        #         try:
-        #             del (self.object_joint_states[name])
-        #         except:
-        #             pass
-        # elif self.world.get_robot().can_attach_object(name):
-        #     self.world.get_robot().detach_object(name)
-        # else:
-        #     raise UnknownBodyException(u'Cannot delete unknown object {}'.format(name))
+        if name in self.object_js_subs:
+            self.object_js_subs[name].unregister()
+            del (self.object_js_subs[name])
+            try:
+                del (self.object_joint_states[name])
+            except:
+                pass
 
     def clear_world(self):
         self.delete_markers()
         self.get_world().soft_reset()
 
-    def object_js_cb(self, object_name, msg):
+    def publish_object_as_marker(self, m):
         """
-        Callback message for ROS Subscriber on JointState to get states of articulated objects into world.
-        :param object_name: Name of the object for which the Joint State message is.
-        :type object_name: str
-        :param msg: Current state of the articulated object that shall be set in the world.
-        :type msg: JointState
+        :type object_: WorldObject
         """
-        self.object_joint_states[object_name] = to_joint_state_dict(msg)
-
-    def update(self):
-        """
-        updated urdfs in god map and updates pybullet object joint states
-        """
-        with self.lock:
+        try:
+            ma = MarkerArray()
+            m.ns = u'world' + m.ns
+            ma.markers.append(m)
+            self.pub_collision_marker.publish(ma)
+        except:
             pass
-            # TODO FIXME
-            # for object_name, object_joint_state in self.object_joint_states.items():
-            #     self.world.get_object(object_name).set_joint_state(object_joint_state)
 
-        return super(PyBulletUpdatePlugin, self).update()
+    def delete_markers(self):
+        self.pub_collision_marker.publish(MarkerArray([Marker(action=Marker.DELETEALL)]))
 
 
 class CollisionChecker(PluginBase):

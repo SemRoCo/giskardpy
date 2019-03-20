@@ -23,7 +23,7 @@ from giskardpy.pybullet_world import PyBulletWorld
 from giskardpy.python_interface import GiskardWrapper
 from giskardpy.symengine_robot import Robot
 from giskardpy.tfwrapper import transform_pose, lookup_transform, lookup_pose
-from giskardpy.utils import msg_to_list
+from giskardpy.utils import msg_to_list, keydefaultdict, dict_to_joint_states
 
 BIG_NUMBER = 1e100
 SMALL_NUMBER = 1e-100
@@ -188,11 +188,20 @@ class GiskardTestWrapper(object):
         self.default_root = self.get_robot().get_root()
         self.map = u'map'
         self.simple_base_pose_pub = rospy.Publisher(u'/move_base_simple/goal', PoseStamped, queue_size=10)
-        self.tick_rate = .3
+        self.tick_rate = .1
+        def create_publisher(topic):
+            p = rospy.Publisher(topic, JointState, queue_size=10)
+            rospy.sleep(.5)
+            return p
+        self.joint_state_publisher = keydefaultdict(create_publisher)
         rospy.sleep(1)
 
     def wait_for_synced(self):
-        while self.tree.tip().name == u'sync':
+        while self.tree.tip().name != u'has goal':
+            self.loop_once()
+            rospy.sleep(self.tick_rate)
+        self.loop_once()
+        while self.tree.tip().name != u'has goal':
             self.loop_once()
             rospy.sleep(self.tick_rate)
 
@@ -235,6 +244,20 @@ class GiskardTestWrapper(object):
     def tear_down(self):
         rospy.sleep(1)
         print(u'stopping plugins')
+
+    def set_object_joint_state(self, object_name, joint_state, topic=None):
+        if topic is None:
+            self.wrapper.set_object_joint_state(object_name, joint_state)
+        else:
+            self.joint_state_publisher[topic].publish(dict_to_joint_states(joint_state))
+
+        self.wait_for_synced()
+        current_js = self.get_world().get_object(object_name).joint_state
+        for joint_name, state in joint_state.items():
+            np.testing.assert_almost_equal(current_js[joint_name].position, state)
+
+    def set_kitchen_js(self, joint_state, object_name=u'kitchen'):
+        self.set_object_joint_state(object_name, joint_state, topic=u'/kitchen/cram_joint_states')
 
     #
     # JOINT GOAL STUFF #################################################################################################
@@ -364,10 +387,6 @@ class GiskardTestWrapper(object):
         assert r.error_codes == UpdateWorldResponse.SUCCESS, \
             u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
                                             update_world_error_code(UpdateWorldResponse.SUCCESS))
-        # p = PoseStamped()
-        # p.header.frame_id = frame_id
-        # p.pose.position = Point(*position)
-        # p.pose.orientation = Quaternion(*orientation)
         p = transform_pose(u'map', pose)
         o_p = self.get_world().get_object(name).base_pose
         assert self.get_world().has_object(name)
@@ -457,8 +476,6 @@ class GiskardTestWrapper(object):
 
     def get_cpi(self, distance_threshold):
         collision_goals = [CollisionEntry(type=CollisionEntry.AVOID_ALL_COLLISIONS, min_dist=distance_threshold)]
-
-        #FIXME
         collision_matrix = self.get_world().collision_goals_to_collision_matrix(collision_goals, 0.0)
         collisions = self.get_world().check_collisions(collision_matrix)
         return self.get_world().collisions_to_closest_point(collisions, collision_matrix)

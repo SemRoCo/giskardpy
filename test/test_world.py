@@ -28,36 +28,6 @@ def function_setup(request, module_setup):
     """
     pass
 
-
-#
-# @pytest.fixture()
-# def empty_world(function_setup):
-#     """
-#     :rtype: World
-#     """
-#     return World()
-
-
-# @pytest.fixture()
-# def world_with_pr2(function_setup):
-#     """
-#     :rtype: World
-#     """
-#     
-#     return w
-# 
-# 
-# @pytest.fixture()
-# def world_with_donbot(function_setup):
-#     """
-#     :type parsed_donbot: WorldObject
-#     :rtype: World
-#     """
-#     w = World()
-#     w.add_robot(parsed_donbot, None, parsed_donbot.controlled_joints, 0, 0)
-#     return w
-
-
 @pytest.fixture()
 def test_folder(request):
     """

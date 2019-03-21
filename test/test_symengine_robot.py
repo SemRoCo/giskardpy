@@ -1,5 +1,8 @@
 
 import giskardpy
+from giskardpy.data_types import SingleJointState
+from giskardpy.tfwrapper import msg_to_kdl, kdl_to_pose
+from test_update_world import to_pose_msg
 
 giskardpy.WORLD_IMPLEMENTATION = None
 
@@ -11,7 +14,7 @@ import pytest
 from urdf_parser_py.urdf import URDF
 
 from giskardpy.symengine_robot import Robot
-from utils_for_tests import rnd_joint_state, pr2_urdf, donbot_urdf, boxy_urdf, base_bot_urdf
+from utils_for_tests import rnd_joint_state, pr2_urdf, donbot_urdf, boxy_urdf, base_bot_urdf, compare_poses
 from giskardpy.urdf_object import hacky_urdf_parser_fix
 from kdl_parser import kdl_tree_from_urdf_model
 import numpy as np
@@ -34,7 +37,7 @@ def parsed_pr2(function_setup):
     """
     :rtype: Robot
     """
-    return Robot(pr2_urdf(),0,0,[])
+    return Robot(pr2_urdf())
 
 
 @pytest.fixture()
@@ -42,21 +45,21 @@ def parsed_base_bot(function_setup):
     """
     :rtype: Robot
     """
-    return Robot(base_bot_urdf(),0,0,[])
+    return Robot(base_bot_urdf())
 
 @pytest.fixture()
 def parsed_donbot(function_setup):
     """
     :rtype: Robot
     """
-    return Robot(donbot_urdf(),0,0,[])
+    return Robot(donbot_urdf())
 
 @pytest.fixture()
 def parsed_boxy(function_setup):
     """
     :rtype: Robot
     """
-    return Robot(boxy_urdf(),0,0,[])
+    return Robot(boxy_urdf())
 
 @pytest.fixture()
 def test_folder(request):
@@ -146,9 +149,9 @@ class KDL(object):
 
 
 class TestSymengineController(object):
-    pr2_joint_limits = Robot(pr2_urdf(), 0, 0, []).get_all_joint_limits()
-    donbot_joint_limits = Robot(donbot_urdf(), 0, 0, []).get_all_joint_limits()
-    boxy_joint_limits = Robot(boxy_urdf(), 0, 0, []).get_all_joint_limits()
+    pr2_joint_limits = Robot(pr2_urdf()).get_all_joint_limits()
+    donbot_joint_limits = Robot(donbot_urdf()).get_all_joint_limits()
+    boxy_joint_limits = Robot(boxy_urdf()).get_all_joint_limits()
 
     def test_constraints_pr2(self, parsed_pr2):
         assert len(parsed_pr2.hard_constraints) == 26
@@ -174,10 +177,13 @@ class TestSymengineController(object):
         tips = [u'l_gripper_tool_frame', u'r_gripper_tool_frame']
         for tip in tips:
             kdl_r = kdl.get_robot(root, tip)
-            kdl_fk = kdl_r.fk_np(js)
-            symengine_fk = parsed_pr2.calc_fk(root, tip, js)
-            np.testing.assert_array_almost_equal(kdl_fk, symengine_fk, decimal=3)
-            # np.testing.assert_array_almost_equal(kdl_r.fk_np_inv(js), sw.inverse_frame(symengine_fk), decimal=3)
+            kdl_fk = kdl_to_pose(kdl_r.fk(js))
+            mjs = {}
+            for joint_name, position in js.items():
+                mjs[joint_name] = SingleJointState(joint_name, position)
+            parsed_pr2.joint_state = mjs
+            symengine_fk = parsed_pr2.get_fk(root, tip).pose
+            compare_poses(kdl_fk, symengine_fk)
 
     @given(rnd_joint_state(donbot_joint_limits))
     def test_donbot_fk1(self, parsed_donbot, js):
@@ -186,20 +192,29 @@ class TestSymengineController(object):
         tips = [u'gripper_tool_frame']
         for tip in tips:
             kdl_r = kdl.get_robot(root, tip)
-            kdl_fk = kdl_r.fk_np(js)
-            symengine_fk = parsed_donbot.calc_fk(root, tip, js)
-            np.testing.assert_array_almost_equal(kdl_fk, symengine_fk, decimal=3)
+            kdl_fk = kdl_to_pose(kdl_r.fk(js))
+            mjs = {}
+            for joint_name, position in js.items():
+                mjs[joint_name] = SingleJointState(joint_name, position)
+            parsed_donbot.joint_state = mjs
+            symengine_fk = parsed_donbot.get_fk(root, tip).pose
+            compare_poses(kdl_fk, symengine_fk)
 
     @given(rnd_joint_state(boxy_joint_limits))
-    def test_donbot_fk1(self, parsed_boxy, js):
+    def test_boxy_fk1(self, parsed_boxy, js):
         kdl = KDL(boxy_urdf())
         root = u'base_footprint'
         tips = [u'left_gripper_tool_frame', u'right_gripper_tool_frame']
         for tip in tips:
             kdl_r = kdl.get_robot(root, tip)
-            kdl_fk = kdl_r.fk_np(js)
-            symengine_fk = parsed_boxy.calc_fk(root, tip, js)
-            np.testing.assert_array_almost_equal(kdl_fk, symengine_fk, decimal=3)
+            kdl_fk = kdl_to_pose(kdl_r.fk(js))
+            mjs = {}
+            for joint_name, position in js.items():
+                mjs[joint_name] = SingleJointState(joint_name, position)
+            parsed_boxy.joint_state = mjs
+            symengine_fk = parsed_boxy.get_fk(root, tip).pose
+            compare_poses(kdl_fk, symengine_fk)
+
 
     def test_get_controllable_joint_names_pr2(self, parsed_pr2):
         expected = {u'l_shoulder_pan_joint', u'br_caster_l_wheel_joint', u'r_gripper_l_finger_tip_joint',

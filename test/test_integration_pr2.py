@@ -21,7 +21,7 @@ from shape_msgs.msg import SolidPrimitive
 # from giskardpy.symengine_wrappers import quaternion_from_axis_angle
 from giskardpy.identifier import fk_identifier
 from utils_for_tests import PR2, compare_poses
-from giskardpy.tfwrapper import lookup_transform, init as tf_init, lookup_pose
+from giskardpy.tfwrapper import lookup_transform, init as tf_init, lookup_pose, transform_pose
 
 # from giskardpy.utils import msg_to_list
 
@@ -217,11 +217,12 @@ def kitchen_setup(resetted_giskard):
     resetted_giskard.set_kitchen_js(js)
     return resetted_giskard
 
+
 class TestFk(object):
     def test_fk1(self, zero_pose):
         root = zero_pose.get_robot().get_root()
         for link in zero_pose.get_robot().get_link_names():
-            fk1 = zero_pose.get_god_map().safe_get_data(fk_identifier+[(root, link)])
+            fk1 = zero_pose.get_god_map().safe_get_data(fk_identifier + [(root, link)])
             fk2 = lookup_pose(root, link)
             np.testing.assert_almost_equal(fk1.pose.position.x, fk2.pose.position.x)
             np.testing.assert_almost_equal(fk1.pose.position.y, fk2.pose.position.y)
@@ -230,6 +231,7 @@ class TestFk(object):
             np.testing.assert_almost_equal(fk1.pose.orientation.y, fk2.pose.orientation.y)
             np.testing.assert_almost_equal(fk1.pose.orientation.z, fk2.pose.orientation.z)
             np.testing.assert_almost_equal(fk1.pose.orientation.w, fk2.pose.orientation.w)
+
 
 class TestJointGoals(object):
     def test_joint_movement1(self, zero_pose):
@@ -469,6 +471,8 @@ class TestCartGoals(object):
     #
     #     zero_pose.send_and_check_goal()
 
+    # TODO test translation and orientation goal in different frame
+
 
 class TestCollisionAvoidanceGoals(object):
     def test_add_box(self, zero_pose):
@@ -525,23 +529,20 @@ class TestCollisionAvoidanceGoals(object):
         pocky = u'http://muh#pocky'
         zero_pose.attach_box(pocky, [0.1, 0.02, 0.02], zero_pose.r_tip, [0.05, 0, 0])
 
-    # def test_attach_box_as_eef(self, zero_pose):
-    #     """
-    #     :type zero_pose: PR2
-    #     """
-    #     # FIXME works but goal cant be checked
-    #     pocky = u'http://muh#pocky'
-    #     zero_pose.attach_box(pocky, [0.1, 0.02, 0.02], zero_pose.r_tip, [0.05, 0, 0], [1, 0, 0, 0])
-    #     p = PoseStamped()
-    #     p.header.frame_id = zero_pose.r_tip
-    #     p.pose.orientation.w = 1
-    #     # rospy.sleep(5)
-    #     for i in range(20):
-    #         zero_pose.loop_once()
-    #         rospy.sleep(0.1)
-    #
-    #     # zero_pose.set_and_check_cart_goal(zero_pose.default_root, zero_pose.l_tip, p)
-    #     zero_pose.set_and_check_cart_goal(zero_pose.default_root, pocky, p)
+    def test_attach_box_as_eef(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        pocky = u'http://muh#pocky'
+        zero_pose.attach_box(pocky, [0.1, 0.02, 0.02], zero_pose.r_tip, [0.05, 0, 0], [1, 0, 0, 0])
+        p = PoseStamped()
+        p.header.frame_id = zero_pose.r_tip
+        p.pose.orientation.w = 1
+        zero_pose.set_cart_goal(zero_pose.default_root, pocky, p)
+        p = transform_pose(zero_pose.default_root, p)
+        zero_pose.send_and_check_goal()
+        p2 = zero_pose.get_robot().get_fk(zero_pose.default_root, pocky)
+        compare_poses(p2.pose, p.pose)
 
     def test_attach_remove_box(self, zero_pose):
         """
@@ -591,9 +592,6 @@ class TestCollisionAvoidanceGoals(object):
         zero_pose.move_base(p)
 
         zero_pose.detach_object(pocky)
-        # compare_poses(old_p.pose, new_pose)
-
-
 
     def test_attach_to_nonexistant_robot_link(self, zero_pose):
         """
@@ -952,7 +950,6 @@ class TestCollisionAvoidanceGoals(object):
         """
         :type box_setup: PR2
         """
-        # FIXME fails because weight of unused joints is set to 1 instead of 0
         p = PoseStamped()
         p.header.frame_id = box_setup.r_tip
         p.pose.position = Point(0.15, 0, 0)
@@ -965,12 +962,6 @@ class TestCollisionAvoidanceGoals(object):
         box_setup.add_collision_entries([collision_entry])
 
         box_setup.send_and_check_goal()
-
-        # p = PoseStamped()
-        # p.header.frame_id = box_setup.r_tip
-        # p.pose.position = Point(0.1, 0, 0)
-        # p.pose.orientation = Quaternion(0, 0, 0, 1)
-        # box_setup.set_cart_goal(box_setup.default_root, box_setup.r_tip, p)
 
         collision_entry = CollisionEntry()
         collision_entry.type = CollisionEntry.AVOID_ALL_COLLISIONS
@@ -1039,8 +1030,6 @@ class TestCollisionAvoidanceGoals(object):
 
         zero_pose.set_joint_goal(collision_pose)
         zero_pose.send_goal()
-
-        # zero_pose.avoid_all_collisions()
 
         attached_link_name = u'pocky'
         zero_pose.attach_box(attached_link_name, [0.08, 0.02, 0.02], zero_pose.l_tip, [0.04, 0, 0])
@@ -1140,22 +1129,6 @@ class TestCollisionAvoidanceGoals(object):
         box_setup.send_goal()
         box_setup.check_cpi_geq(box_setup.get_l_gripper_links(), 0.049)
 
-    # def test_grasping(self, fake_table_setup):
-    #     """
-    #     :type fake_table_setup: PR2
-    #     """
-    #     pocky = u'http://muh#pocky'
-    #     fake_table_setup.add_box(pocky, [0.02, 0.02, 0.1], u'map', [.5, -0.1, .77])
-    #     goal_pose = PoseStamped()
-    #     goal_pose.header.frame_id = u'map'
-    #     goal_pose.pose.position = Point(.5, -0.13, .77)
-    #     goal_pose.pose.orientation = Quaternion(*quaternion_from_axis_angle([0,0,1], np.pi/2))
-    #     fake_table_setup.avoid_all_collisions(0.025)
-    #     # fake_table_setup.allow_all_collisions()
-    #     fake_table_setup.set_and_check_cart_goal(fake_table_setup.default_root, fake_table_setup.r_tip, goal_pose)
-    #     pass
-
-    #
     # def test_end_state_collision(self, box_setup):
     #     """
     #     :type box_setup: PR2
@@ -1176,8 +1149,6 @@ class TestCollisionAvoidanceGoals(object):
     #     pass
 
     # TODO test plan only
-
-    # TODO test translation and orientation goal in different frame
 
     def test_pick_and_place(self, kitchen_setup):
         """
@@ -1266,15 +1237,6 @@ class TestCollisionAvoidanceGoals(object):
         kitchen_setup.allow_all_collisions()
         kitchen_setup.set_and_check_cart_goal(kitchen_setup.default_root, kitchen_setup.l_tip, p)
 
-        # p = PoseStamped()
-        # p.header.frame_id = kitchen_setup.l_tip
-        # p.pose.position.x = -0.1
-        # p.pose.orientation.w = 1
-        # kitchen_setup.avoid_all_collisions(0.05)
-        # kitchen_setup.set_and_check_cart_goal(kitchen_setup.default_root, kitchen_setup.l_tip, p)
-        # cpi = kitchen_setup.get_cpi(0.05)
-        # cpi.
-
         # post grasp
         pregrasp_pose = PoseStamped()
         pregrasp_pose.header.frame_id = u'base_footprint'
@@ -1292,44 +1254,6 @@ class TestCollisionAvoidanceGoals(object):
     def test_set_kitchen_joint_state(self, kitchen_setup):
         kitchen_js = {u'sink_area_left_upper_drawer_main_joint': 0.45}
         kitchen_setup.set_kitchen_js(kitchen_js)
-
-    #
-    # def test_place_spoon1(self):
-    #     base_pose = PoseStamped()
-    #     base_pose.header.frame_id = 'map'
-    #     base_pose.pose.position = Point(-1.010, -0.152, 0.000)
-    #     base_pose.pose.orientation = Quaternion(0.000, 0.000, -0.707, 0.707)
-    #     self.move_base(base_pose)
-    #
-    #     goal_js = {
-    #         'r_elbow_flex_joint': -1.43322543123,
-    #         'r_forearm_roll_joint': pi / 2,
-    #         'r_gripper_joint': 2.22044604925e-16,
-    #         'r_shoulder_lift_joint': 0,
-    #         'r_shoulder_pan_joint': -1.39478600655,
-    #         'r_upper_arm_roll_joint': -pi / 2,
-    #         'r_wrist_flex_joint': -0.1001,
-    #         'r_wrist_roll_joint': 0,
-    #
-    #         'l_elbow_flex_joint': -1.53432386765,
-    #         'l_forearm_roll_joint': -0.335634766956,
-    #         'l_gripper_joint': 2.22044604925e-16,
-    #         'l_shoulder_lift_joint': 0.199493756207,
-    #         'l_shoulder_pan_joint': 0.854317292495,
-    #         'l_upper_arm_roll_joint': 1.90837777308,
-    #         'l_wrist_flex_joint': -0.623267982468,
-    #         'l_wrist_roll_joint': -0.910310693429,
-    #
-    #         'torso_lift_joint': 0.206303584043,
-    #     }
-    #     self.set_and_check_js_goal(goal_js)
-    #     self.add_kitchen()
-    #     self.giskard.avoid_collision(0.05, body_b='kitchen')
-    #     p = PoseStamped()
-    #     p.header.frame_id = 'base_footprint'
-    #     p.pose.position = Point(0.69, -0.374, 0.82)
-    #     p.pose.orientation = Quaternion(-0.010, 0.719, 0.006, 0.695)
-    #     self.set_and_check_cart_goal(self.default_root, self.r_tip, p)
 
     #
     # def test_pick_up_spoon(self):
@@ -1384,3 +1308,5 @@ class TestCollisionAvoidanceGoals(object):
     #
 
     # TODO test pickup tray
+
+    # TODO FIXME attaching and detach of urdf objects that listen to joint states

@@ -98,6 +98,8 @@ class World(object):
             self._objects[name].suicide()
             print(u'<-- removed object {} to world'.format(name))
             del (self._objects[name])
+        else:
+            raise UnknownBodyException(u'can\'t remove object \'{}\', because it doesn\' exist'.format(name))
 
     def remove_all_objects(self):
         for object_ in self._objects.values():

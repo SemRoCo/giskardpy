@@ -78,7 +78,7 @@ class TestPyBulletRobot(test_world.TestRobot):
     def test_safe_load_collision_matrix(self, test_folder):
         r = self.cls(donbot_urdf(), path_to_data_folder=test_folder, calc_self_collision_matrix=True)
         scm = r.get_self_collision_matrix()
-        assert len(scm) == 54
+        assert len(scm) == 53
 
     def test_attach_urdf_object1_2(self, test_folder):
         parsed_pr2 = self.cls(donbot_urdf(), path_to_data_folder=test_folder, calc_self_collision_matrix=True)
@@ -110,8 +110,20 @@ class TestPyBulletRobot(test_world.TestRobot):
         r.detach_sub_tree(box.get_name())
         assert scm.symmetric_difference(r.get_self_collision_matrix()) == set()
 
-    # TODO test reset collision matrix
+    def test_reset_collision_matrix(self, test_folder):
+        r = self.cls(donbot_urdf(), path_to_data_folder=test_folder)
+        r.update_self_collision_matrix()
+        scm = r.get_self_collision_matrix()
 
+        box = self.cls.from_world_body(make_world_body_box())
+        p = Pose()
+        p.position = Point(0, 0, 0)
+        p.orientation = Quaternion(0, 0, 0, 1)
+        r.attach_urdf_object(box, u'gripper_tool_frame', p)
+
+        assert scm.symmetric_difference(r.get_self_collision_matrix()) != set()
+        r.reset()
+        assert scm.symmetric_difference(r.get_self_collision_matrix()) == set()
 
 
 class TestPyBulletWorld(test_world.TestWorld):

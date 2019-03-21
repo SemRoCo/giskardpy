@@ -77,10 +77,16 @@ def compare_poses(pose1, pose2, decimal=3):
     np.testing.assert_almost_equal(pose1.position.x, pose2.position.x, decimal=decimal)
     np.testing.assert_almost_equal(pose1.position.y, pose2.position.y, decimal=decimal)
     np.testing.assert_almost_equal(pose1.position.z, pose2.position.z, decimal=decimal)
-    np.testing.assert_almost_equal(pose1.orientation.x, pose2.orientation.x, decimal=decimal)
-    np.testing.assert_almost_equal(pose1.orientation.y, pose2.orientation.y, decimal=decimal)
-    np.testing.assert_almost_equal(pose1.orientation.z, pose2.orientation.z, decimal=decimal)
-    np.testing.assert_almost_equal(pose1.orientation.w, pose2.orientation.w, decimal=decimal)
+    try:
+        np.testing.assert_almost_equal(pose1.orientation.x, pose2.orientation.x, decimal=decimal)
+        np.testing.assert_almost_equal(pose1.orientation.y, pose2.orientation.y, decimal=decimal)
+        np.testing.assert_almost_equal(pose1.orientation.z, pose2.orientation.z, decimal=decimal)
+        np.testing.assert_almost_equal(pose1.orientation.w, pose2.orientation.w, decimal=decimal)
+    except:
+        np.testing.assert_almost_equal(pose1.orientation.x, -pose2.orientation.x, decimal=decimal)
+        np.testing.assert_almost_equal(pose1.orientation.y, -pose2.orientation.y, decimal=decimal)
+        np.testing.assert_almost_equal(pose1.orientation.z, -pose2.orientation.z, decimal=decimal)
+        np.testing.assert_almost_equal(pose1.orientation.w, -pose2.orientation.w, decimal=decimal)
 
 @composite
 def variable_name(draw):

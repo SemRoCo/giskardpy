@@ -166,9 +166,12 @@ class WorldUpdatePlugin(PluginBase):
             pass
 
     def remove_object(self, name):
-        m = self.get_world().get_object(name).as_marker_msg()
-        m.action = m.DELETE
-        self.publish_object_as_marker(m)
+        try:
+            m = self.get_world().get_object(name).as_marker_msg()
+            m.action = m.DELETE
+            self.publish_object_as_marker(m)
+        except:
+            pass
         self.get_world().remove_object(name)
         if name in self.object_js_subs:
             self.object_js_subs[name].unregister()
@@ -181,6 +184,10 @@ class WorldUpdatePlugin(PluginBase):
     def clear_world(self):
         self.delete_markers()
         self.get_world().soft_reset()
+        for v in self.object_js_subs.values():
+            v.unregister()
+        self.object_js_subs = {}
+        self.object_joint_states = {}
 
     def publish_object_as_marker(self, m):
         """

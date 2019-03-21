@@ -515,7 +515,7 @@ class TestSympyWrapper(unittest.TestCase):
         self.assertGreaterEqual(angle, -1.e-10)
         my_m = spw.to_numpy(angle_axis2mat(angle, axis))
         angle_diff = mat2axangle(m.T.dot(my_m))[1]
-        self.assertAlmostEqual(angle_diff, 0.0)
+        self.assertAlmostEqual(angle_diff, 0.0, places=6)
 
     # fails if numbers too big or too small
     # TODO buggy

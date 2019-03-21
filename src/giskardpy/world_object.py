@@ -264,3 +264,8 @@ class WorldObject(URDFObject):
         sub_tree = super(WorldObject, self).detach_sub_tree(joint_name)
         self.update_self_collision_matrix(removed_links=sub_tree.get_link_names())
         return sub_tree
+
+    def reset(self):
+        super(WorldObject, self).reset()
+        self.update_self_collision_matrix()
+

@@ -1,3 +1,5 @@
+import shutil
+
 import pytest
 import rospy
 from geometry_msgs.msg import PoseStamped, Point, Quaternion
@@ -27,17 +29,29 @@ floor_detection_pose = {
     u'ur5_wrist_3_joint': 1.55717146397,
 }
 
+folder_name = u'tmp_data/'
+
 
 @pytest.fixture(scope=u'module')
 def ros(request):
+    try:
+        print(u'deleting tmp test folder')
+        shutil.rmtree(folder_name)
+    except Exception:
+        pass
+
     print(u'init ros')
-    # shutil.rmtree(u'../data/')
     rospy.init_node(u'tests')
     tf_init(60)
 
     def kill_ros():
         print(u'shutdown ros')
         rospy.signal_shutdown(u'die')
+        try:
+            print(u'deleting tmp test folder')
+            # shutil.rmtree(folder_name)
+        except Exception:
+            pass
 
     request.addfinalizer(kill_ros)
 
@@ -55,7 +69,7 @@ def resetted_giskard(giskard):
     :type giskard: Donbot
     """
     print(u'resetting giskard')
-    giskard.soft_reset()
+    giskard.clear_world()
     giskard.reset_base()
     return giskard
 
@@ -69,15 +83,6 @@ def zero_pose(resetted_giskard):
     resetted_giskard.allow_all_collisions()
     resetted_giskard.send_and_check_goal()
     return resetted_giskard
-
-
-#
-# @pytest.fixture()
-# def pocky_pose_setup(resetted_giskard):
-#     resetted_giskard.set_joint_goal(pocky_pose)
-#     resetted_giskard.allow_all_collisions()
-#     resetted_giskard.send_and_check_goal()
-#     return resetted_giskard
 
 
 @pytest.fixture()

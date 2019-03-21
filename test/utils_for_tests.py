@@ -69,6 +69,7 @@ def compare_axis_angle(angle1, axis1, angle2, axis2):
     elif np.isclose(axis1, -axis2).all():
         assert np.isclose(angle1, abs(angle2 - 2 * pi)), '{} != {}'.format(angle1, angle2)
 
+
 def compare_poses(pose1, pose2, decimal=3):
     """
     :type pose1: Pose
@@ -87,6 +88,7 @@ def compare_poses(pose1, pose2, decimal=3):
         np.testing.assert_almost_equal(pose1.orientation.y, -pose2.orientation.y, decimal=decimal)
         np.testing.assert_almost_equal(pose1.orientation.z, -pose2.orientation.z, decimal=decimal)
         np.testing.assert_almost_equal(pose1.orientation.w, -pose2.orientation.w, decimal=decimal)
+
 
 @composite
 def variable_name(draw):
@@ -122,25 +124,30 @@ def pr2_joint_state(draw):
     pr2 = Robot.from_urdf_file(pr2_urdf())
     return draw(rnd_joint_state(*pr2.get_joint_limits()))
 
+
 def pr2_urdf():
     with open(u'urdfs/pr2.urdf', u'r') as f:
         urdf_string = f.read()
     return urdf_string
+
 
 def base_bot_urdf():
     with open(u'urdfs/2d_base_bot.urdf', u'r') as f:
         urdf_string = f.read()
     return urdf_string
 
+
 def donbot_urdf():
     with open(u'urdfs/iai_donbot.urdf', u'r') as f:
         urdf_string = f.read()
     return urdf_string
 
+
 def boxy_urdf():
     with open(u'urdfs/boxy.urdf', u'r') as f:
         urdf_string = f.read()
     return urdf_string
+
 
 def limited_float(outer_limit=BIG_NUMBER, min_dist_to_zero=None):
     # f = st.floats(allow_nan=False, allow_infinity=False, max_value=outer_limit, min_value=-outer_limit)
@@ -180,6 +187,24 @@ def pykdl_frame_to_numpy(pykdl_frame):
 
 class GiskardTestWrapper(object):
     def __init__(self, default_root=u'base_link'):
+        rospy.set_param(u'~enable_gui', False)
+        rospy.set_param(u'~debug', False)
+        rospy.set_param(u'~enable_visualization', False)
+        rospy.set_param(u'~enable_collision_marker', False)
+        rospy.set_param(u'~tree_tick_rate', .01)
+        rospy.set_param(u'~map_frame', u'map')
+        rospy.set_param(u'~root_link', u'base_footprint')
+        rospy.set_param(u'~wiggle_precision_threshold', 4)
+        rospy.set_param(u'~sample_period', 0.1)
+        rospy.set_param(u'~default_joint_vel_limit', 10)
+        rospy.set_param(u'~default_collision_avoidance_distance', 0.05)
+        rospy.set_param(u'~fill_velocity_values', False)
+        rospy.set_param(u'~nWSR', u'None')
+        rospy.set_param(u'~path_to_data_folder', u'tmp_data/')
+        rospy.set_param(u'~collision_time_threshold', 10)
+        rospy.set_param(u'~max_traj_length', 30)
+        rospy.set_param(u'~joint_convergence_threshold', 0.001)
+
         self.sub_result = rospy.Subscriber(u'/giskardpy/command/result', MoveActionResult, self.cb, queue_size=100)
 
         self.tree = grow_tree()
@@ -195,10 +220,12 @@ class GiskardTestWrapper(object):
         self.map = u'map'
         self.simple_base_pose_pub = rospy.Publisher(u'/move_base_simple/goal', PoseStamped, queue_size=10)
         self.tick_rate = .1
+
         def create_publisher(topic):
             p = rospy.Publisher(topic, JointState, queue_size=10)
             rospy.sleep(.5)
             return p
+
         self.joint_state_publisher = keydefaultdict(create_publisher)
         rospy.sleep(1)
 
@@ -374,8 +401,8 @@ class GiskardTestWrapper(object):
     def remove_object(self, name, expected_response=UpdateWorldResponse.SUCCESS):
         r = self.wrapper.remove_object(name)
         assert r.error_codes == expected_response, \
-                u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
-                                                update_world_error_code(expected_response))
+            u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
+                                            update_world_error_code(expected_response))
         assert not self.get_world().has_object(name)
 
     def detach_object(self, name, expected_response=UpdateWorldResponse.SUCCESS):
@@ -383,8 +410,8 @@ class GiskardTestWrapper(object):
         p = transform_pose(u'map', p)
         r = self.wrapper.detach_object(name)
         assert r.error_codes == expected_response, \
-                u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
-                                                update_world_error_code(expected_response))
+            u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
+                                            update_world_error_code(expected_response))
         assert self.get_world().has_object(name)
         compare_poses(self.get_world().get_object(name).base_pose, p.pose, decimal=2)
 
@@ -457,8 +484,8 @@ class GiskardTestWrapper(object):
         scm = self.get_robot().get_self_collision_matrix()
         r = self.wrapper.attach_box(name, size, frame_id, position, orientation)
         assert r.error_codes == expected_response, \
-        u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
-                                        update_world_error_code(expected_response))
+            u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
+                                            update_world_error_code(expected_response))
         if expected_response == UpdateWorldResponse.SUCCESS:
             self.wait_for_synced()
             assert name in self.get_controllable_links()
@@ -471,8 +498,8 @@ class GiskardTestWrapper(object):
         scm = self.get_robot().get_self_collision_matrix()
         r = self.wrapper.attach_object(name, frame_id)
         assert r.error_codes == expected_response, \
-        u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
-                                        update_world_error_code(expected_response))
+            u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
+                                            update_world_error_code(expected_response))
         self.wait_for_synced()
         assert name in self.get_controllable_links()
         assert not self.get_world().has_object(name)
@@ -504,7 +531,8 @@ class GiskardTestWrapper(object):
         for link in links:
             assert cpi[link].contact_distance <= distance_threshold, u'{} -- {}\n {} > {}'.format(link,
                                                                                                   cpi[link].link_b,
-                                                                                                  cpi[link].contact_distance,
+                                                                                                  cpi[
+                                                                                                      link].contact_distance,
                                                                                                   distance_threshold)
 
     def move_base(self, goal_pose):
@@ -513,7 +541,6 @@ class GiskardTestWrapper(object):
         """
         self.simple_base_pose_pub.publish(goal_pose)
         self.wait_for_synced()
-
 
     def reset_base(self):
         p = PoseStamped()
@@ -524,27 +551,9 @@ class GiskardTestWrapper(object):
 
 class PR2(GiskardTestWrapper):
     def __init__(self):
-        rospy.set_param(u'~enable_gui', False)
-        rospy.set_param(u'~debug', False)
-        rospy.set_param(u'~enable_visualization', False)
-        rospy.set_param(u'~enable_collision_marker', True)
-        rospy.set_param(u'~tree_tick_rate', .01)
-        rospy.set_param(u'~map_frame', u'map')
-        rospy.set_param(u'~joint_convergence_threshold', 0.001)
-        rospy.set_param(u'~wiggle_precision_threshold', 4)
-        rospy.set_param(u'~sample_period', 0.1)
-        rospy.set_param(u'~default_joint_vel_limit', 10)
-        rospy.set_param(u'~default_joint_weight', 0.0001)
-        rospy.set_param(u'~default_collision_avoidance_distance', 0.05)
-        rospy.set_param(u'~fill_velocity_values', False)
-        rospy.set_param(u'~nWSR', u'None')
-        rospy.set_param(u'~root_link', u'base_footprint')
-        # rospy.set_param(u'~enable_self_collision', True)
-        rospy.set_param(u'~path_to_data_folder', u'tmp_data/')
-        rospy.set_param(u'~collision_time_threshold', 10)
-        rospy.set_param(u'~max_traj_length', 30)
         self.r_tip = u'r_gripper_tool_frame'
         self.l_tip = u'l_gripper_tool_frame'
+        rospy.set_param(u'~default_joint_weight', 0.0001)
         super(PR2, self).__init__()
         self.default_root = u'base_link'
 
@@ -586,24 +595,7 @@ class PR2(GiskardTestWrapper):
 
 class Donbot(GiskardTestWrapper):
     def __init__(self, default_root=u'base_link'):
-        rospy.set_param(u'~enable_gui', False)
-        rospy.set_param(u'~debug', True)
-        rospy.set_param(u'~tree_tick_rate', .1)
-        rospy.set_param(u'~map_frame', u'map')
-        rospy.set_param(u'~joint_convergence_threshold', 0.002)
-        rospy.set_param(u'~wiggle_precision_threshold', 4)
-        rospy.set_param(u'~sample_period', 0.05)
-        rospy.set_param(u'~default_joint_vel_limit', 0.25)
         rospy.set_param(u'~default_joint_weight', 0.001)
-        rospy.set_param(u'~default_collision_avoidance_distance', 0.05)
-        rospy.set_param(u'~fill_velocity_values', False)
-        rospy.set_param(u'~nWSR', u'None')
-        rospy.set_param(u'~root_link', u'base_footprint')
-        rospy.set_param(u'~enable_collision_marker', True)
-        # rospy.set_param(u'~enable_self_collision', True)
-        rospy.set_param(u'~path_to_data_folder', u'../data/')
-        rospy.set_param(u'~collision_time_threshold', 10)
-        rospy.set_param(u'~max_traj_length', 30)
         self.camera_tip = u'camera_link'
         self.gripper_tip = u'gripper_tool_frame'
         super(Donbot, self).__init__(default_root)

@@ -35,6 +35,7 @@ class GodMap(object):
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.lock.release()
 
+    # @profile
     def _get_member(self, identifier,  member):
         """
         :param identifier:
@@ -45,25 +46,25 @@ class GodMap(object):
         """
         if identifier is None:
             raise AttributeError()
-        if callable(identifier):
-            # TODO this solution calls identifier multiple times if the result is an array, make it faster
-            if is_iterable(member) and not isinstance(member, str) and not isinstance(member, unicode):
-                return identifier(*member)
-            else:
-                return identifier(member)
         try:
             return identifier[member]
         except TypeError:
+            if callable(identifier):
+                # if is_iterable(member) and not isinstance(member, str) and not isinstance(member, unicode):
+                return identifier(*member)
+                # else:
+                #     return identifier(member)
+            # try:
+            #     return identifier[int(member)]
+            # except (TypeError, ValueError):
             try:
-                return identifier[int(member)]
-            except (TypeError, ValueError):
-                try:
-                    return getattr(identifier, member)
-                except TypeError as e:
-                    pass
+                return getattr(identifier, member)
+            except TypeError as e:
+                pass
         except IndexError:
             return identifier[int(member)]
 
+    # @profile
     def get_data(self, identifier):
         """
 
@@ -115,6 +116,7 @@ class GodMap(object):
             self.expr_to_key[str(expr)] = identifier_parts
         return self.key_to_expr[identifier]
 
+    # @profile
     def get_symbol_map(self, exprs=None):
         """
         :return: a dict which maps all registered expressions to their values or 0 if there is no number entry

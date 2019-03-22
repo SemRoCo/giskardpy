@@ -154,7 +154,6 @@ class PluginBehavior(GiskardBehavior):
                         assert self.my_status is not None, u'{} did not return a status'.format(plugin_name)
                         if not self.is_running():
                             return
-                    rospy.sleep(self.sleep)
                 self.looped_once = True
         except Exception as e:
             traceback.print_exc()

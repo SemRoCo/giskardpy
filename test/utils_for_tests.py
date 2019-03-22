@@ -16,7 +16,7 @@ from numpy import pi
 from py_trees import Blackboard
 from sensor_msgs.msg import JointState
 
-from giskard_trees import grow_tree
+from giskardpy.garden import grow_tree
 from giskardpy.identifier import robot_identifier, world_identifier
 from giskardpy.plugin_pybullet import CollisionChecker
 from giskardpy.pybullet_world import PyBulletWorld
@@ -209,34 +209,31 @@ class GiskardTestWrapper(object):
 
         self.tree = grow_tree()
         self.loop_once()
-        rospy.sleep(1)
+        # rospy.sleep(1)
         self.wrapper = GiskardWrapper(ns=u'tests')
         self.results = Queue(100)
-        # self.joint_limits = {joint_name: self.get_robot().get_joint_limits(joint_name) for joint_name in
-        #                      self.get_controlled_joint_names() if self.get_robot().is_joint_controllable(joint_name)}
-        # self.world = self.get_god_map().safe_get_data([u'pybullet_world'])  # type: PyBulletWorld
-        # self.world_plugin = self.tree.root.children[3].children[3]._plugins[u'coll']  # type: CollisionChecker
         self.default_root = self.get_robot().get_root()
         self.map = u'map'
         self.simple_base_pose_pub = rospy.Publisher(u'/move_base_simple/goal', PoseStamped, queue_size=10)
-        self.tick_rate = .1
+        self.tick_rate = 10
 
         def create_publisher(topic):
             p = rospy.Publisher(topic, JointState, queue_size=10)
-            rospy.sleep(.5)
+            rospy.sleep(.2)
             return p
 
         self.joint_state_publisher = keydefaultdict(create_publisher)
-        rospy.sleep(1)
+        # rospy.sleep(1)
 
     def wait_for_synced(self):
+        sleeper = rospy.Rate(self.tick_rate)
         while self.tree.tip().name != u'has goal':
             self.loop_once()
-            rospy.sleep(self.tick_rate)
+            sleeper.sleep()
         self.loop_once()
         while self.tree.tip().name != u'has goal':
             self.loop_once()
-            rospy.sleep(self.tick_rate)
+            sleeper.sleep()
 
     def get_robot(self):
         """
@@ -365,9 +362,10 @@ class GiskardTestWrapper(object):
         t1 = Thread(target=self.get_as()._as.action_server.internal_goal_callback, args=(goal,))
         self.loop_once()
         t1.start()
+        sleeper = rospy.Rate(self.tick_rate)
         while self.results.empty():
             self.loop_once()
-            rospy.sleep(self.tick_rate)
+            sleeper.sleep()
             i += 1
         t1.join()
         self.loop_once()

@@ -15,7 +15,7 @@ class JointStatesInput(object):
 
 
 class Point3Input(InputArray):
-    def __init__(self, to_expr, prefix=(), suffix=(), x=(u'0',), y=(u'1',), z=(u'2',)):
+    def __init__(self, to_expr, prefix=(), suffix=(), x=(0,), y=(1,), z=(2,)):
         super(Point3Input, self).__init__(to_expr, prefix, suffix,
                                           x=x, y=y, z=z)
 

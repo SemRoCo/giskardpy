@@ -5,7 +5,11 @@
   <node pkg="giskardpy" type="giskard_trees.py" name="giskard" output="screen">
     <param name="path_to_data_folder" value="$(find giskardpy)/data/pr2" />
     <param name="enable_gui" value="$(arg gui)"/>
+    <rosparam param="debug">False</rosparam>
+    <rosparam param="enable_visualization">False</rosparam>
+    <rosparam param="enable_collision_marker">False</rosparam>
     <rosparam param="map_frame">map</rosparam>
+    <rosparam param="root_link">base_footprint</rosparam>
     <rosparam param="joint_convergence_threshold">0.002</rosparam>
     <rosparam param="wiggle_precision_threshold">7</rosparam>
     <rosparam param="max_traj_length">30</rosparam>
@@ -15,12 +19,8 @@
     <rosparam param="default_collision_avoidance_distance">0.05</rosparam>
     <rosparam param="fill_velocity_values">False</rosparam>
     <rosparam param="nWSR">None</rosparam> <!-- None results in a nWSR estimation thats fine most of the time -->
-    <rosparam param="root_link">base_footprint</rosparam>
-    <rosparam param="enable_collision_marker">True</rosparam>
     <rosparam param="collision_time_threshold">15</rosparam>
-    <rosparam param="debug">False</rosparam>
     <rosparam param="tree_tick_rate">0.1</rosparam>
-    <rosparam param="enable_visualization">True</rosparam>
   </node>
 
   <node pkg="giskardpy" type="interactive_marker.py" name="giskard_interactive_marker" output="screen">

@@ -358,8 +358,10 @@ class ControllerPlugin(PluginBase):
             self.controller.update_soft_constraints(self.soft_constraints)
             self.controller.compile()
 
+    # @profile
     def update(self):
-        expr = self.god_map.get_symbol_map(self.controller.get_expr())
+        expr = self.controller.get_expr()
+        expr = self.god_map.get_symbol_map(expr)
         next_cmd = self.controller.get_cmd(expr, self.nWSR)
         self.next_cmd.update(next_cmd)
 

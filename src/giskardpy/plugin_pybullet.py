@@ -206,12 +206,12 @@ class WorldUpdatePlugin(PluginBase):
 
 
 class CollisionChecker(PluginBase):
-    def __init__(self, default_collision_avoidance_distance, map_frame, root_link):
+    def __init__(self, default_collision_avoidance_distance, map_frame, root_link, marker=True):
         super(CollisionChecker, self).__init__()
         self.default_min_dist = default_collision_avoidance_distance
         self.map_frame = map_frame
         self.robot_root = root_link
-        self.marker = True
+        self.marker = marker
         self.lock = Lock()
         self.object_js_subs = {}  # JointState subscribers for articulated world objects
         self.object_joint_states = {}  # JointStates messages for articulated world objects
@@ -229,6 +229,7 @@ class CollisionChecker(PluginBase):
         self.get_god_map().safe_set_data(closest_point_identifier, None)
         super(CollisionChecker, self).initialize()
 
+    # @profile
     def update(self):
         """
         Computes closest point info for all robot links and safes it to the god map.

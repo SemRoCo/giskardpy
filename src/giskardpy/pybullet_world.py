@@ -56,6 +56,7 @@ class PyBulletWorld(World):
     def __get_pybullet_object_id(self, name):
         return self.get_object(name).get_pybullet_id()
 
+    # @profile
     def check_collisions(self, cut_off_distances):
         """
         :param cut_off_distances: (robot_link, body_b, link_b) -> cut off distance. Contacts between objects not in this
@@ -69,23 +70,34 @@ class PyBulletWorld(World):
         """
         # TODO I think I have to multiply distance with something
         collisions = defaultdict(lambda: None)
+        checked_things = set()
         for k, distance in cut_off_distances.items():
             (robot_link, body_b, link_b) = k
+            r_k = (link_b, body_b, robot_link)
+            if r_k in checked_things:
+                if r_k in collisions:
+                    collisions[k] = self.__flip_contact_info(collisions[r_k])
+                continue
             robot_link_id = self.robot.get_pybullet_link_id(robot_link)
             if self.robot.get_name() == body_b:
                 object_id = self.robot.get_pybullet_id()
                 link_b_id = self.robot.get_pybullet_link_id(link_b)
             else:
                 object_id = self.__get_pybullet_object_id(body_b)
-                link_b_id = self.get_object(body_b).get_pybullet_link_id(link_b)
-            # FIXME redundant checks for robot link pairs
-            contacts = [ContactInfo(*x) for x in p.getClosestPoints(self.robot.get_pybullet_id(), object_id,
-                                                                    distance * 3,
-                                                                    robot_link_id, link_b_id)]
+                if link_b != u'':
+                    link_b_id = self.get_object(body_b).get_pybullet_link_id(link_b)
+            if body_b == self.robot.get_name():
+                contacts = [ContactInfo(*x) for x in p.getClosestPoints(self.robot.get_pybullet_id(), object_id,
+                                                                        distance * 3,
+                                                                        robot_link_id, link_b_id)]
+            else:
+                contacts = [ContactInfo(*x) for x in p.getClosestPoints(self.robot.get_pybullet_id(), object_id,
+                                                                        distance * 3,
+                                                                        robot_link_id)]
             if len(contacts) > 0:
                 collisions.update({k: min(contacts, key=lambda x: x.contact_distance)})
-                # asdf = self.should_switch(contacts[0])
                 pass
+            checked_things.add(k)
         return collisions
 
     def __should_flip_contact_info(self, contact_info):
@@ -101,7 +113,6 @@ class PyBulletWorld(World):
         if not np.isclose(contact_info2.contact_normal_on_b, contact_info.contact_normal_on_b).all():
             return False
         pa = np.array(contact_info.position_on_a)
-        # pb = np.array(contact_info.position_on_b)
 
         new_p = Pose()
         new_p.position = Point(*pa)
@@ -125,7 +136,9 @@ class PyBulletWorld(World):
                            contact_info.body_unique_id_a, contact_info.body_unique_id_b,
                            contact_info.link_index_a, contact_info.link_index_b,
                            contact_info.position_on_b, contact_info.position_on_a,
-                           (-np.array(contact_info.contact_normal_on_b)).tolist(), contact_info.contact_distance,
+                           [-contact_info.contact_normal_on_b[0],
+                            -contact_info.contact_normal_on_b[1],
+                            -contact_info.contact_normal_on_b[2]], contact_info.contact_distance,
                            contact_info.normal_force,
                            contact_info.lateralFriction1, contact_info.lateralFrictionDir1,
                            contact_info.lateralFriction2,

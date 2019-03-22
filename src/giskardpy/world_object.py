@@ -81,6 +81,7 @@ class WorldObject(URDFObject):
         self.suicide()
 
     def get_controlled_links(self):
+        #FIXME expensive
         controllable_links = set()
         for joint_name in self.controlled_joints:
             controllable_links.update(self.get_sub_tree_link_names_with_collision(joint_name))

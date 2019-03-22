@@ -138,12 +138,14 @@ def pose_to_kdl(pose):
                                     pose.position.y,
                                     pose.position.z))
 
+
 def point_to_kdl(point):
     """
     :type point: Point
     :rtype: PyKDL.Vector
     """
     return PyKDL.Vector(point.x, point.y, point.z)
+
 
 def msg_to_kdl(msg):
     if isinstance(msg, TransformStamped):
@@ -159,6 +161,7 @@ def msg_to_kdl(msg):
     else:
         raise TypeError(u'can\'t convert {} to kdl'.format(type(msg)))
 
+
 def kdl_to_pose(frame):
     """
     :type frame: PyKDL.Frame
@@ -168,12 +171,9 @@ def kdl_to_pose(frame):
     p.position.x = frame.p[0]
     p.position.y = frame.p[1]
     p.position.z = frame.p[2]
-    m = np.array([[frame.M[0, 0], frame.M[0, 1], frame.M[0, 2], 0],
-                  [frame.M[1, 0], frame.M[1, 1], frame.M[1, 2], 0],
-                  [frame.M[2, 0], frame.M[2, 1], frame.M[2, 2], 0],
-                  [0, 0, 0, 1]])
-    p.orientation = Quaternion(*quaternion_from_matrix(m))
+    p.orientation = Quaternion(*frame.M.GetQuaternion())
     return p
+
 
 def kdl_to_point(vector):
     """
@@ -186,6 +186,7 @@ def kdl_to_point(vector):
     p.z = vector[2]
     return p
 
+
 def kdl_to_vector(vector):
     """
     :ty vector: PyKDL.Vector
@@ -196,3 +197,13 @@ def kdl_to_vector(vector):
     v.y = vector[1]
     v.z = vector[2]
     return v
+
+
+def np_to_kdl(matrix):
+    r = PyKDL.Rotation(matrix[0, 0], matrix[0, 1], matrix[0, 2],
+                       matrix[1, 0], matrix[1, 1], matrix[1, 2],
+                       matrix[2, 0], matrix[2, 1], matrix[2, 2])
+    p = PyKDL.Vector(matrix[0, 3],
+                     matrix[1, 3],
+                     matrix[2, 3])
+    return PyKDL.Frame(r,p)

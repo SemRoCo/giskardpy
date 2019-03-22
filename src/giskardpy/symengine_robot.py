@@ -33,6 +33,7 @@ class Robot(Backend):
         """
         self._fk_expressions = {}
         self._fks = {}
+        self._evaluated_fks = {}
         self._joint_to_frame = {}
         self._default_joint_velocity_limit = default_joint_vel_limit
         self._default_weight = default_joint_weight
@@ -49,6 +50,17 @@ class Robot(Backend):
     @property
     def joint_constraints(self):
         return self._joint_constraints
+
+    @Backend.joint_state.setter
+    def joint_state(self, value):
+        """
+        :param joint_state:
+        :type joint_state: dict
+        :return:
+        """
+        Backend.joint_state.fset(self, value)
+        self.__joint_state_positions = {str(self._joint_to_symbol_map[k]): v.position for k, v in self.joint_state.items()}
+        self._evaluated_fks.clear()
 
     def reinitialize(self, joints_to_symbols_map=None):
         """
@@ -129,12 +141,13 @@ class Robot(Backend):
         return self._fk_expressions[root_link, tip_link]
 
     def get_fk(self, root, tip):
-        a = {str(self._joint_to_symbol_map[k]): v.position for k, v in self.joint_state.items()}
-        homo_m = self._fks[root, tip](**a)
-        p = PoseStamped()
-        p.header.frame_id = root
-        p.pose = homo_matrix_to_pose(homo_m)
-        return p
+        if (root, tip) not in self._evaluated_fks:
+            homo_m = self._fks[root, tip](**self.__joint_state_positions)
+            p = PoseStamped()
+            p.header.frame_id = root
+            p.pose = homo_matrix_to_pose(homo_m)
+            self._evaluated_fks[root, tip] = p
+        return self._evaluated_fks[root, tip]
 
     def init_fast_fks(self):
         def f(key):

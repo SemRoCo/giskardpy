@@ -248,7 +248,8 @@ class World(object):
                 link_bs = collision_entry.link_bs
                 if body_b != robot_name:
                     if link_bs == []:
-                        link_bs = self.get_object(body_b).get_link_names_with_collision()
+                        # link_bs = self.get_object(body_b).get_link_names_with_collision()
+                        link_bs = ['']
                     elif link_bs != []:
                         for link_b in link_bs:
                             # TODO use sets and intersection to safe time
@@ -275,7 +276,6 @@ class World(object):
                                 min_allowed_distance[key] = collision_entry.min_dist
 
         return min_allowed_distance
-
 
     def collisions_to_closest_point(self, collisions, min_allowed_distance):
         """

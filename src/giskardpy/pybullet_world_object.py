@@ -44,7 +44,8 @@ class PyBulletWorldObject(WorldObject):
         """
         self._js = value
         for joint_name, singe_joint_state in value.items():
-            p.resetJointState(self._pybullet_id, self.joint_name_to_info[joint_name].joint_index, singe_joint_state.position)
+            p.resetJointState(self._pybullet_id, self.joint_name_to_info[joint_name].joint_index,
+                              singe_joint_state.position)
 
     @WorldObject.base_pose.setter
     def base_pose(self, value):

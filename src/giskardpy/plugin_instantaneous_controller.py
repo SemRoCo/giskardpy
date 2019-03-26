@@ -23,7 +23,7 @@ import numpy as np
 # TODO plan only not supported
 # TODO waypoints not supported
 class GoalToConstraints(GetGoal):
-    def __init__(self, name, as_name, root_link):
+    def __init__(self, name, as_name, use_slerp=True):
         GetGoal.__init__(self, name, as_name)
         self.soft_constraints = {}
         self.used_joints = set()
@@ -31,6 +31,7 @@ class GoalToConstraints(GetGoal):
         self.known_constraints = set()
         self.controlled_joints = set()
         self.controllable_links = set()
+        self.use_slerp = use_slerp
 
     def setup(self, timeout):
         return super(GoalToConstraints, self).setup(timeout)
@@ -107,13 +108,13 @@ class GoalToConstraints(GetGoal):
         # TODO split this into 2 functions, for translation and rotation
         goal_input = FrameInput(self.god_map.to_symbol,
                                 translation_prefix=cartesian_goal_identifier +
-                                                    [str(Controller.TRANSLATION_3D),
+                                                   [str(Controller.TRANSLATION_3D),
                                                     (root, tip),
                                                     u'goal_pose',
                                                     u'pose',
                                                     u'position'],
                                 rotation_prefix=cartesian_goal_identifier +
-                                                 [str(Controller.ROTATION_3D),
+                                                [str(Controller.ROTATION_3D),
                                                  (root, tip),
                                                  u'goal_pose',
                                                  u'pose',
@@ -121,11 +122,11 @@ class GoalToConstraints(GetGoal):
 
         current_input = FrameInput(self.god_map.to_symbol,
                                    translation_prefix=fk_identifier +
-                                                       [(root, tip),
+                                                      [(root, tip),
                                                        u'pose',
                                                        u'position'],
                                    rotation_prefix=fk_identifier +
-                                                    [(root, tip),
+                                                   [(root, tip),
                                                     u'pose',
                                                     u'orientation'])
         weight_key = cartesian_goal_identifier + [str(type), (root, tip), u'weight']
@@ -143,13 +144,22 @@ class GoalToConstraints(GetGoal):
                                  max_trans_speed=max_speed,
                                  ns=u'{}/{}'.format(root, tip))
         elif type == Controller.ROTATION_3D:
-            return rotation_conv(goal_input.get_rotation(),
-                                 sw.rotation_of(self.get_robot().get_fk_expression(root, tip)),
-                                 current_input.get_rotation(),
-                                 weights=weight,
-                                 rot_gain=p_gain,
-                                 max_rot_speed=max_speed,
-                                 ns=u'{}/{}'.format(root, tip))
+            if self.use_slerp:
+                return rotation_conv_slerp(goal_input.get_rotation(),
+                                           sw.rotation_of(self.get_robot().get_fk_expression(root, tip)),
+                                           current_input.get_rotation(),
+                                           weights=weight,
+                                           rot_gain=p_gain,
+                                           max_rot_speed=max_speed,
+                                           ns=u'{}/{}'.format(root, tip))
+            else:
+                return rotation_conv(goal_input.get_rotation(),
+                                     sw.rotation_of(self.get_robot().get_fk_expression(root, tip)),
+                                     current_input.get_rotation(),
+                                     weights=weight,
+                                     rot_gain=p_gain,
+                                     max_rot_speed=max_speed,
+                                     ns=u'{}/{}'.format(root, tip))
 
         return {}
 
@@ -157,7 +167,6 @@ class GoalToConstraints(GetGoal):
         """
         to self.controller and saves functions for continuous joints in god map.
         """
-        # pyfunctions = {}
         for joint_name in self.get_robot().controlled_joints:
 
             joint_current_expr = self.get_expr_joint_current_position(joint_name)
@@ -172,13 +181,9 @@ class GoalToConstraints(GetGoal):
                                                                        weight_expr,
                                                                        gain_expr,
                                                                        max_speed_expr, joint_name))
-                # self.controller.update_soft_constraints(soft_constraints, self.god_map.get_registered_symbols())
             else:
                 self.soft_constraints.update(joint_position(joint_current_expr, goal_joint_expr, weight_expr,
                                                             gain_expr, max_speed_expr, joint_name))
-            # self.controller.update_soft_constraints(soft_constraints, self.god_map.get_registered_symbols())
-
-        # self.god_map.safe_set_data([pyfunction_identifier], pyfunctions)
 
     def add_collision_avoidance_soft_constraints(self):
         """
@@ -192,11 +197,11 @@ class GoalToConstraints(GetGoal):
                                             prefix=closest_point_identifier + [link, u'position_on_b'])
             current_input = FrameInput(self.god_map.to_symbol,
                                        translation_prefix=fk_identifier +
-                                                           [(self.get_robot().get_root(), link),
+                                                          [(self.get_robot().get_root(), link),
                                                            u'pose',
                                                            u'position'],
                                        rotation_prefix=fk_identifier +
-                                                        [(self.get_robot().get_root(), link),
+                                                       [(self.get_robot().get_root(), link),
                                                         u'pose',
                                                         u'orientation'])
             min_dist = self.god_map.to_symbol(closest_point_identifier + [link, u'min_dist'])
@@ -204,7 +209,8 @@ class GoalToConstraints(GetGoal):
                                           prefix=closest_point_identifier + [link, u'contact_normal'])
 
             soft_constraints.update(link_to_link_avoidance(link,
-                                                           self.get_robot().get_fk_expression(self.get_robot().get_root(), link),
+                                                           self.get_robot().get_fk_expression(
+                                                               self.get_robot().get_root(), link),
                                                            current_input.get_frame(),
                                                            point_on_link_input.get_expression(),
                                                            other_point_input.get_expression(),
@@ -217,18 +223,18 @@ class GoalToConstraints(GetGoal):
         """
         Sets the goal for all joints which are not used in another goal to their current position.
         """
-        joint_goal = self.get_god_map().safe_get_data(cartesian_goal_identifier +[str(Controller.JOINT)])
+        joint_goal = self.get_god_map().safe_get_data(cartesian_goal_identifier + [str(Controller.JOINT)])
         for joint_name in self.get_robot().controlled_joints:
             if joint_name not in joint_goal:
                 joint_goal[joint_name] = {u'weight': 0,
                                           u'p_gain': 0,
                                           u'max_speed': self.get_god_map().safe_get_data(default_joint_vel_identifier),
                                           u'position': self.get_god_map().safe_get_data(js_identifier +
-                                                                                   [joint_name,
-                                                                                   u'position'])}
+                                                                                        [joint_name,
+                                                                                         u'position'])}
                 if joint_name not in self.used_joints:
                     joint_goal[joint_name][u'weight'] = 1
-                    joint_goal[joint_name][u'p_gain'] = 10. #FIXME don't hardcode this
+                    joint_goal[joint_name][u'p_gain'] = 10.  # FIXME don't hardcode this
 
         self.get_god_map().safe_set_data(cartesian_goal_identifier + [str(Controller.JOINT)], joint_goal)
 
@@ -271,6 +277,7 @@ class GoalToConstraints(GetGoal):
         """
         max_speed_key = cartesian_goal_identifier + [str(Controller.JOINT), joint_name, u'max_speed']
         return self.god_map.to_symbol(max_speed_key)
+
 
 def cmd_to_goals(cmd):
     """

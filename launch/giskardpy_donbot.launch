@@ -21,6 +21,7 @@
     <rosparam param="debug">False</rosparam>
     <rosparam param="tree_tick_rate">0.1</rosparam>
     <rosparam param="enable_visualization">True</rosparam>
+    <rosparam param="slerp">True</rosparam>
   </node>
 
   <node pkg="giskardpy" type="interactive_marker.py" name="giskard_interactive_marker" output="screen">

@@ -924,7 +924,49 @@ def diffable_slerp(q1, q2, t):
                                        diffable_if_greater_zero(if2, 0.5 * q1 + 0.5 * q2, ratio_a * q1 + ratio_b * q2))
 
 
+def piecewise_matrix(*piecewise_vector):
+    # TODO testme
+    # FIXME support non 2d matrices?
+    dimensions = piecewise_vector[0][0].shape
+    for m, condition in piecewise_vector:
+        assert m.shape == dimensions
+    matrix = se.zeros(*dimensions)
+    for x in range(dimensions[0]):
+        for y in range(dimensions[1]):
+            piecewise_entry = []
+            for m, condition in piecewise_vector:
+                piecewise_entry.append([m[x, y], condition])
+            matrix[x, y] = se.Piecewise(*piecewise_entry)
+    return matrix
+
+
+# def slerp(q1, q2, t):
+#     """
+#     !takes a long time to compile!
+#     :param q1: 4x1 Matrix
+#     :type q1: Matrix
+#     :param q2: 4x1 Matrix
+#     :type q2: Matrix
+#     :param t: float, 0-1
+#     :type t:  Union[float, Symbol]
+#     :return: 4x1 Matrix; Return spherical linear interpolation between two quaternions.
+#     :rtype: Matrix
+#     """
+#     #FIXME
+#     d = dot(q1, q2)
+#     d_abs = Abs(d)
+#     q1_2 = piecewise_matrix([-q1, d < 0.0], [q1, True])
+#     angle = acos(d_abs)
+#
+#     isin = 1.0 / sin(angle)
+#     q1_3 = q1_2 * sin((1.0 - t) * angle) * isin
+#     q2_2 = q2 * sin(t * angle) * isin
+#     q1_3 += q2_2
+#     return piecewise_matrix([q1, t == 0.0],
+#                             [q2, t == 1.0],
+#                             [q1, Abs(d_abs - 1.0) < _EPS],
+#                             [q1_2, Abs(angle) < _EPS],
+#                             [q1_3, True])
+
 def to_numpy(matrix):
     return np.array(matrix.tolist()).astype(float).reshape(matrix.shape)
-
-

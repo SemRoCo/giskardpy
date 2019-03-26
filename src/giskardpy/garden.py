@@ -71,6 +71,7 @@ def grow_tree():
     wiggle_precision_threshold = rospy.get_param(u'~wiggle_precision_threshold')
     default_collision_avoidance_distance = rospy.get_param(u'~default_collision_avoidance_distance')
     collision_time_threshold = rospy.get_param(u'~collision_time_threshold')
+    slerp = rospy.get_param(u'~slerp')
     # max_traj_length = rospy.get_param(u'~max_traj_length')
 
     # output related params
@@ -115,7 +116,7 @@ def grow_tree():
     # ----------------------------------------------
     root = Sequence(u'root')
     root.add_child(wait_for_goal)
-    root.add_child(GoalToConstraints(u'update constraints', action_server_name, root_link))
+    root.add_child(GoalToConstraints(u'update constraints', action_server_name, slerp))
     root.add_child(planning)
     root.add_child(CleanUp(u'cleanup'))
     root.add_child(publish_result)

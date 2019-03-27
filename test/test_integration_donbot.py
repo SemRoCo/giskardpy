@@ -1,5 +1,5 @@
 import shutil
-
+import numpy as np
 import pytest
 import rospy
 from geometry_msgs.msg import PoseStamped, Point, Quaternion
@@ -134,6 +134,32 @@ class TestJointGoals(object):
         """
         zero_pose.allow_self_collision()
         zero_pose.send_and_check_joint_goal(floor_detection_pose)
+
+    def test_joint_movement2(self, zero_pose):
+        """
+        :type zero_pose: Donbot
+        """
+        js = {
+            u'ur5_shoulder_pan_joint': -1.5438225905,
+            u'ur5_shoulder_lift_joint': -1.20804578463,
+            u'ur5_elbow_joint': -2.21223670641,
+            u'ur5_wrist_1_joint': -1.5827181975,
+            u'ur5_wrist_2_joint': -4.71748859087,
+            u'ur5_wrist_3_joint': -1.57543737093,
+        }
+        zero_pose.allow_self_collision()
+        zero_pose.send_and_check_joint_goal(js)
+
+        js2 = {
+            u'ur5_shoulder_pan_joint': -np.pi / 2,
+            u'ur5_shoulder_lift_joint': -np.pi / 2,
+            u'ur5_elbow_joint': -2.3,
+            u'ur5_wrist_1_joint': -np.pi / 2,
+            u'ur5_wrist_2_joint': 0,
+            u'ur5_wrist_3_joint': -np.pi / 2,
+        }
+        zero_pose.allow_self_collision()
+        zero_pose.send_and_check_joint_goal(js2)
 
     def test_partial_joint_state_goal1(self, zero_pose):
         """

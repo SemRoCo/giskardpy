@@ -72,6 +72,7 @@ def grow_tree():
     default_collision_avoidance_distance = rospy.get_param(u'~default_collision_avoidance_distance')
     collision_time_threshold = rospy.get_param(u'~collision_time_threshold')
     slerp = rospy.get_param(u'~slerp')
+    plot_trajectory = rospy.get_param(u'~plot_trajectory')
     # max_traj_length = rospy.get_param(u'~max_traj_length')
 
     # output related params
@@ -120,7 +121,7 @@ def grow_tree():
     root.add_child(planning)
     root.add_child(CleanUp(u'cleanup'))
     root.add_child(publish_result)
-    root.add_child(SendResult(u'send result', action_server_name, path_to_data_folder))
+    root.add_child(SendResult(u'send result', action_server_name, path_to_data_folder, plot_trajectory))
 
     tree = BehaviourTree(root)
 

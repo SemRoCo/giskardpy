@@ -22,6 +22,7 @@
     <rosparam param="tree_tick_rate">1</rosparam>
     <rosparam param="enable_visualization">False</rosparam>
     <rosparam param="slerp">False</rosparam>
+    <rosparam param="plot_trajectory">False</rosparam>
     <!-- remaps for real hsr -->
     <!-- <remap from="/whole_body_controller/state" to="/hsrb/arm_trajectory_controller/state"/> -->
     <!-- <remap from="/whole_body_controller/follow_joint_trajectory" to="/hsrb/arm_trajectory_controller/follow_joint_trajectory"/> -->

@@ -16,11 +16,28 @@ import numpy as np
 
 from giskardpy.python_interface import GiskardWrapper
 
-
 if __name__ == '__main__':
     rospy.init_node('donbot_test_movements')
 
     g = GiskardWrapper()
+
+    js = {
+        'gripper_joint': 0.0065,
+        'odom_x_joint': 0.0,
+        'odom_y_joint': 0.0,
+        'odom_z_joint': 0.0,
+        'ur5_elbow_joint': 1.05104740416,
+        'ur5_shoulder_lift_joint': -0.723444608389,
+        'ur5_shoulder_pan_joint': -0.0106331042379,
+        'ur5_wrist_1_joint': 3.41359659947,
+        'ur5_wrist_2_joint': -1.52307799476,
+        'ur5_wrist_3_joint': 0.052335263781,
+    }
+    g.set_joint_goal(js)
+    g.allow_all_collisions()
+    g.plan_and_execute()
+    g.allow_all_collisions()
+
     #
     # goal_pose = PoseStamped()
     # goal_pose.header.frame_id = u'base_link'
@@ -35,16 +52,11 @@ if __name__ == '__main__':
     # g.set_cart_goal('base_link', 'gripper_tool_frame', goal_pose)
     # g.allow_all_collisions()
     # g.plan_and_execute()
-    g.add_box(position=[1.2,0,0.5])
-    r_tip = 'r_gripper_tool_frame'
+    tip = 'gripper_tool_frame'
     p = PoseStamped()
-    p.header.frame_id = r_tip
-    p.pose.position = Point(0.1, 0, 0)
+    p.header.frame_id = tip
+    p.pose.position = Point(0.0, 0, -1)
     p.pose.orientation = Quaternion(0, 0, 0, 1)
-    g.set_cart_goal('base_link', r_tip, p)
+    g.set_cart_goal('base_footprint', tip, p)
 
-    collision_entry = CollisionEntry()
-    collision_entry.type = CollisionEntry.AVOID_ALL_COLLISIONS
-    collision_entry.min_dist = 0.05
-    g.set_collision_entries([collision_entry])
     g.plan_and_execute()

@@ -114,8 +114,9 @@ class GoalCanceled(ActionServerBehavior):
 
 
 class SendResult(ActionServerBehavior):
-    def __init__(self, name, as_name, path_to_data_folder, action_type=None):
+    def __init__(self, name, as_name, path_to_data_folder, action_type=None, plot_trajectory=False):
         self.path_to_data_folder = path_to_data_folder
+        self.plot_trajectory = plot_trajectory
         super(SendResult, self).__init__(name, as_name, action_type)
 
     def update(self):
@@ -133,9 +134,10 @@ class SendResult(ActionServerBehavior):
         return Status.SUCCESS
 
     def plot_traj(self):
-        trajectory = self.get_god_map().safe_get_data(trajectory_identifier)
-        controlled_joints = self.get_robot().controlled_joints
-        plot_trajectory(trajectory, controlled_joints, self.path_to_data_folder)
+        if self.plot_trajectory:
+            trajectory = self.get_god_map().safe_get_data(trajectory_identifier)
+            controlled_joints = self.get_robot().controlled_joints
+            plot_trajectory(trajectory, controlled_joints, self.path_to_data_folder)
 
     def exception_to_error_code(self, exception):
         """

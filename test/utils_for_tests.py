@@ -189,7 +189,7 @@ class GiskardTestWrapper(object):
     def __init__(self, default_root=u'base_link'):
         rospy.set_param(u'~enable_gui', False)
         rospy.set_param(u'~debug', False)
-        rospy.set_param(u'~enable_visualization', False)
+        rospy.set_param(u'~enable_visualization', True)
         rospy.set_param(u'~enable_collision_marker', False)
         rospy.set_param(u'~tree_tick_rate', .01)
         rospy.set_param(u'~map_frame', u'map')
@@ -204,6 +204,7 @@ class GiskardTestWrapper(object):
         rospy.set_param(u'~collision_time_threshold', 10)
         rospy.set_param(u'~max_traj_length', 30)
         rospy.set_param(u'~joint_convergence_threshold', 0.001)
+        rospy.set_param(u'~slerp', True)
 
         self.sub_result = rospy.Subscriber(u'/giskardpy/command/result', MoveActionResult, self.cb, queue_size=100)
 

@@ -5,24 +5,24 @@
   <node pkg="giskardpy" type="giskard_trees.py" name="giskard" output="screen">
     <param name="path_to_data_folder" value="$(find giskardpy)/data/donbot" />
     <param name="enable_gui" value="$(arg gui)"/>
+    <rosparam param="enable_collision_marker">False</rosparam>
+    <rosparam param="enable_visualization">True</rosparam>
+    <rosparam param="plot_trajectory">False</rosparam>
+    <rosparam param="debug">False</rosparam>
     <rosparam param="map_frame">map</rosparam>
     <rosparam param="joint_convergence_threshold">0.001</rosparam>
     <rosparam param="wiggle_precision_threshold">5</rosparam>
     <rosparam param="max_traj_length">30</rosparam>
-    <rosparam param="sample_period">0.05</rosparam>
+    <rosparam param="sample_period">0.01</rosparam>
     <rosparam param="default_joint_vel_limit">0.25</rosparam>
     <rosparam param="default_joint_weight">0.001</rosparam>
     <rosparam param="default_collision_avoidance_distance">0.05</rosparam>
     <rosparam param="fill_velocity_values">False</rosparam>
     <rosparam param="nWSR">None</rosparam> <!-- None results in a nWSR estimation thats fine most of the time -->
     <rosparam param="root_link">odom</rosparam>
-    <rosparam param="enable_collision_marker">True</rosparam>
     <rosparam param="collision_time_threshold">15</rosparam>
-    <rosparam param="debug">False</rosparam>
     <rosparam param="tree_tick_rate">0.1</rosparam>
-    <rosparam param="enable_visualization">True</rosparam>
     <rosparam param="slerp">True</rosparam>
-    <rosparam param="plot_trajectory">False</rosparam>
   </node>
 
   <node pkg="giskardpy" type="interactive_marker.py" name="giskard_interactive_marker" output="screen">

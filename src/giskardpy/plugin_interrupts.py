@@ -32,7 +32,6 @@ class WiggleCancel(PluginBase):
         :return: a sequence of all the rounded joint positions
         :rtype: tuple
         """
-        # FIXME weird non deterministic error, happens because pluginbehavior is not stopped fast enough?
         return tuple(round(x.position, self.wiggle_precision) for x in js.values())
 
 

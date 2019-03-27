@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+from time import time
+
 import rospy
 
 from actionlib.simple_action_client import SimpleActionClient
@@ -18,7 +20,7 @@ from giskardpy.python_interface import GiskardWrapper
 
 if __name__ == '__main__':
     rospy.init_node('donbot_test_movements')
-
+    t = time()
     g = GiskardWrapper()
 
     js = {
@@ -34,9 +36,10 @@ if __name__ == '__main__':
         'ur5_wrist_3_joint': 0.052335263781,
     }
     g.set_joint_goal(js)
-    g.allow_all_collisions()
+    g.avoid_collision(0.01, [], 'iai_donbot', [])
     g.plan_and_execute()
-    g.allow_all_collisions()
+    g.avoid_collision(0.01, [], 'iai_donbot', [])
+    # g.allow_all_collisions()
 
     #
     # goal_pose = PoseStamped()
@@ -60,3 +63,7 @@ if __name__ == '__main__':
     g.set_cart_goal('base_footprint', tip, p)
 
     g.plan_and_execute()
+    print('shit took {}'.format(time()-t))
+
+#nothing 30.92
+#coll    31.22

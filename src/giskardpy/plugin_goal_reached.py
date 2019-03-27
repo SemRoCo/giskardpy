@@ -1,4 +1,5 @@
 import numpy as np
+from time import time
 
 from py_trees import Status
 
@@ -19,10 +20,10 @@ class GoalReachedPlugin(PluginBase):
 
     def update(self):
         current_js = self.get_god_map().safe_get_data(js_identifier)
-        time = self.get_god_map().safe_get_data(time_identifier)
+        planning_time = self.get_god_map().safe_get_data(time_identifier)
         # TODO make 1 a parameter
-        if time >= 1:
+        if planning_time >= 1:
             if np.abs([v.velocity for v in current_js.values()]).max() < self.joint_convergence_threshold:
-                print(u'done')
+                print(u'found goal trajectory with length {}s in {}s'.format(planning_time, time() -self.get_blackboard().runtime))
                 return Status.SUCCESS
         return Status.RUNNING

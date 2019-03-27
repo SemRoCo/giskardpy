@@ -1,4 +1,5 @@
 from copy import copy
+from time import time
 
 from giskard_msgs.msg import CollisionEntry
 from giskard_msgs.msg import Controller
@@ -84,6 +85,7 @@ class GoalToConstraints(GetGoal):
         self.get_god_map().safe_set_data(collision_goal_identifier, move_cmd.collisions)
 
         self.get_god_map().safe_set_data(soft_constraint_identifier, self.soft_constraints)
+        self.get_blackboard().runtime = time()
         return Status.SUCCESS
 
     def add_cart_controller_soft_constraints(self, controller, t):

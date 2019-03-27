@@ -191,11 +191,11 @@ class GiskardTestWrapper(object):
         rospy.set_param(u'~debug', False)
         rospy.set_param(u'~enable_visualization', True)
         rospy.set_param(u'~enable_collision_marker', False)
-        rospy.set_param(u'~tree_tick_rate', .01)
+        rospy.set_param(u'~tree_tick_rate', .05)
         rospy.set_param(u'~map_frame', u'map')
         rospy.set_param(u'~root_link', u'base_footprint')
         rospy.set_param(u'~wiggle_precision_threshold', 4)
-        rospy.set_param(u'~sample_period', 0.1)
+        rospy.set_param(u'~sample_period', 0.01)
         rospy.set_param(u'~default_joint_vel_limit', 10)
         rospy.set_param(u'~default_collision_avoidance_distance', 0.05)
         rospy.set_param(u'~fill_velocity_values', False)
@@ -204,7 +204,7 @@ class GiskardTestWrapper(object):
         rospy.set_param(u'~collision_time_threshold', 10)
         rospy.set_param(u'~max_traj_length', 30)
         rospy.set_param(u'~joint_convergence_threshold', 0.001)
-        rospy.set_param(u'~slerp', True)
+        rospy.set_param(u'~plot_trajectory', False)
 
         self.sub_result = rospy.Subscriber(u'/giskardpy/command/result', MoveActionResult, self.cb, queue_size=100)
 
@@ -553,6 +553,7 @@ class PR2(GiskardTestWrapper):
         self.r_tip = u'r_gripper_tool_frame'
         self.l_tip = u'l_gripper_tool_frame'
         rospy.set_param(u'~default_joint_weight', 0.0001)
+        rospy.set_param(u'~slerp', False)
         super(PR2, self).__init__()
         self.default_root = u'base_link'
 
@@ -595,6 +596,7 @@ class PR2(GiskardTestWrapper):
 class Donbot(GiskardTestWrapper):
     def __init__(self, default_root=u'base_link'):
         rospy.set_param(u'~default_joint_weight', 0.001)
+        rospy.set_param(u'~slerp', True)
         self.camera_tip = u'camera_link'
         self.gripper_tip = u'gripper_tool_frame'
         super(Donbot, self).__init__(default_root)

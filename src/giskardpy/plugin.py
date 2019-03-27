@@ -48,6 +48,9 @@ class PluginBase(object):
         """
         return self.get_god_map().safe_get_data(robot_identifier)
 
+    def get_blackboard(self):
+        return Blackboard()
+
 class GiskardBehavior(Behaviour):
     def __init__(self, name):
         self.god_map = Blackboard().god_map
@@ -73,6 +76,9 @@ class GiskardBehavior(Behaviour):
 
     def raise_to_blackboard(self, exception):
         Blackboard().set('exception', exception)
+
+    def get_blackboard(self):
+        return Blackboard()
 
 class PluginBehavior(GiskardBehavior):
 

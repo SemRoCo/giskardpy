@@ -51,8 +51,13 @@ class PluginBehavior(GiskardBehavior):
     def get_plugins(self):
         return self._plugins
 
-    def add_plugin(self, name, plugin):
-        """Registers a plugin with the process manager. The name needs to be unique."""
+    def add_plugin(self, plugin):
+        """
+        Registers a plugin with the process manager. The name needs to be unique.
+        :param plugin: Behaviour
+        :return:
+        """
+        name = plugin.name
         if name in self._plugins:
             raise KeyError(u'A plugin with name "{}" already exists.'.format(name))
         self._plugins[name] = plugin

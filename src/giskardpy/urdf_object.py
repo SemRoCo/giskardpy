@@ -2,9 +2,9 @@ from collections import namedtuple
 from itertools import chain
 
 import urdf_parser_py.urdf as up
-from geometry_msgs.msg import Pose, Vector3
+from geometry_msgs.msg import Pose, Vector3, Point, Quaternion
 from std_msgs.msg import ColorRGBA
-from tf.transformations import euler_from_quaternion
+from tf.transformations import euler_from_quaternion, quaternion_from_euler
 from visualization_msgs.msg import Marker
 
 from giskardpy.exceptions import DuplicateNameException, UnknownBodyException, CorruptShapeException

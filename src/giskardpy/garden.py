@@ -26,7 +26,7 @@ from giskardpy.plugin_pybullet import WorldUpdatePlugin, CollisionChecker
 from giskardpy.plugin_send_trajectory import SendTrajectory
 from giskardpy.pybullet_world import PyBulletWorld
 from giskardpy.utils import create_path, render_dot_tree
-from giskardpy.visualization import VisualizationBehavior
+from giskardpy.plugin_visualization import VisualizationBehavior
 from giskardpy.world_object import WorldObject
 
 

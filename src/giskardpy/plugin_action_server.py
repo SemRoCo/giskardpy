@@ -1,11 +1,9 @@
-import numpy as np
 from Queue import Empty, Queue
 
 import actionlib
 from giskard_msgs.msg._MoveGoal import MoveGoal
 from giskard_msgs.msg._MoveResult import MoveResult
 from py_trees import Blackboard, Status
-
 
 from giskardpy.exceptions import MAX_NWSR_REACHEDException, QPSolverException, SolverTimeoutError, InsolvableException, \
     SymengineException, PathCollisionException, UnknownBodyException
@@ -20,6 +18,7 @@ class ActionServerHandler(object):
     """
     Interface to action server which is more useful for behaviors.
     """
+
     def __init__(self, action_name, action_type):
         self.goal_queue = Queue(1)
         self.result_queue = Queue(1)
@@ -27,7 +26,6 @@ class ActionServerHandler(object):
                                                 execute_cb=self.execute_cb, auto_start=False)
         # self._as.register_preempt_callback(self.cancel_cb)
         self._as.start()
-
 
     def execute_cb(self, goal):
         """
@@ -55,18 +53,22 @@ class ActionServerHandler(object):
         # TODO put shit in queue
         def call_me_now():
             self._as.set_preempted(result)
+
         self.result_queue.put(call_me_now)
 
     def send_result(self, result=None):
         """
         :type result: MoveResult
         """
+
         def call_me_now():
             self._as.set_succeeded(result)
+
         self.result_queue.put(call_me_now)
 
     def is_preempt_requested(self):
         return self._as.is_preempt_requested()
+
 
 class ActionServerBehavior(GiskardBehavior):
     def __init__(self, name, as_name, action_type=None):

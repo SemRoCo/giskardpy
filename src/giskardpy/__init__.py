@@ -4,7 +4,6 @@ ERROR = 2
 # TODO figure out how to do this print level shit properly
 PRINT_LEVEL = NORMAL
 
-
 MAP = u'map'
 
 # BACKEND = None
@@ -16,5 +15,3 @@ BACKEND = 'llvm'
 # BACKEND = 'lambda'
 
 WORLD_IMPLEMENTATION = u'pybullet'
-
-

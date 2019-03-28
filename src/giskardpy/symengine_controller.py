@@ -1,9 +1,9 @@
 import hashlib
 import warnings
+from collections import OrderedDict
 from itertools import chain
 
 import symengine_wrappers as sw
-from collections import OrderedDict
 from giskardpy.qp_problem_builder import QProblemBuilder, SoftConstraint
 from giskardpy.symengine_robot import Robot
 

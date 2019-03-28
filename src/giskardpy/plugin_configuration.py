@@ -3,9 +3,10 @@ from Queue import Empty, Queue
 import rospy
 from py_trees import Status
 from sensor_msgs.msg import JointState
+
 from giskardpy.identifier import js_identifier
 from giskardpy.plugin import GiskardBehavior
-from giskardpy.tfwrapper import lookup_transform, lookup_pose
+from giskardpy.tfwrapper import lookup_pose
 from giskardpy.utils import to_joint_state_dict
 
 

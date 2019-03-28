@@ -1,9 +1,9 @@
-import string
-import random
-import pybullet as p
-from collections import namedtuple
 import os
+import random
+import string
+from collections import namedtuple
 
+import pybullet as p
 from geometry_msgs.msg import Pose, PoseStamped, Point, Quaternion
 
 import giskardpy
@@ -68,8 +68,10 @@ def deactivate_rendering():
     p.configureDebugVisualizer(p.COV_ENABLE_TINY_RENDERER, 0)
     p.configureDebugVisualizer(p.COV_ENABLE_GUI, 0)
 
+
 def activate_rendering():
     p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 1)
+
 
 def stop_pybullet():
     p.disconnect()
@@ -84,6 +86,7 @@ def start_pybullet(gui):
     p.setGravity(0, 0, -9.8)
     return server_id
 
+
 def pybullet_pose_to_msg(pose):
     """
     :type pose: tuple
@@ -95,6 +98,7 @@ def pybullet_pose_to_msg(pose):
     pose.pose.position = Point(*position)
     pose.pose.orientation = Quaternion(*orientation)
     return pose
+
 
 def msg_to_pybullet_pose(msg):
     """
@@ -112,11 +116,14 @@ def msg_to_pybullet_pose(msg):
                    msg.orientation.w)
     return position, orientation
 
+
 def clear_pybullet():
     p.resetSimulation()
 
+
 def get_body_names():
     return [p.getBodyInfo(p.getBodyUniqueId(i))[1] for i in range(p.getNumBodies())]
+
 
 def print_body_names():
     print(get_body_names())

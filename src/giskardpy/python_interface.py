@@ -6,6 +6,7 @@ from giskard_msgs.srv import UpdateWorld, UpdateWorldRequest, UpdateWorldRespons
 from sensor_msgs.msg import JointState
 from shape_msgs.msg import SolidPrimitive
 from visualization_msgs.msg import MarkerArray
+
 from giskardpy.utils import dict_to_joint_states, make_world_body_box
 
 
@@ -18,7 +19,7 @@ class GiskardWrapper(object):
             rospy.wait_for_service(u'{}/update_world'.format(ns))
             self.client.wait_for_server()
         self.tip_to_root = {}
-        self.robot_name = rospy.get_param(u'robot_description').split('\n',1)[1].split('" ',1)[0].split('"')[1]
+        self.robot_name = rospy.get_param(u'robot_description').split('\n', 1)[1].split('" ', 1)[0].split('"')[1]
         self.collisions = []
         self.clear_cmds()
         self.object_js_topics = {}
@@ -35,7 +36,6 @@ class GiskardWrapper(object):
         """
         self.set_tranlation_goal(root, tip, pose_stamped)
         self.set_rotation_goal(root, tip, pose_stamped)
-
 
     def set_tranlation_goal(self, root, tip, pose_stamped, p_gain=3, max_speed=0.1):
         """
@@ -193,7 +193,7 @@ class GiskardWrapper(object):
     def interrupt(self):
         self.client.cancel_goal()
 
-    def get_result(self,  timeout=rospy.Duration()):
+    def get_result(self, timeout=rospy.Duration()):
         """
         Waits for giskardpy result and returns it. Only used when plan_and_execute was called with wait=False
         :type timeout: rospy.Duration
@@ -221,7 +221,6 @@ class GiskardWrapper(object):
         req = UpdateWorldRequest(UpdateWorldRequest.REMOVE, object, False, PoseStamped())
         return self.update_world.call(req)
 
-
     def add_box(self, name=u'box', size=(1, 1, 1), frame_id=u'map', position=(0, 0, 0), orientation=(0, 0, 0, 1),
                 pose=None):
         box = make_world_body_box(name, size[0], size[1], size[2])
@@ -234,7 +233,8 @@ class GiskardWrapper(object):
         req = UpdateWorldRequest(UpdateWorldRequest.ADD, box, False, pose)
         return self.update_world.call(req)
 
-    def add_sphere(self, name=u'sphere', size=1, frame_id=u'map', position=(0,0,0), orientation=(0,0,0,1), pose=None):
+    def add_sphere(self, name=u'sphere', size=1, frame_id=u'map', position=(0, 0, 0), orientation=(0, 0, 0, 1),
+                   pose=None):
         object = WorldBody()
         object.type = WorldBody.PRIMITIVE_BODY
         object.name = str(name)
@@ -249,7 +249,7 @@ class GiskardWrapper(object):
         req = UpdateWorldRequest(UpdateWorldRequest.ADD, object, False, pose)
         return self.update_world.call(req)
 
-    def add_cylinder(self, name=u'cylinder', size=(1,1), frame_id=u'map', position=(0,0,0), orientation=(0,0,0,1),
+    def add_cylinder(self, name=u'cylinder', size=(1, 1), frame_id=u'map', position=(0, 0, 0), orientation=(0, 0, 0, 1),
                      pose=None):
         object = WorldBody()
         object.type = WorldBody.PRIMITIVE_BODY
@@ -279,8 +279,8 @@ class GiskardWrapper(object):
         pose = PoseStamped()
         pose.header.stamp = rospy.Time.now()
         pose.header.frame_id = str(frame_id) if frame_id is not None else u'map'
-        pose.pose.position = Point(*(position if position is not None else [0,0,0]))
-        pose.pose.orientation = Quaternion(*(orientation if orientation is not None else [0,0,0,1]))
+        pose.pose.position = Point(*(position if position is not None else [0, 0, 0]))
+        pose.pose.orientation = Quaternion(*(orientation if orientation is not None else [0, 0, 0, 1]))
 
         req = UpdateWorldRequest(UpdateWorldRequest.ADD, box, True, pose)
         return self.update_world.call(req)

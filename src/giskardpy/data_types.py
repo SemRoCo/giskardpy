@@ -1,4 +1,4 @@
-from collections import OrderedDict, namedtuple
+from collections import OrderedDict
 
 
 class SingleJointState(object):
@@ -10,6 +10,7 @@ class SingleJointState(object):
 
     def __str__(self):
         return u'{}: {}, {}, {}'.format(self.name, self.position, self.velocity, self.effort)
+
 
 class Trajectory(object):
     def __init__(self):
@@ -40,8 +41,9 @@ class Trajectory(object):
 
 
 class ClosestPointInfo(object):
-    #TODO why no named tuple?
-    def __init__(self, position_on_a, position_on_b, contact_distance, min_dist, link_a, link_b, contact_normal, old_key):
+    # TODO why no named tuple?
+    def __init__(self, position_on_a, position_on_b, contact_distance, min_dist, link_a, link_b, contact_normal,
+                 old_key):
         self.position_on_a = position_on_a
         self.position_on_b = position_on_b
         self.contact_distance = contact_distance

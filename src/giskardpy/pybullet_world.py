@@ -1,18 +1,16 @@
-import pybullet as p
-from collections import namedtuple, OrderedDict, defaultdict
-
-from geometry_msgs.msg import Vector3, PoseStamped, Point, Quaternion, Pose
-import giskardpy
-from giskardpy.data_types import SingleJointState, ClosestPointInfo
 import numpy as np
+from collections import defaultdict
 
+import pybullet as p
+from geometry_msgs.msg import Point, Pose
+
+import giskardpy
+from giskardpy.data_types import ClosestPointInfo
 from giskardpy.pybullet_world_object import PyBulletWorldObject
-from giskardpy.pybullet_wrapper import ContactInfo, deactivate_rendering, activate_rendering
-from giskardpy.utils import keydefaultdict, suppress_stdout, NullContextManager, resolve_ros_iris_in_urdf, \
-    write_to_tmp, resolve_ros_iris
-
-from giskardpy.world_object import WorldObject
+from giskardpy.pybullet_wrapper import ContactInfo
+from giskardpy.utils import resolve_ros_iris
 from giskardpy.world import World
+from giskardpy.world_object import WorldObject
 
 # TODO globally define map
 

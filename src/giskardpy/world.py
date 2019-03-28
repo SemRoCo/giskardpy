@@ -7,9 +7,9 @@ from giskardpy.data_types import ClosestPointInfo
 from giskardpy.exceptions import RobotExistsException, DuplicateNameException, PhysicsWorldException, \
     UnknownBodyException, UnsupportedOptionException
 from giskardpy.symengine_robot import Robot
-from giskardpy.tfwrapper import transform_pose, transform_point, transform_vector, msg_to_kdl, kdl_to_pose
+from giskardpy.tfwrapper import msg_to_kdl, kdl_to_pose
 from giskardpy.urdf_object import URDFObject
-from giskardpy.utils import keydefaultdict, to_point_stamped, msg_to_list, to_vector3_stamped
+from giskardpy.utils import keydefaultdict
 from giskardpy.world_object import WorldObject
 
 
@@ -120,7 +120,7 @@ class World(object):
         if self.has_object(robot.get_name()):
             raise DuplicateNameException(
                 u'can\'t add robot; object with name "{}" already exists'.format(robot.get_name()))
-        self._robot = Robot.from_urdf_object(robot, base_pose, controlled_joints,  self._path_to_data_folder,
+        self._robot = Robot.from_urdf_object(robot, base_pose, controlled_joints, self._path_to_data_folder,
                                              default_joint_vel_limit, default_joint_weight, calc_self_collision_matrix)
 
     @property
@@ -164,7 +164,7 @@ class World(object):
             cut_off_obj = self.robot.detach_sub_tree(joint_name)
         else:
             raise UnsupportedOptionException(u'only detach from robot supported')
-        wo = WorldObject.from_urdf_object(cut_off_obj) # type: WorldObject
+        wo = WorldObject.from_urdf_object(cut_off_obj)  # type: WorldObject
         wo.base_pose = p_map
         self.add_object(wo)
 

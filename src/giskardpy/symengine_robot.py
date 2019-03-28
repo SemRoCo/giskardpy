@@ -5,11 +5,10 @@ from geometry_msgs.msg import PoseStamped
 
 import symengine_wrappers as spw
 from giskardpy import BACKEND, WORLD_IMPLEMENTATION
-
 from giskardpy.pybullet_world_object import PyBulletWorldObject
 from giskardpy.qp_problem_builder import HardConstraint, JointConstraint
 from giskardpy.utils import keydefaultdict, \
-    suppress_stdout, suppress_stderr, homo_matrix_to_pose
+    homo_matrix_to_pose
 from giskardpy.world_object import WorldObject
 
 Joint = namedtuple(u'Joint', [u'symbol', u'velocity_limit', u'lower', u'upper', u'type', u'frame'])
@@ -59,7 +58,8 @@ class Robot(Backend):
         :return:
         """
         Backend.joint_state.fset(self, value)
-        self.__joint_state_positions = {str(self._joint_to_symbol_map[k]): v.position for k, v in self.joint_state.items()}
+        self.__joint_state_positions = {str(self._joint_to_symbol_map[k]): v.position for k, v in
+                                        self.joint_state.items()}
         self._evaluated_fks.clear()
 
     def reinitialize(self, joints_to_symbols_map=None):
@@ -196,5 +196,3 @@ class Robot(Backend):
         :rtype: spw.Symbol
         """
         return self._joint_to_symbol_map[joint_name]
-
-

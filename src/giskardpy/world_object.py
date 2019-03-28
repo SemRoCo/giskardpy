@@ -1,9 +1,9 @@
-import hashlib
-import os
-import numpy as np
 import errno
+import hashlib
+import numpy as np
+import os
 import pickle
-from itertools import combinations, product
+from itertools import product
 
 from geometry_msgs.msg import Pose, Quaternion
 
@@ -81,7 +81,7 @@ class WorldObject(URDFObject):
         self.suicide()
 
     def get_controlled_links(self):
-        #FIXME expensive
+        # FIXME expensive
         controllable_links = set()
         for joint_name in self.controlled_joints:
             controllable_links.update(self.get_sub_tree_link_names_with_collision(joint_name))
@@ -269,4 +269,3 @@ class WorldObject(URDFObject):
     def reset(self):
         super(WorldObject, self).reset()
         self.update_self_collision_matrix()
-

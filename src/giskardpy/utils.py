@@ -1,33 +1,32 @@
 from __future__ import division
 
+import errno
+import numpy as np
+import os
+import pkg_resources
 import pydot
+import pylab as plt
+import re
 import rospkg
 import subprocess
+import sys
 from collections import defaultdict, OrderedDict
-import numpy as np
-from itertools import product, chain
+from contextlib import contextmanager
+from itertools import product
 from numpy import pi
-from rospy import logwarn
-import re
-
-import errno
 
 from geometry_msgs.msg import PointStamped, Point, Vector3Stamped, Vector3, Pose, PoseStamped, QuaternionStamped, \
     Quaternion
 from giskard_msgs.msg import WorldBody
 from py_trees import common, Chooser, Selector, Sequence, Behaviour
 from py_trees.composites import Parallel
+from rospy import logwarn
 from sensor_msgs.msg import JointState
 from shape_msgs.msg import SolidPrimitive
-from tf.transformations import quaternion_multiply, quaternion_conjugate, quaternion_matrix, quaternion_from_matrix
+from tf.transformations import quaternion_multiply, quaternion_conjugate
 
-from giskardpy.data_types import SingleJointState
 from giskardpy.data_types import ClosestPointInfo
-from contextlib import contextmanager
-import sys, os
-import pylab as plt
-import pkg_resources
-
+from giskardpy.data_types import SingleJointState
 from giskardpy.plugin import PluginBehavior
 from giskardpy.tfwrapper import kdl_to_pose, np_to_kdl
 
@@ -577,8 +576,10 @@ def is_iterable(qwe):
         return False
     return True
 
+
 def homo_matrix_to_pose(m):
     return kdl_to_pose(np_to_kdl(m))
+
 
 def compare_version(version1, operator, version2):
     """

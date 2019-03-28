@@ -1,12 +1,13 @@
+import numpy as np
 from copy import copy
 from time import time
 
-from giskard_msgs.msg import CollisionEntry
 from giskard_msgs.msg import Controller
 from giskard_msgs.msg import MoveCmd
 from giskard_msgs.msg import MoveGoal
 from py_trees import Status
 
+import symengine_wrappers as sw
 from giskardpy.exceptions import InsolvableException
 from giskardpy.identifier import soft_constraint_identifier, next_cmd_identifier, \
     collision_goal_identifier, fk_identifier, \
@@ -16,9 +17,7 @@ from giskardpy.plugin import GiskardBehavior
 from giskardpy.plugin_action_server import GetGoal
 from giskardpy.symengine_controller import SymEngineController, position_conv, rotation_conv, \
     link_to_link_avoidance, joint_position, continuous_joint_position, rotation_conv_slerp
-import symengine_wrappers as sw
 from giskardpy.tfwrapper import transform_pose
-import numpy as np
 
 
 # TODO plan only not supported

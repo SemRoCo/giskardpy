@@ -1,15 +1,15 @@
 from collections import namedtuple
 from itertools import chain
 
-from geometry_msgs.msg import Pose, Vector3
 import urdf_parser_py.urdf as up
+from geometry_msgs.msg import Pose, Vector3
 from std_msgs.msg import ColorRGBA
 from tf.transformations import euler_from_quaternion
 from visualization_msgs.msg import Marker
 
 from giskardpy.exceptions import DuplicateNameException, UnknownBodyException, CorruptShapeException
 from giskardpy.utils import cube_volume, cube_surface, sphere_volume, cylinder_volume, cylinder_surface, \
-    suppress_stderr, remove_outer_tag
+    suppress_stderr
 
 Joint = namedtuple('Joint', ['symbol', 'velocity_limit', 'lower', 'upper', 'type', 'frame'])
 

@@ -1,14 +1,12 @@
+import numpy as np
 import pickle
 import warnings
 from collections import OrderedDict, namedtuple
-import numpy as np
 from time import time
 
-from giskardpy import BACKEND
-
 import giskardpy.symengine_wrappers as spw
+from giskardpy import BACKEND
 from giskardpy.qp_solver import QPSolver
-
 from giskardpy.symengine_wrappers import load_compiled_function, safe_compiled_function
 
 SoftConstraint = namedtuple(u'SoftConstraint', [u'lower', u'upper', u'weight', u'expression'])
@@ -22,6 +20,7 @@ class QProblemBuilder(object):
     """
     Wraps around QPOases. Builds the required matrices from constraints.
     """
+
     def __init__(self, joint_constraints_dict, hard_constraints_dict, soft_constraints_dict, controlled_joint_symbols,
                  free_symbols=None, path_to_functions=''):
         """
@@ -207,7 +206,6 @@ class QProblemBuilder(object):
         # TODO enable debug print in an elegant way, preferably without slowing anything down
         # self.debug_print(np_H, np_A, np_lb, np_ub, np_lbA, np_ubA, xdot_full)
         return OrderedDict((observable, xdot_full[i]) for i, observable in enumerate(self.controlled_joints))
-
 
 # with pd.option_context('display.max_rows', None, 'display.max_columns', None):
 #     print(df)

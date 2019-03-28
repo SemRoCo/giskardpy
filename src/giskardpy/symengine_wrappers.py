@@ -1,13 +1,12 @@
+import numpy as np
 import os
 import pickle
+from numpy import pi
 from warnings import warn
 
 import symengine as se
 from symengine import Matrix, Symbol, eye, sympify, diag, zeros, lambdify, Abs, Max, Min, sin, cos, tan, acos, asin, \
     atan, atan2, nan, sqrt, log, tanh, var, floor, Piecewise, sign
-import numpy as np
-from numpy import pi
-
 from symengine.lib.symengine_wrapper import Lambdify
 
 from giskardpy.exceptions import SymengineException

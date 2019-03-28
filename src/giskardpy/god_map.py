@@ -1,16 +1,15 @@
 import copy
+from copy import copy
 from multiprocessing import Lock
 
 import symengine_wrappers as sw
-from copy import copy
-
-from giskardpy.utils import is_iterable
 
 
 class GodMap(object):
     """
     Data structure used by plugins to exchange information.
     """
+
     # TODO give this fucker a lock
     def __init__(self):
         self._data = {}
@@ -36,7 +35,7 @@ class GodMap(object):
         self.lock.release()
 
     # @profile
-    def _get_member(self, identifier,  member):
+    def _get_member(self, identifier, member):
         """
         :param identifier:
         :type identifier: Union[None, dict, list, tuple, object]
@@ -122,7 +121,7 @@ class GodMap(object):
         :return: a dict which maps all registered expressions to their values or 0 if there is no number entry
         :rtype: dict
         """
-        #TODO potential speedup by only updating entries that have changed
+        # TODO potential speedup by only updating entries that have changed
         with self.lock:
             if exprs is None:
                 exprs = self.expr_to_key.keys()

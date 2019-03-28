@@ -2,6 +2,7 @@ import traceback
 from collections import OrderedDict
 from multiprocessing import Lock
 from threading import Thread
+
 import rospy
 from py_trees import Behaviour, Blackboard, Status
 

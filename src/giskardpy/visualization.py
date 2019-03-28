@@ -1,8 +1,9 @@
-from giskardpy.identifier import fk_identifier
-from plugin import GiskardBehavior
 import py_trees
 from interactive_markers.menu_handler import *
 from visualization_msgs.msg import *
+
+from giskardpy.identifier import fk_identifier
+from plugin import GiskardBehavior
 
 
 class VisualizationBehavior(GiskardBehavior):

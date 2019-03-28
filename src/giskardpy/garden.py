@@ -1,34 +1,34 @@
 import functools
 
-from py_trees.behaviours import Count
-
-import giskardpy.pybullet_wrapper as pbw
+import py_trees
 import rospy
 from control_msgs.msg import JointTrajectoryControllerState
 from giskard_msgs.msg import MoveAction
 from py_trees import Sequence, Selector, BehaviourTree, Blackboard
-import py_trees
-from py_trees.meta import running_is_failure, success_is_running, failure_is_success, success_is_failure
+from py_trees.meta import success_is_running, failure_is_success, success_is_failure
+
+import giskardpy.pybullet_wrapper as pbw
 from giskardpy.god_map import GodMap
-from giskardpy.identifier import world_identifier, robot_identifier, js_identifier, default_joint_weight_identifier, \
+from giskardpy.identifier import world_identifier, js_identifier, default_joint_weight_identifier, \
     default_joint_vel_identifier
 from giskardpy.input_system import JointStatesInput
 from giskardpy.plugin import PluginBehavior, SuccessPlugin
 from giskardpy.plugin_action_server import GoalReceived, SendResult, GoalCanceled
 from giskardpy.plugin_cleanup import CleanUp
+from giskardpy.plugin_configuration import ConfigurationPlugin
 from giskardpy.plugin_goal_reached import GoalReachedPlugin
 from giskardpy.plugin_instantaneous_controller import GoalToConstraints, ControllerPlugin
 from giskardpy.plugin_interrupts import CollisionCancel, WiggleCancel
-from giskardpy.plugin_configuration import ConfigurationPlugin
 from giskardpy.plugin_kinematic_sim import KinSimPlugin
-from giskardpy.plugin_knowrob import KnowrobPlugin
+# from giskardpy.plugin_knowrob import KnowrobPlugin
 from giskardpy.plugin_log_trajectory import LogTrajPlugin
 from giskardpy.plugin_pybullet import WorldUpdatePlugin, CollisionChecker
 from giskardpy.plugin_send_trajectory import SendTrajectory
-from giskardpy.visualization import VisualizationBehavior
 from giskardpy.pybullet_world import PyBulletWorld
 from giskardpy.utils import create_path, render_dot_tree
+from giskardpy.visualization import VisualizationBehavior
 from giskardpy.world_object import WorldObject
+
 
 def initialize_blackboard(urdf, default_joint_vel_limit, default_joint_weight, path_to_data_folder, gui):
     pbw.start_pybullet(gui)
@@ -51,6 +51,7 @@ def initialize_blackboard(urdf, default_joint_vel_limit, default_joint_weight, p
                                 suffix=[u'position'])
     world.robot.reinitialize(js_input.joint_map)
     blackboard.god_map.safe_set_data(world_identifier, world)
+
 
 def grow_tree():
     gui = rospy.get_param(u'~enable_gui')
@@ -110,7 +111,8 @@ def grow_tree():
 
     actual_planning = PluginBehavior(u'planning', sleep=0)
     actual_planning.add_plugin(KinSimPlugin(u'kin sim', sample_period))
-    actual_planning.add_plugin(CollisionChecker(u'coll', default_collision_avoidance_distance, map_frame, root_link, marker))
+    actual_planning.add_plugin(
+        CollisionChecker(u'coll', default_collision_avoidance_distance, map_frame, root_link, marker))
     actual_planning.add_plugin(ControllerPlugin(u'controller', path_to_data_folder, nWSR))
     actual_planning.add_plugin(LogTrajPlugin(u'log'))
     actual_planning.add_plugin(GoalReachedPlugin(u'goal reached', joint_convergence_threshold))

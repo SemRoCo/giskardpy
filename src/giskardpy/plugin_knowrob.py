@@ -1,10 +1,11 @@
 from Queue import Empty, Queue
 
+import pybullet
 import rospy
 from knowrob_objects.msg import ObjectStateArray, ObjectState
 from py_trees import Status
 from std_srvs.srv import Trigger, TriggerRequest
-import pybullet
+
 from giskardpy import MAP
 from giskardpy.exceptions import CorruptShapeException
 from giskardpy.plugin import GiskardBehavior
@@ -44,7 +45,7 @@ class KnowrobPlugin(GiskardBehavior):
         try:
             while not self.lock.empty():
                 updates = self.lock.get()
-                for object_state in updates.object_states: # type: ObjectState
+                for object_state in updates.object_states:  # type: ObjectState
                     object_name = object_state.object_id
                     if not self.get_world().has_object(object_name):
                         try:
@@ -64,4 +65,3 @@ class KnowrobPlugin(GiskardBehavior):
             pass
 
         return Status.RUNNING
-

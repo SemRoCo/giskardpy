@@ -1,23 +1,22 @@
 import traceback
-import numpy as np
-import rospy
-from geometry_msgs.msg import Point, Vector3, PoseStamped
-from giskard_msgs.msg import CollisionEntry, WorldBody
 from multiprocessing import Lock
 
+import rospy
+from geometry_msgs.msg import Point, Vector3, PoseStamped
+from giskard_msgs.srv import UpdateWorld, UpdateWorldResponse, UpdateWorldRequest
 from py_trees import Status
+from sensor_msgs.msg import JointState
 from std_msgs.msg import ColorRGBA
 from std_srvs.srv import SetBool, SetBoolResponse
-from sensor_msgs.msg import JointState
-from giskard_msgs.srv import UpdateWorld, UpdateWorldResponse, UpdateWorldRequest
 from visualization_msgs.msg import Marker, MarkerArray
+
+from giskardpy.data_types import ClosestPointInfo
 from giskardpy.exceptions import CorruptShapeException, UnknownBodyException, \
-    UnsupportedOptionException, DuplicateNameException, PhysicsWorldException
+    UnsupportedOptionException, DuplicateNameException
 from giskardpy.identifier import collision_goal_identifier, closest_point_identifier
 from giskardpy.plugin import GiskardBehavior
-from giskardpy.tfwrapper import transform_pose, lookup_transform, transform_point, transform_vector
-from giskardpy.data_types import ClosestPointInfo
-from giskardpy.utils import keydefaultdict, to_joint_state_dict
+from giskardpy.tfwrapper import transform_pose
+from giskardpy.utils import to_joint_state_dict
 from giskardpy.world_object import WorldObject
 
 

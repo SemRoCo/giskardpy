@@ -1,9 +1,11 @@
 from collections import OrderedDict
-from geometry_msgs.msg import PoseStamped, Point, Quaternion, Pose
+
+import pybullet as p
+from geometry_msgs.msg import Pose
+
 from giskardpy.pybullet_wrapper import load_urdf_string_into_bullet, JointInfo, pybullet_pose_to_msg, \
     deactivate_rendering, activate_rendering, msg_to_pybullet_pose
 from giskardpy.world_object import WorldObject
-import pybullet as p
 
 
 class PyBulletWorldObject(WorldObject):

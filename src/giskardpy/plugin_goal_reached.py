@@ -4,19 +4,13 @@ from time import time
 from py_trees import Status
 
 from giskardpy.identifier import time_identifier, js_identifier
-from giskardpy.plugin import PluginBase
+from giskardpy.plugin import GiskardBehavior
 
 
-class GoalReachedPlugin(PluginBase):
-    def __init__(self, joint_convergence_threshold):
-        super(GoalReachedPlugin, self).__init__()
+class GoalReachedPlugin(GiskardBehavior):
+    def __init__(self, name, joint_convergence_threshold):
+        super(GoalReachedPlugin, self).__init__(name)
         self.joint_convergence_threshold = joint_convergence_threshold
-
-    def setup(self):
-        super(GoalReachedPlugin, self).setup()
-
-    def initialize(self):
-        super(GoalReachedPlugin, self).initialize()
 
     def update(self):
         current_js = self.get_god_map().safe_get_data(js_identifier)

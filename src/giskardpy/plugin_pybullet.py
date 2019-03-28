@@ -14,24 +14,24 @@ from visualization_msgs.msg import Marker, MarkerArray
 from giskardpy.exceptions import CorruptShapeException, UnknownBodyException, \
     UnsupportedOptionException, DuplicateNameException, PhysicsWorldException
 from giskardpy.identifier import collision_goal_identifier, closest_point_identifier
-from giskardpy.plugin import PluginBase
+from giskardpy.plugin import GiskardBehavior
 from giskardpy.tfwrapper import transform_pose, lookup_transform, transform_point, transform_vector
 from giskardpy.data_types import ClosestPointInfo
 from giskardpy.utils import keydefaultdict, to_joint_state_dict
 from giskardpy.world_object import WorldObject
 
 
-class WorldUpdatePlugin(PluginBase):
+class WorldUpdatePlugin(GiskardBehavior):
     # TODO reject changes if plugin not active or something
-    def __init__(self):
-        super(WorldUpdatePlugin, self).__init__()
+    def __init__(self, name):
+        super(WorldUpdatePlugin, self).__init__(name)
         self.global_reference_frame_name = u'map'
         self.lock = Lock()
         self.object_js_subs = {}  # JointState subscribers for articulated world objects
         self.object_joint_states = {}  # JointStates messages for articulated world objects
 
-    def setup(self):
-        super(WorldUpdatePlugin, self).setup()
+    def setup(self, timeout=5.0):
+        super(WorldUpdatePlugin, self).setup(timeout)
         # TODO make service name a parameter
         self.srv_update_world = rospy.Service(u'~update_world', UpdateWorld, self.update_world_cb)
         self.pub_collision_marker = rospy.Publisher(u'~visualization_marker_array', MarkerArray, queue_size=1)
@@ -45,7 +45,7 @@ class WorldUpdatePlugin(PluginBase):
             for object_name, object_joint_state in self.object_joint_states.items():
                 self.get_world().get_object(object_name).joint_state = object_joint_state
 
-        return super(WorldUpdatePlugin, self).update()
+        return Status.RUNNING
 
     def object_js_cb(self, object_name, msg):
         """
@@ -204,9 +204,9 @@ class WorldUpdatePlugin(PluginBase):
         self.pub_collision_marker.publish(MarkerArray([Marker(action=Marker.DELETEALL)]))
 
 
-class CollisionChecker(PluginBase):
-    def __init__(self, default_collision_avoidance_distance, map_frame, root_link, marker=True):
-        super(CollisionChecker, self).__init__()
+class CollisionChecker(GiskardBehavior):
+    def __init__(self, name, default_collision_avoidance_distance, map_frame, root_link, marker=True):
+        super(CollisionChecker, self).__init__(name)
         self.default_min_dist = default_collision_avoidance_distance
         self.map_frame = map_frame
         self.robot_root = root_link
@@ -215,18 +215,18 @@ class CollisionChecker(PluginBase):
         self.object_js_subs = {}  # JointState subscribers for articulated world objects
         self.object_joint_states = {}  # JointStates messages for articulated world objects
 
-    def setup(self):
-        super(CollisionChecker, self).setup()
+    def setup(self, timeout=10.0):
+        super(CollisionChecker, self).setup(timeout)
         self.pub_collision_marker = rospy.Publisher(u'~visualization_marker_array', MarkerArray, queue_size=1)
         self.srv_viz_gui = rospy.Service(u'~enable_marker', SetBool, self.enable_marker_cb)
         rospy.sleep(.5)
 
-    def initialize(self):
+    def initialise(self):
         collision_goals = self.get_god_map().safe_get_data(collision_goal_identifier)
         self.collision_matrix = self.get_world().collision_goals_to_collision_matrix(collision_goals,
                                                                                      self.default_min_dist)
         self.get_god_map().safe_set_data(closest_point_identifier, None)
-        super(CollisionChecker, self).initialize()
+        super(CollisionChecker, self).initialise()
 
     # @profile
     def update(self):
@@ -243,7 +243,7 @@ class CollisionChecker(PluginBase):
                 self.publish_cpi_markers(closest_point)
 
             self.god_map.safe_set_data(closest_point_identifier, closest_point)
-        return super(CollisionChecker, self).update()
+        return Status.RUNNING
 
     def enable_marker_cb(self, setbool):
         """

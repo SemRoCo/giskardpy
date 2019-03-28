@@ -1,12 +1,14 @@
 from collections import OrderedDict
 
+from py_trees import Status
+
 from giskardpy.data_types import SingleJointState
 from giskardpy.identifier import time_identifier, js_identifier, next_cmd_identifier
-from giskardpy.plugin import PluginBase
+from giskardpy.plugin import GiskardBehavior
 
 
-class KinSimPlugin(PluginBase):
-    def __init__(self, sample_period):
+class KinSimPlugin(GiskardBehavior):
+    def __init__(self, name, sample_period):
         """
         :type js_identifier: str
         :type next_cmd_identifier: str
@@ -15,12 +17,12 @@ class KinSimPlugin(PluginBase):
         :type sample_period: float
         """
         self.frequency = sample_period
-        super(KinSimPlugin, self).__init__()
+        super(KinSimPlugin, self).__init__(name)
 
-    def initialize(self):
+    def initialise(self):
         self.next_js = None
         self.time = -self.frequency
-        super(KinSimPlugin, self).initialize()
+        super(KinSimPlugin, self).initialise()
 
     def update(self):
         self.time += self.frequency
@@ -39,4 +41,4 @@ class KinSimPlugin(PluginBase):
         else:
             self.get_god_map().safe_set_data(js_identifier, current_js)
         self.get_god_map().safe_set_data(time_identifier, self.time)
-        return super(KinSimPlugin, self).update()
+        return Status.RUNNING

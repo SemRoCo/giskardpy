@@ -2,18 +2,18 @@ from py_trees import Status
 
 from giskardpy.exceptions import PathCollisionException, InsolvableException
 from giskardpy.identifier import time_identifier, closest_point_identifier, js_identifier
-from giskardpy.plugin import GiskardBehavior, PluginBase
+from giskardpy.plugin import GiskardBehavior
 from giskardpy.utils import closest_point_constraint_violated, plot_trajectory
 
 
-class WiggleCancel(PluginBase):
-    def __init__(self, wiggle_precision_threshold):
+class WiggleCancel(GiskardBehavior):
+    def __init__(self, name, wiggle_precision_threshold):
         self.wiggle_precision = wiggle_precision_threshold
-        super(WiggleCancel, self).__init__()
+        super(WiggleCancel, self).__init__(name)
 
-    def initialize(self):
+    def initialise(self):
         self.past_joint_states = set()
-        super(WiggleCancel, self).initialize()
+        super(WiggleCancel, self).initialise()
 
     def update(self):
         current_js = self.get_god_map().safe_get_data(js_identifier)
@@ -21,9 +21,10 @@ class WiggleCancel(PluginBase):
         rounded_js = self.round_js(current_js)
         # TODO make 1 a parameter
         if time >= 1 and rounded_js in self.past_joint_states:
+            # TODO raise to blackboard and return failure?
             raise InsolvableException(u'endless wiggling detected')
         self.past_joint_states.add(rounded_js)
-        return super(WiggleCancel, self).update()
+        return Status.RUNNING
 
     def round_js(self, js):
         """

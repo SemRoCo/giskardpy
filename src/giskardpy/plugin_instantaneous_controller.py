@@ -12,7 +12,7 @@ from giskardpy.identifier import soft_constraint_identifier, next_cmd_identifier
     collision_goal_identifier, fk_identifier, \
     closest_point_identifier, js_identifier, cartesian_goal_identifier, default_joint_vel_identifier
 from giskardpy.input_system import FrameInput, Point3Input, Vector3Input
-from giskardpy.plugin import PluginBase
+from giskardpy.plugin import GiskardBehavior
 from giskardpy.plugin_action_server import GetGoal
 from giskardpy.symengine_controller import SymEngineController, position_conv, rotation_conv, \
     link_to_link_avoidance, joint_position, continuous_joint_position, rotation_conv_slerp
@@ -342,20 +342,23 @@ def cart_controller_to_goal(controller):
     return goals
 
 
-class ControllerPlugin(PluginBase):
-    def __init__(self, path_to_functions, nWSR=None):
-        super(ControllerPlugin, self).__init__()
+class ControllerPlugin(GiskardBehavior):
+    def __init__(self, name, path_to_functions, nWSR=None):
+        super(ControllerPlugin, self).__init__(name)
         self.path_to_functions = path_to_functions
         self.nWSR = nWSR
         self.soft_constraints = None
 
-    def setup(self):
-        super(ControllerPlugin, self).setup()
-
     def initialize(self):
-        super(ControllerPlugin, self).initialize()
+        self.initialise()
+
+    def initialise(self):
+        super(ControllerPlugin, self).initialise()
         self.init_controller()
         self.next_cmd = {}
+
+    def setup(self, timeout=0.0):
+        return super(ControllerPlugin, self).setup(5.0)
 
     def init_controller(self):
         new_soft_constraints = self.get_god_map().safe_get_data(soft_constraint_identifier)
@@ -375,4 +378,4 @@ class ControllerPlugin(PluginBase):
         self.next_cmd.update(next_cmd)
 
         self.get_god_map().safe_set_data(next_cmd_identifier, self.next_cmd)
-        return None
+        return Status.RUNNING

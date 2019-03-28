@@ -2,34 +2,36 @@ from Queue import Empty, Queue
 
 import rospy
 from knowrob_objects.msg import ObjectStateArray, ObjectState
+from py_trees import Status
 from std_srvs.srv import Trigger, TriggerRequest
 import pybullet
 from giskardpy import MAP
 from giskardpy.exceptions import CorruptShapeException
-from giskardpy.plugin import PluginBase
+from giskardpy.plugin import GiskardBehavior
 from giskardpy.tfwrapper import transform_pose
 from giskardpy.world_object import WorldObject
 
 
-class KnowrobPlugin(PluginBase):
+class KnowrobPlugin(GiskardBehavior):
     """
     Listens to a joint state topic, transforms it into a dict and writes it to the got map.
     Gets replace with a kinematic sim plugin during a parallel universe.
     """
 
-    def __init__(self, object_state_topic=u'object_state'):
+    def __init__(self, name, object_state_topic=u'object_state'):
         """
         :type js_identifier: str
         """
-        super(KnowrobPlugin, self).__init__()
+        super(KnowrobPlugin, self).__init__(name)
         self.mjs = None
         self.object_state_topic = object_state_topic
         self.lock = Queue()
 
-    def setup(self):
+    def setup(self, timeout=10.0):
         self.object_state_sub = rospy.Subscriber(self.object_state_topic, ObjectStateArray, self.cb, queue_size=1)
         self.get_update_srv = rospy.ServiceProxy(u'/object_state_publisher/update_object_positions', Trigger)
         self.get_update_srv.call(TriggerRequest())
+        super(KnowrobPlugin, self).setup(timeout)
 
     def cb(self, data):
         try:
@@ -61,5 +63,5 @@ class KnowrobPlugin(PluginBase):
         except Empty:
             pass
 
-        return None
+        return Status.RUNNING
 

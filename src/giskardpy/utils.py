@@ -28,7 +28,7 @@ import sys, os
 import pylab as plt
 import pkg_resources
 
-from giskardpy.plugin import PluginBehavior, PluginBase
+from giskardpy.plugin import PluginBehavior
 from giskardpy.tfwrapper import kdl_to_pose, np_to_kdl
 
 
@@ -470,12 +470,12 @@ def generate_pydot_graph(root, visibility_level):
             attributes = ('note', 'gold', 'black')
         elif isinstance(node, PluginBehavior):
             attributes = ('box', 'green', 'black')
-        elif isinstance(node, PluginBase) or node.children != []:
-            attributes = ('ellipse', 'ghostwhite', 'black')  # encapsulating behaviour (e.g. wait)
+        # elif isinstance(node, PluginBase) or node.children != []:
+        #     attributes = ('ellipse', 'ghostwhite', 'black')  # encapsulating behaviour (e.g. wait)
         else:
             attributes = ('ellipse', 'gray', 'black')
-        if not isinstance(node, PluginBase) and node.blackbox_level != common.BlackBoxLevel.NOT_A_BLACKBOX:
-            attributes = (attributes[0], 'gray20', blackbox_font_colours[node.blackbox_level])
+        # if not isinstance(node, PluginBase) and node.blackbox_level != common.BlackBoxLevel.NOT_A_BLACKBOX:
+        #     attributes = (attributes[0], 'gray20', blackbox_font_colours[node.blackbox_level])
         return attributes
 
     fontsize = 11

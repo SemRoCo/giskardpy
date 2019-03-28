@@ -8,50 +8,6 @@ from py_trees import Behaviour, Blackboard, Status
 from giskardpy.identifier import world_identifier, robot_identifier
 
 
-class PluginBase(object):
-    def __init__(self):
-        self.god_map = Blackboard().god_map
-
-    def setup(self):
-        pass
-
-    def initialize(self):
-        pass
-
-    def stop(self):
-        pass
-
-    def update(self):
-        """
-        :return: Status.Success, if the job of the behavior plugin is finished
-                 Status.Failure, if something went wrong the behavior is stopped
-                 Status.Running, if the behavior should only be killed in emergencies
-                 None, does not change the current status of the behavior
-        """
-        return None
-
-    def get_god_map(self):
-        """
-        :rtype: giskardpy.god_map.GodMap
-        """
-        return self.god_map
-
-    def get_world(self):
-        """
-        :rtype: giskardpy.world.World
-        """
-        return self.get_god_map().safe_get_data(world_identifier)
-
-    def get_robot(self):
-        """
-        :rtype: giskardpy.symengine_robot.Robot
-        """
-        return self.get_god_map().safe_get_data(robot_identifier)
-
-    def get_blackboard(self):
-        return Blackboard()
-
-
 class GiskardBehavior(Behaviour):
     def __init__(self, name):
         self.god_map = Blackboard().god_map
@@ -107,7 +63,7 @@ class PluginBehavior(GiskardBehavior):
 
     def start_plugins(self):
         for plugin in self._plugins.values():
-            plugin.setup()
+            plugin.setup(10.0)
 
     def initialise(self):
         self.looped_once = False
@@ -150,13 +106,14 @@ class PluginBehavior(GiskardBehavior):
 
     def loop_over_plugins(self):
         try:
-            self.init_plugins()
+            # self.init_plugins()
             while self.is_running() and not rospy.is_shutdown():
                 for plugin_name, plugin in self._plugins.items():
                     with self.status_lock:
                         if not self.is_running():
                             return
-                        status = plugin.update()
+                        for node in plugin.tick():
+                            status = node.status
                         if status is not None:
                             self.set_status(status)
                         assert self.my_status is not None, u'{} did not return a status'.format(plugin_name)
@@ -169,6 +126,6 @@ class PluginBehavior(GiskardBehavior):
             Blackboard().set('exception', e)
 
 
-class SuccessPlugin(PluginBase):
+class SuccessPlugin(GiskardBehavior):
     def update(self):
         return Status.SUCCESS

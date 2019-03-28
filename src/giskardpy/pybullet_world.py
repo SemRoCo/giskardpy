@@ -131,8 +131,8 @@ class PyBulletWorld(World):
 
     def __flip_contact_info(self, contact_info):
         return ContactInfo(contact_info.contact_flag,
-                           contact_info.body_unique_id_a, contact_info.body_unique_id_b,
-                           contact_info.link_index_a, contact_info.link_index_b,
+                           contact_info.body_unique_id_b, contact_info.body_unique_id_a,
+                           contact_info.link_index_b, contact_info.link_index_a,
                            contact_info.position_on_b, contact_info.position_on_a,
                            [-contact_info.contact_normal_on_b[0],
                             -contact_info.contact_normal_on_b[1],

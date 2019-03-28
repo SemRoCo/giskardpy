@@ -25,7 +25,6 @@ from giskardpy.tfwrapper import transform_pose
 class GoalToConstraints(GetGoal):
     def __init__(self, name, as_name, use_slerp=True):
         GetGoal.__init__(self, name, as_name)
-        self.soft_constraints = {}
         self.used_joints = set()
 
         self.known_constraints = set()
@@ -37,6 +36,7 @@ class GoalToConstraints(GetGoal):
         return super(GoalToConstraints, self).setup(timeout)
 
     def initialise(self):
+        self.soft_constraints = {}
         self.get_god_map().safe_set_data(collision_goal_identifier, None)
 
     def terminate(self, new_status):
@@ -44,7 +44,6 @@ class GoalToConstraints(GetGoal):
 
     def update(self):
         # TODO make this interruptable
-        # self.update_controlled_joints_and_links(controlled_joints_identifier, controllable_links_identifier)
 
         goal_msg = self.get_goal()  # type: MoveGoal
         if len(goal_msg.cmd_seq) == 0:
@@ -54,10 +53,6 @@ class GoalToConstraints(GetGoal):
             self.raise_to_blackboard(InsolvableException(u'only plan and execute is supported'))
             return Status.SUCCESS
 
-        # if self.was_urdf_updated():
-        #     # TODO do this somewhere else?
-        #     self.add_js_controller_soft_constraints()
-        #     self.add_collision_avoidance_soft_constraints()
         self.add_js_controller_soft_constraints()
         self.add_collision_avoidance_soft_constraints()
 

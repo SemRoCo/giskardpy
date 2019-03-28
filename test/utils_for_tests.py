@@ -190,7 +190,7 @@ class GiskardTestWrapper(object):
         rospy.set_param(u'~enable_gui', False)
         rospy.set_param(u'~debug', False)
         rospy.set_param(u'~enable_visualization', True)
-        rospy.set_param(u'~enable_collision_marker', False)
+        rospy.set_param(u'~enable_collision_marker', True)
         rospy.set_param(u'~tree_tick_rate', .01)
         rospy.set_param(u'~map_frame', u'map')
         rospy.set_param(u'~root_link', u'base_footprint')

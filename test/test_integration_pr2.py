@@ -593,6 +593,41 @@ class TestCollisionAvoidanceGoals(object):
 
         zero_pose.detach_object(pocky)
 
+    def test_attach_detach_twice(self, zero_pose):
+        pocky = u'http://muh#pocky'
+        zero_pose.attach_box(pocky, [0.1, 0.02, 0.02], zero_pose.r_tip, [0.05, 0, 0], [1, 0, 0, 0])
+        p = PoseStamped()
+        p.header.frame_id = zero_pose.r_tip
+        p.pose.orientation.w = 1
+        zero_pose.set_cart_goal(zero_pose.default_root, pocky, p)
+        p = transform_pose(zero_pose.default_root, p)
+        zero_pose.send_and_check_goal()
+        p2 = zero_pose.get_robot().get_fk(zero_pose.default_root, pocky)
+        compare_poses(p2.pose, p.pose)
+
+        zero_pose.clear_world()
+
+        old_p = PoseStamped()
+        old_p.header.frame_id = zero_pose.r_tip
+        old_p.pose.position = Point(0.05, 0, 0)
+        old_p.pose.orientation = Quaternion(0., 0., 0.47942554, 0.87758256)
+        zero_pose.add_box(pocky, [0.1, 0.02, 0.02], pose=old_p)
+        zero_pose.attach_existing(pocky, frame_id=zero_pose.r_tip)
+        relative_pose = zero_pose.get_robot().get_fk(zero_pose.r_tip, pocky).pose
+        compare_poses(old_p.pose, relative_pose)
+
+        p = PoseStamped()
+        p.header.frame_id = zero_pose.r_tip
+        p.pose.position.x = -0.1
+        p.pose.orientation.w = 1.0
+        zero_pose.set_and_check_cart_goal(zero_pose.default_root, zero_pose.r_tip, p)
+        # p.header.frame_id = u'map'
+        # p.pose.position.y = -1
+        # p.pose.orientation = Quaternion(0, 0, 0.47942554, 0.87758256)
+        # zero_pose.move_base(p)
+        #
+        # zero_pose.detach_object(pocky)
+
     def test_attach_to_nonexistant_robot_link(self, zero_pose):
         """
         :type zero_pose: PR2

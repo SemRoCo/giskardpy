@@ -4,8 +4,8 @@ from giskardpy.garden import grow_tree
 from giskardpy.utils import check_dependencies
 
 # TODO add pytest to package xml
-# TODO fix marker
 # TODO add transform3d to package xml
+# TODO do an additional sync round after goal received
 
 
 if __name__ == u'__main__':

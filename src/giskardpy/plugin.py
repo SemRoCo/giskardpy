@@ -24,7 +24,7 @@ class PluginBase(object):
     def update(self):
         """
         :return: Status.Success, if the job of the behavior plugin is finished
-                 Status.Failure, if something went wrong the the behavior is stopped
+                 Status.Failure, if something went wrong the behavior is stopped
                  Status.Running, if the behavior should only be killed in emergencies
                  None, does not change the current status of the behavior
         """
@@ -50,6 +50,7 @@ class PluginBase(object):
 
     def get_blackboard(self):
         return Blackboard()
+
 
 class GiskardBehavior(Behaviour):
     def __init__(self, name):
@@ -79,6 +80,7 @@ class GiskardBehavior(Behaviour):
 
     def get_blackboard(self):
         return Blackboard()
+
 
 class PluginBehavior(GiskardBehavior):
 
@@ -165,6 +167,7 @@ class PluginBehavior(GiskardBehavior):
             traceback.print_exc()
             # TODO make 'exception' string a parameter somewhere
             Blackboard().set('exception', e)
+
 
 class SuccessPlugin(PluginBase):
     def update(self):

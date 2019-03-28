@@ -103,6 +103,29 @@ class URDFObject(object):
         return cls.from_parts(world_body.name, links, joints, *args, **kwargs)
 
     @classmethod
+    def from_object_state(cls, object_state, *args, **kwargs):
+        """
+        :type world_body: knowrob_objects.msg._ObjectState.ObjectState
+        :rtype: URDFObject
+        """
+        links = []
+        joints = []
+        shape = [object_state.size.y,
+                 object_state.size.x,
+                 object_state.size.z]
+        if object_state.has_visual and object_state.mesh_path == u'':
+            geometry = up.Box(shape)
+        elif object_state.has_visual:
+            geometry = up.Mesh(object_state.mesh_path)
+        else:
+            raise CorruptShapeException(u'object state has no visual')
+        link = up.Link(object_state.object_id,
+                       visual=up.Visual(geometry, material=up.Material(u'green', color=up.Color(0, 1, 0, 1))),
+                       collision=up.Collision(geometry))
+        links.append(link)
+        return cls.from_parts(object_state.object_id, links, joints, *args, **kwargs)
+
+    @classmethod
     def from_parts(cls, robot_name, links, joints, *args, **kwargs):
         """
         :param robot_name:
@@ -381,7 +404,6 @@ class URDFObject(object):
         self.reinitialize()
         return sub_tree
 
-
     def reset(self):
         """
         Detaches all object that have been attached to the robot.
@@ -390,8 +412,7 @@ class URDFObject(object):
         self.reinitialize()
 
     def __str__(self):
-        return self.get_name()
-
+        return self.get_urdf()
 
     def reinitialize(self):
         self._urdf_robot = up.URDF.from_xml_string(self.get_urdf())
@@ -410,7 +431,6 @@ class URDFObject(object):
 
     def get_controllable_joints(self):
         return [joint_name for joint_name in self.get_joint_names() if self.is_joint_controllable(joint_name)]
-
 
     def __eq__(self, o):
         """
@@ -451,7 +471,7 @@ class URDFObject(object):
                               geometry.length)
         else:
             raise Exception(u'world body type {} can\'t be converted to marker'.format(geometry.__class__.__name__))
-        m.color = ColorRGBA(0,1,0,0.5)
+        m.color = ColorRGBA(0, 1, 0, 0.5)
         return m
 
     def link_as_marker(self, link_name):

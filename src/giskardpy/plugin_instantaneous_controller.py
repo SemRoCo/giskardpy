@@ -375,4 +375,4 @@ class ControllerPlugin(PluginBase):
         self.next_cmd.update(next_cmd)
 
         self.get_god_map().safe_set_data(next_cmd_identifier, self.next_cmd)
-        return Status.RUNNING
+        return None

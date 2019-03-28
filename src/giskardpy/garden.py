@@ -1,4 +1,7 @@
 import functools
+
+from py_trees.behaviours import Count
+
 import giskardpy.pybullet_wrapper as pbw
 import rospy
 from control_msgs.msg import JointTrajectoryControllerState
@@ -18,6 +21,7 @@ from giskardpy.plugin_instantaneous_controller import GoalToConstraints, Control
 from giskardpy.plugin_interrupts import CollisionCancel, WiggleCancel
 from giskardpy.plugin_configuration import ConfigurationPlugin
 from giskardpy.plugin_kinematic_sim import KinSimPlugin
+from giskardpy.plugin_knowrob import KnowrobPlugin
 from giskardpy.plugin_log_trajectory import LogTrajPlugin
 from giskardpy.plugin_pybullet import WorldUpdatePlugin, CollisionChecker
 from giskardpy.plugin_send_trajectory import SendTrajectory
@@ -93,9 +97,11 @@ def grow_tree():
     sync = PluginBehavior(u'sync')
     sync.add_plugin(u'js', ConfigurationPlugin(map_frame))
     sync.add_plugin(u'pybullet updater', WorldUpdatePlugin())
+    # sync.add_plugin(u'knowrob sync', KnowrobPlugin())
     sync.add_plugin(u'in sync', SuccessPlugin())
     wait_for_goal.add_child(sync)
     wait_for_goal.add_child(GoalReceived(u'has goal', action_server_name, MoveAction))
+    # wait_for_goal.add_child(Count(u'one last sync', fail_until=0, running_until=1, success_until=2))
     # ----------------------------------------------
     planning = failure_is_success(Selector)(u'planning')
     planning.add_child(GoalCanceled(u'goal canceled', action_server_name))

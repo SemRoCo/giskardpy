@@ -42,7 +42,6 @@ class WorldUpdatePlugin(PluginBase):
         """
         with self.lock:
             pass
-            # TODO FIXME
             for object_name, object_joint_state in self.object_joint_states.items():
                 self.get_world().get_object(object_name).joint_state = object_joint_state
 

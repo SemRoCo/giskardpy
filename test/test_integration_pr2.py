@@ -621,12 +621,6 @@ class TestCollisionAvoidanceGoals(object):
         p.pose.position.x = -0.1
         p.pose.orientation.w = 1.0
         zero_pose.set_and_check_cart_goal(zero_pose.default_root, zero_pose.r_tip, p)
-        # p.header.frame_id = u'map'
-        # p.pose.position.y = -1
-        # p.pose.orientation = Quaternion(0, 0, 0.47942554, 0.87758256)
-        # zero_pose.move_base(p)
-        #
-        # zero_pose.detach_object(pocky)
 
     def test_attach_to_nonexistant_robot_link(self, zero_pose):
         """

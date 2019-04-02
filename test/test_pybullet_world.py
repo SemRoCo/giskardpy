@@ -184,6 +184,39 @@ class TestPyBulletWorld(test_world.TestWorld):
         w = super(TestPyBulletWorld, self).test_attach_detach_existing_obj_to_robot1(function_setup)
         assert_num_pybullet_objects(4)
 
+    def test_verify_collision_entries_empty(self, test_folder):
+        super(TestPyBulletWorld, self).test_verify_collision_entries_empty(test_folder)
+
+    def test_verify_collision_entries_split0(self, test_folder):
+        super(TestPyBulletWorld, self).test_verify_collision_entries_split0(test_folder)
+
+    def test_verify_collision_entries_split1(self, test_folder):
+        super(TestPyBulletWorld, self).test_verify_collision_entries_split1(test_folder)
+
+    def test_verify_collision_entries_split2(self, test_folder):
+        super(TestPyBulletWorld, self).test_verify_collision_entries_split2(test_folder)
+
+    def test_verify_collision_entries_split3(self, test_folder):
+        super(TestPyBulletWorld, self).test_verify_collision_entries_split3(test_folder)
+
+    def test_verify_collision_entries_split4(self, test_folder):
+        super(TestPyBulletWorld, self).test_verify_collision_entries_split4(test_folder)
+
+    def test_collision_goals_to_collision_matrix3(self, test_folder):
+        return super(TestPyBulletWorld, self).test_collision_goals_to_collision_matrix3(test_folder)
+
+    def test_collision_goals_to_collision_matrix5(self, test_folder):
+        return super(TestPyBulletWorld, self).test_collision_goals_to_collision_matrix5(test_folder)
+
+    def test_collision_goals_to_collision_matrix6(self, test_folder):
+        return super(TestPyBulletWorld, self).test_collision_goals_to_collision_matrix6(test_folder)
+
+    def test_collision_goals_to_collision_matrix7(self, test_folder):
+        return super(TestPyBulletWorld, self).test_collision_goals_to_collision_matrix7(test_folder)
+
+    def test_collision_goals_to_collision_matrix8(self, test_folder):
+        return super(TestPyBulletWorld, self).test_collision_goals_to_collision_matrix8(test_folder)
+
     # TODO test that has collision entries of robot links without collision geometry
 
 

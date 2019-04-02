@@ -37,6 +37,7 @@ class Robot(Backend):
         self._default_joint_velocity_limit = default_joint_vel_limit
         self._default_weight = default_joint_weight
         self._joint_to_symbol_map = keydefaultdict(lambda x: spw.Symbol(x))
+        # self.__joint_state_positions = {str(self._joint_to_symbol_map[k]): 0 for k, v in self.get_controllable_joints()}
         self._calc_self_collision_matrix = calc_self_collision_matrix
         super(Robot, self).__init__(urdf, base_pose, controlled_joints, path_to_data_folder, *args, **kwargs)
         self.reinitialize()
@@ -61,6 +62,12 @@ class Robot(Backend):
         self.__joint_state_positions = {str(self._joint_to_symbol_map[k]): v.position for k, v in
                                         self.joint_state.items()}
         self._evaluated_fks.clear()
+
+    def get_joint_state_positions(self):
+        try:
+            return self.__joint_state_positions
+        except:
+            return {str(self._joint_to_symbol_map[x]): 0 for x in self.get_controllable_joints()}
 
     def reinitialize(self, joints_to_symbols_map=None):
         """
@@ -142,7 +149,7 @@ class Robot(Backend):
 
     def get_fk(self, root, tip):
         if (root, tip) not in self._evaluated_fks:
-            homo_m = self._fks[root, tip](**self.__joint_state_positions)
+            homo_m = self._fks[root, tip](**self.get_joint_state_positions())
             p = PoseStamped()
             p.header.frame_id = root
             p.pose = homo_matrix_to_pose(homo_m)

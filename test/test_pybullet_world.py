@@ -217,6 +217,12 @@ class TestPyBulletWorld(test_world.TestWorld):
     def test_collision_goals_to_collision_matrix8(self, test_folder):
         return super(TestPyBulletWorld, self).test_collision_goals_to_collision_matrix8(test_folder)
 
+    def test_verify_collision_entries_allow_all(self, test_folder):
+        super(TestPyBulletWorld, self).test_verify_collision_entries_allow_all(test_folder)
+
+    def test_verify_collision_entries_cut_off1(self, test_folder):
+        super(TestPyBulletWorld, self).test_verify_collision_entries_cut_off1(test_folder)
+
     # TODO test that has collision entries of robot links without collision geometry
 
 

@@ -43,6 +43,17 @@ def test_folder(request):
     request.addfinalizer(kill_pybullet)
     return folder_name
 
+@pytest.fixture()
+def delete_test_folder(request):
+    """
+    :rtype: World
+    """
+    folder_name = u'tmp_data/'
+    try:
+        shutil.rmtree(folder_name)
+    except:
+        pass
+    return folder_name
 
 def allow_all_entry():
     ce = CollisionEntry()
@@ -67,16 +78,16 @@ def avoid_all_entry(min_dist):
 class TestWorldObj(test_urdf_object.TestUrdfObject):
     cls = WorldObject
 
-    def test_safe_load_collision_matrix(self, test_folder):
-        r = self.cls(donbot_urdf(), path_to_data_folder=test_folder)
+    def test_safe_load_collision_matrix(self, test_folder, delete_test_folder):
+        r = self.cls(donbot_urdf(), path_to_data_folder=test_folder, calc_self_collision_matrix=True)
         r.update_self_collision_matrix()
         scm = r.get_self_collision_matrix()
         r.safe_self_collision_matrix(test_folder)
         r.load_self_collision_matrix(test_folder)
         assert scm == r.get_self_collision_matrix()
 
-    def test_safe_load_collision_matrix2(self, test_folder):
-        r = self.cls(donbot_urdf(), path_to_data_folder=test_folder)
+    def test_safe_load_collision_matrix2(self, test_folder, delete_test_folder):
+        r = self.cls(donbot_urdf(), path_to_data_folder=test_folder, calc_self_collision_matrix=True)
         r.update_self_collision_matrix()
         scm = r.get_self_collision_matrix()
 

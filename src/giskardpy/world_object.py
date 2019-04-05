@@ -13,10 +13,12 @@ from giskardpy.urdf_object import URDFObject
 
 
 class WorldObject(URDFObject):
-    def __init__(self, urdf, base_pose=None, controlled_joints=None, path_to_data_folder=u'', *args, **kwargs):
+    def __init__(self, urdf, base_pose=None, controlled_joints=None, path_to_data_folder=u'',
+                 calc_self_collision_matrix=True, *args, **kwargs):
         super(WorldObject, self).__init__(urdf, *args, **kwargs)
         self.path_to_data_folder = path_to_data_folder + u'collision_matrix/'
         self.controlled_joints = controlled_joints
+        self._calc_self_collision_matrix = calc_self_collision_matrix
         if base_pose is None:
             p = Pose()
             p.orientation.w = 1
@@ -214,7 +216,7 @@ class WorldObject(URDFObject):
                                        if link1 != object_name and link2 != object_name}
 
     def update_self_collision_matrix(self, added_links=None, removed_links=None):
-        if not self.load_self_collision_matrix(self.path_to_data_folder):
+        if self._calc_self_collision_matrix and not self.load_self_collision_matrix(self.path_to_data_folder):
             if added_links is None:
                 added_links = set()
             if removed_links is None:

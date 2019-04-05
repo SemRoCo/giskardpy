@@ -38,8 +38,8 @@ class Robot(Backend):
         self._default_weight = default_joint_weight
         self._joint_to_symbol_map = keydefaultdict(lambda x: spw.Symbol(x))
         # self.__joint_state_positions = {str(self._joint_to_symbol_map[k]): 0 for k, v in self.get_controllable_joints()}
-        self._calc_self_collision_matrix = calc_self_collision_matrix
-        super(Robot, self).__init__(urdf, base_pose, controlled_joints, path_to_data_folder, *args, **kwargs)
+        super(Robot, self).__init__(urdf, base_pose, controlled_joints, path_to_data_folder, calc_self_collision_matrix,
+                                    *args, **kwargs)
         self.reinitialize()
         self.update_self_collision_matrix(added_links=set(combinations(self.get_link_names_with_collision(), 2)))
 

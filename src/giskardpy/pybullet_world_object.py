@@ -14,7 +14,8 @@ class PyBulletWorldObject(WorldObject):
     """
     base_link_name = u'base'
 
-    def __init__(self, urdf, base_pose=None, controlled_joints=None, path_to_data_folder=u'', *args, **kwargs):
+    def __init__(self, urdf, base_pose=None, controlled_joints=None, path_to_data_folder=u'',
+                 calc_self_collision_matrix=False, *args, **kwargs):
         """
         :type name: str
         :param urdf: Path to URDF file, or content of already loaded URDF file.
@@ -29,6 +30,7 @@ class PyBulletWorldObject(WorldObject):
                                                   base_pose=base_pose,
                                                   controlled_joints=controlled_joints,
                                                   path_to_data_folder=path_to_data_folder,
+                                                  calc_self_collision_matrix=calc_self_collision_matrix,
                                                   *args, **kwargs)
         self.reinitialize()
         if base_pose is None:

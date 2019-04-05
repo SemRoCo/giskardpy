@@ -9,16 +9,23 @@ from giskardpy.pybullet_world import PyBulletWorld
 from giskardpy.pybullet_world_object import PyBulletWorldObject
 import giskardpy.pybullet_wrapper as pbw
 from giskardpy.symengine_robot import Robot
-from giskardpy.utils import make_world_body_box
+from giskardpy.utils import make_world_body_box, make_world_body_sphere, make_world_body_cylinder
 from utils_for_tests import pr2_urdf, base_bot_urdf, donbot_urdf, boxy_urdf
 from giskardpy.world_object import WorldObject
 import test_world
 
+folder_name = u'tmp_data/'
 
 @pytest.fixture(scope=u'module')
 def module_setup(request):
     print(u'starting pybullet')
     pbw.start_pybullet(False)
+
+    print(u'deleting tmp test folder')
+    try:
+        shutil.rmtree(folder_name)
+    except:
+        pass
 
     def kill_pybullet():
         print(u'shutdown pybullet')
@@ -46,8 +53,6 @@ def test_folder(request, function_setup):
     """
     :rtype: World
     """
-    folder_name = u'tmp_data/'
-
     def kill_pybullet():
         try:
             print(u'deleting tmp test folder')
@@ -58,6 +63,17 @@ def test_folder(request, function_setup):
     request.addfinalizer(kill_pybullet)
     return folder_name
 
+@pytest.fixture()
+def delete_test_folder(request):
+    """
+    :rtype: World
+    """
+    folder_name = u'tmp_data/'
+    try:
+        shutil.rmtree(folder_name)
+    except:
+        pass
+    return folder_name
 
 def assert_num_pybullet_objects(num):
     assert p.getNumBodies() == num, pbw.print_body_names()
@@ -75,7 +91,25 @@ class TestPyBulletWorldObject(test_world.TestWorldObj):
 class TestPyBulletRobot(test_world.TestRobot):
     cls = Robot
 
-    def test_safe_load_collision_matrix(self, test_folder):
+    def test_from_world_body_box(self, function_setup):
+        wb = make_world_body_box()
+        urdf_obj = self.cls.from_world_body(wb, calc_self_collision_matrix=False)
+        assert len(urdf_obj.get_link_names()) == 1
+        assert len(urdf_obj.get_joint_names()) == 0
+
+    def test_from_world_body_sphere(self, function_setup):
+        wb = make_world_body_sphere()
+        urdf_obj = self.cls.from_world_body(wb, calc_self_collision_matrix=False)
+        assert len(urdf_obj.get_link_names()) == 1
+        assert len(urdf_obj.get_joint_names()) == 0
+
+    def test_from_world_body_cylinder(self, function_setup):
+        wb = make_world_body_cylinder()
+        urdf_obj = self.cls.from_world_body(wb, calc_self_collision_matrix=False)
+        assert len(urdf_obj.get_link_names()) == 1
+        assert len(urdf_obj.get_joint_names()) == 0
+
+    def test_safe_load_collision_matrix(self, test_folder, delete_test_folder):
         r = self.cls(donbot_urdf(), path_to_data_folder=test_folder, calc_self_collision_matrix=True)
         scm = r.get_self_collision_matrix()
         assert len(scm) == 53

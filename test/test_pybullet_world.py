@@ -51,7 +51,7 @@ def test_folder(request, function_setup):
     def kill_pybullet():
         try:
             print(u'deleting tmp test folder')
-            shutil.rmtree(folder_name)
+            # shutil.rmtree(folder_name)
         except Exception:
             pass
 
@@ -217,11 +217,17 @@ class TestPyBulletWorld(test_world.TestWorld):
     def test_collision_goals_to_collision_matrix8(self, test_folder):
         return super(TestPyBulletWorld, self).test_collision_goals_to_collision_matrix8(test_folder)
 
+    def test_collision_goals_to_collision_matrix9(self, test_folder):
+        return super(TestPyBulletWorld, self).test_collision_goals_to_collision_matrix9(test_folder)
+
     def test_verify_collision_entries_allow_all(self, test_folder):
         super(TestPyBulletWorld, self).test_verify_collision_entries_allow_all(test_folder)
 
     def test_verify_collision_entries_cut_off1(self, test_folder):
         super(TestPyBulletWorld, self).test_verify_collision_entries_cut_off1(test_folder)
+
+    def test_verify_collision_entries_split5(self, test_folder):
+        super(TestPyBulletWorld, self).test_verify_collision_entries_split5(test_folder)
 
     # TODO test that has collision entries of robot links without collision geometry
 

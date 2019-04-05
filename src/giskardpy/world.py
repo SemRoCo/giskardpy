@@ -171,7 +171,11 @@ class World(object):
     def get_robot_collision_matrix(self, min_dist):
         robot_name = self.robot.get_name()
         collision_matrix = self.robot.get_self_collision_matrix()
-        return {(link1, robot_name, link2): min_dist for link1, link2 in collision_matrix}
+        collision_matrix2 = {}
+        for link1, link2 in collision_matrix:
+            collision_matrix2[link1, robot_name, link2] = min_dist
+            collision_matrix2[link2, robot_name, link1] = min_dist
+        return collision_matrix2
 
     def collision_goals_to_collision_matrix(self, collision_goals, min_dist):
         """
@@ -180,8 +184,12 @@ class World(object):
         :return: dict mapping (robot_link, body_b, link_b) -> min allowed distance
         :rtype: dict
         """
-        min_allowed_distance = {}
         collision_goals = self.verify_collision_entries(collision_goals, min_dist)
+        if collision_goals and self.is_avoid_all_self_collision(collision_goals[0]):
+            min_allowed_distance = self.get_robot_collision_matrix(min_dist)
+            collision_goals.pop(0)
+        else:
+            min_allowed_distance = {}
         for collision_entry in collision_goals:  # type: CollisionEntry
             assert len(collision_entry.robot_links) == 1
             assert len(collision_entry.link_bs) == 1
@@ -193,6 +201,9 @@ class World(object):
                             del min_allowed_distance[key2]
                 elif key in min_allowed_distance:
                     del min_allowed_distance[key]
+                    if collision_entry.body_b == self.robot.get_name():
+                        rev_key = (collision_entry.link_bs[0], collision_entry.body_b, collision_entry.robot_links[0])
+                        del min_allowed_distance[rev_key]
 
             elif self.is_avoid_collision(collision_entry):
                 min_allowed_distance[key] = collision_entry.min_dist
@@ -206,6 +217,10 @@ class World(object):
                            CollisionEntry.AVOID_ALL_COLLISIONS]:
                 rospy.logwarn(u'ALLOW_ALL_COLLISIONS and AVOID_ALL_COLLISIONS deprecated, use AVOID_COLLISIONS and'
                               u'ALLOW_COLLISIONS instead with ALL constant instead.')
+                if ce.type == CollisionEntry.ALLOW_ALL_COLLISIONS:
+                    ce.type = CollisionEntry.ALLOW_COLLISION
+                else:
+                    ce.type = CollisionEntry.AVOID_COLLISION
 
         for ce in collision_goals:  # type: CollisionEntry
             if CollisionEntry.ALL in ce.robot_links and len(ce.robot_links) != 1:
@@ -224,8 +239,11 @@ class World(object):
                 ce.link_bs = [CollisionEntry.ALL]
 
         for i, ce in enumerate(reversed(collision_goals)):
-            if self.is_avoid_all_collision(ce) or self.is_allow_all_collision(ce):
+            if self.is_avoid_all_collision(ce):
                 collision_goals = collision_goals[len(collision_goals) - i - 1:]
+                break
+            if self.is_allow_all_collision(ce):
+                collision_goals = collision_goals[len(collision_goals) - i:]
                 break
         else:
             ce = CollisionEntry()
@@ -275,6 +293,9 @@ class World(object):
         i = 0
         while i < len(collision_goals):
             collision_entry = collision_goals[i]
+            if self.is_avoid_all_self_collision(collision_entry):
+                i += 1
+                continue
             if self.all_link_bs(collision_entry):
                 if collision_entry.body_b == self.robot.get_name():
                     new_ces = []
@@ -300,6 +321,18 @@ class World(object):
                     collision_goals.insert(i, new_ce)
                 i += len(new_ces)
                 continue
+            elif len(collision_entry.link_bs) > 1:
+                collision_goals.remove(collision_entry)
+                for link_b in collision_entry.link_bs:
+                    ce = CollisionEntry()
+                    ce.type = collision_entry.type
+                    ce.robot_links = collision_entry.robot_links
+                    ce.body_b = collision_entry.body_b
+                    ce.link_bs = [link_b]
+                    ce.min_dist = collision_entry.min_dist
+                    collision_goals.insert(i, ce)
+                i += len(collision_entry.link_bs)
+                continue
             i += 1
         return collision_goals
 
@@ -308,6 +341,9 @@ class World(object):
         controlled_robot_links = self.robot.get_controlled_links()
         while i < len(collision_goals):
             collision_entry = collision_goals[i]
+            if self.is_avoid_all_self_collision(collision_entry):
+                i += 1
+                continue
             if self.all_robot_links(collision_entry):
                 collision_goals.remove(collision_entry)
 
@@ -325,6 +361,17 @@ class World(object):
                     collision_goals.insert(i, new_ce)
                 i += len(new_ces)
                 continue
+            elif len(collision_entry.robot_links) > 1:
+                collision_goals.remove(collision_entry)
+                for robot_link in collision_entry.robot_links:
+                    ce = CollisionEntry()
+                    ce.type = collision_entry.type
+                    ce.robot_links = [robot_link]
+                    ce.body_b = collision_entry.body_b
+                    ce.min_dist = collision_entry.min_dist
+                    ce.link_bs = collision_entry.link_bs
+                    collision_goals.insert(i, ce)
+                i += len(collision_entry.robot_links)
             i += 1
         return collision_goals
 
@@ -335,7 +382,7 @@ class World(object):
             if self.all_body_bs(collision_entry):
                 collision_goals.remove(collision_entry)
                 new_ces = []
-                for body_b in self.get_object_names() + [self.robot.get_name()]:
+                for body_b in [self.robot.get_name()] + self.get_object_names():
                     ce = CollisionEntry()
                     ce.type = collision_entry.type
                     ce.robot_links = collision_entry.robot_links
@@ -343,7 +390,7 @@ class World(object):
                     ce.body_b = body_b
                     ce.link_bs = collision_entry.link_bs
                     new_ces.append(ce)
-                for new_ce in new_ces:
+                for new_ce in reversed(new_ces):
                     collision_goals.insert(i, new_ce)
                 i += len(new_ces)
                 continue
@@ -374,6 +421,16 @@ class World(object):
         return self.is_avoid_collision(collision_entry) \
                and self.all_robot_links(collision_entry) \
                and self.all_body_bs(collision_entry) \
+               and self.all_link_bs(collision_entry)
+
+    def is_avoid_all_self_collision(self, collision_entry):
+        """
+        :type collision_entry: CollisionEntry
+        :return: bool
+        """
+        return self.is_avoid_collision(collision_entry) \
+               and self.all_robot_links(collision_entry) \
+               and collision_entry.body_b == self.robot.get_name() \
                and self.all_link_bs(collision_entry)
 
     def is_allow_all_collision(self, collision_entry):

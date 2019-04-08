@@ -78,7 +78,7 @@ class ActionServerBehavior(GiskardBehavior):
         super(ActionServerBehavior, self).__init__(name)
 
     def setup(self, timeout):
-        # TODO handle timeout8
+        # TODO handle timeout
         self.as_handler = Blackboard().get(self.as_name)
         if self.as_handler is None:
             self.as_handler = ActionServerHandler(self.as_name, self.action_type)

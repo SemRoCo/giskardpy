@@ -30,10 +30,10 @@ class WorldUpdatePlugin(GiskardBehavior):
         self.object_joint_states = {}  # JointStates messages for articulated world objects
 
     def setup(self, timeout=5.0):
-        super(WorldUpdatePlugin, self).setup(timeout)
         # TODO make service name a parameter
         self.srv_update_world = rospy.Service(u'~update_world', UpdateWorld, self.update_world_cb)
         self.pub_collision_marker = rospy.Publisher(u'~visualization_marker_array', MarkerArray, queue_size=1)
+        return super(WorldUpdatePlugin, self).setup(timeout)
 
     def update(self):
         """
@@ -44,7 +44,7 @@ class WorldUpdatePlugin(GiskardBehavior):
             for object_name, object_joint_state in self.object_joint_states.items():
                 self.get_world().get_object(object_name).joint_state = object_joint_state
 
-        return Status.RUNNING
+        return Status.SUCCESS
 
     def object_js_cb(self, object_name, msg):
         """

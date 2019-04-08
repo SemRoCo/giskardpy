@@ -228,13 +228,14 @@ class GiskardTestWrapper(object):
 
     def wait_for_synced(self):
         sleeper = rospy.Rate(self.tick_rate)
-        while self.tree.tip().name != u'has goal':
-            self.loop_once()
-            sleeper.sleep()
         self.loop_once()
-        while self.tree.tip().name != u'has goal':
-            self.loop_once()
-            sleeper.sleep()
+        # while self.tree.tip().name != u'has goal':
+        #     self.loop_once()
+        #     sleeper.sleep()
+        # self.loop_once()
+        # while self.tree.tip().name != u'has goal':
+        #     self.loop_once()
+        #     sleeper.sleep()
 
     def get_robot(self):
         """
@@ -540,7 +541,11 @@ class GiskardTestWrapper(object):
         :type goal_pose: PoseStamped
         """
         self.simple_base_pose_pub.publish(goal_pose)
+        rospy.sleep(.06)
         self.wait_for_synced()
+        current_pose = self.get_robot().get_base_pose()
+        goal_pose = transform_pose(u'map', goal_pose)
+        compare_poses(goal_pose.pose, current_pose.pose)
 
     def reset_base(self):
         p = PoseStamped()

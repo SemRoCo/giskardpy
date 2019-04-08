@@ -475,6 +475,13 @@ class TestCartGoals(object):
 
 
 class TestCollisionAvoidanceGoals(object):
+    def test_move_base(self, zero_pose):
+        p = PoseStamped()
+        p.header.frame_id = u'map'
+        p.pose.position.y = -1
+        p.pose.orientation = Quaternion(0, 0, 0.47942554, 0.87758256)
+        zero_pose.move_base(p)
+
     def test_add_box(self, zero_pose):
         """
         :type zero_pose: PR2
@@ -591,6 +598,7 @@ class TestCollisionAvoidanceGoals(object):
         p.pose.position.y = -1
         p.pose.orientation = Quaternion(0, 0, 0.47942554, 0.87758256)
         zero_pose.move_base(p)
+        rospy.sleep(.5)
 
         zero_pose.detach_object(pocky)
 

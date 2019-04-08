@@ -7,7 +7,7 @@ from tf2_kdl import transform_to_kdl
 from tf2_py._tf2 import ExtrapolationException
 from tf2_ros import Buffer, TransformListener
 
-tfBuffer = None
+tfBuffer = None # type: Buffer
 tf_listener = None
 
 
@@ -21,6 +21,10 @@ def init(tf_buffer_size=15):
     tfBuffer = Buffer(rospy.Duration(tf_buffer_size))
     tf_listener = TransformListener(tfBuffer)
     rospy.sleep(5.0)
+
+def wait_for_transform(target_frame, source_frame, time, timeout):
+    global tfBuller
+    return tfBuffer.can_transform(target_frame, source_frame, time, timeout)
 
 
 def transform_pose(target_frame, pose):
@@ -106,7 +110,7 @@ def lookup_transform(target_frame, source_frame, time=rospy.Time()):
         return None
 
 
-def lookup_pose(target_frame, source_frame):
+def lookup_pose(target_frame, source_frame, time=None):
     """
     :type target_frame: str
     :type source_frame: str
@@ -115,6 +119,8 @@ def lookup_pose(target_frame, source_frame):
     """
     p = PoseStamped()
     p.header.frame_id = source_frame
+    if time is not None:
+        p.header.stamp = time
     p.pose.orientation.w = 1.0
     return transform_pose(target_frame, p)
 

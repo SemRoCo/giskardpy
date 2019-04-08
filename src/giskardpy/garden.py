@@ -95,12 +95,14 @@ def grow_tree():
 
     # ----------------------------------------------
     wait_for_goal = Sequence(u'wait for goal')
-    sync = PluginBehavior(u'sync')
-    sync.add_plugin(success_is_running(ConfigurationPlugin)(u'js', map_frame))
-    sync.add_plugin(WorldUpdatePlugin(u'pybullet updater'))
+    # sync = PluginBehavior(u'sync')
+    # sync.add_plugin(success_is_running(ConfigurationPlugin)(u'js', map_frame))
+    # sync.add_plugin(WorldUpdatePlugin(u'pybullet updater'))
     # sync.add_plugin(u'knowrob sync', KnowrobPlugin())
-    sync.add_plugin(SuccessPlugin(u'in sync'))
-    wait_for_goal.add_child(sync)
+    # sync.add_plugin(SuccessPlugin(u'in sync'))
+    # wait_for_goal.add_child(sync)
+    wait_for_goal.add_child(ConfigurationPlugin(u'js', map_frame))
+    wait_for_goal.add_child(WorldUpdatePlugin(u'pybullet updater'))
     wait_for_goal.add_child(GoalReceived(u'has goal', action_server_name, MoveAction))
     # wait_for_goal.add_child(Count(u'one last sync', fail_until=0, running_until=1, success_until=2))
     # ----------------------------------------------

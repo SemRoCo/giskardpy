@@ -56,6 +56,7 @@ class WorldUpdatePlugin(GiskardBehavior):
         """
         self.object_joint_states[object_name] = to_joint_state_dict(msg)
 
+
     def update_world_cb(self, req):
         """
         Callback function of the ROS service to update the internal giskard world.

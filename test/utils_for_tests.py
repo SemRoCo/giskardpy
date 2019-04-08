@@ -281,6 +281,7 @@ class GiskardTestWrapper(object):
             self.wrapper.set_object_joint_state(object_name, joint_state)
         else:
             self.joint_state_publisher[topic].publish(dict_to_joint_states(joint_state))
+            rospy.sleep(.5)
 
         self.wait_for_synced()
         current_js = self.get_world().get_object(object_name).joint_state

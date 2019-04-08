@@ -191,6 +191,7 @@ class World(object):
         else:
             min_allowed_distance = {}
         for collision_entry in collision_goals:  # type: CollisionEntry
+            pass
             assert len(collision_entry.robot_links) == 1
             assert len(collision_entry.link_bs) == 1
             key = (collision_entry.robot_links[0], collision_entry.body_b, collision_entry.link_bs[0])
@@ -372,6 +373,7 @@ class World(object):
                     ce.link_bs = collision_entry.link_bs
                     collision_goals.insert(i, ce)
                 i += len(collision_entry.robot_links)
+                continue
             i += 1
         return collision_goals
 

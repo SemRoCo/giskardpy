@@ -19,5 +19,4 @@ class LogTrajPlugin(GiskardBehavior):
         trajectory = self.get_god_map().safe_get_data(trajectory_identifier)
         trajectory.set(time, current_js)
         self.get_god_map().safe_set_data(trajectory_identifier, trajectory)
-
         return Status.RUNNING

@@ -22,7 +22,7 @@ class World(object):
         self._path_to_data_folder = path_to_data_folder
 
     # General ----------------------------------------------------------------------------------------------------------
-
+    
     def soft_reset(self):
         """
         keeps robot and other important objects like ground plane

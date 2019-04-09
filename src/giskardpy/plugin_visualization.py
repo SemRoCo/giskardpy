@@ -1,3 +1,5 @@
+from copy import deepcopy
+
 import py_trees
 import rospy
 from geometry_msgs.msg import Point, Quaternion
@@ -33,10 +35,6 @@ class VisualizationBehavior(GiskardBehavior):
             if marker is None:
                 continue
 
-            marker.scale.x *= 0.99
-            marker.scale.y *= 0.99
-            marker.scale.z *= 0.99
-
             marker.header.frame_id = self.robot_base
             marker.action = Marker.ADD
             marker.id = i
@@ -45,10 +43,6 @@ class VisualizationBehavior(GiskardBehavior):
 
             origin = robot.get_urdf_link(link_name).visual.origin
             fk = get_fk(self.robot_base, link_name).pose
-            marker.color.a = 0.5
-            marker.color.r = 1.0
-            marker.color.g = 1.0
-            marker.color.b = 1.0
 
             if origin is not None:
                 marker.pose.position = Point(*origin.xyz)

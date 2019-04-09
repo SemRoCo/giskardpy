@@ -81,7 +81,7 @@ class PluginBehavior(GiskardBehavior):
 
     def init_plugins(self):
         for plugin in self._plugins.values():
-            plugin.initialize()
+            plugin.initialise()
 
     def is_running(self):
         return self.my_status == Status.RUNNING

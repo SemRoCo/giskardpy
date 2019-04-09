@@ -25,6 +25,7 @@ class WorldObject(URDFObject):
             self.base_pose = p
         # FIXME using .joint_state creates a chicken egg problem in pybulletworldobject
         self._js = self.get_zero_joint_state()
+        self._controlled_links = None
         self._self_collision_matrix = set()
 
     @classmethod
@@ -74,6 +75,7 @@ class WorldObject(URDFObject):
 
     @controlled_joints.setter
     def controlled_joints(self, value):
+        self._controlled_links = None
         self._controlled_joints = value
 
     def suicide(self):
@@ -82,12 +84,17 @@ class WorldObject(URDFObject):
     def __del__(self):
         self.suicide()
 
+    def reinitialize(self):
+        self._controlled_links = None
+        super(WorldObject, self).reinitialize()
+
     def get_controlled_links(self):
         # FIXME expensive
-        controllable_links = set()
-        for joint_name in self.controlled_joints:
-            controllable_links.update(self.get_sub_tree_link_names_with_collision(joint_name))
-        return controllable_links
+        if not self._controlled_links:
+            self._controlled_links = set()
+            for joint_name in self.controlled_joints:
+                self._controlled_links.update(self.get_sub_tree_link_names_with_collision(joint_name))
+        return self._controlled_links
 
     def get_self_collision_matrix(self):
         """
@@ -267,6 +274,7 @@ class WorldObject(URDFObject):
         sub_tree = super(WorldObject, self).detach_sub_tree(joint_name)
         self.update_self_collision_matrix(removed_links=sub_tree.get_link_names())
         return sub_tree
+
 
     def reset(self):
         super(WorldObject, self).reset()

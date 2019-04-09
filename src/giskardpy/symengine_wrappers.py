@@ -248,7 +248,6 @@ def speed_up(function, parameters, backend=u'llvm'):
         if backend in [u'llvm', u'lambda']:
             f = CompiledFunction(str_params, fast_f, len(function), function.shape)
         elif backend is None:
-            # @profile
             def f(**kwargs):
                 filtered_kwargs = {str(k): kwargs[k] for k in str_params}
                 return np.array(function.subs(filtered_kwargs).tolist(), dtype=float).reshape(function.shape)

@@ -45,12 +45,6 @@ class CollisionCancel(GiskardBehavior):
         self.collision_time_threshold = collision_time_threshold
         super(CollisionCancel, self).__init__(name)
 
-    def setup(self, timeout):
-        return super(CollisionCancel, self).setup(timeout)
-
-    def initialise(self):
-        super(CollisionCancel, self).initialise()
-
     def update(self):
         time = self.get_god_map().safe_get_data(time_identifier)
         if time >= self.collision_time_threshold:

@@ -37,7 +37,6 @@ MOVABLE_JOINT_TYPES = [u'revolute', u'continuous', u'prismatic']
 ROTATIONAL_JOINT_TYPES = [u'revolute', u'continuous']
 TRANSLATIONAL_JOINT_TYPES = [u'prismatic']
 
-
 class URDFObject(object):
     def __init__(self, urdf, *args, **kwargs):
         """
@@ -409,6 +408,7 @@ class URDFObject(object):
         self.reinitialize()
         return sub_tree
 
+    
     def reset(self):
         """
         Detaches all object that have been attached to the robot.
@@ -419,6 +419,7 @@ class URDFObject(object):
     def __str__(self):
         return self.get_urdf()
 
+    
     def reinitialize(self):
         self._urdf_robot = up.URDF.from_xml_string(self.get_urdf())
 
@@ -479,7 +480,6 @@ class URDFObject(object):
         m.color = ColorRGBA(0, 1, 0, 0.5)
         return m
 
-    @profile
     def link_as_marker(self, link_name):
         if link_name not in self._link_to_marker:
             marker = Marker()
@@ -521,5 +521,9 @@ class URDFObject(object):
             marker.color.r = 1.0
             marker.color.g = 1.0
             marker.color.b = 1.0
+
+            marker.scale.x *= 0.99
+            marker.scale.y *= 0.99
+            marker.scale.z *= 0.99
             self._link_to_marker[link_name] = marker
         return self._link_to_marker[link_name]

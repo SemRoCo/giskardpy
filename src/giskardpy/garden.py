@@ -29,7 +29,6 @@ from giskardpy.utils import create_path, render_dot_tree
 from giskardpy.plugin_visualization import VisualizationBehavior
 from giskardpy.world_object import WorldObject
 
-
 def initialize_blackboard(urdf, default_joint_vel_limit, default_joint_weight, path_to_data_folder, gui):
     pbw.start_pybullet(gui)
     controlled_joints = rospy.wait_for_message(u'/whole_body_controller/state',
@@ -51,7 +50,6 @@ def initialize_blackboard(urdf, default_joint_vel_limit, default_joint_weight, p
                                 suffix=[u'position'])
     world.robot.reinitialize(js_input.joint_map)
     blackboard.god_map.safe_set_data(world_identifier, world)
-
 
 def grow_tree():
     gui = rospy.get_param(u'~enable_gui')

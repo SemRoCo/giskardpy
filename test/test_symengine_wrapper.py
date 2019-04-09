@@ -703,7 +703,6 @@ class TestSympyWrapper(unittest.TestCase):
            limited_float(outer_limit=1e5))
     def test_fmod(self, a, b):
         assume(b != 0)
-        sw_r = spw.fmod(a, b)
         ref_r = np.fmod(a, b)
         self.assertAlmostEqual(speed_up_and_execute(spw.fmod, [a, b]), ref_r, places=4)
 

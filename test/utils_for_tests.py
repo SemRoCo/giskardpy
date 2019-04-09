@@ -541,7 +541,7 @@ class GiskardTestWrapper(object):
         :type goal_pose: PoseStamped
         """
         self.simple_base_pose_pub.publish(goal_pose)
-        rospy.sleep(.06)
+        rospy.sleep(.07)
         self.wait_for_synced()
         current_pose = self.get_robot().get_base_pose()
         goal_pose = transform_pose(u'map', goal_pose)

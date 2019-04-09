@@ -148,13 +148,15 @@ class Robot(Backend):
         return self._fk_expressions[root_link, tip_link]
 
     def get_fk(self, root, tip):
-        if (root, tip) not in self._evaluated_fks:
+        try:
+            return self._evaluated_fks[root, tip]
+        except KeyError:
             homo_m = self._fks[root, tip](**self.get_joint_state_positions())
             p = PoseStamped()
             p.header.frame_id = root
             p.pose = homo_matrix_to_pose(homo_m)
             self._evaluated_fks[root, tip] = p
-        return self._evaluated_fks[root, tip]
+            return p
 
     def init_fast_fks(self):
         def f(key):

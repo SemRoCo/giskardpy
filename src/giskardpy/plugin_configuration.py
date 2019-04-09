@@ -27,9 +27,6 @@ class ConfigurationPlugin(GiskardBehavior):
         self.joint_state_topic = joint_state_topic
         self.lock = Queue(maxsize=1)
 
-    def initialize(self):
-        self.initialise()
-
     def setup(self, timeout=0.0):
         self.joint_state_sub = rospy.Subscriber(self.joint_state_topic, JointState, self.cb, queue_size=1)
         return super(ConfigurationPlugin, self).setup(timeout)

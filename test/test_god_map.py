@@ -5,7 +5,7 @@ import unittest
 from collections import namedtuple
 
 from geometry_msgs.msg import PoseStamped
-from hypothesis import given
+from hypothesis import given, reproduce_failure
 import hypothesis.strategies as st
 import giskardpy.symengine_wrappers as sw
 from giskardpy.god_map import GodMap
@@ -161,7 +161,7 @@ class TestGodMap(unittest.TestCase):
         db = GodMap()
         f = lambda x: x
         db.safe_set_data([key], f)
-        self.assertEqual(db.safe_get_data([key, key2]), key2)
+        self.assertEqual(db.safe_get_data([key, [key2]]), key2)
 
     @given(variable_name(),
            variable_name(),

@@ -30,19 +30,15 @@ class GoalToConstraints(GetGoal):
         self.known_constraints = set()
         self.controlled_joints = set()
         self.controllable_links = set()
+        self.last_urdf = None
         self.use_slerp = use_slerp
 
-    def setup(self, timeout):
-        return super(GoalToConstraints, self).setup(timeout)
-
     def initialise(self):
-        self.soft_constraints = {}
         self.get_god_map().safe_set_data(collision_goal_identifier, None)
 
     def terminate(self, new_status):
         super(GoalToConstraints, self).terminate(new_status)
 
-    @profile
     def update(self):
         # TODO make this interruptable
 
@@ -54,8 +50,11 @@ class GoalToConstraints(GetGoal):
             self.raise_to_blackboard(InsolvableException(u'only plan and execute is supported'))
             return Status.SUCCESS
 
-        self.add_js_controller_soft_constraints()
-        self.add_collision_avoidance_soft_constraints()
+        if self.has_robot_changed():
+            self.soft_constraints = {}
+            # TODO split soft contraints into js, coll and cart; update cart always and js/coll only when urdf changed, js maybe never
+            self.add_js_controller_soft_constraints()
+            self.add_collision_avoidance_soft_constraints()
 
         # TODO handle multiple cmds
         move_cmd = goal_msg.cmd_seq[0]  # type: MoveCmd
@@ -82,6 +81,12 @@ class GoalToConstraints(GetGoal):
         self.get_god_map().safe_set_data(soft_constraint_identifier, self.soft_constraints)
         self.get_blackboard().runtime = time()
         return Status.SUCCESS
+
+    def has_robot_changed(self):
+        new_urdf = self.get_robot().get_urdf()
+        result = self.last_urdf != new_urdf
+        self.last_urdf = new_urdf
+        return result
 
     def add_cart_controller_soft_constraints(self, controller, t):
         """
@@ -344,9 +349,6 @@ class ControllerPlugin(GiskardBehavior):
         self.nWSR = nWSR
         self.soft_constraints = None
 
-    def initialize(self):
-        self.initialise()
-
     def initialise(self):
         super(ControllerPlugin, self).initialise()
         self.init_controller()
@@ -365,7 +367,6 @@ class ControllerPlugin(GiskardBehavior):
             self.controller.update_soft_constraints(self.soft_constraints)
             self.controller.compile()
 
-    @profile
     def update(self):
         expr = self.controller.get_expr()
         expr = self.god_map.get_symbol_map(expr)

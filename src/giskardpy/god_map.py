@@ -34,7 +34,6 @@ class GodMap(object):
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.lock.release()
 
-    # @profile
     def _get_member(self, identifier, member):
         """
         :param identifier:
@@ -63,7 +62,6 @@ class GodMap(object):
         except IndexError:
             return identifier[int(member)]
 
-    # @profile
     def get_data(self, identifier):
         """
 
@@ -115,7 +113,6 @@ class GodMap(object):
             self.expr_to_key[str(expr)] = identifier_parts
         return self.key_to_expr[identifier]
 
-    # @profile
     def get_symbol_map(self, exprs=None):
         """
         :return: a dict which maps all registered expressions to their values or 0 if there is no number entry

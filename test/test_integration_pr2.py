@@ -101,7 +101,7 @@ pick_up_pose = {
     u'r_upper_arm_roll_joint': -1.46335011257,
     u'r_wrist_flex_joint': -0.100010762609,
     u'r_wrist_roll_joint': 0.0509923457388,
-    u'torso_lift_joint': 0.321791330751,
+    u'torso_lift_joint': 0.261791330751,
 }
 
 folder_name = u'tmp_data/'
@@ -1260,6 +1260,8 @@ class TestCollisionAvoidanceGoals(object):
         :return:
         """
 
+        kitchen_setup.send_and_check_joint_goal(pick_up_pose)
+
         base_pose = PoseStamped()
         base_pose.header.frame_id = u'map'
         base_pose.pose.position = Point(0.743, 0.586, 0.000)
@@ -1269,7 +1271,7 @@ class TestCollisionAvoidanceGoals(object):
         # grasp
         p = PoseStamped()
         p.header.frame_id = kitchen_setup.l_tip
-        p.pose.position.x = 0.09
+        p.pose.position.x = 0.2
         p.pose.orientation.w = 1
         kitchen_setup.allow_all_collisions()
         kitchen_setup.set_and_check_cart_goal(kitchen_setup.default_root, kitchen_setup.l_tip, p)

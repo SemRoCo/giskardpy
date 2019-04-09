@@ -56,7 +56,6 @@ class WorldUpdatePlugin(GiskardBehavior):
         """
         self.object_joint_states[object_name] = to_joint_state_dict(msg)
 
-
     def update_world_cb(self, req):
         """
         Callback function of the ROS service to update the internal giskard world.
@@ -221,7 +220,6 @@ class CollisionChecker(GiskardBehavior):
         self.srv_viz_gui = rospy.Service(u'~enable_marker', SetBool, self.enable_marker_cb)
         rospy.sleep(.5)
 
-    @profile
     def initialise(self):
         collision_goals = self.get_god_map().safe_get_data(collision_goal_identifier)
         self.collision_matrix = self.get_world().collision_goals_to_collision_matrix(collision_goals,
@@ -229,7 +227,6 @@ class CollisionChecker(GiskardBehavior):
         self.get_god_map().safe_set_data(closest_point_identifier, None)
         super(CollisionChecker, self).initialise()
 
-    @profile
     def update(self):
         """
         Computes closest point info for all robot links and safes it to the god map.

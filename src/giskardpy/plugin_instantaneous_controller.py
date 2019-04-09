@@ -42,6 +42,7 @@ class GoalToConstraints(GetGoal):
     def terminate(self, new_status):
         super(GoalToConstraints, self).terminate(new_status)
 
+    @profile
     def update(self):
         # TODO make this interruptable
 
@@ -364,7 +365,7 @@ class ControllerPlugin(GiskardBehavior):
             self.controller.update_soft_constraints(self.soft_constraints)
             self.controller.compile()
 
-    # @profile
+    @profile
     def update(self):
         expr = self.controller.get_expr()
         expr = self.god_map.get_symbol_map(expr)

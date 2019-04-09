@@ -578,7 +578,6 @@ class TestCollisionAvoidanceGoals(object):
         """
         :type zero_pose: PR2
         """
-        # FIXME fails nondeterministic, only when all tests run at once; test_attach_existing_box was before
         pocky = u'http://muh#pocky'
         old_p = PoseStamped()
         old_p.header.frame_id = zero_pose.r_tip

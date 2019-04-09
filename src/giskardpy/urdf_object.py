@@ -51,6 +51,7 @@ class URDFObject(object):
         self.original_urdf = hacky_urdf_parser_fix(urdf)
         with suppress_stderr():
             self._urdf_robot = up.URDF.from_xml_string(self.original_urdf)  # type: up.Robot
+        self._link_to_marker = {}
 
     @classmethod
     def from_urdf_file(cls, urdf_file, *args, **kwargs):
@@ -390,6 +391,10 @@ class URDFObject(object):
             self._urdf_robot.add_joint(j)
         for l in urdf_object._urdf_robot.links:
             self._urdf_robot.add_link(l)
+        try:
+            del self._link_to_marker[urdf_object.get_name()]
+        except:
+            pass
         self.reinitialize()
 
     def detach_sub_tree(self, joint_name):
@@ -474,44 +479,47 @@ class URDFObject(object):
         m.color = ColorRGBA(0, 1, 0, 0.5)
         return m
 
+    @profile
     def link_as_marker(self, link_name):
-        marker = Marker()
-        geometry = self.get_urdf_link(link_name).visual.geometry
+        if link_name not in self._link_to_marker:
+            marker = Marker()
+            geometry = self.get_urdf_link(link_name).visual.geometry
 
-        if isinstance(geometry, up.Mesh):
-            marker.type = Marker.MESH_RESOURCE
-            marker.mesh_resource = geometry.filename
-            if geometry.scale is None:
-                marker.scale.x = 1.0
-                marker.scale.z = 1.0
-                marker.scale.y = 1.0
+            if isinstance(geometry, up.Mesh):
+                marker.type = Marker.MESH_RESOURCE
+                marker.mesh_resource = geometry.filename
+                if geometry.scale is None:
+                    marker.scale.x = 1.0
+                    marker.scale.z = 1.0
+                    marker.scale.y = 1.0
+                else:
+                    marker.scale.x = geometry.scale[0]
+                    marker.scale.z = geometry.scale[1]
+                    marker.scale.y = geometry.scale[2]
+                marker.mesh_use_embedded_materials = True
+            elif isinstance(geometry, up.Box):
+                marker.type = Marker.CUBE
+                marker.scale.x = geometry.size[0]
+                marker.scale.y = geometry.size[1]
+                marker.scale.z = geometry.size[2]
+            elif isinstance(geometry, up.Cylinder):
+                marker.type = Marker.CYLINDER
+                marker.scale.x = geometry.radius
+                marker.scale.y = geometry.radius
+                marker.scale.z = geometry.length
+            elif isinstance(geometry, up.Sphere):
+                marker.type = Marker.SPHERE
+                marker.scale.x = geometry.radius
+                marker.scale.y = geometry.radius
+                marker.scale.z = geometry.radius
             else:
-                marker.scale.x = geometry.scale[0]
-                marker.scale.z = geometry.scale[1]
-                marker.scale.y = geometry.scale[2]
-            marker.mesh_use_embedded_materials = True
-        elif isinstance(geometry, up.Box):
-            marker.type = Marker.CUBE
-            marker.scale.x = geometry.size[0]
-            marker.scale.y = geometry.size[1]
-            marker.scale.z = geometry.size[2]
-        elif isinstance(geometry, up.Cylinder):
-            marker.type = Marker.CYLINDER
-            marker.scale.x = geometry.radius
-            marker.scale.y = geometry.radius
-            marker.scale.z = geometry.length
-        elif isinstance(geometry, up.Sphere):
-            marker.type = Marker.SPHERE
-            marker.scale.x = geometry.radius
-            marker.scale.y = geometry.radius
-            marker.scale.z = geometry.radius
-        else:
-            return None
+                return None
 
-        marker.header.frame_id = self.get_root()
-        marker.action = Marker.ADD
-        marker.color.a = 0.5
-        marker.color.r = 1.0
-        marker.color.g = 1.0
-        marker.color.b = 1.0
-        return marker
+            marker.header.frame_id = self.get_root()
+            marker.action = Marker.ADD
+            marker.color.a = 0.5
+            marker.color.r = 1.0
+            marker.color.g = 1.0
+            marker.color.b = 1.0
+            self._link_to_marker[link_name] = marker
+        return self._link_to_marker[link_name]

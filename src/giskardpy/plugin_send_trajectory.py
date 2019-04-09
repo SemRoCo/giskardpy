@@ -53,6 +53,7 @@ class SendTrajectory(ActionClient, GiskardBehavior):
             trajectory_msg.points.append(p)
         return trajectory_msg
 
+    @profile
     def update(self):
         """
         Check only to see whether the underlying action server has

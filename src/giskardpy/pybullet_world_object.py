@@ -106,8 +106,9 @@ class PyBulletWorldObject(WorldObject):
         activate_rendering()
 
     def suicide(self):
-        p.removeBody(self._pybullet_id)
-        print(u'removed {} from pybullet'.format(self.get_name()))
+        if self._pybullet_id is not None:
+            p.removeBody(self._pybullet_id)
+            print(u'<-- removed {} from pybullet'.format(self.get_name()))
 
     def __del__(self):
         self.suicide()

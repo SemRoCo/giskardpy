@@ -416,11 +416,11 @@ class GiskardTestWrapper(object):
         assert self.get_world().has_object(name)
         compare_poses(self.get_world().get_object(name).base_pose, p.pose, decimal=2)
 
-    def add_box(self, name=u'box', size=(1, 1, 1), pose=None):
+    def add_box(self, name=u'box', size=(1, 1, 1), pose=None, expected_response=UpdateWorldResponse.SUCCESS):
         r = self.wrapper.add_box(name, size, pose=pose)
-        assert r.error_codes == UpdateWorldResponse.SUCCESS, \
+        assert r.error_codes == expected_response, \
             u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
-                                            update_world_error_code(UpdateWorldResponse.SUCCESS))
+                                            update_world_error_code(expected_response))
         p = transform_pose(u'map', pose)
         o_p = self.get_world().get_object(name).base_pose
         assert self.get_world().has_object(name)

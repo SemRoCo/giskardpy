@@ -458,7 +458,7 @@ class GiskardTestWrapper(object):
         pass
 
     def allow_self_collision(self):
-        self.wrapper.disable_self_collision()
+        self.wrapper.allow_self_collision()
 
     def add_collision_entries(self, collisions_entries):
         self.wrapper.set_collision_entries(collisions_entries)

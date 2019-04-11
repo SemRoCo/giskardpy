@@ -1,11 +1,13 @@
 import functools
 
-import py_trees
+# import py_trees_ros
+import py_trees_ros
 import rospy
 from control_msgs.msg import JointTrajectoryControllerState
 from giskard_msgs.msg import MoveAction
 from py_trees import Sequence, Selector, BehaviourTree, Blackboard
 from py_trees.meta import success_is_running, failure_is_success, success_is_failure
+from py_trees_ros.trees import BehaviourTree
 
 import giskardpy.pybullet_wrapper as pbw
 from giskardpy.god_map import GodMap
@@ -93,16 +95,10 @@ def grow_tree():
 
     # ----------------------------------------------
     wait_for_goal = Sequence(u'wait for goal')
-    # sync = PluginBehavior(u'sync')
-    # sync.add_plugin(success_is_running(ConfigurationPlugin)(u'js', map_frame))
-    # sync.add_plugin(WorldUpdatePlugin(u'pybullet updater'))
-    # sync.add_plugin(u'knowrob sync', KnowrobPlugin())
-    # sync.add_plugin(SuccessPlugin(u'in sync'))
-    # wait_for_goal.add_child(sync)
     wait_for_goal.add_child(ConfigurationPlugin(u'js', map_frame))
     wait_for_goal.add_child(WorldUpdatePlugin(u'pybullet updater'))
     wait_for_goal.add_child(GoalReceived(u'has goal', action_server_name, MoveAction))
-    # wait_for_goal.add_child(Count(u'one last sync', fail_until=0, running_until=1, success_until=2))
+    wait_for_goal.add_child(ConfigurationPlugin(u'js', map_frame))
     # ----------------------------------------------
     planning = failure_is_success(Selector)(u'planning')
     planning.add_child(GoalCanceled(u'goal canceled', action_server_name))
@@ -135,10 +131,10 @@ def grow_tree():
 
     if debug:
         def post_tick(snapshot_visitor, behaviour_tree):
-            print(u'\n' + py_trees.display.ascii_tree(behaviour_tree.root,
-                                                      snapshot_information=snapshot_visitor))
+            print(u'\n' + py_trees_ros.display.ascii_tree(behaviour_tree.root,
+                                                          snapshot_information=snapshot_visitor))
 
-        snapshot_visitor = py_trees.visitors.SnapshotVisitor()
+        snapshot_visitor = py_trees_ros.visitors.SnapshotVisitor()
         tree.add_post_tick_handler(functools.partial(post_tick, snapshot_visitor))
         tree.visitors.append(snapshot_visitor)
     path = path_to_data_folder + u'/tree'

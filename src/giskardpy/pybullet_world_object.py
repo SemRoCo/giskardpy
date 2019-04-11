@@ -1,4 +1,5 @@
 from collections import OrderedDict
+from multiprocessing import Lock
 
 import pybullet as p
 from geometry_msgs.msg import Pose
@@ -26,6 +27,7 @@ class PyBulletWorldObject(WorldObject):
         :type path_to_data_folder: str
         """
         self._pybullet_id = None
+        self.lock = Lock()
         super(PyBulletWorldObject, self).__init__(urdf,
                                                   base_pose=base_pose,
                                                   controlled_joints=controlled_joints,
@@ -46,18 +48,20 @@ class PyBulletWorldObject(WorldObject):
         :type joint_state: dict
         :return:
         """
-        self._js = value
-        for joint_name, singe_joint_state in value.items():
-            p.resetJointState(self._pybullet_id, self.joint_name_to_info[joint_name].joint_index,
-                              singe_joint_state.position)
+        with self.lock:
+            self._js = value
+            for joint_name, singe_joint_state in value.items():
+                p.resetJointState(self._pybullet_id, self.joint_name_to_info[joint_name].joint_index,
+                                  singe_joint_state.position)
 
     @WorldObject.base_pose.setter
     def base_pose(self, value):
-        if self._pybullet_id is not None:
-            self._base_pose = value
-            WorldObject.base_pose.fset(self, value)
-            position, orientation = msg_to_pybullet_pose(value)
-            p.resetBasePositionAndOrientation(self._pybullet_id, position, orientation)
+        with self.lock:
+            if self._pybullet_id is not None:
+                self._base_pose = value
+                WorldObject.base_pose.fset(self, value)
+                position, orientation = msg_to_pybullet_pose(value)
+                p.resetBasePositionAndOrientation(self._pybullet_id, position, orientation)
 
     def get_pybullet_id(self):
         return self._pybullet_id
@@ -66,7 +70,6 @@ class PyBulletWorldObject(WorldObject):
         """
         Syncs joint and link infos with bullet
         """
-
         self.joint_id_map = {}
         self.link_name_to_id = {}
         self.link_id_to_name = {}
@@ -90,16 +93,17 @@ class PyBulletWorldObject(WorldObject):
         self.link_id_to_name[-1] = self.get_root()
 
     def reinitialize(self):
-        super(PyBulletWorldObject, self).reinitialize()
-        deactivate_rendering()
-        joint_state = None
-        base_pose = None
-        if self._pybullet_id is not None:
-            joint_state = self.joint_state
-            base_pose = self.base_pose
-            self.suicide()
-        self._pybullet_id = load_urdf_string_into_bullet(self.get_urdf(), base_pose)
-        self.__sync_with_bullet()
+        with self.lock:
+            super(PyBulletWorldObject, self).reinitialize()
+            deactivate_rendering()
+            joint_state = None
+            base_pose = None
+            if self._pybullet_id is not None:
+                joint_state = self.joint_state
+                base_pose = self.base_pose
+                self.suicide()
+            self._pybullet_id = load_urdf_string_into_bullet(self.get_urdf(), base_pose)
+            self.__sync_with_bullet()
         if joint_state is not None:
             joint_state = {k: v for k, v in joint_state.items() if k in self.get_joint_names()}
             self.joint_state = joint_state

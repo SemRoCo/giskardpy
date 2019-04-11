@@ -263,6 +263,9 @@ class TestPyBulletWorld(test_world.TestWorld):
     def test_verify_collision_entries_split5(self, test_folder):
         super(TestPyBulletWorld, self).test_verify_collision_entries_split5(test_folder)
 
+    def test_verify_collision_entries_allow_all_self(self, test_folder):
+        super(TestPyBulletWorld, self).test_verify_collision_entries_allow_all_self(test_folder)
+
     # TODO test that has collision entries of robot links without collision geometry
 
 

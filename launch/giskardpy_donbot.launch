@@ -3,7 +3,7 @@
   <arg name="gui" default="False"/>
 
   <node pkg="giskardpy" type="giskard_trees.py" name="giskard" output="screen">
-    <param name="path_to_data_folder" value="$(find giskardpy)/data/donbot" />
+    <param name="path_to_data_folder" value="$(find giskardpy)/data" />
     <param name="enable_gui" value="$(arg gui)"/>
     <rosparam param="enable_collision_marker">True</rosparam>
     <rosparam param="enable_visualization">True</rosparam>

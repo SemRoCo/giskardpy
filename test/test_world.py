@@ -43,6 +43,7 @@ def test_folder(request):
     request.addfinalizer(kill_pybullet)
     return folder_name
 
+
 @pytest.fixture()
 def delete_test_folder(request):
     """
@@ -54,6 +55,7 @@ def delete_test_folder(request):
     except:
         pass
     return folder_name
+
 
 def allow_all_entry():
     ce = CollisionEntry()
@@ -336,6 +338,17 @@ class TestWorld(object):
         ces = [allow_all_entry()]
         new_ces = world_with_donbot.verify_collision_entries(ces, 0.05)
         assert len(new_ces) == 0
+
+    def test_verify_collision_entries_allow_all_self(self, test_folder):
+        world_with_donbot = self.make_world_with_donbot(test_folder)
+        ce = CollisionEntry()
+        ce.type = CollisionEntry.ALLOW_COLLISION
+        ce.robot_links = [CollisionEntry.ALL]
+        ce.body_b = world_with_donbot.robot.get_name()
+        ce.link_bs = [CollisionEntry.ALL]
+        ces = [ce]
+        new_ces = world_with_donbot.verify_collision_entries(ces, 0.05)
+        assert len(new_ces) == 1 + len(world_with_donbot.robot.get_self_collision_matrix()) * 2
 
     def test_verify_collision_entries_unknown_robot_link(self, test_folder):
         world_with_donbot = self.make_world_with_donbot(test_folder)
@@ -877,8 +890,8 @@ class TestWorld(object):
         # assert len(collision_matrix) == 0
         # assert len([x for x in collision_matrix if x[0] == allowed_link and x[2] == name2]) == 0
         for (robot_link, body_b, body_b_link), dist in collision_matrix.items():
-            assert not(robot_link in collision_entry.robot_links and body_b_link in collision_entry.link_bs)
-            assert not(body_b_link in collision_entry.robot_links and robot_link in collision_entry.link_bs)
+            assert not (robot_link in collision_entry.robot_links and body_b_link in collision_entry.link_bs)
+            assert not (body_b_link in collision_entry.robot_links and robot_link in collision_entry.link_bs)
         #     assert dist == min_dist
         #     if body_b != world_with_donbot.robot.get_name():
         #         assert body_b_link == u''

@@ -185,13 +185,11 @@ class World(object):
         :rtype: dict
         """
         collision_goals = self.verify_collision_entries(collision_goals, min_dist)
-        if collision_goals and self.is_avoid_all_self_collision(collision_goals[0]):
-            min_allowed_distance = self.get_robot_collision_matrix(min_dist)
-            collision_goals.pop(0)
-        else:
-            min_allowed_distance = {}
+        min_allowed_distance = {}
         for collision_entry in collision_goals:  # type: CollisionEntry
-            pass
+            if self.is_avoid_all_self_collision(collision_entry):
+                min_allowed_distance.update(self.get_robot_collision_matrix(collision_entry.min_dist))
+                continue
             assert len(collision_entry.robot_links) == 1
             assert len(collision_entry.link_bs) == 1
             key = (collision_entry.robot_links[0], collision_entry.body_b, collision_entry.link_bs[0])
@@ -280,7 +278,7 @@ class World(object):
                         raise UnknownBodyException(u'robot link {} unknown'.format(robot_link))
             if collision_entry.body_b == robot_name:
                 for robot_link in collision_entry.link_bs:
-                    if robot_link not in robot_links:
+                    if robot_link != CollisionEntry.ALL and robot_link not in robot_links:
                         raise UnknownBodyException(u'link b {} of body {} unknown'.format(robot_link, collision_entry.body_b))
             elif not self.all_body_bs(collision_entry) and not self.all_link_bs(collision_entry):
                 object_links = self.get_object(collision_entry.body_b).get_link_names()

@@ -4,6 +4,7 @@ import numpy as np
 import os
 import pickle
 from itertools import product
+from time import time
 
 from geometry_msgs.msg import Pose, Quaternion
 
@@ -117,6 +118,7 @@ class WorldObject(URDFObject):
         """
         # TODO computational expansive because of too many collision checks
         print(u'calculating self collision matrix')
+        t = time()
         np.random.seed(1337)
         always = set()
 
@@ -143,6 +145,7 @@ class WorldObject(URDFObject):
             if len(sometimes2) > 0:
                 rest = rest.difference(sometimes2)
                 sometimes = sometimes.union(sometimes2)
+        print(u'calculated self collision matrix in {:.3f}s'.format(time()-t))
         return sometimes
 
     def get_possible_collisions(self, link):

@@ -1,6 +1,7 @@
 from Queue import Empty, Queue
 
 import actionlib
+import rospy
 from giskard_msgs.msg._MoveGoal import MoveGoal
 from giskard_msgs.msg._MoveResult import MoveResult
 from py_trees import Blackboard, Status
@@ -95,6 +96,7 @@ class ActionServerBehavior(GiskardBehavior):
 class GoalReceived(ActionServerBehavior):
     def update(self):
         if self.get_as().has_goal():
+            rospy.sleep(.5)
             return Status.SUCCESS
         return Status.FAILURE
 

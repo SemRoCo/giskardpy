@@ -294,6 +294,9 @@ class URDFObject(object):
     def get_links_from_sub_tree(self, joint_name):
         return self.get_sub_tree_at_joint(joint_name).get_link_names()
 
+    def get_links_with_collision(self):
+        return [x for x in self.get_link_names() if self.has_link_collision(x)]
+
     def get_sub_tree_at_joint(self, joint_name):
         """
         :type joint_name: str

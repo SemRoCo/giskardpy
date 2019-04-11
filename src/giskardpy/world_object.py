@@ -124,7 +124,7 @@ class WorldObject(URDFObject):
 
         # find meaningless self-collisions
         for link_a, link_b in link_combinations:
-            if self.are_linked(link_a, link_b):
+            if self.are_linked(link_a, link_b) or link_a == link_b:
                 always.add((link_a, link_b))
         rest = link_combinations.difference(always)
         self.joint_state = self.get_zero_joint_state()
@@ -271,7 +271,8 @@ class WorldObject(URDFObject):
 
     def attach_urdf_object(self, urdf_object, parent_link, pose):
         super(WorldObject, self).attach_urdf_object(urdf_object, parent_link, pose)
-        self.update_self_collision_matrix(added_links=set(product(self.get_link_names(), urdf_object.get_link_names())))
+        self.update_self_collision_matrix(added_links=set(product(self.get_links_with_collision(),
+                                                                  urdf_object.get_links_with_collision())))
 
     def detach_sub_tree(self, joint_name):
         sub_tree = super(WorldObject, self).detach_sub_tree(joint_name)

@@ -279,6 +279,9 @@ def msg_to_list(thing):
                 thing.orientation.w]
 
 
+def position_dist(position1, position2):
+    return np.linalg.norm(np.array(msg_to_list(position2)) - np.array(msg_to_list(position1)))
+
 def create_path(path):
     if not os.path.exists(os.path.dirname(path)):
         try:

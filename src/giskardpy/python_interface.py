@@ -240,6 +240,15 @@ class GiskardWrapper(object):
 
     def add_box(self, name=u'box', size=(1, 1, 1), frame_id=u'map', position=(0, 0, 0), orientation=(0, 0, 0, 1),
                 pose=None):
+        """
+        :param name:
+        :param size: (x length, y length, z length)
+        :param frame_id:
+        :param position:
+        :param orientation:
+        :param pose:
+        :return:
+        """
         box = make_world_body_box(name, size[0], size[1], size[2])
         if pose is None:
             pose = PoseStamped()
@@ -263,6 +272,21 @@ class GiskardWrapper(object):
             pose.pose.orientation = Quaternion(*orientation)
         object.shape.type = SolidPrimitive.SPHERE
         object.shape.dimensions.append(size)
+        req = UpdateWorldRequest(UpdateWorldRequest.ADD, object, False, pose)
+        return self.update_world.call(req)
+
+    def add_mesh(self, name=u'mesh', mesh=u'', frame_id=u'map', position=(0, 0, 0), orientation=(0, 0, 0, 1),
+                   pose=None):
+        object = WorldBody()
+        object.type = WorldBody.MESH_BODY
+        object.name = str(name)
+        if pose is None:
+            pose = PoseStamped()
+            pose.header.stamp = rospy.Time.now()
+            pose.header.frame_id = str(frame_id)
+            pose.pose.position = Point(*position)
+            pose.pose.orientation = Quaternion(*orientation)
+        object.mesh = mesh
         req = UpdateWorldRequest(UpdateWorldRequest.ADD, object, False, pose)
         return self.update_world.call(req)
 

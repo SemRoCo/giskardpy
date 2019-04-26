@@ -19,6 +19,8 @@ from shape_msgs.msg import SolidPrimitive
 
 # from giskardpy.python_interface import GiskardWrapper
 # from giskardpy.symengine_wrappers import quaternion_from_axis_angle
+from tf.transformations import quaternion_matrix, quaternion_from_matrix
+
 from giskardpy.identifier import fk_identifier
 from utils_for_tests import PR2, compare_poses
 from giskardpy.tfwrapper import lookup_transform, init as tf_init, lookup_pose, transform_pose
@@ -1308,57 +1310,68 @@ class TestCollisionAvoidanceGoals(object):
         kitchen_js = {u'sink_area_left_upper_drawer_main_joint': 0.45}
         kitchen_setup.set_kitchen_js(kitchen_js)
 
-    #
-    # def test_pick_up_spoon(self):
-    #     base_pose = PoseStamped()
-    #     base_pose.header.frame_id = 'map'
-    #     base_pose.pose.position = Point(0.365, 0.368, 0.000)
-    #     base_pose.pose.orientation = Quaternion(0.000, 0.000, -0.007, 1.000)
-    #     self.move_base(base_pose)
-    #
-    #     self.giskard.allow_all_collisions()
-    #     self.set_and_check_js_goal(gaya_pose)
-    #
-    #     self.add_kitchen()
-    #     kitchen_js = {'sink_area_left_upper_drawer_main_joint': 0.45}
-    #     self.giskard.set_object_joint_state('kitchen', kitchen_js)
-    #     rospy.sleep(.5)
-    #
-    #     # put gripper above drawer
-    #     pick_spoon_pose = PoseStamped()
-    #     pick_spoon_pose.header.frame_id = 'base_footprint'
-    #     pick_spoon_pose.pose.position = Point(0.567, 0.498, 0.89)
-    #     pick_spoon_pose.pose.orientation = Quaternion(0.018, 0.702, 0.004, 0.712)
-    #     self.set_and_check_cart_goal(self.default_root, self.l_tip, pick_spoon_pose)
-    #
-    #     #put gripper in drawer
-    #     self.giskard.set_collision_entries(self.get_allow_l_gripper('kitchen'))
-    #     p = PoseStamped()
-    #     p.header.frame_id = self.l_tip
-    #     p.pose.position.x = 0.1
-    #     p.pose.orientation.w = 1
-    #     self.set_and_check_cart_goal(self.default_root, self.l_tip, p)
-    #
-    #     #attach spoon
-    #     r = self.giskard.attach_box('pocky', [0.02, 0.02, 0.1], self.l_tip, [0, 0, 0])
-    #     self.assertEqual(r.error_codes, UpdateWorldResponse.SUCCESS)
-    #
-    #     # allow grippe and spoon
-    #     ces = self.get_allow_l_gripper('kitchen')
-    #     ce = CollisionEntry()
-    #     ce.type = CollisionEntry.ALLOW_COLLISION
-    #     ce.robot_link = 'pocky'
-    #     ce.body_b = 'kitchen'
-    #     ces.append(ce)
-    #     self.giskard.set_collision_entries(ces)
-    #
-    #     # pick up
-    #     p = PoseStamped()
-    #     p.header.frame_id = self.l_tip
-    #     p.pose.position.x = -0.1
-    #     p.pose.orientation.w = 1
-    #     self.set_and_check_cart_goal(self.default_root, self.l_tip, p)
-    #
+
+    def test_pick_up_spoon(self, kitchen_setup):
+        spoon_name = u'spoon'
+
+        base_pose = PoseStamped()
+        base_pose.header.frame_id = u'map'
+        base_pose.pose.position = Point(0.465, 0.368, 0.000)
+        base_pose.pose.orientation = Quaternion(0.000, 0.000, -0.007, 1.000)
+        kitchen_setup.move_base(base_pose)
+        rospy.sleep(.5)
+
+        #open drawer
+        l_goal = PoseStamped()
+        l_goal.header.frame_id = u'iai_kitchen/sink_area_left_upper_drawer_handle'
+        l_goal.pose.position.y = -.1
+        l_goal.pose.orientation = Quaternion(*quaternion_from_matrix([[-1, 0, 0, 0],
+                                                                      [ 0, 0, -1, 0],
+                                                                      [ 0,-1, 0, 0],
+                                                                      [0,0,0,1]]))
+        kitchen_setup.wrapper.allow_collision(kitchen_setup.get_l_gripper_links(), u'kitchen')
+        kitchen_setup.set_and_check_cart_goal(kitchen_setup.default_root, kitchen_setup.l_tip, l_goal)
+
+        l_goal = PoseStamped()
+        l_goal.header.frame_id = kitchen_setup.l_tip
+        l_goal.pose.position.x = -.45
+        l_goal.pose.orientation.w = 1
+        kitchen_setup.wrapper.allow_collision(kitchen_setup.get_l_gripper_links(), u'kitchen')
+        kitchen_setup.set_and_check_cart_goal(kitchen_setup.default_root, kitchen_setup.l_tip, l_goal)
+
+        kitchen_js = {u'sink_area_left_upper_drawer_main_joint': 0.45}
+        kitchen_setup.set_kitchen_js(kitchen_js)
+
+        spoon_pose = PoseStamped()
+        spoon_pose.header.frame_id = u'map'
+        spoon_pose.pose.position = Point(0.940, 0.861, 0.745)
+        spoon_pose.pose.orientation = Quaternion(0, 0, 0, 1)
+
+        kitchen_setup.add_box(spoon_name, [0.1, 0.02, 0.02], spoon_pose)
+
+        # put gripper above drawer
+        pick_spoon_pose = PoseStamped()
+        pick_spoon_pose.header.frame_id = u'base_footprint'
+        pick_spoon_pose.pose.position = Point(0.567, 0.498, 0.89)
+        pick_spoon_pose.pose.orientation = Quaternion(0.018, 0.702, 0.004, 0.712)
+        kitchen_setup.set_and_check_cart_goal(kitchen_setup.default_root, kitchen_setup.l_tip, pick_spoon_pose)
+
+        #put gripper in drawer
+        kitchen_setup.wrapper.avoid_collision(0.001, kitchen_setup.get_l_gripper_links(),
+                                              u'kitchen') #, [u'sink_area_left_upper_drawer_main']) # FIXME
+        kitchen_setup.wrapper.allow_collision(kitchen_setup.get_l_gripper_links(), spoon_name)
+        p = lookup_pose(u'map', kitchen_setup.l_tip)
+        p.pose.position = spoon_pose.pose.position
+        kitchen_setup.set_cart_goal(kitchen_setup.default_root, kitchen_setup.l_tip, p)
+        kitchen_setup.send_and_check_goal()
+        current_pose = lookup_pose(u'map', kitchen_setup.l_tip)
+        assert current_pose.pose.position.z < 0.76
+
+        kitchen_setup.attach_existing(spoon_name, kitchen_setup.l_tip)
+
+        kitchen_setup.send_and_check_joint_goal(gaya_pose)
+
+
 
     # TODO test pickup tray
 

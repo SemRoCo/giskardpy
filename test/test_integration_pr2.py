@@ -1,7 +1,3 @@
-# import shutil
-# import rospkg
-# from multiprocessing import Queue
-# from threading import Thread
 import numpy as np
 import shutil
 from itertools import combinations
@@ -9,23 +5,16 @@ from itertools import combinations
 import pytest
 import rospy
 from numpy import pi
-# from angles import normalize_angle, normalize_angle_positive, shortest_angular_distance
 from geometry_msgs.msg import PoseStamped, Point, Quaternion
 from giskard_msgs.msg import CollisionEntry, MoveActionGoal, MoveResult, WorldBody, MoveGoal
 from giskard_msgs.srv import UpdateWorldResponse, UpdateWorldRequest
-# from sensor_msgs.msg import JointState
 from shape_msgs.msg import SolidPrimitive
-# from transforms3d.quaternions import axangle2quat
-
-# from giskardpy.python_interface import GiskardWrapper
-# from giskardpy.symengine_wrappers import quaternion_from_axis_angle
 from tf.transformations import quaternion_matrix, quaternion_from_matrix
 
 from giskardpy.identifier import fk_identifier
 from utils_for_tests import PR2, compare_poses
 from giskardpy.tfwrapper import lookup_transform, init as tf_init, lookup_pose, transform_pose
 
-# from giskardpy.utils import msg_to_list
 
 # TODO roslaunch iai_pr2_sim ros_control_sim.launch
 # TODO roslaunch iai_kitchen upload_kitchen_obj.launch
@@ -1358,7 +1347,7 @@ class TestCollisionAvoidanceGoals(object):
 
         #put gripper in drawer
         kitchen_setup.wrapper.avoid_collision(0.001, kitchen_setup.get_l_gripper_links(),
-                                              u'kitchen') #, [u'sink_area_left_upper_drawer_main']) # FIXME
+                                              u'kitchen', [u'sink_area_left_upper_drawer_main']) # FIXME
         kitchen_setup.wrapper.allow_collision(kitchen_setup.get_l_gripper_links(), spoon_name)
         p = lookup_pose(u'map', kitchen_setup.l_tip)
         p.pose.position = spoon_pose.pose.position

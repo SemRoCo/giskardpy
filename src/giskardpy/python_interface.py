@@ -136,7 +136,7 @@ class GiskardWrapper(object):
         collision_entry = CollisionEntry()
         collision_entry.type = CollisionEntry.ALLOW_COLLISION
         collision_entry.robot_links = [CollisionEntry.ALL]
-        collision_entry.body_b = self.robot_name
+        collision_entry.body_b = CollisionEntry.ALL
         collision_entry.link_bs = [CollisionEntry.ALL]
         self.set_collision_entries([collision_entry])
 

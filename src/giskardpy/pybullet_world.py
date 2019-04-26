@@ -3,6 +3,7 @@ from collections import defaultdict
 
 import pybullet as p
 from geometry_msgs.msg import Point, Pose
+from giskard_msgs.msg import CollisionEntry
 
 import giskardpy
 from giskardpy.data_types import ClosestPointInfo
@@ -81,9 +82,9 @@ class PyBulletWorld(World):
                 link_b_id = self.robot.get_pybullet_link_id(link_b)
             else:
                 object_id = self.__get_pybullet_object_id(body_b)
-                if link_b != u'':
+                if link_b != CollisionEntry.ALL:
                     link_b_id = self.get_object(body_b).get_pybullet_link_id(link_b)
-            if body_b == self.robot.get_name():
+            if body_b == self.robot.get_name() or link_b != CollisionEntry.ALL:
                 contacts = [ContactInfo(*x) for x in p.getClosestPoints(self.robot.get_pybullet_id(), object_id,
                                                                         distance * 3,
                                                                         robot_link_id, link_b_id)]

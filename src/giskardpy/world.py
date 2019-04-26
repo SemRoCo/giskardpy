@@ -271,20 +271,20 @@ class World(object):
             if not (collision_entry.body_b == robot_name or
                     collision_entry.body_b in self.get_object_names() or
                     self.all_body_bs(collision_entry)):
-                raise UnknownBodyException(u'body b {} unknown'.format(collision_entry.body_b))
+                raise UnknownBodyException(u'body b \'{}\' unknown'.format(collision_entry.body_b))
             if not self.all_robot_links(collision_entry):
                 for robot_link in collision_entry.robot_links:
                     if robot_link not in robot_links:
-                        raise UnknownBodyException(u'robot link {} unknown'.format(robot_link))
+                        raise UnknownBodyException(u'robot link \'{}\' unknown'.format(robot_link))
             if collision_entry.body_b == robot_name:
                 for robot_link in collision_entry.link_bs:
                     if robot_link != CollisionEntry.ALL and robot_link not in robot_links:
-                        raise UnknownBodyException(u'link b {} of body {} unknown'.format(robot_link, collision_entry.body_b))
+                        raise UnknownBodyException(u'link b \'{}\' of body \'{}\' unknown'.format(robot_link, collision_entry.body_b))
             elif not self.all_body_bs(collision_entry) and not self.all_link_bs(collision_entry):
                 object_links = self.get_object(collision_entry.body_b).get_link_names()
                 for link_b in collision_entry.link_bs:
                     if link_b not in object_links:
-                        raise UnknownBodyException(u'link b {} of body {} unknown'.format(link_b, collision_entry.body_b))
+                        raise UnknownBodyException(u'link b \'{}\' of body \'{}\' unknown'.format(link_b, collision_entry.body_b))
 
 
     def split_link_bs(self, collision_goals):

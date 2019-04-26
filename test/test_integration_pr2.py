@@ -1278,7 +1278,9 @@ class TestCollisionAvoidanceGoals(object):
         p.header.frame_id = kitchen_setup.l_tip
         p.pose.position.x = 0.2
         p.pose.orientation.w = 1
-        kitchen_setup.allow_all_collisions()
+        kitchen_setup.wrapper.avoid_collision(0.01, body_b=u'kitchen')
+        kitchen_setup.wrapper.allow_collision(kitchen_setup.get_l_gripper_links(), u'kitchen',
+                                              [u'sink_area', u'sink_area_surface'])
         kitchen_setup.set_and_check_cart_goal(kitchen_setup.default_root, kitchen_setup.l_tip, p)
 
         # post grasp
@@ -1347,7 +1349,7 @@ class TestCollisionAvoidanceGoals(object):
 
         #put gripper in drawer
         kitchen_setup.wrapper.avoid_collision(0.001, kitchen_setup.get_l_gripper_links(),
-                                              u'kitchen', [u'sink_area_left_upper_drawer_main']) # FIXME
+                                              u'kitchen', [u'sink_area_left_upper_drawer_main'])
         kitchen_setup.wrapper.allow_collision(kitchen_setup.get_l_gripper_links(), spoon_name)
         p = lookup_pose(u'map', kitchen_setup.l_tip)
         p.pose.position = spoon_pose.pose.position

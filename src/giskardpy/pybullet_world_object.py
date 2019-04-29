@@ -112,6 +112,7 @@ class PyBulletWorldObject(WorldObject):
     def suicide(self):
         if self._pybullet_id is not None:
             p.removeBody(self._pybullet_id)
+            self._pybullet_id = None
             print(u'<-- removed {} from pybullet'.format(self.get_name()))
 
     def __del__(self):

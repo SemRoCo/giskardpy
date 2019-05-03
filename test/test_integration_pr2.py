@@ -1,20 +1,17 @@
 import numpy as np
-import shutil
-from itertools import combinations
+from numpy import pi
 
 import pytest
 import rospy
-from numpy import pi
 from geometry_msgs.msg import PoseStamped, Point, Quaternion
 from giskard_msgs.msg import CollisionEntry, MoveActionGoal, MoveResult, WorldBody, MoveGoal
 from giskard_msgs.srv import UpdateWorldResponse, UpdateWorldRequest
 from shape_msgs.msg import SolidPrimitive
-from tf.transformations import quaternion_matrix, quaternion_from_matrix
+from tf.transformations import quaternion_from_matrix
 
 from giskardpy.identifier import fk_identifier
+from giskardpy.tfwrapper import init as tf_init, lookup_pose, transform_pose
 from utils_for_tests import PR2, compare_poses
-from giskardpy.tfwrapper import lookup_transform, init as tf_init, lookup_pose, transform_pose
-
 
 # TODO roslaunch iai_pr2_sim ros_control_sim.launch
 # TODO roslaunch iai_kitchen upload_kitchen_obj.launch
@@ -1301,7 +1298,6 @@ class TestCollisionAvoidanceGoals(object):
         kitchen_js = {u'sink_area_left_upper_drawer_main_joint': 0.45}
         kitchen_setup.set_kitchen_js(kitchen_js)
 
-
     def test_pick_up_spoon(self, kitchen_setup):
         spoon_name = u'spoon'
 
@@ -1312,14 +1308,14 @@ class TestCollisionAvoidanceGoals(object):
         kitchen_setup.move_base(base_pose)
         rospy.sleep(.5)
 
-        #open drawer
+        # open drawer
         l_goal = PoseStamped()
         l_goal.header.frame_id = u'iai_kitchen/sink_area_left_upper_drawer_handle'
         l_goal.pose.position.y = -.1
         l_goal.pose.orientation = Quaternion(*quaternion_from_matrix([[-1, 0, 0, 0],
-                                                                      [ 0, 0, -1, 0],
-                                                                      [ 0,-1, 0, 0],
-                                                                      [0,0,0,1]]))
+                                                                      [0, 0, -1, 0],
+                                                                      [0, -1, 0, 0],
+                                                                      [0, 0, 0, 1]]))
         kitchen_setup.wrapper.allow_collision(kitchen_setup.get_l_gripper_links(), u'kitchen')
         kitchen_setup.set_and_check_cart_goal(kitchen_setup.default_root, kitchen_setup.l_tip, l_goal)
 
@@ -1347,7 +1343,7 @@ class TestCollisionAvoidanceGoals(object):
         pick_spoon_pose.pose.orientation = Quaternion(0.018, 0.702, 0.004, 0.712)
         kitchen_setup.set_and_check_cart_goal(kitchen_setup.default_root, kitchen_setup.l_tip, pick_spoon_pose)
 
-        #put gripper in drawer
+        # put gripper in drawer
         kitchen_setup.wrapper.avoid_collision(0.001, kitchen_setup.get_l_gripper_links(),
                                               u'kitchen', [u'sink_area_left_upper_drawer_main'])
         kitchen_setup.wrapper.allow_collision(kitchen_setup.get_l_gripper_links(), spoon_name)
@@ -1362,8 +1358,29 @@ class TestCollisionAvoidanceGoals(object):
 
         kitchen_setup.send_and_check_joint_goal(gaya_pose)
 
+    def test_tray(self, zero_pose):
+        tray_name = u'tray'
+        js = {
+            u'r_elbow_flex_joint': -1.58118094489,
+            u'r_forearm_roll_joint': -0.904933033043,
+            u'r_shoulder_lift_joint': 0.822412440711,
+            u'r_shoulder_pan_joint': -1.07866800992,
+            u'r_upper_arm_roll_joint': -1.34905471854,
+            u'r_wrist_flex_joint': -1.20182042644,
+            u'r_wrist_roll_joint': 0.190433188769,
+        }
+        zero_pose.send_and_check_joint_goal(js)
 
+        r_goal = PoseStamped()
+        r_goal.header.frame_id = zero_pose.r_tip
+        r_goal.pose.position.x = 0.3
+        r_goal.pose.orientation = Quaternion(*quaternion_from_matrix([[-1, 0, 0, 0],
+                                                                      [0,  1, 0, 0],
+                                                                      [0,  0, -1, 0],
+                                                                      [0, 0, 0, 1]]))
+        zero_pose.set_and_check_cart_goal(u'torso_lift_link', zero_pose.l_tip, r_goal)
 
-    # TODO test pickup tray
+        zero_pose.attach_box(tray_name, [.3, .1, .2], zero_pose.r_tip, [.15,0,0],[0,0,0,1])
+
 
     # TODO FIXME attaching and detach of urdf objects that listen to joint states

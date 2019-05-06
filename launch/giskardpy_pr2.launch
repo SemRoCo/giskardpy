@@ -6,8 +6,8 @@
     <param name="path_to_data_folder" value="$(find giskardpy)/data/pr2" />
     <param name="enable_gui" value="$(arg gui)"/>
     <rosparam param="debug">False</rosparam>
-    <rosparam param="enable_visualization">False</rosparam>
-    <rosparam param="enable_collision_marker">False</rosparam>
+    <rosparam param="enable_visualization">True</rosparam>
+    <rosparam param="enable_collision_marker">True</rosparam>
     <rosparam param="map_frame">map</rosparam>
     <rosparam param="root_link">base_footprint</rosparam>
     <rosparam param="joint_convergence_threshold">0.002</rosparam>

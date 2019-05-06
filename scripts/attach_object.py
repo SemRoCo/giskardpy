@@ -2,6 +2,7 @@
 import rospy
 import sys
 from giskardpy.python_interface import GiskardWrapper
+from giskardpy import logging
 
 if __name__ == '__main__':
     rospy.init_node('attach_object')
@@ -10,9 +11,9 @@ if __name__ == '__main__':
         name = rospy.get_param('~name')
         result = giskard.attach_object(name=name, link_frame_id=rospy.get_param('~link'))
         if result.error_codes == result.SUCCESS:
-            rospy.loginfo('existing object \'{}\' attached'.format(name))
+            logging.loginfo('existing object \'{}\' attached'.format(name))
         else:
-            rospy.logwarn('failed to add object \'{}\''.format(name))
-            rospy.logwarn(result)
+            logging.logwarn('failed to add object \'{}\''.format(name))
+            logging.logwarn(result)
     except KeyError:
-        rospy.loginfo('Example call: rosrun giskardpy add_object.py _name:=box link:=gripper_tool_frame')
+        logging.loginfo('Example call: rosrun giskardpy add_object.py _name:=box link:=gripper_tool_frame')

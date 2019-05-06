@@ -20,7 +20,6 @@ from geometry_msgs.msg import PointStamped, Point, Vector3Stamped, Vector3, Pose
 from giskard_msgs.msg import WorldBody
 from py_trees import common, Chooser, Selector, Sequence, Behaviour
 from py_trees.composites import Parallel
-from rospy import logwarn
 from sensor_msgs.msg import JointState
 from shape_msgs.msg import SolidPrimitive
 from tf.transformations import quaternion_multiply, quaternion_conjugate
@@ -29,6 +28,7 @@ from giskardpy.data_types import ClosestPointInfo
 from giskardpy.data_types import SingleJointState
 from giskardpy.plugin import PluginBehavior
 from giskardpy.tfwrapper import kdl_to_pose, np_to_kdl
+from giskardpy import logging
 
 
 @contextmanager
@@ -667,18 +667,18 @@ def rospkg_exists(name):
     try:
         m = r.get_manifest(package_name)
     except Exception as e:
-        logwarn('package {name} not found'.format(name=name))
+        logging.logwarn('package {name} not found'.format(name=name))
         return False
     if len(version_entry1) == 1:
         return True
     if not compare_version(version_entry1[2], version_entry1[1], m.version):
-        logwarn('found ROS package {installed_name}=={installed_version} but {r} is required}'.format(
+        logging.logwarn('found ROS package {installed_name}=={installed_version} but {r} is required}'.format(
             installed_name=package_name, installed_version=str(m.version), r=name))
         return False
     for entry in version_list[1:]:
         operator_and_version = re.split('(==|>=|<=|<|>)', entry)
         if not compare_version(operator_and_version[2], operator_and_version[1], m.version):
-            logwarn('found ROS package {installed_name}=={installed_version} but {r} is required}'.format(
+            logging.logwarn('found ROS package {installed_name}=={installed_version} but {r} is required}'.format(
                 installed_name=package_name, installed_version=str(m.version), r=name))
             return False
 
@@ -704,5 +704,6 @@ def check_dependencies():
         except pkg_resources.DistributionNotFound as e:
             rospkg_exists(d)
         except pkg_resources.VersionConflict as e:
-            logwarn('found {version_f} but version {version_r} is required'.format(version_r=str(e.req),
+            logging.logwarn('found {version_f} but version {version_r} is required'.format(version_r=str(e.req),
                                                                                    version_f=str(e.dist)))
+

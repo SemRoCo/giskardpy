@@ -7,6 +7,7 @@ from geometry_msgs.msg import Point, Vector3, Quaternion, Pose, Transform, PoseS
 from giskard_msgs.srv import UpdateWorld, UpdateWorldResponse, UpdateWorldRequest
 from giskard_msgs.msg import WorldBody
 from shape_msgs.msg import SolidPrimitive
+from giskardpy import logging
 
 
 def to_point_msg(vector3_msg):
@@ -172,11 +173,11 @@ def call_service(proxy, request, expected_error, user_msg):
         :type user_msg: str
     """
     t = time()
-    rospy.loginfo(user_msg)
+    logging.loginfo(user_msg)
     resp = proxy(request)  # type: UpdateWorldResponse
     if resp.error_codes != expected_error:
         raise RuntimeError(resp.error_msg)
-    rospy.loginfo("...OK. Took {}s.".format(time() -t))
+    logging.loginfo("...OK. Took {}s.".format(time() -t))
 
 
 def add_wand(proxy):
@@ -302,5 +303,5 @@ def test_update_world():
 
 if __name__ == "__main__":
     rospy.init_node('test_update_world')
-    rospy.loginfo("Test Update World...")
+    logging.loginfo("Test Update World...")
     test_update_world()

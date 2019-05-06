@@ -11,6 +11,7 @@ from giskardpy.tfwrapper import msg_to_kdl, kdl_to_pose
 from giskardpy.urdf_object import URDFObject
 from giskardpy.utils import keydefaultdict
 from giskardpy.world_object import WorldObject
+from giskardpy import logging
 
 
 class World(object):
@@ -214,7 +215,7 @@ class World(object):
         for ce in collision_goals:  # type: CollisionEntry
             if ce.type in [CollisionEntry.ALLOW_ALL_COLLISIONS,
                            CollisionEntry.AVOID_ALL_COLLISIONS]:
-                rospy.logwarn(u'ALLOW_ALL_COLLISIONS and AVOID_ALL_COLLISIONS deprecated, use AVOID_COLLISIONS and'
+                logging.logwarn(u'ALLOW_ALL_COLLISIONS and AVOID_ALL_COLLISIONS deprecated, use AVOID_COLLISIONS and'
                               u'ALLOW_COLLISIONS instead with ALL constant instead.')
                 if ce.type == CollisionEntry.ALLOW_ALL_COLLISIONS:
                     ce.type = CollisionEntry.ALLOW_COLLISION

@@ -44,8 +44,8 @@ if __name__ == '__main__':
                                   js_topic=rospy.get_param('~js', None),
                                   pose=pose)
         if result.error_codes == result.SUCCESS:
-            rospy.loginfo('urdf \'{}\' added'.format(name))
+            rospy.loginfo('urdfs \'{}\' added'.format(name))
         else:
-            rospy.logwarn('failed to add urdf \'{}\''.format(name))
+            rospy.logwarn('failed to add urdfs \'{}\''.format(name))
     except KeyError:
         rospy.loginfo('Example call: rosrun giskardpy add_urdf.py _name:=kitchen _param:=kitchen_description _js:=kitchen_joint_states _root_frame:=world _frame_id:=map')

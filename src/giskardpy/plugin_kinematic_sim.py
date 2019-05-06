@@ -1,12 +1,14 @@
 from collections import OrderedDict
 
+from py_trees import Status
+
 from giskardpy.data_types import SingleJointState
 from giskardpy.identifier import time_identifier, js_identifier, next_cmd_identifier
-from giskardpy.plugin import PluginBase
+from giskardpy.plugin import GiskardBehavior
 
 
-class KinSimPlugin(PluginBase):
-    def __init__(self, sample_period):
+class KinSimPlugin(GiskardBehavior):
+    def __init__(self, name, sample_period):
         """
         :type js_identifier: str
         :type next_cmd_identifier: str
@@ -15,17 +17,17 @@ class KinSimPlugin(PluginBase):
         :type sample_period: float
         """
         self.frequency = sample_period
-        super(KinSimPlugin, self).__init__()
+        super(KinSimPlugin, self).__init__(name)
 
-    def initialize(self):
+    def initialise(self):
         self.next_js = None
         self.time = -self.frequency
-        super(KinSimPlugin, self).initialize()
+        super(KinSimPlugin, self).initialise()
 
     def update(self):
         self.time += self.frequency
-        motor_commands = self.god_map.safe_get_data([next_cmd_identifier])
-        current_js = self.god_map.safe_get_data([js_identifier])
+        motor_commands = self.get_god_map().safe_get_data(next_cmd_identifier)
+        current_js = self.get_god_map().safe_get_data(js_identifier)
         if motor_commands is not None:
             self.next_js = OrderedDict()
             for joint_name, sjs in current_js.items():
@@ -35,8 +37,8 @@ class KinSimPlugin(PluginBase):
                     cmd = 0.0
                 self.next_js[joint_name] = SingleJointState(sjs.name, sjs.position + cmd * self.frequency, velocity=cmd)
         if self.next_js is not None:
-            self.god_map.safe_set_data([js_identifier], self.next_js)
+            self.get_god_map().safe_set_data(js_identifier, self.next_js)
         else:
-            self.god_map.safe_set_data([js_identifier], current_js)
-        self.god_map.safe_set_data([time_identifier], self.time)
-        return super(KinSimPlugin, self).update()
+            self.get_god_map().safe_set_data(js_identifier, current_js)
+        self.get_god_map().safe_set_data(time_identifier, self.time)
+        return Status.RUNNING

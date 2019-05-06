@@ -12,73 +12,6 @@ class SingleJointState(object):
         return u'{}: {}, {}, {}'.format(self.name, self.position, self.velocity, self.effort)
 
 
-# class MultiJointState(object):
-#     def __init__(self):
-#         self._states = OrderedDict()
-#
-#     def get(self, name):
-#         return self._states[name]
-#
-#     def set(self, state):
-#         self._states[state.name] = state
-#
-#     def keys(self):
-#         return self._states.keys()
-#
-#     def values(self):
-#         return self._states.values()
-#
-#     def items(self):
-#         return self._states.items()
-
-
-class Point(object):
-    def __init__(self, x=0.0, y=0.0, z=0.0):
-        self.x = x
-        self.y = y
-        self.z = z
-
-    def __repr__(self):
-        return u'{}(x={}, y={}, z={})'.format(self.__class__.__name__, self.x, self.y, self.z)
-
-
-class Quaternion(object):
-    def __init__(self, x=0.0, y=0.0, z=0.0, w=1.0):
-        self.x = x
-        self.y = y
-        self.z = z
-        self.w = w
-
-    def __repr__(self):
-        return u'{}(x={}, y={}, z={}, w={})'.format(self.__class__.__name__, self.x, self.y, self.z, self.w)
-
-
-class Transform(object):
-    def __init__(self, translation=Point(), rotation=Quaternion()):
-        self.translation = translation
-        self.rotation = rotation
-
-    def __repr__(self):
-        return u'{}(translation={}, rotation={})'.format(self.__class__.__name__, self.translation, self.rotation)
-
-
-# class Stamped(object):
-#     def __init__(self, reference_name=''):
-#         self.reference_name = reference_name
-
-
-# class PointStamped(Point, Stamped):
-#     pass
-
-
-# class QuaternionStamped(Quaternion, Stamped):
-#     pass
-
-
-# class TransformStamped(Transform, Stamped):
-#     pass
-
-
 class Trajectory(object):
     def __init__(self):
         self._points = OrderedDict()
@@ -108,8 +41,9 @@ class Trajectory(object):
 
 
 class ClosestPointInfo(object):
-    #TODO why no named tuple?
-    def __init__(self, position_on_a, position_on_b, contact_distance, min_dist, link_a, link_b, contact_normal, old_key):
+    # TODO why no named tuple?
+    def __init__(self, position_on_a, position_on_b, contact_distance, min_dist, link_a, link_b, contact_normal,
+                 old_key):
         self.position_on_a = position_on_a
         self.position_on_b = position_on_b
         self.contact_distance = contact_distance

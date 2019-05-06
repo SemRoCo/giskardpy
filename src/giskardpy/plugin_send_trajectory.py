@@ -11,7 +11,8 @@ from giskardpy.plugin import GiskardBehavior
 
 
 class SendTrajectory(ActionClient, GiskardBehavior):
-    error_code_to_str = {value: name for name, value in vars(FollowJointTrajectoryResult).items() if isinstance(value, int)}
+    error_code_to_str = {value: name for name, value in vars(FollowJointTrajectoryResult).items() if
+                         isinstance(value, int)}
 
     def __init__(self, name, fill_velocity_values,
                  action_namespace=u'/whole_body_controller/follow_joint_trajectory'):
@@ -27,8 +28,7 @@ class SendTrajectory(ActionClient, GiskardBehavior):
 
     def initialise(self):
         super(SendTrajectory, self).initialise()
-        trajectory = self.get_god_map().safe_get_data([trajectory_identifier])
-        # self.get_god_map().safe_set_data([self.trajectory_identifier], None)
+        trajectory = self.get_god_map().safe_get_data(trajectory_identifier)
         goal = FollowJointTrajectoryGoal()
         goal.trajectory = self.traj_to_msg(trajectory)
         self.action_goal = goal
@@ -82,6 +82,3 @@ class SendTrajectory(ActionClient, GiskardBehavior):
         else:
             self.feedback_message = "moving"
             return py_trees.Status.RUNNING
-
-
-

@@ -1,92 +1,90 @@
-import hashlib
 from collections import namedtuple, OrderedDict
+from itertools import combinations
+
+from geometry_msgs.msg import PoseStamped
+
 import symengine_wrappers as spw
-from urdf_parser_py.urdf import URDF, Box, Sphere, Mesh, Cylinder
-
+from giskardpy import BACKEND, WORLD_IMPLEMENTATION
+from giskardpy.pybullet_world_object import PyBulletWorldObject
 from giskardpy.qp_problem_builder import HardConstraint, JointConstraint
-from giskardpy.utils import cube_volume, cube_surface, sphere_volume, cylinder_volume, cylinder_surface, keydefaultdict, \
-    suppress_stdout, suppress_stderr
+from giskardpy.utils import keydefaultdict, \
+    homo_matrix_to_pose
+from giskardpy.world_object import WorldObject
 
-Joint = namedtuple('Joint', ['symbol', 'velocity_limit', 'lower', 'upper', 'type', 'frame'])
+Joint = namedtuple(u'Joint', [u'symbol', u'velocity_limit', u'lower', u'upper', u'type', u'frame'])
 
-
-def hacky_urdf_parser_fix(urdf_str):
-    # TODO this function is inefficient but the tested urdf's aren't big enough for it to be a problem
-    fixed_urdf = ''
-    delete = False
-    black_list = ['transmission', 'gazebo']
-    black_open = ['<{}'.format(x) for x in black_list]
-    black_close = ['</{}'.format(x) for x in black_list]
-    for line in urdf_str.split('\n'):
-        if len([x for x in black_open if x in line]) > 0:
-            delete = True
-        if len([x for x in black_close if x in line]) > 0:
-            delete = False
-            continue
-        if not delete:
-            fixed_urdf += line + '\n'
-    return fixed_urdf.encode('utf-8')
+if WORLD_IMPLEMENTATION == u'pybullet':
+    Backend = PyBulletWorldObject
+else:
+    Backend = WorldObject
 
 
-JOINT_TYPES = [u'fixed', u'revolute', u'continuous', u'prismatic']
-MOVABLE_JOINT_TYPES = [u'revolute', u'continuous', u'prismatic']
-ROTATIONAL_JOINT_TYPES = [u'revolute', u'continuous']
-TRANSLATIONAL_JOINT_TYPES = [u'prismatic']
-
-
-class Robot(object):
-    # TODO split urdf part into separate file?
-    # TODO remove slow shit from init?
-    def __init__(self, urdf, default_joint_vel_limit, default_joint_weight):
+class Robot(Backend):
+    def __init__(self, urdf, base_pose=None, controlled_joints=None, path_to_data_folder=u'', default_joint_vel_limit=0,
+                 default_joint_weight=0, calc_self_collision_matrix=True, *args, **kwargs):
         """
         :param urdf:
         :type urdf: str
-        :param joints_to_symbols_map: maps urdf joint names to symbols
+        :param joints_to_symbols_map: maps urdfs joint names to symbols
         :type joints_to_symbols_map: dict
         :param default_joint_vel_limit: all velocity limits which are undefined or higher than this will be set to this
         :type default_joint_vel_limit: Symbol
         """
-        self.default_joint_velocity_limit = default_joint_vel_limit
-        self.default_weight = default_joint_weight
-        self.fks = {}
+        self._fk_expressions = {}
+        self._fks = {}
+        self._evaluated_fks = {}
         self._joint_to_frame = {}
-        self.joint_to_symbol_map = keydefaultdict(lambda x: spw.Symbol(x))
-        self.urdf = urdf
-        with suppress_stderr():
-            self._urdf_robot = URDF.from_xml_string(hacky_urdf_parser_fix(self.urdf))
+        self._default_joint_velocity_limit = default_joint_vel_limit
+        self._default_weight = default_joint_weight
+        self._joint_to_symbol_map = keydefaultdict(lambda x: spw.Symbol(x))
+        # self.__joint_state_positions = {str(self._joint_to_symbol_map[k]): 0 for k, v in self.get_controllable_joints()}
+        super(Robot, self).__init__(urdf, base_pose, controlled_joints, path_to_data_folder, calc_self_collision_matrix,
+                                    *args, **kwargs)
+        self.reinitialize()
+        self.update_self_collision_matrix(added_links=set(combinations(self.get_link_names_with_collision(), 2)))
 
-    @classmethod
-    def from_urdf_file(cls, urdf_file, joints_to_symbols_map=None, default_joint_vel_limit=1):
-        """
-        :param urdf_file: path to urdf file
-        :type urdf_file: str
-        :param joints_to_symbols_map: maps urdf joint names to symbols
-        :type joints_to_symbols_map: dict
-        :param default_joint_vel_limit: all velocity limits which are undefined or higher than this will be set to this
-        :type default_joint_vel_limit: float
-        :rtype: Robot
-        """
-        with open(urdf_file, 'r') as f:
-            urdf_string = f.read()
-        self = cls(urdf_string, default_joint_vel_limit)
-        self.parse_urdf(joints_to_symbols_map)
-        return self
+    @property
+    def hard_constraints(self):
+        return self._hard_constraints
 
-    def parse_urdf(self, joints_to_symbols_map=None):
+    @property
+    def joint_constraints(self):
+        return self._joint_constraints
+
+    @Backend.joint_state.setter
+    def joint_state(self, value):
         """
-        :param joints_to_symbols_map: maps urdf joint names to symbols
+        :param joint_state:
+        :type joint_state: dict
+        :return:
+        """
+        Backend.joint_state.fset(self, value)
+        self.__joint_state_positions = {str(self._joint_to_symbol_map[k]): v.position for k, v in
+                                        self.joint_state.items()}
+        self._evaluated_fks.clear()
+
+    def get_joint_state_positions(self):
+        try:
+            return self.__joint_state_positions
+        except:
+            return {str(self._joint_to_symbol_map[x]): 0 for x in self.get_controllable_joints()}
+
+    def reinitialize(self, joints_to_symbols_map=None):
+        """
+        :param joints_to_symbols_map: maps urdfs joint names to symbols
         :type joints_to_symbols_map: dict
         """
+        super(Robot, self).reinitialize()
         if joints_to_symbols_map is not None:
-            self.joint_to_symbol_map.update(joints_to_symbols_map)
+            self._joint_to_symbol_map.update(joints_to_symbols_map)
+        self._fk_expressions = {}
         self._create_frames_expressions()
         self._create_constraints()
+        self.init_fast_fks()
 
-    def get_name(self):
-        """
-        :rtype: str
-        """
-        return self._urdf_robot.name
+    def update_self_collision_matrix(self, added_links=None, removed_links=None):
+        if self._calc_self_collision_matrix:
+            super(Robot, self).update_self_collision_matrix(added_links, removed_links)
 
     def _create_frames_expressions(self):
         for joint_name, urdf_joint in self._urdf_robot.joint_map.items():
@@ -106,11 +104,11 @@ class Robot(object):
                     joint_frame = spw.eye(4)
             else:
                 # TODO more specific exception
-                raise Exception(u'Joint type "{}" is not supported by urdf parser.'.format(urdf_joint.type))
+                raise Exception(u'Joint type "{}" is not supported by urdfs parser.'.format(urdf_joint.type))
 
-            if urdf_joint.type in ROTATIONAL_JOINT_TYPES:
+            if self.is_rotational_joint(joint_name):
                 joint_frame *= spw.rotation_matrix_from_axis_angle(spw.vector3(*urdf_joint.axis), joint_symbol)
-            elif urdf_joint.type in TRANSLATIONAL_JOINT_TYPES:
+            elif self.is_translational_joint(joint_name):
                 joint_frame *= spw.translation3(*(spw.point3(*urdf_joint.axis) * joint_symbol)[:3])
 
             self._joint_to_frame[joint_name] = joint_frame
@@ -119,21 +117,21 @@ class Robot(object):
         """
         Creates hard and joint constraints.
         """
-        self.hard_constraints = OrderedDict()
-        self.joint_constraints = OrderedDict()
+        self._hard_constraints = OrderedDict()
+        self._joint_constraints = OrderedDict()
         for i, joint_name in enumerate(self.get_joint_names_controllable()):
-            lower_limit, upper_limit = self.get_joint_lower_upper_limit(joint_name)
+            lower_limit, upper_limit = self.get_joint_limits(joint_name)
             joint_symbol = self.get_joint_symbol(joint_name)
             velocity_limit = self.get_joint_velocity_limit_expr(joint_name)
 
             if lower_limit is not None and upper_limit is not None:
-                self.hard_constraints[joint_name] = HardConstraint(lower=lower_limit - joint_symbol,
-                                                                   upper=upper_limit - joint_symbol,
-                                                                   expression=joint_symbol)
+                self._hard_constraints[joint_name] = HardConstraint(lower=lower_limit - joint_symbol,
+                                                                    upper=upper_limit - joint_symbol,
+                                                                    expression=joint_symbol)
 
-            self.joint_constraints[joint_name] = JointConstraint(lower=-velocity_limit,
-                                                                 upper=velocity_limit,
-                                                                 weight=self.default_weight)
+            self._joint_constraints[joint_name] = JointConstraint(lower=-velocity_limit,
+                                                                  upper=velocity_limit,
+                                                                  weight=self._default_weight)
 
     def get_fk_expression(self, root_link, tip_link):
         """
@@ -142,100 +140,58 @@ class Robot(object):
         :return: 4d matrix describing the transformation from root_link to tip_link
         :rtype: spw.Matrix
         """
-        if (root_link, tip_link) not in self.fks:
+        if (root_link, tip_link) not in self._fk_expressions:
             fk = spw.eye(4)
             for joint_name in self.get_joint_names_from_chain(root_link, tip_link):
                 fk *= self.get_joint_frame(joint_name)
-            self.fks[root_link, tip_link] = fk
-        return self.fks[root_link, tip_link]
+            self._fk_expressions[root_link, tip_link] = fk
+        return self._fk_expressions[root_link, tip_link]
 
-    # JOINT FUNCITONS
+    def get_fk(self, root, tip):
+        try:
+            return self._evaluated_fks[root, tip]
+        except KeyError:
+            homo_m = self._fks[root, tip](**self.get_joint_state_positions())
+            p = PoseStamped()
+            p.header.frame_id = root
+            p.pose = homo_matrix_to_pose(homo_m)
+            self._evaluated_fks[root, tip] = p
+            return p
 
-    def get_joint_names(self):
-        """
-        :rtype: list
-        """
-        return self._urdf_robot.joint_map.keys()
+    def init_fast_fks(self):
+        def f(key):
+            root, tip = key
+            fk = self.get_fk_expression(root, tip)
+            m = spw.speed_up(fk, fk.free_symbols, backend=BACKEND)
+            return m
 
-    def get_joint_names_from_chain(self, root_link, tip_link):
-        """
-        :rtype root: str
-        :rtype tip: str
-        :rtype: list
-        """
-        return self._urdf_robot.get_chain(root_link, tip_link, True, False, True)
+        self._fks = keydefaultdict(f)
 
-    def get_joint_names_from_chain_controllable(self, root_link, tip_link):
-        """
-        :rtype root: str
-        :rtype tip: str
-        :rtype: list
-        """
-        return self._urdf_robot.get_chain(root_link, tip_link, True, False, False)
-
-    def get_joint_names_controllable(self):
-        """
-        :return: returns the names of all movable joints which are not mimic.
-        :rtype: list
-        """
-        return [joint_name for joint_name in self.get_joint_names() if self.is_joint_controllable(joint_name)]
-
-    def get_joint_limits(self):
-        """
-        :return: dict mapping joint names to tuple containing lower and upper limits
-        :rtype: dict
-        """
-        return {joint_name: self.get_joint_lower_upper_limit(joint_name) for joint_name in self.get_joint_names()
-                if self.is_joint_controllable(joint_name)}
+    # JOINT FUNCTIONS
 
     def get_joint_symbols(self):
         """
-        :return: dict mapping urdf joint name to symbol
+        :return: dict mapping urdfs joint name to symbol
         :rtype: dict
         """
         return {joint_name: self.get_joint_symbol(joint_name) for joint_name in self.get_joint_names_controllable()}
 
-    def get_joint_lower_upper_limit(self, joint_names):
-        """
-        Returns joint limits specified in the safety controller entry if given, else returns the normal limits.
-        :param joint_name: name of the joint in the urdf
-        :type joint_names: str
-        :return: lower limit, upper limit or None if not applicable
-        :rtype: float, float
-        """
-        # TODO use min of safety and normal limits
-        joint = self._urdf_robot.joint_map[joint_names]
-        if self.is_joint_continuous(joint_names):
-            lower_limit = None
-            upper_limit = None
-        elif joint.safety_controller is not None:
-            lower_limit = joint.safety_controller.soft_lower_limit
-            upper_limit = joint.safety_controller.soft_upper_limit
-        else:
-            if joint.limit is not None:
-                lower_limit = joint.limit.lower if joint.limit.lower is not None else None
-                upper_limit = joint.limit.upper if joint.limit.upper is not None else None
-            else:
-                lower_limit = None
-                upper_limit = None
-        return lower_limit, upper_limit
-
     def get_joint_velocity_limit_expr(self, joint_name):
         """
-        :param joint_name: name of the joint in the urdf
+        :param joint_name: name of the joint in the urdfs
         :type joint_name: str
-        :return: minimum of default velocity limit and limit specified in urdf
+        :return: minimum of default velocity limit and limit specified in urdfs
         :rtype: float
         """
         limit = self._urdf_robot.joint_map[joint_name].limit
         if limit is None or limit.velocity is None:
-            return self.default_joint_velocity_limit
+            return self._default_joint_velocity_limit
         else:
-            return spw.Min(limit.velocity, self.default_joint_velocity_limit)
+            return spw.Min(limit.velocity, self._default_joint_velocity_limit)
 
     def get_joint_frame(self, joint_name):
         """
-        :param joint_name: name of the joint in the urdf
+        :param joint_name: name of the joint in the urdfs
         :type joint_name: str
         :return: matrix expression describing the transformation caused by this joint
         :rtype: spw.Matrix
@@ -244,120 +200,8 @@ class Robot(object):
 
     def get_joint_symbol(self, joint_name):
         """
-        :param joint_name: name of the joint in the urdf
+        :param joint_name: name of the joint in the urdfs
         :type joint_name: str
         :rtype: spw.Symbol
         """
-        return self.joint_to_symbol_map[joint_name]
-
-    def is_joint_controllable(self, joint_name):
-        """
-        :param joint_name: name of the joint in the urdf
-        :type joint_name: str
-        :return: True if joint type is revolute, continuous or prismatic
-        :rtype: bool
-        """
-        joint = self._urdf_robot.joint_map[joint_name]
-        return joint.type in MOVABLE_JOINT_TYPES and joint.mimic is None
-
-    def is_joint_mimic(self, joint_name):
-        """
-        :param joint_name: name of the joint in the urdf
-        :type joint_name: str
-        :rtype: bool
-        """
-        joint = self._urdf_robot.joint_map[joint_name]
-        return joint.type in MOVABLE_JOINT_TYPES and joint.mimic is not None
-
-    def is_joint_continuous(self, joint_name):
-        """
-        :param joint_name: name of the joint in the urdf
-        :type joint_name: str
-        :rtype: bool
-        """
-        return self._urdf_robot.joint_map[joint_name].type == u'continuous'
-
-    def is_joint_type_supported(self, joint_name):
-        return self._urdf_robot.joint_map[joint_name].type in JOINT_TYPES
-
-    # LINK FUNCTIONS
-
-    def get_link_names_from_chain(self, root_link, tip_link):
-        """
-        :type root_link: str
-        :type tip_link: str
-        :return: list of all links in chain excluding root_link, including tip_link
-        :rtype: list
-        """
-        return self._urdf_robot.get_chain(root_link, tip_link, False, True, False)
-
-    def get_link_names(self):
-        """
-        :rtype: dict
-        """
-        return self._urdf_robot.link_map.keys()
-
-    def get_sub_tree_link_names_with_collision(self, root_joint):
-        """
-        returns a set of links with
-        :type: str
-        :param volume_threshold: links with simple geometric shape and less volume than this will be ignored
-        :type volume_threshold: float
-        :param surface_treshold:
-        :type surface_treshold: float
-        :return: all links connected to root
-        :rtype: list
-        """
-        sub_tree = self.get_sub_tree_links(root_joint)
-        return [link_name for link_name in sub_tree if self.has_link_collision(link_name)]
-
-    def get_sub_tree_links(self, root_joint):
-        """
-        :type root_joint: str
-        :return: list containing all link names in the subtree after root_joint
-        :rtype: list
-        """
-        links = []
-        joints = [root_joint]
-        for joint in joints:
-            try:
-                child_link = self._urdf_robot.joint_map[joint].child
-                if child_link in self._urdf_robot.child_map:
-                    for j, l in self._urdf_robot.child_map[child_link]:
-                        joints.append(j)
-                links.append(child_link)
-            except KeyError as e:
-                return []
-
-        return links
-
-    def has_link_collision(self, link_name, volume_threshold=1e-6, surface_threshold=1e-4):
-        """
-        :type link: str
-        :param volume_threshold: m**3, ignores simple geometry shapes with a volume less than this
-        :type volume_threshold: float
-        :param surface_threshold: m**2, ignores simple geometry shapes with a surface area less than this
-        :type surface_threshold: float
-        :return: True if collision geometry is mesh or simple shape with volume/surface bigger than thresholds.
-        :rtype: bool
-        """
-        link = self._urdf_robot.link_map[link_name]
-        if link.collision is not None:
-            geo = link.collision.geometry
-            return isinstance(geo, Box) and (cube_volume(*geo.size) > volume_threshold or
-                                             cube_surface(*geo.size) > surface_threshold) or \
-                   isinstance(geo, Sphere) and sphere_volume(geo.radius) > volume_threshold or \
-                   isinstance(geo, Cylinder) and (cylinder_volume(geo.radius, geo.length) > volume_threshold or
-                                                  cylinder_surface(geo.radius, geo.length) > surface_threshold) or \
-                   isinstance(geo, Mesh)
-        return False
-
-    def has_link_visuals(self, link_name):
-        link = self._urdf_robot.link_map[link_name]
-        return link.visual is not None
-
-    def get_urdf(self):
-        return self.urdf
-
-    def get_hash(self):
-        return hashlib.md5(self.urdf).hexdigest()
+        return self._joint_to_symbol_map[joint_name]

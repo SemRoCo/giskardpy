@@ -1,4 +1,5 @@
 import numpy as np
+
 import qpoases
 from qpoases import PyReturnValue
 
@@ -50,7 +51,7 @@ class QPSolver(object):
         number_of_retries = 2
         while number_of_retries > 0:
             if nWSR is None:
-                nWSR = np.array([sum(A.shape)*2])
+                nWSR = np.array([sum(A.shape) * 2])
             else:
                 nWSR = np.array([nWSR])
             number_of_retries -= 1
@@ -72,7 +73,7 @@ class QPSolver(object):
                 r = 5
                 A = np.round(A, r)
                 nWSR = None
-        else: # if not break
+        else:  # if not break
             self.started = False
             raise QPSolverException(self.RETURN_VALUE_DICT[success])
 

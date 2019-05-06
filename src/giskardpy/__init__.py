@@ -1,5 +1,10 @@
-# USE_SYMENGINE = False
-USE_SYMENGINE = True
+DEBUG = 0
+NORMAL = 1
+ERROR = 2
+# TODO figure out how to do this print level shit properly
+PRINT_LEVEL = NORMAL
+
+MAP = u'map'
 
 # BACKEND = None
 # BACKEND = 'cse'
@@ -9,8 +14,4 @@ USE_SYMENGINE = True
 BACKEND = 'llvm'
 # BACKEND = 'lambda'
 
-DEBUG = 0
-NORMAL = 1
-ERROR = 2
-# TODO figure out how to do this print level shit properly
-PRINT_LEVEL = NORMAL
+WORLD_IMPLEMENTATION = u'pybullet'

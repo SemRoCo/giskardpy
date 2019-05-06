@@ -4,7 +4,7 @@ fk_identifier = robot_identifier + [u'get_fk']
 js_identifier = robot_identifier + [u'joint_state']
 data_folder_identifier = [u'asdf']
 
-cartesian_goal_identifier = [u'goal']
+constraints_identifier = [u'constraints']
 trajectory_identifier = [u'traj']
 time_identifier = [u'time']
 next_cmd_identifier = [u'motor']

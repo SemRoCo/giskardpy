@@ -1,7 +1,10 @@
+import json
+
 import rospy
 from actionlib import SimpleActionClient
 from geometry_msgs.msg import PoseStamped, Point, Quaternion
-from giskard_msgs.msg import MoveAction, MoveCmd, Controller, MoveGoal, WorldBody, CollisionEntry, MoveResult
+from giskard_msgs.msg import MoveAction, Controller, MoveGoal, WorldBody, CollisionEntry, MoveResult, Constraint, \
+    MoveCmd
 from giskard_msgs.srv import UpdateWorld, UpdateWorldRequest, UpdateWorldResponse
 from sensor_msgs.msg import JointState
 from shape_msgs.msg import SolidPrimitive
@@ -34,10 +37,10 @@ class GiskardWrapper(object):
         :param pose_stamped:
         :type pose_stamped: PoseStamped
         """
-        self.set_tranlation_goal(root, tip, pose_stamped)
+        self.set_translation_goal(root, tip, pose_stamped)
         self.set_rotation_goal(root, tip, pose_stamped)
 
-    def set_tranlation_goal(self, root, tip, pose_stamped, p_gain=3, max_speed=0.1):
+    def set_translation_goal(self, root, tip, pose_stamped, p_gain=3, max_speed=0.1):
         """
         :param tip:
         :type tip: str
@@ -52,7 +55,7 @@ class GiskardWrapper(object):
         controller.weight = 1
         controller.max_speed = max_speed
         controller.p_gain = p_gain
-        self.cmd_seq[-1].controllers.append(controller)
+        self.cmd_seq[-1].constraints.append(controller)
 
     def set_rotation_goal(self, root, tip, pose_stamped, p_gain=3, max_speed=1.0):
         """
@@ -69,28 +72,29 @@ class GiskardWrapper(object):
         controller.weight = 1
         controller.max_speed = max_speed
         controller.p_gain = p_gain
-        self.cmd_seq[-1].controllers.append(controller)
+        self.cmd_seq[-1].constraints.append(controller)
 
     def set_joint_goal(self, joint_state):
         """
         :param joint_state:
         :type joint_state: dict
         """
-        controller = Controller()
-        controller.type = Controller.JOINT
-        controller.weight = 1
-        controller.p_gain = self.joint_gain
-        controller.max_speed = self.joint_max_speed
         if isinstance(joint_state, dict):
             for joint_name, joint_position in joint_state.items():
-                controller.goal_state.name.append(joint_name)
-                controller.goal_state.position.append(joint_position)
-        elif isinstance(joint_state, JointState):
-            controller.goal_state = joint_state
-        self.cmd_seq[-1].controllers.append(controller)
+                constraint = Constraint()
+                constraint.name = u'JointPosition'
+                constraint.parameter_value_pair = json.dumps({
+                    u'joint_name': joint_name,
+                    u'weight': 1,
+                    u'gain': self.joint_gain,
+                    u'max_speed': self.joint_max_speed,
+                    u'goal_position': joint_position
+                })
+                self.cmd_seq[-1].constraints.append(constraint)
 
     def set_collision_entries(self, collisions):
-        self.cmd_seq[-1].collisions.extend(collisions)
+        pass
+        # self.cmd_seq[-1].collisions.extend(collisions)
 
     def allow_collision(self, robot_links=(CollisionEntry.ALL,), body_b=CollisionEntry.ALL,
                         link_bs=(CollisionEntry.ALL,)):
@@ -276,7 +280,7 @@ class GiskardWrapper(object):
         return self.update_world.call(req)
 
     def add_mesh(self, name=u'mesh', mesh=u'', frame_id=u'map', position=(0, 0, 0), orientation=(0, 0, 0, 1),
-                   pose=None):
+                 pose=None):
         object = WorldBody()
         object.type = WorldBody.MESH_BODY
         object.name = str(name)

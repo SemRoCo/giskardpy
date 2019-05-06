@@ -46,7 +46,8 @@
   <run_depend>urdfdom_py</run_depend>
   <run_depend>qpoases</run_depend>
   <run_depend>giskard_msgs</run_depend>
-
+  <run_depend>py_trees</run_depend>
+  <run_depend>py_trees_ros</run_depend>
   <test_depend>rosunit</test_depend>
 
   <!-- The export tag contains other, unspecified, tags -->

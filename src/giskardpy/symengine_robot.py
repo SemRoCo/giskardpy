@@ -1,10 +1,8 @@
 import hashlib
-from collections import namedtuple, OrderedDict, defaultdict
-import numpy as np
+from collections import namedtuple, OrderedDict
 import symengine_wrappers as spw
 from urdf_parser_py.urdf import URDF, Box, Sphere, Mesh, Cylinder
 
-from giskardpy.input_system import JointStatesInput
 from giskardpy.qp_problem_builder import HardConstraint, JointConstraint
 from giskardpy.utils import cube_volume, cube_surface, sphere_volume, cylinder_volume, cylinder_surface, keydefaultdict, \
     suppress_stdout, suppress_stderr
@@ -27,7 +25,7 @@ def hacky_urdf_parser_fix(urdf_str):
             continue
         if not delete:
             fixed_urdf += line + '\n'
-    return fixed_urdf
+    return fixed_urdf.encode('utf-8')
 
 
 JOINT_TYPES = [u'fixed', u'revolute', u'continuous', u'prismatic']
@@ -39,17 +37,17 @@ TRANSLATIONAL_JOINT_TYPES = [u'prismatic']
 class Robot(object):
     # TODO split urdf part into separate file?
     # TODO remove slow shit from init?
-    def __init__(self, urdf, default_joint_vel_limit=0):
+    def __init__(self, urdf, default_joint_vel_limit, default_joint_weight):
         """
         :param urdf:
         :type urdf: str
         :param joints_to_symbols_map: maps urdf joint names to symbols
         :type joints_to_symbols_map: dict
         :param default_joint_vel_limit: all velocity limits which are undefined or higher than this will be set to this
-        :type default_joint_vel_limit: float
+        :type default_joint_vel_limit: Symbol
         """
         self.default_joint_velocity_limit = default_joint_vel_limit
-        self.default_weight = 0.0001
+        self.default_weight = default_joint_weight
         self.fks = {}
         self._joint_to_frame = {}
         self.joint_to_symbol_map = keydefaultdict(lambda x: spw.Symbol(x))
@@ -58,7 +56,7 @@ class Robot(object):
             self._urdf_robot = URDF.from_xml_string(hacky_urdf_parser_fix(self.urdf))
 
     @classmethod
-    def from_urdf_file(cls, urdf_file, joints_to_symbols_map=None, default_joint_vel_limit=0):
+    def from_urdf_file(cls, urdf_file, joints_to_symbols_map=None, default_joint_vel_limit=1):
         """
         :param urdf_file: path to urdf file
         :type urdf_file: str
@@ -126,7 +124,7 @@ class Robot(object):
         for i, joint_name in enumerate(self.get_joint_names_controllable()):
             lower_limit, upper_limit = self.get_joint_lower_upper_limit(joint_name)
             joint_symbol = self.get_joint_symbol(joint_name)
-            velocity_limit = self.get_joint_velocity_limit(joint_name)
+            velocity_limit = self.get_joint_velocity_limit_expr(joint_name)
 
             if lower_limit is not None and upper_limit is not None:
                 self.hard_constraints[joint_name] = HardConstraint(lower=lower_limit - joint_symbol,
@@ -207,7 +205,10 @@ class Robot(object):
         """
         # TODO use min of safety and normal limits
         joint = self._urdf_robot.joint_map[joint_names]
-        if joint.safety_controller is not None:
+        if self.is_joint_continuous(joint_names):
+            lower_limit = None
+            upper_limit = None
+        elif joint.safety_controller is not None:
             lower_limit = joint.safety_controller.soft_lower_limit
             upper_limit = joint.safety_controller.soft_upper_limit
         else:
@@ -219,7 +220,7 @@ class Robot(object):
                 upper_limit = None
         return lower_limit, upper_limit
 
-    def get_joint_velocity_limit(self, joint_name):
+    def get_joint_velocity_limit_expr(self, joint_name):
         """
         :param joint_name: name of the joint in the urdf
         :type joint_name: str
@@ -230,7 +231,7 @@ class Robot(object):
         if limit is None or limit.velocity is None:
             return self.default_joint_velocity_limit
         else:
-            return min(limit.velocity, self.default_joint_velocity_limit)
+            return spw.Min(limit.velocity, self.default_joint_velocity_limit)
 
     def get_joint_frame(self, joint_name):
         """
@@ -350,6 +351,10 @@ class Robot(object):
                                                   cylinder_surface(geo.radius, geo.length) > surface_threshold) or \
                    isinstance(geo, Mesh)
         return False
+
+    def has_link_visuals(self, link_name):
+        link = self._urdf_robot.link_map[link_name]
+        return link.visual is not None
 
     def get_urdf(self):
         return self.urdf

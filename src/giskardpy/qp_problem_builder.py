@@ -1,14 +1,13 @@
 import pickle
+import warnings
 from collections import OrderedDict, namedtuple
 import numpy as np
-from itertools import chain
 from time import time
 
 from giskardpy import BACKEND
 
 import giskardpy.symengine_wrappers as spw
 from giskardpy.qp_solver import QPSolver
-import hashlib
 
 from giskardpy.symengine_wrappers import load_compiled_function, safe_compiled_function
 
@@ -34,6 +33,8 @@ class QProblemBuilder(object):
         :param path_to_functions: location where the compiled functions can be safed.
         :type path_to_functions: str
         """
+        if free_symbols is not None:
+            warnings.warn('use of free_symbols deprecated', DeprecationWarning)
         assert (not len(controlled_joint_symbols) > len(joint_constraints_dict))
         assert (not len(controlled_joint_symbols) < len(joint_constraints_dict))
         assert (len(hard_constraints_dict) <= len(controlled_joint_symbols))
@@ -50,6 +51,7 @@ class QProblemBuilder(object):
 
         self.qp_solver = QPSolver(len(self.joint_constraints_dict) + len(self.soft_constraints_dict),
                                   len(self.hard_constraints_dict) + len(self.soft_constraints_dict))
+        self.lbAs = None  # for debugging purposes
 
     # @profile
     def make_matrices(self):
@@ -164,14 +166,19 @@ class QProblemBuilder(object):
             ubA.append(key)
             weights.append(key)
             xdot.append(key)
-        p_lb = pd.DataFrame(np_lb[:-len(self.soft_constraints_dict)], lb)
-        p_ub = pd.DataFrame(np_ub[:-len(self.soft_constraints_dict)], ub)
-        p_lbA = pd.DataFrame(np_lbA, lbA)
-        p_ubA = pd.DataFrame(np_ubA, ubA)
-        p_weights = pd.DataFrame(np_H.dot(np.ones(np_H.shape[0])), weights)
+        p_lb = pd.DataFrame(np_lb[:-len(self.soft_constraints_dict)], lb).sort_index()
+        p_ub = pd.DataFrame(np_ub[:-len(self.soft_constraints_dict)], ub).sort_index()
+        p_lbA = pd.DataFrame(np_lbA, lbA).sort_index()
+        p_ubA = pd.DataFrame(np_ubA, ubA).sort_index()
+        p_weights = pd.DataFrame(np_H.dot(np.ones(np_H.shape[0])), weights).sort_index()
         if xdot_full is not None:
-            p_xdot = pd.DataFrame(xdot_full, xdot)
-        p_A = pd.DataFrame(np_A, lbA, weights)
+            p_xdot = pd.DataFrame(xdot_full, xdot).sort_index()
+        p_A = pd.DataFrame(np_A, lbA, weights).sort_index()
+        if self.lbAs is None:
+            self.lbAs = p_lbA
+        else:
+            self.lbAs = self.lbAs.T.append(p_lbA.T, ignore_index=True).T
+            # self.lbAs.T[[c for c in self.lbAs.T.columns if 'dist' in c]].plot()
         pass
 
     def get_cmd(self, substitutions, nWSR=None):
@@ -197,3 +204,7 @@ class QProblemBuilder(object):
         # TODO enable debug print in an elegant way, preferably without slowing anything down
         # self.debug_print(np_H, np_A, np_lb, np_ub, np_lbA, np_ubA, xdot_full)
         return OrderedDict((observable, xdot_full[i]) for i, observable in enumerate(self.controlled_joints))
+
+
+# with pd.option_context('display.max_rows', None, 'display.max_columns', None):
+#     print(df)

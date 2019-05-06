@@ -10,6 +10,8 @@ from giskardpy.data_types import Transform, Point, Quaternion
 from lxml import etree
 import PyKDL as kdl # TODO: get rid of this dependency
 
+from giskardpy.utils import convert_dae_to_obj
+
 
 class ColorRgba(object):
     def __init__(self, r=1.0, g=1.0, b=1.0, a=1.0):
@@ -73,6 +75,12 @@ class MaterialProperty(object):
 
 class VisualProperty(object):
     def __init__(self, name=u'', origin=Transform(), geometry=None, material=None):
+        """
+        :type name: str
+        :type origin: Transform
+        :type geometry: GeometricShape
+        :type material: MaterialProperty
+        """
         self.name = name
         self.origin = origin
         self.geometry = geometry
@@ -92,6 +100,9 @@ class UrdfObject(object):
         self.inertial_props = inertial_props
         self.visual_props = visual_props
         self.collision_props = collision_props
+
+    def get_urdf(self):
+        return to_urdf_string(self)
 
 class Box(UrdfObject):
     def __init__(self, name, length, width, height):
@@ -159,12 +170,16 @@ def to_urdf_xml(urdf_object, skip_robot_tag=False):
         else:
             root = etree.Element(u'visual')
         root.append(to_urdf_xml(urdf_object.origin))
+        if isinstance(urdf_object.geometry, MeshShape):
+            urdf_object.geometry.filename = convert_dae_to_obj(urdf_object.geometry.filename)
         root.append(to_urdf_xml(urdf_object.geometry))
         if urdf_object.material:
             root.append(to_urdf_xml(urdf_object.material))
     elif isinstance(urdf_object, CollisionProperty):
         root = etree.Element(u'collision', name=urdf_object.name)
         root.append(to_urdf_xml(urdf_object.origin))
+        if isinstance(urdf_object.geometry, MeshShape):
+            urdf_object.geometry.filename = convert_dae_to_obj(urdf_object.geometry.filename)
         root.append(to_urdf_xml(urdf_object.geometry))
     elif isinstance(urdf_object, Transform):
         r = kdl.Rotation.Quaternion(urdf_object.rotation.x, urdf_object.rotation.y,
@@ -391,3 +406,12 @@ def from_pose_msg(pose_msg):
     :rtype: Transform
     """
     return Transform(from_point_msg(pose_msg.position), from_quaternion_msg(pose_msg.orientation))
+
+def remove_outer_tag(xml):
+    """
+    :param xml:
+    :type xml: str
+    :return:
+    :rtype: str
+    """
+    return xml.split('>', 1)[1].rsplit('<',1)[0]

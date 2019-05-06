@@ -1,5 +1,6 @@
 import copy
-import traceback
+from multiprocessing import Lock
+
 import symengine_wrappers as sw
 from copy import copy
 
@@ -7,7 +8,7 @@ class GodMap(object):
     """
     Data structure used by plugins to exchange information.
     """
-
+    # TODO give this fucker a lock
     def __init__(self):
         self._data = {}
         self.expr_separator = u'_'
@@ -15,6 +16,7 @@ class GodMap(object):
         self.expr_to_key = {}
         self.default_value = 0
         self.last_expr_values = {}
+        self.lock = Lock()
 
     def __copy__(self):
         god_map_copy = GodMap()
@@ -22,6 +24,14 @@ class GodMap(object):
         god_map_copy.key_to_expr = copy(self.key_to_expr)
         god_map_copy.expr_to_key = copy(self.expr_to_key)
         return god_map_copy
+
+    def __enter__(self):
+        print('acquired')
+        self.lock.acquire()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.lock.release()
 
     def _get_member(self, identifier,  member):
         """
@@ -46,6 +56,8 @@ class GodMap(object):
                     return getattr(identifier, member)
                 except TypeError as e:
                     pass
+        except IndexError:
+            return identifier[int(member)]
 
     def get_data(self, identifier):
         """
@@ -76,6 +88,11 @@ class GodMap(object):
         else:
             return result
 
+    def safe_get_data(self, identifier):
+        with self.lock:
+            r = self.get_data(identifier)
+        return r
+
     def to_symbol(self, identifier):
         """
         All registered identifiers will be included in self.get_symbol_map().
@@ -100,7 +117,8 @@ class GodMap(object):
         :rtype: dict
         """
         #TODO potential speedup by only updating entries that have changed
-        return {expr: self.get_data(key) for expr, key in self.expr_to_key.items()}
+        with self.lock:
+            return {expr: self.get_data(key) for expr, key in self.expr_to_key.items()}
 
     def get_registered_symbols(self):
         """
@@ -139,4 +157,6 @@ class GodMap(object):
             else:
                 self._data[namespace] = value
 
-
+    def safe_set_data(self, identifier, value):
+        with self.lock:
+            self.set_data(identifier, value)

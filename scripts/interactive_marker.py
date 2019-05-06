@@ -1,10 +1,11 @@
+#!/usr/bin/env python
 import numpy as np
 from collections import defaultdict
 from copy import deepcopy
 
 import rospy
 from actionlib.simple_action_client import SimpleActionClient
-from geometry_msgs.msg import Pose
+from geometry_msgs.msg import Pose, PoseStamped
 from geometry_msgs.msg._Quaternion import Quaternion
 from giskard_msgs.msg._Controller import Controller
 from giskard_msgs.msg._MoveAction import MoveAction
@@ -19,49 +20,50 @@ from visualization_msgs.msg._InteractiveMarkerControl import InteractiveMarkerCo
 from visualization_msgs.msg._InteractiveMarkerFeedback import InteractiveMarkerFeedback
 from visualization_msgs.msg._Marker import Marker
 
-from giskardpy.plugin import PluginBase
+from giskardpy.python_interface import GiskardWrapper
 from giskardpy.utils import qv_mult
 
 MARKER_SCALE = 0.15
 
 
 
-class InteractiveMarkerPlugin(PluginBase):
+class IMServer(object):
     """
     Spawns interactive Marker which send cart goals to action server.
     Does not interact with god map.
     """
-    def __init__(self, root_tips, suffix=u''):
+    def __init__(self, root_tips, suffix=u'', giskard_name=u'giskardpy/command'):
         """
         :param root_tips: list containing root->tip tuple for each interactive marker.
         :type root_tips: list
         :param suffix: the marker will be called 'eef_control{}'.format(suffix)
         :type suffix: str
         """
+        self.enable_self_collision = rospy.get_param(u'~enable_self_collision', True)
+        self.giskard = GiskardWrapper(giskard_name)
         if len(root_tips) > 0:
             self.roots, self.tips = zip(*root_tips)
         else:
             self.roots = []
             self.tips = []
         self.suffix = suffix
+        self.giskard_name = giskard_name
         self.markers = {}
-        super(InteractiveMarkerPlugin, self).__init__()
-
-    def start_once(self):
-        # giskard goal client
-        self.client = SimpleActionClient(u'qp_controller/command', MoveAction)
-        self.client.wait_for_server()
 
         # marker server
         self.server = InteractiveMarkerServer(u'eef_control{}'.format(self.suffix))
         self.menu_handler = MenuHandler()
 
-        all_goals = {}
 
         for root, tip in zip(self.roots, self.tips):
             int_marker = self.make_6dof_marker(InteractiveMarkerControl.MOVE_ROTATE_3D, root, tip)
             self.server.insert(int_marker,
-                               self.process_feedback(self.server, int_marker.name, self.client, root, tip, all_goals))
+                               self.process_feedback(self.server,
+                                                     int_marker.name,
+                                                     root,
+                                                     tip,
+                                                     self.giskard,
+                                                     self.enable_self_collision))
             self.menu_handler.apply(self.server, int_marker.name)
 
         self.server.applyChanges()
@@ -154,7 +156,7 @@ class InteractiveMarkerPlugin(PluginBase):
         return int_marker
 
     class process_feedback(object):
-        def __init__(self, i_server, marker_name, client, root_link, tip_link, all_goals):
+        def __init__(self, i_server, marker_name, root_link, tip_link, giskard, enable_self_collision):
             """
             :param i_server:
             :type i_server: InteractiveMarkerServer
@@ -166,42 +168,35 @@ class InteractiveMarkerPlugin(PluginBase):
             :type root_link: str
             :param tip_link:
             :type tip_link: str
-            :param all_goals:
-            :type all_goals: dict
+            :param giskard:
+            :type giskard: GiskardWrapper
+            :param enable_self_collision:
+            :type enable_self_collision: bool
             """
             self.i_server = i_server
             self.marker_name = marker_name
-            self.client = client
             self.tip_link = tip_link
             self.root_link = root_link
-            self.all_goals = all_goals
-            self.reset_goal()
+            self.giskard = giskard
+            self.enable_self_collision = enable_self_collision
             self.marker_pub = rospy.Publisher(u'visualization_marker_array', MarkerArray, queue_size=10)
 
-        def reset_goal(self):
-            p = Pose()
-            p.orientation.w = 1
-            self.all_goals[self.root_link, self.tip_link] = []
-            self.all_goals[self.root_link, self.tip_link].append(self.make_translation_controller(self.tip_link, p))
-            self.all_goals[self.root_link, self.tip_link].append(self.make_rotation_controller(self.tip_link, p))
 
         def __call__(self, feedback):
             if feedback.event_type == InteractiveMarkerFeedback.MOUSE_UP:
-                self.all_goals = defaultdict(list)
-                self.all_goals[self.root_link, self.tip_link] = []
                 print(u'got interactive goal update')
-                # translation
-                controller = self.make_translation_controller(feedback.header.frame_id,
-                                                              feedback.pose)
-                self.all_goals[self.root_link, self.tip_link].append(controller)
 
-                # rotation
-                controller = self.make_rotation_controller(feedback.header.frame_id,
-                                                           feedback.pose)
-                self.all_goals[self.root_link, self.tip_link].append(controller)
-                self.send_all_goals()
+                p = PoseStamped()
+                p.header.frame_id = feedback.header.frame_id
+                p.pose = feedback.pose
+
+                self.giskard.set_cart_goal(self.root_link, self.tip_link, p)
+
+                if not self.enable_self_collision:
+                    self.giskard.disable_self_collision()
+
+                self.giskard.plan_and_execute(wait=False)
                 self.pub_goal_marker(feedback.header, feedback.pose)
-                self.reset_goal()
                 self.i_server.setPose(self.marker_name, Pose())
             self.i_server.applyChanges()
 
@@ -269,50 +264,11 @@ class InteractiveMarkerPlugin(PluginBase):
             ma.markers.append(m)
             self.marker_pub.publish(ma)
 
-        def make_translation_controller(self, frame_id, pose):
-            """
-            :param frame_id:
-            :type frame_id: str
-            :param pose:
-            :type pose: Pose
-            :return:
-            :rtype: giskard_msgs.msg._Controller.Controller
-            """
-            controller = self.make_controller(frame_id, pose)
-            controller.type = Controller.TRANSLATION_3D
-            controller.p_gain = 3
-            controller.max_speed = 0.3
-            controller.weight = 1.0
-            return controller
 
-        def make_rotation_controller(self, frame_id, pose):
-            controller = self.make_controller(frame_id, pose)
-            controller.type = Controller.ROTATION_3D
-            controller.p_gain = 3
-            controller.max_speed = 0.5
-            controller.weight = 1.0
-            return controller
 
-        def make_controller(self, frame_id, pose):
-            controller = Controller()
-            controller.tip_link = self.tip_link
-            controller.root_link = self.root_link
-            controller.goal_pose.header.frame_id = frame_id
-            controller.goal_pose.pose = pose
-            return controller
-
-        def send_all_goals(self):
-            goal = MoveGoal()
-            goal.type = MoveGoal.PLAN_AND_EXECUTE
-            move_cmd = MoveCmd()
-            # move_cmd.max_trajectory_length = 20
-            for g in self.all_goals.values():
-                move_cmd.controllers.extend(g)
-            goal.cmd_seq.append(move_cmd)
-            self.client.send_goal(goal)
-
-        def stop(self):
-            self.marker_pub.unregister()
-
-    def copy(self):
-        return self
+if __name__ == u'__main__':
+    rospy.init_node(u'giskard_interactive_marker')
+    root_tips = rospy.get_param(u'~interactive_marker_chains')
+    im = IMServer(root_tips)
+    while not rospy.is_shutdown():
+        rospy.sleep(1)

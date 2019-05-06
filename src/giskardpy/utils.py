@@ -1,15 +1,23 @@
 from __future__ import division
 
-import codecs
-import ctypes
-import hashlib
-import tempfile
+import pydot
+import rospkg
+import subprocess
+import xml
 from collections import defaultdict, OrderedDict
 import numpy as np
+from itertools import product, chain
 from numpy import pi
-import math
+from rospy import logwarn
+import re
+
+import errno
+from os import tmpfile
+
 from geometry_msgs.msg import PointStamped, Point, Vector3Stamped, Vector3, Pose, PoseStamped, QuaternionStamped, \
     Quaternion
+from py_trees import common, Chooser, Selector, Sequence, Behaviour
+from py_trees.composites import Parallel
 from sensor_msgs.msg import JointState
 from tf.transformations import quaternion_multiply, quaternion_conjugate
 
@@ -17,37 +25,10 @@ from giskardpy.data_types import SingleJointState
 from giskardpy.data_types import ClosestPointInfo
 from contextlib import contextmanager
 import sys, os
-import io
+import pylab as plt
+import pkg_resources
 
-
-@contextmanager
-def suppress_stdout(to=os.devnull):
-    '''
-    import os
-
-    with stdout_redirected(to=filename):
-        print("from Python")
-        os.system("echo non-Python applications are also supported")
-    '''
-    fd = sys.stdout.fileno()
-
-    ##### assert that Python and C stdio write using the same file descriptor
-    ####assert libc.fileno(ctypes.c_void_p.in_dll(libc, "stdout")) == fd == 1
-
-    def _redirect_stdout(to):
-        sys.stdout.close()  # + implicit flush()
-        os.dup2(to.fileno(), fd)  # fd writes to 'to' file
-        sys.stdout = os.fdopen(fd, 'w')  # Python writes to fd
-
-    with os.fdopen(os.dup(fd), 'w') as old_stdout:
-        with open(to, 'w') as file:
-            _redirect_stdout(to=file)
-        try:
-            yield  # allow code to be run with the redirected stdout
-        finally:
-            _redirect_stdout(to=old_stdout)  # restore stdout.
-            # buffering and flags such as
-            # CLOEXEC may be different
+from giskardpy.plugin import PluginBehavior, PluginBase
 
 
 @contextmanager
@@ -60,6 +41,24 @@ def suppress_stderr():
         finally:
             sys.stderr = old_stdout
 
+@contextmanager
+def suppress_stdout():
+    devnull = os.open('/dev/null', os.O_WRONLY)
+    old_stdout = os.dup(1)
+    os.dup2(devnull, 1)
+    try:
+        yield
+    finally:
+        os.dup2(old_stdout, 1)
+        os.close(devnull)
+
+class NullContextManager(object):
+    def __init__(self, dummy_resource=None):
+        self.dummy_resource = dummy_resource
+    def __enter__(self):
+        return self.dummy_resource
+    def __exit__(self, *args):
+        pass
 
 class keydefaultdict(defaultdict):
     """
@@ -293,3 +292,351 @@ def msg_to_list(thing):
                 thing.orientation.y,
                 thing.orientation.z,
                 thing.orientation.w]
+
+def create_path(path):
+    if not os.path.exists(os.path.dirname(path)):
+        try:
+            os.makedirs(os.path.dirname(path))
+        except OSError as exc:  # Guard against race condition
+            if exc.errno != errno.EEXIST:
+                raise
+
+def plot_trajectory(tj, controlled_joints, path_to_data_folder):
+    """
+    :type tj: Trajectory
+    :param controlled_joints: only joints in this list will be added to the plot
+    :type controlled_joints: list
+    """
+    return
+    if len(tj._points) <= 0:
+        return
+    colors = [u'b', u'g', u'r', u'c', u'm', u'y', u'k']
+    line_styles = [u'', u'--', u'-.']
+    fmts = [u''.join(x) for x in product(line_styles, colors)]
+    positions = []
+    velocities = []
+    times = []
+    names = [x for x in tj._points[0.0].keys() if x in controlled_joints]
+    for time, point in tj.items():
+        positions.append([v.position for j, v in point.items() if j in controlled_joints])
+        velocities.append([v.velocity for j, v in point.items() if j in controlled_joints])
+        times.append(time)
+    positions = np.array(positions)
+    velocities = np.array(velocities).T
+    times = np.array(times)
+
+    f, (ax1, ax2) = plt.subplots(2, sharex=True)
+    ax1.set_title(u'position')
+    ax2.set_title(u'velocity')
+    # positions -= positions.mean(axis=0)
+    for i, position in enumerate(positions.T):
+        ax1.plot(times, position, fmts[i], label=names[i])
+        ax2.plot(times, velocities[i], fmts[i])
+    box = ax1.get_position()
+    # ax1.set_ylim(-3, 1)
+    ax1.set_position([box.x0, box.y0, box.width * 0.6, box.height])
+    box = ax2.get_position()
+    ax2.set_position([box.x0, box.y0, box.width * 0.6, box.height])
+
+    # Put a legend to the right of the current axis
+    ax1.legend(loc=u'center', bbox_to_anchor=(1.45, 0))
+    ax1.grid()
+    ax2.grid()
+
+    plt.savefig(path_to_data_folder + u'trajectory.pdf')
+
+
+def resolve_ros_iris_in_urdf(input_urdf):
+    """
+    Replace all instances of ROS IRIs with a urdf string with global paths in the file system.
+    :param input_urdf: URDF in which the ROS IRIs shall be replaced.
+    :type input_urdf: str
+    :return: URDF with replaced ROS IRIs.
+    :rtype: str
+    """
+    output_urdf = u''
+    for line in input_urdf.split(u'\n'):
+        output_urdf += resolve_ros_iris(line)
+        output_urdf += u'\n'
+    return output_urdf
+
+rospack = rospkg.RosPack()
+def resolve_ros_iris(path):
+    if u'package://' in path:
+        split = path.split(u'package://')
+        prefix = split[0]
+        result = prefix
+        for suffix in split[1:]:
+            package_name, suffix = suffix.split(u'/', 1)
+            real_path = rospack.get_path(package_name)
+            result += u'{}/{}'.format(real_path, suffix)
+        return result
+    else:
+        return path
+
+def convert_dae_to_obj(path):
+    path = path.replace(u'\'', u'')
+    file_name = path.split(u'/')[-1]
+    name, file_format = file_name.split(u'.')
+    if u'dae' in file_format:
+        input_path = resolve_ros_iris(path)
+        new_path = u'/tmp/giskardpy/{}.obj'.format(name)
+        create_path(new_path)
+        try:
+            subprocess.check_call([u'meshlabserver', u'-i', input_path, u'-o', new_path])
+        except Exception as e:
+            print(u'meshlab not installed, can\'t convert dae to obj')
+        return new_path
+    return path
+
+def write_to_tmp(filename, urdf_string):
+    """
+    Writes a URDF string into a temporary file on disc. Used to deliver URDFs to PyBullet that only loads file.
+    :param filename: Name of the temporary file without any path information, e.g. 'pr2.urdf'
+    :type filename: str
+    :param urdf_string: URDF as an XML string that shall be written to disc.
+    :type urdf_string: str
+    :return: Complete path to where the urdf was written, e.g. '/tmp/pr2.urdf'
+    :rtype: str
+    """
+    new_path = u'/tmp/giskardpy/{}'.format(filename)
+    create_path(new_path)
+    with open(new_path, u'w') as o:
+        o.write(urdf_string)
+    return new_path
+
+def render_dot_tree(root, visibility_level=common.VisibilityLevel.DETAIL, name=None):
+    """
+    Render the dot tree to .dot, .svg, .png. files in the current
+    working directory. These will be named with the root behaviour name.
+
+    Args:
+        root (:class:`~py_trees.behaviour.Behaviour`): the root of a tree, or subtree
+        visibility_level (:class`~py_trees.common.VisibilityLevel`): collapse subtrees at or under this level
+        name (:obj:`str`): name to use for the created files (defaults to the root behaviour name)
+
+    Example:
+
+        Render a simple tree to dot/svg/png file:
+
+        .. graphviz:: dot/sequence.dot
+
+        .. code-block:: python
+
+            root = py_trees.composites.Sequence("Sequence")
+            for job in ["Action 1", "Action 2", "Action 3"]:
+                success_after_two = py_trees.behaviours.Count(name=job,
+                                                              fail_until=0,
+                                                              running_until=1,
+                                                              success_until=10)
+                root.add_child(success_after_two)
+            py_trees.display.render_dot_tree(root)
+
+    .. tip::
+
+        A good practice is to provide a command line argument for optional rendering of a program so users
+        can quickly visualise what tree the program will execute.
+    """
+    graph = generate_pydot_graph(root, visibility_level)
+    filename_wo_extension = root.name.lower().replace(" ", "_") if name is None else name
+    print("Writing %s.dot/svg/png" % filename_wo_extension)
+    graph.write(filename_wo_extension + '.dot')
+    graph.write_png(filename_wo_extension + '.png')
+    graph.write_svg(filename_wo_extension + '.svg')
+
+def generate_pydot_graph(root, visibility_level):
+    """
+    Generate the pydot graph - this is usually the first step in
+    rendering the tree to file. See also :py:func:`render_dot_tree`.
+
+    Args:
+        root (:class:`~py_trees.behaviour.Behaviour`): the root of a tree, or subtree
+        visibility_level (:class`~py_trees.common.VisibilityLevel`): collapse subtrees at or under this level
+
+    Returns:
+        pydot.Dot: graph
+    """
+    def get_node_attributes(node, visibility_level):
+        blackbox_font_colours = {common.BlackBoxLevel.DETAIL: "dodgerblue",
+                                 common.BlackBoxLevel.COMPONENT: "lawngreen",
+                                 common.BlackBoxLevel.BIG_PICTURE: "white"
+                                 }
+        if isinstance(node, Chooser):
+            attributes = ('doubleoctagon', 'cyan', 'black')  # octagon
+        elif isinstance(node, Selector):
+            attributes = ('octagon', 'cyan', 'black')  # octagon
+        elif isinstance(node, Sequence):
+            attributes = ('box', 'orange', 'black')
+        elif isinstance(node, Parallel):
+            attributes = ('note', 'gold', 'black')
+        elif isinstance(node, PluginBehavior):
+            attributes = ('box', 'green', 'black')
+        elif isinstance(node, PluginBase) or node.children != []:
+            attributes = ('ellipse', 'ghostwhite', 'black')  # encapsulating behaviour (e.g. wait)
+        else:
+            attributes = ('ellipse', 'gray', 'black')
+        if not isinstance(node, PluginBase) and node.blackbox_level != common.BlackBoxLevel.NOT_A_BLACKBOX:
+            attributes = (attributes[0], 'gray20', blackbox_font_colours[node.blackbox_level])
+        return attributes
+
+    fontsize = 11
+    graph = pydot.Dot(graph_type='digraph')
+    graph.set_name(root.name.lower().replace(" ", "_"))
+    # fonts: helvetica, times-bold, arial (times-roman is the default, but this helps some viewers, like kgraphviewer)
+    graph.set_graph_defaults(fontname='times-roman')
+    graph.set_node_defaults(fontname='times-roman')
+    graph.set_edge_defaults(fontname='times-roman')
+    (node_shape, node_colour, node_font_colour) = get_node_attributes(root, visibility_level)
+    node_root = pydot.Node(root.name, shape=node_shape, style="filled", fillcolor=node_colour, fontsize=fontsize, fontcolor=node_font_colour)
+    graph.add_node(node_root)
+    names = [root.name]
+
+    def add_edges(root, root_dot_name, visibility_level):
+        if visibility_level < root.blackbox_level:
+            if isinstance(root, PluginBehavior):
+                childrens = []
+                names2 = []
+                for name, children in root.get_plugins().items():
+                    childrens.append(children)
+                    names2.append(name)
+            else:
+                childrens = root.children
+                names2 = [c.name for c in childrens]
+            for name, c in zip(names2, childrens):
+                (node_shape, node_colour, node_font_colour) = get_node_attributes(c, visibility_level)
+                proposed_dot_name = name
+                while proposed_dot_name in names:
+                    proposed_dot_name = proposed_dot_name + "*"
+                names.append(proposed_dot_name)
+                node = pydot.Node(proposed_dot_name, shape=node_shape, style="filled", fillcolor=node_colour, fontsize=fontsize, fontcolor=node_font_colour)
+                graph.add_node(node)
+                edge = pydot.Edge(root_dot_name, proposed_dot_name)
+                graph.add_edge(edge)
+                if (isinstance(c, PluginBehavior) and c.get_plugins() != []) or \
+                        (isinstance(c, Behaviour) and c.children != []):
+                    add_edges(c, proposed_dot_name, visibility_level)
+
+    add_edges(root, root.name, visibility_level)
+    return graph
+
+
+
+def compare_version(version1, operator, version2):
+    """
+    compares two version numbers by means of the given operator
+    :param version1: version number 1 e.g. 0.1.0
+    :type version1: str
+    :param operator: ==,<=,>=,<,>
+    :type operator: str
+    :param version2: version number 1 e.g. 3.2.0
+    :type version2: str
+    :return:
+    """
+    version1 = version1.split('.')
+    version2 = version2.split('.')
+    if operator == '==':
+        if (len(version1) != len(version2)):
+            return False
+        for i in range(len(version1)):
+            if version1[i] != version2[i]:
+                return False
+        return True
+    elif operator == '<=':
+        k = min(len(version1), len(version2))
+        for i in range(k):
+            if version1[i] > version2[i]:
+                return True
+            elif version1[i] < version2[i]:
+                return False
+        if len(version1) < len(version2):
+            return False
+        else:
+            return True
+    elif operator == '>=':
+        k = min(len(version1), len(version2))
+        for i in range(k):
+            if version1[i] < version2[i]:
+                return True
+            elif version1[i] > version2[i]:
+                return False
+        if len(version1) > len(version2):
+            return False
+        else:
+            return True
+    elif operator == '<':
+        k = min(len(version1), len(version2))
+        for i in range(k):
+            if version1[i] > version2[i]:
+                return True
+            elif version1[i] < version2[i]:
+                return False
+        if len(version1) < len(version2):
+            return False
+        else:
+            return True
+    elif operator == '>':
+        k = min(len(version1), len(version2))
+        for i in range(k):
+            if version1[i] < version2[i]:
+                return True
+            elif version1[i] > version2[i]:
+                return False
+        if len(version1) > len(version2):
+            return False
+        else:
+            return True
+    else:
+        return False
+
+
+def rospkg_exists(name):
+    """
+       checks whether a ros package with the given name and version exists
+       :param name: the name and version of the ros package in requirements format e.g. giskard_msgs<=0.1.0
+       :type name: str
+       :return: True if it exits else False
+    """
+    r = rospkg.RosPack()
+    name = name.replace(' ', '')
+    version_list = name.split(',')
+    version_entry1 = re.split('(==|>=|<=|<|>)', version_list[0])
+    package_name=version_entry1[0]
+    try:
+        m = r.get_manifest(package_name)
+    except Exception as e:
+        logwarn('package {name} not found'.format(name=name))
+        return False
+    if len(version_entry1) == 1:
+        return True
+    if not compare_version(version_entry1[2], version_entry1[1], m.version):
+        logwarn('found ROS package {installed_name}=={installed_version} but {r} is required}'.format(installed_name=package_name, installed_version=str(m.version), r=name))
+        return False
+    for entry in version_list[1:]:
+        operator_and_version = re.split('(==|>=|<=|<|>)', entry)
+        if not compare_version(operator_and_version[2], operator_and_version[1], m.version):
+            logwarn('found ROS package {installed_name}=={installed_version} but {r} is required}'.format(installed_name=package_name, installed_version=str(m.version), r=name))
+            return False
+
+    return True
+
+
+def check_dependencies():
+    """
+    Checks whether the dependencies specified in the dependency.txt in the root folder of giskardpy are installed. If a
+    dependecy is not installed a message is printed.
+    """
+    r = rospkg.RosPack()
+
+    with open(r.get_path('giskardpy') + '/dependencies.txt') as f:
+        dependencies = f.readlines()
+
+    dependencies = [x.split('#')[0] for x in dependencies]
+    dependencies = [x.strip() for x in dependencies]
+
+    for d in dependencies:
+        try:
+            pkg_resources.require(d)
+        except pkg_resources.DistributionNotFound as e:
+            rospkg_exists(d)
+        except pkg_resources.VersionConflict as e:
+            logwarn('found {version_f} but version {version_r} is required'.format(version_r=str(e.req), version_f=str(e.dist)))

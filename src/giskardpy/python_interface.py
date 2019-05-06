@@ -19,7 +19,7 @@ class GiskardWrapper(object):
             rospy.wait_for_service(u'{}/update_world'.format(ns))
             self.client.wait_for_server()
         self.tip_to_root = {}
-        self.robot_name = rospy.get_param(u'robot_description').split('\n', 1)[1].split('" ', 1)[0].split('"')[1]
+        self.robot_name = URDFObject(rospy.get_param(u'robot_description')).get_name()
         self.collisions = []
         self.clear_cmds()
         self.object_js_topics = {}

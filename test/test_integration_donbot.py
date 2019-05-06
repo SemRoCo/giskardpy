@@ -1,23 +1,12 @@
 import shutil
-import rospkg
-from multiprocessing import Queue
-from threading import Thread
 import numpy as np
 import pytest
 import rospy
-from numpy import pi
-from angles import normalize_angle, normalize_angle_positive, shortest_angular_distance
 from geometry_msgs.msg import PoseStamped, Point, Quaternion
-from giskard_msgs.msg import MoveActionResult, CollisionEntry, MoveActionGoal, MoveResult, WorldBody, MoveGoal
-from giskard_msgs.srv import UpdateWorldResponse, UpdateWorldRequest
-from sensor_msgs.msg import JointState
-from shape_msgs.msg import SolidPrimitive
-from transforms3d.quaternions import axangle2quat
+from giskard_msgs.msg import MoveActionGoal, MoveResult, MoveGoal
 
-from giskardpy.symengine_wrappers import quaternion_from_axis_angle
-from giskardpy.test_utils import Donbot, Donbot
-from giskardpy.tfwrapper import transform_pose, lookup_transform, init as tf_init
-from giskardpy.utils import msg_to_list
+from utils_for_tests import Donbot
+from giskardpy.tfwrapper import lookup_transform, init as tf_init
 
 # TODO roslaunch iai_donbot_sim ros_control_sim.launch
 
@@ -40,17 +29,29 @@ floor_detection_pose = {
     u'ur5_wrist_3_joint': 1.55717146397,
 }
 
+folder_name = u'tmp_data/'
+
 
 @pytest.fixture(scope=u'module')
 def ros(request):
+    try:
+        print(u'deleting tmp test folder')
+        shutil.rmtree(folder_name)
+    except Exception:
+        pass
+
     print(u'init ros')
-    # shutil.rmtree(u'../data/')
     rospy.init_node(u'tests')
     tf_init(60)
 
     def kill_ros():
         print(u'shutdown ros')
         rospy.signal_shutdown(u'die')
+        try:
+            print(u'deleting tmp test folder')
+            # shutil.rmtree(folder_name)
+        except Exception:
+            pass
 
     request.addfinalizer(kill_ros)
 
@@ -84,22 +85,19 @@ def zero_pose(resetted_giskard):
     return resetted_giskard
 
 
-#
-# @pytest.fixture()
-# def pocky_pose_setup(resetted_giskard):
-#     resetted_giskard.set_joint_goal(pocky_pose)
-#     resetted_giskard.allow_all_collisions()
-#     resetted_giskard.send_and_check_goal()
-#     return resetted_giskard
-
-
 @pytest.fixture()
 def box_setup(pocky_pose_setup):
     """
     :type pocky_pose_setup: Donbot
     :rtype: Donbot
     """
-    pocky_pose_setup.add_box(position=[1.2, 0, 0.5])
+    p = PoseStamped()
+    p.header.frame_id = u'map'
+    p.pose.position.x = 1.2
+    p.pose.position.y = 0
+    p.pose.position.z = 0.5
+    p.pose.orientation.w = 1
+    pocky_pose_setup.add_box(pose=p)
     return pocky_pose_setup
 
 
@@ -109,7 +107,13 @@ def fake_table_setup(zero_pose):
     :type zero_pose: Donbot
     :rtype: Donbot
     """
-    zero_pose.add_box(position=[.9, 0, 0.2])
+    p = PoseStamped()
+    p.header.frame_id = u'map'
+    p.pose.position.x = 0.9
+    p.pose.position.y = 0
+    p.pose.position.z = 0.2
+    p.pose.orientation.w = 1
+    zero_pose.add_box(pose=p)
     return zero_pose
 
 
@@ -130,6 +134,32 @@ class TestJointGoals(object):
         """
         zero_pose.allow_self_collision()
         zero_pose.send_and_check_joint_goal(floor_detection_pose)
+
+    def test_joint_movement2(self, zero_pose):
+        """
+        :type zero_pose: Donbot
+        """
+        js = {
+            u'ur5_shoulder_pan_joint': -1.5438225905,
+            u'ur5_shoulder_lift_joint': -1.20804578463,
+            u'ur5_elbow_joint': -2.21223670641,
+            u'ur5_wrist_1_joint': -1.5827181975,
+            u'ur5_wrist_2_joint': -4.71748859087,
+            u'ur5_wrist_3_joint': -1.57543737093,
+        }
+        zero_pose.allow_self_collision()
+        zero_pose.send_and_check_joint_goal(js)
+
+        js2 = {
+            u'ur5_shoulder_pan_joint': -np.pi / 2,
+            u'ur5_shoulder_lift_joint': -np.pi / 2,
+            u'ur5_elbow_joint': -2.3,
+            u'ur5_wrist_1_joint': -np.pi / 2,
+            u'ur5_wrist_2_joint': 0,
+            u'ur5_wrist_3_joint': -np.pi / 2,
+        }
+        zero_pose.allow_self_collision()
+        zero_pose.send_and_check_joint_goal(js2)
 
     def test_partial_joint_state_goal1(self, zero_pose):
         """
@@ -354,7 +384,7 @@ class TestCartGoals(object):
 #
 #
 #
-# class TestCollisionAvoidanceGoals(object):
+class TestCollisionAvoidanceGoals(object):
 #     def test_add_box(self, zero_pose):
 #         """
 #         :type zero_pose: Donbot
@@ -518,39 +548,30 @@ class TestCartGoals(object):
 #
 #         box_setup.send_and_check_goal(MoveResult.UNKNOWN_OBJECT)
 #
-#     def test_allow_self_collision(self, zero_pose):
-#         """
-#         :type zero_pose: Donbot
-#         """
-#         zero_pose.check_cpi_geq(zero_pose.get_r_gripper_links(), 0.1)
-#         zero_pose.check_cpi_geq(zero_pose.get_l_gripper_links(), 0.1)
+    # def test_allow_self_collision(self, zero_pose):
+    #     """
+    #     :type zero_pose: Donbot
+    #     """
+    #     zero_pose.check_cpi_geq(zero_pose.get_r_gripper_links(), 0.1)
 #
-#     def test_allow_self_collision2(self, zero_pose):
-#         """
-#         :type zero_pose: Donbot
-#         """
-#         goal_js = {
-#             u'l_elbow_flex_joint': -1.43286344265,
-#             u'l_forearm_roll_joint': 1.26465060073,
-#             u'l_shoulder_lift_joint': 0.47990329056,
-#             u'l_shoulder_pan_joint': 0.281272240139,
-#             u'l_upper_arm_roll_joint': 0.528415402668,
-#             u'l_wrist_flex_joint': -1.18811419869,
-#             u'l_wrist_roll_joint': 2.26884630124,
-#         }
-#         zero_pose.allow_all_collisions()
-#         zero_pose.send_and_check_joint_goal(goal_js)
-#
-#         p = PoseStamped()
-#         p.header.frame_id = zero_pose.l_tip
-#         p.header.stamp = rospy.get_rostime()
-#         p.pose.position.x = 0.2
-#         p.pose.orientation.w = 1
-#         zero_pose.allow_self_collision()
-#         zero_pose.set_and_check_cart_goal(zero_pose.default_root, zero_pose.l_tip, p)
-#         zero_pose.check_cpi_leq(zero_pose.get_l_gripper_links(), 0.01)
-#         zero_pose.check_cpi_leq([u'r_forearm_link'], 0.01)
-#         zero_pose.check_cpi_geq(zero_pose.get_r_gripper_links(), 0.05)
+    def test_allow_self_collision2(self, zero_pose):
+        """
+        :type zero_pose: Donbot
+        """
+        goal_js = {
+            u'ur5_shoulder_lift_joint': .5,
+        }
+        zero_pose.allow_self_collision()
+        zero_pose.send_and_check_joint_goal(goal_js)
+
+        arm_goal = PoseStamped()
+        arm_goal.header.frame_id = zero_pose.gripper_tip
+        arm_goal.pose.position.y = -.1
+        arm_goal.pose.orientation.w = 1
+        zero_pose.allow_self_collision()
+        zero_pose.set_and_check_cart_goal(zero_pose.default_root, zero_pose.gripper_tip, arm_goal)
+
+        # zero_pose.check_cpi_geq(zero_pose.get_r_gripper_links(), 0.05)
 #
 #     def test_allow_self_collision3(self, zero_pose):
 #         """
@@ -587,30 +608,22 @@ class TestCartGoals(object):
 #         zero_pose.check_cpi_leq([u'r_forearm_link'], 0.01)
 #         zero_pose.check_cpi_geq(zero_pose.get_r_gripper_links(), 0.05)
 #
-#     def test_avoid_self_collision(self, zero_pose):
-#         """
-#         :type zero_pose: Donbot
-#         """
-#         goal_js = {
-#             u'l_elbow_flex_joint': -1.43286344265,
-#             u'l_forearm_roll_joint': 1.26465060073,
-#             u'l_shoulder_lift_joint': 0.47990329056,
-#             u'l_shoulder_pan_joint': 0.281272240139,
-#             u'l_upper_arm_roll_joint': 0.528415402668,
-#             u'l_wrist_flex_joint': -1.18811419869,
-#             u'l_wrist_roll_joint': 2.26884630124,
-#         }
-#         zero_pose.allow_all_collisions()
-#         zero_pose.send_and_check_joint_goal(goal_js)
-#
-#         p = PoseStamped()
-#         p.header.frame_id = zero_pose.l_tip
-#         p.header.stamp = rospy.get_rostime()
-#         p.pose.position.x = 0.2
-#         p.pose.orientation.w = 1
-#         zero_pose.set_cart_goal(zero_pose.default_root, zero_pose.l_tip, p)
-#         zero_pose.send_goal()
-#         zero_pose.check_cpi_geq(zero_pose.get_r_gripper_links(), 0.048)
+    def test_avoid_self_collision(self, zero_pose):
+        """
+        :type zero_pose: Donbot
+        """
+        goal_js = {
+            u'ur5_shoulder_lift_joint': .5,
+        }
+        zero_pose.wrapper.set_self_collision_distance(0.025)
+        zero_pose.send_and_check_joint_goal(goal_js)
+
+        arm_goal = PoseStamped()
+        arm_goal.header.frame_id = zero_pose.gripper_tip
+        arm_goal.pose.position.y = -.1
+        arm_goal.pose.orientation.w = 1
+        zero_pose.wrapper.set_self_collision_distance(0.025)
+        zero_pose.set_and_check_cart_goal(zero_pose.default_root, zero_pose.gripper_tip, arm_goal)
 #
 #     def test_avoid_collision(self, box_setup):
 #         """

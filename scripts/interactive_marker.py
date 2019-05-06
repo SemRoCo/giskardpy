@@ -193,7 +193,7 @@ class IMServer(object):
                 self.giskard.set_cart_goal(self.root_link, self.tip_link, p)
 
                 if not self.enable_self_collision:
-                    self.giskard.disable_self_collision()
+                    self.giskard.allow_self_collision()
 
                 self.giskard.plan_and_execute(wait=False)
                 self.pub_goal_marker(feedback.header, feedback.pose)

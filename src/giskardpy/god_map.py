@@ -1,13 +1,15 @@
 import copy
+from copy import copy
 from multiprocessing import Lock
 
 import symengine_wrappers as sw
-from copy import copy
+
 
 class GodMap(object):
     """
     Data structure used by plugins to exchange information.
     """
+
     # TODO give this fucker a lock
     def __init__(self):
         self._data = {}
@@ -26,14 +28,13 @@ class GodMap(object):
         return god_map_copy
 
     def __enter__(self):
-        print('acquired')
         self.lock.acquire()
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.lock.release()
 
-    def _get_member(self, identifier,  member):
+    def _get_member(self, identifier, member):
         """
         :param identifier:
         :type identifier: Union[None, dict, list, tuple, object]
@@ -43,19 +44,21 @@ class GodMap(object):
         """
         if identifier is None:
             raise AttributeError()
-        if callable(identifier):
-            # TODO this solution calls identifier multiple times if the result is an array, make it faster
-            return self._get_member(identifier(self), member)
         try:
             return identifier[member]
         except TypeError:
+            if callable(identifier):
+                # if is_iterable(member) and not isinstance(member, str) and not isinstance(member, unicode):
+                return identifier(*member)
+                # else:
+                #     return identifier(member)
+            # try:
+            #     return identifier[int(member)]
+            # except (TypeError, ValueError):
             try:
-                return identifier[int(member)]
-            except (TypeError, ValueError):
-                try:
-                    return getattr(identifier, member)
-                except TypeError as e:
-                    pass
+                return getattr(identifier, member)
+            except TypeError as e:
+                pass
         except IndexError:
             return identifier[int(member)]
 
@@ -76,12 +79,11 @@ class GodMap(object):
                 result = self._get_member(result, member)
             except AttributeError:
                 result = self.default_value
-            except TypeError:
-                pass
             except KeyError as e:
-                # TODO is this really a good idea?
                 # traceback.print_exc()
-                # raise KeyError(key)
+                # raise KeyError(identifier)
+                # TODO is this really a good idea?
+                # I do this because it automatically sets weights for unused goals to 0
                 result = self.default_value
         if callable(result):
             return result(self)
@@ -111,14 +113,16 @@ class GodMap(object):
             self.expr_to_key[str(expr)] = identifier_parts
         return self.key_to_expr[identifier]
 
-    def get_symbol_map(self):
+    def get_symbol_map(self, exprs=None):
         """
         :return: a dict which maps all registered expressions to their values or 0 if there is no number entry
         :rtype: dict
         """
-        #TODO potential speedup by only updating entries that have changed
+        # TODO potential speedup by only updating entries that have changed
         with self.lock:
-            return {expr: self.get_data(key) for expr, key in self.expr_to_key.items()}
+            if exprs is None:
+                exprs = self.expr_to_key.keys()
+            return {expr: self.get_data(self.expr_to_key[expr]) for expr in exprs}
 
     def get_registered_symbols(self):
         """

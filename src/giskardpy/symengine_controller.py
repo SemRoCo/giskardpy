@@ -1,9 +1,9 @@
 import hashlib
 import warnings
+from collections import OrderedDict
 from itertools import chain
 
 import symengine_wrappers as sw
-from collections import OrderedDict
 from giskardpy.qp_problem_builder import QProblemBuilder, SoftConstraint
 from giskardpy.symengine_robot import Robot
 
@@ -36,10 +36,10 @@ class SymEngineController(object):
         """
         self.controlled_joints = joint_names
         self.joint_to_symbols_str = OrderedDict((x, self.robot.get_joint_symbol(x)) for x in self.controlled_joints)
-        self.joint_constraints = OrderedDict(((self.robot.get_name(), k), self.robot.joint_constraints[k]) for k in
+        self.joint_constraints = OrderedDict(((self.robot.get_name(), k), self.robot._joint_constraints[k]) for k in
                                              self.controlled_joints)
-        self.hard_constraints = OrderedDict(((self.robot.get_name(), k), self.robot.hard_constraints[k]) for k in
-                                            self.controlled_joints if k in self.robot.hard_constraints)
+        self.hard_constraints = OrderedDict(((self.robot.get_name(), k), self.robot._hard_constraints[k]) for k in
+                                            self.controlled_joints if k in self.robot._hard_constraints)
 
     def update_soft_constraints(self, soft_constraints, free_symbols=None):
         """
@@ -48,7 +48,7 @@ class SymEngineController(object):
         :type free_symbols: set
         """
         if free_symbols is not None:
-            warnings.warn('use of free_symbols deprecated', DeprecationWarning)
+            warnings.warn(u'use of free_symbols deprecated', DeprecationWarning)
         # TODO bug if soft constraints get replaced, actual amount does not change.
         last_number_of_constraints = len(self.soft_constraints)
         if free_symbols is not None:
@@ -63,7 +63,7 @@ class SymEngineController(object):
         a = ''.join(str(x) for x in sorted(chain(self.soft_constraints.keys(),
                                                  self.hard_constraints.keys(),
                                                  self.joint_constraints.keys())))
-        function_hash = hashlib.md5(a + self.robot.get_hash()).hexdigest()
+        function_hash = hashlib.md5(a + self.robot.get_urdf()).hexdigest()
         path_to_functions = self.path_to_functions + function_hash
         self.qp_problem_builder = QProblemBuilder(self.joint_constraints,
                                                   self.hard_constraints,
@@ -82,14 +82,13 @@ class SymEngineController(object):
         :return: maps joint names to command
         :rtype: dict
         """
-        try:
-            next_cmd = self.qp_problem_builder.get_cmd(substitutions, nWSR)
-            if next_cmd is None:
-                pass
-            return {name: next_cmd[symbol] for name, symbol in self.joint_to_symbols_str.items()}
-        except AttributeError:
-            self.compile()
-            return self.get_cmd(substitutions, nWSR)
+        next_cmd = self.qp_problem_builder.get_cmd(substitutions, nWSR)
+        if next_cmd is None:
+            pass
+        return {name: next_cmd[symbol] for name, symbol in self.joint_to_symbols_str.items()}
+
+    def get_expr(self):
+        return self.qp_problem_builder.get_expr()
 
 
 def joint_position(current_joint, joint_goal, weight, p_gain, max_speed, name):
@@ -115,7 +114,7 @@ def joint_position(current_joint, joint_goal, weight, p_gain, max_speed, name):
     return soft_constraints
 
 
-def continuous_joint_position(current_joint, rotation_distance, weight, p_gain, max_speed, constraint_name):
+def continuous_joint_position(current_joint, joint_goal, weight, p_gain, max_speed, constraint_name):
     """
     :type current_joint: sw.Symbol
     :type rotation_distance: sw.Symbol
@@ -129,13 +128,16 @@ def continuous_joint_position(current_joint, rotation_distance, weight, p_gain, 
     # TODO almost the same as joint_position
     soft_constraints = OrderedDict()
 
-    capped_err = sw.diffable_max_fast(sw.diffable_min_fast(p_gain * rotation_distance, max_speed), -max_speed)
+    err = sw.shortest_angular_distance(current_joint, joint_goal)
+    capped_err = sw.diffable_max_fast(sw.diffable_min_fast(p_gain * err, max_speed), -max_speed)
 
     soft_constraints[constraint_name] = SoftConstraint(lower=capped_err,
                                                        upper=capped_err,
                                                        weight=weight,
                                                        expression=current_joint)
-    # add_debug_constraint(soft_constraints, '{} //change//'.format(name), change)
+    # add_debug_constraint(soft_constraints, '{} //change//'.format(constraint_name), err)
+    # add_debug_constraint(soft_constraints, '{} //curr//'.format(constraint_name), current_joint)
+    # add_debug_constraint(soft_constraints, '{} //goal//'.format(constraint_name), joint_goal)
     # add_debug_constraint(soft_constraints, '{} //max_speed//'.format(name), max_speed)
     return soft_constraints
 

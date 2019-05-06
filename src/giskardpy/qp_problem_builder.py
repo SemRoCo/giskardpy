@@ -1,14 +1,12 @@
+import numpy as np
 import pickle
 import warnings
 from collections import OrderedDict, namedtuple
-import numpy as np
 from time import time
 
-from giskardpy import BACKEND
-
 import giskardpy.symengine_wrappers as spw
+from giskardpy import BACKEND
 from giskardpy.qp_solver import QPSolver
-
 from giskardpy.symengine_wrappers import load_compiled_function, safe_compiled_function
 
 SoftConstraint = namedtuple(u'SoftConstraint', [u'lower', u'upper', u'weight', u'expression'])
@@ -22,6 +20,7 @@ class QProblemBuilder(object):
     """
     Wraps around QPOases. Builds the required matrices from constraints.
     """
+
     def __init__(self, joint_constraints_dict, hard_constraints_dict, soft_constraints_dict, controlled_joint_symbols,
                  free_symbols=None, path_to_functions=''):
         """
@@ -34,7 +33,7 @@ class QProblemBuilder(object):
         :type path_to_functions: str
         """
         if free_symbols is not None:
-            warnings.warn('use of free_symbols deprecated', DeprecationWarning)
+            warnings.warn(u'use of free_symbols deprecated', DeprecationWarning)
         assert (not len(controlled_joint_symbols) > len(joint_constraints_dict))
         assert (not len(controlled_joint_symbols) < len(joint_constraints_dict))
         assert (len(hard_constraints_dict) <= len(controlled_joint_symbols))
@@ -53,7 +52,10 @@ class QProblemBuilder(object):
                                   len(self.hard_constraints_dict) + len(self.soft_constraints_dict))
         self.lbAs = None  # for debugging purposes
 
-    # @profile
+    def get_expr(self):
+        return self.cython_big_ass_M.str_params
+
+    #
     def make_matrices(self):
         """
         Turns constrains into a function that computes the matrices needed for QPOases.
@@ -173,7 +175,7 @@ class QProblemBuilder(object):
         p_weights = pd.DataFrame(np_H.dot(np.ones(np_H.shape[0])), weights).sort_index()
         if xdot_full is not None:
             p_xdot = pd.DataFrame(xdot_full, xdot).sort_index()
-        p_A = pd.DataFrame(np_A, lbA, weights).sort_index()
+        p_A = pd.DataFrame(np_A, lbA, weights).sort_index(1).sort_index(0)
         if self.lbAs is None:
             self.lbAs = p_lbA
         else:
@@ -204,7 +206,6 @@ class QProblemBuilder(object):
         # TODO enable debug print in an elegant way, preferably without slowing anything down
         # self.debug_print(np_H, np_A, np_lb, np_ub, np_lbA, np_ubA, xdot_full)
         return OrderedDict((observable, xdot_full[i]) for i, observable in enumerate(self.controlled_joints))
-
 
 # with pd.option_context('display.max_rows', None, 'display.max_columns', None):
 #     print(df)

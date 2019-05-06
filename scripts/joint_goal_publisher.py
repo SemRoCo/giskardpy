@@ -55,7 +55,7 @@ class JointGoalPublisher(object):
 
     def init_urdf(self, robot):
         """
-        reads the controllable joints from a urdf
+        reads the controllable joints from a urdfs
         :param robot:
         """
         robot = robot.getElementsByTagName('robot')[0]
@@ -258,7 +258,7 @@ class JointGoalPublisherGui(Frame):
             goal_dict[key] = value.get()
 
         if self.allow_self_collision.get():
-            jgp.giskard_wrapper.disable_self_collision()
+            jgp.giskard_wrapper.allow_self_collision()
         else:
             jgp.giskard_wrapper.avoid_collision(self.collision_distance, body_b=jgp.giskard_wrapper.robot_name)
 

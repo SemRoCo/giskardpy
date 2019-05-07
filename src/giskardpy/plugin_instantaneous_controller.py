@@ -11,7 +11,7 @@ from giskardpy.constraints import JointPosition
 from giskardpy.exceptions import InsolvableException
 from giskardpy.identifier import soft_constraint_identifier, next_cmd_identifier, \
     collision_goal_identifier, fk_identifier, \
-    closest_point_identifier, js_identifier, constraints, default_joint_vel_identifier, constraints_identifier
+    closest_point_identifier, js_identifier, default_joint_vel_identifier, constraints_identifier
 from giskardpy.input_system import FrameInput, Point3Input, Vector3Input
 from giskardpy.plugin import GiskardBehavior
 from giskardpy.plugin_action_server import GetGoal
@@ -78,11 +78,11 @@ class GoalToConstraints(GetGoal):
         except AttributeError:
             self.raise_to_blackboard(InsolvableException(u'couldn\'t transform goal'))
             return Status.SUCCESS
-        self.get_god_map().safe_set_data(constraints, parsed_constraints)
+        self.get_god_map().safe_set_data(constraints_identifier, parsed_constraints)
 
         # self.set_unused_joint_goals_to_current()
 
-        # self.get_god_map().safe_set_data(collision_goal_identifier, move_cmd.collisions)
+        self.get_god_map().safe_set_data(collision_goal_identifier, [])
 
         self.get_god_map().safe_set_data(soft_constraint_identifier, self.soft_constraints)
         self.get_blackboard().runtime = time()
@@ -93,23 +93,22 @@ class GoalToConstraints(GetGoal):
         :type cmd: MoveCmd
         :rtype: dict
         """
-        goals = {}
-        goals[str(Controller.JOINT)] = {}
-        goals[str(Controller.TRANSLATION_3D)] = {}
-        goals[str(Controller.ROTATION_3D)] = {}
+        constraints = {}
         for constraint in cmd.constraints:
             try:
                 c = eval(constraint.name)(self.god_map, constraints_identifier)
             except NameError as e:
-                self.raise_to_blackboard(InsolvableException(u'unsupported controller type'))
+                # TODO return next best constraint type
+                self.raise_to_blackboard(InsolvableException(u'unsupported constraint type'))
                 return Status.SUCCESS
             try:
                 params = json.loads(constraint.parameter_value_pair)
                 soft_constraints = c.get_constraint(**params)
-                self.get_god_map().safe_set_data(constraints_identifier + [str(c)], params)
+                self.soft_constraints.update(soft_constraints)
+                constraints[str(c)] = params
             except TypeError as e:
                 self.raise_to_blackboard(InsolvableException(help(c.get_constraint)))
-        return goals
+        self.get_god_map().safe_set_data(constraints_identifier, constraints)
 
     def has_robot_changed(self):
         new_urdf = self.get_robot().get_urdf()

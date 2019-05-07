@@ -68,6 +68,20 @@ class Constraint(object):
 
 class JointPosition(Constraint):
     def get_constraint(self, joint_name, **kwargs):
+        """
+        example:
+        name='JointPosition'
+        parameter_value_pair='{
+            "joint_name": "torso_lift_joint", #required
+            "goal_position": 0, #required
+            "weight": 1, #optional
+            "gain": 10, #optional -- error is multiplied with this value
+            "max_speed": 1 #optional -- rad/s or m/s depending on joint; can not go higher than urdf limit
+        }'
+        :param joint_name:
+        :param kwargs:
+        :return:
+        """
         self.joint_name = joint_name
 
         current_joint = self.joint_position_expr(joint_name)

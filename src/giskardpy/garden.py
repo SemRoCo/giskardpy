@@ -1,6 +1,6 @@
 import functools
 
-# import py_trees_ros
+import py_trees
 import py_trees_ros
 import rospy
 from control_msgs.msg import JointTrajectoryControllerState
@@ -22,7 +22,6 @@ from giskardpy.plugin_goal_reached import GoalReachedPlugin
 from giskardpy.plugin_instantaneous_controller import GoalToConstraints, ControllerPlugin
 from giskardpy.plugin_interrupts import CollisionCancel, WiggleCancel
 from giskardpy.plugin_kinematic_sim import KinSimPlugin
-# from giskardpy.plugin_knowrob import KnowrobPlugin
 from giskardpy.plugin_log_trajectory import LogTrajPlugin
 from giskardpy.plugin_pybullet import WorldUpdatePlugin, CollisionChecker
 from giskardpy.plugin_send_trajectory import SendTrajectory
@@ -131,8 +130,8 @@ def grow_tree():
 
     if debug:
         def post_tick(snapshot_visitor, behaviour_tree):
-            print(u'\n' + py_trees_ros.display.ascii_tree(behaviour_tree.root,
-                                                          snapshot_information=snapshot_visitor))
+            print(u'\n' + py_trees.display.ascii_tree(behaviour_tree.root,
+                                                      snapshot_information=snapshot_visitor))
 
         snapshot_visitor = py_trees_ros.visitors.SnapshotVisitor()
         tree.add_post_tick_handler(functools.partial(post_tick, snapshot_visitor))

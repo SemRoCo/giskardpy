@@ -60,7 +60,8 @@ class Constraint(object):
         return self.get_god_map().safe_get_data(robot_identifier)
 
     def joint_position_expr(self, joint_name):
-        return self.get_god_map().safe_get_data(js_identifier + [joint_name, u'position'])
+        key = js_identifier + [joint_name, u'position']
+        return self.god_map.to_symbol(key)
 
     def __str__(self):
         return self.__class__.__name__

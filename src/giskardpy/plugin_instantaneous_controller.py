@@ -74,11 +74,10 @@ class GoalToConstraints(GetGoal):
         #     except TypeError as e:
         #         self.raise_to_blackboard(InsolvableException(help(c)))
         try:
-            parsed_constraints = self.parse_constraints(move_cmd)
+            self.parse_constraints(move_cmd)
         except AttributeError:
             self.raise_to_blackboard(InsolvableException(u'couldn\'t transform goal'))
             return Status.SUCCESS
-        self.get_god_map().safe_set_data(constraints_identifier, parsed_constraints)
 
         # self.set_unused_joint_goals_to_current()
 

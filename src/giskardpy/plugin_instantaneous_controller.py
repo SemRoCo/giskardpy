@@ -1,3 +1,4 @@
+import inspect
 import json
 import numpy as np
 from copy import copy
@@ -7,7 +8,7 @@ from giskard_msgs.msg import Controller, MoveGoal, MoveCmd, Constraint
 from py_trees import Status
 
 import symengine_wrappers as sw
-from giskardpy.constraints import JointPosition
+import giskardpy.constraints
 from giskardpy.exceptions import InsolvableException
 from giskardpy.identifier import soft_constraint_identifier, next_cmd_identifier, \
     collision_goal_identifier, fk_identifier, \
@@ -19,6 +20,9 @@ from giskardpy.symengine_controller import SymEngineController, position_conv, r
     link_to_link_avoidance, joint_position, continuous_joint_position, rotation_conv_slerp
 from giskardpy.tfwrapper import transform_pose
 
+
+def allowed_constraint_names():
+    return [x[0] for x in inspect.getmembers(giskardpy.constraints) if inspect.isclass(x[1])]
 
 # TODO plan only not supported
 # TODO waypoints not supported
@@ -78,6 +82,9 @@ class GoalToConstraints(GetGoal):
         except AttributeError:
             self.raise_to_blackboard(InsolvableException(u'couldn\'t transform goal'))
             return Status.SUCCESS
+        except InsolvableException as e:
+            self.raise_to_blackboard(e)
+            return Status.SUCCESS
 
         # self.set_unused_joint_goals_to_current()
 
@@ -94,19 +101,21 @@ class GoalToConstraints(GetGoal):
         """
         constraints = {}
         for constraint in cmd.constraints:
+            if constraint.name not in allowed_constraint_names():
+                # TODO test me
+                raise InsolvableException(u'unknown constraint')
             try:
                 c = eval(constraint.name)(self.god_map, constraints_identifier)
             except NameError as e:
                 # TODO return next best constraint type
-                self.raise_to_blackboard(InsolvableException(u'unsupported constraint type'))
-                return Status.SUCCESS
+                raise InsolvableException(u'unsupported constraint type')
             try:
                 params = json.loads(constraint.parameter_value_pair)
                 soft_constraints = c.get_constraint(**params)
                 self.soft_constraints.update(soft_constraints)
                 constraints[str(c)] = params
             except TypeError as e:
-                self.raise_to_blackboard(InsolvableException(help(c.get_constraint)))
+                raise InsolvableException(help(c.get_constraint))
         self.get_god_map().safe_set_data(constraints_identifier, constraints)
 
     def has_robot_changed(self):

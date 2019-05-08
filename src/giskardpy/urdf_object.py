@@ -2,9 +2,9 @@ from collections import namedtuple
 from itertools import chain
 
 import urdf_parser_py.urdf as up
-from geometry_msgs.msg import Pose, Vector3, Point, Quaternion
+from geometry_msgs.msg import Pose, Vector3
 from std_msgs.msg import ColorRGBA
-from tf.transformations import euler_from_quaternion, quaternion_from_euler
+from tf.transformations import euler_from_quaternion
 from visualization_msgs.msg import Marker
 
 from giskardpy.exceptions import DuplicateNameException, UnknownBodyException, CorruptShapeException
@@ -36,6 +36,7 @@ JOINT_TYPES = [u'fixed', u'revolute', u'continuous', u'prismatic']
 MOVABLE_JOINT_TYPES = [u'revolute', u'continuous', u'prismatic']
 ROTATIONAL_JOINT_TYPES = [u'revolute', u'continuous']
 TRANSLATIONAL_JOINT_TYPES = [u'prismatic']
+
 
 class URDFObject(object):
     def __init__(self, urdf, *args, **kwargs):
@@ -169,13 +170,42 @@ class URDFObject(object):
         """
         return self._urdf_robot.joint_map.keys()
 
+    def get_split_chain(self, root, tip, joints=True, links=True, fixed=True):
+        if root == tip:
+            return [], [], []
+        root_chain = self._urdf_robot.get_chain(self.get_root(), root, True, True, True)
+        tip_chain = self._urdf_robot.get_chain(self.get_root(), tip, True, True, True)
+        for i in range(min(len(root_chain), len(tip_chain))):
+            if root_chain[i] != tip_chain[i]:
+                break
+        else:
+            i += 1
+        connection = tip_chain[i - 1]
+        root_chain = root_chain[i:]
+        root_chain.reverse()
+        tip_chain = tip_chain[i:]
+        if not links:
+            root_chain = [x for x in root_chain if not self.has_link(x)]
+            tip_chain = [x for x in tip_chain if not self.has_link(x)]
+        if not joints:
+            root_chain = [x for x in root_chain if not self.has_joint(x)]
+            tip_chain = [x for x in tip_chain if not self.has_joint(x)]
+        if not fixed:
+            root_chain = [x for x in root_chain if not self.is_joint_fixed(x)]
+            tip_chain = [x for x in tip_chain if not self.is_joint_fixed(x)]
+        return root_chain, [connection] if links else [], tip_chain
+
+    def get_chain(self, root, tip, joints=True, links=True, fixed=True):
+        root_chain, connection, tip_chain = self.get_split_chain(root, tip, joints, links, fixed)
+        return root_chain + connection + tip_chain
+
     def get_joint_names_from_chain(self, root_link, tip_link):
         """
         :rtype root: str
         :rtype tip: str
         :rtype: list
         """
-        return self._urdf_robot.get_chain(root_link, tip_link, True, False, True)
+        return self.get_chain(root_link, tip_link, True, False, True)
 
     def get_joint_names_from_chain_controllable(self, root_link, tip_link):
         """
@@ -183,7 +213,7 @@ class URDFObject(object):
         :rtype tip: str
         :rtype: list
         """
-        return self._urdf_robot.get_chain(root_link, tip_link, True, False, False)
+        return self.get_chain(root_link, tip_link, True, False, False)
 
     def get_joint_names_controllable(self):
         """
@@ -237,6 +267,12 @@ class URDFObject(object):
         joint = self.get_urdf_joint(name)
         return joint.type in MOVABLE_JOINT_TYPES and joint.mimic is not None
 
+    def has_joint(self, name):
+        return name in self._urdf_robot.joint_map
+
+    def has_link(self, name):
+        return name in self._urdf_robot.link_map
+
     def is_joint_continuous(self, name):
         """
         :param name: name of the joint in the urdfs
@@ -244,6 +280,14 @@ class URDFObject(object):
         :rtype: bool
         """
         return self.get_joint_type(name) == u'continuous'
+
+    def is_joint_fixed(self, name):
+        """
+        :param name: name of the joint in the urdfs
+        :type name: str
+        :rtype: bool
+        """
+        return self.get_joint_type(name) == u'fixed'
 
     def get_joint_type(self, name):
         return self.get_urdf_joint(name).type
@@ -411,7 +455,6 @@ class URDFObject(object):
         self.reinitialize()
         return sub_tree
 
-    
     def reset(self):
         """
         Detaches all object that have been attached to the robot.
@@ -422,7 +465,6 @@ class URDFObject(object):
     def __str__(self):
         return self.get_urdf()
 
-    
     def reinitialize(self):
         self._urdf_robot = up.URDF.from_xml_string(self.get_urdf())
 
@@ -430,13 +472,31 @@ class URDFObject(object):
         # TODO should this really be a class function?
         return u'{}'.format(name)
 
-    def get_parent_link_name(self, child_link_name):
-        if child_link_name in self._urdf_robot.parent_map:
-            return self._urdf_robot.parent_map[child_link_name][1]
+    def get_parent_link_of_link(self, link_name):
+        if link_name in self._urdf_robot.parent_map:
+            return self._urdf_robot.parent_map[link_name][1]
+
+    def get_child_link_of_link(self, link_name):
+        if link_name in self._urdf_robot.child_map:
+            return self._urdf_robot.child_map[link_name][1]
+
+    def get_parent_joint_of_link(self, link_name):
+        if link_name in self._urdf_robot.parent_map:
+            return self._urdf_robot.parent_map[link_name][0]
+
+    def get_child_joints_of_link(self, link_name):
+        if link_name in self._urdf_robot.child_map:
+            return [x[0] for x in self._urdf_robot.child_map[link_name]]
+
+    def get_parent_link_of_joint(self, joint_name):
+        return self._urdf_robot.joint_map[joint_name].parent
+
+    def get_child_link_of_joint(self, joint_name):
+        return self._urdf_robot.joint_map[joint_name].child
 
     def are_linked(self, link_a, link_b):
-        return link_a == self.get_parent_link_name(link_b) or \
-               (link_b == self.get_parent_link_name(link_a))
+        return link_a == self.get_parent_link_of_link(link_b) or \
+               (link_b == self.get_parent_link_of_link(link_a))
 
     def get_controllable_joints(self):
         return [joint_name for joint_name in self.get_joint_names() if self.is_joint_controllable(joint_name)]

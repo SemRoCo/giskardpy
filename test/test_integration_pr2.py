@@ -345,10 +345,10 @@ class TestCartGoals(object):
         zero_pose.set_cart_goal(zero_pose.l_tip, zero_pose.r_tip, r_goal)
 
         l_goal = PoseStamped()
-        l_goal.header.frame_id = zero_pose.l_tip
+        l_goal.header.frame_id = zero_pose.r_tip
         l_goal.pose.position.y = -.1
         l_goal.pose.orientation.w = 1
-        zero_pose.set_and_check_cart_goal(zero_pose.default_root, zero_pose.l_tip, l_goal)
+        zero_pose.set_and_check_cart_goal(zero_pose.default_root, zero_pose.r_tip, l_goal)
 
     def test_cart_goal_1eef(self, zero_pose):
         """

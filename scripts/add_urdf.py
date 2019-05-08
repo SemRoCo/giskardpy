@@ -6,7 +6,7 @@ from geometry_msgs.msg import PoseStamped, Point, Quaternion
 from tf.transformations import quaternion_from_euler
 
 from giskardpy.python_interface import GiskardWrapper
-from giskardpy.tfwrapper import lookup_transform
+from giskardpy.tfwrapper import lookup_transform, lookup_pose
 
 if __name__ == '__main__':
     rospy.init_node('add_urdf')
@@ -20,7 +20,7 @@ if __name__ == '__main__':
         root_frame = rospy.get_param('~root_frame', None)
         map_frame = rospy.get_param('~frame_id', 'map')
         if root_frame is not None:
-            pose = lookup_transform(map_frame, root_frame)
+            pose = lookup_pose(map_frame, root_frame)
         else:
             pose = PoseStamped()
             pose.header.frame_id = map_frame
@@ -48,4 +48,4 @@ if __name__ == '__main__':
         else:
             rospy.logwarn('failed to add urdfs \'{}\''.format(name))
     except KeyError:
-        rospy.loginfo('Example call: rosrun giskardpy add_urdf.py _name:=kitchen _param:=kitchen_description _js:=kitchen_joint_states _root_frame:=world _frame_id:=map')
+        rospy.loginfo('Example call: rosrun giskardpy add_urdf.py _name:=kitchen _param:=kitchen_description _js:=kitchen/joint_states _root_frame:=iai_kitchen/world _frame_id:=map')

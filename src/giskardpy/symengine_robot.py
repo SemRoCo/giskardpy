@@ -104,7 +104,7 @@ class Robot(Backend):
                     joint_frame = spw.eye(4)
             else:
                 # TODO more specific exception
-                raise Exception(u'Joint type "{}" is not supported by urdfs parser.'.format(urdf_joint.type))
+                raise TypeError(u'Joint type "{}" is not supported by urdfs parser.'.format(urdf_joint.type))
 
             if self.is_rotational_joint(joint_name):
                 joint_frame *= spw.rotation_matrix_from_axis_angle(spw.vector3(*urdf_joint.axis), joint_symbol)
@@ -142,7 +142,10 @@ class Robot(Backend):
         """
         if (root_link, tip_link) not in self._fk_expressions:
             fk = spw.eye(4)
-            for joint_name in self.get_joint_names_from_chain(root_link, tip_link):
+            root_chain, _, tip_chain = self.get_split_chain(root_link, tip_link, links=False)
+            for joint_name in root_chain:
+                fk *= spw.inverse_frame(self.get_joint_frame(joint_name))
+            for joint_name in tip_chain:
                 fk *= self.get_joint_frame(joint_name)
             self._fk_expressions[root_link, tip_link] = fk
         return self._fk_expressions[root_link, tip_link]

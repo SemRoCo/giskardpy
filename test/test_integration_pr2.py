@@ -1,3 +1,4 @@
+import itertools
 import numpy as np
 from numpy import pi
 
@@ -7,7 +8,7 @@ from geometry_msgs.msg import PoseStamped, Point, Quaternion
 from giskard_msgs.msg import CollisionEntry, MoveActionGoal, MoveResult, WorldBody, MoveGoal
 from giskard_msgs.srv import UpdateWorldResponse, UpdateWorldRequest
 from shape_msgs.msg import SolidPrimitive
-from tf.transformations import quaternion_from_matrix
+from tf.transformations import quaternion_from_matrix, quaternion_about_axis
 
 from giskardpy.identifier import fk_identifier
 from giskardpy.tfwrapper import init as tf_init, lookup_pose, transform_pose
@@ -208,18 +209,18 @@ def kitchen_setup(resetted_giskard):
 
 class TestFk(object):
     def test_fk1(self, zero_pose):
-        root = zero_pose.get_robot().get_root()
-        for link in zero_pose.get_robot().get_link_names():
-            fk1 = zero_pose.get_god_map().safe_get_data(fk_identifier + [(root, link)])
-            fk2 = lookup_pose(root, link)
-            np.testing.assert_almost_equal(fk1.pose.position.x, fk2.pose.position.x)
-            np.testing.assert_almost_equal(fk1.pose.position.y, fk2.pose.position.y)
-            np.testing.assert_almost_equal(fk1.pose.position.z, fk2.pose.position.z)
-            np.testing.assert_almost_equal(fk1.pose.orientation.x, fk2.pose.orientation.x)
-            np.testing.assert_almost_equal(fk1.pose.orientation.y, fk2.pose.orientation.y)
-            np.testing.assert_almost_equal(fk1.pose.orientation.z, fk2.pose.orientation.z)
-            np.testing.assert_almost_equal(fk1.pose.orientation.w, fk2.pose.orientation.w)
+        for root, tip in itertools.product(zero_pose.get_robot().get_link_names(), repeat=2):
+            fk1 = zero_pose.get_god_map().safe_get_data(fk_identifier + [(root, tip)])
+            fk2 = lookup_pose(root, tip)
+            compare_poses(fk1.pose, fk2.pose)
 
+    def test_fk2(self, zero_pose):
+        pocky = u'box'
+        zero_pose.attach_box(pocky, [0.1, 0.02, 0.02], zero_pose.r_tip, [0.05, 0, 0], [1, 0, 0, 0])
+        for root, tip in itertools.product(zero_pose.get_robot().get_link_names(), [pocky]):
+            fk1 = zero_pose.get_god_map().safe_get_data(fk_identifier + [(root, tip)])
+            fk2 = lookup_pose(root, tip)
+            compare_poses(fk1.pose, fk2.pose)
 
 class TestJointGoals(object):
     def test_joint_movement1(self, zero_pose):
@@ -268,6 +269,87 @@ class TestJointGoals(object):
 
 
 class TestCartGoals(object):
+    def test_keep_position1(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        zero_pose.allow_self_collision()
+        r_goal = PoseStamped()
+        r_goal.header.frame_id = zero_pose.r_tip
+        r_goal.pose.position.x = -.1
+        r_goal.pose.orientation.w = 1
+        zero_pose.set_and_check_cart_goal(u'torso_lift_link', zero_pose.r_tip, r_goal)
+
+        zero_pose.allow_self_collision()
+        js = {u'torso_lift_joint': 0.1}
+        r_goal = PoseStamped()
+        r_goal.header.frame_id = zero_pose.r_tip
+        r_goal.pose.orientation.w = 1
+        expected_pose = lookup_pose(u'torso_lift_link', zero_pose.r_tip)
+        expected_pose.header.stamp = rospy.Time()
+        zero_pose.set_cart_goal(u'torso_lift_link', zero_pose.r_tip, r_goal)
+        zero_pose.set_joint_goal(js)
+        zero_pose.send_and_check_goal()
+        zero_pose.check_cart_goal(zero_pose.r_tip, expected_pose)
+
+    def test_keep_position2(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        zero_pose.allow_self_collision()
+        r_goal = PoseStamped()
+        r_goal.header.frame_id = zero_pose.r_tip
+        r_goal.pose.position.x = -.1
+        r_goal.pose.orientation.w = 1
+        zero_pose.set_and_check_cart_goal(u'torso_lift_link', zero_pose.r_tip, r_goal)
+
+        zero_pose.allow_self_collision()
+        js = {u'torso_lift_joint': 0.1}
+        r_goal = PoseStamped()
+        r_goal.header.frame_id = zero_pose.r_tip
+        r_goal.pose.orientation.w = 1
+        expected_pose = lookup_pose(zero_pose.default_root, zero_pose.r_tip)
+        expected_pose.header.stamp = rospy.Time()
+        zero_pose.set_cart_goal(zero_pose.default_root, zero_pose.r_tip, r_goal)
+        zero_pose.set_joint_goal(js)
+        zero_pose.send_and_check_goal()
+        zero_pose.check_cart_goal(zero_pose.r_tip, expected_pose)
+
+    def test_keep_position3(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        js = {
+            u'r_elbow_flex_joint': -1.58118094489,
+            u'r_forearm_roll_joint': -0.904933033043,
+            u'r_shoulder_lift_joint': 0.822412440711,
+            u'r_shoulder_pan_joint': -1.07866800992,
+            u'r_upper_arm_roll_joint': -1.34905471854,
+            u'r_wrist_flex_joint': -1.20182042644,
+            u'r_wrist_roll_joint': 0.190433188769,
+        }
+        zero_pose.send_and_check_joint_goal(js)
+
+        r_goal = PoseStamped()
+        r_goal.header.frame_id = zero_pose.r_tip
+        r_goal.pose.position.x = 0.3
+        r_goal.pose.orientation = Quaternion(*quaternion_from_matrix([[-1, 0, 0, 0],
+                                                                      [0,  1, 0, 0],
+                                                                      [0,  0, -1, 0],
+                                                                      [0, 0, 0, 1]]))
+        zero_pose.set_and_check_cart_goal(u'torso_lift_link', zero_pose.l_tip, r_goal)
+
+        r_goal = PoseStamped()
+        r_goal.header.frame_id = zero_pose.r_tip
+        r_goal.pose.orientation.w = 1
+        zero_pose.set_cart_goal(zero_pose.l_tip, zero_pose.r_tip, r_goal)
+
+        l_goal = PoseStamped()
+        l_goal.header.frame_id = zero_pose.r_tip
+        l_goal.pose.position.y = -.1
+        l_goal.pose.orientation.w = 1
+        zero_pose.set_and_check_cart_goal(zero_pose.default_root, zero_pose.r_tip, l_goal)
+
     def test_cart_goal_1eef(self, zero_pose):
         """
         :type zero_pose: PR2
@@ -1360,6 +1442,7 @@ class TestCollisionAvoidanceGoals(object):
 
     def test_tray(self, zero_pose):
         tray_name = u'tray'
+
         js = {
             u'r_elbow_flex_joint': -1.58118094489,
             u'r_forearm_roll_joint': -0.904933033043,
@@ -1381,6 +1464,27 @@ class TestCollisionAvoidanceGoals(object):
         zero_pose.set_and_check_cart_goal(u'torso_lift_link', zero_pose.l_tip, r_goal)
 
         zero_pose.attach_box(tray_name, [.3, .1, .2], zero_pose.r_tip, [.15,0,0],[0,0,0,1])
+
+        zero_pose.allow_collision(robot_links=[tray_name],
+                                  body_b=zero_pose.get_robot().get_name(),
+                                  link_bs=zero_pose.get_l_gripper_links())
+
+        r_goal = PoseStamped()
+        r_goal.header.frame_id = zero_pose.l_tip
+        r_goal.pose.orientation.w = 1
+        zero_pose.set_cart_goal(tray_name, zero_pose.l_tip, r_goal)
+
+        expected_pose = lookup_pose(tray_name, zero_pose.l_tip)
+        expected_pose.header.stamp = rospy.Time()
+
+        l_goal = PoseStamped()
+        l_goal.header.frame_id = tray_name
+        l_goal.pose.position.y = -.1
+        l_goal.pose.position.x = .1
+        l_goal.pose.orientation = Quaternion(*quaternion_about_axis(1, [1,0,0]))
+        zero_pose.set_and_check_cart_goal(zero_pose.default_root, tray_name, l_goal)
+        zero_pose.check_cart_goal(zero_pose.l_tip, expected_pose)
+
 
 
     # TODO FIXME attaching and detach of urdf objects that listen to joint states

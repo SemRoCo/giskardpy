@@ -2,9 +2,9 @@ import pytest
 from geometry_msgs.msg import Pose, Point, Quaternion
 
 from giskardpy.exceptions import DuplicateNameException, UnknownBodyException
-from utils_for_tests import pr2_urdf, donbot_urdf, boxy_urdf, base_bot_urdf
 from giskardpy.urdf_object import URDFObject
 from giskardpy.utils import make_world_body_box, make_world_body_sphere, make_world_body_cylinder, make_urdf_world_body
+from utils_for_tests import pr2_urdf, donbot_urdf, boxy_urdf, base_bot_urdf
 
 
 @pytest.fixture(scope=u'module')
@@ -73,7 +73,7 @@ class TestUrdfObject(object):
 
     def test_get_parent_link_name(self, function_setup):
         parsed_pr2 = self.cls(pr2_urdf())
-        assert parsed_pr2.get_parent_link_name(u'l_gripper_tool_frame') == u'l_gripper_palm_link'
+        assert parsed_pr2.get_parent_link_of_link(u'l_gripper_tool_frame') == u'l_gripper_palm_link'
 
     def test_get_link_names_from_chain(self, function_setup):
         pass
@@ -305,6 +305,119 @@ class TestUrdfObject(object):
         pass
 
     def test_get_sub_tree_link_names_with_collision(self, function_setup):
+        pass
+
+    def test_get_chain1(self, function_setup):
+        parsed_pr2 = self.cls(pr2_urdf())
+        root = parsed_pr2.get_root()
+        tip = u'l_gripper_tool_frame'
+        chain = parsed_pr2.get_joint_names_from_chain(root, tip)
+        assert chain == [u'base_footprint_joint',
+                         u'torso_lift_joint',
+                         u'l_shoulder_pan_joint',
+                         u'l_shoulder_lift_joint',
+                         u'l_upper_arm_roll_joint',
+                         u'l_upper_arm_joint',
+                         u'l_elbow_flex_joint',
+                         u'l_forearm_roll_joint',
+                         u'l_forearm_joint',
+                         u'l_wrist_flex_joint',
+                         u'l_wrist_roll_joint',
+                         u'l_force_torque_adapter_joint',
+                         u'l_force_torque_joint',
+                         u'l_gripper_palm_joint',
+                         u'l_gripper_tool_joint']
+
+    def test_get_chain2(self, function_setup):
+        parsed_pr2 = self.cls(pr2_urdf())
+        root = u'r_gripper_tool_frame'
+        tip = u'l_gripper_tool_frame'
+        chain = parsed_pr2.get_joint_names_from_chain(root, tip)
+        assert chain == [u'r_gripper_tool_joint',
+                         u'r_gripper_palm_joint',
+                         u'r_wrist_roll_joint',
+                         u'r_wrist_flex_joint',
+                         u'r_forearm_joint',
+                         u'r_forearm_roll_joint',
+                         u'r_elbow_flex_joint',
+                         u'r_upper_arm_joint',
+                         u'r_upper_arm_roll_joint',
+                         u'r_shoulder_lift_joint',
+                         u'r_shoulder_pan_joint',
+                         u'l_shoulder_pan_joint',
+                         u'l_shoulder_lift_joint',
+                         u'l_upper_arm_roll_joint',
+                         u'l_upper_arm_joint',
+                         u'l_elbow_flex_joint',
+                         u'l_forearm_roll_joint',
+                         u'l_forearm_joint',
+                         u'l_wrist_flex_joint',
+                         u'l_wrist_roll_joint',
+                         u'l_force_torque_adapter_joint',
+                         u'l_force_torque_joint',
+                         u'l_gripper_palm_joint',
+                         u'l_gripper_tool_joint']
+
+    def test_get_chain3(self, function_setup):
+        parsed_pr2 = self.cls(pr2_urdf())
+        tip = parsed_pr2.get_root()
+        root = u'l_gripper_tool_frame'
+        chain = parsed_pr2.get_joint_names_from_chain(root, tip)
+        assert chain == [u'l_gripper_tool_joint',
+                         u'l_gripper_palm_joint',
+                         u'l_force_torque_joint',
+                         u'l_force_torque_adapter_joint',
+                         u'l_wrist_roll_joint',
+                         u'l_wrist_flex_joint',
+                         u'l_forearm_joint',
+                         u'l_forearm_roll_joint',
+                         u'l_elbow_flex_joint',
+                         u'l_upper_arm_joint',
+                         u'l_upper_arm_roll_joint',
+                         u'l_shoulder_lift_joint',
+                         u'l_shoulder_pan_joint',
+                         u'torso_lift_joint',
+                         u'base_footprint_joint']
+
+    def test_get_chain4(self, function_setup):
+        parsed_pr2 = self.cls(pr2_urdf())
+        tip = u'l_gripper_tool_frame'
+        root = u'l_gripper_tool_frame'
+        chain = parsed_pr2.get_joint_names_from_chain(root, tip)
+        assert chain == []
+
+    def test_get_chain5(self, function_setup):
+        parsed_pr2 = self.cls(pr2_urdf())
+        tip = u'l_upper_arm_link'
+        root = u'l_shoulder_lift_link'
+        chain = parsed_pr2.get_joint_names_from_chain(root, tip)
+        assert chain == [u'l_upper_arm_roll_joint', u'l_upper_arm_joint']
+
+    def test_get_chain6(self, function_setup):
+        parsed_pr2 = self.cls(pr2_urdf())
+        tip = u'l_gripper_palm_link'
+        root = u'l_gripper_tool_frame'
+        chain = parsed_pr2.get_joint_names_from_chain(root, tip)
+        assert chain == [u'l_gripper_tool_joint']
+
+    def test_get_chain_attached(self, function_setup):
+        parsed_pr2 = self.cls(pr2_urdf())
+        box = self.cls.from_world_body(make_world_body_box())
+        p = Pose()
+        p.position = Point(0, 0, 0.1)
+        p.orientation = Quaternion(1, 0, 0, 0)
+        parsed_pr2.attach_urdf_object(box, u'l_gripper_tool_frame', p)
+        tip = u'l_gripper_tool_frame'
+        root = box.get_name()
+        chain = parsed_pr2.get_joint_names_from_chain(root, tip)
+        assert chain == [box.get_name()]
+
+    def test_get_chain_fixed_joints(self, function_setup):
+        # TODO test fixed joints
+        pass
+
+    def test_get_chain_links(self, function_setup):
+        # TODO test link=true
         pass
 
     def test_get_sub_tree_link_names_with_collision_boxy(self, function_setup):

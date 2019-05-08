@@ -8,7 +8,7 @@ from geometry_msgs.msg import PoseStamped, Point, Quaternion
 from giskard_msgs.msg import CollisionEntry, MoveActionGoal, MoveResult, WorldBody, MoveGoal
 from giskard_msgs.srv import UpdateWorldResponse, UpdateWorldRequest
 from shape_msgs.msg import SolidPrimitive
-from tf.transformations import quaternion_from_matrix
+from tf.transformations import quaternion_from_matrix, quaternion_about_axis
 
 from giskardpy.identifier import fk_identifier
 from giskardpy.tfwrapper import init as tf_init, lookup_pose, transform_pose
@@ -210,6 +210,14 @@ def kitchen_setup(resetted_giskard):
 class TestFk(object):
     def test_fk1(self, zero_pose):
         for root, tip in itertools.product(zero_pose.get_robot().get_link_names(), repeat=2):
+            fk1 = zero_pose.get_god_map().safe_get_data(fk_identifier + [(root, tip)])
+            fk2 = lookup_pose(root, tip)
+            compare_poses(fk1.pose, fk2.pose)
+
+    def test_fk2(self, zero_pose):
+        pocky = u'box'
+        zero_pose.attach_box(pocky, [0.1, 0.02, 0.02], zero_pose.r_tip, [0.05, 0, 0], [1, 0, 0, 0])
+        for root, tip in itertools.product(zero_pose.get_robot().get_link_names(), [pocky]):
             fk1 = zero_pose.get_god_map().safe_get_data(fk_identifier + [(root, tip)])
             fk2 = lookup_pose(root, tip)
             compare_poses(fk1.pose, fk2.pose)
@@ -1462,15 +1470,20 @@ class TestCollisionAvoidanceGoals(object):
                                   link_bs=zero_pose.get_l_gripper_links())
 
         r_goal = PoseStamped()
-        r_goal.header.frame_id = zero_pose.r_tip
+        r_goal.header.frame_id = zero_pose.l_tip
         r_goal.pose.orientation.w = 1
-        zero_pose.set_cart_goal(zero_pose.l_tip, zero_pose.r_tip, r_goal)
+        zero_pose.set_cart_goal(tray_name, zero_pose.l_tip, r_goal)
+
+        expected_pose = lookup_pose(tray_name, zero_pose.l_tip)
+        expected_pose.header.stamp = rospy.Time()
 
         l_goal = PoseStamped()
-        l_goal.header.frame_id = zero_pose.l_tip
+        l_goal.header.frame_id = tray_name
         l_goal.pose.position.y = -.1
-        l_goal.pose.orientation.w = 1
+        l_goal.pose.position.x = .1
+        l_goal.pose.orientation = Quaternion(*quaternion_about_axis(1, [1,0,0]))
         zero_pose.set_and_check_cart_goal(zero_pose.default_root, tray_name, l_goal)
+        zero_pose.check_cart_goal(zero_pose.l_tip, expected_pose)
 
 
 

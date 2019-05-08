@@ -16,6 +16,7 @@ from giskardpy.identifier import world_identifier, js_identifier, default_joint_
 from giskardpy.input_system import JointStatesInput
 from giskardpy.plugin import PluginBehavior, SuccessPlugin
 from giskardpy.plugin_action_server import GoalReceived, SendResult, GoalCanceled
+from giskardpy.plugin_attached_tf_publicher import TFPlugin
 from giskardpy.plugin_cleanup import CleanUp
 from giskardpy.plugin_configuration import ConfigurationPlugin
 from giskardpy.plugin_goal_reached import GoalReachedPlugin
@@ -94,6 +95,7 @@ def grow_tree():
 
     # ----------------------------------------------
     wait_for_goal = Sequence(u'wait for goal')
+    wait_for_goal.add_child(TFPlugin(u'tf'))
     wait_for_goal.add_child(ConfigurationPlugin(u'js', map_frame))
     wait_for_goal.add_child(WorldUpdatePlugin(u'pybullet updater'))
     wait_for_goal.add_child(GoalReceived(u'has goal', action_server_name, MoveAction))

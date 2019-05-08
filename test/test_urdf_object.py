@@ -393,6 +393,25 @@ class TestUrdfObject(object):
         chain = parsed_pr2.get_joint_names_from_chain(root, tip)
         assert chain == [u'l_upper_arm_roll_joint', u'l_upper_arm_joint']
 
+    def test_get_chain6(self, function_setup):
+        parsed_pr2 = self.cls(pr2_urdf())
+        tip = u'l_gripper_palm_link'
+        root = u'l_gripper_tool_frame'
+        chain = parsed_pr2.get_joint_names_from_chain(root, tip)
+        assert chain == [u'l_gripper_tool_joint']
+
+    def test_get_chain_attached(self, function_setup):
+        parsed_pr2 = self.cls(pr2_urdf())
+        box = self.cls.from_world_body(make_world_body_box())
+        p = Pose()
+        p.position = Point(0, 0, 0.1)
+        p.orientation = Quaternion(1, 0, 0, 0)
+        parsed_pr2.attach_urdf_object(box, u'l_gripper_tool_frame', p)
+        tip = u'l_gripper_tool_frame'
+        root = box.get_name()
+        chain = parsed_pr2.get_joint_names_from_chain(root, tip)
+        assert chain == [box.get_name()]
+
     def test_get_chain_fixed_joints(self, function_setup):
         # TODO test fixed joints
         pass

@@ -15,4 +15,4 @@ if __name__ == '__main__':
             rospy.logwarn('failed to add object \'{}\''.format(name))
             rospy.logwarn(result)
     except KeyError:
-        rospy.loginfo('Example call: rosrun giskardpy add_object.py _name:=box link:=gripper_tool_frame')
+        rospy.loginfo('Example call: rosrun giskardpy attach_object.py _name:=box _link:=gripper_tool_frame')

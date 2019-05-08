@@ -173,26 +173,17 @@ class URDFObject(object):
     def get_split_chain(self, root, tip, joints=True, links=True, fixed=True):
         if root == tip:
             return [], [], []
-        root_chain = self._urdf_robot.get_chain(self.get_root(), root, True, True, True)
-        tip_chain = self._urdf_robot.get_chain(self.get_root(), tip, True, True, True)
+        root_chain = self._urdf_robot.get_chain(self.get_root(), root, False, True, True)
+        tip_chain = self._urdf_robot.get_chain(self.get_root(), tip, False, True, True)
         for i in range(min(len(root_chain), len(tip_chain))):
             if root_chain[i] != tip_chain[i]:
                 break
         else:
             i += 1
         connection = tip_chain[i - 1]
-        root_chain = root_chain[i:]
+        root_chain = self._urdf_robot.get_chain(connection, root, joints, links, fixed)
         root_chain.reverse()
-        tip_chain = tip_chain[i:]
-        if not links:
-            root_chain = [x for x in root_chain if not self.has_link(x)]
-            tip_chain = [x for x in tip_chain if not self.has_link(x)]
-        if not joints:
-            root_chain = [x for x in root_chain if not self.has_joint(x)]
-            tip_chain = [x for x in tip_chain if not self.has_joint(x)]
-        if not fixed:
-            root_chain = [x for x in root_chain if not self.is_joint_fixed(x)]
-            tip_chain = [x for x in tip_chain if not self.is_joint_fixed(x)]
+        tip_chain = self._urdf_robot.get_chain(connection, tip, joints, links, fixed)
         return root_chain, [connection] if links else [], tip_chain
 
     def get_chain(self, root, tip, joints=True, links=True, fixed=True):

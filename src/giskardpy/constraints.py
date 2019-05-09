@@ -1,5 +1,5 @@
 from collections import OrderedDict
-
+import numpy as np
 from geometry_msgs.msg import PoseStamped
 from rospy_message_converter.message_converter import convert_dictionary_to_ros_message
 
@@ -128,7 +128,21 @@ class CartesianConstraint(Constraint):
         self.tip = kwargs[u'tip']
         goal = convert_dictionary_to_ros_message(u'geometry_msgs/PoseStamped', kwargs[u'goal'])
         goal = transform_pose(self.root, goal)
+
+        # make sure rotation is normalized quaternion
+        # TODO make a function out of this
+        rotation = np.array([goal.pose.orientation.x,
+                             goal.pose.orientation.y,
+                             goal.pose.orientation.z,
+                             goal.pose.orientation.w])
+        normalized_rotation = rotation / np.linalg.norm(rotation)
+        goal.pose.orientation.x = normalized_rotation[0]
+        goal.pose.orientation.y = normalized_rotation[1]
+        goal.pose.orientation.z = normalized_rotation[2]
+        goal.pose.orientation.w = normalized_rotation[3]
+
         kwargs[u'goal'] = goal
+
         super(CartesianConstraint, self).safe_params_on_god_map(**kwargs)
 
     def get_goal_pose(self, name):
@@ -212,28 +226,18 @@ class CartesianPosition(CartesianConstraint):
         trans_scale = sw.diffable_min_fast(trans_error * gain, max_speed)
         trans_control = trans_error_vector / trans_error * trans_scale
 
-        soft_constraints[u'position x: {}/{}'.format(root, tip)] = SoftConstraint(lower=trans_control[0],
+        soft_constraints[str(self) + u'x'] = SoftConstraint(lower=trans_control[0],
                                                                                   upper=trans_control[0],
                                                                                   weight=weight,
                                                                                   expression=current_position[0])
-        soft_constraints[u'position y: {}/{}'.format(root, tip)] = SoftConstraint(lower=trans_control[1],
+        soft_constraints[str(self) + u'y'] = SoftConstraint(lower=trans_control[1],
                                                                                   upper=trans_control[1],
                                                                                   weight=weight,
                                                                                   expression=current_position[1])
-        soft_constraints[u'position z: {}/{}'.format(root, tip)] = SoftConstraint(lower=trans_control[2],
+        soft_constraints[str(self) + u'z'] = SoftConstraint(lower=trans_control[2],
                                                                                   upper=trans_control[2],
                                                                                   weight=weight,
                                                                                   expression=current_position[2])
-        add_debug_constraint(soft_constraints, 'pos x', current_position[0])
-        add_debug_constraint(soft_constraints, 'pos y', current_position[1])
-        add_debug_constraint(soft_constraints, 'pos z', current_position[2])
-        add_debug_constraint(soft_constraints, 'pos z trans_error_vector', trans_error_vector[2])
-        add_debug_constraint(soft_constraints, 'pos  trans_error', trans_error)
-        add_debug_constraint(soft_constraints, 'pos trans_scale', trans_scale)
-        add_debug_constraint(soft_constraints, 'pos gain', gain)
-        add_debug_constraint(soft_constraints, 'pos max_speed', max_speed)
-        add_debug_constraint(soft_constraints, 'pos z goal_position', goal_position[2])
-
         return soft_constraints
 
 
@@ -295,15 +299,15 @@ class CartesianOrientation(CartesianConstraint):
         axis, angle = sw.diffable_axis_angle_from_matrix((current_rotation.T * (current_evaluated_rotation * hack)).T)
         c_aa = (axis * angle)
 
-        soft_constraints[u'rotation 0: {}/{}'.format(root, tip)] = SoftConstraint(lower=r_rot_control[0],
+        soft_constraints[str(self) + u'/0'] = SoftConstraint(lower=r_rot_control[0],
                                                                                   upper=r_rot_control[0],
                                                                                   weight=weight,
                                                                                   expression=c_aa[0])
-        soft_constraints[u'rotation 1: {}/{}'.format(root, tip)] = SoftConstraint(lower=r_rot_control[1],
+        soft_constraints[str(self) + u'/1'] = SoftConstraint(lower=r_rot_control[1],
                                                                                   upper=r_rot_control[1],
                                                                                   weight=weight,
                                                                                   expression=c_aa[1])
-        soft_constraints[u'rotation 2: {}/{}'.format(root, tip)] = SoftConstraint(lower=r_rot_control[2],
+        soft_constraints[str(self) + u'/2'] = SoftConstraint(lower=r_rot_control[2],
                                                                                   upper=r_rot_control[2],
                                                                                   weight=weight,
                                                                                   expression=c_aa[2])
@@ -373,15 +377,15 @@ class CartesianOrientationSlerp(CartesianConstraint):
         axis, angle = sw.diffable_axis_angle_from_matrix((current_rotation.T * (current_evaluated_rotation * hack)).T)
         c_aa = (axis * angle)
 
-        soft_constraints[str(self) + u'/1'] = SoftConstraint(lower=r_rot_control[0],
+        soft_constraints[str(self) + u'/0'] = SoftConstraint(lower=r_rot_control[0],
                                                              upper=r_rot_control[0],
                                                              weight=weight,
                                                              expression=c_aa[0])
-        soft_constraints[str(self) + u'/2'] = SoftConstraint(lower=r_rot_control[1],
+        soft_constraints[str(self) + u'/1'] = SoftConstraint(lower=r_rot_control[1],
                                                              upper=r_rot_control[1],
                                                              weight=weight,
                                                              expression=c_aa[1])
-        soft_constraints[str(self) + u'/3'] = SoftConstraint(lower=r_rot_control[2],
+        soft_constraints[str(self) + u'/2'] = SoftConstraint(lower=r_rot_control[2],
                                                              upper=r_rot_control[2],
                                                              weight=weight,
                                                              expression=c_aa[2])

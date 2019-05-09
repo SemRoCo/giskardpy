@@ -1,8 +1,14 @@
 from collections import OrderedDict
 
+from geometry_msgs.msg import PoseStamped
+from rospy_message_converter.message_converter import convert_dictionary_to_ros_message
+
 import symengine_wrappers as sw
-from giskardpy.identifier import robot_identifier, world_identifier, js_identifier
+from giskardpy.identifier import robot_identifier, world_identifier, js_identifier, constraints_identifier, \
+    fk_identifier
+from giskardpy.input_system import FrameInput
 from giskardpy.qp_problem_builder import SoftConstraint
+from giskardpy.tfwrapper import transform_pose
 
 
 class Constraint(object):
@@ -10,17 +16,16 @@ class Constraint(object):
         self.god_map = god_map
         self.prefix = prefix
 
+    def safe_params_on_god_map(self, **kwargs):
+        constraints = self.get_god_map().safe_get_data(constraints_identifier)
+        constraints[str(self)] = kwargs
+        self.get_god_map().safe_set_data(constraints_identifier, constraints)
+
     def get_constraint(self, **kwargs):
         pass
 
     def get_identifier(self):
         return self.prefix + [str(self)]
-
-    def get_fk(self, root, tip):
-        pass
-
-    def get_fk_evaluated(self, root, tip):
-        pass
 
     def get_symbol(self, name):
         key = self.get_identifier() + [name]
@@ -68,6 +73,11 @@ class Constraint(object):
 
 
 class JointPosition(Constraint):
+
+    def safe_params_on_god_map(self, **kwargs):
+        self.joint_name = kwargs[u'joint_name']
+        super(JointPosition, self).safe_params_on_god_map(**kwargs)
+
     def get_constraint(self, joint_name, **kwargs):
         """
         example:
@@ -83,7 +93,6 @@ class JointPosition(Constraint):
         :param kwargs:
         :return:
         """
-        self.joint_name = joint_name
 
         current_joint = self.joint_position_expr(joint_name)
 
@@ -110,6 +119,275 @@ class JointPosition(Constraint):
         return u'{}/{}'.format(self.__class__.__name__, self.joint_name)
 
 
+class CartesianConstraint(Constraint):
+    def __str__(self):
+        return u'{}/{}/{}'.format(self.__class__.__name__, self.root, self.tip)
+
+    def safe_params_on_god_map(self, **kwargs):
+        self.root = kwargs[u'root']
+        self.tip = kwargs[u'tip']
+        goal = convert_dictionary_to_ros_message(u'geometry_msgs/PoseStamped', kwargs[u'goal'])
+        goal = transform_pose(self.root, goal)
+        kwargs[u'goal'] = goal
+        super(CartesianConstraint, self).safe_params_on_god_map(**kwargs)
+
+    def get_goal_pose(self, name):
+        return FrameInput(self.get_god_map().to_symbol,
+                          translation_prefix=constraints_identifier +
+                                             [str(self),
+                                              name,
+                                              u'pose',
+                                              u'position'],
+                          rotation_prefix=constraints_identifier +
+                                          [str(self),
+                                           name,
+                                           u'pose',
+                                           u'orientation']).get_frame()
+
+    def get_fk(self, root, tip):
+        return self.get_robot().get_fk_expression(root, tip)
+
+    def get_fk_evaluated(self, root, tip):
+        return FrameInput(self.get_god_map().to_symbol,
+                          translation_prefix=fk_identifier +
+                                             [(root, tip),
+                                              u'pose',
+                                              u'position'],
+                          rotation_prefix=fk_identifier +
+                                          [(root, tip),
+                                           u'pose',
+                                           u'orientation']).get_frame()
+
+
+class CartesianPosition(CartesianConstraint):
+
+    def get_constraint(self, root, tip, **kwargs):
+        """
+        example:
+        name='CartesianPosition'
+        parameter_value_pair='{
+            "root": "base_footprint", #required
+            "tip": "r_gripper_tool_frame", #required
+            "goal_position": {"header":
+                                {"stamp":
+                                    {"secs": 0,
+                                    "nsecs": 0},
+                                "frame_id": "",
+                                "seq": 0},
+                            "pose": {"position":
+                                        {"y": 0.0,
+                                        "x": 0.0,
+                                        "z": 0.0},
+                                    "orientation": {"y": 0.0,
+                                                    "x": 0.0,
+                                                    "z": 0.0,
+                                                    "w": 0.0}
+                                    }
+                            }', #required
+            "weight": 1, #optional
+            "gain": 3, #optional -- error is multiplied with this value
+            "max_speed": 0.3 #optional -- rad/s or m/s depending on joint; can not go higher than urdf limit
+        }'
+        :param root:
+        :param tip:
+        :param goal_position:
+        :param weights:
+        :param gain:
+        :param max_trans_speed:
+        :param ns:
+        :return:
+        """
+
+        goal_position = sw.position_of(self.get_goal_pose(u'goal'))
+        weight = self.get_symbol(u'weight')
+        gain = self.get_symbol(u'gain')
+        max_speed = self.get_symbol(u'max_speed')
+
+        current_position = sw.position_of(self.get_fk(root, tip))
+
+        soft_constraints = OrderedDict()
+
+        trans_error_vector = goal_position - current_position
+        trans_error = sw.norm(trans_error_vector)
+        trans_scale = sw.diffable_min_fast(trans_error * gain, max_speed)
+        trans_control = trans_error_vector / trans_error * trans_scale
+
+        soft_constraints[u'position x: {}/{}'.format(root, tip)] = SoftConstraint(lower=trans_control[0],
+                                                                                  upper=trans_control[0],
+                                                                                  weight=weight,
+                                                                                  expression=current_position[0])
+        soft_constraints[u'position y: {}/{}'.format(root, tip)] = SoftConstraint(lower=trans_control[1],
+                                                                                  upper=trans_control[1],
+                                                                                  weight=weight,
+                                                                                  expression=current_position[1])
+        soft_constraints[u'position z: {}/{}'.format(root, tip)] = SoftConstraint(lower=trans_control[2],
+                                                                                  upper=trans_control[2],
+                                                                                  weight=weight,
+                                                                                  expression=current_position[2])
+        add_debug_constraint(soft_constraints, 'pos x', current_position[0])
+        add_debug_constraint(soft_constraints, 'pos y', current_position[1])
+        add_debug_constraint(soft_constraints, 'pos z', current_position[2])
+        add_debug_constraint(soft_constraints, 'pos z trans_error_vector', trans_error_vector[2])
+        add_debug_constraint(soft_constraints, 'pos  trans_error', trans_error)
+        add_debug_constraint(soft_constraints, 'pos trans_scale', trans_scale)
+        add_debug_constraint(soft_constraints, 'pos gain', gain)
+        add_debug_constraint(soft_constraints, 'pos max_speed', max_speed)
+        add_debug_constraint(soft_constraints, 'pos z goal_position', goal_position[2])
+
+        return soft_constraints
+
+
+class CartesianOrientation(CartesianConstraint):
+
+    def get_constraint(self, root, tip, **kwargs):
+        """
+        example:
+        name='CartesianPosition'
+        parameter_value_pair='{
+            "root": "base_footprint", #required
+            "tip": "r_gripper_tool_frame", #required
+            "goal_position": {"header":
+                                {"stamp":
+                                    {"secs": 0,
+                                    "nsecs": 0},
+                                "frame_id": "",
+                                "seq": 0},
+                            "pose": {"position":
+                                        {"y": 0.0,
+                                        "x": 0.0,
+                                        "z": 0.0},
+                                    "orientation": {"y": 0.0,
+                                                    "x": 0.0,
+                                                    "z": 0.0,
+                                                    "w": 0.0}
+                                    }
+                            }', #required
+            "weight": 1, #optional
+            "gain": 3, #optional -- error is multiplied with this value
+            "max_speed": 0.3 #optional -- rad/s or m/s depending on joint; can not go higher than urdf limit
+        }'
+        :param root:
+        :param tip:
+        :param goal_position:
+        :param weights:
+        :param gain:
+        :param max_speed:
+        :param ns:
+        :return:
+        """
+        goal_rotation = sw.rotation_of(self.get_goal_pose(u'goal'))
+        weight = self.get_symbol(u'weight')
+        gain = self.get_symbol(u'gain')
+        max_speed = self.get_symbol(u'max_speed')
+
+        current_rotation = sw.rotation_of(self.get_fk(root, tip))
+        current_evaluated_rotation = sw.rotation_of(self.get_fk_evaluated(root, tip))
+
+        soft_constraints = OrderedDict()
+        axis, angle = sw.diffable_axis_angle_from_matrix((current_rotation.T * goal_rotation))
+
+        capped_angle = sw.diffable_max_fast(sw.diffable_min_fast(gain * angle, max_speed), -max_speed)
+
+        r_rot_control = axis * capped_angle
+
+        hack = sw.rotation_matrix_from_axis_angle([0, 0, 1], 0.0001)
+
+        axis, angle = sw.diffable_axis_angle_from_matrix((current_rotation.T * (current_evaluated_rotation * hack)).T)
+        c_aa = (axis * angle)
+
+        soft_constraints[u'rotation 0: {}/{}'.format(root, tip)] = SoftConstraint(lower=r_rot_control[0],
+                                                                                  upper=r_rot_control[0],
+                                                                                  weight=weight,
+                                                                                  expression=c_aa[0])
+        soft_constraints[u'rotation 1: {}/{}'.format(root, tip)] = SoftConstraint(lower=r_rot_control[1],
+                                                                                  upper=r_rot_control[1],
+                                                                                  weight=weight,
+                                                                                  expression=c_aa[1])
+        soft_constraints[u'rotation 2: {}/{}'.format(root, tip)] = SoftConstraint(lower=r_rot_control[2],
+                                                                                  upper=r_rot_control[2],
+                                                                                  weight=weight,
+                                                                                  expression=c_aa[2])
+        return soft_constraints
+
+
+class CartesianOrientationSlerp(CartesianConstraint):
+
+    def get_constraint(self, root, tip, **kwargs):
+        """
+        example:
+        name='CartesianPosition'
+        parameter_value_pair='{
+            "root": "base_footprint", #required
+            "tip": "r_gripper_tool_frame", #required
+            "goal_position": {"header":
+                                {"stamp":
+                                    {"secs": 0,
+                                    "nsecs": 0},
+                                "frame_id": "",
+                                "seq": 0},
+                            "pose": {"position":
+                                        {"y": 0.0,
+                                        "x": 0.0,
+                                        "z": 0.0},
+                                    "orientation": {"y": 0.0,
+                                                    "x": 0.0,
+                                                    "z": 0.0,
+                                                    "w": 0.0}
+                                    }
+                            }', #required
+            "weight": 1, #optional
+            "gain": 3, #optional -- error is multiplied with this value
+            "max_speed": 0.3 #optional -- rad/s or m/s depending on joint; can not go higher than urdf limit
+        }'
+        :param root:
+        :param tip:
+        :param goal_position:
+        :param weights:
+        :param gain:
+        :param max_speed:
+        :param ns:
+        :return:
+        """
+        goal_rotation = sw.rotation_of(self.get_goal_pose(u'goal'))
+        weight = self.get_symbol(u'weight')
+        gain = self.get_symbol(u'gain')
+        max_speed = self.get_symbol(u'max_speed')
+
+        current_rotation = sw.rotation_of(self.get_fk(root, tip))
+        current_evaluated_rotation = sw.rotation_of(self.get_fk_evaluated(root, tip))
+
+        soft_constraints = OrderedDict()
+
+        axis, angle = sw.diffable_axis_angle_from_matrix((current_rotation.T * goal_rotation))
+        angle = sw.diffable_abs(angle)
+
+        capped_angle = sw.diffable_min_fast(max_speed / (gain * angle), 1)
+
+        q1 = sw.quaternion_from_matrix(current_rotation)
+        q2 = sw.quaternion_from_matrix(goal_rotation)
+        intermediate_goal = sw.diffable_slerp(q1, q2, capped_angle)
+        axis, angle = sw.axis_angle_from_quaternion(*sw.quaternion_diff(q1, intermediate_goal))
+        r_rot_control = axis * angle
+
+        hack = sw.rotation_matrix_from_axis_angle([0, 0, 1], 0.0001)
+        axis, angle = sw.diffable_axis_angle_from_matrix((current_rotation.T * (current_evaluated_rotation * hack)).T)
+        c_aa = (axis * angle)
+
+        soft_constraints[str(self) + u'/1'] = SoftConstraint(lower=r_rot_control[0],
+                                                             upper=r_rot_control[0],
+                                                             weight=weight,
+                                                             expression=c_aa[0])
+        soft_constraints[str(self) + u'/2'] = SoftConstraint(lower=r_rot_control[1],
+                                                             upper=r_rot_control[1],
+                                                             weight=weight,
+                                                             expression=c_aa[1])
+        soft_constraints[str(self) + u'/3'] = SoftConstraint(lower=r_rot_control[2],
+                                                             upper=r_rot_control[2],
+                                                             weight=weight,
+                                                             expression=c_aa[2])
+        return soft_constraints
+
+
 class LinkToAnyAvoidance(Constraint):
     def get_constraint(self, link_name, lower_limit=0.05, upper_limit=1e9, weight=10000):
         current_pose = self.get_fk(u'base_footprint', link_name)
@@ -129,33 +407,6 @@ class LinkToAnyAvoidance(Constraint):
                                                                upper=upper_limit,
                                                                weight=weight,
                                                                expression=dist)
-        return soft_constraints
-
-
-class CartesianPosition(Constraint):
-    def get_constraint(self, root, tip, goal_position, weights=1, trans_gain=3, max_trans_speed=0.3, ns=''):
-        current_position = self.get_fk(root, tip)
-
-        soft_constraints = OrderedDict()
-
-        trans_error_vector = goal_position - current_position
-        trans_error = sw.norm(trans_error_vector)
-        trans_scale = sw.diffable_min_fast(trans_error * trans_gain, max_trans_speed)
-        trans_control = trans_error_vector / trans_error * trans_scale
-
-        soft_constraints[u'position x: {}'.format(ns)] = SoftConstraint(lower=trans_control[0],
-                                                                        upper=trans_control[0],
-                                                                        weight=weights,
-                                                                        expression=current_position[0])
-        soft_constraints[u'position y: {}'.format(ns)] = SoftConstraint(lower=trans_control[1],
-                                                                        upper=trans_control[1],
-                                                                        weight=weights,
-                                                                        expression=current_position[1])
-        soft_constraints[u'position z: {}'.format(ns)] = SoftConstraint(lower=trans_control[2],
-                                                                        upper=trans_control[2],
-                                                                        weight=weights,
-                                                                        expression=current_position[2])
-
         return soft_constraints
 
 

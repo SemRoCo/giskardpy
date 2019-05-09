@@ -7,7 +7,7 @@ from giskard_msgs.msg._MoveResult import MoveResult
 from py_trees import Blackboard, Status
 
 from giskardpy.exceptions import MAX_NWSR_REACHEDException, QPSolverException, SolverTimeoutError, InsolvableException, \
-    SymengineException, PathCollisionException, UnknownBodyException
+    SymengineException, PathCollisionException, UnknownBodyException, ImplementationException
 from giskardpy.identifier import trajectory_identifier
 from giskardpy.plugin import GiskardBehavior
 from giskardpy.utils import plot_trajectory
@@ -163,6 +163,9 @@ class SendResult(ActionServerBehavior):
             error_code = MoveResult.SYMENGINE_ERROR
         elif isinstance(exception, PathCollisionException):
             error_code = MoveResult.PATH_COLLISION
+        elif isinstance(exception, ImplementationException):
+            print(exception)
+            error_code = MoveResult.INSOLVABLE
         elif exception is not None:
             error_code = MoveResult.INSOLVABLE
         return error_code

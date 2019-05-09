@@ -126,7 +126,7 @@ def grow_tree():
     root.add_child(planning)
     root.add_child(CleanUp(u'cleanup'))
     root.add_child(publish_result)
-    root.add_child(SendResult(u'send result', action_server_name, path_to_data_folder, plot_trajectory))
+    root.add_child(SendResult(u'send result', action_server_name, path_to_data_folder, MoveAction, plot_trajectory))
 
     tree = BehaviourTree(root)
 

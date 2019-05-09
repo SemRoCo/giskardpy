@@ -6,6 +6,8 @@ from geometry_msgs.msg import PoseStamped, Point, Quaternion
 from giskard_msgs.msg import MoveAction, Controller, MoveGoal, WorldBody, CollisionEntry, MoveResult, Constraint, \
     MoveCmd
 from giskard_msgs.srv import UpdateWorld, UpdateWorldRequest, UpdateWorldResponse
+from rospy_message_converter.json_message_converter import convert_ros_message_to_json
+from rospy_message_converter.message_converter import convert_ros_message_to_dictionary
 from sensor_msgs.msg import JointState
 from shape_msgs.msg import SolidPrimitive
 from visualization_msgs.msg import MarkerArray
@@ -48,15 +50,17 @@ class GiskardWrapper(object):
         :param pose_stamped:
         :type pose_stamped: PoseStamped
         """
-        controller = Controller()
-        controller.root_link = str(root)
-        controller.tip_link = str(tip)
-        controller.goal_pose = pose_stamped
-        controller.type = Controller.TRANSLATION_3D
-        controller.weight = 1
-        controller.max_speed = max_speed
-        controller.p_gain = p_gain
-        self.cmd_seq[-1].constraints.append(controller)
+        constraint = Constraint()
+        constraint.name = u'CartesianPosition'
+        constraint.parameter_value_pair = json.dumps({
+            u'root': root,
+            u'tip': tip,
+            u'weight': 1,
+            u'gain': p_gain,
+            u'max_speed': max_speed,
+            u'goal': convert_ros_message_to_dictionary(pose_stamped)
+        })
+        self.cmd_seq[-1].constraints.append(constraint)
 
     def set_rotation_goal(self, root, tip, pose_stamped, p_gain=3, max_speed=1.0):
         """
@@ -65,15 +69,17 @@ class GiskardWrapper(object):
         :param pose_stamped:
         :type pose_stamped: PoseStamped
         """
-        controller = Controller()
-        controller.root_link = str(root)
-        controller.tip_link = str(tip)
-        controller.goal_pose = pose_stamped
-        controller.type = Controller.ROTATION_3D
-        controller.weight = 1
-        controller.max_speed = max_speed
-        controller.p_gain = p_gain
-        self.cmd_seq[-1].constraints.append(controller)
+        constraint = Constraint()
+        constraint.name = u'CartesianOrientation'
+        constraint.parameter_value_pair = json.dumps({
+            u'root': root,
+            u'tip': tip,
+            u'weight': 1,
+            u'gain': p_gain,
+            u'max_speed': max_speed,
+            u'goal': convert_ros_message_to_dictionary(pose_stamped)
+        })
+        self.cmd_seq[-1].constraints.append(constraint)
 
     def set_joint_goal(self, joint_state):
         """

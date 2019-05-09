@@ -9,7 +9,8 @@ from py_trees import Status
 
 import symengine_wrappers as sw
 import giskardpy.constraints
-from giskardpy.exceptions import InsolvableException
+from giskardpy.constraints import JointPosition
+from giskardpy.exceptions import InsolvableException, ImplementationException
 from giskardpy.identifier import soft_constraint_identifier, next_cmd_identifier, \
     collision_goal_identifier, fk_identifier, \
     closest_point_identifier, js_identifier, default_joint_vel_identifier, constraints_identifier
@@ -99,24 +100,23 @@ class GoalToConstraints(GetGoal):
         :type cmd: MoveCmd
         :rtype: dict
         """
-        constraints = {}
+        self.get_god_map().safe_set_data(constraints_identifier, {})
         for constraint in cmd.constraints:
             if constraint.name not in allowed_constraint_names():
                 # TODO test me
                 raise InsolvableException(u'unknown constraint')
             try:
-                c = eval(constraint.name)(self.god_map, constraints_identifier)
+                c = eval(u'giskardpy.constraints.{}'.format(constraint.name))(self.god_map, constraints_identifier)
             except NameError as e:
                 # TODO return next best constraint type
-                raise InsolvableException(u'unsupported constraint type')
+                raise ImplementationException(u'unsupported constraint type')
             try:
                 params = json.loads(constraint.parameter_value_pair)
+                c.safe_params_on_god_map(**params)
                 soft_constraints = c.get_constraint(**params)
                 self.soft_constraints.update(soft_constraints)
-                constraints[str(c)] = params
             except TypeError as e:
-                raise InsolvableException(help(c.get_constraint))
-        self.get_god_map().safe_set_data(constraints_identifier, constraints)
+                raise ImplementationException(help(c.get_constraint))
 
     def has_robot_changed(self):
         new_urdf = self.get_robot().get_urdf()

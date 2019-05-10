@@ -195,7 +195,7 @@ class GiskardTestWrapper(object):
         rospy.set_param(u'~map_frame', u'map')
         rospy.set_param(u'~root_link', u'base_footprint')
         rospy.set_param(u'~wiggle_precision_threshold', 4)
-        rospy.set_param(u'~sample_period', 0.1)
+        rospy.set_param(u'~sample_period', 0.05)
         rospy.set_param(u'~default_joint_vel_limit', 10)
         rospy.set_param(u'~default_collision_avoidance_distance', 0.05)
         rospy.set_param(u'~fill_velocity_values', False)
@@ -203,8 +203,8 @@ class GiskardTestWrapper(object):
         rospy.set_param(u'~path_to_data_folder', u'tmp_data/')
         rospy.set_param(u'~collision_time_threshold', 10)
         rospy.set_param(u'~max_traj_length', 30)
-        rospy.set_param(u'~joint_convergence_threshold', 0.001)
-        rospy.set_param(u'~plot_trajectory', False)
+        rospy.set_param(u'~joint_convergence_threshold', 0.005)
+        rospy.set_param(u'~plot_trajectory', True)
 
         self.sub_result = rospy.Subscriber(u'/giskardpy/command/result', MoveActionResult, self.cb, queue_size=100)
 

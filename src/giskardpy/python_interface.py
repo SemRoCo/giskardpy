@@ -56,7 +56,7 @@ class GiskardWrapper(object):
             u'root': root,
             u'tip': tip,
             u'goal': convert_ros_message_to_dictionary(pose_stamped),
-            u'weight': 1,
+            # u'weight': 1,
             u'gain': p_gain,
             u'max_speed': max_speed,
         })
@@ -75,7 +75,7 @@ class GiskardWrapper(object):
             u'root': root,
             u'tip': tip,
             u'goal': convert_ros_message_to_dictionary(pose_stamped),
-            u'weight': 1,
+            # u'weight': 1,
             u'gain': p_gain,
             u'max_speed': max_speed,
         })

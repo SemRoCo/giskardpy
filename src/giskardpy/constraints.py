@@ -2,6 +2,7 @@ import numpy as np
 from collections import OrderedDict
 
 from rospy_message_converter.message_converter import convert_dictionary_to_ros_message
+from scipy.optimize import curve_fit
 
 import symengine_wrappers as sw
 from giskardpy.identifier import robot_identifier, world_identifier, js_identifier, constraints_identifier, \
@@ -9,6 +10,12 @@ from giskardpy.identifier import robot_identifier, world_identifier, js_identifi
 from giskardpy.input_system import FrameInput, Point3Input, Vector3Input
 from giskardpy.qp_problem_builder import SoftConstraint
 from giskardpy.tfwrapper import transform_pose
+
+MAX_WEIGHT = 10
+HIGH_WEIGHT = 5
+MID_WEIGHT = 1
+LOW_WEIGHT = 0.5
+ZERO_WEIGHT = 0
 
 
 class Constraint(object):
@@ -133,7 +140,7 @@ class CartesianConstraint(Constraint):
     gain = u'gain'
     max_speed = u'max_speed'
 
-    def __init__(self, god_map, root, tip, goal, weight=1, gain=3, max_speed=0.1):
+    def __init__(self, god_map, root, tip, goal, weight=HIGH_WEIGHT, gain=3, max_speed=0.1):
         super(CartesianConstraint, self).__init__(god_map)
         self.root = root
         self.tip = tip
@@ -392,7 +399,7 @@ class LinkToAnyAvoidance(Constraint):
     upper_limit = u'upper_limit'
     weight = u'weight'
 
-    def __init__(self, god_map, link_name, lower_limit=0.05, upper_limit=1e9, weight=1000):
+    def __init__(self, god_map, link_name, lower_limit=0.05, upper_limit=1e9, weight=10):
         super(LinkToAnyAvoidance, self).__init__(god_map)
         self.link_name = link_name
         params = {self.lower_limit: lower_limit,
@@ -431,14 +438,31 @@ class LinkToAnyAvoidance(Constraint):
 
         dist = (contact_normal.T * (controllable_point - other_point))[0]
 
-        soft_constraints[str(self)] = SoftConstraint(lower=lower_limit - dist,
-                                                     upper=upper_limit,
-                                                     weight=weight,
+        y = np.array([MAX_WEIGHT, LOW_WEIGHT, ZERO_WEIGHT])
+        x = np.array([0, 0.01, 0.05])
+        (A, B, C), _ = curve_fit(lambda t, a, b, c: a / (t + c) + b, x, y)
+
+        weight_f = sw.Piecewise([MAX_WEIGHT, dist <= 0],
+                                [ZERO_WEIGHT, dist > 0.05],
+                                [A / (dist + C) + B, True])
+
+        soft_constraints[str(self)] = SoftConstraint(lower=.1,
+                                                     upper=.1,
+                                                     weight=weight_f,
                                                      expression=dist)
         return soft_constraints
 
     def __str__(self):
         return u'{}/{}'.format(self.__class__.__name__, self.link_name)
+
+
+class CollisionAvoidance(Constraint):
+
+    def __init__(self, god_map, **kwargs):
+        super(CollisionAvoidance, self).__init__(god_map, **kwargs)
+
+    def get_constraint(self, **kwargs):
+        super(CollisionAvoidance, self).get_constraint(**kwargs)
 
 
 def add_debug_constraint(d, key, expr):

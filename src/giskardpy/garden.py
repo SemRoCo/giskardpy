@@ -103,7 +103,7 @@ def grow_tree():
     # ----------------------------------------------
     planning = failure_is_success(Selector)(u'planning')
     planning.add_child(GoalCanceled(u'goal canceled', action_server_name))
-    planning.add_child(CollisionCancel(u'in collision', collision_time_threshold))
+    # planning.add_child(CollisionCancel(u'in collision', collision_time_threshold))
     planning.add_child(success_is_failure(VisualizationBehavior)(u'visualization', enable_visualization))
 
     actual_planning = PluginBehavior(u'planning', sleep=0)
@@ -113,7 +113,7 @@ def grow_tree():
     actual_planning.add_plugin(ControllerPlugin(u'controller', path_to_data_folder, nWSR))
     actual_planning.add_plugin(LogTrajPlugin(u'log'))
     actual_planning.add_plugin(GoalReachedPlugin(u'goal reached', joint_convergence_threshold))
-    actual_planning.add_plugin(WiggleCancel(u'wiggle', wiggle_precision_threshold))
+    # actual_planning.add_plugin(WiggleCancel(u'wiggle', wiggle_precision_threshold))
     planning.add_child(actual_planning)
     # ----------------------------------------------
     publish_result = failure_is_success(Selector)(u'move robot')

@@ -55,10 +55,10 @@ class GiskardWrapper(object):
         constraint.parameter_value_pair = json.dumps({
             u'root': root,
             u'tip': tip,
+            u'goal': convert_ros_message_to_dictionary(pose_stamped),
             u'weight': 1,
             u'gain': p_gain,
             u'max_speed': max_speed,
-            u'goal': convert_ros_message_to_dictionary(pose_stamped)
         })
         self.cmd_seq[-1].constraints.append(constraint)
 
@@ -70,14 +70,14 @@ class GiskardWrapper(object):
         :type pose_stamped: PoseStamped
         """
         constraint = Constraint()
-        constraint.name = u'CartesianOrientation'
+        constraint.name = u'CartesianOrientationSlerp'
         constraint.parameter_value_pair = json.dumps({
             u'root': root,
             u'tip': tip,
+            u'goal': convert_ros_message_to_dictionary(pose_stamped),
             u'weight': 1,
             u'gain': p_gain,
             u'max_speed': max_speed,
-            u'goal': convert_ros_message_to_dictionary(pose_stamped)
         })
         self.cmd_seq[-1].constraints.append(constraint)
 
@@ -92,16 +92,15 @@ class GiskardWrapper(object):
                 constraint.name = u'JointPosition'
                 constraint.parameter_value_pair = json.dumps({
                     u'joint_name': joint_name,
+                    u'goal': joint_position,
                     u'weight': 1,
                     u'gain': self.joint_gain,
                     u'max_speed': self.joint_max_speed,
-                    u'goal_position': joint_position
                 })
                 self.cmd_seq[-1].constraints.append(constraint)
 
     def set_collision_entries(self, collisions):
-        pass
-        # self.cmd_seq[-1].collisions.extend(collisions)
+        self.cmd_seq[-1].collisions.extend(collisions)
 
     def allow_collision(self, robot_links=(CollisionEntry.ALL,), body_b=CollisionEntry.ALL,
                         link_bs=(CollisionEntry.ALL,)):

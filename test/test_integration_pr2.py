@@ -12,6 +12,7 @@ from tf.transformations import quaternion_from_matrix
 from giskardpy.identifier import fk_identifier
 from giskardpy.tfwrapper import init as tf_init, lookup_pose, transform_pose
 from utils_for_tests import PR2, compare_poses
+from giskardpy import logging
 
 # TODO roslaunch iai_pr2_sim ros_control_sim.launch
 # TODO roslaunch iai_kitchen upload_kitchen_obj.launch
@@ -98,20 +99,20 @@ folder_name = u'tmp_data/'
 @pytest.fixture(scope=u'module')
 def ros(request):
     try:
-        print(u'deleting tmp test folder')
+        logging.loginfo(u'deleting tmp test folder')
         # shutil.rmtree(folder_name)
     except Exception:
         pass
 
-    print(u'init ros')
+    logging.loginfo(u'init ros')
     rospy.init_node(u'tests')
     tf_init(60)
 
     def kill_ros():
-        print(u'shutdown ros')
+        logging.loginfo(u'shutdown ros')
         rospy.signal_shutdown(u'die')
         try:
-            print(u'deleting tmp test folder')
+            logging.loginfo(u'deleting tmp test folder')
             # shutil.rmtree(folder_name)
         except Exception:
             pass
@@ -131,7 +132,7 @@ def resetted_giskard(giskard):
     """
     :type giskard: PR2
     """
-    print(u'resetting giskard')
+    logging.loginfo(u'resetting giskard')
     giskard.clear_world()
     giskard.reset_base()
     return giskard

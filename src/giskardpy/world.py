@@ -53,7 +53,7 @@ class World(object):
         if self.has_object(object_.get_name()):
             raise DuplicateNameException(u'object with that name already exists')
         self._objects[object_.get_name()] = object_
-        print(u'--> added {} to world'.format(object_.get_name()))
+        logging.loginfo(u'--> added {} to world'.format(object_.get_name()))
 
     def set_object_pose(self, name, pose):
         """
@@ -97,7 +97,7 @@ class World(object):
     def remove_object(self, name):
         if self.has_object(name):
             self._objects[name].suicide()
-            print(u'<-- removed object {} to world'.format(name))
+            logging.loginfo(u'<-- removed object {} to world'.format(name))
             del (self._objects[name])
         else:
             raise UnknownBodyException(u'can\'t remove object \'{}\', because it doesn\' exist'.format(name))

@@ -24,6 +24,7 @@ from giskardpy.python_interface import GiskardWrapper
 from giskardpy.symengine_robot import Robot
 from giskardpy.tfwrapper import transform_pose, lookup_transform, lookup_pose
 from giskardpy.utils import msg_to_list, keydefaultdict, dict_to_joint_states
+from giskardpy import logging
 
 BIG_NUMBER = 1e100
 SMALL_NUMBER = 1e-100
@@ -275,7 +276,7 @@ class GiskardTestWrapper(object):
 
     def tear_down(self):
         rospy.sleep(1)
-        print(u'stopping plugins')
+        logging.loginfo(u'stopping plugins')
 
     def set_object_joint_state(self, object_name, joint_state, topic=None):
         if topic is None:

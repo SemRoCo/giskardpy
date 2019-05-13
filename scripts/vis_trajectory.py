@@ -93,7 +93,7 @@ def cb(data):
     now = datetime.now()
     plt.savefig(
         u'trajectory_{}-{}-{}-{}-{}-{}.pdf'.format(now.year, now.month, now.day, now.hour, now.minute, now.second))
-    print(u'saved trajectory')
+    logging.loginfo(u'saved trajectory')
     # plt.show()
 
 

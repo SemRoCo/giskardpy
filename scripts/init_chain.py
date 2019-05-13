@@ -2,6 +2,7 @@
 import rospy
 from actionlib import SimpleActionClient
 from giskard_msgs.msg import MoveAction, MoveGoal, MoveCmd, Controller
+from giskardpy import logging
 
 if __name__ == '__main__':
     rospy.init_node('init_chain')
@@ -26,5 +27,5 @@ if __name__ == '__main__':
             move_cmd.controllers.append(controller)
     goal.type = MoveGoal.PLAN_ONLY
     goal.cmd_seq.append(move_cmd)
-    print('sending goal')
+    logging.loginfo('sending goal')
     client.send_goal_and_wait(goal)

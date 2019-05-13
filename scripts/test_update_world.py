@@ -298,7 +298,7 @@ def test_update_world():
         # add_dummy_pr2(update_world)
         # add_kitchen(update_world)
     except rospy.ServiceException as e:
-        print("Service call failed: {}".format(e))
+        logging.logerr("Service call failed: {}".format(e))
 
 
 if __name__ == "__main__":

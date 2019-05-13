@@ -153,7 +153,7 @@ def closest_point_constraint_violated(closest_point_infos, tolerance=0.9):
     """
     for link_name, cpi_info in closest_point_infos.items():  # type: (str, ClosestPointInfo)
         if cpi_info.contact_distance < cpi_info.min_dist * tolerance:
-            print(u'collision constraints violated: {}'.format(cpi_info.link_a, cpi_info.link_b,
+            logging.loginfo(u'collision constraints violated: {}'.format(cpi_info.link_a, cpi_info.link_b,
                                                                cpi_info.contact_distance))
             return True
     return False
@@ -382,7 +382,7 @@ def convert_dae_to_obj(path):
         try:
             subprocess.check_call([u'meshlabserver', u'-i', input_path, u'-o', new_path])
         except Exception as e:
-            print(u'meshlab not installed, can\'t convert dae to obj')
+            logging.logerr(u'meshlab not installed, can\'t convert dae to obj')
         return new_path
     return path
 
@@ -438,7 +438,7 @@ def render_dot_tree(root, visibility_level=common.VisibilityLevel.DETAIL, name=N
     """
     graph = generate_pydot_graph(root, visibility_level)
     filename_wo_extension = root.name.lower().replace(" ", "_") if name is None else name
-    print("Writing %s.dot/svg/png" % filename_wo_extension)
+    logging.loginfo("Writing %s.dot/svg/png" % filename_wo_extension)
     graph.write(filename_wo_extension + '.dot')
     graph.write_png(filename_wo_extension + '.png')
     graph.write_svg(filename_wo_extension + '.svg')

@@ -11,6 +11,7 @@ from geometry_msgs.msg import Pose, Quaternion
 from giskardpy.data_types import SingleJointState
 from giskardpy.tfwrapper import msg_to_kdl
 from giskardpy.urdf_object import URDFObject
+from giskardpy import logging
 
 
 class WorldObject(URDFObject):
@@ -117,7 +118,7 @@ class WorldObject(URDFObject):
         :rtype: set
         """
         # TODO computational expansive because of too many collision checks
-        print(u'calculating self collision matrix')
+        logging.loginfo(u'calculating self collision matrix')
         t = time()
         np.random.seed(1337)
         always = set()
@@ -145,7 +146,7 @@ class WorldObject(URDFObject):
             if len(sometimes2) > 0:
                 rest = rest.difference(sometimes2)
                 sometimes = sometimes.union(sometimes2)
-        print(u'calculated self collision matrix in {:.3f}s'.format(time()-t))
+        logging.loginfo(u'calculated self collision matrix in {:.3f}s'.format(time()-t))
         return sometimes
 
     def get_possible_collisions(self, link):
@@ -245,7 +246,7 @@ class WorldObject(URDFObject):
         if os.path.isfile(path):
             with open(path) as f:
                 self._self_collision_matrix = pickle.load(f)
-                print(u'loaded self collision matrix {}'.format(path))
+                logging.loginfo(u'loaded self collision matrix {}'.format(path))
                 return True
         return False
 
@@ -261,7 +262,7 @@ class WorldObject(URDFObject):
                 if exc.errno != errno.EEXIST:
                     raise
         with open(path, u'w') as file:
-            print(u'saved self collision matrix {}'.format(path))
+            logging.loginfo(u'saved self collision matrix {}'.format(path))
             pickle.dump(self._self_collision_matrix, file)
 
     def as_marker_msg(self, ns=u'', id=1):

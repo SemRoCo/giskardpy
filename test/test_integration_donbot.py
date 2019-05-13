@@ -7,6 +7,7 @@ from giskard_msgs.msg import MoveActionGoal, MoveResult, MoveGoal
 
 from utils_for_tests import Donbot
 from giskardpy.tfwrapper import lookup_transform, init as tf_init
+from giskardpy import logging
 
 # TODO roslaunch iai_donbot_sim ros_control_sim.launch
 
@@ -35,20 +36,20 @@ folder_name = u'tmp_data/'
 @pytest.fixture(scope=u'module')
 def ros(request):
     try:
-        print(u'deleting tmp test folder')
+        logging.loginfo(u'deleting tmp test folder')
         shutil.rmtree(folder_name)
     except Exception:
         pass
 
-    print(u'init ros')
+        logging.loginfo(u'init ros')
     rospy.init_node(u'tests')
     tf_init(60)
 
     def kill_ros():
-        print(u'shutdown ros')
+        logging.loginfo(u'shutdown ros')
         rospy.signal_shutdown(u'die')
         try:
-            print(u'deleting tmp test folder')
+            logging.loginfo(u'deleting tmp test folder')
             # shutil.rmtree(folder_name)
         except Exception:
             pass
@@ -68,7 +69,7 @@ def resetted_giskard(giskard):
     """
     :type giskard: Donbot
     """
-    print(u'resetting giskard')
+    logging.loginfo(u'resetting giskard')
     giskard.clear_world()
     giskard.reset_base()
     return giskard

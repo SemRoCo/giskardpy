@@ -4,6 +4,7 @@ import numpy as np
 
 import PyKDL as kdl
 from urdf_parser_py.urdf import Robot
+from giskardpy import logging
 
 def euler_to_quat(r, p, y):
     sr, sp, sy = np.sin(r/2.0), np.sin(p/2.0), np.sin(y/2.0)
@@ -77,11 +78,11 @@ def kdl_tree_from_urdf_model(urdf):
 def main():
     import sys
     def usage():
-        print("Tests for kdl_parser:\n")
-        print("kdl_parser <urdfs file>")
-        print("\tLoad the URDF from file.")
-        print("kdl_parser")
-        print("\tLoad the URDF from the parameter server.")
+        logging.logdebug("Tests for kdl_parser:\n")
+        logging.logdebug("kdl_parser <urdfs file>")
+        logging.logdebug("\tLoad the URDF from file.")
+        logging.logdebug("kdl_parser")
+        logging.logdebug("\tLoad the URDF from the parameter server.")
         sys.exit(1)
 
     if len(sys.argv) > 2:
@@ -99,17 +100,17 @@ def main():
     for j in robot.joint_map:
         if robot.joint_map[j].joint_type != 'fixed':
             num_non_fixed_joints += 1
-    print "URDF non-fixed joints: %d;" % num_non_fixed_joints,
-    print "KDL joints: %d" % tree.getNrOfJoints()
-    print "URDF joints: %d; KDL segments: %d" %(len(robot.joint_map),
-                                                tree.getNrOfSegments())
+    logging.loginfo("URDF non-fixed joints: %d;" % num_non_fixed_joints)
+    logging.loginfo("KDL joints: %d" % tree.getNrOfJoints())
+    logging.loginfo("URDF joints: %d; KDL segments: %d" %(len(robot.joint_map),
+                                                tree.getNrOfSegments()))
     import random
     base_link = robot.get_root()
     end_link = robot.link_map.keys()[random.randint(0, len(robot.link_map)-1)]
     chain = tree.getChain(base_link, end_link)
-    print "Root link: %s; Random end link: %s" % (base_link, end_link)
+    logging.logdinfo("Root link: %s; Random end link: %s" % (base_link, end_link))
     for i in range(chain.getNrOfSegments()):
-        print chain.getSegment(i).getName()
+        logging.logdinfo(chain.getSegment(i).getName())
 
 if __name__ == "__main__":
     main()

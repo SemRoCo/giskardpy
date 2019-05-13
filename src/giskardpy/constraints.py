@@ -438,8 +438,8 @@ class LinkToAnyAvoidance(Constraint):
 
         dist = (contact_normal.T * (controllable_point - other_point))[0]
 
+        x = np.array([0, 0.02, 0.05])
         y = np.array([MAX_WEIGHT, LOW_WEIGHT, ZERO_WEIGHT])
-        x = np.array([0, 0.01, 0.05])
         (A, B, C), _ = curve_fit(lambda t, a, b, c: a / (t + c) + b, x, y)
 
         weight_f = sw.Piecewise([MAX_WEIGHT, dist <= 0],
@@ -463,6 +463,14 @@ class CollisionAvoidance(Constraint):
 
     def get_constraint(self, **kwargs):
         super(CollisionAvoidance, self).get_constraint(**kwargs)
+
+class Grasp(CartesianConstraint):
+
+    def __init__(self, god_map, root, tip, goal, weight=HIGH_WEIGHT, gain=3, max_speed=0.1):
+        super(Grasp, self).__init__(god_map, root, tip, goal, weight, gain, max_speed)
+
+    def __str__(self):
+        return super(Grasp, self).__str__()
 
 
 def add_debug_constraint(d, key, expr):

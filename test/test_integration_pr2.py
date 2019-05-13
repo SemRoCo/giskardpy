@@ -1,5 +1,4 @@
 import itertools
-import numpy as np
 from numpy import pi
 
 import pytest
@@ -222,6 +221,7 @@ class TestFk(object):
             fk2 = lookup_pose(root, tip)
             compare_poses(fk1.pose, fk2.pose)
 
+
 class TestJointGoals(object):
     def test_joint_movement1(self, zero_pose):
         """
@@ -334,8 +334,8 @@ class TestCartGoals(object):
         r_goal.header.frame_id = zero_pose.r_tip
         r_goal.pose.position.x = 0.3
         r_goal.pose.orientation = Quaternion(*quaternion_from_matrix([[-1, 0, 0, 0],
-                                                                      [0,  1, 0, 0],
-                                                                      [0,  0, -1, 0],
+                                                                      [0, 1, 0, 0],
+                                                                      [0, 0, -1, 0],
                                                                       [0, 0, 0, 1]]))
         zero_pose.set_and_check_cart_goal(u'torso_lift_link', zero_pose.l_tip, r_goal)
 
@@ -1140,22 +1140,22 @@ class TestCollisionAvoidanceGoals(object):
             u'l_upper_arm_roll_joint': 0.5532568387077381,
             u'l_wrist_flex_joint': - 1.215660155912625,
             u'l_wrist_roll_joint': 4.249300323527076,
-            u'r_forearm_roll_joint': 0.0,
-            u'r_shoulder_lift_joint': 0.0,
-            u'r_shoulder_pan_joint': 0.0,
-            u'r_upper_arm_roll_joint': 0.0,
-            u'r_wrist_flex_joint': 0.0,
-            u'r_wrist_roll_joint': 0.0,
-            u'r_elbow_flex_joint': 0.0,
             u'torso_lift_joint': 0.2}
 
         zero_pose.set_joint_goal(collision_pose)
         zero_pose.send_goal()
 
         attached_link_name = u'pocky'
-        zero_pose.attach_box(attached_link_name, [0.08, 0.02, 0.02], zero_pose.l_tip, [0.04, 0, 0])
+        zero_pose.attach_box(attached_link_name, [0.08, 0.02, 0.02], zero_pose.l_tip, [0.04, 0, 0], [0, 0, 0, 1])
 
-        zero_pose.set_joint_goal({u'torso_lift_joint': 0.2})
+        zero_pose.set_joint_goal({u'r_forearm_roll_joint': 0.0,
+                                  u'r_shoulder_lift_joint': 0.0,
+                                  u'r_shoulder_pan_joint': 0.0,
+                                  u'r_upper_arm_roll_joint': 0.0,
+                                  u'r_wrist_flex_joint': 0.0,
+                                  u'r_wrist_roll_joint': 0.0,
+                                  u'r_elbow_flex_joint': 0.0,
+                                  u'torso_lift_joint': 0.2})
 
         p = PoseStamped()
         p.header.frame_id = zero_pose.l_tip
@@ -1458,12 +1458,12 @@ class TestCollisionAvoidanceGoals(object):
         r_goal.header.frame_id = zero_pose.r_tip
         r_goal.pose.position.x = 0.3
         r_goal.pose.orientation = Quaternion(*quaternion_from_matrix([[-1, 0, 0, 0],
-                                                                      [0,  1, 0, 0],
-                                                                      [0,  0, -1, 0],
+                                                                      [0, 1, 0, 0],
+                                                                      [0, 0, -1, 0],
                                                                       [0, 0, 0, 1]]))
         zero_pose.set_and_check_cart_goal(u'torso_lift_link', zero_pose.l_tip, r_goal)
 
-        zero_pose.attach_box(tray_name, [.3, .1, .2], zero_pose.r_tip, [.15,0,0],[0,0,0,1])
+        zero_pose.attach_box(tray_name, [.3, .1, .2], zero_pose.r_tip, [.15, 0, 0], [0, 0, 0, 1])
 
         zero_pose.allow_collision(robot_links=[tray_name],
                                   body_b=zero_pose.get_robot().get_name(),
@@ -1481,10 +1481,18 @@ class TestCollisionAvoidanceGoals(object):
         l_goal.header.frame_id = tray_name
         l_goal.pose.position.y = -.1
         l_goal.pose.position.x = .1
-        l_goal.pose.orientation = Quaternion(*quaternion_about_axis(1, [1,0,0]))
+        l_goal.pose.orientation = Quaternion(*quaternion_about_axis(1, [1, 0, 0]))
         zero_pose.set_and_check_cart_goal(zero_pose.default_root, tray_name, l_goal)
         zero_pose.check_cart_goal(zero_pose.l_tip, expected_pose)
 
+    def test_gras_sphere(self, pocky_pose_setup):
+        pocky_pose_setup.open_r_gripper()
+        object_name = u'ball'
+        ball_pose = PoseStamped()
+        ball_pose.header.frame_id = pocky_pose_setup.r_tip
+        ball_pose.pose.position.x = .1
+        ball_pose.pose.orientation.w = 1
+        pocky_pose_setup.add_sphere(object_name, .05, ball_pose)
 
 
     # TODO FIXME attaching and detach of urdf objects that listen to joint states

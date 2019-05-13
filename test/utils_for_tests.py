@@ -1,28 +1,26 @@
+import keyword
+import numpy as np
 from multiprocessing import Queue
+from numpy import pi
 from threading import Thread
 
+import hypothesis.strategies as st
 import rospy
-from angles import normalize_angle, shortest_angular_distance
+from angles import shortest_angular_distance
 from geometry_msgs.msg import PoseStamped, Pose, Point, Quaternion
 from giskard_msgs.msg import MoveActionResult, CollisionEntry, MoveActionGoal, MoveResult
 from giskard_msgs.srv import UpdateWorldResponse
-from hypothesis import given, reproduce_failure, assume
-import hypothesis.strategies as st
+from hypothesis import assume
 from hypothesis.strategies import composite
-import keyword
-import numpy as np
-from numpy import pi
-
 from py_trees import Blackboard
 from sensor_msgs.msg import JointState
 
 from giskardpy.garden import grow_tree
 from giskardpy.identifier import robot_identifier, world_identifier
-from giskardpy.plugin_pybullet import CollisionChecker
 from giskardpy.pybullet_world import PyBulletWorld
 from giskardpy.python_interface import GiskardWrapper
 from giskardpy.symengine_robot import Robot
-from giskardpy.tfwrapper import transform_pose, lookup_transform, lookup_pose
+from giskardpy.tfwrapper import transform_pose, lookup_pose
 from giskardpy.utils import msg_to_list, keydefaultdict, dict_to_joint_states
 
 BIG_NUMBER = 1e100
@@ -204,7 +202,7 @@ class GiskardTestWrapper(object):
         rospy.set_param(u'~collision_time_threshold', 10)
         rospy.set_param(u'~max_traj_length', 30)
         rospy.set_param(u'~joint_convergence_threshold', 0.005)
-        rospy.set_param(u'~plot_trajectory', True)
+        rospy.set_param(u'~plot_trajectory', False)
 
         self.sub_result = rospy.Subscriber(u'/giskardpy/command/result', MoveActionResult, self.cb, queue_size=100)
 
@@ -308,7 +306,7 @@ class GiskardTestWrapper(object):
                 goal = expected[joint_name]
                 current = current_joint_state.position[i]
                 if self.get_robot().is_joint_continuous(joint_name):
-                    np.testing.assert_almost_equal(shortest_angular_distance(goal, current), 0, decimal=6)
+                    np.testing.assert_almost_equal(shortest_angular_distance(goal, current), 0, decimal=3)
                 else:
                     np.testing.assert_almost_equal(goal, current, 2)
 
@@ -426,8 +424,8 @@ class GiskardTestWrapper(object):
         assert self.get_world().has_object(name)
         compare_poses(p.pose, o_p)
 
-    def add_sphere(self, name=u'sphere', pose=None):
-        r = self.wrapper.add_sphere(name=name, pose=pose)
+    def add_sphere(self, name=u'sphere', size=1, pose=None):
+        r = self.wrapper.add_sphere(name=name, size=size, pose=pose)
         assert r.error_codes == UpdateWorldResponse.SUCCESS, \
             u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
                                             update_world_error_code(UpdateWorldResponse.SUCCESS))
@@ -590,6 +588,20 @@ class PR2(GiskardTestWrapper):
     def get_l_gripper_collision_entries(self, body_b=u'box', distance=0, action=CollisionEntry.ALLOW_COLLISION):
         links = self.get_l_gripper_links()
         return [CollisionEntry(action, distance, [link], body_b, []) for link in links]
+
+    def open_r_gripper(self):
+        js = {u'r_gripper_l_finger_joint': 0.54,
+              u'r_gripper_r_finger_joint': 0.54,
+              u'r_gripper_l_finger_tip_joint': 0.54,
+              u'r_gripper_r_finger_tip_joint': 0.54}
+        self.send_and_check_joint_goal(js)
+
+    def close_r_gripper(self):
+        js = {u'r_gripper_l_finger_joint': 0,
+              u'r_gripper_r_finger_joint': 0,
+              u'r_gripper_l_finger_tip_joint': 0,
+              u'r_gripper_r_finger_tip_joint': 0}
+        self.send_and_check_joint_goal(js)
 
     def move_pr2_base(self, goal_pose):
         """

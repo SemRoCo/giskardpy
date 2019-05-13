@@ -484,6 +484,10 @@ class GiskardTestWrapper(object):
     def attach_box(self, name=u'box', size=None, frame_id=None, position=None, orientation=None,
                    expected_response=UpdateWorldResponse.SUCCESS):
         scm = self.get_robot().get_self_collision_matrix()
+        expected_pose = PoseStamped()
+        expected_pose.header.frame_id = frame_id
+        expected_pose.pose.position = Point(*position)
+        expected_pose.pose.orientation = Quaternion(*orientation)
         r = self.wrapper.attach_box(name, size, frame_id, position, orientation)
         assert r.error_codes == expected_response, \
             u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
@@ -494,6 +498,7 @@ class GiskardTestWrapper(object):
             assert not self.get_world().has_object(name)
             assert scm.difference(self.get_robot().get_self_collision_matrix()) == set()
             assert len(scm) < len(self.get_robot().get_self_collision_matrix())
+            compare_poses(expected_pose.pose, lookup_pose(frame_id, name).pose)
         self.loop_once()
 
     def attach_existing(self, name=u'box', frame_id=None, expected_response=UpdateWorldResponse.SUCCESS):

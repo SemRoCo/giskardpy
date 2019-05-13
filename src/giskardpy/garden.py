@@ -1,6 +1,6 @@
 import functools
 
-# import py_trees_ros
+import py_trees
 import py_trees_ros
 import rospy
 from control_msgs.msg import JointTrajectoryControllerState
@@ -16,13 +16,13 @@ from giskardpy.identifier import world_identifier, js_identifier, default_joint_
 from giskardpy.input_system import JointStatesInput
 from giskardpy.plugin import PluginBehavior, SuccessPlugin
 from giskardpy.plugin_action_server import GoalReceived, SendResult, GoalCanceled
+from giskardpy.plugin_attached_tf_publicher import TFPlugin
 from giskardpy.plugin_cleanup import CleanUp
 from giskardpy.plugin_configuration import ConfigurationPlugin
 from giskardpy.plugin_goal_reached import GoalReachedPlugin
 from giskardpy.plugin_instantaneous_controller import GoalToConstraints, ControllerPlugin
 from giskardpy.plugin_interrupts import CollisionCancel, WiggleCancel
 from giskardpy.plugin_kinematic_sim import KinSimPlugin
-# from giskardpy.plugin_knowrob import KnowrobPlugin
 from giskardpy.plugin_log_trajectory import LogTrajPlugin
 from giskardpy.plugin_pybullet import WorldUpdatePlugin, CollisionChecker
 from giskardpy.plugin_send_trajectory import SendTrajectory
@@ -96,6 +96,7 @@ def grow_tree():
 
     # ----------------------------------------------
     wait_for_goal = Sequence(u'wait for goal')
+    wait_for_goal.add_child(TFPlugin(u'tf'))
     wait_for_goal.add_child(ConfigurationPlugin(u'js', map_frame))
     wait_for_goal.add_child(WorldUpdatePlugin(u'pybullet updater'))
     wait_for_goal.add_child(GoalReceived(u'has goal', action_server_name, MoveAction))
@@ -131,14 +132,13 @@ def grow_tree():
     tree = BehaviourTree(root)
 
     if debug:
-        #def post_tick(snapshot_visitor, behaviour_tree):
-        #    logging.logdebug(u'\n' + py_trees_ros.display.ascii_tree(behaviour_tree.root,
-        #                                                  snapshot_information=snapshot_visitor))
+        def post_tick(snapshot_visitor, behaviour_tree):
+            logging.logdebug(u'\n' + py_trees.display.ascii_tree(behaviour_tree.root,
+                                                      snapshot_information=snapshot_visitor))
 
-        #snapshot_visitor = py_trees_ros.visitors.SnapshotVisitor()
-        #tree.add_post_tick_handler(functools.partial(post_tick, snapshot_visitor))
-        #tree.visitors.append(snapshot_visitor)
-        pass
+        snapshot_visitor = py_trees_ros.visitors.SnapshotVisitor()
+        tree.add_post_tick_handler(functools.partial(post_tick, snapshot_visitor))
+        tree.visitors.append(snapshot_visitor)
     path = path_to_data_folder + u'/tree'
     create_path(path)
     render_dot_tree(root, name=path)

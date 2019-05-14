@@ -18,6 +18,7 @@ from giskardpy.plugin_action_server import GetGoal
 from giskardpy.symengine_controller import SymEngineController, position_conv, rotation_conv, \
     link_to_link_avoidance, joint_position, continuous_joint_position, rotation_conv_slerp
 from giskardpy.tfwrapper import transform_pose
+from giskardpy import logging
 
 
 # TODO plan only not supported
@@ -93,10 +94,10 @@ class GoalToConstraints(GetGoal):
         Adds cart controller constraints for each goal.
         :type controller: Controller
         """
-        print(u'used chains:')
+        logging.logdebug(u'used chains:')
         (root, tip) = (controller.root_link, controller.tip_link)
         self.used_joints.update(self.get_robot().get_joint_names_from_chain_controllable(root, tip))
-        print(u'{} -> {} type: {}'.format(root, tip, t))
+        logging.logdebug(u'{} -> {} type: {}'.format(root, tip, t))
         self.soft_constraints.update(self.cart_goal_to_soft_constraints(root, tip, t))
 
     def cart_goal_to_soft_constraints(self, root, tip, type):

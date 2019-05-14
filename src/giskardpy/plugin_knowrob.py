@@ -11,6 +11,7 @@ from giskardpy.exceptions import CorruptShapeException
 from giskardpy.plugin import GiskardBehavior
 from giskardpy.tfwrapper import transform_pose
 from giskardpy.world_object import WorldObject
+from giskardpy import logging
 
 
 class KnowrobPlugin(GiskardBehavior):
@@ -56,7 +57,7 @@ class KnowrobPlugin(GiskardBehavior):
                         try:
                             self.get_world().add_object(world_object)
                         except pybullet.error as e:
-                            rospy.logwarn(u'mesh \'{}\' does not exist'.format(object_state.mesh_path))
+                            logging.logwarn(u'mesh \'{}\' does not exist'.format(object_state.mesh_path))
                             continue
                     pose_in_map = transform_pose(MAP, object_state.pose).pose
                     self.get_world().set_object_pose(object_name, pose_in_map)

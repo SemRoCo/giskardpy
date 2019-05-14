@@ -30,6 +30,7 @@ from giskardpy.pybullet_world import PyBulletWorld
 from giskardpy.utils import create_path, render_dot_tree
 from giskardpy.plugin_visualization import VisualizationBehavior
 from giskardpy.world_object import WorldObject
+from giskardpy import logging
 
 def initialize_blackboard(urdf, default_joint_vel_limit, default_joint_weight, path_to_data_folder, gui):
     pbw.start_pybullet(gui)
@@ -132,7 +133,7 @@ def grow_tree():
 
     if debug:
         def post_tick(snapshot_visitor, behaviour_tree):
-            print(u'\n' + py_trees.display.ascii_tree(behaviour_tree.root,
+            logging.logdebug(u'\n' + py_trees.display.ascii_tree(behaviour_tree.root,
                                                       snapshot_information=snapshot_visitor))
 
         snapshot_visitor = py_trees_ros.visitors.SnapshotVisitor()

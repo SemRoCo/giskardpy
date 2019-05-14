@@ -8,6 +8,7 @@ import pylab as plt
 from control_msgs.msg import FollowJointTrajectoryActionGoal
 from trajectory_msgs.msg import JointTrajectoryPoint
 import numpy as np
+from giskardpy import logging
 
 
 # def plot_trajectory(tj, controlled_joints):
@@ -92,7 +93,7 @@ def cb(data):
     now = datetime.now()
     plt.savefig(
         u'trajectory_{}-{}-{}-{}-{}-{}.pdf'.format(now.year, now.month, now.day, now.hour, now.minute, now.second))
-    print(u'saved trajectory')
+    logging.loginfo(u'saved trajectory')
     # plt.show()
 
 
@@ -100,5 +101,5 @@ if __name__ == '__main__':
     rospy.init_node('vis_joint_traj')
     topic = rospy.get_param('~topic', '/whole_body_controller/follow_joint_trajectory/goal')
     sub = rospy.Subscriber(topic, FollowJointTrajectoryActionGoal, cb, queue_size=10)
-    rospy.loginfo('running')
+    logging.loginfo('running')
     rospy.spin()

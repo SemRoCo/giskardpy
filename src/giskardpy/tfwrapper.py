@@ -6,6 +6,7 @@ from tf2_geometry_msgs import do_transform_pose, do_transform_vector3, do_transf
 from tf2_kdl import transform_to_kdl
 from tf2_py._tf2 import ExtrapolationException
 from tf2_ros import Buffer, TransformListener
+from giskardpy import logging
 
 tfBuffer = None # type: Buffer
 tf_listener = None
@@ -46,7 +47,7 @@ def transform_pose(target_frame, pose):
         new_pose = do_transform_pose(pose, transform)
         return new_pose
     except ExtrapolationException as e:
-        rospy.logwarn(e)
+        logging.logwarn(e)
 
 
 def transform_vector(target_frame, vector):
@@ -68,7 +69,7 @@ def transform_vector(target_frame, vector):
         new_pose = do_transform_vector3(vector, transform)
         return new_pose
     except ExtrapolationException as e:
-        rospy.logwarn(e)
+        logging.logwarn(e)
 
 
 def transform_point(target_frame, point):
@@ -90,7 +91,7 @@ def transform_point(target_frame, point):
         new_pose = do_transform_point(point, transform)
         return new_pose
     except ExtrapolationException as e:
-        rospy.logwarn(e)
+        logging.logwarn(e)
 
 
 def lookup_transform(target_frame, source_frame, time=rospy.Time()):

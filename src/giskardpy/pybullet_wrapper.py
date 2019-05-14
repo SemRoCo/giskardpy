@@ -7,7 +7,7 @@ import pybullet as p
 from geometry_msgs.msg import Pose, PoseStamped, Point, Quaternion
 
 import giskardpy
-from giskardpy import DEBUG, MAP
+from giskardpy import DEBUG, MAP, logging
 from giskardpy.exceptions import DuplicateNameException
 from giskardpy.urdf_object import URDFObject
 from giskardpy.utils import write_to_tmp, NullContextManager, suppress_stdout, resolve_ros_iris_in_urdf
@@ -126,4 +126,4 @@ def get_body_names():
 
 
 def print_body_names():
-    print(get_body_names())
+    logging.loginfo("".join(get_body_names()))

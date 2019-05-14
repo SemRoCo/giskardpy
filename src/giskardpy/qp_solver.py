@@ -4,6 +4,7 @@ import qpoases
 from qpoases import PyReturnValue
 
 from giskardpy.exceptions import MAX_NWSR_REACHEDException, QPSolverException
+from giskardpy import logging
 
 
 class QPSolver(object):
@@ -69,7 +70,7 @@ class QPSolver(object):
                 self.started = True
                 break
             else:
-                print(u'{}; retrying with A rounded to 5 decimal places'.format(self.RETURN_VALUE_DICT[success]))
+                logging.loginfo(u'{}; retrying with A rounded to 5 decimal places'.format(self.RETURN_VALUE_DICT[success]))
                 r = 5
                 A = np.round(A, r)
                 nWSR = None

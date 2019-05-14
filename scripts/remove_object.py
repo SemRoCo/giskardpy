@@ -2,6 +2,7 @@
 import rospy
 import sys
 from giskardpy.python_interface import GiskardWrapper
+from giskardpy import logging
 
 if __name__ == '__main__':
     rospy.init_node('remove_object')
@@ -12,10 +13,10 @@ if __name__ == '__main__':
         try:
             name = sys.argv[1]
         except IndexError:
-            rospy.loginfo('Example call: rosrun giskardpy remove_object.py _name:=muh')
+            logging.loginfo('Example call: rosrun giskardpy remove_object.py _name:=muh')
             sys.exit()
     result = giskard.remove_object(name)
     if result.error_codes == result.SUCCESS:
-        rospy.loginfo('{} removed'.format(name))
+        logging.loginfo('{} removed'.format(name))
     else:
-        rospy.logwarn('failed to remove {} {}'.format(name, result))
+        logging.logwarn('failed to remove {} {}'.format(name, result))

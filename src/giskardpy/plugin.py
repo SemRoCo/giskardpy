@@ -7,6 +7,7 @@ import rospy
 from py_trees import Behaviour, Blackboard, Status
 
 from giskardpy.identifier import world_identifier, robot_identifier
+from giskardpy import logging
 
 
 class GiskardBehavior(Behaviour):
@@ -93,7 +94,7 @@ class PluginBehavior(GiskardBehavior):
             self.update_thread.join()
         except Exception as e:
             # FIXME sometimes terminate gets called without init being called
-            rospy.logwarn(u'terminate was called before init')
+            logging.logwarn(u'terminate was called before init')
         self.stop_plugins()
         super(PluginBehavior, self).terminate(new_status)
 

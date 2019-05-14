@@ -12,23 +12,24 @@ from giskardpy.symengine_robot import Robot
 from giskardpy.utils import make_world_body_box, make_world_body_sphere, make_world_body_cylinder
 from utils_for_tests import pr2_urdf, base_bot_urdf, donbot_urdf, boxy_urdf
 from giskardpy.world_object import WorldObject
+from giskardpy import logging
 import test_world
 
 folder_name = u'tmp_data/'
 
 @pytest.fixture(scope=u'module')
 def module_setup(request):
-    print(u'starting pybullet')
+    logging.loginfo(u'starting pybullet')
     pbw.start_pybullet(False)
 
-    print(u'deleting tmp test folder')
+    logging.loginfo(u'deleting tmp test folder')
     try:
         shutil.rmtree(folder_name)
     except:
         pass
 
     def kill_pybullet():
-        print(u'shutdown pybullet')
+        logging.loginfo(u'shutdown pybullet')
         pbw.stop_pybullet()
 
     request.addfinalizer(kill_pybullet)
@@ -42,7 +43,7 @@ def function_setup(request, module_setup):
     pbw.clear_pybullet()
 
     def kill_pybullet():
-        print(u'resetting pybullet')
+        logging.loginfo(u'resetting pybullet')
         pbw.clear_pybullet()
 
     request.addfinalizer(kill_pybullet)
@@ -55,7 +56,7 @@ def test_folder(request, function_setup):
     """
     def kill_pybullet():
         try:
-            print(u'deleting tmp test folder')
+            logging.loginfo(u'deleting tmp test folder')
             # shutil.rmtree(folder_name)
         except Exception:
             pass

@@ -7,6 +7,7 @@ from tf.transformations import quaternion_from_euler
 
 from giskardpy.python_interface import GiskardWrapper
 from giskardpy.tfwrapper import lookup_transform, lookup_pose
+from giskardpy import logging
 
 if __name__ == '__main__':
     rospy.init_node('add_urdf')
@@ -32,7 +33,7 @@ if __name__ == '__main__':
                 pose.pose.orientation.w = 1
         if path is None:
             if param_name is None:
-                rospy.logwarn('neither _param nor _path specified')
+                logging.logwarn('neither _param nor _path specified')
                 sys.exit()
             else:
                 urdf = rospy.get_param(param_name)
@@ -44,8 +45,8 @@ if __name__ == '__main__':
                                   js_topic=rospy.get_param('~js', None),
                                   pose=pose)
         if result.error_codes == result.SUCCESS:
-            rospy.loginfo('urdfs \'{}\' added'.format(name))
+            logging.loginfo('urdfs \'{}\' added'.format(name))
         else:
-            rospy.logwarn('failed to add urdfs \'{}\''.format(name))
+            logging.logwarn('failed to add urdfs \'{}\''.format(name))
     except KeyError:
-        rospy.loginfo('Example call: rosrun giskardpy add_urdf.py _name:=kitchen _param:=kitchen_description _js:=kitchen/joint_states _root_frame:=iai_kitchen/world _frame_id:=map')
+        logging.loginfo('Example call: rosrun giskardpy add_urdf.py _name:=kitchen _param:=kitchen_description _js:=kitchen/joint_states _root_frame:=iai_kitchen/world _frame_id:=map')

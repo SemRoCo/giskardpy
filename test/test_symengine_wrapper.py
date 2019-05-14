@@ -20,6 +20,7 @@ from transforms3d.quaternions import quat2mat
 import giskardpy.symengine_wrappers as spw
 from giskardpy.tfwrapper import np_to_kdl, kdl_to_pose
 from giskardpy.utils import homo_matrix_to_pose
+from giskardpy import logging
 from utils_for_tests import limited_float, SMALL_NUMBER, unit_vector, quaternion, vector, \
     pykdl_frame_to_numpy, lists_of_same_length, angle, compare_axis_angle, angle_positive, compare_poses
 
@@ -143,7 +144,7 @@ class TestSympyWrapper(unittest.TestCase):
            limited_float(),
            limited_float())
     def test_diffable_if_greater_eq_zero(self, condition, if_result, else_result):
-        print(condition, if_result, else_result)
+        logging.logdebug("{}{}{}".format(condition, if_result, else_result))
         r1 = np.float(spw.diffable_if_greater_eq_zero(condition, if_result, else_result))
         r2 = np.float(if_result if condition >= 0 else else_result)
         self.assertTrue(np.isclose(r1, r2), msg='{} if {} >= 0 else {} => {}'.format(if_result, condition, else_result,

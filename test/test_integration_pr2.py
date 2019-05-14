@@ -12,6 +12,7 @@ from tf.transformations import quaternion_from_matrix, quaternion_about_axis
 from giskardpy.identifier import fk_identifier
 from giskardpy.tfwrapper import init as tf_init, lookup_pose, transform_pose
 from utils_for_tests import PR2, compare_poses
+from giskardpy import logging
 
 # TODO roslaunch iai_pr2_sim ros_control_sim.launch
 # TODO roslaunch iai_kitchen upload_kitchen_obj.launch
@@ -114,20 +115,20 @@ folder_name = u'tmp_data/'
 @pytest.fixture(scope=u'module')
 def ros(request):
     try:
-        print(u'deleting tmp test folder')
+        logging.loginfo(u'deleting tmp test folder')
         # shutil.rmtree(folder_name)
     except Exception:
         pass
 
-    print(u'init ros')
+    logging.loginfo(u'init ros')
     rospy.init_node(u'tests')
     tf_init(60)
 
     def kill_ros():
-        print(u'shutdown ros')
+        logging.loginfo(u'shutdown ros')
         rospy.signal_shutdown(u'die')
         try:
-            print(u'deleting tmp test folder')
+            logging.loginfo(u'deleting tmp test folder')
             # shutil.rmtree(folder_name)
         except Exception:
             pass
@@ -147,7 +148,7 @@ def resetted_giskard(giskard):
     """
     :type giskard: PR2
     """
-    print(u'resetting giskard')
+    logging.loginfo(u'resetting giskard')
     giskard.clear_world()
     giskard.reset_base()
     return giskard
@@ -401,18 +402,19 @@ class TestCartGoals(object):
         """
         :type zero_pose: PR2
         """
+        root = u'base_link'
         r_goal = PoseStamped()
         r_goal.header.frame_id = zero_pose.r_tip
         r_goal.header.stamp = rospy.get_rostime()
         r_goal.pose.position = Point(-0.1, 0, 0)
         r_goal.pose.orientation = Quaternion(0, 0, 0, 1)
-        zero_pose.set_cart_goal(zero_pose.default_root, zero_pose.r_tip, r_goal)
+        zero_pose.set_cart_goal(root, zero_pose.r_tip, r_goal)
         l_goal = PoseStamped()
         l_goal.header.frame_id = zero_pose.l_tip
         l_goal.header.stamp = rospy.get_rostime()
         l_goal.pose.position = Point(-0.05, 0, 0)
         l_goal.pose.orientation = Quaternion(0, 0, 0, 1)
-        zero_pose.set_cart_goal(zero_pose.default_root, zero_pose.l_tip, l_goal)
+        zero_pose.set_cart_goal(root, zero_pose.l_tip, l_goal)
         zero_pose.allow_self_collision()
         zero_pose.send_and_check_goal()
         zero_pose.check_cart_goal(zero_pose.r_tip, r_goal)

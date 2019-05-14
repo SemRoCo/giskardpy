@@ -15,6 +15,7 @@ from giskard_msgs.msg._MoveCmd import MoveCmd
 from giskard_msgs.msg._MoveGoal import MoveGoal
 from sensor_msgs.msg._JointState import JointState
 import numpy as np
+from giskardpy import logging
 
 from giskardpy.python_interface import GiskardWrapper
 
@@ -63,7 +64,7 @@ if __name__ == '__main__':
     g.set_cart_goal('base_footprint', tip, p)
 
     g.plan_and_execute()
-    print('shit took {}'.format(time()-t))
+    logging.loginfo('shit took {}'.format(time()-t))
 
 #nothing 30.92
 #coll    31.22

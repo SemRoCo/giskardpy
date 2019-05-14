@@ -11,6 +11,7 @@ from symengine.lib.symengine_wrapper import Lambdify
 
 from giskardpy.exceptions import SymengineException
 from giskardpy.utils import create_path
+from giskardpy import logging
 
 pathSeparator = '_'
 
@@ -185,7 +186,7 @@ def safe_compiled_function(f, file_name):
     create_path(file_name)
     with open(file_name, 'w') as file:
         pickle.dump(f, file)
-        print(u'saved {}'.format(file_name))
+        logging.loginfo(u'saved {}'.format(file_name))
 
 
 def load_compiled_function(file_name):
@@ -196,7 +197,7 @@ def load_compiled_function(file_name):
                 return fast_f
         except EOFError as e:
             os.remove(file_name)
-            print(u'{} deleted because it was corrupted'.format(file_name))
+            logging.logerr(u'{} deleted because it was corrupted'.format(file_name))
 
 
 class CompiledFunction(object):

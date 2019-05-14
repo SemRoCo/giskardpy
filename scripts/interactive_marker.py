@@ -22,6 +22,7 @@ from visualization_msgs.msg._Marker import Marker
 
 from giskardpy.python_interface import GiskardWrapper
 from giskardpy.utils import qv_mult
+from giskardpy import logging
 
 MARKER_SCALE = 0.15
 
@@ -184,7 +185,7 @@ class IMServer(object):
 
         def __call__(self, feedback):
             if feedback.event_type == InteractiveMarkerFeedback.MOUSE_UP:
-                print(u'got interactive goal update')
+                logging.loginfo(u'got interactive goal update')
 
                 p = PoseStamped()
                 p.header.frame_id = feedback.header.frame_id

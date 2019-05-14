@@ -8,6 +8,7 @@ import giskardpy.symengine_wrappers as spw
 from giskardpy import BACKEND
 from giskardpy.qp_solver import QPSolver
 from giskardpy.symengine_wrappers import load_compiled_function, safe_compiled_function
+from giskardpy import logging
 
 SoftConstraint = namedtuple(u'SoftConstraint', [u'lower', u'upper', u'weight', u'expression'])
 HardConstraint = namedtuple(u'HardConstraint', [u'lower', u'upper', u'expression'])
@@ -91,7 +92,7 @@ class QProblemBuilder(object):
         self.np_g = np.zeros(len(weights))
 
         if self.cython_big_ass_M is None:
-            print(u'new controller requested; compiling')
+            logging.loginfo(u'new controller requested; compiling')
             self.H = spw.diag(*weights)
 
             self.lb = spw.Matrix(lb)
@@ -109,7 +110,7 @@ class QProblemBuilder(object):
             A_soft = spw.Matrix(soft_expressions)
             t = time()
             A_soft = A_soft.jacobian(M_controlled_joints)
-            print(u'jacobian took {}'.format(time() - t))
+            logging.loginfo(u'jacobian took {}'.format(time() - t))
             identity = spw.eye(A_soft.shape[0])
             A_soft = A_soft.row_join(identity)
 
@@ -130,10 +131,10 @@ class QProblemBuilder(object):
             self.cython_big_ass_M = spw.speed_up(self.big_ass_M, self.free_symbols, backend=BACKEND)
             if self.path_to_functions is not None:
                 safe_compiled_function(self.cython_big_ass_M, self.path_to_functions)
-            print(u'autowrap took {}'.format(time() - t))
+                logging.loginfo(u'autowrap took {}'.format(time() - t))
         else:
-            print(u'controller loaded {}'.format(self.path_to_functions))
-        print(u'controller ready {}s'.format(time() - t_total))
+            logging.loginfo(u'controller loaded {}'.format(self.path_to_functions))
+            logging.loginfo(u'controller ready {}s'.format(time() - t_total))
 
     def save_pickle(self, hash, f):
         with open(u'/tmp/{}'.format(hash), u'w') as file:
@@ -204,7 +205,7 @@ class QProblemBuilder(object):
         if xdot_full is None:
             return None
         # TODO enable debug print in an elegant way, preferably without slowing anything down
-        self.debug_print(np_H, np_A, np_lb, np_ub, np_lbA, np_ubA, xdot_full)
+        # self.debug_print(np_H, np_A, np_lb, np_ub, np_lbA, np_ubA, xdot_full)
         return OrderedDict((observable, xdot_full[i]) for i, observable in enumerate(self.controlled_joints))
 
 # with pd.option_context('display.max_rows', None, 'display.max_columns', None):

@@ -9,6 +9,7 @@ import xml.dom.minidom
 from sensor_msgs.msg import JointState
 from math import pi
 from control_msgs.msg import JointTrajectoryControllerState
+from giskardpy import logging
 
 
 def get_param(name, value=None):
@@ -39,7 +40,7 @@ class JointGoalPublisher(object):
                 if child.getElementsByTagName('revolute'):
                     joint = child.getElementsByTagName('revolute')[0]
                 else:
-                    rospy.logwarn("Unknown joint type %s", child)
+                    logging.logwarn("Unknown joint type %s", child)
                     continue
 
                 if joint:
@@ -81,7 +82,7 @@ class JointGoalPublisher(object):
                         minval = float(limit.getAttribute('lower'))
                         maxval = float(limit.getAttribute('upper'))
                     except:
-                        rospy.logwarn("%s is not fixed, nor continuous, but limits are not specified!" % name)
+                        logging.logwarn("%s is not fixed, nor continuous, but limits are not specified!" % name)
                         continue
 
                 safety_tags = child.getElementsByTagName('safety_controller')

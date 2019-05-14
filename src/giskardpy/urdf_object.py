@@ -239,6 +239,13 @@ class URDFObject(object):
             except AttributeError:
                 return None, None
 
+    def get_joint_velocity_limit(self, joint_name):
+        limit = self._urdf_robot.joint_map[joint_name].limit
+        if limit is None or limit.velocity is None:
+            return None
+        else:
+            return limit.velocity
+
     def is_joint_controllable(self, name):
         """
         :param name: name of the joint in the urdfs

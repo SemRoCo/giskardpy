@@ -2,6 +2,7 @@
 import rospy
 from giskardpy.garden import grow_tree
 from giskardpy.utils import check_dependencies
+from giskardpy import logging
 
 # TODO add pytest to package xml
 # TODO add transform3d to package xml
@@ -20,4 +21,4 @@ if __name__ == u'__main__':
             sleeper.sleep()
         except KeyboardInterrupt:
             break
-    print(u'\n')
+    logging.loginfo(u'\n')

@@ -35,7 +35,11 @@ pocky_pose = {u'r_elbow_flex_joint': -1.29610152504,
 
               u'torso_lift_joint': 0.2,
               u'head_pan_joint': 0,
-              u'head_tilt_joint': 0}
+              u'head_tilt_joint': 0,
+              u'odom_x_joint': 0,
+              u'odom_y_joint': 0,
+              u'odom_z_joint': 0
+              }
 
 default_pose = {u'r_elbow_flex_joint': -0.15,
                 u'r_forearm_roll_joint': 0,
@@ -55,7 +59,11 @@ default_pose = {u'r_elbow_flex_joint': -0.15,
 
                 u'torso_lift_joint': 0.2,
                 u'head_pan_joint': 0,
-                u'head_tilt_joint': 0}
+                u'head_tilt_joint': 0,
+                u'odom_x_joint': 0,
+                u'odom_y_joint': 0,
+                u'odom_z_joint': 0
+                }
 
 gaya_pose = {u'r_shoulder_pan_joint': -1.7125,
              u'r_shoulder_lift_joint': -0.25672,
@@ -70,7 +78,12 @@ gaya_pose = {u'r_shoulder_pan_joint': -1.7125,
              u'l_elbow_flex_joint': - 2.1224,
              u'l_forearm_roll_joint': 16.99,
              u'l_wrist_flex_joint': - 0.10001,
-             u'l_wrist_roll_joint': 0}
+             u'l_wrist_roll_joint': 0,
+             u'torso_lift_joint': 0.2,
+             u'odom_x_joint': 0,
+             u'odom_y_joint': 0,
+             u'odom_z_joint': 0
+             }
 
 pick_up_pose = {
     u'head_pan_joint': -2.46056758502e-16,
@@ -90,6 +103,9 @@ pick_up_pose = {
     u'r_wrist_flex_joint': -0.100010762609,
     u'r_wrist_roll_joint': 0.0509923457388,
     u'torso_lift_joint': 0.261791330751,
+    u'odom_x_joint': 0,
+    u'odom_y_joint': 0,
+    u'odom_z_joint': 0
 }
 
 folder_name = u'tmp_data/'
@@ -1494,5 +1510,18 @@ class TestCollisionAvoidanceGoals(object):
         ball_pose.pose.orientation.w = 1
         pocky_pose_setup.add_sphere(object_name, .05, ball_pose)
 
+    def test_muh(self):
+        # take spoon out of drawer
+        # take milk out of fridge
+        # take cereal out of vertical drawer and put it back
+        # get bowl from left middle drawer left side
+        # get cup from left middle drawer right side
+        # put milk back into fridge
+        # put cup bowl and spoon in sink
+
+        # base movement
+        # tray
+        # waypoints
+        pass
 
     # TODO FIXME attaching and detach of urdf objects that listen to joint states

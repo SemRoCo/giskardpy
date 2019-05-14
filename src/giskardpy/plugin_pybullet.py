@@ -260,7 +260,7 @@ class CollisionChecker(GiskardBehavior):
         :type closest_point_infos: dict
         """
         m = Marker()
-        m.header.frame_id = self.robot_root
+        m.header.frame_id = self.get_robot().get_root()
         m.action = Marker.ADD
         m.type = Marker.LINE_LIST
         m.id = 1337

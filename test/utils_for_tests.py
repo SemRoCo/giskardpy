@@ -201,7 +201,7 @@ class GiskardTestWrapper(object):
         rospy.set_param(u'~path_to_data_folder', u'tmp_data/')
         rospy.set_param(u'~collision_time_threshold', 10)
         rospy.set_param(u'~max_traj_length', 30)
-        rospy.set_param(u'~joint_convergence_threshold', 0.005)
+        rospy.set_param(u'~joint_convergence_threshold', 0.004)
         rospy.set_param(u'~plot_trajectory', False)
 
         self.sub_result = rospy.Subscriber(u'/giskardpy/command/result', MoveActionResult, self.cb, queue_size=100)
@@ -325,7 +325,7 @@ class GiskardTestWrapper(object):
         self.wrapper.set_cart_goal(root, tip, goal_pose)
 
     def set_and_check_cart_goal(self, root, tip, goal_pose):
-        goal_pose = transform_pose(u'base_footprint', goal_pose)
+        goal_pose = transform_pose(u'map', goal_pose)
         self.set_cart_goal(root, tip, goal_pose)
         self.loop_once()
         self.send_and_check_goal()
@@ -333,8 +333,8 @@ class GiskardTestWrapper(object):
         self.check_cart_goal(tip, goal_pose)
 
     def check_cart_goal(self, tip, goal_pose):
-        goal_in_base = transform_pose(u'base_footprint', goal_pose)
-        current_pose = lookup_pose(u'base_footprint', tip)
+        goal_in_base = transform_pose(u'map', goal_pose)
+        current_pose = lookup_pose(u'map', tip)
         np.testing.assert_array_almost_equal(msg_to_list(goal_in_base.pose.position),
                                              msg_to_list(current_pose.pose.position), decimal=3)
 
@@ -543,6 +543,7 @@ class GiskardTestWrapper(object):
         """
         :type goal_pose: PoseStamped
         """
+        return
         self.simple_base_pose_pub.publish(goal_pose)
         rospy.sleep(.07)
         self.wait_for_synced()
@@ -564,7 +565,7 @@ class PR2(GiskardTestWrapper):
         rospy.set_param(u'~default_joint_weight', 0.0001)
         rospy.set_param(u'~slerp', False)
         super(PR2, self).__init__()
-        self.default_root = u'base_link'
+        self.default_root = u'odom'
 
     def get_l_gripper_links(self):
         return [u'l_gripper_l_finger_tip_link', u'l_gripper_r_finger_tip_link', u'l_gripper_l_finger_link',

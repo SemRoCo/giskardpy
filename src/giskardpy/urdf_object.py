@@ -521,13 +521,13 @@ class URDFObject(object):
             m.scale = Vector3(*geometry.size)
         elif isinstance(geometry, up.Sphere):
             m.type = Marker.SPHERE
-            m.scale = Vector3(geometry.radius,
-                              geometry.radius,
-                              geometry.radius)
+            m.scale = Vector3(geometry.radius * 2,
+                              geometry.radius * 2,
+                              geometry.radius * 2)
         elif isinstance(geometry, up.Cylinder):
             m.type = Marker.CYLINDER
-            m.scale = Vector3(geometry.radius,
-                              geometry.radius,
+            m.scale = Vector3(geometry.radius * 2,
+                              geometry.radius * 2,
                               geometry.length)
         else:
             raise Exception(u'world body type {} can\'t be converted to marker'.format(geometry.__class__.__name__))

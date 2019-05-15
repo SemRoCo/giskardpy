@@ -1321,6 +1321,45 @@ class TestCollisionAvoidanceGoals(object):
 
     # TODO test plan only
 
+    def test_attached_two_items(self, zero_pose):
+        box1_name = u'box1'
+        box2_name = u'box2'
+
+        js = {
+            u'r_elbow_flex_joint': -1.58118094489,
+            u'r_forearm_roll_joint': -0.904933033043,
+            u'r_shoulder_lift_joint': 0.822412440711,
+            u'r_shoulder_pan_joint': -1.07866800992,
+            u'r_upper_arm_roll_joint': -1.34905471854,
+            u'r_wrist_flex_joint': -1.20182042644,
+            u'r_wrist_roll_joint': 0.190433188769,
+        }
+        zero_pose.send_and_check_joint_goal(js)
+
+        r_goal = PoseStamped()
+        r_goal.header.frame_id = zero_pose.r_tip
+        r_goal.pose.position.x = 0.4
+        r_goal.pose.orientation = Quaternion(*quaternion_from_matrix([[-1, 0, 0, 0],
+                                                                      [0, 1, 0, 0],
+                                                                      [0, 0, -1, 0],
+                                                                      [0, 0, 0, 1]]))
+        zero_pose.set_and_check_cart_goal(u'torso_lift_link', zero_pose.l_tip, r_goal)
+
+        zero_pose.attach_box(box1_name, [.2, .04, .04], zero_pose.r_tip, [.1, 0, 0], [0, 0, 0, 1])
+        zero_pose.attach_box(box2_name, [.2, .04, .04], zero_pose.l_tip, [.1, 0, 0], [0, 0, 0, 1])
+
+        zero_pose.send_and_check_goal()
+
+        zero_pose.check_cpi_geq([box1_name, box2_name], 0.049)
+
+        zero_pose.detach_object(box1_name)
+        zero_pose.detach_object(box2_name)
+        base_goal = PoseStamped()
+        base_goal.header.frame_id = u'base_footprint'
+        base_goal.pose.position.x = -.1
+        base_goal.pose.orientation.w = 1
+        zero_pose.move_base(base_goal)
+
     def test_pick_and_place(self, kitchen_setup):
         """
         :type kitchen_setup: PR2

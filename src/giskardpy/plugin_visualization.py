@@ -1,4 +1,4 @@
-from copy import deepcopy
+import hashlib
 
 import py_trees
 import rospy
@@ -6,9 +6,7 @@ from geometry_msgs.msg import Point, Quaternion
 from tf.transformations import quaternion_from_euler
 from visualization_msgs.msg import Marker, MarkerArray
 
-from giskardpy.identifier import fk_identifier
 from giskardpy.tfwrapper import pose_to_kdl, kdl_to_pose
-from giskardpy.utils import keydefaultdict
 from plugin import GiskardBehavior
 
 
@@ -37,7 +35,7 @@ class VisualizationBehavior(GiskardBehavior):
 
             marker.header.frame_id = self.robot_base
             marker.action = Marker.ADD
-            marker.id = i
+            marker.id = int(hashlib.md5(link_name).hexdigest()[:6], 16) # FIXME find a better way to give the same link the same id
             marker.ns = u'planning_visualization'
             marker.header.stamp = rospy.Time()
 

@@ -395,16 +395,28 @@ class CartesianOrientationSlerp(CartesianConstraint):
 
 
 class LinkToAnyAvoidance(Constraint):
-    lower_limit = u'lower_limit'
-    upper_limit = u'upper_limit'
-    weight = u'weight'
+    repel_speed = u'repel_speed'
+    max_weight_distance = u'max_weight_distance'
+    low_weight_distance = u'low_weight_distance'
+    zero_weight_distance = u'zero_weight_distance'
+    A = u'A'
+    B = u'B'
+    C = u'C'
 
-    def __init__(self, god_map, link_name, lower_limit=0.05, upper_limit=1e9, weight=10):
+    def __init__(self, god_map, link_name, repel_speed=0.1, max_weight_distance=0.0, low_weight_distance=0.02,
+                 zero_weight_distance=0.05):
         super(LinkToAnyAvoidance, self).__init__(god_map)
         self.link_name = link_name
-        params = {self.lower_limit: lower_limit,
-                  self.upper_limit: upper_limit,
-                  self.weight: weight}
+        x = np.array([max_weight_distance, low_weight_distance, zero_weight_distance])
+        y = np.array([MAX_WEIGHT, LOW_WEIGHT, ZERO_WEIGHT])
+        (A, B, C), _ = curve_fit(lambda t, a, b, c: a / (t + c) + b, x, y)
+        params = {self.repel_speed: repel_speed,
+                  self.max_weight_distance: max_weight_distance,
+                  self.low_weight_distance: low_weight_distance,
+                  self.zero_weight_distance: zero_weight_distance,
+                  self.A: A,
+                  self.B: B,
+                  self.C: C}
         self.safe_params_on_god_map(params)
 
     def get_distance_to_closest_object(self, link_name):
@@ -428,9 +440,13 @@ class LinkToAnyAvoidance(Constraint):
         point_on_link = self.get_closest_point_on_a(self.link_name)
         other_point = self.get_closest_point_on_b(self.link_name)
         contact_normal = self.get_contact_normal_on_b(self.link_name)
-        weight = self.get_symbol(self.weight)
-        lower_limit = self.get_distance_to_closest_object(self.link_name)
-        upper_limit = self.get_symbol(self.upper_limit)
+        repel_speed = self.get_symbol(self.repel_speed)
+        max_weight_distance = self.get_symbol(self.max_weight_distance)
+        low_weight_distance = self.get_symbol(self.low_weight_distance)
+        zero_weight_distance = self.get_symbol(self.zero_weight_distance)
+        A = self.get_symbol(self.A)
+        B = self.get_symbol(self.B)
+        C = self.get_symbol(self.C)
 
         soft_constraints = OrderedDict()
 
@@ -438,16 +454,14 @@ class LinkToAnyAvoidance(Constraint):
 
         dist = (contact_normal.T * (controllable_point - other_point))[0]
 
-        x = np.array([0, 0.02, 0.05])
-        y = np.array([MAX_WEIGHT, LOW_WEIGHT, ZERO_WEIGHT])
-        (A, B, C), _ = curve_fit(lambda t, a, b, c: a / (t + c) + b, x, y)
 
-        weight_f = sw.Piecewise([MAX_WEIGHT, dist <= 0],
-                                [ZERO_WEIGHT, dist > 0.05],
+
+        weight_f = sw.Piecewise([MAX_WEIGHT, dist <= max_weight_distance],
+                                [ZERO_WEIGHT, dist > zero_weight_distance],
                                 [A / (dist + C) + B, True])
 
-        soft_constraints[str(self)] = SoftConstraint(lower=.1,
-                                                     upper=.1,
+        soft_constraints[str(self)] = SoftConstraint(lower=repel_speed,
+                                                     upper=repel_speed,
                                                      weight=weight_f,
                                                      expression=dist)
         return soft_constraints

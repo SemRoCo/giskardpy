@@ -24,7 +24,7 @@ def allowed_constraint_names():
 # TODO plan only not supported
 # TODO waypoints not supported
 class GoalToConstraints(GetGoal):
-    def __init__(self, name, as_name, use_slerp=True):
+    def __init__(self, name, as_name, default_collision_avoidance_distance):
         GetGoal.__init__(self, name, as_name)
         self.used_joints = set()
 
@@ -32,7 +32,7 @@ class GoalToConstraints(GetGoal):
         self.controlled_joints = set()
         self.controllable_links = set()
         self.last_urdf = None
-        self.use_slerp = use_slerp
+        self.default_collision_avoidance_distance = default_collision_avoidance_distance
 
     def initialise(self):
         self.get_god_map().safe_set_data(collision_goal_identifier, None)
@@ -117,7 +117,8 @@ class GoalToConstraints(GetGoal):
         """
         soft_constraints = {}
         for link in self.get_robot().get_controlled_links():
-            constraint = LinkToAnyAvoidance(self.god_map, link)
+            constraint = LinkToAnyAvoidance(self.god_map, link,
+                                            zero_weight_distance=self.default_collision_avoidance_distance)
             soft_constraints.update(constraint.get_constraint())
 
         self.soft_constraints.update(soft_constraints)

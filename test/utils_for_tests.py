@@ -15,14 +15,15 @@ from hypothesis.strategies import composite
 from py_trees import Blackboard
 from sensor_msgs.msg import JointState
 
+from giskardpy import logging
 from giskardpy.garden import grow_tree
 from giskardpy.identifier import robot_identifier, world_identifier
 from giskardpy.pybullet_world import PyBulletWorld
 from giskardpy.python_interface import GiskardWrapper
 from giskardpy.symengine_robot import Robot
+from giskardpy.symengine_wrappers import axis_angle_from_quaternion
 from giskardpy.tfwrapper import transform_pose, lookup_pose
 from giskardpy.utils import msg_to_list, keydefaultdict, dict_to_joint_states
-from giskardpy import logging
 
 BIG_NUMBER = 1e100
 SMALL_NUMBER = 1e-100
@@ -69,7 +70,7 @@ def compare_axis_angle(angle1, axis1, angle2, axis2):
         assert np.isclose(angle1, abs(angle2 - 2 * pi)), '{} != {}'.format(angle1, angle2)
 
 
-def compare_poses(pose1, pose2, decimal=3):
+def compare_poses(pose1, pose2, decimal=2):
     """
     :type pose1: Pose
     :type pose2: Pose
@@ -186,7 +187,7 @@ def pykdl_frame_to_numpy(pykdl_frame):
 
 class GiskardTestWrapper(object):
     def __init__(self, default_root=u'base_link'):
-        rospy.set_param(u'~enable_gui', False)
+        rospy.set_param(u'~enable_gui', True)
         rospy.set_param(u'~debug', False)
         rospy.set_param(u'~enable_visualization', True)
         rospy.set_param(u'~enable_collision_marker', True)
@@ -286,7 +287,7 @@ class GiskardTestWrapper(object):
         self.wait_for_synced()
         current_js = self.get_world().get_object(object_name).joint_state
         for joint_name, state in joint_state.items():
-            np.testing.assert_almost_equal(current_js[joint_name].position, state)
+            np.testing.assert_almost_equal(current_js[joint_name].position, state, 2)
 
     def set_kitchen_js(self, joint_state, object_name=u'kitchen'):
         self.set_object_joint_state(object_name, joint_state, topic=u'/kitchen/cram_joint_states')
@@ -322,6 +323,14 @@ class GiskardTestWrapper(object):
     #
     # CART GOAL STUFF ##################################################################################################
     #
+    def keep_position(self, tip, root=None):
+        if root is None:
+            root = self.default_root
+        goal = PoseStamped()
+        goal.header.frame_id = tip
+        goal.pose.orientation.w = 1
+        self.set_cart_goal(root, tip, goal)
+
     def set_cart_goal(self, root, tip, goal_pose):
         self.wrapper.set_cart_goal(root, tip, goal_pose)
 
@@ -432,8 +441,8 @@ class GiskardTestWrapper(object):
                                             update_world_error_code(UpdateWorldResponse.SUCCESS))
         assert self.get_world().has_object(name)
 
-    def add_cylinder(self, name=u'cylinder', pose=None):
-        r = self.wrapper.add_cylinder(name=name, pose=pose)
+    def add_cylinder(self, name=u'cylinder', size=[1, 1], pose=None):
+        r = self.wrapper.add_cylinder(name=name, size=size, pose=pose)
         assert r.error_codes == UpdateWorldResponse.SUCCESS, \
             u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
                                             update_world_error_code(UpdateWorldResponse.SUCCESS))
@@ -544,7 +553,6 @@ class GiskardTestWrapper(object):
         """
         :type goal_pose: PoseStamped
         """
-        return
         self.simple_base_pose_pub.publish(goal_pose)
         rospy.sleep(.07)
         self.wait_for_synced()
@@ -567,6 +575,16 @@ class PR2(GiskardTestWrapper):
         rospy.set_param(u'~slerp', False)
         super(PR2, self).__init__()
         self.default_root = u'odom'
+
+    def move_base(self, goal_pose):
+        goal_pose = transform_pose(self.default_root, goal_pose)
+        js = {u'odom_x_joint': goal_pose.pose.position.x,
+              u'odom_y_joint': goal_pose.pose.position.y,
+              u'odom_z_joint': float(axis_angle_from_quaternion(goal_pose.pose.orientation.x,
+                                                                goal_pose.pose.orientation.y,
+                                                                goal_pose.pose.orientation.z,
+                                                                goal_pose.pose.orientation.w)[1])}
+        self.send_and_check_joint_goal(js)
 
     def get_l_gripper_links(self):
         return [u'l_gripper_l_finger_tip_link', u'l_gripper_r_finger_tip_link', u'l_gripper_l_finger_link',
@@ -603,6 +621,20 @@ class PR2(GiskardTestWrapper):
               u'r_gripper_r_finger_joint': 0,
               u'r_gripper_l_finger_tip_joint': 0,
               u'r_gripper_r_finger_tip_joint': 0}
+        self.send_and_check_joint_goal(js)
+
+    def open_l_gripper(self):
+        js = {u'l_gripper_l_finger_joint': 0.54,
+              u'l_gripper_r_finger_joint': 0.54,
+              u'l_gripper_l_finger_tip_joint': 0.54,
+              u'l_gripper_r_finger_tip_joint': 0.54}
+        self.send_and_check_joint_goal(js)
+
+    def close_l_gripper(self):
+        js = {u'l_gripper_l_finger_joint': 0,
+              u'l_gripper_r_finger_joint': 0,
+              u'l_gripper_l_finger_tip_joint': 0,
+              u'l_gripper_r_finger_tip_joint': 0}
         self.send_and_check_joint_goal(js)
 
     def move_pr2_base(self, goal_pose):

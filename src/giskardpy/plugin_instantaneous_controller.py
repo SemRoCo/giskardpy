@@ -7,7 +7,7 @@ from giskard_msgs.msg import MoveGoal, MoveCmd
 from py_trees import Status
 
 import giskardpy.constraints
-from giskardpy.constraints import LinkToAnyAvoidance
+from giskardpy.constraints import LinkToAnyAvoidance, JointPosition
 from giskardpy.exceptions import InsolvableException, ImplementationException
 from giskardpy.identifier import soft_constraint_identifier, next_cmd_identifier, \
     collision_goal_identifier, constraints_identifier
@@ -56,7 +56,7 @@ class GoalToConstraints(GetGoal):
         if self.has_robot_changed():
             self.soft_constraints = {}
             # TODO split soft contraints into js, coll and cart; update cart always and js/coll only when urdf changed, js maybe never
-            # self.add_js_controller_soft_constraints()
+            self.add_js_controller_soft_constraints()
         self.add_collision_avoidance_soft_constraints()
 
         # TODO handle multiple cmds
@@ -99,6 +99,11 @@ class GoalToConstraints(GetGoal):
                 self.soft_constraints.update(soft_constraints)
             except TypeError as e:
                 raise ImplementationException(help(c.get_constraint))
+
+    def add_js_controller_soft_constraints(self):
+        for joint_name in self.get_robot().controlled_joints:
+            c = JointPosition(self.get_god_map(), joint_name, self.get_robot().joint_state[joint_name].position, 0, 0)
+            self.soft_constraints.update(c.get_constraint())
 
     def has_robot_changed(self):
         new_urdf = self.get_robot().get_urdf()

@@ -217,6 +217,8 @@ class CompiledFunction(object):
         except KeyError as e:
             msg = u'KeyError: {}\ntry deleting the data folder to trigger recompilation'.format(e.message)
             raise SymengineException(msg)
+        except TypeError as e:
+            raise SymengineException(e.message)
 
 
 def speed_up(function, parameters, backend=u'llvm'):

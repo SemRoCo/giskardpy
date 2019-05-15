@@ -1468,39 +1468,8 @@ class TestCollisionAvoidanceGoals(object):
         kitchen_js = {u'sink_area_left_upper_drawer_main_joint': 0.45}
         kitchen_setup.set_kitchen_js(kitchen_js)
 
-    def test_two_attached_items(self, zero_pose):
-        box1_name = u'box1'
-        box2_name = u'box2'
-
-        js = {
-            u'r_elbow_flex_joint': -1.58118094489,
-            u'r_forearm_roll_joint': -0.904933033043,
-            u'r_shoulder_lift_joint': 0.822412440711,
-            u'r_shoulder_pan_joint': -1.07866800992,
-            u'r_upper_arm_roll_joint': -1.34905471854,
-            u'r_wrist_flex_joint': -1.20182042644,
-            u'r_wrist_roll_joint': 0.190433188769,
-        }
-        zero_pose.send_and_check_joint_goal(js)
-
-        r_goal = PoseStamped()
-        r_goal.header.frame_id = zero_pose.r_tip
-        r_goal.pose.position.x = 0.4
-        r_goal.pose.orientation = Quaternion(*quaternion_from_matrix([[-1, 0, 0, 0],
-                                                                      [0, 1, 0, 0],
-                                                                      [0, 0, -1, 0],
-                                                                      [0, 0, 0, 1]]))
-        zero_pose.set_and_check_cart_goal(u'torso_lift_link', zero_pose.l_tip, r_goal)
-
-        zero_pose.attach_box(box1_name, [.2, .04, .04], zero_pose.r_tip, [.1, 0, 0], [0, 0, 0, 1])
-        zero_pose.attach_box(box2_name, [.2, .04, .04], zero_pose.l_tip, [.1, 0, 0], [0, 0, 0, 1])
-
-        zero_pose.send_and_check_goal()
-
-        zero_pose.check_cpi_geq([box1_name, box2_name], 0.049)
-
-
     def open_drawer(self, setup, tool_frame, handle_link, drawer_joint):
+        setup.open_r_gripper()
         setup.open_l_gripper()
         tool_frame_goal = PoseStamped()
         tool_frame_goal.header.frame_id = handle_link
@@ -1522,6 +1491,7 @@ class TestCollisionAvoidanceGoals(object):
 
     def close_drawer(self, setup, tool_frame, handle_link, drawer_joint):
         setup.open_r_gripper()
+        setup.open_l_gripper()
         tool_frame_goal = PoseStamped()
         tool_frame_goal.header.frame_id = handle_link
         tool_frame_goal.pose.position.y = -.1
@@ -1682,7 +1652,7 @@ class TestCollisionAvoidanceGoals(object):
         cup_pose.pose.position = Point(0., 0.2, -.05)
         cup_pose.pose.orientation = Quaternion(0, 0, 0, 1)
 
-        kitchen_setup.add_cylinder(cup_name, [0.07, 0.07], cup_pose)
+        kitchen_setup.add_cylinder(cup_name, [0.07, 0.04], cup_pose)
 
         # spawn bowl
         bowl_pose = PoseStamped()
@@ -1690,7 +1660,7 @@ class TestCollisionAvoidanceGoals(object):
         bowl_pose.pose.position = Point(0., -0.2, -.05)
         bowl_pose.pose.orientation = Quaternion(0, 0, 0, 1)
 
-        kitchen_setup.add_cylinder(bowl_name, [0.05, 0.15], bowl_pose)
+        kitchen_setup.add_cylinder(bowl_name, [0.05, 0.07], bowl_pose)
 
         kitchen_setup.send_and_check_joint_goal(gaya_pose)
 
@@ -1720,33 +1690,37 @@ class TestCollisionAvoidanceGoals(object):
         kitchen_setup.set_cart_goal(kitchen_setup.default_root, kitchen_setup.r_tip, r_goal)
         kitchen_setup.send_and_check_goal()
 
-
         kitchen_setup.attach_existing(bowl_name, kitchen_setup.l_tip)
         kitchen_setup.attach_existing(cup_name, kitchen_setup.r_tip)
 
         kitchen_setup.send_and_check_joint_goal(gaya_pose)
         base_goal = PoseStamped()
         base_goal.header.frame_id = u'base_footprint'
-        base_goal.pose.orientation = Quaternion(*quaternion_about_axis(pi, [0,0,1]))
+        base_goal.pose.position.x = -.1
+        base_goal.pose.orientation = Quaternion(*quaternion_about_axis(pi, [0, 0, 1]))
         kitchen_setup.move_base(base_goal)
 
         # place bowl and cup
         bowl_goal = PoseStamped()
         bowl_goal.header.frame_id = u'iai_kitchen/kitchen_island_surface'
-        bowl_goal.pose.position = Point(.1, 0, .1)
+        bowl_goal.pose.position = Point(.1, 0, .05)
         bowl_goal.pose.orientation = Quaternion(0, 0, 0, 1)
 
         cup_goal = PoseStamped()
         cup_goal.header.frame_id = u'iai_kitchen/kitchen_island_surface'
         cup_goal.pose.orientation = Quaternion(0, 0, 0, 1)
-        cup_goal.pose.position = Point(.05, 0.1, .1)
+        cup_goal.pose.position = Point(.05, 0.25, .07)
 
         kitchen_setup.set_cart_goal(kitchen_setup.default_root, bowl_name, bowl_goal)
-        kitchen_setup.set_and_check_cart_goal(kitchen_setup.default_root, cup_name, cup_goal)
+        kitchen_setup.set_cart_goal(kitchen_setup.default_root, cup_name, cup_goal)
+        kitchen_setup.send_and_check_goal()
 
         kitchen_setup.detach_object(bowl_name)
         kitchen_setup.detach_object(cup_name)
         kitchen_setup.send_and_check_joint_goal(gaya_pose)
+
+        self.close_drawer(kitchen_setup, kitchen_setup.l_tip, u'iai_kitchen/sink_area_left_middle_drawer_handle',
+                          u'sink_area_left_middle_drawer_main_joint')
 
     def test_tray(self, zero_pose):
         tray_name = u'tray'

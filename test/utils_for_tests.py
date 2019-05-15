@@ -187,7 +187,7 @@ def pykdl_frame_to_numpy(pykdl_frame):
 
 class GiskardTestWrapper(object):
     def __init__(self, default_root=u'base_link'):
-        rospy.set_param(u'~enable_gui', True)
+        rospy.set_param(u'~enable_gui', False)
         rospy.set_param(u'~debug', False)
         rospy.set_param(u'~enable_visualization', True)
         rospy.set_param(u'~enable_collision_marker', True)

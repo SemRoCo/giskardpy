@@ -565,14 +565,14 @@ class URDFObject(object):
                 marker.scale.z = geometry.size[2]
             elif isinstance(geometry, up.Cylinder):
                 marker.type = Marker.CYLINDER
-                marker.scale.x = geometry.radius
-                marker.scale.y = geometry.radius
+                marker.scale.x = geometry.radius * 2
+                marker.scale.y = geometry.radius * 2
                 marker.scale.z = geometry.length
             elif isinstance(geometry, up.Sphere):
                 marker.type = Marker.SPHERE
-                marker.scale.x = geometry.radius
-                marker.scale.y = geometry.radius
-                marker.scale.z = geometry.radius
+                marker.scale.x = geometry.radius * 2
+                marker.scale.y = geometry.radius * 2
+                marker.scale.z = geometry.radius * 2
             else:
                 return None
 

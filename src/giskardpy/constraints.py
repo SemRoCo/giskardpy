@@ -134,16 +134,31 @@ class JointPosition(Constraint):
         return u'{}/{}'.format(self.__class__.__name__, self.joint_name)
 
 
+class JointPositionList(Constraint):
+    def __init__(self, god_map, goal_state, weight=1, gain=10, max_speed=1):
+        super(JointPositionList, self).__init__(god_map)
+        self.constraints = []
+        for i, joint_name in enumerate(goal_state[u'name']):
+            goal_position = goal_state[u'position'][i]
+            self.constraints.append(JointPosition(god_map, joint_name, goal_position, weight, gain, max_speed))
+
+    def get_constraint(self):
+        soft_constraints = OrderedDict()
+        for constraint in self.constraints:
+            soft_constraints.update(constraint.get_constraint())
+        return soft_constraints
+
+
 class CartesianConstraint(Constraint):
     goal = u'goal'
     weight = u'weight'
     gain = u'gain'
     max_speed = u'max_speed'
 
-    def __init__(self, god_map, root, tip, goal, weight=HIGH_WEIGHT, gain=3, max_speed=0.1):
+    def __init__(self, god_map, root_link, tip_link, goal, weight=HIGH_WEIGHT, gain=3, max_speed=0.1):
         super(CartesianConstraint, self).__init__(god_map)
-        self.root = root
-        self.tip = tip
+        self.root = root_link
+        self.tip = tip_link
         goal = convert_dictionary_to_ros_message(u'geometry_msgs/PoseStamped', goal)
         goal = transform_pose(self.root, goal)
 
@@ -454,8 +469,6 @@ class LinkToAnyAvoidance(Constraint):
 
         dist = (contact_normal.T * (controllable_point - other_point))[0]
 
-
-
         weight_f = sw.Piecewise([MAX_WEIGHT, dist <= max_weight_distance],
                                 [ZERO_WEIGHT, dist > zero_weight_distance],
                                 [A / (dist + C) + B, True])
@@ -477,6 +490,7 @@ class CollisionAvoidance(Constraint):
 
     def get_constraint(self, **kwargs):
         super(CollisionAvoidance, self).get_constraint(**kwargs)
+
 
 class Grasp(CartesianConstraint):
 

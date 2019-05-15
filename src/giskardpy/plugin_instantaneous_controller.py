@@ -1,10 +1,12 @@
 import inspect
+import itertools
 import json
 from copy import copy
 from time import time
 
 from giskard_msgs.msg import MoveGoal, MoveCmd
 from py_trees import Status
+from rospy_message_converter.message_converter import convert_ros_message_to_dictionary
 
 import giskardpy.constraints
 from giskardpy.constraints import LinkToAnyAvoidance, JointPosition
@@ -83,17 +85,21 @@ class GoalToConstraints(GetGoal):
         :type cmd: MoveCmd
         :rtype: dict
         """
-        for constraint in cmd.constraints:
-            if constraint.name not in allowed_constraint_names():
+        for constraint in itertools.chain(cmd.constraints, cmd.joint_constraints, cmd.cartesian_constraints):
+            if constraint.type not in allowed_constraint_names():
                 # TODO test me
                 raise InsolvableException(u'unknown constraint')
             try:
-                C = eval(u'giskardpy.constraints.{}'.format(constraint.name))
+                C = eval(u'giskardpy.constraints.{}'.format(constraint.type))
             except NameError as e:
                 # TODO return next best constraint type
                 raise ImplementationException(u'unsupported constraint type')
             try:
-                params = json.loads(constraint.parameter_value_pair)
+                if hasattr(constraint, u'parameter_value_pair'):
+                    params = json.loads(constraint.parameter_value_pair)
+                else:
+                    params = convert_ros_message_to_dictionary(constraint)
+                    del params[u'type']
                 c = C(self.god_map, **params)
                 soft_constraints = c.get_constraint()
                 self.soft_constraints.update(soft_constraints)

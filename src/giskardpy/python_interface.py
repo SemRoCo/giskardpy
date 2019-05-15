@@ -4,9 +4,8 @@ import rospy
 from actionlib import SimpleActionClient
 from geometry_msgs.msg import PoseStamped, Point, Quaternion
 from giskard_msgs.msg import MoveAction, Controller, MoveGoal, WorldBody, CollisionEntry, MoveResult, Constraint, \
-    MoveCmd
+    MoveCmd, JointConstraint, CartesianConstraint
 from giskard_msgs.srv import UpdateWorld, UpdateWorldRequest, UpdateWorldResponse
-from rospy_message_converter.json_message_converter import convert_ros_message_to_json
 from rospy_message_converter.message_converter import convert_ros_message_to_dictionary
 from sensor_msgs.msg import JointState
 from shape_msgs.msg import SolidPrimitive
@@ -43,60 +42,95 @@ class GiskardWrapper(object):
         self.set_translation_goal(root, tip, pose_stamped)
         self.set_rotation_goal(root, tip, pose_stamped)
 
-    def set_translation_goal(self, root, tip, pose_stamped, p_gain=3, max_speed=0.1):
+    def set_translation_goal(self, root, tip, pose_stamped, weight=None, gain=None, max_speed=None):
         """
         :param tip:
         :type tip: str
         :param pose_stamped:
         :type pose_stamped: PoseStamped
         """
-        constraint = Constraint()
-        constraint.name = u'CartesianPosition'
-        constraint.parameter_value_pair = json.dumps({
-            u'root': root,
-            u'tip': tip,
-            u'goal': convert_ros_message_to_dictionary(pose_stamped),
-            # u'weight': 1,
-            u'gain': p_gain,
-            u'max_speed': max_speed,
-        })
-        self.cmd_seq[-1].constraints.append(constraint)
+        if not gain and not max_speed and not weight:
+            constraint = CartesianConstraint()
+            constraint.type = CartesianConstraint.TRANSLATION_3D
+            constraint.root_link = str(root)
+            constraint.tip_link = str(tip)
+            constraint.goal = pose_stamped
+            self.cmd_seq[-1].cartesian_constraints.append(constraint)
+        else:
+            constraint = Constraint()
+            constraint.type = u'CartesianPosition'
+            params = {}
+            params[u'root'] = root
+            params[u'tip'] = tip
+            params[u'goal'] = convert_ros_message_to_dictionary(pose_stamped)
+            if gain:
+                params[u'gain'] = gain
+            if max_speed:
+                params[u'max_speed'] = max_speed
+            if weight:
+                params[u'weight'] = weight
+            constraint.parameter_value_pair = json.dumps(params)
+            self.cmd_seq[-1].constraints.append(constraint)
 
-    def set_rotation_goal(self, root, tip, pose_stamped, p_gain=3, max_speed=1.0):
+    def set_rotation_goal(self, root, tip, pose_stamped, weight=None, gain=None, max_speed=None):
         """
         :param tip:
         :type tip: str
         :param pose_stamped:
         :type pose_stamped: PoseStamped
         """
-        constraint = Constraint()
-        constraint.name = u'CartesianOrientationSlerp'
-        constraint.parameter_value_pair = json.dumps({
-            u'root': root,
-            u'tip': tip,
-            u'goal': convert_ros_message_to_dictionary(pose_stamped),
-            # u'weight': 1,
-            u'gain': p_gain,
-            u'max_speed': max_speed,
-        })
-        self.cmd_seq[-1].constraints.append(constraint)
+        if not gain and not max_speed and not weight:
+            constraint = CartesianConstraint()
+            constraint.type = CartesianConstraint.ROTATION_3D
+            constraint.root_link = str(root)
+            constraint.tip_link = str(tip)
+            constraint.goal = pose_stamped
+            self.cmd_seq[-1].cartesian_constraints.append(constraint)
+        else:
+            constraint = Constraint()
+            constraint.type = u'CartesianOrientationSlerp'
+            params = {}
+            params[u'root'] = root
+            params[u'tip'] = tip
+            params[u'goal'] = convert_ros_message_to_dictionary(pose_stamped)
+            if gain:
+                params[u'gain'] = gain
+            if max_speed:
+                params[u'max_speed'] = max_speed
+            if weight:
+                params[u'weight'] = weight
+            constraint.parameter_value_pair = json.dumps(params)
+            self.cmd_seq[-1].constraints.append(constraint)
 
-    def set_joint_goal(self, joint_state):
+    def set_joint_goal(self, joint_state, weight=None, gain=None, max_speed=None):
         """
         :param joint_state:
         :type joint_state: dict
         """
-        if isinstance(joint_state, dict):
+        if not weight and not gain and not max_speed:
+            constraint = JointConstraint()
+            constraint.type = JointConstraint.JOINT
+            if isinstance(joint_state, dict):
+                for joint_name, joint_position in joint_state.items():
+                    constraint.goal_state.name.append(joint_name)
+                    constraint.goal_state.position.append(joint_position)
+            elif isinstance(joint_state, JointState):
+                constraint.goal_state = joint_state
+            self.cmd_seq[-1].joint_constraints.append(constraint)
+        elif isinstance(joint_state, dict):
             for joint_name, joint_position in joint_state.items():
                 constraint = Constraint()
-                constraint.name = u'JointPosition'
-                constraint.parameter_value_pair = json.dumps({
-                    u'joint_name': joint_name,
-                    u'goal': joint_position,
-                    u'weight': 1,
-                    u'gain': self.joint_gain,
-                    u'max_speed': self.joint_max_speed,
-                })
+                constraint.type = u'JointPosition'
+                params = {}
+                params[u'joint_name'] = joint_name
+                params[u'goal'] = joint_position
+                if weight:
+                    params[u'weight'] = weight
+                if gain:
+                    params[u'gain'] = gain
+                if max_speed:
+                    params[u'max_speed'] = max_speed
+                constraint.parameter_value_pair = json.dumps(params)
                 self.cmd_seq[-1].constraints.append(constraint)
 
     def set_collision_entries(self, collisions):

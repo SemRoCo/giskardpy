@@ -332,7 +332,7 @@ def plot_trajectory(tj, controlled_joints, path_to_data_folder):
     ax2.set_position([box.x0, box.y0, box.width * 0.6, box.height])
 
     # Put a legend to the right of the current axis
-    ax1.legend(loc=u'center', bbox_to_anchor=(1.45, 0))
+    ax1.legend(loc=u'center', bbox_to_anchor=(1.45, 0), prop={'size': 5})
     ax1.grid()
     ax2.grid()
 

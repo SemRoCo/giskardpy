@@ -310,6 +310,7 @@ class TestJointGoals(object):
         result = zero_pose.send_goal(goal)
         assert result.error_code == MoveResult.INSOLVABLE
 
+    # TODO test goal for unknown joint
 
 class TestCartGoals(object):
     def test_keep_position1(self, zero_pose):

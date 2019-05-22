@@ -22,7 +22,7 @@ class SendTrajectory(ActionClient, GiskardBehavior):
 
     def setup(self, timeout):
         # TODO get this from god map
-        self.controller_joints = rospy.wait_for_message(u'/whole_body_controller/state',
+        self.controller_joints = rospy.wait_for_message(u'~state',
                                                         JointTrajectoryControllerState).joint_names
         return super(SendTrajectory, self).setup(timeout)
 

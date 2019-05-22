@@ -310,7 +310,8 @@ class GiskardTestWrapper(object):
                 if self.get_robot().is_joint_continuous(joint_name):
                     np.testing.assert_almost_equal(shortest_angular_distance(goal, current), 0, decimal=3)
                 else:
-                    np.testing.assert_almost_equal(goal, current, 2)
+                    np.testing.assert_almost_equal(current, goal, 2,
+                                                   err_msg=u'{} at {} insteand of {}'.format(joint_name, current, goal))
 
     def send_and_check_joint_goal(self, goal):
         """
@@ -494,7 +495,10 @@ class GiskardTestWrapper(object):
         expected_pose = PoseStamped()
         expected_pose.header.frame_id = frame_id
         expected_pose.pose.position = Point(*position)
-        expected_pose.pose.orientation = Quaternion(*orientation)
+        if orientation:
+            expected_pose.pose.orientation = Quaternion(*orientation)
+        else:
+            expected_pose.pose.orientation = Quaternion(0,0,0,1)
         r = self.wrapper.attach_box(name, size, frame_id, position, orientation)
         assert r.error_codes == expected_response, \
             u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),

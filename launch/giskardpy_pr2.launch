@@ -17,12 +17,14 @@
     <rosparam param="default_joint_vel_limit">0.2</rosparam>
     <rosparam param="default_joint_weight">0.0001</rosparam>
     <rosparam param="default_collision_avoidance_distance">0.05</rosparam>
-    <rosparam param="fill_velocity_values">False</rosparam>
+    <rosparam param="fill_velocity_values">True</rosparam>
     <rosparam param="nWSR">None</rosparam> <!-- None results in a nWSR estimation thats fine most of the time -->
     <rosparam param="collision_time_threshold">15</rosparam>
     <rosparam param="tree_tick_rate">0.1</rosparam>
     <rosparam param="slerp">False</rosparam>
-    <rosparam param="plot_trajectory">False</rosparam>
+    <rosparam param="plot_trajectory">True</rosparam>
+    <remap from="/whole_body_controller/follow_joint_trajectory/" to="/whole_body_controller/follow_joint_trajectory/base/"/>
+    <remap from="~state" to="/whole_body_controller/base/state"/>
   </node>
 
   <node pkg="giskardpy" type="interactive_marker.py" name="giskard_interactive_marker" output="screen">

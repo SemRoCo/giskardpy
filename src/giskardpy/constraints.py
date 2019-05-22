@@ -226,13 +226,6 @@ class CartesianPosition(CartesianConstraint):
             "gain": 3, #optional -- error is multiplied with this value
             "max_speed": 0.3 #optional -- rad/s or m/s depending on joint; can not go higher than urdf limit
         }'
-        :param root:
-        :param tip:
-        :param goal_position:
-        :param weights:
-        :param gain:
-        :param max_trans_speed:
-        :param ns:
         :return:
         """
 
@@ -360,13 +353,6 @@ class CartesianOrientationSlerp(CartesianConstraint):
             "gain": 3, #optional -- error is multiplied with this value
             "max_speed": 0.3 #optional -- rad/s or m/s depending on joint; can not go higher than urdf limit
         }'
-        :param root:
-        :param tip:
-        :param goal_position:
-        :param weights:
-        :param gain:
-        :param max_speed:
-        :param ns:
         :return:
         """
         goal_rotation = sw.rotation_of(self.get_goal_pose(self.goal))

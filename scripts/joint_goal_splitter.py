@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 import rospy
 import control_msgs.msg
 import trajectory_msgs.msg

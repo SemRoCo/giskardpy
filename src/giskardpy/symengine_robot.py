@@ -124,7 +124,7 @@ class Robot(Backend):
             joint_symbol = self.get_joint_symbol(joint_name)
             velocity_limit = self.get_joint_velocity_limit_expr(joint_name)
 
-            if lower_limit is not None and upper_limit is not None:
+            if not self.is_joint_continuous(joint_name):
                 self._hard_constraints[joint_name] = HardConstraint(lower=lower_limit - joint_symbol,
                                                                     upper=upper_limit - joint_symbol,
                                                                     expression=joint_symbol)
@@ -132,6 +132,7 @@ class Robot(Backend):
             self._joint_constraints[joint_name] = JointConstraint(lower=-velocity_limit,
                                                                   upper=velocity_limit,
                                                                   weight=self._default_weight)
+
 
     def get_fk_expression(self, root_link, tip_link):
         """

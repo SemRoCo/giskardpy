@@ -18,10 +18,11 @@ class JointGoalSplitter:
 
         self._as = actionlib.SimpleActionServer('/joint_goal_splitter/follow_joint_trajectory', control_msgs.msg.FollowJointTrajectoryAction,
                                                 execute_cb=self.callback, auto_start=False)
-        self._as.register_preempt_callback(self.preempt_cb())
+        self._as.register_preempt_callback(self.preempt_cb)
         self._as.start()
 
         self.pub = rospy.Publisher('/joint_goal_splitter/state', control_msgs.msg.JointTrajectoryControllerState, queue_size=10)
+        self.running = True
         self.t = threading.Thread(target=self.state_publisher_thread)
         self.t.daemon = True
         self.t.start()
@@ -29,6 +30,7 @@ class JointGoalSplitter:
         rospy.spin()
 
     def __del__(self):
+        self.running = False
         self.t.join()
 
 
@@ -107,7 +109,7 @@ class JointGoalSplitter:
 
     def state_publisher_thread(self):
         rate = rospy.Rate(10)  # 10hz
-        while not rospy.is_shutdown():
+        while self.running and (not rospy.is_shutdown()):
             state = control_msgs.msg.JointTrajectoryControllerState()
             state.joint_names = self.arm_joints + self.base_joints
             self.pub.publish(state)

@@ -7,9 +7,10 @@ from giskard_msgs.srv import UpdateWorld, UpdateWorldResponse, UpdateWorldReques
 from py_trees import Status
 from sensor_msgs.msg import JointState
 from std_msgs.msg import ColorRGBA
-from std_srvs.srv import SetBool, SetBoolResponse
+from std_srvs.srv import SetBool, SetBoolResponse, SetBoolRequest
 from visualization_msgs.msg import Marker, MarkerArray
 
+from giskardpy import pybullet_wrapper
 from giskardpy.data_types import ClosestPointInfo
 from giskardpy.exceptions import CorruptShapeException, UnknownBodyException, \
     UnsupportedOptionException, DuplicateNameException
@@ -218,7 +219,20 @@ class CollisionChecker(GiskardBehavior):
         super(CollisionChecker, self).setup(timeout)
         self.pub_collision_marker = rospy.Publisher(u'~visualization_marker_array', MarkerArray, queue_size=1)
         self.srv_viz_gui = rospy.Service(u'~enable_marker', SetBool, self.enable_marker_cb)
+        self.srv_activate_rendering = rospy.Service(u'~render', SetBool, self.activate_rendering)
         rospy.sleep(.5)
+
+    def activate_rendering(self, data):
+        """
+        :type data: SetBoolRequest
+        :return:
+        """
+        pybullet_wrapper.render = data.data
+        if data.data:
+            pybullet_wrapper.activate_rendering()
+        else:
+            pybullet_wrapper.deactivate_rendering()
+        return SetBoolResponse()
 
     def initialise(self):
         collision_goals = self.get_god_map().safe_get_data(collision_goal_identifier)

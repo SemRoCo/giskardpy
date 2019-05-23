@@ -23,8 +23,8 @@
     <rosparam param="tree_tick_rate">0.1</rosparam>
     <rosparam param="slerp">False</rosparam>
     <rosparam param="plot_trajectory">True</rosparam>
-    <remap from="/whole_body_controller/follow_joint_trajectory/" to="/whole_body_controller/follow_joint_trajectory/base/"/>
-    <remap from="~state" to="/whole_body_controller/base/state"/>
+    <!-- <remap from="/whole_body_controller/follow_joint_trajectory/" to="/whole_body_controller/follow_joint_trajectory/base/"/> -->
+    <!-- <remap from="~state" to="/whole_body_controller/base/state"/> -->
   </node>
 
   <node pkg="giskardpy" type="interactive_marker.py" name="giskard_interactive_marker" output="screen">

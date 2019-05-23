@@ -7,6 +7,7 @@ from py_trees_ros.actions import ActionClient
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 
 from giskardpy.identifier import trajectory_identifier
+from giskardpy.logging import loginfo
 from giskardpy.plugin import GiskardBehavior
 
 
@@ -17,12 +18,14 @@ class SendTrajectory(ActionClient, GiskardBehavior):
     def __init__(self, name, fill_velocity_values,
                  action_namespace=u'/whole_body_controller/follow_joint_trajectory'):
         GiskardBehavior.__init__(self, name)
+        loginfo(u'waiting for action server \'{}\' to appear'.format(action_namespace))
         ActionClient.__init__(self, name, FollowJointTrajectoryAction, None, action_namespace)
+        loginfo(u'successfully conected to action server')
         self.fill_velocity_values = fill_velocity_values
 
     def setup(self, timeout):
         # TODO get this from god map
-        self.controller_joints = rospy.wait_for_message(u'~state',
+        self.controller_joints = rospy.wait_for_message(u'/whole_body_controller/state',
                                                         JointTrajectoryControllerState).joint_names
         return super(SendTrajectory, self).setup(timeout)
 

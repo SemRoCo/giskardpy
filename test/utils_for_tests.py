@@ -12,6 +12,7 @@ from giskard_msgs.msg import MoveActionResult, CollisionEntry, MoveActionGoal, M
 from giskard_msgs.srv import UpdateWorldResponse
 from hypothesis import assume
 from hypothesis.strategies import composite
+from iai_naive_kinematics_sim.srv import SetJointState, SetJointStateRequest
 from py_trees import Blackboard
 from sensor_msgs.msg import JointState
 
@@ -196,7 +197,7 @@ class GiskardTestWrapper(object):
         rospy.set_param(u'~root_link', u'base_footprint')
         rospy.set_param(u'~wiggle_precision_threshold', 4)
         rospy.set_param(u'~sample_period', 0.05)
-        rospy.set_param(u'~default_joint_vel_limit', 10)
+        rospy.set_param(u'~default_joint_vel_limit', 0.1)
         rospy.set_param(u'~default_collision_avoidance_distance', 0.05)
         rospy.set_param(u'~fill_velocity_values', False)
         rospy.set_param(u'~nWSR', u'None')
@@ -347,7 +348,7 @@ class GiskardTestWrapper(object):
         goal_in_base = transform_pose(u'map', goal_pose)
         current_pose = lookup_pose(u'map', tip)
         np.testing.assert_array_almost_equal(msg_to_list(goal_in_base.pose.position),
-                                             msg_to_list(current_pose.pose.position), decimal=3)
+                                             msg_to_list(current_pose.pose.position), decimal=2)
 
         try:
             np.testing.assert_array_almost_equal(msg_to_list(goal_in_base.pose.orientation),
@@ -498,7 +499,7 @@ class GiskardTestWrapper(object):
         if orientation:
             expected_pose.pose.orientation = Quaternion(*orientation)
         else:
-            expected_pose.pose.orientation = Quaternion(0,0,0,1)
+            expected_pose.pose.orientation = Quaternion(0, 0, 0, 1)
         r = self.wrapper.attach_box(name, size, frame_id, position, orientation)
         assert r.error_codes == expected_response, \
             u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
@@ -577,6 +578,8 @@ class PR2(GiskardTestWrapper):
         self.l_tip = u'l_gripper_tool_frame'
         rospy.set_param(u'~default_joint_weight', 0.0001)
         rospy.set_param(u'~slerp', False)
+        self.r_gripper = rospy.ServiceProxy(u'r_gripper_simulator/set_joint_states', SetJointState)
+        self.l_gripper = rospy.ServiceProxy(u'l_gripper_simulator/set_joint_states', SetJointState)
         super(PR2, self).__init__()
         self.default_root = u'odom'
 
@@ -614,32 +617,32 @@ class PR2(GiskardTestWrapper):
         return [CollisionEntry(action, distance, [link], body_b, []) for link in links]
 
     def open_r_gripper(self):
-        js = {u'r_gripper_l_finger_joint': 0.54,
-              u'r_gripper_r_finger_joint': 0.54,
-              u'r_gripper_l_finger_tip_joint': 0.54,
-              u'r_gripper_r_finger_tip_joint': 0.54}
-        self.send_and_check_joint_goal(js)
+        sjs = SetJointStateRequest()
+        sjs.state.name = [u'r_gripper_l_finger_joint', u'r_gripper_r_finger_joint', u'r_gripper_l_finger_tip_joint',
+                          u'r_gripper_r_finger_tip_joint']
+        sjs.state.position = [0.54, 0.54, 0.54, 0.54]
+        self.r_gripper.call(sjs)
 
     def close_r_gripper(self):
-        js = {u'r_gripper_l_finger_joint': 0,
-              u'r_gripper_r_finger_joint': 0,
-              u'r_gripper_l_finger_tip_joint': 0,
-              u'r_gripper_r_finger_tip_joint': 0}
-        self.send_and_check_joint_goal(js)
+        sjs = SetJointStateRequest()
+        sjs.state.name = [u'r_gripper_l_finger_joint', u'r_gripper_r_finger_joint', u'r_gripper_l_finger_tip_joint',
+                          u'r_gripper_r_finger_tip_joint']
+        sjs.state.position = [0, 0, 0, 0]
+        self.r_gripper.call(sjs)
 
     def open_l_gripper(self):
-        js = {u'l_gripper_l_finger_joint': 0.54,
-              u'l_gripper_r_finger_joint': 0.54,
-              u'l_gripper_l_finger_tip_joint': 0.54,
-              u'l_gripper_r_finger_tip_joint': 0.54}
-        self.send_and_check_joint_goal(js)
+        sjs = SetJointStateRequest()
+        sjs.state.name = [u'l_gripper_l_finger_joint', u'l_gripper_r_finger_joint', u'l_gripper_l_finger_tip_joint',
+                          u'l_gripper_r_finger_tip_joint']
+        sjs.state.position = [0.54, 0.54, 0.54, 0.54]
+        self.r_gripper.call(sjs)
 
     def close_l_gripper(self):
-        js = {u'l_gripper_l_finger_joint': 0,
-              u'l_gripper_r_finger_joint': 0,
-              u'l_gripper_l_finger_tip_joint': 0,
-              u'l_gripper_r_finger_tip_joint': 0}
-        self.send_and_check_joint_goal(js)
+        sjs = SetJointStateRequest()
+        sjs.state.name = [u'l_gripper_l_finger_joint', u'l_gripper_r_finger_joint', u'l_gripper_l_finger_tip_joint',
+                          u'l_gripper_r_finger_tip_joint']
+        sjs.state.position = [0, 0, 0, 0]
+        self.r_gripper.call(sjs)
 
     def move_pr2_base(self, goal_pose):
         """

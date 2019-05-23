@@ -146,33 +146,37 @@ class QProblemBuilder(object):
     def debug_print(self, np_H, np_A, np_lb, np_ub, np_lbA, np_ubA, xdot_full=None):
         import pandas as pd
         lb = []
-        ub = []
+        # ub = []
         lbA = []
-        ubA = []
+        # ubA = []
         weights = []
         xdot = []
+        if xdot_full is not None:
+            A_dot_x = np_A.dot(xdot_full)
         for iJ, k in enumerate(self.joint_constraints_dict.keys()):
             key = 'j -- ' + str(k)
             lb.append(key)
-            ub.append(key)
+            # ub.append(key)
             weights.append(key)
             xdot.append(key)
 
         for iH, k in enumerate(self.hard_constraints_dict.keys()):
             key = 'h -- ' + str(k)
             lbA.append(key)
-            ubA.append(key)
+            # ubA.append(key)
 
         for iS, k in enumerate(self.soft_constraints_dict.keys()):
             key = 's -- ' + str(k)
             lbA.append(key)
-            ubA.append(key)
+            # ubA.append(key)
             weights.append(key)
             xdot.append(key)
         p_lb = pd.DataFrame(np_lb[:-len(self.soft_constraints_dict)], lb).sort_index()
-        p_ub = pd.DataFrame(np_ub[:-len(self.soft_constraints_dict)], ub).sort_index()
+        p_ub = pd.DataFrame(np_ub[:-len(self.soft_constraints_dict)], lb).sort_index()
         p_lbA = pd.DataFrame(np_lbA, lbA).sort_index()
-        p_ubA = pd.DataFrame(np_ubA, ubA).sort_index()
+        if xdot_full is not None:
+            p_A_dot_x = pd.DataFrame(A_dot_x, lbA).sort_index()
+        p_ubA = pd.DataFrame(np_ubA, lbA).sort_index()
         p_weights = pd.DataFrame(np_H.dot(np.ones(np_H.shape[0])), weights).sort_index()
         if xdot_full is not None:
             p_xdot = pd.DataFrame(xdot_full, xdot).sort_index()
@@ -205,7 +209,7 @@ class QProblemBuilder(object):
         if xdot_full is None:
             return None
         # TODO enable debug print in an elegant way, preferably without slowing anything down
-        # self.debug_print(np_H, np_A, np_lb, np_ub, np_lbA, np_ubA, xdot_full)
+        self.debug_print(np_H, np_A, np_lb, np_ub, np_lbA, np_ubA, xdot_full)
         return OrderedDict((observable, xdot_full[i]) for i, observable in enumerate(self.controlled_joints))
 
 # with pd.option_context('display.max_rows', None, 'display.max_columns', None):

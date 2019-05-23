@@ -1,14 +1,16 @@
 from py_trees import Status
+from time import time
 
+from giskardpy import logging
 from giskardpy.exceptions import PathCollisionException, InsolvableException
 from giskardpy.identifier import time_identifier, closest_point_identifier, js_identifier
 from giskardpy.plugin import GiskardBehavior
 from giskardpy.utils import closest_point_constraint_violated
-
+import numpy as np
 
 class WiggleCancel(GiskardBehavior):
-    def __init__(self, name, wiggle_precision_threshold):
-        self.wiggle_precision = wiggle_precision_threshold
+    def __init__(self, name, wiggle_precision_threshold1):
+        self.wiggle_precision1 = wiggle_precision_threshold1
         super(WiggleCancel, self).__init__(name)
 
     def initialise(self):
@@ -17,11 +19,17 @@ class WiggleCancel(GiskardBehavior):
 
     def update(self):
         current_js = self.get_god_map().safe_get_data(js_identifier)
-        time = self.get_god_map().safe_get_data(time_identifier)
+        current_time = self.get_god_map().safe_get_data(time_identifier)
         rounded_js = self.round_js(current_js)
         # TODO make 1 a parameter
-        if time >= 1 and rounded_js in self.past_joint_states:
-            # TODO raise to blackboard and return failure?
+        if current_time >= 1 and rounded_js in self.past_joint_states:
+            current_max_joint_vel = np.abs([v.velocity for v in current_js.values()]).max()
+            # TODO this threshold should depend on the joint type
+            if current_max_joint_vel < 0.25:
+                logging.loginfo(u'found goal trajectory with length {}s in {}s'.format(current_time,
+                                                                                       time() - self.get_blackboard().runtime))
+                return Status.SUCCESS
+            logging.loginfo(u'current max joint vel = {}'.format(current_max_joint_vel))
             raise InsolvableException(u'endless wiggling detected')
         self.past_joint_states.add(rounded_js)
         return Status.RUNNING
@@ -33,7 +41,7 @@ class WiggleCancel(GiskardBehavior):
         :return: a sequence of all the rounded joint positions
         :rtype: tuple
         """
-        return tuple(round(x.position, self.wiggle_precision) for x in js.values())
+        return tuple(round(x.position, self.wiggle_precision1) for x in js.values())
 
 
 class MaxTrajLength(GiskardBehavior):

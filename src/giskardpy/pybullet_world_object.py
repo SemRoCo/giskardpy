@@ -41,6 +41,7 @@ class PyBulletWorldObject(WorldObject):
             p.orientation.w = 1
             self.base_pose = p
         self.self_collision_matrix = set()
+        self.render = False
 
     @WorldObject.joint_state.setter
     def joint_state(self, value):
@@ -133,6 +134,9 @@ class PyBulletWorldObject(WorldObject):
         :rtype: int
         """
         return self.link_name_to_id[link_name]
+
+    def pybullet_link_id_to_name(self, link_id):
+        return self.link_id_to_name[link_id]
 
     def in_collision(self, link_a, link_b, distance):
         link_id_a = self.get_pybullet_link_id(link_a)

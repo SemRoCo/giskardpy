@@ -9,6 +9,7 @@ from py_trees import Blackboard, Status
 from giskardpy.exceptions import MAX_NWSR_REACHEDException, QPSolverException, SolverTimeoutError, InsolvableException, \
     SymengineException, PathCollisionException, UnknownBodyException, ImplementationException
 from giskardpy.identifier import trajectory_identifier
+from giskardpy.logging import loginfo
 from giskardpy.plugin import GiskardBehavior
 from giskardpy.utils import plot_trajectory
 
@@ -25,7 +26,6 @@ class ActionServerHandler(object):
         self.result_queue = Queue(1)
         self._as = actionlib.SimpleActionServer(action_name, action_type,
                                                 execute_cb=self.execute_cb, auto_start=False)
-        # self._as.register_preempt_callback(self.cancel_cb)
         self._as.start()
 
     def execute_cb(self, goal):

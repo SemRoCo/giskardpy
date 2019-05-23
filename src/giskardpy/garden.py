@@ -8,7 +8,8 @@ from giskard_msgs.msg import MoveAction
 from py_trees import Sequence, Selector, BehaviourTree, Blackboard
 from py_trees.meta import success_is_running, failure_is_success, success_is_failure
 from py_trees_ros.trees import BehaviourTree
-
+from rospy import ROSException
+import sys
 import giskardpy.pybullet_wrapper as pbw
 from giskardpy.god_map import GodMap
 from giskardpy.identifier import world_identifier, js_identifier, default_joint_weight_identifier, \
@@ -34,9 +35,16 @@ from giskardpy import logging
 
 def initialize_blackboard(urdf, default_joint_vel_limit, default_joint_weight, path_to_data_folder, gui):
     pbw.start_pybullet(gui)
-    controlled_joints = rospy.wait_for_message(u'~state',
-                                               JointTrajectoryControllerState).joint_names
-
+    while True:
+        try:
+            controlled_joints = rospy.wait_for_message(u'/whole_body_controller/state',
+                                                       JointTrajectoryControllerState,
+                                                       timeout=5.0).joint_names
+        except ROSException as e:
+            logging.logerr(u'state topic not available')
+            logging.logerr(e)
+        else:
+            break
     blackboard = Blackboard
     blackboard.god_map = GodMap()
 
@@ -110,10 +118,11 @@ def grow_tree():
     actual_planning.add_plugin(KinSimPlugin(u'kin sim', sample_period))
     actual_planning.add_plugin(
         CollisionChecker(u'coll', default_collision_avoidance_distance, map_frame, root_link, marker))
+    # actual_planning.add_plugin(success_is_running(VisualizationBehavior)(u'visualization', enable_visualization))
     actual_planning.add_plugin(ControllerPlugin(u'controller', path_to_data_folder, nWSR))
     actual_planning.add_plugin(LogTrajPlugin(u'log'))
     actual_planning.add_plugin(GoalReachedPlugin(u'goal reached', joint_convergence_threshold))
-    # actual_planning.add_plugin(WiggleCancel(u'wiggle', wiggle_precision_threshold))
+    actual_planning.add_plugin(WiggleCancel(u'wiggle', wiggle_precision_threshold))
     planning.add_child(actual_planning)
     # ----------------------------------------------
     publish_result = failure_is_success(Selector)(u'move robot')

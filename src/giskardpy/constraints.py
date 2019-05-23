@@ -11,7 +11,7 @@ from giskardpy.input_system import FrameInput, Point3Input, Vector3Input
 from giskardpy.qp_problem_builder import SoftConstraint
 from giskardpy.tfwrapper import transform_pose
 
-MAX_WEIGHT = 10
+MAX_WEIGHT = 15
 HIGH_WEIGHT = 5
 MID_WEIGHT = 1
 LOW_WEIGHT = 0.5
@@ -86,7 +86,7 @@ class JointPosition(Constraint):
     gain = u'gain'
     max_speed = u'max_speed'
 
-    def __init__(self, god_map, joint_name, goal, weight=1, gain=10, max_speed=1):
+    def __init__(self, god_map, joint_name, goal, weight=LOW_WEIGHT, gain=10, max_speed=1):
         super(JointPosition, self).__init__(god_map)
         self.joint_name = joint_name
         params = {self.goal: goal,
@@ -135,7 +135,7 @@ class JointPosition(Constraint):
 
 
 class JointPositionList(Constraint):
-    def __init__(self, god_map, goal_state, weight=1, gain=10, max_speed=1):
+    def __init__(self, god_map, goal_state, weight=LOW_WEIGHT, gain=10, max_speed=1):
         super(JointPositionList, self).__init__(god_map)
         self.constraints = []
         for i, joint_name in enumerate(goal_state[u'name']):
@@ -404,7 +404,7 @@ class LinkToAnyAvoidance(Constraint):
     B = u'B'
     C = u'C'
 
-    def __init__(self, god_map, link_name, repel_speed=0.1, max_weight_distance=0.0, low_weight_distance=0.02,
+    def __init__(self, god_map, link_name, repel_speed=1, max_weight_distance=0.0, low_weight_distance=0.01,
                  zero_weight_distance=0.05):
         super(LinkToAnyAvoidance, self).__init__(god_map)
         self.link_name = link_name
@@ -463,6 +463,7 @@ class LinkToAnyAvoidance(Constraint):
                                                      upper=repel_speed,
                                                      weight=weight_f,
                                                      expression=dist)
+        add_debug_constraint(soft_constraints, str(self) + ' -- dist', dist)
         return soft_constraints
 
     def __str__(self):

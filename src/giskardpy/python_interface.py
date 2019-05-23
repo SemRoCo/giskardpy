@@ -16,7 +16,7 @@ from giskardpy.utils import dict_to_joint_states, make_world_body_box
 
 
 class GiskardWrapper(object):
-    def __init__(self, giskard_topic=u'giskardpy/command', ns=u'giskard', joint_gain=10, joint_max_speed=1):
+    def __init__(self, giskard_topic=u'giskardpy/command', ns=u'giskard'):
         if giskard_topic is not None:
             self.client = SimpleActionClient(giskard_topic, MoveAction)
             self.update_world = rospy.ServiceProxy(u'{}/update_world'.format(ns), UpdateWorld)
@@ -28,8 +28,6 @@ class GiskardWrapper(object):
         self.collisions = []
         self.clear_cmds()
         self.object_js_topics = {}
-        self.joint_gain = joint_gain
-        self.joint_max_speed = joint_max_speed
         rospy.sleep(.3)
 
     def set_cart_goal(self, root, tip, pose_stamped):

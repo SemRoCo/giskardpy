@@ -17,6 +17,7 @@ from giskardpy.exceptions import CorruptShapeException, UnknownBodyException, \
 from giskardpy.identifier import collision_goal_identifier, closest_point_identifier
 from giskardpy.plugin import GiskardBehavior
 from giskardpy.tfwrapper import transform_pose
+from giskardpy.urdf_object import FIXED_JOINT, CONTINUOUS_JOINT
 from giskardpy.utils import to_joint_state_dict
 from giskardpy.world_object import WorldObject
 
@@ -68,21 +69,23 @@ class WorldUpdatePlugin(GiskardBehavior):
         # TODO block or queue updates while planning
         with self.lock:
             try:
-                if req.operation is UpdateWorldRequest.ADD:
+                if req.operation == UpdateWorldRequest.ADD:
                     if req.rigidly_attached:
                         self.attach_object(req)
                     else:
                         self.add_object(req)
 
-                elif req.operation is UpdateWorldRequest.REMOVE:
+                elif req.operation == UpdateWorldRequest.REMOVE:
                     self.remove_object(req.body.name)
-                elif req.operation is UpdateWorldRequest.ALTER:
+                elif req.operation == UpdateWorldRequest.ALTER:
                     self.remove_object(req.body.name)
                     self.add_object(req)
-                elif req.operation is UpdateWorldRequest.REMOVE_ALL:
+                elif req.operation == UpdateWorldRequest.REMOVE_ALL:
                     self.clear_world()
-                elif req.operation is UpdateWorldRequest.DETACH:
+                elif req.operation == UpdateWorldRequest.DETACH:
                     self.detach_object(req)
+                elif req.operation == 42 and req.rigidly_attached:
+                    self.attach_object(req, joint_type=CONTINUOUS_JOINT)
                 else:
                     return UpdateWorldResponse(UpdateWorldResponse.INVALID_OPERATION,
                                                u'Received invalid operation code: {}'.format(req.operation))
@@ -135,7 +138,7 @@ class WorldUpdatePlugin(GiskardBehavior):
         except:
             pass
 
-    def attach_object(self, req):
+    def attach_object(self, req, joint_type=FIXED_JOINT, axis=None):
         """
         :type req: UpdateWorldRequest
         """
@@ -146,7 +149,7 @@ class WorldUpdatePlugin(GiskardBehavior):
             p = transform_pose(req.pose.header.frame_id, p)
             world_object = self.get_world().get_object(req.body.name)
             self.get_world().attach_existing_obj_to_robot(req.body.name, req.pose.header.frame_id,
-                                                          p.pose)
+                                                          p.pose, joint_type, axis)
             m = world_object.as_marker_msg()
             m.header.frame_id = p.header.frame_id
             m.pose = p.pose
@@ -154,7 +157,9 @@ class WorldUpdatePlugin(GiskardBehavior):
             world_object = WorldObject.from_world_body(req.body)
             self.get_world().robot.attach_urdf_object(world_object,
                                                       req.pose.header.frame_id,
-                                                      req.pose.pose)
+                                                      req.pose.pose,
+                                                      joint_type,
+                                                      axis)
             m = world_object.as_marker_msg()
             m.pose = req.pose.pose
             m.header = req.pose.header

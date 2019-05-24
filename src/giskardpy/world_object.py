@@ -10,7 +10,7 @@ from geometry_msgs.msg import Pose, Quaternion
 
 from giskardpy.data_types import SingleJointState
 from giskardpy.tfwrapper import msg_to_kdl
-from giskardpy.urdf_object import URDFObject
+from giskardpy.urdf_object import URDFObject, FIXED_JOINT
 from giskardpy import logging
 
 
@@ -48,7 +48,10 @@ class WorldObject(URDFObject):
 
     @joint_state.setter
     def joint_state(self, value):
-        self._js = value
+        old_js = self._js
+        self._js = {}
+        self._js.update(old_js)
+        self._js.update(value)
 
     @property
     def base_pose(self):
@@ -270,10 +273,16 @@ class WorldObject(URDFObject):
         m.pose = self.base_pose
         return m
 
-    def attach_urdf_object(self, urdf_object, parent_link, pose):
-        super(WorldObject, self).attach_urdf_object(urdf_object, parent_link, pose)
+    def attach_urdf_object(self, urdf_object, parent_link, pose, joint_type=FIXED_JOINT, axis=None):
+        super(WorldObject, self).attach_urdf_object(urdf_object, parent_link, pose, joint_type, axis)
         self.update_self_collision_matrix(added_links=set(product(self.get_links_with_collision(),
                                                                   urdf_object.get_links_with_collision())))
+        if joint_type != FIXED_JOINT:
+            joint_name = urdf_object.get_name()
+            self.controlled_joints.append(joint_name)
+            js = self.joint_state
+            js[joint_name] = SingleJointState(joint_name)
+            self.joint_state = js
 
     def detach_sub_tree(self, joint_name):
         sub_tree = super(WorldObject, self).detach_sub_tree(joint_name)

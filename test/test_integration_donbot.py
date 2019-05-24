@@ -202,7 +202,7 @@ class TestCartGoals(object):
         p.pose.position = Point(0, -0.1, 0)
         p.pose.orientation = Quaternion(0, 0, 0, 1)
         zero_pose.allow_self_collision()
-        zero_pose.set_and_check_cart_goal(zero_pose.default_root, zero_pose.gripper_tip, p)
+        zero_pose.set_and_check_cart_goal(p, zero_pose.gripper_tip, zero_pose.default_root)
 
     def test_endless_wiggling1(self, zero_pose):
         """
@@ -231,7 +231,7 @@ class TestCartGoals(object):
         goal_pose.pose.orientation.w = 0
 
         zero_pose.allow_self_collision()
-        zero_pose.set_and_check_cart_goal(zero_pose.default_root, zero_pose.camera_tip, goal_pose)
+        zero_pose.set_and_check_cart_goal(goal_pose, zero_pose.camera_tip, zero_pose.default_root)
 
     def test_endless_wiggling2(self, zero_pose):
         """
@@ -249,7 +249,7 @@ class TestCartGoals(object):
         goal_pose.pose.orientation.w = .9
 
         zero_pose.allow_self_collision()
-        zero_pose.set_and_check_cart_goal(zero_pose.default_root, zero_pose.gripper_tip, goal_pose)
+        zero_pose.set_and_check_cart_goal(goal_pose, zero_pose.gripper_tip, zero_pose.default_root)
 
 #     def test_cart_goal_2eef(self, zero_pose):
 #         """
@@ -570,7 +570,7 @@ class TestCollisionAvoidanceGoals(object):
         arm_goal.pose.position.y = -.1
         arm_goal.pose.orientation.w = 1
         zero_pose.allow_self_collision()
-        zero_pose.set_and_check_cart_goal(zero_pose.default_root, zero_pose.gripper_tip, arm_goal)
+        zero_pose.set_and_check_cart_goal(arm_goal, zero_pose.gripper_tip, zero_pose.default_root)
 
         # zero_pose.check_cpi_geq(zero_pose.get_r_gripper_links(), 0.05)
 #
@@ -624,7 +624,7 @@ class TestCollisionAvoidanceGoals(object):
         arm_goal.pose.position.y = -.1
         arm_goal.pose.orientation.w = 1
         zero_pose.wrapper.set_self_collision_distance(0.025)
-        zero_pose.set_and_check_cart_goal(zero_pose.default_root, zero_pose.gripper_tip, arm_goal)
+        zero_pose.set_and_check_cart_goal(arm_goal, zero_pose.gripper_tip, zero_pose.default_root)
 #
 #     def test_avoid_collision(self, box_setup):
 #         """

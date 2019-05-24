@@ -368,17 +368,21 @@ class GiskardWrapper(object):
         req = UpdateWorldRequest(UpdateWorldRequest.ADD, box, True, pose)
         return self.update_world.call(req)
 
-    def attach_object(self, name, link_frame_id):
+    def attach_object(self, name, link_frame_id, fixed=True):
         """
         :type name: str
         :type link_frame_id: str
+        :param fixed: experimental don't use!
         :return: UpdateWorldResponse
         """
         req = UpdateWorldRequest()
         req.rigidly_attached = True
         req.body.name = name
         req.pose.header.frame_id = link_frame_id
-        req.operation = UpdateWorldRequest.ADD
+        if fixed:
+            req.operation = UpdateWorldRequest.ADD
+        else:
+            req.operation = 42
         return self.update_world.call(req)
 
     def detach_object(self, object_name):

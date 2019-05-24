@@ -1,4 +1,5 @@
 import symengine_wrappers as sw
+from giskardpy.utils import keydefaultdict
 
 
 class InputArray(object):
@@ -9,9 +10,11 @@ class InputArray(object):
 
 class JointStatesInput(object):
     def __init__(self, to_expr, joint_names, prefix=(), suffix=()):
-        self.joint_map = {}
+        self.joint_map = keydefaultdict(lambda joint_name: to_expr(list(prefix) +
+                                                                   [joint_name] +
+                                                                   list(suffix)))
         for joint_name in joint_names:
-            self.joint_map[joint_name] = to_expr(list(prefix) + [joint_name] + list(suffix))
+            self.joint_map[joint_name] # trigger factory
 
 
 class Point3Input(InputArray):

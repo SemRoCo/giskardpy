@@ -161,20 +161,20 @@ class QProblemBuilder(object):
         for iH, k in enumerate(self.hard_constraints_dict.keys()):
             key = 'h -- ' + str(k)
             lbA.append(key)
-            upper_bound = np_ubA[iH]
-            lower_bound = np_lbA[iH]
-            if np.sign(upper_bound) == np.sign(lower_bound):
-                logging.logwarn(u'{} out of bounds'.format(k))
-                if upper_bound > 0:
-                    logging.logwarn(u'{} value below lower bound by {}'.format(k, lower_bound))
-                    vel = np_ub[iH]
-                    if abs(vel) < abs(lower_bound):
-                        logging.logerr(u'joint vel of {} to low to get back into bound in one iteration'.format(vel))
-                else:
-                    logging.logwarn(u'{} value above upper bound by {}'.format(k, abs(upper_bound)))
-                    vel = np_lb[iH]
-                    if abs(vel) < abs(lower_bound):
-                        logging.logerr(u'joint vel of {} to low to get back into bound in one iteration'.format(vel))
+            # upper_bound = np_ubA[iH]
+            # lower_bound = np_lbA[iH]
+            # if np.sign(upper_bound) == np.sign(lower_bound):
+            #     logging.logwarn(u'{} out of bounds'.format(k))
+            #     if upper_bound > 0:
+            #         logging.logwarn(u'{} value below lower bound by {}'.format(k, lower_bound))
+            #         vel = np_ub[iH]
+            #         if abs(vel) < abs(lower_bound):
+            #             logging.logerr(u'joint vel of {} to low to get back into bound in one iteration'.format(vel))
+            #     else:
+            #         logging.logwarn(u'{} value above upper bound by {}'.format(k, abs(upper_bound)))
+            #         vel = np_lb[iH]
+            #         if abs(vel) < abs(lower_bound):
+            #             logging.logerr(u'joint vel of {} to low to get back into bound in one iteration'.format(vel))
 
         for iS, k in enumerate(self.soft_constraints_dict.keys()):
             key = 's -- ' + str(k)
@@ -196,17 +196,18 @@ class QProblemBuilder(object):
         else:
             self.lbAs = self.lbAs.T.append(p_lbA.T, ignore_index=True).T
             # self.lbAs.T[[c for c in self.lbAs.T.columns if 'dist' in c]].plot()
-        arrays = [(p_weights, 'H'),
-                  (p_A, 'A'),
-                  (p_lbA, 'lbA'),
-                  (p_ubA, 'ubA'),
-                  (p_lb, 'lb'),
-                  (p_ub, 'ub')]
-        for a, name in arrays:
-            logging.logwarn(u'{} has the following nans:'.format(name))
-            self.check_for_nan(a)
-            logging.logwarn(u'{} has the following big numbers:'.format(name))
-            self.check_for_big_numbers(a)
+        # arrays = [(p_weights, u'H'),
+        #           (p_A, u'A'),
+        #           (p_lbA, u'lbA'),
+        #           (p_ubA, u'ubA'),
+        #           (p_lb, u'lb'),
+        #           (p_ub, u'ub')]
+        # for a, name in arrays:
+        #     logging.logwarn(u'{} has the following nans:'.format(name))
+        #     self.check_for_nan(a)
+        #     logging.logwarn(u'{} has the following big numbers:'.format(name))
+        #     self.check_for_big_numbers(a)
+        pass
 
     def check_for_nan(self, p_array):
         p_filtered = p_array.apply(lambda x: zip(x.index[x.isnull()].tolist(), x[x.isnull()]), 1)
@@ -250,7 +251,7 @@ class QProblemBuilder(object):
         if xdot_full is None:
             return None
         # TODO enable debug print in an elegant way, preferably without slowing anything down
-        # self.debug_print(np_H, np_A, np_lb, np_ub, np_lbA, np_ubA, xdot_full)
+        self.debug_print(np_H, np_A, np_lb, np_ub, np_lbA, np_ubA, xdot_full)
         return OrderedDict((observable, xdot_full[i]) for i, observable in enumerate(self.controlled_joints))
 
 # with pd.option_context('display.max_rows', None, 'display.max_columns', None):

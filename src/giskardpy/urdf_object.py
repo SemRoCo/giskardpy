@@ -1,15 +1,15 @@
 from collections import namedtuple
 from itertools import chain
-
+import numpy as np
 import urdf_parser_py.urdf as up
-from geometry_msgs.msg import Pose, Vector3
+from geometry_msgs.msg import Pose, Vector3, Quaternion
 from std_msgs.msg import ColorRGBA
-from tf.transformations import euler_from_quaternion
+from tf.transformations import euler_from_quaternion, quaternion_from_euler
 from visualization_msgs.msg import Marker
 
 from giskardpy.exceptions import DuplicateNameException, UnknownBodyException, CorruptShapeException
 from giskardpy.utils import cube_volume, cube_surface, sphere_volume, cylinder_volume, cylinder_surface, \
-    suppress_stderr
+    suppress_stderr, msg_to_list
 
 Joint = namedtuple('Joint', ['symbol', 'velocity_limit', 'lower', 'upper', 'type', 'frame'])
 
@@ -32,10 +32,15 @@ def hacky_urdf_parser_fix(urdf_str):
     return fixed_urdf
 
 
-JOINT_TYPES = [u'fixed', u'revolute', u'continuous', u'prismatic']
-MOVABLE_JOINT_TYPES = [u'revolute', u'continuous', u'prismatic']
-ROTATIONAL_JOINT_TYPES = [u'revolute', u'continuous']
-TRANSLATIONAL_JOINT_TYPES = [u'prismatic']
+FIXED_JOINT = u'fixed'
+REVOLUTE_JOINT = u'revolute'
+CONTINUOUS_JOINT = u'continuous'
+PRISMATIC_JOINT = u'prismatic'
+JOINT_TYPES = [FIXED_JOINT, REVOLUTE_JOINT, CONTINUOUS_JOINT, PRISMATIC_JOINT]
+MOVABLE_JOINT_TYPES = [REVOLUTE_JOINT, CONTINUOUS_JOINT, PRISMATIC_JOINT]
+ROTATIONAL_JOINT_TYPES = [REVOLUTE_JOINT, CONTINUOUS_JOINT]
+TRANSLATIONAL_JOINT_TYPES = [PRISMATIC_JOINT]
+LIMITED_JOINTS = [PRISMATIC_JOINT, REVOLUTE_JOINT]
 
 
 class URDFObject(object):
@@ -246,6 +251,10 @@ class URDFObject(object):
         else:
             return limit.velocity
 
+    def get_joint_axis(self, joint_name):
+        joint = self.get_urdf_joint(joint_name)
+        return joint.axis
+
     def is_joint_controllable(self, name):
         """
         :param name: name of the joint in the urdfs
@@ -277,7 +286,7 @@ class URDFObject(object):
         :type name: str
         :rtype: bool
         """
-        return self.get_joint_type(name) == u'continuous'
+        return self.get_joint_type(name) == CONTINUOUS_JOINT
 
     def is_joint_fixed(self, name):
         """
@@ -285,7 +294,7 @@ class URDFObject(object):
         :type name: str
         :rtype: bool
         """
-        return self.get_joint_type(name) == u'fixed'
+        return self.get_joint_type(name) == FIXED_JOINT
 
     def get_joint_type(self, name):
         return self.get_urdf_joint(name).type
@@ -393,7 +402,7 @@ class URDFObject(object):
     def get_root(self):
         return self._urdf_robot.get_root()
 
-    def attach_urdf_object(self, urdf_object, parent_link, pose):
+    def attach_urdf_object(self, urdf_object, parent_link, pose, joint_type=FIXED_JOINT, axis=None):
         """
         Rigidly attach another object to the robot.
         :param urdf_object: Object that shall be attached to the robot.
@@ -419,17 +428,26 @@ class URDFObject(object):
         if len(set(urdf_object.get_joint_names()).intersection(set(self.get_joint_names()))) != 0:
             raise DuplicateNameException(u'can not merge urdfs that share joint names')
 
+
+        if joint_type == CONTINUOUS_JOINT and not axis:
+            # this axis computation only works on two finger grippers
+            p_grasp_point__parent = msg_to_list(self.get_joint_origin(self.get_parent_joint_of_link(parent_link)).position)
+            p_object__grasp_point = msg_to_list(pose.position)
+            axis = np.cross(p_object__grasp_point, p_grasp_point__parent)
+            axis = axis / np.linalg.norm(axis)
+
         joint = up.Joint(self.robot_name_to_root_joint(urdf_object.get_name()),
                          parent=parent_link,
                          child=urdf_object.get_root(),
-                         joint_type=u'fixed',
+                         joint_type=joint_type,
                          origin=up.Pose([pose.position.x,
                                          pose.position.y,
                                          pose.position.z],
                                         euler_from_quaternion([pose.orientation.x,
                                                                pose.orientation.y,
                                                                pose.orientation.z,
-                                                               pose.orientation.w])))
+                                                               pose.orientation.w])),
+                         axis=axis)
         self._urdf_robot.add_joint(joint)
         for j in urdf_object._urdf_robot.joints:
             self._urdf_robot.add_joint(j)
@@ -440,6 +458,16 @@ class URDFObject(object):
         except:
             pass
         self.reinitialize()
+
+    def get_joint_origin(self, joint_name):
+        origin = self.get_urdf_joint(joint_name).origin
+        p = Pose()
+        p.position.x = origin.xyz[0]
+        p.position.y = origin.xyz[1]
+        p.position.z = origin.xyz[2]
+        p.orientation = Quaternion(*quaternion_from_euler(*origin.rpy))
+        return p
+
 
     def detach_sub_tree(self, joint_name):
         """

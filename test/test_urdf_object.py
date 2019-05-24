@@ -2,7 +2,7 @@ import pytest
 from geometry_msgs.msg import Pose, Point, Quaternion
 
 from giskardpy.exceptions import DuplicateNameException, UnknownBodyException
-from giskardpy.urdf_object import URDFObject
+from giskardpy.urdf_object import URDFObject, CONTINUOUS_JOINT
 from giskardpy.utils import make_world_body_box, make_world_body_sphere, make_world_body_cylinder, make_urdf_world_body
 from utils_for_tests import pr2_urdf, donbot_urdf, boxy_urdf, base_bot_urdf
 
@@ -133,6 +133,24 @@ class TestUrdfObject(object):
             assert False, u'expected exception'
         except Exception:
             assert True
+
+    def test_attach_urdf_object_with_continues_joint1(self, function_setup):
+        axis = [0,1,0]
+        parsed_pr2 = self.cls(pr2_urdf())
+        num_of_links_before = len(parsed_pr2.get_link_names())
+        num_of_joints_before = len(parsed_pr2.get_joint_names())
+        link_chain_before = len(parsed_pr2.get_links_from_sub_tree(u'torso_lift_joint'))
+        box = self.cls.from_world_body(make_world_body_box())
+        p = Pose()
+        p.position = Point(0, 0, 0.1)
+        p.orientation = Quaternion(0, 0, 0, 1)
+        parsed_pr2.attach_urdf_object(box, u'l_gripper_tool_frame', p, joint_type=CONTINUOUS_JOINT)
+        assert box.get_name() in parsed_pr2.get_link_names()
+        assert len(parsed_pr2.get_link_names()) == num_of_links_before + 1
+        assert len(parsed_pr2.get_joint_names()) == num_of_joints_before + 1
+        assert len(parsed_pr2.get_links_from_sub_tree(u'torso_lift_joint')) == link_chain_before + 1
+        assert parsed_pr2.is_joint_continuous(box.get_name())
+        assert parsed_pr2.get_joint_axis(box.get_name()) == axis
 
     def test_attach_twice(self, function_setup):
         parsed_pr2 = self.cls(pr2_urdf())

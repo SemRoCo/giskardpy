@@ -36,8 +36,7 @@ class Robot(Backend):
         self._joint_to_frame = {}
         self._default_joint_velocity_limit = default_joint_vel_limit
         self._default_weight = default_joint_weight
-        self._joint_to_symbol_map = keydefaultdict(lambda x: spw.Symbol(x))
-        # self.__joint_state_positions = {str(self._joint_to_symbol_map[k]): 0 for k, v in self.get_controllable_joints()}
+        self._joint_to_symbol_map = keydefaultdict(lambda x: spw.Symbol(x)) # don't iterate over this map!!
         super(Robot, self).__init__(urdf, base_pose, controlled_joints, path_to_data_folder, calc_self_collision_matrix,
                                     *args, **kwargs)
         self.reinitialize()
@@ -76,7 +75,10 @@ class Robot(Backend):
         """
         super(Robot, self).reinitialize()
         if joints_to_symbols_map is not None:
-            self._joint_to_symbol_map.update(joints_to_symbols_map)
+            # TODO don't change the input parameter
+            # old_joint_symbol_map = self._joint_to_symbol_map
+            self._joint_to_symbol_map = joints_to_symbols_map
+            # self._joint_to_symbol_map.update(old_joint_symbol_map)
         self._fk_expressions = {}
         self._create_frames_expressions()
         self._create_constraints()

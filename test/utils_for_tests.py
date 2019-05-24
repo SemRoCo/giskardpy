@@ -331,14 +331,32 @@ class GiskardTestWrapper(object):
         goal = PoseStamped()
         goal.header.frame_id = tip
         goal.pose.orientation.w = 1
-        self.set_cart_goal(root, tip, goal)
+        self.set_cart_goal(goal, tip, root)
 
-    def set_cart_goal(self, root, tip, goal_pose):
+    def keep_orientation(self, tip, root=None):
+        goal = PoseStamped()
+        goal.header.frame_id = tip
+        goal.pose.orientation.w = 1
+        self.set_rotation_goal(goal, tip, root)
+
+    def set_rotation_goal(self, goal_pose, tip, root=None):
+        if not root:
+            root = self.default_root
+        self.wrapper.set_rotation_goal(root, tip, goal_pose)
+
+    def set_translation_goal(self, goal_pose, tip, root=None):
+        if not root:
+            root = self.default_root
+        self.wrapper.set_translation_goal(root, tip, goal_pose)
+
+    def set_cart_goal(self, goal_pose, tip, root=None):
+        if not root:
+            root = self.default_root
         self.wrapper.set_cart_goal(root, tip, goal_pose)
 
-    def set_and_check_cart_goal(self, root, tip, goal_pose):
+    def set_and_check_cart_goal(self, goal_pose, tip, root=None):
         goal_pose = transform_pose(u'map', goal_pose)
-        self.set_cart_goal(root, tip, goal_pose)
+        self.set_cart_goal(goal_pose, tip, root)
         self.loop_once()
         self.send_and_check_goal()
         self.loop_once()
@@ -513,9 +531,9 @@ class GiskardTestWrapper(object):
             compare_poses(expected_pose.pose, lookup_pose(frame_id, name).pose)
         self.loop_once()
 
-    def attach_existing(self, name=u'box', frame_id=None, expected_response=UpdateWorldResponse.SUCCESS):
+    def attach_existing(self, name=u'box', frame_id=None, expected_response=UpdateWorldResponse.SUCCESS, fixed=True):
         scm = self.get_robot().get_self_collision_matrix()
-        r = self.wrapper.attach_object(name, frame_id)
+        r = self.wrapper.attach_object(name, frame_id, fixed)
         assert r.error_codes == expected_response, \
             u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
                                             update_world_error_code(expected_response))
@@ -524,6 +542,7 @@ class GiskardTestWrapper(object):
         assert not self.get_world().has_object(name)
         assert scm.difference(self.get_robot().get_self_collision_matrix()) == set()
         assert len(scm) < len(self.get_robot().get_self_collision_matrix())
+        assert not fixed == self.get_robot().is_joint_continuous(name)
         self.loop_once()
 
     def get_cpi(self, distance_threshold):

@@ -51,7 +51,7 @@ class PyBulletWorldObject(WorldObject):
         :return:
         """
         with self.lock:
-            self._js = value
+            WorldObject.joint_state.fset(self, value)
             for joint_name, singe_joint_state in value.items():
                 p.resetJointState(self._pybullet_id, self.joint_name_to_info[joint_name].joint_index,
                                   singe_joint_state.position)

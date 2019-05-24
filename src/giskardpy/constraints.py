@@ -463,7 +463,6 @@ class LinkToAnyAvoidance(Constraint):
                                                      upper=repel_speed,
                                                      weight=weight_f,
                                                      expression=dist)
-        add_debug_constraint(soft_constraints, str(self) + ' -- dist', dist)
         return soft_constraints
 
     def __str__(self):

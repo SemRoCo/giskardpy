@@ -6,9 +6,10 @@ from time import time
 
 import giskardpy.symengine_wrappers as spw
 from giskardpy import BACKEND
+from giskardpy import logging
+from giskardpy.exceptions import QPSolverException
 from giskardpy.qp_solver import QPSolver
 from giskardpy.symengine_wrappers import load_compiled_function, safe_compiled_function
-from giskardpy import logging
 
 SoftConstraint = namedtuple(u'SoftConstraint', [u'lower', u'upper', u'weight', u'expression'])
 HardConstraint = namedtuple(u'HardConstraint', [u'lower', u'upper', u'expression'])
@@ -146,9 +147,7 @@ class QProblemBuilder(object):
     def debug_print(self, np_H, np_A, np_lb, np_ub, np_lbA, np_ubA, xdot_full=None):
         import pandas as pd
         lb = []
-        # ub = []
         lbA = []
-        # ubA = []
         weights = []
         xdot = []
         if xdot_full is not None:
@@ -156,19 +155,20 @@ class QProblemBuilder(object):
         for iJ, k in enumerate(self.joint_constraints_dict.keys()):
             key = 'j -- ' + str(k)
             lb.append(key)
-            # ub.append(key)
             weights.append(key)
             xdot.append(key)
 
         for iH, k in enumerate(self.hard_constraints_dict.keys()):
             key = 'h -- ' + str(k)
             lbA.append(key)
-            # ubA.append(key)
+            upper_bound = np_ubA[iH]
+            lower_bound = np_lbA[iH]
+            if np.sign(upper_bound) == np.sign(lower_bound):
+                logging.logwarn(u'{} out of bounds'.format(k))
 
         for iS, k in enumerate(self.soft_constraints_dict.keys()):
             key = 's -- ' + str(k)
             lbA.append(key)
-            # ubA.append(key)
             weights.append(key)
             xdot.append(key)
         p_lb = pd.DataFrame(np_lb[:-len(self.soft_constraints_dict)], lb).sort_index()
@@ -186,7 +186,34 @@ class QProblemBuilder(object):
         else:
             self.lbAs = self.lbAs.T.append(p_lbA.T, ignore_index=True).T
             # self.lbAs.T[[c for c in self.lbAs.T.columns if 'dist' in c]].plot()
-        pass
+        arrays = [(p_weights, 'H'),
+                  (p_A, 'A'),
+                  (p_lbA, 'lbA'),
+                  (p_ubA, 'ubA'),
+                  (p_lb, 'lb'),
+                  (p_ub, 'ub')]
+        for a, name in arrays:
+            logging.logwarn(u'{} has the following nans:'.format(name))
+            self.check_for_nan(a)
+            logging.logwarn(u'{} has the following big numbers:'.format(name))
+            self.check_for_big_numbers(a)
+
+    def check_for_nan(self, p_array):
+        p_filtered = p_array.apply(lambda x: zip(x.index[x.isnull()].tolist(), x[x.isnull()]), 1)
+        p_filtered = p_filtered[p_filtered.apply(lambda x: len(x)) > 0]
+        self.print_pandas_array(p_filtered)
+
+    def check_for_big_numbers(self, p_array, big=1e10):
+        # FIXME fails if condition is true on first entry
+        p_filtered = p_array.apply(lambda x: zip(x.index[abs(x) > big].tolist(), x[x > big]), 1)
+        p_filtered = p_filtered[p_filtered.apply(lambda x: len(x)) > 0]
+        self.print_pandas_array(p_filtered)
+
+    def print_pandas_array(self, array):
+        import pandas as pd
+        if len(array) > 0:
+            with pd.option_context('display.max_rows', None, 'display.max_columns', None):
+                print(array)
 
     def get_cmd(self, substitutions, nWSR=None):
         """
@@ -205,11 +232,15 @@ class QProblemBuilder(object):
         np_lbA = np.array(np_big_ass_M[:self.shape1, -2])
         np_ubA = np.array(np_big_ass_M[:self.shape1, -1])
         # self.debug_print(np_H, np_A, np_lb, np_ub, np_lbA, np_ubA)
-        xdot_full = self.qp_solver.solve(np_H, self.np_g, np_A, np_lb, np_ub, np_lbA, np_ubA, nWSR)
+        try:
+            xdot_full = self.qp_solver.solve(np_H, self.np_g, np_A, np_lb, np_ub, np_lbA, np_ubA, nWSR)
+        except QPSolverException as e:
+            self.debug_print(np_H, np_A, np_lb, np_ub, np_lbA, np_ubA)
+            raise e
         if xdot_full is None:
             return None
         # TODO enable debug print in an elegant way, preferably without slowing anything down
-        self.debug_print(np_H, np_A, np_lb, np_ub, np_lbA, np_ubA, xdot_full)
+        # self.debug_print(np_H, np_A, np_lb, np_ub, np_lbA, np_ubA, xdot_full)
         return OrderedDict((observable, xdot_full[i]) for i, observable in enumerate(self.controlled_joints))
 
 # with pd.option_context('display.max_rows', None, 'display.max_columns', None):

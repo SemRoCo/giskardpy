@@ -197,7 +197,7 @@ class GiskardTestWrapper(object):
         rospy.set_param(u'~root_link', u'base_footprint')
         rospy.set_param(u'~wiggle_precision_threshold', 4)
         rospy.set_param(u'~sample_period', 0.05)
-        rospy.set_param(u'~default_joint_vel_limit', 0.1)
+        rospy.set_param(u'~default_joint_vel_limit', 0.151)
         rospy.set_param(u'~default_collision_avoidance_distance', 0.05)
         rospy.set_param(u'~fill_velocity_values', False)
         rospy.set_param(u'~nWSR', u'None')

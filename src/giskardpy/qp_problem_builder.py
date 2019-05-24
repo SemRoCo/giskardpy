@@ -165,6 +165,16 @@ class QProblemBuilder(object):
             lower_bound = np_lbA[iH]
             if np.sign(upper_bound) == np.sign(lower_bound):
                 logging.logwarn(u'{} out of bounds'.format(k))
+                if upper_bound > 0:
+                    logging.logwarn(u'{} value below lower bound by {}'.format(k, lower_bound))
+                    vel = np_ub[iH]
+                    if abs(vel) < abs(lower_bound):
+                        logging.logerr(u'joint vel of {} to low to get back into bound in one iteration'.format(vel))
+                else:
+                    logging.logwarn(u'{} value above upper bound by {}'.format(k, abs(upper_bound)))
+                    vel = np_lb[iH]
+                    if abs(vel) < abs(lower_bound):
+                        logging.logerr(u'joint vel of {} to low to get back into bound in one iteration'.format(vel))
 
         for iS, k in enumerate(self.soft_constraints_dict.keys()):
             key = 's -- ' + str(k)

@@ -104,7 +104,7 @@ class PyBulletWorldObject(WorldObject):
                 joint_state = self.joint_state
                 base_pose = self.base_pose
                 self.suicide()
-            self._pybullet_id = load_urdf_string_into_bullet(self.get_urdf(), base_pose)
+            self._pybullet_id = load_urdf_string_into_bullet(self.get_urdf_str(), base_pose)
             self.__sync_with_bullet()
         if joint_state is not None:
             joint_state = {k: v for k, v in joint_state.items() if k in self.get_joint_names()}

@@ -1,6 +1,7 @@
+import numpy as np
 from collections import namedtuple
 from itertools import chain
-import numpy as np
+
 import urdf_parser_py.urdf as up
 from geometry_msgs.msg import Pose, Vector3, Quaternion
 from std_msgs.msg import ColorRGBA
@@ -152,7 +153,7 @@ class URDFObject(object):
         :type urdf_object: URDFObject
         :rtype: cls
         """
-        return cls(urdf_object.get_urdf(), *args, **kwargs)
+        return cls(urdf_object.get_urdf_str(), *args, **kwargs)
 
     def get_name(self):
         """
@@ -396,7 +397,7 @@ class URDFObject(object):
                    isinstance(geo, up.Mesh)
         return False
 
-    def get_urdf(self):
+    def get_urdf_str(self):
         return self._urdf_robot.to_xml_string()
 
     def get_root(self):
@@ -428,10 +429,20 @@ class URDFObject(object):
         if len(set(urdf_object.get_joint_names()).intersection(set(self.get_joint_names()))) != 0:
             raise DuplicateNameException(u'can not merge urdfs that share joint names')
 
-
+        origin = up.Pose([pose.position.x,
+                          pose.position.y,
+                          pose.position.z],
+                         euler_from_quaternion([pose.orientation.x,
+                                                pose.orientation.y,
+                                                pose.orientation.z,
+                                                pose.orientation.w]))
         if joint_type == CONTINUOUS_JOINT and not axis:
             # this axis computation only works on two finger grippers
-            p_grasp_point__parent = msg_to_list(self.get_joint_origin(self.get_parent_joint_of_link(parent_link)).position)
+            urdf_object.get_urdf_link(urdf_object.get_root()).collision.origin = origin
+            urdf_object.get_urdf_link(urdf_object.get_root()).visual.origin = origin
+            origin = up.Pose([0,0,0],[0,0,0])
+            p_grasp_point__parent = msg_to_list(
+                self.get_joint_origin(self.get_parent_joint_of_link(parent_link)).position)
             p_object__grasp_point = msg_to_list(pose.position)
             axis = np.cross(p_object__grasp_point, p_grasp_point__parent)
             axis = axis / np.linalg.norm(axis)
@@ -440,13 +451,7 @@ class URDFObject(object):
                          parent=parent_link,
                          child=urdf_object.get_root(),
                          joint_type=joint_type,
-                         origin=up.Pose([pose.position.x,
-                                         pose.position.y,
-                                         pose.position.z],
-                                        euler_from_quaternion([pose.orientation.x,
-                                                               pose.orientation.y,
-                                                               pose.orientation.z,
-                                                               pose.orientation.w])),
+                         origin=origin,
                          axis=axis)
         self._urdf_robot.add_joint(joint)
         for j in urdf_object._urdf_robot.joints:
@@ -468,7 +473,6 @@ class URDFObject(object):
         p.orientation = Quaternion(*quaternion_from_euler(*origin.rpy))
         return p
 
-
     def detach_sub_tree(self, joint_name):
         """
         :rtype: URDFObject
@@ -489,10 +493,10 @@ class URDFObject(object):
         self.reinitialize()
 
     def __str__(self):
-        return self.get_urdf()
+        return self.get_urdf_str()
 
     def reinitialize(self):
-        self._urdf_robot = up.URDF.from_xml_string(self.get_urdf())
+        self._urdf_robot = up.URDF.from_xml_string(self.get_urdf_str())
 
     def robot_name_to_root_joint(self, name):
         # TODO should this really be a class function?
@@ -532,7 +536,7 @@ class URDFObject(object):
         :type o: URDFObject
         :rtype: bool
         """
-        return o.get_urdf() == self.get_urdf()
+        return o.get_urdf_str() == self.get_urdf_str()
 
     def has_link_visuals(self, link_name):
         link = self._urdf_robot.link_map[link_name]

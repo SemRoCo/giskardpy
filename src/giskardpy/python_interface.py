@@ -3,7 +3,7 @@ import json
 import rospy
 from actionlib import SimpleActionClient
 from geometry_msgs.msg import PoseStamped, Point, Quaternion
-from giskard_msgs.msg import MoveAction, Controller, MoveGoal, WorldBody, CollisionEntry, MoveResult, Constraint, \
+from giskard_msgs.msg import MoveAction, MoveGoal, WorldBody, CollisionEntry, MoveResult, Constraint, \
     MoveCmd, JointConstraint, CartesianConstraint
 from giskard_msgs.srv import UpdateWorld, UpdateWorldRequest, UpdateWorldResponse
 from rospy_message_converter.message_converter import convert_ros_message_to_dictionary
@@ -391,7 +391,7 @@ class GiskardWrapper(object):
         req.operation = req.DETACH
         return self.update_world.call(req)
 
-    def add_urdf(self, name, urdf, js_topic, pose):
+    def add_urdf(self, name, urdf, pose, js_topic):
         urdf_body = WorldBody()
         urdf_body.name = str(name)
         urdf_body.type = WorldBody.URDF_BODY

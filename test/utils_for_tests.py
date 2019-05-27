@@ -468,8 +468,8 @@ class GiskardTestWrapper(object):
                                             update_world_error_code(UpdateWorldResponse.SUCCESS))
         assert self.get_world().has_object(name)
 
-    def add_urdf(self, name, urdf, js_topic, pose):
-        r = self.wrapper.add_urdf(name, urdf, js_topic, pose)
+    def add_urdf(self, name, urdf, pose, js_topic):
+        r = self.wrapper.add_urdf(name, urdf, pose, js_topic)
         assert r.error_codes == UpdateWorldResponse.SUCCESS, \
             u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
                                             update_world_error_code(UpdateWorldResponse.SUCCESS))

@@ -121,9 +121,7 @@ def fake_table_setup(zero_pose):
 @pytest.fixture()
 def kitchen_setup(zero_pose):
     object_name = u'kitchen'
-    zero_pose.add_urdf(object_name,
-                       rospy.get_param(u'kitchen_description'),
-                       u'/kitchen/joint_states',
+    zero_pose.add_urdf(object_name, rospy.get_param(u'kitchen_description'), u'/kitchen/joint_states',
                        lookup_transform(u'map', u'iai_kitchen/world'))
     return zero_pose
 

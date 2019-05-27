@@ -48,9 +48,9 @@ class WorldObject(URDFObject):
 
     @joint_state.setter
     def joint_state(self, value):
-        old_js = self._js
-        self._js = {}
-        self._js.update(old_js)
+        new_js = {}
+        new_js.update(self._js)
+        self._js = new_js
         self._js.update(value)
 
     @property
@@ -244,7 +244,7 @@ class WorldObject(URDFObject):
         """
         :rtype: bool
         """
-        urdf_hash = hashlib.md5(self.get_urdf()).hexdigest()
+        urdf_hash = hashlib.md5(self.get_urdf_str()).hexdigest()
         path = u'{}/{}/{}'.format(path, self.get_name(), urdf_hash)
         if os.path.isfile(path):
             with open(path) as f:
@@ -254,7 +254,7 @@ class WorldObject(URDFObject):
         return False
 
     def safe_self_collision_matrix(self, path):
-        urdf_hash = hashlib.md5(self.get_urdf()).hexdigest()
+        urdf_hash = hashlib.md5(self.get_urdf_str()).hexdigest()
         path = u'{}/{}/{}'.format(path, self.get_name(), urdf_hash)
         if not os.path.exists(os.path.dirname(path)):
             try:

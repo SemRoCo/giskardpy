@@ -40,10 +40,7 @@ if __name__ == '__main__':
         else:
             with open(path, 'r') as f:
                 urdf = f.read()
-        result = giskard.add_urdf(name=name,
-                                  urdf=urdf,
-                                  js_topic=rospy.get_param('~js', None),
-                                  pose=pose)
+        result = giskard.add_urdf(name=name, urdf=urdf, pose=pose, js_topic=rospy.get_param('~js', None))
         if result.error_codes == result.SUCCESS:
             logging.loginfo('urdfs \'{}\' added'.format(name))
         else:

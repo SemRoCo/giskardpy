@@ -252,10 +252,10 @@ class TestUrdfObject(object):
         p = Pose()
         p.position = Point(0, 0, 0)
         p.orientation = Quaternion(0, 0, 0, 1)
-        original_urdf = parsed_pr2.get_urdf()
+        original_urdf = parsed_pr2.get_urdf_str()
         parsed_pr2.attach_urdf_object(box, u'l_gripper_tool_frame', p)
         parsed_pr2.detach_sub_tree(u'box')
-        assert original_urdf == parsed_pr2.get_urdf()
+        assert original_urdf == parsed_pr2.get_urdf_str()
 
     def test_detach_non_existing_object(self, function_setup):
         parsed_pr2 = self.cls(pr2_urdf())

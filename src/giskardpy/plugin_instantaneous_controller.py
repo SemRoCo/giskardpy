@@ -112,7 +112,7 @@ class GoalToConstraints(GetGoal):
             self.soft_constraints.update(c.get_constraint())
 
     def has_robot_changed(self):
-        new_urdf = self.get_robot().get_urdf()
+        new_urdf = self.get_robot().get_urdf_str()
         result = self.last_urdf != new_urdf
         self.last_urdf = new_urdf
         return result

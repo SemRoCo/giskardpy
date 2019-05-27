@@ -63,7 +63,7 @@ class SymEngineController(object):
         a = ''.join(str(x) for x in sorted(chain(self.soft_constraints.keys(),
                                                  self.hard_constraints.keys(),
                                                  self.joint_constraints.keys())))
-        function_hash = hashlib.md5(a + self.robot.get_urdf()).hexdigest()
+        function_hash = hashlib.md5(a + self.robot.get_urdf_str()).hexdigest()
         path_to_functions = self.path_to_functions + function_hash
         self.qp_problem_builder = QProblemBuilder(self.joint_constraints,
                                                   self.hard_constraints,

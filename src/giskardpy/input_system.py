@@ -14,7 +14,7 @@ class JointStatesInput(object):
                                                                    [joint_name] +
                                                                    list(suffix)))
         for joint_name in joint_names:
-            self.joint_map[joint_name] # trigger factory
+            self.joint_map[joint_name]  # trigger factory
 
 
 class Point3Input(InputArray):
@@ -27,6 +27,17 @@ class Point3Input(InputArray):
 
 
 class Vector3Input(Point3Input):
+    def get_expression(self):
+        return sw.vector3(self.x, self.y, self.z)
+
+
+class VectorStampedInput(InputArray):
+    def __init__(self, to_expr, vector_prefix=(), vector_suffix=(), x=(u'x',), y=(u'y',), z=(u'z',)):
+        super(VectorStampedInput, self).__init__(to_expr, (), (),
+                                                 x=list(vector_prefix) + list(x) + list(vector_suffix),
+                                                 y=list(vector_prefix) + list(y) + list(vector_suffix),
+                                                 z=list(vector_prefix) + list(z) + list(vector_suffix))
+
     def get_expression(self):
         return sw.vector3(self.x, self.y, self.z)
 

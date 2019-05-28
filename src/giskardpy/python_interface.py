@@ -2,7 +2,7 @@ import json
 
 import rospy
 from actionlib import SimpleActionClient
-from geometry_msgs.msg import PoseStamped, Point, Quaternion
+from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped
 from giskard_msgs.msg import MoveAction, MoveGoal, WorldBody, CollisionEntry, MoveResult, Constraint, \
     MoveCmd, JointConstraint, CartesianConstraint
 from giskard_msgs.srv import UpdateWorld, UpdateWorldRequest, UpdateWorldResponse
@@ -24,11 +24,17 @@ class GiskardWrapper(object):
             rospy.wait_for_service(u'{}/update_world'.format(ns))
             self.client.wait_for_server()
         self.tip_to_root = {}
-        self.robot_name = URDFObject(rospy.get_param(u'robot_description')).get_name()
+        self.robot_urdf = URDFObject(rospy.get_param(u'robot_description'))
         self.collisions = []
         self.clear_cmds()
         self.object_js_topics = {}
         rospy.sleep(.3)
+
+    def get_robot_name(self):
+        return self.robot_urdf.get_name()
+
+    def get_root(self):
+        return self.robot_urdf.get_root()
 
     def set_cart_goal(self, root, tip, pose_stamped):
         """
@@ -131,6 +137,30 @@ class GiskardWrapper(object):
                 constraint.parameter_value_pair = json.dumps(params)
                 self.cmd_seq[-1].constraints.append(constraint)
 
+    def align_planes(self, tip, tip_normal, root=None, root_normal=None):
+        """
+        :type tip: str
+        :type tip_normal: Vector3Stamped
+        :type root: str
+        :type root_normal: Vector3Stamped
+        :return:
+        """
+        params = {}
+        params[u'root'] = root if root else self.get_root()
+        params[u'tip'] = tip
+        params[u'tip_normal'] = convert_ros_message_to_dictionary(tip_normal)
+        if not root_normal:
+            root_normal = Vector3Stamped()
+            root_normal.header.frame_id = self.get_root()
+            root_normal.vector.z = 1
+        params[u'root_normal'] = convert_ros_message_to_dictionary(root_normal)
+
+        constraint = Constraint()
+        constraint.type = u'AlignPlanes'
+        constraint.parameter_value_pair = json.dumps(params)
+        self.cmd_seq[-1].constraints.append(constraint)
+
+
     def set_collision_entries(self, collisions):
         self.cmd_seq[-1].collisions.extend(collisions)
 
@@ -186,7 +216,7 @@ class GiskardWrapper(object):
         collision_entry = CollisionEntry()
         collision_entry.type = CollisionEntry.ALLOW_COLLISION
         collision_entry.robot_links = [CollisionEntry.ALL]
-        collision_entry.body_b = self.robot_name
+        collision_entry.body_b = self.get_robot_name()
         collision_entry.link_bs = [CollisionEntry.ALL]
         self.set_collision_entries([collision_entry])
 
@@ -194,7 +224,7 @@ class GiskardWrapper(object):
         collision_entry = CollisionEntry()
         collision_entry.type = CollisionEntry.AVOID_COLLISION
         collision_entry.robot_links = [CollisionEntry.ALL]
-        collision_entry.body_b = self.robot_name
+        collision_entry.body_b = self.get_robot_name()
         collision_entry.link_bs = [CollisionEntry.ALL]
         collision_entry.min_dist = min_dist
         self.set_collision_entries([collision_entry])

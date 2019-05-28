@@ -1,13 +1,13 @@
-import shutil
 import numpy as np
+
 import pytest
 import rospy
-from geometry_msgs.msg import PoseStamped, Point, Quaternion
+from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped
 from giskard_msgs.msg import MoveActionGoal, MoveResult, MoveGoal
 
-from utils_for_tests import Donbot
-from giskardpy.tfwrapper import lookup_transform, init as tf_init
 from giskardpy import logging
+from giskardpy.tfwrapper import lookup_transform, init as tf_init, lookup_pose
+from utils_for_tests import Donbot
 
 # TODO roslaunch iai_donbot_sim ros_control_sim.launch
 
@@ -30,6 +30,15 @@ floor_detection_pose = {
     u'ur5_wrist_3_joint': 1.55717146397,
 }
 
+better_js = {
+    u'ur5_shoulder_pan_joint': -np.pi / 2,
+    u'ur5_shoulder_lift_joint': -2.44177755311,
+    u'ur5_elbow_joint': 2.15026930371,
+    u'ur5_wrist_1_joint': 0.291547812391,
+    u'ur5_wrist_2_joint': np.pi / 2,
+    u'ur5_wrist_3_joint': np.pi / 2
+}
+
 folder_name = u'tmp_data/'
 
 
@@ -37,7 +46,7 @@ folder_name = u'tmp_data/'
 def ros(request):
     try:
         logging.loginfo(u'deleting tmp test folder')
-        shutil.rmtree(folder_name)
+        # shutil.rmtree(folder_name)
     except Exception:
         pass
 
@@ -87,19 +96,15 @@ def zero_pose(resetted_giskard):
 
 
 @pytest.fixture()
-def box_setup(pocky_pose_setup):
+def better_pose(resetted_giskard):
     """
     :type pocky_pose_setup: Donbot
     :rtype: Donbot
     """
-    p = PoseStamped()
-    p.header.frame_id = u'map'
-    p.pose.position.x = 1.2
-    p.pose.position.y = 0
-    p.pose.position.z = 0.5
-    p.pose.orientation.w = 1
-    pocky_pose_setup.add_box(pose=p)
-    return pocky_pose_setup
+    resetted_giskard.set_joint_goal(better_js)
+    resetted_giskard.allow_all_collisions()
+    resetted_giskard.send_and_check_goal()
+    return resetted_giskard
 
 
 @pytest.fixture()
@@ -249,6 +254,7 @@ class TestCartGoals(object):
         zero_pose.allow_self_collision()
         zero_pose.set_and_check_cart_goal(goal_pose, zero_pose.gripper_tip, zero_pose.default_root)
 
+
 #     def test_cart_goal_2eef(self, zero_pose):
 #         """
 #         :type zero_pose: Donbot
@@ -384,175 +390,41 @@ class TestCartGoals(object):
 #
 #
 class TestCollisionAvoidanceGoals(object):
-#     def test_add_box(self, zero_pose):
-#         """
-#         :type zero_pose: Donbot
-#         """
-#         object_name = u'muh'
-#         zero_pose.add_box(object_name, position=[1.2, 0, 1.6])
-#
-#     def test_add_remove_sphere(self, zero_pose):
-#         """
-#         :type zero_pose: Donbot
-#         """
-#         object_name = u'muh'
-#         zero_pose.add_sphere(object_name, position=[1.2, 0, 1.6])
-#         zero_pose.remove_object(object_name)
-#
-#     def test_add_remove_cylinder(self, zero_pose):
-#         """
-#         :type zero_pose: Donbot
-#         """
-#         object_name = u'muh'
-#         zero_pose.add_cylinder(object_name, position=[1.2, 0, 1.6])
-#         zero_pose.remove_object(object_name)
-#
-#     def test_add_urdf_body(self, kitchen_setup):
-#         """
-#         :type kitchen_setup: Donbot
-#         """
-#         kitchen_setup.remove_object(u'kitchen')
-#
-#     def test_attach_box(self, zero_pose):
-#         """
-#         :type zero_pose: Donbot
-#         """
-#         pocky = u'http://muh#pocky'
-#         zero_pose.attach_box(pocky, [0.1, 0.02, 0.02], zero_pose.r_tip, [0.05, 0, 0])
-#
-#     def test_attach_existing_box(self, zero_pose):
-#         """
-#         :type zero_pose: Donbot
-#         """
-#         pocky = u'http://muh#pocky'
-#         zero_pose.add_box(pocky, [0.1, 0.02, 0.02], zero_pose.r_tip, [0.05, 0, 0])
-#         zero_pose.attach_box(pocky, frame_id=zero_pose.r_tip)
-#
-#     def test_attach_to_nonexistant_robot_link(self, zero_pose):
-#         """
-#         :type zero_pose: Donbot
-#         """
-#         pocky = u'http://muh#pocky'
-#         zero_pose.attach_box(pocky, [0.1, 0.02, 0.02], u'', [0.05, 0, 0],
-#                              expected_response=UpdateWorldResponse.CORRUPT_SHAPE_ERROR)
-#
-#     def test_add_remove_object(self, zero_pose):
-#         """
-#         :type zero_pose: Donbot
-#         """
-#         object_name = u'muh'
-#         zero_pose.add_box(object_name, position=[1.2, 0, 1.6])
-#         zero_pose.remove_object(object_name)
-#
-#     def test_invalid_update_world(self, zero_pose):
-#         """
-#         :type zero_pose: Donbot
-#         """
-#         req = UpdateWorldRequest(42, WorldBody(), True, PoseStamped())
-#         assert zero_pose.wrapper.update_world.call(req).error_codes == UpdateWorldResponse.INVALID_OPERATION
-#
-#     def test_missing_body_error(self, zero_pose):
-#         """
-#         :type zero_pose: Donbot
-#         """
-#         zero_pose.remove_object(u'muh', expected_response=UpdateWorldResponse.MISSING_BODY_ERROR)
-#
-#     def test_corrupt_shape_error(self, zero_pose):
-#         """
-#         :type zero_pose: Donbot
-#         """
-#         req = UpdateWorldRequest(UpdateWorldRequest.ADD, WorldBody(type=WorldBody.PRIMITIVE_BODY,
-#                                                                    shape=SolidPrimitive(type=42)), True, PoseStamped())
-#         assert zero_pose.wrapper.update_world.call(req).error_codes == UpdateWorldResponse.CORRUPT_SHAPE_ERROR
-#
-#     def test_unsupported_options(self, kitchen_setup):
-#         """
-#         :type kitchen_setup: Donbot
-#         """
-#         wb = WorldBody()
-#         pose = PoseStamped()
-#         pose.header.stamp = rospy.Time.now()
-#         pose.header.frame_id = str(u'map')
-#         pose.pose.position = Point()
-#         pose.pose.orientation = Quaternion(w=1)
-#         wb.type = WorldBody.URDF_BODY
-#
-#         req = UpdateWorldRequest(UpdateWorldRequest.ADD, wb, True, pose)
-#         assert kitchen_setup.wrapper.update_world.call(req).error_codes == UpdateWorldResponse.UNSUPPORTED_OPTIONS
-#
-#     def test_link_b_set_but_body_b_not(self, box_setup):
-#         """
-#         :type box_setup: Donbot
-#         """
-#         ce = CollisionEntry()
-#         ce.type = CollisionEntry.AVOID_COLLISION
-#         ce.link_bs = [u'asdf']
-#         box_setup.add_collision_entries([ce])
-#         box_setup.send_and_check_goal(MoveResult.INSOLVABLE)
-#
-#     def test_unknown_robot_link(self, box_setup):
-#         """
-#         :type box_setup: Donbot
-#         """
-#         ce = CollisionEntry()
-#         ce.type = CollisionEntry.AVOID_COLLISION
-#         ce.robot_links = [u'asdf']
-#         box_setup.add_collision_entries([ce])
-#         box_setup.send_and_check_goal(MoveResult.UNKNOWN_OBJECT)
-#
-#     def test_unknown_body_b(self, box_setup):
-#         """
-#         :type box_setup: Donbot
-#         """
-#         ce = CollisionEntry()
-#         ce.type = CollisionEntry.AVOID_COLLISION
-#         ce.body_b = u'asdf'
-#         box_setup.add_collision_entries([ce])
-#         box_setup.send_and_check_goal(MoveResult.UNKNOWN_OBJECT)
-#
-#     def test_unknown_link_b(self, box_setup):
-#         """
-#         :type box_setup: Donbot
-#         """
-#         ce = CollisionEntry()
-#         ce.type = CollisionEntry.AVOID_COLLISION
-#         ce.body_b = u'box'
-#         ce.link_bs = [u'asdf']
-#         box_setup.add_collision_entries([ce])
-#         box_setup.send_and_check_goal(MoveResult.UNKNOWN_OBJECT)
-#
-#     def test_base_link_in_collision(self, zero_pose):
-#         """
-#         :type zero_pose: Donbot
-#         """
-#         zero_pose.allow_self_collision()
-#         zero_pose.add_box(position=[0, 0, -0.2])
-#         zero_pose.send_and_check_joint_goal(pocky_pose)
-#
-#     def test_unknown_object1(self, box_setup):
-#         """
-#         :type box_setup: Donbot
-#         """
-#         p = PoseStamped()
-#         p.header.frame_id = box_setup.r_tip
-#         p.pose.position = Point(0.1, 0, 0)
-#         p.pose.orientation = Quaternion(0, 0, 0, 1)
-#         box_setup.set_cart_goal(box_setup.default_root, box_setup.r_tip, p)
-#
-#         collision_entry = CollisionEntry()
-#         collision_entry.type = CollisionEntry.AVOID_COLLISION
-#         collision_entry.min_dist = 0.05
-#         collision_entry.body_b = u'muh'
-#         box_setup.add_collision_entries([collision_entry])
-#
-#         box_setup.send_and_check_goal(MoveResult.UNKNOWN_OBJECT)
-#
-    # def test_allow_self_collision(self, zero_pose):
-    #     """
-    #     :type zero_pose: Donbot
-    #     """
-    #     zero_pose.check_cpi_geq(zero_pose.get_r_gripper_links(), 0.1)
-#
+    def test_attach_existing_box_non_fixed(self, better_pose):
+        """
+        :type zero_pose: Donbot
+        """
+        pocky = u'box'
+        # hack_link_name = u'hack_link'
+        # box_object = URDFObject.from_world_body(make_world_body_box(box_name, 0.05, 0.03, 0.2))
+        # link_object = URDFObject.from_world_body(make_world_body_box(hack_link_name, 0.01, 0.01, 0.01))
+
+        p = lookup_pose(better_pose.default_root, better_pose.gripper_tip)
+        p.pose.position.z -= 0.075
+        p.pose.orientation = Quaternion(0., 0., 0, 1)
+
+        better_pose.add_box(pocky, [0.05, 0.03, 0.2], p)
+        better_pose.attach_existing(pocky, frame_id=u'refills_finger')
+
+        tip_normal = Vector3Stamped()
+        tip_normal.header.frame_id = pocky
+        tip_normal.vector.z = 1
+
+        root_normal = Vector3Stamped()
+        root_normal.header.frame_id = u'base_footprint'
+        root_normal.vector.z = 1
+        better_pose.align_planes(pocky, tip_normal, u'base_footprint', root_normal)
+
+        pocky_goal = PoseStamped()
+        pocky_goal.header.frame_id = pocky
+        pocky_goal.pose.position.z = -.5
+        pocky_goal.pose.position.x = .1
+        pocky_goal.pose.position.y = -.2
+        pocky_goal.pose.orientation.w = 1
+        better_pose.allow_self_collision()
+        better_pose.set_translation_goal(pocky_goal, pocky, u'base_footprint')
+        better_pose.send_and_check_goal()
+
     def test_allow_self_collision2(self, zero_pose):
         """
         :type zero_pose: Donbot
@@ -570,43 +442,6 @@ class TestCollisionAvoidanceGoals(object):
         zero_pose.allow_self_collision()
         zero_pose.set_and_check_cart_goal(arm_goal, zero_pose.gripper_tip, zero_pose.default_root)
 
-        # zero_pose.check_cpi_geq(zero_pose.get_r_gripper_links(), 0.05)
-#
-#     def test_allow_self_collision3(self, zero_pose):
-#         """
-#         :type zero_pose: Donbot
-#         """
-#         goal_js = {
-#             u'l_elbow_flex_joint': -1.43286344265,
-#             u'l_forearm_roll_joint': 1.26465060073,
-#             u'l_shoulder_lift_joint': 0.47990329056,
-#             u'l_shoulder_pan_joint': 0.281272240139,
-#             u'l_upper_arm_roll_joint': 0.528415402668,
-#             u'l_wrist_flex_joint': -1.18811419869,
-#             u'l_wrist_roll_joint': 2.26884630124,
-#         }
-#         zero_pose.allow_all_collisions()
-#         zero_pose.send_and_check_joint_goal(goal_js)
-#
-#         p = PoseStamped()
-#         p.header.frame_id = zero_pose.l_tip
-#         p.header.stamp = rospy.get_rostime()
-#         p.pose.position.x = 0.18
-#         p.pose.position.z = 0.02
-#         p.pose.orientation.w = 1
-#
-#         ces = []
-#         ces.append(CollisionEntry(type=CollisionEntry.ALLOW_COLLISION,
-#                                   robot_links=zero_pose.get_l_gripper_links(),
-#                                   body_b=u'pr2',
-#                                   link_bs=zero_pose.get_r_forearm_links()))
-#         zero_pose.add_collision_entries(ces)
-#
-#         zero_pose.set_and_check_cart_goal(zero_pose.default_root, zero_pose.l_tip, p)
-#         zero_pose.check_cpi_leq(zero_pose.get_l_gripper_links(), 0.01)
-#         zero_pose.check_cpi_leq([u'r_forearm_link'], 0.01)
-#         zero_pose.check_cpi_geq(zero_pose.get_r_gripper_links(), 0.05)
-#
     def test_avoid_self_collision(self, zero_pose):
         """
         :type zero_pose: Donbot
@@ -623,207 +458,3 @@ class TestCollisionAvoidanceGoals(object):
         arm_goal.pose.orientation.w = 1
         zero_pose.wrapper.set_self_collision_distance(0.025)
         zero_pose.set_and_check_cart_goal(arm_goal, zero_pose.gripper_tip, zero_pose.default_root)
-#
-#     def test_avoid_collision(self, box_setup):
-#         """
-#         :type box_setup: Donbot
-#         """
-#         ce = CollisionEntry()
-#         ce.type = CollisionEntry.AVOID_COLLISION
-#         ce.body_b = u'box'
-#         ce.min_dist = 0.05
-#         box_setup.add_collision_entries([ce])
-#         box_setup.send_and_check_goal(MoveResult.SUCCESS)
-#         box_setup.check_cpi_geq(box_setup.get_l_gripper_links(), 0.048)
-#         box_setup.check_cpi_geq(box_setup.get_r_gripper_links(), 0.048)
-#
-#     def test_allow_collision(self, box_setup):
-#         """
-#         :type box_setup: Donbot
-#         """
-#         p = PoseStamped()
-#         p.header.frame_id = box_setup.r_tip
-#         p.header.stamp = rospy.get_rostime()
-#         p.pose.position = Point(0.15, 0, 0)
-#         p.pose.orientation = Quaternion(0, 0, 0, 1)
-#
-#         collision_entry = CollisionEntry()
-#         collision_entry.type = CollisionEntry.ALLOW_COLLISION
-#         collision_entry.body_b = u'box'
-#         collision_entry.link_bs = [u'base']
-#         box_setup.wrapper.set_collision_entries([collision_entry])
-#
-#         box_setup.allow_self_collision()
-#         box_setup.set_and_check_cart_goal(box_setup.default_root, box_setup.r_tip, p)
-#
-#         box_setup.check_cpi_geq(box_setup.get_l_gripper_links(), 0.0)
-#         box_setup.check_cpi_leq(box_setup.get_r_gripper_links(), 0.0)
-#
-#     def test_avoid_collision2(self, box_setup):
-#         """
-#         :type box_setup: Donbot
-#         """
-#         p = PoseStamped()
-#         p.header.frame_id = box_setup.r_tip
-#         p.pose.position = Point(0.1, 0, 0)
-#         p.pose.orientation = Quaternion(0, 0, 0, 1)
-#         box_setup.set_cart_goal(box_setup.default_root, box_setup.r_tip, p)
-#
-#         # box_setup.wrapper.avoid_collision()
-#
-#         collision_entry = CollisionEntry()
-#         collision_entry.type = CollisionEntry.AVOID_COLLISION
-#         collision_entry.min_dist = 0.05
-#         collision_entry.body_b = u'box'
-#         box_setup.add_collision_entries([collision_entry])
-#
-#         box_setup.send_and_check_goal()
-#         box_setup.check_cpi_geq(box_setup.get_l_gripper_links(), 0.048)
-#         box_setup.check_cpi_geq(box_setup.get_r_gripper_links(), 0.048)
-#
-#     def test_avoid_collision_with_far_object(self, pocky_pose_setup):
-#         """
-#         :type pocky_pose_setup: Donbot
-#         """
-#         pocky_pose_setup.add_box(position=[25, 25, 25])
-#         p = PoseStamped()
-#         p.header.frame_id = pocky_pose_setup.r_tip
-#         p.pose.position = Point(0.1, 0, 0)
-#         p.pose.orientation = Quaternion(0, 0, 0, 1)
-#         pocky_pose_setup.set_cart_goal(pocky_pose_setup.default_root, pocky_pose_setup.r_tip, p)
-#
-#         collision_entry = CollisionEntry()
-#         collision_entry.type = CollisionEntry.AVOID_COLLISION
-#         collision_entry.min_dist = 0.05
-#         collision_entry.body_b = u'box'
-#         pocky_pose_setup.add_collision_entries([collision_entry])
-#
-#         pocky_pose_setup.send_and_check_goal()
-#         pocky_pose_setup.check_cpi_geq(pocky_pose_setup.get_l_gripper_links(), 0.048)
-#         pocky_pose_setup.check_cpi_geq(pocky_pose_setup.get_r_gripper_links(), 0.048)
-#
-#     def test_avoid_all_collision(self, box_setup):
-#         """
-#         :type box_setup: Donbot
-#         """
-#         p = PoseStamped()
-#         p.header.frame_id = box_setup.r_tip
-#         p.pose.position = Point(0.1, 0, 0)
-#         p.pose.orientation = Quaternion(0, 0, 0, 1)
-#         box_setup.set_cart_goal(box_setup.default_root, box_setup.r_tip, p)
-#
-#         collision_entry = CollisionEntry()
-#         collision_entry.type = CollisionEntry.AVOID_ALL_COLLISIONS
-#         collision_entry.min_dist = 0.05
-#         box_setup.add_collision_entries([collision_entry])
-#
-#         box_setup.send_and_check_goal()
-#
-#         box_setup.check_cpi_geq(box_setup.get_l_gripper_links(), 0.048)
-#         box_setup.check_cpi_geq(box_setup.get_r_gripper_links(), 0.048)
-#
-#     def test_get_out_of_collision(self, box_setup):
-#         """
-#         :type box_setup: Donbot
-#         """
-#         p = PoseStamped()
-#         p.header.frame_id = box_setup.r_tip
-#         p.pose.position = Point(0.15, 0, 0)
-#         p.pose.orientation = Quaternion(0, 0, 0, 1)
-#         box_setup.set_cart_goal(box_setup.default_root, box_setup.r_tip, p)
-#
-#         collision_entry = CollisionEntry()
-#         collision_entry.type = CollisionEntry.ALLOW_ALL_COLLISIONS
-#         collision_entry.min_dist = 0.05
-#         box_setup.add_collision_entries([collision_entry])
-#
-#         box_setup.send_and_check_goal()
-#
-#         p = PoseStamped()
-#         p.header.frame_id = box_setup.r_tip
-#         p.pose.position = Point(0.1, 0, 0)
-#         p.pose.orientation = Quaternion(0, 0, 0, 1)
-#         box_setup.set_cart_goal(box_setup.default_root, box_setup.r_tip, p)
-#
-#         collision_entry = CollisionEntry()
-#         collision_entry.type = CollisionEntry.AVOID_ALL_COLLISIONS
-#         collision_entry.min_dist = 0.05
-#         box_setup.add_collision_entries([collision_entry])
-#
-#         box_setup.send_and_check_goal()
-#
-#         box_setup.check_cpi_geq(box_setup.get_l_gripper_links(), 0.048)
-#         box_setup.check_cpi_geq(box_setup.get_r_gripper_links(), 0.048)
-#
-#     def test_allow_collision_gripper(self, box_setup):
-#         """
-#         :type box_setup: Donbot
-#         """
-#         ces = box_setup.get_allow_l_gripper(u'box')
-#         box_setup.add_collision_entries(ces)
-#         p = PoseStamped()
-#         p.header.frame_id = box_setup.l_tip
-#         p.header.stamp = rospy.get_rostime()
-#         p.pose.position.x = 0.11
-#         p.pose.orientation.w = 1
-#         box_setup.set_and_check_cart_goal(box_setup.default_root, box_setup.l_tip, p)
-#         # box_setup.check_cpi_leq(box_setup.get_l_gripper_links(), 0.0)
-#         box_setup.check_cpi_geq(box_setup.get_r_gripper_links(), 0.048)
-#
-#     def test_attached_collision1(self, box_setup):
-#         """
-#         :type box_setup: Donbot
-#         """
-#         attached_link_name = u'pocky'
-#         box_setup.attach_box(attached_link_name, [0.1, 0.02, 0.02], box_setup.r_tip, [0.05, 0, 0])
-#         box_setup.attach_box(attached_link_name, [0.1, 0.02, 0.02], box_setup.r_tip, [0.05, 0, 0],
-#                              expected_response=UpdateWorldResponse.DUPLICATE_BODY_ERROR)
-#         p = PoseStamped()
-#         p.header.frame_id = box_setup.r_tip
-#         p.header.stamp = rospy.get_rostime()
-#         p.pose.position.x = -0.11
-#         p.pose.orientation.w = 1
-#         box_setup.set_and_check_cart_goal(box_setup.default_root, box_setup.r_tip, p)
-#         box_setup.check_cpi_geq(box_setup.get_l_gripper_links(), 0.048)
-#         box_setup.check_cpi_geq([attached_link_name], 0.048)
-#         box_setup.remove_object(attached_link_name)
-#
-#     def test_attached_collision_avoidance(self, box_setup):
-#         """
-#         :type box_setup: Donbot
-#         """
-#         pocky = 'http://muh#pocky'
-#         box_setup.attach_box(pocky, [0.1, 0.02, 0.02], box_setup.r_tip, [0.05, 0, 0])
-#
-#         ces = []
-#         ce = CollisionEntry()
-#         ce.type = CollisionEntry.ALLOW_COLLISION
-#         ce.robot_links = [pocky]
-#         ce.body_b = 'box'
-#         ces.append(ce)
-#         box_setup.add_collision_entries(ces)
-#
-#         p = PoseStamped()
-#         p.header.frame_id = box_setup.r_tip
-#         p.header.stamp = rospy.get_rostime()
-#         p.pose.position.y = -0.11
-#         p.pose.orientation.w = 1
-#         box_setup.set_and_check_cart_goal(box_setup.default_root, box_setup.r_tip, p)
-#         box_setup.check_cpi_geq(box_setup.get_l_gripper_links(), 0.048)
-#
-#
-#     def test_avoid_collision_gripper(self, box_setup):
-#         """
-#         :type box_setup: Donbot
-#         """
-#         box_setup.allow_all_collisions()
-#         ces = box_setup.get_l_gripper_collision_entries(u'box', 0.05, CollisionEntry.AVOID_COLLISION)
-#         box_setup.add_collision_entries(ces)
-#         p = PoseStamped()
-#         p.header.frame_id = box_setup.l_tip
-#         p.header.stamp = rospy.get_rostime()
-#         p.pose.position.x = 0.
-#         p.pose.orientation.w = 1
-#         box_setup.set_cart_goal(box_setup.default_root, box_setup.l_tip, p)
-#         box_setup.send_goal()
-#         box_setup.check_cpi_geq(box_setup.get_l_gripper_links(), 0.049)

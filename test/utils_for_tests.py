@@ -339,6 +339,9 @@ class GiskardTestWrapper(object):
         goal.pose.orientation.w = 1
         self.set_rotation_goal(goal, tip, root)
 
+    def align_planes(self, tip, tip_normal, root=None, root_normal=None):
+        self.wrapper.align_planes(tip, tip_normal, root, root_normal)
+
     def set_rotation_goal(self, goal_pose, tip, root=None):
         if not root:
             root = self.default_root

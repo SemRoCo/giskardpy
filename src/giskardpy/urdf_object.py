@@ -5,7 +5,7 @@ from itertools import chain
 import urdf_parser_py.urdf as up
 from geometry_msgs.msg import Pose, Vector3, Quaternion
 from std_msgs.msg import ColorRGBA
-from tf.transformations import euler_from_quaternion, quaternion_from_euler
+from tf.transformations import euler_from_quaternion, quaternion_from_euler, rotation_from_matrix, quaternion_matrix
 from visualization_msgs.msg import Marker
 
 from giskardpy.exceptions import DuplicateNameException, UnknownBodyException, CorruptShapeException
@@ -403,7 +403,7 @@ class URDFObject(object):
     def get_root(self):
         return self._urdf_robot.get_root()
 
-    def attach_urdf_object(self, urdf_object, parent_link, pose, joint_type=FIXED_JOINT, axis=None):
+    def attach_urdf_object(self, urdf_object, parent_link, pose):
         """
         Rigidly attach another object to the robot.
         :param urdf_object: Object that shall be attached to the robot.
@@ -436,23 +436,12 @@ class URDFObject(object):
                                                 pose.orientation.y,
                                                 pose.orientation.z,
                                                 pose.orientation.w]))
-        if joint_type == CONTINUOUS_JOINT and not axis:
-            # this axis computation only works on two finger grippers
-            urdf_object.get_urdf_link(urdf_object.get_root()).collision.origin = origin
-            urdf_object.get_urdf_link(urdf_object.get_root()).visual.origin = origin
-            origin = up.Pose([0,0,0],[0,0,0])
-            p_grasp_point__parent = msg_to_list(
-                self.get_joint_origin(self.get_parent_joint_of_link(parent_link)).position)
-            p_object__grasp_point = msg_to_list(pose.position)
-            axis = np.cross(p_object__grasp_point, p_grasp_point__parent)
-            axis = axis / np.linalg.norm(axis)
 
         joint = up.Joint(self.robot_name_to_root_joint(urdf_object.get_name()),
                          parent=parent_link,
                          child=urdf_object.get_root(),
-                         joint_type=joint_type,
-                         origin=origin,
-                         axis=axis)
+                         joint_type=FIXED_JOINT,
+                         origin=origin)
         self._urdf_robot.add_joint(joint)
         for j in urdf_object._urdf_robot.joints:
             self._urdf_robot.add_joint(j)

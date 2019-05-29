@@ -148,13 +148,13 @@ class World(object):
     def remove_robot(self):
         self._robot = None
 
-    def attach_existing_obj_to_robot(self, name, link, pose, joint_type=FIXED_JOINT, axis=None):
+    def attach_existing_obj_to_robot(self, name, link, pose):
         """
         :param name: name of the existing object
         :type name: name
         """
         # TODO this should know the object pose and not require it as input
-        self._robot.attach_urdf_object(self.get_object(name), link, pose, joint_type, axis)
+        self._robot.attach_urdf_object(self.get_object(name), link, pose)
         self.remove_object(name)
 
     def detach(self, joint_name, from_obj=None):

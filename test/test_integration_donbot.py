@@ -418,7 +418,7 @@ class TestCollisionAvoidanceGoals(object):
         pocky_goal = PoseStamped()
         pocky_goal.header.frame_id = pocky
         pocky_goal.pose.position.z = -.5
-        pocky_goal.pose.position.x = .1
+        pocky_goal.pose.position.x = .3
         pocky_goal.pose.position.y = -.2
         pocky_goal.pose.orientation.w = 1
         better_pose.allow_self_collision()

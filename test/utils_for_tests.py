@@ -534,9 +534,9 @@ class GiskardTestWrapper(object):
             compare_poses(expected_pose.pose, lookup_pose(frame_id, name).pose)
         self.loop_once()
 
-    def attach_existing(self, name=u'box', frame_id=None, expected_response=UpdateWorldResponse.SUCCESS, fixed=True):
+    def attach_existing(self, name=u'box', frame_id=None, expected_response=UpdateWorldResponse.SUCCESS):
         scm = self.get_robot().get_self_collision_matrix()
-        r = self.wrapper.attach_object(name, frame_id, fixed)
+        r = self.wrapper.attach_object(name, frame_id)
         assert r.error_codes == expected_response, \
             u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
                                             update_world_error_code(expected_response))
@@ -545,7 +545,6 @@ class GiskardTestWrapper(object):
         assert not self.get_world().has_object(name)
         assert scm.difference(self.get_robot().get_self_collision_matrix()) == set()
         assert len(scm) < len(self.get_robot().get_self_collision_matrix())
-        assert not fixed == self.get_robot().is_joint_continuous(name)
         self.loop_once()
 
     def get_cpi(self, distance_threshold):

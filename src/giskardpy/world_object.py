@@ -7,11 +7,12 @@ from itertools import product
 from time import time
 
 from geometry_msgs.msg import Pose, Quaternion
+from tf.transformations import euler_from_quaternion, rotation_from_matrix, quaternion_matrix
 
+from giskardpy import logging
 from giskardpy.data_types import SingleJointState
 from giskardpy.tfwrapper import msg_to_kdl
-from giskardpy.urdf_object import URDFObject, FIXED_JOINT
-from giskardpy import logging
+from giskardpy.urdf_object import URDFObject
 
 
 class WorldObject(URDFObject):
@@ -149,7 +150,7 @@ class WorldObject(URDFObject):
             if len(sometimes2) > 0:
                 rest = rest.difference(sometimes2)
                 sometimes = sometimes.union(sometimes2)
-        logging.loginfo(u'calculated self collision matrix in {:.3f}s'.format(time()-t))
+        logging.loginfo(u'calculated self collision matrix in {:.3f}s'.format(time() - t))
         return sometimes
 
     def get_possible_collisions(self, link):
@@ -273,22 +274,16 @@ class WorldObject(URDFObject):
         m.pose = self.base_pose
         return m
 
-    def attach_urdf_object(self, urdf_object, parent_link, pose, joint_type=FIXED_JOINT, axis=None):
-        super(WorldObject, self).attach_urdf_object(urdf_object, parent_link, pose, joint_type, axis)
+    def attach_urdf_object(self, urdf_object, parent_link, pose):
+        super(WorldObject, self).attach_urdf_object(urdf_object, parent_link, pose)
         self.update_self_collision_matrix(added_links=set(product(self.get_links_with_collision(),
                                                                   urdf_object.get_links_with_collision())))
-        if joint_type != FIXED_JOINT:
-            joint_name = urdf_object.get_name()
-            self.controlled_joints.append(joint_name)
-            js = self.joint_state
-            js[joint_name] = SingleJointState(joint_name)
-            self.joint_state = js
+        # TODO set joint state for controllable joints of added urdf?
 
     def detach_sub_tree(self, joint_name):
         sub_tree = super(WorldObject, self).detach_sub_tree(joint_name)
         self.update_self_collision_matrix(removed_links=sub_tree.get_link_names())
         return sub_tree
-
 
     def reset(self):
         super(WorldObject, self).reset()

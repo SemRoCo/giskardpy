@@ -1,6 +1,7 @@
 import inspect
 import itertools
 import json
+import traceback
 from copy import copy
 from time import time
 
@@ -104,6 +105,7 @@ class GoalToConstraints(GetGoal):
                 soft_constraints = c.get_constraint()
                 self.soft_constraints.update(soft_constraints)
             except TypeError as e:
+                traceback.print_exc()
                 raise ImplementationException(help(c.get_constraint))
 
     def add_js_controller_soft_constraints(self):

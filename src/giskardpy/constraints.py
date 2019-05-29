@@ -571,7 +571,6 @@ class GravityJoint(Constraint):
         weight = self.get_input_float(self.weight)
 
         parent_link = self.get_robot().get_parent_link_of_joint(self.joint_name)
-        # child_link = self.get_robot().get_child_link_of_joint(self.joint_name)
 
         parent_R_root = sw.rotation_of(self.get_fk(parent_link, self.get_robot().get_root()))
 
@@ -584,25 +583,12 @@ class GravityJoint(Constraint):
         axis_of_rotation = sw.vector3(*self.get_robot().get_joint_axis(self.joint_name))
         l = sw.dot(g__parent, axis_of_rotation)
         goal__parent = g__parent - sw.scale(axis_of_rotation, l)
+        goal__parent = sw.scale(goal__parent, 1)
 
-        parent_R_g_y = sw.cross(axis_of_rotation, goal__parent)
+        goal_vel = sw.acos(sw.dot(com__parent, goal__parent))
 
-        parent_R_g = sw.Matrix([[goal__parent[0], parent_R_g_y[0], axis_of_rotation[0], 0],
-                                [goal__parent[1], parent_R_g_y[1], axis_of_rotation[1], 0],
-                                [goal__parent[2], parent_R_g_y[2], axis_of_rotation[2], 0],
-                                [0, 0, 0, 1]])
-
-        parent_R_current_y = sw.cross(axis_of_rotation, com__parent)
-
-        parent_R_current = sw.Matrix([[goal__parent[0], parent_R_current_y[0], axis_of_rotation[0], 0],
-                                      [goal__parent[1], parent_R_current_y[1], axis_of_rotation[1], 0],
-                                      [goal__parent[2], parent_R_current_y[2], axis_of_rotation[2], 0],
-                                      [0, 0, 0, 1]])
-
-        goal_vel = sw.rotation_distance(parent_R_current.T, parent_R_g)
-
-        muh = sw.cross(com__parent, goal__parent)
-        goal_vel *= sw.sign(sw.dot(muh, axis_of_rotation))
+        ref_axis_of_rotation = sw.cross(com__parent, goal__parent)
+        goal_vel *= sw.sign(sw.dot(ref_axis_of_rotation, axis_of_rotation))
 
 
         soft_constraints[str(self)] = SoftConstraint(lower=goal_vel,

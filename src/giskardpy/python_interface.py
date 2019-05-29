@@ -145,21 +145,23 @@ class GiskardWrapper(object):
         :type root_normal: Vector3Stamped
         :return:
         """
-        params = {}
-        params[u'root'] = root if root else self.get_root()
-        params[u'tip'] = tip
-        params[u'tip_normal'] = convert_ros_message_to_dictionary(tip_normal)
+        root = root if root else self.get_root()
+        tip_normal = convert_ros_message_to_dictionary(tip_normal)
         if not root_normal:
             root_normal = Vector3Stamped()
             root_normal.header.frame_id = self.get_root()
             root_normal.vector.z = 1
-        params[u'root_normal'] = convert_ros_message_to_dictionary(root_normal)
+        root_normal = convert_ros_message_to_dictionary(root_normal)
+        self.set_json_goal(u'AlignPlanes', tip=tip, tip_normal=tip_normal, root=root, root_normal=root_normal)
 
+    def gravity_controlled_joint(self, joint_name, object_name):
+        self.set_json_goal(u'GravityJoint', joint_name=joint_name, object_name=object_name)
+
+    def set_json_goal(self, constraint_type, **kwargs):
         constraint = Constraint()
-        constraint.type = u'AlignPlanes'
-        constraint.parameter_value_pair = json.dumps(params)
+        constraint.type = constraint_type
+        constraint.parameter_value_pair = json.dumps(kwargs)
         self.cmd_seq[-1].constraints.append(constraint)
-
 
     def set_collision_entries(self, collisions):
         self.cmd_seq[-1].collisions.extend(collisions)

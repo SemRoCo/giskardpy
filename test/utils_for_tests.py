@@ -415,6 +415,9 @@ class GiskardTestWrapper(object):
     def add_waypoint(self):
         self.wrapper.add_cmd()
 
+    def add_json_goal(self, constraint_type, **kwargs):
+        self.wrapper.set_json_goal(constraint_type, **kwargs)
+
     #
     # BULLET WORLD #####################################################################################################
     #

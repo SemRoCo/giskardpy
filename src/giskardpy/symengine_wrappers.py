@@ -526,21 +526,18 @@ def trace(matrix):
     return sum(matrix[i, i] for i in range(matrix.shape[0]))
 
 
-def rotation_distance(rotation_matrix1, rotation_matrix2):
+def rotation_distance(a_R_b, b_R_c):
     """
-    :param rotation_matrix1: 4x4 or 3x3 Matrix
-    :type rotation_matrix1: Matrix
-    :param rotation_matrix2: 4x4 or 3x3 Matrix
-    :type rotation_matrix2: Matrix
-    :return: angle from the axis/angle representation of rotation_matrix1 * rotation_matrix2.T
+    :param a_R_b: 4x4 or 3x3 Matrix
+    :type a_R_b: Matrix
+    :param b_R_c: 4x4 or 3x3 Matrix
+    :type b_R_c: Matrix
+    :return: angle of axis angle representation of a_R_c
     :rtype: Union[float, Symbol]
     """
     # TODO test me
-    difference = rotation_matrix1 * rotation_matrix2.T
-    # return -(((trace(difference) - 1)/2)-1)
+    difference = a_R_b * b_R_c
     v = (trace(difference[:3, :3]) - 1) / 2
-    # v = Max(-1, v)
-    # v = Min(1, v)
     return se.acos(v)
 
 

@@ -31,12 +31,12 @@ class Vector3Input(Point3Input):
         return sw.vector3(self.x, self.y, self.z)
 
 
-class VectorStampedInput(InputArray):
+class Vector3StampedInput(InputArray):
     def __init__(self, to_expr, vector_prefix=(), vector_suffix=(), x=(u'x',), y=(u'y',), z=(u'z',)):
-        super(VectorStampedInput, self).__init__(to_expr, (), (),
-                                                 x=list(vector_prefix) + list(x) + list(vector_suffix),
-                                                 y=list(vector_prefix) + list(y) + list(vector_suffix),
-                                                 z=list(vector_prefix) + list(z) + list(vector_suffix))
+        super(Vector3StampedInput, self).__init__(to_expr, (), (),
+                                                  x=list(vector_prefix) + list(x) + list(vector_suffix),
+                                                  y=list(vector_prefix) + list(y) + list(vector_suffix),
+                                                  z=list(vector_prefix) + list(z) + list(vector_suffix))
 
     def get_expression(self):
         return sw.vector3(self.x, self.y, self.z)

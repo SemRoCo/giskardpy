@@ -8,7 +8,7 @@ from scipy.optimize import curve_fit
 import symengine_wrappers as sw
 from giskardpy.identifier import robot_identifier, world_identifier, js_identifier, constraints_identifier, \
     fk_identifier, closest_point_identifier
-from giskardpy.input_system import FrameInput, Point3Input, Vector3Input, VectorStampedInput
+from giskardpy.input_system import FrameInput, Point3Input, Vector3Input, Vector3StampedInput
 from giskardpy.qp_problem_builder import SoftConstraint
 from giskardpy.tfwrapper import transform_pose, transform_vector
 
@@ -34,10 +34,6 @@ class Constraint(object):
     def get_identifier(self):
         return constraints_identifier + [str(self)]
 
-    def get_symbol(self, name):
-        key = self.get_identifier() + [name]
-        return self.god_map.to_symbol(key)
-
     def get_world_object_pose(self, object_name, link_name):
         pass
 
@@ -59,7 +55,7 @@ class Constraint(object):
         """
         return self.get_god_map().safe_get_data(robot_identifier)
 
-    def joint_position_expr(self, joint_name):
+    def get_input_joint_position(self, joint_name):
         key = js_identifier + [joint_name, u'position']
         return self.god_map.to_symbol(key)
 
@@ -79,6 +75,25 @@ class Constraint(object):
                                           [(root, tip),
                                            u'pose',
                                            u'orientation']).get_frame()
+
+    def get_input_float(self, name):
+        key = self.get_identifier() + [name]
+        return self.god_map.to_symbol(key)
+
+    def get_input_PoseStamped(self, name):
+        return FrameInput(self.get_god_map().to_symbol,
+                          translation_prefix=self.get_identifier() +
+                                             [name,
+                                              u'pose',
+                                              u'position'],
+                          rotation_prefix=self.get_identifier() +
+                                          [name,
+                                           u'pose',
+                                           u'orientation']).get_frame()
+
+    def get_input_Vector3Stamped(self, name):
+        return Vector3StampedInput(self.god_map.to_symbol,
+                                   vector_prefix=self.get_identifier() + [name, u'vector']).get_expression()
 
 
 class JointPosition(Constraint):
@@ -110,12 +125,12 @@ class JointPosition(Constraint):
         :return:
         """
 
-        current_joint = self.joint_position_expr(self.joint_name)
+        current_joint = self.get_input_joint_position(self.joint_name)
 
-        joint_goal = self.get_symbol(self.goal)
-        weight = self.get_symbol(self.weight)
-        p_gain = self.get_symbol(self.gain)
-        max_speed = self.get_symbol(self.max_speed)
+        joint_goal = self.get_input_float(self.goal)
+        weight = self.get_input_float(self.weight)
+        p_gain = self.get_input_float(self.gain)
+        max_speed = self.get_input_float(self.max_speed)
 
         soft_constraints = OrderedDict()
 
@@ -181,16 +196,8 @@ class CartesianConstraint(Constraint):
                   self.max_speed: max_speed}
         self.save_params_on_god_map(params)
 
-    def get_goal_pose(self, name):
-        return FrameInput(self.get_god_map().to_symbol,
-                          translation_prefix=self.get_identifier() +
-                                             [name,
-                                              u'pose',
-                                              u'position'],
-                          rotation_prefix=self.get_identifier() +
-                                          [name,
-                                           u'pose',
-                                           u'orientation']).get_frame()
+    def get_goal_pose(self):
+        return self.get_input_PoseStamped(self.goal)
 
     def __str__(self):
         return u'{}/{}/{}'.format(self.__class__.__name__, self.root, self.tip)
@@ -228,10 +235,10 @@ class CartesianPosition(CartesianConstraint):
         :return:
         """
 
-        goal_position = sw.position_of(self.get_goal_pose(self.goal))
-        weight = self.get_symbol(self.weight)
-        gain = self.get_symbol(self.gain)
-        max_speed = self.get_symbol(self.max_speed)
+        goal_position = sw.position_of(self.get_goal_pose())
+        weight = self.get_input_float(self.weight)
+        gain = self.get_input_float(self.gain)
+        max_speed = self.get_input_float(self.max_speed)
 
         current_position = sw.position_of(self.get_fk(self.root, self.tip))
 
@@ -290,10 +297,10 @@ class CartesianOrientation(CartesianConstraint):
         }'
         :return:
         """
-        goal_rotation = sw.rotation_of(self.get_goal_pose(self.goal))
-        weight = self.get_symbol(self.weight)
-        gain = self.get_symbol(self.gain)
-        max_speed = self.get_symbol(self.max_speed)
+        goal_rotation = sw.rotation_of(self.get_goal_pose())
+        weight = self.get_input_float(self.weight)
+        gain = self.get_input_float(self.gain)
+        max_speed = self.get_input_float(self.max_speed)
 
         current_rotation = sw.rotation_of(self.get_fk(self.root, self.tip))
         current_evaluated_rotation = sw.rotation_of(self.get_fk_evaluated(self.root, self.tip))
@@ -356,10 +363,10 @@ class CartesianOrientationSlerp(CartesianConstraint):
         }'
         :return:
         """
-        goal_rotation = sw.rotation_of(self.get_goal_pose(self.goal))
-        weight = self.get_symbol(self.weight)
-        gain = self.get_symbol(self.gain)
-        max_speed = self.get_symbol(self.max_speed)
+        goal_rotation = sw.rotation_of(self.get_goal_pose())
+        weight = self.get_input_float(self.weight)
+        gain = self.get_input_float(self.gain)
+        max_speed = self.get_input_float(self.max_speed)
 
         current_rotation = sw.rotation_of(self.get_fk(self.root, self.tip))
         current_evaluated_rotation = sw.rotation_of(self.get_fk_evaluated(self.root, self.tip))
@@ -442,13 +449,13 @@ class LinkToAnyAvoidance(Constraint):
         point_on_link = self.get_closest_point_on_a(self.link_name)
         other_point = self.get_closest_point_on_b(self.link_name)
         contact_normal = self.get_contact_normal_on_b(self.link_name)
-        repel_speed = self.get_symbol(self.repel_speed)
-        max_weight_distance = self.get_symbol(self.max_weight_distance)
-        low_weight_distance = self.get_symbol(self.low_weight_distance)
-        zero_weight_distance = self.get_symbol(self.zero_weight_distance)
-        A = self.get_symbol(self.A)
-        B = self.get_symbol(self.B)
-        C = self.get_symbol(self.C)
+        repel_speed = self.get_input_float(self.repel_speed)
+        max_weight_distance = self.get_input_float(self.max_weight_distance)
+        low_weight_distance = self.get_input_float(self.low_weight_distance)
+        zero_weight_distance = self.get_input_float(self.zero_weight_distance)
+        A = self.get_input_float(self.A)
+        B = self.get_input_float(self.B)
+        C = self.get_input_float(self.C)
 
         soft_constraints = OrderedDict()
 
@@ -512,19 +519,17 @@ class AlignPlanes(Constraint):
         return u'{}/{}/{}'.format(self.__class__.__name__, self.root, self.tip)
 
     def get_root_normal_vector(self):
-        return VectorStampedInput(self.god_map.to_symbol,
-                                  vector_prefix=self.get_identifier() + [self.root_normal, u'vector']).get_expression()
+        return self.get_input_Vector3Stamped(self.root_normal)
 
     def get_tip_normal_vector(self):
-        return VectorStampedInput(self.god_map.to_symbol,
-                                  vector_prefix=self.get_identifier() + [self.tip_normal, u'vector']).get_expression()
+        return self.get_input_Vector3Stamped(self.tip_normal)
 
     def get_constraint(self):
         # TODO integrate gain and max_speed?
         soft_constraints = OrderedDict()
-        weight = self.get_symbol(self.weight)
-        gain = self.get_symbol(self.gain)
-        max_speed = self.get_symbol(self.max_speed)
+        weight = self.get_input_float(self.weight)
+        gain = self.get_input_float(self.gain)
+        max_speed = self.get_input_float(self.max_speed)
         root_R_tip = sw.rotation_of(self.get_fk(self.root, self.tip))
         tip_normal__tip = self.get_tip_normal_vector()
         root_normal__root = self.get_root_normal_vector()
@@ -545,6 +550,70 @@ class AlignPlanes(Constraint):
                                                             weight=weight,
                                                             expression=tip_normal__root[2])
         return soft_constraints
+
+
+class GravityJoint(Constraint):
+    weight = u'weight'
+
+    def __init__(self, god_map, joint_name, object_name, weight=HIGH_WEIGHT):
+        super(GravityJoint, self).__init__(god_map)
+        self.joint_name = joint_name
+        self.weight = weight
+        self.object_name = object_name
+        # todo make sure center of mass is in child frame id
+        params = {self.weight: weight}
+        self.save_params_on_god_map(params)
+
+    def get_constraint(self):
+        soft_constraints = OrderedDict()
+
+        current_joint = self.get_input_joint_position(self.joint_name)
+        weight = self.get_input_float(self.weight)
+
+        parent_link = self.get_robot().get_parent_link_of_joint(self.joint_name)
+        # child_link = self.get_robot().get_child_link_of_joint(self.joint_name)
+
+        parent_R_root = sw.rotation_of(self.get_fk(parent_link, self.get_robot().get_root()))
+
+        com__parent = sw.position_of(self.get_fk_evaluated(parent_link, self.object_name))
+        com__parent[3] = 0
+        com__parent = sw.scale(com__parent, 1)
+
+        g = sw.vector3(0, 0, -1)
+        g__parent = parent_R_root * g
+        axis_of_rotation = sw.vector3(*self.get_robot().get_joint_axis(self.joint_name))
+        l = sw.dot(g__parent, axis_of_rotation)
+        goal__parent = g__parent - sw.scale(axis_of_rotation, l)
+
+        parent_R_g_y = sw.cross(axis_of_rotation, goal__parent)
+
+        parent_R_g = sw.Matrix([[goal__parent[0], parent_R_g_y[0], axis_of_rotation[0], 0],
+                                [goal__parent[1], parent_R_g_y[1], axis_of_rotation[1], 0],
+                                [goal__parent[2], parent_R_g_y[2], axis_of_rotation[2], 0],
+                                [0, 0, 0, 1]])
+
+        parent_R_current_y = sw.cross(axis_of_rotation, com__parent)
+
+        parent_R_current = sw.Matrix([[goal__parent[0], parent_R_current_y[0], axis_of_rotation[0], 0],
+                                      [goal__parent[1], parent_R_current_y[1], axis_of_rotation[1], 0],
+                                      [goal__parent[2], parent_R_current_y[2], axis_of_rotation[2], 0],
+                                      [0, 0, 0, 1]])
+
+        goal_vel = sw.rotation_distance(parent_R_current.T, parent_R_g)
+
+        muh = sw.cross(com__parent, goal__parent)
+        goal_vel *= sw.sign(sw.dot(muh, axis_of_rotation))
+
+
+        soft_constraints[str(self)] = SoftConstraint(lower=goal_vel,
+                                                     upper=goal_vel,
+                                                     weight=weight,
+                                                     expression=current_joint)
+
+        return soft_constraints
+
+    def __str__(self):
+        return u'{}/{}'.format(self.__class__.__name__, self.joint_name)
 
 
 def add_debug_constraint(d, key, expr):

@@ -413,7 +413,8 @@ class TestCollisionAvoidanceGoals(object):
         root_normal = Vector3Stamped()
         root_normal.header.frame_id = u'base_footprint'
         root_normal.vector.z = 1
-        better_pose.align_planes(pocky, tip_normal, u'base_footprint', root_normal)
+        # better_pose.align_planes(pocky, tip_normal, u'base_footprint', root_normal)
+        better_pose.add_json_goal(u'GravityJoint', joint_name=u'refills_finger', object_name=pocky)
 
         pocky_goal = PoseStamped()
         pocky_goal.header.frame_id = pocky

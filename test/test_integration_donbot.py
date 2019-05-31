@@ -4,6 +4,7 @@ import pytest
 import rospy
 from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped
 from giskard_msgs.msg import MoveActionGoal, MoveResult, MoveGoal
+from tf.transformations import quaternion_about_axis
 
 from giskardpy import logging
 from giskardpy.tfwrapper import lookup_transform, init as tf_init, lookup_pose
@@ -399,28 +400,29 @@ class TestCollisionAvoidanceGoals(object):
         # box_object = URDFObject.from_world_body(make_world_body_box(box_name, 0.05, 0.03, 0.2))
         # link_object = URDFObject.from_world_body(make_world_body_box(hack_link_name, 0.01, 0.01, 0.01))
 
-        p = lookup_pose(better_pose.default_root, better_pose.gripper_tip)
-        p.pose.position.z -= 0.075
-        p.pose.orientation = Quaternion(0., 0., 0, 1)
+        p = PoseStamped()
+        p.header.frame_id = u'refills_finger'
+        p.pose.position.y = -0.075
+        p.pose.orientation = Quaternion(0,0,0,1)
 
-        better_pose.add_box(pocky, [0.05, 0.03, 0.2], p)
+        better_pose.add_box(pocky, [0.05, 0.2, 0.03], p)
         better_pose.attach_existing(pocky, frame_id=u'refills_finger')
 
         tip_normal = Vector3Stamped()
         tip_normal.header.frame_id = pocky
-        tip_normal.vector.z = 1
+        tip_normal.vector.y = 1
 
         root_normal = Vector3Stamped()
         root_normal.header.frame_id = u'base_footprint'
         root_normal.vector.z = 1
-        # better_pose.align_planes(pocky, tip_normal, u'base_footprint', root_normal)
-        better_pose.add_json_goal(u'GravityJoint', joint_name=u'refills_finger', object_name=pocky)
+        better_pose.align_planes(pocky, tip_normal, u'base_footprint', root_normal)
+        # better_pose.add_json_goal(u'GravityJoint', joint_name=u'refills_finger', object_name=pocky)
 
         pocky_goal = PoseStamped()
         pocky_goal.header.frame_id = pocky
-        pocky_goal.pose.position.z = -.5
+        pocky_goal.pose.position.y = -.5
         pocky_goal.pose.position.x = .3
-        pocky_goal.pose.position.y = -.2
+        pocky_goal.pose.position.z = -.2
         pocky_goal.pose.orientation.w = 1
         better_pose.allow_self_collision()
         better_pose.set_translation_goal(pocky_goal, pocky, u'base_footprint')

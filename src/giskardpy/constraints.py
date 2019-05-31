@@ -555,12 +555,11 @@ class AlignPlanes(Constraint):
 class GravityJoint(Constraint):
     weight = u'weight'
 
-    def __init__(self, god_map, joint_name, object_name, weight=HIGH_WEIGHT):
+    def __init__(self, god_map, joint_name, object_name, weight=MAX_WEIGHT):
         super(GravityJoint, self).__init__(god_map)
         self.joint_name = joint_name
         self.weight = weight
         self.object_name = object_name
-        # todo make sure center of mass is in child frame id
         params = {self.weight: weight}
         self.save_params_on_god_map(params)
 
@@ -591,8 +590,8 @@ class GravityJoint(Constraint):
         goal_vel *= sw.sign(sw.dot(ref_axis_of_rotation, axis_of_rotation))
 
 
-        soft_constraints[str(self)] = SoftConstraint(lower=goal_vel,
-                                                     upper=goal_vel,
+        soft_constraints[str(self)] = SoftConstraint(lower=goal_vel, #sw.Min(goal_vel, 0),
+                                                     upper=goal_vel, #sw.Max(goal_vel, 0),
                                                      weight=weight,
                                                      expression=current_joint)
 

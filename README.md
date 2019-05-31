@@ -38,9 +38,3 @@ cd ..                                       # go to workspace directory
 catkin build                                # build packages
 source ~/giskardpy_ws/devel/setup.bash      # source new overlay
 ```
-
-### Tests
-Run
-```
-catkin build --catkin-make-args run_tests  # build packages
-```

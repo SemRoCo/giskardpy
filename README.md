@@ -3,7 +3,7 @@ The core python library of the Giskard framework for constraint- and optimizatio
 
 ## Installation instructions for 16.04/kinetic
 
-First install symengine + symengine.py
+First install symengine + symengine.py, this does not have to be part of the ros workspace
 ```
 sudo apt-get install llvm-6.0-dev
 git clone https://github.com/symengine/symengine.git

@@ -34,7 +34,7 @@ from giskardpy import logging
 
 def initialize_blackboard(urdf, default_joint_vel_limit, default_joint_weight, path_to_data_folder, gui):
     pbw.start_pybullet(gui)
-    controlled_joints = rospy.wait_for_message(u'/joint_goal_splitter/state',
+    controlled_joints = rospy.wait_for_message(u'/whole_body_controller/state',
                                                JointTrajectoryControllerState).joint_names
 
     blackboard = Blackboard
@@ -127,7 +127,7 @@ def grow_tree():
     root.add_child(planning)
     root.add_child(CleanUp(u'cleanup'))
     root.add_child(publish_result)
-    root.add_child(SendResult(u'send result', action_server_name, path_to_data_folder, plot_trajectory))
+    root.add_child(SendResult(u'send result', action_server_name, path_to_data_folder, plot_trajectory=plot_trajectory))
 
     tree = BehaviourTree(root)
 

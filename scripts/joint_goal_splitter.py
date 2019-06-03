@@ -9,20 +9,20 @@ import controller_manager_msgs.srv
 
 class JointGoalSplitter:
     def __init__(self):
-        rospy.init_node('JointGoalSplitter', anonymous=True)
-        self.base_client = actionlib.SimpleActionClient('/whole_body_controller/follow_joint_trajectory/base', control_msgs.msg.FollowJointTrajectoryAction)#/hsrb/omni_base_controller/follow_joint_trajectory
-        self.arm_client = actionlib.SimpleActionClient('/whole_body_controller/follow_joint_trajectory',
+        rospy.init_node('JointGoalSplitter')
+        self.base_client = actionlib.SimpleActionClient('/whole_body_controller/base/follow_joint_trajectory', control_msgs.msg.FollowJointTrajectoryAction)#/hsrb/omni_base_controller/follow_joint_trajectory
+        self.arm_client = actionlib.SimpleActionClient('/whole_body_controller/body/follow_joint_trajectory',
                                                         control_msgs.msg.FollowJointTrajectoryAction)
 
         self.base_joints = rospy.wait_for_message('/whole_body_controller/base/state', control_msgs.msg.JointTrajectoryControllerState).joint_names
-        self.arm_joints = rospy.wait_for_message('/whole_body_controller/state', control_msgs.msg.JointTrajectoryControllerState).joint_names
+        self.arm_joints = rospy.wait_for_message('/whole_body_controller/body/state', control_msgs.msg.JointTrajectoryControllerState).joint_names
 
-        self._as = actionlib.SimpleActionServer('/joint_goal_splitter/follow_joint_trajectory', control_msgs.msg.FollowJointTrajectoryAction,
+        self._as = actionlib.SimpleActionServer('/whole_body_controller/follow_joint_trajectory', control_msgs.msg.FollowJointTrajectoryAction,
                                                 execute_cb=self.callback, auto_start=False)
         self._as.register_preempt_callback(self.preempt_cb)
         self._as.start()
 
-        self.pub = rospy.Publisher('/joint_goal_splitter/state', control_msgs.msg.JointTrajectoryControllerState, queue_size=10)
+        self.pub = rospy.Publisher('/whole_body_controller/state', control_msgs.msg.JointTrajectoryControllerState, queue_size=10)
         self.running = True
         self.t = threading.Thread(target=self.state_publisher_thread)
         self.t.daemon = True
@@ -36,6 +36,7 @@ class JointGoalSplitter:
 
 
     def callback(self, goal):
+        print('received goal')
         self.success = True
         base_ids = []
         arm_ids = []
@@ -56,7 +57,9 @@ class JointGoalSplitter:
             if len(p.positions) > max(base_ids): #einzeln checken
                 base_traj_point = trajectory_msgs.msg.JointTrajectoryPoint()
                 joint_pos = [p.positions[i] for i in base_ids]
+                joint_vel = [p.velocities[i] for i in base_ids]
                 base_traj_point.positions = tuple(joint_pos)
+                base_traj_point.velocities = tuple(joint_vel)
                 base_traj_point.time_from_start.nsecs = p.time_from_start.nsecs
                 base_traj_point.time_from_start.secs = p.time_from_start.secs
                 base_traj_points.append(base_traj_point)
@@ -64,7 +67,9 @@ class JointGoalSplitter:
             if len(p.positions) > max(arm_ids):
                 arm_traj_point = trajectory_msgs.msg.JointTrajectoryPoint()
                 joint_pos_arm = [p.positions[i] for i in arm_ids]
+                joint_vel_arm = [p.velocities[i] for i in arm_ids]
                 arm_traj_point.positions = tuple(joint_pos_arm)
+                arm_traj_point.velocities = tuple(joint_vel_arm)
                 arm_traj_point.time_from_start.nsecs = p.time_from_start.nsecs
                 arm_traj_point.time_from_start.secs = p.time_from_start.secs
                 arm_traj_points.append(arm_traj_point)
@@ -76,11 +81,14 @@ class JointGoalSplitter:
         base_goal.trajectory = base_traj
         arm_goal.trajectory = arm_traj
 
+        print('send splitted goals')
         self.base_client.send_goal(base_goal, feedback_cb=self.feedback_cb_base)
         self.arm_client.send_goal(arm_goal, feedback_cb=self.feedback_cb_arm)
 
         self.base_client.wait_for_result()
+        print('received result 1')
         self.arm_client.wait_for_result()
+        print('received result 2')
 
         self.base_result = self.base_client.get_result()
         self.arm_result = self.arm_client.get_result()

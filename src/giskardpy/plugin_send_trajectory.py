@@ -15,14 +15,14 @@ class SendTrajectory(ActionClient, GiskardBehavior):
                          isinstance(value, int)}
 
     def __init__(self, name, fill_velocity_values,
-                 action_namespace=u'/joint_goal_splitter/follow_joint_trajectory'):
+                 action_namespace=u'/whole_body_controller/follow_joint_trajectory'):
         GiskardBehavior.__init__(self, name)
         ActionClient.__init__(self, name, FollowJointTrajectoryAction, None, action_namespace)
         self.fill_velocity_values = fill_velocity_values
 
     def setup(self, timeout):
         # TODO get this from god map
-        self.controller_joints = rospy.wait_for_message(u'/joint_goal_splitter/state',
+        self.controller_joints = rospy.wait_for_message(u'/whole_body_controller/state',
                                                         JointTrajectoryControllerState).joint_names
         return super(SendTrajectory, self).setup(timeout)
 

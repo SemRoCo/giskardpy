@@ -30,6 +30,8 @@ from giskardpy.data_types import SingleJointState
 from giskardpy.plugin import PluginBehavior
 from giskardpy.tfwrapper import kdl_to_pose, np_to_kdl
 
+r = rospkg.RosPack()
+
 
 @contextmanager
 def suppress_stderr():
@@ -65,7 +67,7 @@ class NullContextManager(object):
         pass
 
 
-class keydefaultdict(defaultdict):
+class KeyDefaultDict(defaultdict):
     """
     A default dict where the key is passed as parameter to the factory function.
     """
@@ -653,6 +655,10 @@ def compare_version(version1, operator, version2):
         return False
 
 
+def get_ros_pkg_path(ros_pkg):
+    return r.get_path(ros_pkg)
+
+
 def rospkg_exists(name):
     """
     checks whether a ros package with the given name and version exists
@@ -660,7 +666,6 @@ def rospkg_exists(name):
     :type name: str
     :return: True if it exits else False
     """
-    r = rospkg.RosPack()
     name = name.replace(' ', '')
     version_list = name.split(',')
     version_entry1 = re.split('(==|>=|<=|<|>)', version_list[0])
@@ -691,9 +696,8 @@ def check_dependencies():
     Checks whether the dependencies specified in the dependency.txt in the root folder of giskardpy are installed. If a
     dependecy is not installed a message is printed.
     """
-    r = rospkg.RosPack()
 
-    with open(r.get_path('giskardpy') + '/dependencies.txt') as f:
+    with open(get_ros_pkg_path('giskardpy') + '/dependencies.txt') as f:
         dependencies = f.readlines()
 
     dependencies = [x.split('#')[0] for x in dependencies]
@@ -710,5 +714,5 @@ def check_dependencies():
 
 
 def str_to_unique_number(s):
-    #FIXME not actually unique
+    # FIXME not actually unique
     return sum(ord(x) for x in s)

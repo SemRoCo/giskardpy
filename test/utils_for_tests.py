@@ -1,5 +1,6 @@
 import keyword
 import numpy as np
+import yaml
 from multiprocessing import Queue
 from numpy import pi
 from threading import Thread
@@ -24,7 +25,7 @@ from giskardpy.python_interface import GiskardWrapper
 from giskardpy.symengine_robot import Robot
 from giskardpy.symengine_wrappers import axis_angle_from_quaternion
 from giskardpy.tfwrapper import transform_pose, lookup_pose
-from giskardpy.utils import msg_to_list, keydefaultdict, dict_to_joint_states
+from giskardpy.utils import msg_to_list, KeyDefaultDict, dict_to_joint_states, get_ros_pkg_path
 
 BIG_NUMBER = 1e100
 SMALL_NUMBER = 1e-100
@@ -187,29 +188,12 @@ def pykdl_frame_to_numpy(pykdl_frame):
 
 
 class GiskardTestWrapper(object):
-    def __init__(self, param_overwrites=None):
-        params = {u'~enable_gui': False,
-                  u'~debug': False,
-                  u'~enable_visualization': True,
-                  u'~enable_collision_marker': True,
-                  u'~tree_tick_rate': .01,
-                  u'~map_frame': u'map',
-                  u'~root_link': u'base_footprint',
-                  u'~wiggle_precision_threshold': 4,
-                  u'~sample_period': 0.05,
-                  u'~default_joint_vel_limit': 0.151,
-                  u'~default_collision_avoidance_distance': 0.05,
-                  u'~fill_velocity_values': True,
-                  u'~nWSR': u'None',
-                  u'~path_to_data_folder': u'tmp_data/',
-                  u'~collision_time_threshold': 10,
-                  u'~max_traj_length': 30,
-                  u'~joint_convergence_threshold': 0.004,
-                  u'~plot_trajectory': False}
-        if param_overwrites is not None:
-            params.update(param_overwrites)
-        for param_name, value in params.items():
-            rospy.set_param(param_name, value)
+    def __init__(self, config_file):
+        with open(get_ros_pkg_path(u'giskardpy') + u'/config/' + config_file) as f:
+            config = yaml.load(f)
+        rospy.set_param(u'~', config)
+        rospy.set_param(u'~path_to_data_folder', u'tmp_data/')
+        rospy.set_param(u'~enable_gui', False)
 
         self.sub_result = rospy.Subscriber(u'/giskardpy/command/result', MoveActionResult, self.cb, queue_size=100)
 
@@ -228,7 +212,7 @@ class GiskardTestWrapper(object):
             rospy.sleep(.2)
             return p
 
-        self.joint_state_publisher = keydefaultdict(create_publisher)
+        self.joint_state_publisher = KeyDefaultDict(create_publisher)
         # rospy.sleep(1)
 
     def wait_for_synced(self):
@@ -604,12 +588,10 @@ class PR2(GiskardTestWrapper):
     def __init__(self):
         self.r_tip = u'r_gripper_tool_frame'
         self.l_tip = u'l_gripper_tool_frame'
-        params = {u'~default_joint_weight': 0.001,
-                  u'~slerp': True}
         self.r_gripper = rospy.ServiceProxy(u'r_gripper_simulator/set_joint_states', SetJointState)
         self.l_gripper = rospy.ServiceProxy(u'l_gripper_simulator/set_joint_states', SetJointState)
-        super(PR2, self).__init__(params)
-        self.default_root = u'odom'
+        super(PR2, self).__init__(u'pr2.yaml')
+        self.default_root = self.get_robot().get_root()
 
     def move_base(self, goal_pose):
         goal_pose = transform_pose(self.default_root, goal_pose)
@@ -687,12 +669,9 @@ class PR2(GiskardTestWrapper):
 
 class Donbot(GiskardTestWrapper):
     def __init__(self):
-        params = {u'~default_joint_weight': 0.001,
-                  u'~slerp': True,
-                  u'~default_collision_avoidance_distance': 0.03}
         self.camera_tip = u'camera_link'
         self.gripper_tip = u'gripper_tool_frame'
-        super(Donbot, self).__init__(params)
+        super(Donbot, self).__init__(u'donbot.yaml')
 
     def move_base(self, goal_pose):
         goal_pose = transform_pose(self.default_root, goal_pose)

@@ -39,7 +39,7 @@ class PyBulletWorld(World):
         self._robot = None
         self.setup()
 
-    def add_robot(self, robot, base_pose, controlled_joints, default_joint_vel_limit, default_joint_weight,
+    def add_robot(self, robot, base_pose, controlled_joints, default_joint_vel_limit, joint_weight,
                   calc_self_collision_matrix):
         """
         :type robot: giskardpy.world_object.WorldObject
@@ -50,7 +50,7 @@ class PyBulletWorld(World):
         if isinstance(robot, PyBulletWorldObject):
             raise TypeError(u'don\t use PyBulletWorldObjects!')
         super(PyBulletWorld, self).add_robot(robot, base_pose, controlled_joints, default_joint_vel_limit,
-                                             default_joint_weight, calc_self_collision_matrix)
+                                             joint_weight, calc_self_collision_matrix)
 
     def __get_pybullet_object_id(self, name):
         return self.get_object(name).get_pybullet_id()

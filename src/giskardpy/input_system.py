@@ -1,5 +1,5 @@
 import symengine_wrappers as sw
-from giskardpy.utils import keydefaultdict
+from giskardpy.utils import KeyDefaultDict
 
 
 class InputArray(object):
@@ -10,7 +10,7 @@ class InputArray(object):
 
 class JointStatesInput(object):
     def __init__(self, to_expr, joint_names, prefix=(), suffix=()):
-        self.joint_map = keydefaultdict(lambda joint_name: to_expr(list(prefix) +
+        self.joint_map = KeyDefaultDict(lambda joint_name: to_expr(list(prefix) +
                                                                    [joint_name] +
                                                                    list(suffix)))
         for joint_name in joint_names:

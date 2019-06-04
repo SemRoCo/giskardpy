@@ -23,6 +23,7 @@ default_collision_avoidance_distance = rosparam + [u'default_collision_avoidance
 enable_collision_marker = rosparam + [u'enable_collision_marker']
 default_joint_weight_identifier = rosparam + [u'default_joint_weight']
 default_joint_vel_identifier = rosparam + [u'default_joint_vel_limit']
+joint_weights = rosparam + [u'joint_weights']
 nWSR = rosparam + [u'nWSR']
 joint_convergence_threshold = rosparam + [u'joint_convergence_threshold']
 wiggle_precision_threshold = rosparam + [u'wiggle_precision_threshold']

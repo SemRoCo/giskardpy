@@ -10,18 +10,11 @@ sample_period: 0.05
 default_joint_vel_limit: 0.25
 default_joint_weight: 0.001
 joint_weights:
-  odom_x_joint: 0.001
-  odom_y_joint: 0.001
-  odom_z_joint: 0.001
-  ur5_shoulder_pan_joint: 0.001
-  ur5_shoulder_lift_joint: 0.001
-  ur5_elbow_joint: 0.001
-  ur5_wrist_1_joint: 0.001
-  ur5_wrist_2_joint: 0.001
-  ur5_wrist_3_joint: 0.001
-  gripper_joint: 0.001
-  refills_finger: 0.001
-default_collision_avoidance_distance: 0.05
+  odom_x_joint: 10
+  odom_y_joint: 10
+  odom_z_joint: 10
+  refills_finger: 0.01
+default_collision_avoidance_distance: 0.03
 fill_velocity_values: True
 nWSR: None # None results in a nWSR estimation thats fine most of the time
 root_link: odom

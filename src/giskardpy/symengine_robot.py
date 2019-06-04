@@ -7,7 +7,7 @@ import symengine_wrappers as spw
 from giskardpy import BACKEND, WORLD_IMPLEMENTATION
 from giskardpy.pybullet_world_object import PyBulletWorldObject
 from giskardpy.qp_problem_builder import HardConstraint, JointConstraint
-from giskardpy.utils import keydefaultdict, \
+from giskardpy.utils import KeyDefaultDict, \
     homo_matrix_to_pose
 from giskardpy.world_object import WorldObject
 
@@ -21,7 +21,7 @@ else:
 
 class Robot(Backend):
     def __init__(self, urdf, base_pose=None, controlled_joints=None, path_to_data_folder=u'', default_joint_vel_limit=0,
-                 default_joint_weight=0, calc_self_collision_matrix=True, *args, **kwargs):
+                 calc_self_collision_matrix=True, joint_weights=None, *args, **kwargs):
         """
         :param urdf:
         :type urdf: str
@@ -34,9 +34,9 @@ class Robot(Backend):
         self._fks = {}
         self._evaluated_fks = {}
         self._joint_to_frame = {}
+        self._joint_weights = joint_weights
         self._default_joint_velocity_limit = default_joint_vel_limit
-        self._default_weight = default_joint_weight
-        self._joint_to_symbol_map = keydefaultdict(lambda x: spw.Symbol(x)) # don't iterate over this map!!
+        self._joint_to_symbol_map = KeyDefaultDict(lambda x: spw.Symbol(x)) # don't iterate over this map!!
         super(Robot, self).__init__(urdf, base_pose, controlled_joints, path_to_data_folder, calc_self_collision_matrix,
                                     *args, **kwargs)
         self.reinitialize()
@@ -133,7 +133,7 @@ class Robot(Backend):
 
             self._joint_constraints[joint_name] = JointConstraint(lower=-velocity_limit,
                                                                   upper=velocity_limit,
-                                                                  weight=self._default_weight)
+                                                                  weight=self._joint_weights[joint_name])
 
 
     def get_fk_expression(self, root_link, tip_link):
@@ -171,7 +171,7 @@ class Robot(Backend):
             m = spw.speed_up(fk, fk.free_symbols, backend=BACKEND)
             return m
 
-        self._fks = keydefaultdict(f)
+        self._fks = KeyDefaultDict(f)
 
     # JOINT FUNCTIONS
 

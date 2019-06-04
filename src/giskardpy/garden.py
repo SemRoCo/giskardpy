@@ -6,33 +6,34 @@ import rospy
 from control_msgs.msg import JointTrajectoryControllerState
 from giskard_msgs.msg import MoveAction
 from py_trees import Sequence, Selector, BehaviourTree, Blackboard
-from py_trees.meta import success_is_running, failure_is_success, success_is_failure
+from py_trees.meta import failure_is_success, success_is_failure
 from py_trees_ros.trees import BehaviourTree
 from rospy import ROSException
-import sys
-import giskardpy.pybullet_wrapper as pbw
-from giskardpy.god_map import GodMap
+
 import giskardpy.identifier as identifier
+import giskardpy.pybullet_wrapper as pbw
+from giskardpy import logging
+from giskardpy.god_map import GodMap
 from giskardpy.input_system import JointStatesInput
-from giskardpy.plugin import PluginBehavior, SuccessPlugin
+from giskardpy.plugin import PluginBehavior
 from giskardpy.plugin_action_server import GoalReceived, SendResult, GoalCanceled
 from giskardpy.plugin_attached_tf_publicher import TFPlugin
 from giskardpy.plugin_cleanup import CleanUp
 from giskardpy.plugin_configuration import ConfigurationPlugin
 from giskardpy.plugin_goal_reached import GoalReachedPlugin
 from giskardpy.plugin_instantaneous_controller import GoalToConstraints, ControllerPlugin
-from giskardpy.plugin_interrupts import CollisionCancel, WiggleCancel
+from giskardpy.plugin_interrupts import WiggleCancel
 from giskardpy.plugin_kinematic_sim import KinSimPlugin
 from giskardpy.plugin_log_trajectory import LogTrajPlugin
 from giskardpy.plugin_pybullet import WorldUpdatePlugin, CollisionChecker
 from giskardpy.plugin_send_trajectory import SendTrajectory
-from giskardpy.pybullet_world import PyBulletWorld
-from giskardpy.utils import create_path, render_dot_tree
 from giskardpy.plugin_visualization import VisualizationBehavior
+from giskardpy.pybullet_world import PyBulletWorld
+from giskardpy.utils import create_path, render_dot_tree, KeyDefaultDict
 from giskardpy.world_object import WorldObject
-from giskardpy import logging
 
-def initialize_blackboard():
+
+def initialize_god_map():
     god_map = GodMap()
     blackboard = Blackboard
     blackboard.god_map = god_map
@@ -62,7 +63,13 @@ def initialize_blackboard():
         else:
             break
 
-    default_joint_weight = god_map.to_symbol(identifier.default_joint_weight_identifier)
+    joint_weight_symbols = KeyDefaultDict(lambda key: god_map.to_symbol(identifier.joint_weights + [key]))
+
+
+    joint_weights = KeyDefaultDict(lambda key: god_map.get_data(identifier.default_joint_weight_identifier))
+    joint_weights.update(god_map.safe_get_data(identifier.joint_weights))
+    god_map.safe_set_data(identifier.joint_weights, joint_weights)
+
     default_joint_vel = god_map.to_symbol(identifier.default_joint_vel_identifier)
 
     world = PyBulletWorld(god_map.safe_get_data(identifier.gui),
@@ -70,17 +77,19 @@ def initialize_blackboard():
     robot = WorldObject(god_map.safe_get_data(identifier.robot_description),
                         None,
                         controlled_joints)
-    world.add_robot(robot, None, controlled_joints, default_joint_vel, default_joint_weight, True)
-    js_input = JointStatesInput(blackboard.god_map.to_symbol, world.robot.get_controllable_joints(), identifier.joint_states,
+    world.add_robot(robot, None, controlled_joints, default_joint_vel, joint_weight_symbols, True)
+    js_input = JointStatesInput(blackboard.god_map.to_symbol, world.robot.get_controllable_joints(),
+                                identifier.joint_states,
                                 suffix=[u'position'])
     world.robot.reinitialize(js_input.joint_map)
     god_map.safe_set_data(identifier.world, world)
     return god_map
 
+
 def grow_tree():
     action_server_name = u'giskardpy/command'
 
-    god_map = initialize_blackboard()
+    god_map = initialize_god_map()
     # ----------------------------------------------
     wait_for_goal = Sequence(u'wait for goal')
     wait_for_goal.add_child(TFPlugin(u'tf'))
@@ -121,7 +130,7 @@ def grow_tree():
     if god_map.safe_get_data(identifier.debug):
         def post_tick(snapshot_visitor, behaviour_tree):
             logging.logdebug(u'\n' + py_trees.display.ascii_tree(behaviour_tree.root,
-                                                      snapshot_information=snapshot_visitor))
+                                                                 snapshot_information=snapshot_visitor))
 
         snapshot_visitor = py_trees_ros.visitors.SnapshotVisitor()
         tree.add_post_tick_handler(functools.partial(post_tick, snapshot_visitor))

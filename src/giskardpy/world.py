@@ -9,7 +9,7 @@ from giskardpy.exceptions import RobotExistsException, DuplicateNameException, P
 from giskardpy.symengine_robot import Robot
 from giskardpy.tfwrapper import msg_to_kdl, kdl_to_pose
 from giskardpy.urdf_object import URDFObject, FIXED_JOINT
-from giskardpy.utils import keydefaultdict
+from giskardpy.utils import KeyDefaultDict
 from giskardpy.world_object import WorldObject
 from giskardpy import logging
 
@@ -109,7 +109,7 @@ class World(object):
 
     # Robot ------------------------------------------------------------------------------------------------------------
 
-    def add_robot(self, robot, base_pose, controlled_joints, default_joint_vel_limit, default_joint_weight,
+    def add_robot(self, robot, base_pose, controlled_joints, default_joint_vel_limit, joint_weights,
                   calc_self_collision_matrix):
         """
         :type robot: giskardpy.world_object.WorldObject
@@ -122,7 +122,7 @@ class World(object):
             raise DuplicateNameException(
                 u'can\'t add robot; object with name "{}" already exists'.format(robot.get_name()))
         self._robot = Robot.from_urdf_object(robot, base_pose, controlled_joints, self._path_to_data_folder,
-                                             default_joint_vel_limit, default_joint_weight, calc_self_collision_matrix)
+                                             default_joint_vel_limit, calc_self_collision_matrix, joint_weights)
 
     @property
     def robot(self):
@@ -454,7 +454,7 @@ class World(object):
         :return: robot_link -> ClosestPointInfo of closest thing
         :rtype: dict
         """
-        closest_point = keydefaultdict(lambda k: ClosestPointInfo((10, 0, 0),
+        closest_point = KeyDefaultDict(lambda k: ClosestPointInfo((10, 0, 0),
                                                                   (0, 0, 0),
                                                                   1e9,
                                                                   0.0,

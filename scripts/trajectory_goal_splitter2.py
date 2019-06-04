@@ -70,7 +70,9 @@ class JointGoalSplitter:
             if len(p.positions) > max(base_ids):  # einzeln checken
                 base_traj_point = trajectory_msgs.msg.JointTrajectoryPoint()
                 joint_pos = [p.positions[i] for i in base_ids]
+                joint_vel = [p.velocities[i] for i in base_ids]
                 base_traj_point.positions = tuple(joint_pos)
+                base_traj_point.velocities = tuple(joint_vel)
                 base_traj_point.time_from_start.nsecs = p.time_from_start.nsecs
                 base_traj_point.time_from_start.secs = p.time_from_start.secs
                 base_traj_points.append(base_traj_point)
@@ -78,7 +80,9 @@ class JointGoalSplitter:
             if len(p.positions) > max(arm_ids):
                 arm_traj_point = trajectory_msgs.msg.JointTrajectoryPoint()
                 joint_pos_arm = [p.positions[i] for i in arm_ids]
+                joint_vel_arm = [p.velocities[i] for i in arm_ids]
                 arm_traj_point.positions = tuple(joint_pos_arm)
+                arm_traj_point.velocities = tuple(joint_vel_arm)
                 arm_traj_point.time_from_start.nsecs = p.time_from_start.nsecs
                 arm_traj_point.time_from_start.secs = p.time_from_start.secs
                 arm_traj_points.append(arm_traj_point)

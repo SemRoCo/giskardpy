@@ -24,11 +24,11 @@ from sensor_msgs.msg import JointState
 from shape_msgs.msg import SolidPrimitive
 from tf.transformations import quaternion_multiply, quaternion_conjugate
 
+from giskardpy import logging
 from giskardpy.data_types import ClosestPointInfo
 from giskardpy.data_types import SingleJointState
 from giskardpy.plugin import PluginBehavior
 from giskardpy.tfwrapper import kdl_to_pose, np_to_kdl
-from giskardpy import logging
 
 
 @contextmanager
@@ -154,7 +154,7 @@ def closest_point_constraint_violated(closest_point_infos, tolerance=0.9):
     for link_name, cpi_info in closest_point_infos.items():  # type: (str, ClosestPointInfo)
         if cpi_info.contact_distance < cpi_info.min_dist * tolerance:
             logging.loginfo(u'collision constraints violated: {}'.format(cpi_info.link_a, cpi_info.link_b,
-                                                               cpi_info.contact_distance))
+                                                                         cpi_info.contact_distance))
             return True
     return False
 
@@ -281,6 +281,7 @@ def msg_to_list(thing):
 
 def position_dist(position1, position2):
     return np.linalg.norm(np.array(msg_to_list(position2)) - np.array(msg_to_list(position1)))
+
 
 def create_path(path):
     if not os.path.exists(os.path.dirname(path)):
@@ -654,10 +655,10 @@ def compare_version(version1, operator, version2):
 
 def rospkg_exists(name):
     """
-       checks whether a ros package with the given name and version exists
-       :param name: the name and version of the ros package in requirements format e.g. giskard_msgs<=0.1.0
-       :type name: str
-       :return: True if it exits else False
+    checks whether a ros package with the given name and version exists
+    :param name: the name and version of the ros package in requirements format e.g. giskard_msgs<=0.1.0
+    :type name: str
+    :return: True if it exits else False
     """
     r = rospkg.RosPack()
     name = name.replace(' ', '')
@@ -705,5 +706,9 @@ def check_dependencies():
             rospkg_exists(d)
         except pkg_resources.VersionConflict as e:
             logging.logwarn('found {version_f} but version {version_r} is required'.format(version_r=str(e.req),
-                                                                                   version_f=str(e.dist)))
+                                                                                           version_f=str(e.dist)))
 
+
+def str_to_unique_number(s):
+    #FIXME not actually unique
+    return sum(ord(x) for x in s)

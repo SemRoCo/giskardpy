@@ -6,7 +6,7 @@ from warnings import warn
 
 import symengine as se
 from symengine import Matrix, Symbol, eye, sympify, diag, zeros, lambdify, Abs, Max, Min, sin, cos, tan, acos, asin, \
-    atan, atan2, nan, sqrt, log, tanh, var, floor, Piecewise, sign
+    atan, atan2, nan, sqrt, log, tanh, var, floor, Piecewise, sign, Eq
 from symengine.lib.symengine_wrapper import Lambdify
 
 from giskardpy.exceptions import SymengineException
@@ -181,6 +181,8 @@ def if_eq_zero(condition, if_result, else_result):
     condition = se.Abs(sign(condition))
     return (1 - condition) * if_result + condition * else_result
 
+def if_eq(a, b, if_result, else_result):
+    return if_eq_zero(a - b, if_result, else_result)
 
 def safe_compiled_function(f, file_name):
     create_path(file_name)

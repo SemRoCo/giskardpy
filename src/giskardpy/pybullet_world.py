@@ -202,7 +202,7 @@ class PyBulletWorld(World):
         for key, cpi in closest_point.items():  # type: (str, ClosestPointInfo)
             if self.__should_flip_contact_info(collisions[cpi.old_key]):
                 closest_point[key] = ClosestPointInfo(cpi.position_on_b, cpi.position_on_a, cpi.contact_distance,
-                                                      cpi.min_dist, cpi.link_a, cpi.link_b,
+                                                      cpi.min_dist, cpi.link_a, cpi.body_b, cpi.link_b,
                                                       -np.array(cpi.contact_normal), key)
         return closest_point
 

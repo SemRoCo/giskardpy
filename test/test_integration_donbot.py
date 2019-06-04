@@ -1,13 +1,14 @@
 import numpy as np
+from copy import deepcopy
 
 import pytest
 import rospy
 from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped
-from giskard_msgs.msg import MoveActionGoal, MoveResult, MoveGoal
-from tf.transformations import quaternion_about_axis
+from giskard_msgs.msg import MoveActionGoal, MoveResult, MoveGoal, CollisionEntry
+from tf.transformations import quaternion_from_matrix
 
 from giskardpy import logging
-from giskardpy.tfwrapper import lookup_transform, init as tf_init, lookup_pose
+from giskardpy.tfwrapper import lookup_transform, init as tf_init
 from utils_for_tests import Donbot
 
 # TODO roslaunch iai_donbot_sim ros_control_sim.launch
@@ -122,6 +123,41 @@ def fake_table_setup(zero_pose):
     p.pose.orientation.w = 1
     zero_pose.add_box(pose=p)
     return zero_pose
+
+
+@pytest.fixture()
+def shelf_setup(better_pose):
+    """
+    :type better_pose: Donbot
+    :rtype: Donbot
+    """
+    layer1 = u'layer1'
+    p = PoseStamped()
+    p.header.frame_id = u'map'
+    p.pose.position.x = 0
+    p.pose.position.y = -1.25
+    p.pose.position.z = 1
+    p.pose.orientation.w = 1
+    better_pose.add_box(layer1, size=[1, 0.5, 0.02], pose=p)
+
+    layer2 = u'layer2'
+    p = PoseStamped()
+    p.header.frame_id = u'map'
+    p.pose.position.x = 0
+    p.pose.position.y = -1.25
+    p.pose.position.z = 1.3
+    p.pose.orientation.w = 1
+    better_pose.add_box(layer2, size=[1, 0.5, 0.02], pose=p)
+
+    back = u'back'
+    p = PoseStamped()
+    p.header.frame_id = u'map'
+    p.pose.position.x = 0
+    p.pose.position.y = -1.5
+    p.pose.position.z = 1
+    p.pose.orientation.w = 1
+    better_pose.add_box(back, size=[1, 0.05, 2], pose=p)
+    return better_pose
 
 
 @pytest.fixture()
@@ -256,140 +292,6 @@ class TestCartGoals(object):
         zero_pose.set_and_check_cart_goal(goal_pose, zero_pose.gripper_tip, zero_pose.default_root)
 
 
-#     def test_cart_goal_2eef(self, zero_pose):
-#         """
-#         :type zero_pose: Donbot
-#         """
-#         # FIXME? eef don't move at the same time
-#         r_goal = PoseStamped()
-#         r_goal.header.frame_id = zero_pose.r_tip
-#         r_goal.header.stamp = rospy.get_rostime()
-#         r_goal.pose.position = Point(-0.1, 0, 0)
-#         r_goal.pose.orientation = Quaternion(0, 0, 0, 1)
-#         zero_pose.set_cart_goal(zero_pose.default_root, zero_pose.r_tip, r_goal)
-#         l_goal = PoseStamped()
-#         l_goal.header.frame_id = zero_pose.l_tip
-#         l_goal.header.stamp = rospy.get_rostime()
-#         l_goal.pose.position = Point(-0.05, 0, 0)
-#         l_goal.pose.orientation = Quaternion(0, 0, 0, 1)
-#         zero_pose.set_cart_goal(zero_pose.default_root, zero_pose.l_tip, l_goal)
-#         zero_pose.allow_self_collision()
-#         zero_pose.send_and_check_goal()
-#         zero_pose.check_cart_goal(zero_pose.r_tip, r_goal)
-#         zero_pose.check_cart_goal(zero_pose.l_tip, l_goal)
-#
-#     def test_weird_wiggling(self, zero_pose):
-#         """
-#         :type zero_pose: Donbot
-#         """
-#
-#         # FIXME get rid of wiggling
-#         goal_js = {
-#             u'l_upper_arm_roll_joint': 1.63487737202,
-#             u'l_shoulder_pan_joint': 1.36222920328,
-#             u'l_shoulder_lift_joint': 0.229120778526,
-#             u'l_forearm_roll_joint': 13.7578920265,
-#             u'l_elbow_flex_joint': -1.48141189643,
-#             u'l_wrist_flex_joint': -1.22662876066,
-#             u'l_wrist_roll_joint': -53.6150824007,
-#         }
-#         zero_pose.allow_all_collisions()
-#         zero_pose.send_and_check_joint_goal(goal_js)
-#
-#         p = PoseStamped()
-#         p.header.frame_id = zero_pose.l_tip
-#         p.header.stamp = rospy.get_rostime()
-#         p.pose.position.x = -0.1
-#         p.pose.orientation.w = 1
-#         zero_pose.allow_all_collisions()
-#         zero_pose.set_and_check_cart_goal(zero_pose.default_root, zero_pose.l_tip, p)
-#
-#         p = PoseStamped()
-#         p.header.frame_id = zero_pose.l_tip
-#         p.header.stamp = rospy.get_rostime()
-#         p.pose.position.x = 0.2
-#         p.pose.orientation.w = 1
-#         zero_pose.allow_all_collisions()
-#         zero_pose.set_and_check_cart_goal(zero_pose.default_root, zero_pose.l_tip, p)
-#
-#     def test_hot_init_failed(self, zero_pose):
-#         """
-#         :type zero_pose: Donbot
-#         """
-#         r_goal = PoseStamped()
-#         r_goal.header.frame_id = zero_pose.r_tip
-#         r_goal.header.stamp = rospy.get_rostime()
-#         r_goal.pose.position = Point(-0.0, 0, 0)
-#         r_goal.pose.orientation = Quaternion(0, 0, 0, 1)
-#         zero_pose.set_cart_goal(zero_pose.default_root, zero_pose.r_tip, r_goal)
-#         l_goal = PoseStamped()
-#         l_goal.header.frame_id = zero_pose.l_tip
-#         l_goal.header.stamp = rospy.get_rostime()
-#         l_goal.pose.position = Point(-0.0, 0, 0)
-#         l_goal.pose.orientation = Quaternion(0, 0, 0, 1)
-#         zero_pose.set_cart_goal(zero_pose.default_root, zero_pose.l_tip, l_goal)
-#         zero_pose.allow_self_collision()
-#         zero_pose.send_and_check_goal()
-#         zero_pose.check_cart_goal(zero_pose.r_tip, r_goal)
-#         zero_pose.check_cart_goal(zero_pose.l_tip, l_goal)
-#
-#         zero_pose.allow_all_collisions()
-#         zero_pose.send_and_check_joint_goal(default_pose)
-#
-#         goal_js = {
-#             u'r_upper_arm_roll_joint': -0.0812729778068,
-#             u'r_shoulder_pan_joint': -1.20939684714,
-#             u'r_shoulder_lift_joint': 0.135095147908,
-#             u'r_forearm_roll_joint': -1.50201448056,
-#             u'r_elbow_flex_joint': -0.404527363115,
-#             u'r_wrist_flex_joint': -1.11738043795,
-#             u'r_wrist_roll_joint': 8.0946050982,
-#         }
-#         zero_pose.allow_all_collisions()
-#         zero_pose.send_and_check_joint_goal(goal_js)
-#
-#     def test_endless_wiggling(self, zero_pose):
-#         """
-#         :type zero_pose: Donbot
-#         """
-#         goal_js = {
-#             u'r_upper_arm_roll_joint': -0.0812729778068,
-#             u'r_shoulder_pan_joint': -1.20939684714,
-#             u'r_shoulder_lift_joint': 0.135095147908,
-#             u'r_forearm_roll_joint': -1.50201448056,
-#             u'r_elbow_flex_joint': -0.404527363115,
-#             u'r_wrist_flex_joint': -1.11738043795,
-#             u'r_wrist_roll_joint': 8.0946050982,
-#         }
-#         zero_pose.allow_all_collisions()
-#         zero_pose.send_and_check_joint_goal(goal_js)
-#
-#         p = PoseStamped()
-#         p.header.frame_id = zero_pose.r_tip
-#         p.header.stamp = rospy.get_rostime()
-#         p.pose.position.x = 0.5
-#         p.pose.orientation.w = 1
-#         # self.giskard.allow_all_collisions()
-#         zero_pose.set_cart_goal(zero_pose.default_root, zero_pose.r_tip, p)
-#         zero_pose.send_and_check_goal(expected_error_code=MoveResult.INSOLVABLE)
-#
-#     def test_root_link_not_equal_chain_root(self, zero_pose):
-#         """
-#         :type zero_pose: Donbot
-#         """
-#         p = PoseStamped()
-#         p.header.stamp = rospy.get_rostime()
-#         p.header.frame_id = u'base_footprint'
-#         p.pose.position.x = 0.8
-#         p.pose.position.y = -0.5
-#         p.pose.position.z = 1
-#         p.pose.orientation.w = 1
-#         zero_pose.allow_self_collision()
-#         zero_pose.set_cart_goal(u'torso_lift_link', zero_pose.r_tip, p)
-#         zero_pose.send_and_check_goal()
-#
-#
-#
 class TestCollisionAvoidanceGoals(object):
     def test_attach_existing_box_non_fixed(self, better_pose):
         """
@@ -403,7 +305,7 @@ class TestCollisionAvoidanceGoals(object):
         p = PoseStamped()
         p.header.frame_id = u'refills_finger'
         p.pose.position.y = -0.075
-        p.pose.orientation = Quaternion(0,0,0,1)
+        p.pose.orientation = Quaternion(0, 0, 0, 1)
 
         better_pose.add_box(pocky, [0.05, 0.2, 0.03], p)
         better_pose.attach_existing(pocky, frame_id=u'refills_finger')
@@ -427,6 +329,67 @@ class TestCollisionAvoidanceGoals(object):
         better_pose.allow_self_collision()
         better_pose.set_translation_goal(pocky_goal, pocky, u'base_footprint')
         better_pose.send_and_check_goal()
+
+    def test_pick_low_place_high(self, better_pose):
+        pass
+
+    def test_place_in_shelf(self, shelf_setup):
+        """
+        :type shelf_setup: Donbot
+        """
+        box = u'box'
+        box_pose = PoseStamped()
+        box_pose.header.frame_id = u'map'
+        box_pose.pose.orientation.w = 1
+        box_pose.pose.position.y = -0.5
+        box_pose.pose.position.z = .1
+        shelf_setup.add_box(box, [0.05, 0.05, 0.2], box_pose)
+
+        grasp_pose = deepcopy(box_pose)
+        grasp_pose.pose.position.z += 0.05
+        grasp_pose.pose.orientation = Quaternion(*quaternion_from_matrix([[-1, 0, 0, 0],
+                                                                          [0, 1, 0, 0],
+                                                                          [0, 0, -1, 0],
+                                                                          [0, 0, 0, 1]]))
+        # shelf_setup.allow_self_collision()
+        shelf_setup.allow_collision([CollisionEntry.ALL], box, [CollisionEntry.ALL])
+        shelf_setup.set_and_check_cart_goal(grasp_pose, shelf_setup.gripper_tip)
+
+        box_goal = PoseStamped()
+        box_goal.header.frame_id = u'map'
+        box_goal.pose.position.z = 1.12
+        box_goal.pose.position.y = -1
+        grasp_pose.pose.orientation.w = 1
+        shelf_setup.set_and_check_cart_goal(box_goal, box)
+        shelf_setup.attach_existing(box, u'refills_finger')
+
+        # p = PoseStamped()
+        # p.header.frame_id = u'refills_finger'
+        # p.pose.position.y = -0.075
+        # p.pose.orientation = Quaternion(0, 0, 0, 1)
+        #
+        # better_pose.add_box(box, [0.05, 0.2, 0.03], p)
+        # better_pose.attach_existing(box, frame_id=u'refills_finger')
+        #
+        # tip_normal = Vector3Stamped()
+        # tip_normal.header.frame_id = box
+        # tip_normal.vector.y = 1
+        #
+        # root_normal = Vector3Stamped()
+        # root_normal.header.frame_id = u'base_footprint'
+        # root_normal.vector.z = 1
+        # better_pose.align_planes(box, tip_normal, u'base_footprint', root_normal)
+        # # better_pose.add_json_goal(u'GravityJoint', joint_name=u'refills_finger', object_name=pocky)
+        #
+        # pocky_goal = PoseStamped()
+        # pocky_goal.header.frame_id = box
+        # pocky_goal.pose.position.y = -.5
+        # pocky_goal.pose.position.x = .3
+        # pocky_goal.pose.position.z = -.2
+        # pocky_goal.pose.orientation.w = 1
+        # better_pose.allow_self_collision()
+        # better_pose.set_translation_goal(pocky_goal, box, u'base_footprint')
+        # better_pose.send_and_check_goal()
 
     def test_allow_self_collision2(self, zero_pose):
         """

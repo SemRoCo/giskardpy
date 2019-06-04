@@ -460,6 +460,7 @@ class World(object):
                                                                   0.0,
                                                                   k,
                                                                   '',
+                                                                  '',
                                                                   (1, 0, 0), k))
         T_base___map = self.robot.T_base___map
         for key, contact_info in collisions.items():  # type: ((str, str, str), ContactInfo)
@@ -471,7 +472,7 @@ class World(object):
             n_in_robot_root = T_base___map.M * PyKDL.Vector(*contact_info.contact_normal_on_b)
             try:
                 cpi = ClosestPointInfo(a_in_robot_root, b_in_robot_root, contact_info.contact_distance,
-                                       min_allowed_distance[key], key[0], u'{} - {}'.format(key[1], key[2]),
+                                       min_allowed_distance[key], key[0], key[1], key[2],
                                        n_in_robot_root, key)
             except KeyError:
                 continue

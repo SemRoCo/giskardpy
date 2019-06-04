@@ -11,6 +11,7 @@ from giskardpy.identifier import robot_identifier, world_identifier, js_identifi
 from giskardpy.input_system import FrameInput, Point3Input, Vector3Input, Vector3StampedInput
 from giskardpy.qp_problem_builder import SoftConstraint
 from giskardpy.tfwrapper import transform_pose, transform_vector
+from giskardpy.utils import str_to_unique_number
 
 MAX_WEIGHT = 15
 HIGH_WEIGHT = 5
@@ -333,6 +334,8 @@ class CartesianOrientation(CartesianConstraint):
 
 
 class CartesianOrientationSlerp(CartesianConstraint):
+    def __init__(self, god_map, root_link, tip_link, goal, weight=HIGH_WEIGHT, gain=6, max_speed=0.5):
+        super(CartesianOrientationSlerp, self).__init__(god_map, root_link, tip_link, goal, weight, gain, max_speed)
 
     def get_constraint(self):
         """
@@ -443,9 +446,30 @@ class LinkToAnyAvoidance(Constraint):
         return Point3Input(self.god_map.to_symbol,
                            prefix=closest_point_identifier + [link_name, u'position_on_b']).get_expression()
 
+    def get_body_b(self, link_name):
+        return self.god_map.to_symbol(closest_point_identifier + [link_name, u'body_b'])
+
     def get_constraint(self):
-        current_pose = self.get_fk(self.get_robot().get_root(), self.link_name)
-        current_pose_eval = self.get_fk_evaluated(self.get_robot().get_root(), self.link_name)
+        base_footprint = self.get_robot().get_non_base_movement_root()
+        base_footprint_T_link = self.get_fk(base_footprint, self.link_name)
+        root_T_base_footprint = self.get_fk(self.get_robot().get_root(), base_footprint)
+
+        body_b = self.get_body_b(self.link_name)
+        robot_name_ascii = str_to_unique_number(self.get_robot().get_name())
+
+        current_pose = sw.if_eq(body_b, robot_name_ascii,
+                                sw.eye(4),
+                                root_T_base_footprint) * base_footprint_T_link
+
+        base_footprint_T_link2 = self.get_fk_evaluated(base_footprint, self.link_name)
+        root_T_base_footprint2 = self.get_fk_evaluated(self.get_robot().get_root(), base_footprint)
+
+        current_pose_eval = sw.if_eq(body_b, robot_name_ascii,
+                                     sw.eye(4),
+                                     root_T_base_footprint2) * base_footprint_T_link2
+
+        # current_pose = self.get_fk(self.get_robot().get_root(), self.link_name)
+        # current_pose_eval = self.get_fk_evaluated(self.get_robot().get_root(), self.link_name)
         point_on_link = self.get_closest_point_on_a(self.link_name)
         other_point = self.get_closest_point_on_b(self.link_name)
         contact_normal = self.get_contact_normal_on_b(self.link_name)
@@ -589,9 +613,8 @@ class GravityJoint(Constraint):
         ref_axis_of_rotation = sw.cross(com__parent, goal__parent)
         goal_vel *= sw.sign(sw.dot(ref_axis_of_rotation, axis_of_rotation))
 
-
-        soft_constraints[str(self)] = SoftConstraint(lower=goal_vel, #sw.Min(goal_vel, 0),
-                                                     upper=goal_vel, #sw.Max(goal_vel, 0),
+        soft_constraints[str(self)] = SoftConstraint(lower=goal_vel,  # sw.Min(goal_vel, 0),
+                                                     upper=goal_vel,  # sw.Max(goal_vel, 0),
                                                      weight=weight,
                                                      expression=current_joint)
 

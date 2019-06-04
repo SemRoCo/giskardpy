@@ -134,24 +134,6 @@ class TestUrdfObject(object):
         except Exception:
             assert True
 
-    def test_attach_urdf_object_with_continues_joint1(self, function_setup):
-        axis = [0,1,0]
-        parsed_pr2 = self.cls(pr2_urdf())
-        num_of_links_before = len(parsed_pr2.get_link_names())
-        num_of_joints_before = len(parsed_pr2.get_joint_names())
-        link_chain_before = len(parsed_pr2.get_links_from_sub_tree(u'torso_lift_joint'))
-        box = self.cls.from_world_body(make_world_body_box())
-        p = Pose()
-        p.position = Point(0, 0, 0.1)
-        p.orientation = Quaternion(0, 0, 0, 1)
-        parsed_pr2.attach_urdf_object(box, u'l_gripper_tool_frame', p, joint_type=CONTINUOUS_JOINT)
-        assert box.get_name() in parsed_pr2.get_link_names()
-        assert len(parsed_pr2.get_link_names()) == num_of_links_before + 1
-        assert len(parsed_pr2.get_joint_names()) == num_of_joints_before + 1
-        assert len(parsed_pr2.get_links_from_sub_tree(u'torso_lift_joint')) == link_chain_before + 1
-        assert parsed_pr2.is_joint_continuous(box.get_name())
-        assert parsed_pr2.get_joint_axis(box.get_name()) == axis
-
     def test_attach_twice(self, function_setup):
         parsed_pr2 = self.cls(pr2_urdf())
         box = self.cls.from_world_body(make_world_body_box())
@@ -706,3 +688,15 @@ class TestUrdfObject(object):
 
     def test_has_link_collision(self, function_setup):
         pass
+
+    def test_get_first_link_with_collision(self, function_setup):
+        parsed_pr2 = self.cls(pr2_urdf())
+        assert parsed_pr2.get_first_link_with_collision() == u'base_link'
+
+    def test_get_non_base_movement_root(self, function_setup):
+        parsed_donbot = self.cls(donbot_urdf())
+        assert parsed_donbot.get_non_base_movement_root() == u'base_footprint'
+
+    def test_get_non_base_movement_root2(self, function_setup):
+        parsed_pr2 = self.cls(pr2_urdf())
+        assert parsed_pr2.get_non_base_movement_root() == u'base_footprint'

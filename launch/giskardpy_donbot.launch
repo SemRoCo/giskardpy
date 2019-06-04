@@ -7,7 +7,7 @@
     <param name="enable_gui" value="$(arg gui)"/>
     <rosparam param="enable_collision_marker">True</rosparam>
     <rosparam param="enable_visualization">True</rosparam>
-    <rosparam param="plot_trajectory">False</rosparam>
+    <rosparam param="plot_trajectory">True</rosparam>
     <rosparam param="debug">False</rosparam>
     <rosparam param="map_frame">map</rosparam>
     <rosparam param="joint_convergence_threshold">0.001</rosparam>
@@ -17,7 +17,7 @@
     <rosparam param="default_joint_vel_limit">0.25</rosparam>
     <rosparam param="default_joint_weight">0.001</rosparam>
     <rosparam param="default_collision_avoidance_distance">0.05</rosparam>
-    <rosparam param="fill_velocity_values">False</rosparam>
+    <rosparam param="fill_velocity_values">True</rosparam>
     <rosparam param="nWSR">None</rosparam> <!-- None results in a nWSR estimation thats fine most of the time -->
     <rosparam param="root_link">odom</rosparam>
     <rosparam param="collision_time_threshold">15</rosparam>
@@ -28,7 +28,7 @@
   <node pkg="giskardpy" type="interactive_marker.py" name="giskard_interactive_marker" output="screen">
     <rosparam param="enable_self_collision">False</rosparam>
     <rosparam param="interactive_marker_chains">
-     - [base_footprint, gripper_tool_frame]
+     - [odom, gripper_tool_frame]
      - [ur5_shoulder_link, camera_link]
     </rosparam>
   </node>

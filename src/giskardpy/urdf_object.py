@@ -403,6 +403,45 @@ class URDFObject(object):
     def get_root(self):
         return self._urdf_robot.get_root()
 
+    def get_first_link_with_collision(self):
+        l = self.get_root()
+        while not self.has_link_collision(l):
+            children = self.get_child_links_of_link(l)
+            children_with_collision = [x for x in children if self.has_link_collision(x)]
+            if len(children_with_collision) > 1 or len(children) > 1:
+                raise TypeError(u'first collision link is not unique')
+            elif len(children_with_collision) == 1:
+                l = children_with_collision[0]
+                break
+            else:
+                l = children[0]
+        return l
+
+    def get_non_base_movement_root(self):
+        l = self.get_root()
+        result = self.__get_non_base_movement_root_helper(l)
+        if result is None:
+            result = l
+        return result
+
+    def __get_non_base_movement_root_helper(self, link_name):
+        if self.has_link_collision(link_name):
+            parent_joint = self.get_parent_joint_of_link(link_name)
+            if self.is_joint_controllable(parent_joint):
+                return link_name
+            else:
+                return None
+        else:
+            for child in self.get_child_links_of_link(link_name):
+                child_result = self.__get_non_base_movement_root_helper(child)
+                if child_result is None:
+                    parent_joint = self.get_parent_joint_of_link(link_name)
+                    if parent_joint is not None and self.is_joint_controllable(parent_joint):
+                        return link_name
+                    else:
+                        return None
+                return child_result
+
     def attach_urdf_object(self, urdf_object, parent_link, pose):
         """
         Rigidly attach another object to the robot.
@@ -495,9 +534,9 @@ class URDFObject(object):
         if link_name in self._urdf_robot.parent_map:
             return self._urdf_robot.parent_map[link_name][1]
 
-    def get_child_link_of_link(self, link_name):
+    def get_child_links_of_link(self, link_name):
         if link_name in self._urdf_robot.child_map:
-            return self._urdf_robot.child_map[link_name][1]
+            return [x[1] for x in self._urdf_robot.child_map[link_name]]
 
     def get_parent_joint_of_link(self, link_name):
         if link_name in self._urdf_robot.parent_map:

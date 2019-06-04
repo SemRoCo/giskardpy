@@ -187,25 +187,29 @@ def pykdl_frame_to_numpy(pykdl_frame):
 
 
 class GiskardTestWrapper(object):
-    def __init__(self, default_root=u'base_link'):
-        rospy.set_param(u'~enable_gui', False)
-        rospy.set_param(u'~debug', False)
-        rospy.set_param(u'~enable_visualization', True)
-        rospy.set_param(u'~enable_collision_marker', True)
-        rospy.set_param(u'~tree_tick_rate', .01)
-        rospy.set_param(u'~map_frame', u'map')
-        rospy.set_param(u'~root_link', u'base_footprint')
-        rospy.set_param(u'~wiggle_precision_threshold', 4)
-        rospy.set_param(u'~sample_period', 0.05)
-        rospy.set_param(u'~default_joint_vel_limit', 0.151)
-        rospy.set_param(u'~default_collision_avoidance_distance', 0.05)
-        rospy.set_param(u'~fill_velocity_values', False)
-        rospy.set_param(u'~nWSR', u'None')
-        rospy.set_param(u'~path_to_data_folder', u'tmp_data/')
-        rospy.set_param(u'~collision_time_threshold', 10)
-        rospy.set_param(u'~max_traj_length', 30)
-        rospy.set_param(u'~joint_convergence_threshold', 0.004)
-        rospy.set_param(u'~plot_trajectory', False)
+    def __init__(self, param_overwrites=None):
+        params = {u'~enable_gui': False,
+                  u'~debug': False,
+                  u'~enable_visualization': True,
+                  u'~enable_collision_marker': True,
+                  u'~tree_tick_rate': .01,
+                  u'~map_frame': u'map',
+                  u'~root_link': u'base_footprint',
+                  u'~wiggle_precision_threshold': 4,
+                  u'~sample_period': 0.05,
+                  u'~default_joint_vel_limit': 0.151,
+                  u'~default_collision_avoidance_distance': 0.05,
+                  u'~fill_velocity_values': True,
+                  u'~nWSR': u'None',
+                  u'~path_to_data_folder': u'tmp_data/',
+                  u'~collision_time_threshold': 10,
+                  u'~max_traj_length': 30,
+                  u'~joint_convergence_threshold': 0.004,
+                  u'~plot_trajectory': False}
+        if param_overwrites is not None:
+            params.update(param_overwrites)
+        for param_name, value in params.items():
+            rospy.set_param(param_name, value)
 
         self.sub_result = rospy.Subscriber(u'/giskardpy/command/result', MoveActionResult, self.cb, queue_size=100)
 
@@ -600,11 +604,11 @@ class PR2(GiskardTestWrapper):
     def __init__(self):
         self.r_tip = u'r_gripper_tool_frame'
         self.l_tip = u'l_gripper_tool_frame'
-        rospy.set_param(u'~default_joint_weight', 0.0001)
-        rospy.set_param(u'~slerp', False)
+        params = {u'~default_joint_weight': 0.001,
+                  u'~slerp': True}
         self.r_gripper = rospy.ServiceProxy(u'r_gripper_simulator/set_joint_states', SetJointState)
         self.l_gripper = rospy.ServiceProxy(u'l_gripper_simulator/set_joint_states', SetJointState)
-        super(PR2, self).__init__()
+        super(PR2, self).__init__(params)
         self.default_root = u'odom'
 
     def move_base(self, goal_pose):
@@ -682,9 +686,20 @@ class PR2(GiskardTestWrapper):
 
 
 class Donbot(GiskardTestWrapper):
-    def __init__(self, default_root=u'base_link'):
-        rospy.set_param(u'~default_joint_weight', 0.001)
-        rospy.set_param(u'~slerp', True)
+    def __init__(self):
+        params = {u'~default_joint_weight': 0.001,
+                  u'~slerp': True,
+                  u'~default_collision_avoidance_distance': 0.03}
         self.camera_tip = u'camera_link'
         self.gripper_tip = u'gripper_tool_frame'
-        super(Donbot, self).__init__(default_root)
+        super(Donbot, self).__init__(params)
+
+    def move_base(self, goal_pose):
+        goal_pose = transform_pose(self.default_root, goal_pose)
+        js = {u'odom_x_joint': goal_pose.pose.position.x,
+              u'odom_y_joint': goal_pose.pose.position.y,
+              u'odom_z_joint': float(axis_angle_from_quaternion(goal_pose.pose.orientation.x,
+                                                                goal_pose.pose.orientation.y,
+                                                                goal_pose.pose.orientation.z,
+                                                                goal_pose.pose.orientation.w)[1])}
+        self.send_and_check_joint_goal(js)

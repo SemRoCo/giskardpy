@@ -3,6 +3,7 @@ from copy import copy
 from multiprocessing import Lock
 
 import symengine_wrappers as sw
+from giskardpy.utils import str_to_unique_number
 
 
 class GodMap(object):
@@ -113,6 +114,14 @@ class GodMap(object):
             self.expr_to_key[str(expr)] = identifier_parts
         return self.key_to_expr[identifier]
 
+    def to_float(self, x):
+        if isinstance(x, str):
+            try:
+                return str_to_unique_number(x)
+            except ValueError:
+                return -1
+        return x
+
     def get_symbol_map(self, exprs=None):
         """
         :return: a dict which maps all registered expressions to their values or 0 if there is no number entry
@@ -122,7 +131,7 @@ class GodMap(object):
         with self.lock:
             if exprs is None:
                 exprs = self.expr_to_key.keys()
-            return {expr: self.get_data(self.expr_to_key[expr]) for expr in exprs}
+            return {expr: self.to_float(self.get_data(self.expr_to_key[expr])) for expr in exprs}
 
     def get_registered_symbols(self):
         """

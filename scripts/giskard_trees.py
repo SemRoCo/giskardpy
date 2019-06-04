@@ -15,6 +15,7 @@ if __name__ == u'__main__':
     tree = grow_tree()
 
     sleeper = rospy.Rate(tree_tick_rate)
+    logging.loginfo(u'giskard is ready')
     while not rospy.is_shutdown():
         try:
             tree.tick()

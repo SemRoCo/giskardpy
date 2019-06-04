@@ -18,7 +18,7 @@ from sensor_msgs.msg import JointState
 
 from giskardpy import logging
 from giskardpy.garden import grow_tree
-from giskardpy.identifier import robot_identifier, world_identifier
+from giskardpy.identifier import robot_identifier, world
 from giskardpy.pybullet_world import PyBulletWorld
 from giskardpy.python_interface import GiskardWrapper
 from giskardpy.symengine_robot import Robot
@@ -429,7 +429,7 @@ class GiskardTestWrapper(object):
         """
         :rtype: PyBulletWorld
         """
-        return self.get_god_map().safe_get_data(world_identifier)
+        return self.get_god_map().safe_get_data(world)
 
     def clear_world(self):
         assert self.wrapper.clear_world().error_codes == UpdateWorldResponse.SUCCESS

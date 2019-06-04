@@ -3,23 +3,23 @@ from time import time
 
 from giskardpy import logging
 from giskardpy.exceptions import PathCollisionException, InsolvableException
-from giskardpy.identifier import time_identifier, closest_point_identifier, js_identifier
+import giskardpy.identifier as identifier
 from giskardpy.plugin import GiskardBehavior
 from giskardpy.utils import closest_point_constraint_violated
 import numpy as np
 
 class WiggleCancel(GiskardBehavior):
-    def __init__(self, name, wiggle_precision_threshold1):
-        self.wiggle_precision1 = wiggle_precision_threshold1
+    def __init__(self, name):
         super(WiggleCancel, self).__init__(name)
+        self.wiggle_precision1 = self.get_god_map().safe_get_data(identifier.wiggle_precision_threshold)
 
     def initialise(self):
         self.past_joint_states = set()
         super(WiggleCancel, self).initialise()
 
     def update(self):
-        current_js = self.get_god_map().safe_get_data(js_identifier)
-        current_time = self.get_god_map().safe_get_data(time_identifier)
+        current_js = self.get_god_map().safe_get_data(identifier.joint_states)
+        current_time = self.get_god_map().safe_get_data(identifier.time_identifier)
         rounded_js = self.round_js(current_js)
         # TODO make 1 a parameter
         if current_time >= 1 and rounded_js in self.past_joint_states:
@@ -49,14 +49,14 @@ class MaxTrajLength(GiskardBehavior):
 
 
 class CollisionCancel(GiskardBehavior):
-    def __init__(self, name, collision_time_threshold):
-        self.collision_time_threshold = collision_time_threshold
+    def __init__(self, name):
+        self.collision_time_threshold = self.get_god_map().safe_get_data(identifier.collision_time_threshold)
         super(CollisionCancel, self).__init__(name)
 
     def update(self):
-        time = self.get_god_map().safe_get_data(time_identifier)
+        time = self.get_god_map().safe_get_data(identifier.time_identifier)
         if time >= self.collision_time_threshold:
-            cp = self.get_god_map().safe_get_data(closest_point_identifier)
+            cp = self.get_god_map().safe_get_data(identifier.closest_point_identifier)
             if cp is not None and closest_point_constraint_violated(cp, tolerance=1):
                 self.raise_to_blackboard(PathCollisionException(
                     u'robot is in collision after {} seconds'.format(self.collision_time_threshold)))

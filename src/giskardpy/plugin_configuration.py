@@ -5,7 +5,7 @@ import rospy
 from py_trees import Status
 from sensor_msgs.msg import JointState
 
-from giskardpy.identifier import js_identifier
+import giskardpy.identifier as identifier
 from giskardpy.plugin import GiskardBehavior
 from giskardpy.tfwrapper import lookup_pose, wait_for_transform
 from giskardpy.utils import to_joint_state_dict
@@ -17,13 +17,13 @@ class ConfigurationPlugin(GiskardBehavior):
     Gets replace with a kinematic sim plugin during a parallel universe.
     """
 
-    def __init__(self, name, map_frame, joint_state_topic=u'joint_states'):
+    def __init__(self, name, joint_state_topic=u'joint_states'):
         """
         :type js_identifier: str
         """
         super(ConfigurationPlugin, self).__init__(name)
         self.mjs = None
-        self.map_frame = map_frame
+        self.map_frame = self.get_god_map().safe_get_data(identifier.map_frame)
         self.joint_state_topic = joint_state_topic
         self.lock = Queue(maxsize=1)
 
@@ -52,5 +52,5 @@ class ConfigurationPlugin(GiskardBehavior):
         base_pose = lookup_pose(self.map_frame, robot_frame)
         self.get_robot().base_pose = base_pose.pose
 
-        self.god_map.safe_set_data(js_identifier, self.mjs)
+        self.god_map.safe_set_data(identifier.joint_states, self.mjs)
         return Status.SUCCESS

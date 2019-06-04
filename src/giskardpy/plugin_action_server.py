@@ -8,7 +8,7 @@ from py_trees import Blackboard, Status
 
 from giskardpy.exceptions import MAX_NWSR_REACHEDException, QPSolverException, SolverTimeoutError, InsolvableException, \
     SymengineException, PathCollisionException, UnknownBodyException, ImplementationException
-from giskardpy.identifier import trajectory_identifier
+import giskardpy.identifier as identifier
 from giskardpy.logging import loginfo
 from giskardpy.plugin import GiskardBehavior
 from giskardpy.utils import plot_trajectory
@@ -118,10 +118,10 @@ class GoalCanceled(ActionServerBehavior):
 
 
 class SendResult(ActionServerBehavior):
-    def __init__(self, name, as_name, path_to_data_folder, action_type=None, plot_trajectory=False):
-        self.path_to_data_folder = path_to_data_folder
-        self.plot_trajectory = plot_trajectory
+    def __init__(self, name, as_name, action_type=None):
         super(SendResult, self).__init__(name, as_name, action_type)
+        self.path_to_data_folder = self.get_god_map().safe_get_data(identifier.data_folder)
+        self.plot_trajectory = self.get_god_map().safe_get_data(identifier.plot_trajectory)
 
     def update(self):
         # TODO get result from god map or blackboard
@@ -139,7 +139,7 @@ class SendResult(ActionServerBehavior):
 
     def plot_traj(self):
         if self.plot_trajectory:
-            trajectory = self.get_god_map().safe_get_data(trajectory_identifier)
+            trajectory = self.get_god_map().safe_get_data(identifier.trajectory_identifier)
             controlled_joints = self.get_robot().controlled_joints
             plot_trajectory(trajectory, controlled_joints, self.path_to_data_folder)
 

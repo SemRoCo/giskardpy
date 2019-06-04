@@ -156,14 +156,14 @@ class PyBulletWorld(World):
         Adds a ground plane to the Bullet World.
         """
         if not self.has_object(self.ground_plane_name):
-            path = resolve_ros_iris(u'package://giskardpy/test/urdfs/ground_plane.urdf')
+            path = resolve_ros_iris(u'package://giskardpy/urdfs/ground_plane.urdf')
             plane = WorldObject.from_urdf_file(path)
             plane.set_name(self.ground_plane_name)
             self.add_object(plane)
 
     def __add_pybullet_bug_fix_hack(self):
         if not self.has_object(self.hack_name):
-            path = resolve_ros_iris(u'package://giskardpy/test/urdfs/tiny_ball.urdf')
+            path = resolve_ros_iris(u'package://giskardpy/urdfs/tiny_ball.urdf')
             plane = WorldObject.from_urdf_file(path)
             plane.set_name(self.hack_name)
             self.add_object(plane)

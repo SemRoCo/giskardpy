@@ -1,7 +1,7 @@
 from py_trees import Status
 
 from giskardpy.data_types import Trajectory
-from giskardpy.identifier import trajectory_identifier, time_identifier, js_identifier
+from giskardpy.identifier import trajectory_identifier, time_identifier, joint_states
 from giskardpy.plugin import GiskardBehavior
 
 
@@ -14,7 +14,7 @@ class LogTrajPlugin(GiskardBehavior):
         super(LogTrajPlugin, self).initialise()
 
     def update(self):
-        current_js = self.get_god_map().safe_get_data(js_identifier)
+        current_js = self.get_god_map().safe_get_data(joint_states)
         time = self.get_god_map().safe_get_data(time_identifier)
         trajectory = self.get_god_map().safe_get_data(trajectory_identifier)
         trajectory.set(time, current_js)

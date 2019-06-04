@@ -8,12 +8,13 @@ from visualization_msgs.msg import Marker, MarkerArray
 
 from giskardpy.tfwrapper import pose_to_kdl, kdl_to_pose
 from plugin import GiskardBehavior
+import giskardpy.identifier as identifier
 
 
 class VisualizationBehavior(GiskardBehavior):
-    def __init__(self, name, enable_visualization):
+    def __init__(self, name):
         super(VisualizationBehavior, self).__init__(name)
-        self.enable_visualization = enable_visualization
+        self.enable_visualization = self.get_god_map().safe_get_data(identifier.marker_visualization)
 
     def setup(self, timeout):
         self.publisher = rospy.Publisher(u'~visualization_marker_array', MarkerArray, queue_size=1)

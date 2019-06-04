@@ -14,7 +14,7 @@ from giskardpy import pybullet_wrapper
 from giskardpy.data_types import ClosestPointInfo
 from giskardpy.exceptions import CorruptShapeException, UnknownBodyException, \
     UnsupportedOptionException, DuplicateNameException
-from giskardpy.identifier import collision_goal_identifier, closest_point_identifier
+import giskardpy.identifier as identifier
 from giskardpy.plugin import GiskardBehavior
 from giskardpy.tfwrapper import transform_pose
 from giskardpy.utils import to_joint_state_dict
@@ -25,7 +25,7 @@ class WorldUpdatePlugin(GiskardBehavior):
     # TODO reject changes if plugin not active or something
     def __init__(self, name):
         super(WorldUpdatePlugin, self).__init__(name)
-        self.global_reference_frame_name = u'map'
+        self.map_frame = self.get_god_map().safe_get_data(identifier.map_frame)
         self.lock = Lock()
         self.object_js_subs = {}  # JointState subscribers for articulated world objects
         self.object_joint_states = {}  # JointStates messages for articulated world objects
@@ -109,13 +109,13 @@ class WorldUpdatePlugin(GiskardBehavior):
         :type req: UpdateWorldRequest
         """
         world_body = req.body
-        global_pose = transform_pose(self.global_reference_frame_name, req.pose).pose
+        global_pose = transform_pose(self.map_frame, req.pose).pose
         world_object = WorldObject.from_world_body(world_body)
         self.get_world().add_object(world_object)
         self.get_world().set_object_pose(world_body.name, global_pose)
         try:
             m = self.get_world().get_object(world_body.name).as_marker_msg()
-            m.header.frame_id = self.global_reference_frame_name
+            m.header.frame_id = self.map_frame
             self.publish_object_as_marker(m)
         except:
             pass
@@ -130,7 +130,7 @@ class WorldUpdatePlugin(GiskardBehavior):
         self.get_world().detach(req.body.name)
         try:
             m = self.get_world().get_object(req.body.name).as_marker_msg()
-            m.header.frame_id = self.global_reference_frame_name
+            m.header.frame_id = self.map_frame
             self.publish_object_as_marker(m)
         except:
             pass
@@ -141,7 +141,7 @@ class WorldUpdatePlugin(GiskardBehavior):
         """
         if self.get_world().has_object(req.body.name):
             p = PoseStamped()
-            p.header.frame_id = self.global_reference_frame_name
+            p.header.frame_id = self.map_frame
             p.pose = self.get_world().get_object(req.body.name).base_pose
             p = transform_pose(req.pose.header.frame_id, p)
             world_object = self.get_world().get_object(req.body.name)
@@ -204,12 +204,11 @@ class WorldUpdatePlugin(GiskardBehavior):
 
 
 class CollisionChecker(GiskardBehavior):
-    def __init__(self, name, default_collision_avoidance_distance, map_frame, root_link, marker=True):
+    def __init__(self, name):
         super(CollisionChecker, self).__init__(name)
-        self.default_min_dist = default_collision_avoidance_distance
-        self.map_frame = map_frame
-        self.robot_root = root_link
-        self.marker = marker
+        self.default_min_dist = self.get_god_map().safe_get_data(identifier.default_collision_avoidance_distance)
+        self.map_frame = self.get_god_map().safe_get_data(identifier.map_frame)
+        self.marker = self.get_god_map().safe_get_data(identifier.enable_collision_marker)
         self.lock = Lock()
         self.object_js_subs = {}  # JointState subscribers for articulated world objects
         self.object_joint_states = {}  # JointStates messages for articulated world objects
@@ -234,10 +233,10 @@ class CollisionChecker(GiskardBehavior):
         return SetBoolResponse()
 
     def initialise(self):
-        collision_goals = self.get_god_map().safe_get_data(collision_goal_identifier)
+        collision_goals = self.get_god_map().safe_get_data(identifier.collision_goal_identifier)
         self.collision_matrix = self.get_world().collision_goals_to_collision_matrix(collision_goals,
                                                                                      self.default_min_dist)
-        self.get_god_map().safe_set_data(closest_point_identifier, None)
+        self.get_god_map().safe_set_data(identifier.closest_point_identifier, None)
         super(CollisionChecker, self).initialise()
 
     def update(self):
@@ -253,7 +252,7 @@ class CollisionChecker(GiskardBehavior):
             if self.marker:
                 self.publish_cpi_markers(closest_point)
 
-            self.god_map.safe_set_data(closest_point_identifier, closest_point)
+            self.god_map.safe_set_data(identifier.closest_point_identifier, closest_point)
         return Status.RUNNING
 
     def enable_marker_cb(self, setbool):

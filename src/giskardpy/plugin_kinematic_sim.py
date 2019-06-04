@@ -3,12 +3,12 @@ from collections import OrderedDict
 from py_trees import Status
 
 from giskardpy.data_types import SingleJointState
-from giskardpy.identifier import time_identifier, js_identifier, next_cmd_identifier
+import giskardpy.identifier as identifier
 from giskardpy.plugin import GiskardBehavior
 
 
 class KinSimPlugin(GiskardBehavior):
-    def __init__(self, name, sample_period):
+    def __init__(self, name):
         """
         :type js_identifier: str
         :type next_cmd_identifier: str
@@ -16,8 +16,8 @@ class KinSimPlugin(GiskardBehavior):
         :param sample_period: the time difference in s between each step.
         :type sample_period: float
         """
-        self.frequency = sample_period
         super(KinSimPlugin, self).__init__(name)
+        self.frequency = self.get_god_map().safe_get_data(identifier.sample_period)
 
     def initialise(self):
         self.next_js = None
@@ -26,8 +26,8 @@ class KinSimPlugin(GiskardBehavior):
 
     def update(self):
         self.time += self.frequency
-        motor_commands = self.get_god_map().safe_get_data(next_cmd_identifier)
-        current_js = self.get_god_map().safe_get_data(js_identifier)
+        motor_commands = self.get_god_map().safe_get_data(identifier.next_cmd_identifier)
+        current_js = self.get_god_map().safe_get_data(identifier.joint_states)
         if motor_commands is not None:
             self.next_js = OrderedDict()
             for joint_name, sjs in current_js.items():
@@ -37,8 +37,8 @@ class KinSimPlugin(GiskardBehavior):
                     cmd = 0.0
                 self.next_js[joint_name] = SingleJointState(sjs.name, sjs.position + cmd * self.frequency, velocity=cmd)
         if self.next_js is not None:
-            self.get_god_map().safe_set_data(js_identifier, self.next_js)
+            self.get_god_map().safe_set_data(identifier.joint_states, self.next_js)
         else:
-            self.get_god_map().safe_set_data(js_identifier, current_js)
-        self.get_god_map().safe_set_data(time_identifier, self.time)
+            self.get_god_map().safe_set_data(identifier.joint_states, current_js)
+        self.get_god_map().safe_set_data(identifier.time_identifier, self.time)
         return Status.RUNNING

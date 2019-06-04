@@ -12,8 +12,7 @@ from rospy_message_converter.message_converter import convert_ros_message_to_dic
 import giskardpy.constraints
 from giskardpy.constraints import LinkToAnyAvoidance, JointPosition
 from giskardpy.exceptions import InsolvableException, ImplementationException
-from giskardpy.identifier import soft_constraint_identifier, next_cmd_identifier, \
-    collision_goal_identifier, constraints_identifier
+import giskardpy.identifier as identifier
 from giskardpy.plugin import GiskardBehavior
 from giskardpy.plugin_action_server import GetGoal
 from giskardpy.symengine_controller import SymEngineController
@@ -23,11 +22,11 @@ from giskardpy import logging
 def allowed_constraint_names():
     return [x[0] for x in inspect.getmembers(giskardpy.constraints) if inspect.isclass(x[1])]
 
-
+# TODO split constraints into separate files
 # TODO plan only not supported
 # TODO waypoints not supported
 class GoalToConstraints(GetGoal):
-    def __init__(self, name, as_name, default_collision_avoidance_distance):
+    def __init__(self, name, as_name):
         GetGoal.__init__(self, name, as_name)
         self.used_joints = set()
 
@@ -35,10 +34,10 @@ class GoalToConstraints(GetGoal):
         self.controlled_joints = set()
         self.controllable_links = set()
         self.last_urdf = None
-        self.default_collision_avoidance_distance = default_collision_avoidance_distance
+        self.default_collision_avoidance_distance = self.get_god_map().safe_get_data(identifier.default_collision_avoidance_distance)
 
     def initialise(self):
-        self.get_god_map().safe_set_data(collision_goal_identifier, None)
+        self.get_god_map().safe_set_data(identifier.collision_goal_identifier, None)
 
     def terminate(self, new_status):
         super(GoalToConstraints, self).terminate(new_status)
@@ -54,7 +53,7 @@ class GoalToConstraints(GetGoal):
             self.raise_to_blackboard(InsolvableException(u'only plan and execute is supported'))
             return Status.SUCCESS
 
-        self.get_god_map().safe_set_data(constraints_identifier, {})
+        self.get_god_map().safe_set_data(identifier.constraints_identifier, {})
 
         if self.has_robot_changed():
             self.soft_constraints = {}
@@ -75,9 +74,9 @@ class GoalToConstraints(GetGoal):
 
         # self.set_unused_joint_goals_to_current()
 
-        self.get_god_map().safe_set_data(collision_goal_identifier, move_cmd.collisions)
+        self.get_god_map().safe_set_data(identifier.collision_goal_identifier, move_cmd.collisions)
 
-        self.get_god_map().safe_set_data(soft_constraint_identifier, self.soft_constraints)
+        self.get_god_map().safe_set_data(identifier.soft_constraint_identifier, self.soft_constraints)
         self.get_blackboard().runtime = time()
         return Status.SUCCESS
 
@@ -133,10 +132,10 @@ class GoalToConstraints(GetGoal):
 
 
 class ControllerPlugin(GiskardBehavior):
-    def __init__(self, name, path_to_functions, nWSR=None):
+    def __init__(self, name):
         super(ControllerPlugin, self).__init__(name)
-        self.path_to_functions = path_to_functions
-        self.nWSR = nWSR
+        self.path_to_functions = self.get_god_map().safe_get_data(identifier.data_folder)
+        self.nWSR = self.get_god_map().safe_get_data(identifier.nWSR)
         self.soft_constraints = None
 
     def initialise(self):
@@ -148,7 +147,7 @@ class ControllerPlugin(GiskardBehavior):
         return super(ControllerPlugin, self).setup(5.0)
 
     def init_controller(self):
-        new_soft_constraints = self.get_god_map().safe_get_data(soft_constraint_identifier)
+        new_soft_constraints = self.get_god_map().safe_get_data(identifier.soft_constraint_identifier)
         if self.soft_constraints is None or set(self.soft_constraints.keys()) != set(new_soft_constraints.keys()):
             self.soft_constraints = copy(new_soft_constraints)
             self.controller = SymEngineController(self.get_robot(),
@@ -163,5 +162,5 @@ class ControllerPlugin(GiskardBehavior):
         next_cmd = self.controller.get_cmd(expr, self.nWSR)
         self.next_cmd.update(next_cmd)
 
-        self.get_god_map().safe_set_data(next_cmd_identifier, self.next_cmd)
+        self.get_god_map().safe_set_data(identifier.next_cmd_identifier, self.next_cmd)
         return Status.RUNNING

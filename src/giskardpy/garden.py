@@ -12,8 +12,7 @@ from rospy import ROSException
 import sys
 import giskardpy.pybullet_wrapper as pbw
 from giskardpy.god_map import GodMap
-from giskardpy.identifier import world_identifier, js_identifier, default_joint_weight_identifier, \
-    default_joint_vel_identifier
+import giskardpy.identifier as identifier
 from giskardpy.input_system import JointStatesInput
 from giskardpy.plugin import PluginBehavior, SuccessPlugin
 from giskardpy.plugin_action_server import GoalReceived, SendResult, GoalCanceled
@@ -33,8 +32,25 @@ from giskardpy.plugin_visualization import VisualizationBehavior
 from giskardpy.world_object import WorldObject
 from giskardpy import logging
 
-def initialize_blackboard(urdf, default_joint_vel_limit, default_joint_weight, path_to_data_folder, gui):
-    pbw.start_pybullet(gui)
+def initialize_blackboard():
+    god_map = GodMap()
+    blackboard = Blackboard
+    blackboard.god_map = god_map
+    god_map.safe_set_data(identifier.rosparam, rospy.get_param(rospy.get_name()))
+    god_map.safe_set_data(identifier.robot_description, rospy.get_param(u'robot_description'))
+    path_to_data_folder = god_map.safe_get_data(identifier.data_folder)
+    # fix path to data folder
+    if not path_to_data_folder.endswith(u'/'):
+        path_to_data_folder += u'/'
+    god_map.safe_set_data(identifier.data_folder, path_to_data_folder)
+
+    # fix nWSR
+    nWSR = god_map.safe_get_data(identifier.nWSR)
+    if nWSR == u'None':
+        nWSR = None
+    god_map.safe_set_data(identifier.nWSR, nWSR)
+
+    pbw.start_pybullet(god_map.safe_get_data(identifier.gui))
     while True:
         try:
             controlled_joints = rospy.wait_for_message(u'/whole_body_controller/state',
@@ -45,101 +61,64 @@ def initialize_blackboard(urdf, default_joint_vel_limit, default_joint_weight, p
             logging.logerr(e)
         else:
             break
-    blackboard = Blackboard
-    blackboard.god_map = GodMap()
 
-    blackboard.god_map.safe_set_data(default_joint_weight_identifier, default_joint_weight)
-    blackboard.god_map.safe_set_data(default_joint_vel_identifier, default_joint_vel_limit)
+    default_joint_weight = god_map.to_symbol(identifier.default_joint_weight_identifier)
+    default_joint_vel = god_map.to_symbol(identifier.default_joint_vel_identifier)
 
-    default_joint_weight = blackboard.god_map.to_symbol(default_joint_weight_identifier)
-    default_joint_vel = blackboard.god_map.to_symbol(default_joint_vel_identifier)
-
-    world = PyBulletWorld(gui, path_to_data_folder)
-    robot = WorldObject(urdf, None, controlled_joints)
+    world = PyBulletWorld(god_map.safe_get_data(identifier.gui),
+                          blackboard.god_map.safe_get_data(identifier.data_folder))
+    robot = WorldObject(god_map.safe_get_data(identifier.robot_description),
+                        None,
+                        controlled_joints)
     world.add_robot(robot, None, controlled_joints, default_joint_vel, default_joint_weight, True)
-    js_input = JointStatesInput(blackboard.god_map.to_symbol, world.robot.get_controllable_joints(), js_identifier,
+    js_input = JointStatesInput(blackboard.god_map.to_symbol, world.robot.get_controllable_joints(), identifier.joint_states,
                                 suffix=[u'position'])
     world.robot.reinitialize(js_input.joint_map)
-    blackboard.god_map.safe_set_data(world_identifier, world)
+    god_map.safe_set_data(identifier.world, world)
+    return god_map
 
 def grow_tree():
-    gui = rospy.get_param(u'~enable_gui')
-    map_frame = rospy.get_param(u'~map_frame')
-    enable_visualization = rospy.get_param(u'~enable_visualization')
-    debug = rospy.get_param(u'~debug')
-    # if debug:
-    #     giskardpy.PRINT_LEVEL = DEBUG
-
-    # robot related params
-    urdf = rospy.get_param(u'robot_description')
-    default_joint_vel_limit = rospy.get_param(u'~default_joint_vel_limit')
-    default_joint_weight = rospy.get_param(u'~default_joint_weight')
-    root_link = rospy.get_param(u'~root_link')
-
-    # planning related params
-    nWSR = rospy.get_param(u'~nWSR')
-    if nWSR == u'None':
-        nWSR = None
-    sample_period = rospy.get_param(u'~sample_period')
-    joint_convergence_threshold = rospy.get_param(u'~joint_convergence_threshold')
-    wiggle_precision_threshold = rospy.get_param(u'~wiggle_precision_threshold')
-    default_collision_avoidance_distance = rospy.get_param(u'~default_collision_avoidance_distance')
-    collision_time_threshold = rospy.get_param(u'~collision_time_threshold')
-    plot_trajectory = rospy.get_param(u'~plot_trajectory')
-    # max_traj_length = rospy.get_param(u'~max_traj_length')
-
-    # output related params
-    fill_velocity_values = rospy.get_param(u'~fill_velocity_values')
     action_server_name = u'giskardpy/command'
 
-    # other
-    path_to_data_folder = rospy.get_param(u'~path_to_data_folder')
-    if not path_to_data_folder.endswith(u'/'):
-        path_to_data_folder += u'/'
-
-    marker = rospy.get_param(u'~enable_collision_marker')
-
-    initialize_blackboard(urdf, default_joint_vel_limit, default_joint_weight, path_to_data_folder, gui)
-
+    god_map = initialize_blackboard()
     # ----------------------------------------------
     wait_for_goal = Sequence(u'wait for goal')
     wait_for_goal.add_child(TFPlugin(u'tf'))
-    wait_for_goal.add_child(ConfigurationPlugin(u'js', map_frame))
+    wait_for_goal.add_child(ConfigurationPlugin(u'js'))
     wait_for_goal.add_child(WorldUpdatePlugin(u'pybullet updater'))
     wait_for_goal.add_child(GoalReceived(u'has goal', action_server_name, MoveAction))
-    wait_for_goal.add_child(ConfigurationPlugin(u'js', map_frame))
+    wait_for_goal.add_child(ConfigurationPlugin(u'js'))
     # ----------------------------------------------
     planning = failure_is_success(Selector)(u'planning')
     planning.add_child(GoalCanceled(u'goal canceled', action_server_name))
     # planning.add_child(CollisionCancel(u'in collision', collision_time_threshold))
-    planning.add_child(success_is_failure(VisualizationBehavior)(u'visualization', enable_visualization))
+    planning.add_child(success_is_failure(VisualizationBehavior)(u'visualization'))
 
     actual_planning = PluginBehavior(u'planning', sleep=0)
-    actual_planning.add_plugin(KinSimPlugin(u'kin sim', sample_period))
-    actual_planning.add_plugin(
-        CollisionChecker(u'coll', default_collision_avoidance_distance, map_frame, root_link, marker))
+    actual_planning.add_plugin(KinSimPlugin(u'kin sim'))
+    actual_planning.add_plugin(CollisionChecker(u'coll'))
     # actual_planning.add_plugin(success_is_running(VisualizationBehavior)(u'visualization', enable_visualization))
-    actual_planning.add_plugin(ControllerPlugin(u'controller', path_to_data_folder, nWSR))
+    actual_planning.add_plugin(ControllerPlugin(u'controller'))
     actual_planning.add_plugin(LogTrajPlugin(u'log'))
-    actual_planning.add_plugin(GoalReachedPlugin(u'goal reached', joint_convergence_threshold))
-    actual_planning.add_plugin(WiggleCancel(u'wiggle', wiggle_precision_threshold))
+    actual_planning.add_plugin(GoalReachedPlugin(u'goal reached'))
+    actual_planning.add_plugin(WiggleCancel(u'wiggle'))
     planning.add_child(actual_planning)
     # ----------------------------------------------
     publish_result = failure_is_success(Selector)(u'move robot')
     publish_result.add_child(GoalCanceled(u'goal canceled', action_server_name))
-    publish_result.add_child(SendTrajectory(u'send traj', fill_velocity_values))
+    publish_result.add_child(SendTrajectory(u'send traj'))
     # ----------------------------------------------
     root = Sequence(u'root')
     root.add_child(wait_for_goal)
-    root.add_child(GoalToConstraints(u'update constraints', action_server_name, default_collision_avoidance_distance))
+    root.add_child(GoalToConstraints(u'update constraints', action_server_name))
     root.add_child(planning)
     root.add_child(CleanUp(u'cleanup'))
     root.add_child(publish_result)
-    root.add_child(SendResult(u'send result', action_server_name, path_to_data_folder, MoveAction, plot_trajectory=plot_trajectory))
+    root.add_child(SendResult(u'send result', action_server_name, MoveAction))
 
     tree = BehaviourTree(root)
 
-    if debug:
+    if god_map.safe_get_data(identifier.debug):
         def post_tick(snapshot_visitor, behaviour_tree):
             logging.logdebug(u'\n' + py_trees.display.ascii_tree(behaviour_tree.root,
                                                       snapshot_information=snapshot_visitor))
@@ -147,7 +126,7 @@ def grow_tree():
         snapshot_visitor = py_trees_ros.visitors.SnapshotVisitor()
         tree.add_post_tick_handler(functools.partial(post_tick, snapshot_visitor))
         tree.visitors.append(snapshot_visitor)
-    path = path_to_data_folder + u'/tree'
+    path = god_map.safe_get_data(identifier.data_folder) + u'tree'
     create_path(path)
     render_dot_tree(root, name=path)
 

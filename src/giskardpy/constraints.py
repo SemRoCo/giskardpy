@@ -6,7 +6,7 @@ from rospy_message_converter.message_converter import convert_dictionary_to_ros_
 from scipy.optimize import curve_fit
 
 import symengine_wrappers as sw
-from giskardpy.identifier import robot_identifier, world_identifier, js_identifier, constraints_identifier, \
+from giskardpy.identifier import robot_identifier, world, joint_states, constraints_identifier, \
     fk_identifier, closest_point_identifier
 from giskardpy.input_system import FrameInput, Point3Input, Vector3Input, Vector3StampedInput
 from giskardpy.qp_problem_builder import SoftConstraint
@@ -48,7 +48,7 @@ class Constraint(object):
         """
         :rtype: giskardpy.world.World
         """
-        return self.get_god_map().safe_get_data(world_identifier)
+        return self.get_god_map().safe_get_data(world)
 
     def get_robot(self):
         """
@@ -57,7 +57,7 @@ class Constraint(object):
         return self.get_god_map().safe_get_data(robot_identifier)
 
     def get_input_joint_position(self, joint_name):
-        key = js_identifier + [joint_name, u'position']
+        key = joint_states + [joint_name, u'position']
         return self.god_map.to_symbol(key)
 
     def __str__(self):

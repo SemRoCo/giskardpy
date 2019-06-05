@@ -45,14 +45,14 @@ class JointGoalSplitter:
         self.current_controller_state.actual = copy.deepcopy(self.current_controller_state.desired)
         self.current_controller_state.error = copy.deepcopy(self.current_controller_state.desired)
 
-        self.state_pub = rospy.Publisher('/joint_goal_splitter/state', control_msgs.msg.JointTrajectoryControllerState, queue_size=10)
+        self.state_pub = rospy.Publisher('/whole_body_controller/state', control_msgs.msg.JointTrajectoryControllerState, queue_size=10)
 
         for topic in self.state_topics:
             rospy.Subscriber(topic, control_msgs.msg.JointTrajectoryControllerState, self.state_cb_update)
 
         rospy.Subscriber(self.state_topics[0], control_msgs.msg.JointTrajectoryControllerState, self.state_cb_publish)
 
-        self._as = actionlib.SimpleActionServer('/joint_goal_splitter/follow_joint_trajectory', control_msgs.msg.FollowJointTrajectoryAction,
+        self._as = actionlib.SimpleActionServer('/whole_body_controller/follow_joint_trajectory', control_msgs.msg.FollowJointTrajectoryAction,
                                                 execute_cb=self.callback, auto_start=False)
         self._as.register_preempt_callback(self.preempt_cb)
         self._as.start()

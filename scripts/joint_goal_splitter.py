@@ -10,7 +10,7 @@ import copy
 
 class JointGoalSplitter:
     def __init__(self):
-        rospy.init_node('JointGoalSplitter', anonymous=True)
+        rospy.init_node('JointGoalSplitter')
         self.action_clients = []
         self.joint_names = []
         self.state_topics = rospy.get_param('/joint_goal_splitter/state_topics', []);
@@ -61,8 +61,8 @@ class JointGoalSplitter:
 
 
     def callback(self, goal):
+        logging.loginfo('received goal')
         self.success = True
-
 
         idx = []
 
@@ -92,6 +92,7 @@ class JointGoalSplitter:
             a_goal.trajectory.points = tuple(goal_trajectories_points[i])
 
 
+        logging.loginfo('send splitted goals')
         for i in range(self.number_of_clients):
             self.action_clients[i].send_goal(action_goals[i]), self.feedback_cb
 

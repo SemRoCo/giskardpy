@@ -10,9 +10,9 @@ sample_period: 0.05
 default_joint_vel_limit: 0.25
 default_joint_weight: 0.001
 joint_weights:
-  odom_x_joint: 10
-  odom_y_joint: 10
-  odom_z_joint: 10
+  odom_x_joint: 1
+  odom_y_joint: 1
+  odom_z_joint: 1
   refills_finger: 0.01
 default_collision_avoidance_distance: 0.03
 fill_velocity_values: True

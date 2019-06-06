@@ -355,13 +355,41 @@ class TestCollisionAvoidanceGoals(object):
         shelf_setup.allow_collision([CollisionEntry.ALL], box, [CollisionEntry.ALL])
         shelf_setup.set_and_check_cart_goal(grasp_pose, shelf_setup.gripper_tip)
 
+        shelf_setup.attach_existing(box, u'refills_finger')
+
         box_goal = PoseStamped()
         box_goal.header.frame_id = u'map'
         box_goal.pose.position.z = 1.12
-        box_goal.pose.position.y = -1
+        box_goal.pose.position.y = -.9
         grasp_pose.pose.orientation.w = 1
-        shelf_setup.set_and_check_cart_goal(box_goal, box)
-        shelf_setup.attach_existing(box, u'refills_finger')
+        shelf_setup.set_translation_goal(box_goal, box)
+
+        tip_normal = Vector3Stamped()
+        tip_normal.header.frame_id = box
+        tip_normal.vector.z = 1
+
+        root_normal = Vector3Stamped()
+        root_normal.header.frame_id = u'base_footprint'
+        root_normal.vector.z = 1
+        shelf_setup.align_planes(box, tip_normal, u'base_footprint', root_normal)
+        shelf_setup.send_and_check_goal()
+
+        box_goal = PoseStamped()
+        box_goal.header.frame_id = box
+        box_goal.pose.position.y = -0.2
+        grasp_pose.pose.orientation.w = 1
+        shelf_setup.set_translation_goal(box_goal, box)
+
+        tip_normal = Vector3Stamped()
+        tip_normal.header.frame_id = box
+        tip_normal.vector.z = 1
+
+        root_normal = Vector3Stamped()
+        root_normal.header.frame_id = u'base_footprint'
+        root_normal.vector.z = 1
+        shelf_setup.align_planes(box, tip_normal, u'base_footprint', root_normal)
+        shelf_setup.send_and_check_goal()
+
 
         # p = PoseStamped()
         # p.header.frame_id = u'refills_finger'

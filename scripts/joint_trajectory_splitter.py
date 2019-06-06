@@ -78,13 +78,16 @@ class JointTrajectorySplitter:
             for i, index_list in enumerate(idx):
                 traj_point = trajectory_msgs.msg.JointTrajectoryPoint()
                 joint_pos = [p.positions[j] for j in index_list]
-                joint_vel = [p.velocities[j] for j in index_list]
-                joint_acc = [p.accelerations[j] for j in index_list]
-                joint_effort = [p.effort[j] for j in index_list]
                 traj_point.positions = tuple(joint_pos)
-                traj_point.velocities = tuple(joint_vel)
-                traj_point.accelerations = tuple(joint_acc)
-                traj_point.effort = tuple(joint_effort)
+                if p.velocities:
+                    joint_vel = [p.velocities[j] for j in index_list]
+                    traj_point.velocities = tuple(joint_vel)
+                if p.accelerations:
+                    joint_acc = [p.accelerations[j] for j in index_list]
+                    traj_point.accelerations = tuple(joint_acc)
+                if p.effort:
+                    joint_effort = [p.effort[j] for j in index_list]
+                    traj_point.effort = tuple(joint_effort)
                 traj_point.time_from_start.nsecs = p.time_from_start.nsecs
                 traj_point.time_from_start.secs = p.time_from_start.secs
                 goal_trajectories_points[i].append(traj_point)

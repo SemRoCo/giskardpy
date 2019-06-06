@@ -41,6 +41,7 @@ class SendTrajectory(ActionClient, GiskardBehavior):
         :return: JointTrajectory
         """
         trajectory_msg = JointTrajectory()
+        trajectory_msg.header.stamp = rospy.get_rostime() + rospy.Duration(0.5)
         trajectory_msg.joint_names = self.controller_joints
         for time, traj_point in trajectory.items():
             p = JointTrajectoryPoint()

@@ -7,13 +7,13 @@ import actionlib
 from giskardpy import logging
 import copy
 
-class JointGoalSplitter:
+class JointTrajectorySplitter:
     def __init__(self):
-        rospy.init_node('JointGoalSplitter')
+        rospy.init_node('joint_trajectory_splitter')
         self.action_clients = []
         self.joint_names = []
-        self.state_topics = rospy.get_param('~state_topics', []);
-        self.client_topics = rospy.get_param('~client_topics', []);
+        self.state_topics = rospy.get_param('~state_topics', [])
+        self.client_topics = rospy.get_param('~client_topics', [])
         self.number_of_clients = len(self.state_topics)
         if self.number_of_clients != len(self.client_topics):
             logging.logerr('Number of state and action topics do not match')
@@ -75,11 +75,16 @@ class JointGoalSplitter:
         goal_trajectories_points = [[] for i in range(self.number_of_clients)]
 
         for p in goal.trajectory.points:
-            traj_points = []
             for i, index_list in enumerate(idx):
                 traj_point = trajectory_msgs.msg.JointTrajectoryPoint()
                 joint_pos = [p.positions[j] for j in index_list]
+                joint_vel = [p.velocities[j] for j in index_list]
+                joint_acc = [p.accelerations[j] for j in index_list]
+                joint_effort = [p.effort[j] for j in index_list]
                 traj_point.positions = tuple(joint_pos)
+                traj_point.velocities = tuple(joint_vel)
+                traj_point.accelerations = tuple(joint_acc)
+                traj_point.effort = tuple(joint_effort)
                 traj_point.time_from_start.nsecs = p.time_from_start.nsecs
                 traj_point.time_from_start.secs = p.time_from_start.secs
                 goal_trajectories_points[i].append(traj_point)
@@ -156,4 +161,4 @@ class JointGoalSplitter:
 
 
 if __name__ == '__main__':
-    j = JointGoalSplitter()
+    j = JointTrajectorySplitter()

@@ -93,6 +93,7 @@ class JointTrajectorySplitter:
                 goal_trajectories_points[i].append(traj_point)
 
         for i, a_goal in enumerate(action_goals):
+            a_goal.trajectory.header = goal.trajectory.header
             a_goal.trajectory.joint_names = self.joint_names[i]
             a_goal.trajectory.points = tuple(goal_trajectories_points[i])
 
@@ -109,8 +110,11 @@ class JointTrajectorySplitter:
             result = control_msgs.msg.FollowJointTrajectoryResult.SUCCESSFUL
             for action_client in self.action_clients:
                 result = action_client.get_result()
-                if result.error_code != control_msgs.msg.FollowJointTrajectoryResult.SUCCESSFUL:
-                    break
+                if result:
+                    if result.error_code != control_msgs.msg.FollowJointTrajectoryResult.SUCCESSFUL:
+                        break
+                    else:
+                        logging.logwarn(u'didn\'t receive successful from {} {}'.format(action_client, result))
 
             self._as.set_succeeded(result)
 

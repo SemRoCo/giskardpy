@@ -182,7 +182,7 @@ class TestSymengineController(object):
             for joint_name, position in js.items():
                 mjs[joint_name] = SingleJointState(joint_name, position)
             parsed_pr2.joint_state = mjs
-            symengine_fk = parsed_pr2.get_fk(root, tip).pose
+            symengine_fk = parsed_pr2.get_fk_pose(root, tip).pose
             compare_poses(kdl_fk, symengine_fk)
 
     @given(rnd_joint_state(donbot_joint_limits))
@@ -197,7 +197,7 @@ class TestSymengineController(object):
             for joint_name, position in js.items():
                 mjs[joint_name] = SingleJointState(joint_name, position)
             parsed_donbot.joint_state = mjs
-            symengine_fk = parsed_donbot.get_fk(root, tip).pose
+            symengine_fk = parsed_donbot.get_fk_pose(root, tip).pose
             compare_poses(kdl_fk, symengine_fk)
 
     @given(rnd_joint_state(boxy_joint_limits))
@@ -212,7 +212,7 @@ class TestSymengineController(object):
             for joint_name, position in js.items():
                 mjs[joint_name] = SingleJointState(joint_name, position)
             parsed_boxy.joint_state = mjs
-            symengine_fk = parsed_boxy.get_fk(root, tip).pose
+            symengine_fk = parsed_boxy.get_fk_pose(root, tip).pose
             compare_poses(kdl_fk, symengine_fk)
 
 

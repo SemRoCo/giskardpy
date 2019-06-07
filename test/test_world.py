@@ -265,7 +265,7 @@ class TestWorld(object):
         assert set(world_with_pr2.robot.get_link_names()).symmetric_difference(links_before) == set()
         assert set(world_with_pr2.robot.get_joint_names()).symmetric_difference(joints_before) == set()
         assert obj_name in world_with_pr2.get_object_names()
-        compare_poses(world_with_pr2.robot.get_fk(world_with_pr2.robot.get_root(), u'l_gripper_tool_frame').pose,
+        compare_poses(world_with_pr2.robot.get_fk_pose(world_with_pr2.robot.get_root(), u'l_gripper_tool_frame').pose,
                       world_with_pr2.get_object(obj_name).base_pose)
         return world_with_pr2
 

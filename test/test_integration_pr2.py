@@ -11,7 +11,7 @@ from shape_msgs.msg import SolidPrimitive
 from tf.transformations import quaternion_from_matrix, quaternion_about_axis
 
 from giskardpy import logging
-from giskardpy.identifier import fk_identifier
+from giskardpy.identifier import fk_pose
 from giskardpy.tfwrapper import init as tf_init, lookup_pose, transform_pose
 from giskardpy.urdf_object import URDFObject
 from giskardpy.utils import make_world_body_box
@@ -215,7 +215,7 @@ def kitchen_setup(resetted_giskard):
 class TestFk(object):
     def test_fk1(self, zero_pose):
         for root, tip in itertools.product(zero_pose.get_robot().get_link_names(), repeat=2):
-            fk1 = zero_pose.get_god_map().safe_get_data(fk_identifier + [(root, tip)])
+            fk1 = zero_pose.get_god_map().safe_get_data(fk_pose + [(root, tip)])
             fk2 = lookup_pose(root, tip)
             compare_poses(fk1.pose, fk2.pose)
 
@@ -223,7 +223,7 @@ class TestFk(object):
         pocky = u'box'
         zero_pose.attach_box(pocky, [0.1, 0.02, 0.02], zero_pose.r_tip, [0.05, 0, 0], [1, 0, 0, 0])
         for root, tip in itertools.product(zero_pose.get_robot().get_link_names(), [pocky]):
-            fk1 = zero_pose.get_god_map().safe_get_data(fk_identifier + [(root, tip)])
+            fk1 = zero_pose.get_god_map().safe_get_data(fk_pose + [(root, tip)])
             fk2 = lookup_pose(root, tip)
             compare_poses(fk1.pose, fk2.pose)
 
@@ -640,7 +640,7 @@ class TestCollisionAvoidanceGoals(object):
         zero_pose.set_cart_goal(p, pocky, zero_pose.default_root)
         p = transform_pose(zero_pose.default_root, p)
         zero_pose.send_and_check_goal()
-        p2 = zero_pose.get_robot().get_fk(zero_pose.default_root, pocky)
+        p2 = zero_pose.get_robot().get_fk_pose(zero_pose.default_root, pocky)
         compare_poses(p2.pose, p.pose)
         zero_pose.detach_object(pocky)
         p = PoseStamped()
@@ -669,7 +669,7 @@ class TestCollisionAvoidanceGoals(object):
         p.pose.orientation = Quaternion(0., 0., 0.47942554, 0.87758256)
         zero_pose.add_box(pocky, [0.1, 0.02, 0.02], pose=p)
         zero_pose.attach_existing(pocky, frame_id=zero_pose.r_tip)
-        relative_pose = zero_pose.get_robot().get_fk(zero_pose.r_tip, pocky).pose
+        relative_pose = zero_pose.get_robot().get_fk_pose(zero_pose.r_tip, pocky).pose
         compare_poses(p.pose, relative_pose)
 
     def test_attach_existing_box2(self, zero_pose):
@@ -683,7 +683,7 @@ class TestCollisionAvoidanceGoals(object):
         old_p.pose.orientation = Quaternion(0., 0., 0.47942554, 0.87758256)
         zero_pose.add_box(pocky, [0.1, 0.02, 0.02], pose=old_p)
         zero_pose.attach_existing(pocky, frame_id=zero_pose.r_tip)
-        relative_pose = zero_pose.get_robot().get_fk(zero_pose.r_tip, pocky).pose
+        relative_pose = zero_pose.get_robot().get_fk_pose(zero_pose.r_tip, pocky).pose
         compare_poses(old_p.pose, relative_pose)
 
         p = PoseStamped()
@@ -714,7 +714,7 @@ class TestCollisionAvoidanceGoals(object):
 
         zero_pose.add_box(pocky, [0.05, 0.03, 0.2], p)
         zero_pose.attach_existing(pocky, frame_id=zero_pose.r_tip, fixed=False)
-        relative_pose = zero_pose.get_robot().get_fk(zero_pose.default_root, pocky).pose
+        relative_pose = zero_pose.get_robot().get_fk_pose(zero_pose.default_root, pocky).pose
         # compare_poses(p.pose, relative_pose)
 
         zero_pose.keep_orientation(pocky)
@@ -734,7 +734,7 @@ class TestCollisionAvoidanceGoals(object):
         zero_pose.set_cart_goal(p, pocky)
         p = transform_pose(zero_pose.default_root, p)
         zero_pose.send_and_check_goal()
-        p2 = zero_pose.get_robot().get_fk(zero_pose.default_root, pocky)
+        p2 = zero_pose.get_robot().get_fk_pose(zero_pose.default_root, pocky)
         compare_poses(p2.pose, p.pose)
 
         zero_pose.clear_world()
@@ -745,7 +745,7 @@ class TestCollisionAvoidanceGoals(object):
         old_p.pose.orientation = Quaternion(0., 0., 0.47942554, 0.87758256)
         zero_pose.add_box(pocky, [0.1, 0.02, 0.02], pose=old_p)
         zero_pose.attach_existing(pocky, frame_id=zero_pose.r_tip)
-        relative_pose = zero_pose.get_robot().get_fk(zero_pose.r_tip, pocky).pose
+        relative_pose = zero_pose.get_robot().get_fk_pose(zero_pose.r_tip, pocky).pose
         compare_poses(old_p.pose, relative_pose)
 
         p = PoseStamped()

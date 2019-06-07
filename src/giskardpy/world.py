@@ -159,7 +159,7 @@ class World(object):
     def detach(self, joint_name, from_obj=None):
         if from_obj is None or self.robot.get_name() == from_obj:
             # this only works because attached simple objects have joint names equal to their name
-            p = self.robot.get_fk(self.robot.get_root(), joint_name)
+            p = self.robot.get_fk_pose(self.robot.get_root(), joint_name)
             p_map = kdl_to_pose(self.robot.root_T_map.Inverse() * msg_to_kdl(p))
 
             cut_off_obj = self.robot.detach_sub_tree(joint_name)
@@ -466,7 +466,7 @@ class World(object):
             if contact_info is None:
                 continue
             link1 = key[0]
-            link_T_root = msg_to_kdl(self.robot.get_fk(link1, self.robot.get_root()))
+            link_T_root = msg_to_kdl(self.robot.get_fk_pose(link1, self.robot.get_root()))
             a_in_robot_root = link_T_root * root_T_map * PyKDL.Vector(*contact_info.position_on_a)
             b_in_robot_root = root_T_map * PyKDL.Vector(*contact_info.position_on_b)
             n_in_robot_root = root_T_map.M * PyKDL.Vector(*contact_info.contact_normal_on_b)

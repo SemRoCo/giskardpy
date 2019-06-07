@@ -27,7 +27,7 @@ class VisualizationBehavior(GiskardBehavior):
 
         markers = []
         robot = self.get_robot()
-        get_fk = robot.get_fk
+        get_fk = robot.get_fk_pose
         links = [x for x in self.get_robot().get_link_names() if robot.has_link_visuals(x)]
         for i, link_name in enumerate(links):
             marker = robot.link_as_marker(link_name)

@@ -1,6 +1,7 @@
 import numpy as np
 from collections import defaultdict
 
+import PyKDL
 import pybullet as p
 from geometry_msgs.msg import Point, Pose
 from giskard_msgs.msg import CollisionEntry
@@ -9,6 +10,7 @@ import giskardpy
 from giskardpy.data_types import ClosestPointInfo
 from giskardpy.pybullet_world_object import PyBulletWorldObject
 from giskardpy.pybullet_wrapper import ContactInfo
+from giskardpy.tfwrapper import msg_to_kdl
 from giskardpy.utils import resolve_ros_iris
 from giskardpy.world import World
 from giskardpy.world_object import WorldObject
@@ -201,7 +203,12 @@ class PyBulletWorld(World):
         closest_point = super(PyBulletWorld, self).collisions_to_closest_point(collisions, min_allowed_distance)
         for key, cpi in closest_point.items():  # type: (str, ClosestPointInfo)
             if self.__should_flip_contact_info(collisions[cpi.old_key]):
-                closest_point[key] = ClosestPointInfo(cpi.position_on_b, cpi.position_on_a, cpi.contact_distance,
+                root_T_link = msg_to_kdl(self.robot.get_fk_pose(self.robot.get_root(), cpi.link_a))
+                b_link = PyKDL.Vector(*cpi.position_on_a)
+                a_root = PyKDL.Vector(*cpi.position_on_b)
+                b_root = root_T_link * b_link
+                a_link = root_T_link.Inverse() * a_root
+                closest_point[key] = ClosestPointInfo(a_link, b_root, cpi.contact_distance,
                                                       cpi.min_dist,
                                                       cpi.link_a,
                                                       cpi.body_b,

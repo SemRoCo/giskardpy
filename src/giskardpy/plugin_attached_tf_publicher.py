@@ -23,7 +23,7 @@ class TFPlugin(GiskardBehavior):
         if self.attached_links:
             tf_msg = TFMessage()
             for link_name in self.attached_links:
-                fk = self.get_robot().get_fk(self.get_robot().get_parent_link_of_link(link_name), link_name)
+                fk = self.get_robot().get_fk_pose(self.get_robot().get_parent_link_of_link(link_name), link_name)
                 tf = TransformStamped()
                 tf.header = fk.header
                 tf.header.stamp = rospy.get_rostime()

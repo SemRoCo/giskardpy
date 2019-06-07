@@ -430,7 +430,7 @@ class GiskardTestWrapper(object):
         assert not self.get_world().has_object(name)
 
     def detach_object(self, name, expected_response=UpdateWorldResponse.SUCCESS):
-        p = self.get_robot().get_fk(self.get_robot().get_root(), name)
+        p = self.get_robot().get_fk_pose(self.get_robot().get_root(), name)
         p = transform_pose(u'map', p)
         r = self.wrapper.detach_object(name)
         assert r.error_codes == expected_response, \

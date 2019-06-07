@@ -1,3 +1,5 @@
+import numpy as np
+
 import giskardpy
 from giskardpy.utils import KeyDefaultDict
 
@@ -6,7 +8,7 @@ import unittest
 from collections import namedtuple
 
 from geometry_msgs.msg import PoseStamped
-from hypothesis import given, reproduce_failure
+from hypothesis import given
 import hypothesis.strategies as st
 import giskardpy.symengine_wrappers as sw
 from giskardpy.god_map import GodMap
@@ -117,6 +119,15 @@ class TestGodMap(unittest.TestCase):
         db.safe_set_data([key], value)
         for i, v in enumerate(value):
             self.assertEqual(db.safe_get_data([key, i]), v)
+
+    def test_list_double_index(self):
+        key = 'asdf'
+        value = np.array([[0, 1], [2, 3]])
+        db = GodMap()
+        db.safe_set_data([key], value)
+        for i in range(value.shape[0]):
+            for j in range(value.shape[1]):
+                self.assertEqual(db.safe_get_data([key, i, j]), value[i, j])
 
     @given(variable_name(),
            st.lists(st.floats(allow_nan=False), min_size=1))
@@ -256,7 +267,8 @@ class TestGodMap(unittest.TestCase):
         r = WorldObject(pr2_urdf())
         w.add_robot(r, PoseStamped(), [], 0, KeyDefaultDict(lambda key: 0), False)
         gm.safe_set_data([u'world'], w)
-        assert r == gm.safe_get_data([u'world',u'robot'])
+        assert r == gm.safe_get_data([u'world', u'robot'])
+
 
 if __name__ == '__main__':
     import rosunit

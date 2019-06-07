@@ -221,6 +221,8 @@ class CompiledFunction(object):
             raise SymengineException(msg)
         except TypeError as e:
             raise SymengineException(e.message)
+        except ValueError as e:
+            raise SymengineException(e.message)
 
 
 def speed_up(function, parameters, backend=u'llvm'):

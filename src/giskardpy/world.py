@@ -1,5 +1,4 @@
 import PyKDL
-import rospy
 from geometry_msgs.msg import PoseStamped
 from giskard_msgs.msg import CollisionEntry
 
@@ -161,7 +160,7 @@ class World(object):
         if from_obj is None or self.robot.get_name() == from_obj:
             # this only works because attached simple objects have joint names equal to their name
             p = self.robot.get_fk(self.robot.get_root(), joint_name)
-            p_map = kdl_to_pose(self.robot.T_base___map.Inverse() * msg_to_kdl(p))
+            p_map = kdl_to_pose(self.robot.root_T_map.Inverse() * msg_to_kdl(p))
 
             cut_off_obj = self.robot.detach_sub_tree(joint_name)
         else:
@@ -456,20 +455,21 @@ class World(object):
         """
         closest_point = KeyDefaultDict(lambda k: ClosestPointInfo((10, 0, 0),
                                                                   (0, 0, 0),
-                                                                  1e9,
+                                                                  100,
                                                                   0.0,
                                                                   k,
                                                                   '',
                                                                   '',
                                                                   (1, 0, 0), k))
-        T_base___map = self.robot.T_base___map
+        root_T_map = self.robot.root_T_map
         for key, contact_info in collisions.items():  # type: ((str, str, str), ContactInfo)
             if contact_info is None:
                 continue
             link1 = key[0]
-            a_in_robot_root = T_base___map * PyKDL.Vector(*contact_info.position_on_a)
-            b_in_robot_root = T_base___map * PyKDL.Vector(*contact_info.position_on_b)
-            n_in_robot_root = T_base___map.M * PyKDL.Vector(*contact_info.contact_normal_on_b)
+            link_T_root = msg_to_kdl(self.robot.get_fk(link1, self.robot.get_root()))
+            a_in_robot_root = link_T_root * root_T_map * PyKDL.Vector(*contact_info.position_on_a)
+            b_in_robot_root = root_T_map * PyKDL.Vector(*contact_info.position_on_b)
+            n_in_robot_root = root_T_map.M * PyKDL.Vector(*contact_info.contact_normal_on_b)
             try:
                 cpi = ClosestPointInfo(a_in_robot_root, b_in_robot_root, contact_info.contact_distance,
                                        min_allowed_distance[key], key[0], key[1], key[2],

@@ -56,7 +56,7 @@ class CollisionCancel(GiskardBehavior):
     def update(self):
         time = self.get_god_map().safe_get_data(identifier.time_identifier)
         if time >= self.collision_time_threshold:
-            cp = self.get_god_map().safe_get_data(identifier.closest_point_identifier)
+            cp = self.get_god_map().safe_get_data(identifier.closest_point)
             if cp is not None and closest_point_constraint_violated(cp, tolerance=1):
                 self.raise_to_blackboard(PathCollisionException(
                     u'robot is in collision after {} seconds'.format(self.collision_time_threshold)))

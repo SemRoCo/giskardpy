@@ -16,10 +16,11 @@ from hypothesis.strategies import composite
 from iai_naive_kinematics_sim.srv import SetJointState, SetJointStateRequest
 from py_trees import Blackboard
 from sensor_msgs.msg import JointState
+from tf.transformations import rotation_from_matrix, quaternion_matrix
 
 from giskardpy import logging
 from giskardpy.garden import grow_tree
-from giskardpy.identifier import robot_identifier, world
+from giskardpy.identifier import robot, world
 from giskardpy.pybullet_world import PyBulletWorld
 from giskardpy.python_interface import GiskardWrapper
 from giskardpy.symengine_robot import Robot
@@ -230,7 +231,7 @@ class GiskardTestWrapper(object):
         """
         :rtype: Robot
         """
-        return self.get_god_map().safe_get_data(robot_identifier)
+        return self.get_god_map().safe_get_data(robot)
 
     def get_god_map(self):
         """
@@ -677,8 +678,9 @@ class Donbot(GiskardTestWrapper):
         goal_pose = transform_pose(self.default_root, goal_pose)
         js = {u'odom_x_joint': goal_pose.pose.position.x,
               u'odom_y_joint': goal_pose.pose.position.y,
-              u'odom_z_joint': float(axis_angle_from_quaternion(goal_pose.pose.orientation.x,
-                                                                goal_pose.pose.orientation.y,
-                                                                goal_pose.pose.orientation.z,
-                                                                goal_pose.pose.orientation.w)[1])}
+              u'odom_z_joint': rotation_from_matrix(quaternion_matrix([goal_pose.pose.orientation.x,
+                                                                             goal_pose.pose.orientation.y,
+                                                                             goal_pose.pose.orientation.z,
+                                                                             goal_pose.pose.orientation.w]))[0]}
+        self.allow_all_collisions()
         self.send_and_check_joint_goal(js)

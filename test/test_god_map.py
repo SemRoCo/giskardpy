@@ -1,4 +1,5 @@
 import giskardpy
+from giskardpy.utils import KeyDefaultDict
 
 giskardpy.WORLD_IMPLEMENTATION = None
 import unittest
@@ -157,7 +158,7 @@ class TestGodMap(unittest.TestCase):
 
     @given(variable_name(),
            variable_name())
-    def test_function1(self, key, key2):
+    def test_function_1param_lambda(self, key, key2):
         db = GodMap()
         f = lambda x: x
         db.safe_set_data([key], f)
@@ -167,7 +168,7 @@ class TestGodMap(unittest.TestCase):
            variable_name(),
            variable_name(),
            variable_name())
-    def test_function2(self, key1, key2, key3, key4):
+    def test_function_2param_call(self, key1, key2, key3, key4):
         db = GodMap()
 
         class MUH(object):
@@ -205,7 +206,7 @@ class TestGodMap(unittest.TestCase):
            variable_name(),
            variable_name(),
            variable_name())
-    def test_function3(self, key1, key2, key3, key4, key5):
+    def test_function4(self, key1, key2, key3, key4, key5):
         db = GodMap()
 
         class MUH(object):
@@ -216,6 +217,21 @@ class TestGodMap(unittest.TestCase):
         d = {key2: a}
         db.safe_set_data([key1], d)
         self.assertEqual(key5, db.safe_get_data([key1, key2, (key3, key4), 0]))
+
+    @given(variable_name(),
+           variable_name(),
+           variable_name())
+    def test_function_no_param(self, key1, key2, key3):
+        db = GodMap()
+
+        class MUH(object):
+            def __call__(self):
+                return [key3]
+
+        a = MUH()
+        d = {key2: a}
+        db.safe_set_data([key1], d)
+        self.assertEqual(key3, db.safe_get_data([key1, key2, [], 0]))
 
     @given(variable_name(),
            st.integers())
@@ -238,7 +254,7 @@ class TestGodMap(unittest.TestCase):
         gm = GodMap()
         w = World()
         r = WorldObject(pr2_urdf())
-        w.add_robot(r, PoseStamped(), [], 0, 0, False)
+        w.add_robot(r, PoseStamped(), [], 0, KeyDefaultDict(lambda key: 0), False)
         gm.safe_set_data([u'world'], w)
         assert r == gm.safe_get_data([u'world',u'robot'])
 

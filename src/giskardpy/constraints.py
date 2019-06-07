@@ -6,12 +6,10 @@ from rospy_message_converter.message_converter import convert_dictionary_to_ros_
 from scipy.optimize import curve_fit
 
 import symengine_wrappers as sw
-from giskardpy.identifier import robot_identifier, world, joint_states, constraints_identifier, \
-    fk_identifier, closest_point_identifier
+import giskardpy.identifier as identifier
 from giskardpy.input_system import FrameInput, Point3Input, Vector3Input, Vector3StampedInput
 from giskardpy.qp_problem_builder import SoftConstraint
 from giskardpy.tfwrapper import transform_pose, transform_vector
-from giskardpy.utils import str_to_unique_number
 
 MAX_WEIGHT = 15
 HIGH_WEIGHT = 5
@@ -25,15 +23,15 @@ class Constraint(object):
         self.god_map = god_map
 
     def save_params_on_god_map(self, params):
-        constraints = self.get_god_map().safe_get_data(constraints_identifier)
+        constraints = self.get_god_map().safe_get_data(identifier.constraints_identifier)
         constraints[str(self)] = params
-        self.get_god_map().safe_set_data(constraints_identifier, constraints)
+        self.get_god_map().safe_set_data(identifier.constraints_identifier, constraints)
 
     def get_constraint(self, **kwargs):
         pass
 
     def get_identifier(self):
-        return constraints_identifier + [str(self)]
+        return identifier.constraints_identifier + [str(self)]
 
     def get_world_object_pose(self, object_name, link_name):
         pass
@@ -48,16 +46,28 @@ class Constraint(object):
         """
         :rtype: giskardpy.world.World
         """
-        return self.get_god_map().safe_get_data(world)
+        return self.get_god_map().safe_get_data(identifier.world)
 
     def get_robot(self):
         """
         :rtype: giskardpy.symengine_robot.Robot
         """
-        return self.get_god_map().safe_get_data(robot_identifier)
+        return self.get_god_map().safe_get_data(identifier.robot)
+
+    def get_world_unsafe(self):
+        """
+        :rtype: giskardpy.world.World
+        """
+        return self.get_god_map().get_data(identifier.world)
+
+    def get_robot_unsafe(self):
+        """
+        :rtype: giskardpy.symengine_robot.Robot
+        """
+        return self.get_god_map().get_data(identifier.robot)
 
     def get_input_joint_position(self, joint_name):
-        key = joint_states + [joint_name, u'position']
+        key = identifier.joint_states + [joint_name, u'position']
         return self.god_map.to_symbol(key)
 
     def __str__(self):
@@ -68,11 +78,11 @@ class Constraint(object):
 
     def get_fk_evaluated(self, root, tip):
         return FrameInput(self.get_god_map().to_symbol,
-                          translation_prefix=fk_identifier +
+                          translation_prefix=identifier.fk_identifier +
                                              [(root, tip),
                                               u'pose',
                                               u'position'],
-                          rotation_prefix=fk_identifier +
+                          rotation_prefix=identifier.fk_identifier +
                                           [(root, tip),
                                            u'pose',
                                            u'orientation']).get_frame()
@@ -411,6 +421,7 @@ class LinkToAnyAvoidance(Constraint):
     max_weight_distance = u'max_weight_distance'
     low_weight_distance = u'low_weight_distance'
     zero_weight_distance = u'zero_weight_distance'
+    body_b_name_to_id = u'body_b_name_to_id'
     A = u'A'
     B = u'B'
     C = u'C'
@@ -422,60 +433,71 @@ class LinkToAnyAvoidance(Constraint):
         x = np.array([max_weight_distance, low_weight_distance, zero_weight_distance])
         y = np.array([MAX_WEIGHT, LOW_WEIGHT, ZERO_WEIGHT])
         (A, B, C), _ = curve_fit(lambda t, a, b, c: a / (t + c) + b, x, y)
+        def body_b_name_to_id():
+            body_b = god_map.get_data(identifier.closest_point + [link_name, u'body_b'])
+            if body_b == u'':
+                return -1
+            elif body_b == self.get_robot_unsafe().get_name():
+                return self.get_robot_unsafe().get_pybullet_id()
+            return self.get_world_unsafe().__get_pybullet_object_id(body_b)
+        # def link_in_chain(link_name):
+        #     body_b = god_map.get_data(identifier.closest_point + [link_name, u'body_b'])
+        #     if body_b == self.get_robot().get_name():
+        #         link_a = god_map.get_data(identifier.closest_point + [link_name, u'link_a'])
+        #         link_b = god_map.get_data(identifier.closest_point + [link_name, u'link_b'])
+        #         self.get_robot().chai
+        #     return False
         params = {self.repel_speed: repel_speed,
                   self.max_weight_distance: max_weight_distance,
                   self.low_weight_distance: low_weight_distance,
                   self.zero_weight_distance: zero_weight_distance,
+                  self.body_b_name_to_id: body_b_name_to_id,
                   self.A: A,
                   self.B: B,
                   self.C: C}
         self.save_params_on_god_map(params)
 
     def get_distance_to_closest_object(self, link_name):
-        return self.get_god_map().to_symbol(closest_point_identifier + [link_name, u'min_dist'])
+        return self.get_god_map().to_symbol(identifier.closest_point + [link_name, u'min_dist'])
 
     def get_contact_normal_on_b(self, link_name):
         return Vector3Input(self.god_map.to_symbol,
-                            prefix=closest_point_identifier + [link_name, u'contact_normal']).get_expression()
+                            prefix=identifier.closest_point + [link_name, u'contact_normal']).get_expression()
 
     def get_closest_point_on_a(self, link_name):
         return Point3Input(self.god_map.to_symbol,
-                           prefix=closest_point_identifier + [link_name, u'position_on_a']).get_expression()
+                           prefix=identifier.closest_point + [link_name, u'position_on_a']).get_expression()
 
     def get_closest_point_on_b(self, link_name):
         return Point3Input(self.god_map.to_symbol,
-                           prefix=closest_point_identifier + [link_name, u'position_on_b']).get_expression()
+                           prefix=identifier.closest_point + [link_name, u'position_on_b']).get_expression()
 
-    def get_body_b(self, link_name):
-        return self.god_map.to_symbol(closest_point_identifier + [link_name, u'body_b'])
+    def get_actual_distance(self, link_name):
+        return self.god_map.to_symbol(identifier.closest_point + [link_name, u'contact_distance'])
+
+    def get_body_b(self, name):
+        # return self.god_map.to_symbol(closest_point_identifier + [link_name, u'body_b'])
+        key = self.get_identifier() + [name, tuple()]
+        return self.god_map.to_symbol(key)
 
     def get_constraint(self):
         base_footprint = self.get_robot().get_non_base_movement_root()
         base_footprint_T_link = self.get_fk(base_footprint, self.link_name)
         root_T_base_footprint = self.get_fk(self.get_robot().get_root(), base_footprint)
 
-        body_b = self.get_body_b(self.link_name)
-        robot_name_ascii = str_to_unique_number(self.get_robot().get_name())
+        body_b = self.get_body_b(self.body_b_name_to_id)
+        robot_id = self.get_robot().get_pybullet_id()
 
-        current_pose = sw.if_eq(body_b, robot_name_ascii,
+        root_T_link = sw.if_eq(body_b, robot_id,
                                 sw.eye(4),
                                 root_T_base_footprint) * base_footprint_T_link
-
-        base_footprint_T_link2 = self.get_fk_evaluated(base_footprint, self.link_name)
-        root_T_base_footprint2 = self.get_fk_evaluated(self.get_robot().get_root(), base_footprint)
-
-        current_pose_eval = sw.if_eq(body_b, robot_name_ascii,
-                                     sw.eye(4),
-                                     root_T_base_footprint2) * base_footprint_T_link2
-
-        # current_pose = self.get_fk(self.get_robot().get_root(), self.link_name)
-        # current_pose_eval = self.get_fk_evaluated(self.get_robot().get_root(), self.link_name)
+        
         point_on_link = self.get_closest_point_on_a(self.link_name)
         other_point = self.get_closest_point_on_b(self.link_name)
         contact_normal = self.get_contact_normal_on_b(self.link_name)
+        actual_distance = self.get_actual_distance(self.link_name)
         repel_speed = self.get_input_float(self.repel_speed)
         max_weight_distance = self.get_input_float(self.max_weight_distance)
-        low_weight_distance = self.get_input_float(self.low_weight_distance)
         zero_weight_distance = self.get_input_float(self.zero_weight_distance)
         A = self.get_input_float(self.A)
         B = self.get_input_float(self.B)
@@ -483,18 +505,26 @@ class LinkToAnyAvoidance(Constraint):
 
         soft_constraints = OrderedDict()
 
-        controllable_point = current_pose * sw.inverse_frame(current_pose_eval) * point_on_link
+        controllable_point = root_T_link * point_on_link
 
         dist = (contact_normal.T * (controllable_point - other_point))[0]
 
-        weight_f = sw.Piecewise([MAX_WEIGHT, dist <= max_weight_distance],
-                                [ZERO_WEIGHT, dist > zero_weight_distance],
-                                [A / (dist + C) + B, True])
+        weight_f = sw.Piecewise([MAX_WEIGHT, actual_distance <= max_weight_distance],
+                                [ZERO_WEIGHT, actual_distance > zero_weight_distance],
+                                [A / (actual_distance + C) + B, True])
 
         soft_constraints[str(self)] = SoftConstraint(lower=repel_speed,
                                                      upper=repel_speed,
                                                      weight=weight_f,
                                                      expression=dist)
+        # add_debug_constraint(soft_constraints, str(self)+'/dist', dist)
+        # add_debug_constraint(soft_constraints, str(self)+'/actual_distance', actual_distance)
+        # add_debug_constraint(soft_constraints, str(self)+'/p on a 0', point_on_link[0])
+        # add_debug_constraint(soft_constraints, str(self)+'/p on a 1', point_on_link[1])
+        # add_debug_constraint(soft_constraints, str(self)+'/p on a 2', point_on_link[2])
+        # add_debug_constraint(soft_constraints, str(self)+'/p on a root 0', controllable_point[0])
+        # add_debug_constraint(soft_constraints, str(self)+'/p on a root 1', controllable_point[1])
+        # add_debug_constraint(soft_constraints, str(self)+'/p on a root 2', controllable_point[2])
         return soft_constraints
 
     def __str__(self):

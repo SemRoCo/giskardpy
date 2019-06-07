@@ -3,18 +3,18 @@ from copy import deepcopy
 
 import pytest
 import rospy
-from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped
+from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped, Pose
 from giskard_msgs.msg import MoveActionGoal, MoveResult, MoveGoal, CollisionEntry
 from tf.transformations import quaternion_from_matrix
 
 from giskardpy import logging
-from giskardpy.tfwrapper import lookup_transform, init as tf_init
-from utils_for_tests import Donbot
+from giskardpy.tfwrapper import lookup_transform, init as tf_init, lookup_pose
+from utils_for_tests import Donbot, compare_poses
 
 # TODO roslaunch iai_donbot_sim ros_control_sim.launch
 
 
-default_pose = {
+default_js = {
     u'ur5_elbow_joint': 0.0,
     u'ur5_shoulder_lift_joint': 0.0,
     u'ur5_shoulder_pan_joint': 0.0,
@@ -23,7 +23,7 @@ default_pose = {
     u'ur5_wrist_3_joint': 0.0
 }
 
-floor_detection_pose = {
+floor_detection_js = {
     u'ur5_shoulder_pan_joint': -1.63407260576,
     u'ur5_shoulder_lift_joint': -1.4751423041,
     u'ur5_elbow_joint': 0.677300930023,
@@ -39,6 +39,15 @@ better_js = {
     u'ur5_wrist_1_joint': 0.291547812391,
     u'ur5_wrist_2_joint': np.pi / 2,
     u'ur5_wrist_3_joint': np.pi / 2
+}
+
+self_collision_js = {
+    u'ur5_shoulder_pan_joint': -1.57,
+    u'ur5_shoulder_lift_joint': -1.35,
+    u'ur5_elbow_joint': 2.4,
+    u'ur5_wrist_1_joint': 0.66,
+    u'ur5_wrist_2_joint': 1.57,
+    u'ur5_wrist_3_joint': 1.28191862405e-15,
 }
 
 folder_name = u'tmp_data/'
@@ -91,7 +100,7 @@ def zero_pose(resetted_giskard):
     """
     :type giskard: Donbot
     """
-    resetted_giskard.set_joint_goal(default_pose)
+    resetted_giskard.set_joint_goal(default_js)
     resetted_giskard.allow_all_collisions()
     resetted_giskard.send_and_check_goal()
     return resetted_giskard
@@ -108,6 +117,17 @@ def better_pose(resetted_giskard):
     resetted_giskard.send_and_check_goal()
     return resetted_giskard
 
+
+@pytest.fixture()
+def self_collision_pose(resetted_giskard):
+    """
+    :type pocky_pose_setup: Donbot
+    :rtype: Donbot
+    """
+    resetted_giskard.set_joint_goal(self_collision_js)
+    resetted_giskard.allow_all_collisions()
+    resetted_giskard.send_and_check_goal()
+    return resetted_giskard
 
 @pytest.fixture()
 def fake_table_setup(zero_pose):
@@ -174,7 +194,7 @@ class TestJointGoals(object):
         :type zero_pose: Donbot
         """
         zero_pose.allow_self_collision()
-        zero_pose.send_and_check_joint_goal(floor_detection_pose)
+        zero_pose.send_and_check_joint_goal(floor_detection_js)
 
     def test_joint_movement2(self, zero_pose):
         """
@@ -207,7 +227,7 @@ class TestJointGoals(object):
         :type zero_pose: Donbot
         """
         zero_pose.allow_self_collision()
-        js = dict(floor_detection_pose.items()[:3])
+        js = dict(floor_detection_js.items()[:3])
         zero_pose.send_and_check_joint_goal(js)
 
     def test_undefined_type(self, zero_pose):
@@ -390,7 +410,6 @@ class TestCollisionAvoidanceGoals(object):
         shelf_setup.align_planes(box, tip_normal, u'base_footprint', root_normal)
         shelf_setup.send_and_check_goal()
 
-
         # p = PoseStamped()
         # p.header.frame_id = u'refills_finger'
         # p.pose.position.y = -0.075
@@ -452,3 +471,10 @@ class TestCollisionAvoidanceGoals(object):
         arm_goal.pose.orientation.w = 1
         zero_pose.wrapper.set_self_collision_distance(0.025)
         zero_pose.set_and_check_cart_goal(arm_goal, zero_pose.gripper_tip, zero_pose.default_root)
+
+    def test_avoid_self_collision2(self, self_collision_pose):
+        self_collision_pose.send_and_check_goal()
+        map_T_root = lookup_pose(u'map', u'base_footprint')
+        expected_pose = Pose()
+        expected_pose.orientation.w = 1
+        compare_poses(map_T_root.pose, expected_pose)

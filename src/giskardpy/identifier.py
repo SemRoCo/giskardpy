@@ -1,13 +1,13 @@
 world = [u'world']
-robot_identifier = world + [u'robot']
-fk_identifier = robot_identifier + [u'get_fk']
-joint_states = robot_identifier + [u'joint_state']
+robot = world + [u'robot']
+fk_identifier = robot + [u'get_fk']
+joint_states = robot + [u'joint_state']
 
 constraints_identifier = [u'constraints']
 trajectory_identifier = [u'traj']
 time_identifier = [u'time']
 next_cmd_identifier = [u'motor']
-closest_point_identifier = [u'cpi']
+closest_point = [u'cpi']
 collision_goal_identifier = [u'collision_goal']
 soft_constraint_identifier = [u'soft_constraints']
 

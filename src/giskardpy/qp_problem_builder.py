@@ -203,22 +203,24 @@ class QProblemBuilder(object):
         #           (p_lb, u'lb'),
         #           (p_ub, u'ub')]
         # for a, name in arrays:
-        #     logging.logwarn(u'{} has the following nans:'.format(name))
-        #     self.check_for_nan(a)
-        #     logging.logwarn(u'{} has the following big numbers:'.format(name))
-        #     self.check_for_big_numbers(a)
+        #     self.check_for_nan(name, a)
+        #     self.check_for_big_numbers(name, a)
         pass
 
-    def check_for_nan(self, p_array):
+    def check_for_nan(self, name, p_array):
         p_filtered = p_array.apply(lambda x: zip(x.index[x.isnull()].tolist(), x[x.isnull()]), 1)
         p_filtered = p_filtered[p_filtered.apply(lambda x: len(x)) > 0]
-        self.print_pandas_array(p_filtered)
+        if len(p_filtered) > 0:
+            self.print_pandas_array(p_filtered)
+            logging.logwarn(u'{} has the following nans:'.format(name))
 
-    def check_for_big_numbers(self, p_array, big=1e10):
+    def check_for_big_numbers(self, name, p_array, big=1e10):
         # FIXME fails if condition is true on first entry
         p_filtered = p_array.apply(lambda x: zip(x.index[abs(x) > big].tolist(), x[x > big]), 1)
         p_filtered = p_filtered[p_filtered.apply(lambda x: len(x)) > 0]
-        self.print_pandas_array(p_filtered)
+        if len(p_filtered) > 0:
+            logging.logwarn(u'{} has the following big numbers:'.format(name))
+            self.print_pandas_array(p_filtered)
 
     def print_pandas_array(self, array):
         import pandas as pd

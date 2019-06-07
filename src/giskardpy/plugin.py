@@ -6,7 +6,7 @@ from threading import Thread
 import rospy
 from py_trees import Behaviour, Blackboard, Status
 
-from giskardpy.identifier import world, robot_identifier
+from giskardpy.identifier import world, robot
 from giskardpy import logging
 
 
@@ -31,7 +31,7 @@ class GiskardBehavior(Behaviour):
         """
         :rtype: giskardpy.symengine_robot.Robot
         """
-        return self.get_god_map().safe_get_data(robot_identifier)
+        return self.get_god_map().safe_get_data(robot)
 
     def raise_to_blackboard(self, exception):
         Blackboard().set('exception', exception)

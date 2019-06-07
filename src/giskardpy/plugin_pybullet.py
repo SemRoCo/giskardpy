@@ -2,7 +2,7 @@ import traceback
 from multiprocessing import Lock
 
 import rospy
-from geometry_msgs.msg import Point, Vector3, PoseStamped
+from geometry_msgs.msg import Point, Vector3, PoseStamped, PointStamped
 from giskard_msgs.srv import UpdateWorld, UpdateWorldResponse, UpdateWorldRequest
 from py_trees import Status
 from sensor_msgs.msg import JointState
@@ -16,7 +16,7 @@ from giskardpy.exceptions import CorruptShapeException, UnknownBodyException, \
     UnsupportedOptionException, DuplicateNameException
 import giskardpy.identifier as identifier
 from giskardpy.plugin import GiskardBehavior
-from giskardpy.tfwrapper import transform_pose
+from giskardpy.tfwrapper import transform_pose, lookup_transform, transform_point
 from giskardpy.utils import to_joint_state_dict
 from giskardpy.world_object import WorldObject
 
@@ -236,7 +236,7 @@ class CollisionChecker(GiskardBehavior):
         collision_goals = self.get_god_map().safe_get_data(identifier.collision_goal_identifier)
         self.collision_matrix = self.get_world().collision_goals_to_collision_matrix(collision_goals,
                                                                                      self.default_min_dist)
-        self.get_god_map().safe_set_data(identifier.closest_point_identifier, None)
+        self.get_god_map().safe_set_data(identifier.closest_point, None)
         super(CollisionChecker, self).initialise()
 
     def update(self):
@@ -252,7 +252,7 @@ class CollisionChecker(GiskardBehavior):
             if self.marker:
                 self.publish_cpi_markers(closest_point)
 
-            self.god_map.safe_set_data(identifier.closest_point_identifier, closest_point)
+            self.god_map.safe_set_data(identifier.closest_point, closest_point)
         return Status.RUNNING
 
     def enable_marker_cb(self, setbool):
@@ -286,7 +286,11 @@ class CollisionChecker(GiskardBehavior):
                 green_threshold = collision_info.min_dist * 3
 
                 if collision_info.contact_distance < green_threshold:
-                    m.points.append(Point(*collision_info.position_on_a))
+                    ps = PointStamped()
+                    ps.header.frame_id = collision_info.link_a
+                    ps.point = Point(*collision_info.position_on_a)
+                    ps = transform_point(self.get_robot().get_root(), ps)
+                    m.points.append(ps.point)
                     m.points.append(Point(*collision_info.position_on_b))
                     m.colors.append(ColorRGBA(0, 1, 0, 1))
                     m.colors.append(ColorRGBA(0, 1, 0, 1))

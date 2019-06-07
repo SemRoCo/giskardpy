@@ -188,8 +188,12 @@ class URDFObject(object):
             i += 1
         connection = tip_chain[i - 1]
         root_chain = self._urdf_robot.get_chain(connection, root, joints, links, fixed)
+        if links:
+            root_chain = root_chain[1:]
         root_chain.reverse()
         tip_chain = self._urdf_robot.get_chain(connection, tip, joints, links, fixed)
+        if links:
+            tip_chain = tip_chain[1:]
         return root_chain, [connection] if links else [], tip_chain
 
     def get_chain(self, root, tip, joints=True, links=True, fixed=True):

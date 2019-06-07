@@ -416,9 +416,25 @@ class TestUrdfObject(object):
         # TODO test fixed joints
         pass
 
-    def test_get_chain_links(self, function_setup):
-        # TODO test link=true
-        pass
+    def test_get_chain_joints_false1(self, function_setup):
+        parsed_donbot = self.cls(donbot_urdf())
+        chain = parsed_donbot.get_chain('odom', 'odom_x_frame', joints=False)
+        assert chain == parsed_donbot._urdf_robot.get_chain('odom', 'odom_x_frame', joints=False)
+
+    def test_get_chain_joints_false2(self, function_setup):
+        parsed_donbot = self.cls(donbot_urdf())
+        chain = parsed_donbot.get_chain('base_link', 'plate', joints=False)
+        assert chain == ['base_link', 'base_footprint', 'plate']
+
+    def test_get_chain_1(self, function_setup):
+        parsed_donbot = self.cls(donbot_urdf())
+        chain = parsed_donbot.get_chain('odom', 'gripper_tool_frame')
+        assert chain == parsed_donbot._urdf_robot.get_chain('odom', 'gripper_tool_frame')
+
+    def test_get_chain_2(self, function_setup):
+        parsed_donbot = self.cls(donbot_urdf())
+        chain = parsed_donbot.get_chain('base_link', 'plate')
+        assert chain == ['base_link', 'base_footprint_joint', 'base_footprint', 'plate_joint', 'plate']
 
     def test_get_sub_tree_link_names_with_collision_boxy(self, function_setup):
         parsed_boxy = self.cls(boxy_urdf())

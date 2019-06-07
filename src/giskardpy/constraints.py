@@ -422,6 +422,7 @@ class LinkToAnyAvoidance(Constraint):
     low_weight_distance = u'low_weight_distance'
     zero_weight_distance = u'zero_weight_distance'
     body_b_name_to_id = u'body_b_name_to_id'
+    link_in_chain = u'link_in_chain'
     A = u'A'
     B = u'B'
     C = u'C'
@@ -433,6 +434,7 @@ class LinkToAnyAvoidance(Constraint):
         x = np.array([max_weight_distance, low_weight_distance, zero_weight_distance])
         y = np.array([MAX_WEIGHT, LOW_WEIGHT, ZERO_WEIGHT])
         (A, B, C), _ = curve_fit(lambda t, a, b, c: a / (t + c) + b, x, y)
+
         def body_b_name_to_id():
             body_b = god_map.get_data(identifier.closest_point + [link_name, u'body_b'])
             if body_b == u'':
@@ -440,18 +442,21 @@ class LinkToAnyAvoidance(Constraint):
             elif body_b == self.get_robot_unsafe().get_name():
                 return self.get_robot_unsafe().get_pybullet_id()
             return self.get_world_unsafe().__get_pybullet_object_id(body_b)
-        # def link_in_chain(link_name):
-        #     body_b = god_map.get_data(identifier.closest_point + [link_name, u'body_b'])
-        #     if body_b == self.get_robot().get_name():
-        #         link_a = god_map.get_data(identifier.closest_point + [link_name, u'link_a'])
-        #         link_b = god_map.get_data(identifier.closest_point + [link_name, u'link_b'])
-        #         self.get_robot().chai
-        #     return False
+
+        def link_in_chain(link_name):
+            body_b = god_map.get_data(identifier.closest_point + [link_name, u'body_b'])
+            if body_b == self.get_robot_unsafe().get_name():
+                link_a = god_map.get_data(identifier.closest_point + [link_name, u'link_a'])
+                link_b = god_map.get_data(identifier.closest_point + [link_name, u'link_b'])
+                chain = self.get_robot_unsafe().get_chain(link_b, link_a)
+                return int(link_name in chain)
+            return 0
         params = {self.repel_speed: repel_speed,
                   self.max_weight_distance: max_weight_distance,
                   self.low_weight_distance: low_weight_distance,
                   self.zero_weight_distance: zero_weight_distance,
                   self.body_b_name_to_id: body_b_name_to_id,
+                  self.link_in_chain: link_in_chain,
                   self.A: A,
                   self.B: B,
                   self.C: C}
@@ -475,23 +480,40 @@ class LinkToAnyAvoidance(Constraint):
     def get_actual_distance(self, link_name):
         return self.god_map.to_symbol(identifier.closest_point + [link_name, u'contact_distance'])
 
+    def get_is_link_in_chain_symbol(self, link_name):
+        return self.god_map.to_symbol(self.get_identifier() + [self.link_in_chain, (link_name,)])
+
     def get_body_b(self, name):
         # return self.god_map.to_symbol(closest_point_identifier + [link_name, u'body_b'])
         key = self.get_identifier() + [name, tuple()]
         return self.god_map.to_symbol(key)
 
     def get_constraint(self):
-        base_footprint = self.get_robot().get_non_base_movement_root()
-        base_footprint_T_link = self.get_fk(base_footprint, self.link_name)
-        root_T_base_footprint = self.get_fk(self.get_robot().get_root(), base_footprint)
+        root_T_link = None
+        chain = self.get_robot().get_chain(self.get_robot().get_root(), self.link_name, joints=False)
+        for i in range(len(chain)-1):
+            l1 = chain[i]
+            l2 = chain[i+1]
+            link_in_chain = self.get_is_link_in_chain_symbol(l1)
+            if root_T_link is None:
+                root_T_link = sw.if_eq_zero(link_in_chain, sw.eye(4), self.get_fk(l1, l2))
+            else:
+                root_T_link *= sw.if_eq_zero(link_in_chain, sw.eye(4), self.get_fk(l1, l2))
 
-        body_b = self.get_body_b(self.body_b_name_to_id)
-        robot_id = self.get_robot().get_pybullet_id()
 
-        root_T_link = sw.if_eq(body_b, robot_id,
-                                sw.eye(4),
-                                root_T_base_footprint) * base_footprint_T_link
-        
+
+
+        # base_footprint = self.get_robot().get_non_base_movement_root()
+        # base_footprint_T_link = self.get_fk(base_footprint, self.link_name)
+        # root_T_base_footprint = self.get_fk(self.get_robot().get_root(), base_footprint)
+        #
+        # body_b = self.get_body_b(self.body_b_name_to_id)
+        # robot_id = self.get_robot().get_pybullet_id()
+        #
+        # root_T_link = sw.if_eq(body_b, robot_id,
+        #                         sw.eye(4),
+        #                         root_T_base_footprint) * base_footprint_T_link
+
         point_on_link = self.get_closest_point_on_a(self.link_name)
         other_point = self.get_closest_point_on_b(self.link_name)
         contact_normal = self.get_contact_normal_on_b(self.link_name)

@@ -74,6 +74,7 @@ def initialize_god_map():
 
     world = PyBulletWorld(god_map.safe_get_data(identifier.gui),
                           blackboard.god_map.safe_get_data(identifier.data_folder))
+    god_map.safe_set_data(identifier.world, world)
     robot = WorldObject(god_map.safe_get_data(identifier.robot_description),
                         None,
                         controlled_joints)
@@ -82,7 +83,6 @@ def initialize_god_map():
                                 identifier.joint_states,
                                 suffix=[u'position'])
     world.robot.reinitialize(js_input.joint_map)
-    god_map.safe_set_data(identifier.world, world)
     return god_map
 
 

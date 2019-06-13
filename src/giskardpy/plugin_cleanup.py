@@ -1,7 +1,9 @@
 from py_trees import Status
 
+from giskardpy.data_types import ClosestPointInfo
 from giskardpy.identifier import closest_point
 from giskardpy.plugin import GiskardBehavior
+from giskardpy.utils import KeyDefaultDict
 
 
 class CleanUp(GiskardBehavior):
@@ -9,7 +11,7 @@ class CleanUp(GiskardBehavior):
         super(CleanUp, self).__init__(name)
 
     def initialise(self):
-        self.get_god_map().safe_set_data(closest_point, None)
+        self.get_god_map().safe_set_data(closest_point, {})
 
     def update(self):
         return Status.SUCCESS

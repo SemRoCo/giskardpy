@@ -221,6 +221,19 @@ def dict_to_joint_states(joint_state_dict):
         js.effort.append(0)
     return js
 
+def normalize_quaternion_msg(quaternion):
+    q = Quaternion()
+    rotation = np.array([quaternion.x,
+                         quaternion.y,
+                         quaternion.z,
+                         quaternion.w])
+    normalized_rotation = rotation / np.linalg.norm(rotation)
+    q.x = normalized_rotation[0]
+    q.y = normalized_rotation[1]
+    q.z = normalized_rotation[2]
+    q.w = normalized_rotation[3]
+    return q
+
 
 def to_point_stamped(frame_id, point):
     """
@@ -335,7 +348,7 @@ def plot_trajectory(tj, controlled_joints, path_to_data_folder):
     ax2.set_position([box.x0, box.y0, box.width * 0.6, box.height])
 
     # Put a legend to the right of the current axis
-    ax1.legend(loc=u'center', bbox_to_anchor=(1.45, 0), prop={'size': 5})
+    ax1.legend(loc=u'center', bbox_to_anchor=(1.45, 0), prop={'size': 10})
     ax1.grid()
     ax2.grid()
 
@@ -716,3 +729,44 @@ def check_dependencies():
 def str_to_unique_number(s):
     # FIXME not actually unique
     return sum(ord(x) for x in s)
+
+def memoize1(f):
+    """ Memoization decorator for a function taking a single argument """
+    class memodict(dict):
+        def __missing__(self, key):
+            ret = self[key] = f(key)
+            return ret
+    return memodict().__getitem__
+
+def memoize2(f):
+    """ Memoization decorator for functions taking one or more arguments. """
+    class memodict(dict):
+        def __init__(self, f):
+            self.f = f
+        def __call__(self, *args):
+            return self[args]
+        def __missing__(self, key):
+            ret = self[key] = self.f(*key)
+            return ret
+    return memodict(f)
+
+
+def memoize3(f):
+    """ Memoization decorator for a function taking one or more arguments. """
+    class memodict(dict):
+        def __getitem__(self, *key):
+            return dict.__getitem__(self, key)
+
+        def __missing__(self, key):
+            ret = self[key] = f(*key)
+            return ret
+
+    return memodict().__getitem__
+
+def memoize4(f):
+  class memodict(dict):
+      __slots__ = ()
+      def __missing__(self, key):
+          self[key] = ret = f(key)
+          return ret
+  return memodict().__getitem__

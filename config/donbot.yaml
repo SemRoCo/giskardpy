@@ -13,7 +13,7 @@ joint_weights:
   odom_x_joint: 1
   odom_y_joint: 1
   odom_z_joint: 1
-  refills_finger: 0.01
+  refills_finger: 0.1
 default_collision_avoidance_distance: 0.05
 fill_velocity_values: True
 nWSR: None # None results in a nWSR estimation thats fine most of the time

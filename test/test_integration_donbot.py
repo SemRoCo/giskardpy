@@ -129,6 +129,7 @@ def self_collision_pose(resetted_giskard):
     resetted_giskard.send_and_check_goal()
     return resetted_giskard
 
+
 @pytest.fixture()
 def fake_table_setup(zero_pose):
     """
@@ -313,6 +314,21 @@ class TestCartGoals(object):
 
 
 class TestCollisionAvoidanceGoals(object):
+    #kernprof -lv py.test test/test_integration_donbot.py::TestCollisionAvoidanceGoals::test_place_in_shelf
+    def test_avoid_collision(self, better_pose):
+        """
+        :type zero_pose: Donbot
+        """
+        box = u'box'
+        p = PoseStamped()
+        p.header.frame_id = u'map'
+        p.pose.position.y = -0.75
+        p.pose.position.z = 0.5
+        p.pose.orientation = Quaternion(0, 0, 0, 1)
+
+        better_pose.add_box(box, [1, 0.5, 2], p)
+        better_pose.send_and_check_goal()
+
     def test_attach_existing_box_non_fixed(self, better_pose):
         """
         :type zero_pose: Donbot
@@ -371,72 +387,43 @@ class TestCollisionAvoidanceGoals(object):
                                                                           [0, 1, 0, 0],
                                                                           [0, 0, -1, 0],
                                                                           [0, 0, 0, 1]]))
-        # shelf_setup.allow_self_collision()
         shelf_setup.allow_collision([CollisionEntry.ALL], box, [CollisionEntry.ALL])
         shelf_setup.set_and_check_cart_goal(grasp_pose, shelf_setup.gripper_tip)
 
-        shelf_setup.attach_existing(box, u'refills_finger')
-
-        box_goal = PoseStamped()
-        box_goal.header.frame_id = u'map'
-        box_goal.pose.position.z = 1.12
-        box_goal.pose.position.y = -.9
-        grasp_pose.pose.orientation.w = 1
-        shelf_setup.set_translation_goal(box_goal, box)
-
-        tip_normal = Vector3Stamped()
-        tip_normal.header.frame_id = box
-        tip_normal.vector.z = 1
-
-        root_normal = Vector3Stamped()
-        root_normal.header.frame_id = u'base_footprint'
-        root_normal.vector.z = 1
-        shelf_setup.align_planes(box, tip_normal, u'base_footprint', root_normal)
-        shelf_setup.send_and_check_goal()
-
-        box_goal = PoseStamped()
-        box_goal.header.frame_id = box
-        box_goal.pose.position.y = -0.2
-        grasp_pose.pose.orientation.w = 1
-        shelf_setup.set_translation_goal(box_goal, box)
-
-        tip_normal = Vector3Stamped()
-        tip_normal.header.frame_id = box
-        tip_normal.vector.z = 1
-
-        root_normal = Vector3Stamped()
-        root_normal.header.frame_id = u'base_footprint'
-        root_normal.vector.z = 1
-        shelf_setup.align_planes(box, tip_normal, u'base_footprint', root_normal)
-        shelf_setup.send_and_check_goal()
-
-        # p = PoseStamped()
-        # p.header.frame_id = u'refills_finger'
-        # p.pose.position.y = -0.075
-        # p.pose.orientation = Quaternion(0, 0, 0, 1)
+        # shelf_setup.attach_existing(box, u'refills_finger')
         #
-        # better_pose.add_box(box, [0.05, 0.2, 0.03], p)
-        # better_pose.attach_existing(box, frame_id=u'refills_finger')
+        # box_goal = PoseStamped()
+        # box_goal.header.frame_id = u'map'
+        # box_goal.pose.position.z = 1.12
+        # box_goal.pose.position.y = -.9
+        # grasp_pose.pose.orientation.w = 1
+        # shelf_setup.set_translation_goal(box_goal, box)
         #
         # tip_normal = Vector3Stamped()
         # tip_normal.header.frame_id = box
-        # tip_normal.vector.y = 1
+        # tip_normal.vector.z = 1
         #
         # root_normal = Vector3Stamped()
         # root_normal.header.frame_id = u'base_footprint'
         # root_normal.vector.z = 1
-        # better_pose.align_planes(box, tip_normal, u'base_footprint', root_normal)
-        # # better_pose.add_json_goal(u'GravityJoint', joint_name=u'refills_finger', object_name=pocky)
+        # shelf_setup.align_planes(box, tip_normal, u'base_footprint', root_normal)
+        # shelf_setup.send_and_check_goal()
         #
-        # pocky_goal = PoseStamped()
-        # pocky_goal.header.frame_id = box
-        # pocky_goal.pose.position.y = -.5
-        # pocky_goal.pose.position.x = .3
-        # pocky_goal.pose.position.z = -.2
-        # pocky_goal.pose.orientation.w = 1
-        # better_pose.allow_self_collision()
-        # better_pose.set_translation_goal(pocky_goal, box, u'base_footprint')
-        # better_pose.send_and_check_goal()
+        # box_goal = PoseStamped()
+        # box_goal.header.frame_id = box
+        # box_goal.pose.position.y = -0.2
+        # grasp_pose.pose.orientation.w = 1
+        # shelf_setup.set_translation_goal(box_goal, box)
+        #
+        # tip_normal = Vector3Stamped()
+        # tip_normal.header.frame_id = box
+        # tip_normal.vector.z = 1
+        #
+        # root_normal = Vector3Stamped()
+        # root_normal.header.frame_id = u'base_footprint'
+        # root_normal.vector.z = 1
+        # shelf_setup.align_planes(box, tip_normal, u'base_footprint', root_normal)
+        # shelf_setup.send_and_check_goal()
 
     def test_allow_self_collision2(self, zero_pose):
         """

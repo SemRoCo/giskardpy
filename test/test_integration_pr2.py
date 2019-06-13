@@ -1765,7 +1765,7 @@ class TestCollisionAvoidanceGoals(object):
         # spawn cereal
         cereal_pose = PoseStamped()
         cereal_pose.header.frame_id = u'iai_kitchen/oven_area_area_right_drawer_main'
-        cereal_pose.pose.position = Point(0., 0., .13)
+        cereal_pose.pose.position = Point(-0.15, 0., .13)
         cereal_pose.pose.orientation = Quaternion(*quaternion_about_axis(pi/2, [0,0,1]))
 
         kitchen_setup.add_box(cereal_name, [0.152, 0.063, 0.23], cereal_pose)

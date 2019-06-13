@@ -6,7 +6,7 @@ from giskardpy.data_types import ClosestPointInfo
 from giskardpy.exceptions import RobotExistsException, DuplicateNameException, PhysicsWorldException, \
     UnknownBodyException, UnsupportedOptionException
 from giskardpy.symengine_robot import Robot
-from giskardpy.tfwrapper import msg_to_kdl, kdl_to_pose
+from giskardpy.tfwrapper import msg_to_kdl, kdl_to_pose, np_to_kdl
 from giskardpy.urdf_object import URDFObject, FIXED_JOINT
 from giskardpy.utils import KeyDefaultDict
 from giskardpy.world_object import WorldObject
@@ -444,6 +444,7 @@ class World(object):
                and self.all_body_bs(collision_entry) \
                and self.all_link_bs(collision_entry)
 
+    # @profile
     def collisions_to_closest_point(self, collisions, min_allowed_distance):
         """
         :param collisions: (robot_link, body_b, link_b) -> ContactInfo
@@ -462,11 +463,13 @@ class World(object):
                                                                   '',
                                                                   (1, 0, 0), k))
         root_T_map = self.robot.root_T_map
+        root = self.robot.get_root()
+        fk = self.robot.get_fk_np
         for key, contact_info in collisions.items():  # type: ((str, str, str), ContactInfo)
             if contact_info is None:
                 continue
             link1 = key[0]
-            link_T_root = msg_to_kdl(self.robot.get_fk_pose(link1, self.robot.get_root()))
+            link_T_root = np_to_kdl(fk(link1, root))
             a_in_robot_root = link_T_root * root_T_map * PyKDL.Vector(*contact_info.position_on_a)
             b_in_robot_root = root_T_map * PyKDL.Vector(*contact_info.position_on_b)
             n_in_robot_root = root_T_map.M * PyKDL.Vector(*contact_info.contact_normal_on_b)

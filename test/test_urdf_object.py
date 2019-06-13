@@ -413,8 +413,14 @@ class TestUrdfObject(object):
         assert chain == [box.get_name()]
 
     def test_get_chain_fixed_joints(self, function_setup):
-        # TODO test fixed joints
-        pass
+        parsed_donbot = self.cls(donbot_urdf())
+        chain = parsed_donbot.get_chain('odom', 'odom_x_frame', joints=False, fixed=False)
+        assert chain == parsed_donbot._urdf_robot.get_chain('odom', 'odom_x_frame', joints=False, fixed=False)
+
+    def test_get_chain_fixed_joints2(self, function_setup):
+        parsed_donbot = self.cls(donbot_urdf())
+        chain = parsed_donbot.get_chain('odom', 'gripper_gripper_right_link', joints=True, fixed=False)
+        assert chain == parsed_donbot._urdf_robot.get_chain('odom', 'gripper_gripper_right_link', joints=True, fixed=False)
 
     def test_get_chain_joints_false1(self, function_setup):
         parsed_donbot = self.cls(donbot_urdf())

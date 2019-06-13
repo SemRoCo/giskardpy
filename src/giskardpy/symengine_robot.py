@@ -160,6 +160,7 @@ class Robot(Backend):
         p.pose = homo_matrix_to_pose(homo_m)
         return p
 
+    
     def get_fk_np(self, root, tip):
         try:
             return self._evaluated_fks[root, tip]

@@ -20,6 +20,7 @@ VERY_SMALL_NUMBER = 1e-100
 SMALL_NUMBER = 1e-10
 
 
+
 def diffable_abs(x):
     """
     :type x: Union[float, Symbol]
@@ -27,6 +28,7 @@ def diffable_abs(x):
     :rtype: Union[float, Symbol]
     """
     return se.sqrt(x ** 2)
+
 
 
 def diffable_sign(x):
@@ -47,8 +49,10 @@ def diffable_sign(x):
     return (tanh(x * 1e105))
 
 
+
 def diffable_heaviside(x):
     return 0.5 * (diffable_sign(x + VERY_SMALL_NUMBER) + 1)
+
 
 
 def diffable_max_fast(x, y):
@@ -274,7 +278,7 @@ def cross(u, v):
     :rtype: Matrix
     """
     if len(u) != len(v):
-        raise ValueError('lengths {} and {} don\' align'.format(len(u), len(v)))
+        raise ValueError('lengths {} and {} don\'t align'.format(len(u), len(v)))
     if len(u) == 3:
         return se.Matrix([u[1] * v[2] - u[2] * v[1],
                           u[2] * v[0] - u[0] * v[2],

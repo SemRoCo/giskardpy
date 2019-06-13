@@ -156,6 +156,7 @@ class ControllerPlugin(GiskardBehavior):
             self.controller.update_soft_constraints(self.soft_constraints)
             self.controller.compile()
 
+    
     def update(self):
         expr = self.controller.get_expr()
         expr = self.god_map.get_symbol_map(expr)

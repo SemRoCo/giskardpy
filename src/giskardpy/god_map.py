@@ -35,6 +35,7 @@ class GodMap(object):
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.lock.release()
 
+
     def _get_member(self, identifier, member):
         """
         :param identifier:
@@ -43,25 +44,15 @@ class GodMap(object):
         :type member: str
         :return:
         """
-        if identifier is None:
-            raise AttributeError()
         try:
             return identifier[member]
         except TypeError:
             if callable(identifier):
-                # if is_iterable(member) and not isinstance(member, str) and not isinstance(member, unicode):
                 return identifier(*member)
-                # else:
-                #     return identifier(member)
-            # try:
-            #     return identifier[int(member)]
-            # except (TypeError, ValueError):
-            try:
-                return getattr(identifier, member)
-            except TypeError as e:
-                pass
+            return getattr(identifier, member)
         except IndexError:
             return identifier[int(member)]
+
 
     def get_data(self, identifier):
         """
@@ -118,6 +109,7 @@ class GodMap(object):
             self.key_to_expr[identifier] = expr
             self.expr_to_key[str(expr)] = identifier_parts
         return self.key_to_expr[identifier]
+
 
     def get_symbol_map(self, exprs=None):
         """

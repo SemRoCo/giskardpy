@@ -209,7 +209,6 @@ class CollisionChecker(GiskardBehavior):
         super(CollisionChecker, self).__init__(name)
         self.default_min_dist = self.get_god_map().safe_get_data(identifier.default_collision_avoidance_distance)
         self.map_frame = self.get_god_map().safe_get_data(identifier.map_frame)
-        self.marker = self.get_god_map().safe_get_data(identifier.enable_collision_marker)
         self.lock = Lock()
         self.object_js_subs = {}  # JointState subscribers for articulated world objects
         self.object_joint_states = {}  # JointStates messages for articulated world objects
@@ -217,9 +216,9 @@ class CollisionChecker(GiskardBehavior):
     def setup(self, timeout=10.0):
         super(CollisionChecker, self).setup(timeout)
         self.pub_collision_marker = rospy.Publisher(u'~visualization_marker_array', MarkerArray, queue_size=1)
-        self.srv_viz_gui = rospy.Service(u'~enable_marker', SetBool, self.enable_marker_cb)
         self.srv_activate_rendering = rospy.Service(u'~render', SetBool, self.activate_rendering)
         rospy.sleep(.5)
+        return True
 
     def activate_rendering(self, data):
         """
@@ -250,55 +249,5 @@ class CollisionChecker(GiskardBehavior):
 
             closest_point = self.get_world().collisions_to_closest_point(collisions, self.collision_matrix)
 
-            if self.marker:
-                self.publish_cpi_markers(closest_point)
-
             self.god_map.safe_set_data(identifier.closest_point, closest_point)
         return Status.RUNNING
-
-    def enable_marker_cb(self, setbool):
-        """
-        :type setbool: std_srvs.srv._SetBool.SetBoolRequest
-        :rtype: SetBoolResponse
-        """
-        # TODO test me
-        self.marker = setbool.data
-        return SetBoolResponse()
-
-    def publish_cpi_markers(self, closest_point_infos):
-        """
-        Publishes a string for each ClosestPointInfo in the dict. If the distance is below the threshold, the string
-        is colored red. If it is below threshold*2 it is yellow. If it is below threshold*3 it is green.
-        Otherwise no string will be published.
-        :type closest_point_infos: dict
-        """
-        m = Marker()
-        m.header.frame_id = self.get_robot().get_root()
-        m.action = Marker.ADD
-        m.type = Marker.LINE_LIST
-        m.id = 1337
-        # TODO make namespace parameter
-        m.ns = u'pybullet collisions'
-        m.scale = Vector3(0.003, 0, 0)
-        if len(closest_point_infos) > 0:
-            for collision_info in closest_point_infos.values():  # type: ClosestPointInfo
-                red_threshold = collision_info.min_dist
-                yellow_threshold = collision_info.min_dist * 2
-                green_threshold = collision_info.min_dist * 3
-
-                if collision_info.contact_distance < green_threshold:
-                    root_T_link = self.get_robot().get_fk_pose(self.get_robot().get_root(), collision_info.link_a)
-                    a__root = msg_to_kdl(root_T_link) * PyKDL.Vector(*collision_info.position_on_a)
-                    m.points.append(Point(*a__root))
-                    m.points.append(Point(*collision_info.position_on_b))
-                    m.colors.append(ColorRGBA(0, 1, 0, 1))
-                    m.colors.append(ColorRGBA(0, 1, 0, 1))
-                if collision_info.contact_distance < yellow_threshold:
-                    m.colors[-2] = ColorRGBA(1, 1, 0, 1)
-                    m.colors[-1] = ColorRGBA(1, 1, 0, 1)
-                if collision_info.contact_distance < red_threshold:
-                    m.colors[-2] = ColorRGBA(1, 0, 0, 1)
-                    m.colors[-1] = ColorRGBA(1, 0, 0, 1)
-        ma = MarkerArray()
-        ma.markers.append(m)
-        self.pub_collision_marker.publish(ma)

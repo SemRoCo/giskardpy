@@ -10,7 +10,7 @@ from visualization_msgs.msg import Marker
 
 from giskardpy.exceptions import DuplicateNameException, UnknownBodyException, CorruptShapeException
 from giskardpy.utils import cube_volume, cube_surface, sphere_volume, cylinder_volume, cylinder_surface, \
-    suppress_stderr, msg_to_list, KeyDefaultDict
+    suppress_stderr, msg_to_list, KeyDefaultDict, memoize3, memoize2
 
 Joint = namedtuple('Joint', ['symbol', 'velocity_limit', 'lower', 'upper', 'type', 'frame'])
 
@@ -58,6 +58,7 @@ class URDFObject(object):
         with suppress_stderr():
             self._urdf_robot = up.URDF.from_xml_string(self.original_urdf)  # type: up.Robot
         self._link_to_marker = {}
+        self.root = self.calc_root()
 
     @classmethod
     def from_urdf_file(cls, urdf_file, *args, **kwargs):
@@ -405,7 +406,11 @@ class URDFObject(object):
         return self._urdf_robot.to_xml_string()
 
     def get_root(self):
-        return self._urdf_robot.get_root()
+        return self.root
+
+    def calc_root(self):
+        self.root = self._urdf_robot.get_root()
+        return self.root
 
     def get_first_link_with_collision(self):
         l = self.get_root()

@@ -149,7 +149,7 @@ class JointPosition(Constraint):
                                                      upper=capped_err,
                                                      weight=weight,
                                                      expression=current_joint)
-        add_debug_constraint(soft_constraints, str(self)+'/dist', err)
+        # add_debug_constraint(soft_constraints, str(self)+'/dist', err)
         return soft_constraints
 
     def __str__(self):
@@ -441,14 +441,14 @@ class LinkToAnyAvoidance(Constraint):
         get_fk = robot.get_fk_np
         get_chain = robot.get_chain
 
-        # @profile
+        
         def root_T_link_b():
             cpi = data[cpi_identifier][self.link_name]
             if cpi.body_b == self.robot_name:
                 return get_fk(self.robot_root, cpi.link_b)
             return identity
 
-        # @profile
+        
         def link_in_chain(link_name):
             cpi = data[cpi_identifier][self.link_name]
             body_b = cpi.body_b
@@ -498,7 +498,7 @@ class LinkToAnyAvoidance(Constraint):
         soft_constraints = OrderedDict()
 
         root_T_link = self.get_root_T_link_b()
-        chain = self.get_robot().get_chain(self.get_robot().get_root(), self.link_name, joints=False)
+        chain = self.get_robot().get_chain(self.get_robot().get_root(), self.link_name, False, True, False)
         for i in range(len(chain) - 1):
             l1 = chain[i]
             l2 = chain[i + 1]

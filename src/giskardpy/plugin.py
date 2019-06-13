@@ -13,6 +13,8 @@ from giskardpy import logging
 class GiskardBehavior(Behaviour):
     def __init__(self, name):
         self.god_map = Blackboard().god_map
+        self.world = None
+        self.robot = None
         super(GiskardBehavior, self).__init__(name)
 
     def get_god_map(self):
@@ -25,13 +27,17 @@ class GiskardBehavior(Behaviour):
         """
         :rtype: giskardpy.world.World
         """
-        return self.get_god_map().safe_get_data(world)
+        if not self.world:
+            self.world = self.get_god_map().safe_get_data(world)
+        return self.world
 
     def get_robot(self):
         """
         :rtype: giskardpy.symengine_robot.Robot
         """
-        return self.get_god_map().safe_get_data(robot)
+        if not self.robot:
+            self.robot = self.get_god_map().safe_get_data(robot)
+        return self.robot
 
     def raise_to_blackboard(self, exception):
         Blackboard().set('exception', exception)

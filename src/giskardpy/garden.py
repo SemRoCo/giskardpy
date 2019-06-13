@@ -20,6 +20,7 @@ from giskardpy.plugin_action_server import GoalReceived, SendResult, GoalCancele
 from giskardpy.plugin_attached_tf_publicher import TFPlugin
 from giskardpy.plugin_cleanup import CleanUp
 from giskardpy.plugin_configuration import ConfigurationPlugin
+from giskardpy.plugin_cpi_marker import CPIMarker
 from giskardpy.plugin_goal_reached import GoalReachedPlugin
 from giskardpy.plugin_instantaneous_controller import GoalToConstraints, ControllerPlugin
 from giskardpy.plugin_interrupts import WiggleCancel
@@ -101,7 +102,10 @@ def grow_tree():
     planning = failure_is_success(Selector)(u'planning')
     planning.add_child(GoalCanceled(u'goal canceled', action_server_name))
     # planning.add_child(CollisionCancel(u'in collision', collision_time_threshold))
-    planning.add_child(success_is_failure(VisualizationBehavior)(u'visualization'))
+    if god_map.safe_get_data(identifier.marker_visualization):
+        planning.add_child(success_is_failure(VisualizationBehavior)(u'visualization'))
+    if god_map.safe_get_data(identifier.enable_collision_marker):
+        planning.add_child(success_is_failure(CPIMarker)(u'cpi marker'))
 
     actual_planning = PluginBehavior(u'planning', sleep=0)
     actual_planning.add_plugin(KinSimPlugin(u'kin sim'))

@@ -15,6 +15,7 @@ class SymEngineController(object):
 
     # TODO should anybody who uses this class know about constraints?
 
+
     def __init__(self, robot, path_to_functions):
         """
         :type robot: Robot
@@ -30,6 +31,7 @@ class SymEngineController(object):
         self.free_symbols = None
         self.qp_problem_builder = None
 
+
     def set_controlled_joints(self, joint_names):
         """
         :type joint_names: set
@@ -40,6 +42,7 @@ class SymEngineController(object):
                                              self.controlled_joints)
         self.hard_constraints = OrderedDict(((self.robot.get_name(), k), self.robot._hard_constraints[k]) for k in
                                             self.controlled_joints if k in self.robot._hard_constraints)
+
 
     def update_soft_constraints(self, soft_constraints, free_symbols=None):
         """
@@ -59,6 +62,7 @@ class SymEngineController(object):
         if last_number_of_constraints != len(self.soft_constraints):
             self.qp_problem_builder = None
 
+
     def compile(self):
         a = ''.join(str(x) for x in sorted(chain(self.soft_constraints.keys(),
                                                  self.hard_constraints.keys(),
@@ -71,6 +75,7 @@ class SymEngineController(object):
                                                   self.joint_to_symbols_str.values(),
                                                   self.free_symbols,
                                                   path_to_functions)
+
 
     def get_cmd(self, substitutions, nWSR=None):
         """

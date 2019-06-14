@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 import rospy
 from sensor_msgs.msg import JointState
 from tf.transformations import quaternion_matrix, rotation_from_matrix

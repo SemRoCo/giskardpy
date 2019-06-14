@@ -28,7 +28,7 @@ class KinSimPlugin(GiskardBehavior):
         self.time += self.frequency
         motor_commands = self.get_god_map().safe_get_data(identifier.next_cmd_identifier)
         current_js = self.get_god_map().safe_get_data(identifier.joint_states)
-        if motor_commands is not None:
+        if motor_commands:
             self.next_js = OrderedDict()
             for joint_name, sjs in current_js.items():
                 if joint_name in motor_commands:

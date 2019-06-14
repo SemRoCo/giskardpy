@@ -273,6 +273,12 @@ class TestJointGoals(object):
         result = zero_pose.send_goal(goal)
         assert result.error_code == MoveResult.INSOLVABLE
 
+    def test_plan_only(self, zero_pose):
+        zero_pose.allow_self_collision()
+        zero_pose.set_joint_goal(pocky_pose)
+        zero_pose.send_and_check_goal(execute=False)
+        zero_pose.check_joint_state(default_pose)
+
     # TODO test goal for unknown joint
 
 class TestCartGoals(object):

@@ -9,7 +9,7 @@ import hypothesis.strategies as st
 import rospy
 from angles import shortest_angular_distance
 from geometry_msgs.msg import PoseStamped, Pose, Point, Quaternion
-from giskard_msgs.msg import MoveActionResult, CollisionEntry, MoveActionGoal, MoveResult
+from giskard_msgs.msg import MoveActionResult, CollisionEntry, MoveActionGoal, MoveResult, MoveGoal
 from giskard_msgs.srv import UpdateWorldResponse
 from hypothesis import assume
 from hypothesis.strategies import composite
@@ -373,13 +373,17 @@ class GiskardTestWrapper(object):
     def get_as(self):
         return Blackboard().get(u'giskardpy/command')
 
-    def send_goal(self, goal=None):
+    def send_goal(self, goal=None, execute=True):
         """
         :rtype: MoveResult
         """
         if goal is None:
             goal = MoveActionGoal()
             goal.goal = self.wrapper._get_goal()
+            if execute:
+                goal.goal.type = MoveGoal.PLAN_AND_EXECUTE
+            else:
+                goal.goal.type = MoveGoal.PLAN_ONLY
         i = 0
         self.loop_once()
         t1 = Thread(target=self.get_as()._as.action_server.internal_goal_callback, args=(goal,))
@@ -395,8 +399,8 @@ class GiskardTestWrapper(object):
         result = self.results.get()
         return result
 
-    def send_and_check_goal(self, expected_error_code=MoveResult.SUCCESS):
-        r = self.send_goal()
+    def send_and_check_goal(self, expected_error_code=MoveResult.SUCCESS, execute=True):
+        r = self.send_goal(execute=execute)
         assert r.error_code == expected_error_code, \
             u'got: {}, expected: {}'.format(move_result_error_code(r.error_code),
                                             move_result_error_code(expected_error_code))

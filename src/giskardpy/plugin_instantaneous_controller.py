@@ -49,9 +49,10 @@ class GoalToConstraints(GetGoal):
         if len(goal_msg.cmd_seq) == 0:
             self.raise_to_blackboard(InsolvableException(u'goal empty'))
             return Status.SUCCESS
-        if goal_msg.type != MoveGoal.PLAN_AND_EXECUTE:
-            self.raise_to_blackboard(InsolvableException(u'only plan and execute is supported'))
+        if goal_msg.type not in [MoveGoal.PLAN_AND_EXECUTE, MoveGoal.PLAN_ONLY]:
+            self.raise_to_blackboard(InsolvableException(u'invalid move action goal type: {}'.format(goal_msg.type)))
             return Status.SUCCESS
+        self.get_god_map().safe_set_data(identifier.execute, goal_msg.type==MoveGoal.PLAN_AND_EXECUTE)
 
         self.get_god_map().safe_set_data(identifier.constraints_identifier, {})
 

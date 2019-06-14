@@ -6,6 +6,7 @@ import rospy
 from control_msgs.msg import JointTrajectoryControllerState
 from giskard_msgs.msg import MoveAction
 from py_trees import Sequence, Selector, BehaviourTree, Blackboard
+from py_trees.behaviours import Count
 from py_trees.meta import failure_is_success, success_is_failure
 from py_trees_ros.trees import BehaviourTree
 from rospy import ROSException
@@ -22,6 +23,7 @@ from giskardpy.plugin_cleanup import CleanUp
 from giskardpy.plugin_configuration import ConfigurationPlugin
 from giskardpy.plugin_cpi_marker import CPIMarker
 from giskardpy.plugin_goal_reached import GoalReachedPlugin
+from giskardpy.plugin_if import IF
 from giskardpy.plugin_instantaneous_controller import GoalToConstraints, ControllerPlugin
 from giskardpy.plugin_interrupts import WiggleCancel
 from giskardpy.plugin_kinematic_sim import KinSimPlugin
@@ -117,16 +119,19 @@ def grow_tree():
     actual_planning.add_plugin(WiggleCancel(u'wiggle'))
     planning.add_child(actual_planning)
     # ----------------------------------------------
-    publish_result = failure_is_success(Selector)(u'move robot')
+    publish_result = failure_is_success(Selector)(u'monitor execution')
     publish_result.add_child(GoalCanceled(u'goal canceled', action_server_name))
     publish_result.add_child(SendTrajectory(u'send traj'))
+    execute = failure_is_success(Sequence)(u'move robot')
+    execute.add_child(IF(u'execute?', identifier.execute))
+    execute.add_child(publish_result)
     # ----------------------------------------------
     root = Sequence(u'root')
     root.add_child(wait_for_goal)
     root.add_child(GoalToConstraints(u'update constraints', action_server_name))
     root.add_child(planning)
     root.add_child(CleanUp(u'cleanup'))
-    root.add_child(publish_result)
+    root.add_child(execute)
     root.add_child(SendResult(u'send result', action_server_name, MoveAction))
 
     tree = BehaviourTree(root)

@@ -11,6 +11,7 @@ next_cmd_identifier = [u'motor']
 closest_point = [u'cpi']
 collision_goal_identifier = [u'collision_goal']
 soft_constraint_identifier = [u'soft_constraints']
+execute = [u'execute']
 
 #stuff from rosparam
 rosparam = [u'rosparam']

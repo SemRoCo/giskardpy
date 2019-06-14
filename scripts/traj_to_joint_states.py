@@ -8,7 +8,7 @@ class TrajToJS(object):
     def __init__(self):
         self.traj_sub = rospy.Subscriber('/whole_body_controller/follow_joint_trajectory/goal',
                                          FollowJointTrajectoryActionGoal, self.cb, queue_size=10)
-        self.joint_state_pub = rospy.Publisher('/giskard/joint_states', JointState, queue_size=1)
+        self.joint_state_pub = rospy.Publisher('/giskard/traj/joint_states', JointState, queue_size=1)
 
     def cb(self, traj):
         """
@@ -29,6 +29,6 @@ class TrajToJS(object):
             r.sleep()
 
 if __name__ == u'__main__':
-    rospy.init_node(u'giskard')
+    rospy.init_node(u'giskardasdfasdf')
     traj2js = TrajToJS()
     rospy.spin()

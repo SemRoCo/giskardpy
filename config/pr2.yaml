@@ -16,7 +16,7 @@ joint_weights:
 default_collision_avoidance_distance: 0.05
 fill_velocity_values: True
 nWSR: None # None results in a nWSR estimation thats fine most of the time
-root_link: odom
+root_link: odom_combined
 collision_time_threshold: 15
 tree_tick_rate: 0.1
 slerp: True

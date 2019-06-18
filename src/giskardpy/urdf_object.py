@@ -169,7 +169,7 @@ class URDFObject(object):
     def get_urdf_robot(self):
         return self._urdf_robot
 
-    # JOINT FUNCITONS
+    # JOINT FUNCTIONS
 
     def get_joint_names(self):
         """
@@ -200,6 +200,9 @@ class URDFObject(object):
     def get_chain(self, root, tip, joints=True, links=True, fixed=True):
         root_chain, connection, tip_chain = self.get_split_chain(root, tip, joints, links, fixed)
         return root_chain + connection + tip_chain
+
+    def get_connecting_link(self, link1, link2):
+        return self.get_split_chain(link1, link2, joints=False)[1][0]
 
     def get_joint_names_from_chain(self, root_link, tip_link):
         """

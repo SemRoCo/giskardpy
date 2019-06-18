@@ -422,7 +422,7 @@ class LinkToAnyAvoidance(Constraint):
     B = u'B'
     C = u'C'
 
-    def __init__(self, god_map, link_name, repel_speed=1, max_weight_distance=0.0, low_weight_distance=0.02,
+    def __init__(self, god_map, link_name, repel_speed=1, max_weight_distance=0.0, low_weight_distance=0.01,
                  zero_weight_distance=0.05):
         super(LinkToAnyAvoidance, self).__init__(god_map)
         self.link_name = link_name
@@ -440,12 +440,14 @@ class LinkToAnyAvoidance(Constraint):
         robot = data[world_identifier].robot
         get_fk = robot.get_fk_np
         get_chain = robot.get_chain
+        get_connecting_link = robot.get_connecting_link
 
         
         def root_T_link_b():
             cpi = data[cpi_identifier][self.link_name]
             if cpi.body_b == self.robot_name:
-                return get_fk(self.robot_root, cpi.link_b)
+                c = get_connecting_link(cpi.link_b, cpi.link_a)
+                return get_fk(self.robot_root, c)
             return identity
 
         

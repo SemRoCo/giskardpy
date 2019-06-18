@@ -13,8 +13,6 @@ from tf.transformations import quaternion_from_matrix, quaternion_about_axis
 from giskardpy import logging
 from giskardpy.identifier import fk_pose
 from giskardpy.tfwrapper import init as tf_init, lookup_pose, transform_pose
-from giskardpy.urdf_object import URDFObject
-from giskardpy.utils import make_world_body_box
 from utils_for_tests import PR2, compare_poses
 
 # TODO roslaunch iai_pr2_sim ros_control_sim.launch
@@ -287,6 +285,7 @@ class TestJointGoals(object):
         zero_pose.check_joint_state(default_pose)
 
     # TODO test goal for unknown joint
+
 
 class TestCartGoals(object):
     def test_keep_position1(self, zero_pose):
@@ -1673,13 +1672,13 @@ class TestCollisionAvoidanceGoals(object):
         # place bowl and cup
         bowl_goal = PoseStamped()
         bowl_goal.header.frame_id = u'iai_kitchen/kitchen_island_surface'
-        bowl_goal.pose.position = Point(.1, 0, .05)
+        bowl_goal.pose.position = Point(.2, 0, .05)
         bowl_goal.pose.orientation = Quaternion(0, 0, 0, 1)
 
         cup_goal = PoseStamped()
         cup_goal.header.frame_id = u'iai_kitchen/kitchen_island_surface'
+        cup_goal.pose.position = Point(.15, 0.25, .07)
         cup_goal.pose.orientation = Quaternion(0, 0, 0, 1)
-        cup_goal.pose.position = Point(.05, 0.25, .07)
 
         kitchen_setup.set_cart_goal(bowl_goal, bowl_name, kitchen_setup.default_root)
         kitchen_setup.set_cart_goal(cup_goal, cup_name, kitchen_setup.default_root)
@@ -1691,6 +1690,34 @@ class TestCollisionAvoidanceGoals(object):
 
         self.close_drawer(kitchen_setup, kitchen_setup.l_tip, u'iai_kitchen/sink_area_left_middle_drawer_handle',
                           u'sink_area_left_middle_drawer_main_joint')
+
+    def test_avoid_self_collision2(self, kitchen_setup):
+        base_goal = PoseStamped()
+        base_goal.header.frame_id = u'base_footprint'
+        base_goal.pose.position.x = -.1
+        base_goal.pose.orientation = Quaternion(*quaternion_about_axis(pi, [0, 0, 1]))
+        kitchen_setup.teleport_base(base_goal)
+
+        # place bowl and cup
+        bowl_goal = PoseStamped()
+        bowl_goal.header.frame_id = u'iai_kitchen/kitchen_island_surface'
+        bowl_goal.pose.position = Point(.2, 0, .05)
+        bowl_goal.pose.orientation = Quaternion(*quaternion_from_matrix([[0, 0, -1, 0],
+                                                                         [0, -1, 0, 0],
+                                                                         [-1, 0, 0, 0],
+                                                                         [0, 0, 0, 1]]))
+
+        cup_goal = PoseStamped()
+        cup_goal.header.frame_id = u'iai_kitchen/kitchen_island_surface'
+        cup_goal.pose.position = Point(.15, 0.25, .07)
+        cup_goal.pose.orientation = Quaternion(*quaternion_from_matrix([[0, 0, -1, 0],
+                                                                        [0, -1, 0, 0],
+                                                                        [-1, 0, 0, 0],
+                                                                        [0, 0, 0, 1]]))
+
+        kitchen_setup.set_cart_goal(bowl_goal, kitchen_setup.l_tip, kitchen_setup.default_root)
+        kitchen_setup.set_cart_goal(cup_goal, kitchen_setup.r_tip, kitchen_setup.default_root)
+        kitchen_setup.send_and_check_goal()
 
     def test_pick_place_cereal1(self, kitchen_setup):
         cereal_name = u'cereal'
@@ -1746,7 +1773,7 @@ class TestCollisionAvoidanceGoals(object):
         cereal_pose = PoseStamped()
         cereal_pose.header.frame_id = u'iai_kitchen/oven_area_area_right_drawer_main'
         cereal_pose.pose.position = Point(-0.15, 0., .13)
-        cereal_pose.pose.orientation = Quaternion(*quaternion_about_axis(pi/2, [0,0,1]))
+        cereal_pose.pose.orientation = Quaternion(*quaternion_about_axis(pi / 2, [0, 0, 1]))
 
         kitchen_setup.add_box(cereal_name, [0.152, 0.063, 0.23], cereal_pose)
 
@@ -1775,7 +1802,6 @@ class TestCollisionAvoidanceGoals(object):
         kitchen_setup.move_base(base_goal)
 
         # kitchen_setup.send_and_check_joint_goal(gaya_pose)
-
 
     def test_tray(self, zero_pose):
         tray_name = u'tray'

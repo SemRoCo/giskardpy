@@ -206,6 +206,7 @@ class GiskardTestWrapper(object):
         self.default_root = self.get_robot().get_root()
         self.map = u'map'
         self.simple_base_pose_pub = rospy.Publisher(u'/move_base_simple/goal', PoseStamped, queue_size=10)
+        self.set_base = rospy.ServiceProxy(u'/base_simulator/set_joint_states', SetJointState)
         self.tick_rate = 10
 
         def create_publisher(topic):
@@ -314,6 +315,18 @@ class GiskardTestWrapper(object):
     #
     # CART GOAL STUFF ##################################################################################################
     #
+    def teleport_base(self, goal_pose):
+        goal_pose = transform_pose(self.default_root, goal_pose)
+        js = {u'odom_x_joint': goal_pose.pose.position.x,
+              u'odom_y_joint': goal_pose.pose.position.y,
+              u'odom_z_joint': rotation_from_matrix(quaternion_matrix([goal_pose.pose.orientation.x,
+                                                                       goal_pose.pose.orientation.y,
+                                                                       goal_pose.pose.orientation.z,
+                                                                       goal_pose.pose.orientation.w]))[0]}
+        goal = SetJointStateRequest()
+        goal.state = dict_to_joint_states(js)
+        self.set_base.call(goal)
+
     def keep_position(self, tip, root=None):
         if root is None:
             root = self.default_root
@@ -586,7 +599,7 @@ class GiskardTestWrapper(object):
         p = PoseStamped()
         p.header.frame_id = self.map
         p.pose.orientation.w = 1
-        self.move_base(p)
+        self.teleport_base(p)
 
 
 class PR2(GiskardTestWrapper):
@@ -683,8 +696,8 @@ class Donbot(GiskardTestWrapper):
         js = {u'odom_x_joint': goal_pose.pose.position.x,
               u'odom_y_joint': goal_pose.pose.position.y,
               u'odom_z_joint': rotation_from_matrix(quaternion_matrix([goal_pose.pose.orientation.x,
-                                                                             goal_pose.pose.orientation.y,
-                                                                             goal_pose.pose.orientation.z,
-                                                                             goal_pose.pose.orientation.w]))[0]}
+                                                                       goal_pose.pose.orientation.y,
+                                                                       goal_pose.pose.orientation.z,
+                                                                       goal_pose.pose.orientation.w]))[0]}
         self.allow_all_collisions()
         self.send_and_check_joint_goal(js)

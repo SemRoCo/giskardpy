@@ -59,6 +59,10 @@ class URDFObject(object):
             self._urdf_robot = up.URDF.from_xml_string(self.original_urdf)  # type: up.Robot
         self._link_to_marker = {}
         self.root = self.calc_root()
+        self.reset_cache()
+
+    def reset_cache(self):
+        self._split_chain = KeyDefaultDict(self.__calc_get_split_chain)
 
     @classmethod
     def from_urdf_file(cls, urdf_file, *args, **kwargs):
@@ -178,6 +182,10 @@ class URDFObject(object):
         return self._urdf_robot.joint_map.keys()
 
     def get_split_chain(self, root, tip, joints=True, links=True, fixed=True):
+        return self._split_chain[root, tip, joints, links, fixed]
+
+    def __calc_get_split_chain(self, args):
+        root, tip, joints, links, fixed = args
         if root == tip:
             return [], [], []
         root_chain = self._urdf_robot.get_chain(self.get_root(), root, False, True, True)
@@ -537,6 +545,7 @@ class URDFObject(object):
 
     def reinitialize(self):
         self._urdf_robot = up.URDF.from_xml_string(self.get_urdf_str())
+        self.reset_cache()
 
     def robot_name_to_root_joint(self, name):
         # TODO should this really be a class function?

@@ -442,7 +442,7 @@ class LinkToAnyAvoidance(Constraint):
         get_chain = robot.get_chain
         get_connecting_link = robot.get_connecting_link
 
-        
+        @profile
         def root_T_link_b():
             cpi = data[cpi_identifier][self.link_name]
             if cpi.body_b == self.robot_name:
@@ -450,7 +450,7 @@ class LinkToAnyAvoidance(Constraint):
                 return get_fk(self.robot_root, c)
             return identity
 
-        
+        @profile
         def link_in_chain(link_name):
             cpi = data[cpi_identifier][self.link_name]
             body_b = cpi.body_b

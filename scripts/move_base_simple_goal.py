@@ -28,7 +28,7 @@ if __name__ == '__main__':
         x_joint = u'odom_x_joint'
         y_joint = u'odom_y_joint'
         z_joint = u'odom_z_joint'
-        root = u'odom'
+        root = u'odom_combined'
 
         giskard = GiskardWrapper()
         sub = rospy.Subscriber(u'/move_base_simple/goal', PoseStamped, call_back, queue_size=10)

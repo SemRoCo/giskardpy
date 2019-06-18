@@ -229,6 +229,13 @@ class TestFk(object):
 
 
 class TestJointGoals(object):
+    def test_move_base(self, zero_pose):
+        p = PoseStamped()
+        p.header.frame_id = u'map'
+        p.pose.position.y = -1
+        p.pose.orientation = Quaternion(0, 0, 0.47942554, 0.87758256)
+        zero_pose.move_base(p)
+
     def test_joint_movement1(self, zero_pose):
         """
         :type zero_pose: PR2
@@ -559,13 +566,6 @@ class TestCartGoals(object):
 
 
 class TestCollisionAvoidanceGoals(object):
-    def test_move_base(self, zero_pose):
-        p = PoseStamped()
-        p.header.frame_id = u'map'
-        p.pose.position.y = -1
-        p.pose.orientation = Quaternion(0, 0, 0.47942554, 0.87758256)
-        zero_pose.move_base(p)
-
     def test_add_box(self, zero_pose):
         """
         :type zero_pose: PR2
@@ -704,32 +704,6 @@ class TestCollisionAvoidanceGoals(object):
         rospy.sleep(.5)
 
         zero_pose.detach_object(pocky)
-
-    def test_attach_existing_box_non_fixed(self, zero_pose):
-        """
-        :type zero_pose: PR2
-        """
-        pocky = u'box'
-        # hack_link_name = u'hack_link'
-        # box_object = URDFObject.from_world_body(make_world_body_box(box_name, 0.05, 0.03, 0.2))
-        # link_object = URDFObject.from_world_body(make_world_body_box(hack_link_name, 0.01, 0.01, 0.01))
-
-        p = lookup_pose(zero_pose.default_root, zero_pose.r_tip)
-        p.pose.position.z -= 0.075
-        p.pose.orientation = Quaternion(0., 0., 0, 1)
-
-        zero_pose.add_box(pocky, [0.05, 0.03, 0.2], p)
-        zero_pose.attach_existing(pocky, frame_id=zero_pose.r_tip, fixed=False)
-        relative_pose = zero_pose.get_robot().get_fk_pose(zero_pose.default_root, pocky).pose
-        # compare_poses(p.pose, relative_pose)
-
-        zero_pose.keep_orientation(pocky)
-        pocky_goal = PoseStamped()
-        pocky_goal.header.frame_id = pocky
-        pocky_goal.pose.position.x -= 0.1
-        pocky_goal.pose.position.z -= 0.1
-        pocky_goal.pose.orientation.w = 1
-        zero_pose.set_and_check_cart_goal(pocky_goal, pocky, u'base_footprint')
 
     def test_attach_detach_twice(self, zero_pose):
         pocky = u'http://muh#pocky'

@@ -177,7 +177,7 @@ class CartesianConstraint(Constraint):
     gain = u'gain'
     max_speed = u'max_speed'
 
-    def __init__(self, god_map, root_link, tip_link, goal, weight=MID_WEIGHT, gain=3, max_speed=0.1):
+    def __init__(self, god_map, root_link, tip_link, goal, weight=HIGH_WEIGHT, gain=3, max_speed=0.1):
         super(CartesianConstraint, self).__init__(god_map)
         self.root = root_link
         self.tip = tip_link
@@ -339,7 +339,7 @@ class CartesianOrientation(CartesianConstraint):
 
 
 class CartesianOrientationSlerp(CartesianConstraint):
-    def __init__(self, god_map, root_link, tip_link, goal, weight=MID_WEIGHT, gain=6, max_speed=0.5):
+    def __init__(self, god_map, root_link, tip_link, goal, weight=HIGH_WEIGHT, gain=6, max_speed=0.5):
         super(CartesianOrientationSlerp, self).__init__(god_map, root_link, tip_link, goal, weight, gain, max_speed)
 
     def get_constraint(self):

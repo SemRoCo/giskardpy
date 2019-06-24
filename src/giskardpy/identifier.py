@@ -16,7 +16,7 @@ execute = [u'execute']
 #stuff from rosparam
 rosparam = [u'rosparam']
 data_folder = rosparam + [u'path_to_data_folder']
-gui = rosparam + [u'gui']
+gui = rosparam + [u'enable_gui']
 map_frame = rosparam + [u'map_frame']
 robot_description = [u'robot_description']
 marker_visualization = rosparam + [u'enable_visualization']

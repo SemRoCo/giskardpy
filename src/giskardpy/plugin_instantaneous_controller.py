@@ -34,7 +34,9 @@ class GoalToConstraints(GetGoal):
         self.controlled_joints = set()
         self.controllable_links = set()
         self.last_urdf = None
-        self.default_collision_avoidance_distance = self.get_god_map().safe_get_data(identifier.default_collision_avoidance_distance)
+        self.zero_weight_distance = self.get_god_map().safe_get_data(identifier.zero_weight_distance)
+        self.low_weight_distance = self.get_god_map().safe_get_data(identifier.low_weight_distance)
+        self.max_weight_distance = self.get_god_map().safe_get_data(identifier.max_weight_distance)
 
     def initialise(self):
         self.get_god_map().safe_set_data(identifier.collision_goal_identifier, None)
@@ -127,7 +129,9 @@ class GoalToConstraints(GetGoal):
         soft_constraints = {}
         for link in self.get_robot().get_controlled_links():
             constraint = LinkToAnyAvoidance(self.god_map, link,
-                                            zero_weight_distance=self.default_collision_avoidance_distance)
+                                            max_weight_distance=self.max_weight_distance,
+                                            low_weight_distance=self.low_weight_distance,
+                                            zero_weight_distance=self.zero_weight_distance)
             soft_constraints.update(constraint.get_constraint())
 
         self.soft_constraints.update(soft_constraints)

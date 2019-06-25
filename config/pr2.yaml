@@ -1,19 +1,23 @@
 enable_collision_marker: True
 enable_visualization: True
-plot_trajectory: True
+plot_trajectory: False
 debug: False
 map_frame: map 
 joint_convergence_threshold: 0.001
 wiggle_precision_threshold: 5
 max_traj_length: 30 # not implemented
 sample_period: 0.05
-default_joint_vel_limit: 0.25
+default_joint_vel_limit: 0.5
 default_joint_weight: 0.0001
 joint_weights:
   odom_x_joint: 1
   odom_y_joint: 1
   odom_z_joint: 1
-default_collision_avoidance_distance: 0.05
+  torso_lift_joint: 0.5
+#default_collision_avoidance_distance: 0.05
+max_weight_distance: 0.0
+low_weight_distance: 0.01
+zero_weight_distance: 0.05
 fill_velocity_values: True
 nWSR: None # None results in a nWSR estimation thats fine most of the time
 root_link: odom_combined

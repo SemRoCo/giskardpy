@@ -207,7 +207,7 @@ class WorldUpdatePlugin(GiskardBehavior):
 class CollisionChecker(GiskardBehavior):
     def __init__(self, name):
         super(CollisionChecker, self).__init__(name)
-        self.default_min_dist = self.get_god_map().safe_get_data(identifier.default_collision_avoidance_distance)
+        # self.default_min_dist = self.get_god_map().safe_get_data(identifier.default_collision_avoidance_distance)
         self.map_frame = self.get_god_map().safe_get_data(identifier.map_frame)
         self.lock = Lock()
         self.object_js_subs = {}  # JointState subscribers for articulated world objects
@@ -235,7 +235,7 @@ class CollisionChecker(GiskardBehavior):
     def initialise(self):
         collision_goals = self.get_god_map().safe_get_data(identifier.collision_goal_identifier)
         self.collision_matrix = self.get_world().collision_goals_to_collision_matrix(collision_goals,
-                                                                                     self.default_min_dist)
+                                                                                     self.get_god_map().safe_get_data(identifier.collisions))
         self.get_god_map().safe_set_data(identifier.closest_point, None)
         super(CollisionChecker, self).initialise()
 

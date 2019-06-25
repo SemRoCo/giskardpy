@@ -73,6 +73,10 @@ def initialize_god_map():
     joint_weights.update(god_map.safe_get_data(identifier.joint_weights))
     god_map.safe_set_data(identifier.joint_weights, joint_weights)
 
+    collision_distances = KeyDefaultDict(lambda key: god_map.get_data(identifier.default_collision_avoidance_distance))
+    collision_distances.update(god_map.get_data(identifier.collisions))
+    god_map.safe_set_data(identifier.collisions, collision_distances)
+
     default_joint_vel = god_map.to_symbol(identifier.default_joint_vel_identifier)
 
     world = PyBulletWorld(god_map.safe_get_data(identifier.gui),

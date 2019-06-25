@@ -999,7 +999,7 @@ class TestCollisionAvoidanceGoals(object):
         ce = CollisionEntry()
         ce.type = CollisionEntry.AVOID_COLLISION
         ce.body_b = u'box'
-        ce.min_dist = 0.05
+        # ce.min_dist = 0.05
         box_setup.add_collision_entries([ce])
         box_setup.send_and_check_goal(MoveResult.SUCCESS)
         box_setup.check_cpi_geq(box_setup.get_l_gripper_links(), 0.048)

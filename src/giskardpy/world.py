@@ -174,8 +174,8 @@ class World(object):
         collision_matrix = self.robot.get_self_collision_matrix()
         collision_matrix2 = {}
         for link1, link2 in collision_matrix:
-            collision_matrix2[link1, robot_name, link2] = min_dist
-            collision_matrix2[link2, robot_name, link1] = min_dist
+            collision_matrix2[link1, robot_name, link2] = min_dist[link1][u'zero_weight_distance']
+            collision_matrix2[link2, robot_name, link1] = min_dist[link1][u'zero_weight_distance']
         return collision_matrix2
 
     def collision_goals_to_collision_matrix(self, collision_goals, min_dist):
@@ -189,7 +189,7 @@ class World(object):
         min_allowed_distance = {}
         for collision_entry in collision_goals:  # type: CollisionEntry
             if self.is_avoid_all_self_collision(collision_entry):
-                min_allowed_distance.update(self.get_robot_collision_matrix(collision_entry.min_dist))
+                min_allowed_distance.update(self.get_robot_collision_matrix(min_dist))
                 continue
             assert len(collision_entry.robot_links) == 1
             assert len(collision_entry.link_bs) == 1
@@ -206,7 +206,7 @@ class World(object):
                         del min_allowed_distance[rev_key]
 
             elif self.is_avoid_collision(collision_entry):
-                min_allowed_distance[key] = collision_entry.min_dist
+                min_allowed_distance[key] = min_dist[key[0]][u'zero_weight_distance']
             else:
                 raise Exception('todo')
         return min_allowed_distance
@@ -251,7 +251,7 @@ class World(object):
             ce.robot_links = [CollisionEntry.ALL]
             ce.body_b = CollisionEntry.ALL
             ce.link_bs = [CollisionEntry.ALL]
-            ce.min_dist = min_dist
+            ce.min_dist = -1
             collision_goals.insert(0, ce)
 
         # split body bs

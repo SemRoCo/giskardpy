@@ -18,7 +18,7 @@ from py_trees import Blackboard
 from sensor_msgs.msg import JointState
 from tf.transformations import rotation_from_matrix, quaternion_matrix
 
-from giskardpy import logging
+from giskardpy import logging, identifier
 from giskardpy.garden import grow_tree
 from giskardpy.identifier import robot, world
 from giskardpy.pybullet_world import PyBulletWorld
@@ -558,7 +558,8 @@ class GiskardTestWrapper(object):
 
     def get_cpi(self, distance_threshold):
         collision_goals = [CollisionEntry(type=CollisionEntry.AVOID_ALL_COLLISIONS, min_dist=distance_threshold)]
-        collision_matrix = self.get_world().collision_goals_to_collision_matrix(collision_goals, 0.0)
+        collision_matrix = self.get_world().collision_goals_to_collision_matrix(collision_goals,
+                                                                                self.get_god_map().safe_get_data(identifier.collisions))
         collisions = self.get_world().check_collisions(collision_matrix)
         return self.get_world().collisions_to_closest_point(collisions, collision_matrix)
 

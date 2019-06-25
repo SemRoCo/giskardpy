@@ -692,10 +692,12 @@ class UpdateGodMap(Constraint):
         if not isinstance(updates, dict):
             raise GiskardException(u'{} used incorrectly, {} not a dict or number'.format(str(self), updates))
         for member, value in updates.items():
-            if isinstance(value, numbers.Number):
-                self.get_god_map().safe_set_data(identifier + [member], value)
+            next_identifier = identifier + [member]
+            if isinstance(value, numbers.Number) and \
+                    isinstance(self.get_god_map().safe_get_data(next_identifier), numbers.Number):
+                self.get_god_map().safe_set_data(next_identifier, value)
             else:
-                self.update_god_map(identifier + [member], value)
+                self.update_god_map(next_identifier, value)
 
 
     def get_constraint(self):

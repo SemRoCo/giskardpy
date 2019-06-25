@@ -215,7 +215,7 @@ class CollisionChecker(GiskardBehavior):
 
     def setup(self, timeout=10.0):
         super(CollisionChecker, self).setup(timeout)
-        self.pub_collision_marker = rospy.Publisher(u'~visualization_marker_array', MarkerArray, queue_size=1)
+        # self.pub_collision_marker = rospy.Publisher(u'~visualization_marker_array', MarkerArray, queue_size=1)
         self.srv_activate_rendering = rospy.Service(u'~render', SetBool, self.activate_rendering)
         rospy.sleep(.5)
         return True

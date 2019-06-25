@@ -3,7 +3,7 @@ from geometry_msgs.msg import PoseStamped
 from tf.transformations import rotation_from_matrix, quaternion_matrix
 
 from giskardpy.python_interface import GiskardWrapper
-from giskardpy.tfwrapper import transform_pose
+from giskardpy.tfwrapper import transform_pose, init
 
 
 def call_back(pose_stamped):
@@ -25,6 +25,7 @@ def call_back(pose_stamped):
 if __name__ == '__main__':
     try:
         rospy.init_node(u'move_base_simple_goal')
+        init()
         x_joint = u'odom_x_joint'
         y_joint = u'odom_y_joint'
         z_joint = u'odom_z_joint'

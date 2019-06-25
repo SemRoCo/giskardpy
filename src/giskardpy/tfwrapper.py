@@ -1,14 +1,15 @@
 import PyKDL
 import rospy
 from geometry_msgs.msg import PoseStamped, Vector3Stamped, PointStamped, TransformStamped, Pose, Quaternion, Point, \
-    Vector3
+    Vector3, Twist, TwistStamped
 from tf2_geometry_msgs import do_transform_pose, do_transform_vector3, do_transform_point
 from tf2_kdl import transform_to_kdl
 from tf2_py._tf2 import ExtrapolationException
 from tf2_ros import Buffer, TransformListener
+
 from giskardpy import logging
 
-tfBuffer = None # type: Buffer
+tfBuffer = None  # type: Buffer
 tf_listener = None
 
 
@@ -22,6 +23,7 @@ def init(tf_buffer_size=15):
     tfBuffer = Buffer(rospy.Duration(tf_buffer_size))
     tf_listener = TransformListener(tfBuffer)
     rospy.sleep(5.0)
+
 
 def wait_for_transform(target_frame, source_frame, time, timeout):
     global tfBuller
@@ -151,6 +153,17 @@ def point_to_kdl(point):
     return PyKDL.Vector(point.x, point.y, point.z)
 
 
+def twist_to_kdl(twist):
+    t = PyKDL.Twist()
+    t.vel[0] = twist.linear.x
+    t.vel[1] = twist.linear.y
+    t.vel[2] = twist.linear.z
+    t.rot[0] = twist.angular.x
+    t.rot[1] = twist.angular.y
+    t.rot[2] = twist.angular.z
+    return t
+
+
 def msg_to_kdl(msg):
     if isinstance(msg, TransformStamped):
         return transform_to_kdl(msg)
@@ -162,6 +175,10 @@ def msg_to_kdl(msg):
         return point_to_kdl(msg.point)
     elif isinstance(msg, Point):
         return point_to_kdl(msg)
+    elif isinstance(msg, Twist):
+        return twist_to_kdl(msg)
+    elif isinstance(msg, TwistStamped):
+        return twist_to_kdl(msg.twist)
     else:
         raise TypeError(u'can\'t convert {} to kdl'.format(type(msg)))
 

@@ -339,7 +339,7 @@ class CartesianOrientation(CartesianConstraint):
 
 
 class CartesianOrientationSlerp(CartesianConstraint):
-    def __init__(self, god_map, root_link, tip_link, goal, weight=HIGH_WEIGHT, gain=6, max_speed=0.5):
+    def __init__(self, god_map, root_link, tip_link, goal, weight=HIGH_WEIGHT, gain=6, max_speed=1):
         super(CartesianOrientationSlerp, self).__init__(god_map, root_link, tip_link, goal, weight, gain, max_speed)
 
     def get_constraint(self):
@@ -442,6 +442,7 @@ class LinkToAnyAvoidance(Constraint):
         get_chain = robot.get_chain
         get_connecting_link = robot.get_connecting_link
 
+        #TODO rename me
         def root_T_link_b():
             cpi = data[cpi_identifier][self.link_name]
             if cpi.body_b == self.robot_name:

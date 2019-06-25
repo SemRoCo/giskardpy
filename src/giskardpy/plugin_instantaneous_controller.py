@@ -44,6 +44,7 @@ class GoalToConstraints(GetGoal):
 
     def update(self):
         # TODO make this interruptable
+        # TODO try catch everything
 
         goal_msg = self.get_goal()  # type: MoveGoal
         if len(goal_msg.cmd_seq) == 0:

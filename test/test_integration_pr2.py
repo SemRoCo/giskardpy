@@ -288,6 +288,16 @@ class TestJointGoals(object):
 
 
 class TestCartGoals(object):
+    def test_rotate_gripper(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        r_goal = PoseStamped()
+        r_goal.header.frame_id = zero_pose.r_tip
+        r_goal.pose.orientation = Quaternion(*quaternion_about_axis(pi, [1,0,0]))
+        zero_pose.set_and_check_cart_goal(r_goal, zero_pose.r_tip)
+
+
     def test_keep_position1(self, zero_pose):
         """
         :type zero_pose: PR2

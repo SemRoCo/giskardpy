@@ -3,7 +3,8 @@ import itertools
 import json
 import traceback
 from copy import copy
-from time import time
+from multiprocessing import Process
+from time import time, sleep
 
 from giskard_msgs.msg import MoveGoal, MoveCmd
 from py_trees import Status
@@ -163,6 +164,11 @@ class ControllerPlugin(GiskardBehavior):
                                                   u'{}/{}/'.format(self.path_to_functions, self.get_robot().get_name()))
             self.controller.set_controlled_joints(self.get_robot().controlled_joints)
             self.controller.update_soft_constraints(self.soft_constraints)
+            p = Process(target=self.controller.compile)
+            p.start()
+            while p.is_alive():
+                sleep(0.05)
+            p.join()
             self.controller.compile()
 
     

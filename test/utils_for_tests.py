@@ -359,11 +359,11 @@ class GiskardTestWrapper(object):
             root = self.default_root
         self.wrapper.set_cart_goal(root, tip, goal_pose)
 
-    def set_and_check_cart_goal(self, goal_pose, tip, root=None):
+    def set_and_check_cart_goal(self, goal_pose, tip, root=None, expected_error_code=MoveResult.SUCCESS):
         goal_pose = transform_pose(u'map', goal_pose)
         self.set_cart_goal(goal_pose, tip, root)
         self.loop_once()
-        self.send_and_check_goal()
+        self.send_and_check_goal(expected_error_code)
         self.loop_once()
         self.check_cart_goal(tip, goal_pose)
 

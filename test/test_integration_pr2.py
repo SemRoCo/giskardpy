@@ -10,7 +10,7 @@ from giskard_msgs.srv import UpdateWorldResponse, UpdateWorldRequest
 from shape_msgs.msg import SolidPrimitive
 from tf.transformations import quaternion_from_matrix, quaternion_about_axis
 
-from giskardpy import logging
+from giskardpy import logging, identifier
 from giskardpy.identifier import fk_pose
 from giskardpy.tfwrapper import init as tf_init, lookup_pose, transform_pose
 from utils_for_tests import PR2, compare_poses
@@ -287,16 +287,63 @@ class TestJointGoals(object):
     # TODO test goal for unknown joint
 
 
+class TestConstraints(object):
+    def test_UpdateGodMap(self, pocky_pose_setup):
+        """
+        :type pocky_pose_setup: PR2
+        """
+        r_goal = PoseStamped()
+        r_goal.header.frame_id = pocky_pose_setup.r_tip
+        r_goal.pose.orientation.w = 1
+        r_goal.pose.position.x += 0.1
+        updates = {
+            u'rosparam': {
+                u'joint_weights': {
+                    u'odom_x_joint': 0.0001,
+                    u'odom_y_joint': 0.0001,
+                    u'odom_z_joint': 0.0001
+                }
+            }
+        }
+        pocky_pose_setup.wrapper.update_god_map(updates)
+        pocky_pose_setup.set_and_check_cart_goal(r_goal, pocky_pose_setup.r_tip)
+        assert pocky_pose_setup.get_god_map().get_data(identifier.joint_weights+[u'odom_x_joint']) == 0.0001
+        assert pocky_pose_setup.get_god_map().get_data(identifier.joint_weights+[u'torso_lift_joint']) == 0.5
+
+    def test_UpdateGodMap2(self, pocky_pose_setup):
+        """
+        :type pocky_pose_setup: PR2
+        """
+        r_goal = PoseStamped()
+        r_goal.header.frame_id = pocky_pose_setup.r_tip
+        r_goal.pose.orientation.w = 1
+        r_goal.pose.position.x += 0.1
+        updates = {
+            u'rosparam': {
+                u'joint_weights': {
+                    u'odom_x_joint': u'asdf',
+                    u'odom_y_joint': 0.0001,
+                    u'odom_z_joint': 0.0001
+                }
+            }
+        }
+        pocky_pose_setup.wrapper.update_god_map(updates)
+        pocky_pose_setup.set_cart_goal(r_goal, pocky_pose_setup.r_tip)
+        pocky_pose_setup.send_and_check_goal(expected_error_code=MoveResult.INSOLVABLE)
+        assert pocky_pose_setup.get_god_map().get_data(identifier.joint_weights+[u'odom_x_joint']) == 1
+        assert pocky_pose_setup.get_god_map().get_data(identifier.joint_weights+[u'torso_lift_joint']) == 0.5
+
+
 class TestCartGoals(object):
+
     def test_rotate_gripper(self, zero_pose):
         """
         :type zero_pose: PR2
         """
         r_goal = PoseStamped()
         r_goal.header.frame_id = zero_pose.r_tip
-        r_goal.pose.orientation = Quaternion(*quaternion_about_axis(pi, [1,0,0]))
+        r_goal.pose.orientation = Quaternion(*quaternion_about_axis(pi, [1, 0, 0]))
         zero_pose.set_and_check_cart_goal(r_goal, zero_pose.r_tip)
-
 
     def test_keep_position1(self, zero_pose):
         """

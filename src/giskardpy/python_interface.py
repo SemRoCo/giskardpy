@@ -157,6 +157,9 @@ class GiskardWrapper(object):
     def gravity_controlled_joint(self, joint_name, object_name):
         self.set_json_goal(u'GravityJoint', joint_name=joint_name, object_name=object_name)
 
+    def update_god_map(self, updates):
+        self.set_json_goal(u'UpdateGodMap', updates=updates)
+
     def set_json_goal(self, constraint_type, **kwargs):
         constraint = Constraint()
         constraint.type = constraint_type
@@ -448,3 +451,4 @@ class GiskardWrapper(object):
         if isinstance(joint_states, dict):
             joint_states = dict_to_joint_states(joint_states)
         self.object_js_topics[object_name].publish(joint_states)
+

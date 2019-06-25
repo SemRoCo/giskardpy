@@ -1,3 +1,4 @@
+import numbers
 import numpy as np
 from collections import OrderedDict
 
@@ -7,6 +8,7 @@ from scipy.optimize import curve_fit
 
 import giskardpy.identifier as identifier
 import symengine_wrappers as sw
+from giskardpy.exceptions import GiskardException
 from giskardpy.input_system import PoseStampedInput, Point3Input, Vector3Input, Vector3StampedInput, FrameInput
 from giskardpy.qp_problem_builder import SoftConstraint
 from giskardpy.tfwrapper import transform_pose, transform_vector
@@ -678,6 +680,26 @@ class GravityJoint(Constraint):
 
     def __str__(self):
         return u'{}/{}'.format(self.__class__.__name__, self.joint_name)
+
+
+class UpdateGodMap(Constraint):
+
+    def __init__(self, god_map, updates):
+        super(UpdateGodMap, self).__init__(god_map)
+        self.update_god_map([], updates)
+
+    def update_god_map(self, identifier, updates):
+        if not isinstance(updates, dict):
+            raise GiskardException(u'{} used incorrectly, {} not a dict or number'.format(str(self), updates))
+        for member, value in updates.items():
+            if isinstance(value, numbers.Number):
+                self.get_god_map().safe_set_data(identifier + [member], value)
+            else:
+                self.update_god_map(identifier + [member], value)
+
+
+    def get_constraint(self):
+        return {}
 
 
 def add_debug_constraint(d, key, expr):

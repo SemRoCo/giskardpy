@@ -12,7 +12,7 @@ from rospy_message_converter.message_converter import convert_ros_message_to_dic
 
 import giskardpy.constraints
 from giskardpy.constraints import LinkToAnyAvoidance, JointPosition
-from giskardpy.exceptions import InsolvableException, ImplementationException
+from giskardpy.exceptions import InsolvableException, ImplementationException, GiskardException
 import giskardpy.identifier as identifier
 from giskardpy.plugin import GiskardBehavior
 from giskardpy.plugin_action_server import GetGoal
@@ -74,6 +74,9 @@ class GoalToConstraints(GetGoal):
             self.raise_to_blackboard(InsolvableException(u'couldn\'t transform goal'))
             return Status.SUCCESS
         except InsolvableException as e:
+            self.raise_to_blackboard(e)
+            return Status.SUCCESS
+        except Exception as e:
             self.raise_to_blackboard(e)
             return Status.SUCCESS
 

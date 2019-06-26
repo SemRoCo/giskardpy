@@ -48,7 +48,10 @@ class WorldObject(URDFObject):
 
     @joint_state.setter
     def joint_state(self, value):
-        self._js = value
+        new_js = {}
+        new_js.update(self._js)
+        self._js = new_js
+        self._js.update(value)
 
     @property
     def base_pose(self):

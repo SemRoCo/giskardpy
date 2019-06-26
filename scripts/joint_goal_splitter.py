@@ -3,7 +3,6 @@
 import rospy
 import control_msgs.msg
 import trajectory_msgs.msg
-#from trajectory_msgs.msg import JointTrajectory
 import actionlib
 from giskardpy import logging
 import copy
@@ -13,10 +12,8 @@ class JointGoalSplitter:
         rospy.init_node('JointGoalSplitter')
         self.action_clients = []
         self.joint_names = []
-        self.state_topics = rospy.get_param('/joint_goal_splitter/state_topics', []);
-        #self.state_topics = ["/whole_body_controller/base/state", "/whole_body_controller/state"]
-        self.client_topics = rospy.get_param('/joint_goal_splitter/client_topics', []);
-        #self.client_topics = ["/whole_body_controller/follow_joint_trajectory/base", "whole_body_controller/follow_joint_trajectory"]
+        self.state_topics = rospy.get_param('~state_topics', []);
+        self.client_topics = rospy.get_param('~client_topics', []);
         self.number_of_clients = len(self.state_topics)
         if self.number_of_clients != len(self.client_topics):
             logging.logerr('Number of state and action topics do not match')

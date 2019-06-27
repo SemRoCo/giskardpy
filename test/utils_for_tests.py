@@ -702,3 +702,21 @@ class Donbot(GiskardTestWrapper):
                                                                        goal_pose.pose.orientation.w]))[0]}
         self.allow_all_collisions()
         self.send_and_check_joint_goal(js)
+
+class Boxy(GiskardTestWrapper):
+    def __init__(self):
+        self.camera_tip = u'camera_link'
+        self.r_tip = u'right_gripper_tool_frame'
+        self.l_tip = u'left_gripper_tool_frame'
+        super(Boxy, self).__init__(u'boxy.yaml')
+
+    def move_base(self, goal_pose):
+        goal_pose = transform_pose(self.default_root, goal_pose)
+        js = {u'odom_x_joint': goal_pose.pose.position.x,
+              u'odom_y_joint': goal_pose.pose.position.y,
+              u'odom_z_joint': rotation_from_matrix(quaternion_matrix([goal_pose.pose.orientation.x,
+                                                                       goal_pose.pose.orientation.y,
+                                                                       goal_pose.pose.orientation.z,
+                                                                       goal_pose.pose.orientation.w]))[0]}
+        self.allow_all_collisions()
+        self.send_and_check_joint_goal(js)

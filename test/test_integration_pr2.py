@@ -1,10 +1,10 @@
 import itertools
 from copy import deepcopy
 from numpy import pi
-
+import numpy as np
 import pytest
 import rospy
-from geometry_msgs.msg import PoseStamped, Point, Quaternion
+from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped
 from giskard_msgs.msg import CollisionEntry, MoveActionGoal, MoveResult, WorldBody, MoveGoal
 from giskard_msgs.srv import UpdateWorldResponse, UpdateWorldRequest
 from shape_msgs.msg import SolidPrimitive
@@ -12,7 +12,7 @@ from tf.transformations import quaternion_from_matrix, quaternion_about_axis
 
 from giskardpy import logging, identifier
 from giskardpy.identifier import fk_pose
-from giskardpy.tfwrapper import init as tf_init, lookup_pose, transform_pose
+from giskardpy.tfwrapper import init as tf_init, lookup_pose, transform_pose, lookup_point, transform_point
 from utils_for_tests import PR2, compare_poses
 
 # TODO roslaunch iai_pr2_sim ros_control_sim.launch
@@ -351,6 +351,53 @@ class TestConstraints(object):
         pocky_pose_setup.send_and_check_goal(expected_error_code=MoveResult.INSOLVABLE)
         assert pocky_pose_setup.get_god_map().get_data(identifier.joint_weights+[u'odom_x_joint']) == 1
         assert pocky_pose_setup.get_god_map().get_data(identifier.joint_weights+[u'torso_lift_joint']) == 0.5
+
+    def test_pointing(self, zero_pose):
+        tip = u'head_mount_kinect_rgb_link'
+        goal_point = lookup_point(u'map', zero_pose.r_tip)
+        pointing_axis = Vector3Stamped()
+        pointing_axis.header.frame_id = tip
+        pointing_axis.vector.x = 1
+        zero_pose.wrapper.pointing(tip, goal_point, pointing_axis=pointing_axis)
+        zero_pose.send_and_check_goal()
+
+        current_x = Vector3Stamped()
+        current_x.header.frame_id = tip
+        current_x.vector.x = 1
+
+        expected_x = transform_point(tip, goal_point)
+        np.testing.assert_almost_equal(expected_x.point.y, 0, 2)
+        np.testing.assert_almost_equal(expected_x.point.z, 0, 2)
+
+        tip = u'head_mount_kinect_rgb_link'
+        goal_point = lookup_point(u'map', zero_pose.r_tip)
+        pointing_axis = Vector3Stamped()
+        pointing_axis.header.frame_id = tip
+        pointing_axis.vector.x = 1
+        zero_pose.wrapper.pointing(tip, goal_point, pointing_axis=pointing_axis, root=zero_pose.r_tip)
+
+        r_goal = PoseStamped()
+        r_goal.header.frame_id = zero_pose.r_tip
+        r_goal.pose.position.x -= 0.2
+        r_goal.pose.position.z += 0.5
+        r_goal.pose.orientation.w = 1
+        r_goal = transform_pose(zero_pose.default_root, r_goal)
+        r_goal.pose.orientation = Quaternion(*quaternion_from_matrix([[0,0,-1,0],
+                                                                      [0,1,0,0],
+                                                                      [1,0,0,0],
+                                                                      [0,0,0,1]]))
+
+        zero_pose.set_and_check_cart_goal(r_goal, zero_pose.r_tip, u'base_footprint')
+
+        current_x = Vector3Stamped()
+        current_x.header.frame_id = tip
+        current_x.vector.x = 1
+
+        expected_x = lookup_point(tip, zero_pose.r_tip)
+        np.testing.assert_almost_equal(expected_x.point.y, 0, 2)
+        np.testing.assert_almost_equal(expected_x.point.z, 0, 2)
+
+
 
 
 class TestCartGoals(object):

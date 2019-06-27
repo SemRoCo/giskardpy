@@ -96,13 +96,15 @@ def transform_point(target_frame, point):
         logging.logwarn(e)
 
 
-def lookup_transform(target_frame, source_frame, time=rospy.Time()):
+def lookup_transform(target_frame, source_frame, time=None):
     """
     :type target_frame: str
     :type source_frame: str
     :return: Transform from target_frame to source_frame
-    :rtype: PoseStamped
+    :rtype: TransformStamped
     """
+    if not time:
+        time = rospy.Time()
     global tfBuffer
     if tfBuffer is None:
         init()
@@ -126,6 +128,21 @@ def lookup_pose(target_frame, source_frame, time=None):
         p.header.stamp = time
     p.pose.orientation.w = 1.0
     return transform_pose(target_frame, p)
+
+def lookup_point(target_frame, source_frame, time=None):
+    """
+    :type target_frame: str
+    :type source_frame: str
+    :return: target_frame <- source_frame
+    :rtype: PointStamped
+    """
+    t = lookup_transform(target_frame, source_frame, time)
+    p = PointStamped()
+    p.header.frame_id = t.header.frame_id
+    p.point.x = t.transform.translation.x
+    p.point.y = t.transform.translation.y
+    p.point.z = t.transform.translation.z
+    return p
 
 
 def pose_to_kdl(pose):

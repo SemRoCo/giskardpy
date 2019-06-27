@@ -42,6 +42,17 @@ class Vector3StampedInput(InputArray):
         return sw.vector3(self.x, self.y, self.z)
 
 
+class PointStampedInput(InputArray):
+    def __init__(self, to_expr, prefix=(), suffix=(), x=(u'x',), y=(u'y',), z=(u'z',)):
+        super(PointStampedInput, self).__init__(to_expr, (), (),
+                                                x=list(prefix) + list(x) + list(suffix),
+                                                y=list(prefix) + list(y) + list(suffix),
+                                                z=list(prefix) + list(z) + list(suffix))
+
+    def get_expression(self):
+        return sw.point3(self.x, self.y, self.z)
+
+
 class PoseStampedInput(InputArray):
     def __init__(self, to_expr, translation_prefix=(), translation_suffix=(),
                  rotation_prefix=(), rotation_suffix=(),

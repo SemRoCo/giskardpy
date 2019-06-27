@@ -9,9 +9,10 @@ from scipy.optimize import curve_fit
 import giskardpy.identifier as identifier
 import symengine_wrappers as sw
 from giskardpy.exceptions import GiskardException
-from giskardpy.input_system import PoseStampedInput, Point3Input, Vector3Input, Vector3StampedInput, FrameInput
+from giskardpy.input_system import PoseStampedInput, Point3Input, Vector3Input, Vector3StampedInput, FrameInput, \
+    PointStampedInput
 from giskardpy.qp_problem_builder import SoftConstraint
-from giskardpy.tfwrapper import transform_pose, transform_vector
+from giskardpy.tfwrapper import transform_pose, transform_vector, transform_point
 
 MAX_WEIGHT = 15
 HIGH_WEIGHT = 5
@@ -29,7 +30,7 @@ class Constraint(object):
         constraints[str(self)] = params
         self.get_god_map().safe_set_data(identifier.constraints_identifier, constraints)
 
-    def get_constraint(self, **kwargs):
+    def get_constraint(self):
         pass
 
     def get_identifier(self):
@@ -101,6 +102,10 @@ class Constraint(object):
     def get_input_Vector3Stamped(self, name):
         return Vector3StampedInput(self.god_map.to_symbol,
                                    vector_prefix=self.get_identifier() + [name, u'vector']).get_expression()
+
+    def get_input_PointStamped(self, name):
+        return PointStampedInput(self.god_map.to_symbol,
+                                 prefix=self.get_identifier() + [name, u'point']).get_expression()
 
 
 class JointPosition(Constraint):
@@ -533,26 +538,6 @@ class LinkToAnyAvoidance(Constraint):
                                                      upper=repel_speed,
                                                      weight=weight_f,
                                                      expression=dist)
-        # add_debug_constraint(soft_constraints, str(self)+'/dist', dist)
-        # add_debug_constraint(soft_constraints, str(self)+'/actual_distance', actual_distance)
-        # add_debug_constraint(soft_constraints, str(self)+'/f', A / (actual_distance + C) + B)
-        # add_debug_constraint(soft_constraints, str(self)+'/contact_normal x', contact_normal[0])
-        # add_debug_constraint(soft_constraints, str(self)+'/contact_normal y', contact_normal[1])
-        # add_debug_constraint(soft_constraints, str(self)+'/contact_normal z', contact_normal[2])
-
-        # add_debug_constraint(soft_constraints, str(self)+'/a x', controllable_point[0])
-        # add_debug_constraint(soft_constraints, str(self)+'/a y', controllable_point[1])
-        # add_debug_constraint(soft_constraints, str(self)+'/a z', controllable_point[2])
-
-        # add_debug_constraint(soft_constraints, str(self)+'/b x', other_point[0])
-        # add_debug_constraint(soft_constraints, str(self)+'/b y', other_point[1])
-        # add_debug_constraint(soft_constraints, str(self)+'/b z', other_point[2])
-        # add_debug_constraint(soft_constraints, str(self)+'/p on a 0', point_on_link[0])
-        # add_debug_constraint(soft_constraints, str(self)+'/p on a 1', point_on_link[1])
-        # add_debug_constraint(soft_constraints, str(self)+'/p on a 2', point_on_link[2])
-        # add_debug_constraint(soft_constraints, str(self)+'/p on a root 0', controllable_point[0])
-        # add_debug_constraint(soft_constraints, str(self)+'/p on a root 1', controllable_point[1])
-        # add_debug_constraint(soft_constraints, str(self)+'/p on a root 2', controllable_point[2])
         return soft_constraints
 
     def __str__(self):
@@ -702,6 +687,76 @@ class UpdateGodMap(Constraint):
 
     def get_constraint(self):
         return {}
+
+
+class Pointing(Constraint):
+    goal_point = u'goal_point'
+    pointing_axis = u'pointing_axis'
+    weight = u'weight'
+
+
+    def __init__(self, god_map, tip, goal_point, root=None, pointing_axis=None, weight=HIGH_WEIGHT):
+        super(Pointing, self).__init__(god_map)
+        if root is None:
+            self.root = self.get_robot().get_root()
+        else:
+            self.root = root
+        self.tip = tip
+
+        goal_point = convert_dictionary_to_ros_message(u'geometry_msgs/PointStamped', goal_point)
+        goal_point = transform_point(self.root, goal_point)
+
+        if pointing_axis is not None:
+            pointing_axis = convert_dictionary_to_ros_message(u'geometry_msgs/Vector3Stamped', pointing_axis)
+            pointing_axis = transform_vector(self.tip, pointing_axis)
+        else:
+            pointing_axis = Vector3Stamped()
+            pointing_axis.header.frame_id = self.tip
+            pointing_axis.vector.z = 1
+        tmp = np.array([pointing_axis.vector.x, pointing_axis.vector.y, pointing_axis.vector.z])
+        tmp = tmp / np.linalg.norm(tmp)
+        pointing_axis.vector = Vector3(*tmp)
+
+        params = {self.goal_point: goal_point,
+                  self.pointing_axis: pointing_axis,
+                  self.weight: weight}
+        self.save_params_on_god_map(params)
+
+    def get_goal_point(self):
+        return self.get_input_PointStamped(self.goal_point)
+
+    def get_pointing_axis(self):
+        return self.get_input_Vector3Stamped(self.pointing_axis)
+
+    def get_constraint(self):
+        soft_constraints = OrderedDict()
+
+        weight = self.get_input_float(self.weight)
+        root_T_tip = self.get_fk(self.root, self.tip)
+        goal_point = self.get_goal_point()
+        pointing_axis = self.get_pointing_axis()
+
+        goal_axis = goal_point - sw.position_of(root_T_tip)
+        goal_axis /= sw.norm(goal_axis)
+        current_axis = root_T_tip * pointing_axis
+        diff = goal_axis - current_axis
+
+        soft_constraints[str(self) + u'x'] = SoftConstraint(lower=diff[0],
+                                                            upper=diff[0],
+                                                            weight=weight,
+                                                            expression=current_axis[0])
+        soft_constraints[str(self) + u'y'] = SoftConstraint(lower=diff[1],
+                                                            upper=diff[1],
+                                                            weight=weight,
+                                                            expression=current_axis[1])
+        soft_constraints[str(self) + u'z'] = SoftConstraint(lower=diff[2],
+                                                            upper=diff[2],
+                                                            weight=weight,
+                                                            expression=current_axis[2])
+        return soft_constraints
+
+    def __str__(self):
+        return u'{}/{}/{}'.format(self.__class__.__name__, self.root, self.tip)
 
 
 def add_debug_constraint(d, key, expr):

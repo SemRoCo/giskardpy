@@ -160,6 +160,18 @@ class GiskardWrapper(object):
     def update_god_map(self, updates):
         self.set_json_goal(u'UpdateGodMap', updates=updates)
 
+    def pointing(self, tip, goal_point, root=None, pointing_axis=None, weight=None):
+        kwargs = {u'tip':tip,
+                  u'goal_point':goal_point}
+        if root is not None:
+            kwargs[u'root'] = root
+        if pointing_axis is not None:
+            kwargs[u'pointing_axis'] = convert_ros_message_to_dictionary(pointing_axis)
+        if weight is not None:
+            kwargs[u'weight'] = weight
+        kwargs[u'goal_point'] = convert_ros_message_to_dictionary(goal_point)
+        self.set_json_goal(u'Pointing', **kwargs)
+
     def set_json_goal(self, constraint_type, **kwargs):
         constraint = Constraint()
         constraint.type = constraint_type

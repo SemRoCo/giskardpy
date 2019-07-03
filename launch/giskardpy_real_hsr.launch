@@ -1,0 +1,78 @@
+<launch>
+
+
+  <arg name="gui" default="false" />
+  <arg name="robot_model" default="hsrb4s" />
+  <arg name="visualization" default="false" />
+  <arg name="implicit_damping" default="false" />
+  <arg name="sim" default="false" />
+
+  
+
+  <node pkg="tf2_ros" type="static_transform_publisher" name="fake_localization_t"
+    output="screen" args="0 0 0 0 0 0 odom odom_t_link" />
+
+  <node pkg="tf2_ros" type="static_transform_publisher" name="fake_localization_x"
+    output="screen" args="0 0 0 0 0 0 odom odom_x_link" />
+
+  <node pkg="tf2_ros" type="static_transform_publisher" name="fake_localization_y"
+    output="screen" args="0 0 0 0 0 0 odom odom_y_link" />
+
+  
+  <include file="$(find giskardpy)/launch/giskardpy_splitter_hsr.launch"/>
+
+  <node pkg="giskardpy" type="hsr_base_joint_state_publisher.py" name="hsr_base_joint_state_publisher" output="screen"/>
+  
+  <!-- <node pkg="hsrb_base_joint_state_publisher" type="hsrb_base_joint_state_publisher_node" name="hsr_base_joint_state_publisher" output="screen"/>-->
+
+  <node pkg="joint_state_publisher" type="joint_state_publisher" name="joint_state_publisher" output="screen">
+    <rosparam param="source_list">
+    - /hsrb/joint_states
+    - /hsrb_base/joint_states
+    </rosparam>
+    <rosparam param="zeros">
+    'odom_x': 0.0
+    'odom_y': 0.0
+    'odom_z': 0.0
+    </rosparam>
+    <param name="rate" value="120"/>
+    <param name="use_gui" value="False"/>
+  </node>
+
+  <node pkg="giskardpy" type="giskard_trees.py" name="giskard" output="screen">
+    <param name="robot_description"
+      command="$(find xacro)/xacro.py $(find hsr_description)/robots/$(arg robot_model).urdf.xacro gazebo_visualization_enabled:=$(arg visualization) implicit_damping:=$(arg implicit_damping)" />
+    <remap from="/robot_description" to="~robot_description" />
+    <param name="path_to_data_folder" value="$(find giskardpy)/data/hsr" />
+    <param name="enable_gui" value="$(arg gui)"/>
+    <rosparam param="map_frame">map</rosparam>
+    <rosparam param="joint_convergence_threshold">0.002</rosparam>
+    <rosparam param="wiggle_precision_threshold">7</rosparam>
+    <rosparam param="max_traj_length">30</rosparam>
+    <rosparam param="sample_period">0.1</rosparam>
+    <rosparam param="default_joint_vel_limit">0.5</rosparam>
+    <rosparam param="default_joint_weight">0.0001</rosparam>
+    <rosparam param="default_collision_avoidance_distance">0.05</rosparam>
+    <rosparam param="fill_velocity_values">False</rosparam>
+    <rosparam param="nWSR">None</rosparam> <!-- None results in a nWSR estimation thats fine most of the time -->
+    <rosparam param="root_link">base_link</rosparam>
+    <rosparam param="enable_collision_marker">False</rosparam>
+    <rosparam param="collision_time_threshold">15</rosparam>
+    <rosparam param="debug">False</rosparam>
+    <rosparam param="tree_tick_rate">1</rosparam>
+    <rosparam param="enable_visualization">False</rosparam>
+    <rosparam param="slerp">False</rosparam>
+    <rosparam param="plot_trajectory">False</rosparam>
+    <!-- remaps for real hsr -->
+    <!-- <remap from="/whole_body_controller/state" to="/hsrb/arm_trajectory_controller/state"/> -->
+    <!-- <remap from="/whole_body_controller/follow_joint_trajectory" to="/hsrb/arm_trajectory_controller/follow_joint_trajectory"/> -->
+  </node>
+
+  <node pkg="giskardpy" type="interactive_marker.py" name="giskard_interactive_marker" output="screen">
+    <rosparam param="enable_self_collision">False</rosparam>
+    <rosparam param="interactive_marker_chains">
+      - [odom_t_link, hand_palm_link]
+    </rosparam>
+  </node>
+
+</launch>

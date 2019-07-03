@@ -2,29 +2,50 @@
 
 import rospy
 import control_msgs.msg
+import pr2_controllers_msgs.msg
 import trajectory_msgs.msg
 import actionlib
 from giskardpy import logging
 import copy
+import rostopic
 
 class JointGoalSplitter:
     def __init__(self):
         rospy.init_node('JointGoalSplitter')
         self.action_clients = []
         self.joint_names = []
-        self.state_topics = rospy.get_param('~state_topics', []);
-        self.client_topics = rospy.get_param('~client_topics', []);
+        self.state_topics = rospy.get_param('~state_topics', [])
+        self.state_topics = ["/hsrb/arm_trajectory_controller/state", "/hsrb/omni_base_controller/state"]
+        self.client_topics = rospy.get_param('~client_topics', [])
+        self.client_topics = ["/hsrb/arm_trajectory_controller/follow_joint_trajectory", "/base_trajectory_action/follow_joint_trajectory"]
         self.number_of_clients = len(self.state_topics)
         if self.number_of_clients != len(self.client_topics):
             logging.logerr('Number of state and action topics do not match')
             exit()
 
+
         if self.number_of_clients == 0:
             logging.logwarn('No state/action topic found')
             exit()
 
+        self.client_type = []
         for i in range(self.number_of_clients):
-            self.action_clients.append(actionlib.SimpleActionClient(self.client_topics[i], control_msgs.msg.FollowJointTrajectoryAction))
+            type = rostopic.get_info_text(self.client_topics[i] + '/goal').split('\n')[0][6:]
+            self.client_type.append(type)
+
+        self.state_type = []
+        for i in range(self.number_of_clients):
+            type = rostopic.get_info_text(self.state_topics[i]).split('\n')[0][6:]
+            self.state_type.append(type)
+
+        for i in range(self.number_of_clients):
+            if self.client_type[i] == 'control_msgs/FollowJointTrajectoryActionGoal':
+                self.action_clients.append(actionlib.SimpleActionClient(self.client_topics[i], control_msgs.msg.FollowJointTrajectoryAction))
+            elif self.client_type[i] == 'pr2_controllers_msgs/JointTrajectoryActionGoal':
+                self.action_clients.append(actionlib.SimpleActionClient(self.client_topics[i], pr2_controllers_msgs.msg.JointTrajectoryAction))
+            else:
+                logging.logerr('wrong client topic type:' + self.client_type[i])
+                exit()
             self.joint_names.append(rospy.wait_for_message(self.state_topics[i], control_msgs.msg.JointTrajectoryControllerState).joint_names)
 
         self.current_controller_state = control_msgs.msg.JointTrajectoryControllerState()
@@ -44,8 +65,14 @@ class JointGoalSplitter:
 
         self.state_pub = rospy.Publisher('/whole_body_controller/state', control_msgs.msg.JointTrajectoryControllerState, queue_size=10)
 
-        for topic in self.state_topics:
-            rospy.Subscriber(topic, control_msgs.msg.JointTrajectoryControllerState, self.state_cb_update)
+        for i in range(self.number_of_clients):
+            if self.state_type[i] == 'control_msgs/JointTrajectoryControllerState':
+                rospy.Subscriber(self.state_topics[i], control_msgs.msg.JointTrajectoryControllerState, self.state_cb_update)
+            elif self.state_type[i] == 'pr2_controllers_msgs/JointTrajectoryControllerState':
+                rospy.Subscriber(self.state_topics[i], pr2_controllers_msgs.msg.JointTrajectoryControllerState, self.state_cb_update)
+            else:
+                logging.logerr('wrong state topic type')
+                exit()
 
         rospy.Subscriber(self.state_topics[0], control_msgs.msg.JointTrajectoryControllerState, self.state_cb_publish)
 
@@ -70,7 +97,18 @@ class JointGoalSplitter:
 
             idx.append(index_list)
 
-        action_goals = [control_msgs.msg.FollowJointTrajectoryGoal() for i in range(self.number_of_clients)]
+        #action_goals = [control_msgs.msg.FollowJointTrajectoryGoal() for i in range(self.number_of_clients)]
+
+        action_goals = []
+        for i in range(self.number_of_clients):
+            if self.client_type[i] == 'control_msgs/FollowJointTrajectoryActionGoal':
+                action_goals.append(control_msgs.msg.FollowJointTrajectoryGoal())
+            elif self.client_type[i] == 'pr2_controllers_msgs/JointTrajectoryActionGoal':
+                action_goals.append(pr2_controllers_msgs.msg.JointTrajectoryGoal())
+            else:
+                logging.logerr('Wrong Action type:' + self.client_type[i])
+                exit()
+
 
         goal_trajectories_points = [[] for i in range(self.number_of_clients)]
 
@@ -100,7 +138,10 @@ class JointGoalSplitter:
         if self.success:
             result = control_msgs.msg.FollowJointTrajectoryResult.SUCCESSFUL
             for action_client in self.action_clients:
-                result = action_client.get_result()
+                temp_result = action_client.get_result()
+                if temp_result._type == 'pr2_controllers_msgs/JointTrajectoryResult':
+                    continue
+                result = temp_result
                 if result.error_code != control_msgs.msg.FollowJointTrajectoryResult.SUCCESSFUL:
                     break
 

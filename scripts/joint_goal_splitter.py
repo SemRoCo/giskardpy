@@ -15,9 +15,7 @@ class JointGoalSplitter:
         self.action_clients = []
         self.joint_names = []
         self.state_topics = rospy.get_param('~state_topics', [])
-        self.state_topics = ["/hsrb/arm_trajectory_controller/state", "/hsrb/omni_base_controller/state"]
         self.client_topics = rospy.get_param('~client_topics', [])
-        self.client_topics = ["/hsrb/arm_trajectory_controller/follow_joint_trajectory", "/base_trajectory_action/follow_joint_trajectory"]
         self.number_of_clients = len(self.state_topics)
         if self.number_of_clients != len(self.client_topics):
             logging.logerr('Number of state and action topics do not match')

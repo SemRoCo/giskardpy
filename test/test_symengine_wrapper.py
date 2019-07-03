@@ -730,8 +730,9 @@ class TestSympyWrapper(unittest.TestCase):
         angle1 = np.pi * f1
         angle2 = np.pi * f2
         ref_distance = shortest_angular_distance(angle1, angle2)
-        self.assertAlmostEqual(speed_up_and_execute(spw.shortest_angular_distance, [angle1, angle2]),
-                               ref_distance, places=7)
+        distance = speed_up_and_execute(spw.shortest_angular_distance, [angle1, angle2])
+        self.assertAlmostEqual(distance, ref_distance, places=7)
+        assert abs(distance) <= np.pi
 
 
 if __name__ == '__main__':

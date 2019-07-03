@@ -14,7 +14,23 @@ joint_weights:
   odom_y_joint: 1
   odom_z_joint: 1
   refills_finger: 0.1
-default_collision_avoidance_distance: 0.05
+collision_avoidance:
+  default:
+    max_weight_distance: 0.0
+    low_weight_distance: 0.01
+    zero_weight_distance: 0.05
+  high: &high
+    max_weight_distance: 0.01
+    low_weight_distance: 0.03
+    zero_weight_distance: 0.05
+  base_link:
+    max_weight_distance: 0.04
+    low_weight_distance: 0.06
+    zero_weight_distance: 0.09
+  l_upper_arm_link: *high
+  r_upper_arm_link: *high
+  l_forearm_link: *high
+  r_forearm_link: *high
 fill_velocity_values: True
 nWSR: None # None results in a nWSR estimation thats fine most of the time
 root_link: odom

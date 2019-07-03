@@ -40,12 +40,13 @@ class SendTrajectory(ActionClient, GiskardBehavior):
         :type traj: giskardpy.data_types.Trajectory
         :return: JointTrajectory
         """
+        hz = self.get_god_map().safe_get_data(identifier.sample_period)
         trajectory_msg = JointTrajectory()
         trajectory_msg.header.stamp = rospy.get_rostime() + rospy.Duration(0.5)
         trajectory_msg.joint_names = self.controller_joints
         for time, traj_point in trajectory.items():
             p = JointTrajectoryPoint()
-            p.time_from_start = rospy.Duration(time)
+            p.time_from_start = rospy.Duration(time*hz)
             for joint_name in self.controller_joints:
                 if joint_name in traj_point:
                     p.positions.append(traj_point[joint_name].position)

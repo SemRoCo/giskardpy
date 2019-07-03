@@ -19,9 +19,12 @@ class WiggleCancel(GiskardBehavior):
 
     def update(self):
         current_js = self.get_god_map().safe_get_data(identifier.joint_states)
-        current_time = self.get_god_map().safe_get_data(identifier.time_identifier)
+        hz = self.get_god_map().safe_get_data(identifier.sample_period)
+        current_time = self.get_god_map().safe_get_data(identifier.time_identifier) * hz
         rounded_js = self.round_js(current_js)
         # TODO make 1 a parameter
+        # if current_time >= 18:
+        #     self.check_fft()
         if current_time >= 1 and rounded_js in self.past_joint_states:
             current_max_joint_vel = np.abs([v.velocity for v in current_js.values()]).max()
             # TODO this threshold should depend on the joint type
@@ -43,6 +46,19 @@ class WiggleCancel(GiskardBehavior):
         """
         return tuple(round(x.position, self.wiggle_precision1) for x in js.values())
 
+
+    def check_fft(self):
+        traj = self.get_god_map().safe_get_data(identifier.trajectory_identifier)
+        hz = self.get_god_map().safe_get_data(identifier.sample_period)
+        current_time = self.get_god_map().safe_get_data(identifier.time_identifier)
+        last_sec = []
+        keys = traj._points[0.0].keys()
+        for time in range(int(current_time-1/hz), current_time):
+            # rounded_time = np.round(time / hz) * hz
+            point = traj._points[time]
+            positions = [point[key].position for key in keys]
+            last_sec.append(positions)
+        last_sec = np.array(last_sec)
 
 class MaxTrajLength(GiskardBehavior):
     pass

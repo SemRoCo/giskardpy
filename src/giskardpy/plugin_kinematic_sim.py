@@ -21,11 +21,11 @@ class KinSimPlugin(GiskardBehavior):
 
     def initialise(self):
         self.next_js = None
-        self.time = -self.frequency
+        self.time = -1
         super(KinSimPlugin, self).initialise()
 
     def update(self):
-        self.time += self.frequency
+        self.time += 1
         motor_commands = self.get_god_map().safe_get_data(identifier.next_cmd_identifier)
         current_js = self.get_god_map().safe_get_data(identifier.joint_states)
         if motor_commands:

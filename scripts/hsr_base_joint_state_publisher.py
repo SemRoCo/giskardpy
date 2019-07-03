@@ -15,7 +15,7 @@ def odom_cb(data):
     global robot_pose
     js = JointState()
     js.header = data.header
-    js.name = ['odom_x_joint', 'odom_y_joint', 'odom_z_joint']
+    js.name = ['odom_x', 'odom_y', 'odom_t']
     js.position = [data.pose.pose.position.x,
                   data.pose.pose.position.y,
                   rotation_from_matrix(quaternion_matrix([data.pose.pose.orientation.x,

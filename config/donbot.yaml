@@ -6,7 +6,7 @@ map_frame: map
 joint_convergence_threshold: 0.001
 wiggle_precision_threshold: 5
 max_traj_length: 30 # not implemented
-sample_period: 0.05
+sample_period: 0.005
 default_joint_vel_limit: 0.25
 default_joint_weight: 0.001
 joint_weights:

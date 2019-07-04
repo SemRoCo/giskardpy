@@ -35,7 +35,7 @@ class KinSimPlugin(GiskardBehavior):
                     cmd = motor_commands[joint_name]
                 else:
                     cmd = 0.0
-                self.next_js[joint_name] = SingleJointState(sjs.name, sjs.position + cmd * self.frequency, velocity=cmd)
+                self.next_js[joint_name] = SingleJointState(sjs.name, sjs.position + cmd, velocity=cmd / self.frequency)
         if self.next_js is not None:
             self.get_god_map().safe_set_data(identifier.joint_states, self.next_js)
         else:

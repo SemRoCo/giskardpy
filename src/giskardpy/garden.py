@@ -77,6 +77,10 @@ def initialize_god_map():
     collision_distances.update(god_map.get_data(identifier.collisions))
     god_map.safe_set_data(identifier.collisions, collision_distances)
 
+    hz = god_map.safe_get_data(identifier.sample_period)
+    joint_vel = god_map.safe_get_data(identifier.default_joint_vel_identifier)
+    god_map.safe_set_data(identifier.default_joint_vel_identifier, joint_vel * hz)
+
     default_joint_vel = god_map.to_symbol(identifier.default_joint_vel_identifier)
 
     world = PyBulletWorld(god_map.safe_get_data(identifier.gui),

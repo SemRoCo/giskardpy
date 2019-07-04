@@ -114,7 +114,7 @@ class JointPosition(Constraint):
     gain = u'gain'
     max_speed = u'max_speed'
 
-    def __init__(self, god_map, joint_name, goal, weight=LOW_WEIGHT, gain=10, max_speed=1):
+    def __init__(self, god_map, joint_name, goal, weight=LOW_WEIGHT, gain=1, max_speed=1):
         super(JointPosition, self).__init__(god_map)
         self.joint_name = joint_name
         params = {self.goal: goal,
@@ -164,7 +164,7 @@ class JointPosition(Constraint):
 
 
 class JointPositionList(Constraint):
-    def __init__(self, god_map, goal_state, weight=LOW_WEIGHT, gain=10, max_speed=1):
+    def __init__(self, god_map, goal_state, weight=LOW_WEIGHT, gain=1, max_speed=1):
         super(JointPositionList, self).__init__(god_map)
         self.constraints = []
         for i, joint_name in enumerate(goal_state[u'name']):
@@ -184,7 +184,7 @@ class CartesianConstraint(Constraint):
     gain = u'gain'
     max_speed = u'max_speed'
 
-    def __init__(self, god_map, root_link, tip_link, goal, weight=HIGH_WEIGHT, gain=3, max_speed=0.1):
+    def __init__(self, god_map, root_link, tip_link, goal, weight=HIGH_WEIGHT, gain=1, max_speed=0.1):
         super(CartesianConstraint, self).__init__(god_map)
         self.root = root_link
         self.tip = tip_link
@@ -278,7 +278,7 @@ class CartesianPosition(CartesianConstraint):
 
 
 class CartesianOrientation(CartesianConstraint):
-    def __init__(self, god_map, root_link, tip_link, goal, weight=HIGH_WEIGHT, gain=3, max_speed=0.5):
+    def __init__(self, god_map, root_link, tip_link, goal, weight=HIGH_WEIGHT, gain=1, max_speed=0.5):
         super(CartesianOrientation, self).__init__(god_map, root_link, tip_link, goal, weight, gain, max_speed)
 
     def get_constraint(self):
@@ -346,7 +346,7 @@ class CartesianOrientation(CartesianConstraint):
 
 
 class CartesianOrientationSlerp(CartesianConstraint):
-    def __init__(self, god_map, root_link, tip_link, goal, weight=HIGH_WEIGHT, gain=6, max_speed=1):
+    def __init__(self, god_map, root_link, tip_link, goal, weight=HIGH_WEIGHT, gain=1, max_speed=1):
         super(CartesianOrientationSlerp, self).__init__(god_map, root_link, tip_link, goal, weight, gain, max_speed)
 
     def get_constraint(self):

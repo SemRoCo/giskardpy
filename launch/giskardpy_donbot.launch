@@ -1,19 +1,19 @@
-<launch>   
+<launch>
 
-  <arg name="gui" default="False"/>
+    <arg name="gui" default="False"/>
 
-  <node pkg="giskardpy" type="giskard_trees.py" name="giskard" output="screen">
-    <param name="path_to_data_folder" value="$(find giskardpy)/data" />
-    <param name="enable_gui" value="$(arg gui)"/>
-    <rosparam command="load" file="$(find giskardpy)/config/donbot.yaml" />
-  </node>
+    <node pkg="giskardpy" type="giskard_trees.py" name="giskard" output="screen">
+        <param name="path_to_data_folder" value="$(find giskardpy)/data" />
+        <param name="enable_gui" value="$(arg gui)"/>
+        <rosparam command="load" file="$(find giskardpy)/config/donbot.yaml" />
+    </node>
 
-  <node pkg="giskardpy" type="interactive_marker.py" name="giskard_interactive_marker" output="screen">
-    <rosparam param="enable_self_collision">False</rosparam>
-    <rosparam param="interactive_marker_chains">
-     - [odom, gripper_tool_frame]
-     - [ur5_shoulder_link, camera_link]
-    </rosparam>
-  </node>
+    <node pkg="giskardpy" type="interactive_marker.py" name="giskard_interactive_marker" output="screen">
+        <rosparam param="enable_self_collision">False</rosparam>
+        <rosparam param="interactive_marker_chains">
+            - [odom, gripper_tool_frame]
+            - [ur5_shoulder_link, camera_link]
+        </rosparam>
+    </node>
 
 </launch>

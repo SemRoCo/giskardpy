@@ -307,7 +307,7 @@ def create_path(path):
                 raise
 
 
-def plot_trajectory(tj, controlled_joints, path_to_data_folder, hz):
+def plot_trajectory(tj, controlled_joints, path_to_data_folder, sample_period):
     """
     :type tj: Trajectory
     :param controlled_joints: only joints in this list will be added to the plot
@@ -329,7 +329,7 @@ def plot_trajectory(tj, controlled_joints, path_to_data_folder, hz):
         times.append(time)
     positions = np.array(positions)
     velocities = np.array(velocities).T
-    times = np.array(times) * hz
+    times = np.array(times) * sample_period
 
     f, (ax1, ax2) = plt.subplots(2, sharex=True)
     ax1.set_title(u'position')

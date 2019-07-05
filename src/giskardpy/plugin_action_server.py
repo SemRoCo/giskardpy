@@ -140,9 +140,9 @@ class SendResult(ActionServerBehavior):
     def plot_traj(self):
         if self.plot_trajectory:
             trajectory = self.get_god_map().safe_get_data(identifier.trajectory_identifier)
-            hz = self.get_god_map().safe_get_data(identifier.sample_period)
+            sample_period = self.get_god_map().safe_get_data(identifier.sample_period)
             controlled_joints = self.get_robot().controlled_joints
-            plot_trajectory(trajectory, controlled_joints, self.path_to_data_folder, hz)
+            plot_trajectory(trajectory, controlled_joints, self.path_to_data_folder, sample_period)
 
     def exception_to_error_code(self, exception):
         """

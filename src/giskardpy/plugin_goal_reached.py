@@ -15,8 +15,8 @@ class GoalReachedPlugin(GiskardBehavior):
 
     def update(self):
         current_js = self.get_god_map().safe_get_data(identifier.joint_states)
-        hz = self.get_god_map().safe_get_data(identifier.sample_period)
-        planning_time = self.get_god_map().safe_get_data(identifier.time_identifier) * hz
+        sample_period = self.get_god_map().safe_get_data(identifier.sample_period)
+        planning_time = self.get_god_map().safe_get_data(identifier.time_identifier) * sample_period
         # TODO make 1 a parameter
         if planning_time >= 1:
             if np.abs([v.velocity for v in current_js.values()]).max() < self.joint_convergence_threshold:

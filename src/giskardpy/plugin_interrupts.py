@@ -19,8 +19,8 @@ class WiggleCancel(GiskardBehavior):
 
     def update(self):
         current_js = self.get_god_map().safe_get_data(identifier.joint_states)
-        hz = self.get_god_map().safe_get_data(identifier.sample_period)
-        current_time = self.get_god_map().safe_get_data(identifier.time_identifier) * hz
+        sample_period = self.get_god_map().safe_get_data(identifier.sample_period)
+        current_time = self.get_god_map().safe_get_data(identifier.time_identifier) * sample_period
         rounded_js = self.round_js(current_js)
         # TODO make 1 a parameter
         # if current_time >= 18:
@@ -49,12 +49,12 @@ class WiggleCancel(GiskardBehavior):
 
     def check_fft(self):
         traj = self.get_god_map().safe_get_data(identifier.trajectory_identifier)
-        hz = self.get_god_map().safe_get_data(identifier.sample_period)
+        sample_period = self.get_god_map().safe_get_data(identifier.sample_period)
         current_time = self.get_god_map().safe_get_data(identifier.time_identifier)
         last_sec = []
         keys = traj._points[0.0].keys()
-        for time in range(int(current_time-1/hz), current_time):
-            # rounded_time = np.round(time / hz) * hz
+        for time in range(int(current_time-1/sample_period), current_time):
+            # rounded_time = np.round(time / sample_period) * sample_period
             point = traj._points[time]
             positions = [point[key].position for key in keys]
             last_sec.append(positions)

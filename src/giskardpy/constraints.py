@@ -429,7 +429,7 @@ class LinkToAnyAvoidance(Constraint):
     B = u'B'
     C = u'C'
 
-    def __init__(self, god_map, link_name, repel_speed=1, max_weight_distance=0.0, low_weight_distance=0.01,
+    def __init__(self, god_map, link_name, repel_speed=0.5, max_weight_distance=0.0, low_weight_distance=0.01,
                  zero_weight_distance=0.05):
         super(LinkToAnyAvoidance, self).__init__(god_map)
         self.link_name = link_name
@@ -449,7 +449,7 @@ class LinkToAnyAvoidance(Constraint):
         get_chain = robot.get_chain
         get_connecting_link = robot.get_connecting_link
 
-        #TODO rename me
+        # TODO rename me
         def root_T_link_b():
             cpi = data[cpi_identifier][self.link_name]
             if cpi.body_b == self.robot_name:
@@ -684,7 +684,6 @@ class UpdateGodMap(Constraint):
             else:
                 self.update_god_map(next_identifier, value)
 
-
     def get_constraint(self):
         return {}
 
@@ -693,7 +692,6 @@ class Pointing(Constraint):
     goal_point = u'goal_point'
     pointing_axis = u'pointing_axis'
     weight = u'weight'
-
 
     def __init__(self, god_map, tip, goal_point, root=None, pointing_axis=None, weight=HIGH_WEIGHT):
         super(Pointing, self).__init__(god_map)

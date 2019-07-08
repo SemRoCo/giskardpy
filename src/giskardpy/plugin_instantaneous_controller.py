@@ -77,6 +77,7 @@ class GoalToConstraints(GetGoal):
             self.raise_to_blackboard(e)
             return Status.SUCCESS
         except Exception as e:
+            traceback.print_exc()
             self.raise_to_blackboard(e)
             return Status.SUCCESS
 

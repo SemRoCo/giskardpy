@@ -31,18 +31,6 @@ class WorldObject(URDFObject):
         self._controlled_links = None
         self._self_collision_matrix = set()
 
-    @classmethod
-    def from_urdf_file(cls, urdf_file, *args, **kwargs):
-        return super(WorldObject, cls).from_urdf_file(urdf_file, *args, **kwargs)
-
-    @classmethod
-    def from_world_body(cls, world_body, *args, **kwargs):
-        return super(WorldObject, cls).from_world_body(world_body, *args, **kwargs)
-
-    @classmethod
-    def from_parts(cls, robot_name, links, joints, *args, **kwargs):
-        return super(WorldObject, cls).from_parts(robot_name, links, joints, *args, **kwargs)
-
     @property
     def joint_state(self):
         return self._js

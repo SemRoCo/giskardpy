@@ -235,7 +235,7 @@ class CollisionChecker(GiskardBehavior):
     def initialise(self):
         collision_goals = self.get_god_map().safe_get_data(identifier.collision_goal_identifier)
         self.collision_matrix = self.get_world().collision_goals_to_collision_matrix(collision_goals,
-                                                                                     self.get_god_map().safe_get_data(identifier.collisions))
+                                                                                     self.get_god_map().safe_get_data(identifier.collisions_distances))
         self.get_god_map().safe_set_data(identifier.closest_point, None)
         super(CollisionChecker, self).initialise()
 

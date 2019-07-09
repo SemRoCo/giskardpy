@@ -37,7 +37,7 @@ class SymEngineController(object):
         :type joint_names: set
         """
         self.controlled_joints = joint_names
-        self.joint_to_symbols_str = OrderedDict((x, self.robot.get_joint_symbol(x)) for x in self.controlled_joints)
+        self.joint_to_symbols_str = OrderedDict((x, self.robot.get_joint_position_symbol(x)) for x in self.controlled_joints)
         self.joint_constraints = OrderedDict(((self.robot.get_name(), k), self.robot._joint_constraints[k]) for k in
                                              self.controlled_joints)
         self.hard_constraints = OrderedDict(((self.robot.get_name(), k), self.robot._hard_constraints[k]) for k in

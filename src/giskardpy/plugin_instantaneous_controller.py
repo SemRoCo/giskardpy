@@ -133,12 +133,12 @@ class GoalToConstraints(GetGoal):
         soft_constraints = {}
         for link in self.get_robot().get_controlled_links():
             constraint = LinkToAnyAvoidance(self.god_map, link,
-                                            max_weight_distance=self.get_god_map().safe_get_data(identifier.collisions+
+                                            max_weight_distance=self.get_god_map().safe_get_data(identifier.collisions_distances +
                                                                                                  [link, u'max_weight_distance']),
-                                            low_weight_distance=self.get_god_map().safe_get_data(identifier.collisions+
+                                            low_weight_distance=self.get_god_map().safe_get_data(identifier.collisions_distances +
                                                                                                  [link, u'low_weight_distance']),
-                                            zero_weight_distance=self.get_god_map().safe_get_data(identifier.collisions+
-                                                                                                 [link, u'zero_weight_distance']))
+                                            zero_weight_distance=self.get_god_map().safe_get_data(identifier.collisions_distances +
+                                                                                                  [link, u'zero_weight_distance']))
             soft_constraints.update(constraint.get_constraint())
 
         self.soft_constraints.update(soft_constraints)
@@ -154,7 +154,7 @@ class ControllerPlugin(GiskardBehavior):
     def initialise(self):
         super(ControllerPlugin, self).initialise()
         self.init_controller()
-        self.next_cmd = {}
+        # self.next_cmd = {}
 
     def setup(self, timeout=0.0):
         return super(ControllerPlugin, self).setup(5.0)
@@ -176,10 +176,13 @@ class ControllerPlugin(GiskardBehavior):
 
     
     def update(self):
+        last_cmd = self.get_god_map().safe_get_data(identifier.cmd)
+        self.get_god_map().safe_set_data(identifier.last_cmd, last_cmd)
+
         expr = self.controller.get_expr()
         expr = self.god_map.get_symbol_map(expr)
-        next_cmd = self.controller.get_cmd(expr, self.nWSR)
-        self.next_cmd.update(next_cmd)
 
-        self.get_god_map().safe_set_data(identifier.next_cmd_identifier, self.next_cmd)
+        next_cmd = self.controller.get_cmd(expr, self.nWSR)
+        self.get_god_map().safe_set_data(identifier.cmd, next_cmd)
+
         return Status.RUNNING

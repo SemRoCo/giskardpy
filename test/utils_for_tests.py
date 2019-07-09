@@ -559,7 +559,7 @@ class GiskardTestWrapper(object):
     def get_cpi(self, distance_threshold):
         collision_goals = [CollisionEntry(type=CollisionEntry.AVOID_ALL_COLLISIONS, min_dist=distance_threshold)]
         collision_matrix = self.get_world().collision_goals_to_collision_matrix(collision_goals,
-                                                                                self.get_god_map().safe_get_data(identifier.collisions))
+                                                                                self.get_god_map().safe_get_data(identifier.collisions_distances))
         collisions = self.get_world().check_collisions(collision_matrix)
         return self.get_world().collisions_to_closest_point(collisions, collision_matrix)
 

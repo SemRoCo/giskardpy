@@ -20,15 +20,18 @@ class TrajToJS(object):
         js = JointState()
         js.name = traj.trajectory.joint_names
         rospy.sleep(start_time - rospy.get_rostime())
-        r = rospy.Rate(20)
+        dt = traj.trajectory.points[1].time_from_start.to_sec() - traj.trajectory.points[0].time_from_start.to_sec()
+        r = rospy.Rate(1/dt)
         for traj_point in traj.trajectory.points:
             js.header.stamp = start_time + traj_point.time_from_start
             js.position = traj_point.positions
             js.velocity = traj_point.velocities
             self.joint_state_pub.publish(js)
             r.sleep()
+        js.velocity = [0 for _ in js.velocity]
+        self.joint_state_pub.publish(js)
 
 if __name__ == u'__main__':
-    rospy.init_node(u'giskardasdfasdf')
+    rospy.init_node(u'traj_to_js_publisher')
     traj2js = TrajToJS()
     rospy.spin()

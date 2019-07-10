@@ -55,7 +55,7 @@ def initialize_god_map():
     god_map.safe_set_data(identifier.nWSR, nWSR)
 
     pbw.start_pybullet(god_map.safe_get_data(identifier.gui))
-    while True:
+    while not rospy.is_shutdown():
         try:
             controlled_joints = rospy.wait_for_message(u'/whole_body_controller/state',
                                                        JointTrajectoryControllerState,
@@ -65,6 +65,7 @@ def initialize_god_map():
             logging.logerr(e)
         else:
             break
+        rospy.sleep(0.5)
 
     joint_weight_symbols = KeyDefaultDict(lambda key: god_map.to_symbol(identifier.joint_weights + [key]))
 

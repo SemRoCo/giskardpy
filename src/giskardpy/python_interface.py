@@ -64,8 +64,8 @@ class GiskardWrapper(object):
             constraint = Constraint()
             constraint.type = u'CartesianPosition'
             params = {}
-            params[u'root'] = root
-            params[u'tip'] = tip
+            params[u'root_link'] = root
+            params[u'tip_link'] = tip
             params[u'goal'] = convert_ros_message_to_dictionary(pose_stamped)
             if gain:
                 params[u'gain'] = gain
@@ -94,8 +94,8 @@ class GiskardWrapper(object):
             constraint = Constraint()
             constraint.type = u'CartesianOrientationSlerp'
             params = {}
-            params[u'root'] = root
-            params[u'tip'] = tip
+            params[u'root_link'] = root
+            params[u'tip_link'] = tip
             params[u'goal'] = convert_ros_message_to_dictionary(pose_stamped)
             if gain:
                 params[u'gain'] = gain

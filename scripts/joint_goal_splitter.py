@@ -129,8 +129,9 @@ class JointGoalSplitter:
         for i in range(self.number_of_clients):
             self.action_clients[i].send_goal(action_goals[i]), self.feedback_cb
 
+        trajectory_duration = goal.trajectory.points[-1].time_from_start + rospy.Duration(secs=2)
         for i in range(self.number_of_clients):
-            self.action_clients[i].wait_for_result()
+            self.action_clients[i].wait_for_result(timeout=trajectory_duration)
 
 
         if self.success:

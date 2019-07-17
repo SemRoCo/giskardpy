@@ -211,11 +211,13 @@ class Robot(Backend):
         :return: minimum of default velocity limit and limit specified in urdfs
         :rtype: float
         """
+        # TODO add sample period
         limit = self._urdf_robot.joint_map[joint_name].limit
+        t = spw.Symbol(u'rosparam_sample_period')
         if limit is None or limit.velocity is None:
             return self._joint_velocity_limit[joint_name]
         else:
-            return spw.Min(limit.velocity, self._joint_velocity_limit[joint_name])
+            return spw.Min(limit.velocity, self._joint_velocity_limit[joint_name])*t
 
     def get_joint_frame(self, joint_name):
         """

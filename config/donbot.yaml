@@ -3,7 +3,7 @@ enable_visualization: True
 plot_trajectory: True
 debug: False
 map_frame: map 
-sample_period: 1
+sample_period: 0.02
 fill_velocity_values: True
 joint_convergence_threshold: 0.001
 wiggle_precision_threshold: 5
@@ -12,7 +12,7 @@ nWSR: None # None results in a nWSR estimation that's fine most of the time
 max_traj_length: 30 # not implemented
 collision_time_threshold: 15 # not implemented
 joint_vel_limit:
-  default: 10
+  default: 0.5
 joint_acceleration_limit: # multiply your desired acc limit with sample period
   default: 10000
 joint_weights:

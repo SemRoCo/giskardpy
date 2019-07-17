@@ -17,7 +17,7 @@ class KinSimPlugin(GiskardBehavior):
         :type sample_period: float
         """
         super(KinSimPlugin, self).__init__(name)
-        self.frequency = self.get_god_map().safe_get_data(identifier.sample_period)
+        self.sample_period = self.get_god_map().safe_get_data(identifier.sample_period)
 
     def initialise(self):
         self.next_js = None
@@ -35,7 +35,8 @@ class KinSimPlugin(GiskardBehavior):
                     cmd = motor_commands[joint_name]
                 else:
                     cmd = 0.0
-                self.next_js[joint_name] = SingleJointState(sjs.name, sjs.position + cmd, velocity=cmd / self.frequency)
+                self.next_js[joint_name] = SingleJointState(sjs.name, sjs.position + cmd,
+                                                            velocity=cmd/self.sample_period)
         if self.next_js is not None:
             self.get_god_map().safe_set_data(identifier.joint_states, self.next_js)
         else:

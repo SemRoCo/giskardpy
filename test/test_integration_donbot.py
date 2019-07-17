@@ -5,7 +5,7 @@ import pytest
 import rospy
 from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped, Pose
 from giskard_msgs.msg import MoveActionGoal, MoveResult, MoveGoal, CollisionEntry
-from tf.transformations import quaternion_from_matrix
+from tf.transformations import quaternion_from_matrix, quaternion_about_axis
 
 from giskardpy import logging
 from giskardpy.tfwrapper import lookup_transform, init as tf_init, lookup_pose
@@ -261,7 +261,7 @@ class TestCartGoals(object):
         p.header.stamp = rospy.get_rostime()
         p.header.frame_id = zero_pose.gripper_tip
         p.pose.position = Point(0, -0.1, 0)
-        p.pose.orientation = Quaternion(0, 0, 0, 1)
+        p.pose.orientation = Quaternion(*quaternion_about_axis(np.pi/4, [1,0,0]))
         zero_pose.allow_self_collision()
         zero_pose.set_and_check_cart_goal(p, zero_pose.gripper_tip, zero_pose.default_root)
 

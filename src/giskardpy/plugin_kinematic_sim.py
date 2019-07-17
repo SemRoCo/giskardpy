@@ -26,7 +26,7 @@ class KinSimPlugin(GiskardBehavior):
 
     def update(self):
         self.time += 1
-        motor_commands = self.get_god_map().safe_get_data(identifier.next_cmd_identifier)
+        motor_commands = self.get_god_map().safe_get_data(identifier.cmd)
         current_js = self.get_god_map().safe_get_data(identifier.joint_states)
         if motor_commands:
             self.next_js = OrderedDict()

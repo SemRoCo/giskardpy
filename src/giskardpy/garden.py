@@ -67,18 +67,17 @@ def initialize_god_map():
             break
         rospy.sleep(0.5)
 
-    joint_weight_symbols = KeyDefaultDict(lambda key: god_map.to_symbol(identifier.joint_weights + [key]))
 
 
-    joint_weights = KeyDefaultDict(lambda key: god_map.get_data(identifier.default_joint_weight_identifier))
-    joint_weights.update(god_map.safe_get_data(identifier.joint_weights))
-    god_map.safe_set_data(identifier.joint_weights, joint_weights)
+    joint_weight_symbols = process_joint_specific_params(identifier.joint_weights,
+                                                         identifier.default_joint_weight_identifier, god_map)
 
-    collision_distances = KeyDefaultDict(lambda key: god_map.get_data(identifier.default_collision_avoidance_distance))
-    collision_distances.update(god_map.get_data(identifier.collisions))
-    god_map.safe_set_data(identifier.collisions, collision_distances)
+    process_joint_specific_params(identifier.collisions_distances, identifier.default_collision_distances, god_map)
 
-    default_joint_vel = god_map.to_symbol(identifier.default_joint_vel_identifier)
+    joint_vel_symbols = process_joint_specific_params(identifier.joint_vel, identifier.default_joint_vel, god_map)
+
+    joint_acc_symbols = process_joint_specific_params(identifier.joint_acc, identifier.default_joint_acc, god_map)
+
 
     world = PyBulletWorld(god_map.safe_get_data(identifier.gui),
                           blackboard.god_map.safe_get_data(identifier.data_folder))
@@ -86,13 +85,21 @@ def initialize_god_map():
     robot = WorldObject(god_map.safe_get_data(identifier.robot_description),
                         None,
                         controlled_joints)
-    world.add_robot(robot, None, controlled_joints, default_joint_vel, joint_weight_symbols, True)
-    js_input = JointStatesInput(blackboard.god_map.to_symbol, world.robot.get_controllable_joints(),
+    world.add_robot(robot, None, controlled_joints, joint_vel_symbols, joint_acc_symbols, joint_weight_symbols, True)
+    joint_position_symbols = JointStatesInput(blackboard.god_map.to_symbol, world.robot.get_controllable_joints(),
                                 identifier.joint_states,
                                 suffix=[u'position'])
-    world.robot.reinitialize(js_input.joint_map)
+    joint_vel_symbols = JointStatesInput(blackboard.god_map.to_symbol, world.robot.get_controllable_joints(),
+                                identifier.joint_states,
+                                suffix=[u'velocity'])
+    world.robot.reinitialize(joint_position_symbols.joint_map, joint_vel_symbols.joint_map)
     return god_map
 
+def process_joint_specific_params(identifier_, default, god_map):
+    d = KeyDefaultDict(lambda key: god_map.get_data(default))
+    d.update(god_map.safe_get_data(identifier_))
+    god_map.safe_set_data(identifier_, d)
+    return KeyDefaultDict(lambda key: god_map.to_symbol(identifier_ + [key]))
 
 def grow_tree():
     action_server_name = u'giskardpy/command'

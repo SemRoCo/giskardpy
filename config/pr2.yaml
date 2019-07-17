@@ -7,9 +7,12 @@ joint_convergence_threshold: 0.001
 wiggle_precision_threshold: 5
 max_traj_length: 30 # not implemented
 sample_period: 0.05
-default_joint_vel_limit: 0.5
-default_joint_weight: 0.0001
+joint_vel_limit:
+  default: 0.25
+joint_acceleration_limit: # multiply your desired acc limit with sample period
+  default: 100
 joint_weights:
+  default: 0.0001
   odom_x_joint: 1
   odom_y_joint: 1
   odom_z_joint: 1

@@ -159,7 +159,7 @@ class TestWorld(object):
         """
         w = self.world_cls(path_to_data_folder=path_to_data_folder)
         r = self.cls(pr2_urdf())
-        w.add_robot(r, None, r.controlled_joints, 0, 0, path_to_data_folder is not None)
+        w.add_robot(r, None, r.controlled_joints, None, None, None, path_to_data_folder is not None)
         return w
 
     def make_world_with_donbot(self, path_to_data_folder=None):
@@ -168,7 +168,7 @@ class TestWorld(object):
         """
         w = self.world_cls(path_to_data_folder=path_to_data_folder)
         r = self.cls(donbot_urdf())
-        w.add_robot(r, None, r.controlled_joints, 0, 0, path_to_data_folder is not None)
+        w.add_robot(r, None, r.controlled_joints, None, None, None, path_to_data_folder is not None)
         return w
 
     def test_add_robot(self, function_setup):
@@ -176,7 +176,7 @@ class TestWorld(object):
         assert len(empty_world.get_objects()) == 0
         assert not empty_world.has_robot()
         pr2 = self.cls(pr2_urdf())
-        empty_world.add_robot(pr2, None, pr2.controlled_joints, 0, 0, False)
+        empty_world.add_robot(pr2, None, pr2.controlled_joints, None, None, None, False)
         assert empty_world.has_robot()
         assert pr2 == empty_world.robot
         return empty_world

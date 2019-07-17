@@ -16,7 +16,7 @@ from giskardpy.identifier import fk_pose
 from giskardpy.tfwrapper import init as tf_init, lookup_pose, transform_pose, lookup_point, transform_point
 from utils_for_tests import PR2, compare_poses
 
-# TODO roslaunch iai_pr2_sim ros_control_sim.launch
+# TODO roslaunch iai_pr2_sim ros_control_sim_with_base.launch
 # TODO roslaunch iai_kitchen upload_kitchen_obj.launch
 
 # scopes = ['module', 'class', 'function']

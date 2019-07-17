@@ -108,20 +108,28 @@ class World(object):
 
     # Robot ------------------------------------------------------------------------------------------------------------
 
-    def add_robot(self, robot, base_pose, controlled_joints, default_joint_vel_limit, joint_weights,
+    def add_robot(self, robot, base_pose, controlled_joints, joint_vel_limit, joint_acc_limit, joint_weights,
                   calc_self_collision_matrix):
         """
         :type robot: giskardpy.world_object.WorldObject
         :type controlled_joints: list
         :type base_pose: PoseStamped
         """
+        if not isinstance(robot, WorldObject):
+            raise TypeError(u'only WorldObject can be added to world')
         if self.has_robot():
             raise RobotExistsException(u'A robot is already loaded')
         if self.has_object(robot.get_name()):
             raise DuplicateNameException(
                 u'can\'t add robot; object with name "{}" already exists'.format(robot.get_name()))
-        self._robot = Robot.from_urdf_object(robot, base_pose, controlled_joints, self._path_to_data_folder,
-                                             default_joint_vel_limit, calc_self_collision_matrix, joint_weights)
+        self._robot = Robot.from_urdf_object(urdf_object=robot,
+                                             base_pose=base_pose,
+                                             controlled_joints=controlled_joints,
+                                             path_to_data_folder=self._path_to_data_folder,
+                                             joint_vel_limit=joint_vel_limit,
+                                             joint_acc_limit=joint_acc_limit,
+                                             calc_self_collision_matrix=calc_self_collision_matrix,
+                                             joint_weights=joint_weights)
 
     @property
     def robot(self):

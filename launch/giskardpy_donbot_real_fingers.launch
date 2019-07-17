@@ -8,14 +8,21 @@
         <rosparam command="load" file="$(find giskardpy)/config/donbot.yaml"/>
     </node>
 
-    <include file="$(find omni_pose_follower)/launch/omni_pose_follower.launch"/>
-
-    <include file="$(find iai_donbot_sim)/launch/refills_finger_hacks.launch"/>
+    <arg name="name_space" default="whole_body_controller/base"/>
+    <rosparam command="load" file="$(find omni_pose_follower)/config/ros_control_sim.yaml" />
+    <node pkg="omni_pose_follower" type="omni_pose_follower.py" name="omni_pose_follower" output="screen">
+        <remap from="~cmd_vel" to="/omnidrive/cmd_vel_twist"/>
+        <remap from="~follow_joint_trajectory" to="/whole_body_controller/base/follow_joint_trajectory"/>
+        <remap from="~state" to="/whole_body_controller/base/state"/>
+        <param name="name_space" value="$(arg name_space)"/>
+        <param name="vel_tolerance" value="0.01"/>
+        <param name="sim" value="False"/>
+    </node>
 
     <node pkg="giskardpy" type="joint_trajectory_splitter.py" name="joint_trajectory_splitter" output="screen">
         <rosparam param="state_topics">
             - /whole_body_controller/base/state
-            - /whole_body_controller/body/state
+            - /fake_state
             - /refills_finger/state
         </rosparam>
         <rosparam param="client_topics">
@@ -30,6 +37,7 @@
         <rosparam param="interactive_marker_chains">
             - [odom, gripper_tool_frame]
             - [ur5_shoulder_link, camera_link]
+            - [odom, base_footprint]
         </rosparam>
     </node>
 

@@ -441,7 +441,7 @@ class LinkToAnyAvoidance(Constraint):
     B = u'B'
     C = u'C'
 
-    def __init__(self, god_map, link_name, repel_speed=0.2, max_weight_distance=0.0, low_weight_distance=0.01,
+    def __init__(self, god_map, link_name, repel_speed=0.5, max_weight_distance=0.0, low_weight_distance=0.01,
                  zero_weight_distance=0.05):
         super(LinkToAnyAvoidance, self).__init__(god_map)
         self.link_name = link_name
@@ -547,8 +547,12 @@ class LinkToAnyAvoidance(Constraint):
                                 [ZERO_WEIGHT, actual_distance > zero_weight_distance],
                                 [A / (actual_distance + C) + B, True])
 
-        soft_constraints[str(self)] = SoftConstraint(lower=repel_speed*t,
-                                                     upper=repel_speed*t,
+        limit = sw.Min(zero_weight_distance - dist, repel_speed*t)
+        # limit = repel_speed * t
+        # limit = 1
+
+        soft_constraints[str(self)] = SoftConstraint(lower=limit,
+                                                     upper=limit,
                                                      weight=weight_f,
                                                      expression=dist)
         return soft_constraints

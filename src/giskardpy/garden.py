@@ -85,7 +85,9 @@ def initialize_god_map():
     robot = WorldObject(god_map.safe_get_data(identifier.robot_description),
                         None,
                         controlled_joints)
-    world.add_robot(robot, None, controlled_joints, joint_vel_symbols, joint_acc_symbols, joint_weight_symbols, True)
+    world.add_robot(robot, None, controlled_joints, joint_vel_symbols, joint_acc_symbols, joint_weight_symbols, True,
+                    ignored_pairs=god_map.safe_get_data(identifier.ignored_self_collisions),
+                    added_pairs=god_map.safe_get_data(identifier.added_self_collisions))
     joint_position_symbols = JointStatesInput(blackboard.god_map.to_symbol, world.robot.get_controllable_joints(),
                                 identifier.joint_states,
                                 suffix=[u'position'])

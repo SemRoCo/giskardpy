@@ -3,10 +3,10 @@ enable_visualization: True
 plot_trajectory: True
 debug: False
 map_frame: map 
-sample_period: 0.01
+sample_period: 0.05
 fill_velocity_values: True
-joint_convergence_threshold: 0.001
-wiggle_precision_threshold: 5
+joint_convergence_threshold: 0.005
+wiggle_precision_threshold: 3
 tree_tick_rate: 0.1
 nWSR: None # None results in a nWSR estimation that's fine most of the time
 max_traj_length: 30 # not implemented
@@ -20,7 +20,7 @@ joint_weights:
   odom_x_joint: 1
   odom_y_joint: 1
   odom_z_joint: 1
-  refills_finger: 0.1
+#  refills_finger: 0.1
 collision_avoidance:
   default:
     max_weight_distance: 0.0
@@ -42,3 +42,8 @@ collision_avoidance:
   ur5_wrist_2_link: *low
   ur5_wrist_3_link: *low
   ur5_forearm_link: *low
+  ur5_upper_arm_link: *low
+self_collision_matrix:
+  ignore: []
+  add:
+    - [plate, ur5_upper_arm_link]

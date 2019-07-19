@@ -7,6 +7,7 @@ from control_msgs.msg import JointTrajectoryControllerState
 from giskard_msgs.msg import MoveAction
 from py_trees import Sequence, Selector, BehaviourTree, Blackboard
 from py_trees.behaviours import Count
+from py_trees.decorators import Condition
 from py_trees.meta import failure_is_success, success_is_failure
 from py_trees_ros.trees import BehaviourTree
 from rospy import ROSException
@@ -133,6 +134,7 @@ def grow_tree():
     actual_planning.add_plugin(GoalReachedPlugin(u'goal reached'))
     actual_planning.add_plugin(WiggleCancel(u'wiggle'))
     planning.add_child(actual_planning)
+    planning.add_child(CleanUp(u'cleanup'))
     # ----------------------------------------------
     publish_result = failure_is_success(Selector)(u'monitor execution')
     publish_result.add_child(GoalCanceled(u'goal canceled', action_server_name))
@@ -145,7 +147,7 @@ def grow_tree():
     root.add_child(wait_for_goal)
     root.add_child(GoalToConstraints(u'update constraints', action_server_name))
     root.add_child(planning)
-    root.add_child(CleanUp(u'cleanup'))
+    # root.add_child(CleanUp(u'cleanup'))
     root.add_child(execute)
     root.add_child(SendResult(u'send result', action_server_name, MoveAction))
 

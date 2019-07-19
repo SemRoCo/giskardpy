@@ -18,8 +18,6 @@ from giskardpy.plugin_action_server import GetGoal
 def allowed_constraint_names():
     return [x[0] for x in inspect.getmembers(giskardpy.constraints) if inspect.isclass(x[1])]
 
-# TODO split constraints into separate files
-# TODO plan only not supported
 # TODO waypoints not supported
 class GoalToConstraints(GetGoal):
     def __init__(self, name, as_name):

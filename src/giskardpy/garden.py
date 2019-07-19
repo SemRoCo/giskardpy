@@ -24,12 +24,13 @@ from giskardpy.plugin_configuration import ConfigurationPlugin
 from giskardpy.plugin_cpi_marker import CPIMarker
 from giskardpy.plugin_goal_reached import GoalReachedPlugin
 from giskardpy.plugin_if import IF
-from giskardpy.plugin_instantaneous_controller import GoalToConstraints, ControllerPlugin
+from giskardpy.plugin_instantaneous_controller import ControllerPlugin
 from giskardpy.plugin_interrupts import WiggleCancel
 from giskardpy.plugin_kinematic_sim import KinSimPlugin
 from giskardpy.plugin_log_trajectory import LogTrajPlugin
 from giskardpy.plugin_pybullet import WorldUpdatePlugin, CollisionChecker
 from giskardpy.plugin_send_trajectory import SendTrajectory
+from giskardpy.plugin_update_constraints import GoalToConstraints
 from giskardpy.plugin_visualization import VisualizationBehavior
 from giskardpy.pybullet_world import PyBulletWorld
 from giskardpy.utils import create_path, render_dot_tree, KeyDefaultDict

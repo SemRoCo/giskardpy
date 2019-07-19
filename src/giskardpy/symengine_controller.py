@@ -49,17 +49,17 @@ class SymEngineController(object):
         xdot_keys = []
         bA_keys = []
         for iJ, k in enumerate(self.joint_constraints.keys()):
-            key = 'j -- ' + str(k)
+            key = u'j -- ' + str(k)
             b_keys.append(key)
             weights_keys.append(key)
             xdot_keys.append(key)
 
         for iH, k in enumerate(self.hard_constraints.keys()):
-            key = 'h -- ' + str(k)
+            key = u'h -- ' + str(k)
             bA_keys.append(key)
 
         for iS, k in enumerate(self.soft_constraints.keys()):
-            key = 's -- ' + str(k)
+            key = str(k)
             bA_keys.append(key)
             weights_keys.append(key)
             xdot_keys.append(key)

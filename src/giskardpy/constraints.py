@@ -156,7 +156,6 @@ class JointPosition(Constraint):
                                                      upper=capped_err,
                                                      weight=weight,
                                                      expression=current_joint)
-        # add_debug_constraint(soft_constraints, str(self)+'/dist', err)
         return soft_constraints
 
     def __str__(self):

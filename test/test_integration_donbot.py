@@ -384,11 +384,11 @@ class TestCollisionAvoidanceGoals(object):
         grasp_pose = deepcopy(box_pose)
         grasp_pose.pose.position.z += 0.05
         grasp_pose.pose.orientation = Quaternion(*quaternion_from_matrix([[-1, 0, 0, 0],
+                                                                          [0, 0, 1, 0],
                                                                           [0, 1, 0, 0],
-                                                                          [0, 0, -1, 0],
                                                                           [0, 0, 0, 1]]))
         shelf_setup.allow_collision([CollisionEntry.ALL], box, [CollisionEntry.ALL])
-        shelf_setup.set_and_check_cart_goal(grasp_pose, shelf_setup.gripper_tip)
+        shelf_setup.set_and_check_cart_goal(grasp_pose, u'refills_finger')
 
         shelf_setup.attach_existing(box, u'refills_finger')
 
@@ -465,3 +465,15 @@ class TestCollisionAvoidanceGoals(object):
         expected_pose = Pose()
         expected_pose.orientation.w = 1
         compare_poses(map_T_root.pose, expected_pose)
+
+
+    def test_unknown_body_b(self, zero_pose):
+        """
+        :type box_setup: PR2
+        """
+        ce = CollisionEntry()
+        ce.type = CollisionEntry.AVOID_COLLISION
+        ce.body_b = u'asdf'
+        zero_pose.add_collision_entries([ce])
+        zero_pose.send_and_check_goal(MoveResult.UNKNOWN_OBJECT)
+        zero_pose.send_and_check_goal()

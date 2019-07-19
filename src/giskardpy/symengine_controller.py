@@ -43,6 +43,27 @@ class SymEngineController(object):
         self.hard_constraints = OrderedDict(((self.robot.get_name(), k), self.robot._hard_constraints[k]) for k in
                                             self.controlled_joints if k in self.robot._hard_constraints)
 
+    def get_qpdata_key_map(self):
+        b_keys = []
+        weights_keys = []
+        xdot_keys = []
+        bA_keys = []
+        for iJ, k in enumerate(self.joint_constraints.keys()):
+            key = 'j -- ' + str(k)
+            b_keys.append(key)
+            weights_keys.append(key)
+            xdot_keys.append(key)
+
+        for iH, k in enumerate(self.hard_constraints.keys()):
+            key = 'h -- ' + str(k)
+            bA_keys.append(key)
+
+        for iS, k in enumerate(self.soft_constraints.keys()):
+            key = 's -- ' + str(k)
+            bA_keys.append(key)
+            weights_keys.append(key)
+            xdot_keys.append(key)
+        return weights_keys, b_keys, bA_keys, xdot_keys
 
     def update_soft_constraints(self, soft_constraints, free_symbols=None):
         """
@@ -87,10 +108,11 @@ class SymEngineController(object):
         :return: maps joint names to command
         :rtype: dict
         """
-        next_cmd = self.qp_problem_builder.get_cmd(substitutions, nWSR)
+        next_cmd, H, A, lb, ub, lbA, ubA, xdot_full = self.qp_problem_builder.get_cmd(substitutions, nWSR)
         if next_cmd is None:
             pass
-        return {name: next_cmd[symbol] for name, symbol in self.joint_to_symbols_str.items()}
+        return {name: next_cmd[symbol] for name, symbol in self.joint_to_symbols_str.items()}, \
+               H, A, lb, ub, lbA, ubA, xdot_full
 
     def get_expr(self):
         return self.qp_problem_builder.get_expr()

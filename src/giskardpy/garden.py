@@ -30,6 +30,7 @@ from giskardpy.plugin_instantaneous_controller import ControllerPlugin
 from giskardpy.plugin_interrupts import WiggleCancel
 from giskardpy.plugin_kinematic_sim import KinSimPlugin
 from giskardpy.plugin_log_trajectory import LogTrajPlugin
+from giskardpy.plugin_plot_trajectory import PlotTrajectory
 from giskardpy.plugin_pybullet import WorldUpdatePlugin
 from giskardpy.plugin_send_trajectory import SendTrajectory
 from giskardpy.plugin_set_cmd import SetCmd
@@ -150,7 +151,6 @@ def grow_tree():
     # ----------------------------------------------
     planning_1 = success_is_failure(Sequence)(u'planning I')
     planning_1.add_child(GoalToConstraints(u'update constraints', action_server_name))
-    # planning_1.add_child(CleanUp(u'cleanup'))
     planning_1.add_child(planning_2)
     # ----------------------------------------------
     # ----------------------------------------------
@@ -163,6 +163,8 @@ def grow_tree():
     root.add_child(wait_for_goal)
     root.add_child(CleanUp(u'cleanup'))
     root.add_child(process_move_goal)
+    if god_map.safe_get_data(identifier.plot_trajectory):
+        root.add_child(PlotTrajectory(u'plot trajectory'))
     root.add_child(move_robot)
     root.add_child(SendResult(u'send result', action_server_name, MoveAction))
 

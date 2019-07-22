@@ -162,7 +162,8 @@ class JointPosition(Constraint):
         return soft_constraints
 
     def __str__(self):
-        return u'{}/{}'.format(self.__class__.__name__, self.joint_name)
+        s = super(JointPosition, self).__str__()
+        return u'{}/{}'.format(s, self.joint_name)
 
 
 class JointPositionList(Constraint):
@@ -223,7 +224,8 @@ class CartesianConstraint(Constraint):
         return self.get_input_PoseStamped(self.goal)
 
     def __str__(self):
-        return u'{}/{}/{}'.format(self.__class__.__name__, self.root, self.tip)
+        s = super(CartesianConstraint, self).__str__()
+        return u'{}/{}/{}'.format(s, self.root, self.tip)
 
 
 class CartesianPosition(CartesianConstraint):
@@ -558,7 +560,8 @@ class LinkToAnyAvoidance(Constraint):
         return soft_constraints
 
     def __str__(self):
-        return u'{}/{}'.format(self.__class__.__name__, self.link_name)
+        s = super(LinkToAnyAvoidance, self).__str__()
+        return u'{}/{}'.format(s, self.link_name)
 
 
 class AlignPlanes(Constraint):
@@ -600,7 +603,8 @@ class AlignPlanes(Constraint):
         self.save_params_on_god_map(params)
 
     def __str__(self):
-        return u'{}/{}/{}'.format(self.__class__.__name__, self.root, self.tip)
+        s = super(AlignPlanes, self).__str__()
+        return u'{}/{}/{}'.format(s, self.root, self.tip)
 
     def get_root_normal_vector(self):
         return self.get_input_Vector3Stamped(self.root_normal)
@@ -681,7 +685,8 @@ class GravityJoint(Constraint):
         return soft_constraints
 
     def __str__(self):
-        return u'{}/{}'.format(self.__class__.__name__, self.joint_name)
+        s = super(GravityJoint, self).__str__()
+        return u'{}/{}'.format(s, self.joint_name)
 
 
 class UpdateGodMap(Constraint):
@@ -771,7 +776,8 @@ class Pointing(Constraint):
         return soft_constraints
 
     def __str__(self):
-        return u'{}/{}/{}'.format(self.__class__.__name__, self.root, self.tip)
+        s = super(Pointing, self).__str__()
+        return u'{}/{}/{}'.format(s, self.root, self.tip)
 
 
 def add_debug_constraint(d, key, expr):

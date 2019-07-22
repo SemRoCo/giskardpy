@@ -92,13 +92,15 @@ class PyBulletWorld(World):
         :type contact_info: ContactInfo
         :rtype: bool
         """
-        contact_info2 = ContactInfo(*min(p.getClosestPoints(contact_info.body_unique_id_b,
-                                                            contact_info.body_unique_id_a,
-                                                            abs(contact_info.contact_distance) * 1.05,
-                                                            contact_info.link_index_b, contact_info.link_index_a),
-                                         key=lambda x: x[8]))
-        if not np.isclose(contact_info2.contact_normal_on_b, contact_info.contact_normal_on_b).all():
-            return False
+        # contact_info2 = ContactInfo(*min(p.getClosestPoints(contact_info.body_unique_id_b,
+        #                                                     contact_info.body_unique_id_a,
+        #                                                     abs(contact_info.contact_distance) * 1.05,
+        #                                                     contact_info.link_index_b, contact_info.link_index_a),
+        #                                  key=lambda x: x[8]))
+        # do i get different results with flipped closest point check
+        # if not np.isclose(contact_info2.contact_normal_on_b, contact_info.contact_normal_on_b).all():
+        #     return False
+        # if they are identical figure out which one is correct
         pa = np.array(contact_info.position_on_a)
 
         new_p = Pose()

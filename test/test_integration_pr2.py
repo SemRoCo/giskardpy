@@ -700,35 +700,78 @@ class TestCartGoals(object):
         zero_pose.set_cart_goal(p, zero_pose.r_tip, u'torso_lift_link')
         zero_pose.send_and_check_goal()
 
-    # def test_waypoints(self, zero_pose):
-    #     """
-    #     :type zero_pose: PR2
-    #     """
-    # FIXME
-    #     p = PoseStamped()
-    #     p.header.frame_id = zero_pose.r_tip
-    #     p.header.stamp = rospy.get_rostime()
-    #     p.pose.position = Point(-0.1, 0, 0)
-    #     p.pose.orientation = Quaternion(0, 0, 0, 1)
-    #     zero_pose.set_cart_goal(zero_pose.default_root, zero_pose.r_tip, p)
-    #
-    #     zero_pose.add_waypoint()
-    #     p = PoseStamped()
-    #     p.header.frame_id = zero_pose.r_tip
-    #     p.header.stamp = rospy.get_rostime()
-    #     p.pose.position = Point(-0.1, 0, -0.1)
-    #     p.pose.orientation = Quaternion(0, 0, 0, 1)
-    #     zero_pose.set_cart_goal(zero_pose.default_root, zero_pose.r_tip, p)
-    #
-    #     zero_pose.add_waypoint()
-    #     p = PoseStamped()
-    #     p.header.frame_id = zero_pose.r_tip
-    #     p.header.stamp = rospy.get_rostime()
-    #     p.pose.position = Point(0.2, 0, 0.1)
-    #     p.pose.orientation = Quaternion(0, 0, 0, 1)
-    #     zero_pose.set_cart_goal(zero_pose.default_root, zero_pose.r_tip, p)
-    #
-    #     zero_pose.send_and_check_goal()
+    def test_waypoints(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        root = u'base_footprint'
+        p = PoseStamped()
+        p.header.frame_id = zero_pose.r_tip
+        p.header.stamp = rospy.get_rostime()
+        p.pose.position = Point(-0.1, 0, 0)
+        p.pose.orientation = Quaternion(0, 0, 0, 1)
+        zero_pose.set_cart_goal(p, zero_pose.r_tip, root)
+
+        zero_pose.add_waypoint()
+        p = PoseStamped()
+        p.header.frame_id = zero_pose.r_tip
+        p.header.stamp = rospy.get_rostime()
+        p.pose.position = Point(0.0, -0.1, -0.1)
+        p.pose.orientation = Quaternion(0, 0, 0, 1)
+        zero_pose.set_cart_goal(p, zero_pose.r_tip, root)
+
+        zero_pose.add_waypoint()
+        p = PoseStamped()
+        p.header.frame_id = zero_pose.r_tip
+        p.header.stamp = rospy.get_rostime()
+        p.pose.position = Point(0.1, 0.1, 0.1)
+        p.pose.orientation = Quaternion(0, 0, 0, 1)
+        zero_pose.set_cart_goal(p, zero_pose.r_tip, root)
+
+        zero_pose.send_and_check_goal()
+
+    def test_waypoints2(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        zero_pose.set_joint_goal(pocky_pose)
+        zero_pose.add_waypoint()
+        zero_pose.set_joint_goal(pick_up_pose)
+        zero_pose.add_waypoint()
+        zero_pose.set_joint_goal(gaya_pose)
+
+        zero_pose.send_and_check_goal()
+        traj = zero_pose.get_trajectory_msg()
+        for i, joint_state in enumerate(traj):
+            try:
+                zero_pose.compare_joint_state(joint_state, pocky_pose)
+                break
+            except AssertionError:
+                pass
+        else: # if no break
+            assert False, u'pocky pose not in trajectory'
+
+        traj = traj[i:]
+        for i, joint_state in enumerate(traj):
+            try:
+                zero_pose.compare_joint_state(joint_state, pick_up_pose)
+                break
+            except AssertionError:
+                pass
+        else: # if no break
+            assert False, u'pick_up_pose not in trajectory'
+
+        traj = traj[i:]
+        for i, joint_state in enumerate(traj):
+            try:
+                zero_pose.compare_joint_state(joint_state, gaya_pose)
+                break
+            except AssertionError:
+                pass
+        else: # if no break
+            assert False, u'gaya_pose not in trajectory'
+
+        pass
 
     # TODO test translation and orientation goal in different frame
 
@@ -1887,92 +1930,6 @@ class TestCollisionAvoidanceGoals(object):
         kitchen_setup.set_cart_goal(bowl_goal, kitchen_setup.l_tip, kitchen_setup.default_root)
         kitchen_setup.set_cart_goal(cup_goal, kitchen_setup.r_tip, kitchen_setup.default_root)
         kitchen_setup.send_and_check_goal()
-
-    def test_pick_place_cereal1(self, kitchen_setup):
-        cereal_name = u'cereal'
-
-        self.open_drawer(kitchen_setup, kitchen_setup.l_tip, u'iai_kitchen/oven_area_area_right_drawer_handle',
-                         u'oven_area_area_right_drawer_main_joint')
-
-        # spawn cereal
-        cereal_pose = PoseStamped()
-        cereal_pose.header.frame_id = u'iai_kitchen/oven_area_area_right_drawer_main'
-        cereal_pose.pose.position = Point(-0.15, 0., .46)
-        cereal_pose.pose.orientation = Quaternion(0, 0, 0, 1)
-
-        kitchen_setup.add_box(cereal_name, [0.152, 0.063, 0.23], cereal_pose)
-
-        # grasp bowl
-        r_goal = deepcopy(cereal_pose)
-        r_goal.pose.position.z += .05
-        r_goal.pose.position.x += .09
-        r_goal.pose.orientation = Quaternion(*quaternion_from_matrix([[-1, 0, 0, 0],
-                                                                      [0, -1, 0, 0],
-                                                                      [0, 0, 1, 0],
-                                                                      [0, 0, 0, 1]]))
-        # kitchen_setup.allow_collision([CollisionEntry.ALL], cereal_name, [CollisionEntry.ALL])
-        kitchen_setup.set_cart_goal(r_goal, kitchen_setup.r_tip, kitchen_setup.default_root)
-        kitchen_setup.send_and_check_goal()
-
-        r_goal.pose.position.x -= .05
-        kitchen_setup.set_cart_goal(r_goal, kitchen_setup.r_tip, kitchen_setup.default_root)
-        kitchen_setup.send_and_check_goal()
-
-        kitchen_setup.attach_existing(cereal_name, kitchen_setup.r_tip)
-
-        base_goal = PoseStamped()
-        base_goal.header.frame_id = u'base_footprint'
-        base_goal.pose.position.x = -.4
-        base_goal.pose.orientation.w = 1
-
-        kitchen_setup.move_base(base_goal)
-
-        kitchen_setup.send_and_check_joint_goal(gaya_pose)
-
-        # self.close_drawer(kitchen_setup, kitchen_setup.l_tip, u'iai_kitchen/oven_area_area_right_drawer_handle',
-        #                  u'oven_area_area_right_drawer_main_joint')
-
-    def test_pick_place_cereal2(self, kitchen_setup):
-        cereal_name = u'cereal'
-
-        kitchen_js = {u'oven_area_area_right_drawer_main_joint': 0.45}
-        kitchen_setup.set_kitchen_js(kitchen_js)
-
-        # spawn cereal
-        cereal_pose = PoseStamped()
-        cereal_pose.header.frame_id = u'iai_kitchen/oven_area_area_right_drawer_main'
-        cereal_pose.pose.position = Point(-0.15, 0., .20)
-        cereal_pose.pose.orientation = Quaternion(*quaternion_about_axis(pi / 2, [0, 0, 1]))
-
-        kitchen_setup.add_box(cereal_name, [0.152, 0.063, 0.23], cereal_pose)
-
-        # grasp cereal
-        r_goal = deepcopy(cereal_pose)
-        r_goal.pose.position.z += .05
-        r_goal.pose.position.y += .09
-        r_goal.pose.orientation = Quaternion(*quaternion_from_matrix([[0, 1, 0, 0],
-                                                                      [-1, 0, 0, 0],
-                                                                      [0, 0, 1, 0],
-                                                                      [0, 0, 0, 1]]))
-        kitchen_setup.set_cart_goal(r_goal, kitchen_setup.r_tip, kitchen_setup.default_root)
-        kitchen_setup.send_and_check_goal()
-
-        r_goal.pose.position.y -= .06
-        kitchen_setup.set_cart_goal(r_goal, kitchen_setup.r_tip, kitchen_setup.default_root)
-        kitchen_setup.send_and_check_goal()
-
-        kitchen_setup.attach_existing(cereal_name, kitchen_setup.r_tip)
-
-        kitchen_setup.send_and_check_joint_goal(gaya_pose)
-
-        base_goal = PoseStamped()
-        base_goal.header.frame_id = u'base_footprint'
-        base_goal.pose.position.x = -.4
-        base_goal.pose.orientation.w = 1
-
-        kitchen_setup.move_base(base_goal)
-
-        # kitchen_setup.send_and_check_joint_goal(gaya_pose)
 
     def test_tray(self, kitchen_setup):
         tray_name = u'tray'

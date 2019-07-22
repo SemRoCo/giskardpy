@@ -20,7 +20,7 @@ joint_weights:
   odom_x_joint: 1
   odom_y_joint: 1
   odom_z_joint: 1
-  refills_finger: 0.1
+#  refills_finger: 0.1
 collision_avoidance:
   default:
     max_weight_distance: 0.0
@@ -42,3 +42,8 @@ collision_avoidance:
   ur5_wrist_2_link: *low
   ur5_wrist_3_link: *low
   ur5_forearm_link: *low
+  ur5_upper_arm_link: *low
+self_collision_matrix:
+  ignore: []
+  add:
+    - [plate, ur5_upper_arm_link]

@@ -1,6 +1,6 @@
 enable_collision_marker: True
 enable_visualization: True
-plot_trajectory: False
+plot_trajectory: True
 debug: False
 map_frame: map 
 joint_convergence_threshold: 0.001

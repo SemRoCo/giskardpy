@@ -7,6 +7,7 @@ from control_msgs.msg import JointTrajectoryControllerState
 from giskard_msgs.msg import MoveAction
 from py_trees import Sequence, Selector, BehaviourTree, Blackboard
 from py_trees.behaviours import Count
+from py_trees.decorators import Condition
 from py_trees.meta import failure_is_success, success_is_failure
 from py_trees_ros.trees import BehaviourTree
 from rospy import ROSException
@@ -20,16 +21,20 @@ from giskardpy.plugin import PluginBehavior
 from giskardpy.plugin_action_server import GoalReceived, SendResult, GoalCanceled
 from giskardpy.plugin_attached_tf_publicher import TFPlugin
 from giskardpy.plugin_cleanup import CleanUp
+from giskardpy.plugin_collision_checker import CollisionChecker
 from giskardpy.plugin_configuration import ConfigurationPlugin
 from giskardpy.plugin_cpi_marker import CPIMarker
 from giskardpy.plugin_goal_reached import GoalReachedPlugin
 from giskardpy.plugin_if import IF
-from giskardpy.plugin_instantaneous_controller import GoalToConstraints, ControllerPlugin
+from giskardpy.plugin_instantaneous_controller import ControllerPlugin
 from giskardpy.plugin_interrupts import WiggleCancel
 from giskardpy.plugin_kinematic_sim import KinSimPlugin
 from giskardpy.plugin_log_trajectory import LogTrajPlugin
-from giskardpy.plugin_pybullet import WorldUpdatePlugin, CollisionChecker
+from giskardpy.plugin_pybullet import WorldUpdatePlugin
 from giskardpy.plugin_send_trajectory import SendTrajectory
+from giskardpy.plugin_set_cmd import SetCmd
+from giskardpy.plugin_time import TimePlugin
+from giskardpy.plugin_update_constraints import GoalToConstraints
 from giskardpy.plugin_visualization import VisualizationBehavior
 from giskardpy.pybullet_world import PyBulletWorld
 from giskardpy.utils import create_path, render_dot_tree, KeyDefaultDict
@@ -86,7 +91,9 @@ def initialize_god_map():
     robot = WorldObject(god_map.safe_get_data(identifier.robot_description),
                         None,
                         controlled_joints)
-    world.add_robot(robot, None, controlled_joints, joint_vel_symbols, joint_acc_symbols, joint_weight_symbols, True)
+    world.add_robot(robot, None, controlled_joints, joint_vel_symbols, joint_acc_symbols, joint_weight_symbols, True,
+                    ignored_pairs=god_map.safe_get_data(identifier.ignored_self_collisions),
+                    added_pairs=god_map.safe_get_data(identifier.added_self_collisions))
     joint_position_symbols = JointStatesInput(blackboard.god_map.to_symbol, world.robot.get_controllable_joints(),
                                 identifier.joint_states,
                                 suffix=[u'position'])
@@ -114,37 +121,50 @@ def grow_tree():
     wait_for_goal.add_child(GoalReceived(u'has goal', action_server_name, MoveAction))
     wait_for_goal.add_child(ConfigurationPlugin(u'js'))
     # ----------------------------------------------
-    planning = failure_is_success(Selector)(u'planning')
-    planning.add_child(GoalCanceled(u'goal canceled', action_server_name))
-    # planning.add_child(CollisionCancel(u'in collision', collision_time_threshold))
-    if god_map.safe_get_data(identifier.marker_visualization):
-        planning.add_child(success_is_failure(VisualizationBehavior)(u'visualization'))
-    if god_map.safe_get_data(identifier.enable_collision_marker):
-        planning.add_child(success_is_failure(CPIMarker)(u'cpi marker'))
-
-    actual_planning = PluginBehavior(u'planning', sleep=0)
-    actual_planning.add_plugin(KinSimPlugin(u'kin sim'))
-    actual_planning.add_plugin(CollisionChecker(u'coll'))
-    # actual_planning.add_plugin(success_is_running(VisualizationBehavior)(u'visualization', enable_visualization))
-    actual_planning.add_plugin(ControllerPlugin(u'controller'))
-    actual_planning.add_plugin(LogTrajPlugin(u'log'))
-    actual_planning.add_plugin(GoalReachedPlugin(u'goal reached'))
-    actual_planning.add_plugin(WiggleCancel(u'wiggle'))
-    planning.add_child(actual_planning)
+    planning_3 = PluginBehavior(u'planning III', sleep=0)
+    planning_3.add_plugin(CollisionChecker(u'coll'))
+    planning_3.add_plugin(ControllerPlugin(u'controller'))
+    planning_3.add_plugin(KinSimPlugin(u'kin sim'))
+    planning_3.add_plugin(LogTrajPlugin(u'log'))
+    planning_3.add_plugin(GoalReachedPlugin(u'goal reached'))
+    planning_3.add_plugin(WiggleCancel(u'wiggle'))
+    planning_3.add_plugin(TimePlugin(u'time'))
     # ----------------------------------------------
     publish_result = failure_is_success(Selector)(u'monitor execution')
     publish_result.add_child(GoalCanceled(u'goal canceled', action_server_name))
     publish_result.add_child(SendTrajectory(u'send traj'))
-    execute = failure_is_success(Sequence)(u'move robot')
-    execute.add_child(IF(u'execute?', identifier.execute))
-    execute.add_child(publish_result)
+    # ----------------------------------------------
+    # ----------------------------------------------
+    planning_2 = failure_is_success(Selector)(u'planning II')
+    planning_2.add_child(GoalCanceled(u'goal canceled', action_server_name))
+    # planning.add_child(CollisionCancel(u'in collision', collision_time_threshold))
+    if god_map.safe_get_data(identifier.marker_visualization):
+        planning_2.add_child(success_is_failure(VisualizationBehavior)(u'visualization'))
+    if god_map.safe_get_data(identifier.enable_collision_marker):
+        planning_2.add_child(success_is_failure(CPIMarker)(u'cpi marker'))
+    planning_2.add_child(planning_3)
+    # ----------------------------------------------
+    move_robot = failure_is_success(Sequence)(u'move robot')
+    move_robot.add_child(IF(u'execute?', identifier.execute))
+    move_robot.add_child(publish_result)
+    # ----------------------------------------------
+    # ----------------------------------------------
+    planning_1 = success_is_failure(Sequence)(u'planning I')
+    planning_1.add_child(GoalToConstraints(u'update constraints', action_server_name))
+    # planning_1.add_child(CleanUp(u'cleanup'))
+    planning_1.add_child(planning_2)
+    # ----------------------------------------------
+    # ----------------------------------------------
+    process_move_goal = failure_is_success(Selector)(u'process move goal')
+    process_move_goal.add_child(planning_1)
+    process_move_goal.add_child(SetCmd(u'set move goal', action_server_name))
+    # ----------------------------------------------
     # ----------------------------------------------
     root = Sequence(u'root')
     root.add_child(wait_for_goal)
-    root.add_child(GoalToConstraints(u'update constraints', action_server_name))
-    root.add_child(planning)
     root.add_child(CleanUp(u'cleanup'))
-    root.add_child(execute)
+    root.add_child(process_move_goal)
+    root.add_child(move_robot)
     root.add_child(SendResult(u'send result', action_server_name, MoveAction))
 
     tree = BehaviourTree(root)

@@ -140,23 +140,24 @@ class JointPosition(Constraint):
         }'
         :return:
         """
-        # TODO fix continuous joints
         current_joint = self.get_input_joint_position(self.joint_name)
 
         joint_goal = self.get_input_float(self.goal)
         weight = self.get_input_float(self.weight)
-        p_gain = self.get_input_float(self.gain)
+        # p_gain = self.get_input_float(self.gain)
         max_speed = self.get_input_float(self.max_speed)
         t = self.get_input_sampling_period()
 
         soft_constraints = OrderedDict()
 
-        s = sw.diffable_sign(joint_goal - current_joint)
-        traj = current_joint + max_speed * t * s
-        limits = ((joint_goal + traj) - s * sw.diffable_abs(joint_goal - traj))/2 - current_joint
+        if self.get_robot().is_joint_continuous(self.joint_name):
+            err = sw.shortest_angular_distance(current_joint, joint_goal)
+        else:
+            err = joint_goal - current_joint
+        capped_err = sw.diffable_max_fast(sw.diffable_min_fast(err, max_speed*t), -max_speed*t)
 
-        soft_constraints[str(self)] = SoftConstraint(lower=limits,
-                                                     upper=limits,
+        soft_constraints[str(self)] = SoftConstraint(lower=capped_err,
+                                                     upper=capped_err,
                                                      weight=weight,
                                                      expression=current_joint)
         return soft_constraints

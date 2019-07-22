@@ -120,8 +120,6 @@ class GoalCanceled(ActionServerBehavior):
 class SendResult(ActionServerBehavior):
     def __init__(self, name, as_name, action_type=None):
         super(SendResult, self).__init__(name, as_name, action_type)
-        self.path_to_data_folder = self.get_god_map().safe_get_data(identifier.data_folder)
-        self.plot_trajectory = self.get_god_map().safe_get_data(identifier.plot_trajectory)
 
     def update(self):
         # TODO get result from god map or blackboard
@@ -130,20 +128,12 @@ class SendResult(ActionServerBehavior):
         result = MoveResult()
         result.error_code = self.exception_to_error_code(e)
         if self.get_as().is_preempt_requested() or not result.error_code == MoveResult.SUCCESS:
-            self.plot_traj()
             self.get_as().send_preempted(result)
         else:
-            self.plot_traj()
             self.get_as().send_result(result)
         return Status.SUCCESS
 
-    def plot_traj(self):
-        if self.plot_trajectory:
-            trajectory = self.get_god_map().safe_get_data(identifier.trajectory)
-            if trajectory:
-                sample_period = self.get_god_map().safe_get_data(identifier.sample_period)
-                controlled_joints = self.get_robot().controlled_joints
-                plot_trajectory(trajectory, controlled_joints, self.path_to_data_folder, sample_period)
+
 
     def exception_to_error_code(self, exception):
         """

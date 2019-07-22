@@ -548,7 +548,7 @@ class TestCartGoals(object):
         p.pose.position = Point(-0.1, 0, 0)
         p.pose.orientation = Quaternion(0, 0, 0, 1)
         zero_pose.allow_self_collision()
-        zero_pose.set_and_check_cart_goal(p, zero_pose.r_tip, zero_pose.default_root)
+        zero_pose.set_and_check_cart_goal(p, zero_pose.r_tip, u'base_footprint')
 
     def test_cart_goal_1eef2(self, zero_pose):
         """

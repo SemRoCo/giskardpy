@@ -33,7 +33,6 @@ class ControllerPlugin(GiskardBehavior):
     def initialise(self):
         super(ControllerPlugin, self).initialise()
         self.init_controller()
-        # self.next_cmd = {}
 
     def setup(self, timeout=0.0):
         return super(ControllerPlugin, self).setup(5.0)

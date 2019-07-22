@@ -700,35 +700,78 @@ class TestCartGoals(object):
         zero_pose.set_cart_goal(p, zero_pose.r_tip, u'torso_lift_link')
         zero_pose.send_and_check_goal()
 
-    # def test_waypoints(self, zero_pose):
-    #     """
-    #     :type zero_pose: PR2
-    #     """
-    # FIXME
-    #     p = PoseStamped()
-    #     p.header.frame_id = zero_pose.r_tip
-    #     p.header.stamp = rospy.get_rostime()
-    #     p.pose.position = Point(-0.1, 0, 0)
-    #     p.pose.orientation = Quaternion(0, 0, 0, 1)
-    #     zero_pose.set_cart_goal(zero_pose.default_root, zero_pose.r_tip, p)
-    #
-    #     zero_pose.add_waypoint()
-    #     p = PoseStamped()
-    #     p.header.frame_id = zero_pose.r_tip
-    #     p.header.stamp = rospy.get_rostime()
-    #     p.pose.position = Point(-0.1, 0, -0.1)
-    #     p.pose.orientation = Quaternion(0, 0, 0, 1)
-    #     zero_pose.set_cart_goal(zero_pose.default_root, zero_pose.r_tip, p)
-    #
-    #     zero_pose.add_waypoint()
-    #     p = PoseStamped()
-    #     p.header.frame_id = zero_pose.r_tip
-    #     p.header.stamp = rospy.get_rostime()
-    #     p.pose.position = Point(0.2, 0, 0.1)
-    #     p.pose.orientation = Quaternion(0, 0, 0, 1)
-    #     zero_pose.set_cart_goal(zero_pose.default_root, zero_pose.r_tip, p)
-    #
-    #     zero_pose.send_and_check_goal()
+    def test_waypoints(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        root = u'base_footprint'
+        p = PoseStamped()
+        p.header.frame_id = zero_pose.r_tip
+        p.header.stamp = rospy.get_rostime()
+        p.pose.position = Point(-0.1, 0, 0)
+        p.pose.orientation = Quaternion(0, 0, 0, 1)
+        zero_pose.set_cart_goal(p, zero_pose.r_tip, root)
+
+        zero_pose.add_waypoint()
+        p = PoseStamped()
+        p.header.frame_id = zero_pose.r_tip
+        p.header.stamp = rospy.get_rostime()
+        p.pose.position = Point(0.0, -0.1, -0.1)
+        p.pose.orientation = Quaternion(0, 0, 0, 1)
+        zero_pose.set_cart_goal(p, zero_pose.r_tip, root)
+
+        zero_pose.add_waypoint()
+        p = PoseStamped()
+        p.header.frame_id = zero_pose.r_tip
+        p.header.stamp = rospy.get_rostime()
+        p.pose.position = Point(0.1, 0.1, 0.1)
+        p.pose.orientation = Quaternion(0, 0, 0, 1)
+        zero_pose.set_cart_goal(p, zero_pose.r_tip, root)
+
+        zero_pose.send_and_check_goal()
+
+    def test_waypoints2(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        zero_pose.set_joint_goal(pocky_pose)
+        zero_pose.add_waypoint()
+        zero_pose.set_joint_goal(pick_up_pose)
+        zero_pose.add_waypoint()
+        zero_pose.set_joint_goal(gaya_pose)
+
+        zero_pose.send_and_check_goal()
+        traj = zero_pose.get_trajectory_msg()
+        for i, joint_state in enumerate(traj):
+            try:
+                zero_pose.compare_joint_state(joint_state, pocky_pose)
+                break
+            except AssertionError:
+                pass
+        else: # if no break
+            assert False, u'pocky pose not in trajectory'
+
+        traj = traj[i:]
+        for i, joint_state in enumerate(traj):
+            try:
+                zero_pose.compare_joint_state(joint_state, pick_up_pose)
+                break
+            except AssertionError:
+                pass
+        else: # if no break
+            assert False, u'pick_up_pose not in trajectory'
+
+        traj = traj[i:]
+        for i, joint_state in enumerate(traj):
+            try:
+                zero_pose.compare_joint_state(joint_state, gaya_pose)
+                break
+            except AssertionError:
+                pass
+        else: # if no break
+            assert False, u'gaya_pose not in trajectory'
+
+        pass
 
     # TODO test translation and orientation goal in different frame
 

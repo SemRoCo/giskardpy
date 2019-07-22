@@ -20,7 +20,7 @@ class WiggleCancel(GiskardBehavior):
     def update(self):
         current_js = self.get_god_map().safe_get_data(identifier.joint_states)
         sample_period = self.get_god_map().safe_get_data(identifier.sample_period)
-        current_time = self.get_god_map().safe_get_data(identifier.time_identifier) * sample_period
+        current_time = self.get_god_map().safe_get_data(identifier.time) * sample_period
         rounded_js = self.round_js(current_js)
         # TODO make 1 a parameter
         # if current_time >= 18:
@@ -48,9 +48,9 @@ class WiggleCancel(GiskardBehavior):
 
 
     def check_fft(self):
-        traj = self.get_god_map().safe_get_data(identifier.trajectory_identifier)
+        traj = self.get_god_map().safe_get_data(identifier.trajectory)
         sample_period = self.get_god_map().safe_get_data(identifier.sample_period)
-        current_time = self.get_god_map().safe_get_data(identifier.time_identifier)
+        current_time = self.get_god_map().safe_get_data(identifier.time)
         last_sec = []
         keys = traj._points[0.0].keys()
         for time in range(int(current_time-1/sample_period), current_time):
@@ -70,7 +70,7 @@ class CollisionCancel(GiskardBehavior):
         super(CollisionCancel, self).__init__(name)
 
     def update(self):
-        time = self.get_god_map().safe_get_data(identifier.time_identifier)
+        time = self.get_god_map().safe_get_data(identifier.time)
         if time >= self.collision_time_threshold:
             cp = self.get_god_map().safe_get_data(identifier.closest_point)
             if cp is not None and closest_point_constraint_violated(cp, tolerance=1):

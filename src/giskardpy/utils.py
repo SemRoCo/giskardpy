@@ -205,6 +205,19 @@ def to_joint_state_dict(msg):
         mjs[joint_name] = sjs
     return mjs
 
+def to_joint_state_dict2(msg):
+    """
+    Converts a ROS message of type sensor_msgs/JointState into a dict that maps name to position
+    :param msg: ROS message to convert.
+    :type msg: JointState
+    :return: Corresponding MultiJointState instance.
+    :rtype: OrderedDict[str, SingleJointState]
+    """
+    js = OrderedDict()
+    for i, joint_name in enumerate(msg.name):
+        js[joint_name] = msg.position[i]
+    return js
+
 
 def dict_to_joint_states(joint_state_dict):
     """

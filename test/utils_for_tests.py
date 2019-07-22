@@ -26,7 +26,8 @@ from giskardpy.python_interface import GiskardWrapper
 from giskardpy.symengine_robot import Robot
 from giskardpy.symengine_wrappers import axis_angle_from_quaternion
 from giskardpy.tfwrapper import transform_pose, lookup_pose
-from giskardpy.utils import msg_to_list, KeyDefaultDict, dict_to_joint_states, get_ros_pkg_path
+from giskardpy.utils import msg_to_list, KeyDefaultDict, dict_to_joint_states, get_ros_pkg_path, to_joint_state_dict, \
+    to_joint_state_dict2
 
 BIG_NUMBER = 1e100
 SMALL_NUMBER = 1e-100
@@ -91,7 +92,6 @@ def compare_poses(pose1, pose2, decimal=2):
         np.testing.assert_almost_equal(pose1.orientation.y, -pose2.orientation.y, decimal=decimal)
         np.testing.assert_almost_equal(pose1.orientation.z, -pose2.orientation.z, decimal=decimal)
         np.testing.assert_almost_equal(pose1.orientation.w, -pose2.orientation.w, decimal=decimal)
-
 
 @composite
 def variable_name(draw):
@@ -286,6 +286,23 @@ class GiskardTestWrapper(object):
     #
     # JOINT GOAL STUFF #################################################################################################
     #
+
+    def compare_joint_state(self, current_js, goal_js, decimal=2):
+        """
+        :type current_js: dict
+        :type goal_js: dict
+        :type decimal: int
+        """
+        joint_names = set(current_js.keys()).intersection(set(goal_js.keys()))
+        for joint_name in joint_names:
+            goal = goal_js[joint_name]
+            current = current_js[joint_name]
+            if self.get_robot().is_joint_continuous(joint_name):
+                np.testing.assert_almost_equal(shortest_angular_distance(goal, current), 0, decimal=decimal)
+            else:
+                np.testing.assert_almost_equal(current, goal, 1,
+                                               err_msg=u'{} at {} insteand of {}'.format(joint_name, current, goal))
+
     def set_joint_goal(self, js):
         """
         :rtype js: dict
@@ -293,16 +310,8 @@ class GiskardTestWrapper(object):
         self.wrapper.set_joint_goal(js)
 
     def check_joint_state(self, expected):
-        current_joint_state = self.get_current_joint_state()
-        for i, joint_name in enumerate(current_joint_state.name):
-            if joint_name in expected:
-                goal = expected[joint_name]
-                current = current_joint_state.position[i]
-                if self.get_robot().is_joint_continuous(joint_name):
-                    np.testing.assert_almost_equal(shortest_angular_distance(goal, current), 0, decimal=2)
-                else:
-                    np.testing.assert_almost_equal(current, goal, 1,
-                                                   err_msg=u'{} at {} insteand of {}'.format(joint_name, current, goal))
+        current_joint_state = to_joint_state_dict2(self.get_current_joint_state())
+        self.compare_joint_state(current_joint_state, expected)
 
     def send_and_check_joint_goal(self, goal):
         """
@@ -423,6 +432,13 @@ class GiskardTestWrapper(object):
 
     def add_json_goal(self, constraint_type, **kwargs):
         self.wrapper.set_json_goal(constraint_type, **kwargs)
+
+    def get_trajectory_msg(self):
+        trajectory = self.get_god_map().get_data(identifier.trajectory)
+        trajectory2 = []
+        for t, p in trajectory._points.items():
+            trajectory2.append({joint_name: js.position for joint_name, js in p.items()})
+        return trajectory2
 
     #
     # BULLET WORLD #####################################################################################################

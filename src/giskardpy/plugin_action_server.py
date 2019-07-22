@@ -35,7 +35,7 @@ class ActionServerHandler(object):
         self.goal_queue.put(goal)
         self.result_queue.get()()
 
-    def get_goal(self):
+    def pop_goal(self):
         try:
             goal = self.goal_queue.get_nowait()
             # self.canceled = False
@@ -105,13 +105,13 @@ class GetGoal(ActionServerBehavior):
     def __init__(self, name, as_name):
         super(GetGoal, self).__init__(name, as_name)
 
-    def get_goal(self):
-        return self.get_as().get_goal()
+    def pop_goal(self):
+        return self.get_as().pop_goal()
 
 
 class GoalCanceled(ActionServerBehavior):
     def update(self):
-        if self.get_as().is_preempt_requested() or Blackboard().get('exception') is not None:
+        if self.get_as().is_preempt_requested() or self.get_blackboard_exception() is not None:
             return Status.SUCCESS
         else:
             return Status.FAILURE
@@ -125,7 +125,7 @@ class SendResult(ActionServerBehavior):
 
     def update(self):
         # TODO get result from god map or blackboard
-        e = Blackboard().get('exception')
+        e = self.get_blackboard_exception()
         Blackboard().set('exception', None)
         result = MoveResult()
         result.error_code = self.exception_to_error_code(e)
@@ -139,7 +139,7 @@ class SendResult(ActionServerBehavior):
 
     def plot_traj(self):
         if self.plot_trajectory:
-            trajectory = self.get_god_map().safe_get_data(identifier.trajectory_identifier)
+            trajectory = self.get_god_map().safe_get_data(identifier.trajectory)
             if trajectory:
                 sample_period = self.get_god_map().safe_get_data(identifier.sample_period)
                 controlled_joints = self.get_robot().controlled_joints

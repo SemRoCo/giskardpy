@@ -337,8 +337,8 @@ def plot_trajectory(tj, controlled_joints, path_to_data_folder, sample_period):
     times = []
     names = [x for x in tj._points[0.0].keys() if x in controlled_joints]
     for time, point in tj.items():
-        positions.append([point[joint_name].position for joint_name in controlled_joints])
-        velocities.append([point[joint_name].velocity for joint_name in controlled_joints])
+        positions.append([point[joint_name].position for joint_name in names])
+        velocities.append([point[joint_name].velocity for joint_name in names])
         times.append(time)
     positions = np.array(positions)
     velocities = np.array(velocities).T

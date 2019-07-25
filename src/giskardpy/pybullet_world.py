@@ -10,7 +10,7 @@ import giskardpy
 from giskardpy.data_types import ClosestPointInfo
 from giskardpy.pybullet_world_object import PyBulletWorldObject
 from giskardpy.pybullet_wrapper import ContactInfo
-from giskardpy.tfwrapper import msg_to_kdl
+from giskardpy.tfwrapper import msg_to_kdl, np_to_kdl
 from giskardpy.utils import resolve_ros_iris
 from giskardpy.world import World
 from giskardpy.world_object import WorldObject
@@ -43,6 +43,7 @@ class PyBulletWorld(World):
 
     def __get_pybullet_object_id(self, name):
         return self.get_object(name).get_pybullet_id()
+
 
     def check_collisions(self, cut_off_distances):
         """
@@ -92,33 +93,21 @@ class PyBulletWorld(World):
         :type contact_info: ContactInfo
         :rtype: bool
         """
-        # contact_info2 = ContactInfo(*min(p.getClosestPoints(contact_info.body_unique_id_b,
-        #                                                     contact_info.body_unique_id_a,
-        #                                                     abs(contact_info.contact_distance) * 1.05,
-        #                                                     contact_info.link_index_b, contact_info.link_index_a),
-        #                                  key=lambda x: x[8]))
-        # do i get different results with flipped closest point check
-        # if not np.isclose(contact_info2.contact_normal_on_b, contact_info.contact_normal_on_b).all():
-        #     return False
-        # if they are identical figure out which one is correct
-        pa = np.array(contact_info.position_on_a)
-
         new_p = Pose()
-        new_p.position = Point(*pa)
+        new_p.position = Point(*contact_info.position_on_a)
         new_p.orientation.w = 1
 
         self.__move_hack(new_p)
+        hack_id = self.__get_pybullet_object_id(self.hack_name)
         try:
             contact_info3 = ContactInfo(
-                *[x for x in p.getClosestPoints(self.__get_pybullet_object_id(self.hack_name),
+                *[x for x in p.getClosestPoints(hack_id,
                                                 contact_info.body_unique_id_a, 0.001) if
                   np.allclose(x[8], -0.005)][0])
-            if contact_info3.body_unique_id_b == contact_info.body_unique_id_a and \
-                    contact_info3.link_index_b == contact_info.link_index_a:
-                return False
+            return not(contact_info3.body_unique_id_b == contact_info.body_unique_id_a and
+                    contact_info3.link_index_b == contact_info.link_index_a)
         except Exception as e:
             return True
-        return True
 
     def __flip_contact_info(self, contact_info):
         return ContactInfo(contact_info.contact_flag,
@@ -180,6 +169,7 @@ class PyBulletWorld(World):
         pwo.joint_state = object_.joint_state
         return super(PyBulletWorld, self).add_object(pwo)
 
+
     def collisions_to_closest_point(self, collisions, min_allowed_distance):
         """
         :param collisions: (robot_link, body_b, link_b) -> ContactInfo
@@ -192,7 +182,7 @@ class PyBulletWorld(World):
         closest_point = super(PyBulletWorld, self).collisions_to_closest_point(collisions, min_allowed_distance)
         for key, cpi in closest_point.items():  # type: (str, ClosestPointInfo)
             if self.__should_flip_contact_info(collisions[cpi.old_key]):
-                root_T_link = msg_to_kdl(self.robot.get_fk_pose(self.robot.get_root(), cpi.link_a))
+                root_T_link = np_to_kdl(self.robot.get_fk_np(self.robot.get_root(), cpi.link_a))
                 b_link = PyKDL.Vector(*cpi.position_on_a)
                 a_root = PyKDL.Vector(*cpi.position_on_b)
                 b_root = root_T_link * b_link

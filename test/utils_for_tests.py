@@ -26,8 +26,7 @@ from giskardpy.python_interface import GiskardWrapper
 from giskardpy.symengine_robot import Robot
 from giskardpy.symengine_wrappers import axis_angle_from_quaternion
 from giskardpy.tfwrapper import transform_pose, lookup_pose
-from giskardpy.utils import msg_to_list, KeyDefaultDict, dict_to_joint_states, get_ros_pkg_path, to_joint_state_dict, \
-    to_joint_state_dict2
+from giskardpy.utils import msg_to_list, KeyDefaultDict, dict_to_joint_states, get_ros_pkg_path, to_joint_state_dict2
 
 BIG_NUMBER = 1e100
 SMALL_NUMBER = 1e-100
@@ -67,11 +66,19 @@ def keys_values(max_length=10, value_type=st.floats(allow_nan=False)):
     return lists_of_same_length([variable_name(), value_type], max_length=max_length, unique=True)
 
 
-def compare_axis_angle(angle1, axis1, angle2, axis2):
-    if np.isclose(axis1, axis2).all():
-        assert np.isclose(angle1, angle2), '{} != {}'.format(angle1, angle2)
-    elif np.isclose(axis1, -axis2).all():
-        assert np.isclose(angle1, abs(angle2 - 2 * pi)), '{} != {}'.format(angle1, angle2)
+def compare_axis_angle(angle1, axis1, angle2, axis2, decimal=3):
+    try:
+        np.testing.assert_array_almost_equal(axis1, axis2, decimal=decimal)
+        np.testing.assert_almost_equal(shortest_angular_distance(angle1, angle2), 0, decimal=decimal)
+    except AssertionError:
+        np.testing.assert_array_almost_equal(axis1, -axis2, decimal=decimal)
+        np.testing.assert_almost_equal(shortest_angular_distance(angle1, abs(angle2 - 2 * pi)), 0, decimal=decimal)
+    # if np.almo(axis1, axis2).all():
+    #     # assert np.isclose(shortest_angular_distance(angle1, angle2), 0), '{} != {}'.format(angle1, angle2)
+    # elif np.isclose(axis1, -axis2).all():
+    #     # assert np.isclose(shortest_angular_distance(angle1, abs(angle2 - 2 * pi)), 0), '{} != {}'.format(angle1, angle2)
+    # else:
+    #     assert False, u'{} != {}'.format(axis1, axis2)
 
 
 def compare_poses(pose1, pose2, decimal=2):
@@ -92,6 +99,7 @@ def compare_poses(pose1, pose2, decimal=2):
         np.testing.assert_almost_equal(pose1.orientation.y, -pose2.orientation.y, decimal=decimal)
         np.testing.assert_almost_equal(pose1.orientation.z, -pose2.orientation.z, decimal=decimal)
         np.testing.assert_almost_equal(pose1.orientation.w, -pose2.orientation.w, decimal=decimal)
+
 
 @composite
 def variable_name(draw):
@@ -164,15 +172,16 @@ def limited_float(outer_limit=BIG_NUMBER, min_dist_to_zero=None):
 
 def unit_vector(length, elements=None):
     if elements is None:
-        elements = limited_float(min_dist_to_zero=1e-20)
+        elements = limited_float(min_dist_to_zero=1e-10)
     vector = st.lists(elements,
                       min_size=length,
                       max_size=length).filter(lambda x: np.linalg.norm(x) > SMALL_NUMBER and
                                                         np.linalg.norm(x) < BIG_NUMBER)
 
     def normalize(v):
+        v = [round(x, 4) for x in v]
         l = np.linalg.norm(v)
-        return [round(x / l, 10) for x in v]
+        return [x / l for x in v]
 
     return st.builds(normalize, vector)
 
@@ -575,7 +584,8 @@ class GiskardTestWrapper(object):
     def get_cpi(self, distance_threshold):
         collision_goals = [CollisionEntry(type=CollisionEntry.AVOID_ALL_COLLISIONS, min_dist=distance_threshold)]
         collision_matrix = self.get_world().collision_goals_to_collision_matrix(collision_goals,
-                                                                                self.get_god_map().safe_get_data(identifier.collisions_distances))
+                                                                                self.get_god_map().safe_get_data(
+                                                                                    identifier.collisions_distances))
         collisions = self.get_world().check_collisions(collision_matrix)
         return self.get_world().collisions_to_closest_point(collisions, collision_matrix)
 
@@ -718,6 +728,7 @@ class Donbot(GiskardTestWrapper):
                                                                        goal_pose.pose.orientation.w]))[0]}
         self.allow_all_collisions()
         self.send_and_check_joint_goal(js)
+
 
 class Boxy(GiskardTestWrapper):
     def __init__(self):

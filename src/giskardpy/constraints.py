@@ -389,15 +389,17 @@ class CartesianOrientationSlerp(CartesianConstraint):
 
         soft_constraints = OrderedDict()
 
-        axis, angle = sw.diffable_axis_angle_from_matrix((current_rotation.T * goal_rotation))
+        # axis, angle = sw.diffable_axis_angle_from_matrix((current_rotation.T * goal_rotation))
+        angle = sw.rotation_distance(current_rotation, goal_rotation)
         angle = sw.diffable_abs(angle)
 
-        capped_angle = sw.diffable_min_fast(max_speed / (gain * angle), 1)
+        capped_angle = sw.diffable_min_fast((gain * angle)/ max_speed, 1)
 
         q1 = sw.quaternion_from_matrix(current_rotation)
         q2 = sw.quaternion_from_matrix(goal_rotation)
         intermediate_goal = sw.diffable_slerp(q1, q2, capped_angle)
-        axis, angle = sw.axis_angle_from_quaternion(*sw.quaternion_diff(q1, intermediate_goal))
+        asdf = sw.quaternion_diff(q1, intermediate_goal)
+        axis, angle = sw.axis_angle_from_quaternion(*asdf)
         r_rot_control = axis * angle
 
         hack = sw.rotation_matrix_from_axis_angle([0, 0, 1], 0.0001)
@@ -416,6 +418,15 @@ class CartesianOrientationSlerp(CartesianConstraint):
                                                              upper=r_rot_control[2],
                                                              weight=weight,
                                                              expression=c_aa[2])
+        add_debug_constraint(soft_constraints, str(self)+'/angle', angle)
+        add_debug_constraint(soft_constraints, str(self)+'/capped_angle', capped_angle)
+        add_debug_constraint(soft_constraints, str(self)+'/max_speed / (gain * angle)', (gain * angle)/max_speed)
+        add_debug_constraint(soft_constraints, str(self)+'/max_speed', max_speed)
+        add_debug_constraint(soft_constraints, str(self)+'/gain', gain)
+        add_debug_constraint(soft_constraints, str(self)+'/asdf[0]', asdf[0])
+        add_debug_constraint(soft_constraints, str(self)+'/asdf[1]', asdf[1])
+        add_debug_constraint(soft_constraints, str(self)+'/asdf[2]', asdf[2])
+        add_debug_constraint(soft_constraints, str(self)+'/asdf[3]', asdf[3])
         return soft_constraints
 
 

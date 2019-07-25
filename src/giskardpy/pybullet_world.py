@@ -112,7 +112,7 @@ class PyBulletWorld(World):
             contact_info3 = ContactInfo(
                 *[x for x in p.getClosestPoints(self.__get_pybullet_object_id(self.hack_name),
                                                 contact_info.body_unique_id_a, 0.001) if
-                  np.allclose(x[8], -0.005)][0])
+                  abs(x[8]+0.005) < 1e-5][0])
             if contact_info3.body_unique_id_b == contact_info.body_unique_id_a and \
                     contact_info3.link_index_b == contact_info.link_index_a:
                 return False

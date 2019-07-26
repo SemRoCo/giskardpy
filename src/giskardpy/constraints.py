@@ -118,9 +118,10 @@ class JointPosition(Constraint):
     gain = u'gain'
     max_speed = u'max_speed'
 
-    def __init__(self, god_map, joint_name, goal, weight=LOW_WEIGHT, gain=1, max_speed=0.5):
+    def __init__(self, god_map, joint_name, goal, weight=LOW_WEIGHT, gain=1, max_speed=1):
         super(JointPosition, self).__init__(god_map)
         self.joint_name = joint_name
+
         params = {self.goal: goal,
                   self.weight: weight,
                   self.gain: gain,

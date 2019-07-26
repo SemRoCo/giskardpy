@@ -610,10 +610,8 @@ class TestSympyWrapper(unittest.TestCase):
         compare_axis_angle(angle, axis, angle2, axis2)
 
     # fails if numbers too big or too small
-    @reproduce_failure('4.0.2', 'AXicY2AgFjAyAAAALgAC')
     @given(quaternion())
     def test_axis_angle_from_quaternion(self, q):
-        # FIXME it probably works but only if the quaternions are normalized
         axis2, angle2 = quat2axangle([q[-1],q[0],q[1],q[2]])
         x,y,z, angle = speed_up_and_execute(spw.axis_angle_from_quaternion, list(q))
         axis = [x,y,z]

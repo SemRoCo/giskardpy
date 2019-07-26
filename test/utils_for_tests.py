@@ -71,14 +71,14 @@ def compare_axis_angle(angle1, axis1, angle2, axis2, decimal=3):
         np.testing.assert_array_almost_equal(axis1, axis2, decimal=decimal)
         np.testing.assert_almost_equal(shortest_angular_distance(angle1, angle2), 0, decimal=decimal)
     except AssertionError:
-        np.testing.assert_array_almost_equal(axis1, -axis2, decimal=decimal)
-        np.testing.assert_almost_equal(shortest_angular_distance(angle1, abs(angle2 - 2 * pi)), 0, decimal=decimal)
-    # if np.almo(axis1, axis2).all():
-    #     # assert np.isclose(shortest_angular_distance(angle1, angle2), 0), '{} != {}'.format(angle1, angle2)
-    # elif np.isclose(axis1, -axis2).all():
-    #     # assert np.isclose(shortest_angular_distance(angle1, abs(angle2 - 2 * pi)), 0), '{} != {}'.format(angle1, angle2)
-    # else:
-    #     assert False, u'{} != {}'.format(axis1, axis2)
+        try:
+            np.testing.assert_array_almost_equal(axis1, -axis2, decimal=decimal)
+            np.testing.assert_almost_equal(shortest_angular_distance(angle1, abs(angle2 - 2 * pi)), 0, decimal=decimal)
+        except AssertionError:
+            np.testing.assert_almost_equal(shortest_angular_distance(angle1, 0), 0, decimal=decimal)
+            np.testing.assert_almost_equal(shortest_angular_distance(0, angle2), 0, decimal=decimal)
+            assert not np.any(np.isnan(axis1))
+            assert not np.any(np.isnan(axis2))
 
 
 def compare_poses(pose1, pose2, decimal=2):
@@ -181,6 +181,8 @@ def unit_vector(length, elements=None):
     def normalize(v):
         v = [round(x, 4) for x in v]
         l = np.linalg.norm(v)
+        if l == 0:
+            return [0,0,0,1]
         return [x / l for x in v]
 
     return st.builds(normalize, vector)

@@ -639,19 +639,12 @@ def axis_angle_from_quaternion(x, y, z, w):
     :return: 4x1 Matrix
     :rtype: Matrix
     """
-    # TODO buggy, angle goes from 0 - 2*pi instead of -pi - +pi
     w2 = se.sqrt(1 - w ** 2)
     angle = (2 * se.acos(w))
-    # TODO decide on axis for 0 angle
-    w2 = Max(w2, 1e-20)
-    x = diffable_if_eq_zero(x, x / w2, 1)
-    y = diffable_if_greater_eq_zero(w2-1e-10, y / w2, 0)
-    z = diffable_if_greater_eq_zero(w2-1e-10, z / w2, 0)
-    l = norm([x,y,z])
-    x /= l
-    y /= l
-    z /= l
-    # angle = normalize_angle(angle)
+    m = if_eq_zero(w2, 1, w2) # avoid /0
+    x = if_eq_zero(w2, 0, x / m)
+    y = if_eq_zero(w2, 0, y / m)
+    z = if_eq_zero(w2, 1, z / m)
     return se.Matrix([x, y, z]), angle
 
 

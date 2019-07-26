@@ -103,7 +103,7 @@ class PyBulletWorld(World):
             contact_info3 = ContactInfo(
                 *[x for x in p.getClosestPoints(hack_id,
                                                 contact_info.body_unique_id_a, 0.001) if
-                  np.allclose(x[8], -0.005)][0])
+                  abs(x[8]+0.005) < 1e-5][0])
             return not(contact_info3.body_unique_id_b == contact_info.body_unique_id_a and
                     contact_info3.link_index_b == contact_info.link_index_a)
         except Exception as e:

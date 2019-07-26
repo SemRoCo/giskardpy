@@ -213,14 +213,18 @@ class QProblemBuilder(object):
         if len(p_filtered) > 0:
             self.print_pandas_array(p_filtered)
             logging.logwarn(u'{} has the following nans:'.format(name))
+        else:
+            logging.loginfo(u'no nans')
 
-    def check_for_big_numbers(self, name, p_array, big=1e10):
+    def check_for_big_numbers(self, name, p_array, big=1e5):
         # FIXME fails if condition is true on first entry
         p_filtered = p_array.apply(lambda x: zip(x.index[abs(x) > big].tolist(), x[x > big]), 1)
         p_filtered = p_filtered[p_filtered.apply(lambda x: len(x)) > 0]
         if len(p_filtered) > 0:
             logging.logwarn(u'{} has the following big numbers:'.format(name))
             self.print_pandas_array(p_filtered)
+        else:
+            logging.loginfo(u'no big numbers')
 
     def print_pandas_array(self, array):
         import pandas as pd

@@ -347,7 +347,7 @@ class CartesianOrientation(CartesianConstraint):
 
 
 class CartesianOrientationSlerp(CartesianConstraint):
-    def __init__(self, god_map, root_link, tip_link, goal, weight=HIGH_WEIGHT, gain=6, max_speed=1):
+    def __init__(self, god_map, root_link, tip_link, goal, weight=HIGH_WEIGHT, gain=10, max_speed=1):
         super(CartesianOrientationSlerp, self).__init__(god_map, root_link, tip_link, goal, weight, gain, max_speed)
 
     def get_constraint(self):
@@ -389,9 +389,9 @@ class CartesianOrientationSlerp(CartesianConstraint):
 
         soft_constraints = OrderedDict()
 
-        axis, angle = sw.diffable_axis_angle_from_matrix((current_rotation.T * goal_rotation))
+        angle = sw.rotation_distance(current_rotation, goal_rotation)
         angle = sw.diffable_abs(angle)
-
+        angle = sw.if_eq_zero(angle, max_speed, angle)
         capped_angle = sw.diffable_min_fast(max_speed / (gain * angle), 1)
 
         q1 = sw.quaternion_from_matrix(current_rotation)

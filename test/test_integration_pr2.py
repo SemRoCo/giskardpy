@@ -773,8 +773,14 @@ class TestCartGoals(object):
 
     # TODO test translation and orientation goal in different frame
 
-
 class TestCollisionAvoidanceGoals(object):
+    def test_nan_in_slerp(self, kitchen_setup):
+        bowl_name = u'bowl'
+        cup_name = u'cup'
+
+        self.open_drawer(kitchen_setup, kitchen_setup.l_tip, u'iai_kitchen/sink_area_left_middle_drawer_handle',
+                         u'sink_area_left_middle_drawer_main_joint')
+
     def test_add_box(self, zero_pose):
         """
         :type zero_pose: PR2

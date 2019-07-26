@@ -196,15 +196,15 @@ class QProblemBuilder(object):
         else:
             self.lbAs = self.lbAs.T.append(p_lbA.T, ignore_index=True).T
             # self.lbAs.T[[c for c in self.lbAs.T.columns if 'dist' in c]].plot()
-        arrays = [(p_weights, u'H'),
-                  (p_A, u'A'),
-                  (p_lbA, u'lbA'),
-                  (p_ubA, u'ubA'),
-                  (p_lb, u'lb'),
-                  (p_ub, u'ub')]
-        for a, name in arrays:
-            self.check_for_nan(name, a)
-            self.check_for_big_numbers(name, a)
+        # arrays = [(p_weights, u'H'),
+        #           (p_A, u'A'),
+        #           (p_lbA, u'lbA'),
+        #           (p_ubA, u'ubA'),
+        #           (p_lb, u'lb'),
+        #           (p_ub, u'ub')]
+        # for a, name in arrays:
+        #     self.check_for_nan(name, a)
+        #     self.check_for_big_numbers(name, a)
         pass
 
     def check_for_nan(self, name, p_array):

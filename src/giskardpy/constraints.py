@@ -391,8 +391,10 @@ class CartesianOrientationSlerp(CartesianConstraint):
 
         angle = sw.rotation_distance(current_rotation, goal_rotation)
         angle = sw.diffable_abs(angle)
-        angle = sw.if_eq_zero(angle, max_speed, angle)
-        capped_angle = sw.diffable_min_fast(max_speed / (gain * angle), 1)
+
+        denominator = (gain * angle)
+        denominator = sw.if_eq_zero(denominator, -1, denominator) # FIXME breaks if maxspeed or gain are negative
+        capped_angle = sw.diffable_max_fast(sw.diffable_min_fast(max_speed / denominator, 1), 0)
 
         q1 = sw.quaternion_from_matrix(current_rotation)
         q2 = sw.quaternion_from_matrix(goal_rotation)
@@ -417,15 +419,16 @@ class CartesianOrientationSlerp(CartesianConstraint):
                                                              upper=r_rot_control[2],
                                                              weight=weight,
                                                              expression=c_aa[2])
-        add_debug_constraint(soft_constraints, str(self)+'/angle', angle)
-        add_debug_constraint(soft_constraints, str(self)+'/capped_angle', capped_angle)
-        add_debug_constraint(soft_constraints, str(self)+'/max_speed / (gain * angle)', (gain * angle)/max_speed)
-        add_debug_constraint(soft_constraints, str(self)+'/max_speed', max_speed)
-        add_debug_constraint(soft_constraints, str(self)+'/gain', gain)
-        add_debug_constraint(soft_constraints, str(self)+'/asdf[0]', asdf[0])
-        add_debug_constraint(soft_constraints, str(self)+'/asdf[1]', asdf[1])
-        add_debug_constraint(soft_constraints, str(self)+'/asdf[2]', asdf[2])
-        add_debug_constraint(soft_constraints, str(self)+'/asdf[3]', asdf[3])
+        # add_debug_constraint(soft_constraints, str(self)+'/angle', angle)
+        # add_debug_constraint(soft_constraints, str(self)+'/capped_angle', capped_angle)
+        # add_debug_constraint(soft_constraints, str(self)+'/max_speed / (gain * angle)', max_speed/(gain * angle))
+        # add_debug_constraint(soft_constraints, str(self)+'/max_speed', max_speed)
+        # add_debug_constraint(soft_constraints, str(self)+'/gain', gain)
+        # add_debug_constraint(soft_constraints, str(self)+'/denominator', denominator)
+        # add_debug_constraint(soft_constraints, str(self)+'/asdf[0]', asdf[0])
+        # add_debug_constraint(soft_constraints, str(self)+'/asdf[1]', asdf[1])
+        # add_debug_constraint(soft_constraints, str(self)+'/asdf[2]', asdf[2])
+        # add_debug_constraint(soft_constraints, str(self)+'/asdf[3]', asdf[3])
         return soft_constraints
 
 

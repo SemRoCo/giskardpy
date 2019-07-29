@@ -261,7 +261,8 @@ class CartesianPosition(CartesianConstraint):
         trans_error_vector = goal_position - current_position
         trans_error = sw.norm(trans_error_vector)
         trans_scale = sw.diffable_min_fast(trans_error * gain, max_speed)
-        trans_control = trans_error_vector / trans_error * trans_scale
+        denominator = sw.if_eq_zero(trans_error, 1, trans_error)
+        trans_control = trans_error_vector / denominator * trans_scale
 
         soft_constraints[str(self) + u'x'] = SoftConstraint(lower=trans_control[0],
                                                             upper=trans_control[0],
@@ -347,7 +348,7 @@ class CartesianOrientation(CartesianConstraint):
 
 
 class CartesianOrientationSlerp(CartesianConstraint):
-    def __init__(self, god_map, root_link, tip_link, goal, weight=HIGH_WEIGHT, gain=10, max_speed=1):
+    def __init__(self, god_map, root_link, tip_link, goal, weight=HIGH_WEIGHT, gain=1, max_speed=1):
         super(CartesianOrientationSlerp, self).__init__(god_map, root_link, tip_link, goal, weight, gain, max_speed)
 
     def get_constraint(self):
@@ -400,12 +401,12 @@ class CartesianOrientationSlerp(CartesianConstraint):
         q2 = sw.quaternion_from_matrix(goal_rotation)
         intermediate_goal = sw.diffable_slerp(q1, q2, capped_angle)
         asdf = sw.quaternion_diff(q1, intermediate_goal)
-        axis, angle = sw.axis_angle_from_quaternion(*asdf)
-        r_rot_control = axis * angle
+        axis3, angle3 = sw.axis_angle_from_quaternion(*asdf)
+        r_rot_control = axis3 * angle3
 
         hack = sw.rotation_matrix_from_axis_angle([0, 0, 1], 0.0001)
-        axis, angle = sw.diffable_axis_angle_from_matrix((current_rotation.T * (current_evaluated_rotation * hack)).T)
-        c_aa = (axis * angle)
+        axis2, angle2 = sw.diffable_axis_angle_from_matrix((current_rotation.T * (current_evaluated_rotation * hack)).T)
+        c_aa = (axis2 * angle2)
 
         soft_constraints[str(self) + u'/0'] = SoftConstraint(lower=r_rot_control[0],
                                                              upper=r_rot_control[0],
@@ -419,16 +420,6 @@ class CartesianOrientationSlerp(CartesianConstraint):
                                                              upper=r_rot_control[2],
                                                              weight=weight,
                                                              expression=c_aa[2])
-        # add_debug_constraint(soft_constraints, str(self)+'/angle', angle)
-        # add_debug_constraint(soft_constraints, str(self)+'/capped_angle', capped_angle)
-        # add_debug_constraint(soft_constraints, str(self)+'/max_speed / (gain * angle)', max_speed/(gain * angle))
-        # add_debug_constraint(soft_constraints, str(self)+'/max_speed', max_speed)
-        # add_debug_constraint(soft_constraints, str(self)+'/gain', gain)
-        # add_debug_constraint(soft_constraints, str(self)+'/denominator', denominator)
-        # add_debug_constraint(soft_constraints, str(self)+'/asdf[0]', asdf[0])
-        # add_debug_constraint(soft_constraints, str(self)+'/asdf[1]', asdf[1])
-        # add_debug_constraint(soft_constraints, str(self)+'/asdf[2]', asdf[2])
-        # add_debug_constraint(soft_constraints, str(self)+'/asdf[3]', asdf[3])
         return soft_constraints
 
 

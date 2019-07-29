@@ -746,7 +746,7 @@ class TestCartGoals(object):
                 break
             except AssertionError:
                 pass
-        else: # if no break
+        else:  # if no break
             assert False, u'pocky pose not in trajectory'
 
         traj = traj[i:]
@@ -756,7 +756,7 @@ class TestCartGoals(object):
                 break
             except AssertionError:
                 pass
-        else: # if no break
+        else:  # if no break
             assert False, u'pick_up_pose not in trajectory'
 
         traj = traj[i:]
@@ -766,12 +766,13 @@ class TestCartGoals(object):
                 break
             except AssertionError:
                 pass
-        else: # if no break
+        else:  # if no break
             assert False, u'gaya_pose not in trajectory'
 
         pass
 
     # TODO test translation and orientation goal in different frame
+
 
 class TestCollisionAvoidanceGoals(object):
     def test_nan_in_slerp(self, kitchen_setup):

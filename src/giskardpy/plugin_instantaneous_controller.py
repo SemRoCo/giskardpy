@@ -62,7 +62,7 @@ class ControllerPlugin(GiskardBehavior):
         self.get_god_map().safe_set_data(identifier.last_cmd, last_cmd)
 
         expr = self.controller.get_expr()
-        expr = self.god_map.get_symbol_map(expr)
+        expr = self.god_map.get_values(expr)
 
         next_cmd, \
         self.qp_data[identifier.H[-1]], \

@@ -75,6 +75,7 @@ class QPSolver(object):
                 r = 5
                 A = np.round(A, r)
                 nWSR = None
+                self.started = False
         else:  # if not break
             self.started = False
             raise QPSolverException(self.RETURN_VALUE_DICT[success])

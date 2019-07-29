@@ -455,6 +455,7 @@ class World(object):
                and self.all_link_bs(collision_entry)
 
     
+
     def collisions_to_closest_point(self, collisions, min_allowed_distance):
         """
         :param collisions: (robot_link, body_b, link_b) -> ContactInfo

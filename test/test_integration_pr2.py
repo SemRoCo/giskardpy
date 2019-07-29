@@ -746,7 +746,7 @@ class TestCartGoals(object):
                 break
             except AssertionError:
                 pass
-        else: # if no break
+        else:  # if no break
             assert False, u'pocky pose not in trajectory'
 
         traj = traj[i:]
@@ -756,7 +756,7 @@ class TestCartGoals(object):
                 break
             except AssertionError:
                 pass
-        else: # if no break
+        else:  # if no break
             assert False, u'pick_up_pose not in trajectory'
 
         traj = traj[i:]
@@ -766,7 +766,7 @@ class TestCartGoals(object):
                 break
             except AssertionError:
                 pass
-        else: # if no break
+        else:  # if no break
             assert False, u'gaya_pose not in trajectory'
 
         pass
@@ -775,6 +775,13 @@ class TestCartGoals(object):
 
 
 class TestCollisionAvoidanceGoals(object):
+    def test_nan_in_slerp(self, kitchen_setup):
+        bowl_name = u'bowl'
+        cup_name = u'cup'
+
+        self.open_drawer(kitchen_setup, kitchen_setup.l_tip, u'iai_kitchen/sink_area_left_middle_drawer_handle',
+                         u'sink_area_left_middle_drawer_main_joint')
+
     def test_add_box(self, zero_pose):
         """
         :type zero_pose: PR2
@@ -1877,7 +1884,7 @@ class TestCollisionAvoidanceGoals(object):
         base_goal.header.frame_id = u'base_footprint'
         base_goal.pose.position.x = -.1
         base_goal.pose.orientation = Quaternion(*quaternion_about_axis(pi, [0, 0, 1]))
-        kitchen_setup.move_base(base_goal)
+        kitchen_setup.teleport_base(base_goal)
 
         # place bowl and cup
         bowl_goal = PoseStamped()

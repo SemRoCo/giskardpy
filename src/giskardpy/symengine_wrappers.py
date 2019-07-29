@@ -214,12 +214,19 @@ class CompiledFunction(object):
         self.shape = shape
 
     def __call__(self, **kwargs):
+        filtered_args = [kwargs[k] for k in self.str_params]
+        return self.call2(filtered_args)
+
+    def call2(self, filtered_args):
+        """
+        :param filtered_args: parameter values in the same order as in self.str_params
+        :type filtered_args: list
+        :return:
+        """
         try:
-            filtered_args = [kwargs[k] for k in self.str_params]
             out = np.empty(self.l)
             self.fast_f.unsafe_real(np.array(filtered_args, dtype=np.double), out)
-            # TODO nan to num is kinda dangerous
-            return np.nan_to_num(out).reshape(self.shape)
+            return out.reshape(self.shape)
         except KeyError as e:
             msg = u'KeyError: {}\ntry deleting the data folder to trigger recompilation'.format(e.message)
             raise SymengineException(msg)
@@ -534,19 +541,20 @@ def trace(matrix):
     return sum(matrix[i, i] for i in range(matrix.shape[0]))
 
 
-def rotation_distance(a_R_b, b_R_c):
+def rotation_distance(a_R_b, a_R_c):
     """
     :param a_R_b: 4x4 or 3x3 Matrix
     :type a_R_b: Matrix
-    :param b_R_c: 4x4 or 3x3 Matrix
-    :type b_R_c: Matrix
-    :return: angle of axis angle representation of a_R_c
+    :param a_R_c: 4x4 or 3x3 Matrix
+    :type a_R_c: Matrix
+    :return: angle of axis angle representation of b_R_c
     :rtype: Union[float, Symbol]
     """
-    # TODO test me
-    difference = a_R_b * b_R_c
-    v = (trace(difference[:3, :3]) - 1) / 2
-    return se.acos(v)
+    difference = a_R_b.T * a_R_c
+    angle = (trace(difference[:3, :3]) - 1) / 2
+    angle = se.Min(angle, 1)
+    angle = se.Max(angle, -1)
+    return se.acos(angle)
 
 
 def diffable_axis_angle_from_matrix(rotation_matrix):
@@ -631,12 +639,12 @@ def axis_angle_from_quaternion(x, y, z, w):
     :return: 4x1 Matrix
     :rtype: Matrix
     """
-    # TODO buggy, angle goes from 0 - 2*pi instead of -pi - +pi
     w2 = se.sqrt(1 - w ** 2)
     angle = (2 * se.acos(w))
-    x = x / w2
-    y = y / w2
-    z = z / w2
+    m = if_eq_zero(w2, 1, w2) # avoid /0
+    x = if_eq_zero(w2, 0, x / m)
+    y = if_eq_zero(w2, 0, y / m)
+    z = if_eq_zero(w2, 1, z / m)
     return se.Matrix([x, y, z]), angle
 
 

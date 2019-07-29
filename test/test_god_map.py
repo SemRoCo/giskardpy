@@ -259,7 +259,7 @@ class TestGodMap(unittest.TestCase):
         for key, value in zip(keys, values):
             gm.safe_set_data([key], value)
             gm.to_symbol([key])
-        self.assertEqual(len(gm.get_symbol_map()), len(keys))
+        self.assertEqual(len(gm.get_values()), len(keys))
 
     def test_god_map_with_world(self):
         gm = GodMap()

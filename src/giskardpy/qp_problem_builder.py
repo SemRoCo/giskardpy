@@ -211,8 +211,8 @@ class QProblemBuilder(object):
         p_filtered = p_array.apply(lambda x: zip(x.index[x.isnull()].tolist(), x[x.isnull()]), 1)
         p_filtered = p_filtered[p_filtered.apply(lambda x: len(x)) > 0]
         if len(p_filtered) > 0:
-            self.print_pandas_array(p_filtered)
             logging.logwarn(u'{} has the following nans:'.format(name))
+            self.print_pandas_array(p_filtered)
         else:
             logging.loginfo(u'no nans')
 
@@ -240,14 +240,13 @@ class QProblemBuilder(object):
         :return: joint name -> joint command
         :rtype: dict
         """
-        np_big_ass_M = self.cython_big_ass_M(**substitutions)
-        # TODO create functions to extract the different matrices.
-        np_H = np.array(np_big_ass_M[self.shape1:, :-2])
-        np_A = np.array(np_big_ass_M[:self.shape1, :self.shape2])
-        np_lb = np.array(np_big_ass_M[self.shape1:, -2])
-        np_ub = np.array(np_big_ass_M[self.shape1:, -1])
-        np_lbA = np.array(np_big_ass_M[:self.shape1, -2])
-        np_ubA = np.array(np_big_ass_M[:self.shape1, -1])
+        np_big_ass_M = self.cython_big_ass_M.call2(substitutions)
+        np_H = np_big_ass_M[self.shape1:, :-2].copy()
+        np_A = np_big_ass_M[:self.shape1, :self.shape2].copy()
+        np_lb = np_big_ass_M[self.shape1:, -2].copy()
+        np_ub = np_big_ass_M[self.shape1:, -1].copy()
+        np_lbA = np_big_ass_M[:self.shape1, -2].copy()
+        np_ubA = np_big_ass_M[:self.shape1, -1].copy()
         # self.debug_print(np_H, np_A, np_lb, np_ub, np_lbA, np_ubA)
         try:
             xdot_full = self.qp_solver.solve(np_H, self.np_g, np_A, np_lb, np_ub, np_lbA, np_ubA, nWSR)

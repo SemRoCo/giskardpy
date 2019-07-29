@@ -275,7 +275,8 @@ class CartesianPosition(CartesianConstraint):
         trans_error_vector = goal_position - current_position
         trans_error = sw.norm(trans_error_vector)
         trans_scale = sw.diffable_min_fast(trans_error * gain, max_speed*t)
-        trans_control = trans_error_vector / trans_error * trans_scale
+        denominator = sw.if_eq_zero(trans_error, 1, trans_error)
+        trans_control = trans_error_vector / denominator * trans_scale
 
         soft_constraints[str(self) + u'x'] = SoftConstraint(lower=trans_control[0],
                                                             upper=trans_control[0],
@@ -404,20 +405,23 @@ class CartesianOrientationSlerp(CartesianConstraint):
 
         soft_constraints = OrderedDict()
 
-        axis, angle = sw.diffable_axis_angle_from_matrix((current_rotation.T * goal_rotation))
+        angle = sw.rotation_distance(current_rotation, goal_rotation)
         angle = sw.diffable_abs(angle)
 
-        capped_angle = sw.diffable_min_fast(max_speed*t / (gain * angle), 1)
+        denominator = (gain * angle)
+        denominator = sw.if_eq_zero(denominator, -1, denominator) # FIXME breaks if maxspeed or gain are negative
+        capped_angle = sw.diffable_max_fast(sw.diffable_min_fast(max_speed*t / denominator, 1), 0)
 
         q1 = sw.quaternion_from_matrix(current_rotation)
         q2 = sw.quaternion_from_matrix(goal_rotation)
         intermediate_goal = sw.diffable_slerp(q1, q2, capped_angle)
-        axis, angle = sw.axis_angle_from_quaternion(*sw.quaternion_diff(q1, intermediate_goal))
-        r_rot_control = axis * angle
+        asdf = sw.quaternion_diff(q1, intermediate_goal)
+        axis3, angle3 = sw.axis_angle_from_quaternion(*asdf)
+        r_rot_control = axis3 * angle3
 
         hack = sw.rotation_matrix_from_axis_angle([0, 0, 1], 0.0001)
-        axis, angle = sw.diffable_axis_angle_from_matrix((current_rotation.T * (current_evaluated_rotation * hack)).T)
-        c_aa = (axis * angle)
+        axis2, angle2 = sw.diffable_axis_angle_from_matrix((current_rotation.T * (current_evaluated_rotation * hack)).T)
+        c_aa = (axis2 * angle2)
 
         soft_constraints[str(self) + u'/0'] = SoftConstraint(lower=r_rot_control[0],
                                                              upper=r_rot_control[0],
@@ -736,7 +740,7 @@ class Pointing(Constraint):
             pointing_axis.header.frame_id = self.tip
             pointing_axis.vector.z = 1
         tmp = np.array([pointing_axis.vector.x, pointing_axis.vector.y, pointing_axis.vector.z])
-        tmp = tmp / np.linalg.norm(tmp)
+        tmp = tmp / np.linalg.norm(tmp) #TODO possible /0
         pointing_axis.vector = Vector3(*tmp)
 
         params = {self.goal_point: goal_point,
@@ -759,7 +763,7 @@ class Pointing(Constraint):
         pointing_axis = self.get_pointing_axis()
 
         goal_axis = goal_point - sw.position_of(root_T_tip)
-        goal_axis /= sw.norm(goal_axis)
+        goal_axis /= sw.norm(goal_axis) #FIXME possible /0
         current_axis = root_T_tip * pointing_axis
         diff = goal_axis - current_axis
 

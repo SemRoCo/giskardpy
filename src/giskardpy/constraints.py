@@ -275,8 +275,7 @@ class CartesianPosition(CartesianConstraint):
         trans_error_vector = goal_position - current_position
         trans_error = sw.norm(trans_error_vector)
         trans_scale = sw.diffable_min_fast(trans_error * gain, max_speed*t)
-        denominator = sw.if_eq_zero(trans_error, 1, trans_error)
-        trans_control = trans_error_vector / denominator * trans_scale
+        trans_control = sw.save_division(trans_error_vector, trans_error) * trans_scale
 
         soft_constraints[str(self) + u'x'] = SoftConstraint(lower=trans_control[0],
                                                             upper=trans_control[0],
@@ -408,9 +407,10 @@ class CartesianOrientationSlerp(CartesianConstraint):
         angle = sw.rotation_distance(current_rotation, goal_rotation)
         angle = sw.diffable_abs(angle)
 
-        denominator = (gain * angle)
-        denominator = sw.if_eq_zero(denominator, -1, denominator) # FIXME breaks if maxspeed or gain are negative
-        capped_angle = sw.diffable_max_fast(sw.diffable_min_fast(max_speed*t / denominator, 1), 0)
+        # denominator = (gain * angle)
+        # denominator = sw.if_eq_zero(denominator, -1, denominator) # FIXME breaks if maxspeed or gain are negative
+        # capped_angle = sw.diffable_max_fast(sw.diffable_min_fast(max_speed*t / denominator, 1), 0)
+        capped_angle = sw.diffable_min_fast(sw.save_division(max_speed, (gain * angle)), 1)
 
         q1 = sw.quaternion_from_matrix(current_rotation)
         q2 = sw.quaternion_from_matrix(goal_rotation)

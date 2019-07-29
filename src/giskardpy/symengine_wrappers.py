@@ -984,3 +984,7 @@ def piecewise_matrix(*piecewise_vector):
 
 def to_numpy(matrix):
     return np.array(matrix.tolist()).astype(float).reshape(matrix.shape)
+
+def save_division(nominator, denominator):
+    save_denominator = if_eq_zero(denominator, 1, denominator)
+    return nominator * if_eq_zero(denominator, 0, 1 / save_denominator)

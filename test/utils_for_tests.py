@@ -320,17 +320,17 @@ class GiskardTestWrapper(object):
         """
         self.wrapper.set_joint_goal(js)
 
-    def check_joint_state(self, expected):
+    def check_joint_state(self, expected, decimal=2):
         current_joint_state = to_joint_state_dict2(self.get_current_joint_state())
-        self.compare_joint_state(current_joint_state, expected)
+        self.compare_joint_state(current_joint_state, expected, decimal=decimal)
 
-    def send_and_check_joint_goal(self, goal):
+    def send_and_check_joint_goal(self, goal, decimal=2):
         """
         :type goal: dict
         """
         self.set_joint_goal(goal)
         self.send_and_check_goal()
-        self.check_joint_state(goal)
+        self.check_joint_state(goal, decimal=decimal)
 
     #
     # CART GOAL STUFF ##################################################################################################
@@ -622,7 +622,7 @@ class GiskardTestWrapper(object):
         self.wait_for_synced()
         current_pose = self.get_robot().get_base_pose()
         goal_pose = transform_pose(u'map', goal_pose)
-        compare_poses(goal_pose.pose, current_pose.pose)
+        compare_poses(goal_pose.pose, current_pose.pose, decimal=1)
 
     def reset_base(self):
         p = PoseStamped()

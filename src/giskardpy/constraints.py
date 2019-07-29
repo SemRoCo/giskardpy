@@ -722,7 +722,7 @@ class Pointing(Constraint):
             pointing_axis.header.frame_id = self.tip
             pointing_axis.vector.z = 1
         tmp = np.array([pointing_axis.vector.x, pointing_axis.vector.y, pointing_axis.vector.z])
-        tmp = tmp / np.linalg.norm(tmp)
+        tmp = tmp / np.linalg.norm(tmp) #TODO possible /0
         pointing_axis.vector = Vector3(*tmp)
 
         params = {self.goal_point: goal_point,
@@ -745,7 +745,7 @@ class Pointing(Constraint):
         pointing_axis = self.get_pointing_axis()
 
         goal_axis = goal_point - sw.position_of(root_T_tip)
-        goal_axis /= sw.norm(goal_axis)
+        goal_axis /= sw.norm(goal_axis) #FIXME possible /0
         current_axis = root_T_tip * pointing_axis
         diff = goal_axis - current_axis
 

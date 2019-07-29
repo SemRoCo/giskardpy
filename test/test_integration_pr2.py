@@ -1884,7 +1884,7 @@ class TestCollisionAvoidanceGoals(object):
         base_goal.header.frame_id = u'base_footprint'
         base_goal.pose.position.x = -.1
         base_goal.pose.orientation = Quaternion(*quaternion_about_axis(pi, [0, 0, 1]))
-        kitchen_setup.move_base(base_goal)
+        kitchen_setup.teleport_base(base_goal)
 
         # place bowl and cup
         bowl_goal = PoseStamped()

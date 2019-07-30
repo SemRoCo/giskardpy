@@ -639,8 +639,10 @@ def axis_angle_from_quaternion(x, y, z, w):
     :return: 4x1 Matrix
     :rtype: Matrix
     """
+    l = norm([x,y,z,w])
+    x, y, z, w = x/l, y/l, z/l, w/l
     w2 = se.sqrt(1 - w ** 2)
-    angle = (2 * se.acos(w))
+    angle = (2 * se.acos(se.Min(se.Max(-1, w), 1)))
     m = if_eq_zero(w2, 1, w2) # avoid /0
     x = if_eq_zero(w2, 0, x / m)
     y = if_eq_zero(w2, 0, y / m)
@@ -985,6 +987,6 @@ def piecewise_matrix(*piecewise_vector):
 def to_numpy(matrix):
     return np.array(matrix.tolist()).astype(float).reshape(matrix.shape)
 
-def save_division(nominator, denominator):
+def save_division(nominator, denominator, if_nan=0):
     save_denominator = if_eq_zero(denominator, 1, denominator)
-    return nominator * if_eq_zero(denominator, 0, 1 / save_denominator)
+    return nominator * if_eq_zero(denominator, if_nan, 1 / save_denominator)

@@ -13,8 +13,11 @@ class CleanUp(GiskardBehavior):
     def initialise(self):
         self.get_god_map().safe_set_data(identifier.closest_point, {})
         # self.get_god_map().safe_set_data(identifier.closest_point, None)
-        self.get_god_map().safe_set_data(identifier.time, 0)
-        self.get_god_map().safe_set_data(identifier.trajectory, Trajectory())
+        self.get_god_map().safe_set_data(identifier.time, 1)
+        current_js = self.get_god_map().safe_get_data(identifier.joint_states)
+        trajectory = Trajectory()
+        trajectory.set(0, current_js)
+        self.get_god_map().safe_set_data(identifier.trajectory, trajectory)
 
     def update(self):
         return Status.SUCCESS

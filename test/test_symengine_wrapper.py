@@ -618,6 +618,14 @@ class TestSympyWrapper(unittest.TestCase):
         angle = float(angle)
         compare_axis_angle(angle, axis, angle2, axis2, 2)
 
+    def test_axis_angle_from_quaternion2(self):
+        q = [0,0,0,1.0000001]
+        axis2, angle2 = quat2axangle([q[-1],q[0],q[1],q[2]])
+        x,y,z, angle = speed_up_and_execute(spw.axis_angle_from_quaternion, list(q))
+        axis = [x,y,z]
+        angle = float(angle)
+        compare_axis_angle(angle, axis, angle2, axis2, 2)
+
     # fails if numbers too big or too small
     # TODO rpy does not follow some conventions I guess
     # @given(unit_vector(4))

@@ -462,7 +462,7 @@ class URDFObject(object):
                         return None
                 return child_result
 
-    def attach_urdf_object(self, urdf_object, parent_link, pose):
+    def attach_urdf_object(self, urdf_object, parent_link, pose, round_to=3):
         """
         Rigidly attach another object to the robot.
         :param urdf_object: Object that shall be attached to the robot.
@@ -488,13 +488,13 @@ class URDFObject(object):
         if len(set(urdf_object.get_joint_names()).intersection(set(self.get_joint_names()))) != 0:
             raise DuplicateNameException(u'can not merge urdfs that share joint names')
 
-        origin = up.Pose([pose.position.x,
-                          pose.position.y,
-                          pose.position.z],
-                         euler_from_quaternion([pose.orientation.x,
-                                                pose.orientation.y,
-                                                pose.orientation.z,
-                                                pose.orientation.w]))
+        origin = up.Pose([np.round(pose.position.x, round_to),
+                          np.round(pose.position.y, round_to),
+                          np.round(pose.position.z, round_to)],
+                         euler_from_quaternion([np.round(pose.orientation.x, round_to),
+                                                np.round(pose.orientation.y, round_to),
+                                                np.round(pose.orientation.z, round_to),
+                                                np.round(pose.orientation.w, round_to)]))
 
         joint = up.Joint(self.robot_name_to_root_joint(urdf_object.get_name()),
                          parent=parent_link,

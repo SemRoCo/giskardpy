@@ -410,7 +410,7 @@ class CartesianOrientationSlerp(CartesianConstraint):
         # denominator = (gain * angle)
         # denominator = sw.if_eq_zero(denominator, -1, denominator) # FIXME breaks if maxspeed or gain are negative
         # capped_angle = sw.diffable_max_fast(sw.diffable_min_fast(max_speed*t / denominator, 1), 0)
-        capped_angle = sw.diffable_min_fast(sw.save_division(max_speed, (gain * angle)), 1)
+        capped_angle = sw.diffable_min_fast(sw.save_division(max_speed*t, (gain * angle)), 1)
 
         q1 = sw.quaternion_from_matrix(current_rotation)
         q2 = sw.quaternion_from_matrix(goal_rotation)

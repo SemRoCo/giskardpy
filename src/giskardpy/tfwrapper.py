@@ -2,6 +2,7 @@ import PyKDL
 import rospy
 from geometry_msgs.msg import PoseStamped, Vector3Stamped, PointStamped, TransformStamped, Pose, Quaternion, Point, \
     Vector3, Twist, TwistStamped
+from tf.transformations import quaternion_from_matrix
 from tf2_geometry_msgs import do_transform_pose, do_transform_vector3, do_transform_point
 from tf2_kdl import transform_to_kdl
 from tf2_py._tf2 import ExtrapolationException
@@ -129,6 +130,7 @@ def lookup_pose(target_frame, source_frame, time=None):
     p.pose.orientation.w = 1.0
     return transform_pose(target_frame, p)
 
+
 def lookup_point(target_frame, source_frame, time=None):
     """
     :type target_frame: str
@@ -235,6 +237,13 @@ def kdl_to_vector(vector):
     v.y = vector[1]
     v.z = vector[2]
     return v
+
+
+def kdl_to_quaternion(rotation_matrix):
+    return Quaternion(*quaternion_from_matrix([[rotation_matrix[0, 0], rotation_matrix[0, 1], rotation_matrix[0, 2], 0],
+                                               [rotation_matrix[1, 0], rotation_matrix[1, 1], rotation_matrix[1, 2], 0],
+                                               [rotation_matrix[2, 0], rotation_matrix[2, 1], rotation_matrix[2, 2], 0],
+                                               [0, 0, 0, 1]]))
 
 
 def np_to_kdl(matrix):

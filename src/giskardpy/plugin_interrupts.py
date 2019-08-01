@@ -29,6 +29,7 @@ class WiggleCancel(GiskardBehavior):
             current_max_joint_vel = np.abs([v.velocity for v in current_js.values()]).max()
             # TODO this threshold should depend on the joint type
             if current_max_joint_vel < 0.25:
+                logging.loginfo(u'stopped by wiggle detector')
                 logging.loginfo(u'found goal trajectory with length {}s in {}s'.format(current_time,
                                                                                        time() - self.get_blackboard().runtime))
                 return Status.SUCCESS

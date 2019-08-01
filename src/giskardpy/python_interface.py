@@ -449,14 +449,17 @@ class GiskardWrapper(object):
         req.operation = req.DETACH
         return self.update_world.call(req)
 
-    def add_urdf(self, name, urdf, pose, js_topic):
+    def add_urdf(self, name, urdf, pose, js_topic=u''):
         urdf_body = WorldBody()
         urdf_body.name = str(name)
         urdf_body.type = WorldBody.URDF_BODY
         urdf_body.urdf = str(urdf)
         urdf_body.joint_state_topic = str(js_topic)
         req = UpdateWorldRequest(UpdateWorldRequest.ADD, urdf_body, False, pose)
-        self.object_js_topics[name] = rospy.Publisher(js_topic, JointState, queue_size=10)
+        if js_topic:
+            # FIXME publisher has to be removed, when object gets deleted
+            # FIXME there could be sync error, if objects get added/removed by something else
+            self.object_js_topics[name] = rospy.Publisher(js_topic, JointState, queue_size=10)
         return self.update_world.call(req)
 
     def set_object_joint_state(self, object_name, joint_states):

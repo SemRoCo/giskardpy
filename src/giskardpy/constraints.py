@@ -291,6 +291,51 @@ class CartesianPosition(CartesianConstraint):
                                                             expression=current_position[2])
         return soft_constraints
 
+class CartesianPositionX(CartesianConstraint):
+    def get_constraint(self):
+        goal_position = sw.position_of(self.get_goal_pose())
+        weight = self.get_input_float(self.weight)
+        gain = self.get_input_float(self.gain)
+        max_speed = self.get_input_float(self.max_speed)
+        t = self.get_input_sampling_period()
+
+        current_position = sw.position_of(self.get_fk(self.root, self.tip))
+
+        soft_constraints = OrderedDict()
+
+        trans_error_vector = goal_position - current_position
+        trans_error = sw.norm(trans_error_vector)
+        trans_scale = sw.diffable_min_fast(trans_error * gain, max_speed*t)
+        trans_control = sw.save_division(trans_error_vector, trans_error) * trans_scale
+
+        soft_constraints[str(self) + u'x'] = SoftConstraint(lower=trans_control[0],
+                                                            upper=trans_control[0],
+                                                            weight=weight,
+                                                            expression=current_position[0])
+        return soft_constraints
+
+class CartesianPositionY(CartesianConstraint):
+    def get_constraint(self):
+        goal_position = sw.position_of(self.get_goal_pose())
+        weight = self.get_input_float(self.weight)
+        gain = self.get_input_float(self.gain)
+        max_speed = self.get_input_float(self.max_speed)
+        t = self.get_input_sampling_period()
+
+        current_position = sw.position_of(self.get_fk(self.root, self.tip))
+
+        soft_constraints = OrderedDict()
+
+        trans_error_vector = goal_position - current_position
+        trans_error = sw.norm(trans_error_vector)
+        trans_scale = sw.diffable_min_fast(trans_error * gain, max_speed*t)
+        trans_control = sw.save_division(trans_error_vector, trans_error) * trans_scale
+
+        soft_constraints[str(self) + u'x'] = SoftConstraint(lower=trans_control[1],
+                                                            upper=trans_control[1],
+                                                            weight=weight,
+                                                            expression=current_position[1])
+        return soft_constraints
 
 class CartesianOrientation(CartesianConstraint):
     def __init__(self, god_map, root_link, tip_link, goal, weight=HIGH_WEIGHT, gain=1, max_speed=0.5):

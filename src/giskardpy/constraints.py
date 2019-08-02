@@ -331,7 +331,7 @@ class CartesianPositionY(CartesianConstraint):
         trans_scale = sw.diffable_min_fast(trans_error * gain, max_speed*t)
         trans_control = sw.save_division(trans_error_vector, trans_error) * trans_scale
 
-        soft_constraints[str(self) + u'x'] = SoftConstraint(lower=trans_control[1],
+        soft_constraints[str(self) + u'y'] = SoftConstraint(lower=trans_control[1],
                                                             upper=trans_control[1],
                                                             weight=weight,
                                                             expression=current_position[1])

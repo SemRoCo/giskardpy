@@ -36,15 +36,15 @@ class GiskardWrapper(object):
     def get_root(self):
         return self.robot_urdf.get_root()
 
-    def set_cart_goal(self, root, tip, pose_stamped):
+    def set_cart_goal(self, root, tip, pose_stamped, trans_max_speed=None, rot_max_speed=None):
         """
         :param tip:
         :type tip: str
         :param pose_stamped:
         :type pose_stamped: PoseStamped
         """
-        self.set_translation_goal(root, tip, pose_stamped)
-        self.set_rotation_goal(root, tip, pose_stamped)
+        self.set_translation_goal(root, tip, pose_stamped, max_speed=trans_max_speed)
+        self.set_rotation_goal(root, tip, pose_stamped, max_speed=rot_max_speed)
 
     def set_translation_goal(self, root, tip, pose_stamped, weight=None, gain=None, max_speed=None):
         """

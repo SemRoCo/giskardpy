@@ -172,6 +172,31 @@ def if_greater_eq_zero(condition, if_result, else_result):
     """
     return if_greater_zero(-condition, else_result, if_result)
 
+def if_greater_eq(a, b, if_result, else_result):
+    """
+    !takes a long time to compile!
+    !Returns shit if condition is very close to but not equal to zero!
+    :type a: Union[float, Symbol]
+    :type b: Union[float, Symbol]
+    :type if_result: Union[float, Symbol]
+    :type else_result: Union[float, Symbol]
+    :return: if_result if a >= b else else_result
+    :rtype: Union[float, Symbol]
+    """
+    return if_greater_zero(b-a, else_result, if_result)
+
+def if_less_eq(a, b, if_result, else_result):
+    """
+    !takes a long time to compile!
+    !Returns shit if condition is very close to but not equal to zero!
+    :type a: Union[float, Symbol]
+    :type b: Union[float, Symbol]
+    :type if_result: Union[float, Symbol]
+    :type else_result: Union[float, Symbol]
+    :return: if_result if a <= b else else_result
+    :rtype: Union[float, Symbol]
+    """
+    return if_greater_eq(b, a, else_result, if_result)
 
 def if_eq_zero(condition, if_result, else_result):
     """
@@ -307,11 +332,6 @@ def vector3(x, y, z):
     return se.Matrix([x, y, z, 0])
 
 
-unitX = vector3(1, 0, 0)
-unitY = vector3(0, 1, 0)
-unitZ = vector3(0, 0, 1)
-
-
 def point3(x, y, z):
     """
     :param x: Union[float, Symbol]
@@ -340,7 +360,7 @@ def scale(v, a):
     :type a: Union[float, Symbol]
     :rtype: Matrix
     """
-    return v / norm(v) * a
+    return save_division(v, norm(v)) * a
 
 
 def dot(a, b):

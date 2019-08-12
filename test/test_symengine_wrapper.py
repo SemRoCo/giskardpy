@@ -197,6 +197,15 @@ class TestSympyWrapper(unittest.TestCase):
 
     @given(limited_float(),
            limited_float(),
+           limited_float(),
+           limited_float())
+    def test_if_greater_eq(self, a, b, if_result, else_result):
+        r2 = np.float(if_result if a >= b else else_result)
+        self.assertAlmostEqual(speed_up_and_execute(spw.if_greater_eq, [a, b, if_result, else_result]),
+                               r2, places=7)
+
+    @given(limited_float(),
+           limited_float(),
            limited_float())
     def test_if_eq_zero(self, condition, if_result, else_result):
         r1 = np.float(spw.if_eq_zero(condition, if_result, else_result))
@@ -337,12 +346,14 @@ class TestSympyWrapper(unittest.TestCase):
         self.assertTrue(np.isclose(r1, r2), msg='|{}|2=\n{} != {}'.format(v, r1, r2))
 
     # fails if numbers too big
-    @given(st.lists(limited_float()),
+    @given(vector(3),
            limited_float())
     def test_scale(self, v, a):
-        assume(np.linalg.norm(v) != 0)
-        r1 = np.array(spw.scale(spw.Matrix(v), a)).astype(float).T[0]
-        r2 = v / np.linalg.norm(v) * a
+        r1 = speed_up_and_execute(lambda x,y,z, scale: spw.scale(spw.Matrix([x,y,z]),scale), [v[0], v[1], v[2], a])
+        if np.linalg.norm(v) == 0:
+            r2 = [0,0,0]
+        else:
+            r2 = v / np.linalg.norm(v) * a
         self.assertTrue(np.isclose(r1, r2).all(), msg='v={} a={}\n{} != {}'.format(v, a, r1, r2))
 
     # fails if numbers too big

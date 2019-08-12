@@ -516,21 +516,34 @@ class LinkToAnyAvoidance(Constraint):
 
         # TODO rename me
         def root_T_link_b():
-            cpi = data[cpi_identifier][self.link_name]
-            if cpi.body_b == self.robot_name:
-                c = get_connecting_link(cpi.link_b, cpi.link_a)
-                return get_fk(self.robot_root, c)
+            try:
+                cpi = data[cpi_identifier][(self.link_name,)][0]
+                if cpi.body_b == self.robot_name:
+                    c = get_connecting_link(cpi.link_b, cpi.link_a)
+                    return get_fk(self.robot_root, c)
+            except IndexError:
+                pass
             return identity
 
         def link_in_chain(link_name):
-            cpi = data[cpi_identifier][self.link_name]
-            body_b = cpi.body_b
-            if body_b == self.robot_name:
-                link_a = cpi.link_a
-                link_b = cpi.link_b
-                chain = get_chain(link_b, link_a, joints=False)
-                return int(link_name in chain)
+            try:
+                cpi = data[cpi_identifier][(self.link_name,)][0]
+                body_b = cpi.body_b
+                if body_b == self.robot_name:
+                    link_a = cpi.link_a
+                    link_b = cpi.link_b
+                    chain = get_chain(link_b, link_a, joints=False)
+                    return int(link_name in chain)
+            except IndexError:
+                pass
             return 1
+
+        def normal_sum(link_name):
+            collisions = data[cpi_identifier][(self.link_name,)]
+            normal = []
+            for collision in collisions:
+                normal.append(np.array(collision.contact_normal))
+            return np.sum(normal, axis=0)
 
         params = {self.repel_speed: repel_speed,
                   self.max_weight_distance: max_weight_distance,
@@ -544,22 +557,22 @@ class LinkToAnyAvoidance(Constraint):
         self.save_params_on_god_map(params)
 
     def get_distance_to_closest_object(self, link_name):
-        return self.get_god_map().to_symbol(identifier.closest_point + [link_name, u'min_dist'])
+        return self.get_god_map().to_symbol(identifier.closest_point + [(link_name,), 0, u'min_dist'])
 
     def get_contact_normal_on_b(self, link_name):
         return Vector3Input(self.god_map.to_symbol,
-                            prefix=identifier.closest_point + [link_name, u'contact_normal']).get_expression()
+                            prefix=identifier.closest_point + [(link_name,), 0, u'contact_normal']).get_expression()
 
     def get_closest_point_on_a(self, link_name):
         return Point3Input(self.god_map.to_symbol,
-                           prefix=identifier.closest_point + [link_name, u'position_on_a']).get_expression()
+                           prefix=identifier.closest_point + [(link_name,), 0, u'position_on_a']).get_expression()
 
     def get_closest_point_on_b(self, link_name):
         return Point3Input(self.god_map.to_symbol,
-                           prefix=identifier.closest_point + [link_name, u'position_on_b']).get_expression()
+                           prefix=identifier.closest_point + [(link_name,), 0, u'position_on_b']).get_expression()
 
     def get_actual_distance(self, link_name):
-        return self.god_map.to_symbol(identifier.closest_point + [link_name, u'contact_distance'])
+        return self.god_map.to_symbol(identifier.closest_point + [(link_name,), 0, u'contact_distance'])
 
     def get_is_link_in_chain_symbol(self, link_name):
         return self.god_map.to_symbol(self.get_identifier() + [self.link_in_chain, (link_name,)])

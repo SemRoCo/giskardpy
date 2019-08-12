@@ -449,14 +449,14 @@ class TestCollisionAvoidanceGoals(object):
         goal_js = {
             u'ur5_shoulder_lift_joint': .5,
         }
-        zero_pose.wrapper.set_self_collision_distance(0.025)
+        # zero_pose.wrapper.set_self_collision_distance(0.025)
         zero_pose.send_and_check_joint_goal(goal_js)
 
         arm_goal = PoseStamped()
         arm_goal.header.frame_id = zero_pose.gripper_tip
         arm_goal.pose.position.y = -.1
         arm_goal.pose.orientation.w = 1
-        zero_pose.wrapper.set_self_collision_distance(0.025)
+        # zero_pose.wrapper.set_self_collision_distance(0.025)
         zero_pose.set_and_check_cart_goal(arm_goal, zero_pose.gripper_tip, zero_pose.default_root)
 
     def test_avoid_self_collision2(self, self_collision_pose):

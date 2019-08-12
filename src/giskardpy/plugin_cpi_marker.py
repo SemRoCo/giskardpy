@@ -22,17 +22,17 @@ class CPIMarker(GiskardBehavior):
         """
         Computes closest point info for all robot links and safes it to the god map.
         """
-        cpi = self.get_god_map().safe_get_data(identifier.closest_point)
-        if cpi:
-            self.publish_cpi_markers(cpi)
+        collisions = self.get_god_map().safe_get_data(identifier.closest_point)
+        if collisions:
+            self.publish_cpi_markers(collisions)
         return Status.SUCCESS
 
-    def publish_cpi_markers(self, closest_point_infos):
+    def publish_cpi_markers(self, collisions):
         """
         Publishes a string for each ClosestPointInfo in the dict. If the distance is below the threshold, the string
         is colored red. If it is below threshold*2 it is yellow. If it is below threshold*3 it is green.
         Otherwise no string will be published.
-        :type closest_point_infos: dict
+        :type collisions: dict
         """
         m = Marker()
         m.header.frame_id = self.get_robot().get_root()
@@ -42,11 +42,12 @@ class CPIMarker(GiskardBehavior):
         # TODO make namespace parameter
         m.ns = u'pybullet collisions'
         m.scale = Vector3(0.003, 0, 0)
-        if len(closest_point_infos) > 0:
-            for collision_info in closest_point_infos.values():  # type: ClosestPointInfo
+        if len(collisions.data) > 0:
+            for collision_infos in collisions.data.values():  # type: ClosestPointInfo
+                collision_info = collision_infos[0]
                 red_threshold = collision_info.min_dist
-                yellow_threshold = collision_info.min_dist * 2
-                green_threshold = collision_info.min_dist * 3
+                yellow_threshold = red_threshold * 2
+                green_threshold = red_threshold * 3
 
                 if collision_info.contact_distance < green_threshold:
                     root_T_link = self.get_robot().get_fk_pose(self.get_robot().get_root(), collision_info.link_a)

@@ -456,42 +456,20 @@ class World(object):
 
     
 
-    def collisions_to_closest_point(self, collisions, min_allowed_distance):
-        """
-        :param collisions: (robot_link, body_b, link_b) -> ContactInfo
-        :type collisions: dict
-        :param min_allowed_distance: (robot_link, body_b, link_b) -> min allowed distance
-        :type min_allowed_distance: dict
-        :return: robot_link -> ClosestPointInfo of closest thing
-        :rtype: dict
-        """
-        closest_point = KeyDefaultDict(lambda k: ClosestPointInfo((10, 0, 0),
-                                                                  (0, 0, 0),
-                                                                  100,
-                                                                  0.0,
-                                                                  k,
-                                                                  '',
-                                                                  '',
-                                                                  (1, 0, 0), k))
+    def transform_contact_info(self, collisions):
         root_T_map = self.robot.root_T_map
         root = self.robot.get_root()
         fk = self.robot.get_fk_np
-        for key, contact_info in collisions.items():  # type: ((str, str, str), ContactInfo)
-            if contact_info is None:
-                continue
-            link1 = key[0]
-            link_T_root = np_to_kdl(fk(link1, root))
-            a_in_robot_root = link_T_root * root_T_map * PyKDL.Vector(*contact_info.position_on_a)
-            b_in_robot_root = root_T_map * PyKDL.Vector(*contact_info.position_on_b)
-            n_in_robot_root = root_T_map.M * PyKDL.Vector(*contact_info.contact_normal_on_b)
-            try:
-                cpi = ClosestPointInfo(a_in_robot_root, b_in_robot_root, contact_info.contact_distance,
-                                       min_allowed_distance[key], key[0], key[1], key[2],
-                                       n_in_robot_root, key)
-            except KeyError:
-                continue
-            if link1 in closest_point:
-                closest_point[link1] = min(closest_point[link1], cpi, key=lambda x: x.contact_distance)
-            else:
-                closest_point[link1] = cpi
-        return closest_point
+        for key, contact_infos in collisions.data.items():  # type: ((str, str, str), ClosestPointInfo)
+            for contact_info in contact_infos:
+                if contact_info is None:
+                    continue
+                link1 = key[0]
+                link_T_root = np_to_kdl(fk(link1, root))
+                a_in_link = link_T_root * root_T_map * PyKDL.Vector(*contact_info.position_on_a)
+                b_in_robot_root = root_T_map * PyKDL.Vector(*contact_info.position_on_b)
+                n_in_robot_root = root_T_map.M * PyKDL.Vector(*contact_info.contact_normal)
+                contact_info.position_on_a = a_in_link
+                contact_info.position_on_b = b_in_robot_root
+                contact_info.contact_normal = n_in_robot_root
+        return collisions

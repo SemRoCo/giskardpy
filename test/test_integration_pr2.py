@@ -1625,14 +1625,13 @@ class TestCollisionAvoidanceGoals(object):
         base_pose.header.frame_id = u'map'
         base_pose.pose.position = Point(0.743, 0.586, 0.000)
         base_pose.pose.orientation.w = 1
-        kitchen_setup.move_pr2_base(base_pose)
+        kitchen_setup.teleport_base(base_pose)
 
         # grasp
         p = PoseStamped()
         p.header.frame_id = kitchen_setup.l_tip
         p.pose.position.x = 0.2
         p.pose.orientation.w = 1
-        kitchen_setup.wrapper.avoid_collision(0.01, body_b=u'kitchen')
         kitchen_setup.wrapper.allow_collision(kitchen_setup.get_l_gripper_links(), u'kitchen',
                                               [u'sink_area', u'sink_area_surface'])
         kitchen_setup.set_and_check_cart_goal(p, kitchen_setup.l_tip, kitchen_setup.default_root)

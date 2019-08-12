@@ -589,7 +589,7 @@ class GiskardTestWrapper(object):
                                                                                 self.get_god_map().safe_get_data(
                                                                                     identifier.collisions_distances))
         collisions = self.get_world().check_collisions(collision_matrix)
-        return self.get_world().collisions_to_closest_point(collisions, collision_matrix)
+        return self.get_world().transform_contact_info(collisions, collision_matrix)
 
     def check_cpi_geq(self, links, distance_threshold):
         cpi = self.get_cpi(distance_threshold)

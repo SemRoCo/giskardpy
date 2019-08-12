@@ -7,10 +7,10 @@ from geometry_msgs.msg import Point, Pose
 from giskard_msgs.msg import CollisionEntry
 
 import giskardpy
-from giskardpy.data_types import ClosestPointInfo
+from giskardpy.data_types import ClosestPointInfo, Collisions
 from giskardpy.pybullet_world_object import PyBulletWorldObject
 from giskardpy.pybullet_wrapper import ContactInfo
-from giskardpy.tfwrapper import msg_to_kdl, np_to_kdl
+from giskardpy.tfwrapper import np_to_kdl
 from giskardpy.utils import resolve_ros_iris
 from giskardpy.world import World
 from giskardpy.world_object import WorldObject
@@ -44,7 +44,6 @@ class PyBulletWorld(World):
     def __get_pybullet_object_id(self, name):
         return self.get_object(name).get_pybullet_id()
 
-
     def check_collisions(self, cut_off_distances):
         """
         :param cut_off_distances: (robot_link, body_b, link_b) -> cut off distance. Contacts between objects not in this
@@ -57,14 +56,16 @@ class PyBulletWorld(World):
         :rtype: dict
         """
         # TODO I think I have to multiply distance with something
-        collisions = defaultdict(lambda: None)
+        collisions = Collisions()
         checked_things = set()
         for k, distance in cut_off_distances.items():
             (robot_link, body_b, link_b) = k
             r_k = (link_b, body_b, robot_link)
             if r_k in checked_things:
                 if r_k in collisions:
-                    collisions[k] = self.__flip_contact_info(collisions[r_k])
+                    for c in collisions[r_k]:
+                        collisions.add(k, self.__flip_contact_info(c))
+                    # collisions.add(k, self.__flip_contact_info(collisions[r_k]))
                 continue
             robot_link_id = self.robot.get_pybullet_link_id(robot_link)
             if self.robot.get_name() == body_b:
@@ -83,7 +84,27 @@ class PyBulletWorld(World):
                                                                         distance * 3,
                                                                         robot_link_id)]
             if len(contacts) > 0:
-                collisions.update({k: min(contacts, key=lambda x: x.contact_distance)})
+                try:
+                    body_b_object = self.get_object(body_b)
+                except KeyError:
+                    body_b_object = self.robot
+                for contact in contacts:
+
+                    if k[2] == u'':
+                        link_b = body_b_object.pybullet_link_id_to_name(contacts[0].body_unique_id_b)
+                        k2 = (k[0], k[1], link_b)
+
+                    else:
+                        k2 = k
+                    collisions.add(k2, ClosestPointInfo(contact.position_on_a,
+                                                        contact.position_on_b,
+                                                        contact.contact_distance,
+                                                        distance,
+                                                        robot_link,
+                                                        body_b,
+                                                        link_b,
+                                                        contact.contact_normal_on_b,
+                                                        k2))
                 pass
             checked_things.add(k)
         return collisions
@@ -103,24 +124,24 @@ class PyBulletWorld(World):
             contact_info3 = ContactInfo(
                 *[x for x in p.getClosestPoints(hack_id,
                                                 contact_info.body_unique_id_a, 0.001) if
-                  abs(x[8]+0.005) < 1e-5][0])
-            return not(contact_info3.body_unique_id_b == contact_info.body_unique_id_a and
-                    contact_info3.link_index_b == contact_info.link_index_a)
+                  abs(x[8] + 0.005) < 1e-5][0])
+            return not (contact_info3.body_unique_id_b == contact_info.body_unique_id_a and
+                        contact_info3.link_index_b == contact_info.link_index_a)
         except Exception as e:
             return True
 
     def __flip_contact_info(self, contact_info):
-        return ContactInfo(contact_info.contact_flag,
-                           contact_info.body_unique_id_b, contact_info.body_unique_id_a,
-                           contact_info.link_index_b, contact_info.link_index_a,
-                           contact_info.position_on_b, contact_info.position_on_a,
-                           [-contact_info.contact_normal_on_b[0],
-                            -contact_info.contact_normal_on_b[1],
-                            -contact_info.contact_normal_on_b[2]], contact_info.contact_distance,
-                           contact_info.normal_force,
-                           contact_info.lateralFriction1, contact_info.lateralFrictionDir1,
-                           contact_info.lateralFriction2,
-                           contact_info.lateralFrictionDir2)
+        return ClosestPointInfo(contact_info.position_on_b,
+                                contact_info.position_on_a,
+                                contact_info.contact_distance,
+                                contact_info.min_dist,
+                                contact_info.link_b,
+                                contact_info.body_b, # this should always be robot, because we only flip for self coll
+                                contact_info.link_a,
+                                [-contact_info.contact_normal[0],
+                                 -contact_info.contact_normal[1],
+                                 -contact_info.contact_normal[2]],
+                                contact_info.old_key)
 
     def setup(self):
         self.__add_ground_plane()
@@ -169,31 +190,30 @@ class PyBulletWorld(World):
         pwo.joint_state = object_.joint_state
         return super(PyBulletWorld, self).add_object(pwo)
 
-
-    def collisions_to_closest_point(self, collisions, min_allowed_distance):
-        """
-        :param collisions: (robot_link, body_b, link_b) -> ContactInfo
-        :type collisions: dict
-        :param min_allowed_distance: (robot_link, body_b, link_b) -> min allowed distance
-        :type min_allowed_distance: dict
-        :return: robot_link -> ClosestPointInfo of closest thing
-        :rtype: dict
-        """
-        closest_point = super(PyBulletWorld, self).collisions_to_closest_point(collisions, min_allowed_distance)
-        for key, cpi in closest_point.items():  # type: (str, ClosestPointInfo)
-            if self.__should_flip_contact_info(collisions[cpi.old_key]):
-                root_T_link = np_to_kdl(self.robot.get_fk_np(self.robot.get_root(), cpi.link_a))
-                b_link = PyKDL.Vector(*cpi.position_on_a)
-                a_root = PyKDL.Vector(*cpi.position_on_b)
-                b_root = root_T_link * b_link
-                a_link = root_T_link.Inverse() * a_root
-                closest_point[key] = ClosestPointInfo(a_link, b_root, cpi.contact_distance,
-                                                      cpi.min_dist,
-                                                      cpi.link_a,
-                                                      cpi.body_b,
-                                                      cpi.link_b,
-                                                      -np.array(cpi.contact_normal), key)
-        return closest_point
+    # def transform_contact_info(self, collisions, min_allowed_distance):
+    #     """
+    #     :param collisions: (robot_link, body_b, link_b) -> ContactInfo
+    #     :type collisions: dict
+    #     :param min_allowed_distance: (robot_link, body_b, link_b) -> min allowed distance
+    #     :type min_allowed_distance: dict
+    #     :return: robot_link -> ClosestPointInfo of closest thing
+    #     :rtype: dict
+    #     """
+    #     closest_point = super(PyBulletWorld, self).transform_contact_info(collisions, min_allowed_distance)
+    #     for key, cpi in closest_point.items():  # type: (str, ClosestPointInfo)
+    #         if self.__should_flip_contact_info(collisions[cpi.old_key]):
+    #             root_T_link = np_to_kdl(self.robot.get_fk_np(self.robot.get_root(), cpi.link_a))
+    #             b_link = PyKDL.Vector(*cpi.position_on_a)
+    #             a_root = PyKDL.Vector(*cpi.position_on_b)
+    #             b_root = root_T_link * b_link
+    #             a_link = root_T_link.Inverse() * a_root
+    #             closest_point[key] = ClosestPointInfo(a_link, b_root, cpi.contact_distance,
+    #                                                   cpi.min_dist,
+    #                                                   cpi.link_a,
+    #                                                   cpi.body_b,
+    #                                                   cpi.link_b,
+    #                                                   -np.array(cpi.contact_normal), key)
+    #     return closest_point
 
     def remove_robot(self):
         self.robot.suicide()

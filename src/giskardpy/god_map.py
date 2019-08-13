@@ -47,6 +47,8 @@ def get_data(identifier, data, default_value=0.0):
         # TODO is this really a good idea?
         # I do this because it automatically sets weights for unused goals to 0
         return default_value
+    except IndexError:
+        return default_value
     return result
 
 

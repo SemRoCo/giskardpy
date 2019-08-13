@@ -155,7 +155,7 @@ class JointPosition(Constraint):
             err = sw.shortest_angular_distance(current_joint, joint_goal)
         else:
             err = joint_goal - current_joint
-        capped_err = sw.diffable_max_fast(sw.diffable_min_fast(err, max_speed*t), -max_speed*t)
+        capped_err = sw.diffable_max_fast(sw.diffable_min_fast(err, max_speed * t), -max_speed * t)
 
         soft_constraints[str(self)] = SoftConstraint(lower=capped_err,
                                                      upper=capped_err,
@@ -274,7 +274,7 @@ class CartesianPosition(CartesianConstraint):
 
         trans_error_vector = goal_position - current_position
         trans_error = sw.norm(trans_error_vector)
-        trans_scale = sw.diffable_min_fast(trans_error * gain, max_speed*t)
+        trans_scale = sw.diffable_min_fast(trans_error * gain, max_speed * t)
         trans_control = sw.save_division(trans_error_vector, trans_error) * trans_scale
 
         soft_constraints[str(self) + u'x'] = SoftConstraint(lower=trans_control[0],
@@ -291,6 +291,7 @@ class CartesianPosition(CartesianConstraint):
                                                             expression=current_position[2])
         return soft_constraints
 
+
 class CartesianPositionX(CartesianConstraint):
     def get_constraint(self):
         goal_position = sw.position_of(self.get_goal_pose())
@@ -305,7 +306,7 @@ class CartesianPositionX(CartesianConstraint):
 
         trans_error_vector = goal_position - current_position
         trans_error = sw.norm(trans_error_vector)
-        trans_scale = sw.diffable_min_fast(trans_error * gain, max_speed*t)
+        trans_scale = sw.diffable_min_fast(trans_error * gain, max_speed * t)
         trans_control = sw.save_division(trans_error_vector, trans_error) * trans_scale
 
         soft_constraints[str(self) + u'x'] = SoftConstraint(lower=trans_control[0],
@@ -313,6 +314,7 @@ class CartesianPositionX(CartesianConstraint):
                                                             weight=weight,
                                                             expression=current_position[0])
         return soft_constraints
+
 
 class CartesianPositionY(CartesianConstraint):
     def get_constraint(self):
@@ -328,7 +330,7 @@ class CartesianPositionY(CartesianConstraint):
 
         trans_error_vector = goal_position - current_position
         trans_error = sw.norm(trans_error_vector)
-        trans_scale = sw.diffable_min_fast(trans_error * gain, max_speed*t)
+        trans_scale = sw.diffable_min_fast(trans_error * gain, max_speed * t)
         trans_control = sw.save_division(trans_error_vector, trans_error) * trans_scale
 
         soft_constraints[str(self) + u'y'] = SoftConstraint(lower=trans_control[1],
@@ -336,6 +338,7 @@ class CartesianPositionY(CartesianConstraint):
                                                             weight=weight,
                                                             expression=current_position[1])
         return soft_constraints
+
 
 class CartesianOrientation(CartesianConstraint):
     def __init__(self, god_map, root_link, tip_link, goal, weight=HIGH_WEIGHT, gain=1, max_speed=0.5):
@@ -455,7 +458,7 @@ class CartesianOrientationSlerp(CartesianConstraint):
         # denominator = (gain * angle)
         # denominator = sw.if_eq_zero(denominator, -1, denominator) # FIXME breaks if maxspeed or gain are negative
         # capped_angle = sw.diffable_max_fast(sw.diffable_min_fast(max_speed*t / denominator, 1), 0)
-        capped_angle = sw.diffable_min_fast(sw.save_division(max_speed*t, (gain * angle)), 1)
+        capped_angle = sw.diffable_min_fast(sw.save_division(max_speed * t, (gain * angle)), 1)
 
         q1 = sw.quaternion_from_matrix(current_rotation)
         q2 = sw.quaternion_from_matrix(goal_rotation)
@@ -483,7 +486,7 @@ class CartesianOrientationSlerp(CartesianConstraint):
         return soft_constraints
 
 
-class LinkToAnyAvoidance(Constraint):
+class LinkToClosestAvoidance(Constraint):
     repel_speed = u'repel_speed'
     max_weight_distance = u'max_weight_distance'
     low_weight_distance = u'low_weight_distance'
@@ -495,11 +498,12 @@ class LinkToAnyAvoidance(Constraint):
     C = u'C'
 
     def __init__(self, god_map, link_name, repel_speed=0.5, max_weight_distance=0.0, low_weight_distance=0.01,
-                 zero_weight_distance=0.05):
-        super(LinkToAnyAvoidance, self).__init__(god_map)
+                 zero_weight_distance=0.05, idx=0):
+        super(LinkToClosestAvoidance, self).__init__(god_map)
         self.link_name = link_name
         self.robot_root = self.get_robot().get_root()
         self.robot_name = self.get_robot_unsafe().get_name()
+        self.idx = idx
         x = np.array([max_weight_distance, low_weight_distance, zero_weight_distance])
         y = np.array([MAX_WEIGHT, LOW_WEIGHT, ZERO_WEIGHT])
         (A, B, C), _ = curve_fit(lambda t, a, b, c: a / (t + c) + b, x, y)
@@ -517,7 +521,7 @@ class LinkToAnyAvoidance(Constraint):
         # TODO rename me
         def root_T_link_b():
             try:
-                cpi = data[cpi_identifier][(self.link_name,)][0]
+                cpi = data[cpi_identifier][(self.link_name,)][self.idx]
                 if cpi.body_b == self.robot_name:
                     c = get_connecting_link(cpi.link_b, cpi.link_a)
                     return get_fk(self.robot_root, c)
@@ -527,7 +531,7 @@ class LinkToAnyAvoidance(Constraint):
 
         def link_in_chain(link_name):
             try:
-                cpi = data[cpi_identifier][(self.link_name,)][0]
+                cpi = data[cpi_identifier][(self.link_name,)][self.idx]
                 body_b = cpi.body_b
                 if body_b == self.robot_name:
                     link_a = cpi.link_a
@@ -538,13 +542,6 @@ class LinkToAnyAvoidance(Constraint):
                 pass
             return 1
 
-        def normal_sum(link_name):
-            collisions = data[cpi_identifier][(self.link_name,)]
-            normal = []
-            for collision in collisions:
-                normal.append(np.array(collision.contact_normal))
-            return np.sum(normal, axis=0)
-
         params = {self.repel_speed: repel_speed,
                   self.max_weight_distance: max_weight_distance,
                   self.low_weight_distance: low_weight_distance,
@@ -553,26 +550,29 @@ class LinkToAnyAvoidance(Constraint):
                   self.root_T_link_b: root_T_link_b,
                   self.A: A,
                   self.B: B,
-                  self.C: C}
+                  self.C: C, }
         self.save_params_on_god_map(params)
 
     def get_distance_to_closest_object(self, link_name):
-        return self.get_god_map().to_symbol(identifier.closest_point + [(link_name,), 0, u'min_dist'])
+        return self.get_god_map().to_symbol(identifier.closest_point + [(link_name,), self.idx, u'min_dist'])
 
     def get_contact_normal_on_b(self, link_name):
         return Vector3Input(self.god_map.to_symbol,
-                            prefix=identifier.closest_point + [(link_name,), 0, u'contact_normal']).get_expression()
+                            prefix=identifier.closest_point + [(link_name,), self.idx,
+                                                               u'contact_normal']).get_expression()
 
     def get_closest_point_on_a(self, link_name):
         return Point3Input(self.god_map.to_symbol,
-                           prefix=identifier.closest_point + [(link_name,), 0, u'position_on_a']).get_expression()
+                           prefix=identifier.closest_point + [(link_name,), self.idx,
+                                                              u'position_on_a']).get_expression()
 
     def get_closest_point_on_b(self, link_name):
         return Point3Input(self.god_map.to_symbol,
-                           prefix=identifier.closest_point + [(link_name,), 0, u'position_on_b']).get_expression()
+                           prefix=identifier.closest_point + [(link_name,), self.idx,
+                                                              u'position_on_b']).get_expression()
 
     def get_actual_distance(self, link_name):
-        return self.god_map.to_symbol(identifier.closest_point + [(link_name,), 0, u'contact_distance'])
+        return self.god_map.to_symbol(identifier.closest_point + [(link_name,), self.idx, u'contact_distance'])
 
     def get_is_link_in_chain_symbol(self, link_name):
         return self.god_map.to_symbol(self.get_identifier() + [self.link_in_chain, (link_name,)])
@@ -613,7 +613,7 @@ class LinkToAnyAvoidance(Constraint):
                                 [ZERO_WEIGHT, actual_distance > zero_weight_distance],
                                 [A / (actual_distance + C) + B, True])
 
-        limit = sw.Min(zero_weight_distance - dist, repel_speed*t)
+        limit = sw.Min(zero_weight_distance - dist, repel_speed * t)
         # limit = repel_speed * t
         # limit = 1
 
@@ -624,8 +624,233 @@ class LinkToAnyAvoidance(Constraint):
         return soft_constraints
 
     def __str__(self):
-        s = super(LinkToAnyAvoidance, self).__str__()
-        return u'{}/{}'.format(s, self.link_name)
+        s = super(LinkToClosestAvoidance, self).__str__()
+        return u'{}/{}/{}'.format(s, self.link_name, self.idx)
+
+
+class EMAAvoidance(Constraint):
+    repel_speed = u'repel_speed'
+    max_weight_distance = u'max_weight_distance'
+    low_weight_distance = u'low_weight_distance'
+    zero_weight_distance = u'zero_weight_distance'
+    root_T_link_b = u'root_T_link_b'
+    link_in_chain = u'link_in_chain'
+    A = u'A'
+    B = u'B'
+    C = u'C'
+    ema_normal = u'ema_normal'
+    a = u'a'
+    b = u'b'
+
+    def __init__(self, god_map, link_name, repel_speed=0.1, max_weight_distance=0.0, low_weight_distance=0.01,
+                 zero_weight_distance=0.05, idx=0):
+        super(EMAAvoidance, self).__init__(god_map)
+        self.link_name = link_name
+        self.robot_root = self.get_robot().get_root()
+        self.robot_name = self.get_robot_unsafe().get_name()
+        self.idx = idx
+        sample_period = self.get_god_map().safe_get_data(identifier.sample_period)
+        self.gamma = 0.1337 ** (sample_period)
+        x = np.array([max_weight_distance, low_weight_distance, zero_weight_distance])
+        y = np.array([MAX_WEIGHT, LOW_WEIGHT, ZERO_WEIGHT])
+        (A, B, C), _ = curve_fit(lambda t, a, b, c: a / (t + c) + b, x, y)
+
+        identity = np.eye(4)
+
+        cpi_identifier = identifier.closest_point[0]
+        world_identifier = identifier.world[0]
+        data = god_map._data
+        robot = data[world_identifier].robot
+        get_fk = robot.get_fk_np
+        get_chain = robot.get_chain
+        get_connecting_link = robot.get_connecting_link
+
+        # TODO rename me
+        def root_T_link_b():
+            try:
+                cpi = data[cpi_identifier][(self.link_name,)][self.idx]
+                if cpi.body_b == self.robot_name:
+                    c = get_connecting_link(cpi.link_b, cpi.link_a)
+                    return get_fk(self.robot_root, c)
+            except IndexError:
+                pass
+            return identity
+
+        def link_in_chain(link_name):
+            try:
+                cpi = data[cpi_identifier][(self.link_name,)][self.idx]
+                body_b = cpi.body_b
+                if body_b == self.robot_name:
+                    link_a = cpi.link_a
+                    link_b = cpi.link_b
+                    chain = get_chain(link_b, link_a, joints=False)
+                    return int(link_name in chain)
+            except IndexError:
+                pass
+            return 1
+
+        self.last_normal = np.array([0, 0, 0])
+
+        def ema_normal():
+            collision = data[cpi_identifier][(self.link_name,)][self.idx]
+            current_normal = np.array([collision.contact_normal[0],
+                                       collision.contact_normal[1],
+                                       collision.contact_normal[2]])
+            # print(np.linalg.norm(current_normal))
+            self.last_normal = self.last_normal * self.gamma + current_normal * (1 - self.gamma)
+            self.last_normal /= np.linalg.norm(self.last_normal)
+            # print(str(np.linalg.norm(self.last_normal))+'============================')
+
+            return current_normal
+
+        self.window = []
+        hz = int(1 / sample_period)
+
+        def moving_avg():
+            collision = data[cpi_identifier][(self.link_name,)][self.idx]
+            current_normal = np.array([collision.contact_normal[0],
+                                       collision.contact_normal[1],
+                                       collision.contact_normal[2]])
+            self.window.append(current_normal)
+            self.window = self.window[-hz / 2:]
+
+            return np.average(self.window, axis=0)
+
+        self.last_normal = np.array([0, 0, 0])
+        def avg():
+            # return data[cpi_identifier][(self.link_name,)][self.idx].contact_normal
+            normals = []
+            weights = []
+            for collision in data[cpi_identifier][(self.link_name,)][:5]:
+                normals.append(np.array([collision.contact_normal[0],
+                                         collision.contact_normal[1],
+                                         collision.contact_normal[2]]))
+                weights.append(1/(collision.contact_distance)**2)
+            if len(normals) != 0:
+                current_normal = np.average(normals, axis=0, weights=weights)
+                self.last_normal = self.last_normal * self.gamma + current_normal * (1 - self.gamma)
+                return self.last_normal
+            else:
+                return [0,0,0]
+
+        self.last_a = np.array([0, 0, 0])
+        def avg_a():
+            # return data[cpi_identifier][(self.link_name,)][self.idx].position_on_a
+            normals = []
+            weights = []
+            for collision in data[cpi_identifier][(self.link_name,)][:5]:
+                normals.append(np.array([collision.position_on_a[0],
+                                         collision.position_on_a[1],
+                                         collision.position_on_a[2]]))
+                weights.append(1/(collision.contact_distance)**2)
+            if len(normals) != 0:
+                current_normal = np.average(normals, axis=0, weights=weights)
+                self.last_a = self.last_a * self.gamma + current_normal * (1 - self.gamma)
+                return self.last_a
+            else:
+                return [0, 0, 0]
+
+        self.last_b = np.array([0, 0, 0])
+        def avg_b():
+            # return data[cpi_identifier][(self.link_name,)][self.idx].position_on_b
+            normals = []
+            weights = []
+            for collision in data[cpi_identifier][(self.link_name,)][:5]:
+                normals.append(np.array([collision.position_on_b[0],
+                                         collision.position_on_b[1],
+                                         collision.position_on_b[2]]))
+                weights.append(1/(collision.contact_distance)**2)
+            if len(normals) != 0:
+                current_normal = np.average(normals, axis=0, weights=weights)
+                self.last_b = self.last_b * self.gamma + current_normal * (1 - self.gamma)
+                return self.last_b
+            else:
+                return [0, 0, 0]
+
+        params = {self.repel_speed: repel_speed,
+                  self.max_weight_distance: max_weight_distance,
+                  self.low_weight_distance: low_weight_distance,
+                  self.zero_weight_distance: zero_weight_distance,
+                  self.link_in_chain: link_in_chain,
+                  self.root_T_link_b: root_T_link_b,
+                  self.ema_normal: avg,
+                  self.a: avg_a,
+                  self.b: avg_b,
+                  self.A: A,
+                  self.B: B,
+                  self.C: C}
+        self.save_params_on_god_map(params)
+
+    def get_distance_to_closest_object(self, link_name):
+        return self.get_god_map().to_symbol(identifier.closest_point + [(link_name,), self.idx, u'min_dist'])
+
+    def get_contact_normal_on_b(self):
+        return Vector3Input(self.god_map.to_symbol,
+                            self.get_identifier() + [self.ema_normal, tuple()]).get_expression()
+
+    def get_closest_point_on_a(self):
+        return Point3Input(self.god_map.to_symbol,
+                           self.get_identifier() + [self.a, tuple()]).get_expression()
+
+    def get_closest_point_on_b(self):
+        return Point3Input(self.god_map.to_symbol,
+                           self.get_identifier() + [self.b, tuple()]).get_expression()
+
+    def get_actual_distance(self, link_name):
+        return self.god_map.to_symbol(identifier.closest_point + [(link_name,), self.idx, u'contact_distance'])
+
+    def get_is_link_in_chain_symbol(self, link_name):
+        return self.god_map.to_symbol(self.get_identifier() + [self.link_in_chain, (link_name,)])
+
+    def get_root_T_link_b(self):
+        return FrameInput(self.god_map.to_symbol, self.get_identifier() + [self.root_T_link_b, tuple()]).get_frame()
+
+    def get_constraint(self):
+        soft_constraints = OrderedDict()
+
+        root_T_link = self.get_root_T_link_b()
+        chain = self.get_robot().get_chain(self.get_robot().get_root(), self.link_name, False, True, False)
+        for i in range(len(chain) - 1):
+            l1 = chain[i]
+            l2 = chain[i + 1]
+            link_in_chain = self.get_is_link_in_chain_symbol(l1)
+            fk_expr = self.get_fk(l1, l2)
+            root_T_link *= sw.if_eq_zero(link_in_chain, sw.eye(4), fk_expr)
+            # add_debug_constraint(soft_constraints, str(self)+'/link in chain / '+l1, link_in_chain)
+
+        point_on_link = self.get_closest_point_on_a()
+        other_point = self.get_closest_point_on_b()
+        contact_normal = self.get_contact_normal_on_b()
+        actual_distance = self.get_actual_distance(self.link_name)
+        repel_speed = self.get_input_float(self.repel_speed)
+        t = self.get_input_sampling_period()
+        max_weight_distance = self.get_input_float(self.max_weight_distance)
+        zero_weight_distance = self.get_input_float(self.zero_weight_distance)
+        A = self.get_input_float(self.A)
+        B = self.get_input_float(self.B)
+        C = self.get_input_float(self.C)
+
+        controllable_point = root_T_link * point_on_link
+
+        dist = (contact_normal.T * (controllable_point - other_point))[0]
+
+        weight_f = sw.Piecewise([MAX_WEIGHT, actual_distance <= max_weight_distance],
+                                [ZERO_WEIGHT, actual_distance > zero_weight_distance],
+                                [A / (actual_distance + C) + B, True])
+
+        limit = sw.Min(zero_weight_distance - dist, repel_speed * t)
+        # limit = repel_speed * t
+        # limit = 1
+
+        soft_constraints[str(self)] = SoftConstraint(lower=limit,
+                                                     upper=limit,
+                                                     weight=weight_f,
+                                                     expression=dist)
+        return soft_constraints
+
+    def __str__(self):
+        s = super(EMAAvoidance, self).__str__()
+        return u'{}/{}/{}'.format(s, self.link_name, self.idx)
 
 
 class AlignPlanes(Constraint):
@@ -798,7 +1023,7 @@ class Pointing(Constraint):
             pointing_axis.header.frame_id = self.tip
             pointing_axis.vector.z = 1
         tmp = np.array([pointing_axis.vector.x, pointing_axis.vector.y, pointing_axis.vector.z])
-        tmp = tmp / np.linalg.norm(tmp) #TODO possible /0
+        tmp = tmp / np.linalg.norm(tmp)  # TODO possible /0
         pointing_axis.vector = Vector3(*tmp)
 
         params = {self.goal_point: goal_point,
@@ -821,7 +1046,7 @@ class Pointing(Constraint):
         pointing_axis = self.get_pointing_axis()
 
         goal_axis = goal_point - sw.position_of(root_T_tip)
-        goal_axis /= sw.norm(goal_axis) #FIXME possible /0
+        goal_axis /= sw.norm(goal_axis)  # FIXME possible /0
         current_axis = root_T_tip * pointing_axis
         diff = goal_axis - current_axis
 

@@ -1,7 +1,5 @@
 from collections import OrderedDict, defaultdict
 
-from sortedcontainers import SortedList
-
 
 class SingleJointState(object):
     def __init__(self, name='', position=0.0, velocity=0.0, effort=0.0):
@@ -85,14 +83,7 @@ class Collisions(object):
             for k in self.key_to_key[(link_a,)]:
                 r.extend(self.data[k])
         if len(r) == 0:
-            return [ClosestPointInfo((10, 0, 0),
-                                     (0, 0, 0),
-                                     100,
-                                     0.0,
-                                     (link_a, body_b, link_b),
-                                     '',
-                                     '',
-                                     (1, 0, 0), (link_a, body_b, link_b))]
+            return []
         return list(sorted(r, key=lambda x: x.contact_distance))
 
     def __getitem__(self, item):
@@ -100,3 +91,6 @@ class Collisions(object):
 
     def __contains__(self, item):
         return item in self.data
+
+    def items(self):
+        return self.data.items()

@@ -589,17 +589,17 @@ class GiskardTestWrapper(object):
                                                                                 self.get_god_map().safe_get_data(
                                                                                     identifier.collisions_distances))
         collisions = self.get_world().check_collisions(collision_matrix)
-        return self.get_world().transform_contact_info(collisions, collision_matrix)
+        return self.get_world().transform_contact_info(collisions)
 
     def check_cpi_geq(self, links, distance_threshold):
         cpi = self.get_cpi(distance_threshold)
         if cpi == 0 or cpi == None:
             return False
         for link in links:
-            assert cpi[link].contact_distance >= distance_threshold, u'{} -- {}\n {} < {}'.format(link,
-                                                                                                  cpi[link].link_b,
+            assert cpi[(link,)][0].contact_distance >= distance_threshold, u'{} -- {}\n {} < {}'.format(link,
+                                                                                                  cpi[(link,)][0].link_b,
                                                                                                   cpi[
-                                                                                                      link].contact_distance,
+                                                                                                      (link,)][0].contact_distance,
                                                                                                   distance_threshold)
 
     def check_cpi_leq(self, links, distance_threshold):
@@ -607,10 +607,10 @@ class GiskardTestWrapper(object):
         if cpi == 0 or cpi == None:
             return False
         for link in links:
-            assert cpi[link].contact_distance <= distance_threshold, u'{} -- {}\n {} > {}'.format(link,
-                                                                                                  cpi[link].link_b,
+            assert cpi[(link,)][0].contact_distance <= distance_threshold, u'{} -- {}\n {} > {}'.format(link,
+                                                                                                  cpi[(link,)][0].link_b,
                                                                                                   cpi[
-                                                                                                      link].contact_distance,
+                                                                                                      (link,)][0].contact_distance,
                                                                                                   distance_threshold)
 
     def move_base(self, goal_pose):

@@ -650,7 +650,9 @@ class EMAAvoidance(Constraint):
         self.robot_name = self.get_robot_unsafe().get_name()
         self.idx = idx
         sample_period = self.get_god_map().safe_get_data(identifier.sample_period)
-        self.gamma = 0.1337 ** (sample_period)
+        # self.gamma = 0.5 ** (sample_period)
+        # self.gamma = int(1/sample_period)*10
+        self.gamma = 1
         x = np.array([max_weight_distance, low_weight_distance, zero_weight_distance])
         y = np.array([MAX_WEIGHT, LOW_WEIGHT, ZERO_WEIGHT])
         (A, B, C), _ = curve_fit(lambda t, a, b, c: a / (t + c) + b, x, y)
@@ -689,83 +691,61 @@ class EMAAvoidance(Constraint):
                 pass
             return 1
 
-        self.last_normal = np.array([0, 0, 0])
+        class EMA(object):
+            def __init__(self2, f, gamma, link_name, normalize=False):
+                self2.f = f
+                self2.gamma = gamma
+                self2.link_name = link_name
+                self2.last_value = None
+                self2.normalize = normalize
 
-        def ema_normal():
-            collision = data[cpi_identifier][(self.link_name,)][self.idx]
-            current_normal = np.array([collision.contact_normal[0],
-                                       collision.contact_normal[1],
-                                       collision.contact_normal[2]])
-            # print(np.linalg.norm(current_normal))
-            self.last_normal = self.last_normal * self.gamma + current_normal * (1 - self.gamma)
-            self.last_normal /= np.linalg.norm(self.last_normal)
-            # print(str(np.linalg.norm(self.last_normal))+'============================')
+            def __call__(self2):
+                normals = []
+                weights = []
+                for collision in data[cpi_identifier][(self2.link_name,)][:5]:
+                    normals.append(np.array([self2.f(collision)[0],
+                                             self2.f(collision)[1],
+                                             self2.f(collision)[2]]))
+                    weights.append(1 / (collision.contact_distance) ** 2)
+                if len(normals) != 0:
+                    current_normal = np.average(normals, axis=0, weights=weights)
+                    if self2.last_value is None:
+                        self2.last_value = current_normal
+                    else:
+                        self2.last_value = self2.last_value * self2.gamma + current_normal * (1 - self2.gamma)
+                        if self2.normalize:
+                            self2.last_value /= np.linalg.norm(self2.last_value)
+                    return self2.last_value
+                else:
+                    return [0, 0, 0]
 
-            return current_normal
+        class AVG(object):
+            def __init__(self2, f, wl, link_name, normalize=False):
+                self2.f = f
+                self2.wl = wl
+                self2.link_name = link_name
+                self2.last_values = []
+                self2.normalize = normalize
 
-        self.window = []
-        hz = int(1 / sample_period)
+            def __call__(self2):
+                normals = []
+                weights = []
+                for collision in data[cpi_identifier][(self2.link_name,)][:5]:
+                    normals.append(np.array([self2.f(collision)[0],
+                                             self2.f(collision)[1],
+                                             self2.f(collision)[2]]))
+                    weights.append(1 / (collision.contact_distance) ** 2)
+                if len(normals) != 0:
+                    current_normal = np.average(normals, axis=0, weights=weights)
+                    self2.last_values.append(current_normal)
+                    self2.last_values = self2.last_values[-self2.wl:]
+                    last_value = np.average(self2.last_values, axis=0)
+                    if self2.normalize:
+                        last_value /= np.linalg.norm(last_value)
+                    return last_value
+                else:
+                    return [0, 0, 0]
 
-        def moving_avg():
-            collision = data[cpi_identifier][(self.link_name,)][self.idx]
-            current_normal = np.array([collision.contact_normal[0],
-                                       collision.contact_normal[1],
-                                       collision.contact_normal[2]])
-            self.window.append(current_normal)
-            self.window = self.window[-hz / 2:]
-
-            return np.average(self.window, axis=0)
-
-        self.last_normal = np.array([0, 0, 0])
-        def avg():
-            # return data[cpi_identifier][(self.link_name,)][self.idx].contact_normal
-            normals = []
-            weights = []
-            for collision in data[cpi_identifier][(self.link_name,)][:5]:
-                normals.append(np.array([collision.contact_normal[0],
-                                         collision.contact_normal[1],
-                                         collision.contact_normal[2]]))
-                weights.append(1/(collision.contact_distance)**2)
-            if len(normals) != 0:
-                current_normal = np.average(normals, axis=0, weights=weights)
-                self.last_normal = self.last_normal * self.gamma + current_normal * (1 - self.gamma)
-                return self.last_normal
-            else:
-                return [0,0,0]
-
-        self.last_a = np.array([0, 0, 0])
-        def avg_a():
-            # return data[cpi_identifier][(self.link_name,)][self.idx].position_on_a
-            normals = []
-            weights = []
-            for collision in data[cpi_identifier][(self.link_name,)][:5]:
-                normals.append(np.array([collision.position_on_a[0],
-                                         collision.position_on_a[1],
-                                         collision.position_on_a[2]]))
-                weights.append(1/(collision.contact_distance)**2)
-            if len(normals) != 0:
-                current_normal = np.average(normals, axis=0, weights=weights)
-                self.last_a = self.last_a * self.gamma + current_normal * (1 - self.gamma)
-                return self.last_a
-            else:
-                return [0, 0, 0]
-
-        self.last_b = np.array([0, 0, 0])
-        def avg_b():
-            # return data[cpi_identifier][(self.link_name,)][self.idx].position_on_b
-            normals = []
-            weights = []
-            for collision in data[cpi_identifier][(self.link_name,)][:5]:
-                normals.append(np.array([collision.position_on_b[0],
-                                         collision.position_on_b[1],
-                                         collision.position_on_b[2]]))
-                weights.append(1/(collision.contact_distance)**2)
-            if len(normals) != 0:
-                current_normal = np.average(normals, axis=0, weights=weights)
-                self.last_b = self.last_b * self.gamma + current_normal * (1 - self.gamma)
-                return self.last_b
-            else:
-                return [0, 0, 0]
 
         params = {self.repel_speed: repel_speed,
                   self.max_weight_distance: max_weight_distance,
@@ -773,9 +753,9 @@ class EMAAvoidance(Constraint):
                   self.zero_weight_distance: zero_weight_distance,
                   self.link_in_chain: link_in_chain,
                   self.root_T_link_b: root_T_link_b,
-                  self.ema_normal: avg,
-                  self.a: avg_a,
-                  self.b: avg_b,
+                  self.ema_normal: AVG(lambda x: x.contact_normal, self.gamma, self.link_name, True),
+                  self.a: AVG(lambda x: x.position_on_a, self.gamma, self.link_name),
+                  self.b: AVG(lambda x: x.position_on_b, self.gamma, self.link_name),
                   self.A: A,
                   self.B: B,
                   self.C: C}
@@ -816,7 +796,6 @@ class EMAAvoidance(Constraint):
             link_in_chain = self.get_is_link_in_chain_symbol(l1)
             fk_expr = self.get_fk(l1, l2)
             root_T_link *= sw.if_eq_zero(link_in_chain, sw.eye(4), fk_expr)
-            # add_debug_constraint(soft_constraints, str(self)+'/link in chain / '+l1, link_in_chain)
 
         point_on_link = self.get_closest_point_on_a()
         other_point = self.get_closest_point_on_b()
@@ -846,6 +825,17 @@ class EMAAvoidance(Constraint):
                                                      upper=limit,
                                                      weight=weight_f,
                                                      expression=dist)
+        # add_debug_constraint(soft_constraints, str(self)+'/normal/x', contact_normal[0])
+        # add_debug_constraint(soft_constraints, str(self)+'/normal/y', contact_normal[1])
+        # add_debug_constraint(soft_constraints, str(self)+'/normal/z', contact_normal[2])
+        #
+        # add_debug_constraint(soft_constraints, str(self)+'/a/x', controllable_point[0])
+        # add_debug_constraint(soft_constraints, str(self)+'/a/y', controllable_point[1])
+        # add_debug_constraint(soft_constraints, str(self)+'/a/z', controllable_point[2])
+        #
+        # add_debug_constraint(soft_constraints, str(self)+'/b/x', other_point[0])
+        # add_debug_constraint(soft_constraints, str(self)+'/b/y', other_point[1])
+        # add_debug_constraint(soft_constraints, str(self)+'/b/z', other_point[2])
         return soft_constraints
 
     def __str__(self):

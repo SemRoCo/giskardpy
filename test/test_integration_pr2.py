@@ -178,7 +178,7 @@ def box_setup(pocky_pose_setup):
     p.pose.position.y = 0
     p.pose.position.z = 0.5
     p.pose.orientation.w = 1
-    pocky_pose_setup.add_box(pose=p)
+    pocky_pose_setup.add_box(size=[1,1,1], pose=p)
     return pocky_pose_setup
 
 
@@ -1234,15 +1234,23 @@ class TestCollisionAvoidanceGoals(object):
         box_setup.check_cpi_geq(box_setup.get_l_gripper_links(), 0.0)
         box_setup.check_cpi_leq(box_setup.get_r_gripper_links(), 0.0)
 
-    def test_avoid_collision2(self, box_setup):
+    def test_avoid_collision2(self, pocky_pose_setup):
         """
         :type box_setup: PR2
         """
         p = PoseStamped()
-        p.header.frame_id = box_setup.r_tip
+        p.header.frame_id = u'map'
+        p.pose.position.x = 1.1
+        p.pose.position.y = 0
+        p.pose.position.z = 0.6
+        p.pose.orientation.w = 1
+        pocky_pose_setup.add_box(size=[1, 1, 0.01], pose=p)
+
+        p = PoseStamped()
+        p.header.frame_id = pocky_pose_setup.r_tip
         p.pose.position = Point(0.1, 0, 0)
         p.pose.orientation = Quaternion(0, 0, 0, 1)
-        box_setup.set_cart_goal(p, box_setup.r_tip, box_setup.default_root)
+        pocky_pose_setup.set_cart_goal(p, pocky_pose_setup.r_tip, pocky_pose_setup.default_root)
 
         # box_setup.wrapper.avoid_collision()
 
@@ -1250,11 +1258,111 @@ class TestCollisionAvoidanceGoals(object):
         collision_entry.type = CollisionEntry.AVOID_COLLISION
         collision_entry.min_dist = 0.05
         collision_entry.body_b = u'box'
-        box_setup.add_collision_entries([collision_entry])
+        pocky_pose_setup.add_collision_entries([collision_entry])
 
-        box_setup.send_and_check_goal()
-        box_setup.check_cpi_geq(box_setup.get_l_gripper_links(), 0.048)
-        box_setup.check_cpi_geq(box_setup.get_r_gripper_links(), 0.048)
+        pocky_pose_setup.send_and_check_goal()
+        pocky_pose_setup.check_cpi_geq(pocky_pose_setup.get_l_gripper_links(), 0.048)
+        pocky_pose_setup.check_cpi_geq(pocky_pose_setup.get_r_gripper_links(), 0.048)
+
+    def test_avoid_collision3(self, pocky_pose_setup):
+        """
+        :type box_setup: PR2
+        """
+        pocky_pose_setup.attach_box(size=[0.2, 0.05, 0.05],
+                                    frame_id=pocky_pose_setup.r_tip,
+                                    position=[0.08,0,0],
+                                    orientation=[0,0,0,1])
+        p = PoseStamped()
+        p.header.frame_id = pocky_pose_setup.r_tip
+        p.pose.position.x = 0.15
+        p.pose.position.y = 0.04
+        p.pose.position.z = 0
+        p.pose.orientation.w = 1
+        pocky_pose_setup.add_box('bl', [0.1,0.01,0.2], p)
+        p = PoseStamped()
+        p.header.frame_id = pocky_pose_setup.r_tip
+        p.pose.position.x = 0.15
+        p.pose.position.y = -0.04
+        p.pose.position.z = 0
+        p.pose.orientation.w = 1
+        pocky_pose_setup.add_box('br', [0.1,0.01,0.2], p)
+
+        p = PoseStamped()
+        p.header.frame_id = pocky_pose_setup.r_tip
+        p.pose.position = Point(-0.15, 0, 0)
+        p.pose.orientation = Quaternion(0, 0, 0, 1)
+        pocky_pose_setup.set_cart_goal(p, pocky_pose_setup.r_tip, pocky_pose_setup.default_root)
+
+        pocky_pose_setup.send_and_check_goal()
+        # TODO check traj length?
+        pocky_pose_setup.check_cpi_geq(['box'], 0.048)
+
+    def test_avoid_collision4(self, pocky_pose_setup):
+        """
+        :type box_setup: PR2
+        """
+        pocky_pose_setup.attach_box(size=[0.2, 0.05, 0.05],
+                                    frame_id=pocky_pose_setup.r_tip,
+                                    position=[0.08,0,0],
+                                    orientation=[0,0,0,1])
+        p = PoseStamped()
+        p.header.frame_id = pocky_pose_setup.r_tip
+        p.pose.position.x = 0.2
+        p.pose.position.y = 0
+        p.pose.position.z = 0
+        p.pose.orientation.w = 1
+        pocky_pose_setup.add_box('b1', [0.01,0.2,0.2], p)
+        p = PoseStamped()
+        p.header.frame_id = pocky_pose_setup.r_tip
+        p.pose.position.x = 0.15
+        p.pose.position.y = 0.04
+        p.pose.position.z = 0
+        p.pose.orientation.w = 1
+        pocky_pose_setup.add_box('bl', [0.1,0.01,0.2], p)
+        p = PoseStamped()
+        p.header.frame_id = pocky_pose_setup.r_tip
+        p.pose.position.x = 0.15
+        p.pose.position.y = -0.04
+        p.pose.position.z = 0
+        p.pose.orientation.w = 1
+        pocky_pose_setup.add_box('br', [0.1,0.01,0.2], p)
+
+        # p = PoseStamped()
+        # p.header.frame_id = pocky_pose_setup.r_tip
+        # p.pose.position = Point(-0.15, 0, 0)
+        # p.pose.orientation = Quaternion(0, 0, 0, 1)
+        # pocky_pose_setup.set_cart_goal(p, pocky_pose_setup.r_tip, pocky_pose_setup.default_root)
+
+        pocky_pose_setup.send_and_check_goal()
+        # TODO check traj length?
+        pocky_pose_setup.check_cpi_geq(['box'], 0.048)
+
+    def test_avoid_collision5(self, pocky_pose_setup):
+        """
+        :type box_setup: PR2
+        """
+        pocky_pose_setup.attach_box(size=[0.2, 0.05, 0.05],
+                                    frame_id=pocky_pose_setup.r_tip,
+                                    position=[0.08,0,0],
+                                    orientation=[0,0,0,1])
+        p = PoseStamped()
+        p.header.frame_id = pocky_pose_setup.r_tip
+        p.pose.position.x = 0.12
+        p.pose.position.y = 0.04
+        p.pose.position.z = 0
+        p.pose.orientation.w = 1
+        pocky_pose_setup.add_cylinder('bl', [0.2,0.01], p)
+        p = PoseStamped()
+        p.header.frame_id = pocky_pose_setup.r_tip
+        p.pose.position.x = 0.12
+        p.pose.position.y = -0.04
+        p.pose.position.z = 0
+        p.pose.orientation.w = 1
+        pocky_pose_setup.add_cylinder('br', [0.2,0.01], p)
+
+        pocky_pose_setup.send_and_check_goal()
+        # TODO check traj length?
+        pocky_pose_setup.check_cpi_geq(['box'], 0.048)
 
     def test_avoid_collision_with_far_object(self, pocky_pose_setup):
         """
@@ -1806,7 +1914,7 @@ class TestCollisionAvoidanceGoals(object):
         kitchen_setup.set_cart_goal(r_goal, kitchen_setup.r_tip, kitchen_setup.default_root)
         kitchen_setup.send_and_check_goal()
         kitchen_setup.attach_existing(milk_name, kitchen_setup.r_tip)
-        kitchen_setup.keep_position(kitchen_setup.r_tip)
+        # kitchen_setup.keep_position(kitchen_setup.r_tip)
         kitchen_setup.close_r_gripper()
 
         # place milk
@@ -1817,7 +1925,7 @@ class TestCollisionAvoidanceGoals(object):
         kitchen_setup.set_cart_goal(milk_goal, milk_name, kitchen_setup.default_root)
         kitchen_setup.send_and_check_goal()
 
-        kitchen_setup.keep_position(kitchen_setup.r_tip)
+        # kitchen_setup.keep_position(kitchen_setup.r_tip)
         kitchen_setup.open_r_gripper()
 
         kitchen_setup.detach_object(milk_name)

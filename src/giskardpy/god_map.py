@@ -18,7 +18,10 @@ def get_member(identifier, member):
     except TypeError:
         if callable(identifier):
             return identifier(*member)
-        return getattr(identifier, member)
+        try:
+            return getattr(identifier, member)
+        except TypeError:
+            pass
     except IndexError:
         return identifier[int(member)]
 

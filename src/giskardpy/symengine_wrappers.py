@@ -950,14 +950,15 @@ def diffable_slerp(q1, q2, t):
     half_theta = acos(cos_half_theta)
 
     sin_half_theta = sqrt(1.0 - cos_half_theta * cos_half_theta)
-    # prevent /0
-    sin_half_theta = diffable_if_eq_zero(sin_half_theta, 1, sin_half_theta)
     if2 = 0.001 - diffable_abs(sin_half_theta)
 
-    ratio_a = sin((1.0 - t) * half_theta) / sin_half_theta
-    ratio_b = sin(t * half_theta) / sin_half_theta
-    return diffable_if_greater_eq_zero(if1, se.Matrix(q1),
-                                       diffable_if_greater_zero(if2, 0.5 * q1 + 0.5 * q2, ratio_a * q1 + ratio_b * q2))
+    ratio_a = save_division(sin((1.0 - t) * half_theta), sin_half_theta)
+    ratio_b = save_division(sin(t * half_theta), sin_half_theta)
+    return diffable_if_greater_eq_zero(if1,
+                                       se.Matrix(q1),
+                                       diffable_if_greater_zero(if2,
+                                                                0.5 * q1 + 0.5 * q2,
+                                                                ratio_a * q1 + ratio_b * q2))
 
 
 def piecewise_matrix(*piecewise_vector):

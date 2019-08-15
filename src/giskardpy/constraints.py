@@ -1,3 +1,4 @@
+from __future__ import division
 import numbers
 import numpy as np
 from collections import OrderedDict
@@ -635,6 +636,7 @@ class EMAAvoidance(Constraint):
     zero_weight_distance = u'zero_weight_distance'
     root_T_link_b = u'root_T_link_b'
     link_in_chain = u'link_in_chain'
+    max_speed = u'max_speed'
     A = u'A'
     B = u'B'
     C = u'C'
@@ -643,7 +645,7 @@ class EMAAvoidance(Constraint):
     b = u'b'
 
     def __init__(self, god_map, link_name, repel_speed=0.1, max_weight_distance=0.0, low_weight_distance=0.01,
-                 zero_weight_distance=0.05, idx=0):
+                 zero_weight_distance=0.05, idx=0, max_speed=0.1):
         super(EMAAvoidance, self).__init__(god_map)
         self.link_name = link_name
         self.robot_root = self.get_robot().get_root()
@@ -720,12 +722,11 @@ class EMAAvoidance(Constraint):
                     return [0, 0, 0]
 
         class AVG(object):
-            def __init__(self2, f, wl, link_name, normalize=False):
+            def __init__(self2, f, wl, link_name):
                 self2.f = f
                 self2.wl = wl
                 self2.link_name = link_name
                 self2.last_values = []
-                self2.normalize = normalize
 
             def __call__(self2):
                 normals = []
@@ -734,26 +735,58 @@ class EMAAvoidance(Constraint):
                     normals.append(np.array([self2.f(collision)[0],
                                              self2.f(collision)[1],
                                              self2.f(collision)[2]]))
-                    weights.append(1 / (collision.contact_distance) ** 2)
+                    weights.append(1)
                 if len(normals) != 0:
                     current_normal = np.average(normals, axis=0, weights=weights)
                     self2.last_values.append(current_normal)
                     self2.last_values = self2.last_values[-self2.wl:]
                     last_value = np.average(self2.last_values, axis=0)
-                    if self2.normalize:
-                        last_value /= np.linalg.norm(last_value)
                     return last_value
                 else:
                     return [0, 0, 0]
 
+        class AVG2(object):
+            def __init__(self2, f, wl, link_name):
+                self2.f = f
+                self2.wl = wl
+                self2.link_name = link_name
+                self2.last_values = []
+
+            def __call__(self2):
+                vs = []
+                min_dists = []
+                for collision in data[cpi_identifier][(self2.link_name,)][:5]:
+                    d = collision.contact_distance
+                    vs.append(np.array([self2.f(collision)[0] * d,
+                                        self2.f(collision)[1] * d,
+                                        self2.f(collision)[2] * d]))
+                    # weights.append(1 / (collision.contact_distance) ** 2)
+                    min_dists.append(collision.min_dist)
+                if len(vs) != 0:
+                    vs = np.atleast_2d(vs).T
+                    min_dists = np.array(min_dists)
+                    scale = np.max([np.zeros(vs.shape[1]), min_dists - np.linalg.norm(vs, axis=0)], axis=0)
+                    vs = vs / np.linalg.norm(vs, axis=0)
+                    vs *= scale
+                    a = np.max([np.zeros(vs.shape[0]), np.max(vs, axis=1)], axis=0)
+                    b = np.min([np.zeros(vs.shape[0]), np.min(vs, axis=1)], axis=0)
+                    current_normal = a + b
+                    self2.last_values.append(current_normal)
+                    self2.last_values = self2.last_values[-self2.wl:]
+                    last_value = np.average(self2.last_values, axis=0)
+                    # last_value /= np.linalg.norm(last_value)
+                    return last_value
+                else:
+                    return [0, 0, 0]
 
         params = {self.repel_speed: repel_speed,
                   self.max_weight_distance: max_weight_distance,
                   self.low_weight_distance: low_weight_distance,
                   self.zero_weight_distance: zero_weight_distance,
+                  self.max_speed: max_speed,
                   self.link_in_chain: link_in_chain,
                   self.root_T_link_b: root_T_link_b,
-                  self.ema_normal: AVG(lambda x: x.contact_normal, self.gamma, self.link_name, True),
+                  self.ema_normal: AVG2(lambda x: x.contact_normal, self.gamma, self.link_name),
                   self.a: AVG(lambda x: x.position_on_a, self.gamma, self.link_name),
                   self.b: AVG(lambda x: x.position_on_b, self.gamma, self.link_name),
                   self.A: A,
@@ -798,10 +831,11 @@ class EMAAvoidance(Constraint):
             root_T_link *= sw.if_eq_zero(link_in_chain, sw.eye(4), fk_expr)
 
         point_on_link = self.get_closest_point_on_a()
-        other_point = self.get_closest_point_on_b()
+        # other_point = self.get_closest_point_on_b()
         contact_normal = self.get_contact_normal_on_b()
         actual_distance = self.get_actual_distance(self.link_name)
         repel_speed = self.get_input_float(self.repel_speed)
+        max_speed = self.get_input_float(self.max_speed)
         t = self.get_input_sampling_period()
         max_weight_distance = self.get_input_float(self.max_weight_distance)
         zero_weight_distance = self.get_input_float(self.zero_weight_distance)
@@ -811,24 +845,37 @@ class EMAAvoidance(Constraint):
 
         controllable_point = root_T_link * point_on_link
 
-        dist = (contact_normal.T * (controllable_point - other_point))[0]
+        # dist = (contact_normal.T * (controllable_point - other_point))[0]
 
         weight_f = sw.Piecewise([MAX_WEIGHT, actual_distance <= max_weight_distance],
                                 [ZERO_WEIGHT, actual_distance > zero_weight_distance],
                                 [A / (actual_distance + C) + B, True])
 
-        limit = sw.Min(zero_weight_distance - dist, repel_speed * t)
+        # limit = sw.Min(zero_weight_distance - dist, repel_speed * t)
+        # contact_normal *= sw.Max(0, sw.Min(zero_weight_distance - actual_distance, repel_speed * t))
         # limit = repel_speed * t
         # limit = 1
 
-        soft_constraints[str(self)] = SoftConstraint(lower=limit,
-                                                     upper=limit,
-                                                     weight=weight_f,
-                                                     expression=dist)
+        trans_error = sw.norm(contact_normal)
+        trans_scale = sw.diffable_min_fast(trans_error, max_speed * t)
+        trans_control = sw.save_division(contact_normal, trans_error) * trans_scale
+
+        soft_constraints[str(self) + '/x'] = SoftConstraint(lower=trans_control[0],
+                                                            upper=trans_control[0],
+                                                            weight=weight_f,
+                                                            expression=controllable_point[0])
+        soft_constraints[str(self) + '/y'] = SoftConstraint(lower=trans_control[1],
+                                                            upper=trans_control[1],
+                                                            weight=weight_f,
+                                                            expression=controllable_point[1])
+        soft_constraints[str(self) + '/z'] = SoftConstraint(lower=trans_control[2],
+                                                            upper=trans_control[2],
+                                                            weight=weight_f,
+                                                            expression=controllable_point[2])
         # add_debug_constraint(soft_constraints, str(self)+'/normal/x', contact_normal[0])
         # add_debug_constraint(soft_constraints, str(self)+'/normal/y', contact_normal[1])
         # add_debug_constraint(soft_constraints, str(self)+'/normal/z', contact_normal[2])
-        #
+
         # add_debug_constraint(soft_constraints, str(self)+'/a/x', controllable_point[0])
         # add_debug_constraint(soft_constraints, str(self)+'/a/y', controllable_point[1])
         # add_debug_constraint(soft_constraints, str(self)+'/a/z', controllable_point[2])

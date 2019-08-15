@@ -83,7 +83,15 @@ class Collisions(object):
             for k in self.key_to_key[(link_a,)]:
                 r.extend(self.data[k])
         if len(r) == 0:
-            return []
+            return [ClosestPointInfo([0,0,0],
+                                     [0,0,0],
+                                     100,
+                                     0,
+                                     link_a,
+                                     body_b,
+                                     link_b,
+                                     [0,0,1],
+                                     (link_a, body_b, link_b))]
         return list(sorted(r, key=lambda x: x.contact_distance))
 
     def __getitem__(self, item):

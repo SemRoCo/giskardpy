@@ -366,8 +366,99 @@ class TestCollisionAvoidanceGoals(object):
         better_pose.set_translation_goal(pocky_goal, pocky, u'base_footprint')
         better_pose.send_and_check_goal()
 
-    def test_pick_low_place_high(self, better_pose):
-        pass
+    def test_avoid_collision2(self, better_pose):
+        """
+        :type box_setup: PR2
+        """
+        better_pose.attach_box(size=[0.05, 0.05, 0.2],
+                                    frame_id=better_pose.gripper_tip,
+                                    position=[0,0,0.08],
+                                    orientation=[0,0,0,1])
+        p = PoseStamped()
+        p.header.frame_id = better_pose.gripper_tip
+        p.pose.position.x = 0
+        p.pose.position.z = 0.15
+        p.pose.position.y = -0.04
+        p.pose.orientation.w = 1
+        better_pose.add_box('br', [0.2,0.01,0.1], p)
+
+
+        better_pose.send_and_check_goal()
+        better_pose.check_cpi_geq(['box'], 0.025)
+
+    def test_avoid_collision3(self, better_pose):
+        """
+        :type box_setup: PR2
+        """
+        better_pose.attach_box(size=[0.05, 0.05, 0.2],
+                                    frame_id=better_pose.gripper_tip,
+                                    position=[0,0,0.08],
+                                    orientation=[0,0,0,1])
+        p = PoseStamped()
+        p.header.frame_id = better_pose.gripper_tip
+        p.pose.position.x = 0
+        p.pose.position.z = 0.15
+        p.pose.position.y = 0.04
+        p.pose.orientation.w = 1
+        better_pose.add_box('bl', [0.2,0.01,0.1], p)
+        p = PoseStamped()
+        p.header.frame_id = better_pose.gripper_tip
+        p.pose.position.x = 0
+        p.pose.position.z = 0.15
+        p.pose.position.y = -0.04
+        p.pose.orientation.w = 1
+        better_pose.add_box('br', [0.2,0.01,0.1], p)
+
+        p = PoseStamped()
+        p.header.frame_id = better_pose.gripper_tip
+        p.pose.position = Point(0, 0, -0.15)
+        p.pose.orientation = Quaternion(0, 0, 0, 1)
+        better_pose.set_cart_goal(p, better_pose.gripper_tip, better_pose.default_root)
+
+        better_pose.send_and_check_goal()
+        # TODO check traj length?
+        better_pose.check_cpi_geq(['box'], 0.048)
+
+    def test_avoid_collision4(self, better_pose):
+        """
+        :type box_setup: PR2
+        """
+        better_pose.attach_cylinder(height=0.2,
+                                    radius=0.025,
+                                    frame_id=better_pose.gripper_tip,
+                                    position=[0,0,0.08],
+                                    orientation=[0,0,0,1])
+        p = PoseStamped()
+        p.header.frame_id = better_pose.gripper_tip
+        p.pose.position.x = 0
+        p.pose.position.z = 0.15
+        p.pose.position.y = 0.04
+        p.pose.orientation = Quaternion(*quaternion_about_axis(np.pi/2, [0,1,0]))
+        better_pose.add_cylinder('fdown', [0.2,0.01], p)
+        p = PoseStamped()
+        p.header.frame_id = better_pose.gripper_tip
+        p.pose.position.x = 0
+        p.pose.position.z = 0.15
+        p.pose.position.y = -0.07
+        p.pose.orientation = Quaternion(*quaternion_about_axis(np.pi/2, [0,1,0]))
+        better_pose.add_cylinder('fup', [0.2,0.01], p)
+        p = PoseStamped()
+        p.header.frame_id = better_pose.gripper_tip
+        p.pose.position.x = 0
+        p.pose.position.z = 0.05
+        p.pose.position.y = 0.07
+        p.pose.orientation = Quaternion(*quaternion_about_axis(np.pi/2, [0,1,0]))
+        better_pose.add_cylinder('bdown', [0.2,0.01], p)
+        p = PoseStamped()
+        p.header.frame_id = better_pose.gripper_tip
+        p.pose.position.x = 0
+        p.pose.position.z = 0.05
+        p.pose.position.y = -0.04
+        p.pose.orientation = Quaternion(*quaternion_about_axis(np.pi/2, [0,1,0]))
+        better_pose.add_cylinder('bup', [0.2,0.01], p)
+
+        better_pose.send_and_check_goal()
+        # TODO check traj length?
 
     def test_place_in_shelf(self, shelf_setup):
         """

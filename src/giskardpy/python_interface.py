@@ -12,7 +12,7 @@ from shape_msgs.msg import SolidPrimitive
 from visualization_msgs.msg import MarkerArray
 
 from giskardpy.urdf_object import URDFObject
-from giskardpy.utils import dict_to_joint_states, make_world_body_box
+from giskardpy.utils import dict_to_joint_states, make_world_body_box, make_world_body_cylinder
 
 
 class GiskardWrapper(object):
@@ -428,6 +428,25 @@ class GiskardWrapper(object):
         pose.pose.orientation = Quaternion(*(orientation if orientation is not None else [0, 0, 0, 1]))
 
         req = UpdateWorldRequest(UpdateWorldRequest.ADD, box, True, pose)
+        return self.update_world.call(req)
+
+    def attach_cylinder(self, name=u'cylinder', height=1, radius=1, frame_id=None, position=None, orientation=None):
+        """
+        :type name: str
+        :type size: list
+        :type frame_id: str
+        :type position: list
+        :type orientation: list
+        :rtype: UpdateWorldResponse
+        """
+        cylinder = make_world_body_cylinder(name, height, radius)
+        pose = PoseStamped()
+        pose.header.stamp = rospy.Time.now()
+        pose.header.frame_id = str(frame_id) if frame_id is not None else u'map'
+        pose.pose.position = Point(*(position if position is not None else [0, 0, 0]))
+        pose.pose.orientation = Quaternion(*(orientation if orientation is not None else [0, 0, 0, 1]))
+
+        req = UpdateWorldRequest(UpdateWorldRequest.ADD, cylinder, True, pose)
         return self.update_world.call(req)
 
     def attach_object(self, name, link_frame_id):

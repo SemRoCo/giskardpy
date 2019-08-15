@@ -570,6 +570,29 @@ class GiskardTestWrapper(object):
             compare_poses(expected_pose.pose, lookup_pose(frame_id, name).pose)
         self.loop_once()
 
+    def attach_cylinder(self, name=u'cylinder', height=1, radius=1, frame_id=None, position=None, orientation=None,
+                   expected_response=UpdateWorldResponse.SUCCESS):
+        scm = self.get_robot().get_self_collision_matrix()
+        expected_pose = PoseStamped()
+        expected_pose.header.frame_id = frame_id
+        expected_pose.pose.position = Point(*position)
+        if orientation:
+            expected_pose.pose.orientation = Quaternion(*orientation)
+        else:
+            expected_pose.pose.orientation = Quaternion(0, 0, 0, 1)
+        r = self.wrapper.attach_cylinder(name, height, radius, frame_id, position, orientation)
+        assert r.error_codes == expected_response, \
+            u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
+                                            update_world_error_code(expected_response))
+        if expected_response == UpdateWorldResponse.SUCCESS:
+            self.wait_for_synced()
+            assert name in self.get_controllable_links()
+            assert not self.get_world().has_object(name)
+            assert scm.difference(self.get_robot().get_self_collision_matrix()) == set()
+            assert len(scm) < len(self.get_robot().get_self_collision_matrix())
+            compare_poses(expected_pose.pose, lookup_pose(frame_id, name).pose)
+        self.loop_once()
+
     def attach_existing(self, name=u'box', frame_id=None, expected_response=UpdateWorldResponse.SUCCESS):
         scm = self.get_robot().get_self_collision_matrix()
         r = self.wrapper.attach_object(name, frame_id)

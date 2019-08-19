@@ -423,36 +423,36 @@ class TestCollisionAvoidanceGoals(object):
         """
         :type box_setup: PR2
         """
-        better_pose.attach_cylinder(height=0.2,
+        better_pose.attach_cylinder(height=0.3,
                                     radius=0.025,
                                     frame_id=better_pose.gripper_tip,
-                                    position=[0,0,0.08],
+                                    position=[0,0,0.13],
                                     orientation=[0,0,0,1])
         p = PoseStamped()
         p.header.frame_id = better_pose.gripper_tip
         p.pose.position.x = 0
-        p.pose.position.z = 0.15
+        p.pose.position.z = 0.25
         p.pose.position.y = 0.04
         p.pose.orientation = Quaternion(*quaternion_about_axis(np.pi/2, [0,1,0]))
         better_pose.add_cylinder('fdown', [0.2,0.01], p)
         p = PoseStamped()
         p.header.frame_id = better_pose.gripper_tip
         p.pose.position.x = 0
-        p.pose.position.z = 0.15
+        p.pose.position.z = 0.25
         p.pose.position.y = -0.07
         p.pose.orientation = Quaternion(*quaternion_about_axis(np.pi/2, [0,1,0]))
         better_pose.add_cylinder('fup', [0.2,0.01], p)
         p = PoseStamped()
         p.header.frame_id = better_pose.gripper_tip
         p.pose.position.x = 0
-        p.pose.position.z = 0.05
+        p.pose.position.z = 0.15
         p.pose.position.y = 0.07
         p.pose.orientation = Quaternion(*quaternion_about_axis(np.pi/2, [0,1,0]))
         better_pose.add_cylinder('bdown', [0.2,0.01], p)
         p = PoseStamped()
         p.header.frame_id = better_pose.gripper_tip
         p.pose.position.x = 0
-        p.pose.position.z = 0.05
+        p.pose.position.z = 0.15
         p.pose.position.y = -0.04
         p.pose.orientation = Quaternion(*quaternion_about_axis(np.pi/2, [0,1,0]))
         better_pose.add_cylinder('bup', [0.2,0.01], p)

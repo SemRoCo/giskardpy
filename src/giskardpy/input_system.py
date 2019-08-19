@@ -30,6 +30,14 @@ class Vector3Input(Point3Input):
     def get_expression(self):
         return sw.vector3(self.x, self.y, self.z)
 
+class WrenchInput(InputArray):
+    def __init__(self, to_expr, prefix=(), suffix=(), fx=(0,), fy=(1,), fz=(2,), tx=(3,), ty=(4,), tz=(5,)):
+        super(WrenchInput, self).__init__(to_expr, prefix, suffix,
+                                          fx=fx, fy=fy, fz=fz, tx=tx, ty=ty, tz=tz)
+
+    def get_expression(self):
+        return sw.Matrix([self.fx, self.fy, self.fz, self.tx, self.ty, self.tz])
+
 
 class Vector3StampedInput(InputArray):
     def __init__(self, to_expr, vector_prefix=(), vector_suffix=(), x=(u'x',), y=(u'y',), z=(u'z',)):

@@ -1,5 +1,6 @@
 import PyKDL
 import rospy
+import numpy as np
 from geometry_msgs.msg import PoseStamped, Vector3Stamped, PointStamped, TransformStamped, Pose, Quaternion, Point, \
     Vector3, Twist, TwistStamped
 from tf.transformations import quaternion_from_matrix
@@ -254,3 +255,23 @@ def np_to_kdl(matrix):
                      matrix[1, 3],
                      matrix[2, 3])
     return PyKDL.Frame(r, p)
+
+def to_np(kdl_thing):
+    if isinstance(kdl_thing, PyKDL.Wrench):
+        return np.array([kdl_thing.force[0],
+                         kdl_thing.force[1],
+                         kdl_thing.force[2],
+                         kdl_thing.torque[0],
+                         kdl_thing.torque[1],
+                         kdl_thing.torque[2]])
+    if isinstance(kdl_thing, PyKDL.Twist):
+        return np.array([kdl_thing.vel[0],
+                         kdl_thing.vel[1],
+                         kdl_thing.vel[2],
+                         kdl_thing.rot[0],
+                         kdl_thing.rot[1],
+                         kdl_thing.rot[2]])
+    if isinstance(kdl_thing, PyKDL.Vector):
+        return np.array([kdl_thing[0],
+                         kdl_thing[1],
+                         kdl_thing[2]])

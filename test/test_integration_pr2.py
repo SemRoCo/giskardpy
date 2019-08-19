@@ -1332,7 +1332,7 @@ class TestCollisionAvoidanceGoals(object):
         # p.pose.position = Point(-0.15, 0, 0)
         # p.pose.orientation = Quaternion(0, 0, 0, 1)
         # pocky_pose_setup.set_cart_goal(p, pocky_pose_setup.r_tip, pocky_pose_setup.default_root)
-
+        pocky_pose_setup.allow_self_collision()
         pocky_pose_setup.send_and_check_goal()
         # TODO check traj length?
         pocky_pose_setup.check_cpi_geq(['box'], 0.048)

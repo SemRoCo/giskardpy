@@ -479,6 +479,7 @@ class TestCollisionAvoidanceGoals(object):
                                                                           [0, 1, 0, 0],
                                                                           [0, 0, 0, 1]]))
         shelf_setup.allow_collision([CollisionEntry.ALL], box, [CollisionEntry.ALL])
+        # shelf_setup.allow_all_collisions()
         shelf_setup.set_and_check_cart_goal(grasp_pose, u'refills_finger')
 
         shelf_setup.attach_existing(box, u'refills_finger')

@@ -752,17 +752,11 @@ class EMAAvoidance(Constraint):
 
             def __call__(self2):
                 vs = []
-                # fs = []
-                # min_dists = []
-                for collision in data[cpi_identifier][(self2.link_name,)][:5]:
+                for collision in data[cpi_identifier][(self2.link_name,)]:
                     d = max(collision.min_dist - collision.contact_distance, 0)
                     if d == 0:
                         vs.append(np.zeros(6))
                         continue
-                    # link_T_a = kdl.Frame()
-                    # link_T_a.p[0] = collision.position_on_a[0]
-                    # link_T_a.p[1] = collision.position_on_a[1]
-                    # link_T_a.p[2] = collision.position_on_a[2]
                     link_T_root = np_to_kdl(get_fk(self.link_name, robot.get_root()))
                     v = kdl.Vector()
                     v[0] = self2.f(collision)[0]
@@ -781,27 +775,12 @@ class EMAAvoidance(Constraint):
                     vs.append(wrench)
 
 
-                    # w = kdl.Wrench()
-                    # w.force[0] = v_link[0] * d
-                    # w.force[1] = v_link[1] * d
-                    # w.force[2] = v_link[2] * d
-                    # vs.append(to_np(link_T_a*w))
-                    # weights.append(1 / (collision.contact_distance) ** 2)
-                    # min_dists.append(collision.min_dist)
                 if len(vs) != 0:
                     vs = np.atleast_2d(vs).T
-                    # min_dists = np.array(min_dists)
-                    # scale = np.max([np.zeros(vs.shape[1]), min_dists - np.linalg.norm(vs, axis=0)], axis=0)
-                    # vs = vs / np.linalg.norm(vs, axis=0)
-                    # vs *= scale
                     current_normal = np.sum(vs, axis=1)
-                    # a = np.max([np.zeros(vs.shape[0]), np.max(vs, axis=1)], axis=0)
-                    # b = np.min([np.zeros(vs.shape[0]), np.min(vs, axis=1)], axis=0)
-                    # current_normal = a + b
                     self2.last_values.append(current_normal)
                     self2.last_values = self2.last_values[-self2.wl:]
                     last_value = np.average(self2.last_values, axis=0)
-                    # last_value /= np.linalg.norm(last_value)
                     return last_value
                 else:
                     return [0, 0, 0]
@@ -888,7 +867,7 @@ class EMAAvoidance(Constraint):
         trans_scale = sw.diffable_min_fast(trans_error, max_speed * t)
         trans_control = self.get_fk(self.get_robot().get_root(), self.link_name) * \
                         sw.vector3(*sw.save_division(trans_error_vector, trans_error) * trans_scale)
-        current_position = sw.position_of(self.get_fk(self.get_robot().get_root(), self.link_name))
+        current_position = sw.position_of(root_T_link)
 
         soft_constraints[str(self) + u'/fx'] = SoftConstraint(lower=trans_control[0],
                                                             upper=trans_control[0],
@@ -919,7 +898,7 @@ class EMAAvoidance(Constraint):
         max_speed = self.get_input_float(self.max_speed)
         t = self.get_input_sampling_period()
 
-        root_R_link = sw.rotation_of(self.get_fk(self.get_robot().get_root(), self.link_name))
+        # root_R_link = sw.rotation_of(self.get_fk(self.get_robot().get_root(), self.link_name))
         root_R_link_eval = sw.rotation_of(self.get_fk_evaluated(self.get_robot().get_root(), self.link_name))
 
         angle = sw.norm(goal_rotation)
@@ -929,8 +908,8 @@ class EMAAvoidance(Constraint):
         goal_rotation = sw.save_division(goal_rotation, angle)
         goal_rotation *= capped_angle
 
-        hack = sw.rotation_matrix_from_axis_angle([0, 0, 1], 0.0001)
-        axis2, angle2 = sw.diffable_axis_angle_from_matrix((root_R_link.T * (root_R_link_eval * hack)).T)
+        hack = sw.rotation_matrix_from_axis_angle([0, 1, 0], 0.0001)
+        axis2, angle2 = sw.diffable_axis_angle_from_matrix((sw.rotation_of(root_T_link).T * (root_R_link_eval * hack)).T)
         c_aa = (axis2 * angle2)
 
         soft_constraints[str(self) + u'/tx'] = SoftConstraint(lower=goal_rotation[0],

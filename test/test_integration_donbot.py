@@ -314,7 +314,7 @@ class TestCartGoals(object):
 
 
 class TestCollisionAvoidanceGoals(object):
-    #kernprof -lv py.test test/test_integration_donbot.py::TestCollisionAvoidanceGoals::test_place_in_shelf
+    #kernprof -lv py.test -s test/test_integration_donbot.py::TestCollisionAvoidanceGoals::test_place_in_shelf
     def test_avoid_collision(self, better_pose):
         """
         :type zero_pose: Donbot
@@ -334,9 +334,6 @@ class TestCollisionAvoidanceGoals(object):
         :type zero_pose: Donbot
         """
         pocky = u'box'
-        # hack_link_name = u'hack_link'
-        # box_object = URDFObject.from_world_body(make_world_body_box(box_name, 0.05, 0.03, 0.2))
-        # link_object = URDFObject.from_world_body(make_world_body_box(hack_link_name, 0.01, 0.01, 0.01))
 
         p = PoseStamped()
         p.header.frame_id = u'refills_finger'
@@ -354,7 +351,6 @@ class TestCollisionAvoidanceGoals(object):
         root_normal.header.frame_id = u'base_footprint'
         root_normal.vector.z = 1
         better_pose.align_planes(pocky, tip_normal, u'base_footprint', root_normal)
-        # better_pose.add_json_goal(u'GravityJoint', joint_name=u'refills_finger', object_name=pocky)
 
         pocky_goal = PoseStamped()
         pocky_goal.header.frame_id = pocky
@@ -524,14 +520,13 @@ class TestCollisionAvoidanceGoals(object):
         goal_js = {
             u'ur5_shoulder_lift_joint': .5,
         }
-        zero_pose.allow_self_collision()
-        zero_pose.send_and_check_joint_goal(goal_js)
+        zero_pose.set_joint_goal(goal_js)
+        zero_pose.send_and_check_goal()
 
         arm_goal = PoseStamped()
         arm_goal.header.frame_id = zero_pose.gripper_tip
         arm_goal.pose.position.y = -.1
         arm_goal.pose.orientation.w = 1
-        zero_pose.allow_self_collision()
         zero_pose.set_and_check_cart_goal(arm_goal, zero_pose.gripper_tip, zero_pose.default_root)
 
     def test_avoid_self_collision(self, zero_pose):

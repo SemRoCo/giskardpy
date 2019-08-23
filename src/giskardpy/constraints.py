@@ -1,7 +1,9 @@
 from __future__ import division
+
 import numbers
 import numpy as np
 from collections import OrderedDict
+
 import PyKDL as kdl
 from geometry_msgs.msg import Vector3Stamped, Vector3
 from rospy_message_converter.message_converter import convert_dictionary_to_ros_message
@@ -591,9 +593,9 @@ class LinkToClosestAvoidance(Constraint):
             root_T_link *= sw.if_eq_zero(link_in_chain, sw.eye(4), fk_expr)
             # add_debug_constraint(soft_constraints, str(self)+'/link in chain / '+l1, link_in_chain)
 
-        point_on_link = self.get_closest_point_on_a(self.link_name)
-        other_point = self.get_closest_point_on_b(self.link_name)
-        contact_normal = self.get_contact_normal_on_b(self.link_name)
+        a_link = self.get_closest_point_on_a(self.link_name)
+        b_root = self.get_closest_point_on_b(self.link_name)
+        n_root = self.get_contact_normal_on_b(self.link_name)
         actual_distance = self.get_actual_distance(self.link_name)
         repel_speed = self.get_input_float(self.repel_speed)
         t = self.get_input_sampling_period()
@@ -603,22 +605,55 @@ class LinkToClosestAvoidance(Constraint):
         B = self.get_input_float(self.B)
         C = self.get_input_float(self.C)
 
-        controllable_point = root_T_link * point_on_link
+        a_root = root_T_link * a_link
 
-        dist = (contact_normal.T * (controllable_point - other_point))[0]
+        # dist = (contact_normal.T * (controllable_point - other_point))[0]
 
-        weight_f = sw.Piecewise([MAX_WEIGHT, actual_distance <= max_weight_distance],
-                                [ZERO_WEIGHT, actual_distance > zero_weight_distance],
-                                [A / (actual_distance + C) + B, True])
+        # trans_error_vector = a_root - b_root
+        # trans_error = sw.norm(trans_error_vector)
+        # trans_scale = sw.diffable_min_fast(trans_error, repel_speed * t)
+        # trans_control = sw.save_division(trans_error_vector, trans_error) * trans_scale
 
-        limit = sw.Min(zero_weight_distance - dist, repel_speed * t)
+
+
+        # limit = sw.Min(zero_weight_distance - dist, repel_speed * t)
         # limit = repel_speed * t
         # limit = 1
 
-        soft_constraints[str(self)] = SoftConstraint(lower=limit,
-                                                     upper=limit,
-                                                     weight=weight_f,
-                                                     expression=dist)
+        # c = b_root + n_root * zero_weight_distance
+        l1_error_vector = a_root - n_root * (actual_distance - zero_weight_distance)
+        l1_error = sw.norm(l1_error_vector)
+        l1_scale = sw.diffable_min_fast(l1_error, repel_speed * t)
+        l1 = sw.save_division(l1_error_vector, l1_error) * l1_scale
+
+        l2 = sw.Matrix([1,1,1])
+        l2[0] *= sw.sign(n_root[0])
+        l2[1] *= sw.sign(n_root[1])
+        l2[2] *= sw.sign(n_root[2])
+
+        lx = sw.diffable_if_greater(l1[0], l2[0], 1e9, l1[0])
+        ux = sw.diffable_if_greater(l1[0], l2[0], l1[0], 1e9)
+        ly = sw.diffable_if_greater(l1[1], l2[1], 1e9, l1[2])
+        uy = sw.diffable_if_greater(l1[1], l2[1], l1[1], 1e9)
+        lz = sw.diffable_if_greater(l1[2], l2[2], 1e9, l1[2])
+        uz = sw.diffable_if_greater(l1[2], l2[2], l1[2], 1e9)
+
+
+
+        weight_f = sw.Max(ZERO_WEIGHT, sw.Min(A / (actual_distance + C) + B, MAX_WEIGHT))
+        # weight too high for empty constraints
+        soft_constraints[str(self) + '/x'] = SoftConstraint(lower=lx,
+                                                            upper=ux,
+                                                            weight=weight_f,
+                                                            expression=a_root[0])
+        soft_constraints[str(self) + '/y'] = SoftConstraint(lower=ly,
+                                                            upper=uy,
+                                                            weight=weight_f,
+                                                            expression=a_root[1])
+        soft_constraints[str(self) + '/z'] = SoftConstraint(lower=lz,
+                                                            upper=uz,
+                                                            weight=weight_f,
+                                                            expression=a_root[2])
         return soft_constraints
 
     def __str__(self):
@@ -653,9 +688,12 @@ class EMAAvoidance(Constraint):
         # self.gamma = 0.5 ** (sample_period)
         # self.gamma = int(1/sample_period)*10
         self.gamma = 1
-        x = np.array([max_weight_distance, low_weight_distance, zero_weight_distance])
-        y = np.array([ZERO_WEIGHT, LOW_WEIGHT, MAX_WEIGHT])
-        (A, B, C), _ = curve_fit(lambda t, a, b, c: -a / (t - c) + b, x, y)
+        # x = np.array([max_weight_distance, low_weight_distance, zero_weight_distance])
+        # y = np.array([ZERO_WEIGHT, LOW_WEIGHT, MAX_WEIGHT])
+        # (A, B, C), _ = curve_fit(lambda t, a, b, c: -a / (t - c) + b, x, y)
+        x = np.array([max_weight_distance, zero_weight_distance])
+        y = np.array([ZERO_WEIGHT, MAX_WEIGHT])
+        (A, B), _ = curve_fit(lambda t, a, b: (t * a) + b, x, y)
 
         identity = np.eye(4)
 
@@ -763,6 +801,8 @@ class EMAAvoidance(Constraint):
                     v[0] = self2.f(collision)[0]
                     v[1] = self2.f(collision)[1]
                     v[2] = self2.f(collision)[2]
+                    # if collision.contact_distance < 0:
+                    #     v = -v
                     v_link = link_T_root.M * v
 
                     r = np.array([collision.position_on_a[0],
@@ -774,7 +814,6 @@ class EMAAvoidance(Constraint):
                     wrench[:3] = rr1 * np.dot(rr1, f)
                     wrench[3:] = np.cross(r, f - wrench[:3])
                     vs.append(wrench)
-
 
                 if len(vs) != 0:
                     vs = np.atleast_2d(vs).T
@@ -796,13 +835,15 @@ class EMAAvoidance(Constraint):
                 for collision in data[cpi_identifier][(self2.link_name,)]:
                     d = max(zero_weight_distance - collision.contact_distance, 0)
                     if d == 0:
-                        vs.append(np.zeros(6))
+                        # vs.append(np.zeros(6))
                         continue
                     link_T_root = np_to_kdl(get_fk(self2.link_name, robot.get_root()))
                     v = kdl.Vector()
                     v[0] = collision.contact_normal[0]
                     v[1] = collision.contact_normal[1]
                     v[2] = collision.contact_normal[2]
+                    # if collision.contact_distance < 0:
+                    #     v = -v
                     v_link = link_T_root.M * v
 
                     r = np.array([collision.position_on_a[0],
@@ -815,10 +856,11 @@ class EMAAvoidance(Constraint):
                     wrench[3:] = np.cross(r, f - wrench[:3])
                     vs.append(wrench)
 
-
                 if len(vs) != 0:
                     vs = np.atleast_2d(vs).T
-                    current_normal = np.average(np.abs(vs), axis=1)
+                    # todo ignore 0 vectors
+                    vs = np.abs(vs)
+                    current_normal = np.sum(vs, axis=1)
                     # self2.last_values.append(current_normal)
                     # last_value = np.average(self2.last_values, axis=0)
                     return current_normal
@@ -838,7 +880,7 @@ class EMAAvoidance(Constraint):
                   self.weights: Weights(self.link_name),
                   self.A: A,
                   self.B: B,
-                  self.C: C}
+                  self.C: 0}
         self.save_params_on_god_map(params)
 
     def get_distance_to_closest_object(self, link_name):
@@ -846,10 +888,11 @@ class EMAAvoidance(Constraint):
 
     def get_contact_normal_on_b(self):
         return WrenchInput(self.god_map.to_symbol,
-                            self.get_identifier() + [self.ema_normal, tuple()]).get_expression()
+                           self.get_identifier() + [self.ema_normal, tuple()]).get_expression()
+
     def get_weights(self):
         return WrenchInput(self.god_map.to_symbol,
-                            self.get_identifier() + [self.weights, tuple()]).get_expression()
+                           self.get_identifier() + [self.weights, tuple()]).get_expression()
 
     def get_closest_point_on_a(self):
         return Point3Input(self.god_map.to_symbol,
@@ -900,13 +943,12 @@ class EMAAvoidance(Constraint):
 
         w11 = root_T_link * sw.vector3(*weights[:3])
         w11 = sw.Matrix([sw.Abs(w) for w in w11])
-        w21 = root_T_link * sw.vector3(*weights[3:])
-        w21 = sw.Matrix([sw.Abs(w) for w in w21])
+        # w21 = root_T_link * sw.vector3(*weights[3:])
+        w21 = sw.Matrix([sw.Abs(w) for w in weights[3:]])
         w1_scale = sw.norm(w11)
         w2_scale = sw.norm(w21)
-        weight_f = lambda weight: sw.Max(ZERO_WEIGHT, sw.Min(MAX_WEIGHT, -A / (weight - C) + B))
-        w1_f = weight_f(w1_scale)
-        w2_f = weight_f(w2_scale)
+        w1_f = sw.Max(ZERO_WEIGHT, sw.Min(MAX_WEIGHT, 2.5 * (w1_scale * A) + B))
+        w2_f = sw.Max(ZERO_WEIGHT, sw.Min(MAX_WEIGHT, 5 * (w2_scale * A) + B))
         w1 = sw.scale(w11, w1_f)
         w2 = sw.scale(w21, w2_f)
 
@@ -923,26 +965,26 @@ class EMAAvoidance(Constraint):
         current_position = sw.position_of(root_T_link)
 
         soft_constraints[str(self) + u'/fx'] = SoftConstraint(lower=trans_control[0],
-                                                            upper=trans_control[0],
-                                                            weight=w1[0],
-                                                            expression=current_position[0])
+                                                              upper=trans_control[0],
+                                                              weight=w1[0],
+                                                              expression=current_position[0])
         soft_constraints[str(self) + u'/fy'] = SoftConstraint(lower=trans_control[1],
-                                                            upper=trans_control[1],
-                                                            weight=w1[1],
-                                                            expression=current_position[1])
+                                                              upper=trans_control[1],
+                                                              weight=w1[1],
+                                                              expression=current_position[1])
         soft_constraints[str(self) + u'/fz'] = SoftConstraint(lower=trans_control[2],
-                                                            upper=trans_control[2],
-                                                            weight=w1[2],
-                                                            expression=current_position[2])
-        add_debug_constraint(soft_constraints, str(self)+'/w1_scale', w1_scale)
-        add_debug_constraint(soft_constraints, str(self)+'/w2_scale', w2_scale)
-        add_debug_constraint(soft_constraints, str(self)+'/w1_f', w1_f)
-        add_debug_constraint(soft_constraints, str(self)+'/w2_f', w2_f)
-
-
-        add_debug_constraint(soft_constraints, str(self)+'/w11/x', w11[0])
-        add_debug_constraint(soft_constraints, str(self)+'/w11/y', w11[1])
-        add_debug_constraint(soft_constraints, str(self)+'/w11/z', w11[2])
+                                                              upper=trans_control[2],
+                                                              weight=w1[2],
+                                                              expression=current_position[2])
+        # add_debug_constraint(soft_constraints, str(self)+'/w1_scale', w1_scale)
+        # add_debug_constraint(soft_constraints, str(self)+'/w2_scale', w2_scale)
+        # add_debug_constraint(soft_constraints, str(self)+'/w1_f', w1_f)
+        # add_debug_constraint(soft_constraints, str(self)+'/w2_f', w2_f)
+        #
+        #
+        # add_debug_constraint(soft_constraints, str(self)+'/w11/x', w11[0])
+        # add_debug_constraint(soft_constraints, str(self)+'/w11/y', w11[1])
+        # add_debug_constraint(soft_constraints, str(self)+'/w11/z', w11[2])
         #
         # add_debug_constraint(soft_constraints, str(self)+'/b/x', other_point[0])
         # add_debug_constraint(soft_constraints, str(self)+'/b/y', other_point[1])
@@ -964,21 +1006,22 @@ class EMAAvoidance(Constraint):
         goal_rotation *= capped_angle
 
         hack = sw.rotation_matrix_from_axis_angle([0, 1, 0], 0.0001)
-        axis2, angle2 = sw.diffable_axis_angle_from_matrix((sw.rotation_of(root_T_link).T * (root_R_link_eval * hack)).T)
+        axis2, angle2 = sw.diffable_axis_angle_from_matrix(
+            (sw.rotation_of(root_T_link).T * (root_R_link_eval * hack)).T)
         c_aa = (axis2 * angle2)
 
         soft_constraints[str(self) + u'/tx'] = SoftConstraint(lower=goal_rotation[0],
-                                                             upper=goal_rotation[0],
-                                                             weight=w2[0],
-                                                             expression=c_aa[0])
+                                                              upper=goal_rotation[0],
+                                                              weight=w2[0],
+                                                              expression=c_aa[0])
         soft_constraints[str(self) + u'/ty'] = SoftConstraint(lower=goal_rotation[1],
-                                                             upper=goal_rotation[1],
-                                                             weight=w2[1],
-                                                             expression=c_aa[1])
+                                                              upper=goal_rotation[1],
+                                                              weight=w2[1],
+                                                              expression=c_aa[1])
         soft_constraints[str(self) + u'/tz'] = SoftConstraint(lower=goal_rotation[2],
-                                                             upper=goal_rotation[2],
-                                                             weight=w2[2],
-                                                             expression=c_aa[2])
+                                                              upper=goal_rotation[2],
+                                                              weight=w2[2],
+                                                              expression=c_aa[2])
 
         return soft_constraints
 

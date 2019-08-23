@@ -19,8 +19,8 @@ def allowed_constraint_names():
     return [x[0] for x in inspect.getmembers(giskardpy.constraints) if inspect.isclass(x[1])]
 
 
-# TODO waypoints not supported
 class GoalToConstraints(GetGoal):
+    #FIXME no error msg when constraint has missing parameter
     def __init__(self, name, as_name):
         GetGoal.__init__(self, name, as_name)
         self.used_joints = set()
@@ -119,8 +119,8 @@ class GoalToConstraints(GetGoal):
         """
         soft_constraints = {}
         for link in self.get_robot().get_controlled_links():
-            for i in range(1):
-                constraint = EMAAvoidance(self.god_map, link,
+            for i in range(4):
+                constraint = LinkToClosestAvoidance(self.god_map, link,
                                                     max_weight_distance=self.get_god_map().safe_get_data(
                                                     identifier.collisions_distances +
                                                     [link, u'max_weight_distance']),

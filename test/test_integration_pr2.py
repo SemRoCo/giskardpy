@@ -446,7 +446,7 @@ class TestCartGoals(object):
         kitchen_setup.set_cart_goal(l_goal, kitchen_setup.l_tip)
         kitchen_setup.set_cart_goal(r_goal, kitchen_setup.r_tip)
         # kitchen_setup.allow_collision([], tray_name, [])
-        kitchen_setup.send_and_check_goal()
+        kitchen_setup.send_and_check_goal(expected_error_code=MoveResult.INSOLVABLE)
 
     def test_rotate_gripper(self, zero_pose):
         """

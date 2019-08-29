@@ -49,8 +49,8 @@ class TestUrdfObject(object):
         wb = make_world_body_box()
         urdf_obj = self.cls.from_world_body(wb)
         assert len(urdf_obj.get_link_names()) == 1
-        assert len(urdf_obj.get_urdf_link('box').collisions) == 1
-        assert len(urdf_obj.get_urdf_link('box').visuals) == 1
+        assert urdf_obj.get_urdf_link('box').collision
+        assert urdf_obj.get_urdf_link('box').visual
         assert len(urdf_obj.get_joint_names()) == 0
 
     def test_from_world_body_sphere(self, function_setup):

@@ -7,59 +7,60 @@ import giskardpy.identifier as identifier
 from giskardpy.plugin import GiskardBehavior
 from giskardpy.utils import closest_point_constraint_violated
 import numpy as np
+import matplotlib.pyplot as plt
+from collections import defaultdict
 
 class WiggleCancel(GiskardBehavior):
     def __init__(self, name):
         super(WiggleCancel, self).__init__(name)
-        self.wiggle_precision1 = self.get_god_map().safe_get_data(identifier.wiggle_precision_threshold)
+        self.fft_duration = self.get_god_map().safe_get_data(identifier.fft_duration)
+        self.wiggle_detection_threshold = self.get_god_map().safe_get_data(identifier.wiggle_detection_threshold)
+        self.min_wiggle_frequency = self.get_god_map().safe_get_data(identifier.min_wiggle_frequency)
+        self.sample_period = self.get_god_map().safe_get_data(identifier.sample_period)
+        self.num_points_in_fft = int(self.fft_duration / self.sample_period)
+
 
     def initialise(self):
         self.past_joint_states = set()
+        self.joint_dict = defaultdict(list)
         super(WiggleCancel, self).initialise()
 
     def update(self):
-        current_js = self.get_god_map().safe_get_data(identifier.joint_states)
-        sample_period = self.get_god_map().safe_get_data(identifier.sample_period)
-        current_time = self.get_god_map().safe_get_data(identifier.time) * sample_period
-        rounded_js = self.round_js(current_js)
-        # TODO make 1 a parameter
-        # if current_time >= 18:
-        #     self.check_fft()
-        if current_time >= 1 and rounded_js in self.past_joint_states:
-            current_max_joint_vel = np.abs([v.velocity for v in current_js.values()]).max()
-            # TODO this threshold should depend on the joint type
-            if current_max_joint_vel < 0.25:
-                logging.loginfo(u'stopped by wiggle detector')
-                logging.loginfo(u'found goal trajectory with length {}s in {}s'.format(current_time,
-                                                                                       time() - self.get_blackboard().runtime))
-                return Status.SUCCESS
-            logging.loginfo(u'current max joint vel = {}'.format(current_max_joint_vel))
-            raise InsolvableException(u'endless wiggling detected')
-        self.past_joint_states.add(rounded_js)
+        latest_points = self.get_god_map().safe_get_data(identifier.joint_states)
+
+        for key in latest_points:
+            self.joint_dict[key].append(latest_points[key].velocity)
+
+        if len(self.joint_dict.values()[0]) < self.num_points_in_fft:
+            return Status.RUNNING
+
+        if len(self.joint_dict.values()[0]) > self.num_points_in_fft:
+            for val in self.joint_dict.values():
+                del (val[0])
+
+        # remove joints that arent moving
+        joints_filtered = np.array(self.joint_dict.values())
+        joints_filtered = [i for i in joints_filtered if
+                           np.any(np.abs(i) > 0.1)]
+
+        if len(joints_filtered) == 0:
+            return Status.RUNNING
+
+        freq = np.fft.rfftfreq(self.num_points_in_fft, d=self.sample_period)
+
+        # find index in frequency list where frequency >= min_wiggle_frequency
+        freq_idx = next(i for i,v in enumerate(freq) if v >= self.min_wiggle_frequency)
+
+        fft = np.fft.rfft(joints_filtered, axis=1)
+        fft = [np.abs(i.real) for i in fft]
+
+        for j in fft:
+            if np.any(j[freq_idx:] > self.wiggle_detection_threshold):
+                raise InsolvableException(u'endless wiggling detected')
+
         return Status.RUNNING
 
-    def round_js(self, js):
-        """
-        :param js: joint_name -> SingleJointState
-        :type js: dict
-        :return: a sequence of all the rounded joint positions
-        :rtype: tuple
-        """
-        return tuple(round(x.position, self.wiggle_precision1) for x in js.values())
 
-
-    def check_fft(self):
-        traj = self.get_god_map().safe_get_data(identifier.trajectory)
-        sample_period = self.get_god_map().safe_get_data(identifier.sample_period)
-        current_time = self.get_god_map().safe_get_data(identifier.time)
-        last_sec = []
-        keys = traj._points[0.0].keys()
-        for time in range(int(current_time-1/sample_period), current_time):
-            # rounded_time = np.round(time / sample_period) * sample_period
-            point = traj._points[time]
-            positions = [point[key].position for key in keys]
-            last_sec.append(positions)
-        last_sec = np.array(last_sec)
 
 class MaxTrajLength(GiskardBehavior):
     pass

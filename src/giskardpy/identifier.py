@@ -27,6 +27,9 @@ b_keys = qp_data + [u'b_keys']
 bA_keys = qp_data + [u'bA_keys']
 xdot_keys = qp_data + [u'xdot_keys']
 
+
+
+
 #stuff from rosparam
 rosparam = [u'rosparam']
 data_folder = rosparam + [u'path_to_data_folder']
@@ -35,6 +38,10 @@ map_frame = rosparam + [u'map_frame']
 robot_description = [u'robot_description']
 marker_visualization = rosparam + [u'enable_visualization']
 sample_period = rosparam + [u'sample_period']
+
+fft_duration = rosparam + [u'fft_duration']
+wiggle_detection_threshold = rosparam + [u'wiggle_detection_threshold']
+min_wiggle_frequency = rosparam + [u'min_wiggle_frequency']
 
 zero_weight_distance = rosparam + [u'zero_weight_distance']
 low_weight_distance = rosparam + [u'low_weight_distance']
@@ -53,7 +60,6 @@ default_joint_acc = joint_acc + [u'default']
 
 nWSR = rosparam + [u'nWSR']
 joint_convergence_threshold = rosparam + [u'joint_convergence_threshold']
-wiggle_precision_threshold = rosparam + [u'wiggle_precision_threshold']
 collision_time_threshold = rosparam + [u'collision_time_threshold']
 fill_velocity_values = rosparam + [u'fill_velocity_values']
 debug = rosparam + [u'debug']

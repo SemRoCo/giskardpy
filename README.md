@@ -20,6 +20,9 @@ sudo python setup.py install
 Install pybullet:
 ```
 sudo pip install pybullet
+sudo pip install scipy
+sudo pip install hypothesis
+sudo pip install pandas
 ```
 
 Now create the workspace

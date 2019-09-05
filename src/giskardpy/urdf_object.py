@@ -102,9 +102,16 @@ class URDFObject(object):
                 geometry = up.Mesh(world_body.mesh)
             else:
                 raise CorruptShapeException(u'primitive shape \'{}\' not supported'.format(world_body.shape.type))
-            link = up.Link(world_body.name,
-                           visual=up.Visual(geometry, material=up.Material(u'green', color=up.Color(0, 1, 0, 1))),
-                           collision=up.Collision(geometry))
+            # FIXME test if this works on 16.04
+            try:
+                link = up.Link(world_body.name)
+                link.add_aggregate(u'visual', up.Visual(geometry,
+                                                        material=up.Material(u'green', color=up.Color(0, 1, 0, 1))))
+                link.add_aggregate(u'collision', up.Collision(geometry))
+            except AssertionError:
+                link = up.Link(world_body.name,
+                               visual=up.Visual(geometry, material=up.Material(u'green', color=up.Color(0, 1, 0, 1))),
+                               collision=up.Collision(geometry))
             links.append(link)
         elif world_body.type == world_body.URDF_BODY:
             o = cls(world_body.urdf, *args, **kwargs)
@@ -243,15 +250,17 @@ class URDFObject(object):
         return {joint_name: self.get_joint_limits(joint_name) for joint_name in self.get_joint_names()
                 if self.is_joint_controllable(joint_name)}
 
-    def get_joint_limits(self, joint_names):
+    def get_joint_limits(self, joint_name):
         """
         Returns joint limits specified in the safety controller entry if given, else returns the normal limits.
         :param joint_name: name of the joint in the urdfs
-        :type joint_names: str
+        :type joint_name: str
         :return: lower limit, upper limit or None if not applicable
         :rtype: float, float
         """
-        joint = self.get_urdf_joint(joint_names)
+        joint = self.get_urdf_joint(joint_name)
+        if self.is_joint_continuous(joint_name):
+            return None, None
         try:
             return max(joint.safety_controller.soft_lower_limit, joint.limit.lower), \
                    min(joint.safety_controller.soft_upper_limit, joint.limit.upper)
@@ -603,7 +612,10 @@ class URDFObject(object):
         m = Marker()
         m.ns = u'{}/{}'.format(ns, self.get_name())
         m.id = id
-        geometry = link.visual.geometry
+        if link.visual:
+            geometry = link.visual.geometry
+        else:
+            geometry = link.visuals[0].geometry
         if isinstance(geometry, up.Box):
             m.type = Marker.CUBE
             m.scale = Vector3(*geometry.size)

@@ -115,22 +115,10 @@ def diffable_if_greater_zero(condition, if_result, else_result):
     # _if = diffable_heaviside(condition) * if_result
     # _else = diffable_heaviside(-condition) * else_result
     # return _if + _else
-    _condition = diffable_sign(condition)  # 1 or -1
+    _condition = diffable_sign(condition - VERY_SMALL_NUMBER)  # 1 or -1
     _if = diffable_max_fast(0, _condition) * if_result  # 0 or if_result
     _else = -diffable_min_fast(0, _condition) * else_result  # 0 or else_result
-    return _if + _else + (1 - diffable_abs(_condition)) * else_result # if_result or else_result
-
-def diffable_if_greater(a, b, if_result, else_result):
-    """
-    !takes a long time to compile!
-    !Returns shit if condition is very close to but not equal to zero!
-    :type condition: Union[float, Symbol]
-    :type if_result: Union[float, Symbol]
-    :type else_result: Union[float, Symbol]
-    :return: if_result if a > b else else_result
-    :rtype: Union[float, Symbol]
-    """
-    return diffable_if_greater_zero(a-b, if_result, else_result)
+    return _if + _else  # if_result or else_result
 
 
 def diffable_if_greater_eq_zero(condition, if_result, else_result):
@@ -144,18 +132,6 @@ def diffable_if_greater_eq_zero(condition, if_result, else_result):
     :rtype: Union[float, Symbol]
     """
     return diffable_if_greater_zero(-condition, else_result, if_result)
-
-def diffable_if_greater_eq(a, b, if_result, else_result):
-    """
-    !takes a long time to compile!
-    !Returns shit if condition is very close to but not equal to zero!
-    :type condition: Union[float, Symbol]
-    :type if_result: Union[float, Symbol]
-    :type else_result: Union[float, Symbol]
-    :return: if_result if a >= b else else_result
-    :rtype: Union[float, Symbol]
-    """
-    return diffable_if_greater_eq_zero(a-b, if_result, else_result)
 
 
 def diffable_if_eq_zero(condition, if_result, else_result):
@@ -172,19 +148,6 @@ def diffable_if_eq_zero(condition, if_result, else_result):
     condition = diffable_abs(diffable_sign(condition))
     return (1 - condition) * if_result + condition * else_result
 
-def diffable_if_eq(a, b, if_result, else_result):
-    """
-    A short expression which can be compiled quickly.
-    !Returns shit if condition is very close to but not equal to zero!
-    !Returns shit if if_result is outside of [-1e8,1e8]!
-    :type condition: Union[float, Symbol]
-    :type if_result: Union[float, Symbol]
-    :type else_result: Union[float, Symbol]
-    :return: if_result if a == b else else_result
-    :rtype: Union[float, Symbol]
-    """
-    return diffable_if_eq_zero(a-b, if_result, else_result)
-
 
 def if_greater_zero(condition, if_result, else_result):
     """
@@ -194,10 +157,7 @@ def if_greater_zero(condition, if_result, else_result):
     :return: if_result if condition > 0 else else_result
     :rtype: Union[float, Symbol]
     """
-    _condition = sign(condition)  # 1 or -1
-    _if = Max(0, _condition) * if_result  # 0 or if_result
-    _else = -Min(0, _condition) * else_result  # 0 or else_result
-    return _if + _else + (1 - Abs(_condition)) * else_result # if_result or else_result
+    return Piecewise([if_result, condition > 0], [else_result, True])
 
 
 def if_greater_eq_zero(condition, if_result, else_result):

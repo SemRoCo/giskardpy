@@ -134,7 +134,7 @@ class TestSympyWrapper(unittest.TestCase):
     # fails if numbers too big
     @given(limited_float(min_dist_to_zero=SMALL_NUMBER))
     def test_sign(self, f1):
-        r1 = np.float(spw.diffable_sign(f1))
+        r1 = speed_up_and_execute(spw.diffable_sign, [f1])
         r2 = np.sign(f1)
         # r2 = 0.5 if f1 == 0 else r2
         self.assertTrue(np.isclose(r1, r2), msg='spw.sign({})={} != np.sign({})={}'.format(f1, r1, f1, r2))
@@ -156,13 +156,26 @@ class TestSympyWrapper(unittest.TestCase):
            limited_float(),
            limited_float())
     def test_diffable_if_greater_eq_zero(self, condition, if_result, else_result):
-        logging.logdebug("{}{}{}".format(condition, if_result, else_result))
         r1 = np.float(spw.diffable_if_greater_eq_zero(condition, if_result, else_result))
         r2 = np.float(if_result if condition >= 0 else else_result)
         self.assertTrue(np.isclose(r1, r2), msg='{} if {} >= 0 else {} => {}'.format(if_result, condition, else_result,
                                                                                      r1))
         self.assertAlmostEqual(
             speed_up_and_execute(spw.diffable_if_greater_eq_zero, [condition, if_result, else_result]),
+            r1, places=7)
+
+    # fails if condition is to close too 0 or too big or too small
+    @given(limited_float(min_dist_to_zero=SMALL_NUMBER),
+           limited_float(min_dist_to_zero=SMALL_NUMBER),
+           limited_float(),
+           limited_float())
+    def test_diffable_if_greater_eq(self, a, b, if_result, else_result):
+        r1 = np.float(spw.diffable_if_greater_eq(a, b, if_result, else_result))
+        r2 = np.float(if_result if a >= b else else_result)
+        self.assertTrue(np.isclose(r1, r2), msg='{} if {} >= {} else {} => {}'.format(if_result, a, b, else_result,
+                                                                                     r1))
+        self.assertAlmostEqual(
+            speed_up_and_execute(spw.diffable_if_greater_eq, [a, b, if_result, else_result]),
             r1, places=7)
 
     # fails if condition is to close too 0 or too big or too small
@@ -177,6 +190,21 @@ class TestSympyWrapper(unittest.TestCase):
                                                                                                  else_result,
                                                                                                  r1))
         self.assertAlmostEqual(speed_up_and_execute(spw.diffable_if_eq_zero, [condition, if_result, else_result]),
+                               r1, places=7)
+
+    # fails if condition is to close too 0 or too big or too small
+    # fails if if_result is too big or too small
+    @given(limited_float(min_dist_to_zero=SMALL_NUMBER),
+           limited_float(min_dist_to_zero=SMALL_NUMBER),
+           limited_float(outer_limit=1e8),
+           limited_float())
+    def test_diffable_if_eq(self, a, b, if_result, else_result):
+        r1 = np.float(spw.diffable_if_eq(a, b, if_result, else_result))
+        r2 = np.float(if_result if a == b else else_result)
+        self.assertTrue(np.isclose(r1, r2, atol=1.e-7), msg='{} if {} == {} else {} => {}'.format(if_result, a, b,
+                                                                                                 else_result,
+                                                                                                 r1))
+        self.assertAlmostEqual(speed_up_and_execute(spw.diffable_if_eq, [a, b, if_result, else_result]),
                                r1, places=7)
 
     @given(limited_float(),
@@ -246,6 +274,38 @@ class TestSympyWrapper(unittest.TestCase):
         self.assertTrue(np.isclose(r1, r1_llvm), msg='{} if {} > 0 else {} => {} != {}'.format(if_result, condition,
                                                                                                else_result,
                                                                                                r1_llvm, r1))
+
+    @given(limited_float(min_dist_to_zero=1e-5),
+           limited_float(min_dist_to_zero=1e-5),
+           limited_float(),
+           limited_float())
+    def test_diffable_if_greater(self, a, b, if_result, else_result):
+        r1 = speed_up_and_execute(spw.diffable_if_greater, [a, b, if_result, else_result])[0]
+        r2 = if_result if a > b else else_result
+        self.assertTrue(np.isclose(r1, r2), msg='{} if {} > {} else {} => {} != {}'.format(if_result, a, b,
+                                                                                               else_result,
+                                                                                               r1, r2))
+
+    @given(limited_float(min_dist_to_zero=1e-5),
+           limited_float(min_dist_to_zero=1e-5),
+           limited_float(),
+           limited_float())
+    def test_diffable_if_greater2(self, a, b, if_result, else_result):
+        r1 = float(spw.diffable_if_greater(a, b, if_result, else_result))
+        r2 = if_result if a > b else else_result
+        self.assertTrue(np.isclose(r1, r2), msg='{} if {} > {} else {} => {} != {}'.format(if_result, a, b,
+                                                                                               else_result,
+                                                                                               r1, r2))
+
+    @given(limited_float(min_dist_to_zero=1e-5),
+           limited_float(),
+           limited_float())
+    def test_diffable_if_greater_zero2(self, a, if_result, else_result):
+        r1 = speed_up_and_execute(spw.diffable_if_greater_zero, [a, if_result, else_result])[0]
+        r2 = if_result if a > 0 else else_result
+        self.assertTrue(np.isclose(r1, r2), msg='{} if {} > {} else {} => {} != {}'.format(if_result, a, 0,
+                                                                                               else_result,
+                                                                                               r1, r2))
 
     # fails if numbers too big or too small
     @given(unit_vector(length=3),

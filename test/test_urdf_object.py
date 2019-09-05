@@ -1,3 +1,5 @@
+from copy import deepcopy
+
 import pytest
 from geometry_msgs.msg import Pose, Point, Quaternion
 
@@ -32,10 +34,23 @@ class TestUrdfObject(object):
         assert len(parsed_pr2.get_link_names()) == 97
         assert parsed_pr2.get_name() == u'pr2'
 
+    def test_urdf_from_file2(self, function_setup):
+        """
+        :type parsed_pr2: tested_class
+        """
+        with open(u'urdfs/tiny_ball.urdf', u'r') as f:
+            urdf_string = f.read()
+        parsed_pr2 = self.cls(urdf_string)
+        assert len(parsed_pr2.get_joint_names()) == 0
+        assert len(parsed_pr2.get_link_names()) == 1
+        assert parsed_pr2.get_name() == u'ball'
+
     def test_from_world_body_box(self, function_setup):
         wb = make_world_body_box()
         urdf_obj = self.cls.from_world_body(wb)
         assert len(urdf_obj.get_link_names()) == 1
+        assert urdf_obj.get_urdf_link('box').collision
+        assert urdf_obj.get_urdf_link('box').visual
         assert len(urdf_obj.get_joint_names()) == 0
 
     def test_from_world_body_sphere(self, function_setup):
@@ -232,12 +247,15 @@ class TestUrdfObject(object):
         parsed_pr2 = self.cls(pr2_urdf())
         box = self.cls.from_world_body(make_world_body_box())
         p = Pose()
-        p.position = Point(0, 0, 0)
-        p.orientation = Quaternion(0, 0, 0, 1)
-        original_urdf = parsed_pr2.get_urdf_str()
+        p.position = Point(0.0, 0.0, 0.0)
+        p.orientation = Quaternion(0.0, 0.0, 0.0, 1.0)
+        original_parsed_pr2 = deepcopy(parsed_pr2)
+        # original_urdf = parsed_pr2.get_urdf_str()
         parsed_pr2.attach_urdf_object(box, u'l_gripper_tool_frame', p)
         parsed_pr2.detach_sub_tree(u'box')
-        assert original_urdf == parsed_pr2.get_urdf_str()
+        assert set(original_parsed_pr2.get_link_names()) == set(parsed_pr2.get_link_names())
+        assert set(original_parsed_pr2.get_joint_names()) == set(parsed_pr2.get_joint_names())
+        # assert original_urdf == parsed_pr2.get_urdf_str()
 
     def test_detach_non_existing_object(self, function_setup):
         parsed_pr2 = self.cls(pr2_urdf())

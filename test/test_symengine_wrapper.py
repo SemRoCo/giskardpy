@@ -10,12 +10,12 @@ import PyKDL
 
 from tf.transformations import quaternion_matrix, quaternion_about_axis, quaternion_from_euler, euler_matrix, \
     rotation_matrix, quaternion_multiply, quaternion_conjugate, quaternion_from_matrix, \
-    quaternion_slerp
+    quaternion_slerp, rotation_from_matrix
 
 from transforms3d.axangles import mat2axangle
-from transforms3d.derivations.angle_axes import angle_axis2mat
+from transforms3d.derivations.angle_axes import angle_axis2mat, angle_axis2quat
 from transforms3d.euler import euler2axangle
-from transforms3d.quaternions import quat2mat
+from transforms3d.quaternions import quat2mat, quat2axangle
 
 import giskardpy.symengine_wrappers as spw
 from giskardpy.tfwrapper import np_to_kdl, kdl_to_pose
@@ -65,7 +65,11 @@ def speed_up_and_execute(f, params):
             symbols.append(s)
             input.append(param)
             symbol_params.append(s)
-    slow_f = spw.Matrix([f(*symbol_params)])
+    try:
+        slow_f = spw.Matrix([f(*symbol_params)])
+    except TypeError:
+        slow_f = spw.Matrix(f(*symbol_params))
+
     fast_f = spw.speed_up(slow_f, symbols)
     subs = {str(symbols[i]): input[i] for i in range(len(symbols))}
     # slow_f.subs()
@@ -122,7 +126,7 @@ class TestSympyWrapper(unittest.TestCase):
     # fails if numbers too big
     @given(limited_float(min_dist_to_zero=SMALL_NUMBER))
     def test_sign(self, f1):
-        r1 = np.float(spw.diffable_sign(f1))
+        r1 = speed_up_and_execute(spw.diffable_sign, [f1])
         r2 = np.sign(f1)
         # r2 = 0.5 if f1 == 0 else r2
         self.assertTrue(np.isclose(r1, r2), msg='spw.sign({})={} != np.sign({})={}'.format(f1, r1, f1, r2))
@@ -144,13 +148,26 @@ class TestSympyWrapper(unittest.TestCase):
            limited_float(),
            limited_float())
     def test_diffable_if_greater_eq_zero(self, condition, if_result, else_result):
-        logging.logdebug("{}{}{}".format(condition, if_result, else_result))
         r1 = np.float(spw.diffable_if_greater_eq_zero(condition, if_result, else_result))
         r2 = np.float(if_result if condition >= 0 else else_result)
         self.assertTrue(np.isclose(r1, r2), msg='{} if {} >= 0 else {} => {}'.format(if_result, condition, else_result,
                                                                                      r1))
         self.assertAlmostEqual(
             speed_up_and_execute(spw.diffable_if_greater_eq_zero, [condition, if_result, else_result]),
+            r1, places=7)
+
+    # fails if condition is to close too 0 or too big or too small
+    @given(limited_float(min_dist_to_zero=SMALL_NUMBER),
+           limited_float(min_dist_to_zero=SMALL_NUMBER),
+           limited_float(),
+           limited_float())
+    def test_diffable_if_greater_eq(self, a, b, if_result, else_result):
+        r1 = np.float(spw.diffable_if_greater_eq(a, b, if_result, else_result))
+        r2 = np.float(if_result if a >= b else else_result)
+        self.assertTrue(np.isclose(r1, r2), msg='{} if {} >= {} else {} => {}'.format(if_result, a, b, else_result,
+                                                                                     r1))
+        self.assertAlmostEqual(
+            speed_up_and_execute(spw.diffable_if_greater_eq, [a, b, if_result, else_result]),
             r1, places=7)
 
     # fails if condition is to close too 0 or too big or too small
@@ -165,6 +182,21 @@ class TestSympyWrapper(unittest.TestCase):
                                                                                                  else_result,
                                                                                                  r1))
         self.assertAlmostEqual(speed_up_and_execute(spw.diffable_if_eq_zero, [condition, if_result, else_result]),
+                               r1, places=7)
+
+    # fails if condition is to close too 0 or too big or too small
+    # fails if if_result is too big or too small
+    @given(limited_float(min_dist_to_zero=SMALL_NUMBER),
+           limited_float(min_dist_to_zero=SMALL_NUMBER),
+           limited_float(outer_limit=1e8),
+           limited_float())
+    def test_diffable_if_eq(self, a, b, if_result, else_result):
+        r1 = np.float(spw.diffable_if_eq(a, b, if_result, else_result))
+        r2 = np.float(if_result if a == b else else_result)
+        self.assertTrue(np.isclose(r1, r2, atol=1.e-7), msg='{} if {} == {} else {} => {}'.format(if_result, a, b,
+                                                                                                 else_result,
+                                                                                                 r1))
+        self.assertAlmostEqual(speed_up_and_execute(spw.diffable_if_eq, [a, b, if_result, else_result]),
                                r1, places=7)
 
     @given(limited_float(),
@@ -234,6 +266,38 @@ class TestSympyWrapper(unittest.TestCase):
         self.assertTrue(np.isclose(r1, r1_llvm), msg='{} if {} > 0 else {} => {} != {}'.format(if_result, condition,
                                                                                                else_result,
                                                                                                r1_llvm, r1))
+
+    @given(limited_float(min_dist_to_zero=1e-5),
+           limited_float(min_dist_to_zero=1e-5),
+           limited_float(),
+           limited_float())
+    def test_diffable_if_greater(self, a, b, if_result, else_result):
+        r1 = speed_up_and_execute(spw.diffable_if_greater, [a, b, if_result, else_result])[0]
+        r2 = if_result if a > b else else_result
+        self.assertTrue(np.isclose(r1, r2), msg='{} if {} > {} else {} => {} != {}'.format(if_result, a, b,
+                                                                                               else_result,
+                                                                                               r1, r2))
+
+    @given(limited_float(min_dist_to_zero=1e-5),
+           limited_float(min_dist_to_zero=1e-5),
+           limited_float(),
+           limited_float())
+    def test_diffable_if_greater2(self, a, b, if_result, else_result):
+        r1 = float(spw.diffable_if_greater(a, b, if_result, else_result))
+        r2 = if_result if a > b else else_result
+        self.assertTrue(np.isclose(r1, r2), msg='{} if {} > {} else {} => {} != {}'.format(if_result, a, b,
+                                                                                               else_result,
+                                                                                               r1, r2))
+
+    @given(limited_float(min_dist_to_zero=1e-5),
+           limited_float(),
+           limited_float())
+    def test_diffable_if_greater_zero2(self, a, if_result, else_result):
+        r1 = speed_up_and_execute(spw.diffable_if_greater_zero, [a, if_result, else_result])[0]
+        r2 = if_result if a > 0 else else_result
+        self.assertTrue(np.isclose(r1, r2), msg='{} if {} > {} else {} => {} != {}'.format(if_result, a, 0,
+                                                                                               else_result,
+                                                                                               r1, r2))
 
     # fails if numbers too big or too small
     @given(unit_vector(length=3),
@@ -538,6 +602,29 @@ class TestSympyWrapper(unittest.TestCase):
         self.assertAlmostEqual(angle_diff, 0.0, places=6)
 
     # fails if numbers too big or too small
+    # TODO nan if angle 0
+    # TODO use 'if' to make angle always positive?
+    @given(quaternion(),
+           quaternion())
+    def test_rotation_distance(self, q1, q2):
+        # assume(angle > 0.0001)
+        # assume(angle < np.pi - 0.0001)
+        m1 = quaternion_matrix(q1)
+        m2 = quaternion_matrix(q2)
+        angle = speed_up_and_execute(spw.rotation_distance, [m1, m2])[0]
+        ref_angle, _, _ = rotation_from_matrix(m1.T.dot(m2))
+        # axis2, angle2 = spw.diffable_axis_angle_from_matrix(spw.rotation_matrix_from_axis_angle(axis, angle))
+        # angle = float(angle)
+        # axis2 = np.array(axis2).astype(float).T[0]
+        if angle < 0:
+            angle = -angle
+            # axis = [-x for x in axis]
+        if ref_angle < 0:
+            ref_angle = -ref_angle
+            # axis2 *= -1
+        self.assertAlmostEqual(angle, ref_angle, msg='{} != {}'.format(angle, ref_angle))
+
+    # fails if numbers too big or too small
     # TODO buggy
     # @given(unit_vector(length=4, elements=float_nonan_noinf_nobig_nosmall))
     # def test_axis_angle_from_quaternion1(self, q):
@@ -581,8 +668,23 @@ class TestSympyWrapper(unittest.TestCase):
             angle2 = -angle2
             axis2 *= -1
         compare_axis_angle(angle, axis, angle2, axis2)
-        # self.assertTrue(np.isclose(angle, angle2), msg='{} != {}'.format(angle, angle2))
-        # self.assertTrue(np.isclose(axis, axis2).all(), msg='{} != {}'.format(axis, axis2))
+
+    # fails if numbers too big or too small
+    @given(quaternion())
+    def test_axis_angle_from_quaternion(self, q):
+        axis2, angle2 = quat2axangle([q[-1],q[0],q[1],q[2]])
+        x,y,z, angle = speed_up_and_execute(spw.axis_angle_from_quaternion, list(q))
+        axis = [x,y,z]
+        angle = float(angle)
+        compare_axis_angle(angle, axis, angle2, axis2, 2)
+
+    def test_axis_angle_from_quaternion2(self):
+        q = [0,0,0,1.0000001]
+        axis2, angle2 = quat2axangle([q[-1],q[0],q[1],q[2]])
+        x,y,z, angle = speed_up_and_execute(spw.axis_angle_from_quaternion, list(q))
+        axis = [x,y,z]
+        angle = float(angle)
+        compare_axis_angle(angle, axis, angle2, axis2, 2)
 
     # fails if numbers too big or too small
     # TODO rpy does not follow some conventions I guess
@@ -730,8 +832,9 @@ class TestSympyWrapper(unittest.TestCase):
         angle1 = np.pi * f1
         angle2 = np.pi * f2
         ref_distance = shortest_angular_distance(angle1, angle2)
-        self.assertAlmostEqual(speed_up_and_execute(spw.shortest_angular_distance, [angle1, angle2]),
-                               ref_distance, places=7)
+        distance = speed_up_and_execute(spw.shortest_angular_distance, [angle1, angle2])
+        self.assertAlmostEqual(distance, ref_distance, places=7)
+        assert abs(distance) <= np.pi
 
 
 if __name__ == '__main__':

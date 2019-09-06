@@ -1,8 +1,10 @@
+from copy import deepcopy
+
 import pytest
 from geometry_msgs.msg import Pose, Point, Quaternion
 
 from giskardpy.exceptions import DuplicateNameException, UnknownBodyException
-from giskardpy.urdf_object import URDFObject
+from giskardpy.urdf_object import URDFObject, CONTINUOUS_JOINT
 from giskardpy.utils import make_world_body_box, make_world_body_sphere, make_world_body_cylinder, make_urdf_world_body
 from utils_for_tests import pr2_urdf, donbot_urdf, boxy_urdf, base_bot_urdf
 
@@ -32,10 +34,23 @@ class TestUrdfObject(object):
         assert len(parsed_pr2.get_link_names()) == 97
         assert parsed_pr2.get_name() == u'pr2'
 
+    def test_urdf_from_file2(self, function_setup):
+        """
+        :type parsed_pr2: tested_class
+        """
+        with open(u'urdfs/tiny_ball.urdf', u'r') as f:
+            urdf_string = f.read()
+        parsed_pr2 = self.cls(urdf_string)
+        assert len(parsed_pr2.get_joint_names()) == 0
+        assert len(parsed_pr2.get_link_names()) == 1
+        assert parsed_pr2.get_name() == u'ball'
+
     def test_from_world_body_box(self, function_setup):
         wb = make_world_body_box()
         urdf_obj = self.cls.from_world_body(wb)
         assert len(urdf_obj.get_link_names()) == 1
+        assert urdf_obj.get_urdf_link('box').collision
+        assert urdf_obj.get_urdf_link('box').visual
         assert len(urdf_obj.get_joint_names()) == 0
 
     def test_from_world_body_sphere(self, function_setup):
@@ -232,12 +247,15 @@ class TestUrdfObject(object):
         parsed_pr2 = self.cls(pr2_urdf())
         box = self.cls.from_world_body(make_world_body_box())
         p = Pose()
-        p.position = Point(0, 0, 0)
-        p.orientation = Quaternion(0, 0, 0, 1)
-        original_urdf = parsed_pr2.get_urdf()
+        p.position = Point(0.0, 0.0, 0.0)
+        p.orientation = Quaternion(0.0, 0.0, 0.0, 1.0)
+        original_parsed_pr2 = deepcopy(parsed_pr2)
+        # original_urdf = parsed_pr2.get_urdf_str()
         parsed_pr2.attach_urdf_object(box, u'l_gripper_tool_frame', p)
         parsed_pr2.detach_sub_tree(u'box')
-        assert original_urdf == parsed_pr2.get_urdf()
+        assert set(original_parsed_pr2.get_link_names()) == set(parsed_pr2.get_link_names())
+        assert set(original_parsed_pr2.get_joint_names()) == set(parsed_pr2.get_joint_names())
+        # assert original_urdf == parsed_pr2.get_urdf_str()
 
     def test_detach_non_existing_object(self, function_setup):
         parsed_pr2 = self.cls(pr2_urdf())
@@ -413,12 +431,34 @@ class TestUrdfObject(object):
         assert chain == [box.get_name()]
 
     def test_get_chain_fixed_joints(self, function_setup):
-        # TODO test fixed joints
-        pass
+        parsed_donbot = self.cls(donbot_urdf())
+        chain = parsed_donbot.get_chain('odom', 'odom_x_frame', joints=False, fixed=False)
+        assert chain == parsed_donbot._urdf_robot.get_chain('odom', 'odom_x_frame', joints=False, fixed=False)
 
-    def test_get_chain_links(self, function_setup):
-        # TODO test link=true
-        pass
+    def test_get_chain_fixed_joints2(self, function_setup):
+        parsed_donbot = self.cls(donbot_urdf())
+        chain = parsed_donbot.get_chain('odom', 'gripper_gripper_right_link', joints=True, fixed=False)
+        assert chain == parsed_donbot._urdf_robot.get_chain('odom', 'gripper_gripper_right_link', joints=True, fixed=False)
+
+    def test_get_chain_joints_false1(self, function_setup):
+        parsed_donbot = self.cls(donbot_urdf())
+        chain = parsed_donbot.get_chain('odom', 'odom_x_frame', joints=False)
+        assert chain == parsed_donbot._urdf_robot.get_chain('odom', 'odom_x_frame', joints=False)
+
+    def test_get_chain_joints_false2(self, function_setup):
+        parsed_donbot = self.cls(donbot_urdf())
+        chain = parsed_donbot.get_chain('base_link', 'plate', joints=False)
+        assert chain == ['base_link', 'base_footprint', 'plate']
+
+    def test_get_chain_1(self, function_setup):
+        parsed_donbot = self.cls(donbot_urdf())
+        chain = parsed_donbot.get_chain('odom', 'gripper_tool_frame')
+        assert chain == parsed_donbot._urdf_robot.get_chain('odom', 'gripper_tool_frame')
+
+    def test_get_chain_2(self, function_setup):
+        parsed_donbot = self.cls(donbot_urdf())
+        chain = parsed_donbot.get_chain('base_link', 'plate')
+        assert chain == ['base_link', 'base_footprint_joint', 'base_footprint', 'plate_joint', 'plate']
 
     def test_get_sub_tree_link_names_with_collision_boxy(self, function_setup):
         parsed_boxy = self.cls(boxy_urdf())
@@ -688,3 +728,15 @@ class TestUrdfObject(object):
 
     def test_has_link_collision(self, function_setup):
         pass
+
+    def test_get_first_link_with_collision(self, function_setup):
+        parsed_pr2 = self.cls(pr2_urdf())
+        assert parsed_pr2.get_first_link_with_collision() == u'base_link'
+
+    def test_get_non_base_movement_root(self, function_setup):
+        parsed_donbot = self.cls(donbot_urdf())
+        assert parsed_donbot.get_non_base_movement_root() == u'base_footprint'
+
+    def test_get_non_base_movement_root2(self, function_setup):
+        parsed_pr2 = self.cls(pr2_urdf())
+        assert parsed_pr2.get_non_base_movement_root() == u'base_footprint'

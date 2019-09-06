@@ -7,19 +7,28 @@ from itertools import product
 from time import time
 
 from geometry_msgs.msg import Pose, Quaternion
+from tf.transformations import euler_from_quaternion, rotation_from_matrix, quaternion_matrix
 
+from giskardpy import logging
 from giskardpy.data_types import SingleJointState
 from giskardpy.tfwrapper import msg_to_kdl
 from giskardpy.urdf_object import URDFObject
-from giskardpy import logging
 
 
 class WorldObject(URDFObject):
     def __init__(self, urdf, base_pose=None, controlled_joints=None, path_to_data_folder=u'',
-                 calc_self_collision_matrix=True, *args, **kwargs):
+                 calc_self_collision_matrix=True, ignored_pairs=None, added_pairs=None, *args, **kwargs):
         super(WorldObject, self).__init__(urdf, *args, **kwargs)
         self.path_to_data_folder = path_to_data_folder + u'collision_matrix/'
         self.controlled_joints = controlled_joints
+        if not ignored_pairs:
+            self.ignored_pairs = set()
+        else:
+            self.ignored_pairs = {tuple(x) for x in ignored_pairs}
+        if not added_pairs:
+            self.added_pairs = set()
+        else:
+            self.added_pairs = {tuple(x) for x in added_pairs}
         self._calc_self_collision_matrix = calc_self_collision_matrix
         if base_pose is None:
             p = Pose()
@@ -30,25 +39,16 @@ class WorldObject(URDFObject):
         self._controlled_links = None
         self._self_collision_matrix = set()
 
-    @classmethod
-    def from_urdf_file(cls, urdf_file, *args, **kwargs):
-        return super(WorldObject, cls).from_urdf_file(urdf_file, *args, **kwargs)
-
-    @classmethod
-    def from_world_body(cls, world_body, *args, **kwargs):
-        return super(WorldObject, cls).from_world_body(world_body, *args, **kwargs)
-
-    @classmethod
-    def from_parts(cls, robot_name, links, joints, *args, **kwargs):
-        return super(WorldObject, cls).from_parts(robot_name, links, joints, *args, **kwargs)
-
     @property
     def joint_state(self):
         return self._js
 
     @joint_state.setter
     def joint_state(self, value):
-        self._js = value
+        new_js = {}
+        new_js.update(self._js)
+        self._js = new_js
+        self._js.update(value)
 
     @property
     def base_pose(self):
@@ -66,7 +66,7 @@ class WorldObject(URDFObject):
                                        value.orientation.w])
         self._base_pose = value
         self._base_pose.orientation = Quaternion(*orientation_vector / np.linalg.norm(orientation_vector))
-        self.T_base___map = msg_to_kdl(self._base_pose).Inverse()
+        self.root_T_map = msg_to_kdl(self._base_pose).Inverse()
 
     @property
     def controlled_joints(self):
@@ -127,6 +127,7 @@ class WorldObject(URDFObject):
         for link_a, link_b in link_combinations:
             if self.are_linked(link_a, link_b) or link_a == link_b:
                 always.add((link_a, link_b))
+        always = always.difference({tuple(x) for x in self.ignored_pairs})
         rest = link_combinations.difference(always)
         self.joint_state = self.get_zero_joint_state()
         always = always.union(self.check_collisions(rest, d))
@@ -146,7 +147,8 @@ class WorldObject(URDFObject):
             if len(sometimes2) > 0:
                 rest = rest.difference(sometimes2)
                 sometimes = sometimes.union(sometimes2)
-        logging.loginfo(u'calculated self collision matrix in {:.3f}s'.format(time()-t))
+        sometimes = sometimes.union(self.added_pairs)
+        logging.loginfo(u'calculated self collision matrix in {:.3f}s'.format(time() - t))
         return sometimes
 
     def get_possible_collisions(self, link):
@@ -241,7 +243,7 @@ class WorldObject(URDFObject):
         """
         :rtype: bool
         """
-        urdf_hash = hashlib.md5(self.get_urdf()).hexdigest()
+        urdf_hash = hashlib.md5(self.get_urdf_str()).hexdigest()
         path = u'{}/{}/{}'.format(path, self.get_name(), urdf_hash)
         if os.path.isfile(path):
             with open(path) as f:
@@ -251,7 +253,7 @@ class WorldObject(URDFObject):
         return False
 
     def safe_self_collision_matrix(self, path):
-        urdf_hash = hashlib.md5(self.get_urdf()).hexdigest()
+        urdf_hash = hashlib.md5(self.get_urdf_str()).hexdigest()
         path = u'{}/{}/{}'.format(path, self.get_name(), urdf_hash)
         if not os.path.exists(os.path.dirname(path)):
             try:
@@ -274,12 +276,12 @@ class WorldObject(URDFObject):
         super(WorldObject, self).attach_urdf_object(urdf_object, parent_link, pose)
         self.update_self_collision_matrix(added_links=set(product(self.get_links_with_collision(),
                                                                   urdf_object.get_links_with_collision())))
+        # TODO set joint state for controllable joints of added urdf?
 
     def detach_sub_tree(self, joint_name):
         sub_tree = super(WorldObject, self).detach_sub_tree(joint_name)
         self.update_self_collision_matrix(removed_links=sub_tree.get_link_names())
         return sub_tree
-
 
     def reset(self):
         super(WorldObject, self).reset()

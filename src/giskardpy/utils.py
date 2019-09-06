@@ -24,11 +24,13 @@ from sensor_msgs.msg import JointState
 from shape_msgs.msg import SolidPrimitive
 from tf.transformations import quaternion_multiply, quaternion_conjugate
 
+from giskardpy import logging
 from giskardpy.data_types import ClosestPointInfo
 from giskardpy.data_types import SingleJointState
 from giskardpy.plugin import PluginBehavior
 from giskardpy.tfwrapper import kdl_to_pose, np_to_kdl
-from giskardpy import logging
+
+r = rospkg.RosPack()
 
 
 @contextmanager
@@ -65,7 +67,7 @@ class NullContextManager(object):
         pass
 
 
-class keydefaultdict(defaultdict):
+class KeyDefaultDict(defaultdict):
     """
     A default dict where the key is passed as parameter to the factory function.
     """
@@ -154,7 +156,7 @@ def closest_point_constraint_violated(closest_point_infos, tolerance=0.9):
     for link_name, cpi_info in closest_point_infos.items():  # type: (str, ClosestPointInfo)
         if cpi_info.contact_distance < cpi_info.min_dist * tolerance:
             logging.loginfo(u'collision constraints violated: {}'.format(cpi_info.link_a, cpi_info.link_b,
-                                                               cpi_info.contact_distance))
+                                                                         cpi_info.contact_distance))
             return True
     return False
 
@@ -203,6 +205,19 @@ def to_joint_state_dict(msg):
         mjs[joint_name] = sjs
     return mjs
 
+def to_joint_state_dict2(msg):
+    """
+    Converts a ROS message of type sensor_msgs/JointState into a dict that maps name to position
+    :param msg: ROS message to convert.
+    :type msg: JointState
+    :return: Corresponding MultiJointState instance.
+    :rtype: OrderedDict[str, SingleJointState]
+    """
+    js = OrderedDict()
+    for i, joint_name in enumerate(msg.name):
+        js[joint_name] = msg.position[i]
+    return js
+
 
 def dict_to_joint_states(joint_state_dict):
     """
@@ -218,6 +233,19 @@ def dict_to_joint_states(joint_state_dict):
         js.velocity.append(0)
         js.effort.append(0)
     return js
+
+def normalize_quaternion_msg(quaternion):
+    q = Quaternion()
+    rotation = np.array([quaternion.x,
+                         quaternion.y,
+                         quaternion.z,
+                         quaternion.w])
+    normalized_rotation = rotation / np.linalg.norm(rotation)
+    q.x = normalized_rotation[0]
+    q.y = normalized_rotation[1]
+    q.z = normalized_rotation[2]
+    q.w = normalized_rotation[3]
+    return q
 
 
 def to_point_stamped(frame_id, point):
@@ -282,6 +310,7 @@ def msg_to_list(thing):
 def position_dist(position1, position2):
     return np.linalg.norm(np.array(msg_to_list(position2)) - np.array(msg_to_list(position1)))
 
+
 def create_path(path):
     if not os.path.exists(os.path.dirname(path)):
         try:
@@ -291,7 +320,7 @@ def create_path(path):
                 raise
 
 
-def plot_trajectory(tj, controlled_joints, path_to_data_folder):
+def plot_trajectory(tj, controlled_joints, path_to_data_folder, sample_period):
     """
     :type tj: Trajectory
     :param controlled_joints: only joints in this list will be added to the plot
@@ -301,19 +330,19 @@ def plot_trajectory(tj, controlled_joints, path_to_data_folder):
     if len(tj._points) <= 0:
         return
     colors = [u'b', u'g', u'r', u'c', u'm', u'y', u'k']
-    line_styles = [u'', u'--', u'-.']
+    line_styles = [u'', u'--', u'-.', u':']
     fmts = [u''.join(x) for x in product(line_styles, colors)]
     positions = []
     velocities = []
     times = []
     names = [x for x in tj._points[0.0].keys() if x in controlled_joints]
     for time, point in tj.items():
-        positions.append([v.position for j, v in point.items() if j in controlled_joints])
-        velocities.append([v.velocity for j, v in point.items() if j in controlled_joints])
+        positions.append([point[joint_name].position for joint_name in names])
+        velocities.append([point[joint_name].velocity for joint_name in names])
         times.append(time)
     positions = np.array(positions)
     velocities = np.array(velocities).T
-    times = np.array(times)
+    times = np.array(times) * sample_period
 
     f, (ax1, ax2) = plt.subplots(2, sharex=True)
     ax1.set_title(u'position')
@@ -332,7 +361,7 @@ def plot_trajectory(tj, controlled_joints, path_to_data_folder):
     ax2.set_position([box.x0, box.y0, box.width * 0.6, box.height])
 
     # Put a legend to the right of the current axis
-    ax1.legend(loc=u'center', bbox_to_anchor=(1.45, 0))
+    ax1.legend(loc=u'center', bbox_to_anchor=(1.45, 0), prop={'size': 10})
     ax1.grid()
     ax2.grid()
 
@@ -652,14 +681,17 @@ def compare_version(version1, operator, version2):
         return False
 
 
+def get_ros_pkg_path(ros_pkg):
+    return r.get_path(ros_pkg)
+
+
 def rospkg_exists(name):
     """
-       checks whether a ros package with the given name and version exists
-       :param name: the name and version of the ros package in requirements format e.g. giskard_msgs<=0.1.0
-       :type name: str
-       :return: True if it exits else False
+    checks whether a ros package with the given name and version exists
+    :param name: the name and version of the ros package in requirements format e.g. giskard_msgs<=0.1.0
+    :type name: str
+    :return: True if it exits else False
     """
-    r = rospkg.RosPack()
     name = name.replace(' ', '')
     version_list = name.split(',')
     version_entry1 = re.split('(==|>=|<=|<|>)', version_list[0])
@@ -690,9 +722,8 @@ def check_dependencies():
     Checks whether the dependencies specified in the dependency.txt in the root folder of giskardpy are installed. If a
     dependecy is not installed a message is printed.
     """
-    r = rospkg.RosPack()
 
-    with open(r.get_path('giskardpy') + '/dependencies.txt') as f:
+    with open(get_ros_pkg_path('giskardpy') + '/dependencies.txt') as f:
         dependencies = f.readlines()
 
     dependencies = [x.split('#')[0] for x in dependencies]
@@ -705,5 +736,50 @@ def check_dependencies():
             rospkg_exists(d)
         except pkg_resources.VersionConflict as e:
             logging.logwarn('found {version_f} but version {version_r} is required'.format(version_r=str(e.req),
-                                                                                   version_f=str(e.dist)))
+                                                                                           version_f=str(e.dist)))
 
+
+def str_to_unique_number(s):
+    # FIXME not actually unique
+    return sum(ord(x) for x in s)
+
+def memoize1(f):
+    """ Memoization decorator for a function taking a single argument """
+    class memodict(dict):
+        def __missing__(self, key):
+            ret = self[key] = f(key)
+            return ret
+    return memodict().__getitem__
+
+def memoize2(f):
+    """ Memoization decorator for functions taking one or more arguments. """
+    class memodict(dict):
+        def __init__(self, f):
+            self.f = f
+        def __call__(self, *args):
+            return self[args]
+        def __missing__(self, key):
+            ret = self[key] = self.f(*key)
+            return ret
+    return memodict(f)
+
+
+def memoize3(f):
+    """ Memoization decorator for a function taking one or more arguments. """
+    class memodict(dict):
+        def __getitem__(self, *key):
+            return dict.__getitem__(self, key)
+
+        def __missing__(self, key):
+            ret = self[key] = f(*key)
+            return ret
+
+    return memodict().__getitem__
+
+def memoize4(f):
+  class memodict(dict):
+      __slots__ = ()
+      def __missing__(self, key):
+          self[key] = ret = f(key)
+          return ret
+  return memodict().__getitem__

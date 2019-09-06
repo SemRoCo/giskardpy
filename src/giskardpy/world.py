@@ -1,5 +1,4 @@
 import PyKDL
-import rospy
 from geometry_msgs.msg import PoseStamped
 from giskard_msgs.msg import CollisionEntry
 
@@ -7,9 +6,9 @@ from giskardpy.data_types import ClosestPointInfo
 from giskardpy.exceptions import RobotExistsException, DuplicateNameException, PhysicsWorldException, \
     UnknownBodyException, UnsupportedOptionException
 from giskardpy.symengine_robot import Robot
-from giskardpy.tfwrapper import msg_to_kdl, kdl_to_pose
-from giskardpy.urdf_object import URDFObject
-from giskardpy.utils import keydefaultdict
+from giskardpy.tfwrapper import msg_to_kdl, kdl_to_pose, np_to_kdl
+from giskardpy.urdf_object import URDFObject, FIXED_JOINT
+from giskardpy.utils import KeyDefaultDict
 from giskardpy.world_object import WorldObject
 from giskardpy import logging
 
@@ -109,20 +108,30 @@ class World(object):
 
     # Robot ------------------------------------------------------------------------------------------------------------
 
-    def add_robot(self, robot, base_pose, controlled_joints, default_joint_vel_limit, default_joint_weight,
-                  calc_self_collision_matrix):
+    def add_robot(self, robot, base_pose, controlled_joints, joint_vel_limit, joint_acc_limit, joint_weights,
+                  calc_self_collision_matrix, ignored_pairs, added_pairs):
         """
         :type robot: giskardpy.world_object.WorldObject
         :type controlled_joints: list
         :type base_pose: PoseStamped
         """
+        if not isinstance(robot, WorldObject):
+            raise TypeError(u'only WorldObject can be added to world')
         if self.has_robot():
             raise RobotExistsException(u'A robot is already loaded')
         if self.has_object(robot.get_name()):
             raise DuplicateNameException(
                 u'can\'t add robot; object with name "{}" already exists'.format(robot.get_name()))
-        self._robot = Robot.from_urdf_object(robot, base_pose, controlled_joints, self._path_to_data_folder,
-                                             default_joint_vel_limit, default_joint_weight, calc_self_collision_matrix)
+        self._robot = Robot.from_urdf_object(urdf_object=robot,
+                                             base_pose=base_pose,
+                                             controlled_joints=controlled_joints,
+                                             path_to_data_folder=self._path_to_data_folder,
+                                             joint_vel_limit=joint_vel_limit,
+                                             joint_acc_limit=joint_acc_limit,
+                                             calc_self_collision_matrix=calc_self_collision_matrix,
+                                             joint_weights=joint_weights,
+                                             ignored_pairs=ignored_pairs,
+                                             added_pairs=added_pairs)
 
     @property
     def robot(self):
@@ -153,14 +162,15 @@ class World(object):
         :param name: name of the existing object
         :type name: name
         """
+        # TODO this should know the object pose and not require it as input
         self._robot.attach_urdf_object(self.get_object(name), link, pose)
         self.remove_object(name)
 
     def detach(self, joint_name, from_obj=None):
         if from_obj is None or self.robot.get_name() == from_obj:
             # this only works because attached simple objects have joint names equal to their name
-            p = self.robot.get_fk(self.robot.get_root(), joint_name)
-            p_map = kdl_to_pose(self.robot.T_base___map.Inverse() * msg_to_kdl(p))
+            p = self.robot.get_fk_pose(self.robot.get_root(), joint_name)
+            p_map = kdl_to_pose(self.robot.root_T_map.Inverse() * msg_to_kdl(p))
 
             cut_off_obj = self.robot.detach_sub_tree(joint_name)
         else:
@@ -174,8 +184,8 @@ class World(object):
         collision_matrix = self.robot.get_self_collision_matrix()
         collision_matrix2 = {}
         for link1, link2 in collision_matrix:
-            collision_matrix2[link1, robot_name, link2] = min_dist
-            collision_matrix2[link2, robot_name, link1] = min_dist
+            collision_matrix2[link1, robot_name, link2] = min_dist[link1][u'zero_weight_distance']
+            collision_matrix2[link2, robot_name, link1] = min_dist[link1][u'zero_weight_distance']
         return collision_matrix2
 
     def collision_goals_to_collision_matrix(self, collision_goals, min_dist):
@@ -189,7 +199,7 @@ class World(object):
         min_allowed_distance = {}
         for collision_entry in collision_goals:  # type: CollisionEntry
             if self.is_avoid_all_self_collision(collision_entry):
-                min_allowed_distance.update(self.get_robot_collision_matrix(collision_entry.min_dist))
+                min_allowed_distance.update(self.get_robot_collision_matrix(min_dist))
                 continue
             assert len(collision_entry.robot_links) == 1
             assert len(collision_entry.link_bs) == 1
@@ -206,7 +216,7 @@ class World(object):
                         del min_allowed_distance[rev_key]
 
             elif self.is_avoid_collision(collision_entry):
-                min_allowed_distance[key] = collision_entry.min_dist
+                min_allowed_distance[key] = min_dist[key[0]][u'zero_weight_distance']
             else:
                 raise Exception('todo')
         return min_allowed_distance
@@ -251,7 +261,7 @@ class World(object):
             ce.robot_links = [CollisionEntry.ALL]
             ce.body_b = CollisionEntry.ALL
             ce.link_bs = [CollisionEntry.ALL]
-            ce.min_dist = min_dist
+            ce.min_dist = -1
             collision_goals.insert(0, ce)
 
         # split body bs
@@ -444,6 +454,8 @@ class World(object):
                and self.all_body_bs(collision_entry) \
                and self.all_link_bs(collision_entry)
 
+    
+
     def collisions_to_closest_point(self, collisions, min_allowed_distance):
         """
         :param collisions: (robot_link, body_b, link_b) -> ContactInfo
@@ -453,24 +465,28 @@ class World(object):
         :return: robot_link -> ClosestPointInfo of closest thing
         :rtype: dict
         """
-        closest_point = keydefaultdict(lambda k: ClosestPointInfo((10, 0, 0),
+        closest_point = KeyDefaultDict(lambda k: ClosestPointInfo((10, 0, 0),
                                                                   (0, 0, 0),
-                                                                  1e9,
+                                                                  100,
                                                                   0.0,
                                                                   k,
                                                                   '',
+                                                                  '',
                                                                   (1, 0, 0), k))
-        T_base___map = self.robot.T_base___map
+        root_T_map = self.robot.root_T_map
+        root = self.robot.get_root()
+        fk = self.robot.get_fk_np
         for key, contact_info in collisions.items():  # type: ((str, str, str), ContactInfo)
             if contact_info is None:
                 continue
             link1 = key[0]
-            a_in_robot_root = T_base___map * PyKDL.Vector(*contact_info.position_on_a)
-            b_in_robot_root = T_base___map * PyKDL.Vector(*contact_info.position_on_b)
-            n_in_robot_root = T_base___map.M * PyKDL.Vector(*contact_info.contact_normal_on_b)
+            link_T_root = np_to_kdl(fk(link1, root))
+            a_in_robot_root = link_T_root * root_T_map * PyKDL.Vector(*contact_info.position_on_a)
+            b_in_robot_root = root_T_map * PyKDL.Vector(*contact_info.position_on_b)
+            n_in_robot_root = root_T_map.M * PyKDL.Vector(*contact_info.contact_normal_on_b)
             try:
                 cpi = ClosestPointInfo(a_in_robot_root, b_in_robot_root, contact_info.contact_distance,
-                                       min_allowed_distance[key], key[0], u'{} - {}'.format(key[1], key[2]),
+                                       min_allowed_distance[key], key[0], key[1], key[2],
                                        n_in_robot_root, key)
             except KeyError:
                 continue

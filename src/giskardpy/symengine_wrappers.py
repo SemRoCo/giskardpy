@@ -6,7 +6,7 @@ from warnings import warn
 
 import symengine as se
 from symengine import Matrix, Symbol, eye, sympify, diag, zeros, lambdify, Abs, Max, Min, sin, cos, tan, acos, asin, \
-    atan, atan2, nan, sqrt, log, tanh, var, floor, Piecewise, sign
+    atan, atan2, nan, sqrt, log, tanh, var, floor, Piecewise, sign, Eq
 from symengine.lib.symengine_wrapper import Lambdify
 
 from giskardpy.exceptions import SymengineException
@@ -20,6 +20,7 @@ VERY_SMALL_NUMBER = 1e-100
 SMALL_NUMBER = 1e-10
 
 
+
 def diffable_abs(x):
     """
     :type x: Union[float, Symbol]
@@ -27,6 +28,7 @@ def diffable_abs(x):
     :rtype: Union[float, Symbol]
     """
     return se.sqrt(x ** 2)
+
 
 
 def diffable_sign(x):
@@ -47,8 +49,10 @@ def diffable_sign(x):
     return (tanh(x * 1e105))
 
 
+
 def diffable_heaviside(x):
     return 0.5 * (diffable_sign(x + VERY_SMALL_NUMBER) + 1)
+
 
 
 def diffable_max_fast(x, y):
@@ -111,10 +115,22 @@ def diffable_if_greater_zero(condition, if_result, else_result):
     # _if = diffable_heaviside(condition) * if_result
     # _else = diffable_heaviside(-condition) * else_result
     # return _if + _else
-    _condition = diffable_sign(condition - VERY_SMALL_NUMBER)  # 1 or -1
+    _condition = diffable_sign(condition)  # 1 or -1
     _if = diffable_max_fast(0, _condition) * if_result  # 0 or if_result
     _else = -diffable_min_fast(0, _condition) * else_result  # 0 or else_result
-    return _if + _else  # if_result or else_result
+    return _if + _else + (1 - diffable_abs(_condition)) * else_result # if_result or else_result
+
+def diffable_if_greater(a, b, if_result, else_result):
+    """
+    !takes a long time to compile!
+    !Returns shit if condition is very close to but not equal to zero!
+    :type condition: Union[float, Symbol]
+    :type if_result: Union[float, Symbol]
+    :type else_result: Union[float, Symbol]
+    :return: if_result if a > b else else_result
+    :rtype: Union[float, Symbol]
+    """
+    return diffable_if_greater_zero(a-b, if_result, else_result)
 
 
 def diffable_if_greater_eq_zero(condition, if_result, else_result):
@@ -128,6 +144,18 @@ def diffable_if_greater_eq_zero(condition, if_result, else_result):
     :rtype: Union[float, Symbol]
     """
     return diffable_if_greater_zero(-condition, else_result, if_result)
+
+def diffable_if_greater_eq(a, b, if_result, else_result):
+    """
+    !takes a long time to compile!
+    !Returns shit if condition is very close to but not equal to zero!
+    :type condition: Union[float, Symbol]
+    :type if_result: Union[float, Symbol]
+    :type else_result: Union[float, Symbol]
+    :return: if_result if a >= b else else_result
+    :rtype: Union[float, Symbol]
+    """
+    return diffable_if_greater_eq_zero(a-b, if_result, else_result)
 
 
 def diffable_if_eq_zero(condition, if_result, else_result):
@@ -144,6 +172,19 @@ def diffable_if_eq_zero(condition, if_result, else_result):
     condition = diffable_abs(diffable_sign(condition))
     return (1 - condition) * if_result + condition * else_result
 
+def diffable_if_eq(a, b, if_result, else_result):
+    """
+    A short expression which can be compiled quickly.
+    !Returns shit if condition is very close to but not equal to zero!
+    !Returns shit if if_result is outside of [-1e8,1e8]!
+    :type condition: Union[float, Symbol]
+    :type if_result: Union[float, Symbol]
+    :type else_result: Union[float, Symbol]
+    :return: if_result if a == b else else_result
+    :rtype: Union[float, Symbol]
+    """
+    return diffable_if_eq_zero(a-b, if_result, else_result)
+
 
 def if_greater_zero(condition, if_result, else_result):
     """
@@ -153,7 +194,10 @@ def if_greater_zero(condition, if_result, else_result):
     :return: if_result if condition > 0 else else_result
     :rtype: Union[float, Symbol]
     """
-    return Piecewise([if_result, condition > 0], [else_result, True])
+    _condition = sign(condition)  # 1 or -1
+    _if = Max(0, _condition) * if_result  # 0 or if_result
+    _else = -Min(0, _condition) * else_result  # 0 or else_result
+    return _if + _else + (1 - Abs(_condition)) * else_result # if_result or else_result
 
 
 def if_greater_eq_zero(condition, if_result, else_result):
@@ -181,6 +225,8 @@ def if_eq_zero(condition, if_result, else_result):
     condition = se.Abs(sign(condition))
     return (1 - condition) * if_result + condition * else_result
 
+def if_eq(a, b, if_result, else_result):
+    return if_eq_zero(a - b, if_result, else_result)
 
 def safe_compiled_function(f, file_name):
     create_path(file_name)
@@ -208,15 +254,26 @@ class CompiledFunction(object):
         self.shape = shape
 
     def __call__(self, **kwargs):
+        filtered_args = [kwargs[k] for k in self.str_params]
+        return self.call2(filtered_args)
+
+    def call2(self, filtered_args):
+        """
+        :param filtered_args: parameter values in the same order as in self.str_params
+        :type filtered_args: list
+        :return:
+        """
         try:
-            filtered_args = [kwargs[k] for k in self.str_params]
             out = np.empty(self.l)
             self.fast_f.unsafe_real(np.array(filtered_args, dtype=np.double), out)
-            # TODO nan to num is kinda dangerous
-            return np.nan_to_num(out).reshape(self.shape)
+            return out.reshape(self.shape)
         except KeyError as e:
             msg = u'KeyError: {}\ntry deleting the data folder to trigger recompilation'.format(e.message)
             raise SymengineException(msg)
+        except TypeError as e:
+            raise SymengineException(e.message)
+        except ValueError as e:
+            raise SymengineException(e.message)
 
 
 def speed_up(function, parameters, backend=u'llvm'):
@@ -268,7 +325,7 @@ def cross(u, v):
     :rtype: Matrix
     """
     if len(u) != len(v):
-        raise ValueError('lengths {} and {} don\' align'.format(len(u), len(v)))
+        raise ValueError('lengths {} and {} don\'t align'.format(len(u), len(v)))
     if len(u) == 3:
         return se.Matrix([u[1] * v[2] - u[2] * v[1],
                           u[2] * v[0] - u[0] * v[2],
@@ -524,22 +581,20 @@ def trace(matrix):
     return sum(matrix[i, i] for i in range(matrix.shape[0]))
 
 
-def rotation_distance(rotation_matrix1, rotation_matrix2):
+def rotation_distance(a_R_b, a_R_c):
     """
-    :param rotation_matrix1: 4x4 or 3x3 Matrix
-    :type rotation_matrix1: Matrix
-    :param rotation_matrix2: 4x4 or 3x3 Matrix
-    :type rotation_matrix2: Matrix
-    :return: angle from the axis/angle representation of rotation_matrix1 * rotation_matrix2.T
+    :param a_R_b: 4x4 or 3x3 Matrix
+    :type a_R_b: Matrix
+    :param a_R_c: 4x4 or 3x3 Matrix
+    :type a_R_c: Matrix
+    :return: angle of axis angle representation of b_R_c
     :rtype: Union[float, Symbol]
     """
-    # TODO test me
-    difference = rotation_matrix1 * rotation_matrix2.T
-    # return -(((trace(difference) - 1)/2)-1)
-    v = (trace(difference[:3, :3]) - 1) / 2
-    # v = Max(-1, v)
-    # v = Min(1, v)
-    return se.acos(v)
+    difference = a_R_b.T * a_R_c
+    angle = (trace(difference[:3, :3]) - 1) / 2
+    angle = se.Min(angle, 1)
+    angle = se.Max(angle, -1)
+    return se.acos(angle)
 
 
 def diffable_axis_angle_from_matrix(rotation_matrix):
@@ -624,12 +679,14 @@ def axis_angle_from_quaternion(x, y, z, w):
     :return: 4x1 Matrix
     :rtype: Matrix
     """
-    # TODO buggy, angle goes from 0 - 2*pi instead of -pi - +pi
+    l = norm([x,y,z,w])
+    x, y, z, w = x/l, y/l, z/l, w/l
     w2 = se.sqrt(1 - w ** 2)
-    angle = (2 * se.acos(w))
-    x = x / w2
-    y = y / w2
-    z = z / w2
+    angle = (2 * se.acos(se.Min(se.Max(-1, w), 1)))
+    m = if_eq_zero(w2, 1, w2) # avoid /0
+    x = if_eq_zero(w2, 0, x / m)
+    y = if_eq_zero(w2, 0, y / m)
+    z = if_eq_zero(w2, 1, z / m)
     return se.Matrix([x, y, z]), angle
 
 
@@ -969,3 +1026,7 @@ def piecewise_matrix(*piecewise_vector):
 
 def to_numpy(matrix):
     return np.array(matrix.tolist()).astype(float).reshape(matrix.shape)
+
+def save_division(nominator, denominator, if_nan=0):
+    save_denominator = if_eq_zero(denominator, 1, denominator)
+    return nominator * if_eq_zero(denominator, if_nan, 1 / save_denominator)

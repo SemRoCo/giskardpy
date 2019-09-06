@@ -23,6 +23,7 @@ ContactInfo = namedtuple(u'ContactInfo', [u'contact_flag', u'body_unique_id_a', 
                                           u'lateralFrictionDir1',
                                           u'lateralFriction2', u'lateralFrictionDir2'])
 
+render = True
 
 def random_string(size=6):
     """
@@ -70,7 +71,8 @@ def deactivate_rendering():
 
 
 def activate_rendering():
-    p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 1)
+    if render:
+        p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 1)
 
 
 def stop_pybullet():

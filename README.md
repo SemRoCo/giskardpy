@@ -3,7 +3,7 @@ The core python library of the Giskard framework for constraint- and optimizatio
 
 ## Installation instructions for 16.04/kinetic
 
-First install symengine + symengine.py
+First install symengine + symengine.py, this does not have to be part of the ros workspace
 ```
 sudo apt-get install llvm-6.0-dev
 git clone https://github.com/symengine/symengine.git
@@ -20,6 +20,9 @@ sudo python setup.py install
 Install pybullet:
 ```
 sudo pip install pybullet
+sudo pip install scipy
+sudo pip install hypothesis
+sudo pip install pandas
 ```
 
 Now create the workspace
@@ -30,17 +33,11 @@ cd ~/giskardpy_ws                           # go to workspace directory
 catkin init                                 # init workspace
 cd src                                      # go to source directory of workspace
 wstool init                                 # init rosinstall
-wstool merge https://raw.githubusercontent.com/SemRoCo/giskardpy/devel/rosinstall/catkin.rosinstall
+wstool merge https://raw.githubusercontent.com/SemRoCo/giskardpy/constraint_update/rosinstall/catkin.rosinstall
                                             # update rosinstall file
 wstool update                               # pull source repositories
 rosdep install --ignore-src --from-paths .  # install dependencies available through apt
 cd ..                                       # go to workspace directory
 catkin build                                # build packages
 source ~/giskardpy_ws/devel/setup.bash      # source new overlay
-```
-
-### Tests
-Run
-```
-catkin build --catkin-make-args run_tests  # build packages
 ```

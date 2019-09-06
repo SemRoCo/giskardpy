@@ -112,9 +112,8 @@ class JointTrajectorySplitter:
                 result = action_client.get_result()
                 if result:
                     if result.error_code != control_msgs.msg.FollowJointTrajectoryResult.SUCCESSFUL:
+                        logging.logwarn(u'didn\'t receive successful from {} {}'.format(action_client.action_client.ns, result))
                         break
-                    else:
-                        logging.logwarn(u'didn\'t receive successful from {} {}'.format(action_client, result))
 
             self._as.set_succeeded(result)
 

@@ -1,9 +1,12 @@
 import rospy
+import numpy as np
 from geometry_msgs.msg import TransformStamped
 from py_trees import Status
 from tf2_msgs.msg import TFMessage
 
+from giskardpy import logging
 from giskardpy.plugin import GiskardBehavior
+from giskardpy.utils import normalize_quaternion_msg
 
 
 class TFPlugin(GiskardBehavior):
@@ -20,21 +23,21 @@ class TFPlugin(GiskardBehavior):
         self.attached_links = set(self.get_robot().get_link_names()) - self.original_links
 
     def update(self):
-        if self.attached_links:
-            tf_msg = TFMessage()
-            for link_name in self.attached_links:
-                fk = self.get_robot().get_fk(self.get_robot().get_parent_link_of_link(link_name), link_name)
-                tf = TransformStamped()
-                tf.header = fk.header
-                tf.header.stamp = rospy.get_rostime()
-                tf.child_frame_id = link_name
-                tf.transform.translation.x = fk.pose.position.x
-                tf.transform.translation.y = fk.pose.position.y
-                tf.transform.translation.z = fk.pose.position.z
-                tf.transform.rotation.x = fk.pose.orientation.x
-                tf.transform.rotation.y = fk.pose.orientation.y
-                tf.transform.rotation.z = fk.pose.orientation.z
-                tf.transform.rotation.w = fk.pose.orientation.w
-                tf_msg.transforms.append(tf)
-            self.tf_pub.publish(tf_msg)
+        try:
+            if self.attached_links:
+                tf_msg = TFMessage()
+                for link_name in self.attached_links:
+                    fk = self.get_robot().get_fk_pose(self.get_robot().get_parent_link_of_link(link_name), link_name)
+                    tf = TransformStamped()
+                    tf.header = fk.header
+                    tf.header.stamp = rospy.get_rostime()
+                    tf.child_frame_id = link_name
+                    tf.transform.translation.x = fk.pose.position.x
+                    tf.transform.translation.y = fk.pose.position.y
+                    tf.transform.translation.z = fk.pose.position.z
+                    tf.transform.rotation = normalize_quaternion_msg(fk.pose.orientation)
+                    tf_msg.transforms.append(tf)
+                self.tf_pub.publish(tf_msg)
+        except KeyError as e:
+            pass
         return Status.SUCCESS

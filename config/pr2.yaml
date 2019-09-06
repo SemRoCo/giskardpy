@@ -8,6 +8,9 @@ fill_velocity_values: True
 joint_convergence_threshold: 0.01
 wiggle_precision_threshold: 5
 tree_tick_rate: 0.1
+fft_duration: 3
+wiggle_detection_threshold: 10
+min_wiggle_frequency: 3
 nWSR: None # None results in a nWSR estimation thats fine most of the time
 max_traj_length: 30 # not implemented
 collision_time_threshold: 15

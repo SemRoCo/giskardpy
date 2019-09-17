@@ -93,7 +93,9 @@ def initialize_god_map():
                         controlled_joints)
     world.add_robot(robot, None, controlled_joints, joint_vel_symbols, joint_acc_symbols, joint_weight_symbols, True,
                     ignored_pairs=god_map.safe_get_data(identifier.ignored_self_collisions),
-                    added_pairs=god_map.safe_get_data(identifier.added_self_collisions))
+                    added_pairs=god_map.safe_get_data(identifier.added_self_collisions),
+                    symengine_backend=god_map.safe_get_data(identifier.symengine_backend),
+                    symengine_opt_level=god_map.safe_get_data(identifier.symengine_opt_level))
     joint_position_symbols = JointStatesInput(blackboard.god_map.to_symbol, world.robot.get_controllable_joints(),
                                 identifier.joint_states,
                                 suffix=[u'position'])

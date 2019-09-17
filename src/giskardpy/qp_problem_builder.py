@@ -5,7 +5,7 @@ from collections import OrderedDict, namedtuple
 from time import time
 
 import giskardpy.symengine_wrappers as spw
-from giskardpy import BACKEND
+# from giskardpy import BACKEND
 from giskardpy import logging
 from giskardpy.exceptions import QPSolverException
 from giskardpy.qp_solver import QPSolver
@@ -24,7 +24,7 @@ class QProblemBuilder(object):
     """
 
     def __init__(self, joint_constraints_dict, hard_constraints_dict, soft_constraints_dict, controlled_joint_symbols,
-                 free_symbols=None, path_to_functions=''):
+                 free_symbols=None, path_to_functions='', backend='llvm', opt_level=0):
         """
         :type joint_constraints_dict: dict
         :type hard_constraints_dict: dict
@@ -45,7 +45,7 @@ class QProblemBuilder(object):
         self.hard_constraints_dict = hard_constraints_dict
         self.soft_constraints_dict = soft_constraints_dict
         self.controlled_joints = controlled_joint_symbols
-        self.make_matrices()
+        self.make_matrices(backend, opt_level)
 
         self.shape1 = len(self.hard_constraints_dict) + len(self.soft_constraints_dict)
         self.shape2 = len(self.joint_constraints_dict) + len(self.soft_constraints_dict)
@@ -58,7 +58,7 @@ class QProblemBuilder(object):
         return self.cython_big_ass_M.str_params
 
     #
-    def make_matrices(self):
+    def make_matrices(self, backend='llvm', opt_level=0):
         """
         Turns constrains into a function that computes the matrices needed for QPOases.
         """
@@ -129,7 +129,10 @@ class QProblemBuilder(object):
             t = time()
             if self.free_symbols is None:
                 self.free_symbols = self.big_ass_M.free_symbols
-            self.cython_big_ass_M = spw.speed_up(self.big_ass_M, self.free_symbols, backend=BACKEND)
+            self.cython_big_ass_M = spw.speed_up(self.big_ass_M,
+                                                 self.free_symbols,
+                                                 backend=backend,
+                                                 opt_level=opt_level)
             if self.path_to_functions is not None:
                 safe_compiled_function(self.cython_big_ass_M, self.path_to_functions)
                 logging.loginfo(u'autowrap took {}'.format(time() - t))

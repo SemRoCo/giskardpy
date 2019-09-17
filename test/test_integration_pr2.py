@@ -1825,6 +1825,25 @@ class TestCollisionAvoidanceGoals(object):
 
         kitchen_setup.send_and_check_joint_goal(gaya_pose)
 
+    # def test_nan(self, kitchen_setup):
+    #     while True:
+    #         kitchen_setup.allow_all_collisions()
+    #         kitchen_setup.send_and_check_joint_goal(gaya_pose)
+    #         js = {k: 0.0 for k in kitchen_setup.get_world().get_object('kitchen').get_controllable_joints()}
+    #         kitchen_setup.set_kitchen_js(js)
+    #         self.open_drawer(kitchen_setup, kitchen_setup.l_tip, u'iai_kitchen/sink_area_left_middle_drawer_handle',
+    #                          u'sink_area_left_middle_drawer_main_joint')
+    #
+    # def test_nan2(self, kitchen_setup):
+    #     tool_frame_goal = PoseStamped()
+    #     tool_frame_goal.header.frame_id = kitchen_setup.l_tip
+    #     tool_frame_goal.pose.position.x = -.45
+    #     tool_frame_goal.pose.orientation.w = 1
+    #     kitchen_setup.set_cart_goal(tool_frame_goal, kitchen_setup.l_tip, kitchen_setup.default_root)
+    #     kitchen_setup.send_and_check_goal(execute=False)
+
+
+
     def test_bowl_and_cup(self, kitchen_setup):
         bowl_name = u'bowl'
         cup_name = u'cup'

@@ -103,17 +103,9 @@ class TestSympyWrapper(unittest.TestCase):
         self.assertTrue(np.isclose(r1, max(f1, f2)), msg='max({},{})={}'.format(f1, f2, r1))
 
     # fails if numbers too small or big
-    @given(limited_float(outer_limit=1e7),
-           limited_float(outer_limit=1e7))
-    def test_save_division(self, f1, f2):
-        r1 = speed_up_and_execute(spw.save_division, (f1, f2))
-        r2 = f1 / f2 if f2 != 0 else 0
-        self.assertTrue(np.isclose(r1, r2), msg='{}/{}={}'.format(f1, f2, r1))
-
-    # fails if numbers too small or big
     @given(limited_float(),
            limited_float())
-    def test_max2(self, f1, f2):
+    def test_max(self, f1, f2):
         r1 = np.float(spw.diffable_max(f1, f2))
         self.assertTrue(np.isclose(r1, max(f1, f2)), msg='max({},{})={}'.format(f1, f2, r1))
 
@@ -127,7 +119,7 @@ class TestSympyWrapper(unittest.TestCase):
     # fails if numbers too big
     @given(limited_float(),
            limited_float())
-    def test_min2(self, f1, f2):
+    def test_min(self, f1, f2):
         r1 = np.float(spw.diffable_min(f1, f2))
         self.assertTrue(np.isclose(r1, min(f1, f2)), msg='min({},{})={}'.format(f1, f2, r1))
 

@@ -1027,12 +1027,6 @@ def piecewise_matrix(*piecewise_vector):
 def to_numpy(matrix):
     return np.array(matrix.tolist()).astype(float).reshape(matrix.shape)
 
-<<<<<<< HEAD
 def save_division(nominator, denominator, if_nan=0):
     save_denominator = if_eq_zero(denominator, 1, denominator)
     return nominator * if_eq_zero(denominator, if_nan, 1 / save_denominator)
-=======
-def save_division(nominator, denominator):
-    save_denominator = if_eq_zero(denominator, 1, denominator)
-    return nominator * if_eq_zero(denominator, 0, 1 / save_denominator)
->>>>>>> d0d2cec... added save division to symengine wrapper and fixed nan bugs in cart constraints

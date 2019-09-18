@@ -49,6 +49,8 @@
   <run_depend>py_trees</run_depend>
   <run_depend>py_trees_ros</run_depend>
   <run_depend>joint_trajectory_action</run_depend>
+  <run_depend>rospy_message_converter</run_depend>
+  <run_depend>python-pytest</run_depend>
   <test_depend>rosunit</test_depend>
 
   <!-- The export tag contains other, unspecified, tags -->

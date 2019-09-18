@@ -2,18 +2,15 @@ import traceback
 from multiprocessing import Lock
 
 import rospy
-from geometry_msgs.msg import Point, Vector3, PoseStamped
+from geometry_msgs.msg import PoseStamped
 from giskard_msgs.srv import UpdateWorld, UpdateWorldResponse, UpdateWorldRequest
 from py_trees import Status
 from sensor_msgs.msg import JointState
-from std_msgs.msg import ColorRGBA
-from std_srvs.srv import SetBool, SetBoolResponse
 from visualization_msgs.msg import Marker, MarkerArray
 
-from giskardpy.data_types import ClosestPointInfo
+import giskardpy.identifier as identifier
 from giskardpy.exceptions import CorruptShapeException, UnknownBodyException, \
     UnsupportedOptionException, DuplicateNameException
-from giskardpy.identifier import collision_goal_identifier, closest_point_identifier
 from giskardpy.plugin import GiskardBehavior
 from giskardpy.tfwrapper import transform_pose
 from giskardpy.utils import to_joint_state_dict
@@ -24,7 +21,7 @@ class WorldUpdatePlugin(GiskardBehavior):
     # TODO reject changes if plugin not active or something
     def __init__(self, name):
         super(WorldUpdatePlugin, self).__init__(name)
-        self.global_reference_frame_name = u'map'
+        self.map_frame = self.get_god_map().safe_get_data(identifier.map_frame)
         self.lock = Lock()
         self.object_js_subs = {}  # JointState subscribers for articulated world objects
         self.object_joint_states = {}  # JointStates messages for articulated world objects
@@ -67,20 +64,20 @@ class WorldUpdatePlugin(GiskardBehavior):
         # TODO block or queue updates while planning
         with self.lock:
             try:
-                if req.operation is UpdateWorldRequest.ADD:
+                if req.operation == UpdateWorldRequest.ADD:
                     if req.rigidly_attached:
                         self.attach_object(req)
                     else:
                         self.add_object(req)
 
-                elif req.operation is UpdateWorldRequest.REMOVE:
+                elif req.operation == UpdateWorldRequest.REMOVE:
                     self.remove_object(req.body.name)
-                elif req.operation is UpdateWorldRequest.ALTER:
+                elif req.operation == UpdateWorldRequest.ALTER:
                     self.remove_object(req.body.name)
                     self.add_object(req)
-                elif req.operation is UpdateWorldRequest.REMOVE_ALL:
+                elif req.operation == UpdateWorldRequest.REMOVE_ALL:
                     self.clear_world()
-                elif req.operation is UpdateWorldRequest.DETACH:
+                elif req.operation == UpdateWorldRequest.DETACH:
                     self.detach_object(req)
                 else:
                     return UpdateWorldResponse(UpdateWorldResponse.INVALID_OPERATION,
@@ -108,13 +105,13 @@ class WorldUpdatePlugin(GiskardBehavior):
         :type req: UpdateWorldRequest
         """
         world_body = req.body
-        global_pose = transform_pose(self.global_reference_frame_name, req.pose).pose
+        global_pose = transform_pose(self.map_frame, req.pose).pose
         world_object = WorldObject.from_world_body(world_body)
         self.get_world().add_object(world_object)
         self.get_world().set_object_pose(world_body.name, global_pose)
         try:
             m = self.get_world().get_object(world_body.name).as_marker_msg()
-            m.header.frame_id = self.global_reference_frame_name
+            m.header.frame_id = self.map_frame
             self.publish_object_as_marker(m)
         except:
             pass
@@ -129,7 +126,7 @@ class WorldUpdatePlugin(GiskardBehavior):
         self.get_world().detach(req.body.name)
         try:
             m = self.get_world().get_object(req.body.name).as_marker_msg()
-            m.header.frame_id = self.global_reference_frame_name
+            m.header.frame_id = self.map_frame
             self.publish_object_as_marker(m)
         except:
             pass
@@ -140,12 +137,11 @@ class WorldUpdatePlugin(GiskardBehavior):
         """
         if self.get_world().has_object(req.body.name):
             p = PoseStamped()
-            p.header.frame_id = self.global_reference_frame_name
+            p.header.frame_id = self.map_frame
             p.pose = self.get_world().get_object(req.body.name).base_pose
             p = transform_pose(req.pose.header.frame_id, p)
             world_object = self.get_world().get_object(req.body.name)
-            self.get_world().attach_existing_obj_to_robot(req.body.name, req.pose.header.frame_id,
-                                                          p.pose)
+            self.get_world().attach_existing_obj_to_robot(req.body.name, req.pose.header.frame_id, p.pose)
             m = world_object.as_marker_msg()
             m.header.frame_id = p.header.frame_id
             m.pose = p.pose
@@ -201,89 +197,3 @@ class WorldUpdatePlugin(GiskardBehavior):
 
     def delete_markers(self):
         self.pub_collision_marker.publish(MarkerArray([Marker(action=Marker.DELETEALL)]))
-
-
-class CollisionChecker(GiskardBehavior):
-    def __init__(self, name, default_collision_avoidance_distance, map_frame, root_link, marker=True):
-        super(CollisionChecker, self).__init__(name)
-        self.default_min_dist = default_collision_avoidance_distance
-        self.map_frame = map_frame
-        self.robot_root = root_link
-        self.marker = marker
-        self.lock = Lock()
-        self.object_js_subs = {}  # JointState subscribers for articulated world objects
-        self.object_joint_states = {}  # JointStates messages for articulated world objects
-
-    def setup(self, timeout=10.0):
-        super(CollisionChecker, self).setup(timeout)
-        self.pub_collision_marker = rospy.Publisher(u'~visualization_marker_array', MarkerArray, queue_size=1)
-        self.srv_viz_gui = rospy.Service(u'~enable_marker', SetBool, self.enable_marker_cb)
-        rospy.sleep(.5)
-
-    def initialise(self):
-        collision_goals = self.get_god_map().safe_get_data(collision_goal_identifier)
-        self.collision_matrix = self.get_world().collision_goals_to_collision_matrix(collision_goals,
-                                                                                     self.default_min_dist)
-        self.get_god_map().safe_set_data(closest_point_identifier, None)
-        super(CollisionChecker, self).initialise()
-
-    def update(self):
-        """
-        Computes closest point info for all robot links and safes it to the god map.
-        """
-        with self.lock:
-            # TODO not necessary to parse collision goals every time
-            collisions = self.get_world().check_collisions(self.collision_matrix)
-
-            closest_point = self.get_world().collisions_to_closest_point(collisions, self.collision_matrix)
-
-            if self.marker:
-                self.publish_cpi_markers(closest_point)
-
-            self.god_map.safe_set_data(closest_point_identifier, closest_point)
-        return Status.RUNNING
-
-    def enable_marker_cb(self, setbool):
-        """
-        :type setbool: std_srvs.srv._SetBool.SetBoolRequest
-        :rtype: SetBoolResponse
-        """
-        # TODO test me
-        self.marker = setbool.data
-        return SetBoolResponse()
-
-    def publish_cpi_markers(self, closest_point_infos):
-        """
-        Publishes a string for each ClosestPointInfo in the dict. If the distance is below the threshold, the string
-        is colored red. If it is below threshold*2 it is yellow. If it is below threshold*3 it is green.
-        Otherwise no string will be published.
-        :type closest_point_infos: dict
-        """
-        m = Marker()
-        m.header.frame_id = self.robot_root
-        m.action = Marker.ADD
-        m.type = Marker.LINE_LIST
-        m.id = 1337
-        # TODO make namespace parameter
-        m.ns = u'pybullet collisions'
-        m.scale = Vector3(0.003, 0, 0)
-        if len(closest_point_infos) > 0:
-            for collision_info in closest_point_infos.values():  # type: ClosestPointInfo
-                red_threshold = collision_info.min_dist
-                yellow_threshold = collision_info.min_dist * 2
-                green_threshold = collision_info.min_dist * 3
-
-                if collision_info.contact_distance < green_threshold:
-                    m.points.append(Point(*collision_info.position_on_a))
-                    m.points.append(Point(*collision_info.position_on_b))
-                    m.colors.append(ColorRGBA(0, 1, 0, 1))
-                    m.colors.append(ColorRGBA(0, 1, 0, 1))
-                if collision_info.contact_distance < yellow_threshold:
-                    m.colors[-2] = ColorRGBA(1, 1, 0, 1)
-                    m.colors[-1] = ColorRGBA(1, 1, 0, 1)
-                if collision_info.contact_distance < red_threshold:
-                    m.colors[-2] = ColorRGBA(1, 0, 0, 1)
-                    m.colors[-1] = ColorRGBA(1, 0, 0, 1)
-        ma = MarkerArray()
-        ma.markers.append(m)
-        self.pub_collision_marker.publish(ma)

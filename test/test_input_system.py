@@ -5,7 +5,7 @@ from hypothesis import given
 import hypothesis.strategies as st
 
 from giskardpy.god_map import GodMap
-from giskardpy.input_system import JointStatesInput, Point3Input, Vector3Input, FrameInput
+from giskardpy.input_system import JointStatesInput, Point3Input, Vector3Input, PoseStampedInput
 from utils_for_tests import variable_name
 
 PKG = u'giskardpy'
@@ -78,8 +78,8 @@ class TestInputSystem(unittest.TestCase):
     def test_frame_input(self, translation_prefix, translation_suffix, rotation_prefix, rotation_suffix,
                          x, y, z, qx, qy, qz, qw):
         gm = GodMap()
-        input = FrameInput(gm.to_symbol, translation_prefix, translation_suffix, rotation_prefix, rotation_suffix,
-                           x, y, z, qx, qy, qz, qw)
+        input = PoseStampedInput(gm.to_symbol, translation_prefix, translation_suffix, rotation_prefix, rotation_suffix,
+                                 x, y, z, qx, qy, qz, qw)
         x_symbol = str(input.x)
         y_symbol = str(input.y)
         z_symbol = str(input.z)

@@ -19,6 +19,7 @@ class QPSolver(object):
         """
         self.qpProblem = qpoases.PySQProblem(dim_a, dim_b)
         options = qpoases.PyOptions()
+        options.setToMPC()
         options.printLevel = qpoases.PyPrintLevel.NONE
         self.qpProblem.setOptions(options)
         self.xdot_full = np.zeros(dim_a)
@@ -27,7 +28,7 @@ class QPSolver(object):
 
     def solve(self, H, g, A, lb, ub, lbA, ubA, nWSR=None):
         """
-        x^T*H*x
+        x^T*H*x + x^T*g
         s.t.: lbA < A*x < ubA
         and    lb <  x  < ub
         :param H: 2d diagonal weight matrix, shape = (jc (joint constraints) + sc (soft constraints)) * (jc + sc)
@@ -46,7 +47,7 @@ class QPSolver(object):
         :type np.array
         :param nWSR:
         :type np.array
-        :return: x according to the equations above, len = number of joints
+        :return: x according to the equations above, len = joint constraints + soft constraints
         :type np.array
         """
         number_of_retries = 2
@@ -74,6 +75,7 @@ class QPSolver(object):
                 r = 5
                 A = np.round(A, r)
                 nWSR = None
+                self.started = False
         else:  # if not break
             self.started = False
             raise QPSolverException(self.RETURN_VALUE_DICT[success])

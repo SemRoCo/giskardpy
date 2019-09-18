@@ -42,7 +42,7 @@ class Trajectory(object):
 
 class ClosestPointInfo(object):
     # TODO why no named tuple?
-    def __init__(self, position_on_a, position_on_b, contact_distance, min_dist, link_a, link_b, contact_normal,
+    def __init__(self, position_on_a, position_on_b, contact_distance, min_dist, link_a, body_b, link_b, contact_normal,
                  old_key):
         self.position_on_a = position_on_a
         self.position_on_b = position_on_b
@@ -50,5 +50,6 @@ class ClosestPointInfo(object):
         self.contact_normal = contact_normal
         self.min_dist = min_dist
         self.link_a = link_a
+        self.body_b = body_b
         self.link_b = link_b
         self.old_key = old_key

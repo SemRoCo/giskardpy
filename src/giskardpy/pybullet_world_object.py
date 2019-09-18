@@ -41,6 +41,7 @@ class PyBulletWorldObject(WorldObject):
             p.orientation.w = 1
             self.base_pose = p
         self.self_collision_matrix = set()
+        self.render = False
 
     @WorldObject.joint_state.setter
     def joint_state(self, value):
@@ -103,7 +104,7 @@ class PyBulletWorldObject(WorldObject):
                 joint_state = self.joint_state
                 base_pose = self.base_pose
                 self.suicide()
-            self._pybullet_id = load_urdf_string_into_bullet(self.get_urdf(), base_pose)
+            self._pybullet_id = load_urdf_string_into_bullet(self.get_urdf_str(), base_pose)
             self.__sync_with_bullet()
         if joint_state is not None:
             joint_state = {k: v for k, v in joint_state.items() if k in self.get_joint_names()}
@@ -133,6 +134,9 @@ class PyBulletWorldObject(WorldObject):
         :rtype: int
         """
         return self.link_name_to_id[link_name]
+
+    def pybullet_link_id_to_name(self, link_id):
+        return self.link_id_to_name[link_id]
 
     def in_collision(self, link_a, link_b, distance):
         link_id_a = self.get_pybullet_link_id(link_a)

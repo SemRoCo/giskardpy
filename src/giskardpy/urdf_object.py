@@ -1,15 +1,16 @@
+import numpy as np
 from collections import namedtuple
 from itertools import chain
 
 import urdf_parser_py.urdf as up
-from geometry_msgs.msg import Pose, Vector3
+from geometry_msgs.msg import Pose, Vector3, Quaternion
 from std_msgs.msg import ColorRGBA
-from tf.transformations import euler_from_quaternion
+from tf.transformations import euler_from_quaternion, quaternion_from_euler, rotation_from_matrix, quaternion_matrix
 from visualization_msgs.msg import Marker
 
 from giskardpy.exceptions import DuplicateNameException, UnknownBodyException, CorruptShapeException
 from giskardpy.utils import cube_volume, cube_surface, sphere_volume, cylinder_volume, cylinder_surface, \
-    suppress_stderr
+    suppress_stderr, msg_to_list, KeyDefaultDict, memoize3, memoize2
 
 Joint = namedtuple('Joint', ['symbol', 'velocity_limit', 'lower', 'upper', 'type', 'frame'])
 
@@ -32,10 +33,15 @@ def hacky_urdf_parser_fix(urdf_str):
     return fixed_urdf
 
 
-JOINT_TYPES = [u'fixed', u'revolute', u'continuous', u'prismatic']
-MOVABLE_JOINT_TYPES = [u'revolute', u'continuous', u'prismatic']
-ROTATIONAL_JOINT_TYPES = [u'revolute', u'continuous']
-TRANSLATIONAL_JOINT_TYPES = [u'prismatic']
+FIXED_JOINT = u'fixed'
+REVOLUTE_JOINT = u'revolute'
+CONTINUOUS_JOINT = u'continuous'
+PRISMATIC_JOINT = u'prismatic'
+JOINT_TYPES = [FIXED_JOINT, REVOLUTE_JOINT, CONTINUOUS_JOINT, PRISMATIC_JOINT]
+MOVABLE_JOINT_TYPES = [REVOLUTE_JOINT, CONTINUOUS_JOINT, PRISMATIC_JOINT]
+ROTATIONAL_JOINT_TYPES = [REVOLUTE_JOINT, CONTINUOUS_JOINT]
+TRANSLATIONAL_JOINT_TYPES = [PRISMATIC_JOINT]
+LIMITED_JOINTS = [PRISMATIC_JOINT, REVOLUTE_JOINT]
 
 
 class URDFObject(object):
@@ -52,6 +58,11 @@ class URDFObject(object):
         with suppress_stderr():
             self._urdf_robot = up.URDF.from_xml_string(self.original_urdf)  # type: up.Robot
         self._link_to_marker = {}
+        self.root = self.calc_root()
+        self.reset_cache()
+
+    def reset_cache(self):
+        self._split_chain = KeyDefaultDict(self.__calc_get_split_chain)
 
     @classmethod
     def from_urdf_file(cls, urdf_file, *args, **kwargs):
@@ -91,9 +102,16 @@ class URDFObject(object):
                 geometry = up.Mesh(world_body.mesh)
             else:
                 raise CorruptShapeException(u'primitive shape \'{}\' not supported'.format(world_body.shape.type))
-            link = up.Link(world_body.name,
-                           visual=up.Visual(geometry, material=up.Material(u'green', color=up.Color(0, 1, 0, 1))),
-                           collision=up.Collision(geometry))
+            # FIXME test if this works on 16.04
+            try:
+                link = up.Link(world_body.name)
+                link.add_aggregate(u'visual', up.Visual(geometry,
+                                                        material=up.Material(u'green', color=up.Color(0, 1, 0, 1))))
+                link.add_aggregate(u'collision', up.Collision(geometry))
+            except AssertionError:
+                link = up.Link(world_body.name,
+                               visual=up.Visual(geometry, material=up.Material(u'green', color=up.Color(0, 1, 0, 1))),
+                               collision=up.Collision(geometry))
             links.append(link)
         elif world_body.type == world_body.URDF_BODY:
             o = cls(world_body.urdf, *args, **kwargs)
@@ -147,7 +165,7 @@ class URDFObject(object):
         :type urdf_object: URDFObject
         :rtype: cls
         """
-        return cls(urdf_object.get_urdf(), *args, **kwargs)
+        return cls(urdf_object.get_urdf_str(), *args, **kwargs)
 
     def get_name(self):
         """
@@ -162,7 +180,7 @@ class URDFObject(object):
     def get_urdf_robot(self):
         return self._urdf_robot
 
-    # JOINT FUNCITONS
+    # JOINT FUNCTIONS
 
     def get_joint_names(self):
         """
@@ -171,6 +189,10 @@ class URDFObject(object):
         return self._urdf_robot.joint_map.keys()
 
     def get_split_chain(self, root, tip, joints=True, links=True, fixed=True):
+        return self._split_chain[root, tip, joints, links, fixed]
+
+    def __calc_get_split_chain(self, args):
+        root, tip, joints, links, fixed = args
         if root == tip:
             return [], [], []
         root_chain = self._urdf_robot.get_chain(self.get_root(), root, False, True, True)
@@ -182,13 +204,20 @@ class URDFObject(object):
             i += 1
         connection = tip_chain[i - 1]
         root_chain = self._urdf_robot.get_chain(connection, root, joints, links, fixed)
+        if links:
+            root_chain = root_chain[1:]
         root_chain.reverse()
         tip_chain = self._urdf_robot.get_chain(connection, tip, joints, links, fixed)
+        if links:
+            tip_chain = tip_chain[1:]
         return root_chain, [connection] if links else [], tip_chain
 
     def get_chain(self, root, tip, joints=True, links=True, fixed=True):
         root_chain, connection, tip_chain = self.get_split_chain(root, tip, joints, links, fixed)
         return root_chain + connection + tip_chain
+
+    def get_connecting_link(self, link1, link2):
+        return self.get_split_chain(link1, link2, joints=False)[1][0]
 
     def get_joint_names_from_chain(self, root_link, tip_link):
         """
@@ -221,15 +250,17 @@ class URDFObject(object):
         return {joint_name: self.get_joint_limits(joint_name) for joint_name in self.get_joint_names()
                 if self.is_joint_controllable(joint_name)}
 
-    def get_joint_limits(self, joint_names):
+    def get_joint_limits(self, joint_name):
         """
         Returns joint limits specified in the safety controller entry if given, else returns the normal limits.
         :param joint_name: name of the joint in the urdfs
-        :type joint_names: str
+        :type joint_name: str
         :return: lower limit, upper limit or None if not applicable
         :rtype: float, float
         """
-        joint = self.get_urdf_joint(joint_names)
+        joint = self.get_urdf_joint(joint_name)
+        if self.is_joint_continuous(joint_name):
+            return None, None
         try:
             return max(joint.safety_controller.soft_lower_limit, joint.limit.lower), \
                    min(joint.safety_controller.soft_upper_limit, joint.limit.upper)
@@ -238,6 +269,17 @@ class URDFObject(object):
                 return joint.limit.lower, joint.limit.upper
             except AttributeError:
                 return None, None
+
+    def get_joint_velocity_limit(self, joint_name):
+        limit = self._urdf_robot.joint_map[joint_name].limit
+        if limit is None or limit.velocity is None:
+            return None
+        else:
+            return limit.velocity
+
+    def get_joint_axis(self, joint_name):
+        joint = self.get_urdf_joint(joint_name)
+        return joint.axis
 
     def is_joint_controllable(self, name):
         """
@@ -270,7 +312,7 @@ class URDFObject(object):
         :type name: str
         :rtype: bool
         """
-        return self.get_joint_type(name) == u'continuous'
+        return self.get_joint_type(name) == CONTINUOUS_JOINT
 
     def is_joint_fixed(self, name):
         """
@@ -278,7 +320,7 @@ class URDFObject(object):
         :type name: str
         :rtype: bool
         """
-        return self.get_joint_type(name) == u'fixed'
+        return self.get_joint_type(name) == FIXED_JOINT
 
     def get_joint_type(self, name):
         return self.get_urdf_joint(name).type
@@ -380,13 +422,56 @@ class URDFObject(object):
                    isinstance(geo, up.Mesh)
         return False
 
-    def get_urdf(self):
+    def get_urdf_str(self):
         return self._urdf_robot.to_xml_string()
 
     def get_root(self):
-        return self._urdf_robot.get_root()
+        return self.root
 
-    def attach_urdf_object(self, urdf_object, parent_link, pose):
+    def calc_root(self):
+        self.root = self._urdf_robot.get_root()
+        return self.root
+
+    def get_first_link_with_collision(self):
+        l = self.get_root()
+        while not self.has_link_collision(l):
+            children = self.get_child_links_of_link(l)
+            children_with_collision = [x for x in children if self.has_link_collision(x)]
+            if len(children_with_collision) > 1 or len(children) > 1:
+                raise TypeError(u'first collision link is not unique')
+            elif len(children_with_collision) == 1:
+                l = children_with_collision[0]
+                break
+            else:
+                l = children[0]
+        return l
+
+    def get_non_base_movement_root(self):
+        l = self.get_root()
+        result = self.__get_non_base_movement_root_helper(l)
+        if result is None:
+            result = l
+        return result
+
+    def __get_non_base_movement_root_helper(self, link_name):
+        if self.has_link_collision(link_name):
+            parent_joint = self.get_parent_joint_of_link(link_name)
+            if self.is_joint_controllable(parent_joint):
+                return link_name
+            else:
+                return None
+        else:
+            for child in self.get_child_links_of_link(link_name):
+                child_result = self.__get_non_base_movement_root_helper(child)
+                if child_result is None:
+                    parent_joint = self.get_parent_joint_of_link(link_name)
+                    if parent_joint is not None and self.is_joint_controllable(parent_joint):
+                        return link_name
+                    else:
+                        return None
+                return child_result
+
+    def attach_urdf_object(self, urdf_object, parent_link, pose, round_to=3):
         """
         Rigidly attach another object to the robot.
         :param urdf_object: Object that shall be attached to the robot.
@@ -412,17 +497,19 @@ class URDFObject(object):
         if len(set(urdf_object.get_joint_names()).intersection(set(self.get_joint_names()))) != 0:
             raise DuplicateNameException(u'can not merge urdfs that share joint names')
 
+        origin = up.Pose([np.round(pose.position.x, round_to),
+                          np.round(pose.position.y, round_to),
+                          np.round(pose.position.z, round_to)],
+                         euler_from_quaternion([np.round(pose.orientation.x, round_to),
+                                                np.round(pose.orientation.y, round_to),
+                                                np.round(pose.orientation.z, round_to),
+                                                np.round(pose.orientation.w, round_to)]))
+
         joint = up.Joint(self.robot_name_to_root_joint(urdf_object.get_name()),
                          parent=parent_link,
                          child=urdf_object.get_root(),
-                         joint_type=u'fixed',
-                         origin=up.Pose([pose.position.x,
-                                         pose.position.y,
-                                         pose.position.z],
-                                        euler_from_quaternion([pose.orientation.x,
-                                                               pose.orientation.y,
-                                                               pose.orientation.z,
-                                                               pose.orientation.w])))
+                         joint_type=FIXED_JOINT,
+                         origin=origin)
         self._urdf_robot.add_joint(joint)
         for j in urdf_object._urdf_robot.joints:
             self._urdf_robot.add_joint(j)
@@ -433,6 +520,15 @@ class URDFObject(object):
         except:
             pass
         self.reinitialize()
+
+    def get_joint_origin(self, joint_name):
+        origin = self.get_urdf_joint(joint_name).origin
+        p = Pose()
+        p.position.x = origin.xyz[0]
+        p.position.y = origin.xyz[1]
+        p.position.z = origin.xyz[2]
+        p.orientation = Quaternion(*quaternion_from_euler(*origin.rpy))
+        return p
 
     def detach_sub_tree(self, joint_name):
         """
@@ -454,10 +550,11 @@ class URDFObject(object):
         self.reinitialize()
 
     def __str__(self):
-        return self.get_urdf()
+        return self.get_urdf_str()
 
     def reinitialize(self):
-        self._urdf_robot = up.URDF.from_xml_string(self.get_urdf())
+        self._urdf_robot = up.URDF.from_xml_string(self.get_urdf_str())
+        self.reset_cache()
 
     def robot_name_to_root_joint(self, name):
         # TODO should this really be a class function?
@@ -467,9 +564,9 @@ class URDFObject(object):
         if link_name in self._urdf_robot.parent_map:
             return self._urdf_robot.parent_map[link_name][1]
 
-    def get_child_link_of_link(self, link_name):
+    def get_child_links_of_link(self, link_name):
         if link_name in self._urdf_robot.child_map:
-            return self._urdf_robot.child_map[link_name][1]
+            return [x[1] for x in self._urdf_robot.child_map[link_name]]
 
     def get_parent_joint_of_link(self, link_name):
         if link_name in self._urdf_robot.parent_map:
@@ -497,7 +594,7 @@ class URDFObject(object):
         :type o: URDFObject
         :rtype: bool
         """
-        return o.get_urdf() == self.get_urdf()
+        return o.get_urdf_str() == self.get_urdf_str()
 
     def has_link_visuals(self, link_name):
         link = self._urdf_robot.link_map[link_name]
@@ -515,7 +612,10 @@ class URDFObject(object):
         m = Marker()
         m.ns = u'{}/{}'.format(ns, self.get_name())
         m.id = id
-        geometry = link.visual.geometry
+        if link.visual:
+            geometry = link.visual.geometry
+        else:
+            geometry = link.visuals[0].geometry
         if isinstance(geometry, up.Box):
             m.type = Marker.CUBE
             m.scale = Vector3(*geometry.size)

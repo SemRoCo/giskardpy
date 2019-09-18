@@ -1,0 +1,49 @@
+enable_collision_marker: True
+enable_visualization: True
+plot_trajectory: True
+debug: False
+map_frame: map 
+sample_period: 0.05
+fill_velocity_values: True
+joint_convergence_threshold: 0.005
+wiggle_precision_threshold: 3
+tree_tick_rate: 0.1
+nWSR: None # None results in a nWSR estimation that's fine most of the time
+max_traj_length: 30 # not implemented
+collision_time_threshold: 15 # not implemented
+joint_vel_limit:
+  default: 1
+joint_acceleration_limit: # multiply your desired acc limit with sample period
+  default: 100
+joint_weights:
+  default: 0.001
+  odom_x_joint: 1
+  odom_y_joint: 1
+  odom_z_joint: 1
+#  refills_finger: 0.1
+collision_avoidance:
+  default:
+    max_weight_distance: 0.0
+    low_weight_distance: 0.01
+    zero_weight_distance: 0.05
+  high: &high
+    max_weight_distance: 0.01
+    low_weight_distance: 0.03
+    zero_weight_distance: 0.05
+  low: &low
+    max_weight_distance: 0.005
+    low_weight_distance: 0.01
+    zero_weight_distance: 0.02
+  base_link:
+    max_weight_distance: 0.04
+    low_weight_distance: 0.06
+    zero_weight_distance: 0.09
+  ur5_wrist_1_link: *low
+  ur5_wrist_2_link: *low
+  ur5_wrist_3_link: *low
+  ur5_forearm_link: *low
+  ur5_upper_arm_link: *low
+self_collision_matrix:
+  ignore: []
+  add:
+    - [plate, ur5_upper_arm_link]

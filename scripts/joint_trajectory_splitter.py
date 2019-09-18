@@ -9,9 +9,9 @@ from giskardpy import logging
 import copy
 import rostopic
 
-class JointGoalSplitter:
+class JointTrajectorySplitter:
     def __init__(self):
-        rospy.init_node('JointGoalSplitter')
+        rospy.init_node('joint_trajectory_splitter')
         self.action_clients = []
         self.joint_names = []
         self.state_topics = rospy.get_param('~state_topics', [])
@@ -111,16 +111,25 @@ class JointGoalSplitter:
         goal_trajectories_points = [[] for i in range(self.number_of_clients)]
 
         for p in goal.trajectory.points:
-            traj_points = []
             for i, index_list in enumerate(idx):
                 traj_point = trajectory_msgs.msg.JointTrajectoryPoint()
                 joint_pos = [p.positions[j] for j in index_list]
                 traj_point.positions = tuple(joint_pos)
+                if p.velocities:
+                    joint_vel = [p.velocities[j] for j in index_list]
+                    traj_point.velocities = tuple(joint_vel)
+                if p.accelerations:
+                    joint_acc = [p.accelerations[j] for j in index_list]
+                    traj_point.accelerations = tuple(joint_acc)
+                if p.effort:
+                    joint_effort = [p.effort[j] for j in index_list]
+                    traj_point.effort = tuple(joint_effort)
                 traj_point.time_from_start.nsecs = p.time_from_start.nsecs
                 traj_point.time_from_start.secs = p.time_from_start.secs
                 goal_trajectories_points[i].append(traj_point)
 
         for i, a_goal in enumerate(action_goals):
+            a_goal.trajectory.header = goal.trajectory.header
             a_goal.trajectory.joint_names = self.joint_names[i]
             a_goal.trajectory.points = tuple(goal_trajectories_points[i])
 
@@ -141,8 +150,10 @@ class JointGoalSplitter:
                 if temp_result._type == 'pr2_controllers_msgs/JointTrajectoryResult':
                     continue
                 result = temp_result
-                if result.error_code != control_msgs.msg.FollowJointTrajectoryResult.SUCCESSFUL:
-                    break
+                if result:
+                    if result.error_code != control_msgs.msg.FollowJointTrajectoryResult.SUCCESSFUL:
+                        logging.logwarn(u'didn\'t receive successful from {} {}'.format(action_client.action_client.ns, result))
+                        break
 
             self._as.set_succeeded(result)
 
@@ -196,4 +207,4 @@ class JointGoalSplitter:
 
 
 if __name__ == '__main__':
-    j = JointGoalSplitter()
+    j = JointTrajectorySplitter()

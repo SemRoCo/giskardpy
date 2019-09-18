@@ -1,14 +1,16 @@
 import PyKDL
 import rospy
 from geometry_msgs.msg import PoseStamped, Vector3Stamped, PointStamped, TransformStamped, Pose, Quaternion, Point, \
-    Vector3
+    Vector3, Twist, TwistStamped
+from tf.transformations import quaternion_from_matrix
 from tf2_geometry_msgs import do_transform_pose, do_transform_vector3, do_transform_point
 from tf2_kdl import transform_to_kdl
 from tf2_py._tf2 import ExtrapolationException
 from tf2_ros import Buffer, TransformListener
+
 from giskardpy import logging
 
-tfBuffer = None # type: Buffer
+tfBuffer = None  # type: Buffer
 tf_listener = None
 
 
@@ -22,6 +24,7 @@ def init(tf_buffer_size=15):
     tfBuffer = Buffer(rospy.Duration(tf_buffer_size))
     tf_listener = TransformListener(tfBuffer)
     rospy.sleep(5.0)
+
 
 def wait_for_transform(target_frame, source_frame, time, timeout):
     global tfBuller
@@ -94,13 +97,15 @@ def transform_point(target_frame, point):
         logging.logwarn(e)
 
 
-def lookup_transform(target_frame, source_frame, time=rospy.Time()):
+def lookup_transform(target_frame, source_frame, time=None):
     """
     :type target_frame: str
     :type source_frame: str
     :return: Transform from target_frame to source_frame
-    :rtype: PoseStamped
+    :rtype: TransformStamped
     """
+    if not time:
+        time = rospy.Time()
     global tfBuffer
     if tfBuffer is None:
         init()
@@ -124,6 +129,22 @@ def lookup_pose(target_frame, source_frame, time=None):
         p.header.stamp = time
     p.pose.orientation.w = 1.0
     return transform_pose(target_frame, p)
+
+
+def lookup_point(target_frame, source_frame, time=None):
+    """
+    :type target_frame: str
+    :type source_frame: str
+    :return: target_frame <- source_frame
+    :rtype: PointStamped
+    """
+    t = lookup_transform(target_frame, source_frame, time)
+    p = PointStamped()
+    p.header.frame_id = t.header.frame_id
+    p.point.x = t.transform.translation.x
+    p.point.y = t.transform.translation.y
+    p.point.z = t.transform.translation.z
+    return p
 
 
 def pose_to_kdl(pose):
@@ -151,6 +172,17 @@ def point_to_kdl(point):
     return PyKDL.Vector(point.x, point.y, point.z)
 
 
+def twist_to_kdl(twist):
+    t = PyKDL.Twist()
+    t.vel[0] = twist.linear.x
+    t.vel[1] = twist.linear.y
+    t.vel[2] = twist.linear.z
+    t.rot[0] = twist.angular.x
+    t.rot[1] = twist.angular.y
+    t.rot[2] = twist.angular.z
+    return t
+
+
 def msg_to_kdl(msg):
     if isinstance(msg, TransformStamped):
         return transform_to_kdl(msg)
@@ -162,6 +194,10 @@ def msg_to_kdl(msg):
         return point_to_kdl(msg.point)
     elif isinstance(msg, Point):
         return point_to_kdl(msg)
+    elif isinstance(msg, Twist):
+        return twist_to_kdl(msg)
+    elif isinstance(msg, TwistStamped):
+        return twist_to_kdl(msg.twist)
     else:
         raise TypeError(u'can\'t convert {} to kdl'.format(type(msg)))
 
@@ -201,6 +237,13 @@ def kdl_to_vector(vector):
     v.y = vector[1]
     v.z = vector[2]
     return v
+
+
+def kdl_to_quaternion(rotation_matrix):
+    return Quaternion(*quaternion_from_matrix([[rotation_matrix[0, 0], rotation_matrix[0, 1], rotation_matrix[0, 2], 0],
+                                               [rotation_matrix[1, 0], rotation_matrix[1, 1], rotation_matrix[1, 2], 0],
+                                               [rotation_matrix[2, 0], rotation_matrix[2, 1], rotation_matrix[2, 2], 0],
+                                               [0, 0, 0, 1]]))
 
 
 def np_to_kdl(matrix):

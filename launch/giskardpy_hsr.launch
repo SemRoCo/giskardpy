@@ -1,8 +1,16 @@
 <launch>
 
   <arg name="gui" default="false" />
+  <arg name="sim" default="false" />
+
+   <group if="$(eval arg('sim') == false)">
+     <include file="$(find giskardpy)/launch/giskardpy_real_hsr.launch"/>
+   </group>
 
   <node pkg="giskardpy" type="giskard_trees.py" name="giskard" output="screen">
+    <!-- <remap from="/tf" to="/giskard/tf" />
+    <remap from="/tf_static" to="/giskard/tf_static" />-->
+    <remap from="/robot_description" to="/giskard/robot_description" />
     <param name="path_to_data_folder" value="$(find giskardpy)/data/hsr" />
     <param name="enable_gui" value="$(arg gui)"/>
     <rosparam param="map_frame">map</rosparam>
@@ -32,7 +40,7 @@
   <node pkg="giskardpy" type="interactive_marker.py" name="giskard_interactive_marker" output="screen">
     <rosparam param="enable_self_collision">False</rosparam>
     <rosparam param="interactive_marker_chains">
-      - [base_link, hand_palm_link]
+      - [odom, hand_palm_link]
     </rosparam>
   </node>
 

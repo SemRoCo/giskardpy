@@ -4,7 +4,7 @@ from itertools import combinations
 from geometry_msgs.msg import PoseStamped
 
 import symengine_wrappers as spw
-from giskardpy import BACKEND, WORLD_IMPLEMENTATION
+from giskardpy import WORLD_IMPLEMENTATION
 from giskardpy.pybullet_world_object import PyBulletWorldObject
 from giskardpy.qp_problem_builder import HardConstraint, JointConstraint
 from giskardpy.utils import KeyDefaultDict, \
@@ -22,7 +22,8 @@ else:
 class Robot(Backend):
     def __init__(self, urdf, joint_weights=None, base_pose=None, controlled_joints=None, path_to_data_folder=u'',
                  joint_vel_limit=None,
-                 joint_acc_limit=None, calc_self_collision_matrix=True, *args, **kwargs):
+                 joint_acc_limit=None, calc_self_collision_matrix=True, symengine_backend='llvm', symengine_opt_level=0,
+                 *args, **kwargs):
         """
         :param urdf:
         :type urdf: str
@@ -31,6 +32,8 @@ class Robot(Backend):
         :param joint_vel_limit: all velocity limits which are undefined or higher than this will be set to this
         :type joint_vel_limit: Symbol
         """
+        self.symengine_backend = symengine_backend
+        self.symengine_opt_level = symengine_opt_level
         self._fk_expressions = {}
         self._fks = {}
         self._evaluated_fks = {}
@@ -205,7 +208,7 @@ class Robot(Backend):
         def f(key):
             root, tip = key
             fk = self.get_fk_expression(root, tip)
-            m = spw.speed_up(fk, fk.free_symbols, backend=BACKEND)
+            m = spw.speed_up(fk, fk.free_symbols, backend=self.symengine_backend, opt_level=self.symengine_opt_level)
             return m
 
         self._fks = KeyDefaultDict(f)

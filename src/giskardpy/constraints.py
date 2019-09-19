@@ -458,8 +458,7 @@ class CartesianOrientationSlerp(CartesianConstraint):
         angle = sw.rotation_distance(current_rotation, goal_rotation)
         angle = sw.diffable_abs(angle)
 
-        capped_angle = sw.diffable_min_fast(sw.save_division(max_speed * t, (gain * angle)), 1)
-
+        capped_angle = sw.diffable_min_fast(sw.save_division(max_speed , (gain * angle)), 1)
         q1 = sw.quaternion_from_matrix(current_rotation)
         q2 = sw.quaternion_from_matrix(goal_rotation)
         intermediate_goal = sw.diffable_slerp(q1, q2, capped_angle)

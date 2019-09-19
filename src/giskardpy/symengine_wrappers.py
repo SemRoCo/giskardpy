@@ -301,7 +301,7 @@ class CompiledFunction(object):
             raise SymengineException(e.message)
 
 
-def speed_up(function, parameters, backend=u'llvm'):
+def speed_up(function, parameters, backend=u'llvm', opt_level=0):
     # TODO use save/load for all options
     str_params = [str(x) for x in parameters]
     if len(parameters) == 0:
@@ -315,7 +315,7 @@ def speed_up(function, parameters, backend=u'llvm'):
     else:
         if backend == u'llvm':
             # try:
-            fast_f = Lambdify(list(parameters), function, backend=backend, cse=True, real=True)
+            fast_f = Lambdify(list(parameters), function, backend=backend, cse=True, real=True, opt_level=opt_level)
             # except RuntimeError as e:
             #     warn(u'WARNING RuntimeError: "{}" during lambdify with LLVM backend, fallback to numpy'.format(e),
             #          RuntimeWarning)

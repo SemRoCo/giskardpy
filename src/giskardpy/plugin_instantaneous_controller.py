@@ -42,7 +42,9 @@ class ControllerPlugin(GiskardBehavior):
         if self.soft_constraints is None or set(self.soft_constraints.keys()) != set(new_soft_constraints.keys()):
             self.soft_constraints = copy(new_soft_constraints)
             self.controller = SymEngineController(self.get_robot(),
-                                                  u'{}/{}/'.format(self.path_to_functions, self.get_robot().get_name()))
+                                                  u'{}/{}/'.format(self.path_to_functions, self.get_robot().get_name()),
+                                                  self.get_god_map().safe_get_data(identifier.symengine_backend),
+                                                  self.get_god_map().safe_get_data(identifier.symengine_opt_level))
             self.controller.set_controlled_joints(self.get_robot().controlled_joints)
             self.controller.update_soft_constraints(self.soft_constraints)
             # p = Process(target=self.controller.compile)

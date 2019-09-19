@@ -16,7 +16,7 @@ class SymEngineController(object):
     # TODO should anybody who uses this class know about constraints?
 
 
-    def __init__(self, robot, path_to_functions):
+    def __init__(self, robot, path_to_functions, backend='llvm', opt_level=0):
         """
         :type robot: Robot
         :param path_to_functions: location where compiled functions are stored
@@ -30,6 +30,8 @@ class SymEngineController(object):
         self.soft_constraints = {}
         self.free_symbols = None
         self.qp_problem_builder = None
+        self.backend = backend
+        self.opt_level = opt_level
 
 
     def set_controlled_joints(self, joint_names):
@@ -95,7 +97,9 @@ class SymEngineController(object):
                                                   self.soft_constraints,
                                                   self.joint_to_symbols_str.values(),
                                                   self.free_symbols,
-                                                  path_to_functions)
+                                                  path_to_functions,
+                                                  self.backend,
+                                                  self.opt_level)
 
 
     def get_cmd(self, substitutions, nWSR=None):

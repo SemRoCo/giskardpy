@@ -178,14 +178,14 @@ class JointPositionList(Constraint):
         return soft_constraints
 
 
-class CartesianConstraint(Constraint):
+class BasicCartesianConstraint(Constraint):
     goal = u'goal'
     weight = u'weight'
     gain = u'gain'
     max_speed = u'max_speed'
 
     def __init__(self, god_map, root_link, tip_link, goal, weight=HIGH_WEIGHT, gain=3, max_speed=0.1):
-        super(CartesianConstraint, self).__init__(god_map)
+        super(BasicCartesianConstraint, self).__init__(god_map)
         self.root = root_link
         self.tip = tip_link
         goal = convert_dictionary_to_ros_message(u'geometry_msgs/PoseStamped', goal)
@@ -213,11 +213,11 @@ class CartesianConstraint(Constraint):
         return self.get_input_PoseStamped(self.goal)
 
     def __str__(self):
-        s = super(CartesianConstraint, self).__str__()
+        s = super(BasicCartesianConstraint, self).__str__()
         return u'{}/{}/{}'.format(s, self.root, self.tip)
 
 
-class CartesianPosition(CartesianConstraint):
+class CartesianPosition(BasicCartesianConstraint):
 
     def get_constraint(self):
         """
@@ -278,7 +278,8 @@ class CartesianPosition(CartesianConstraint):
                                                             expression=current_position[2])
         return soft_constraints
 
-class CartesianPositionX(CartesianConstraint):
+
+class CartesianPositionX(BasicCartesianConstraint):
     def get_constraint(self):
         goal_position = sw.position_of(self.get_goal_pose())
         weight = self.get_input_float(self.weight)
@@ -292,7 +293,7 @@ class CartesianPositionX(CartesianConstraint):
 
         trans_error_vector = goal_position - current_position
         trans_error = sw.norm(trans_error_vector)
-        trans_scale = sw.diffable_min_fast(trans_error * gain, max_speed*t)
+        trans_scale = sw.diffable_min_fast(trans_error * gain, max_speed * t)
         trans_control = sw.save_division(trans_error_vector, trans_error) * trans_scale
 
         soft_constraints[str(self) + u'x'] = SoftConstraint(lower=trans_control[0],
@@ -301,7 +302,8 @@ class CartesianPositionX(CartesianConstraint):
                                                             expression=current_position[0])
         return soft_constraints
 
-class CartesianPositionY(CartesianConstraint):
+
+class CartesianPositionY(BasicCartesianConstraint):
     def get_constraint(self):
         goal_position = sw.position_of(self.get_goal_pose())
         weight = self.get_input_float(self.weight)
@@ -315,7 +317,7 @@ class CartesianPositionY(CartesianConstraint):
 
         trans_error_vector = goal_position - current_position
         trans_error = sw.norm(trans_error_vector)
-        trans_scale = sw.diffable_min_fast(trans_error * gain, max_speed*t)
+        trans_scale = sw.diffable_min_fast(trans_error * gain, max_speed * t)
         trans_control = sw.save_division(trans_error_vector, trans_error) * trans_scale
 
         soft_constraints[str(self) + u'x'] = SoftConstraint(lower=trans_control[1],
@@ -324,7 +326,8 @@ class CartesianPositionY(CartesianConstraint):
                                                             expression=current_position[1])
         return soft_constraints
 
-class CartesianOrientation(CartesianConstraint):
+
+class CartesianOrientation(BasicCartesianConstraint):
     def __init__(self, god_map, root_link, tip_link, goal, weight=HIGH_WEIGHT, gain=3, max_speed=0.5):
         super(CartesianOrientation, self).__init__(god_map, root_link, tip_link, goal, weight, gain, max_speed)
 
@@ -392,7 +395,7 @@ class CartesianOrientation(CartesianConstraint):
         return soft_constraints
 
 
-class CartesianOrientationSlerp(CartesianConstraint):
+class CartesianOrientationSlerp(BasicCartesianConstraint):
     def __init__(self, god_map, root_link, tip_link, goal, weight=HIGH_WEIGHT, gain=1, max_speed=1):
         super(CartesianOrientationSlerp, self).__init__(god_map, root_link, tip_link, goal, weight, gain, max_speed)
 
@@ -465,6 +468,26 @@ class CartesianOrientationSlerp(CartesianConstraint):
         return soft_constraints
 
 
+class CartesianPose(BasicCartesianConstraint):
+    # TODO do this with multi inheritance
+    goal = u'goal'
+    weight = u'weight'
+    gain = u'gain'
+    max_speed = u'max_speed'
+
+    def __init__(self, god_map, root_link, tip_link, goal, weight=HIGH_WEIGHT, gain=3, max_speed=0.1):
+        super(CartesianPose, self).__init__(god_map, root_link, tip_link, goal, weight, gain, max_speed)
+        self.constraints = []
+        self.constraints.append(CartesianPosition(god_map, root_link, tip_link, goal, weight, gain, max_speed))
+        self.constraints.append(CartesianOrientationSlerp(god_map, root_link, tip_link, goal, weight, gain, max_speed))
+
+    def get_constraint(self):
+        soft_constraints = OrderedDict()
+        for constraint in self.constraints:
+            soft_constraints.update(constraint.get_constraint())
+        return soft_constraints
+
+
 class LinkToAnyAvoidance(Constraint):
     repel_speed = u'repel_speed'
     max_weight_distance = u'max_weight_distance'
@@ -496,7 +519,7 @@ class LinkToAnyAvoidance(Constraint):
         get_chain = robot.get_chain
         get_connecting_link = robot.get_connecting_link
 
-        #TODO rename me
+        # TODO rename me
         def root_T_link_b():
             cpi = data[cpi_identifier][self.link_name]
             if cpi.body_b == self.robot_name:
@@ -734,7 +757,6 @@ class UpdateGodMap(Constraint):
             else:
                 self.update_god_map(next_identifier, value)
 
-
     def get_constraint(self):
         return {}
 
@@ -743,7 +765,6 @@ class Pointing(Constraint):
     goal_point = u'goal_point'
     pointing_axis = u'pointing_axis'
     weight = u'weight'
-
 
     def __init__(self, god_map, tip, goal_point, root=None, pointing_axis=None, weight=HIGH_WEIGHT):
         super(Pointing, self).__init__(god_map)
@@ -764,7 +785,7 @@ class Pointing(Constraint):
             pointing_axis.header.frame_id = self.tip
             pointing_axis.vector.z = 1
         tmp = np.array([pointing_axis.vector.x, pointing_axis.vector.y, pointing_axis.vector.z])
-        tmp = tmp / np.linalg.norm(tmp) #TODO possible /0
+        tmp = tmp / np.linalg.norm(tmp)  # TODO possible /0
         pointing_axis.vector = Vector3(*tmp)
 
         params = {self.goal_point: goal_point,
@@ -787,7 +808,7 @@ class Pointing(Constraint):
         pointing_axis = self.get_pointing_axis()
 
         goal_axis = goal_point - sw.position_of(root_T_tip)
-        goal_axis /= sw.norm(goal_axis) #FIXME possible /0
+        goal_axis /= sw.norm(goal_axis)  # FIXME possible /0
         current_axis = root_T_tip * pointing_axis
         diff = goal_axis - current_axis
 

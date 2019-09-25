@@ -136,11 +136,19 @@ class JointTrajectorySplitter:
 
         logging.loginfo('send splitted goals')
         for i in range(self.number_of_clients):
-            self.action_clients[i].send_goal(action_goals[i]), self.feedback_cb
+            self.action_clients[i].send_goal(action_goals[i], feedback_cb=self.feedback_cb, done_cb=self.done_cb)
 
-        trajectory_duration = goal.trajectory.points[-1].time_from_start + rospy.Duration(secs=2)
+        timeout = goal.trajectory.points[-1].time_from_start + rospy.Duration(secs=2)
         for i in range(self.number_of_clients):
-            self.action_clients[i].wait_for_result(timeout=trajectory_duration)
+            start = rospy.Time.now()
+            finished_before_timeout = self.action_clients[i].wait_for_result(timeout=timeout)
+            now = rospy.Time.now()
+            timeout = timeout - (now - start)
+            if not finished_before_timeout:
+                logging.logwarn("action client timed out")
+                self.success = False
+                self._as.set_aborted()
+                break
 
 
         if self.success:
@@ -160,6 +168,16 @@ class JointTrajectorySplitter:
 
     def feedback_cb(self, feedback):
         self._as.publish_feedback(feedback)
+
+    def done_cb(self, state, result):
+        if result._type == 'pr2_controllers_msgs/JointTrajectoryResult':
+            return
+        if result.error_code != control_msgs.msg.FollowJointTrajectoryResult.SUCCESSFUL:
+            for client in self.action_clients:
+                client.cancel_goal()
+            self.success = False
+            self._as.set_preempted()
+            logging.logwarn(u'action goal failed {}'.format(result))
 
 
     def preempt_cb(self):

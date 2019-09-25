@@ -5,17 +5,13 @@
   <arg name="robot_model" default="hsrb4s" />
   <arg name="visualization" default="false" />
   <arg name="implicit_damping" default="false" />
-  <arg name="robot_state_publisher_delay" default="2" />
   <remap from="/robot_description" to="/giskard/robot_description" />
-  <remap from="/tf" to="/giskard/tf" />
-  <remap from="/tf_static" to="/giskard/tf_static" />
-
 
 
   <node pkg="giskardpy" type="hsrb_urdf_publisher.py" name="hsrb_urdf_publisher" output="screen"/>
 
 
-  <!--joint_trajectory_action offers an action interface for the hsrb base controller because the standart interface only offers a topic to send goals.
+  <!--joint_trajectory_action offers an action interface for the hsrb base controller because the standard interface only offers a topic to send goals.
    The joint goal splitter uses this interface to send joint trajectories to the base controller of the hsr-->
   <!--#######################################################################-->
 
@@ -39,17 +35,15 @@
 
   <!--#######################################################################-->
 
-
+  <!--node that uses the odometry of the hsr to calculate and publish joint states for the fake joints of the base-->
+  <!--#######################################################################-->
+  <node pkg="giskardpy" type="hsr_base_joint_state_publisher.py" name="hsr_base_joint_state_publisher" output="screen"/>
+  <!--#######################################################################-->
 
 
   <!--launch node that combines base joint states and body joint states on the /joint_state topic-->
   <!--#######################################################################-->
-
-  <node pkg="giskardpy" type="hsr_base_joint_state_publisher.py" name="hsr_base_joint_state_publisher" output="screen"/>
-  
-  <!-- <node pkg="hsrb_base_joint_state_publisher" type="hsrb_base_joint_state_publisher_node" name="hsr_base_joint_state_publisher" output="screen"/>-->
-
-  <node pkg="joint_state_publisher" type="joint_state_publisher" name="joint_state_publisher" output="screen" launch-prefix="bash -c 'sleep $(arg robot_state_publisher_delay); $0 $@' ">
+  <node pkg="joint_state_publisher" type="joint_state_publisher" name="joint_state_publisher" output="screen" >
     <rosparam param="source_list">
     - /hsrb/joint_states
     - /hsrb_base/joint_states
@@ -61,72 +55,7 @@
     </rosparam>
     <param name="rate" value="120"/>
     <param name="use_gui" value="False"/>
-    <remap from="/robot_description" to="/giskard/robot_description" />
   </node>
-
-
-  <node pkg="robot_state_publisher" type="robot_state_publisher" name="robot_state_publisher" launch-prefix="bash -c 'sleep $(arg robot_state_publisher_delay); $0 $@' ">
-    <remap from="/robot_description" to="/giskard/robot_description" />
-    <remap from="/tf" to="/giskard/tf" />
-    <remap from="/tf_static" to="/giskard/tf_static" />
-  </node>
-
-  <node pkg="tf2_ros" type="static_transform_publisher" name="fake_localization" output="screen" args="0 0 0 0 0 0 map odom">
-    <remap from="/tf" to="/giskard/tf" />
-    <remap from="/tf_static" to="/giskard/tf_static" />
-  </node>
-
-  <node pkg="rviz" type="rviz" name="rviz" output="screen">
-    <remap from="/tf" to="/giskard/tf" />
-    <remap from="/tf_static" to="/giskard/tf_static" />
-  </node>
-
-
-
 <!--#######################################################################-->
-
-
-
-
-
-
-
-
-
-
-  <!-- <node pkg="giskardpy" type="giskard_trees.py" name="giskard" output="screen">
-    <remap from="/robot_description" to="/giskard/robot_description" />
-    <param name="path_to_data_folder" value="$(find giskardpy)/data/hsr" />
-    <param name="enable_gui" value="$(arg gui)"/>
-    <rosparam param="map_frame">map</rosparam>
-    <rosparam param="joint_convergence_threshold">0.002</rosparam>
-    <rosparam param="wiggle_precision_threshold">7</rosparam>
-    <rosparam param="max_traj_length">30</rosparam>
-    <rosparam param="sample_period">0.1</rosparam>
-    <rosparam param="default_joint_vel_limit">0.5</rosparam>
-    <rosparam param="default_joint_weight">0.0001</rosparam>
-    <rosparam param="default_collision_avoidance_distance">0.05</rosparam>
-    <rosparam param="fill_velocity_values">False</rosparam>
-    <rosparam param="nWSR">None</rosparam> --><!-- None results in a nWSR estimation thats fine most of the time -->
-    <!--<rosparam param="root_link">odom</rosparam>
-    <rosparam param="enable_collision_marker">False</rosparam>
-    <rosparam param="collision_time_threshold">15</rosparam>
-    <rosparam param="debug">False</rosparam>
-    <rosparam param="tree_tick_rate">1</rosparam>
-    <rosparam param="enable_visualization">False</rosparam>
-    <rosparam param="slerp">False</rosparam>
-    <rosparam param="plot_trajectory">False</rosparam>-->
-    <!-- remaps for real hsr -->
-    <!-- <remap from="/whole_body_controller/state" to="/hsrb/arm_trajectory_controller/state"/> -->
-    <!-- <remap from="/whole_body_controller/follow_joint_trajectory" to="/hsrb/arm_trajectory_controller/follow_joint_trajectory"/> -->
-  <!--</node>-->
-
-  <!--<node pkg="giskardpy" type="interactive_marker.py" name="giskard_interactive_marker" output="screen">
-    <rosparam param="enable_self_collision">False</rosparam>
-    <rosparam param="interactive_marker_chains">
-      - [odom, hand_palm_link]
-      - [odom, base_footprint]
-    </rosparam>
-  </node>-->
 
 </launch>

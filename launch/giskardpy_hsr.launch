@@ -8,33 +8,9 @@
    </group>
 
   <node pkg="giskardpy" type="giskard_trees.py" name="giskard" output="screen">
-    <!-- <remap from="/tf" to="/giskard/tf" />
-    <remap from="/tf_static" to="/giskard/tf_static" />-->
+    <param name="path_to_data_folder" value="$(find giskardpy)/data" />
     <remap from="/robot_description" to="/giskard/robot_description" />
-    <param name="path_to_data_folder" value="$(find giskardpy)/data/hsr" />
-    <param name="enable_gui" value="$(arg gui)"/>
-    <rosparam param="map_frame">map</rosparam>
-    <rosparam param="joint_convergence_threshold">0.002</rosparam>
-    <rosparam param="wiggle_precision_threshold">7</rosparam>
-    <rosparam param="max_traj_length">30</rosparam>
-    <rosparam param="sample_period">0.1</rosparam>
-    <rosparam param="default_joint_vel_limit">0.5</rosparam>
-    <rosparam param="default_joint_weight">0.0001</rosparam>
-    <rosparam param="default_collision_avoidance_distance">0.05</rosparam>
-    <rosparam param="fill_velocity_values">False</rosparam>
-    <rosparam param="nWSR">None</rosparam> <!-- None results in a nWSR estimation thats fine most of the time -->
-    <rosparam param="root_link">base_link</rosparam>
-    <rosparam param="enable_collision_marker">True</rosparam>
-    <rosparam param="collision_time_threshold">15</rosparam>
-    <rosparam param="debug">True</rosparam>
-    <rosparam param="tree_tick_rate">1</rosparam>
-    <rosparam param="enable_visualization">False</rosparam>
-    <rosparam param="slerp">False</rosparam>
-    <rosparam param="plot_trajectory">False</rosparam>
-    <!-- remaps for real hsr -->
-    <!-- <remap from="/whole_body_controller/state" to="/hsrb/arm_trajectory_controller/state"/> -->
-    <!-- <remap from="/whole_body_controller/follow_joint_trajectory" to="/hsrb/arm_trajectory_controller/follow_joint_trajectory"/> -->
-    <!-- <remap from="/joint_states" to="/hsrb/joint_states"/> -->
+    <rosparam command="load" file="$(find giskardpy)/config/hsr.yaml"/>
   </node>
 
   <node pkg="giskardpy" type="interactive_marker.py" name="giskard_interactive_marker" output="screen">

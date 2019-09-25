@@ -43,8 +43,12 @@ class GiskardWrapper(object):
         :param pose_stamped:
         :type pose_stamped: PoseStamped
         """
-        self.set_translation_goal(root, tip, pose_stamped)
-        self.set_rotation_goal(root, tip, pose_stamped)
+        constraint = CartesianConstraint()
+        constraint.type = CartesianConstraint.POSE_6D
+        constraint.root_link = str(root)
+        constraint.tip_link = str(tip)
+        constraint.goal = pose_stamped
+        self.cmd_seq[-1].cartesian_constraints.append(constraint)
 
     def set_translation_goal(self, root, tip, pose_stamped, weight=None, gain=None, max_speed=None):
         """

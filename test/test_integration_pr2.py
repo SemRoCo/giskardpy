@@ -683,6 +683,22 @@ class TestCartGoals(object):
         zero_pose.set_cart_goal(p, zero_pose.r_tip, zero_pose.default_root)
         zero_pose.send_and_check_goal()
 
+    def test_endless_wiggling2(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        cartesian_goal.root_link = 'torso_lift_link'
+        cartesian_goal.tip_link = 'l_gripper_tool_frame'
+
+        cartesian_goal.goal.header.frame_id = 'base_link'
+        cartesian_goal.goal.pose.position.x = 0.4
+        cartesian_goal.goal.pose.position.y = 0.5
+        cartesian_goal.goal.pose.position.z = 1
+        cartesian_goal.goal.pose.orientation.x = 0
+        cartesian_goal.goal.pose.orientation.y = 0
+        cartesian_goal.goal.pose.orientation.z = 1
+        cartesian_goal.goal.pose.orientation.w = 0
+
     def test_root_link_not_equal_chain_root(self, zero_pose):
         """
         :type zero_pose: PR2
@@ -1824,6 +1840,25 @@ class TestCollisionAvoidanceGoals(object):
         kitchen_setup.detach_object(milk_name)
 
         kitchen_setup.send_and_check_joint_goal(gaya_pose)
+
+    # def test_nan(self, kitchen_setup):
+    #     while True:
+    #         kitchen_setup.allow_all_collisions()
+    #         kitchen_setup.send_and_check_joint_goal(gaya_pose)
+    #         js = {k: 0.0 for k in kitchen_setup.get_world().get_object('kitchen').get_controllable_joints()}
+    #         kitchen_setup.set_kitchen_js(js)
+    #         self.open_drawer(kitchen_setup, kitchen_setup.l_tip, u'iai_kitchen/sink_area_left_middle_drawer_handle',
+    #                          u'sink_area_left_middle_drawer_main_joint')
+    #
+    # def test_nan2(self, kitchen_setup):
+    #     tool_frame_goal = PoseStamped()
+    #     tool_frame_goal.header.frame_id = kitchen_setup.l_tip
+    #     tool_frame_goal.pose.position.x = -.45
+    #     tool_frame_goal.pose.orientation.w = 1
+    #     kitchen_setup.set_cart_goal(tool_frame_goal, kitchen_setup.l_tip, kitchen_setup.default_root)
+    #     kitchen_setup.send_and_check_goal(execute=False)
+
+
 
     def test_bowl_and_cup(self, kitchen_setup):
         bowl_name = u'bowl'

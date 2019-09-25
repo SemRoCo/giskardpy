@@ -32,6 +32,11 @@ xdot_keys = qp_data + [u'xdot_keys']
 
 #stuff from rosparam
 rosparam = [u'rosparam']
+
+#symengine stuff
+symengine_backend = rosparam + [u'backend']
+symengine_opt_level = rosparam + [u'opt_level']
+
 data_folder = rosparam + [u'path_to_data_folder']
 gui = rosparam + [u'enable_gui']
 map_frame = rosparam + [u'map_frame']

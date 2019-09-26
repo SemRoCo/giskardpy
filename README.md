@@ -5,7 +5,7 @@ The core python library of the Giskard framework for constraint- and optimizatio
 
 First install symengine + symengine.py, this does not have to be part of the ros workspace
 ```
-sudo apt-get install llvm-6.0-dev
+sudo apt-get install llvm-6.0-dev # or llvm-8-dev if you are using 18.04
 git clone https://github.com/symengine/symengine.git
 git clone https://github.com/symengine/symengine.py.git
 cd symengine
@@ -23,7 +23,7 @@ Install pybullet:
 ```
 sudo pip install pybullet
 sudo pip install scipy
-sudo pip install hypothesis
+sudo pip install hypothesis # only needed if you want to run tests
 sudo pip install pandas
 ```
 

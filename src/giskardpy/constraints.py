@@ -598,7 +598,9 @@ class LinkToAnyAvoidance(Constraint):
 
         controllable_point = root_T_link * point_on_link
 
-        dist = (contact_normal.T * (controllable_point - other_point))[0]
+        # actually (contact_normal.T * (controllable_point- other_point))[0]
+        # but other_point is constant and therefore get removed during differentiation anyway
+        dist = (contact_normal.T * (controllable_point))[0]
 
         weight_f = sw.Piecewise([MAX_WEIGHT, actual_distance <= max_weight_distance],
                                 [ZERO_WEIGHT, actual_distance > zero_weight_distance],

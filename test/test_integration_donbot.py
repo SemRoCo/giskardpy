@@ -378,7 +378,7 @@ class TestCollisionAvoidanceGoals(object):
         p.pose.orientation.w = 1
         better_pose.add_box('br', [0.2,0.01,0.1], p)
 
-
+        better_pose.allow_self_collision()
         better_pose.send_and_check_goal()
         better_pose.check_cpi_geq(['box'], 0.025)
 

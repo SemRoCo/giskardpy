@@ -1051,3 +1051,16 @@ def to_numpy(matrix):
 def save_division(nominator, denominator, if_nan=0):
     save_denominator = if_eq_zero(denominator, 1, denominator)
     return nominator * if_eq_zero(denominator, if_nan, 1 / save_denominator)
+
+def entrywise_product(matrix1, matrix2):
+    """
+    :type matrix1: se.Matrix
+    :type matrix2: se.Matrix
+    :return:
+    """
+    assert matrix1.shape == matrix2.shape
+    result = se.zeros(*matrix1.shape)
+    for i in range(matrix1.shape[0]):
+        for j in range(matrix1.shape[1]):
+            result[i,j] = matrix1[i,j] * matrix2[i,j]
+    return result

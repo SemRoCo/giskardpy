@@ -73,7 +73,9 @@ def speed_up_and_execute(f, params):
     fast_f = spw.speed_up(slow_f, symbols)
     subs = {str(symbols[i]): input[i] for i in range(len(symbols))}
     # slow_f.subs()
-    result = fast_f(**subs).T
+    result = fast_f(**subs).T # TODO why do I transpose here ?!?
+    if result.shape[0] > 1 and result.shape[1] > 1:
+        return result.T
     if result.shape[1] == 1:
         return result.T[0]
     else:
@@ -855,6 +857,15 @@ class TestSympyWrapper(unittest.TestCase):
         self.assertAlmostEqual(distance, ref_distance, places=7)
         assert abs(distance) <= np.pi
 
+    @given(unit_vector(4),
+           unit_vector(4))
+    def test_entrywise_product(self, q1, q2):
+        # TODO use real matrices
+        m1 = quat2mat(q1)
+        m2 = quat2mat(q2)
+        r1 = speed_up_and_execute(spw.entrywise_product, [m1, m2])
+        r2 = m1*m2
+        np.testing.assert_array_almost_equal(r1,r2)
 
 if __name__ == '__main__':
     import rosunit

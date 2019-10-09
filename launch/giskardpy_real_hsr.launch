@@ -1,15 +1,18 @@
 <launch>
 
+  <arg name="on_hsr"/><!-- This parameter describes if giskard is running on the hsr itself -->
 
-  <!--<arg name="gui" default="false" />-->
-  <arg name="robot_model" default="hsrb4s" />
-  <arg name="visualization" default="false" />
-  <arg name="implicit_damping" default="false" />
   <remap from="/robot_description" to="/giskard/robot_description" />
 
+  <group if="$(eval arg('on_hsr') == true)">
+     <node pkg="giskardpy" type="hsrb_urdf_publisher.py" name="hsrb_urdf_publisher" output="screen"/>
+  </group>
 
-  <node pkg="giskardpy" type="hsrb_urdf_publisher.py" name="hsrb_urdf_publisher" output="screen"/>
-
+  <group if="$(eval arg('on_hsr') == false)">
+      <include file="$(find hsr_description)/launch/upload_hsrb_with_fake_joints.launch">
+        <arg name="description_name" value="/giskard/robot_description"/>
+      </include>
+  </group>
 
   <!--joint_trajectory_action offers an action interface for the hsrb base controller because the standard interface only offers a topic to send goals.
    The joint goal splitter uses this interface to send joint trajectories to the base controller of the hsr-->

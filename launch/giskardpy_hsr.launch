@@ -1,15 +1,22 @@
 <launch>
 
+<!--TODO:
+    delay
+    paramter if runnung on hsr
+    real hsr args necessary?-->
   <arg name="gui" default="false" />
   <arg name="sim" default="false" />
+  <arg name="on_hsr" default="false" />
 
-   <group if="$(eval arg('sim') == false)">
-     <include file="$(find giskardpy)/launch/giskardpy_real_hsr.launch"/>
-   </group>
+  <group if="$(eval arg('sim') == false)">
+    <include file="$(find giskardpy)/launch/giskardpy_real_hsr.launch">
+      <arg name="on_hsr" value="$(arg on_hsr)"/>
+    </include>
+  </group>
 
   <node pkg="giskardpy" type="giskard_trees.py" name="giskard" output="screen">
     <param name="path_to_data_folder" value="$(find giskardpy)/data" />
-    <remap from="/robot_description" to="/giskard/robot_description" />
+    <remap if="$(eval arg('sim') == false)" from="/robot_description" to="/giskard/robot_description" />
     <rosparam command="load" file="$(find giskardpy)/config/hsr.yaml"/>
   </node>
 

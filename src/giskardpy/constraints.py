@@ -493,8 +493,6 @@ class LinkToClosestAvoidance(Constraint):
     zero_weight_distance = u'zero_weight_distance'
     root_T_link_b = u'root_T_link_b'
     link_in_chain = u'link_in_chain'
-    magic_vector = u'magic_vector'
-    num_of_cpis = u'num_of_cpis'
     A = u'A'
     B = u'B'
     C = u'C'
@@ -544,32 +542,12 @@ class LinkToClosestAvoidance(Constraint):
                 pass
             return 1
 
-        def get_magic_vector():
-            magic_point = np.zeros((4,4))
-            try:
-                for cpi in data[cpi_identifier][(self.link_name,)]: # type: ClosestPointInfo
-                    d = max(cpi.min_dist - cpi.contact_distance, 0)
-                    if d > 0:
-                        n = np.array(list(cpi.contact_normal)+[0]).reshape((4,1)) / d
-                        p = np.array(list(cpi.position_on_a)+[1]).reshape((4,1))
-                        magic_point += np.dot(n,p.T)
-                return magic_point
-            except IndexError:
-                pass
-            return magic_point
-
-        def get_num_of_cpis():
-            return len(data[cpi_identifier][(self.link_name,)])
-            # return 1
-
         params = {self.repel_speed: repel_speed,
                   self.max_weight_distance: max_weight_distance,
                   self.low_weight_distance: low_weight_distance,
                   self.zero_weight_distance: zero_weight_distance,
                   self.link_in_chain: link_in_chain,
                   self.root_T_link_b: root_T_link_b,
-                  self.magic_vector: get_magic_vector,
-                  self.num_of_cpis: get_num_of_cpis,
                   self.A: A,
                   self.B: B,
                   self.C: C, }
@@ -602,12 +580,6 @@ class LinkToClosestAvoidance(Constraint):
     def get_root_T_link_b(self):
         return FrameInput(self.god_map.to_symbol, self.get_identifier() + [self.root_T_link_b, tuple()]).get_frame()
 
-    def get_magic_matrix(self):
-        return FrameInput(self.god_map.to_symbol, self.get_identifier() + [self.magic_vector, tuple()]).get_frame()
-
-    def get_num_of_cpis(self):
-        return self.god_map.to_symbol(self.get_identifier() + [self.num_of_cpis, tuple()])
-
     def get_constraint(self):
         soft_constraints = OrderedDict()
 
@@ -621,9 +593,8 @@ class LinkToClosestAvoidance(Constraint):
             root_T_link *= sw.if_eq_zero(link_in_chain, sw.eye(4), fk_expr)
             # add_debug_constraint(soft_constraints, str(self)+'/link in chain / '+l1, link_in_chain)
 
-        magic_vector = self.get_magic_matrix()
-        limit = self.get_num_of_cpis()
-        other_point = self.get_closest_point_on_b(self.link_name)
+        point_on_link = self.get_closest_point_on_a(self.link_name)
+        # other_point = self.get_closest_point_on_b(self.link_name)
         contact_normal = self.get_contact_normal_on_b(self.link_name)
         actual_distance = self.get_actual_distance(self.link_name)
         repel_speed = self.get_input_float(self.repel_speed)
@@ -634,23 +605,22 @@ class LinkToClosestAvoidance(Constraint):
         B = self.get_input_float(self.B)
         C = self.get_input_float(self.C)
 
-        magic_matrix = sw.entrywise_product(root_T_link, magic_vector)
-        magic = sum(magic_matrix)
+        controllable_point = root_T_link * point_on_link
 
-        # dist = (contact_normal.T * (magic_matrix))[0]
+        dist = (contact_normal.T * (controllable_point))[0]
 
         weight_f = sw.Piecewise([MAX_WEIGHT, actual_distance <= max_weight_distance],
                                 [ZERO_WEIGHT, actual_distance > zero_weight_distance],
                                 [A / (actual_distance + C) + B, True])
 
-        # limit = sw.Min(zero_weight_distance - dist, repel_speed*t)
+        limit = sw.Min(zero_weight_distance - dist, repel_speed * t)
         # limit = repel_speed * t
         # limit = 1
 
-        soft_constraints[str(self)] = SoftConstraint(lower=limit * repel_speed * t,
-                                                     upper=limit * repel_speed * t,
+        soft_constraints[str(self)] = SoftConstraint(lower=limit,
+                                                     upper=limit,
                                                      weight=weight_f,
-                                                     expression=magic)
+                                                     expression=dist)
         return soft_constraints
 
     def __str__(self):

@@ -11,7 +11,7 @@ from py_trees import Status
 from rospy_message_converter.message_converter import convert_ros_message_to_dictionary
 
 import giskardpy.constraints
-from giskardpy.constraints import LinkToAnyAvoidance, JointPosition
+from giskardpy.constraints import LinkToClosestAvoidance, JointPosition
 from giskardpy.exceptions import InsolvableException, ImplementationException, GiskardException
 import giskardpy.identifier as identifier
 from giskardpy.plugin import GiskardBehavior

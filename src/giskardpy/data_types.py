@@ -1,4 +1,4 @@
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 
 
 class SingleJointState(object):
@@ -53,3 +53,52 @@ class ClosestPointInfo(object):
         self.body_b = body_b
         self.link_b = link_b
         self.old_key = old_key
+
+
+class Collisions(object):
+    def __init__(self):
+        self.data = defaultdict(list)
+        self.key_to_key = defaultdict(set)
+
+    def add(self, key, contact):
+        """
+        :type key: list
+        :type contact: ClosestPointInfo
+        :return:
+        """
+        self.data[key].append(contact)
+        self.key_to_key[(key[0],)].add(key)
+        self.key_to_key[key[0], key[1]].add(key)
+
+    def get(self, link_a, body_b=None, link_b=None):
+
+        if body_b is not None and link_b is not None:
+            r = self.data[(link_a, body_b, link_b)]
+        elif body_b is not None and link_b is None:
+            r = []
+            for k in self.key_to_key[(link_a, body_b)]:
+                r.extend(self.data[k])
+        else:
+            r = []
+            for k in self.key_to_key[(link_a,)]:
+                r.extend(self.data[k])
+        if len(r) == 0:
+            return [ClosestPointInfo([0,0,0],
+                                     [0,0,0],
+                                     100,
+                                     0,
+                                     link_a,
+                                     body_b,
+                                     link_b,
+                                     [0,0,1],
+                                     (link_a, body_b, link_b))]
+        return list(sorted(r, key=lambda x: x.contact_distance))
+
+    def __getitem__(self, item):
+        return self.get(*item)
+
+    def __contains__(self, item):
+        return item in self.data
+
+    def items(self):
+        return self.data.items()

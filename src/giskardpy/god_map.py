@@ -18,7 +18,10 @@ def get_member(identifier, member):
     except TypeError:
         if callable(identifier):
             return identifier(*member)
-        return getattr(identifier, member)
+        try:
+            return getattr(identifier, member)
+        except TypeError:
+            pass
     except IndexError:
         return identifier[int(member)]
 
@@ -46,6 +49,8 @@ def get_data(identifier, data, default_value=0.0):
         # raise KeyError(identifier)
         # TODO is this really a good idea?
         # I do this because it automatically sets weights for unused goals to 0
+        return default_value
+    except IndexError:
         return default_value
     return result
 

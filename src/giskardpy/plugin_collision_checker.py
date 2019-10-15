@@ -53,7 +53,8 @@ class CollisionChecker(GiskardBehavior):
         with self.lock:
             collisions = self.get_world().check_collisions(self.collision_matrix)
 
-            closest_point = self.get_world().collisions_to_closest_point(collisions, self.collision_matrix)
+            # closest_point = self.get_world().collisions_to_closest_point(collisions, self.collision_matrix)
+            collisions = self.get_world().transform_contact_info(collisions)
 
-            self.god_map.safe_set_data(identifier.closest_point, closest_point)
+            self.god_map.safe_set_data(identifier.closest_point, collisions)
         return Status.RUNNING

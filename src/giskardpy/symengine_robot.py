@@ -146,15 +146,31 @@ class Robot(Backend):
                                                                     upper=upper_limit - joint_symbol,
                                                                     expression=joint_symbol)
 
-            self._joint_constraints[joint_name] = JointConstraint(lower=spw.Max(-velocity_limit,
-                                                                                 self.get_joint_velocity_symbol(
-                                                                                     joint_name) -
-                                                                                 self._joint_acc_limit[joint_name]),
-                                                                  upper=spw.Min(velocity_limit,
-                                                                                self.get_joint_velocity_symbol(
-                                                                                    joint_name) + self._joint_acc_limit[
-                                                                                    joint_name]),
-                                                                  weight=self._joint_weights[joint_name])
+                self._joint_constraints[joint_name] = JointConstraint(lower=spw.Max(lower_limit - joint_symbol,
+                                                                                    spw.Max(-velocity_limit,
+                                                                                            self.get_joint_velocity_symbol(
+                                                                                                joint_name) -
+                                                                                            self._joint_acc_limit[
+                                                                                                joint_name])),
+                                                                      upper=spw.Min(upper_limit - joint_symbol,
+                                                                                    spw.Min(velocity_limit,
+                                                                                            self.get_joint_velocity_symbol(
+                                                                                                joint_name) +
+                                                                                            self._joint_acc_limit[
+                                                                                                joint_name])),
+                                                                      weight=self._joint_weights[joint_name])
+            else:
+                self._joint_constraints[joint_name] = JointConstraint(lower=spw.Max(-velocity_limit,
+                                                                                    self.get_joint_velocity_symbol(
+                                                                                        joint_name) -
+                                                                                    self._joint_acc_limit[
+                                                                                        joint_name]),
+                                                                      upper=spw.Min(velocity_limit,
+                                                                                    self.get_joint_velocity_symbol(
+                                                                                        joint_name) +
+                                                                                    self._joint_acc_limit[
+                                                                                        joint_name]),
+                                                                      weight=self._joint_weights[joint_name])
 
     def get_fk_expression(self, root_link, tip_link):
         """
@@ -214,13 +230,12 @@ class Robot(Backend):
         :return: minimum of default velocity limit and limit specified in urdfs
         :rtype: float
         """
-        # TODO add sample period
         limit = self._urdf_robot.joint_map[joint_name].limit
-        t = spw.Symbol(u'rosparam_sample_period')
+        t = spw.Symbol(u'rosparam_sample_period')  # TODO this should be a parameter
         if limit is None or limit.velocity is None:
             return self._joint_velocity_limit[joint_name]
         else:
-            return spw.Min(limit.velocity, self._joint_velocity_limit[joint_name])*t
+            return spw.Min(limit.velocity, self._joint_velocity_limit[joint_name]) * t
 
     def get_joint_frame(self, joint_name):
         """

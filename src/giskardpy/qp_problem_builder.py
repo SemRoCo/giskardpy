@@ -93,7 +93,7 @@ class QProblemBuilder(object):
         self.np_g = np.zeros(len(weights))
 
         if self.cython_big_ass_M is None:
-            logging.loginfo(u'new controller requested; compiling')
+            logging.loginfo(u'new controller with {} constraints requested; compiling'.format(len(soft_expressions)))
             self.H = spw.diag(*weights)
 
             self.lb = spw.Matrix(lb)
@@ -259,7 +259,7 @@ class QProblemBuilder(object):
         if xdot_full is None:
             return None
         # TODO enable debug print in an elegant way, preferably without slowing anything down
-        # self.debug_print(np_H, np_A, np_lb, np_ub, np_lbA, np_ubA, xdot_full)
+        self.debug_print(np_H, np_A, np_lb, np_ub, np_lbA, np_ubA, xdot_full)
         return OrderedDict((observable, xdot_full[i]) for i, observable in enumerate(self.controlled_joints)), \
                np_H, np_A, np_lb, np_ub, np_lbA, np_ubA, xdot_full
 

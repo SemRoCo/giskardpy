@@ -73,7 +73,9 @@ def speed_up_and_execute(f, params):
     fast_f = spw.speed_up(slow_f, symbols)
     subs = {str(symbols[i]): input[i] for i in range(len(symbols))}
     # slow_f.subs()
-    result = fast_f(**subs).T
+    result = fast_f(**subs).T # TODO why do I transpose here ?!?
+    if result.shape[0] > 1 and result.shape[1] > 1:
+        return result.T
     if result.shape[1] == 1:
         return result.T[0]
     else:
@@ -221,6 +223,15 @@ class TestSympyWrapper(unittest.TestCase):
     def test_if_greater_eq_zero(self, condition, if_result, else_result):
         r2 = np.float(if_result if condition >= 0 else else_result)
         self.assertAlmostEqual(speed_up_and_execute(spw.if_greater_eq_zero, [condition, if_result, else_result]),
+                               r2, places=7)
+
+    @given(limited_float(),
+           limited_float(),
+           limited_float(),
+           limited_float())
+    def test_if_greater_eq(self, a, b, if_result, else_result):
+        r2 = np.float(if_result if a >= b else else_result)
+        self.assertAlmostEqual(speed_up_and_execute(spw.if_greater_eq, [a, b, if_result, else_result]),
                                r2, places=7)
 
     @given(limited_float(),
@@ -397,12 +408,14 @@ class TestSympyWrapper(unittest.TestCase):
         self.assertTrue(np.isclose(r1, r2), msg='|{}|2=\n{} != {}'.format(v, r1, r2))
 
     # fails if numbers too big
-    @given(st.lists(limited_float()),
+    @given(vector(3),
            limited_float())
     def test_scale(self, v, a):
-        assume(np.linalg.norm(v) != 0)
-        r1 = np.array(spw.scale(spw.Matrix(v), a)).astype(float).T[0]
-        r2 = v / np.linalg.norm(v) * a
+        r1 = speed_up_and_execute(lambda x,y,z, scale: spw.scale(spw.Matrix([x,y,z]),scale), [v[0], v[1], v[2], a])
+        if np.linalg.norm(v) == 0:
+            r2 = [0,0,0]
+        else:
+            r2 = v / np.linalg.norm(v) * a
         self.assertTrue(np.isclose(r1, r2).all(), msg='v={} a={}\n{} != {}'.format(v, a, r1, r2))
 
     # fails if numbers too big
@@ -844,6 +857,15 @@ class TestSympyWrapper(unittest.TestCase):
         self.assertAlmostEqual(distance, ref_distance, places=7)
         assert abs(distance) <= np.pi
 
+    @given(unit_vector(4),
+           unit_vector(4))
+    def test_entrywise_product(self, q1, q2):
+        # TODO use real matrices
+        m1 = quat2mat(q1)
+        m2 = quat2mat(q2)
+        r1 = speed_up_and_execute(spw.entrywise_product, [m1, m2])
+        r2 = m1*m2
+        np.testing.assert_array_almost_equal(r1,r2)
 
 if __name__ == '__main__':
     import rosunit

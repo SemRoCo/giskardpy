@@ -10,7 +10,7 @@ from rospy_message_converter.message_converter import convert_ros_message_to_dic
 
 import giskardpy.constraints
 import giskardpy.identifier as identifier
-from giskardpy.constraints import LinkToAnyAvoidance, JointPosition
+from giskardpy.constraints import LinkToClosestAvoidance, JointPosition, EMAAvoidance
 from giskardpy.exceptions import InsolvableException, ImplementationException
 from giskardpy.plugin_action_server import GetGoal
 
@@ -19,8 +19,8 @@ def allowed_constraint_names():
     return [x[0] for x in inspect.getmembers(giskardpy.constraints) if inspect.isclass(x[1])]
 
 
-# TODO waypoints not supported
 class GoalToConstraints(GetGoal):
+    #FIXME no error msg when constraint has missing parameter
     def __init__(self, name, as_name):
         GetGoal.__init__(self, name, as_name)
         self.used_joints = set()
@@ -119,16 +119,18 @@ class GoalToConstraints(GetGoal):
         """
         soft_constraints = {}
         for link in self.get_robot().get_controlled_links():
-            constraint = LinkToAnyAvoidance(self.god_map, link,
-                                            max_weight_distance=self.get_god_map().safe_get_data(
-                                                identifier.collisions_distances +
-                                                [link, u'max_weight_distance']),
-                                            low_weight_distance=self.get_god_map().safe_get_data(
-                                                identifier.collisions_distances +
-                                                [link, u'low_weight_distance']),
-                                            zero_weight_distance=self.get_god_map().safe_get_data(
-                                                identifier.collisions_distances +
-                                                [link, u'zero_weight_distance']))
-            soft_constraints.update(constraint.get_constraint())
+            for i in range(5):
+                constraint = LinkToClosestAvoidance(self.god_map, link,
+                                                    max_weight_distance=self.get_god_map().safe_get_data(
+                                                    identifier.collisions_distances +
+                                                    [link, u'max_weight_distance']),
+                                                    low_weight_distance=self.get_god_map().safe_get_data(
+                                                    identifier.collisions_distances +
+                                                    [link, u'low_weight_distance']),
+                                                    zero_weight_distance=self.get_god_map().safe_get_data(
+                                                    identifier.collisions_distances +
+                                                    [link, u'zero_weight_distance']),
+                                                    idx=i)
+                soft_constraints.update(constraint.get_constraint())
 
         self.soft_constraints.update(soft_constraints)

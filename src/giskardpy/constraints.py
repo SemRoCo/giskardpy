@@ -11,7 +11,6 @@ from scipy.optimize import curve_fit
 
 import giskardpy.identifier as identifier
 import symengine_wrappers as sw
-from giskardpy.data_types import ClosestPointInfo
 from giskardpy.exceptions import GiskardException
 from giskardpy.input_system import PoseStampedInput, Point3Input, Vector3Input, Vector3StampedInput, FrameInput, \
     PointStampedInput, WrenchInput
@@ -459,7 +458,7 @@ class CartesianOrientationSlerp(CartesianConstraint):
         angle = sw.rotation_distance(current_rotation, goal_rotation)
         angle = sw.diffable_abs(angle)
 
-        capped_angle = sw.diffable_min_fast(sw.save_division(max_speed , (gain * angle)), 1)
+        capped_angle = sw.diffable_min_fast(sw.save_division(max_speed, (gain * angle)), 1)
         q1 = sw.quaternion_from_matrix(current_rotation)
         q2 = sw.quaternion_from_matrix(goal_rotation)
         intermediate_goal = sw.diffable_slerp(q1, q2, capped_angle)
@@ -609,16 +608,20 @@ class LinkToClosestAvoidance(Constraint):
 
         dist = (contact_normal.T * (controllable_point))[0]
 
-        weight_f = sw.Piecewise([MAX_WEIGHT, actual_distance <= max_weight_distance],
-                                [ZERO_WEIGHT, actual_distance > zero_weight_distance],
-                                [A / (actual_distance + C) + B, True])
+        # weight_f = sw.Piecewise([MAX_WEIGHT, actual_distance <= max_weight_distance],
+        #                         [ZERO_WEIGHT, actual_distance > zero_weight_distance],
+        #                         [A / (actual_distance + C) + B, True])
 
-        limit = sw.Min(zero_weight_distance - dist, repel_speed * t)
+        weight_f = sw.Max(sw.Min(MAX_WEIGHT, A / (actual_distance + C) + B), ZERO_WEIGHT)
+
+        limit = zero_weight_distance - actual_distance
+        limit = sw.Min(sw.Max(limit, -repel_speed * t), repel_speed * t)
+        # sw.Min(, repel_speed * t)
         # limit = repel_speed * t
         # limit = 1
 
         soft_constraints[str(self)] = SoftConstraint(lower=limit,
-                                                     upper=limit,
+                                                     upper=1e9,
                                                      weight=weight_f,
                                                      expression=dist)
         return soft_constraints

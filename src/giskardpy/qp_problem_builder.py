@@ -93,7 +93,7 @@ class QProblemBuilder(object):
         self.np_g = np.zeros(len(weights))
 
         if self.cython_big_ass_M is None:
-            logging.loginfo(u'new controller requested; compiling')
+            logging.loginfo(u'new controller with {} constraints requested; compiling'.format(len(soft_expressions)))
             self.H = spw.diag(*weights)
 
             self.lb = spw.Matrix(lb)

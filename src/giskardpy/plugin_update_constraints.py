@@ -119,7 +119,7 @@ class GoalToConstraints(GetGoal):
         """
         soft_constraints = {}
         for link in self.get_robot().get_controlled_links():
-            for i in range(1):
+            for i in range(5):
                 constraint = LinkToClosestAvoidance(self.god_map, link,
                                                     max_weight_distance=self.get_god_map().safe_get_data(
                                                     identifier.collisions_distances +

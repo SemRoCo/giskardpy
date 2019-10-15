@@ -146,13 +146,13 @@ class Robot(Backend):
                                                                     upper=upper_limit - joint_symbol,
                                                                     expression=joint_symbol)
 
-                self._joint_constraints[joint_name] = JointConstraint(lower=spw.Min(lower_limit - joint_symbol,
+                self._joint_constraints[joint_name] = JointConstraint(lower=spw.Max(lower_limit - joint_symbol,
                                                                                     spw.Max(-velocity_limit,
                                                                                             self.get_joint_velocity_symbol(
                                                                                                 joint_name) -
                                                                                             self._joint_acc_limit[
                                                                                                 joint_name])),
-                                                                      upper=spw.Max(upper_limit - joint_symbol,
+                                                                      upper=spw.Min(upper_limit - joint_symbol,
                                                                                     spw.Min(velocity_limit,
                                                                                             self.get_joint_velocity_symbol(
                                                                                                 joint_name) +

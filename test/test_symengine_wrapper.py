@@ -11,13 +11,28 @@ from tf.transformations import quaternion_matrix, quaternion_about_axis, quatern
 from transforms3d.euler import euler2axangle
 from transforms3d.quaternions import quat2mat, quat2axangle
 
-import giskardpy.casadi_wrapper as w
-# import giskardpy.symengine_wrappers as w
+from giskardpy import w
 from utils_for_tests import limited_float, SMALL_NUMBER, unit_vector, quaternion, vector, \
     pykdl_frame_to_numpy, lists_of_same_length, angle, compare_axis_angle, angle_positive
 
 
 class TestSympyWrapper(unittest.TestCase):
+
+    #TODO test free symbols
+
+    def test_is_matrix(self):
+        self.assertFalse(w.is_matrix(w.Symbol('a')))
+        self.assertTrue(w.is_matrix(w.Matrix([[0,0]])))
+
+    def test_jacobian(self):
+        a = w.Symbol('a')
+        b = w.Symbol('b')
+        m = w.Matrix([a+b, a**2, b**2])
+        jac = w.jacobian(m, [a,b])
+        expected = w.Matrix([[1,1],[2*a,0],[0,2*b]])
+        for i in range(expected.shape[0]):
+            for j in range(expected.shape[1]):
+                assert w.equivalent(jac[i,j], expected[i,j])
 
     # fails if numbers too small or big
     @given(limited_float(outer_limit=1e10))

@@ -2,8 +2,7 @@ import copy
 from copy import copy
 from multiprocessing import Lock
 
-import symengine_wrappers as sw
-
+from giskardpy import w
 
 def get_member(identifier, member):
     """
@@ -24,6 +23,8 @@ def get_member(identifier, member):
             pass
     except IndexError:
         return identifier[int(member)]
+    except RuntimeError:
+        pass
 
 
 def get_data(identifier, data, default_value=0.0):
@@ -114,7 +115,7 @@ class GodMap(object):
         identifier = tuple(identifier)
         identifier_parts = identifier
         if identifier not in self.key_to_expr:
-            expr = sw.Symbol(self.expr_separator.join([str(x) for x in identifier]))
+            expr = w.Symbol(self.expr_separator.join([str(x) for x in identifier]))
             if expr in self.expr_to_key:
                 raise Exception(u'{} not allowed in key'.format(self.expr_separator))
             self.key_to_expr[identifier] = expr

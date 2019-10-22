@@ -41,7 +41,6 @@ from giskardpy.pybullet_world import PyBulletWorld
 from giskardpy.utils import create_path, render_dot_tree, KeyDefaultDict
 from giskardpy.world_object import WorldObject
 
-
 def initialize_god_map():
     god_map = GodMap()
     blackboard = Blackboard
@@ -84,7 +83,7 @@ def initialize_god_map():
 
     joint_acc_symbols = process_joint_specific_params(identifier.joint_acc, identifier.default_joint_acc, god_map)
 
-    hz = god_map.safe_get_data(identifier.sample_period)
+    # hz = god_map.safe_get_data(identifier.sample_period)
 
     world = PyBulletWorld(god_map.safe_get_data(identifier.gui),
                           blackboard.god_map.safe_get_data(identifier.data_folder))

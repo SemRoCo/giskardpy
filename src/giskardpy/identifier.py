@@ -34,6 +34,7 @@ xdot_keys = qp_data + [u'xdot_keys']
 rosparam = [u'rosparam']
 
 #symengine stuff
+symbolic_backend = rosparam + [u'symbolic_backend']
 symengine_backend = rosparam + [u'backend']
 symengine_opt_level = rosparam + [u'opt_level']
 

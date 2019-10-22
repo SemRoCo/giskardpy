@@ -2,7 +2,6 @@
 import giskardpy
 from giskardpy.data_types import SingleJointState
 from giskardpy.tfwrapper import msg_to_kdl, kdl_to_pose
-from test_update_world import to_pose_msg
 
 giskardpy.WORLD_IMPLEMENTATION = None
 

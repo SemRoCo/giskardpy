@@ -13,11 +13,26 @@ from giskardpy.exceptions import SymengineException
 from giskardpy.utils import create_path
 from giskardpy import logging
 
+Compiler_Backend = u'llvm'
+Opt_Level = 0
+
 pathSeparator = '_'
 
 # VERY_SMALL_NUMBER = 2.22507385851e-308
 VERY_SMALL_NUMBER = 1e-100
 SMALL_NUMBER = 1e-10
+
+def is_matrix(expression):
+    return isinstance(expression, se.Matrix)
+
+def is_symbol(expression):
+    return isinstance(expression, se.Symbol)
+
+def jacobian(expressions, symbols):
+    return expressions.jacobian(Matrix(symbols))
+
+def equivalent(expression1, expression2):
+    return expression1 == expression2
 
 def compile_and_execute(f, params):
     symbols = []
@@ -81,6 +96,9 @@ def compile_and_execute(f, params):
     #     return result.T[0]
     # else:
     #     return result[0]
+
+def free_symbols(expression):
+    return expression.free_symbols
 
 def diffable_abs(x):
     """
@@ -374,14 +392,14 @@ def speed_up(function, parameters, backend=u'llvm', opt_level=0):
         def f(**kwargs):
             return constant_result
     else:
-        if backend == u'llvm':
+        if Compiler_Backend == u'llvm':
             # try:
-            fast_f = Lambdify(list(parameters), function, backend=backend, cse=True, real=True, opt_level=opt_level)
+            fast_f = Lambdify(list(parameters), function, backend=Compiler_Backend, cse=True, real=True, opt_level=Opt_Level)
             # except RuntimeError as e:
             #     warn(u'WARNING RuntimeError: "{}" during lambdify with LLVM backend, fallback to numpy'.format(e),
             #          RuntimeWarning)
             #     backend = u'lambda'
-        if backend == u'lambda':
+        if Compiler_Backend == u'lambda':
             try:
                 fast_f = Lambdify(list(parameters), function, backend=u'lambda', cse=True, real=True)
             except RuntimeError as e:
@@ -389,13 +407,13 @@ def speed_up(function, parameters, backend=u'llvm', opt_level=0):
                      RuntimeWarning)
                 backend = None
 
-        if backend in [u'llvm', u'lambda']:
+        if Compiler_Backend in [u'llvm', u'lambda']:
             f = CompiledFunction(str_params, fast_f, len(function), function.shape)
-        elif backend is None:
+        elif Compiler_Backend is None:
             def f(**kwargs):
                 filtered_kwargs = {str(k): kwargs[k] for k in str_params}
                 return np.array(function.subs(filtered_kwargs).tolist(), dtype=float).reshape(function.shape)
-        if backend == u'python':
+        if Compiler_Backend == u'python':
             f = function
 
     return f

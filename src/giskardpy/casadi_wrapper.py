@@ -16,12 +16,28 @@ pathSeparator = '_'
 VERY_SMALL_NUMBER = 1e-100
 SMALL_NUMBER = 1e-10
 
+def diag(*args):
+    return ca.diag(Matrix(args))
 
 def Symbol(data):
-    if isinstance(data, str):
+    if isinstance(data, str) or isinstance(data, unicode):
         return ca.SX.sym(data)
     return ca.SX(data)
 
+def jacobian(expressions, symbols):
+    return ca.jacobian(expressions, Matrix(symbols))
+
+def equivalent(expression1, expression2):
+    return ca.is_equal(ca.simplify(expression1), ca.simplify(expression2), 1)
+
+def free_symbols(expression):
+    return ca.symvar(expression)
+
+def is_matrix(expression):
+    return expression.shape[0] * expression.shape[1] > 1
+
+def is_symbol(expression):
+    return expression.shape[0] * expression.shape[1] == 1
 
 def compile_and_execute(f, params):
     symbols = []
@@ -73,11 +89,7 @@ def compile_and_execute(f, params):
     fast_f = speed_up(f(*symbol_params), symbol_params)
     # subs = {str(symbols[i]): input[i] for i in range(len(symbols))}
     # slow_f.subs()
-    result = fast_f(*input)
-    if isinstance(result, tuple):
-        result = [np.array(x) for x in result]
-    else:
-        result = np.array(result)
+    result = fast_f.call2(input)
     if result.shape[0] * result.shape[1] == 1:
         return result[0][0]
     # if result.shape[0] > 1 and result.shape[1] > 1:
@@ -103,11 +115,14 @@ def Matrix(data):
                 y = 1
             m = ca.SX(x, y)
         for i in range(m.shape[0]):
-            for j in range(m.shape[1]):
-                try:
-                    m[i, j] = data[i][j]
-                except:
-                    m[i, j] = data[i, j]
+            if y > 1:
+                for j in range(m.shape[1]):
+                    try:
+                        m[i, j] = data[i][j]
+                    except:
+                        m[i, j] = data[i, j]
+            else:
+                m[i] = data[i]
         return m
 
 
@@ -391,17 +406,18 @@ class CompiledFunction(object):
         :type filtered_args: list
         :return:
         """
-        try:
-            out = np.empty(self.l)
-            self.fast_f.unsafe_real(np.array(filtered_args, dtype=np.double), out)
-            return out.reshape(self.shape)
-        except KeyError as e:
-            msg = u'KeyError: {}\ntry deleting the data folder to trigger recompilation'.format(e.message)
-            raise SymengineException(msg)
-        except TypeError as e:
-            raise SymengineException(e.message)
-        except ValueError as e:
-            raise SymengineException(e.message)
+        return np.array(self.fast_f(*filtered_args))
+        # try:
+        #     out = np.empty(self.l)
+        #     self.fast_f.unsafe_real(np.array(filtered_args, dtype=np.double), out)
+        #     return out.reshape(self.shape)
+        # except KeyError as e:
+        #     msg = u'KeyError: {}\ntry deleting the data folder to trigger recompilation'.format(e.message)
+        #     raise SymengineException(msg)
+        # except TypeError as e:
+        #     raise SymengineException(e.message)
+        # except ValueError as e:
+        #     raise SymengineException(e.message)
 
 
 def speed_up(function, parameters, backend=u'clang'):
@@ -412,8 +428,10 @@ def speed_up(function, parameters, backend=u'clang'):
 
     f.generate('gen.c')
     C = ca.Importer('gen.c', backend)
-    f2 = ca.external('f', C)
-    return f2
+    f_fast = ca.external('f', C)
+    str_params = [str(x) for x in parameters]
+    f = CompiledFunction(str_params, f_fast, 0, 0)
+    return f
     # TODO use save/load for all options
     # str_params = [str(x) for x in parameters]
     # if len(parameters) == 0:

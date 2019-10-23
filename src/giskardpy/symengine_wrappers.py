@@ -14,7 +14,7 @@ from giskardpy.utils import create_path
 from giskardpy import logging
 
 Compiler_Backend = u'llvm'
-Opt_Level = 0
+Opt_Level = 3
 
 pathSeparator = '_'
 

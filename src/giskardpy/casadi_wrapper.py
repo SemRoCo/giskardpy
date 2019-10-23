@@ -393,8 +393,10 @@ class CompiledFunction(object):
     def __init__(self, str_params, fast_f, l, shape):
         self.str_params = str_params
         self.fast_f = fast_f
-        self.l = l
         self.shape = shape
+        self.buf, self.f_eval = fast_f.buffer()
+        self.out = np.zeros(self.shape, order='F')
+        self.buf.set_res(0, memoryview(self.out))
 
     def __call__(self, **kwargs):
         filtered_args = [kwargs[k] for k in self.str_params]
@@ -406,68 +408,19 @@ class CompiledFunction(object):
         :type filtered_args: list
         :return:
         """
-        return np.array(self.fast_f(*filtered_args))
-        # try:
-        #     out = np.empty(self.l)
-        #     self.fast_f.unsafe_real(np.array(filtered_args, dtype=np.double), out)
-        #     return out.reshape(self.shape)
-        # except KeyError as e:
-        #     msg = u'KeyError: {}\ntry deleting the data folder to trigger recompilation'.format(e.message)
-        #     raise SymengineException(msg)
-        # except TypeError as e:
-        #     raise SymengineException(e.message)
-        # except ValueError as e:
-        #     raise SymengineException(e.message)
 
+        filtered_args = np.array(filtered_args, dtype=float)
+        self.buf.set_arg(0, memoryview(filtered_args))
+        self.f_eval()
+        return self.out
 
 def speed_up(function, parameters, backend=u'clang'):
-    try:
-        f = ca.Function('f', parameters, [function])
-    except:
-        f = ca.Function('f', parameters, function)
-
-    f.generate('gen.c')
-    C = ca.Importer('gen.c', backend)
-    f_fast = ca.external('f', C)
     str_params = [str(x) for x in parameters]
-    f = CompiledFunction(str_params, f_fast, 0, 0)
-    return f
-    # TODO use save/load for all options
-    # str_params = [str(x) for x in parameters]
-    # if len(parameters) == 0:
-    #     try:
-    #         constant_result = np.array(function).astype(float).reshape(function.shape)
-    #     except:
-    #         return
-    #
-    #     def f(**kwargs):
-    #         return constant_result
-    # else:
-    #     if backend == u'llvm':
-    #         # try:
-    #         fast_f = Lambdify(list(parameters), function, backend=backend, cse=True, real=True, opt_level=opt_level)
-    #         # except RuntimeError as e:
-    #         #     warn(u'WARNING RuntimeError: "{}" during lambdify with LLVM backend, fallback to numpy'.format(e),
-    #         #          RuntimeWarning)
-    #         #     backend = u'lambda'
-    #     if backend == u'lambda':
-    #         try:
-    #             fast_f = Lambdify(list(parameters), function, backend=u'lambda', cse=True, real=True)
-    #         except RuntimeError as e:
-    #             warn(u'WARNING RuntimeError: "{}" during lambdify with lambda backend, no speedup possible'.format(e),
-    #                  RuntimeWarning)
-    #             backend = None
-    #
-    #     if backend in [u'llvm', u'lambda']:
-    #         f = CompiledFunction(str_params, fast_f, len(function), function.shape)
-    #     elif backend is None:
-    #         def f(**kwargs):
-    #             filtered_kwargs = {str(k): kwargs[k] for k in str_params}
-    #             return np.array(function.subs(filtered_kwargs).tolist(), dtype=float).reshape(function.shape)
-    #     if backend == u'python':
-    #         f = function
-    #
-    # return f
+    try:
+        f = ca.Function('f', [Matrix(parameters)], [ca.densify(function)])
+    except:
+        f = ca.Function('f', [Matrix(parameters)], ca.densify(function))
+    return CompiledFunction(str_params, f, 0, function.shape)
 
 
 def cross(u, v):

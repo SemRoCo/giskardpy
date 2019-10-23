@@ -56,7 +56,6 @@ class QProblemBuilder(object):
     def get_expr(self):
         return self.cython_big_ass_M.str_params
 
-    #
     def make_matrices(self, backend='llvm', opt_level=0):
         """
         Turns constrains into a function that computes the matrices needed for QPOases.

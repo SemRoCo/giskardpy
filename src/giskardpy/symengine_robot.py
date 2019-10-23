@@ -1,3 +1,4 @@
+import traceback
 from collections import namedtuple, OrderedDict, defaultdict
 from itertools import combinations
 
@@ -197,7 +198,8 @@ class Robot(Backend):
             p = PoseStamped()
             p.header.frame_id = root
             p.pose = homo_matrix_to_pose(homo_m)
-        except:
+        except Exception as e:
+            traceback.print_exc()
             pass
         return p
 

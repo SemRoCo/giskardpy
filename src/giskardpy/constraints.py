@@ -589,8 +589,7 @@ class LinkToClosestAvoidance(Constraint):
             l2 = chain[i + 1]
             link_in_chain = self.get_is_link_in_chain_symbol(l1)
             fk_expr = self.get_fk(l1, l2)
-            root_T_link *= w.if_eq_zero(link_in_chain, w.eye(4), fk_expr)
-            # add_debug_constraint(soft_constraints, str(self)+'/link in chain / '+l1, link_in_chain)
+            root_T_link = w.dot(root_T_link, w.diffable_if_eq_zero(link_in_chain, w.eye(4), fk_expr))
 
         point_on_link = self.get_closest_point_on_a(self.link_name)
         # other_point = self.get_closest_point_on_b(self.link_name)
@@ -608,22 +607,16 @@ class LinkToClosestAvoidance(Constraint):
 
         dist = w.dot(contact_normal.T, (controllable_point))[0]
 
-        # weight_f = sw.Piecewise([MAX_WEIGHT, actual_distance <= max_weight_distance],
-        #                         [ZERO_WEIGHT, actual_distance > zero_weight_distance],
-        #                         [A / (actual_distance + C) + B, True])
-
         weight_f = w.Max(w.Min(MAX_WEIGHT, A / (actual_distance + C) + B), ZERO_WEIGHT)
 
         limit = zero_weight_distance - actual_distance
         limit = w.Min(w.Max(limit, -repel_speed * t), repel_speed * t)
-        # sw.Min(, repel_speed * t)
-        # limit = repel_speed * t
-        # limit = 1
 
         soft_constraints[str(self)] = SoftConstraint(lower=limit,
                                                      upper=1e9,
                                                      weight=weight_f,
                                                      expression=dist)
+
         return soft_constraints
 
     def __str__(self):

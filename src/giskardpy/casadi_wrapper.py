@@ -34,7 +34,7 @@ def free_symbols(expression):
     return ca.symvar(expression)
 
 def is_matrix(expression):
-    return expression.shape[0] * expression.shape[1] > 1
+    return hasattr(expression, 'shape') and expression.shape[0] * expression.shape[1] > 1
 
 def is_symbol(expression):
     return expression.shape[0] * expression.shape[1] == 1

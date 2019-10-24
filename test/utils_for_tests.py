@@ -161,8 +161,8 @@ def boxy_urdf():
 
 
 def limited_float(outer_limit=BIG_NUMBER, min_dist_to_zero=None):
-    # f = st.floats(allow_nan=False, allow_infinity=False, max_value=outer_limit, min_value=-outer_limit)
-    f = st.floats(allow_nan=False, allow_infinity=False)
+    f = st.floats(allow_nan=False, allow_infinity=False, max_value=outer_limit, min_value=-outer_limit)
+    # f = st.floats(allow_nan=False, allow_infinity=False)
     if min_dist_to_zero is not None:
         f = f.filter(lambda x: (outer_limit > abs(x) and abs(x) > min_dist_to_zero) or x == 0)
     else:
@@ -182,8 +182,8 @@ def unit_vector(length, elements=None):
         v = [round(x, 4) for x in v]
         l = np.linalg.norm(v)
         if l == 0:
-            return [0,0,0,1]
-        return [x / l for x in v]
+            return np.array([0]*(length-1)+[1])
+        return np.array([x / l for x in v])
 
     return st.builds(normalize, vector)
 

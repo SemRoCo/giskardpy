@@ -315,6 +315,14 @@ class TestCartGoals(object):
 
 class TestCollisionAvoidanceGoals(object):
     #kernprof -lv py.test -s test/test_integration_donbot.py::TestCollisionAvoidanceGoals::test_place_in_shelf
+
+    def test_attach_box(self, better_pose):
+        """
+        :type zero_pose: PR2
+        """
+        pocky = u'http://muh#pocky'
+        better_pose.attach_box(pocky, [0.1, 0.02, 0.02], better_pose.gripper_tip, [0.05, 0, 0])
+
     def test_avoid_collision(self, better_pose):
         """
         :type zero_pose: Donbot

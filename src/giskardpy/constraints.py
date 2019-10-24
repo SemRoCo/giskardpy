@@ -10,7 +10,7 @@ from rospy_message_converter.message_converter import convert_dictionary_to_ros_
 from scipy.optimize import curve_fit
 
 import giskardpy.identifier as identifier
-import symengine_wrappers as sw
+from giskardpy import w
 from giskardpy.exceptions import GiskardException
 from giskardpy.input_system import PoseStampedInput, Point3Input, Vector3Input, Vector3StampedInput, FrameInput, \
     PointStampedInput, WrenchInput
@@ -155,10 +155,10 @@ class JointPosition(Constraint):
         soft_constraints = OrderedDict()
 
         if self.get_robot().is_joint_continuous(self.joint_name):
-            err = sw.shortest_angular_distance(current_joint, joint_goal)
+            err = w.shortest_angular_distance(current_joint, joint_goal)
         else:
             err = joint_goal - current_joint
-        capped_err = sw.diffable_max_fast(sw.diffable_min_fast(err, max_speed * t), -max_speed * t)
+        capped_err = w.diffable_max_fast(w.diffable_min_fast(err, max_speed * t), -max_speed * t)
 
         soft_constraints[str(self)] = SoftConstraint(lower=capped_err,
                                                      upper=capped_err,
@@ -265,20 +265,20 @@ class CartesianPosition(CartesianConstraint):
         :return:
         """
 
-        goal_position = sw.position_of(self.get_goal_pose())
+        goal_position = w.position_of(self.get_goal_pose())
         weight = self.get_input_float(self.weight)
         gain = self.get_input_float(self.gain)
         max_speed = self.get_input_float(self.max_speed)
         t = self.get_input_sampling_period()
 
-        current_position = sw.position_of(self.get_fk(self.root, self.tip))
+        current_position = w.position_of(self.get_fk(self.root, self.tip))
 
         soft_constraints = OrderedDict()
 
         trans_error_vector = goal_position - current_position
-        trans_error = sw.norm(trans_error_vector)
-        trans_scale = sw.diffable_min_fast(trans_error * gain, max_speed * t)
-        trans_control = sw.save_division(trans_error_vector, trans_error) * trans_scale
+        trans_error = w.norm(trans_error_vector)
+        trans_scale = w.diffable_min_fast(trans_error * gain, max_speed * t)
+        trans_control = w.save_division(trans_error_vector, trans_error) * trans_scale
 
         soft_constraints[str(self) + u'x'] = SoftConstraint(lower=trans_control[0],
                                                             upper=trans_control[0],
@@ -297,20 +297,20 @@ class CartesianPosition(CartesianConstraint):
 
 class CartesianPositionX(CartesianConstraint):
     def get_constraint(self):
-        goal_position = sw.position_of(self.get_goal_pose())
+        goal_position = w.position_of(self.get_goal_pose())
         weight = self.get_input_float(self.weight)
         gain = self.get_input_float(self.gain)
         max_speed = self.get_input_float(self.max_speed)
         t = self.get_input_sampling_period()
 
-        current_position = sw.position_of(self.get_fk(self.root, self.tip))
+        current_position = w.position_of(self.get_fk(self.root, self.tip))
 
         soft_constraints = OrderedDict()
 
         trans_error_vector = goal_position - current_position
-        trans_error = sw.norm(trans_error_vector)
-        trans_scale = sw.diffable_min_fast(trans_error * gain, max_speed * t)
-        trans_control = sw.save_division(trans_error_vector, trans_error) * trans_scale
+        trans_error = w.norm(trans_error_vector)
+        trans_scale = w.diffable_min_fast(trans_error * gain, max_speed * t)
+        trans_control = w.save_division(trans_error_vector, trans_error) * trans_scale
 
         soft_constraints[str(self) + u'x'] = SoftConstraint(lower=trans_control[0],
                                                             upper=trans_control[0],
@@ -321,20 +321,20 @@ class CartesianPositionX(CartesianConstraint):
 
 class CartesianPositionY(CartesianConstraint):
     def get_constraint(self):
-        goal_position = sw.position_of(self.get_goal_pose())
+        goal_position = w.position_of(self.get_goal_pose())
         weight = self.get_input_float(self.weight)
         gain = self.get_input_float(self.gain)
         max_speed = self.get_input_float(self.max_speed)
         t = self.get_input_sampling_period()
 
-        current_position = sw.position_of(self.get_fk(self.root, self.tip))
+        current_position = w.position_of(self.get_fk(self.root, self.tip))
 
         soft_constraints = OrderedDict()
 
         trans_error_vector = goal_position - current_position
-        trans_error = sw.norm(trans_error_vector)
-        trans_scale = sw.diffable_min_fast(trans_error * gain, max_speed * t)
-        trans_control = sw.save_division(trans_error_vector, trans_error) * trans_scale
+        trans_error = w.norm(trans_error_vector)
+        trans_scale = w.diffable_min_fast(trans_error * gain, max_speed * t)
+        trans_control = w.save_division(trans_error_vector, trans_error) * trans_scale
 
         soft_constraints[str(self) + u'y'] = SoftConstraint(lower=trans_control[1],
                                                             upper=trans_control[1],
@@ -376,24 +376,24 @@ class CartesianOrientation(CartesianConstraint):
         }'
         :return:
         """
-        goal_rotation = sw.rotation_of(self.get_goal_pose())
+        goal_rotation = w.rotation_of(self.get_goal_pose())
         weight = self.get_input_float(self.weight)
         gain = self.get_input_float(self.gain)
         max_speed = self.get_input_float(self.max_speed)
 
-        current_rotation = sw.rotation_of(self.get_fk(self.root, self.tip))
-        current_evaluated_rotation = sw.rotation_of(self.get_fk_evaluated(self.root, self.tip))
+        current_rotation = w.rotation_of(self.get_fk(self.root, self.tip))
+        current_evaluated_rotation = w.rotation_of(self.get_fk_evaluated(self.root, self.tip))
 
         soft_constraints = OrderedDict()
-        axis, angle = sw.diffable_axis_angle_from_matrix((current_rotation.T * goal_rotation))
+        axis, angle = w.diffable_axis_angle_from_matrix(w.dot(current_rotation.T, goal_rotation))
 
-        capped_angle = sw.diffable_max_fast(sw.diffable_min_fast(gain * angle, max_speed), -max_speed)
+        capped_angle = w.diffable_max_fast(w.diffable_min_fast(gain * angle, max_speed), -max_speed)
 
         r_rot_control = axis * capped_angle
 
-        hack = sw.rotation_matrix_from_axis_angle([0, 0, 1], 0.0001)
+        hack = w.rotation_matrix_from_axis_angle([0, 0, 1], 0.0001)
 
-        axis, angle = sw.diffable_axis_angle_from_matrix((current_rotation.T * (current_evaluated_rotation * hack)).T)
+        axis, angle = w.diffable_axis_angle_from_matrix(w.dot(current_rotation.T, w.dot(current_evaluated_rotation, hack)).T)
         c_aa = (axis * angle)
 
         soft_constraints[str(self) + u'/0'] = SoftConstraint(lower=r_rot_control[0],
@@ -444,30 +444,30 @@ class CartesianOrientationSlerp(CartesianConstraint):
         }'
         :return:
         """
-        goal_rotation = sw.rotation_of(self.get_goal_pose())
+        goal_rotation = w.rotation_of(self.get_goal_pose())
         weight = self.get_input_float(self.weight)
         gain = self.get_input_float(self.gain)
         max_speed = self.get_input_float(self.max_speed)
         t = self.get_input_sampling_period()
 
-        current_rotation = sw.rotation_of(self.get_fk(self.root, self.tip))
-        current_evaluated_rotation = sw.rotation_of(self.get_fk_evaluated(self.root, self.tip))
+        current_rotation = w.rotation_of(self.get_fk(self.root, self.tip))
+        current_evaluated_rotation = w.rotation_of(self.get_fk_evaluated(self.root, self.tip))
 
         soft_constraints = OrderedDict()
 
-        angle = sw.rotation_distance(current_rotation, goal_rotation)
-        angle = sw.diffable_abs(angle)
+        angle = w.rotation_distance(current_rotation, goal_rotation)
+        angle = w.diffable_abs(angle)
 
-        capped_angle = sw.diffable_min_fast(sw.save_division(max_speed, (gain * angle)), 1)
-        q1 = sw.quaternion_from_matrix(current_rotation)
-        q2 = sw.quaternion_from_matrix(goal_rotation)
-        intermediate_goal = sw.diffable_slerp(q1, q2, capped_angle)
-        asdf = sw.quaternion_diff(q1, intermediate_goal)
-        axis3, angle3 = sw.axis_angle_from_quaternion(*asdf)
+        capped_angle = w.diffable_min_fast(w.save_division(max_speed, (gain * angle)), 1)
+        q1 = w.quaternion_from_matrix(current_rotation)
+        q2 = w.quaternion_from_matrix(goal_rotation)
+        intermediate_goal = w.diffable_slerp(q1, q2, capped_angle)
+        tmp_q = w.quaternion_diff(q1, intermediate_goal)
+        axis3, angle3 = w.axis_angle_from_quaternion(tmp_q[0], tmp_q[1], tmp_q[2], tmp_q[3])
         r_rot_control = axis3 * angle3
 
-        hack = sw.rotation_matrix_from_axis_angle([0, 0, 1], 0.0001)
-        axis2, angle2 = sw.diffable_axis_angle_from_matrix((current_rotation.T * (current_evaluated_rotation * hack)).T)
+        hack = w.rotation_matrix_from_axis_angle([0, 0, 1], 0.0001)
+        axis2, angle2 = w.diffable_axis_angle_from_matrix(w.dot(current_rotation.T, w.dot(current_evaluated_rotation, hack)).T)
         c_aa = (axis2 * angle2)
 
         soft_constraints[str(self) + u'/0'] = SoftConstraint(lower=r_rot_control[0],
@@ -589,8 +589,7 @@ class LinkToClosestAvoidance(Constraint):
             l2 = chain[i + 1]
             link_in_chain = self.get_is_link_in_chain_symbol(l1)
             fk_expr = self.get_fk(l1, l2)
-            root_T_link *= sw.if_eq_zero(link_in_chain, sw.eye(4), fk_expr)
-            # add_debug_constraint(soft_constraints, str(self)+'/link in chain / '+l1, link_in_chain)
+            root_T_link = w.dot(root_T_link, w.diffable_if_eq_zero(link_in_chain, w.eye(4), fk_expr))
 
         point_on_link = self.get_closest_point_on_a(self.link_name)
         # other_point = self.get_closest_point_on_b(self.link_name)
@@ -604,26 +603,20 @@ class LinkToClosestAvoidance(Constraint):
         B = self.get_input_float(self.B)
         C = self.get_input_float(self.C)
 
-        controllable_point = root_T_link * point_on_link
+        controllable_point = w.dot(root_T_link, point_on_link)
 
-        dist = (contact_normal.T * (controllable_point))[0]
+        dist = w.dot(contact_normal.T, (controllable_point))[0]
 
-        # weight_f = sw.Piecewise([MAX_WEIGHT, actual_distance <= max_weight_distance],
-        #                         [ZERO_WEIGHT, actual_distance > zero_weight_distance],
-        #                         [A / (actual_distance + C) + B, True])
-
-        weight_f = sw.Max(sw.Min(MAX_WEIGHT, A / (actual_distance + C) + B), ZERO_WEIGHT)
+        weight_f = w.Max(w.Min(MAX_WEIGHT, A / (actual_distance + C) + B), ZERO_WEIGHT)
 
         limit = zero_weight_distance - actual_distance
-        limit = sw.Min(sw.Max(limit, -repel_speed * t), repel_speed * t)
-        # sw.Min(, repel_speed * t)
-        # limit = repel_speed * t
-        # limit = 1
+        limit = w.Min(w.Max(limit, -repel_speed * t), repel_speed * t)
 
         soft_constraints[str(self)] = SoftConstraint(lower=limit,
                                                      upper=1e9,
                                                      weight=weight_f,
                                                      expression=dist)
+
         return soft_constraints
 
     def __str__(self):
@@ -891,7 +884,7 @@ class EMAAvoidance(Constraint):
             l2 = chain[i + 1]
             link_in_chain = self.get_is_link_in_chain_symbol(l1)
             fk_expr = self.get_fk(l1, l2)
-            root_T_link *= sw.if_eq_zero(link_in_chain, sw.eye(4), fk_expr)
+            root_T_link *= w.if_eq_zero(link_in_chain, w.eye(4), fk_expr)
 
         # point_on_link = self.get_closest_point_on_a()
         # other_point = self.get_closest_point_on_b()
@@ -911,28 +904,28 @@ class EMAAvoidance(Constraint):
 
         # dist = (contact_normal.T * (controllable_point - other_point))[0]
 
-        w11 = root_T_link * sw.vector3(*weights[:3])
-        w11 = sw.Matrix([sw.Abs(w) for w in w11])
+        w11 = root_T_link * w.vector3(*weights[:3])
+        w11 = w.Matrix([w.Abs(w) for w in w11])
         # w21 = root_T_link * sw.vector3(*weights[3:])
-        w21 = sw.Matrix([sw.Abs(w) for w in weights[3:]])
-        w1_scale = sw.norm(w11)
-        w2_scale = sw.norm(w21)
-        w1_f = sw.Max(ZERO_WEIGHT, sw.Min(MAX_WEIGHT, 2.5 * (w1_scale * A) + B))
-        w2_f = sw.Max(ZERO_WEIGHT, sw.Min(MAX_WEIGHT, 5 * (w2_scale * A) + B))
-        w1 = sw.scale(w11, w1_f)
-        w2 = sw.scale(w21, w2_f)
+        w21 = w.Matrix([w.Abs(w) for w in weights[3:]])
+        w1_scale = w.norm(w11)
+        w2_scale = w.norm(w21)
+        w1_f = w.Max(ZERO_WEIGHT, w.Min(MAX_WEIGHT, 2.5 * (w1_scale * A) + B))
+        w2_f = w.Max(ZERO_WEIGHT, w.Min(MAX_WEIGHT, 5 * (w2_scale * A) + B))
+        w1 = w.scale(w11, w1_f)
+        w2 = w.scale(w21, w2_f)
 
         # limit = sw.Min(zero_weight_distance - dist, repel_speed * t)
         # contact_normal *= sw.Max(0, sw.Min(zero_weight_distance - actual_distance, repel_speed * t))
         # limit = repel_speed * t
         # limit = 1
 
-        trans_error_vector = sw.Matrix(contact_normal[:3])
-        trans_error = sw.norm(trans_error_vector)
-        trans_scale = sw.diffable_min_fast(trans_error, max_speed * t)
+        trans_error_vector = w.Matrix(contact_normal[:3])
+        trans_error = w.norm(trans_error_vector)
+        trans_scale = w.diffable_min_fast(trans_error, max_speed * t)
         trans_control = self.get_fk(self.get_robot().get_root(), self.link_name) * \
-                        sw.vector3(*sw.save_division(trans_error_vector, trans_error) * trans_scale)
-        current_position = sw.position_of(root_T_link)
+                        w.vector3(*w.save_division(trans_error_vector, trans_error) * trans_scale)
+        current_position = w.position_of(root_T_link)
 
         soft_constraints[str(self) + u'/fx'] = SoftConstraint(lower=trans_control[0],
                                                               upper=trans_control[0],
@@ -1054,11 +1047,11 @@ class AlignPlanes(Constraint):
         weight = self.get_input_float(self.weight)
         gain = self.get_input_float(self.gain)
         max_speed = self.get_input_float(self.max_speed)
-        root_R_tip = sw.rotation_of(self.get_fk(self.root, self.tip))
+        root_R_tip = w.rotation_of(self.get_fk(self.root, self.tip))
         tip_normal__tip = self.get_tip_normal_vector()
         root_normal__root = self.get_root_normal_vector()
 
-        tip_normal__root = root_R_tip * tip_normal__tip
+        tip_normal__root = w.dot(root_R_tip, tip_normal__tip)
         diff = root_normal__root - tip_normal__root
 
         soft_constraints[str(self) + u'x'] = SoftConstraint(lower=diff[0],
@@ -1095,23 +1088,23 @@ class GravityJoint(Constraint):
 
         parent_link = self.get_robot().get_parent_link_of_joint(self.joint_name)
 
-        parent_R_root = sw.rotation_of(self.get_fk(parent_link, self.get_robot().get_root()))
+        parent_R_root = w.rotation_of(self.get_fk(parent_link, self.get_robot().get_root()))
 
-        com__parent = sw.position_of(self.get_fk_evaluated(parent_link, self.object_name))
+        com__parent = w.position_of(self.get_fk_evaluated(parent_link, self.object_name))
         com__parent[3] = 0
-        com__parent = sw.scale(com__parent, 1)
+        com__parent = w.scale(com__parent, 1)
 
-        g = sw.vector3(0, 0, -1)
-        g__parent = parent_R_root * g
-        axis_of_rotation = sw.vector3(*self.get_robot().get_joint_axis(self.joint_name))
-        l = sw.dot(g__parent, axis_of_rotation)
-        goal__parent = g__parent - sw.scale(axis_of_rotation, l)
-        goal__parent = sw.scale(goal__parent, 1)
+        g = w.vector3(0, 0, -1)
+        g__parent = w.dot(parent_R_root, g)
+        axis_of_rotation = w.vector3(*self.get_robot().get_joint_axis(self.joint_name))
+        l = w.dot(g__parent, axis_of_rotation)
+        goal__parent = g__parent - w.scale(axis_of_rotation, l)
+        goal__parent = w.scale(goal__parent, 1)
 
-        goal_vel = sw.acos(sw.dot(com__parent, goal__parent))
+        goal_vel = w.acos(w.dot(com__parent, goal__parent))
 
-        ref_axis_of_rotation = sw.cross(com__parent, goal__parent)
-        goal_vel *= sw.sign(sw.dot(ref_axis_of_rotation, axis_of_rotation))
+        ref_axis_of_rotation = w.cross(com__parent, goal__parent)
+        goal_vel *= w.sign(w.dot(ref_axis_of_rotation, axis_of_rotation))
 
         soft_constraints[str(self)] = SoftConstraint(lower=goal_vel,  # sw.Min(goal_vel, 0),
                                                      upper=goal_vel,  # sw.Max(goal_vel, 0),
@@ -1192,9 +1185,9 @@ class Pointing(Constraint):
         goal_point = self.get_goal_point()
         pointing_axis = self.get_pointing_axis()
 
-        goal_axis = goal_point - sw.position_of(root_T_tip)
-        goal_axis /= sw.norm(goal_axis)  # FIXME possible /0
-        current_axis = root_T_tip * pointing_axis
+        goal_axis = goal_point - w.position_of(root_T_tip)
+        goal_axis /= w.norm(goal_axis)  # FIXME possible /0
+        current_axis = w.dot(root_T_tip, pointing_axis)
         diff = goal_axis - current_axis
 
         soft_constraints[str(self) + u'x'] = SoftConstraint(lower=diff[0],

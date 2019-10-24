@@ -1,10 +1,10 @@
+import traceback
 from collections import namedtuple, OrderedDict, defaultdict
 from itertools import combinations
 
 from geometry_msgs.msg import PoseStamped
 
-import symengine_wrappers as spw
-from giskardpy import WORLD_IMPLEMENTATION
+from giskardpy import WORLD_IMPLEMENTATION, w
 from giskardpy.pybullet_world_object import PyBulletWorldObject
 from giskardpy.qp_problem_builder import HardConstraint, JointConstraint
 from giskardpy.utils import KeyDefaultDict, \
@@ -51,7 +51,7 @@ class Robot(Backend):
             self._joint_acc_limit = defaultdict(lambda: 100)  # no acceleration limit per default
         else:
             self._joint_acc_limit = joint_acc_limit
-        self._joint_position_symbols = KeyDefaultDict(lambda x: spw.Symbol(x))  # don't iterate over this map!!
+        self._joint_position_symbols = KeyDefaultDict(lambda x: w.Symbol(x))  # don't iterate over this map!!
         self._joint_velocity_symbols = KeyDefaultDict(lambda x: 0)  # don't iterate over this map!!
         super(Robot, self).__init__(urdf, base_pose, controlled_joints, path_to_data_folder, calc_self_collision_matrix,
                                     *args, **kwargs)
@@ -116,17 +116,20 @@ class Robot(Backend):
                 if urdf_joint.origin is not None:
                     xyz = urdf_joint.origin.xyz if urdf_joint.origin.xyz is not None else [0, 0, 0]
                     rpy = urdf_joint.origin.rpy if urdf_joint.origin.rpy is not None else [0, 0, 0]
-                    joint_frame = spw.translation3(*xyz) * spw.rotation_matrix_from_rpy(*rpy)
+                    joint_frame = w.dot(w.translation3(*xyz), w.rotation_matrix_from_rpy(*rpy))
                 else:
-                    joint_frame = spw.eye(4)
+                    joint_frame = w.eye(4)
             else:
                 # TODO more specific exception
                 raise TypeError(u'Joint type "{}" is not supported by urdfs parser.'.format(urdf_joint.type))
 
             if self.is_rotational_joint(joint_name):
-                joint_frame *= spw.rotation_matrix_from_axis_angle(spw.vector3(*urdf_joint.axis), joint_symbol)
+                joint_frame = w.dot(joint_frame, w.rotation_matrix_from_axis_angle(w.vector3(*urdf_joint.axis), joint_symbol))
             elif self.is_translational_joint(joint_name):
-                joint_frame *= spw.translation3(*(spw.point3(*urdf_joint.axis) * joint_symbol)[:3])
+                translation_axis = (w.point3(*urdf_joint.axis) * joint_symbol)
+                joint_frame = w.dot(joint_frame, w.translation3(translation_axis[0],
+                                                                translation_axis[1],
+                                                                translation_axis[2]))
 
             self._joint_to_frame[joint_name] = joint_frame
 
@@ -146,29 +149,29 @@ class Robot(Backend):
                                                                     upper=upper_limit - joint_symbol,
                                                                     expression=joint_symbol)
 
-                self._joint_constraints[joint_name] = JointConstraint(lower=spw.Max(lower_limit - joint_symbol,
-                                                                                    spw.Max(-velocity_limit,
-                                                                                            self.get_joint_velocity_symbol(
+                self._joint_constraints[joint_name] = JointConstraint(lower=w.Max(lower_limit - joint_symbol,
+                                                                                  w.Max(-velocity_limit,
+                                                                                        self.get_joint_velocity_symbol(
                                                                                                 joint_name) -
-                                                                                            self._joint_acc_limit[
+                                                                                        self._joint_acc_limit[
                                                                                                 joint_name])),
-                                                                      upper=spw.Min(upper_limit - joint_symbol,
-                                                                                    spw.Min(velocity_limit,
-                                                                                            self.get_joint_velocity_symbol(
+                                                                      upper=w.Min(upper_limit - joint_symbol,
+                                                                                  w.Min(velocity_limit,
+                                                                                        self.get_joint_velocity_symbol(
                                                                                                 joint_name) +
-                                                                                            self._joint_acc_limit[
+                                                                                        self._joint_acc_limit[
                                                                                                 joint_name])),
                                                                       weight=self._joint_weights[joint_name])
             else:
-                self._joint_constraints[joint_name] = JointConstraint(lower=spw.Max(-velocity_limit,
-                                                                                    self.get_joint_velocity_symbol(
+                self._joint_constraints[joint_name] = JointConstraint(lower=w.Max(-velocity_limit,
+                                                                                  self.get_joint_velocity_symbol(
                                                                                         joint_name) -
-                                                                                    self._joint_acc_limit[
+                                                                                  self._joint_acc_limit[
                                                                                         joint_name]),
-                                                                      upper=spw.Min(velocity_limit,
-                                                                                    self.get_joint_velocity_symbol(
+                                                                      upper=w.Min(velocity_limit,
+                                                                                  self.get_joint_velocity_symbol(
                                                                                         joint_name) +
-                                                                                    self._joint_acc_limit[
+                                                                                  self._joint_acc_limit[
                                                                                         joint_name]),
                                                                       weight=self._joint_weights[joint_name])
 
@@ -180,20 +183,24 @@ class Robot(Backend):
         :rtype: spw.Matrix
         """
         if (root_link, tip_link) not in self._fk_expressions:
-            fk = spw.eye(4)
+            fk = w.eye(4)
             root_chain, _, tip_chain = self.get_split_chain(root_link, tip_link, links=False)
             for joint_name in root_chain:
-                fk *= spw.inverse_frame(self.get_joint_frame(joint_name))
+                fk = w.dot(fk, w.inverse_frame(self.get_joint_frame(joint_name)))
             for joint_name in tip_chain:
-                fk *= self.get_joint_frame(joint_name)
+                fk = w.dot(fk, self.get_joint_frame(joint_name))
             self._fk_expressions[root_link, tip_link] = fk
         return self._fk_expressions[root_link, tip_link]
 
     def get_fk_pose(self, root, tip):
-        homo_m = self.get_fk_np(root, tip)
-        p = PoseStamped()
-        p.header.frame_id = root
-        p.pose = homo_matrix_to_pose(homo_m)
+        try:
+            homo_m = self.get_fk_np(root, tip)
+            p = PoseStamped()
+            p.header.frame_id = root
+            p.pose = homo_matrix_to_pose(homo_m)
+        except Exception as e:
+            traceback.print_exc()
+            pass
         return p
 
     def get_fk_np(self, root, tip):
@@ -208,7 +215,7 @@ class Robot(Backend):
         def f(key):
             root, tip = key
             fk = self.get_fk_expression(root, tip)
-            m = spw.speed_up(fk, fk.free_symbols, backend=self.symengine_backend, opt_level=self.symengine_opt_level)
+            m = w.speed_up(fk, w.free_symbols(fk))
             return m
 
         self._fks = KeyDefaultDict(f)
@@ -231,11 +238,11 @@ class Robot(Backend):
         :rtype: float
         """
         limit = self._urdf_robot.joint_map[joint_name].limit
-        t = spw.Symbol(u'rosparam_sample_period')  # TODO this should be a parameter
+        t = w.Symbol(u'rosparam_sample_period')  # TODO this should be a parameter
         if limit is None or limit.velocity is None:
             return self._joint_velocity_limit[joint_name]
         else:
-            return spw.Min(limit.velocity, self._joint_velocity_limit[joint_name]) * t
+            return w.Min(limit.velocity, self._joint_velocity_limit[joint_name]) * t
 
     def get_joint_frame(self, joint_name):
         """

@@ -1,7 +1,7 @@
 import unittest
 
-from angles import normalize_angle
-from hypothesis import given, reproduce_failure, assume
+from angles import shortest_angular_distance, normalize_angle_positive, normalize_angle
+from hypothesis import given, assume, reproduce_failure
 import hypothesis.strategies as st
 
 import numpy as np
@@ -9,20 +9,20 @@ import numpy as np
 import PyKDL
 
 from tf.transformations import quaternion_matrix, quaternion_about_axis, quaternion_from_euler, euler_matrix, \
-    rotation_matrix, quaternion_multiply, quaternion_conjugate, random_quaternion, quaternion_from_matrix, \
-    quaternion_slerp, rotation_from_matrix, euler_from_matrix
-
-from numpy import pi
+    rotation_matrix, quaternion_multiply, quaternion_conjugate, quaternion_from_matrix, \
+    quaternion_slerp, rotation_from_matrix
 
 from transforms3d.axangles import mat2axangle
-from transforms3d.derivations.angle_axes import angle_axis2mat
-from transforms3d.euler import euler2mat, axangle2euler, euler2axangle
-from transforms3d.quaternions import quat2mat, axangle2quat
+from transforms3d.derivations.angle_axes import angle_axis2mat, angle_axis2quat
+from transforms3d.euler import euler2axangle
+from transforms3d.quaternions import quat2mat, quat2axangle
 
 import giskardpy.symengine_wrappers as spw
-from giskardpy import BACKEND
-from giskardpy.test_utils import limited_float, SMALL_NUMBER, unit_vector, quaternion, vector, \
-    pykdl_frame_to_numpy, lists_of_same_length, angle, compare_axis_angle, angle_positive
+from giskardpy.tfwrapper import np_to_kdl, kdl_to_pose
+from giskardpy.utils import homo_matrix_to_pose
+from giskardpy import logging
+from utils_for_tests import limited_float, SMALL_NUMBER, unit_vector, quaternion, vector, \
+    pykdl_frame_to_numpy, lists_of_same_length, angle, compare_axis_angle, angle_positive, compare_poses
 
 PKG = 'giskardpy'
 
@@ -30,8 +30,10 @@ PKG = 'giskardpy'
 def speed_up_and_execute(f, params):
     symbols = []
     input = []
+
     class next_symbol(object):
         symbol_counter = 0
+
         def __call__(self):
             self.symbol_counter += 1
             return spw.Symbol('a{}'.format(self.symbol_counter))
@@ -43,12 +45,19 @@ def speed_up_and_execute(f, params):
             l2 = []
             for j in range(param.shape[0]):
                 l1 = []
-                for k in range(param.shape[1]):
+                if len(param.shape) == 2:
+                    for k in range(param.shape[1]):
+                        s = ns()
+                        symbols.append(s)
+                        input.append(param[j, k])
+                        l1.append(s)
+                    l2.append(l1)
+                else:
                     s = ns()
                     symbols.append(s)
-                    input.append(param[j,k])
-                    l1.append(s)
-                l2.append(l1)
+                    input.append(param[j])
+                    l2.append(s)
+
             p = spw.Matrix(l2)
             symbol_params.append(p)
         else:
@@ -56,7 +65,11 @@ def speed_up_and_execute(f, params):
             symbols.append(s)
             input.append(param)
             symbol_params.append(s)
-    slow_f = spw.Matrix([f(*symbol_params)])
+    try:
+        slow_f = spw.Matrix([f(*symbol_params)])
+    except TypeError:
+        slow_f = spw.Matrix(f(*symbol_params))
+
     fast_f = spw.speed_up(slow_f, symbols)
     subs = {str(symbols[i]): input[i] for i in range(len(symbols))}
     # slow_f.subs()
@@ -113,7 +126,7 @@ class TestSympyWrapper(unittest.TestCase):
     # fails if numbers too big
     @given(limited_float(min_dist_to_zero=SMALL_NUMBER))
     def test_sign(self, f1):
-        r1 = np.float(spw.diffable_sign(f1))
+        r1 = speed_up_and_execute(spw.diffable_sign, [f1])
         r2 = np.sign(f1)
         # r2 = 0.5 if f1 == 0 else r2
         self.assertTrue(np.isclose(r1, r2), msg='spw.sign({})={} != np.sign({})={}'.format(f1, r1, f1, r2))
@@ -122,33 +135,97 @@ class TestSympyWrapper(unittest.TestCase):
     @given(limited_float(min_dist_to_zero=SMALL_NUMBER),
            limited_float(),
            limited_float())
-    def test_if_greater_zero(self, condition, if_result, else_result):
-        r1 = np.float(spw.if_greater_zero(condition, if_result, else_result))
+    def test_diffable_if_greater_zero(self, condition, if_result, else_result):
+        r1 = np.float(spw.diffable_if_greater_zero(condition, if_result, else_result))
         r2 = np.float(if_result if condition > 0 else else_result)
         self.assertTrue(np.isclose(r1, r2), msg='{} if {} > 0 else {} => {}'.format(if_result, condition, else_result,
                                                                                     r1))
+        self.assertAlmostEqual(speed_up_and_execute(spw.diffable_if_greater_zero, [condition, if_result, else_result]),
+                               r1, places=7)
 
     # fails if condition is to close too 0 or too big or too small
     @given(limited_float(min_dist_to_zero=SMALL_NUMBER),
            limited_float(),
            limited_float())
-    def test_if_greater_eq_zero(self, condition, if_result, else_result):
-        r1 = np.float(spw.if_greater_eq_zero(condition, if_result, else_result))
+    def test_diffable_if_greater_eq_zero(self, condition, if_result, else_result):
+        r1 = np.float(spw.diffable_if_greater_eq_zero(condition, if_result, else_result))
         r2 = np.float(if_result if condition >= 0 else else_result)
         self.assertTrue(np.isclose(r1, r2), msg='{} if {} >= 0 else {} => {}'.format(if_result, condition, else_result,
                                                                                      r1))
+        self.assertAlmostEqual(
+            speed_up_and_execute(spw.diffable_if_greater_eq_zero, [condition, if_result, else_result]),
+            r1, places=7)
+
+    # fails if condition is to close too 0 or too big or too small
+    @given(limited_float(min_dist_to_zero=SMALL_NUMBER),
+           limited_float(min_dist_to_zero=SMALL_NUMBER),
+           limited_float(),
+           limited_float())
+    def test_diffable_if_greater_eq(self, a, b, if_result, else_result):
+        r1 = np.float(spw.diffable_if_greater_eq(a, b, if_result, else_result))
+        r2 = np.float(if_result if a >= b else else_result)
+        self.assertTrue(np.isclose(r1, r2), msg='{} if {} >= {} else {} => {}'.format(if_result, a, b, else_result,
+                                                                                     r1))
+        self.assertAlmostEqual(
+            speed_up_and_execute(spw.diffable_if_greater_eq, [a, b, if_result, else_result]),
+            r1, places=7)
 
     # fails if condition is to close too 0 or too big or too small
     # fails if if_result is too big or too small
     @given(limited_float(min_dist_to_zero=SMALL_NUMBER),
            limited_float(outer_limit=1e8),
            limited_float())
-    def test_if_eq_zero(self, condition, if_result, else_result):
+    def test_diffable_if_eq_zero(self, condition, if_result, else_result):
         r1 = np.float(spw.diffable_if_eq_zero(condition, if_result, else_result))
         r2 = np.float(if_result if condition == 0 else else_result)
         self.assertTrue(np.isclose(r1, r2, atol=1.e-7), msg='{} if {} == 0 else {} => {}'.format(if_result, condition,
                                                                                                  else_result,
                                                                                                  r1))
+        self.assertAlmostEqual(speed_up_and_execute(spw.diffable_if_eq_zero, [condition, if_result, else_result]),
+                               r1, places=7)
+
+    # fails if condition is to close too 0 or too big or too small
+    # fails if if_result is too big or too small
+    @given(limited_float(min_dist_to_zero=SMALL_NUMBER),
+           limited_float(min_dist_to_zero=SMALL_NUMBER),
+           limited_float(outer_limit=1e8),
+           limited_float())
+    def test_diffable_if_eq(self, a, b, if_result, else_result):
+        r1 = np.float(spw.diffable_if_eq(a, b, if_result, else_result))
+        r2 = np.float(if_result if a == b else else_result)
+        self.assertTrue(np.isclose(r1, r2, atol=1.e-7), msg='{} if {} == {} else {} => {}'.format(if_result, a, b,
+                                                                                                 else_result,
+                                                                                                 r1))
+        self.assertAlmostEqual(speed_up_and_execute(spw.diffable_if_eq, [a, b, if_result, else_result]),
+                               r1, places=7)
+
+    @given(limited_float(),
+           limited_float(),
+           limited_float())
+    def test_if_greater_zero(self, condition, if_result, else_result):
+        r2 = np.float(if_result if condition > 0 else else_result)
+        self.assertAlmostEqual(speed_up_and_execute(spw.if_greater_zero, [condition, if_result, else_result]),
+                               r2, places=7)
+
+    @given(limited_float(),
+           limited_float(),
+           limited_float())
+    def test_if_greater_eq_zero(self, condition, if_result, else_result):
+        r2 = np.float(if_result if condition >= 0 else else_result)
+        self.assertAlmostEqual(speed_up_and_execute(spw.if_greater_eq_zero, [condition, if_result, else_result]),
+                               r2, places=7)
+
+    @given(limited_float(),
+           limited_float(),
+           limited_float())
+    def test_if_eq_zero(self, condition, if_result, else_result):
+        r1 = np.float(spw.if_eq_zero(condition, if_result, else_result))
+        r2 = np.float(if_result if condition == 0 else else_result)
+        self.assertTrue(np.isclose(r1, r2, atol=1.e-7), msg='{} if {} == 0 else {} => {}'.format(if_result, condition,
+                                                                                                 else_result,
+                                                                                                 r1))
+        self.assertAlmostEqual(speed_up_and_execute(spw.if_eq_zero, [condition, if_result, else_result]),
+                               r1, places=7)
 
     # TODO test save compiled function
     # TODO test load compiled function
@@ -176,7 +253,7 @@ class TestSympyWrapper(unittest.TestCase):
         condition_s = spw.Symbol('condition')
         if_s = spw.Symbol('if')
         else_s = spw.Symbol('else')
-        expr = spw.if_greater_zero(condition_s, if_s, else_s)
+        expr = spw.diffable_if_greater_zero(condition_s, if_s, else_s)
         llvm = spw.speed_up(spw.Matrix([expr]), expr.free_symbols)
         kwargs = {'condition': condition,
                   'if': if_result,
@@ -184,11 +261,43 @@ class TestSympyWrapper(unittest.TestCase):
 
         # r1_expr = float(expr.subs(kwargs))
         r1_llvm = llvm(**kwargs)[0][0]
-        r1 = float(spw.if_greater_zero(condition, if_result, else_result))
+        r1 = float(spw.diffable_if_greater_zero(condition, if_result, else_result))
 
         self.assertTrue(np.isclose(r1, r1_llvm), msg='{} if {} > 0 else {} => {} != {}'.format(if_result, condition,
                                                                                                else_result,
                                                                                                r1_llvm, r1))
+
+    @given(limited_float(min_dist_to_zero=1e-5),
+           limited_float(min_dist_to_zero=1e-5),
+           limited_float(),
+           limited_float())
+    def test_diffable_if_greater(self, a, b, if_result, else_result):
+        r1 = speed_up_and_execute(spw.diffable_if_greater, [a, b, if_result, else_result])[0]
+        r2 = if_result if a > b else else_result
+        self.assertTrue(np.isclose(r1, r2), msg='{} if {} > {} else {} => {} != {}'.format(if_result, a, b,
+                                                                                               else_result,
+                                                                                               r1, r2))
+
+    @given(limited_float(min_dist_to_zero=1e-5),
+           limited_float(min_dist_to_zero=1e-5),
+           limited_float(),
+           limited_float())
+    def test_diffable_if_greater2(self, a, b, if_result, else_result):
+        r1 = float(spw.diffable_if_greater(a, b, if_result, else_result))
+        r2 = if_result if a > b else else_result
+        self.assertTrue(np.isclose(r1, r2), msg='{} if {} > {} else {} => {} != {}'.format(if_result, a, b,
+                                                                                               else_result,
+                                                                                               r1, r2))
+
+    @given(limited_float(min_dist_to_zero=1e-5),
+           limited_float(),
+           limited_float())
+    def test_diffable_if_greater_zero2(self, a, if_result, else_result):
+        r1 = speed_up_and_execute(spw.diffable_if_greater_zero, [a, if_result, else_result])[0]
+        r2 = if_result if a > 0 else else_result
+        self.assertTrue(np.isclose(r1, r2), msg='{} if {} > {} else {} => {} != {}'.format(if_result, a, 0,
+                                                                                               else_result,
+                                                                                               r1, r2))
 
     # fails if numbers too big or too small
     @given(unit_vector(length=3),
@@ -223,23 +332,30 @@ class TestSympyWrapper(unittest.TestCase):
     @given(quaternion(),
            quaternion(),
            st.floats(allow_nan=False, allow_infinity=False, min_value=0, max_value=1))
-    def test_speed_up_slerp(self, q1, q2, t):
-        q1_s = spw.var('q1x q1y q1z q1w')
-        q2_s = spw.var('q2x q2y q2z q2w')
-        t_s = spw.Symbol('t')
-        q1_expr = spw.Matrix(q1_s)
-        q2_expr = spw.Matrix(q2_s)
-        expr = spw.diffable_slerp(q1_expr, q2_expr, t_s)
+    def test_speed_up_diffable_slerp(self, q1, q2, t):
+        q1 = np.array(q1)
+        q2 = np.array(q2)
+        r = speed_up_and_execute(spw.diffable_slerp, [q1, q2, t])
+        r_ref = quaternion_slerp(q1, q2, t)
+        try:
+            np.testing.assert_almost_equal(r, r_ref, decimal=3)
+        except:
+            np.testing.assert_almost_equal(r, -r_ref, decimal=3)
 
-        slerp = spw.speed_up(expr, expr.free_symbols)
-        kwargs = {'q1x': q1[0], 'q1y': q1[1], 'q1z': q1[2], 'q1w': q1[3],
-                  'q2x': q2[0], 'q2y': q2[1], 'q2z': q2[2], 'q2w': q2[3],
-                  't': t}
-        r1 = slerp(**kwargs).T[0]
-        r2 = np.array([float(x.evalf(real=True)) for x in spw.diffable_slerp(spw.Matrix(q1), spw.Matrix(q2), t)])
-        self.assertTrue(np.isclose(r1, r2, atol=1e-3).all() or
-                        np.isclose(r1, -r2, atol=1e-3).all(),
-                        msg='q1={} q2={} t={}\n{} != {}'.format(q1, q2, t, r1, r2))
+    # @given(quaternion(),
+    #        quaternion(),
+    #        st.floats(allow_nan=False, allow_infinity=False, min_value=0, max_value=1))
+    # @reproduce_failure('4.0.2', 'AXicY2CAAkYGBixM7IBotSwAAU0ACQ==')
+    # FIXME
+    # def test_speed_up_slerp(self, q1, q2, t):
+    #     q1 = np.array(q1)
+    #     q2 = np.array(q2)
+    #     r = speed_up_and_execute(spw.slerp, [q1, q2, t])
+    #     r_ref = quaternion_slerp(q1, q2, t)
+    #     try:
+    #         np.testing.assert_almost_equal(r, r_ref, decimal=4)
+    #     except:
+    #         np.testing.assert_almost_equal(r, -r_ref, decimal=4)
 
     # fails if numbers too big
     @given(vector(3),
@@ -441,7 +557,7 @@ class TestSympyWrapper(unittest.TestCase):
            angle_positive())
     def test_axis_angle_from_matrix(self, axis, angle):
         assume(angle > 0.0001)
-        assume(angle < np.pi-0.0001)
+        assume(angle < np.pi - 0.0001)
         axis2, angle2 = spw.diffable_axis_angle_from_matrix(spw.rotation_matrix_from_axis_angle(axis, angle))
         angle2 = float(angle2)
         axis2 = np.array(axis2).astype(float).T[0]
@@ -469,7 +585,7 @@ class TestSympyWrapper(unittest.TestCase):
             angle2 = -angle2
             axis2 *= -1
         if angle == 0:
-            axis = [0,0,1]
+            axis = [0, 0, 1]
         self.assertTrue(np.isclose(angle, angle2), msg='{} != {}'.format(angle, angle2))
         self.assertTrue(np.isclose(axis, axis2).all(), msg='{} != {}'.format(axis, axis2))
 
@@ -477,13 +593,36 @@ class TestSympyWrapper(unittest.TestCase):
     def test_axis_angle_from_matrix2(self, q):
         m = quat2mat(q)
         axis_reference, angle_reference = mat2axangle(m)
-        assume(angle_reference < np.pi-0.001)
-        assume(angle_reference > -np.pi+0.001)
+        assume(angle_reference < np.pi - 0.001)
+        assume(angle_reference > -np.pi + 0.001)
         axis, angle = spw.diffable_axis_angle_from_matrix_stable(m)
         self.assertGreaterEqual(angle, -1.e-10)
         my_m = spw.to_numpy(angle_axis2mat(angle, axis))
         angle_diff = mat2axangle(m.T.dot(my_m))[1]
-        self.assertTrue(np.isclose(angle_diff, 0))
+        self.assertAlmostEqual(angle_diff, 0.0, places=6)
+
+    # fails if numbers too big or too small
+    # TODO nan if angle 0
+    # TODO use 'if' to make angle always positive?
+    @given(quaternion(),
+           quaternion())
+    def test_rotation_distance(self, q1, q2):
+        # assume(angle > 0.0001)
+        # assume(angle < np.pi - 0.0001)
+        m1 = quaternion_matrix(q1)
+        m2 = quaternion_matrix(q2)
+        angle = speed_up_and_execute(spw.rotation_distance, [m1, m2])[0]
+        ref_angle, _, _ = rotation_from_matrix(m1.T.dot(m2))
+        # axis2, angle2 = spw.diffable_axis_angle_from_matrix(spw.rotation_matrix_from_axis_angle(axis, angle))
+        # angle = float(angle)
+        # axis2 = np.array(axis2).astype(float).T[0]
+        if angle < 0:
+            angle = -angle
+            # axis = [-x for x in axis]
+        if ref_angle < 0:
+            ref_angle = -ref_angle
+            # axis2 *= -1
+        self.assertAlmostEqual(angle, ref_angle, msg='{} != {}'.format(angle, ref_angle))
 
     # fails if numbers too big or too small
     # TODO buggy
@@ -529,8 +668,23 @@ class TestSympyWrapper(unittest.TestCase):
             angle2 = -angle2
             axis2 *= -1
         compare_axis_angle(angle, axis, angle2, axis2)
-        # self.assertTrue(np.isclose(angle, angle2), msg='{} != {}'.format(angle, angle2))
-        # self.assertTrue(np.isclose(axis, axis2).all(), msg='{} != {}'.format(axis, axis2))
+
+    # fails if numbers too big or too small
+    @given(quaternion())
+    def test_axis_angle_from_quaternion(self, q):
+        axis2, angle2 = quat2axangle([q[-1],q[0],q[1],q[2]])
+        x,y,z, angle = speed_up_and_execute(spw.axis_angle_from_quaternion, list(q))
+        axis = [x,y,z]
+        angle = float(angle)
+        compare_axis_angle(angle, axis, angle2, axis2, 2)
+
+    def test_axis_angle_from_quaternion2(self):
+        q = [0,0,0,1.0000001]
+        axis2, angle2 = quat2axangle([q[-1],q[0],q[1],q[2]])
+        x,y,z, angle = speed_up_and_execute(spw.axis_angle_from_quaternion, list(q))
+        axis = [x,y,z]
+        angle = float(angle)
+        compare_axis_angle(angle, axis, angle2, axis2, 2)
 
     # fails if numbers too big or too small
     # TODO rpy does not follow some conventions I guess
@@ -594,7 +748,7 @@ class TestSympyWrapper(unittest.TestCase):
         angle = (spw.trace(matrix[:3, :3]) - 1) / 2
         angle = np.arccos(angle)
         assume(angle > 0.01)
-        assume(angle < np.pi-0.01)
+        assume(angle < np.pi - 0.01)
         q2 = np.array(spw.quaternion_from_axis_angle(*spw.diffable_axis_angle_from_matrix(matrix))).astype(float).T
         q1 = np.array(spw.quaternion_from_matrix(matrix.tolist())).astype(float).T
         self.assertTrue(np.isclose(q1, q2).all() or np.isclose(q1, -q2).all(), msg='{} != {}'.format(q, q1))
@@ -646,6 +800,41 @@ class TestSympyWrapper(unittest.TestCase):
         self.assertTrue(np.isclose(r1, r2, atol=1e-3).all() or
                         np.isclose(r1, -r2, atol=1e-3).all(),
                         msg='q1={} q2={} t={}\n{} != {}'.format(q1, q2, t, r1, r2))
+
+    # fails if numbers too big or too small
+    @given(limited_float(outer_limit=1e5),
+           limited_float(outer_limit=1e5))
+    def test_fmod(self, a, b):
+        assume(b != 0)
+        ref_r = np.fmod(a, b)
+        self.assertAlmostEqual(speed_up_and_execute(spw.fmod, [a, b]), ref_r, places=4)
+
+    # fails if numbers too big or too small
+    @given(limited_float(outer_limit=1e10))
+    def test_normalize_angle_positive(self, a):
+        a = a * np.pi
+        ref_r = normalize_angle_positive(a)
+        sw_r = speed_up_and_execute(spw.normalize_angle_positive, [a])
+
+        self.assertAlmostEqual(shortest_angular_distance(ref_r, sw_r), 0.0, places=5)
+
+    # fails if numbers too big or too small
+    @given(limited_float(outer_limit=1e5))
+    def test_normalize_angle(self, a):
+        a = a * np.pi
+        ref_r = normalize_angle(a)
+        self.assertAlmostEqual(speed_up_and_execute(spw.normalize_angle, [a]), ref_r, places=5)
+
+    # fails if numbers too big or too small
+    @given(limited_float(outer_limit=1e3),
+           limited_float(outer_limit=1e3))
+    def test_shorted_angular_distance(self, f1, f2):
+        angle1 = np.pi * f1
+        angle2 = np.pi * f2
+        ref_distance = shortest_angular_distance(angle1, angle2)
+        distance = speed_up_and_execute(spw.shortest_angular_distance, [angle1, angle2])
+        self.assertAlmostEqual(distance, ref_distance, places=7)
+        assert abs(distance) <= np.pi
 
 
 if __name__ == '__main__':

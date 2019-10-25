@@ -2,32 +2,31 @@
 
   <arg name="gui" default="false" />
 
+  <node pkg="giskardpy" type="joint_trajectory_splitter.py" name="joint_trajectory_splitter" output="screen">
+    <rosparam param="state_topics">
+      - /whole_body_controller/base/state 
+      - /whole_body_controller/body/state
+    </rosparam>
+    <rosparam param="client_topics">
+      - /whole_body_controller/base/follow_joint_trajectory
+      - /whole_body_controller/body/follow_joint_trajectory
+    </rosparam>
+  </node>
+
   <node pkg="giskardpy" type="giskard_trees.py" name="giskard" output="screen">
-    <param name="path_to_data_folder" value="$(find giskardpy)/data/pr2" />
+    <param name="path_to_data_folder" value="$(find giskardpy)/data" />
     <param name="enable_gui" value="$(arg gui)"/>
-    <rosparam param="map_frame">map</rosparam>
-    <rosparam param="joint_convergence_threshold">0.002</rosparam>
-    <rosparam param="wiggle_precision_threshold">7</rosparam>
-    <rosparam param="max_traj_length">30</rosparam>
-    <rosparam param="sample_period">0.1</rosparam>
-    <rosparam param="default_joint_vel_limit">0.2</rosparam>
-    <rosparam param="default_joint_weight">0.0001</rosparam>
-    <rosparam param="default_collision_avoidance_distance">0.05</rosparam>
-    <rosparam param="fill_velocity_values">False</rosparam>
-    <rosparam param="nWSR">None</rosparam> <!-- None results in a nWSR estimation thats fine most of the time -->
-    <rosparam param="root_link">base_footprint</rosparam>
-    <rosparam param="enable_collision_marker">True</rosparam>
-    <rosparam param="collision_time_threshold">15</rosparam>
-    <rosparam param="debug">False</rosparam>
-    <rosparam param="tree_tick_rate">0.1</rosparam>
-    <rosparam param="enable_visualization">True</rosparam>
+    <rosparam command="load" file="$(find giskardpy)/config/pr2.yaml"/>
+    <!-- <remap from="/whole_body_controller/follow_joint_trajectory/" to="/whole_body_controller/follow_joint_trajectory/base/"/> -->
+    <!-- <remap from="~state" to="/whole_body_controller/base/state"/> -->
   </node>
 
   <node pkg="giskardpy" type="interactive_marker.py" name="giskard_interactive_marker" output="screen">
     <rosparam param="enable_self_collision">False</rosparam>
     <rosparam param="interactive_marker_chains">
-      - [base_link, r_gripper_tool_frame]
-      - [base_link, l_gripper_tool_frame]
+      - [odom_combined, r_gripper_tool_frame]
+      - [odom_combined, l_gripper_tool_frame]
+      - [odom_combined, base_footprint]
     </rosparam>
   </node>
 

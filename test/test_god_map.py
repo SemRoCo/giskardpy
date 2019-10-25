@@ -1,10 +1,20 @@
+import numpy as np
+
+import giskardpy
+from giskardpy.utils import KeyDefaultDict
+
+giskardpy.WORLD_IMPLEMENTATION = None
 import unittest
 from collections import namedtuple
-from hypothesis import given, reproduce_failure, assume
+
+from geometry_msgs.msg import PoseStamped
+from hypothesis import given
 import hypothesis.strategies as st
 import giskardpy.symengine_wrappers as sw
 from giskardpy.god_map import GodMap
-from giskardpy.test_utils import variable_name, keys_values, lists_of_same_length
+from utils_for_tests import variable_name, keys_values, lists_of_same_length, pr2_urdf
+from giskardpy.world import World
+from giskardpy.world_object import WorldObject
 
 PKG = u'giskardpy'
 
@@ -110,6 +120,15 @@ class TestGodMap(unittest.TestCase):
         for i, v in enumerate(value):
             self.assertEqual(db.safe_get_data([key, i]), v)
 
+    def test_list_double_index(self):
+        key = 'asdf'
+        value = np.array([[0, 1], [2, 3]])
+        db = GodMap()
+        db.safe_set_data([key], value)
+        for i in range(value.shape[0]):
+            for j in range(value.shape[1]):
+                self.assertEqual(db.safe_get_data([key, i, j]), value[i, j])
+
     @given(variable_name(),
            st.lists(st.floats(allow_nan=False), min_size=1))
     def test_tuple1(self, key, value):
@@ -149,26 +168,81 @@ class TestGodMap(unittest.TestCase):
             self.assertEqual(db.safe_get_data([key, -i]), l[-i])
 
     @given(variable_name(),
-           st.floats(allow_nan=False))
-    def test_function1(self, key, value):
-        # TODO not clean that i try to call every function
+           variable_name())
+    def test_function_1param_lambda(self, key, key2):
         db = GodMap()
-        f = lambda gm: value
+        f = lambda x: x
         db.safe_set_data([key], f)
-        self.assertEqual(db.safe_get_data([key]), value)
+        self.assertEqual(db.safe_get_data([key, [key2]]), key2)
 
-    @given(variable_name(), variable_name(), st.floats(allow_nan=False))
-    def test_function2(self, key, dict_key, return_value):
+    @given(variable_name(),
+           variable_name(),
+           variable_name(),
+           variable_name())
+    def test_function_2param_call(self, key1, key2, key3, key4):
         db = GodMap()
 
         class MUH(object):
-            def __call__(self, god_map):
-                return return_value
+            def __call__(self, next_member, next_next_member):
+                return next_next_member
 
         a = MUH()
-        d = {dict_key: a}
-        db.safe_set_data([key], d)
-        self.assertEqual(db.safe_get_data([key, dict_key]), return_value)
+        d = {key2: a}
+        db.safe_set_data([key1], d)
+        self.assertEqual(db.safe_get_data([key1, key2, (key3, key4)]), key4)
+
+    @given(variable_name(),
+           variable_name(),
+           variable_name(),
+           variable_name(),
+           variable_name())
+    def test_function3(self, key1, key2, key3, key4, key5):
+        db = GodMap()
+
+        class MUH(object):
+            def __call__(self, next_member):
+                return [key5]
+
+        a = MUH()
+        d = {key2: a}
+        db.safe_set_data([key1], d)
+        try:
+            db.safe_get_data([key1, key2, (key3, key4), 0])
+            assert False
+        except TypeError:
+            assert True
+
+    @given(variable_name(),
+           variable_name(),
+           variable_name(),
+           variable_name(),
+           variable_name())
+    def test_function4(self, key1, key2, key3, key4, key5):
+        db = GodMap()
+
+        class MUH(object):
+            def __call__(self, next_member, next_next_member):
+                return [key5]
+
+        a = MUH()
+        d = {key2: a}
+        db.safe_set_data([key1], d)
+        self.assertEqual(key5, db.safe_get_data([key1, key2, (key3, key4), 0]))
+
+    @given(variable_name(),
+           variable_name(),
+           variable_name())
+    def test_function_no_param(self, key1, key2, key3):
+        db = GodMap()
+
+        class MUH(object):
+            def __call__(self):
+                return [key3]
+
+        a = MUH()
+        d = {key2: a}
+        db.safe_set_data([key1], d)
+        self.assertEqual(key3, db.safe_get_data([key1, key2, [], 0]))
 
     @given(variable_name(),
            st.integers())
@@ -185,7 +259,15 @@ class TestGodMap(unittest.TestCase):
         for key, value in zip(keys, values):
             gm.safe_set_data([key], value)
             gm.to_symbol([key])
-        self.assertEqual(len(gm.get_symbol_map()), len(keys))
+        self.assertEqual(len(gm.get_values()), len(keys))
+
+    def test_god_map_with_world(self):
+        gm = GodMap()
+        w = World()
+        r = WorldObject(pr2_urdf())
+        w.add_robot(r, PoseStamped(), [], 0, KeyDefaultDict(lambda key: 0), False)
+        gm.safe_set_data([u'world'], w)
+        assert r == gm.safe_get_data([u'world', u'robot'])
 
 
 if __name__ == '__main__':

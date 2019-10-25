@@ -9,4 +9,4 @@
 - git: 
     local-name: giskard_msgs
     uri: https://github.com/SemRoCo/giskard_msgs.git
-    version: master
+    version: devel

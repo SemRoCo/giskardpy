@@ -22,6 +22,7 @@ from visualization_msgs.msg._Marker import Marker
 
 from giskardpy.python_interface import GiskardWrapper
 from giskardpy.utils import qv_mult
+from giskardpy import logging
 
 MARKER_SCALE = 0.15
 
@@ -184,7 +185,7 @@ class IMServer(object):
 
         def __call__(self, feedback):
             if feedback.event_type == InteractiveMarkerFeedback.MOUSE_UP:
-                print(u'got interactive goal update')
+                logging.loginfo(u'got interactive goal update')
 
                 p = PoseStamped()
                 p.header.frame_id = feedback.header.frame_id
@@ -193,7 +194,7 @@ class IMServer(object):
                 self.giskard.set_cart_goal(self.root_link, self.tip_link, p)
 
                 if not self.enable_self_collision:
-                    self.giskard.disable_self_collision()
+                    self.giskard.allow_self_collision()
 
                 self.giskard.plan_and_execute(wait=False)
                 self.pub_goal_marker(feedback.header, feedback.pose)

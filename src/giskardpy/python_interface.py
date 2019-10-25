@@ -1,16 +1,22 @@
+import json
+
 import rospy
 from actionlib import SimpleActionClient
-from geometry_msgs.msg import PoseStamped, Point, Quaternion
-from giskard_msgs.msg import MoveAction, MoveCmd, Controller, MoveGoal, WorldBody, CollisionEntry, MoveResult
+from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped
+from giskard_msgs.msg import MoveAction, MoveGoal, WorldBody, CollisionEntry, MoveResult, Constraint, \
+    MoveCmd, JointConstraint, CartesianConstraint
 from giskard_msgs.srv import UpdateWorld, UpdateWorldRequest, UpdateWorldResponse
+from rospy_message_converter.message_converter import convert_ros_message_to_dictionary
 from sensor_msgs.msg import JointState
 from shape_msgs.msg import SolidPrimitive
 from visualization_msgs.msg import MarkerArray
-from giskardpy.utils import dict_to_joint_states
+
+from giskardpy.urdf_object import URDFObject
+from giskardpy.utils import dict_to_joint_states, make_world_body_box
 
 
 class GiskardWrapper(object):
-    def __init__(self, giskard_topic=u'giskardpy/command', ns=u'giskard', joint_gain=10, joint_max_speed=1):
+    def __init__(self, giskard_topic=u'giskardpy/command', ns=u'giskard'):
         if giskard_topic is not None:
             self.client = SimpleActionClient(giskard_topic, MoveAction)
             self.update_world = rospy.ServiceProxy(u'{}/update_world'.format(ns), UpdateWorld)
@@ -18,13 +24,17 @@ class GiskardWrapper(object):
             rospy.wait_for_service(u'{}/update_world'.format(ns))
             self.client.wait_for_server()
         self.tip_to_root = {}
-        self.robot_name = rospy.get_param(u'robot_description').split('\n',1)[1].split('" ',1)[0].split('"')[1]
+        self.robot_urdf = URDFObject(rospy.get_param(u'robot_description'))
         self.collisions = []
         self.clear_cmds()
         self.object_js_topics = {}
-        self.joint_gain = joint_gain
-        self.joint_max_speed = joint_max_speed
         rospy.sleep(.3)
+
+    def get_robot_name(self):
+        return self.robot_urdf.get_name()
+
+    def get_root(self):
+        return self.robot_urdf.get_root()
 
     def set_cart_goal(self, root, tip, pose_stamped):
         """
@@ -33,66 +43,150 @@ class GiskardWrapper(object):
         :param pose_stamped:
         :type pose_stamped: PoseStamped
         """
-        self.set_tranlation_goal(root, tip, pose_stamped)
-        self.set_rotation_goal(root, tip, pose_stamped)
+        constraint = CartesianConstraint()
+        constraint.type = CartesianConstraint.POSE_6D
+        constraint.root_link = str(root)
+        constraint.tip_link = str(tip)
+        constraint.goal = pose_stamped
+        self.cmd_seq[-1].cartesian_constraints.append(constraint)
 
-
-    def set_tranlation_goal(self, root, tip, pose_stamped, p_gain=3, max_speed=0.1):
+    def set_translation_goal(self, root, tip, pose_stamped, weight=None, gain=None, max_speed=None):
         """
         :param tip:
         :type tip: str
         :param pose_stamped:
         :type pose_stamped: PoseStamped
         """
-        controller = Controller()
-        controller.root_link = str(root)
-        controller.tip_link = str(tip)
-        controller.goal_pose = pose_stamped
-        controller.type = Controller.TRANSLATION_3D
-        controller.weight = 1
-        controller.max_speed = max_speed
-        controller.p_gain = p_gain
-        self.cmd_seq[-1].controllers.append(controller)
+        if not gain and not max_speed and not weight:
+            constraint = CartesianConstraint()
+            constraint.type = CartesianConstraint.TRANSLATION_3D
+            constraint.root_link = str(root)
+            constraint.tip_link = str(tip)
+            constraint.goal = pose_stamped
+            self.cmd_seq[-1].cartesian_constraints.append(constraint)
+        else:
+            constraint = Constraint()
+            constraint.type = u'CartesianPosition'
+            params = {}
+            params[u'root_link'] = root
+            params[u'tip_link'] = tip
+            params[u'goal'] = convert_ros_message_to_dictionary(pose_stamped)
+            if gain:
+                params[u'gain'] = gain
+            if max_speed:
+                params[u'max_speed'] = max_speed
+            if weight:
+                params[u'weight'] = weight
+            constraint.parameter_value_pair = json.dumps(params)
+            self.cmd_seq[-1].constraints.append(constraint)
 
-    def set_rotation_goal(self, root, tip, pose_stamped, p_gain=3, max_speed=1.0):
+    def set_rotation_goal(self, root, tip, pose_stamped, weight=None, gain=None, max_speed=None):
         """
         :param tip:
         :type tip: str
         :param pose_stamped:
         :type pose_stamped: PoseStamped
         """
-        controller = Controller()
-        controller.root_link = str(root)
-        controller.tip_link = str(tip)
-        controller.goal_pose = pose_stamped
-        controller.type = Controller.ROTATION_3D
-        controller.weight = 1
-        controller.max_speed = max_speed
-        controller.p_gain = p_gain
-        self.cmd_seq[-1].controllers.append(controller)
+        if not gain and not max_speed and not weight:
+            constraint = CartesianConstraint()
+            constraint.type = CartesianConstraint.ROTATION_3D
+            constraint.root_link = str(root)
+            constraint.tip_link = str(tip)
+            constraint.goal = pose_stamped
+            self.cmd_seq[-1].cartesian_constraints.append(constraint)
+        else:
+            constraint = Constraint()
+            constraint.type = u'CartesianOrientationSlerp'
+            params = {}
+            params[u'root_link'] = root
+            params[u'tip_link'] = tip
+            params[u'goal'] = convert_ros_message_to_dictionary(pose_stamped)
+            if gain:
+                params[u'gain'] = gain
+            if max_speed:
+                params[u'max_speed'] = max_speed
+            if weight:
+                params[u'weight'] = weight
+            constraint.parameter_value_pair = json.dumps(params)
+            self.cmd_seq[-1].constraints.append(constraint)
 
-    def set_joint_goal(self, joint_state):
+    def set_joint_goal(self, joint_state, weight=None, gain=None, max_speed=None):
         """
         :param joint_state:
         :type joint_state: dict
         """
-        controller = Controller()
-        controller.type = Controller.JOINT
-        controller.weight = 1
-        controller.p_gain = self.joint_gain
-        controller.max_speed = self.joint_max_speed
-        if isinstance(joint_state, dict):
+        if not weight and not gain and not max_speed:
+            constraint = JointConstraint()
+            constraint.type = JointConstraint.JOINT
+            if isinstance(joint_state, dict):
+                for joint_name, joint_position in joint_state.items():
+                    constraint.goal_state.name.append(joint_name)
+                    constraint.goal_state.position.append(joint_position)
+            elif isinstance(joint_state, JointState):
+                constraint.goal_state = joint_state
+            self.cmd_seq[-1].joint_constraints.append(constraint)
+        elif isinstance(joint_state, dict):
             for joint_name, joint_position in joint_state.items():
-                controller.goal_state.name.append(joint_name)
-                controller.goal_state.position.append(joint_position)
-        elif isinstance(joint_state, JointState):
-            controller.goal_state = joint_state
-        self.cmd_seq[-1].controllers.append(controller)
+                constraint = Constraint()
+                constraint.type = u'JointPosition'
+                params = {}
+                params[u'joint_name'] = joint_name
+                params[u'goal'] = joint_position
+                if weight:
+                    params[u'weight'] = weight
+                if gain:
+                    params[u'gain'] = gain
+                if max_speed:
+                    params[u'max_speed'] = max_speed
+                constraint.parameter_value_pair = json.dumps(params)
+                self.cmd_seq[-1].constraints.append(constraint)
+
+    def align_planes(self, tip, tip_normal, root=None, root_normal=None):
+        """
+        :type tip: str
+        :type tip_normal: Vector3Stamped
+        :type root: str
+        :type root_normal: Vector3Stamped
+        :return:
+        """
+        root = root if root else self.get_root()
+        tip_normal = convert_ros_message_to_dictionary(tip_normal)
+        if not root_normal:
+            root_normal = Vector3Stamped()
+            root_normal.header.frame_id = self.get_root()
+            root_normal.vector.z = 1
+        root_normal = convert_ros_message_to_dictionary(root_normal)
+        self.set_json_goal(u'AlignPlanes', tip=tip, tip_normal=tip_normal, root=root, root_normal=root_normal)
+
+    def gravity_controlled_joint(self, joint_name, object_name):
+        self.set_json_goal(u'GravityJoint', joint_name=joint_name, object_name=object_name)
+
+    def update_god_map(self, updates):
+        self.set_json_goal(u'UpdateGodMap', updates=updates)
+
+    def pointing(self, tip, goal_point, root=None, pointing_axis=None, weight=None):
+        kwargs = {u'tip':tip,
+                  u'goal_point':goal_point}
+        if root is not None:
+            kwargs[u'root'] = root
+        if pointing_axis is not None:
+            kwargs[u'pointing_axis'] = convert_ros_message_to_dictionary(pointing_axis)
+        if weight is not None:
+            kwargs[u'weight'] = weight
+        kwargs[u'goal_point'] = convert_ros_message_to_dictionary(goal_point)
+        self.set_json_goal(u'Pointing', **kwargs)
+
+    def set_json_goal(self, constraint_type, **kwargs):
+        constraint = Constraint()
+        constraint.type = constraint_type
+        constraint.parameter_value_pair = json.dumps(kwargs)
+        self.cmd_seq[-1].constraints.append(constraint)
 
     def set_collision_entries(self, collisions):
         self.cmd_seq[-1].collisions.extend(collisions)
 
-    def allow_collision(self, robot_links=None, body_b=u'', link_bs=None):
+    def allow_collision(self, robot_links=(CollisionEntry.ALL,), body_b=CollisionEntry.ALL,
+                        link_bs=(CollisionEntry.ALL,)):
         """
         :param robot_links: list of robot link names as str, None or empty list means all
         :type robot_links: list
@@ -101,10 +195,6 @@ class GiskardWrapper(object):
         :param link_bs: list of link name of body_b, None or empty list means all
         :type link_bs: list
         """
-        if robot_links is None:
-            robot_links = []
-        if link_bs is None:
-            link_bs = []
         collision_entry = CollisionEntry()
         collision_entry.type = CollisionEntry.ALLOW_COLLISION
         collision_entry.robot_links = [str(x) for x in robot_links]
@@ -112,7 +202,8 @@ class GiskardWrapper(object):
         collision_entry.link_bs = [str(x) for x in link_bs]
         self.set_collision_entries([collision_entry])
 
-    def avoid_collision(self, min_dist, robot_links=None, body_b=u'', link_bs=None):
+    def avoid_collision(self, min_dist, robot_links=(CollisionEntry.ALL,), body_b=CollisionEntry.ALL,
+                        link_bs=(CollisionEntry.ALL,)):
         """
         :param min_dist: the distance giskard is trying to keep between specified links
         :type min_dist: float
@@ -123,10 +214,6 @@ class GiskardWrapper(object):
         :param link_bs: list of link name of body_b, None or empty list means all
         :type link_bs: list
         """
-        if robot_links is None:
-            robot_links = []
-        if link_bs is None:
-            link_bs = []
         collision_entry = CollisionEntry()
         collision_entry.type = CollisionEntry.AVOID_COLLISION
         collision_entry.min_dist = min_dist
@@ -140,7 +227,27 @@ class GiskardWrapper(object):
         Allows all collisions for next goal.
         """
         collision_entry = CollisionEntry()
-        collision_entry.type = CollisionEntry.ALLOW_ALL_COLLISIONS
+        collision_entry.type = CollisionEntry.ALLOW_COLLISION
+        collision_entry.robot_links = [CollisionEntry.ALL]
+        collision_entry.body_b = CollisionEntry.ALL
+        collision_entry.link_bs = [CollisionEntry.ALL]
+        self.set_collision_entries([collision_entry])
+
+    def allow_self_collision(self):
+        collision_entry = CollisionEntry()
+        collision_entry.type = CollisionEntry.ALLOW_COLLISION
+        collision_entry.robot_links = [CollisionEntry.ALL]
+        collision_entry.body_b = self.get_robot_name()
+        collision_entry.link_bs = [CollisionEntry.ALL]
+        self.set_collision_entries([collision_entry])
+
+    def set_self_collision_distance(self, min_dist=0.05):
+        collision_entry = CollisionEntry()
+        collision_entry.type = CollisionEntry.AVOID_COLLISION
+        collision_entry.robot_links = [CollisionEntry.ALL]
+        collision_entry.body_b = self.get_robot_name()
+        collision_entry.link_bs = [CollisionEntry.ALL]
+        collision_entry.min_dist = min_dist
         self.set_collision_entries([collision_entry])
 
     def avoid_all_collisions(self, distance=0.05):
@@ -150,7 +257,10 @@ class GiskardWrapper(object):
         :type distance: float
         """
         collision_entry = CollisionEntry()
-        collision_entry.type = CollisionEntry.AVOID_ALL_COLLISIONS
+        collision_entry.type = CollisionEntry.AVOID_COLLISION
+        collision_entry.robot_links = [CollisionEntry.ALL]
+        collision_entry.body_b = CollisionEntry.ALL
+        collision_entry.link_bs = [CollisionEntry.ALL]
         collision_entry.min_dist = distance
         self.set_collision_entries([collision_entry])
 
@@ -180,6 +290,21 @@ class GiskardWrapper(object):
         else:
             self.client.send_goal(goal)
 
+    def plan(self, wait=True):
+        """
+        :param wait: this function block if wait=True
+        :type wait: bool
+        :return: result from giskard
+        :rtype: MoveResult
+        """
+        goal = self._get_goal()
+        goal.type = MoveGoal.PLAN_ONLY
+        if wait:
+            self.client.send_goal_and_wait(goal)
+            return self.client.get_result()
+        else:
+            self.client.send_goal(goal)
+
     def get_collision_entries(self):
         return self.cmd_seq
 
@@ -193,7 +318,7 @@ class GiskardWrapper(object):
     def interrupt(self):
         self.client.cancel_goal()
 
-    def get_result(self,  timeout=rospy.Duration()):
+    def get_result(self, timeout=rospy.Duration()):
         """
         Waits for giskardpy result and returns it. Only used when plan_and_execute was called with wait=False
         :type timeout: rospy.Duration
@@ -221,50 +346,69 @@ class GiskardWrapper(object):
         req = UpdateWorldRequest(UpdateWorldRequest.REMOVE, object, False, PoseStamped())
         return self.update_world.call(req)
 
-    def make_box(self, name=u'box', size=(1,1,1)):
-        box = WorldBody()
-        box.type = WorldBody.PRIMITIVE_BODY
-        box.name = str(name)
-        box.shape.type = SolidPrimitive.BOX
-        if size is not None:
-            box.shape.dimensions.append(size[0])
-            box.shape.dimensions.append(size[1])
-            box.shape.dimensions.append(size[2])
-        return box
-
-    def add_box(self, name=u'box', size=(1, 1, 1), frame_id=u'map', position=(0, 0, 0), orientation=(0, 0, 0, 1)):
-        box = self.make_box(name, size)
-        pose = PoseStamped()
-        pose.header.stamp = rospy.Time.now()
-        pose.header.frame_id = str(frame_id)
-        pose.pose.position = Point(*position)
-        pose.pose.orientation = Quaternion(*orientation)
+    def add_box(self, name=u'box', size=(1, 1, 1), frame_id=u'map', position=(0, 0, 0), orientation=(0, 0, 0, 1),
+                pose=None):
+        """
+        :param name:
+        :param size: (x length, y length, z length)
+        :param frame_id:
+        :param position:
+        :param orientation:
+        :param pose:
+        :return:
+        """
+        box = make_world_body_box(name, size[0], size[1], size[2])
+        if pose is None:
+            pose = PoseStamped()
+            pose.header.stamp = rospy.Time.now()
+            pose.header.frame_id = str(frame_id)
+            pose.pose.position = Point(*position)
+            pose.pose.orientation = Quaternion(*orientation)
         req = UpdateWorldRequest(UpdateWorldRequest.ADD, box, False, pose)
         return self.update_world.call(req)
 
-    def add_sphere(self, name=u'sphere', size=1, frame_id=u'map', position=(0,0,0), orientation=(0,0,0,1)):
+    def add_sphere(self, name=u'sphere', size=1, frame_id=u'map', position=(0, 0, 0), orientation=(0, 0, 0, 1),
+                   pose=None):
         object = WorldBody()
         object.type = WorldBody.PRIMITIVE_BODY
         object.name = str(name)
-        pose = PoseStamped()
-        pose.header.stamp = rospy.Time.now()
-        pose.header.frame_id = str(frame_id)
-        pose.pose.position = Point(*position)
-        pose.pose.orientation = Quaternion(*orientation)
+        if pose is None:
+            pose = PoseStamped()
+            pose.header.stamp = rospy.Time.now()
+            pose.header.frame_id = str(frame_id)
+            pose.pose.position = Point(*position)
+            pose.pose.orientation = Quaternion(*orientation)
         object.shape.type = SolidPrimitive.SPHERE
         object.shape.dimensions.append(size)
         req = UpdateWorldRequest(UpdateWorldRequest.ADD, object, False, pose)
         return self.update_world.call(req)
 
-    def add_cylinder(self, name=u'cylinder', size=(1,1), frame_id=u'map', position=(0,0,0), orientation=(0,0,0,1)):
+    def add_mesh(self, name=u'mesh', mesh=u'', frame_id=u'map', position=(0, 0, 0), orientation=(0, 0, 0, 1),
+                 pose=None):
+        object = WorldBody()
+        object.type = WorldBody.MESH_BODY
+        object.name = str(name)
+        if pose is None:
+            pose = PoseStamped()
+            pose.header.stamp = rospy.Time.now()
+            pose.header.frame_id = str(frame_id)
+            pose.pose.position = Point(*position)
+            pose.pose.orientation = Quaternion(*orientation)
+        object.mesh = mesh
+        req = UpdateWorldRequest(UpdateWorldRequest.ADD, object, False, pose)
+        return self.update_world.call(req)
+
+    def add_cylinder(self, name=u'cylinder', size=(1, 1), frame_id=u'map', position=(0, 0, 0), orientation=(0, 0, 0, 1),
+                     pose=None):
         object = WorldBody()
         object.type = WorldBody.PRIMITIVE_BODY
         object.name = str(name)
-        pose = PoseStamped()
-        pose.header.stamp = rospy.Time.now()
-        pose.header.frame_id = str(frame_id)
-        pose.pose.position = Point(*position)
-        pose.pose.orientation = Quaternion(*orientation)
+        if pose is None:
+            pose = PoseStamped()
+            pose.header.stamp = rospy.Time.now()
+            pose.header.frame_id = str(frame_id)
+            pose.pose.position = Point(*position)
+            pose.pose.orientation = Quaternion(*orientation)
         object.shape.type = SolidPrimitive.CYLINDER
         object.shape.dimensions.append(size[0])
         object.shape.dimensions.append(size[1])
@@ -280,12 +424,12 @@ class GiskardWrapper(object):
         :type orientation: list
         :rtype: UpdateWorldResponse
         """
-        box = self.make_box(name, size)
+        box = make_world_body_box(name, size[0], size[1], size[2])
         pose = PoseStamped()
         pose.header.stamp = rospy.Time.now()
         pose.header.frame_id = str(frame_id) if frame_id is not None else u'map'
-        pose.pose.position = Point(*(position if position is not None else [0,0,0]))
-        pose.pose.orientation = Quaternion(*(orientation if orientation is not None else [0,0,0,1]))
+        pose.pose.position = Point(*(position if position is not None else [0, 0, 0]))
+        pose.pose.orientation = Quaternion(*(orientation if orientation is not None else [0, 0, 0, 1]))
 
         req = UpdateWorldRequest(UpdateWorldRequest.ADD, box, True, pose)
         return self.update_world.call(req)
@@ -303,14 +447,23 @@ class GiskardWrapper(object):
         req.operation = UpdateWorldRequest.ADD
         return self.update_world.call(req)
 
-    def add_urdf(self, name, urdf, js_topic, pose):
+    def detach_object(self, object_name):
+        req = UpdateWorldRequest()
+        req.body.name = object_name
+        req.operation = req.DETACH
+        return self.update_world.call(req)
+
+    def add_urdf(self, name, urdf, pose, js_topic=u''):
         urdf_body = WorldBody()
         urdf_body.name = str(name)
         urdf_body.type = WorldBody.URDF_BODY
         urdf_body.urdf = str(urdf)
         urdf_body.joint_state_topic = str(js_topic)
         req = UpdateWorldRequest(UpdateWorldRequest.ADD, urdf_body, False, pose)
-        self.object_js_topics[name] = rospy.Publisher(js_topic, JointState, queue_size=10)
+        if js_topic:
+            # FIXME publisher has to be removed, when object gets deleted
+            # FIXME there could be sync error, if objects get added/removed by something else
+            self.object_js_topics[name] = rospy.Publisher(js_topic, JointState, queue_size=10)
         return self.update_world.call(req)
 
     def set_object_joint_state(self, object_name, joint_states):
@@ -318,9 +471,3 @@ class GiskardWrapper(object):
             joint_states = dict_to_joint_states(joint_states)
         self.object_js_topics[object_name].publish(joint_states)
 
-    def disable_self_collision(self):
-        collision_entry = CollisionEntry()
-        collision_entry.type = CollisionEntry.ALLOW_COLLISION
-        collision_entry.min_dist = 1
-        collision_entry.body_b = self.robot_name
-        self.set_collision_entries([collision_entry])

@@ -1,34 +1,36 @@
 from __future__ import division
 
+import errno
+import numpy as np
+import os
+import pkg_resources
 import pydot
+import pylab as plt
+import re
 import rospkg
 import subprocess
-import xml
+import sys
 from collections import defaultdict, OrderedDict
-import numpy as np
-from itertools import product, chain
+from contextlib import contextmanager
+from itertools import product
 from numpy import pi
-from rospy import logwarn
-import re
-
-import errno
-from os import tmpfile
 
 from geometry_msgs.msg import PointStamped, Point, Vector3Stamped, Vector3, Pose, PoseStamped, QuaternionStamped, \
     Quaternion
+from giskard_msgs.msg import WorldBody
 from py_trees import common, Chooser, Selector, Sequence, Behaviour
 from py_trees.composites import Parallel
 from sensor_msgs.msg import JointState
+from shape_msgs.msg import SolidPrimitive
 from tf.transformations import quaternion_multiply, quaternion_conjugate
 
-from giskardpy.data_types import SingleJointState
+from giskardpy import logging
 from giskardpy.data_types import ClosestPointInfo
-from contextlib import contextmanager
-import sys, os
-import pylab as plt
-import pkg_resources
+from giskardpy.data_types import SingleJointState
+from giskardpy.plugin import PluginBehavior
+from giskardpy.tfwrapper import kdl_to_pose, np_to_kdl
 
-from giskardpy.plugin import PluginBehavior, PluginBase
+r = rospkg.RosPack()
 
 
 @contextmanager
@@ -41,6 +43,7 @@ def suppress_stderr():
         finally:
             sys.stderr = old_stdout
 
+
 @contextmanager
 def suppress_stdout():
     devnull = os.open('/dev/null', os.O_WRONLY)
@@ -52,18 +55,23 @@ def suppress_stdout():
         os.dup2(old_stdout, 1)
         os.close(devnull)
 
+
 class NullContextManager(object):
     def __init__(self, dummy_resource=None):
         self.dummy_resource = dummy_resource
+
     def __enter__(self):
         return self.dummy_resource
+
     def __exit__(self, *args):
         pass
 
-class keydefaultdict(defaultdict):
+
+class KeyDefaultDict(defaultdict):
     """
     A default dict where the key is passed as parameter to the factory function.
     """
+
     def __missing__(self, key):
         if self.default_factory is None:
             raise KeyError(key)
@@ -81,28 +89,6 @@ def urdfs_equal(urdf1, urdf2):
     """
     # return hashlib.md5(urdf1).hexdigest() == hashlib.md5(urdf2).hexdigest()
     return urdf1 == urdf2
-
-
-# def slerp(q1, q2, t):
-#     cos_half_theta = np.dot(q1, q2)
-#
-#     if (cos_half_theta < 0):
-#         q2 = -q2
-#         cos_half_theta = -cos_half_theta
-#
-#     if (abs(cos_half_theta) >= 1.0):
-#         return q1
-#
-#     half_theta = math.acos(cos_half_theta)
-#     sin_half_theta = np.sqrt(1.0 - cos_half_theta * cos_half_theta)
-#
-#     if (abs(sin_half_theta) < 0.001):
-#         return 0.5 * q1 + 0.5 * q2
-#
-#     ratio_a = np.sin((1.0 - t) * half_theta) / sin_half_theta
-#     ratio_b = np.sin(t * half_theta) / sin_half_theta
-#
-#     return ratio_a * q1 + ratio_b * q2
 
 
 def sphere_volume(radius):
@@ -169,7 +155,8 @@ def closest_point_constraint_violated(closest_point_infos, tolerance=0.9):
     """
     for link_name, cpi_info in closest_point_infos.items():  # type: (str, ClosestPointInfo)
         if cpi_info.contact_distance < cpi_info.min_dist * tolerance:
-            print(cpi_info.link_a, cpi_info.link_b, cpi_info.contact_distance)
+            logging.loginfo(u'collision constraints violated: {}'.format(cpi_info.link_a, cpi_info.link_b,
+                                                                         cpi_info.contact_distance))
             return True
     return False
 
@@ -218,6 +205,19 @@ def to_joint_state_dict(msg):
         mjs[joint_name] = sjs
     return mjs
 
+def to_joint_state_dict2(msg):
+    """
+    Converts a ROS message of type sensor_msgs/JointState into a dict that maps name to position
+    :param msg: ROS message to convert.
+    :type msg: JointState
+    :return: Corresponding MultiJointState instance.
+    :rtype: OrderedDict[str, SingleJointState]
+    """
+    js = OrderedDict()
+    for i, joint_name in enumerate(msg.name):
+        js[joint_name] = msg.position[i]
+    return js
+
 
 def dict_to_joint_states(joint_state_dict):
     """
@@ -233,6 +233,19 @@ def dict_to_joint_states(joint_state_dict):
         js.velocity.append(0)
         js.effort.append(0)
     return js
+
+def normalize_quaternion_msg(quaternion):
+    q = Quaternion()
+    rotation = np.array([quaternion.x,
+                         quaternion.y,
+                         quaternion.z,
+                         quaternion.w])
+    normalized_rotation = rotation / np.linalg.norm(rotation)
+    q.x = normalized_rotation[0]
+    q.y = normalized_rotation[1]
+    q.z = normalized_rotation[2]
+    q.w = normalized_rotation[3]
+    return q
 
 
 def to_point_stamped(frame_id, point):
@@ -293,6 +306,11 @@ def msg_to_list(thing):
                 thing.orientation.z,
                 thing.orientation.w]
 
+
+def position_dist(position1, position2):
+    return np.linalg.norm(np.array(msg_to_list(position2)) - np.array(msg_to_list(position1)))
+
+
 def create_path(path):
     if not os.path.exists(os.path.dirname(path)):
         try:
@@ -301,29 +319,30 @@ def create_path(path):
             if exc.errno != errno.EEXIST:
                 raise
 
-def plot_trajectory(tj, controlled_joints, path_to_data_folder):
+
+def plot_trajectory(tj, controlled_joints, path_to_data_folder, sample_period):
     """
     :type tj: Trajectory
     :param controlled_joints: only joints in this list will be added to the plot
     :type controlled_joints: list
     """
-    return
+    # return
     if len(tj._points) <= 0:
         return
     colors = [u'b', u'g', u'r', u'c', u'm', u'y', u'k']
-    line_styles = [u'', u'--', u'-.']
+    line_styles = [u'', u'--', u'-.', u':']
     fmts = [u''.join(x) for x in product(line_styles, colors)]
     positions = []
     velocities = []
     times = []
     names = [x for x in tj._points[0.0].keys() if x in controlled_joints]
     for time, point in tj.items():
-        positions.append([v.position for j, v in point.items() if j in controlled_joints])
-        velocities.append([v.velocity for j, v in point.items() if j in controlled_joints])
+        positions.append([point[joint_name].position for joint_name in names])
+        velocities.append([point[joint_name].velocity for joint_name in names])
         times.append(time)
     positions = np.array(positions)
     velocities = np.array(velocities).T
-    times = np.array(times)
+    times = np.array(times) * sample_period
 
     f, (ax1, ax2) = plt.subplots(2, sharex=True)
     ax1.set_title(u'position')
@@ -333,13 +352,16 @@ def plot_trajectory(tj, controlled_joints, path_to_data_folder):
         ax1.plot(times, position, fmts[i], label=names[i])
         ax2.plot(times, velocities[i], fmts[i])
     box = ax1.get_position()
-    # ax1.set_ylim(-3, 1)
+    diff = abs(positions.max() - positions.min()) * 0.1
+    ax1.set_ylim(positions.min() - diff, positions.max() + diff)
+    diff = abs(velocities.max() - velocities.min()) * 0.1
+    ax2.set_ylim(velocities.min() - diff, velocities.max() + diff)
     ax1.set_position([box.x0, box.y0, box.width * 0.6, box.height])
     box = ax2.get_position()
     ax2.set_position([box.x0, box.y0, box.width * 0.6, box.height])
 
     # Put a legend to the right of the current axis
-    ax1.legend(loc=u'center', bbox_to_anchor=(1.45, 0))
+    ax1.legend(loc=u'center', bbox_to_anchor=(1.45, 0), prop={'size': 10})
     ax1.grid()
     ax2.grid()
 
@@ -348,7 +370,7 @@ def plot_trajectory(tj, controlled_joints, path_to_data_folder):
 
 def resolve_ros_iris_in_urdf(input_urdf):
     """
-    Replace all instances of ROS IRIs with a urdf string with global paths in the file system.
+    Replace all instances of ROS IRIs with a urdfs string with global paths in the file system.
     :param input_urdf: URDF in which the ROS IRIs shall be replaced.
     :type input_urdf: str
     :return: URDF with replaced ROS IRIs.
@@ -360,7 +382,10 @@ def resolve_ros_iris_in_urdf(input_urdf):
         output_urdf += u'\n'
     return output_urdf
 
+
 rospack = rospkg.RosPack()
+
+
 def resolve_ros_iris(path):
     if u'package://' in path:
         split = path.split(u'package://')
@@ -374,6 +399,7 @@ def resolve_ros_iris(path):
     else:
         return path
 
+
 def convert_dae_to_obj(path):
     path = path.replace(u'\'', u'')
     file_name = path.split(u'/')[-1]
@@ -385,18 +411,19 @@ def convert_dae_to_obj(path):
         try:
             subprocess.check_call([u'meshlabserver', u'-i', input_path, u'-o', new_path])
         except Exception as e:
-            print(u'meshlab not installed, can\'t convert dae to obj')
+            logging.logerr(u'meshlab not installed, can\'t convert dae to obj')
         return new_path
     return path
+
 
 def write_to_tmp(filename, urdf_string):
     """
     Writes a URDF string into a temporary file on disc. Used to deliver URDFs to PyBullet that only loads file.
-    :param filename: Name of the temporary file without any path information, e.g. 'pr2.urdf'
+    :param filename: Name of the temporary file without any path information, e.g. 'pr2.urdfs'
     :type filename: str
     :param urdf_string: URDF as an XML string that shall be written to disc.
     :type urdf_string: str
-    :return: Complete path to where the urdf was written, e.g. '/tmp/pr2.urdf'
+    :return: Complete path to where the urdfs was written, e.g. '/tmp/pr2.urdfs'
     :rtype: str
     """
     new_path = u'/tmp/giskardpy/{}'.format(filename)
@@ -404,6 +431,7 @@ def write_to_tmp(filename, urdf_string):
     with open(new_path, u'w') as o:
         o.write(urdf_string)
     return new_path
+
 
 def render_dot_tree(root, visibility_level=common.VisibilityLevel.DETAIL, name=None):
     """
@@ -439,10 +467,11 @@ def render_dot_tree(root, visibility_level=common.VisibilityLevel.DETAIL, name=N
     """
     graph = generate_pydot_graph(root, visibility_level)
     filename_wo_extension = root.name.lower().replace(" ", "_") if name is None else name
-    print("Writing %s.dot/svg/png" % filename_wo_extension)
+    logging.loginfo("Writing %s.dot/svg/png" % filename_wo_extension)
     graph.write(filename_wo_extension + '.dot')
     graph.write_png(filename_wo_extension + '.png')
     graph.write_svg(filename_wo_extension + '.svg')
+
 
 def generate_pydot_graph(root, visibility_level):
     """
@@ -456,6 +485,7 @@ def generate_pydot_graph(root, visibility_level):
     Returns:
         pydot.Dot: graph
     """
+
     def get_node_attributes(node, visibility_level):
         blackbox_font_colours = {common.BlackBoxLevel.DETAIL: "dodgerblue",
                                  common.BlackBoxLevel.COMPONENT: "lawngreen",
@@ -471,12 +501,12 @@ def generate_pydot_graph(root, visibility_level):
             attributes = ('note', 'gold', 'black')
         elif isinstance(node, PluginBehavior):
             attributes = ('box', 'green', 'black')
-        elif isinstance(node, PluginBase) or node.children != []:
-            attributes = ('ellipse', 'ghostwhite', 'black')  # encapsulating behaviour (e.g. wait)
+        # elif isinstance(node, PluginBase) or node.children != []:
+        #     attributes = ('ellipse', 'ghostwhite', 'black')  # encapsulating behaviour (e.g. wait)
         else:
             attributes = ('ellipse', 'gray', 'black')
-        if not isinstance(node, PluginBase) and node.blackbox_level != common.BlackBoxLevel.NOT_A_BLACKBOX:
-            attributes = (attributes[0], 'gray20', blackbox_font_colours[node.blackbox_level])
+        # if not isinstance(node, PluginBase) and node.blackbox_level != common.BlackBoxLevel.NOT_A_BLACKBOX:
+        #     attributes = (attributes[0], 'gray20', blackbox_font_colours[node.blackbox_level])
         return attributes
 
     fontsize = 11
@@ -487,7 +517,8 @@ def generate_pydot_graph(root, visibility_level):
     graph.set_node_defaults(fontname='times-roman')
     graph.set_edge_defaults(fontname='times-roman')
     (node_shape, node_colour, node_font_colour) = get_node_attributes(root, visibility_level)
-    node_root = pydot.Node(root.name, shape=node_shape, style="filled", fillcolor=node_colour, fontsize=fontsize, fontcolor=node_font_colour)
+    node_root = pydot.Node(root.name, shape=node_shape, style="filled", fillcolor=node_colour, fontsize=fontsize,
+                           fontcolor=node_font_colour)
     graph.add_node(node_root)
     names = [root.name]
 
@@ -508,7 +539,8 @@ def generate_pydot_graph(root, visibility_level):
                 while proposed_dot_name in names:
                     proposed_dot_name = proposed_dot_name + "*"
                 names.append(proposed_dot_name)
-                node = pydot.Node(proposed_dot_name, shape=node_shape, style="filled", fillcolor=node_colour, fontsize=fontsize, fontcolor=node_font_colour)
+                node = pydot.Node(proposed_dot_name, shape=node_shape, style="filled", fillcolor=node_colour,
+                                  fontsize=fontsize, fontcolor=node_font_colour)
                 graph.add_node(node)
                 edge = pydot.Edge(root_dot_name, proposed_dot_name)
                 graph.add_edge(edge)
@@ -519,6 +551,66 @@ def generate_pydot_graph(root, visibility_level):
     add_edges(root, root.name, visibility_level)
     return graph
 
+
+def remove_outer_tag(xml):
+    """
+    :param xml:
+    :type xml: str
+    :return:
+    :rtype: str
+    """
+    return xml.split('>', 1)[1].rsplit('<', 1)[0]
+
+
+def make_world_body_box(name=u'box', x_length=1, y_length=1, z_length=1):
+    box = WorldBody()
+    box.type = WorldBody.PRIMITIVE_BODY
+    box.name = str(name)
+    box.shape.type = SolidPrimitive.BOX
+    box.shape.dimensions.append(x_length)
+    box.shape.dimensions.append(y_length)
+    box.shape.dimensions.append(z_length)
+    return box
+
+
+def make_world_body_sphere(name=u'sphere', radius=1):
+    sphere = WorldBody()
+    sphere.type = WorldBody.PRIMITIVE_BODY
+    sphere.name = str(name)
+    sphere.shape.type = SolidPrimitive.SPHERE
+    sphere.shape.dimensions.append(radius)
+    return sphere
+
+
+def make_world_body_cylinder(name=u'cylinder', height=1, radius=1):
+    cylinder = WorldBody()
+    cylinder.type = WorldBody.PRIMITIVE_BODY
+    cylinder.name = str(name)
+    cylinder.shape.type = SolidPrimitive.CYLINDER
+    cylinder.shape.dimensions = [0, 0]
+    cylinder.shape.dimensions[SolidPrimitive.CYLINDER_HEIGHT] = height
+    cylinder.shape.dimensions[SolidPrimitive.CYLINDER_RADIUS] = radius
+    return cylinder
+
+
+def make_urdf_world_body(name, urdf):
+    wb = WorldBody()
+    wb.name = name
+    wb.type = wb.URDF_BODY
+    wb.urdf = urdf
+    return wb
+
+
+def is_iterable(qwe):
+    try:
+        iter(qwe)
+    except TypeError:
+        return False
+    return True
+
+
+def homo_matrix_to_pose(m):
+    return kdl_to_pose(np_to_kdl(m))
 
 
 def compare_version(version1, operator, version2):
@@ -589,32 +681,37 @@ def compare_version(version1, operator, version2):
         return False
 
 
+def get_ros_pkg_path(ros_pkg):
+    return r.get_path(ros_pkg)
+
+
 def rospkg_exists(name):
     """
-       checks whether a ros package with the given name and version exists
-       :param name: the name and version of the ros package in requirements format e.g. giskard_msgs<=0.1.0
-       :type name: str
-       :return: True if it exits else False
+    checks whether a ros package with the given name and version exists
+    :param name: the name and version of the ros package in requirements format e.g. giskard_msgs<=0.1.0
+    :type name: str
+    :return: True if it exits else False
     """
-    r = rospkg.RosPack()
     name = name.replace(' ', '')
     version_list = name.split(',')
     version_entry1 = re.split('(==|>=|<=|<|>)', version_list[0])
-    package_name=version_entry1[0]
+    package_name = version_entry1[0]
     try:
         m = r.get_manifest(package_name)
     except Exception as e:
-        logwarn('package {name} not found'.format(name=name))
+        logging.logwarn('package {name} not found'.format(name=name))
         return False
     if len(version_entry1) == 1:
         return True
     if not compare_version(version_entry1[2], version_entry1[1], m.version):
-        logwarn('found ROS package {installed_name}=={installed_version} but {r} is required}'.format(installed_name=package_name, installed_version=str(m.version), r=name))
+        logging.logwarn('found ROS package {installed_name}=={installed_version} but {r} is required}'.format(
+            installed_name=package_name, installed_version=str(m.version), r=name))
         return False
     for entry in version_list[1:]:
         operator_and_version = re.split('(==|>=|<=|<|>)', entry)
         if not compare_version(operator_and_version[2], operator_and_version[1], m.version):
-            logwarn('found ROS package {installed_name}=={installed_version} but {r} is required}'.format(installed_name=package_name, installed_version=str(m.version), r=name))
+            logging.logwarn('found ROS package {installed_name}=={installed_version} but {r} is required}'.format(
+                installed_name=package_name, installed_version=str(m.version), r=name))
             return False
 
     return True
@@ -625,9 +722,8 @@ def check_dependencies():
     Checks whether the dependencies specified in the dependency.txt in the root folder of giskardpy are installed. If a
     dependecy is not installed a message is printed.
     """
-    r = rospkg.RosPack()
 
-    with open(r.get_path('giskardpy') + '/dependencies.txt') as f:
+    with open(get_ros_pkg_path('giskardpy') + '/dependencies.txt') as f:
         dependencies = f.readlines()
 
     dependencies = [x.split('#')[0] for x in dependencies]
@@ -639,4 +735,51 @@ def check_dependencies():
         except pkg_resources.DistributionNotFound as e:
             rospkg_exists(d)
         except pkg_resources.VersionConflict as e:
-            logwarn('found {version_f} but version {version_r} is required'.format(version_r=str(e.req), version_f=str(e.dist)))
+            logging.logwarn('found {version_f} but version {version_r} is required'.format(version_r=str(e.req),
+                                                                                           version_f=str(e.dist)))
+
+
+def str_to_unique_number(s):
+    # FIXME not actually unique
+    return sum(ord(x) for x in s)
+
+def memoize1(f):
+    """ Memoization decorator for a function taking a single argument """
+    class memodict(dict):
+        def __missing__(self, key):
+            ret = self[key] = f(key)
+            return ret
+    return memodict().__getitem__
+
+def memoize2(f):
+    """ Memoization decorator for functions taking one or more arguments. """
+    class memodict(dict):
+        def __init__(self, f):
+            self.f = f
+        def __call__(self, *args):
+            return self[args]
+        def __missing__(self, key):
+            ret = self[key] = self.f(*key)
+            return ret
+    return memodict(f)
+
+
+def memoize3(f):
+    """ Memoization decorator for a function taking one or more arguments. """
+    class memodict(dict):
+        def __getitem__(self, *key):
+            return dict.__getitem__(self, key)
+
+        def __missing__(self, key):
+            ret = self[key] = f(*key)
+            return ret
+
+    return memodict().__getitem__
+
+def memoize4(f):
+  class memodict(dict):
+      __slots__ = ()
+      def __missing__(self, key):
+          self[key] = ret = f(key)
+          return ret
+  return memodict().__getitem__

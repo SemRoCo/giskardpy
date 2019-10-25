@@ -9,6 +9,7 @@ import xml.dom.minidom
 from sensor_msgs.msg import JointState
 from math import pi
 from control_msgs.msg import JointTrajectoryControllerState
+from giskardpy import logging
 
 
 def get_param(name, value=None):
@@ -39,7 +40,7 @@ class JointGoalPublisher(object):
                 if child.getElementsByTagName('revolute'):
                     joint = child.getElementsByTagName('revolute')[0]
                 else:
-                    rospy.logwarn("Unknown joint type %s", child)
+                    logging.logwarn("Unknown joint type %s", child)
                     continue
 
                 if joint:
@@ -55,7 +56,7 @@ class JointGoalPublisher(object):
 
     def init_urdf(self, robot):
         """
-        reads the controllable joints from a urdf
+        reads the controllable joints from a urdfs
         :param robot:
         """
         robot = robot.getElementsByTagName('robot')[0]
@@ -81,7 +82,7 @@ class JointGoalPublisher(object):
                         minval = float(limit.getAttribute('lower'))
                         maxval = float(limit.getAttribute('upper'))
                     except:
-                        rospy.logwarn("%s is not fixed, nor continuous, but limits are not specified!" % name)
+                        logging.logwarn("%s is not fixed, nor continuous, but limits are not specified!" % name)
                         continue
 
                 safety_tags = child.getElementsByTagName('safety_controller')
@@ -258,9 +259,9 @@ class JointGoalPublisherGui(Frame):
             goal_dict[key] = value.get()
 
         if self.allow_self_collision.get():
-            jgp.giskard_wrapper.disable_self_collision()
+            jgp.giskard_wrapper.allow_self_collision()
         else:
-            jgp.giskard_wrapper.avoid_collision(self.collision_distance, body_b=jgp.giskard_wrapper.robot_name)
+            jgp.giskard_wrapper.avoid_collision(self.collision_distance, body_b=jgp.giskard_wrapper.get_robot_name())
 
         self.jgp.send_goal(goal_dict)
 

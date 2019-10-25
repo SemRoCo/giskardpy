@@ -1,6 +1,8 @@
 class GiskardException(Exception):
     pass
 
+class ImplementationException(GiskardException):
+    pass
 
 # -----------------------------------------------------------------------------------------------------------------------
 class InsolvableException(GiskardException):

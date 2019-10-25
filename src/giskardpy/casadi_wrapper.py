@@ -3,7 +3,7 @@ import pickle
 
 import casadi as ca
 import numpy as np
-from casadi import sign, cos, acos, sin, sqrt, atan2
+from casadi import sign, cos, acos, sin, sqrt, atan2, qpsol
 from numpy import pi
 
 from giskardpy import logging

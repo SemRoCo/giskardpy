@@ -52,7 +52,6 @@ class PyBulletWorld(World):
         :return: (robot_link, body_b, link_b) -> ContactInfo
         :rtype: dict
         """
-        # TODO I think I have to multiply distance with something
         collisions = Collisions()
         checked_things = set()
         for k, distance in cut_off_distances.items():

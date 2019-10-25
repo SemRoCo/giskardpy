@@ -94,6 +94,10 @@ class Collisions(object):
                                      (link_a, body_b, link_b))]
         return list(sorted(r, key=lambda x: x.contact_distance))
 
+    def get_external_collisions(self, link_a, robot_name):
+        collisions = self.get(link_a)
+        return [x for x in collisions if x.body_b != robot_name]
+
     def __getitem__(self, item):
         return self.get(*item)
 

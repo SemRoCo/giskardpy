@@ -460,18 +460,18 @@ class World(object):
 
     def transform_contact_info(self, collisions):
         root_T_map = self.robot.root_T_map
-        root = self.robot.get_root()
-        fk = self.robot.get_fk_np
+        # root = self.robot.get_root()
+        # fk = self.robot.get_fk_np
         for key, contact_infos in collisions.data.items():  # type: ((str, str, str), ClosestPointInfo)
             for contact_info in contact_infos:
                 if contact_info is None:
                     continue
-                link1 = key[0]
-                link_T_root = np_to_kdl(fk(link1, root))
-                a_in_link = link_T_root * root_T_map * PyKDL.Vector(*contact_info.position_on_a)
+                # link1 = key[0]
+                # link_T_root = np_to_kdl(fk(link1, root))
+                a_in_robot_root = root_T_map * PyKDL.Vector(*contact_info.position_on_a)
                 b_in_robot_root = root_T_map * PyKDL.Vector(*contact_info.position_on_b)
                 n_in_robot_root = root_T_map.M * PyKDL.Vector(*contact_info.contact_normal)
-                contact_info.position_on_a = a_in_link
+                contact_info.position_on_a = a_in_robot_root
                 contact_info.position_on_b = b_in_robot_root
                 contact_info.contact_normal = n_in_robot_root
         return collisions

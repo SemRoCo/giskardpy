@@ -6,7 +6,7 @@ from std_msgs.msg import ColorRGBA
 from visualization_msgs.msg import Marker, MarkerArray
 
 import giskardpy.identifier as identifier
-from giskardpy.data_types import ClosestPointInfo
+from giskardpy.data_types import ClosestPointInfo, Collisions
 from giskardpy.plugin import GiskardBehavior
 from giskardpy.tfwrapper import msg_to_kdl
 
@@ -32,7 +32,7 @@ class CPIMarker(GiskardBehavior):
         Publishes a string for each ClosestPointInfo in the dict. If the distance is below the threshold, the string
         is colored red. If it is below threshold*2 it is yellow. If it is below threshold*3 it is green.
         Otherwise no string will be published.
-        :type collisions: dict
+        :type collisions: Collisions
         """
         m = Marker()
         m.header.frame_id = self.get_robot().get_root()
@@ -43,25 +43,26 @@ class CPIMarker(GiskardBehavior):
         m.ns = u'pybullet collisions'
         m.scale = Vector3(0.003, 0, 0)
         if len(collisions.data) > 0:
-            for collision_infos in collisions.data.values():  # type: ClosestPointInfo
-                collision_info = collision_infos[0]
-                red_threshold = collision_info.min_dist
-                yellow_threshold = red_threshold * 2
-                green_threshold = red_threshold * 3
+            for collision_infos in collisions.data.values():  # type: list
+                if len(collision_infos) > 0:
+                    collision_info = collision_infos[0]
+                    red_threshold = collision_info.min_dist
+                    yellow_threshold = red_threshold * 2
+                    green_threshold = red_threshold * 3
 
-                if collision_info.contact_distance < green_threshold:
-                    root_T_link = self.get_robot().get_fk_pose(self.get_robot().get_root(), collision_info.link_a)
-                    a__root = msg_to_kdl(root_T_link) * PyKDL.Vector(*collision_info.position_on_a)
-                    m.points.append(Point(*a__root))
-                    m.points.append(Point(*collision_info.position_on_b))
-                    m.colors.append(ColorRGBA(0, 1, 0, 1))
-                    m.colors.append(ColorRGBA(0, 1, 0, 1))
-                if collision_info.contact_distance < yellow_threshold:
-                    m.colors[-2] = ColorRGBA(1, 1, 0, 1)
-                    m.colors[-1] = ColorRGBA(1, 1, 0, 1)
-                if collision_info.contact_distance < red_threshold:
-                    m.colors[-2] = ColorRGBA(1, 0, 0, 1)
-                    m.colors[-1] = ColorRGBA(1, 0, 0, 1)
+                    if collision_info.contact_distance < green_threshold:
+                        # root_T_link = self.get_robot().get_fk_pose(self.get_robot().get_root(), collision_info.link_a)
+                        # a__root = msg_to_kdl(root_T_link) * PyKDL.Vector(*collision_info.position_on_a)
+                        m.points.append(Point(*collision_info.position_on_a))
+                        m.points.append(Point(*collision_info.position_on_b))
+                        m.colors.append(ColorRGBA(0, 1, 0, 1))
+                        m.colors.append(ColorRGBA(0, 1, 0, 1))
+                    if collision_info.contact_distance < yellow_threshold:
+                        m.colors[-2] = ColorRGBA(1, 1, 0, 1)
+                        m.colors[-1] = ColorRGBA(1, 1, 0, 1)
+                    if collision_info.contact_distance < red_threshold:
+                        m.colors[-2] = ColorRGBA(1, 0, 0, 1)
+                        m.colors[-1] = ColorRGBA(1, 0, 0, 1)
         ma = MarkerArray()
         ma.markers.append(m)
         self.pub_collision_marker.publish(ma)

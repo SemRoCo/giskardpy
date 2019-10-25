@@ -11,30 +11,44 @@ import rostopic
 
 class JointTrajectorySplitter:
     def __init__(self):
-        rospy.init_node('joint_trajectory_splitter')
         self.action_clients = []
         self.joint_names = []
+        while not rospy.has_param('~state_topics'):
+            logging.loginfo('waiting for param ' + '~state_topics')
+            rospy.sleep(1)
+        while not rospy.has_param('~client_topics'):
+            logging.loginfo('waiting for param ' + '~client_topics')
+            rospy.sleep(1)
         self.state_topics = rospy.get_param('~state_topics', [])
         self.client_topics = rospy.get_param('~client_topics', [])
         self.number_of_clients = len(self.state_topics)
         if self.number_of_clients != len(self.client_topics):
-            logging.logerr('Number of state and action topics do not match')
+            logging.logerr('Joint Trajector Splitter: number of state and action topics do not match')
             exit()
 
 
         if self.number_of_clients == 0:
-            logging.logwarn('No state/action topic found')
+            logging.logerr('Joint Trajector Splitter: the state_topic or client_topic parameter is empty')
             exit()
 
         self.client_type = []
         for i in range(self.number_of_clients):
-            type = rostopic.get_info_text(self.client_topics[i] + '/goal').split('\n')[0][6:]
-            self.client_type.append(type)
+            try:
+                type = rostopic.get_info_text(self.client_topics[i] + '/goal').split('\n')[0][6:]
+                self.client_type.append(type)
+            except rostopic.ROSTopicException:
+                logging.logerr("Joint Trajector Splitter: unkown topic " + self.client_topics[i] + '/goal' + "\nmissing / in front of topic name?")
+                exit()
+
 
         self.state_type = []
         for i in range(self.number_of_clients):
-            type = rostopic.get_info_text(self.state_topics[i]).split('\n')[0][6:]
-            self.state_type.append(type)
+            try:
+                type = rostopic.get_info_text(self.state_topics[i]).split('\n')[0][6:]
+                self.state_type.append(type)
+            except rostopic.ROSTopicException:
+                logging.logerr("Joint Trajector Splitter: unkown topic " + self.state_topics[i] + "\nmissing / in front of topic name?")
+                exit()
 
         for i in range(self.number_of_clients):
             if self.client_type[i] == 'control_msgs/FollowJointTrajectoryActionGoal':
@@ -42,7 +56,7 @@ class JointTrajectorySplitter:
             elif self.client_type[i] == 'pr2_controllers_msgs/JointTrajectoryActionGoal':
                 self.action_clients.append(actionlib.SimpleActionClient(self.client_topics[i], pr2_controllers_msgs.msg.JointTrajectoryAction))
             else:
-                logging.logerr('wrong client topic type:' + self.client_type[i])
+                logging.logerr('Joint Trajector Splitter: wrong client topic type:' + self.client_type[i] + '\nmust be either control_msgs/FollowJointTrajectoryActionGoal or pr2_controllers_msgs/JointTrajectoryActionGoal')
                 exit()
             self.joint_names.append(rospy.wait_for_message(self.state_topics[i], control_msgs.msg.JointTrajectoryControllerState).joint_names)
 
@@ -69,7 +83,7 @@ class JointTrajectorySplitter:
             elif self.state_type[i] == 'pr2_controllers_msgs/JointTrajectoryControllerState':
                 rospy.Subscriber(self.state_topics[i], pr2_controllers_msgs.msg.JointTrajectoryControllerState, self.state_cb_update)
             else:
-                logging.logerr('wrong state topic type')
+                logging.logerr('Joint Trajector Splitter: wrong state topic type ' + self.state_type[i] + '\nmust be either control_msgs/JointTrajectoryControllerState or pr2_controllers_msgs/JointTrajectoryControllerState')
                 exit()
 
         rospy.Subscriber(self.state_topics[0], control_msgs.msg.JointTrajectoryControllerState, self.state_cb_publish)
@@ -91,22 +105,23 @@ class JointTrajectorySplitter:
         for joint_name_list in self.joint_names:
             index_list = []
             for joint_name in joint_name_list:
-                index_list.append(goal.trajectory.joint_names.index(joint_name))
+                try:
+                    index_list.append(goal.trajectory.joint_names.index(joint_name))
+                except ValueError:
+                    logging.logerr('Joint Trajector Splitter: the goal does not contain the joint ' + joint_name + ' but it is published by one of the state topics')
+                    result = control_msgs.msg.FollowJointTrajectoryResult()
+                    result.error_code = control_msgs.msg.FollowJointTrajectoryResult.INVALID_GOAL
+                    self._as.set_aborted(result)
+                    return
 
             idx.append(index_list)
-
-        #action_goals = [control_msgs.msg.FollowJointTrajectoryGoal() for i in range(self.number_of_clients)]
 
         action_goals = []
         for i in range(self.number_of_clients):
             if self.client_type[i] == 'control_msgs/FollowJointTrajectoryActionGoal':
                 action_goals.append(control_msgs.msg.FollowJointTrajectoryGoal())
-            elif self.client_type[i] == 'pr2_controllers_msgs/JointTrajectoryActionGoal':
-                action_goals.append(pr2_controllers_msgs.msg.JointTrajectoryGoal())
             else:
-                logging.logerr('Wrong Action type:' + self.client_type[i])
-                exit()
-
+                action_goals.append(pr2_controllers_msgs.msg.JointTrajectoryGoal())
 
         goal_trajectories_points = [[] for i in range(self.number_of_clients)]
 
@@ -145,25 +160,14 @@ class JointTrajectorySplitter:
             now = rospy.Time.now()
             timeout = timeout - (now - start)
             if not finished_before_timeout:
-                logging.logwarn("action client timed out")
+                logging.logwarn("Joint Trajector Splitter: Client took to long to finish action")
                 self.success = False
                 self._as.set_aborted()
                 break
 
 
         if self.success:
-            result = control_msgs.msg.FollowJointTrajectoryResult.SUCCESSFUL
-            for action_client in self.action_clients:
-                temp_result = action_client.get_result()
-                if temp_result._type == 'pr2_controllers_msgs/JointTrajectoryResult':
-                    continue
-                result = temp_result
-                if result:
-                    if result.error_code != control_msgs.msg.FollowJointTrajectoryResult.SUCCESSFUL:
-                        logging.logwarn(u'didn\'t receive successful from {} {}'.format(action_client.action_client.ns, result))
-                        break
-
-            self._as.set_succeeded(result)
+            self._as.set_succeeded()
 
 
     def feedback_cb(self, feedback):
@@ -176,8 +180,8 @@ class JointTrajectorySplitter:
             for client in self.action_clients:
                 client.cancel_goal()
             self.success = False
-            self._as.set_preempted()
-            logging.logwarn(u'action goal failed {}'.format(result))
+            self._as.set_aborted(result)
+            logging.logwarn(u'Joint Trajector Splitter: client failed to execute action goal \n {}'.format(result))
 
 
     def preempt_cb(self):
@@ -225,4 +229,5 @@ class JointTrajectorySplitter:
 
 
 if __name__ == '__main__':
+    rospy.init_node('joint_trajectory_splitter')
     j = JointTrajectorySplitter()

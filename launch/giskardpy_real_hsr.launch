@@ -5,7 +5,15 @@
   <remap from="/robot_description" to="/giskard/robot_description" />
 
   <group if="$(eval arg('on_hsr') == true)">
-     <node pkg="giskardpy" type="hsrb_urdf_publisher.py" name="hsrb_urdf_publisher" output="screen"/>
+    <node pkg="giskardpy" type="urdf_merger.py" name="urdf_merger" output="screen">
+      <rosparam param="/urdf_merger/urdf_sources" subst_value="true">
+      - source : $(find giskardpy)/test/urdfs/holonomic_base.urdf
+      - source : robot_description
+        link : odom_t_link
+        position : [0,0,0]
+        rotation : [0,0,0,1]
+      </rosparam>
+    </node>
   </group>
 
   <group if="$(eval arg('on_hsr') == false)">

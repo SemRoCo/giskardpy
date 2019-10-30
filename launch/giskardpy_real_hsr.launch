@@ -13,6 +13,7 @@
         position : [0,0,0]
         rotation : [0,0,0,1]
       </rosparam>
+      <param name="robot_name" value="hsrb"/>
     </node>
   </group>
 

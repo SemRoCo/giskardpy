@@ -9,7 +9,12 @@ while not rospy.has_param('/urdf_merger/urdf_sources'):
     logging.loginfo('waiting for rosparam /urdf_merger/urdf_sources')
     rospy.sleep(1.0)
 
+while not rospy.has_param('/urdf_merger/robot_name'):
+    logging.loginfo('waiting for rosparam /urdf_merger/robot_name')
+    rospy.sleep(1.0)
+
 urdf_sources = rospy.get_param('/urdf_merger/urdf_sources')
+robot_name = rospy.get_param('/urdf_merger/robot_name')
 
 merged_object = None
 
@@ -38,6 +43,7 @@ for source in urdf_sources[1:]:
     merged_object.attach_urdf_object(urdf_object, source['link'], Pose(position, rotation))
 
 
+merged_object.set_name(robot_name)
 merged_urdf = merged_object.get_urdf_str()
 
 rospy.set_param('/giskard/robot_description', merged_urdf)

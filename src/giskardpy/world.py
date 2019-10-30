@@ -47,6 +47,7 @@ class World(object):
         """
         :type object_: URDFObject
         """
+        # FIXME this interface seems unintuitive, why not pass base pose as well?
         if self.has_robot() and self.robot.get_name() == object_.get_name():
             raise DuplicateNameException(u'object and robot have the same name')
         if self.has_object(object_.get_name()):

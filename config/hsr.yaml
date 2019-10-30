@@ -1,0 +1,34 @@
+backend: llvm
+opt_level: 0
+enable_collision_marker: True
+enable_visualization: True
+plot_trajectory: True
+debug: False
+map_frame: map
+sample_period: 0.05
+fill_velocity_values: True
+joint_convergence_threshold: 0.01
+wiggle_precision_threshold: 5
+tree_tick_rate: 0.1
+fft_duration: 3
+wiggle_detection_threshold: 10
+min_wiggle_frequency: 3
+path_to_data_folder: $(find giskardpy)/data/hsr/
+nWSR: None # None results in a nWSR estimation thats fine most of the time
+max_traj_length: 30 # not implemented
+collision_time_threshold: 15
+joint_vel_limit:
+  default: 1
+joint_acceleration_limit: # multiply your desired acc limit with sample period
+  default: 100
+joint_weights:
+  default: 0.0001
+#default_collision_avoidance_distance: 0.05
+collision_avoidance:
+  default:
+    max_weight_distance: 0.0
+    low_weight_distance: 0.01
+    zero_weight_distance: 0.05
+self_collision_matrix:
+  ignore: []
+  add: []

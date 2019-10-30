@@ -171,20 +171,20 @@ class QProblemBuilder(object):
         for iH, k in enumerate(self.hard_constraints_dict.keys()):
             key = 'h -- ' + str(k)
             lbA.append(key)
-            # upper_bound = np_ubA[iH]
-            # lower_bound = np_lbA[iH]
-            # if np.sign(upper_bound) == np.sign(lower_bound):
-            #     logging.logwarn(u'{} out of bounds'.format(k))
-            #     if upper_bound > 0:
-            #         logging.logwarn(u'{} value below lower bound by {}'.format(k, lower_bound))
-            #         vel = np_ub[iH]
-            #         if abs(vel) < abs(lower_bound):
-            #             logging.logerr(u'joint vel of {} to low to get back into bound in one iteration'.format(vel))
-            #     else:
-            #         logging.logwarn(u'{} value above upper bound by {}'.format(k, abs(upper_bound)))
-            #         vel = np_lb[iH]
-            #         if abs(vel) < abs(lower_bound):
-            #             logging.logerr(u'joint vel of {} to low to get back into bound in one iteration'.format(vel))
+            upper_bound = np_ubA[iH]
+            lower_bound = np_lbA[iH]
+            if np.sign(upper_bound) == np.sign(lower_bound):
+                logging.logwarn(u'{} out of bounds'.format(k))
+                if upper_bound > 0:
+                    logging.logwarn(u'{} value below lower bound by {}'.format(k, lower_bound))
+                    vel = np_ub[iH]
+                    if abs(vel) < abs(lower_bound):
+                        logging.logerr(u'joint vel of {} to low to get back into bound in one iteration'.format(vel))
+                else:
+                    logging.logwarn(u'{} value above upper bound by {}'.format(k, abs(upper_bound)))
+                    vel = np_lb[iH]
+                    if abs(vel) < abs(lower_bound):
+                        logging.logerr(u'joint vel of {} to low to get back into bound in one iteration'.format(vel))
 
         for iS, k in enumerate(self.soft_constraints_dict.keys()):
             key = 's -- ' + str(k)
@@ -206,15 +206,15 @@ class QProblemBuilder(object):
         else:
             self.lbAs = self.lbAs.T.append(p_lbA.T, ignore_index=True).T
             # self.lbAs.T[[c for c in self.lbAs.T.columns if 'dist' in c]].plot()
-        # arrays = [(p_weights, u'H'),
-        #           (p_A, u'A'),
-        #           (p_lbA, u'lbA'),
-        #           (p_ubA, u'ubA'),
-        #           (p_lb, u'lb'),
-        #           (p_ub, u'ub')]
-        # for a, name in arrays:
-        #     self.check_for_nan(name, a)
-        #     self.check_for_big_numbers(name, a)
+        arrays = [(p_weights, u'H'),
+                  (p_A, u'A'),
+                  (p_lbA, u'lbA'),
+                  (p_ubA, u'ubA'),
+                  (p_lb, u'lb'),
+                  (p_ub, u'ub')]
+        for a, name in arrays:
+            self.check_for_nan(name, a)
+            self.check_for_big_numbers(name, a)
         pass
 
     def check_for_nan(self, name, p_array):

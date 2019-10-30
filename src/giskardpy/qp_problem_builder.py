@@ -206,15 +206,15 @@ class QProblemBuilder(object):
         else:
             self.lbAs = self.lbAs.T.append(p_lbA.T, ignore_index=True).T
             # self.lbAs.T[[c for c in self.lbAs.T.columns if 'dist' in c]].plot()
-        arrays = [(p_weights, u'H'),
-                  (p_A, u'A'),
-                  (p_lbA, u'lbA'),
-                  (p_ubA, u'ubA'),
-                  (p_lb, u'lb'),
-                  (p_ub, u'ub')]
-        for a, name in arrays:
-            self.check_for_nan(name, a)
-            self.check_for_big_numbers(name, a)
+        # arrays = [(p_weights, u'H'),
+        #           (p_A, u'A'),
+        #           (p_lbA, u'lbA'),
+        #           (p_ubA, u'ubA'),
+        #           (p_lb, u'lb'),
+        #           (p_ub, u'ub')]
+        # for a, name in arrays:
+        #     self.check_for_nan(name, a)
+        #     self.check_for_big_numbers(name, a)
         pass
 
     def check_for_nan(self, name, p_array):
@@ -266,7 +266,7 @@ class QProblemBuilder(object):
         if xdot_full is None:
             return None
         # TODO enable debug print in an elegant way, preferably without slowing anything down
-        self.debug_print(np_H, np_A, np_lb, np_ub, np_lbA, np_ubA, xdot_full)
+        # self.debug_print(np_H, np_A, np_lb, np_ub, np_lbA, np_ubA, xdot_full)
         return OrderedDict((observable, xdot_full[i]) for i, observable in enumerate(self.controlled_joints)), \
                np_H, np_A, np_lb, np_ub, np_lbA, np_ubA, xdot_full
 

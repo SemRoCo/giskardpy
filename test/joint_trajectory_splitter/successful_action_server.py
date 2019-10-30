@@ -6,7 +6,7 @@ import control_msgs.msg
 from giskardpy import  logging
 
 
-class SuccessfulAction(object):
+class SuccessfulActionServer(object):
 
 
     def __init__(self, name):

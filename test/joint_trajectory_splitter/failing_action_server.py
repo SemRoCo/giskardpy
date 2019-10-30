@@ -5,7 +5,7 @@ import actionlib
 import control_msgs.msg
 
 
-class SuccessfulAction(object):
+class FailingActionServer(object):
 
 
     def __init__(self, name):

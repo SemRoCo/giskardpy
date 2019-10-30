@@ -23,5 +23,5 @@ class TimeoutActionServer(object):
 if __name__ == '__main__':
     rospy.init_node('TimeooutActionServer')
     name = rospy.get_name()
-    server = TimeoutAction(name)
+    server = TimeoutActionServer(name)
     rospy.spin()

@@ -23,5 +23,5 @@ class SuccessfulActionServer(object):
 if __name__ == '__main__':
     rospy.init_node('SuccessfulActionServer')
     name = rospy.get_name()
-    server = SuccessfulAction(name)
+    server = SuccessfulActionServer(name)
     rospy.spin()

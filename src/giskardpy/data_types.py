@@ -86,6 +86,7 @@ class Collisions(object):
             self.self_collisions[key].append(contact)
             self.self_collisions[key[:-1]].append(contact)
             self.self_collisions[key[:-2]].append(contact)
+            self.self_collisions[key[0], key[2]].append(contact)
             self.self_collisions[movable_joint].append(contact)
         else:
             self.external_collision[key].append(contact)
@@ -130,13 +131,19 @@ class Collisions(object):
             r = collisions
         else:
             link_a = self.robot.get_child_link_of_joint(joint_name)
-            r = [self._default_collision(link_a, None, None)]
+            return [self._default_collision(link_a, None, None)]
         # collisions = self.get(link_a)
         # return [x for x in collisions if x.body_b != robot_name]
         return list(sorted(r, key=lambda x: x.contact_distance))
 
-    def __getitem__(self, item):
-        return self.get(*item)
+    def get_self_collisions(self, link_a, link_b):
+        r = self.self_collisions[link_a, link_b]
+        if len(r) == 0:
+            return [self._default_collision(link_a, self.robot.get_name(), link_b)]
+        return list(sorted(r, key=lambda x: x.contact_distance))
+
+    # def __getitem__(self, item):
+    #     return self.get(*item)
 
     def __contains__(self, item):
         return item in self.self_collisions or item in self.external_collision

@@ -59,7 +59,7 @@ class PyBulletWorld(World):
             r_k = (link_b, body_b, robot_link)
             if r_k in checked_things:
                 if r_k in collisions:
-                    for c in collisions[r_k]:
+                    for c in collisions.get(*r_k):
                         collisions.add(k, self.__flip_contact_info(c))
                     # collisions.add(k, self.__flip_contact_info(collisions[r_k]))
                 continue
@@ -197,26 +197,13 @@ class PyBulletWorld(World):
         :rtype: dict
         """
         for collision in collisions.items():  # type: ClosestPointInfo
-            # for collision in collisions_per_link:  # type: ClosestPointInfo
-                if self.__should_flip_contact_info(collision):
-                    # root_T_link = np_to_kdl(self.robot.get_fk_np(self.robot.get_root(), collision.link_a))
-                    # b_link = PyKDL.Vector(*collision.position_on_a)
-                    # a_root = PyKDL.Vector(*collision.position_on_b)
-                    # b_root = root_T_link * b_link
-                    # a_link = root_T_link.Inverse() * a_root
-                    tmp = collision.position_on_a
-                    collision.position_on_a = collision.position_on_b
-                    collision.position_on_b = tmp
-                    collision.contact_normal = [-collision.contact_normal[0],
-                                                -collision.contact_normal[1],
-                                                -collision.contact_normal[2]]
-                    # collisions[key] = ClosestPointInfo(collision.position_on_b, collision.position_on_a,
-                    #                                    collision.contact_distance,
-                    #                                    collision.min_dist,
-                    #                                    collision.link_a,
-                    #                                    collision.body_b,
-                    #                                    collision.link_b,
-                    #                                    -np.array(collision.contact_normal), key)
+            if self.__should_flip_contact_info(collision):
+                tmp = collision.position_on_a
+                collision.position_on_a = collision.position_on_b
+                collision.position_on_b = tmp
+                collision.contact_normal = [-collision.contact_normal[0],
+                                            -collision.contact_normal[1],
+                                            -collision.contact_normal[2]]
         closest_point = super(PyBulletWorld, self).transform_contact_info(collisions)
         return closest_point
 

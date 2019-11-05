@@ -593,7 +593,7 @@ class ExternalCollisionAvoidance(Constraint):
 
         dist = w.dot(r_V_n.T, r_P_pa)[0]
 
-        weight_f = w.Max(w.Min(MAX_WEIGHT, A / (actual_distance + C) + B), ZERO_WEIGHT)
+        weight_f = w.Max(w.Min(MAX_WEIGHT, A / (w.Max(actual_distance, 0) + C) + B), ZERO_WEIGHT)
 
         limit = zero_weight_distance - actual_distance
         limit = w.Min(w.Max(limit, -repel_speed * t), repel_speed * t)
@@ -643,21 +643,26 @@ class SelfCollisionAvoidance(Constraint):
 
     def get_contact_normal_on_b(self):
         return Vector3Input(self.god_map.to_symbol,
-                            prefix=identifier.closest_point + [(self.link_a, self.robot_name, self.link_b), 0,
+                            prefix=identifier.closest_point + [u'get_self_collisions',
+                                                               (self.link_a, self.link_b),
+                                                               0,
                                                                u'contact_normal']).get_expression()
 
     def get_closest_point_on_a(self):
         return Point3Input(self.god_map.to_symbol,
-                           prefix=identifier.closest_point + [(self.link_a, self.robot_name, self.link_b), 0,
+                           prefix=identifier.closest_point + [u'get_self_collisions',
+                                                              (self.link_a, self.link_b), 0,
                                                               u'position_on_a']).get_expression()
 
     def get_r_T_pb(self):
         return TranslationInput(self.god_map.to_symbol,
-                                prefix=identifier.closest_point + [(self.link_a, self.robot_name, self.link_b), 0,
+                                prefix=identifier.closest_point + [u'get_self_collisions',
+                                                                   (self.link_a, self.link_b), 0,
                                                                    u'position_on_b']).get_frame()
 
     def get_actual_distance(self):
-        return self.god_map.to_symbol(identifier.closest_point + [(self.link_a, self.robot_name, self.link_b), 0,
+        return self.god_map.to_symbol(identifier.closest_point + [u'get_self_collisions',
+                                                                  (self.link_a, self.link_b), 0,
                                                                   u'contact_distance'])
 
     def get_constraint(self):
@@ -671,17 +676,21 @@ class SelfCollisionAvoidance(Constraint):
         B = self.get_input_float(self.B)
         C = self.get_input_float(self.C)
 
-        a_T_r = self.get_fk_evaluated(self.link_a, self.robot_root)
+        # a_T_r = self.get_fk_evaluated(self.link_a, self.robot_root)
         r_T_b = self.get_fk_evaluated(self.robot_root, self.link_b)
+
+        movable_joint = self.get_robot().get_movable_parent_joint(self.link_a)
+        f = self.get_robot().get_child_link_of_joint(movable_joint)
+        a_T_f = self.get_fk_evaluated(self.link_a, f)
 
         b_T_a = self.get_fk(self.link_b, self.link_a)
         pb_T_r = w.inverse_frame(self.get_r_T_pb())
-        r_P_pa = self.get_closest_point_on_a()
+        f_P_pa = self.get_closest_point_on_a()
 
         r_V_n = self.get_contact_normal_on_b()
 
         pb_T_b = w.dot(pb_T_r, r_T_b)
-        a_P_pa = w.dot(a_T_r, r_P_pa)
+        a_P_pa = w.dot(a_T_f, f_P_pa)
 
         pb_P_pa = w.dot(pb_T_b, b_T_a, a_P_pa)
 
@@ -689,7 +698,7 @@ class SelfCollisionAvoidance(Constraint):
 
         dist = w.dot(pb_V_n.T, pb_P_pa)[0]
 
-        weight_f = w.Max(w.Min(MAX_WEIGHT, A / (actual_distance + C) + B), ZERO_WEIGHT)
+        weight_f = w.Max(w.Min(MAX_WEIGHT, A / (w.Max(actual_distance, 0) + C) + B), ZERO_WEIGHT)
 
         limit = zero_weight_distance - actual_distance
         limit = w.Min(w.Max(limit, -repel_speed * t), repel_speed * t)
@@ -698,7 +707,6 @@ class SelfCollisionAvoidance(Constraint):
                                                      upper=1e9,
                                                      weight=weight_f,
                                                      expression=dist)
-
         return soft_constraints
 
     def __str__(self):

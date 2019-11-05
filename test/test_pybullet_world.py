@@ -1,8 +1,11 @@
+from collections import defaultdict
+from itertools import product, combinations_with_replacement
+
 import pybullet as p
 import shutil
 
 import pytest
-from geometry_msgs.msg import Pose, Point, Quaternion
+from geometry_msgs.msg import Pose, Point, Quaternion, PoseStamped
 from giskard_msgs.msg import CollisionEntry
 
 from giskardpy.pybullet_world import PyBulletWorld
@@ -266,6 +269,62 @@ class TestPyBulletWorld(test_world.TestWorld):
 
     def test_verify_collision_entries_allow_all_self(self, test_folder):
         super(TestPyBulletWorld, self).test_verify_collision_entries_allow_all_self(test_folder)
+
+    def test_check_collisions(self, test_folder):
+        w = self.make_world_with_pr2()
+        pr22 = self.cls(pr2_urdf())
+        pr22.set_name('pr22')
+        w.add_object(pr22)
+        base_pose = Pose()
+        base_pose.position.x = 10
+        base_pose.orientation.w = 1
+        w.set_object_pose('pr22', base_pose)
+        robot_links = pr22.get_link_names()
+        cut_off_distances = {(link1, 'pr22', link2): 0.1 for link1, link2 in product(robot_links, repeat=2)}
+
+        assert len(w.check_collisions(cut_off_distances)) == 0
+
+    def test_check_collisions2(self, test_folder):
+        w = self.make_world_with_pr2()
+        pr22 = self.cls(pr2_urdf())
+        pr22.set_name('pr22')
+        w.add_object(pr22)
+        base_pose = Pose()
+        base_pose.position.x = 0.05
+        base_pose.orientation.w = 1
+        w.set_object_pose('pr22', base_pose)
+
+        pr23 = self.cls(pr2_urdf())
+        pr23.set_name('pr23')
+        w.add_object(pr23)
+        base_pose = Pose()
+        base_pose.position.y = 0.05
+        base_pose.orientation.w = 1
+        w.set_object_pose('pr23', base_pose)
+
+        min_dist = defaultdict(lambda : {u'zero_weight_distance': 0.1})
+        cut_off_distances = w.collision_goals_to_collision_matrix([], min_dist)
+
+        for i in range(160):
+            assert len(w.check_collisions(cut_off_distances)) == 90
+
+    def test_check_collisions3(self, test_folder):
+        w = self.make_world_with_pr2()
+        pr22 = self.cls(pr2_urdf())
+        pr22.set_name('pr22')
+        w.add_object(pr22)
+        base_pose = Pose()
+        base_pose.position.x = 1.5
+        base_pose.orientation.w = 1
+        w.set_object_pose('pr22', base_pose)
+        min_dist = defaultdict(lambda: {u'zero_weight_distance': 0.1})
+        cut_off_distances = w.collision_goals_to_collision_matrix([], min_dist)
+        robot_links = pr22.get_link_names()
+        cut_off_distances.update({(link1, 'pr22', link2): 0.1 for link1, link2 in product(robot_links, repeat=2)})
+
+        for i in range(160):
+            assert len(w.check_collisions(cut_off_distances)) == 36
+
 
     # TODO test that has collision entries of robot links without collision geometry
 

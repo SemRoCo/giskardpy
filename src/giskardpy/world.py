@@ -6,12 +6,12 @@ from giskardpy.data_types import ClosestPointInfo
 from giskardpy.exceptions import RobotExistsException, DuplicateNameException, PhysicsWorldException, \
     UnknownBodyException, UnsupportedOptionException
 from giskardpy.symengine_robot import Robot
-from giskardpy.tfwrapper import msg_to_kdl, kdl_to_pose, np_to_kdl
+from giskardpy.tfwrapper import msg_to_kdl, kdl_to_pose, np_to_kdl, to_np
 from giskardpy.urdf_object import URDFObject, FIXED_JOINT
-from giskardpy.utils import KeyDefaultDict
+from giskardpy.utils import KeyDefaultDict, np_point, np_vector
 from giskardpy.world_object import WorldObject
 from giskardpy import logging
-
+import numpy as np
 
 class World(object):
     def __init__(self, path_to_data_folder=u''):
@@ -47,6 +47,7 @@ class World(object):
         """
         :type object_: URDFObject
         """
+        # FIXME this interface seems unintuitive, why not pass base pose as well?
         if self.has_robot() and self.robot.get_name() == object_.get_name():
             raise DuplicateNameException(u'object and robot have the same name')
         if self.has_object(object_.get_name()):
@@ -459,19 +460,19 @@ class World(object):
     
 
     def transform_contact_info(self, collisions):
-        root_T_map = self.robot.root_T_map
-        # root = self.robot.get_root()
-        # fk = self.robot.get_fk_np
-        for key, contact_infos in collisions.data.items():  # type: ((str, str, str), ClosestPointInfo)
-            for contact_info in contact_infos:
-                if contact_info is None:
-                    continue
-                # link1 = key[0]
-                # link_T_root = np_to_kdl(fk(link1, root))
-                a_in_robot_root = root_T_map * PyKDL.Vector(*contact_info.position_on_a)
-                b_in_robot_root = root_T_map * PyKDL.Vector(*contact_info.position_on_b)
-                n_in_robot_root = root_T_map.M * PyKDL.Vector(*contact_info.contact_normal)
-                contact_info.position_on_a = a_in_robot_root
-                contact_info.position_on_b = b_in_robot_root
-                contact_info.contact_normal = n_in_robot_root
+        root_T_map = to_np(self.robot.root_T_map)
+        for contact_info in collisions.items():  # type: ClosestPointInfo
+            if contact_info is None:
+                continue
+            movable_joint = self.robot.get_movable_parent_joint(contact_info.link_a)
+            f = self.robot.get_child_link_of_joint(movable_joint)
+            f_T_r = self.robot.get_fk_np(f, self.robot.get_root())
+            contact_info.frame = f
+
+            f_P_pa = np.linalg.multi_dot((f_T_r, root_T_map, np_point(*contact_info.position_on_a)))
+            r_P_pb = np.dot(root_T_map, np_point(*contact_info.position_on_b))
+            r_V_n = np.dot(root_T_map, np_vector(*contact_info.contact_normal))
+            contact_info.position_on_a = f_P_pa[:-1]
+            contact_info.position_on_b = r_P_pb[:-1]
+            contact_info.contact_normal = r_V_n[:-1]
         return collisions

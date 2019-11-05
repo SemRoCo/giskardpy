@@ -275,3 +275,8 @@ def to_np(kdl_thing):
         return np.array([kdl_thing[0],
                          kdl_thing[1],
                          kdl_thing[2]])
+    if isinstance(kdl_thing, PyKDL.Frame):
+        return np.array([[kdl_thing.M[0,0], kdl_thing.M[0,1], kdl_thing.M[0,2], kdl_thing.p[0]],
+                         [kdl_thing.M[1,0], kdl_thing.M[1,1], kdl_thing.M[1,2], kdl_thing.p[1]],
+                         [kdl_thing.M[2,0], kdl_thing.M[2,1], kdl_thing.M[2,2], kdl_thing.p[2]],
+                         [0, 0, 0, 1]])

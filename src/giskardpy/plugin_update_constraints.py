@@ -118,37 +118,37 @@ class GoalToConstraints(GetGoal):
         Adds a constraint for each link that pushed it away from its closest point.
         """
         soft_constraints = {}
-        for link in self.get_robot().get_controlled_links():
+        for joint_name in self.get_robot().get_controllable_joints():
             for i in range(5):
-                constraint = ExternalCollisionAvoidance(self.god_map, link,
+                constraint = ExternalCollisionAvoidance(self.god_map, joint_name,
                                                     max_weight_distance=self.get_god_map().safe_get_data(
                                                     identifier.collisions_distances +
-                                                    [link, u'max_weight_distance']),
+                                                    [joint_name, u'max_weight_distance']),
                                                     low_weight_distance=self.get_god_map().safe_get_data(
                                                     identifier.collisions_distances +
-                                                    [link, u'low_weight_distance']),
+                                                    [joint_name, u'low_weight_distance']),
                                                     zero_weight_distance=self.get_god_map().safe_get_data(
                                                     identifier.collisions_distances +
-                                                    [link, u'zero_weight_distance']),
+                                                    [joint_name, u'zero_weight_distance']),
                                                     idx=i)
                 soft_constraints.update(constraint.get_constraint())
-        for link_a, link_b in self.get_robot().get_self_collision_matrix():
-            max_weight_distance = min(self.get_god_map().safe_get_data(identifier.collisions_distances +
-                                                                       [link_a, u'max_weight_distance']),
-                                      self.get_god_map().safe_get_data(identifier.collisions_distances +
-                                                                       [link_b, u'max_weight_distance']))
-            low_weight_distance = min(self.get_god_map().safe_get_data(identifier.collisions_distances +
-                                                                       [link_a, u'low_weight_distance']),
-                                      self.get_god_map().safe_get_data(identifier.collisions_distances +
-                                                                       [link_b, u'low_weight_distance']))
-            zero_weight_distance = min(self.get_god_map().safe_get_data(identifier.collisions_distances +
-                                                                       [link_a, u'zero_weight_distance']),
-                                      self.get_god_map().safe_get_data(identifier.collisions_distances +
-                                                                       [link_b, u'zero_weight_distance']))
-            constraint = SelfCollisionAvoidance(self.god_map, link_a, link_b,
-                                                max_weight_distance=max_weight_distance,
-                                                low_weight_distance=low_weight_distance,
-                                                zero_weight_distance=zero_weight_distance)
-            soft_constraints.update(constraint.get_constraint())
+        # for link_a, link_b in self.get_robot().get_self_collision_matrix():
+        #     max_weight_distance = min(self.get_god_map().safe_get_data(identifier.collisions_distances +
+        #                                                                [link_a, u'max_weight_distance']),
+        #                               self.get_god_map().safe_get_data(identifier.collisions_distances +
+        #                                                                [link_b, u'max_weight_distance']))
+        #     low_weight_distance = min(self.get_god_map().safe_get_data(identifier.collisions_distances +
+        #                                                                [link_a, u'low_weight_distance']),
+        #                               self.get_god_map().safe_get_data(identifier.collisions_distances +
+        #                                                                [link_b, u'low_weight_distance']))
+        #     zero_weight_distance = min(self.get_god_map().safe_get_data(identifier.collisions_distances +
+        #                                                                [link_a, u'zero_weight_distance']),
+        #                               self.get_god_map().safe_get_data(identifier.collisions_distances +
+        #                                                                [link_b, u'zero_weight_distance']))
+        #     constraint = SelfCollisionAvoidance(self.god_map, link_a, link_b,
+        #                                         max_weight_distance=max_weight_distance,
+        #                                         low_weight_distance=low_weight_distance,
+        #                                         zero_weight_distance=zero_weight_distance)
+        #     soft_constraints.update(constraint.get_constraint())
 
         self.soft_constraints.update(soft_constraints)

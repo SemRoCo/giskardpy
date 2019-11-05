@@ -52,7 +52,7 @@ class PyBulletWorld(World):
         :return: (robot_link, body_b, link_b) -> ContactInfo
         :rtype: dict
         """
-        collisions = Collisions()
+        collisions = Collisions(self.robot)
         checked_things = set()
         for k, distance in cut_off_distances.items():
             (robot_link, body_b, link_b) = k
@@ -196,8 +196,8 @@ class PyBulletWorld(World):
         :return: robot_link -> ClosestPointInfo of closest thing
         :rtype: dict
         """
-        for key, collisions_per_link in collisions.items():  # type: (str, list)
-            for collision in collisions_per_link:  # type: ClosestPointInfo
+        for collision in collisions.items():  # type: ClosestPointInfo
+            # for collision in collisions_per_link:  # type: ClosestPointInfo
                 if self.__should_flip_contact_info(collision):
                     # root_T_link = np_to_kdl(self.robot.get_fk_np(self.robot.get_root(), collision.link_a))
                     # b_link = PyKDL.Vector(*collision.position_on_a)

@@ -46,10 +46,10 @@ class PyBulletWorldObject(WorldObject):
     @WorldObject.joint_state.setter
     def joint_state(self, value):
         """
-        :param joint_state:
-        :type joint_state: dict
-        :return:
-        """
+                :param joint_state:
+                :type joint_state: dict
+                :return:
+                """
         with self.lock:
             WorldObject.joint_state.fset(self, value)
             for joint_name, singe_joint_state in value.items():

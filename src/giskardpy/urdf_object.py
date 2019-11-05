@@ -572,12 +572,21 @@ class URDFObject(object):
         if link_name in self._urdf_robot.parent_map:
             return self._urdf_robot.parent_map[link_name][0]
 
+    def get_parent_joint_of_joint(self, joint_name):
+        return self.get_parent_joint_of_link(self.get_parent_link_of_joint(joint_name))
+
     def get_child_joints_of_link(self, link_name):
         if link_name in self._urdf_robot.child_map:
             return [x[0] for x in self._urdf_robot.child_map[link_name]]
 
     def get_parent_link_of_joint(self, joint_name):
         return self._urdf_robot.joint_map[joint_name].parent
+
+    def get_movable_parent_joint(self, link_name):
+        joint = self.get_parent_joint_of_link(link_name)
+        while self.is_joint_fixed(joint):
+            joint = self.get_parent_joint_of_joint(joint)
+        return joint
 
     def get_child_link_of_joint(self, joint_name):
         return self._urdf_robot.joint_map[joint_name].child

@@ -591,6 +591,37 @@ class TestCartGoals(object):
         zero_pose.check_cart_goal(zero_pose.r_tip, r_goal)
         zero_pose.check_cart_goal(zero_pose.l_tip, l_goal)
 
+    def test_cart_goal_2eef2(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        root = u'odom_combined'
+
+        p = PoseStamped()
+        p.header.stamp = rospy.get_rostime()
+        p.header.frame_id = zero_pose.r_tip
+        p.pose.position = Point(-0.1, 0, 0)
+        p.pose.orientation = Quaternion(0, 0, 0, 1)
+        zero_pose.allow_self_collision()
+        zero_pose.set_and_check_cart_goal(p, zero_pose.r_tip, root)
+
+        r_goal = PoseStamped()
+        r_goal.header.frame_id = zero_pose.r_tip
+        r_goal.header.stamp = rospy.get_rostime()
+        r_goal.pose.position = Point(0, -0.1, 0)
+        r_goal.pose.orientation = Quaternion(0, 0, 0, 1)
+        zero_pose.set_cart_goal(r_goal, zero_pose.r_tip, root)
+        l_goal = PoseStamped()
+        l_goal.header.frame_id = zero_pose.l_tip
+        l_goal.header.stamp = rospy.get_rostime()
+        l_goal.pose.position = Point(-0.05, 0, 0)
+        l_goal.pose.orientation = Quaternion(0, 0, 0, 1)
+        zero_pose.set_cart_goal(l_goal, zero_pose.l_tip, root)
+        zero_pose.allow_self_collision()
+        zero_pose.send_and_check_goal()
+        zero_pose.check_cart_goal(zero_pose.r_tip, r_goal)
+        zero_pose.check_cart_goal(zero_pose.l_tip, l_goal)
+
     def test_weird_wiggling(self, zero_pose):
         """
         :type zero_pose: PR2
@@ -682,6 +713,22 @@ class TestCartGoals(object):
         p.pose.orientation.w = 1
         zero_pose.set_cart_goal(p, zero_pose.r_tip, zero_pose.default_root)
         zero_pose.send_and_check_goal()
+
+    def test_endless_wiggling2(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        cartesian_goal.root_link = 'torso_lift_link'
+        cartesian_goal.tip_link = 'l_gripper_tool_frame'
+
+        cartesian_goal.goal.header.frame_id = 'base_link'
+        cartesian_goal.goal.pose.position.x = 0.4
+        cartesian_goal.goal.pose.position.y = 0.5
+        cartesian_goal.goal.pose.position.z = 1
+        cartesian_goal.goal.pose.orientation.x = 0
+        cartesian_goal.goal.pose.orientation.y = 0
+        cartesian_goal.goal.pose.orientation.z = 1
+        cartesian_goal.goal.pose.orientation.w = 0
 
     def test_root_link_not_equal_chain_root(self, zero_pose):
         """

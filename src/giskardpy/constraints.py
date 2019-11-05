@@ -193,14 +193,14 @@ class JointPositionList(Constraint):
         return soft_constraints
 
 
-class CartesianConstraint(Constraint):
+class BasicCartesianConstraint(Constraint):
     goal = u'goal'
     weight = u'weight'
     gain = u'gain'
     max_speed = u'max_speed'
 
     def __init__(self, god_map, root_link, tip_link, goal, weight=HIGH_WEIGHT, gain=1, max_speed=0.1):
-        super(CartesianConstraint, self).__init__(god_map)
+        super(BasicCartesianConstraint, self).__init__(god_map)
         self.root = root_link
         self.tip = tip_link
         goal = convert_dictionary_to_ros_message(u'geometry_msgs/PoseStamped', goal)
@@ -228,11 +228,11 @@ class CartesianConstraint(Constraint):
         return self.get_input_PoseStamped(self.goal)
 
     def __str__(self):
-        s = super(CartesianConstraint, self).__str__()
+        s = super(BasicCartesianConstraint, self).__str__()
         return u'{}/{}/{}'.format(s, self.root, self.tip)
 
 
-class CartesianPosition(CartesianConstraint):
+class CartesianPosition(BasicCartesianConstraint):
 
     def get_constraint(self):
         """
@@ -294,7 +294,7 @@ class CartesianPosition(CartesianConstraint):
         return soft_constraints
 
 
-class CartesianPositionX(CartesianConstraint):
+class CartesianPositionX(BasicCartesianConstraint):
     def get_constraint(self):
         goal_position = w.position_of(self.get_goal_pose())
         weight = self.get_input_float(self.weight)
@@ -318,7 +318,7 @@ class CartesianPositionX(CartesianConstraint):
         return soft_constraints
 
 
-class CartesianPositionY(CartesianConstraint):
+class CartesianPositionY(BasicCartesianConstraint):
     def get_constraint(self):
         goal_position = w.position_of(self.get_goal_pose())
         weight = self.get_input_float(self.weight)
@@ -342,7 +342,7 @@ class CartesianPositionY(CartesianConstraint):
         return soft_constraints
 
 
-class CartesianOrientation(CartesianConstraint):
+class CartesianOrientation(BasicCartesianConstraint):
     def __init__(self, god_map, root_link, tip_link, goal, weight=HIGH_WEIGHT, gain=1, max_speed=0.5):
         super(CartesianOrientation, self).__init__(god_map, root_link, tip_link, goal, weight, gain, max_speed)
 
@@ -411,7 +411,7 @@ class CartesianOrientation(CartesianConstraint):
         return soft_constraints
 
 
-class CartesianOrientationSlerp(CartesianConstraint):
+class CartesianOrientationSlerp(BasicCartesianConstraint):
     def __init__(self, god_map, root_link, tip_link, goal, weight=HIGH_WEIGHT, gain=1, max_speed=1):
         super(CartesianOrientationSlerp, self).__init__(god_map, root_link, tip_link, goal, weight, gain, max_speed)
 
@@ -486,6 +486,26 @@ class CartesianOrientationSlerp(CartesianConstraint):
         return soft_constraints
 
 
+class CartesianPose(BasicCartesianConstraint):
+    # TODO do this with multi inheritance
+    goal = u'goal'
+    weight = u'weight'
+    gain = u'gain'
+    max_speed = u'max_speed'
+
+    def __init__(self, god_map, root_link, tip_link, goal, weight=HIGH_WEIGHT, gain=3, max_speed=0.1):
+        super(CartesianPose, self).__init__(god_map, root_link, tip_link, goal, weight, gain, max_speed)
+        self.constraints = []
+        self.constraints.append(CartesianPosition(god_map, root_link, tip_link, goal, weight, gain, max_speed))
+        self.constraints.append(CartesianOrientationSlerp(god_map, root_link, tip_link, goal, weight, gain, max_speed))
+
+    def get_constraint(self):
+        soft_constraints = OrderedDict()
+        for constraint in self.constraints:
+            soft_constraints.update(constraint.get_constraint())
+        return soft_constraints
+
+
 class ExternalCollisionAvoidance(Constraint):
     repel_speed = u'repel_speed'
     max_weight_distance = u'max_weight_distance'
@@ -497,10 +517,10 @@ class ExternalCollisionAvoidance(Constraint):
     B = u'B'
     C = u'C'
 
-    def __init__(self, god_map, link_name, repel_speed=0.5, max_weight_distance=0.0, low_weight_distance=0.01,
+    def __init__(self, god_map, joint_name, repel_speed=0.5, max_weight_distance=0.0, low_weight_distance=0.01,
                  zero_weight_distance=0.05, idx=0):
         super(ExternalCollisionAvoidance, self).__init__(god_map)
-        self.link_name = link_name
+        self.joint_name = joint_name
         self.robot_root = self.get_robot().get_root()
         self.robot_name = self.get_robot_unsafe().get_name()
         self.idx = idx
@@ -517,46 +537,45 @@ class ExternalCollisionAvoidance(Constraint):
                   self.C: C, }
         self.save_params_on_god_map(params)
 
-    def get_distance_to_closest_object(self, link_name):
+    def get_distance_to_closest_object(self):
         return self.get_god_map().to_symbol(identifier.closest_point + [u'get_external_collisions',
-                                                                        (link_name, self.robot_name),
+                                                                        (self.joint_name,),
                                                                         self.idx,
                                                                         u'min_dist'])
 
-    def get_contact_normal_on_b(self, link_name):
+    def get_contact_normal_on_b(self):
         return Vector3Input(self.god_map.to_symbol,
                             prefix=identifier.closest_point + [u'get_external_collisions',
-                                                               (link_name, self.robot_name),
+                                                               (self.joint_name,),
                                                                self.idx,
                                                                u'contact_normal']).get_expression()
 
-    def get_closest_point_on_a(self, link_name):
+    def get_closest_point_on_a(self):
         return Point3Input(self.god_map.to_symbol,
                            prefix=identifier.closest_point + [u'get_external_collisions',
-                                                              (link_name, self.robot_name),
+                                                              (self.joint_name,),
                                                               self.idx,
                                                               u'position_on_a']).get_expression()
 
-    def get_closest_point_on_b(self, link_name):
+    def get_closest_point_on_b(self):
         return Point3Input(self.god_map.to_symbol,
                            prefix=identifier.closest_point + [u'get_external_collisions',
-                                                              (link_name, self.robot_name),
+                                                              (self.joint_name,),
                                                               self.idx,
                                                               u'position_on_b']).get_expression()
 
-    def get_actual_distance(self, link_name):
+    def get_actual_distance(self):
         return self.god_map.to_symbol(identifier.closest_point + [u'get_external_collisions',
-                                                                  (link_name, self.robot_name),
+                                                                  (self.joint_name,),
                                                                   self.idx,
                                                                   u'contact_distance'])
 
     def get_constraint(self):
         soft_constraints = OrderedDict()
 
-        r_P_pa = self.get_closest_point_on_a(self.link_name)
-        # other_point = self.get_closest_point_on_b(self.link_name)
-        r_V_n = self.get_contact_normal_on_b(self.link_name)
-        actual_distance = self.get_actual_distance(self.link_name)
+        a_P_pa = self.get_closest_point_on_a()
+        r_V_n = self.get_contact_normal_on_b()
+        actual_distance = self.get_actual_distance()
         repel_speed = self.get_input_float(self.repel_speed)
         t = self.get_input_sampling_period()
         zero_weight_distance = self.get_input_float(self.zero_weight_distance)
@@ -564,10 +583,11 @@ class ExternalCollisionAvoidance(Constraint):
         B = self.get_input_float(self.B)
         C = self.get_input_float(self.C)
 
-        a_T_r = self.get_fk_evaluated(self.link_name, self.robot_root)
-        r_T_a = self.get_fk(self.robot_root, self.link_name)
+        # a_T_r = self.get_fk_evaluated(self.joint_name, self.robot_root)
+        child_link = self.get_robot().get_child_link_of_joint(self.joint_name)
+        r_T_a = self.get_fk(self.robot_root, child_link)
 
-        a_P_pa = w.dot(a_T_r, r_P_pa)
+        # a_P_pa = w.dot(a_T_r, r_P_pa)
 
         r_P_pa = w.dot(r_T_a, a_P_pa)
 
@@ -587,7 +607,7 @@ class ExternalCollisionAvoidance(Constraint):
 
     def __str__(self):
         s = super(ExternalCollisionAvoidance, self).__str__()
-        return u'{}/{}/{}'.format(s, self.link_name, self.idx)
+        return u'{}/{}/{}'.format(s, self.joint_name, self.idx)
 
 
 class SelfCollisionAvoidance(Constraint):

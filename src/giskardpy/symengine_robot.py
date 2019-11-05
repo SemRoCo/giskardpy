@@ -1,5 +1,6 @@
 import traceback
 from collections import namedtuple, OrderedDict, defaultdict
+from copy import deepcopy
 from itertools import combinations
 
 from geometry_msgs.msg import PoseStamped
@@ -190,7 +191,8 @@ class Robot(Backend):
             for joint_name in tip_chain:
                 fk = w.dot(fk, self.get_joint_frame(joint_name))
             self._fk_expressions[root_link, tip_link] = fk
-        return self._fk_expressions[root_link, tip_link]
+            # FIXME there is some reference fuckup going on, but i don't know where; deepcopy is just a quick fix
+        return deepcopy(self._fk_expressions[root_link, tip_link])
 
     def get_fk_pose(self, root, tip):
         try:

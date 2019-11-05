@@ -66,6 +66,11 @@ class NullContextManager(object):
     def __exit__(self, *args):
         pass
 
+def np_vector(x,y,z):
+    return np.array([x,y,z,0])
+
+def np_point(x,y,z):
+    return np.array([x,y,z,1])
 
 class KeyDefaultDict(defaultdict):
     """

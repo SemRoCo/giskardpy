@@ -172,7 +172,7 @@ class TestSymengineController(object):
         :return:
         """
         kdl = KDL(pr2_urdf())
-        root = u'base_link'
+        root = u'odom_combined'
         tips = [u'l_gripper_tool_frame', u'r_gripper_tool_frame']
         for tip in tips:
             kdl_r = kdl.get_robot(root, tip)

@@ -9,7 +9,7 @@ import giskardpy.identifier as identifier
 from giskardpy.data_types import ClosestPointInfo, Collisions
 from giskardpy.plugin import GiskardBehavior
 from giskardpy.tfwrapper import msg_to_kdl
-
+import numpy as np
 
 class CPIMarker(GiskardBehavior):
     def setup(self, timeout=10.0):
@@ -42,18 +42,18 @@ class CPIMarker(GiskardBehavior):
         # TODO make namespace parameter
         m.ns = u'pybullet collisions'
         m.scale = Vector3(0.003, 0, 0)
-        if len(collisions.data) > 0:
-            for collision_infos in collisions.data.values():  # type: list
-                if len(collision_infos) > 0:
-                    collision_info = collision_infos[0]
+        if len(collisions.items()) > 0:
+            for collision_info in collisions.items():  # type: list
+                # if len(collision_infos) > 0:
+                #     collision_info = collision_infos[0]
                     red_threshold = collision_info.min_dist
                     yellow_threshold = red_threshold * 2
                     green_threshold = red_threshold * 3
 
                     if collision_info.contact_distance < green_threshold:
-                        # root_T_link = self.get_robot().get_fk_pose(self.get_robot().get_root(), collision_info.link_a)
-                        # a__root = msg_to_kdl(root_T_link) * PyKDL.Vector(*collision_info.position_on_a)
-                        m.points.append(Point(*collision_info.position_on_a))
+                        root_T_link = self.get_robot().get_fk_np(self.get_robot().get_root(), collision_info.frame)
+                        a__root = np.dot(root_T_link, np.concatenate((collision_info.position_on_a, [1])))[:-1]
+                        m.points.append(Point(*a__root))
                         m.points.append(Point(*collision_info.position_on_b))
                         m.colors.append(ColorRGBA(0, 1, 0, 1))
                         m.colors.append(ColorRGBA(0, 1, 0, 1))

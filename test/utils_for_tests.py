@@ -137,7 +137,7 @@ def pr2_joint_state(draw):
 
 
 def pr2_urdf():
-    with open(u'urdfs/pr2.urdf', u'r') as f:
+    with open(u'urdfs/pr2_with_base.urdf', u'r') as f:
         urdf_string = f.read()
     return urdf_string
 

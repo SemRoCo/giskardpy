@@ -393,7 +393,10 @@ class URDFObject(object):
         return URDFObject.from_parts(joint_name, tree_links, tree_joints)
 
     def get_urdf_joint(self, joint_name):
-        return self._urdf_robot.joint_map[joint_name]
+        try:
+            return self._urdf_robot.joint_map[joint_name]
+        except :
+            pass
 
     def get_urdf_link(self, link_name):
         return self._urdf_robot.link_map[link_name]

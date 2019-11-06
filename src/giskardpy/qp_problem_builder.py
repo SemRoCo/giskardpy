@@ -49,8 +49,9 @@ class QProblemBuilder(object):
         self.shape1 = len(self.hard_constraints_dict) + len(self.soft_constraints_dict)
         self.shape2 = len(self.joint_constraints_dict) + len(self.soft_constraints_dict)
 
-        self.qp_solver = QPSolver(len(self.joint_constraints_dict) + len(self.soft_constraints_dict),
-                                  len(self.hard_constraints_dict) + len(self.soft_constraints_dict))
+        self.qp_solver = QPSolver(len(self.hard_constraints_dict),
+                                  len(self.joint_constraints_dict),
+                                  len(self.soft_constraints_dict))
         self.lbAs = None  # for debugging purposes
 
     def get_expr(self):
@@ -160,8 +161,8 @@ class QProblemBuilder(object):
         lbA = []
         weights = []
         xdot = []
-        if xdot_full is not None:
-            A_dot_x = np_A.dot(xdot_full)
+        # if xdot_full is not None:
+        #     A_dot_x = np_A.dot(xdot_full)
         for iJ, k in enumerate(self.joint_constraints_dict.keys()):
             key = 'j -- ' + str(k)
             lb.append(key)
@@ -190,16 +191,16 @@ class QProblemBuilder(object):
             key = 's -- ' + str(k)
             lbA.append(key)
             weights.append(key)
-            xdot.append(key)
+            # xdot.append(key)
         p_lb = pd.DataFrame(np_lb[:-len(self.soft_constraints_dict)], lb).sort_index()
         p_ub = pd.DataFrame(np_ub[:-len(self.soft_constraints_dict)], lb).sort_index()
         p_lbA = pd.DataFrame(np_lbA, lbA).sort_index()
-        if xdot_full is not None:
-            p_A_dot_x = pd.DataFrame(A_dot_x, lbA).sort_index()
+        # if xdot_full is not None:
+        #     p_A_dot_x = pd.DataFrame(A_dot_x, lbA).sort_index()
         p_ubA = pd.DataFrame(np_ubA, lbA).sort_index()
         p_weights = pd.DataFrame(np_H.dot(np.ones(np_H.shape[0])), weights).sort_index()
         if xdot_full is not None:
-            p_xdot = pd.DataFrame(xdot_full, xdot).sort_index()
+            p_xdot = pd.DataFrame(xdot_full[:len(xdot)], xdot).sort_index()
         p_A = pd.DataFrame(np_A, lbA, weights).sort_index(1).sort_index(0)
         if self.lbAs is None:
             self.lbAs = p_lbA

@@ -1,9 +1,6 @@
 from collections import OrderedDict, defaultdict
-from itertools import chain
 
-import numpy as np
-
-from giskardpy.tfwrapper import to_np
+from sortedcontainers import sortedlist, SortedKeyList
 
 
 class SingleJointState(object):
@@ -67,10 +64,11 @@ class Collisions(object):
         :type robot: giskardpy.symengine_robot.Robot
         """
         self.robot = robot
-        self.self_collisions = defaultdict(list)
-        self.external_collision = defaultdict(list)
+        self.self_collisions = defaultdict(lambda: SortedKeyList([self._default_collision('','','')]*20,
+                                                         key=lambda x: x.contact_distance))
+        self.external_collision = defaultdict(lambda: SortedKeyList([self._default_collision('','','')]*20,
+                                                            key=lambda x: x.contact_distance))
         self.all_collisions = set()
-        # self.key_to_key = defaultdict(set)
 
     def add(self, key, contact):
         """
@@ -83,20 +81,16 @@ class Collisions(object):
         self.all_collisions.add(contact)
 
         if body_b == self.robot.get_name():
-            self.self_collisions[key].append(contact)
-            self.self_collisions[key[:-1]].append(contact)
-            self.self_collisions[key[:-2]].append(contact)
-            self.self_collisions[key[0], key[2]].append(contact)
-            self.self_collisions[movable_joint].append(contact)
+            self.self_collisions[key].add(contact)
+            self.self_collisions[key[:-1]].add(contact)
+            self.self_collisions[key[:-2]].add(contact)
+            self.self_collisions[key[0], key[2]].add(contact)
+            self.self_collisions[movable_joint].add(contact)
         else:
-            self.external_collision[key].append(contact)
-            self.external_collision[key[:-1]].append(contact)
-            self.external_collision[key[:-2]].append(contact)
-            self.external_collision[movable_joint].append(contact)
-
-        # self.data[key].append(contact)
-        # self.key_to_key[(key[0],)].add(key)
-        # self.key_to_key[key[0], key[1]].add(key)
+            self.external_collision[key].add(contact)
+            self.external_collision[key[:-1]].add(contact)
+            self.external_collision[key[:-2]].add(contact)
+            self.external_collision[movable_joint].add(contact)
 
     def _default_collision(self, link_a, body_b, link_b):
         return ClosestPointInfo([0, 0, 0],
@@ -109,46 +103,20 @@ class Collisions(object):
                                 [0, 0, 1],
                                 (link_a, body_b, link_b))
 
-    def get(self, link_a, body_b=None, link_b=None):
-
-        if body_b is not None and link_b is not None:
-            r = self.external_collision[(link_a, body_b, link_b)]
-        elif body_b is not None and link_b is None:
-            r = []
-            for k in self.key_to_key[(link_a, body_b)]:
-                r.extend(self.external_collision[k])
-        else:
-            r = []
-            for k in self.key_to_key[(link_a,)]:
-                r.extend(self.external_collision[k])
-        if len(r) == 0:
-            return [self._default_collision(link_a, body_b, link_b)]
-        return list(sorted(r, key=lambda x: x.contact_distance))
+    def get(self, key):
+        if key in self.external_collision:
+            return self.external_collision[key]
+        elif key in self.self_collisions:
+            return self. self_collisions[key]
 
     def get_external_collisions(self, joint_name):
-        collisions = self.external_collision[joint_name]
-        if collisions:
-            r = collisions
-        else:
-            link_a = self.robot.get_child_link_of_joint(joint_name)
-            return [self._default_collision(link_a, None, None)]
-        # collisions = self.get(link_a)
-        # return [x for x in collisions if x.body_b != robot_name]
-        return list(sorted(r, key=lambda x: x.contact_distance))
+        return self.external_collision[joint_name]
 
     def get_self_collisions(self, link_a, link_b):
-        r = self.self_collisions[link_a, link_b]
-        if len(r) == 0:
-            return [self._default_collision(link_a, self.robot.get_name(), link_b)]
-        return list(sorted(r, key=lambda x: x.contact_distance))
-
-    # def __getitem__(self, item):
-    #     return self.get(*item)
+        return self.self_collisions[link_a, link_b]
 
     def __contains__(self, item):
         return item in self.self_collisions or item in self.external_collision
 
     def items(self):
-        # return chain(self.external_collision)
-        # return self.data.items()
         return self.all_collisions

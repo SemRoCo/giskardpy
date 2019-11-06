@@ -205,6 +205,7 @@ class Robot(Backend):
             pass
         return p
 
+    # @profile
     def get_fk_np(self, root, tip):
         try:
             return self._evaluated_fks[root, tip]

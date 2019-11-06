@@ -59,9 +59,10 @@ class PyBulletWorld(World):
             r_k = (link_b, body_b, robot_link)
             if r_k in checked_things:
                 if r_k in collisions:
-                    for c in collisions.get(*r_k):
-                        collisions.add(k, self.__flip_contact_info(c))
-                    # collisions.add(k, self.__flip_contact_info(collisions[r_k]))
+                    # FIXME might break in the future
+                    #  collisions always returns a list, where there are default collisions at the end
+                    #  ideally we want to only reverse the real collisions, right now this is just the first entry
+                    collisions.add(k, self.__flip_contact_info(collisions.get(r_k)[0]))
                 continue
             robot_link_id = self.robot.get_pybullet_link_id(robot_link)
             if self.robot.get_name() == body_b:

@@ -563,6 +563,7 @@ class TestCollisionAvoidanceGoals(object):
             u'ur5_shoulder_lift_joint': .5,
         }
         # zero_pose.wrapper.set_self_collision_distance(0.025)
+        zero_pose.allow_self_collision()
         zero_pose.send_and_check_joint_goal(goal_js)
 
         arm_goal = PoseStamped()

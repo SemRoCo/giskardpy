@@ -184,7 +184,7 @@ class PyBulletWorld(World):
         :param min_allowed_distance: (robot_link, body_b, link_b) -> min allowed distance
         :type min_allowed_distance: dict
         :return: robot_link -> ClosestPointInfo of closest thing
-        :rtype: dict
+        :rtype: Collisions
         """
         for collision in collisions.items():  # type: ClosestPointInfo
             if self.__should_flip_contact_info(collision):

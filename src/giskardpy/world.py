@@ -217,9 +217,6 @@ class World(object):
                             del min_allowed_distance[key2]
                 elif key in min_allowed_distance:
                     del min_allowed_distance[key]
-                    if collision_entry.body_b == self.robot.get_name():
-                        rev_key = (collision_entry.link_bs[0], collision_entry.body_b, collision_entry.robot_links[0])
-                        del min_allowed_distance[rev_key]
 
             elif self.is_avoid_collision(collision_entry):
                 min_allowed_distance[key] = min_dist[key[0]][u'zero_weight_distance']

@@ -10,7 +10,7 @@ from visualization_msgs.msg import Marker
 
 from giskardpy.exceptions import DuplicateNameException, UnknownBodyException, CorruptShapeException
 from giskardpy.utils import cube_volume, cube_surface, sphere_volume, cylinder_volume, cylinder_surface, \
-    suppress_stderr, msg_to_list, KeyDefaultDict, memoize3, memoize2
+    suppress_stderr, msg_to_list, KeyDefaultDict, memoize
 
 Joint = namedtuple('Joint', ['symbol', 'velocity_limit', 'lower', 'upper', 'type', 'frame'])
 
@@ -58,11 +58,15 @@ class URDFObject(object):
         with suppress_stderr():
             self._urdf_robot = up.URDF.from_xml_string(self.original_urdf)  # type: up.Robot
         self._link_to_marker = {}
-        self.root = self.calc_root()
         self.reset_cache()
 
     def reset_cache(self):
-        self._split_chain = KeyDefaultDict(self.__calc_get_split_chain)
+        for method_name in dir(self):
+            try:
+                getattr(self, method_name).memo.clear()
+            except:
+                pass
+
 
     @classmethod
     def from_urdf_file(cls, urdf_file, *args, **kwargs):
@@ -167,6 +171,7 @@ class URDFObject(object):
         """
         return cls(urdf_object.get_urdf_str(), *args, **kwargs)
 
+    @memoize
     def get_name(self):
         """
         :rtype: str
@@ -182,17 +187,15 @@ class URDFObject(object):
 
     # JOINT FUNCTIONS
 
+    @memoize
     def get_joint_names(self):
         """
         :rtype: list
         """
         return self._urdf_robot.joint_map.keys()
 
+    @memoize
     def get_split_chain(self, root, tip, joints=True, links=True, fixed=True):
-        return self._split_chain[root, tip, joints, links, fixed]
-
-    def __calc_get_split_chain(self, args):
-        root, tip, joints, links, fixed = args
         if root == tip:
             return [], [], []
         root_chain = self._urdf_robot.get_chain(self.get_root(), root, False, True, True)
@@ -212,13 +215,16 @@ class URDFObject(object):
             tip_chain = tip_chain[1:]
         return root_chain, [connection] if links else [], tip_chain
 
+    @memoize
     def get_chain(self, root, tip, joints=True, links=True, fixed=True):
         root_chain, connection, tip_chain = self.get_split_chain(root, tip, joints, links, fixed)
         return root_chain + connection + tip_chain
 
+    @memoize
     def get_connecting_link(self, link1, link2):
         return self.get_split_chain(link1, link2, joints=False)[1][0]
 
+    @memoize
     def get_joint_names_from_chain(self, root_link, tip_link):
         """
         :rtype root: str
@@ -227,6 +233,7 @@ class URDFObject(object):
         """
         return self.get_chain(root_link, tip_link, True, False, True)
 
+    @memoize
     def get_joint_names_from_chain_controllable(self, root_link, tip_link):
         """
         :rtype root: str
@@ -235,6 +242,7 @@ class URDFObject(object):
         """
         return self.get_chain(root_link, tip_link, True, False, False)
 
+    @memoize
     def get_joint_names_controllable(self):
         """
         :return: returns the names of all movable joints which are not mimic.
@@ -242,6 +250,7 @@ class URDFObject(object):
         """
         return [joint_name for joint_name in self.get_joint_names() if self.is_joint_controllable(joint_name)]
 
+    @memoize
     def get_all_joint_limits(self):
         """
         :return: dict mapping joint names to tuple containing lower and upper limits
@@ -250,6 +259,7 @@ class URDFObject(object):
         return {joint_name: self.get_joint_limits(joint_name) for joint_name in self.get_joint_names()
                 if self.is_joint_controllable(joint_name)}
 
+    @memoize
     def get_joint_limits(self, joint_name):
         """
         Returns joint limits specified in the safety controller entry if given, else returns the normal limits.
@@ -270,6 +280,7 @@ class URDFObject(object):
             except AttributeError:
                 return None, None
 
+    @memoize
     def get_joint_velocity_limit(self, joint_name):
         limit = self._urdf_robot.joint_map[joint_name].limit
         if limit is None or limit.velocity is None:
@@ -277,10 +288,12 @@ class URDFObject(object):
         else:
             return limit.velocity
 
+    @memoize
     def get_joint_axis(self, joint_name):
         joint = self.get_urdf_joint(joint_name)
         return joint.axis
 
+    @memoize
     def is_joint_controllable(self, name):
         """
         :param name: name of the joint in the urdfs
@@ -291,6 +304,7 @@ class URDFObject(object):
         joint = self.get_urdf_joint(name)
         return joint.type in MOVABLE_JOINT_TYPES and joint.mimic is None
 
+    @memoize
     def is_joint_mimic(self, name):
         """
         :param name: name of the joint in the urdfs
@@ -300,12 +314,15 @@ class URDFObject(object):
         joint = self.get_urdf_joint(name)
         return joint.type in MOVABLE_JOINT_TYPES and joint.mimic is not None
 
+    @memoize
     def has_joint(self, name):
         return name in self._urdf_robot.joint_map
 
+    @memoize
     def has_link(self, name):
         return name in self._urdf_robot.link_map
 
+    @memoize
     def is_joint_continuous(self, name):
         """
         :param name: name of the joint in the urdfs
@@ -314,6 +331,7 @@ class URDFObject(object):
         """
         return self.get_joint_type(name) == CONTINUOUS_JOINT
 
+    @memoize
     def is_joint_fixed(self, name):
         """
         :param name: name of the joint in the urdfs
@@ -322,20 +340,25 @@ class URDFObject(object):
         """
         return self.get_joint_type(name) == FIXED_JOINT
 
+    @memoize
     def get_joint_type(self, name):
         return self.get_urdf_joint(name).type
 
+    @memoize
     def is_joint_type_supported(self, name):
         return self.get_joint_type(name) in JOINT_TYPES
 
+    @memoize
     def is_rotational_joint(self, name):
         return self.get_joint_type(name) in ROTATIONAL_JOINT_TYPES
 
+    @memoize
     def is_translational_joint(self, name):
         return self.get_joint_type(name) in TRANSLATIONAL_JOINT_TYPES
 
     # LINK FUNCTIONS
 
+    @memoize
     def get_link_names_from_chain(self, root_link, tip_link):
         """
         :type root_link: str
@@ -345,12 +368,14 @@ class URDFObject(object):
         """
         return self._urdf_robot.get_chain(root_link, tip_link, False, True, False)
 
+    @memoize
     def get_link_names(self):
         """
         :rtype: dict
         """
         return self._urdf_robot.link_map.keys()
 
+    @memoize
     def get_sub_tree_link_names_with_collision(self, root_joint):
         """
         returns a set of links with
@@ -365,15 +390,19 @@ class URDFObject(object):
         sub_tree = self.get_links_from_sub_tree(root_joint)
         return [link_name for link_name in sub_tree if self.has_link_collision(link_name)]
 
+    @memoize
     def get_link_names_with_collision(self):
         return [link_name for link_name in self.get_link_names() if self.has_link_collision(link_name)]
 
+    @memoize
     def get_links_from_sub_tree(self, joint_name):
         return self.get_sub_tree_at_joint(joint_name).get_link_names()
 
+    @memoize
     def get_links_with_collision(self):
         return [x for x in self.get_link_names() if self.has_link_collision(x)]
 
+    @memoize
     def get_sub_tree_at_joint(self, joint_name):
         """
         :type joint_name: str
@@ -392,18 +421,21 @@ class URDFObject(object):
 
         return URDFObject.from_parts(joint_name, tree_links, tree_joints)
 
+    @memoize
     def get_urdf_joint(self, joint_name):
         try:
             return self._urdf_robot.joint_map[joint_name]
         except :
             pass
 
+    @memoize
     def get_urdf_link(self, link_name):
         return self._urdf_robot.link_map[link_name]
 
     def split_at_link(self, link_name):
         pass
 
+    @memoize
     def has_link_collision(self, link_name, volume_threshold=1e-6, surface_threshold=1e-4):
         """
         :type link: str
@@ -425,16 +457,15 @@ class URDFObject(object):
                    isinstance(geo, up.Mesh)
         return False
 
+    @memoize
     def get_urdf_str(self):
         return self._urdf_robot.to_xml_string()
 
+    @memoize
     def get_root(self):
-        return self.root
+        return self._urdf_robot.get_root()
 
-    def calc_root(self):
-        self.root = self._urdf_robot.get_root()
-        return self.root
-
+    @memoize
     def get_first_link_with_collision(self):
         l = self.get_root()
         while not self.has_link_collision(l):
@@ -449,6 +480,7 @@ class URDFObject(object):
                 l = children[0]
         return l
 
+    @memoize
     def get_non_base_movement_root(self):
         l = self.get_root()
         result = self.__get_non_base_movement_root_helper(l)
@@ -524,6 +556,7 @@ class URDFObject(object):
             pass
         self.reinitialize()
 
+    @memoize
     def get_joint_origin(self, joint_name):
         origin = self.get_urdf_joint(joint_name).origin
         p = Pose()
@@ -563,41 +596,51 @@ class URDFObject(object):
         # TODO should this really be a class function?
         return u'{}'.format(name)
 
+    @memoize
     def get_parent_link_of_link(self, link_name):
         if link_name in self._urdf_robot.parent_map:
             return self._urdf_robot.parent_map[link_name][1]
 
+    @memoize
     def get_child_links_of_link(self, link_name):
         if link_name in self._urdf_robot.child_map:
             return [x[1] for x in self._urdf_robot.child_map[link_name]]
 
+    @memoize
     def get_parent_joint_of_link(self, link_name):
         if link_name in self._urdf_robot.parent_map:
             return self._urdf_robot.parent_map[link_name][0]
 
+    @memoize
     def get_parent_joint_of_joint(self, joint_name):
         return self.get_parent_joint_of_link(self.get_parent_link_of_joint(joint_name))
 
+    @memoize
     def get_child_joints_of_link(self, link_name):
         if link_name in self._urdf_robot.child_map:
             return [x[0] for x in self._urdf_robot.child_map[link_name]]
 
+    @memoize
     def get_parent_link_of_joint(self, joint_name):
         return self._urdf_robot.joint_map[joint_name].parent
 
+    @memoize
     def get_movable_parent_joint(self, link_name):
         joint = self.get_parent_joint_of_link(link_name)
         while self.is_joint_fixed(joint):
             joint = self.get_parent_joint_of_joint(joint)
         return joint
 
+    @memoize
     def get_child_link_of_joint(self, joint_name):
         return self._urdf_robot.joint_map[joint_name].child
 
+    @memoize
     def are_linked(self, link_a, link_b):
         return link_a == self.get_parent_link_of_link(link_b) or \
                (link_b == self.get_parent_link_of_link(link_a))
 
+    @memoize
     def get_controllable_joints(self):
         return [joint_name for joint_name in self.get_joint_names() if self.is_joint_controllable(joint_name)]
 
@@ -608,6 +651,7 @@ class URDFObject(object):
         """
         return o.get_urdf_str() == self.get_urdf_str()
 
+    @memoize
     def has_link_visuals(self, link_name):
         link = self._urdf_robot.link_map[link_name]
         return link.visual is not None

@@ -1,6 +1,10 @@
 from __future__ import division
 
 import errno
+import pickle
+from functools import wraps
+
+import cPickle
 import numpy as np
 import os
 import pkg_resources
@@ -748,43 +752,18 @@ def str_to_unique_number(s):
     # FIXME not actually unique
     return sum(ord(x) for x in s)
 
-def memoize1(f):
-    """ Memoization decorator for a function taking a single argument """
-    class memodict(dict):
-        def __missing__(self, key):
-            ret = self[key] = f(key)
-            return ret
-    return memodict().__getitem__
 
-def memoize2(f):
-    """ Memoization decorator for functions taking one or more arguments. """
-    class memodict(dict):
-        def __init__(self, f):
-            self.f = f
-        def __call__(self, *args):
-            return self[args]
-        def __missing__(self, key):
-            ret = self[key] = self.f(*key)
-            return ret
-    return memodict(f)
-
-
-def memoize3(f):
-    """ Memoization decorator for a function taking one or more arguments. """
-    class memodict(dict):
-        def __getitem__(self, *key):
-            return dict.__getitem__(self, key)
-
-        def __missing__(self, key):
-            ret = self[key] = f(*key)
-            return ret
-
-    return memodict().__getitem__
-
-def memoize4(f):
-  class memodict(dict):
-      __slots__ = ()
-      def __missing__(self, key):
-          self[key] = ret = f(key)
-          return ret
-  return memodict().__getitem__
+def memoize(function):
+    memo = function.memo = {}
+    @wraps(function)
+    def wrapper(*args, **kwargs):
+        # key = cPickle.dumps((args, kwargs))
+        # key = pickle.dumps((args, sorted(kwargs.items()), -1))
+        key = (args, frozenset(kwargs.items()))
+        try:
+            return memo[key]
+        except KeyError:
+            rv = function(*args, **kwargs)
+            memo[key] = rv
+            return rv
+    return wrapper

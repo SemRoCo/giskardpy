@@ -70,6 +70,7 @@ class Collisions(object):
                                                             key=lambda x: x.contact_distance))
         self.all_collisions = set()
 
+    # @profile
     def add(self, key, contact):
         """
         :type key: list
@@ -82,14 +83,14 @@ class Collisions(object):
 
         if body_b == self.robot.get_name():
             self.self_collisions[key].add(contact)
-            self.self_collisions[key[:-1]].add(contact)
-            self.self_collisions[key[:-2]].add(contact)
+            # self.self_collisions[key[:-1]].add(contact)
+            # self.self_collisions[key[:-2]].add(contact)
             self.self_collisions[key[0], key[2]].add(contact)
-            self.self_collisions[movable_joint].add(contact)
+            # self.self_collisions[movable_joint].add(contact)
         else:
             self.external_collision[key].add(contact)
-            self.external_collision[key[:-1]].add(contact)
-            self.external_collision[key[:-2]].add(contact)
+            # self.external_collision[key[:-1]].add(contact)
+            # self.external_collision[key[:-2]].add(contact)
             self.external_collision[movable_joint].add(contact)
 
     def _default_collision(self, link_a, body_b, link_b):

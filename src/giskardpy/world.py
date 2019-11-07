@@ -458,7 +458,7 @@ class World(object):
                and self.all_link_bs(collision_entry)
 
     
-
+    # @profile
     def transform_contact_info(self, collisions):
         root_T_map = to_np(self.robot.root_T_map)
         for contact_info in collisions.items():  # type: ClosestPointInfo
@@ -469,7 +469,7 @@ class World(object):
             f_T_r = self.robot.get_fk_np(f, self.robot.get_root())
             contact_info.frame = f
 
-            f_P_pa = np.linalg.multi_dot((f_T_r, root_T_map, np_point(*contact_info.position_on_a)))
+            f_P_pa = np.dot(np.dot(f_T_r, root_T_map), np_point(*contact_info.position_on_a))
             r_P_pb = np.dot(root_T_map, np_point(*contact_info.position_on_b))
             r_V_n = np.dot(root_T_map, np_vector(*contact_info.contact_normal))
             contact_info.position_on_a = f_P_pa[:-1]

@@ -119,7 +119,7 @@ class GoalToConstraints(GetGoal):
         """
         soft_constraints = {}
         for joint_name in self.get_robot().get_controllable_joints():
-            for i in range(5):
+            for i in range(1):
                 constraint = ExternalCollisionAvoidance(self.god_map, joint_name,
                                                     max_weight_distance=self.get_god_map().safe_get_data(
                                                     identifier.collisions_distances +
@@ -133,6 +133,10 @@ class GoalToConstraints(GetGoal):
                                                     idx=i)
                 soft_constraints.update(constraint.get_constraint())
         for link_a, link_b in self.get_robot().get_self_collision_matrix():
+            if link_a > link_b:
+                tmp = link_a
+                link_a = link_b
+                link_b = tmp
             max_weight_distance = min(self.get_god_map().safe_get_data(identifier.collisions_distances +
                                                                        [link_a, u'max_weight_distance']),
                                       self.get_god_map().safe_get_data(identifier.collisions_distances +

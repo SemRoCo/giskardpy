@@ -41,7 +41,6 @@ class PyBulletWorld(World):
     def __get_pybullet_object_id(self, name):
         return self.get_object(name).get_pybullet_id()
 
-    # @profile
     def check_collisions(self, cut_off_distances):
         """
         :param cut_off_distances: (robot_link, body_b, link_b) -> cut off distance. Contacts between objects not in this
@@ -54,26 +53,18 @@ class PyBulletWorld(World):
         :rtype: dict
         """
         collisions = Collisions(self.robot)
-        checked_things = set()
-        for k, distance in cut_off_distances.items():
-            (robot_link, body_b, link_b) = k
-            r_k = (link_b, body_b, robot_link)
-            if r_k in checked_things:
-                if r_k in collisions:
-                    # FIXME might break in the future
-                    #  collisions always returns a list, where there are default collisions at the end
-                    #  ideally we want to only reverse the real collisions, right now this is just the first entry
-                    collisions.add(k, self.__flip_contact_info(collisions.get(r_k)[0]))
-                continue
-            robot_link_id = self.robot.get_pybullet_link_id(robot_link)
-            if self.robot.get_name() == body_b:
+        robot_name = self.robot.get_name()
+        for (robot_link, body_b, link_b), distance in cut_off_distances.items():
+            if robot_name == body_b:
                 object_id = self.robot.get_pybullet_id()
                 link_b_id = self.robot.get_pybullet_link_id(link_b)
             else:
                 object_id = self.__get_pybullet_object_id(body_b)
                 if link_b != CollisionEntry.ALL:
                     link_b_id = self.get_object(body_b).get_pybullet_link_id(link_b)
-            if body_b == self.robot.get_name() or link_b != CollisionEntry.ALL:
+
+            robot_link_id = self.robot.get_pybullet_link_id(robot_link)
+            if body_b == robot_name or link_b != CollisionEntry.ALL:
                 contacts = [ContactInfo(*x) for x in p.getClosestPoints(self.robot.get_pybullet_id(), object_id,
                                                                         distance * 3,
                                                                         robot_link_id, link_b_id)]
@@ -87,14 +78,11 @@ class PyBulletWorld(World):
                 except KeyError:
                     body_b_object = self.robot
                 for contact in contacts:
-
-                    if k[2] == u'':
+                    if link_b == CollisionEntry.ALL:
                         link_b = body_b_object.pybullet_link_id_to_name(contact.link_index_b)
-                        k2 = (k[0], k[1], link_b)
-
-                    else:
-                        k2 = k
-                    collisions.add(k2, ClosestPointInfo(contact.position_on_a,
+                    k = (robot_link, body_b, link_b)
+                    collisions.add(k,
+                                   ClosestPointInfo(contact.position_on_a,
                                                         contact.position_on_b,
                                                         contact.contact_distance,
                                                         distance,
@@ -102,9 +90,7 @@ class PyBulletWorld(World):
                                                         body_b,
                                                         link_b,
                                                         contact.contact_normal_on_b,
-                                                        k2))
-                pass
-            checked_things.add(k)
+                                                        k))
         return collisions
 
     # @profile

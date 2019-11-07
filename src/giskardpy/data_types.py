@@ -1,6 +1,6 @@
 from collections import OrderedDict, defaultdict
 
-from sortedcontainers import sortedlist, SortedKeyList
+from sortedcontainers import SortedKeyList
 
 
 class SingleJointState(object):
@@ -64,13 +64,22 @@ class Collisions(object):
         :type robot: giskardpy.symengine_robot.Robot
         """
         self.robot = robot
-        self.self_collisions = defaultdict(lambda: SortedKeyList([self._default_collision('','','')]*20,
-                                                         key=lambda x: x.contact_distance))
-        self.external_collision = defaultdict(lambda: SortedKeyList([self._default_collision('','','')]*20,
-                                                            key=lambda x: x.contact_distance))
+
+        # FIXME I'm assuming that self collisions only has collisions for pairs of objects
+        #   which results in a list of length 1 always, which is why I don't sort to safe time
+        #   I start with a list of default collisions in case there was none
+        def f1():
+            return [self._default_collision('', '', '')]
+
+        self.self_collisions = defaultdict(f1)
+
+        def f2():
+            return SortedKeyList([self._default_collision('', '', '')] * 20,
+                                 key=lambda x: x.contact_distance)
+
+        self.external_collision = defaultdict(f2)
         self.all_collisions = set()
 
-    # @profile
     def add(self, key, contact):
         """
         :type key: list
@@ -82,13 +91,13 @@ class Collisions(object):
         self.all_collisions.add(contact)
 
         if body_b == self.robot.get_name():
-            self.self_collisions[key].add(contact)
+            # self.self_collisions[key].add(contact)
             # self.self_collisions[key[:-1]].add(contact)
             # self.self_collisions[key[:-2]].add(contact)
-            self.self_collisions[key[0], key[2]].add(contact)
+            self.self_collisions[key[0], key[2]].insert(0, contact)
             # self.self_collisions[movable_joint].add(contact)
         else:
-            self.external_collision[key].add(contact)
+            # self.external_collision[key].add(contact)
             # self.external_collision[key[:-1]].add(contact)
             # self.external_collision[key[:-2]].add(contact)
             self.external_collision[movable_joint].add(contact)
@@ -104,16 +113,29 @@ class Collisions(object):
                                 [0, 0, 1],
                                 (link_a, body_b, link_b))
 
-    def get(self, key):
-        if key in self.external_collision:
-            return self.external_collision[key]
-        elif key in self.self_collisions:
-            return self. self_collisions[key]
+    # def get(self, key):
+    #     if key in self.external_collision:
+    #         return self.external_collision[key]
+    #     elif key in self.self_collisions:
+    #         return self. self_collisions[key]
 
     def get_external_collisions(self, joint_name):
+        """
+        Collisions are saved as a list for each movable robot joint, sorted by contact distance
+        :type joint_name: str
+        :rtype: ClosestPointInfo
+        """
         return self.external_collision[joint_name]
 
     def get_self_collisions(self, link_a, link_b):
+        """
+        Make sure that link_a < link_b, the reverse collision is not saved.
+        :type link_a: str
+        :type link_b: str
+        :return:
+        :rtype: ClosestPointInfo
+        """
+        # FIXME maybe check for reverse key?
         return self.self_collisions[link_a, link_b]
 
     def __contains__(self, item):

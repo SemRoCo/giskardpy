@@ -676,7 +676,6 @@ class SelfCollisionAvoidance(Constraint):
         B = self.get_input_float(self.B)
         C = self.get_input_float(self.C)
 
-        # a_T_r = self.get_fk_evaluated(self.link_a, self.robot_root)
         r_T_b = self.get_fk_evaluated(self.robot_root, self.link_b)
 
         movable_joint = self.get_robot().get_movable_parent_joint(self.link_a)

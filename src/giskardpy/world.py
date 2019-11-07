@@ -187,8 +187,11 @@ class World(object):
         collision_matrix = self.robot.get_self_collision_matrix()
         collision_matrix2 = {}
         for link1, link2 in collision_matrix:
-            collision_matrix2[link1, robot_name, link2] = min_dist[link1][u'zero_weight_distance']
-            collision_matrix2[link2, robot_name, link1] = min_dist[link1][u'zero_weight_distance']
+            # FIXME should I use the minimum of both distances?
+            if link1 < link2:
+                collision_matrix2[link1, robot_name, link2] = min_dist[link1][u'zero_weight_distance']
+            else:
+                collision_matrix2[link2, robot_name, link1] = min_dist[link1][u'zero_weight_distance']
         return collision_matrix2
 
     def collision_goals_to_collision_matrix(self, collision_goals, min_dist):

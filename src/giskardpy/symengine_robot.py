@@ -185,15 +185,13 @@ class Robot(Backend):
         :return: 4d matrix describing the transformation from root_link to tip_link
         :rtype: spw.Matrix
         """
-        # if (root_link, tip_link) not in self._fk_expressions:
         fk = w.eye(4)
         root_chain, _, tip_chain = self.get_split_chain(root_link, tip_link, links=False)
         for joint_name in root_chain:
             fk = w.dot(fk, w.inverse_frame(self.get_joint_frame(joint_name)))
         for joint_name in tip_chain:
             fk = w.dot(fk, self.get_joint_frame(joint_name))
-        # self._fk_expressions[root_link, tip_link] = fk
-            # FIXME there is some reference fuckup going on, but i don't know where; deepcopy is just a quick fix
+        # FIXME there is some reference fuckup going on, but i don't know where; deepcopy is just a quick fix
         return deepcopy(fk)
 
     def get_fk_pose(self, root, tip):
@@ -209,12 +207,7 @@ class Robot(Backend):
 
     @memoize
     def get_fk_np(self, root, tip):
-        # try:
-        #     return self._evaluated_fks[root, tip]
-        # except KeyError:
         return self._fks[root, tip](**self.get_joint_state_positions())
-        # self._evaluated_fks[root, tip] = homo_m
-        # return homo_m
 
     def init_fast_fks(self):
         def f(key):

@@ -457,7 +457,6 @@ class URDFObject(object):
                    isinstance(geo, up.Mesh)
         return False
 
-    @memoize
     def get_urdf_str(self):
         return self._urdf_robot.to_xml_string()
 

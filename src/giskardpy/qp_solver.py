@@ -22,6 +22,7 @@ class QPSolver(object):
         self.j = j
         self.s = s
         self.started = False
+        self.shape = (0,0)
         pass
 
     def init(self, dim_a, dim_b):
@@ -68,6 +69,9 @@ class QPSolver(object):
         ub = ub[j_mask]
         H = H[j_mask][:,j_mask]
         g = np.zeros(H.shape[0])
+        if A.shape != self.shape:
+            self.started = False
+            self.shape = A.shape
 
         number_of_retries = 2
         while number_of_retries > 0:

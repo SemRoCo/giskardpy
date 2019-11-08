@@ -434,6 +434,7 @@ class TestConstraints(object):
 class TestCartGoals(object):
 
     def test_wiggle(self, kitchen_setup):
+        #FIXME
         tray_name = u'tray'
 
         tray_pose = PoseStamped()

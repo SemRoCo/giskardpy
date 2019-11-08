@@ -434,15 +434,10 @@ class TestConstraints(object):
 class TestCartGoals(object):
 
     def test_wiggle(self, kitchen_setup):
-        #FIXME
-        tray_name = u'tray'
-
         tray_pose = PoseStamped()
         tray_pose.header.frame_id = u'iai_kitchen/sink_area_surface'
         tray_pose.pose.position = Point(0.1, -0.4, 0.07)
         tray_pose.pose.orientation.w = 1
-
-        # kitchen_setup.add_box(tray_name, [.2,.4,.1], tray_pose)
 
         l_goal = deepcopy(tray_pose)
         l_goal.pose.position.y -= 0.18
@@ -463,7 +458,7 @@ class TestCartGoals(object):
         kitchen_setup.set_cart_goal(l_goal, kitchen_setup.l_tip)
         kitchen_setup.set_cart_goal(r_goal, kitchen_setup.r_tip)
         # kitchen_setup.allow_collision([], tray_name, [])
-        kitchen_setup.send_and_check_goal(expected_error_code=MoveResult.INSOLVABLE)
+        kitchen_setup.send_and_check_goal()
 
     def test_rotate_gripper(self, zero_pose):
         """

@@ -433,33 +433,6 @@ class TestConstraints(object):
 
 class TestCartGoals(object):
 
-    def test_wiggle(self, kitchen_setup):
-        tray_pose = PoseStamped()
-        tray_pose.header.frame_id = u'iai_kitchen/sink_area_surface'
-        tray_pose.pose.position = Point(0.1, -0.4, 0.07)
-        tray_pose.pose.orientation.w = 1
-
-        l_goal = deepcopy(tray_pose)
-        l_goal.pose.position.y -= 0.18
-        l_goal.pose.position.z += 0.05
-        l_goal.pose.orientation = Quaternion(*quaternion_from_matrix([[0, -1, 0, 0],
-                                                                      [1, 0, 0, 0],
-                                                                      [0, 0, 1, 0],
-                                                                      [0, 0, 0, 1]]))
-
-        r_goal = deepcopy(tray_pose)
-        r_goal.pose.position.y += 0.18
-        r_goal.pose.position.z += 0.05
-        r_goal.pose.orientation = Quaternion(*quaternion_from_matrix([[0, 1, 0, 0],
-                                                                      [-1, 0, 0, 0],
-                                                                      [0, 0, 1, 0],
-                                                                      [0, 0, 0, 1]]))
-
-        kitchen_setup.set_cart_goal(l_goal, kitchen_setup.l_tip)
-        kitchen_setup.set_cart_goal(r_goal, kitchen_setup.r_tip)
-        # kitchen_setup.allow_collision([], tray_name, [])
-        kitchen_setup.send_and_check_goal()
-
     def test_rotate_gripper(self, zero_pose):
         """
         :type zero_pose: PR2
@@ -609,14 +582,6 @@ class TestCartGoals(object):
         """
         root = u'odom_combined'
 
-        p = PoseStamped()
-        p.header.stamp = rospy.get_rostime()
-        p.header.frame_id = zero_pose.r_tip
-        p.pose.position = Point(-0.1, 0, 0)
-        p.pose.orientation = Quaternion(0, 0, 0, 1)
-        zero_pose.allow_self_collision()
-        zero_pose.set_and_check_cart_goal(p, zero_pose.r_tip, root)
-
         r_goal = PoseStamped()
         r_goal.header.frame_id = zero_pose.r_tip
         r_goal.header.stamp = rospy.get_rostime()
@@ -634,7 +599,34 @@ class TestCartGoals(object):
         zero_pose.check_cart_goal(zero_pose.r_tip, r_goal)
         zero_pose.check_cart_goal(zero_pose.l_tip, l_goal)
 
-    def test_weird_wiggling(self, zero_pose):
+    def test_wiggle1(self, kitchen_setup):
+        tray_pose = PoseStamped()
+        tray_pose.header.frame_id = u'iai_kitchen/sink_area_surface'
+        tray_pose.pose.position = Point(0.1, -0.4, 0.07)
+        tray_pose.pose.orientation.w = 1
+
+        l_goal = deepcopy(tray_pose)
+        l_goal.pose.position.y -= 0.18
+        l_goal.pose.position.z += 0.05
+        l_goal.pose.orientation = Quaternion(*quaternion_from_matrix([[0, -1, 0, 0],
+                                                                      [1, 0, 0, 0],
+                                                                      [0, 0, 1, 0],
+                                                                      [0, 0, 0, 1]]))
+
+        r_goal = deepcopy(tray_pose)
+        r_goal.pose.position.y += 0.18
+        r_goal.pose.position.z += 0.05
+        r_goal.pose.orientation = Quaternion(*quaternion_from_matrix([[0, 1, 0, 0],
+                                                                      [-1, 0, 0, 0],
+                                                                      [0, 0, 1, 0],
+                                                                      [0, 0, 0, 1]]))
+
+        kitchen_setup.set_cart_goal(l_goal, kitchen_setup.l_tip)
+        kitchen_setup.set_cart_goal(r_goal, kitchen_setup.r_tip)
+        # kitchen_setup.allow_collision([], tray_name, [])
+        kitchen_setup.send_and_check_goal()
+
+    def test_wiggle2(self, zero_pose):
         """
         :type zero_pose: PR2
         """
@@ -665,6 +657,30 @@ class TestCartGoals(object):
         p.pose.orientation.w = 1
         # zero_pose.allow_all_collisions()
         zero_pose.set_and_check_cart_goal(p, zero_pose.l_tip, zero_pose.default_root)
+
+    def test_wiggle3(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        goal_js = {
+            u'r_upper_arm_roll_joint': -0.0812729778068,
+            u'r_shoulder_pan_joint': -1.20939684714,
+            u'r_shoulder_lift_joint': 0.135095147908,
+            u'r_forearm_roll_joint': -1.50201448056,
+            u'r_elbow_flex_joint': -0.404527363115,
+            u'r_wrist_flex_joint': -1.11738043795,
+            u'r_wrist_roll_joint': 8.0946050982,
+        }
+        zero_pose.allow_all_collisions()
+        zero_pose.send_and_check_joint_goal(goal_js)
+
+        p = PoseStamped()
+        p.header.frame_id = zero_pose.r_tip
+        p.header.stamp = rospy.get_rostime()
+        p.pose.position.x = 0.5
+        p.pose.orientation.w = 1
+        zero_pose.set_cart_goal(p, zero_pose.r_tip, zero_pose.default_root)
+        zero_pose.send_and_check_goal()
 
     def test_hot_init_failed(self, zero_pose):
         """
@@ -701,46 +717,6 @@ class TestCartGoals(object):
         }
         zero_pose.allow_all_collisions()
         zero_pose.send_and_check_joint_goal(goal_js)
-
-    def test_endless_wiggling(self, zero_pose):
-        """
-        :type zero_pose: PR2
-        """
-        goal_js = {
-            u'r_upper_arm_roll_joint': -0.0812729778068,
-            u'r_shoulder_pan_joint': -1.20939684714,
-            u'r_shoulder_lift_joint': 0.135095147908,
-            u'r_forearm_roll_joint': -1.50201448056,
-            u'r_elbow_flex_joint': -0.404527363115,
-            u'r_wrist_flex_joint': -1.11738043795,
-            u'r_wrist_roll_joint': 8.0946050982,
-        }
-        zero_pose.allow_all_collisions()
-        zero_pose.send_and_check_joint_goal(goal_js)
-
-        p = PoseStamped()
-        p.header.frame_id = zero_pose.r_tip
-        p.header.stamp = rospy.get_rostime()
-        p.pose.position.x = 0.5
-        p.pose.orientation.w = 1
-        zero_pose.set_cart_goal(p, zero_pose.r_tip, zero_pose.default_root)
-        zero_pose.send_and_check_goal()
-
-    def test_endless_wiggling2(self, zero_pose):
-        """
-        :type zero_pose: PR2
-        """
-        cartesian_goal.root_link = 'torso_lift_link'
-        cartesian_goal.tip_link = 'l_gripper_tool_frame'
-
-        cartesian_goal.goal.header.frame_id = 'base_link'
-        cartesian_goal.goal.pose.position.x = 0.4
-        cartesian_goal.goal.pose.position.y = 0.5
-        cartesian_goal.goal.pose.position.z = 1
-        cartesian_goal.goal.pose.orientation.x = 0
-        cartesian_goal.goal.pose.orientation.y = 0
-        cartesian_goal.goal.pose.orientation.z = 1
-        cartesian_goal.goal.pose.orientation.w = 0
 
     def test_root_link_not_equal_chain_root(self, zero_pose):
         """
@@ -834,10 +810,7 @@ class TestCartGoals(object):
 
 
 class TestCollisionAvoidanceGoals(object):
-    def test_nan_in_slerp(self, kitchen_setup):
-        bowl_name = u'bowl'
-        cup_name = u'cup'
-
+    def test_open_drawer(self, kitchen_setup):
         self.open_drawer(kitchen_setup, kitchen_setup.l_tip, u'iai_kitchen/sink_area_left_middle_drawer_handle',
                          u'sink_area_left_middle_drawer_main_joint')
 
@@ -913,6 +886,7 @@ class TestCollisionAvoidanceGoals(object):
         """
         :type zero_pose: PR2
         """
+        # FIXME
         pocky = u'http://muh#pocky'
         zero_pose.attach_box(pocky, [0.1, 0.02, 0.02], zero_pose.r_tip, [0.05, 0, 0], [1, 0, 0, 0])
         p = PoseStamped()

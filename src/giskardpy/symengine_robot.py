@@ -177,7 +177,6 @@ class Robot(Backend):
                                                                                         joint_name]),
                                                                       weight=self._joint_weights[joint_name])
 
-    @memoize
     def get_fk_expression(self, root_link, tip_link):
         """
         :type root_link: str

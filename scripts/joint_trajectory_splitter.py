@@ -9,6 +9,23 @@ from giskardpy import logging
 import copy
 import rostopic
 
+
+class done_cb(object):
+    def __init__(self, name, action_clients, _as):
+        self.name = name
+        self.action_clients = action_clients
+        self._as = _as
+
+    def __call__(self, state, result):
+        if result._type == 'pr2_controllers_msgs/JointTrajectoryResult':
+            return
+        if result.error_code != control_msgs.msg.FollowJointTrajectoryResult.SUCCESSFUL:
+            for client in self.action_clients:
+                client.cancel_goal()
+            self.success = False
+            self._as.set_aborted(result)
+            logging.logwarn(u'Joint Trajector Splitter: client \'{}\' failed to execute action goal \n {}'.format(self.name, result))
+
 class JointTrajectorySplitter:
     def __init__(self):
         self.action_clients = []
@@ -37,7 +54,7 @@ class JointTrajectorySplitter:
                 type = rostopic.get_info_text(self.client_topics[i] + '/goal').split('\n')[0][6:]
                 self.client_type.append(type)
             except rostopic.ROSTopicException:
-                logging.logerr("Joint Trajector Splitter: unkown topic " + self.client_topics[i] + '/goal' + "\nmissing / in front of topic name?")
+                logging.logerr('Joint Trajector Splitter: unknown topic \'{}/goal\' \nmissing / in front of topic name?'.format(self.client_topics[i]))
                 exit()
 
 
@@ -47,7 +64,9 @@ class JointTrajectorySplitter:
                 type = rostopic.get_info_text(self.state_topics[i]).split('\n')[0][6:]
                 self.state_type.append(type)
             except rostopic.ROSTopicException:
-                logging.logerr("Joint Trajector Splitter: unkown topic " + self.state_topics[i] + "\nmissing / in front of topic name?")
+                logging.logerr(
+                    'Joint Trajector Splitter: unknown topic \'{}/goal\' \nmissing / in front of topic name?'.format(
+                        self.state_topics[i]))
                 exit()
 
         for i in range(self.number_of_clients):
@@ -59,6 +78,7 @@ class JointTrajectorySplitter:
                 logging.logerr('Joint Trajector Splitter: wrong client topic type:' + self.client_type[i] + '\nmust be either control_msgs/FollowJointTrajectoryActionGoal or pr2_controllers_msgs/JointTrajectoryActionGoal')
                 exit()
             self.joint_names.append(rospy.wait_for_message(self.state_topics[i], control_msgs.msg.JointTrajectoryControllerState).joint_names)
+            logging.loginfo('Joint Trajector Splitter: connected to {}'.format(self.client_topics[i]))
 
         self.current_controller_state = control_msgs.msg.JointTrajectoryControllerState()
         total_number_joints = 0
@@ -92,7 +112,7 @@ class JointTrajectorySplitter:
                                                 execute_cb=self.callback, auto_start=False)
         self._as.register_preempt_callback(self.preempt_cb)
         self._as.start()
-
+        logging.loginfo(u'Joint Trajector Splitter: running')
         rospy.spin()
 
 
@@ -151,7 +171,9 @@ class JointTrajectorySplitter:
 
         logging.loginfo('send splitted goals')
         for i in range(self.number_of_clients):
-            self.action_clients[i].send_goal(action_goals[i], feedback_cb=self.feedback_cb, done_cb=self.done_cb)
+            self.action_clients[i].send_goal(action_goals[i],
+                                             feedback_cb=self.feedback_cb,
+                                             done_cb=done_cb(self.client_topics[i], self.action_clients, self._as))
 
         timeout = goal.trajectory.points[-1].time_from_start + rospy.Duration(secs=2)
         for i in range(self.number_of_clients):
@@ -172,17 +194,6 @@ class JointTrajectorySplitter:
 
     def feedback_cb(self, feedback):
         self._as.publish_feedback(feedback)
-
-    def done_cb(self, state, result):
-        if result._type == 'pr2_controllers_msgs/JointTrajectoryResult':
-            return
-        if result.error_code != control_msgs.msg.FollowJointTrajectoryResult.SUCCESSFUL:
-            for client in self.action_clients:
-                client.cancel_goal()
-            self.success = False
-            self._as.set_aborted(result)
-            logging.logwarn(u'Joint Trajector Splitter: client failed to execute action goal \n {}'.format(result))
-
 
     def preempt_cb(self):
         for action_client in self.action_clients:

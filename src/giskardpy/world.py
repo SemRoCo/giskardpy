@@ -6,12 +6,12 @@ from giskardpy.data_types import ClosestPointInfo
 from giskardpy.exceptions import RobotExistsException, DuplicateNameException, PhysicsWorldException, \
     UnknownBodyException, UnsupportedOptionException
 from giskardpy.symengine_robot import Robot
-from giskardpy.tfwrapper import msg_to_kdl, kdl_to_pose, np_to_kdl
+from giskardpy.tfwrapper import msg_to_kdl, kdl_to_pose, np_to_kdl, to_np
 from giskardpy.urdf_object import URDFObject, FIXED_JOINT
-from giskardpy.utils import KeyDefaultDict
+from giskardpy.utils import KeyDefaultDict, np_point, np_vector
 from giskardpy.world_object import WorldObject
 from giskardpy import logging
-
+import numpy as np
 
 class World(object):
     def __init__(self, path_to_data_folder=u''):
@@ -187,8 +187,11 @@ class World(object):
         collision_matrix = self.robot.get_self_collision_matrix()
         collision_matrix2 = {}
         for link1, link2 in collision_matrix:
-            collision_matrix2[link1, robot_name, link2] = min_dist[link1][u'zero_weight_distance']
-            collision_matrix2[link2, robot_name, link1] = min_dist[link1][u'zero_weight_distance']
+            # FIXME should I use the minimum of both distances?
+            if link1 < link2:
+                collision_matrix2[link1, robot_name, link2] = min_dist[link1][u'zero_weight_distance']
+            else:
+                collision_matrix2[link2, robot_name, link1] = min_dist[link1][u'zero_weight_distance']
         return collision_matrix2
 
     def collision_goals_to_collision_matrix(self, collision_goals, min_dist):
@@ -214,9 +217,6 @@ class World(object):
                             del min_allowed_distance[key2]
                 elif key in min_allowed_distance:
                     del min_allowed_distance[key]
-                    if collision_entry.body_b == self.robot.get_name():
-                        rev_key = (collision_entry.link_bs[0], collision_entry.body_b, collision_entry.robot_links[0])
-                        del min_allowed_distance[rev_key]
 
             elif self.is_avoid_collision(collision_entry):
                 min_allowed_distance[key] = min_dist[key[0]][u'zero_weight_distance']
@@ -228,8 +228,8 @@ class World(object):
         for ce in collision_goals:  # type: CollisionEntry
             if ce.type in [CollisionEntry.ALLOW_ALL_COLLISIONS,
                            CollisionEntry.AVOID_ALL_COLLISIONS]:
-                logging.logwarn(u'ALLOW_ALL_COLLISIONS and AVOID_ALL_COLLISIONS deprecated, use AVOID_COLLISIONS and'
-                              u'ALLOW_COLLISIONS instead with ALL constant instead.')
+                # logging.logwarn(u'ALLOW_ALL_COLLISIONS and AVOID_ALL_COLLISIONS deprecated, use AVOID_COLLISIONS and'
+                #               u'ALLOW_COLLISIONS instead with ALL constant instead.')
                 if ce.type == CollisionEntry.ALLOW_ALL_COLLISIONS:
                     ce.type = CollisionEntry.ALLOW_COLLISION
                 else:
@@ -458,21 +458,21 @@ class World(object):
                and self.all_link_bs(collision_entry)
 
     
-
+    # @profile
     def transform_contact_info(self, collisions):
-        root_T_map = self.robot.root_T_map
-        root = self.robot.get_root()
-        fk = self.robot.get_fk_np
-        for key, contact_infos in collisions.data.items():  # type: ((str, str, str), ClosestPointInfo)
-            for contact_info in contact_infos:
-                if contact_info is None:
-                    continue
-                link1 = key[0]
-                link_T_root = np_to_kdl(fk(link1, root))
-                a_in_link = link_T_root * root_T_map * PyKDL.Vector(*contact_info.position_on_a)
-                b_in_robot_root = root_T_map * PyKDL.Vector(*contact_info.position_on_b)
-                n_in_robot_root = root_T_map.M * PyKDL.Vector(*contact_info.contact_normal)
-                contact_info.position_on_a = a_in_link
-                contact_info.position_on_b = b_in_robot_root
-                contact_info.contact_normal = n_in_robot_root
+        root_T_map = to_np(self.robot.root_T_map)
+        for contact_info in collisions.items():  # type: ClosestPointInfo
+            if contact_info is None:
+                continue
+            movable_joint = self.robot.get_movable_parent_joint(contact_info.link_a)
+            f = self.robot.get_child_link_of_joint(movable_joint)
+            f_T_r = self.robot.get_fk_np(f, self.robot.get_root())
+            contact_info.frame = f
+
+            f_P_pa = np.dot(np.dot(f_T_r, root_T_map), np_point(*contact_info.position_on_a))
+            r_P_pb = np.dot(root_T_map, np_point(*contact_info.position_on_b))
+            r_V_n = np.dot(root_T_map, np_vector(*contact_info.contact_normal))
+            contact_info.position_on_a = f_P_pa[:-1]
+            contact_info.position_on_b = r_P_pb[:-1]
+            contact_info.contact_normal = r_V_n[:-1]
         return collisions

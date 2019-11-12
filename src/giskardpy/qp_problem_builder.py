@@ -49,8 +49,9 @@ class QProblemBuilder(object):
         self.shape1 = len(self.hard_constraints_dict) + len(self.soft_constraints_dict)
         self.shape2 = len(self.joint_constraints_dict) + len(self.soft_constraints_dict)
 
-        self.qp_solver = QPSolver(len(self.joint_constraints_dict) + len(self.soft_constraints_dict),
-                                  len(self.hard_constraints_dict) + len(self.soft_constraints_dict))
+        self.qp_solver = QPSolver(len(self.hard_constraints_dict),
+                                  len(self.joint_constraints_dict),
+                                  len(self.soft_constraints_dict))
         self.lbAs = None  # for debugging purposes
 
     def get_expr(self):
@@ -160,8 +161,8 @@ class QProblemBuilder(object):
         lbA = []
         weights = []
         xdot = []
-        if xdot_full is not None:
-            A_dot_x = np_A.dot(xdot_full)
+        # if xdot_full is not None:
+        #     A_dot_x = np_A.dot(xdot_full)
         for iJ, k in enumerate(self.joint_constraints_dict.keys()):
             key = 'j -- ' + str(k)
             lb.append(key)
@@ -190,31 +191,31 @@ class QProblemBuilder(object):
             key = 's -- ' + str(k)
             lbA.append(key)
             weights.append(key)
-            xdot.append(key)
+            # xdot.append(key)
         p_lb = pd.DataFrame(np_lb[:-len(self.soft_constraints_dict)], lb).sort_index()
         p_ub = pd.DataFrame(np_ub[:-len(self.soft_constraints_dict)], lb).sort_index()
         p_lbA = pd.DataFrame(np_lbA, lbA).sort_index()
-        if xdot_full is not None:
-            p_A_dot_x = pd.DataFrame(A_dot_x, lbA).sort_index()
+        # if xdot_full is not None:
+        #     p_A_dot_x = pd.DataFrame(A_dot_x, lbA).sort_index()
         p_ubA = pd.DataFrame(np_ubA, lbA).sort_index()
         p_weights = pd.DataFrame(np_H.dot(np.ones(np_H.shape[0])), weights).sort_index()
         if xdot_full is not None:
-            p_xdot = pd.DataFrame(xdot_full, xdot).sort_index()
+            p_xdot = pd.DataFrame(xdot_full[:len(xdot)], xdot).sort_index()
         p_A = pd.DataFrame(np_A, lbA, weights).sort_index(1).sort_index(0)
         if self.lbAs is None:
             self.lbAs = p_lbA
         else:
             self.lbAs = self.lbAs.T.append(p_lbA.T, ignore_index=True).T
             # self.lbAs.T[[c for c in self.lbAs.T.columns if 'dist' in c]].plot()
-        arrays = [(p_weights, u'H'),
-                  (p_A, u'A'),
-                  (p_lbA, u'lbA'),
-                  (p_ubA, u'ubA'),
-                  (p_lb, u'lb'),
-                  (p_ub, u'ub')]
-        for a, name in arrays:
-            self.check_for_nan(name, a)
-            self.check_for_big_numbers(name, a)
+        # arrays = [(p_weights, u'H'),
+        #           (p_A, u'A'),
+        #           (p_lbA, u'lbA'),
+        #           (p_ubA, u'ubA'),
+        #           (p_lb, u'lb'),
+        #           (p_ub, u'ub')]
+        # for a, name in arrays:
+        #     self.check_for_nan(name, a)
+        #     self.check_for_big_numbers(name, a)
         pass
 
     def check_for_nan(self, name, p_array):
@@ -266,7 +267,7 @@ class QProblemBuilder(object):
         if xdot_full is None:
             return None
         # TODO enable debug print in an elegant way, preferably without slowing anything down
-        self.debug_print(np_H, np_A, np_lb, np_ub, np_lbA, np_ubA, xdot_full)
+        # self.debug_print(np_H, np_A, np_lb, np_ub, np_lbA, np_ubA, xdot_full)
         return OrderedDict((observable, xdot_full[i]) for i, observable in enumerate(self.controlled_joints)), \
                np_H, np_A, np_lb, np_ub, np_lbA, np_ubA, xdot_full
 

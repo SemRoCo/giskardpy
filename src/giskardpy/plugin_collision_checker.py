@@ -45,16 +45,12 @@ class CollisionChecker(GiskardBehavior):
 
         super(CollisionChecker, self).initialise()
 
-
     def update(self):
         """
         Computes closest point info for all robot links and safes it to the god map.
         """
         with self.lock:
             collisions = self.get_world().check_collisions(self.collision_matrix)
-
-            # closest_point = self.get_world().collisions_to_closest_point(collisions, self.collision_matrix)
-            collisions = self.get_world().transform_contact_info(collisions)
-
-            self.god_map.safe_set_data(identifier.closest_point, collisions)
+            closest_points = self.get_world().transform_contact_info(collisions)
+            self.god_map.safe_set_data(identifier.closest_point, closest_points)
         return Status.RUNNING

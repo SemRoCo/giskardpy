@@ -99,7 +99,6 @@ class SymEngineController(object):
                                                   self.backend,
                                                   self.opt_level)
 
-
     def get_cmd(self, substitutions, nWSR=None):
         """
         Computes joint commands that satisfy constrains given substitutions.

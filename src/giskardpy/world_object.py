@@ -100,7 +100,7 @@ class WorldObject(URDFObject):
 
     def get_self_collision_matrix(self):
         """
-        :return: (link1, link2) -> min allowed distance
+        :return: A list of link pairs for which we have to calculate self collisions
         """
         return self._self_collision_matrix
 

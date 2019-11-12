@@ -6,9 +6,7 @@ import rospy
 from control_msgs.msg import JointTrajectoryControllerState
 from giskard_msgs.msg import MoveAction
 from py_trees import Sequence, Selector, BehaviourTree, Blackboard
-from py_trees.behaviours import Count
-from py_trees.decorators import Condition
-from py_trees.meta import failure_is_success, success_is_failure
+from py_trees.meta import failure_is_success, success_is_failure, success_is_running
 from py_trees_ros.trees import BehaviourTree
 from rospy import ROSException
 
@@ -125,6 +123,8 @@ def grow_tree():
     # ----------------------------------------------
     planning_3 = PluginBehavior(u'planning III', sleep=0)
     planning_3.add_plugin(CollisionChecker(u'coll'))
+    # if god_map.safe_get_data(identifier.enable_collision_marker):
+    #     planning_3.add_plugin(success_is_running(CPIMarker)(u'cpi marker'))
     planning_3.add_plugin(ControllerPlugin(u'controller'))
     planning_3.add_plugin(KinSimPlugin(u'kin sim'))
     planning_3.add_plugin(LogTrajPlugin(u'log'))

@@ -606,35 +606,32 @@ class GiskardTestWrapper(object):
         assert len(scm) < len(self.get_robot().get_self_collision_matrix())
         self.loop_once()
 
-    def get_cpi(self, distance_threshold):
+    def get_external_collisions(self, link, distance_threshold):
+        """
+        :param distance_threshold:
+        :rtype: list
+        """
         collision_goals = [CollisionEntry(type=CollisionEntry.AVOID_ALL_COLLISIONS, min_dist=distance_threshold)]
         collision_matrix = self.get_world().collision_goals_to_collision_matrix(collision_goals,
                                                                                 self.get_god_map().safe_get_data(
                                                                                     identifier.collisions_distances))
         collisions = self.get_world().check_collisions(collision_matrix)
-        return self.get_world().transform_contact_info(collisions)
+        collisions = self.get_world().transform_contact_info(collisions)
+        collision_list = collisions.external_collision[self.get_robot().get_movable_parent_joint(link)]
+        for key, self_collisions in collisions.self_collisions.items():
+            if link in key:
+                collision_list.update(self_collisions)
+        return collision_list
 
     def check_cpi_geq(self, links, distance_threshold):
-        cpi = self.get_cpi(distance_threshold)
-        if cpi == 0 or cpi == None:
-            return False
         for link in links:
-            assert cpi[(link,)][0].contact_distance >= distance_threshold, u'{} -- {}\n {} < {}'.format(link,
-                                                                                                  cpi[(link,)][0].link_b,
-                                                                                                  cpi[
-                                                                                                      (link,)][0].contact_distance,
-                                                                                                  distance_threshold)
+            collisions = self.get_external_collisions(link, distance_threshold)
+            assert collisions[0].contact_distance >= distance_threshold
 
     def check_cpi_leq(self, links, distance_threshold):
-        cpi = self.get_cpi(distance_threshold)
-        if cpi == 0 or cpi == None:
-            return False
         for link in links:
-            assert cpi[(link,)][0].contact_distance <= distance_threshold, u'{} -- {}\n {} > {}'.format(link,
-                                                                                                  cpi[(link,)][0].link_b,
-                                                                                                  cpi[
-                                                                                                      (link,)][0].contact_distance,
-                                                                                                  distance_threshold)
+            collisions = self.get_external_collisions(link, distance_threshold)
+            assert collisions[0].contact_distance <= distance_threshold
 
     def move_base(self, goal_pose):
         """

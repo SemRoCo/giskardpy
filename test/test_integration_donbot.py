@@ -223,6 +223,24 @@ class TestJointGoals(object):
         zero_pose.allow_self_collision()
         zero_pose.send_and_check_joint_goal(js2)
 
+    def test_joint_movement3(self, resetted_giskard):
+        """
+        :type zero_pose: Donbot
+        """
+        js = {
+            u'odom_x_joint': 1,
+            u'odom_y_joint': 1,
+            u'odom_z_joint': 1,
+            u'ur5_shoulder_pan_joint': -1.5438225905,
+            u'ur5_shoulder_lift_joint': -1.20804578463,
+            u'ur5_elbow_joint': -2.21223670641,
+            u'ur5_wrist_1_joint': -1.5827181975,
+            u'ur5_wrist_2_joint': -4.71748859087,
+            u'ur5_wrist_3_joint': -1.57543737093,
+        }
+        resetted_giskard.allow_self_collision()
+        resetted_giskard.send_and_check_joint_goal(js)
+
     def test_partial_joint_state_goal1(self, zero_pose):
         """
         :type zero_pose: Donbot
@@ -545,6 +563,7 @@ class TestCollisionAvoidanceGoals(object):
             u'ur5_shoulder_lift_joint': .5,
         }
         # zero_pose.wrapper.set_self_collision_distance(0.025)
+        zero_pose.allow_self_collision()
         zero_pose.send_and_check_joint_goal(goal_js)
 
         arm_goal = PoseStamped()

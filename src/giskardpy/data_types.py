@@ -1,5 +1,7 @@
 from collections import OrderedDict, defaultdict
 
+from sortedcontainers import SortedKeyList
+
 
 class SingleJointState(object):
     def __init__(self, name='', position=0.0, velocity=0.0, effort=0.0):
@@ -43,7 +45,7 @@ class Trajectory(object):
 class ClosestPointInfo(object):
     # TODO why no named tuple?
     def __init__(self, position_on_a, position_on_b, contact_distance, min_dist, link_a, body_b, link_b, contact_normal,
-                 old_key):
+                 old_key, frame=u'base_footprint'):
         self.position_on_a = position_on_a
         self.position_on_b = position_on_b
         self.contact_distance = contact_distance
@@ -53,12 +55,30 @@ class ClosestPointInfo(object):
         self.body_b = body_b
         self.link_b = link_b
         self.old_key = old_key
+        self.frame = frame
 
 
 class Collisions(object):
-    def __init__(self):
-        self.data = defaultdict(list)
-        self.key_to_key = defaultdict(set)
+    def __init__(self, robot):
+        """
+        :type robot: giskardpy.symengine_robot.Robot
+        """
+        self.robot = robot
+
+        # FIXME I'm assuming that self collisions only has collisions for pairs of objects
+        #   which results in a list of length 1 always, which is why I don't sort to safe time
+        #   I start with a list of default collisions in case there was none
+        def f1():
+            return [self._default_collision('', '', '')]
+
+        self.self_collisions = defaultdict(f1)
+
+        def f2():
+            return SortedKeyList([self._default_collision('', '', '')] * 20,
+                                 key=lambda x: x.contact_distance)
+
+        self.external_collision = defaultdict(f2)
+        self.all_collisions = set()
 
     def add(self, key, contact):
         """
@@ -66,39 +86,60 @@ class Collisions(object):
         :type contact: ClosestPointInfo
         :return:
         """
-        self.data[key].append(contact)
-        self.key_to_key[(key[0],)].add(key)
-        self.key_to_key[key[0], key[1]].add(key)
+        body_b = key[1]
+        movable_joint = self.robot.get_movable_parent_joint(key[0])
+        self.all_collisions.add(contact)
 
-    def get(self, link_a, body_b=None, link_b=None):
-
-        if body_b is not None and link_b is not None:
-            r = self.data[(link_a, body_b, link_b)]
-        elif body_b is not None and link_b is None:
-            r = []
-            for k in self.key_to_key[(link_a, body_b)]:
-                r.extend(self.data[k])
+        if body_b == self.robot.get_name():
+            # self.self_collisions[key].add(contact)
+            # self.self_collisions[key[:-1]].add(contact)
+            # self.self_collisions[key[:-2]].add(contact)
+            self.self_collisions[key[0], key[2]].insert(0, contact)
+            # self.self_collisions[movable_joint].add(contact)
         else:
-            r = []
-            for k in self.key_to_key[(link_a,)]:
-                r.extend(self.data[k])
-        if len(r) == 0:
-            return [ClosestPointInfo([0,0,0],
-                                     [0,0,0],
-                                     100,
-                                     0,
-                                     link_a,
-                                     body_b,
-                                     link_b,
-                                     [0,0,1],
-                                     (link_a, body_b, link_b))]
-        return list(sorted(r, key=lambda x: x.contact_distance))
+            # self.external_collision[key].add(contact)
+            # self.external_collision[key[:-1]].add(contact)
+            # self.external_collision[key[:-2]].add(contact)
+            self.external_collision[movable_joint].add(contact)
 
-    def __getitem__(self, item):
-        return self.get(*item)
+    def _default_collision(self, link_a, body_b, link_b):
+        return ClosestPointInfo([0, 0, 0],
+                                [0, 0, 0],
+                                100,
+                                0,
+                                link_a,
+                                body_b,
+                                link_b,
+                                [0, 0, 1],
+                                (link_a, body_b, link_b))
+
+    # def get(self, key):
+    #     if key in self.external_collision:
+    #         return self.external_collision[key]
+    #     elif key in self.self_collisions:
+    #         return self. self_collisions[key]
+
+    def get_external_collisions(self, joint_name):
+        """
+        Collisions are saved as a list for each movable robot joint, sorted by contact distance
+        :type joint_name: str
+        :rtype: ClosestPointInfo
+        """
+        return self.external_collision[joint_name]
+
+    def get_self_collisions(self, link_a, link_b):
+        """
+        Make sure that link_a < link_b, the reverse collision is not saved.
+        :type link_a: str
+        :type link_b: str
+        :return:
+        :rtype: ClosestPointInfo
+        """
+        # FIXME maybe check for reverse key?
+        return self.self_collisions[link_a, link_b]
 
     def __contains__(self, item):
-        return item in self.data
+        return item in self.self_collisions or item in self.external_collision
 
     def items(self):
-        return self.data.items()
+        return self.all_collisions

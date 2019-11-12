@@ -110,5 +110,27 @@ class FrameInput(InputArray):
     def get_position(self):
         return w.position_of(self.get_frame())
 
+    def get_translation(self):
+        return w.translation_of(self.get_frame())
+
+    def get_rotation(self):
+        return w.rotation_of(self.get_frame())
+
+class TranslationInput(InputArray):
+    def __init__(self, to_expr, prefix):
+        super(TranslationInput, self).__init__(to_expr, (), (),
+                                         x=list(prefix) + [0],
+                                         y=list(prefix) + [1],
+                                         z=list(prefix) + [2])
+
+    def get_frame(self):
+        return w.translation3(self.x, self.y, self.z)
+
+    def get_position(self):
+        return w.position_of(self.get_frame())
+
+    def get_translation(self):
+        return w.translation_of(self.get_frame())
+
     def get_rotation(self):
         return w.rotation_of(self.get_frame())

@@ -1,7 +1,3 @@
-symbolic_backend:
-  lib: symengine
-  backend: llvm # currently the only option
-  opt_level: 0 # 0 means fast compilation, slower planning, 3 is slowest compilation, faster planner
 enable_collision_marker: True
 enable_visualization: True
 plot_trajectory: True

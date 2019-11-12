@@ -1,5 +1,3 @@
-backend: llvm
-opt_level: 0
 enable_collision_marker: True
 enable_visualization: True
 plot_trajectory: True

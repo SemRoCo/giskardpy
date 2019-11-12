@@ -8,7 +8,6 @@ from time import time
 from giskardpy import logging, w
 from giskardpy.exceptions import QPSolverException
 from giskardpy.qp_solver import QPSolver
-from giskardpy.symengine_wrappers import load_compiled_function, safe_compiled_function
 
 
 SoftConstraint = namedtuple(u'SoftConstraint', [u'lower', u'upper', u'weight', u'expression'])
@@ -23,7 +22,7 @@ class QProblemBuilder(object):
     """
 
     def __init__(self, joint_constraints_dict, hard_constraints_dict, soft_constraints_dict, controlled_joint_symbols,
-                 free_symbols=None, path_to_functions='', backend='llvm', opt_level=0):
+                 free_symbols=None, path_to_functions=''):
         """
         :type joint_constraints_dict: dict
         :type hard_constraints_dict: dict
@@ -44,7 +43,7 @@ class QProblemBuilder(object):
         self.hard_constraints_dict = hard_constraints_dict
         self.soft_constraints_dict = soft_constraints_dict
         self.controlled_joints = controlled_joint_symbols
-        self.make_matrices(backend, opt_level)
+        self.make_matrices()
 
         self.shape1 = len(self.hard_constraints_dict) + len(self.soft_constraints_dict)
         self.shape2 = len(self.joint_constraints_dict) + len(self.soft_constraints_dict)
@@ -57,7 +56,7 @@ class QProblemBuilder(object):
     def get_expr(self):
         return self.cython_big_ass_M.str_params
 
-    def make_matrices(self, backend='llvm', opt_level=0):
+    def make_matrices(self):
         """
         Turns constrains into a function that computes the matrices needed for QPOases.
         """
@@ -88,7 +87,7 @@ class QProblemBuilder(object):
             assert not w.is_matrix(c.expression), u'Matrices are not allowed as soft constraint expression'
             soft_expressions.append(c.expression)
 
-        self.cython_big_ass_M = load_compiled_function(self.path_to_functions)
+        self.cython_big_ass_M = w.load_compiled_function(self.path_to_functions)
         self.np_g = np.zeros(len(weights))
 
         if self.cython_big_ass_M is None:

@@ -110,7 +110,7 @@ class World(object):
     # Robot ------------------------------------------------------------------------------------------------------------
 
     def add_robot(self, robot, base_pose, controlled_joints, joint_vel_limit, joint_acc_limit, joint_weights,
-                  calc_self_collision_matrix, ignored_pairs, added_pairs, symengine_backend, symengine_opt_level):
+                  calc_self_collision_matrix, ignored_pairs, added_pairs):
         """
         :type robot: giskardpy.world_object.WorldObject
         :type controlled_joints: list
@@ -132,9 +132,7 @@ class World(object):
                                              calc_self_collision_matrix=calc_self_collision_matrix,
                                              joint_weights=joint_weights,
                                              ignored_pairs=ignored_pairs,
-                                             added_pairs=added_pairs,
-                                             symengine_backend=symengine_backend,
-                                             symengine_opt_level=symengine_opt_level)
+                                             added_pairs=added_pairs)
 
     @property
     def robot(self):

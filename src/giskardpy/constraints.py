@@ -517,7 +517,7 @@ class ExternalCollisionAvoidance(Constraint):
     B = u'B'
     C = u'C'
 
-    def __init__(self, god_map, joint_name, repel_speed=0.5, max_weight_distance=0.0, low_weight_distance=0.01,
+    def __init__(self, god_map, joint_name, repel_speed=0.1, max_weight_distance=0.0, low_weight_distance=0.01,
                  zero_weight_distance=0.05, idx=0):
         super(ExternalCollisionAvoidance, self).__init__(god_map)
         self.joint_name = joint_name
@@ -621,7 +621,7 @@ class SelfCollisionAvoidance(Constraint):
     B = u'B'
     C = u'C'
 
-    def __init__(self, god_map, link_a, link_b, repel_speed=0.5, max_weight_distance=0.0, low_weight_distance=0.01,
+    def __init__(self, god_map, link_a, link_b, repel_speed=0.1, max_weight_distance=0.0, low_weight_distance=0.01,
                  zero_weight_distance=0.05):
         super(SelfCollisionAvoidance, self).__init__(god_map)
         self.link_a = link_a

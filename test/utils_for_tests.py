@@ -617,8 +617,11 @@ class GiskardTestWrapper(object):
                                                                                     identifier.collisions_distances))
         collisions = self.get_world().check_collisions(collision_matrix)
         collisions = self.get_world().transform_contact_info(collisions)
-        collisions = collisions.external_collision[self.get_robot().get_movable_parent_joint(link)]
-        return collisions
+        collision_list = collisions.external_collision[self.get_robot().get_movable_parent_joint(link)]
+        for key, self_collisions in collisions.self_collisions.items():
+            if link in key:
+                collision_list.update(self_collisions)
+        return collision_list
 
     def check_cpi_geq(self, links, distance_threshold):
         for link in links:

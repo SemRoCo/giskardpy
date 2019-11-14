@@ -76,8 +76,7 @@ class Constraint(object):
         return self.god_map.to_symbol(key)
 
     def get_input_sampling_period(self):
-        key = identifier.rosparam + [u'sample_period']
-        return self.god_map.to_symbol(key)
+        return self.god_map.to_symbol(identifier.sample_period)
 
     def __str__(self):
         return self.__class__.__name__

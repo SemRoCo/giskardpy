@@ -72,16 +72,14 @@ def initialize_god_map():
 
 
 
-    joint_weight_symbols = process_joint_specific_params(identifier.joint_weights,
-                                                         identifier.default_joint_weight_identifier, god_map)
+    joint_weight_symbols = process_joint_specific_params(identifier.joint_cost,
+                                                         identifier.default_joint_cost_identifier, god_map)
 
-    process_joint_specific_params(identifier.collisions_distances, identifier.default_collision_distances, god_map)
+    process_joint_specific_params(identifier.distance_thresholds, identifier.default_collision_distances, god_map)
 
     joint_vel_symbols = process_joint_specific_params(identifier.joint_vel, identifier.default_joint_vel, god_map)
 
     joint_acc_symbols = process_joint_specific_params(identifier.joint_acc, identifier.default_joint_acc, god_map)
-
-    # hz = god_map.safe_get_data(identifier.sample_period)
 
     world = PyBulletWorld(god_map.safe_get_data(identifier.gui),
                           blackboard.god_map.safe_get_data(identifier.data_folder))
@@ -138,9 +136,9 @@ def grow_tree():
     planning_2 = failure_is_success(Selector)(u'planning II')
     planning_2.add_child(GoalCanceled(u'goal canceled', action_server_name))
     # planning.add_child(CollisionCancel(u'in collision', collision_time_threshold))
-    if god_map.safe_get_data(identifier.marker_visualization):
+    if god_map.safe_get_data(identifier.enable_VisualizationBehavior):
         planning_2.add_child(success_is_failure(VisualizationBehavior)(u'visualization'))
-    if god_map.safe_get_data(identifier.enable_collision_marker):
+    if god_map.safe_get_data(identifier.enable_CPIMarker):
         planning_2.add_child(success_is_failure(CPIMarker)(u'cpi marker'))
     planning_2.add_child(planning_3)
     # ----------------------------------------------
@@ -163,7 +161,7 @@ def grow_tree():
     root.add_child(wait_for_goal)
     root.add_child(CleanUp(u'cleanup'))
     root.add_child(process_move_goal)
-    if god_map.safe_get_data(identifier.plot_trajectory):
+    if god_map.safe_get_data(identifier.enable_PlotTrajectory):
         root.add_child(PlotTrajectory(u'plot trajectory'))
     root.add_child(move_robot)
     root.add_child(SendResult(u'send result', action_server_name, MoveAction))

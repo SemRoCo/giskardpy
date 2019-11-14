@@ -327,8 +327,8 @@ class TestConstraints(object):
         }
         pocky_pose_setup.wrapper.update_god_map(updates)
         pocky_pose_setup.set_and_check_cart_goal(r_goal, pocky_pose_setup.r_tip)
-        assert pocky_pose_setup.get_god_map().get_data(identifier.joint_weights + [u'odom_x_joint']) == 0.0001
-        assert pocky_pose_setup.get_god_map().get_data(identifier.joint_weights + [u'torso_lift_joint']) == 0.5
+        assert pocky_pose_setup.get_god_map().get_data(identifier.joint_cost + [u'odom_x_joint']) == 0.0001
+        assert pocky_pose_setup.get_god_map().get_data(identifier.joint_cost + [u'torso_lift_joint']) == 0.5
 
     def test_UpdateGodMap2(self, pocky_pose_setup):
         """
@@ -350,8 +350,8 @@ class TestConstraints(object):
         pocky_pose_setup.wrapper.update_god_map(updates)
         pocky_pose_setup.set_cart_goal(r_goal, pocky_pose_setup.r_tip)
         pocky_pose_setup.send_and_check_goal(expected_error_code=MoveResult.INSOLVABLE)
-        assert pocky_pose_setup.get_god_map().get_data(identifier.joint_weights + [u'odom_x_joint']) == 1
-        assert pocky_pose_setup.get_god_map().get_data(identifier.joint_weights + [u'torso_lift_joint']) == 0.5
+        assert pocky_pose_setup.get_god_map().get_data(identifier.joint_cost + [u'odom_x_joint']) == 1
+        assert pocky_pose_setup.get_god_map().get_data(identifier.joint_cost + [u'torso_lift_joint']) == 0.5
 
     def test_UpdateGodMap3(self, pocky_pose_setup):
         """
@@ -369,8 +369,8 @@ class TestConstraints(object):
         pocky_pose_setup.wrapper.update_god_map(updates)
         pocky_pose_setup.set_cart_goal(r_goal, pocky_pose_setup.r_tip)
         pocky_pose_setup.send_and_check_goal(expected_error_code=MoveResult.INSOLVABLE)
-        assert pocky_pose_setup.get_god_map().get_data(identifier.joint_weights + [u'odom_x_joint']) == 1
-        assert pocky_pose_setup.get_god_map().get_data(identifier.joint_weights + [u'torso_lift_joint']) == 0.5
+        assert pocky_pose_setup.get_god_map().get_data(identifier.joint_cost + [u'odom_x_joint']) == 1
+        assert pocky_pose_setup.get_god_map().get_data(identifier.joint_cost + [u'torso_lift_joint']) == 0.5
 
     def test_pointing(self, kitchen_setup):
         base_goal = PoseStamped()

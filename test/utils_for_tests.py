@@ -614,7 +614,7 @@ class GiskardTestWrapper(object):
         collision_goals = [CollisionEntry(type=CollisionEntry.AVOID_ALL_COLLISIONS, min_dist=distance_threshold)]
         collision_matrix = self.get_world().collision_goals_to_collision_matrix(collision_goals,
                                                                                 self.get_god_map().safe_get_data(
-                                                                                    identifier.collisions_distances))
+                                                                                    identifier.distance_thresholds))
         collisions = self.get_world().check_collisions(collision_matrix)
         collisions = self.get_world().transform_contact_info(collisions)
         collision_list = collisions.external_collision[self.get_robot().get_movable_parent_joint(link)]

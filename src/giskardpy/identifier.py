@@ -32,45 +32,56 @@ xdot_keys = qp_data + [u'xdot_keys']
 
 
 #stuff from rosparam
-rosparam = [u'rosparam']
-
-#symengine stuff
-symbolic_backend = rosparam + [u'symbolic_backend']
-symengine_backend = rosparam + [u'backend']
-symengine_opt_level = rosparam + [u'opt_level']
-
-data_folder = rosparam + [u'path_to_data_folder']
-gui = rosparam + [u'enable_gui']
-map_frame = rosparam + [u'map_frame']
 robot_description = [u'robot_description']
-marker_visualization = rosparam + [u'enable_visualization']
-sample_period = rosparam + [u'sample_period']
 
-fft_duration = rosparam + [u'fft_duration']
-wiggle_detection_threshold = rosparam + [u'wiggle_detection_threshold']
-min_wiggle_frequency = rosparam + [u'min_wiggle_frequency']
+rosparam = [u'rosparam']
+gui = rosparam + [u'enable_gui']
+data_folder = rosparam + [u'path_to_data_folder']
 
-zero_weight_distance = rosparam + [u'zero_weight_distance']
-low_weight_distance = rosparam + [u'low_weight_distance']
-max_weight_distance = rosparam + [u'max_weight_distance']
-collisions_distances = rosparam + [u'collision_avoidance']
-default_collision_distances = collisions_distances + [u'default']
+# config file
+# general options
+general_options = rosparam + [u'general_options']
+sample_period = general_options + [u'sample_period']
+map_frame = general_options + [u'map_frame']
+fill_velocity_values = general_options + [u'fill_velocity_values']
+joint_convergence_threshold = general_options + [u'joint_convergence_threshold']
 
-joint_weights = rosparam + [u'joint_weights']
-default_joint_weight_identifier = joint_weights + [u'default']
-
-joint_vel = rosparam + [u'joint_vel_limit']
+joint_vel = general_options + [u'joint_vel_limit']
 default_joint_vel = joint_vel + [u'default']
 
-joint_acc = rosparam + [u'joint_acceleration_limit']
+joint_acc = general_options + [u'joint_acceleration_limit']
 default_joint_acc = joint_acc + [u'default']
 
-nWSR = rosparam + [u'nWSR']
-joint_convergence_threshold = rosparam + [u'joint_convergence_threshold']
-collision_time_threshold = rosparam + [u'collision_time_threshold']
-fill_velocity_values = rosparam + [u'fill_velocity_values']
-debug = rosparam + [u'debug']
-plot_trajectory = rosparam + [u'plot_trajectory']
-enable_collision_marker = rosparam + [u'enable_collision_marker']
-ignored_self_collisions = rosparam + [u'self_collision_matrix', u'ignore']
-added_self_collisions = rosparam + [u'self_collision_matrix', u'add']
+joint_cost = general_options + [u'joint_weights']
+default_joint_cost_identifier = joint_cost + [u'default']
+
+# qp solver
+qp_solver = rosparam + [u'qp_solver']
+nWSR = qp_solver + [u'nWSR']
+
+# plugins
+plugins = rosparam + [u'plugins']
+enable_VisualizationBehavior = plugins + [u'VisualizationBehavior', u'enabled']
+enable_CPIMarker = plugins + [u'CPIMarker', u'enabled']
+enable_PlotTrajectory = plugins + [u'PlotTrajectory', u'enabled']
+fft_duration = plugins + [u'WiggleCancel', u'fft_duration']
+wiggle_detection_threshold = plugins + [u'WiggleCancel', u'wiggle_detection_threshold']
+min_wiggle_frequency = plugins + [u'WiggleCancel', u'min_wiggle_frequency']
+
+# behavior tree
+behavior_tree = rosparam + [u'behavior_tree']
+debug = behavior_tree + [u'debug']
+tree_tick_rate = behavior_tree + [u'tree_tick_rate']
+
+# collision avoidance
+collision_avoidance = rosparam + [u'collision_avoidance']
+
+distance_thresholds = collision_avoidance + [u'distance_thresholds']
+default_collision_distances = distance_thresholds + [u'default']
+
+self_collision_avoidance = collision_avoidance + [u'self_collision_avoidance']
+ignored_self_collisions = self_collision_avoidance + [u'ignore']
+added_self_collisions = self_collision_avoidance + [u'add']
+
+external_collision_avoidance = collision_avoidance + [u'external_collision_avoidance']
+number_of_repeller = external_collision_avoidance + [u'number_of_repeller']

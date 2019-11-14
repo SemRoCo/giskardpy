@@ -12,11 +12,6 @@ from giskardpy.utils import resolve_ros_iris
 from giskardpy.world import World
 from giskardpy.world_object import WorldObject
 
-# TODO globally define map
-
-MAP = u'map'
-
-
 class PyBulletWorld(World):
     """
     Wraps around the shitty pybullet api.

@@ -22,8 +22,7 @@ else:
 
 class Robot(Backend):
     def __init__(self, urdf, joint_weights=None, base_pose=None, controlled_joints=None, path_to_data_folder=u'',
-                 joint_vel_limit=None,
-                 joint_acc_limit=None, calc_self_collision_matrix=True, *args, **kwargs):
+                 joint_vel_limit=None, joint_acc_limit=None, calc_self_collision_matrix=True, *args, **kwargs):
         """
         :param urdf:
         :type urdf: str
@@ -233,7 +232,7 @@ class Robot(Backend):
         :rtype: float
         """
         limit = self._urdf_robot.joint_map[joint_name].limit
-        t = w.Symbol(u'rosparam_sample_period')  # TODO this should be a parameter
+        t = w.Symbol(u'rosparam_general_options_sample_period')  # TODO this should be a parameter
         if limit is None or limit.velocity is None:
             return self._joint_velocity_limit[joint_name]
         else:

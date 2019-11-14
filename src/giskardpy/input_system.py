@@ -1,4 +1,4 @@
-from giskardpy import w
+from giskardpy import symbolic_wrapper as w
 from giskardpy.utils import KeyDefaultDict
 
 

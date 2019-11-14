@@ -5,7 +5,7 @@ from itertools import combinations
 
 from geometry_msgs.msg import PoseStamped
 
-from giskardpy import WORLD_IMPLEMENTATION, w
+from giskardpy import WORLD_IMPLEMENTATION, symbolic_wrapper as w
 from giskardpy.pybullet_world_object import PyBulletWorldObject
 from giskardpy.qp_problem_builder import HardConstraint, JointConstraint
 from giskardpy.utils import KeyDefaultDict, \

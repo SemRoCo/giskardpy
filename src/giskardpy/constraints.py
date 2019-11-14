@@ -9,7 +9,7 @@ from rospy_message_converter.message_converter import convert_dictionary_to_ros_
 from scipy.optimize import curve_fit
 
 import giskardpy.identifier as identifier
-from giskardpy import w
+from giskardpy import symbolic_wrapper as w
 from giskardpy.exceptions import GiskardException
 from giskardpy.input_system import PoseStampedInput, Point3Input, Vector3Input, Vector3StampedInput, FrameInput, \
     PointStampedInput, TranslationInput

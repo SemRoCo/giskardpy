@@ -5,7 +5,7 @@ from collections import OrderedDict, namedtuple
 from time import time
 
 # from giskardpy import BACKEND
-from giskardpy import logging, w
+from giskardpy import logging, symbolic_wrapper as w
 from giskardpy.exceptions import QPSolverException
 from giskardpy.qp_solver import QPSolver
 

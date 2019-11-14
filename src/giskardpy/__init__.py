@@ -7,7 +7,7 @@ MAP = u'map'
 
 BACKEND = u'symengine'
 # import symengine_wrappers as w
-import casadi_wrapper as w
+import casadi_wrapper as symbolic_wrapper
 
 
 WORLD_IMPLEMENTATION = u'pybullet'

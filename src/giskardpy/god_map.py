@@ -2,8 +2,7 @@ import copy
 from copy import copy
 from multiprocessing import Lock
 
-import symengine_wrappers as sw
-
+from giskardpy import symbolic_wrapper as w
 
 def get_member(identifier, member):
     """
@@ -18,9 +17,14 @@ def get_member(identifier, member):
     except TypeError:
         if callable(identifier):
             return identifier(*member)
-        return getattr(identifier, member)
+        try:
+            return getattr(identifier, member)
+        except TypeError:
+            pass
     except IndexError:
         return identifier[int(member)]
+    except RuntimeError:
+        pass
 
 
 def get_data(identifier, data, default_value=0.0):
@@ -46,6 +50,8 @@ def get_data(identifier, data, default_value=0.0):
         # raise KeyError(identifier)
         # TODO is this really a good idea?
         # I do this because it automatically sets weights for unused goals to 0
+        return default_value
+    except IndexError:
         return default_value
     return result
 
@@ -109,7 +115,7 @@ class GodMap(object):
         identifier = tuple(identifier)
         identifier_parts = identifier
         if identifier not in self.key_to_expr:
-            expr = sw.Symbol(self.expr_separator.join([str(x) for x in identifier]))
+            expr = w.Symbol(self.expr_separator.join([str(x) for x in identifier]))
             if expr in self.expr_to_key:
                 raise Exception(u'{} not allowed in key'.format(self.expr_separator))
             self.key_to_expr[identifier] = expr

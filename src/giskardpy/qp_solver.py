@@ -10,13 +10,22 @@ from giskardpy import logging
 class QPSolver(object):
     RETURN_VALUE_DICT = {value: name for name, value in vars(PyReturnValue).items()}
 
-    def __init__(self, dim_a, dim_b):
+    def __init__(self, h, j, s):
         """
         :param dim_a: number of joint constraints + number of soft constraints
         :type int
         :param dim_b: number of hard constraints + number of soft constraints
         :type int
         """
+        # self.init(dim_a, dim_b)
+        self.h = h
+        self.j = j
+        self.s = s
+        self.started = False
+        self.shape = (0,0)
+        pass
+
+    def init(self, dim_a, dim_b):
         self.qpProblem = qpoases.PySQProblem(dim_a, dim_b)
         options = qpoases.PyOptions()
         options.setToMPC()
@@ -50,6 +59,20 @@ class QPSolver(object):
         :return: x according to the equations above, len = joint constraints + soft constraints
         :type np.array
         """
+        j_mask = H.sum(axis=1) != 0
+        s_mask = j_mask[self.j:]
+        h_mask = np.concatenate((np.array([True] * self.h), s_mask))
+        A = A[h_mask][:,j_mask].copy()
+        lbA = lbA[h_mask]
+        ubA = ubA[h_mask]
+        lb = lb[j_mask]
+        ub = ub[j_mask]
+        H = H[j_mask][:,j_mask]
+        g = np.zeros(H.shape[0])
+        if A.shape != self.shape:
+            self.started = False
+            self.shape = A.shape
+
         number_of_retries = 2
         while number_of_retries > 0:
             if nWSR is None:
@@ -58,6 +81,7 @@ class QPSolver(object):
                 nWSR = np.array([nWSR])
             number_of_retries -= 1
             if not self.started:
+                self.init(A.shape[1], A.shape[0])
                 success = self.qpProblem.init(H, g, A, lb, ub, lbA, ubA, nWSR)
                 if success == PyReturnValue.MAX_NWSR_REACHED:
                     self.started = False

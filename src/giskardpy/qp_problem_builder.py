@@ -4,12 +4,11 @@ import warnings
 from collections import OrderedDict, namedtuple
 from time import time
 
-import giskardpy.symengine_wrappers as spw
 # from giskardpy import BACKEND
-from giskardpy import logging
+from giskardpy import logging, symbolic_wrapper as w
 from giskardpy.exceptions import QPSolverException
 from giskardpy.qp_solver import QPSolver
-from giskardpy.symengine_wrappers import load_compiled_function, safe_compiled_function
+
 
 SoftConstraint = namedtuple(u'SoftConstraint', [u'lower', u'upper', u'weight', u'expression'])
 HardConstraint = namedtuple(u'HardConstraint', [u'lower', u'upper', u'expression'])
@@ -17,14 +16,13 @@ JointConstraint = namedtuple(u'JointConstraint', [u'lower', u'upper', u'weight']
 
 BIG_NUMBER = 1e9
 
-
 class QProblemBuilder(object):
     """
     Wraps around QPOases. Builds the required matrices from constraints.
     """
 
     def __init__(self, joint_constraints_dict, hard_constraints_dict, soft_constraints_dict, controlled_joint_symbols,
-                 free_symbols=None, path_to_functions='', backend='llvm', opt_level=0):
+                 free_symbols=None, path_to_functions=''):
         """
         :type joint_constraints_dict: dict
         :type hard_constraints_dict: dict
@@ -45,20 +43,20 @@ class QProblemBuilder(object):
         self.hard_constraints_dict = hard_constraints_dict
         self.soft_constraints_dict = soft_constraints_dict
         self.controlled_joints = controlled_joint_symbols
-        self.make_matrices(backend, opt_level)
+        self.make_matrices()
 
         self.shape1 = len(self.hard_constraints_dict) + len(self.soft_constraints_dict)
         self.shape2 = len(self.joint_constraints_dict) + len(self.soft_constraints_dict)
 
-        self.qp_solver = QPSolver(len(self.joint_constraints_dict) + len(self.soft_constraints_dict),
-                                  len(self.hard_constraints_dict) + len(self.soft_constraints_dict))
+        self.qp_solver = QPSolver(len(self.hard_constraints_dict),
+                                  len(self.joint_constraints_dict),
+                                  len(self.soft_constraints_dict))
         self.lbAs = None  # for debugging purposes
 
     def get_expr(self):
         return self.cython_big_ass_M.str_params
 
-    #
-    def make_matrices(self, backend='llvm', opt_level=0):
+    def make_matrices(self):
         """
         Turns constrains into a function that computes the matrices needed for QPOases.
         """
@@ -86,55 +84,64 @@ class QProblemBuilder(object):
             ubA.append(c.upper)
             lb.append(-BIG_NUMBER)
             ub.append(BIG_NUMBER)
-            assert not isinstance(c.expression, spw.Matrix), u'Matrices are not allowed as soft constraint expression'
+            assert not w.is_matrix(c.expression), u'Matrices are not allowed as soft constraint expression'
             soft_expressions.append(c.expression)
 
-        self.cython_big_ass_M = load_compiled_function(self.path_to_functions)
+        self.cython_big_ass_M = w.load_compiled_function(self.path_to_functions)
         self.np_g = np.zeros(len(weights))
 
         if self.cython_big_ass_M is None:
-            logging.loginfo(u'new controller requested; compiling')
-            self.H = spw.diag(*weights)
+            logging.loginfo(u'new controller with {} constraints requested; compiling'.format(len(soft_expressions)))
+            h = len(self.hard_constraints_dict)
+            s = len(self.soft_constraints_dict)
+            c = len(self.joint_constraints_dict)
 
-            self.lb = spw.Matrix(lb)
-            self.ub = spw.Matrix(ub)
+            #       c           s       1      1
+            #   |----------------------------------
+            # h | A hard    |   0    |       |
+            #   | -------------------| lbA   | ubA
+            # s | A soft    |identity|       |
+            #   |-----------------------------------
+            #c+s| H                  | lb    | ub
+            #   | ----------------------------------
+            self.big_ass_M = w.zeros(h+s+s+c, c+s+2)
+
+            self.big_ass_M[h+s:,:-2] = w.diag(*weights)
+
+            self.lb = w.Matrix(lb)
+            self.ub = w.Matrix(ub)
 
             # make A
             # hard part
-            M_controlled_joints = spw.Matrix(self.controlled_joints)
-            A_hard = spw.Matrix(hard_expressions)
-            A_hard = A_hard.jacobian(M_controlled_joints)
-            zerosHxS = spw.zeros(A_hard.shape[0], len(soft_expressions))
-            A_hard = A_hard.row_join(zerosHxS)
+            A_hard = w.Matrix(hard_expressions)
+            A_hard = w.jacobian(A_hard, self.controlled_joints)
+            self.big_ass_M[:h, :c] = A_hard
 
             # soft part
-            A_soft = spw.Matrix(soft_expressions)
+            A_soft = w.Matrix(soft_expressions)
             t = time()
-            A_soft = A_soft.jacobian(M_controlled_joints)
+            A_soft = w.jacobian(A_soft, self.controlled_joints)
             logging.loginfo(u'jacobian took {}'.format(time() - t))
-            identity = spw.eye(A_soft.shape[0])
-            A_soft = A_soft.row_join(identity)
+            identity = w.eye(A_soft.shape[0])
+            self.big_ass_M[h:h+s, :c] = A_soft
+            self.big_ass_M[h:h+s, c:c+s] = identity
 
-            # final A
-            self.A = A_hard.col_join(A_soft)
 
-            self.lbA = spw.Matrix(lbA)
-            self.ubA = spw.Matrix(ubA)
+            self.lbA = w.Matrix(lbA)
+            self.ubA = w.Matrix(ubA)
 
-            big_ass_M_A = self.A.row_join(self.lbA).row_join(self.ubA)
-            big_ass_M_H = self.H.row_join(self.lb).row_join(self.ub)
-            # putting everything into one big matrix to take full advantage of cse in speed_up()
-            self.big_ass_M = big_ass_M_A.col_join(big_ass_M_H)
+            self.big_ass_M[:h+s, c+s] = self.lbA
+            self.big_ass_M[:h+s, c+s+1] = self.ubA
+            self.big_ass_M[h+s:, c+s] = self.lb
+            self.big_ass_M[h+s:, c+s+1] = self.ub
 
             t = time()
             if self.free_symbols is None:
-                self.free_symbols = self.big_ass_M.free_symbols
-            self.cython_big_ass_M = spw.speed_up(self.big_ass_M,
-                                                 self.free_symbols,
-                                                 backend=backend,
-                                                 opt_level=opt_level)
+                self.free_symbols = w.free_symbols(self.big_ass_M)
+            self.cython_big_ass_M = w.speed_up(self.big_ass_M,
+                                               self.free_symbols)
             if self.path_to_functions is not None:
-                safe_compiled_function(self.cython_big_ass_M, self.path_to_functions)
+                # safe_compiled_function(self.cython_big_ass_M, self.path_to_functions)
                 logging.loginfo(u'autowrap took {}'.format(time() - t))
         else:
             logging.loginfo(u'controller loaded {}'.format(self.path_to_functions))
@@ -153,8 +160,8 @@ class QProblemBuilder(object):
         lbA = []
         weights = []
         xdot = []
-        if xdot_full is not None:
-            A_dot_x = np_A.dot(xdot_full)
+        # if xdot_full is not None:
+        #     A_dot_x = np_A.dot(xdot_full)
         for iJ, k in enumerate(self.joint_constraints_dict.keys()):
             key = 'j -- ' + str(k)
             lb.append(key)
@@ -183,31 +190,31 @@ class QProblemBuilder(object):
             key = 's -- ' + str(k)
             lbA.append(key)
             weights.append(key)
-            xdot.append(key)
+            # xdot.append(key)
         p_lb = pd.DataFrame(np_lb[:-len(self.soft_constraints_dict)], lb).sort_index()
         p_ub = pd.DataFrame(np_ub[:-len(self.soft_constraints_dict)], lb).sort_index()
         p_lbA = pd.DataFrame(np_lbA, lbA).sort_index()
-        if xdot_full is not None:
-            p_A_dot_x = pd.DataFrame(A_dot_x, lbA).sort_index()
+        # if xdot_full is not None:
+        #     p_A_dot_x = pd.DataFrame(A_dot_x, lbA).sort_index()
         p_ubA = pd.DataFrame(np_ubA, lbA).sort_index()
         p_weights = pd.DataFrame(np_H.dot(np.ones(np_H.shape[0])), weights).sort_index()
         if xdot_full is not None:
-            p_xdot = pd.DataFrame(xdot_full, xdot).sort_index()
+            p_xdot = pd.DataFrame(xdot_full[:len(xdot)], xdot).sort_index()
         p_A = pd.DataFrame(np_A, lbA, weights).sort_index(1).sort_index(0)
         if self.lbAs is None:
             self.lbAs = p_lbA
         else:
             self.lbAs = self.lbAs.T.append(p_lbA.T, ignore_index=True).T
             # self.lbAs.T[[c for c in self.lbAs.T.columns if 'dist' in c]].plot()
-        arrays = [(p_weights, u'H'),
-                  (p_A, u'A'),
-                  (p_lbA, u'lbA'),
-                  (p_ubA, u'ubA'),
-                  (p_lb, u'lb'),
-                  (p_ub, u'ub')]
-        for a, name in arrays:
-            self.check_for_nan(name, a)
-            self.check_for_big_numbers(name, a)
+        # arrays = [(p_weights, u'H'),
+        #           (p_A, u'A'),
+        #           (p_lbA, u'lbA'),
+        #           (p_ubA, u'ubA'),
+        #           (p_lb, u'lb'),
+        #           (p_ub, u'ub')]
+        # for a, name in arrays:
+        #     self.check_for_nan(name, a)
+        #     self.check_for_big_numbers(name, a)
         pass
 
     def check_for_nan(self, name, p_array):

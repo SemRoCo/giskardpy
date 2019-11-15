@@ -10,7 +10,7 @@ from collections import namedtuple
 from geometry_msgs.msg import PoseStamped
 from hypothesis import given
 import hypothesis.strategies as st
-import giskardpy.symengine_wrappers as sw
+from giskardpy import w, identifier
 from giskardpy.god_map import GodMap
 from utils_for_tests import variable_name, keys_values, lists_of_same_length, pr2_urdf
 from giskardpy.world import World
@@ -249,7 +249,7 @@ class TestGodMap(unittest.TestCase):
     def test_to_symbol(self, key, value):
         gm = GodMap()
         gm.safe_set_data([key], value)
-        self.assertTrue(isinstance(gm.to_symbol([key]), sw.Symbol))
+        self.assertTrue(w.is_symbol(gm.to_symbol([key])))
         self.assertTrue(key in str(gm.to_symbol([key])))
 
     @given(lists_of_same_length([variable_name(), st.floats()], unique=True))
@@ -259,15 +259,26 @@ class TestGodMap(unittest.TestCase):
         for key, value in zip(keys, values):
             gm.safe_set_data([key], value)
             gm.to_symbol([key])
-        self.assertEqual(len(gm.get_values()), len(keys))
+        self.assertEqual(len(gm.get_values(keys)), len(keys))
 
     def test_god_map_with_world(self):
         gm = GodMap()
         w = World()
         r = WorldObject(pr2_urdf())
-        w.add_robot(r, PoseStamped(), [], 0, KeyDefaultDict(lambda key: 0), False)
+        w.add_robot(robot=r,
+                    base_pose=PoseStamped(),
+                    controlled_joints=[],
+                    joint_vel_limit=KeyDefaultDict(lambda key: 0),
+                    joint_acc_limit=KeyDefaultDict(lambda key: 0),
+                    joint_weights=KeyDefaultDict(lambda key: 0),
+                    calc_self_collision_matrix=False,
+                    ignored_pairs=set(),
+                    added_pairs=set(),
+                    symengine_backend='llvm',
+                    symengine_opt_level=0)
         gm.safe_set_data([u'world'], w)
-        assert r == gm.safe_get_data([u'world', u'robot'])
+        gm_robot = gm.safe_get_data(identifier.robot)
+        assert 'pr2' == gm_robot.get_name()
 
 
 if __name__ == '__main__':

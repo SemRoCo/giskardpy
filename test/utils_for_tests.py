@@ -769,3 +769,19 @@ class Boxy(GiskardTestWrapper):
                                                                        goal_pose.pose.orientation.w]))[0]}
         self.allow_all_collisions()
         self.send_and_check_joint_goal(js)
+
+class HSR(GiskardTestWrapper):
+    def __init__(self):
+        self.tip = u'hand_palm_link'
+        super(HSR, self).__init__(u'hsr.yaml')
+
+    def move_base(self, goal_pose):
+        goal_pose = transform_pose(self.default_root, goal_pose)
+        js = {u'odom_x': goal_pose.pose.position.x,
+              u'odom_y': goal_pose.pose.position.y,
+              u'odom_t': rotation_from_matrix(quaternion_matrix([goal_pose.pose.orientation.x,
+                                                                       goal_pose.pose.orientation.y,
+                                                                       goal_pose.pose.orientation.z,
+                                                                       goal_pose.pose.orientation.w]))[0]}
+        self.allow_all_collisions()
+        self.send_and_check_joint_goal(js)

@@ -462,7 +462,7 @@ class World(object):
         for contact_info in collisions.items():  # type: ClosestPointInfo
             if contact_info is None:
                 continue
-            movable_joint = self.robot.get_movable_parent_joint(contact_info.link_a)
+            movable_joint = self.robot.get_controlled_parent_joint(contact_info.link_a)
             f = self.robot.get_child_link_of_joint(movable_joint)
             f_T_r = self.robot.get_fk_np(f, self.robot.get_root())
             contact_info.frame = f

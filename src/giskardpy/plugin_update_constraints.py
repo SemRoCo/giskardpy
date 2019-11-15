@@ -115,7 +115,7 @@ class GoalToConstraints(GetGoal):
         Adds a constraint for each link that pushed it away from its closest point.
         """
         soft_constraints = {}
-        for joint_name in self.get_robot().get_controllable_joints():
+        for joint_name in self.get_robot().controlled_joints:
             for i in range(self.get_god_map().safe_get_data(identifier.number_of_repeller)):
                 constraint = ExternalCollisionAvoidance(self.god_map, joint_name,
                                                     max_weight_distance=self.get_god_map().safe_get_data(

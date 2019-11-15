@@ -624,13 +624,6 @@ class URDFObject(object):
         return self._urdf_robot.joint_map[joint_name].parent
 
     @memoize
-    def get_movable_parent_joint(self, link_name):
-        joint = self.get_parent_joint_of_link(link_name)
-        while self.is_joint_fixed(joint):
-            joint = self.get_parent_joint_of_joint(joint)
-        return joint
-
-    @memoize
     def get_child_link_of_joint(self, joint_name):
         return self._urdf_robot.joint_map[joint_name].child
 

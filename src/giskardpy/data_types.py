@@ -87,7 +87,7 @@ class Collisions(object):
         :return:
         """
         body_b = key[1]
-        movable_joint = self.robot.get_movable_parent_joint(key[0])
+        movable_joint = self.robot.get_controlled_parent_joint(key[0])
         self.all_collisions.add(contact)
 
         if body_b == self.robot.get_name():

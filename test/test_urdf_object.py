@@ -96,7 +96,7 @@ class TestUrdfObject(object):
 
     def test_get_movable_parent_joint(self, function_setup):
         parsed_pr2 = self.cls(pr2_urdf())
-        assert parsed_pr2.get_movable_parent_joint(u'l_gripper_tool_frame') == u'l_wrist_roll_joint'
+        assert parsed_pr2.get_controlled_parent_joint(u'l_gripper_tool_frame') == u'l_wrist_roll_joint'
 
     def test_get_link_names_from_chain(self, function_setup):
         pass

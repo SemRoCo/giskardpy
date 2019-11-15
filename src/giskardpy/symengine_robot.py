@@ -76,6 +76,13 @@ class Robot(Backend):
         # self._evaluated_fks.clear()
         self.get_fk_np.memo.clear()
 
+    @memoize
+    def get_controlled_parent_joint(self, link_name):
+        joint = self.get_parent_joint_of_link(link_name)
+        while joint not in self.controlled_joints:
+            joint = self.get_parent_joint_of_joint(joint)
+        return joint
+
     def get_joint_state_positions(self):
         try:
             return self.__joint_state_positions

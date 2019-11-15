@@ -785,3 +785,17 @@ class HSR(GiskardTestWrapper):
                                                                        goal_pose.pose.orientation.w]))[0]}
         self.allow_all_collisions()
         self.send_and_check_joint_goal(js)
+
+    def open_gripper(self):
+        js = {u'hand_l_spring_proximal_joint': 0.7,
+              u'hand_r_spring_proximal_joint': 0.7}
+        self.send_and_check_joint_goal(js)
+
+    def close_gripper(self):
+        js = {u'hand_l_spring_proximal_joint': 0,
+              u'hand_r_spring_proximal_joint': 0}
+        self.send_and_check_joint_goal(js)
+
+    # def command_gripper(self, width):
+    #     js = {u'hand_motor_joint': width}
+    #     self.send_and_check_joint_goal(js)

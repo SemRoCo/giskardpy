@@ -63,7 +63,7 @@ def giskard(request, ros):
 @pytest.fixture()
 def resetted_giskard(giskard):
     """
-    :type giskard: PR2
+    :type giskard: HSR
     """
     logging.loginfo(u'resetting giskard')
     giskard.clear_world()
@@ -71,6 +71,7 @@ def resetted_giskard(giskard):
     base_goal.header.frame_id = u'map'
     base_goal.pose.orientation.w = 1
     giskard.move_base(base_goal)
+    giskard.close_gripper()
     return giskard
 
 
@@ -131,15 +132,23 @@ class TestCollisionAvoidanceGoals(object):
         box_name = u'asdf'
         box_pose = PoseStamped()
         box_pose.header.frame_id = u'map'
-        box_pose.pose.position = Point(0.85, 0, .66)
+        box_pose.pose.position = Point(0.85, 0.3, .66)
         box_pose.pose.orientation = Quaternion(0, 0, 0, 1)
 
         box_setup.add_box(box_name, [0.07, 0.04, 0.1], box_pose)
+        box_setup.open_gripper()
 
         grasp_pose = deepcopy(box_pose)
-        grasp_pose.pose.position.x -= 0.1
+        grasp_pose.pose.position.x -= 0.05
         grasp_pose.pose.orientation = Quaternion(*quaternion_from_matrix([[0, 0, 1, 0],
                                                                           [0, -1, 0, 0],
                                                                           [1, 0, 0, 0],
                                                                           [0, 0, 0, 1]]))
         box_setup.set_and_check_cart_goal(grasp_pose, box_setup.tip)
+        box_setup.attach_existing(box_name, box_setup.tip)
+
+        base_goal = PoseStamped()
+        base_goal.header.frame_id = box_setup.default_root
+        base_goal.pose.position.x -= 1
+        base_goal.pose.orientation.w = 1
+        box_setup.move_base(base_goal)

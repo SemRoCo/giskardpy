@@ -485,18 +485,21 @@ class CartesianOrientationSlerp(BasicCartesianConstraint):
         return soft_constraints
 
 
-class CartesianPose(BasicCartesianConstraint):
+class CartesianPose(Constraint):
     # TODO do this with multi inheritance
     goal = u'goal'
     weight = u'weight'
     gain = u'gain'
     max_speed = u'max_speed'
 
-    def __init__(self, god_map, root_link, tip_link, goal, weight=HIGH_WEIGHT, gain=3, max_speed=0.1):
-        super(CartesianPose, self).__init__(god_map, root_link, tip_link, goal, weight, gain, max_speed)
+    def __init__(self, god_map, root_link, tip_link, goal, weight=HIGH_WEIGHT, gain=3, translation_max_speed=0.1,
+                 rotation_max_speed=0.5):
+        super(CartesianPose, self).__init__(god_map)
         self.constraints = []
-        self.constraints.append(CartesianPosition(god_map, root_link, tip_link, goal, weight, gain, max_speed))
-        self.constraints.append(CartesianOrientationSlerp(god_map, root_link, tip_link, goal, weight, gain, max_speed))
+        self.constraints.append(CartesianPosition(god_map, root_link, tip_link, goal, weight, gain,
+                                                  translation_max_speed))
+        self.constraints.append(CartesianOrientationSlerp(god_map, root_link, tip_link, goal, weight, gain,
+                                                          rotation_max_speed))
 
     def get_constraint(self):
         soft_constraints = OrderedDict()

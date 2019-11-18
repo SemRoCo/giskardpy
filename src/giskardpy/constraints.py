@@ -864,6 +864,16 @@ class Pointing(Constraint):
     weight = u'weight'
 
     def __init__(self, god_map, tip, goal_point, root=None, pointing_axis=None, weight=HIGH_WEIGHT):
+        """
+        :type tip: str
+        :param goal_point: json representing PointStamped
+        :type goal_point: str
+        :param root: default is root link of robot
+        :type root: str
+        :param pointing_axis: json representing Vector3Stamped, default is z axis
+        :type pointing_axis: str
+        :type weight: float
+        """
         super(Pointing, self).__init__(god_map)
         if root is None:
             self.root = self.get_robot().get_root()

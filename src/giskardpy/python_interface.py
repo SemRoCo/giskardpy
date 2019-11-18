@@ -2,6 +2,7 @@ import json
 
 import rospy
 from actionlib import SimpleActionClient
+from genpy import Message
 from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped
 from giskard_msgs.msg import MoveAction, MoveGoal, WorldBody, CollisionEntry, MoveResult, Constraint, \
     MoveCmd, JointConstraint, CartesianConstraint
@@ -175,6 +176,9 @@ class GiskardWrapper(object):
     def set_json_goal(self, constraint_type, **kwargs):
         constraint = Constraint()
         constraint.type = constraint_type
+        for k, v in kwargs.items():
+            if isinstance(v, Message):
+                kwargs[k] = convert_ros_message_to_dictionary(v)
         constraint.parameter_value_pair = json.dumps(kwargs)
         self.cmd_seq[-1].constraints.append(constraint)
 

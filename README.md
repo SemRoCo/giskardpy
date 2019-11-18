@@ -29,7 +29,7 @@ catkin build                                # build packages
 source ~/giskardpy_ws/devel/setup.bash      # source new overlay
 ```
 
-### symengine
+### (optional) symengine
 If you want to use the symengine backend, it can be install like this (does not have to be part of the ros workspace):
 ```
 sudo apt-get install llvm-6.0-dev # or llvm-8-dev if you are using 18.04

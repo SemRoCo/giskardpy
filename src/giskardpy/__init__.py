@@ -1,17 +1,13 @@
 DEBUG = 0
 NORMAL = 1
 ERROR = 2
-# TODO figure out how to do this print level shit properly
 PRINT_LEVEL = NORMAL
 
 MAP = u'map'
 
-# BACKEND = None
-# BACKEND = 'cse'
-# BACKEND = 'numpy'
-# BACKEND = 'cython'
+BACKEND = u'symengine'
+# import symengine_wrappers as w
+import casadi_wrapper as symbolic_wrapper
 
-BACKEND = 'llvm'
-# BACKEND = 'lambda'
 
 WORLD_IMPLEMENTATION = u'pybullet'

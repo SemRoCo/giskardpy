@@ -6,9 +6,7 @@ import rospy
 from control_msgs.msg import JointTrajectoryControllerState
 from giskard_msgs.msg import MoveAction
 from py_trees import Sequence, Selector, BehaviourTree, Blackboard
-from py_trees.behaviours import Count
-from py_trees.decorators import Condition
-from py_trees.meta import failure_is_success, success_is_failure
+from py_trees.meta import failure_is_success, success_is_failure, success_is_running
 from py_trees_ros.trees import BehaviourTree
 from rospy import ROSException
 
@@ -40,7 +38,6 @@ from giskardpy.plugin_visualization import VisualizationBehavior
 from giskardpy.pybullet_world import PyBulletWorld
 from giskardpy.utils import create_path, render_dot_tree, KeyDefaultDict
 from giskardpy.world_object import WorldObject
-
 
 def initialize_god_map():
     god_map = GodMap()
@@ -75,15 +72,14 @@ def initialize_god_map():
 
 
 
-    joint_weight_symbols = process_joint_specific_params(identifier.joint_weights,
-                                                         identifier.default_joint_weight_identifier, god_map)
+    joint_weight_symbols = process_joint_specific_params(identifier.joint_cost,
+                                                         identifier.default_joint_cost_identifier, god_map)
 
-    process_joint_specific_params(identifier.collisions_distances, identifier.default_collision_distances, god_map)
+    process_joint_specific_params(identifier.distance_thresholds, identifier.default_collision_distances, god_map)
 
     joint_vel_symbols = process_joint_specific_params(identifier.joint_vel, identifier.default_joint_vel, god_map)
 
     joint_acc_symbols = process_joint_specific_params(identifier.joint_acc, identifier.default_joint_acc, god_map)
-
 
     world = PyBulletWorld(god_map.safe_get_data(identifier.gui),
                           blackboard.god_map.safe_get_data(identifier.data_folder))
@@ -93,9 +89,7 @@ def initialize_god_map():
                         controlled_joints)
     world.add_robot(robot, None, controlled_joints, joint_vel_symbols, joint_acc_symbols, joint_weight_symbols, True,
                     ignored_pairs=god_map.safe_get_data(identifier.ignored_self_collisions),
-                    added_pairs=god_map.safe_get_data(identifier.added_self_collisions),
-                    symengine_backend=god_map.safe_get_data(identifier.symengine_backend),
-                    symengine_opt_level=god_map.safe_get_data(identifier.symengine_opt_level))
+                    added_pairs=god_map.safe_get_data(identifier.added_self_collisions))
     joint_position_symbols = JointStatesInput(blackboard.god_map.to_symbol, world.robot.get_controllable_joints(),
                                 identifier.joint_states,
                                 suffix=[u'position'])
@@ -125,6 +119,8 @@ def grow_tree():
     # ----------------------------------------------
     planning_3 = PluginBehavior(u'planning III', sleep=0)
     planning_3.add_plugin(CollisionChecker(u'coll'))
+    # if god_map.safe_get_data(identifier.enable_collision_marker):
+    #     planning_3.add_plugin(success_is_running(CPIMarker)(u'cpi marker'))
     planning_3.add_plugin(ControllerPlugin(u'controller'))
     planning_3.add_plugin(KinSimPlugin(u'kin sim'))
     planning_3.add_plugin(LogTrajPlugin(u'log'))
@@ -140,9 +136,9 @@ def grow_tree():
     planning_2 = failure_is_success(Selector)(u'planning II')
     planning_2.add_child(GoalCanceled(u'goal canceled', action_server_name))
     # planning.add_child(CollisionCancel(u'in collision', collision_time_threshold))
-    if god_map.safe_get_data(identifier.marker_visualization):
+    if god_map.safe_get_data(identifier.enable_VisualizationBehavior):
         planning_2.add_child(success_is_failure(VisualizationBehavior)(u'visualization'))
-    if god_map.safe_get_data(identifier.enable_collision_marker):
+    if god_map.safe_get_data(identifier.enable_CPIMarker):
         planning_2.add_child(success_is_failure(CPIMarker)(u'cpi marker'))
     planning_2.add_child(planning_3)
     # ----------------------------------------------
@@ -165,7 +161,7 @@ def grow_tree():
     root.add_child(wait_for_goal)
     root.add_child(CleanUp(u'cleanup'))
     root.add_child(process_move_goal)
-    if god_map.safe_get_data(identifier.plot_trajectory):
+    if god_map.safe_get_data(identifier.enable_PlotTrajectory):
         root.add_child(PlotTrajectory(u'plot trajectory'))
     root.add_child(move_robot)
     root.add_child(SendResult(u'send result', action_server_name, MoveAction))

@@ -7,6 +7,7 @@ import giskardpy.identifier as identifier
 from giskardpy.plugin import GiskardBehavior
 from giskardpy import logging
 
+#fast
 
 class GoalReachedPlugin(GiskardBehavior):
     def __init__(self, name):

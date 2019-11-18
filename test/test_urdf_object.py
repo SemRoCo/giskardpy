@@ -90,6 +90,14 @@ class TestUrdfObject(object):
         parsed_pr2 = self.cls(pr2_urdf())
         assert parsed_pr2.get_parent_link_of_link(u'l_gripper_tool_frame') == u'l_gripper_palm_link'
 
+    def test_get_parent_joint_of_joint(self, function_setup):
+        parsed_pr2 = self.cls(pr2_urdf())
+        assert parsed_pr2.get_parent_joint_of_joint(u'l_gripper_tool_joint') == u'l_gripper_palm_joint'
+
+    def test_get_movable_parent_joint(self, function_setup):
+        parsed_pr2 = self.cls(pr2_urdf())
+        assert parsed_pr2.get_controlled_parent_joint(u'l_gripper_tool_frame') == u'l_wrist_roll_joint'
+
     def test_get_link_names_from_chain(self, function_setup):
         pass
 
@@ -294,6 +302,9 @@ class TestUrdfObject(object):
         lower_limit, upper_limit = parsed_base_bot.get_joint_limits(u'joint_x')
         assert lower_limit == -3
         assert upper_limit == 3
+
+    def get_movable_parent(self, function_setup):
+        parsed_pr2 = self.cls(pr2_urdf())
 
     def test_get_joint_names_from_chain(self, function_setup):
         pass

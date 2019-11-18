@@ -1,20 +1,14 @@
-import numpy as np
 import os
 import pickle
+
+import casadi as ca
+import numpy as np
+from casadi import sign, cos, acos, sin, sqrt, atan2, qpsol
 from numpy import pi
-from warnings import warn
 
-import symengine as se
-from symengine import Matrix, Symbol, eye, sympify, diag, zeros, lambdify, Abs, Max, Min, sin, cos, tan, acos, asin, \
-    atan, atan2, nan, sqrt, log, tanh, var, floor, Piecewise, sign, Eq
-from symengine.lib.symengine_wrapper import Lambdify
-
+from giskardpy import logging
 from giskardpy.exceptions import SymengineException
 from giskardpy.utils import create_path
-from giskardpy import logging
-
-Compiler_Backend = u'llvm'
-Opt_Level = 0
 
 pathSeparator = '_'
 
@@ -22,68 +16,81 @@ pathSeparator = '_'
 VERY_SMALL_NUMBER = 1e-100
 SMALL_NUMBER = 1e-10
 
-def is_matrix(expression):
-    return isinstance(expression, se.Matrix)
+def diag(*args):
+    return ca.diag(Matrix(args))
 
-def is_symbol(expression):
-    return isinstance(expression, se.Symbol)
+def Symbol(data):
+    if isinstance(data, str) or isinstance(data, unicode):
+        return ca.SX.sym(data)
+    return ca.SX(data)
 
 def jacobian(expressions, symbols):
-    return expressions.jacobian(Matrix(symbols))
+    return ca.jacobian(expressions, Matrix(symbols))
 
 def equivalent(expression1, expression2):
-    return expression1 == expression2
+    return ca.is_equal(ca.simplify(expression1), ca.simplify(expression2), 1)
+
+def free_symbols(expression):
+    return ca.symvar(expression)
+
+def is_matrix(expression):
+    return hasattr(expression, 'shape') and expression.shape[0] * expression.shape[1] > 1
+
+def is_symbol(expression):
+    return expression.shape[0] * expression.shape[1] == 1
 
 def compile_and_execute(f, params):
     symbols = []
     input = []
 
-    class next_symbol(object):
-        symbol_counter = 0
+    # class next_symbol(object):
+    #     symbol_counter = 0
+    #
+    #     def __call__(self):
+    #         self.symbol_counter += 1
+    #         return ca.SX.sym('a{}'.format(self.symbol_counter))
 
-        def __call__(self):
-            self.symbol_counter += 1
-            return Symbol('a{}'.format(self.symbol_counter))
-
-    ns = next_symbol()
+    # ns = next_symbol()
     symbol_params = []
     for i, param in enumerate(params):
         if isinstance(param, list):
             param = np.array(param)
         if isinstance(param, np.ndarray):
-            l2 = []
-            for j in range(param.shape[0]):
-                l1 = []
-                if len(param.shape) == 2:
-                    for k in range(param.shape[1]):
-                        s = ns()
-                        symbols.append(s)
-                        input.append(param[j, k])
-                        l1.append(s)
-                    l2.append(l1)
-                else:
-                    s = ns()
-                    symbols.append(s)
-                    input.append(param[j])
-                    l2.append(s)
-
-            p = Matrix(l2)
-            symbol_params.append(p)
-        else:
-            s = ns()
-            symbols.append(s)
             input.append(param)
-            symbol_params.append(s)
-    try:
-        slow_f = Matrix([f(*symbol_params)])
-    except TypeError:
-        slow_f = Matrix(f(*symbol_params))
+            symbol_params.append(ca.SX.sym('m', *param.shape))
+            # l2 = []
+            # for j in range(param.shape[0]):
+            #     l1 = []
+            #     if len(param.shape) == 2:
+            #         for k in range(param.shape[1]):
+            #             s = ns()
+            #             symbols.append(s)
+            #             input.append(param[j, k])
+            #             l1.append(s)
+            #         l2.append(l1)
+            #     else:
+            #         s = ns()
+            #         symbols.append(s)
+            #         input.append(param[j])
+            #         l2.append(s)
+            #
+            # p = Matrix(l2)
+            # symbol_params.append(p)
+        else:
+            # s = ns()
+            # symbols.append(s)
+            input.append(param)
+            symbol_params.append(ca.SX.sym('s'))
+    # try:
+    #     slow_f = Matrix([f(*symbol_params)])
+    # except TypeError:
+    #     slow_f = Matrix(f(*symbol_params))
 
-    fast_f = speed_up(slow_f, symbols)
-    subs = {str(symbols[i]): input[i] for i in range(len(symbols))}
+    fast_f = speed_up(f(*symbol_params), symbol_params)
+    # subs = {str(symbols[i]): input[i] for i in range(len(symbols))}
     # slow_f.subs()
-    result = fast_f(**subs) # TODO why do I transpose here ?!?
-    if result.shape[0]*result.shape[1] == 1:
+    result = fast_f.call2(input)
+    if result.shape[0] * result.shape[1] == 1:
         return result[0][0]
     # if result.shape[0] > 1 and result.shape[1] > 1:
     elif result.shape[1] == 1:
@@ -92,13 +99,40 @@ def compile_and_execute(f, params):
         return result[0]
     else:
         return result
-    # if result.shape[1] == 1:
-    #     return result.T[0]
-    # else:
-    #     return result[0]
 
-def free_symbols(expression):
-    return expression.free_symbols
+
+def Matrix(data):
+    try:
+        return ca.SX(data)
+    except NotImplementedError:
+        if hasattr(data, u'shape'):
+            m = ca.SX(*data.shape)
+        else:
+            x = len(data)
+            if isinstance(data[0], list) or isinstance(data[0], tuple):
+                y = len(data[0])
+            else:
+                y = 1
+            m = ca.SX(x, y)
+        for i in range(m.shape[0]):
+            if y > 1:
+                for j in range(m.shape[1]):
+                    try:
+                        m[i, j] = data[i][j]
+                    except:
+                        m[i, j] = data[i, j]
+            else:
+                m[i] = data[i]
+        return m
+
+
+def zeros(x, y):
+    return ca.SX.zeros(x, y)
+
+
+def Abs(x):
+    return ca.fabs(x)
+
 
 def diffable_abs(x):
     """
@@ -106,8 +140,7 @@ def diffable_abs(x):
     :return: abs(x)
     :rtype: Union[float, Symbol]
     """
-    return se.sqrt(x ** 2)
-
+    return Abs(x)
 
 
 def diffable_sign(x):
@@ -124,14 +157,15 @@ def diffable_sign(x):
     :return: sign(x)
     :rtype: Union[float, Symbol]
     """
-    # return x/(-VERY_SMALL_NUMBER + diffable_abs(x))
-    return (tanh(x * 1e105))
-
+    return ca.sign(x)
 
 
 # def diffable_heaviside(x):
-#     return 0.5 * (diffable_sign(x + VERY_SMALL_NUMBER) + 1)
+#     return ca.heaviside(x)
 
+
+def Max(x, y):
+    return ca.fmax(x, y)
 
 
 def diffable_max_fast(x, y):
@@ -143,7 +177,7 @@ def diffable_max_fast(x, y):
     :return: max(x, y)
     :rtype: Union[float, Symbol]
     """
-    return ((x + y) + diffable_abs(x - y)) / 2
+    return Max(x, y)
 
 
 def diffable_max(x, y):
@@ -154,7 +188,11 @@ def diffable_max(x, y):
     :return: max(x, y)
     :rtype: Union[float, Symbol]
     """
-    return diffable_if_greater_zero(x - y, x, y)
+    return Max(x, y)
+
+
+def Min(x, y):
+    return ca.fmin(x, y)
 
 
 def diffable_min_fast(x, y):
@@ -166,7 +204,7 @@ def diffable_min_fast(x, y):
     :return: min(x, y)
     :rtype: Union[float, Symbol]
     """
-    return ((x + y) - diffable_abs(x - y)) / 2
+    return Min(x, y)
 
 
 def diffable_min(x, y):
@@ -177,7 +215,7 @@ def diffable_min(x, y):
     :return: min(x, y)
     :rtype: Union[float, Symbol]
     """
-    return diffable_if_greater_zero(y - x, x, y)
+    return Min(x, y)
 
 
 def diffable_if_greater_zero(condition, if_result, else_result):
@@ -190,14 +228,8 @@ def diffable_if_greater_zero(condition, if_result, else_result):
     :return: if_result if condition > 0 else else_result
     :rtype: Union[float, Symbol]
     """
-    # condition -= VERY_SMALL_NUMBER
-    # _if = diffable_heaviside(condition) * if_result
-    # _else = diffable_heaviside(-condition) * else_result
-    # return _if + _else
-    _condition = diffable_sign(condition)  # 1 or -1
-    _if = diffable_max_fast(0, _condition) * if_result  # 0 or if_result
-    _else = -diffable_min_fast(0, _condition) * else_result  # 0 or else_result
-    return _if + _else + (1 - diffable_abs(_condition)) * else_result # if_result or else_result
+    return if_greater_zero(condition, if_result, else_result)
+
 
 def diffable_if_greater(a, b, if_result, else_result):
     """
@@ -209,8 +241,10 @@ def diffable_if_greater(a, b, if_result, else_result):
     :return: if_result if a > b else else_result
     :rtype: Union[float, Symbol]
     """
-    return diffable_if_greater_zero(a-b, if_result, else_result)
+    return if_greater(a, b, if_result, else_result)
 
+def if_greater(a, b, if_result, else_result):
+    return ca.if_else(ca.gt(a,b), if_result, else_result)
 
 def diffable_if_greater_eq_zero(condition, if_result, else_result):
     """
@@ -222,7 +256,8 @@ def diffable_if_greater_eq_zero(condition, if_result, else_result):
     :return: if_result if condition >= 0 else else_result
     :rtype: Union[float, Symbol]
     """
-    return diffable_if_greater_zero(-condition, else_result, if_result)
+    return if_greater_eq_zero(condition, if_result, else_result)
+
 
 def diffable_if_greater_eq(a, b, if_result, else_result):
     """
@@ -234,7 +269,7 @@ def diffable_if_greater_eq(a, b, if_result, else_result):
     :return: if_result if a >= b else else_result
     :rtype: Union[float, Symbol]
     """
-    return diffable_if_greater_eq_zero(a-b, if_result, else_result)
+    return if_greater_eq(a, b, if_result, else_result)
 
 
 def diffable_if_eq_zero(condition, if_result, else_result):
@@ -248,8 +283,8 @@ def diffable_if_eq_zero(condition, if_result, else_result):
     :return: if_result if condition == 0 else else_result
     :rtype: Union[float, Symbol]
     """
-    condition = diffable_abs(diffable_sign(condition))
-    return (1 - condition) * if_result + condition * else_result
+    return if_eq_zero(condition, if_result, else_result)
+
 
 def diffable_if_eq(a, b, if_result, else_result):
     """
@@ -262,7 +297,7 @@ def diffable_if_eq(a, b, if_result, else_result):
     :return: if_result if a == b else else_result
     :rtype: Union[float, Symbol]
     """
-    return diffable_if_eq_zero(a-b, if_result, else_result)
+    return if_eq(a, b, if_result, else_result)
 
 
 def if_greater_zero(condition, if_result, else_result):
@@ -276,7 +311,7 @@ def if_greater_zero(condition, if_result, else_result):
     _condition = sign(condition)  # 1 or -1
     _if = Max(0, _condition) * if_result  # 0 or if_result
     _else = -Min(0, _condition) * else_result  # 0 or else_result
-    return _if + _else + (1 - Abs(_condition)) * else_result # if_result or else_result
+    return _if + _else + (1 - Abs(_condition)) * else_result  # if_result or else_result
 
 
 def if_greater_eq_zero(condition, if_result, else_result):
@@ -289,7 +324,8 @@ def if_greater_eq_zero(condition, if_result, else_result):
     :return: if_result if condition >= 0 else else_result
     :rtype: Union[float, Symbol]
     """
-    return if_greater_zero(-condition, else_result, if_result)
+    return if_greater_eq(condition, 0, if_result, else_result)
+
 
 def if_greater_eq(a, b, if_result, else_result):
     """
@@ -302,7 +338,8 @@ def if_greater_eq(a, b, if_result, else_result):
     :return: if_result if a >= b else else_result
     :rtype: Union[float, Symbol]
     """
-    return if_greater_zero(b-a, else_result, if_result)
+    return ca.if_else(ca.ge(a,b), if_result, else_result)
+
 
 def if_less_eq(a, b, if_result, else_result):
     """
@@ -317,6 +354,7 @@ def if_less_eq(a, b, if_result, else_result):
     """
     return if_greater_eq(b, a, else_result, if_result)
 
+
 def if_eq_zero(condition, if_result, else_result):
     """
     A short expression which can be compiled quickly.
@@ -326,11 +364,12 @@ def if_eq_zero(condition, if_result, else_result):
     :return: if_result if condition == 0 else else_result
     :rtype: Union[float, Symbol]
     """
-    condition = se.Abs(sign(condition))
-    return (1 - condition) * if_result + condition * else_result
+    return ca.if_else(condition, else_result, if_result)
+
 
 def if_eq(a, b, if_result, else_result):
-    return if_eq_zero(a - b, if_result, else_result)
+    return ca.if_else(ca.eq(a,b), if_result, else_result)
+
 
 def safe_compiled_function(f, file_name):
     create_path(file_name)
@@ -354,8 +393,10 @@ class CompiledFunction(object):
     def __init__(self, str_params, fast_f, l, shape):
         self.str_params = str_params
         self.fast_f = fast_f
-        self.l = l
         self.shape = shape
+        self.buf, self.f_eval = fast_f.buffer()
+        self.out = np.zeros(self.shape, order='F')
+        self.buf.set_res(0, memoryview(self.out))
 
     def __call__(self, **kwargs):
         filtered_args = [kwargs[k] for k in self.str_params]
@@ -367,56 +408,19 @@ class CompiledFunction(object):
         :type filtered_args: list
         :return:
         """
-        try:
-            out = np.empty(self.l)
-            self.fast_f.unsafe_real(np.array(filtered_args, dtype=np.double), out)
-            return out.reshape(self.shape)
-        except KeyError as e:
-            msg = u'KeyError: {}\ntry deleting the data folder to trigger recompilation'.format(e.message)
-            raise SymengineException(msg)
-        except TypeError as e:
-            raise SymengineException(e.message)
-        except ValueError as e:
-            raise SymengineException(e.message)
 
+        filtered_args = np.array(filtered_args, dtype=float)
+        self.buf.set_arg(0, memoryview(filtered_args))
+        self.f_eval()
+        return self.out
 
-def speed_up(function, parameters, backend=u'llvm', opt_level=0):
-    # TODO use save/load for all options
+def speed_up(function, parameters, backend=u'clang'):
     str_params = [str(x) for x in parameters]
-    if len(parameters) == 0:
-        try:
-            constant_result = np.array(function).astype(float).reshape(function.shape)
-        except:
-            return
-
-        def f(**kwargs):
-            return constant_result
-    else:
-        if Compiler_Backend == u'llvm':
-            # try:
-            fast_f = Lambdify(list(parameters), function, backend=Compiler_Backend, cse=True, real=True, opt_level=Opt_Level)
-            # except RuntimeError as e:
-            #     warn(u'WARNING RuntimeError: "{}" during lambdify with LLVM backend, fallback to numpy'.format(e),
-            #          RuntimeWarning)
-            #     backend = u'lambda'
-        if Compiler_Backend == u'lambda':
-            try:
-                fast_f = Lambdify(list(parameters), function, backend=u'lambda', cse=True, real=True)
-            except RuntimeError as e:
-                warn(u'WARNING RuntimeError: "{}" during lambdify with lambda backend, no speedup possible'.format(e),
-                     RuntimeWarning)
-                backend = None
-
-        if Compiler_Backend in [u'llvm', u'lambda']:
-            f = CompiledFunction(str_params, fast_f, len(function), function.shape)
-        elif Compiler_Backend is None:
-            def f(**kwargs):
-                filtered_kwargs = {str(k): kwargs[k] for k in str_params}
-                return np.array(function.subs(filtered_kwargs).tolist(), dtype=float).reshape(function.shape)
-        if Compiler_Backend == u'python':
-            f = function
-
-    return f
+    try:
+        f = ca.Function('f', [Matrix(parameters)], [ca.densify(function)])
+    except:
+        f = ca.Function('f', [Matrix(parameters)], ca.densify(function))
+    return CompiledFunction(str_params, f, 0, function.shape)
 
 
 def cross(u, v):
@@ -428,17 +432,7 @@ def cross(u, v):
     :return: 1d Matrix. If u and v have length 4, it ignores the last entry and adds a zero to the result.
     :rtype: Matrix
     """
-    if len(u) != len(v):
-        raise ValueError('lengths {} and {} don\'t align'.format(len(u), len(v)))
-    if len(u) == 3:
-        return se.Matrix([u[1] * v[2] - u[2] * v[1],
-                          u[2] * v[0] - u[0] * v[2],
-                          u[0] * v[1] - u[1] * v[0]])
-    if len(u) == 4:
-        return se.Matrix([u[1] * v[2] - u[2] * v[1],
-                          u[2] * v[0] - u[0] * v[2],
-                          u[0] * v[1] - u[1] * v[0],
-                          0])
+    return ca.cross(u, v)
 
 
 def vector3(x, y, z):
@@ -448,7 +442,7 @@ def vector3(x, y, z):
     :param z: Union[float, Symbol]
     :rtype: Matrix
     """
-    return se.Matrix([x, y, z, 0])
+    return Matrix([x, y, z, 0])
 
 
 def point3(x, y, z):
@@ -458,7 +452,7 @@ def point3(x, y, z):
     :param z: Union[float, Symbol]
     :rtype: Matrix
     """
-    return se.Matrix([x, y, z, 1])
+    return Matrix([x, y, z, 1])
 
 
 def norm(v):
@@ -467,10 +461,7 @@ def norm(v):
     :return: |v|_2
     :rtype: Union[float, Symbol]
     """
-    r = 0
-    for x in v:
-        r += x ** 2
-    return se.sqrt(r)
+    return ca.norm_2(v)
 
 
 def scale(v, a):
@@ -482,13 +473,13 @@ def scale(v, a):
     return save_division(v, norm(v)) * a
 
 
-def dot(a, b):
+def dot(*matrices):
     """
     :type a: Matrix
     :type b: Matrix
     :rtype: Union[float, Symbol]
     """
-    return a * b
+    return ca.mtimes(matrices)
 
 
 def translation3(x, y, z):
@@ -503,7 +494,7 @@ def translation3(x, y, z):
          [0,0,0,1]]
     :rtype: Matrix
     """
-    r = se.eye(4)
+    r = eye(4)
     r[0, 3] = x
     r[1, 3] = y
     r[2, 3] = z
@@ -522,19 +513,19 @@ def rotation_matrix_from_rpy(roll, pitch, yaw):
     """
     # TODO don't split this into 3 matrices
 
-    rx = se.Matrix([[1, 0, 0, 0],
-                    [0, se.cos(roll), -se.sin(roll), 0],
-                    [0, se.sin(roll), se.cos(roll), 0],
-                    [0, 0, 0, 1]])
-    ry = se.Matrix([[se.cos(pitch), 0, se.sin(pitch), 0],
-                    [0, 1, 0, 0],
-                    [-se.sin(pitch), 0, se.cos(pitch), 0],
-                    [0, 0, 0, 1]])
-    rz = se.Matrix([[se.cos(yaw), -se.sin(yaw), 0, 0],
-                    [se.sin(yaw), se.cos(yaw), 0, 0],
-                    [0, 0, 1, 0],
-                    [0, 0, 0, 1]])
-    return (rz * ry * rx)
+    rx = Matrix([[1, 0, 0, 0],
+                [0, ca.cos(roll), -ca.sin(roll), 0],
+                [0, ca.sin(roll), ca.cos(roll), 0],
+                [0, 0, 0, 1]])
+    ry = Matrix([[ca.cos(pitch), 0, ca.sin(pitch), 0],
+                [0, 1, 0, 0],
+                [-ca.sin(pitch), 0, ca.cos(pitch), 0],
+                [0, 0, 0, 1]])
+    rz = Matrix([[ca.cos(yaw), -ca.sin(yaw), 0, 0],
+                [ca.sin(yaw), ca.cos(yaw), 0, 0],
+                [0, 0, 1, 0],
+                [0, 0, 0, 1]])
+    return dot(rz,ry,rx)
 
 
 def rotation_matrix_from_axis_angle(axis, angle):
@@ -547,8 +538,8 @@ def rotation_matrix_from_axis_angle(axis, angle):
     :return: 4x4 Matrix
     :rtype: Matrix
     """
-    ct = se.cos(angle)
-    st = se.sin(angle)
+    ct = ca.cos(angle)
+    st = ca.sin(angle)
     vt = 1 - ct
     m_vt_0 = vt * axis[0]
     m_vt_1 = vt * axis[1]
@@ -559,10 +550,10 @@ def rotation_matrix_from_axis_angle(axis, angle):
     m_vt_0_1 = m_vt_0 * axis[1]
     m_vt_0_2 = m_vt_0 * axis[2]
     m_vt_1_2 = m_vt_1 * axis[2]
-    return se.Matrix([[ct + m_vt_0 * axis[0], -m_st_2 + m_vt_0_1, m_st_1 + m_vt_0_2, 0],
-                      [m_st_2 + m_vt_0_1, ct + m_vt_1 * axis[1], -m_st_0 + m_vt_1_2, 0],
-                      [-m_st_1 + m_vt_0_2, m_st_0 + m_vt_1_2, ct + m_vt_2 * axis[2], 0],
-                      [0, 0, 0, 1]])
+    return Matrix([[ct + m_vt_0 * axis[0], -m_st_2 + m_vt_0_1, m_st_1 + m_vt_0_2, 0],
+                  [m_st_2 + m_vt_0_1, ct + m_vt_1 * axis[1], -m_st_0 + m_vt_1_2, 0],
+                  [-m_st_1 + m_vt_0_2, m_st_0 + m_vt_1_2, ct + m_vt_2 * axis[2], 0],
+                  [0, 0, 0, 1]])
 
 
 def rotation_matrix_from_quaternion(x, y, z, w):
@@ -580,10 +571,10 @@ def rotation_matrix_from_quaternion(x, y, z, w):
     y2 = y * y
     z2 = z * z
     w2 = w * w
-    return se.Matrix([[w2 + x2 - y2 - z2, 2 * x * y - 2 * w * z, 2 * x * z + 2 * w * y, 0],
-                      [2 * x * y + 2 * w * z, w2 - x2 + y2 - z2, 2 * y * z - 2 * w * x, 0],
-                      [2 * x * z - 2 * w * y, 2 * y * z + 2 * w * x, w2 - x2 - y2 + z2, 0],
-                      [0, 0, 0, 1]])
+    return Matrix([[w2 + x2 - y2 - z2, 2 * x * y - 2 * w * z, 2 * x * z + 2 * w * y, 0],
+                  [2 * x * y + 2 * w * z, w2 - x2 + y2 - z2, 2 * y * z - 2 * w * x, 0],
+                  [2 * x * z - 2 * w * y, 2 * y * z + 2 * w * x, w2 - x2 - y2 + z2, 0],
+                  [0, 0, 0, 1]])
 
 
 def frame_axis_angle(x, y, z, axis, angle):
@@ -597,7 +588,7 @@ def frame_axis_angle(x, y, z, axis, angle):
     :return: 4x4 Matrix
     :rtype: Matrix
     """
-    return translation3(x, y, z) * rotation_matrix_from_axis_angle(axis, angle)
+    return dot(translation3(x, y, z), rotation_matrix_from_axis_angle(axis, angle))
 
 
 def frame_rpy(x, y, z, roll, pitch, yaw):
@@ -611,7 +602,7 @@ def frame_rpy(x, y, z, roll, pitch, yaw):
     :return: 4x4 Matrix
     :rtype: Matrix
     """
-    return translation3(x, y, z) * rotation_matrix_from_rpy(roll, pitch, yaw)
+    return dot(translation3(x, y, z), rotation_matrix_from_rpy(roll, pitch, yaw))
 
 
 def frame_quaternion(x, y, z, qx, qy, qz, qw):
@@ -626,7 +617,11 @@ def frame_quaternion(x, y, z, qx, qy, qz, qw):
     :return: 4x4 Matrix
     :rtype: Matrix
     """
-    return translation3(x, y, z) * rotation_matrix_from_quaternion(qx, qy, qz, qw)
+    return dot(translation3(x, y, z), rotation_matrix_from_quaternion(qx, qy, qz, qw))
+
+
+def eye(size):
+    return ca.SX.eye(size)
 
 
 def inverse_frame(frame):
@@ -636,9 +631,9 @@ def inverse_frame(frame):
     :return: 4x4 Matrix
     :rtype: Matrix
     """
-    inv = se.eye(4)
+    inv = eye(4)
     inv[:3, :3] = frame[:3, :3].T
-    inv[:3, 3] = -inv[:3, :3] * frame[:3, 3]
+    inv[:3, 3] = dot(-inv[:3, :3], frame[:3, 3])
     return inv
 
 
@@ -659,7 +654,11 @@ def translation_of(frame):
     :return: 4x4 Matrix; sets the rotation part of a frame to identity
     :rtype: Matrix
     """
-    return se.eye(3).col_join(se.Matrix([[0] * 3])).row_join(frame[:4, 3:])
+    r = eye(4)
+    r[0, 3] = frame[0, 3]
+    r[1, 3] = frame[1, 3]
+    r[2, 3] = frame[2, 3]
+    return r
 
 
 def rotation_of(frame):
@@ -669,7 +668,10 @@ def rotation_of(frame):
     :return: 4x4 Matrix; sets the translation part of a frame to 0
     :rtype: Matrix
     """
-    return frame[:4, :3].row_join(se.Matrix([0, 0, 0, 1]))
+    frame[0,3] = 0
+    frame[1,3] = 0
+    frame[2,3] = 0
+    return frame
 
 
 def trace(matrix):
@@ -689,11 +691,11 @@ def rotation_distance(a_R_b, a_R_c):
     :return: angle of axis angle representation of b_R_c
     :rtype: Union[float, Symbol]
     """
-    difference = a_R_b.T * a_R_c
+    difference = dot(a_R_b.T, a_R_c)
     angle = (trace(difference[:3, :3]) - 1) / 2
-    angle = se.Min(angle, 1)
-    angle = se.Max(angle, -1)
-    return se.acos(angle)
+    angle = Min(angle, 1)
+    angle = Max(angle, -1)
+    return acos(angle)
 
 
 def diffable_axis_angle_from_matrix(rotation_matrix):
@@ -709,13 +711,13 @@ def diffable_axis_angle_from_matrix(rotation_matrix):
     # TODO use 'if' to make angle always positive?
     rm = rotation_matrix
     angle = (trace(rm[:3, :3]) - 1) / 2
-    angle = se.acos(angle)
+    angle = acos(angle)
     x = (rm[2, 1] - rm[1, 2])
     y = (rm[0, 2] - rm[2, 0])
     z = (rm[1, 0] - rm[0, 1])
-    n = se.sqrt(x * x + y * y + z * z)
+    n = sqrt(x * x + y * y + z * z)
 
-    axis = se.Matrix([x / n, y / n, z / n])
+    axis = Matrix([x / n, y / n, z / n])
     return axis, angle
 
 
@@ -731,15 +733,15 @@ def diffable_axis_angle_from_matrix_stable(rotation_matrix):
     angle = (trace(rm[:3, :3]) - 1) / 2
     angle = diffable_min_fast(angle, 1)
     angle = diffable_max_fast(angle, -1)
-    angle = se.acos(angle)
+    angle = acos(angle)
     x = (rm[2, 1] - rm[1, 2])
     y = (rm[0, 2] - rm[2, 0])
     z = (rm[1, 0] - rm[0, 1])
-    n = se.sqrt(x * x + y * y + z * z)
+    n = sqrt(x * x + y * y + z * z)
     m = diffable_if_eq_zero(n, 1, n)
-    axis = se.Matrix([diffable_if_eq_zero(n, 0, x / m),
-                      diffable_if_eq_zero(n, 0, y / m),
-                      diffable_if_eq_zero(n, 1, z / m)])
+    axis = Matrix([diffable_if_eq_zero(n, 0, x / m),
+                   diffable_if_eq_zero(n, 0, y / m),
+                   diffable_if_eq_zero(n, 1, z / m)])
     return axis, angle
 
 
@@ -752,18 +754,18 @@ def axis_angle_from_matrix(rotation_matrix):
     """
     rm = rotation_matrix
     angle = (trace(rm[:3, :3]) - 1) / 2
-    angle = se.Min(angle, 1)
-    angle = se.Max(angle, -1)
-    angle = se.acos(angle)
+    angle = Min(angle, 1)
+    angle = Max(angle, -1)
+    angle = acos(angle)
     x = (rm[2, 1] - rm[1, 2])
     y = (rm[0, 2] - rm[2, 0])
     z = (rm[1, 0] - rm[0, 1])
-    n = se.sqrt(x * x + y * y + z * z)
+    n = sqrt(x * x + y * y + z * z)
     m = if_eq_zero(n, 1, n)
-    axis = se.Matrix([if_eq_zero(n, 0, x / m),
-                      if_eq_zero(n, 0, y / m),
-                      if_eq_zero(n, 1, z / m)])
-    sign = diffable_sign(angle)
+    axis = Matrix([if_eq_zero(n, 0, x / m),
+                   if_eq_zero(n, 0, y / m),
+                   if_eq_zero(n, 1, z / m)])
+    sign = if_eq_zero(angle, 1, diffable_sign(angle))
     axis *= sign
     angle = sign * angle
     return axis, angle
@@ -778,15 +780,15 @@ def axis_angle_from_quaternion(x, y, z, w):
     :return: 4x1 Matrix
     :rtype: Matrix
     """
-    l = norm([x,y,z,w])
-    x, y, z, w = x/l, y/l, z/l, w/l
-    w2 = se.sqrt(1 - w ** 2)
-    angle = (2 * se.acos(se.Min(se.Max(-1, w), 1)))
-    m = if_eq_zero(w2, 1, w2) # avoid /0
+    l = norm(Matrix([x, y, z, w]))
+    x, y, z, w = x / l, y / l, z / l, w / l
+    w2 = sqrt(1 - w ** 2)
+    angle = (2 * acos(Min(Max(-1, w), 1)))
+    m = if_eq_zero(w2, 1, w2)  # avoid /0
     x = if_eq_zero(w2, 0, x / m)
     y = if_eq_zero(w2, 0, y / m)
     z = if_eq_zero(w2, 1, z / m)
-    return se.Matrix([x, y, z]), angle
+    return Matrix([x, y, z]), angle
 
 
 def quaternion_from_axis_angle(axis, angle):
@@ -798,10 +800,10 @@ def quaternion_from_axis_angle(axis, angle):
     :rtype: Matrix
     """
     half_angle = angle / 2
-    return se.Matrix([axis[0] * se.sin(half_angle),
-                      axis[1] * se.sin(half_angle),
-                      axis[2] * se.sin(half_angle),
-                      se.cos(half_angle)])
+    return Matrix([axis[0] * sin(half_angle),
+                   axis[1] * sin(half_angle),
+                   axis[2] * sin(half_angle),
+                   cos(half_angle)])
 
 
 def axis_angle_from_rpy(roll, pitch, yaw):
@@ -857,12 +859,12 @@ def quaternion_from_rpy(roll, pitch, yaw):
     pitch_half = pitch / 2.0
     yaw_half = yaw / 2.0
 
-    c_roll = se.cos(roll_half)
-    s_roll = se.sin(roll_half)
-    c_pitch = se.cos(pitch_half)
-    s_pitch = se.sin(pitch_half)
-    c_yaw = se.cos(yaw_half)
-    s_yaw = se.sin(yaw_half)
+    c_roll = cos(roll_half)
+    s_roll = sin(roll_half)
+    c_pitch = cos(pitch_half)
+    s_pitch = sin(pitch_half)
+    c_yaw = cos(yaw_half)
+    s_yaw = sin(yaw_half)
 
     cc = c_roll * c_yaw
     cs = c_roll * s_yaw
@@ -874,7 +876,7 @@ def quaternion_from_rpy(roll, pitch, yaw):
     z = c_pitch * cs - s_pitch * sc
     w = c_pitch * cc + s_pitch * ss
 
-    return se.Matrix([x, y, z, w])
+    return Matrix([x, y, z, w])
 
 
 def quaternion_from_matrix(matrix):
@@ -936,7 +938,7 @@ def quaternion_from_matrix(matrix):
                                                                                               m_k_i + m_i_k)))
     q[3] = diffable_if_greater_zero(if0, t, m_k_j - m_j_k)
 
-    q *= 0.5 / se.sqrt(t * M[3, 3])
+    q *= 0.5 / sqrt(t * M[3, 3])
     return q
 
 
@@ -949,12 +951,18 @@ def quaternion_multiply(q1, q2):
     :return: 4x1 Matrix
     :rtype: Matrix
     """
-    x0, y0, z0, w0 = q2
-    x1, y1, z1, w1 = q1
-    return se.Matrix([x1 * w0 + y1 * z0 - z1 * y0 + w1 * x0,
-                      -x1 * z0 + y1 * w0 + z1 * x0 + w1 * y0,
-                      x1 * y0 - y1 * x0 + z1 * w0 + w1 * z0,
-                      -x1 * x0 - y1 * y0 - z1 * z0 + w1 * w0])
+    x0 = q2[0]
+    y0 = q2[1]
+    z0 = q2[2]
+    w0 = q2[3]
+    x1 = q1[0]
+    y1 = q1[1]
+    z1 = q1[2]
+    w1 = q1[3]
+    return Matrix([x1 * w0 + y1 * z0 - z1 * y0 + w1 * x0,
+                   -x1 * z0 + y1 * w0 + z1 * x0 + w1 * y0,
+                   x1 * y0 - y1 * x0 + z1 * w0 + w1 * z0,
+                   -x1 * x0 - y1 * y0 - z1 * z0 + w1 * w0])
 
 
 def quaternion_conjugate(quaternion):
@@ -964,7 +972,7 @@ def quaternion_conjugate(quaternion):
     :return: 4x1 Matrix
     :rtype: Matrix
     """
-    return se.Matrix([-quaternion[0], -quaternion[1], -quaternion[2], quaternion[3]])
+    return Matrix([-quaternion[0], -quaternion[1], -quaternion[2], quaternion[3]])
 
 
 def quaternion_diff(q0, q1):
@@ -987,7 +995,7 @@ def cosine_distance(v0, v1):
     :type v1: Matrix
     :rtype: Union[float, Symbol]
     """
-    return 1 - (v0.T * v1)[0]
+    return 1 - (dot(v0.T, v1))[0]
 
 
 def euclidean_distance(v1, v2):
@@ -1007,11 +1015,7 @@ def euclidean_distance(v1, v2):
 
 
 def fmod(a, b):
-    s = sign(a)
-    a = Abs(a)
-    b = Abs(b)
-    f1 = a - (b * floor(a / b))
-    return s * se.Piecewise([0, Abs(a - b) < SMALL_NUMBER], [f1, True])
+    return ca.fmod(a, b)
 
 
 def normalize_angle_positive(angle):
@@ -1028,7 +1032,8 @@ def normalize_angle(angle):
     It takes and returns radians.
     """
     a = normalize_angle_positive(angle)
-    return Piecewise([a - 2.0 * pi, a > pi], [a, True])
+    return diffable_if_greater(a, pi, a - 2.0 * pi, a)
+    # return Piecewise([, a > pi], [a, True])
 
 
 def shortest_angular_distance(from_angle, to_angle):
@@ -1054,7 +1059,7 @@ def diffable_slerp(q1, q2, t):
     :return: 4x1 Matrix; Return spherical linear interpolation between two quaternions.
     :rtype: Matrix
     """
-    cos_half_theta = dot(q1.T, q2)[0]
+    cos_half_theta = dot(q1.T, q2)
 
     if0 = -cos_half_theta
     q2 = diffable_if_greater_zero(if0, -q2, q2)
@@ -1074,26 +1079,26 @@ def diffable_slerp(q1, q2, t):
     ratio_a = save_division(sin((1.0 - t) * half_theta), sin_half_theta)
     ratio_b = save_division(sin(t * half_theta), sin_half_theta)
     return diffable_if_greater_eq_zero(if1,
-                                       se.Matrix(q1),
+                                       Matrix(q1),
                                        diffable_if_greater_zero(if2,
                                                                 0.5 * q1 + 0.5 * q2,
                                                                 ratio_a * q1 + ratio_b * q2))
 
 
-def piecewise_matrix(*piecewise_vector):
-    # TODO testme
-    # FIXME support non 2d matrices?
-    dimensions = piecewise_vector[0][0].shape
-    for m, condition in piecewise_vector:
-        assert m.shape == dimensions
-    matrix = se.zeros(*dimensions)
-    for x in range(dimensions[0]):
-        for y in range(dimensions[1]):
-            piecewise_entry = []
-            for m, condition in piecewise_vector:
-                piecewise_entry.append([m[x, y], condition])
-            matrix[x, y] = se.Piecewise(*piecewise_entry)
-    return matrix
+# def piecewise_matrix(*piecewise_vector):
+#     # TODO testme
+#     # FIXME support non 2d matrices?
+#     dimensions = piecewise_vector[0][0].shape
+#     for m, condition in piecewise_vector:
+#         assert m.shape == dimensions
+#     matrix = zeros(*dimensions)
+#     for x in range(dimensions[0]):
+#         for y in range(dimensions[1]):
+#             piecewise_entry = []
+#             for m, condition in piecewise_vector:
+#                 piecewise_entry.append([m[x, y], condition])
+#             matrix[x, y] = Piecewise(*piecewise_entry)
+#     return matrix
 
 
 # def slerp(q1, q2, t):
@@ -1127,9 +1132,11 @@ def piecewise_matrix(*piecewise_vector):
 def to_numpy(matrix):
     return np.array(matrix.tolist()).astype(float).reshape(matrix.shape)
 
+
 def save_division(nominator, denominator, if_nan=0):
     save_denominator = if_eq_zero(denominator, 1, denominator)
     return nominator * if_eq_zero(denominator, if_nan, 1 / save_denominator)
+
 
 def entrywise_product(matrix1, matrix2):
     """
@@ -1138,8 +1145,8 @@ def entrywise_product(matrix1, matrix2):
     :return:
     """
     assert matrix1.shape == matrix2.shape
-    result = se.zeros(*matrix1.shape)
+    result = zeros(*matrix1.shape)
     for i in range(matrix1.shape[0]):
         for j in range(matrix1.shape[1]):
-            result[i,j] = matrix1[i,j] * matrix2[i,j]
+            result[i, j] = matrix1[i, j] * matrix2[i, j]
     return result

@@ -1,0 +1,34 @@
+<?xml version="1.0" ?>
+
+<robot name="hsrb">    <!--TODO: UnknownBodyException: body b 'hsrb' unknown     when robot name not "hsrb". Why??-->    
+
+    <link name="odom"/>
+
+    <joint name="odom_x" type="prismatic">
+        <axis xyz="1.0 0.0 0.0" />
+        <limit effort="1.0" velocity="0.1" lower="-10.0" upper="10.0" />
+        <parent link="odom" />
+        <child link="odom_x_link" />
+    </joint>
+
+     <link name="odom_x_link"/>
+
+    <joint name="odom_y" type="prismatic">
+        <axis xyz="0.0 1.0 0.0" />
+        <limit effort="1.0" velocity="0.1" lower="-10.0" upper="10.0" />
+        <parent link="odom_x_link" />
+        <child link="odom_y_link" />
+    </joint>
+
+     <link name="odom_y_link"/>
+
+    <joint name="odom_t" type="continuous">
+        <axis xyz="0.0 0.0 1.0" />
+        <limit effort="1.0" velocity="0.1"/>
+        <parent link="odom_y_link" />
+        <child link="odom_t_link" />
+    </joint>
+
+    <link name="odom_t_link"/>
+
+</robot>

@@ -1,0 +1,21 @@
+<launch>
+
+    <node pkg="joint_trajectory_action" type="joint_trajectory_action" name="joint_trajectory_action" output="screen">
+        <rosparam param="/base_trajectory_action/follow_joint_trajectory/joints">
+        - odom_x 
+        - odom_y
+        - odom_t
+        </rosparam>
+        <remap from="/command" to="/hsrb/omni_base_controller/command"/>
+        <remap from="/joint_trajectory_action" to="/base_trajectory_action/follow_joint_trajectory"/>
+        <remap from="/state" to="/hsrb/omni_base_controller/state"/>
+    </node>
+
+    <!-- <include file="$(find joint_trajectory_action)/launch/hsrb_base_joint_trajectory_action.launch"/> -->
+
+    <node pkg="giskardpy" type="joint_trajectory_splitter.py" name="joint_trajectory_splitter" output="screen">
+        <rosparam param="state_topics">["/hsrb/arm_trajectory_controller/state", "/hsrb/omni_base_controller/state"]</rosparam>
+        <rosparam param="client_topics">["/hsrb/arm_trajectory_controller/follow_joint_trajectory", "/base_trajectory_action/follow_joint_trajectory"]</rosparam>
+    </node>
+
+</launch>

@@ -3,26 +3,11 @@ The core python library of the Giskard framework for constraint- and optimizatio
 
 ## Installation instructions for 16.04/kinetic
 
-First install symengine + symengine.py, this does not have to be part of the ros workspace
-```
-sudo apt-get install llvm-6.0-dev # or llvm-8-dev if you are using 18.04
-git clone https://github.com/symengine/symengine.git
-git clone https://github.com/symengine/symengine.py.git
-cd symengine
-git checkout `cat ../symengine.py/symengine_version.txt`
-mkdir build
-cd build
-cmake -DWITH_LLVM:BOOL=ON -DBUILD_TESTS:BOOL=OFF -DBUILD_BENCHMARKS:BOOL=OFF ..
-make
-sudo make install
-cd ../../symengine.py
-sudo python setup.py install
-```
-
-Install pybullet:
+Install the following python packages:
 ```
 sudo pip install pybullet
 sudo pip install scipy
+sudo pip install casadi
 sudo pip install hypothesis # only needed if you want to run tests
 sudo pip install pandas
 ```
@@ -42,6 +27,23 @@ rosdep install --ignore-src --from-paths .  # install dependencies available thr
 cd ..                                       # go to workspace directory
 catkin build                                # build packages
 source ~/giskardpy_ws/devel/setup.bash      # source new overlay
+```
+
+### symengine
+If you want to use the symengine backend, it can be install like this (does not have to be part of the ros workspace):
+```
+sudo apt-get install llvm-6.0-dev # or llvm-8-dev if you are using 18.04
+git clone https://github.com/symengine/symengine.git
+git clone https://github.com/symengine/symengine.py.git
+cd symengine
+git checkout `cat ../symengine.py/symengine_version.txt`
+mkdir build
+cd build
+cmake -DWITH_LLVM:BOOL=ON -DBUILD_TESTS:BOOL=OFF -DBUILD_BENCHMARKS:BOOL=OFF ..
+make
+sudo make install
+cd ../../symengine.py
+sudo python setup.py install
 ```
 
 ### Tutorials

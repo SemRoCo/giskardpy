@@ -1,4 +1,4 @@
-import symengine_wrappers as sw
+from giskardpy import symbolic_wrapper as w
 from giskardpy.utils import KeyDefaultDict
 
 
@@ -23,12 +23,20 @@ class Point3Input(InputArray):
                                           x=x, y=y, z=z)
 
     def get_expression(self):
-        return sw.point3(self.x, self.y, self.z)
+        return w.point3(self.x, self.y, self.z)
 
 
 class Vector3Input(Point3Input):
     def get_expression(self):
-        return sw.vector3(self.x, self.y, self.z)
+        return w.vector3(self.x, self.y, self.z)
+
+class WrenchInput(InputArray):
+    def __init__(self, to_expr, prefix=(), suffix=(), fx=(0,), fy=(1,), fz=(2,), tx=(3,), ty=(4,), tz=(5,)):
+        super(WrenchInput, self).__init__(to_expr, prefix, suffix,
+                                          fx=fx, fy=fy, fz=fz, tx=tx, ty=ty, tz=tz)
+
+    def get_expression(self):
+        return w.Matrix([self.fx, self.fy, self.fz, self.tx, self.ty, self.tz])
 
 
 class Vector3StampedInput(InputArray):
@@ -39,7 +47,7 @@ class Vector3StampedInput(InputArray):
                                                   z=list(vector_prefix) + list(z) + list(vector_suffix))
 
     def get_expression(self):
-        return sw.vector3(self.x, self.y, self.z)
+        return w.vector3(self.x, self.y, self.z)
 
 
 class PointStampedInput(InputArray):
@@ -50,7 +58,7 @@ class PointStampedInput(InputArray):
                                                 z=list(prefix) + list(z) + list(suffix))
 
     def get_expression(self):
-        return sw.point3(self.x, self.y, self.z)
+        return w.point3(self.x, self.y, self.z)
 
 
 class PoseStampedInput(InputArray):
@@ -68,13 +76,13 @@ class PoseStampedInput(InputArray):
                                                qw=list(rotation_prefix) + list(qw) + list(rotation_suffix))
 
     def get_frame(self):
-        return sw.frame_quaternion(self.x, self.y, self.z, self.qx, self.qy, self.qz, self.qw)
+        return w.frame_quaternion(self.x, self.y, self.z, self.qx, self.qy, self.qz, self.qw)
 
     def get_position(self):
-        return sw.point3(self.x, self.y, self.z)
+        return w.point3(self.x, self.y, self.z)
 
     def get_rotation(self):
-        return sw.rotation_matrix_from_quaternion(self.qx, self.qy, self.qz, self.qw)
+        return w.rotation_matrix_from_quaternion(self.qx, self.qy, self.qz, self.qw)
 
 
 class FrameInput(InputArray):
@@ -94,13 +102,35 @@ class FrameInput(InputArray):
                                          f23=list(prefix) + [2,3])
 
     def get_frame(self):
-        return sw.Matrix([[self.f00, self.f01, self.f02, self.f03],
-                          [self.f10, self.f11, self.f12, self.f13],
-                          [self.f20, self.f21, self.f22, self.f23],
-                          [0, 0, 0, 1]])
+        return w.Matrix([[self.f00, self.f01, self.f02, self.f03],
+                         [self.f10, self.f11, self.f12, self.f13],
+                         [self.f20, self.f21, self.f22, self.f23],
+                         [0, 0, 0, 1]])
 
     def get_position(self):
-        return sw.position_of(self.get_frame())
+        return w.position_of(self.get_frame())
+
+    def get_translation(self):
+        return w.translation_of(self.get_frame())
 
     def get_rotation(self):
-        return sw.rotation_of(self.get_frame())
+        return w.rotation_of(self.get_frame())
+
+class TranslationInput(InputArray):
+    def __init__(self, to_expr, prefix):
+        super(TranslationInput, self).__init__(to_expr, (), (),
+                                         x=list(prefix) + [0],
+                                         y=list(prefix) + [1],
+                                         z=list(prefix) + [2])
+
+    def get_frame(self):
+        return w.translation3(self.x, self.y, self.z)
+
+    def get_position(self):
+        return w.position_of(self.get_frame())
+
+    def get_translation(self):
+        return w.translation_of(self.get_frame())
+
+    def get_rotation(self):
+        return w.rotation_of(self.get_frame())

@@ -137,7 +137,7 @@ def pr2_joint_state(draw):
 
 
 def pr2_urdf():
-    with open(u'urdfs/pr2.urdf', u'r') as f:
+    with open(u'urdfs/pr2_with_base.urdf', u'r') as f:
         urdf_string = f.read()
     return urdf_string
 
@@ -161,8 +161,8 @@ def boxy_urdf():
 
 
 def limited_float(outer_limit=BIG_NUMBER, min_dist_to_zero=None):
-    # f = st.floats(allow_nan=False, allow_infinity=False, max_value=outer_limit, min_value=-outer_limit)
-    f = st.floats(allow_nan=False, allow_infinity=False)
+    f = st.floats(allow_nan=False, allow_infinity=False, max_value=outer_limit, min_value=-outer_limit)
+    # f = st.floats(allow_nan=False, allow_infinity=False)
     if min_dist_to_zero is not None:
         f = f.filter(lambda x: (outer_limit > abs(x) and abs(x) > min_dist_to_zero) or x == 0)
     else:
@@ -182,8 +182,8 @@ def unit_vector(length, elements=None):
         v = [round(x, 4) for x in v]
         l = np.linalg.norm(v)
         if l == 0:
-            return [0,0,0,1]
-        return [x / l for x in v]
+            return np.array([0]*(length-1)+[1])
+        return np.array([x / l for x in v])
 
     return st.builds(normalize, vector)
 
@@ -570,6 +570,29 @@ class GiskardTestWrapper(object):
             compare_poses(expected_pose.pose, lookup_pose(frame_id, name).pose)
         self.loop_once()
 
+    def attach_cylinder(self, name=u'cylinder', height=1, radius=1, frame_id=None, position=None, orientation=None,
+                   expected_response=UpdateWorldResponse.SUCCESS):
+        scm = self.get_robot().get_self_collision_matrix()
+        expected_pose = PoseStamped()
+        expected_pose.header.frame_id = frame_id
+        expected_pose.pose.position = Point(*position)
+        if orientation:
+            expected_pose.pose.orientation = Quaternion(*orientation)
+        else:
+            expected_pose.pose.orientation = Quaternion(0, 0, 0, 1)
+        r = self.wrapper.attach_cylinder(name, height, radius, frame_id, position, orientation)
+        assert r.error_codes == expected_response, \
+            u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
+                                            update_world_error_code(expected_response))
+        if expected_response == UpdateWorldResponse.SUCCESS:
+            self.wait_for_synced()
+            assert name in self.get_controllable_links()
+            assert not self.get_world().has_object(name)
+            assert scm.difference(self.get_robot().get_self_collision_matrix()) == set()
+            assert len(scm) < len(self.get_robot().get_self_collision_matrix())
+            compare_poses(expected_pose.pose, lookup_pose(frame_id, name).pose)
+        self.loop_once()
+
     def attach_existing(self, name=u'box', frame_id=None, expected_response=UpdateWorldResponse.SUCCESS):
         scm = self.get_robot().get_self_collision_matrix()
         r = self.wrapper.attach_object(name, frame_id)
@@ -583,35 +606,32 @@ class GiskardTestWrapper(object):
         assert len(scm) < len(self.get_robot().get_self_collision_matrix())
         self.loop_once()
 
-    def get_cpi(self, distance_threshold):
+    def get_external_collisions(self, link, distance_threshold):
+        """
+        :param distance_threshold:
+        :rtype: list
+        """
         collision_goals = [CollisionEntry(type=CollisionEntry.AVOID_ALL_COLLISIONS, min_dist=distance_threshold)]
         collision_matrix = self.get_world().collision_goals_to_collision_matrix(collision_goals,
                                                                                 self.get_god_map().safe_get_data(
-                                                                                    identifier.collisions_distances))
+                                                                                    identifier.distance_thresholds))
         collisions = self.get_world().check_collisions(collision_matrix)
-        return self.get_world().collisions_to_closest_point(collisions, collision_matrix)
+        collisions = self.get_world().transform_contact_info(collisions)
+        collision_list = collisions.external_collision[self.get_robot().get_movable_parent_joint(link)]
+        for key, self_collisions in collisions.self_collisions.items():
+            if link in key:
+                collision_list.update(self_collisions)
+        return collision_list
 
     def check_cpi_geq(self, links, distance_threshold):
-        cpi = self.get_cpi(distance_threshold)
-        if cpi == 0 or cpi == None:
-            return False
         for link in links:
-            assert cpi[link].contact_distance >= distance_threshold, u'{} -- {}\n {} < {}'.format(link,
-                                                                                                  cpi[link].link_b,
-                                                                                                  cpi[
-                                                                                                      link].contact_distance,
-                                                                                                  distance_threshold)
+            collisions = self.get_external_collisions(link, distance_threshold)
+            assert collisions[0].contact_distance >= distance_threshold
 
     def check_cpi_leq(self, links, distance_threshold):
-        cpi = self.get_cpi(distance_threshold)
-        if cpi == 0 or cpi == None:
-            return False
         for link in links:
-            assert cpi[link].contact_distance <= distance_threshold, u'{} -- {}\n {} > {}'.format(link,
-                                                                                                  cpi[link].link_b,
-                                                                                                  cpi[
-                                                                                                      link].contact_distance,
-                                                                                                  distance_threshold)
+            collisions = self.get_external_collisions(link, distance_threshold)
+            assert collisions[0].contact_distance <= distance_threshold
 
     def move_base(self, goal_pose):
         """
@@ -749,3 +769,33 @@ class Boxy(GiskardTestWrapper):
                                                                        goal_pose.pose.orientation.w]))[0]}
         self.allow_all_collisions()
         self.send_and_check_joint_goal(js)
+
+class HSR(GiskardTestWrapper):
+    def __init__(self):
+        self.tip = u'hand_palm_link'
+        super(HSR, self).__init__(u'hsr.yaml')
+
+    def move_base(self, goal_pose):
+        goal_pose = transform_pose(self.default_root, goal_pose)
+        js = {u'odom_x': goal_pose.pose.position.x,
+              u'odom_y': goal_pose.pose.position.y,
+              u'odom_t': rotation_from_matrix(quaternion_matrix([goal_pose.pose.orientation.x,
+                                                                       goal_pose.pose.orientation.y,
+                                                                       goal_pose.pose.orientation.z,
+                                                                       goal_pose.pose.orientation.w]))[0]}
+        self.allow_all_collisions()
+        self.send_and_check_joint_goal(js)
+
+    def open_gripper(self):
+        js = {u'hand_l_spring_proximal_joint': 0.7,
+              u'hand_r_spring_proximal_joint': 0.7}
+        self.send_and_check_joint_goal(js)
+
+    def close_gripper(self):
+        js = {u'hand_l_spring_proximal_joint': 0,
+              u'hand_r_spring_proximal_joint': 0}
+        self.send_and_check_joint_goal(js)
+
+    # def command_gripper(self, width):
+    #     js = {u'hand_motor_joint': width}
+    #     self.send_and_check_joint_goal(js)

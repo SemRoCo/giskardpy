@@ -8,6 +8,7 @@ Install the following python packages:
 sudo pip install pybullet
 sudo pip install scipy
 sudo pip install casadi
+sudo pip install sortedcontainers
 sudo pip install hypothesis # only needed if you want to run tests
 sudo pip install pandas
 ```

@@ -5,6 +5,8 @@ import control_msgs.msg
 import pr2_controllers_msgs.msg
 import trajectory_msgs.msg
 import actionlib
+from rospy import AnyMsg
+
 from giskardpy import logging
 import copy
 import rostopic
@@ -51,6 +53,7 @@ class JointTrajectorySplitter:
         self.client_type = []
         for i in range(self.number_of_clients):
             try:
+                rospy.wait_for_message(self.state_topics[i], AnyMsg)
                 type = rostopic.get_info_text(self.client_topics[i] + '/goal').split('\n')[0][6:]
                 self.client_type.append(type)
             except rostopic.ROSTopicException:

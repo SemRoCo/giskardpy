@@ -9,9 +9,9 @@ general_options:
     default: 100
   joint_weights: # the planner prefers low weight joints to achieve solutions
     default: 0.001
-    odom_x_joint: 1
-    odom_y_joint: 1
-    odom_z_joint: 1
+    odom_x_joint: 0.1
+    odom_y_joint: 0.1
+    odom_z_joint: 0.1
 qp_solver:
   nWSR: None # None results in a nWSR estimation thats fine most of the time
 plugins:

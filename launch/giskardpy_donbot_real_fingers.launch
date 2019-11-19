@@ -8,26 +8,15 @@
         <rosparam command="load" file="$(find giskardpy)/config/donbot.yaml"/>
     </node>
 
-    <arg name="name_space" default="whole_body_controller/base"/>
-    <rosparam command="load" file="$(find omni_pose_follower)/config/ros_control_sim.yaml" />
-    <node pkg="omni_pose_follower" type="omni_pose_follower.py" name="omni_pose_follower" output="screen">
-        <remap from="~cmd_vel" to="/omnidrive/cmd_vel_twist"/>
-        <remap from="~follow_joint_trajectory" to="/whole_body_controller/base/follow_joint_trajectory"/>
-        <remap from="~state" to="/whole_body_controller/base/state"/>
-        <param name="name_space" value="$(arg name_space)"/>
-        <param name="vel_tolerance" value="0.01"/>
-        <param name="sim" value="False"/>
-    </node>
-
     <node pkg="giskardpy" type="joint_trajectory_splitter.py" name="joint_trajectory_splitter" output="screen">
         <rosparam param="state_topics">
             - /whole_body_controller/base/state
-            - /fake_state
+            - /pos_traj_controller/state
             - /refills_finger/state
         </rosparam>
         <rosparam param="client_topics">
             - /whole_body_controller/base/follow_joint_trajectory
-            - /whole_body_controller/body/follow_joint_trajectory
+            - /pos_traj_controller/follow_joint_trajectory
             - /whole_body_controller/refills_finger/follow_joint_trajectory
         </rosparam>
     </node>

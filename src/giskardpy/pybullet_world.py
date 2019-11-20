@@ -88,7 +88,6 @@ class PyBulletWorld(World):
                                                         k))
         return collisions
 
-    # @profile
     def __should_flip_contact_info(self, contact_info):
         """
         :type contact_info: ContactInfo
@@ -171,7 +170,6 @@ class PyBulletWorld(World):
         pwo.joint_state = object_.joint_state
         return super(PyBulletWorld, self).add_object(pwo)
 
-    # @profile
     def transform_contact_info(self, collisions):
         """
         :param collisions: (robot_link, body_b, link_b) -> ContactInfo

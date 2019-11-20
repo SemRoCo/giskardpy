@@ -40,4 +40,6 @@ class TFPlugin(GiskardBehavior):
                 self.tf_pub.publish(tf_msg)
         except KeyError as e:
             pass
+        except UnboundLocalError as e:
+            pass
         return Status.SUCCESS

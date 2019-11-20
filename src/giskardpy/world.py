@@ -456,15 +456,13 @@ class World(object):
                and self.all_link_bs(collision_entry)
 
     
-    # @profile
     def transform_contact_info(self, collisions):
         root_T_map = to_np(self.robot.root_T_map)
+        robot_root = self.robot.get_root()
         for contact_info in collisions.items():  # type: ClosestPointInfo
-            if contact_info is None:
-                continue
             movable_joint = self.robot.get_controlled_parent_joint(contact_info.link_a)
             f = self.robot.get_child_link_of_joint(movable_joint)
-            f_T_r = self.robot.get_fk_np(f, self.robot.get_root())
+            f_T_r = self.robot.get_fk_np(f, robot_root)
             contact_info.frame = f
 
             f_P_pa = np.dot(np.dot(f_T_r, root_T_map), np_point(*contact_info.position_on_a))

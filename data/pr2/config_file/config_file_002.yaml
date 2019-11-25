@@ -1,0 +1,554 @@
+- name: world_room_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: sink_area_footprint_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: sink_area_main_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: sink_area_surface_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: sink_area_sink_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: sink_area_right_panel_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: sink_area_trash_drawer_main_joint
+  params:
+    constraint_type: angular
+    controllable_link: ''
+    'controllable_link ': iai_kitchen/sink_area_trash_drawer_handle
+    grasp_axis: y
+- name: sink_area_trash_drawer_handle_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: sink_area_left_upper_drawer_main_joint
+  params:
+    constraint_type: translational
+    controllable_link: ''
+    'controllable_link ': iai_kitchen/sink_area_left_upper_drawer_handle
+    grasp_axis: y
+- name: sink_area_left_upper_drawer_handle_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: sink_area_left_middle_drawer_main_joint
+  params:
+    constraint_type: translational
+    controllable_link: ''
+    'controllable_link ': iai_kitchen/sink_area_left_middle_drawer_handle
+    grasp_axis: y
+- name: sink_area_left_middle_drawer_handle_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: sink_area_left_bottom_drawer_main_joint
+  params:
+    constraint_type: translational
+    controllable_link: ''
+    'controllable_link ': iai_kitchen/sink_area_left_bottom_drawer_handle
+    grasp_axis: y
+- name: sink_area_left_bottom_drawer_handle_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: sink_area_dish_washer_main_joint
+  params:
+    constraint_type: rotational
+    controllable_link: ''
+    'controllable_link ': iai_kitchen/sink_area_dish_washer_door_handle
+    grasp_axis: y
+- name: sink_area_dish_washer_door_joint
+  params:
+    constraint_type: angular
+    controllable_link: ''
+    'controllable_link ': iai_kitchen/sink_area_dish_washer_door_handle
+    grasp_axis: y
+- name: sink_area_dish_washer_door_handle_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: oven_area_footprint_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: oven_area_main_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: oven_area_oven_main_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: oven_area_oven_door_joint
+  params:
+    constraint_type: angular
+    controllable_link: ''
+    'controllable_link ': iai_kitchen/oven_area_oven_door_handle
+    grasp_axis: y
+- name: oven_area_oven_door_handle_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: oven_area_oven_panel_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: oven_area_oven_knob_stove_1_joint
+  params:
+    constraint_type: rotational
+    controllable_link: ''
+    'controllable_link ': ai_kitchen/oven_area_oven_knob_stove_1
+    grasp_axis: y
+- name: oven_area_oven_knob_stove_2_joint
+  params:
+    constraint_type: rotational
+    controllable_link: ''
+    'controllable_link ': ai_kitchen/oven_area_oven_knob_stove_2
+    grasp_axis: y
+- name: oven_area_oven_knob_stove_3_joint
+  params:
+    constraint_type: rotational
+    controllable_link: ''
+    'controllable_link ': ai_kitchen/oven_area_oven_knob_stove_3
+    grasp_axis: y
+- name: oven_area_oven_knob_stove_4_joint
+  params:
+    constraint_type: rotational
+    controllable_link: ''
+    'controllable_link ': ai_kitchen/oven_area_oven_knob_stove_4
+    grasp_axis: y
+- name: oven_area_oven_knob_oven_joint
+  params:
+    constraint_type: rotational
+    controllable_link: ''
+    'controllable_link ': iai_kitchen/oven_area_oven_knob_oven
+    grasp_axis: y
+- name: oven_area_area_middle_upper_drawer_main_joint
+  params:
+    constraint_type: translational
+    controllable_link: ''
+    'controllable_link ': iai_kitchen/oven_area_area_middle_upper_drawer_handle
+    grasp_axis: y
+- name: oven_area_area_middle_upper_drawer_handle_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: oven_area_area_middle_lower_drawer_main_joint
+  params:
+    constraint_type: translational
+    controllable_link: ''
+    'controllable_link ': iai_kitchen/oven_area_area_middle_lower_drawer_handle
+    grasp_axis: y
+- name: oven_area_area_middle_lower_drawer_handle_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: oven_area_area_left_drawer_main_joint
+  params:
+    constraint_type: translational
+    controllable_link: ''
+    'controllable_link ': iai_kitchen/oven_area_area_left_drawer_handle
+    grasp_axis: z
+- name: oven_area_area_left_drawer_handle_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: oven_area_area_left_drawer_board_0_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: oven_area_area_left_drawer_barrier_0_right_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: oven_area_area_left_drawer_barrier_0_left_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: oven_area_area_left_drawer_barrier_0_back_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: oven_area_area_left_drawer_board_1_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: oven_area_area_left_drawer_barrier_1_right_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: oven_area_area_left_drawer_barrier_1_left_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: oven_area_area_left_drawer_barrier_1_back_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: oven_area_area_left_drawer_board_2_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: oven_area_area_left_drawer_barrier_2_right_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: oven_area_area_left_drawer_barrier_2_left_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: oven_area_area_left_drawer_barrier_2_back_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: oven_area_area_left_drawer_board_3_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: oven_area_area_left_drawer_barrier_3_right_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: oven_area_area_left_drawer_barrier_3_left_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: oven_area_area_left_drawer_barrier_3_back_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: oven_area_area_right_drawer_main_joint
+  params:
+    constraint_type: translational
+    controllable_link: ''
+    'controllable_link ': iai_kitchen/oven_area_area_right_drawer_handle
+    grasp_axis: z
+- name: oven_area_area_right_drawer_handle_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: oven_area_area_right_drawer_board_0_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: oven_area_area_right_drawer_barrier_0_right_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: oven_area_area_right_drawer_barrier_0_left_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: oven_area_area_right_drawer_barrier_0_back_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: oven_area_area_right_drawer_board_1_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: oven_area_area_right_drawer_barrier_1_right_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: oven_area_area_right_drawer_barrier_1_left_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: oven_area_area_right_drawer_barrier_1_back_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: oven_area_area_right_drawer_board_2_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: oven_area_area_right_drawer_barrier_2_right_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: oven_area_area_right_drawer_barrier_2_left_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: oven_area_area_right_drawer_barrier_2_back_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: oven_area_area_right_drawer_board_3_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: oven_area_area_right_drawer_barrier_3_right_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: oven_area_area_right_drawer_barrier_3_left_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: oven_area_area_right_drawer_barrier_3_back_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: kitchen_island_footprint_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: kitchen_island_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: kitchen_island_surface_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: kitchen_island_stove_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: kitchen_island_left_panel_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: kitchen_island_left_upper_drawer_main_joint
+  params:
+    constraint_type: translational
+    controllable_link: ''
+    'controllable_link ': iai_kitchen/kitchen_island_left_upper_drawer_handle
+    grasp_axis: y
+- name: kitchen_island_left_upper_drawer_handle_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: kitchen_island_left_lower_drawer_main_joint
+  params:
+    constraint_type: translational
+    controllable_link: ''
+    'controllable_link ': iai_kitchen/kitchen_island_left_lower_drawer_handle
+    grasp_axis: y
+- name: kitchen_island_left_lower_drawer_handle_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: kitchen_island_middle_panel_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: kitchen_island_middle_upper_drawer_main_joint
+  params:
+    constraint_type: translational
+    controllable_link: ''
+    'controllable_link ': iai_kitchen/kitchen_island_middle_upper_drawer_handle
+    grasp_axis: y
+- name: kitchen_island_middle_upper_drawer_handle_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: kitchen_island_middle_lower_drawer_main_joint
+  params:
+    constraint_type: translational
+    controllable_link: ''
+    'controllable_link ': iai_kitchen/kitchen_island_middle_lower_drawer_handle
+    grasp_axis: y
+- name: kitchen_island_middle_lower_drawer_handle_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: kitchen_island_right_panel_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: kitchen_island_right_upper_drawer_main_joint
+  params:
+    constraint_type: translational
+    controllable_link: ''
+    'controllable_link ': iai_kitchen/kitchen_island_right_upper_drawer_handle
+    grasp_axis: y
+- name: kitchen_island_right_upper_drawer_handle_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: kitchen_island_right_lower_drawer_main_joint
+  params:
+    constraint_type: translational
+    controllable_link: ''
+    'controllable_link ': iai_kitchen/kitchen_island_right_lower_drawer_handle
+    grasp_axis: y
+- name: kitchen_island_right_lower_drawer_handle_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: fridge_area_footprint_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: fridge_area_main_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: fridge_area_lower_drawer_main_joint
+  params:
+    constraint_type: translational
+    controllable_link: ''
+    'controllable_link ': iai_kitchen/fridge_area_lower_drawer_handle
+    grasp_axis: y
+- name: fridge_area_lower_drawer_handle_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: iai_fridge_main_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: iai_fridge_main_middle_level_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: iai_fridge_door_joint
+  params:
+    constraint_type: angular
+    controllable_link: ''
+    'controllable_link ': iai_kitchen/iai_fridge_door_handle
+    grasp_axis: z
+- name: iai_fridge_door_shelves_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: iai_fridge_ceiling_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: iai_fridge_door_handle_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: table_area_main_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: walls_main_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: wall_1_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: wall_2_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: wall_3_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: wall_4_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: wall_5_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: wall_6_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''
+- name: wall_7_joint
+  params:
+    constraint_type: ''
+    controllable_link: ''
+    grasp_axis: ''

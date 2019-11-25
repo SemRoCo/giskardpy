@@ -5,8 +5,11 @@ from collections import OrderedDict
 
 import numpy as np
 from geometry_msgs.msg import Vector3Stamped, Vector3
-from rospy_message_converter.message_converter import convert_dictionary_to_ros_message
+from rospy_message_converter.message_converter import convert_dictionary_to_ros_message, \
+    convert_ros_message_to_dictionary
 from scipy.optimize import curve_fit
+
+from tf.transformations import quaternion_matrix, quaternion_from_matrix
 
 import giskardpy.identifier as identifier
 from giskardpy import symbolic_wrapper as w
@@ -15,6 +18,11 @@ from giskardpy.input_system import PoseStampedInput, Point3Input, Vector3Input, 
     PointStampedInput, TranslationInput
 from giskardpy.qp_problem_builder import SoftConstraint
 from giskardpy.tfwrapper import transform_pose, transform_vector, transform_point
+from giskardpy import tfwrapper as tf_wrapper
+from giskardpy.python_interface import GiskardWrapper
+from utils_constraints import Utils, ConfigFileManager
+
+import rospy
 
 MAX_WEIGHT = 15
 HIGH_WEIGHT = 5
@@ -939,6 +947,566 @@ class Pointing(Constraint):
     def __str__(self):
         s = super(Pointing, self).__str__()
         return u'{}/{}/{}'.format(s, self.root, self.tip)
+
+
+class MoveWithConstraint(Constraint):
+    # Symbol
+    goal_pose = u'goal_pose'
+    gain = u'gain'
+    weight = u'weight'
+    max_speed = u'max_speed'
+
+    # initializiert mit god_map und name constraint
+    def __init__(self, god_map, goal_name, body_name, weight=HIGH_WEIGHT, gain=1, max_speed=0.1): # orientation max speed= 0.5 und posistion max speed = 0.1
+        super(MoveWithConstraint, self).__init__(god_map)
+
+        self.goal_name = goal_name
+        self.body_name = body_name
+
+        rospy.logout("START INFO ABOUT JOINT: ")
+        # split iai_kitchen and original frame name
+        frame_name = goal_name.split("/")[-1]
+        prefix_name = goal_name.split("/")[0]
+        rospy.logout("Frame name without prefix: " + frame_name)
+        # check and get controllable joint of joint
+        joint_name = self.get_controllable_joint(frame_name)
+        rospy.logout("The next controllable joint is :" + joint_name)
+
+        # Take info from config file,which axis to grasp
+        self.config_file_manager = ConfigFileManager()
+        self.utils = Utils()
+        self.config_file_manager.load_yaml_config_file(
+            "/home/ange-michel/Desktop/giskardpy_ws/src/giskardpy/data/pr2/config_file/config_file_002.yaml")
+        self.params_controllable_joint = self.config_file_manager.get_params_joint(joint_name=joint_name)
+        self.axis = self.params_controllable_joint['grasp_axis']
+
+        # get grasp pose
+        goal_pose = tf_wrapper.lookup_pose(self.get_robot().get_root(),
+                                           goal_name)
+
+        rospy.logout("The goal name is: " + goal_name)
+        rospy.logout("Pose is :")
+        rospy.logout(goal_pose.pose)
+
+        # set symbol and grasp pose in param
+        params = {self.goal_pose: goal_pose,
+                  self.gain: gain,
+                  self.weight: weight,
+                  self.max_speed: max_speed}
+        # save params
+        self.save_params_on_god_map(params)
+
+    def get_goal_pose(self):
+        return self.get_input_PoseStamped(self.goal_pose)
+
+    def get_controllable_joint(self, link_name):
+        joint_name = self.get_world().get_object("kitchen").get_parent_joint_of_link(link_name)
+        if self.get_world().get_object("kitchen").is_joint_controllable(joint_name):
+            return joint_name
+        else:
+            return self.get_controllable_joint(self.get_world().get_object("kitchen").
+                                               get_parent_link_of_link(link_name))
+
+    def get_constraint(self):
+        soft_constraints = {}
+
+        # determine constraint position
+        # homogen matrix for goal pose
+        goal_pose = self.get_goal_pose()
+        # get current hand/gripper pose to base_footprint
+        root_T_hand = self.get_fk(self.get_robot().get_root(), self.body_name)
+
+        goal_position = w.position_of(goal_pose)
+        weight = self.get_input_float(self.weight)
+        gain = self.get_input_float(self.gain)
+        max_speed = self.get_input_float(self.max_speed)
+        t = self.get_input_sampling_period()
+
+        current_position = w.position_of(root_T_hand)
+
+        error_vector = goal_position - current_position
+        error_norm = w.norm(error_vector)
+        scale_mvt = w.diffable_min_fast(error_norm * gain, max_speed * t)
+        trans_control = w.save_division(error_vector, error_norm) * scale_mvt
+
+        soft_constraints[str(self) + u'x'] = SoftConstraint(lower=trans_control[0],
+                                                            upper=trans_control[0],
+                                                            weight=weight,
+                                                            expression=current_position[0])
+        soft_constraints[str(self) + u'y'] = SoftConstraint(lower=trans_control[1],
+                                                            upper=trans_control[1],
+                                                            weight=weight,
+                                                            expression=current_position[1])
+        soft_constraints[str(self) + u'z'] = SoftConstraint(lower=trans_control[2],
+                                                            upper=trans_control[2],
+                                                            weight=weight,
+                                                            expression=current_position[2])
+
+        # Do rotation constraints of gripper
+        # get orientation value
+        goal_rotation = w.rotation_of(self.get_goal_pose())
+
+        # do fix a rotation
+        rospy.logout("The grasp axis is: " + self.axis)
+        h_g = self.utils.rotation_gripper_to_object(self.axis)
+        goal_rotation = w.dot(goal_rotation, h_g)
+
+        #
+        weight = self.get_input_float(self.weight)
+        gain = self.get_input_float(self.gain)
+        max_speed = 0.5 #self.get_input_float(self.max_speed)
+
+        current_rotation = w.rotation_of(self.get_fk(self.get_robot().get_root(), self.body_name))
+        current_evaluated_rotation = w.rotation_of(self.get_fk_evaluated(self.get_robot().get_root(), self.body_name))
+
+        angle = w.rotation_distance(current_rotation, goal_rotation)
+        angle = w.diffable_abs(angle)
+
+        capped_angle = w.diffable_min_fast(w.save_division(max_speed * t, (gain * angle)), 1)
+        q1 = w.quaternion_from_matrix(current_rotation)
+        q2 = w.quaternion_from_matrix(goal_rotation)
+        intermediate_goal = w.diffable_slerp(q1, q2, capped_angle)
+        tmp_q = w.quaternion_diff(q1, intermediate_goal)
+        axis3, angle3 = w.axis_angle_from_quaternion(tmp_q[0], tmp_q[1], tmp_q[2], tmp_q[3])
+        r_rot_control = axis3 * angle3
+
+        hack = w.rotation_matrix_from_axis_angle([0, 0, 1], 0.0001)
+        axis2, angle2 = w.diffable_axis_angle_from_matrix(w.dot(current_rotation.T,
+                                                                w.dot(current_evaluated_rotation, hack)).T)
+        c_aa = (axis2 * angle2)
+
+        soft_constraints[str(self) + u'/0'] = SoftConstraint(lower=r_rot_control[0],
+                                                             upper=r_rot_control[0],
+                                                             weight=weight,
+                                                             expression=c_aa[0])
+        soft_constraints[str(self) + u'/1'] = SoftConstraint(lower=r_rot_control[1],
+                                                             upper=r_rot_control[1],
+                                                             weight=weight,
+                                                             expression=c_aa[1])
+        soft_constraints[str(self) + u'/2'] = SoftConstraint(lower=r_rot_control[2],
+                                                             upper=r_rot_control[2],
+                                                             weight=weight,
+                                                             expression=c_aa[2])
+        return soft_constraints
+
+    def __str__(self):
+        return u'{}/{}'.format(self.__class__.__name__, self.goal_name)
+
+
+# "root": "base_footprint", #required
+# '"tip": "r_gripper_tool_frame", #required
+# "goal_position": dict {}
+class CartesianPoseUpdate(Constraint):
+    # TODO do this with multi inheritance
+    goal = u'goal'
+    weight = u'weight'
+    gain = u'gain'
+    max_speed = u'max_speed'
+
+    def __init__(self, god_map, root_link, tip_link, goal_name, weight=HIGH_WEIGHT, gain=3, max_speed=0.1):
+        super(CartesianPoseUpdate, self).__init__(god_map)
+        # update parameter
+        self.goal_name = goal_name
+        self.body_name = tip_link
+
+        rospy.logout("START INFO ABOUT JOINT: ")
+        # split iai_kitchen and original frame name
+        frame_name = str(goal_name).split("/")[-1]
+        prefix_name = str(goal_name).split("/")[0]
+        rospy.logout("Frame name without prefix: " + frame_name)
+        # check and get controllable joint of joint
+        joint_name = self.get_controllable_joint(frame_name)
+        rospy.logout("The next controllable joint is :" + joint_name)
+
+        # Take info from config file, axis to grasp
+        self.config_file_manager = ConfigFileManager()
+        self.config_file_manager.load_yaml_config_file(
+            self.get_god_map().safe_get_data(identifier.data_folder) + "/pr2/config_file/config_file_002.yaml")
+
+        self.params_controllable_joint = self.config_file_manager.get_params_joint(joint_name=joint_name)
+        self.axis = self.params_controllable_joint['grasp_axis']
+
+        # get grasp pose
+        goal_pose = tf_wrapper.lookup_pose(self.get_robot().get_root(),
+                                           goal_name)
+
+        rospy.logout("The goal name is: " + goal_name)
+        rospy.logout("Pose is :")
+        rospy.logout(goal_pose.pose)
+        rospy.logout("Axis :")
+        rospy.logout(self.axis)
+
+        # determine rotation constraint
+        goal_rotation = quaternion_matrix([goal_pose.pose.orientation.x,
+                                           goal_pose.pose.orientation.y,
+                                           goal_pose.pose.orientation.z,
+                                           goal_pose.pose.orientation.w])  # sw.rotation_of(goal_pose)
+        h_g = w.Matrix([[-1, 0, 0, 0],
+                         [0, 0, 1, 0],
+                         [0, 1, 0, 0],
+                         [0, 0, 0, 1]])
+        goal_rotation = goal_rotation * h_g
+        new_orientation = quaternion_from_matrix(goal_rotation)
+        goal_pose.pose.orientation.x = new_orientation[0]
+        goal_pose.pose.orientation.y = new_orientation[1]
+        goal_pose.pose.orientation.z = new_orientation[2]
+        goal_pose.pose.orientation.w = new_orientation[3]
+        goal = convert_ros_message_to_dictionary(goal_pose)
+        self.constraints = []
+        self.constraints.append(CartesianPosition(god_map, root_link, tip_link, goal, weight, gain, max_speed))
+        self.constraints.append(CartesianOrientationSlerp(god_map, root_link, tip_link, goal, weight, gain, max_speed))
+
+    def get_controllable_joint(self, link_name):
+        joint_name = self.get_world().get_object("kitchen").get_parent_joint_of_link(link_name)
+        if self.get_world().get_object("kitchen").is_joint_controllable(joint_name):
+            return joint_name
+        else:
+            return self.get_controllable_joint(self.get_world().get_object("kitchen").
+                                               get_parent_link_of_link(link_name))
+
+    def get_constraint(self):
+        soft_constraints = OrderedDict()
+        for constraint in self.constraints:
+            soft_constraints.update(constraint.get_constraint())
+        return soft_constraints
+
+
+OPEN = -1
+CLOSE = 1
+
+
+class TranslationalAngularConstraint(Constraint):
+    # Symbol
+    goal_pose = u'goal_pose'
+    gain = u'gain'
+    weight = u'weight'
+    max_speed = u'max_speed'
+
+    # initializiert mit god_map und name constraint
+    def __init__(self, god_map, goal_name, body_name, weight=HIGH_WEIGHT, gain=1, max_speed=0.1,
+                 action=OPEN):
+        super(TranslationalAngularConstraint, self).__init__(god_map)
+
+        self.goal_name = goal_name
+        self.body_name = body_name
+
+        # info about goal
+        rospy.logout("START INFO ABOUT JOINT: ")
+        # split iai_kitchen and original frame name
+        frame_name = goal_name.split("/")[-1]
+        prefix_name = goal_name.split("/")[0]
+        rospy.logout("Frame name without prefix: " + frame_name)
+        # check and get controllable joint of joint
+        joint_name = self.get_controllable_joint(frame_name)
+        rospy.logout("The next controllable joint is :" + joint_name)
+        # get grasp axis
+        self.axis = self.get_world().get_object("kitchen").get_joint_axis(joint_name)
+        # get joint limits
+        self.limits = self.get_world().get_object("kitchen").get_joint_limits(joint_name)
+        # typ of constraint, translational or angular
+        self.angular = False
+
+        # get pose of grasped joint
+        goal_pose = tf_wrapper.lookup_pose(self.get_robot().get_root(),
+                                           body_name)
+        # get pose object to map
+        object_pose_to_map = tf_wrapper.lookup_pose("map", goal_name)
+
+        rospy.logout("Check if joint is translational or rotational")
+        # check typ of joint
+        if self.get_world().get_object("kitchen").is_translational_joint(joint_name):
+            for ind in range(len(self.axis)):
+                self.axis[ind] = action * (self.axis[ind] * self.limits[1])
+            # set new translational coordinate
+            goal_pose.pose.position.x = goal_pose.pose.position.x + self.axis[0]
+            goal_pose.pose.position.y = goal_pose.pose.position.y + self.axis[1]
+            goal_pose.pose.position.z = goal_pose.pose.position.z + self.axis[2]
+        elif self.get_world().get_object("kitchen").is_rotational_joint(joint_name):
+            self.angular = True
+            child_link = self.get_world().get_object("kitchen").get_child_link_of_joint(joint_name)
+            # pose_link_parent and goal_pose_to_map have reference to map
+            self.pose_link_parent = tf_wrapper.lookup_pose("map",
+                                                           prefix_name + "/" + child_link)
+            utils = Utils()
+            if joint_name == "oven_area_oven_door_joint":
+                self.axis = [0, 1, 0]
+                limit = 1.57
+                opening = limit * action
+            else:
+                opening = self.limits[1] * action
+
+            new_pose_goal = utils.estimated_positions_fro_circle([self.pose_link_parent.pose.position.x,
+                                                                  self.pose_link_parent.pose.position.y,
+                                                                  self.pose_link_parent.pose.position.z],
+                                                                 [object_pose_to_map.pose.position.x,
+                                                                  object_pose_to_map.pose.position.y,
+                                                                  object_pose_to_map.pose.position.z],
+                                                                 self.axis, opening)
+            # set new coordinate of gripper with angular mvt
+            goal_pose.pose.position.x = round(new_pose_goal[0], 2)
+            goal_pose.pose.position.y = round(new_pose_goal[1], 2)
+            goal_pose.pose.position.z = round(new_pose_goal[2], 2)
+            rospy.logout("end pose after rotation")
+            rospy.logout(goal_pose)
+
+            # get radius of arc
+            self.child_link_frame = prefix_name + "/" + child_link
+            self.pose_child_link = tf_wrapper.lookup_pose(self.get_robot().get_root(), self.child_link_frame)
+            self.radius = utils.get_distance([self.pose_link_parent.pose.position.x,
+                                              self.pose_link_parent.pose.position.y,
+                                              self.pose_link_parent.pose.position.z],
+                                             [object_pose_to_map.pose.position.x,
+                                              object_pose_to_map.pose.position.y,
+                                              object_pose_to_map.pose.position.z])
+
+        # set symbol and grasp pose in param
+        params = {self.goal_pose: goal_pose,
+                  self.gain: gain,
+                  self.weight: weight,
+                  self.max_speed: max_speed}
+        # save params
+        self.save_params_on_god_map(params)
+
+    def get_goal_pose(self):
+        return self.get_input_PoseStamped(self.goal_pose)
+
+    def get_controllable_joint(self, link_name):
+        joint_name = self.get_world().get_object("kitchen").get_parent_joint_of_link(link_name)
+        if self.get_world().get_object("kitchen").is_joint_controllable(joint_name):
+            return joint_name
+        else:
+            return self.get_controllable_joint(self.get_world().get_object("kitchen").
+                                               get_parent_link_of_link(link_name))
+
+    def get_constraint(self):
+        soft_constraints = {}
+
+        # determine constraint position
+        # homogen matrix for goal pose
+        goal_pose = self.get_goal_pose()
+        # get current hand/gripper pose to base_footprint
+        root_T_hand = self.get_fk(self.get_robot().get_root(), self.body_name)
+        goal_position = w.position_of(goal_pose)
+        weight = self.get_input_float(self.weight)
+        gain = self.get_input_float(self.gain)
+        max_speed = self.get_input_float(self.max_speed)
+        t = self.get_input_sampling_period()
+
+        current_position = w.position_of(root_T_hand)
+
+        # direction to goal
+
+        error_vector = goal_position - current_position
+        error_norm = w.norm(error_vector)
+        scale_mvt = w.diffable_min_fast(error_norm * gain, max_speed * t)
+        #scale_mvt = w.diffable_min_fast(error_norm, max_speed * t)
+        trans_control = w.save_division(error_vector, error_norm) * scale_mvt
+
+        soft_constraints[str(self) + u'x'] = SoftConstraint(lower=trans_control[0],
+                                                            upper=trans_control[0],
+                                                            weight=weight,
+                                                            expression=current_position[0])
+        soft_constraints[str(self) + u'y'] = SoftConstraint(lower=trans_control[1],
+                                                            upper=trans_control[1],
+                                                            weight=weight,
+                                                            expression=current_position[1])
+        soft_constraints[str(self) + u'z'] = SoftConstraint(lower=trans_control[2],
+                                                            upper=trans_control[2],
+                                                            weight=weight,
+                                                            expression=current_position[2])
+        # if mvt is angular, then hold the radius distance between gripper and center (controllable joint)
+        if self.angular:
+            hold_radius = (current_position[0] - self.pose_child_link.pose.position.x) ** 2 + \
+                          (current_position[1] - self.pose_child_link.pose.position.y) ** 2 + \
+                          (current_position[2] - self.pose_child_link.pose.position.z) ** 2
+
+            distance_gripper_to_pose_link_parent = (self.radius) ** 2
+
+            soft_constraints[str(self) + u'radius'] = SoftConstraint(
+                lower=distance_gripper_to_pose_link_parent - hold_radius,
+                upper=distance_gripper_to_pose_link_parent - hold_radius,
+                weight=weight,
+                expression=hold_radius)
+
+        # determine rotation constraint
+        goal_rotation = w.rotation_of(root_T_hand)
+        weight = self.get_input_float(self.weight)
+        gain = self.get_input_float(self.gain)
+        max_speed = 0.5  #  self.get_input_float(self.max_speed)
+
+        current_rotation = w.rotation_of(self.get_fk(self.get_robot().get_root(), self.body_name))
+        current_evaluated_rotation = w.rotation_of(self.get_fk_evaluated(self.get_robot().get_root(), self.body_name))
+
+        # slerp
+        angle = w.rotation_distance(current_rotation, goal_rotation)
+        angle = w.diffable_abs(angle)
+        capped_angle = w.diffable_min_fast(w.save_division(max_speed * t, (gain * angle)), 1)
+        q1 = w.quaternion_from_matrix(current_rotation)
+        q2 = w.quaternion_from_matrix(goal_rotation)
+        intermediate_goal = w.diffable_slerp(q1, q2, capped_angle)
+        tmp_q = w.quaternion_diff(q1, intermediate_goal)
+        axis3, angle3 = w.axis_angle_from_quaternion(tmp_q[0], tmp_q[1], tmp_q[2], tmp_q[3])
+        r_rot_control = axis3 * angle3
+
+        hack = w.rotation_matrix_from_axis_angle([0, 0, 1], 0.0001)
+        axis2, angle2 = w.diffable_axis_angle_from_matrix(w.dot(current_rotation.T,
+                                                                w.dot(current_evaluated_rotation, hack)).T)
+        c_aa = (axis2 * angle2)
+        # end slerp
+
+        soft_constraints[str(self) + u'/0'] = SoftConstraint(lower=r_rot_control[0],
+                                                             upper=r_rot_control[0],
+                                                             weight=weight,
+                                                             expression=c_aa[0])
+        soft_constraints[str(self) + u'/1'] = SoftConstraint(lower=r_rot_control[1],
+                                                             upper=r_rot_control[1],
+                                                             weight=weight,
+                                                             expression=c_aa[1])
+        soft_constraints[str(self) + u'/2'] = SoftConstraint(lower=r_rot_control[2],
+                                                             upper=r_rot_control[2],
+                                                             weight=weight,
+                                                             expression=c_aa[2])
+        return soft_constraints
+
+    def __str__(self):
+        return u'{}/{}'.format(self.__class__.__name__, self.goal_name)
+
+
+class RotationalConstraint(Constraint):
+    # Symbol
+    goal_pose = u'goal_pose'
+    gain = u'gain'
+    weight = u'weight'
+    max_speed = u'max_speed'
+
+    # initializiert mit god_map und name constraint
+    def __init__(self, god_map, goal_name, body_name, weight=HIGH_WEIGHT, gain=3, max_speed=0.1, action=OPEN):
+        super(RotationalConstraint, self).__init__(god_map)
+
+        self.goal_name = goal_name
+        self.body_name = body_name
+        self.h_g = None
+        self.action = action
+
+        rospy.logout("START INFO ABOUT JOINT: ")
+        # split iai_kitchen and original frame name
+        frame_name = goal_name.split("/")[-1]
+        prefix_name = goal_name.split("/")[0]
+        rospy.logout("Frame name without prefix: " + frame_name)
+        # check and get controllable joint of joint
+        joint_name = self.get_controllable_joint(frame_name)
+        rospy.logout("The next controllable joint is :" + joint_name)
+        self.axis = self.get_world().get_object("kitchen").get_joint_axis(joint_name)
+        self.limits = self.get_world().get_object("kitchen").get_joint_limits(joint_name)
+
+        # get gripper pose
+        goal_pose = tf_wrapper.lookup_pose(self.get_robot().get_root(),
+                                           goal_name)
+
+        self.utils = Utils()
+
+        # check joint and get rotation
+        self.angular = self.get_world().get_object("kitchen").is_rotational_joint(joint_name)
+
+        if self.action == 1:
+            self.h_g = self.utils.rotation_gripper_to_object(self.axis)
+        elif self.action == -1:
+            self.h_g = self.utils.rotation_gripper_to_object("y_2")
+
+        # set symbol and grasp pose in param
+        params = {self.goal_pose: goal_pose,
+                  self.gain: gain,
+                  self.weight: weight,
+                  self.max_speed: max_speed}
+        # save params
+        self.save_params_on_god_map(params)
+
+    def get_goal_pose(self):
+        return self.get_input_PoseStamped(self.goal_pose)
+
+    def get_controllable_joint(self, link_name):
+        joint_name = self.get_world().get_object("kitchen").get_parent_joint_of_link(link_name)
+        if self.get_world().get_object("kitchen").is_joint_controllable(joint_name):
+            return joint_name
+        else:
+            return self.get_controllable_joint(self.get_world().get_object("kitchen").
+                                               get_parent_link_of_link(link_name))
+
+    def get_constraint(self):
+        soft_constraints = {}
+
+        # determine constraint position
+        # homogen matrix for goal pose
+        goal_pose = self.get_goal_pose()
+        # get current hand/gripper pose to base_footprint
+        root_T_hand = self.get_fk(self.get_robot().get_root(), self.body_name)
+
+        goal_position = w.position_of(goal_pose)
+        weight = self.get_input_float(self.weight)
+        gain = self.get_input_float(self.gain)
+        max_speed = self.get_input_float(self.max_speed)
+
+        current_position = w.position_of(root_T_hand)
+
+        error_vector = goal_position - current_position
+        error_norm = w.norm(error_vector)
+        scale_mvt = w.diffable_min_fast(error_norm * gain, max_speed)
+        trans_control = error_vector / error_norm * scale_mvt
+
+        soft_constraints[str(self) + u'x'] = SoftConstraint(lower=trans_control[0],
+                                                            upper=trans_control[0],
+                                                            weight=weight,
+                                                            expression=current_position[0])
+        soft_constraints[str(self) + u'y'] = SoftConstraint(lower=trans_control[1],
+                                                            upper=trans_control[1],
+                                                            weight=weight,
+                                                            expression=current_position[1])
+        soft_constraints[str(self) + u'z'] = SoftConstraint(lower=trans_control[2],
+                                                            upper=trans_control[2],
+                                                            weight=weight,
+                                                            expression=current_position[2])
+
+        goal_rotation = w.rotation_of(self.get_goal_pose())
+        # apply rotation
+
+
+        #h_g = self.utils.rotation_gripper_to_object("y_2")
+        goal_rotation = w.dot(goal_rotation, self.h_g)
+
+        weight = self.get_input_float(self.weight)
+        gain = self.get_input_float(self.gain)
+        max_speed = self.get_input_float(self.max_speed)
+
+        current_rotation = w.rotation_of(self.get_fk(self.get_robot().get_root(), self.body_name))
+        current_evaluated_rotation = w.rotation_of(self.get_fk_evaluated(self.get_robot().get_root(), self.body_name))
+
+        axis, angle = w.diffable_axis_angle_from_matrix((current_rotation.T * goal_rotation))
+
+        capped_angle = w.diffable_max_fast(w.diffable_min_fast(gain * angle, max_speed), -max_speed)
+
+        r_rot_control = axis * capped_angle
+
+        hack = w.rotation_matrix_from_axis_angle([0, 0, 1], 0.0001)
+
+        axis, angle = w.diffable_axis_angle_from_matrix((current_rotation.T * (current_evaluated_rotation * hack)).T)
+        c_aa = (axis * angle)
+
+        soft_constraints[str(self) + u'/0'] = SoftConstraint(lower=r_rot_control[0],
+                                                             upper=r_rot_control[0],
+                                                             weight=weight,
+                                                             expression=c_aa[0])
+        soft_constraints[str(self) + u'/1'] = SoftConstraint(lower=r_rot_control[1],
+                                                             upper=r_rot_control[1],
+                                                             weight=weight,
+                                                             expression=c_aa[1])
+        soft_constraints[str(self) + u'/2'] = SoftConstraint(lower=r_rot_control[2],
+                                                             upper=r_rot_control[2],
+                                                             weight=weight,
+                                                             expression=c_aa[2])
+        return soft_constraints
+
+    def __str__(self):
+        return u'{}/{}'.format(self.__class__.__name__, self.goal_name)
 
 
 def add_debug_constraint(d, key, expr):

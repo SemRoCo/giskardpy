@@ -1103,7 +1103,8 @@ class CartesianPoseUpdate(Constraint):
     gain = u'gain'
     max_speed = u'max_speed'
 
-    def __init__(self, god_map, root_link, tip_link, goal_name, weight=HIGH_WEIGHT, gain=3, max_speed=0.1):
+    def __init__(self, god_map, root_link, tip_link, goal_name, weight=HIGH_WEIGHT, gain=1,  translation_max_speed=0.1,
+                 rotation_max_speed=0.5):
         super(CartesianPoseUpdate, self).__init__(god_map)
         # update parameter
         self.goal_name = goal_name
@@ -1153,8 +1154,8 @@ class CartesianPoseUpdate(Constraint):
         goal_pose.pose.orientation.w = new_orientation[3]
         goal = convert_ros_message_to_dictionary(goal_pose)
         self.constraints = []
-        self.constraints.append(CartesianPosition(god_map, root_link, tip_link, goal, weight, gain, max_speed))
-        self.constraints.append(CartesianOrientationSlerp(god_map, root_link, tip_link, goal, weight, gain, max_speed))
+        self.constraints.append(CartesianPosition(god_map, root_link, tip_link, goal, weight, gain, translation_max_speed))
+        self.constraints.append(CartesianOrientationSlerp(god_map, root_link, tip_link, goal, weight, gain, rotation_max_speed))
 
     def get_controllable_joint(self, link_name):
         joint_name = self.get_world().get_object("kitchen").get_parent_joint_of_link(link_name)

@@ -320,7 +320,7 @@ if __name__ == '__main__':
     #open_kitchen_island_object()
     #open_oven_door_object()
     #open_sink_area_object()
-    reset_ktichen(list_joint)
+    #reset_ktichen(list_joint)
     print("test is done.")
 
     # set_cart_goal_test()

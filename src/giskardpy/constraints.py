@@ -957,7 +957,8 @@ class MoveWithConstraint(Constraint):
     max_speed = u'max_speed'
 
     # initializiert mit god_map und name constraint
-    def __init__(self, god_map, goal_name, body_name, weight=HIGH_WEIGHT, gain=1, max_speed=0.1): # orientation max speed= 0.5 und posistion max speed = 0.1
+    def __init__(self, god_map, goal_name, body_name, weight=HIGH_WEIGHT, gain=1,
+                 max_speed=0.1):  # orientation max speed= 0.5 und posistion max speed = 0.1
         super(MoveWithConstraint, self).__init__(god_map)
 
         self.goal_name = goal_name
@@ -1054,7 +1055,7 @@ class MoveWithConstraint(Constraint):
         #
         weight = self.get_input_float(self.weight)
         gain = self.get_input_float(self.gain)
-        max_speed = 0.5 #self.get_input_float(self.max_speed)
+        max_speed = 0.5  # self.get_input_float(self.max_speed)
 
         current_rotation = w.rotation_of(self.get_fk(self.get_robot().get_root(), self.body_name))
         current_evaluated_rotation = w.rotation_of(self.get_fk_evaluated(self.get_robot().get_root(), self.body_name))
@@ -1103,7 +1104,7 @@ class CartesianPoseUpdate(Constraint):
     gain = u'gain'
     max_speed = u'max_speed'
 
-    def __init__(self, god_map, root_link, tip_link, goal_name, weight=HIGH_WEIGHT, gain=1,  translation_max_speed=0.1,
+    def __init__(self, god_map, root_link, tip_link, goal_name, weight=HIGH_WEIGHT, gain=1, translation_max_speed=0.1,
                  rotation_max_speed=0.5):
         super(CartesianPoseUpdate, self).__init__(god_map)
         # update parameter
@@ -1121,11 +1122,22 @@ class CartesianPoseUpdate(Constraint):
 
         # Take info from config file, axis to grasp
         self.config_file_manager = ConfigFileManager()
+        self.utils = Utils()
         self.config_file_manager.load_yaml_config_file(
             self.get_god_map().safe_get_data(identifier.data_folder) + "/pr2/config_file/config_file_002.yaml")
 
         self.params_controllable_joint = self.config_file_manager.get_params_joint(joint_name=joint_name)
-        self.axis = self.params_controllable_joint['grasp_axis']
+        # get from frame_handle which axis will be need to grasp with gripper. on x, y or z / MoveWithConstraint
+        self.grasp_axis = self.params_controllable_joint['grasp_axis']
+        # get axis of controllable joint / TranslationalAngularConstraint
+        self.axis = self.get_world().get_object("kitchen").get_joint_axis(joint_name)
+        # get controllable joint limits / TranslationalAngularConstraint
+        self.limits = self.get_world().get_object("kitchen").get_joint_limits(joint_name)
+        self.angular = False
+
+        # Firstly do constraints for movement to object and after do constraints for open or close
+
+        self.constraints = []
 
         # get grasp pose
         goal_pose = tf_wrapper.lookup_pose(self.get_robot().get_root(),
@@ -1134,28 +1146,37 @@ class CartesianPoseUpdate(Constraint):
         rospy.logout("The goal name is: " + goal_name)
         rospy.logout("Pose is :")
         rospy.logout(goal_pose.pose)
-        rospy.logout("Axis :")
-        rospy.logout(self.axis)
+        rospy.logout("Grasp Axis is :")
+        rospy.logout(self.grasp_axis)
 
+        # convert goal msg to dictionary
+        # goal = convert_ros_message_to_dictionary(goal_pose)
+
+        # determine rotation constraint
+        # Do rotation constraints of gripper
+        # get orientation value
         # determine rotation constraint
         goal_rotation = quaternion_matrix([goal_pose.pose.orientation.x,
                                            goal_pose.pose.orientation.y,
                                            goal_pose.pose.orientation.z,
                                            goal_pose.pose.orientation.w])  # sw.rotation_of(goal_pose)
-        h_g = w.Matrix([[-1, 0, 0, 0],
-                         [0, 0, 1, 0],
-                         [0, 1, 0, 0],
-                         [0, 0, 0, 1]])
-        goal_rotation = goal_rotation * h_g
-        new_orientation = quaternion_from_matrix(goal_rotation)
+
+        # do fix a rotation
+        h_g = self.utils.rotation_gripper_to_object(self.grasp_axis)
+        goal_rotation = w.dot(goal_rotation, h_g)
+        new_orientation = w.quaternion_from_matrix(goal_rotation)
+        # new_orientation = quaternion_from_matrix(goal_rotation)
         goal_pose.pose.orientation.x = new_orientation[0]
         goal_pose.pose.orientation.y = new_orientation[1]
         goal_pose.pose.orientation.z = new_orientation[2]
         goal_pose.pose.orientation.w = new_orientation[3]
+
+        # update orientation of gripper for constraints orientation
         goal = convert_ros_message_to_dictionary(goal_pose)
-        self.constraints = []
-        self.constraints.append(CartesianPosition(god_map, root_link, tip_link, goal, weight, gain, translation_max_speed))
-        self.constraints.append(CartesianOrientationSlerp(god_map, root_link, tip_link, goal, weight, gain, rotation_max_speed))
+        self.constraints.append(CartesianPosition(god_map, root_link, tip_link, goal, weight, gain,
+                                                  translation_max_speed))
+        self.constraints.append(CartesianOrientationSlerp(god_map, root_link, tip_link, goal, weight, gain,
+                                                          rotation_max_speed))
 
     def get_controllable_joint(self, link_name):
         joint_name = self.get_world().get_object("kitchen").get_parent_joint_of_link(link_name)
@@ -1300,7 +1321,7 @@ class TranslationalAngularConstraint(Constraint):
         error_vector = goal_position - current_position
         error_norm = w.norm(error_vector)
         scale_mvt = w.diffable_min_fast(error_norm * gain, max_speed * t)
-        #scale_mvt = w.diffable_min_fast(error_norm, max_speed * t)
+        # scale_mvt = w.diffable_min_fast(error_norm, max_speed * t)
         trans_control = w.save_division(error_vector, error_norm) * scale_mvt
 
         soft_constraints[str(self) + u'x'] = SoftConstraint(lower=trans_control[0],
@@ -1333,7 +1354,7 @@ class TranslationalAngularConstraint(Constraint):
         goal_rotation = w.rotation_of(root_T_hand)
         weight = self.get_input_float(self.weight)
         gain = self.get_input_float(self.gain)
-        max_speed = 0.5  #  self.get_input_float(self.max_speed)
+        max_speed = 0.5  # self.get_input_float(self.max_speed)
 
         current_rotation = w.rotation_of(self.get_fk(self.get_robot().get_root(), self.body_name))
         current_evaluated_rotation = w.rotation_of(self.get_fk_evaluated(self.get_robot().get_root(), self.body_name))
@@ -1470,8 +1491,7 @@ class RotationalConstraint(Constraint):
         goal_rotation = w.rotation_of(self.get_goal_pose())
         # apply rotation
 
-
-        #h_g = self.utils.rotation_gripper_to_object("y_2")
+        # h_g = self.utils.rotation_gripper_to_object("y_2")
         goal_rotation = w.dot(goal_rotation, self.h_g)
 
         weight = self.get_input_float(self.weight)

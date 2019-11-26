@@ -66,9 +66,9 @@ class Gripper:
         :return:
         """
         self.giskard.set_json_goal("MoveWithConstraint", goal_name=goal, body_name=body)
-        # self.giskard.set_json_goal("CartesianPoseUpdate", root_link="base_footprint", tip_link=body, goal_name=goal)
-        # self.giskard.avoid_all_collisions()
-        self.giskard.allow_all_collisions()
+        #self.giskard.set_json_goal("CartesianPoseUpdate", root_link="base_footprint", tip_link=body, goal_name=goal)
+        self.giskard.avoid_all_collisions()
+        #self.giskard.allow_all_collisions()
         self.giskard.plan_and_execute()
 
     def open_or_close_with_translation(self, goal, body, action):
@@ -316,7 +316,7 @@ if __name__ == '__main__':
     rospy.logout("START SOME MOVE as Test")
     #  jl1, ja1 = gripper.info_about_joints('sink_area_left_upper_drawer_main_joint')
     #  print(jl1, ja1)
-    #open_fridge_door()
+    open_fridge_door()
     #open_kitchen_island_object()
     #open_oven_door_object()
     #open_sink_area_object()

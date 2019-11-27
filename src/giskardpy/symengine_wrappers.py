@@ -482,13 +482,16 @@ def scale(v, a):
     return save_division(v, norm(v)) * a
 
 
-def dot(a, b):
+def dot(*matrices):
     """
     :type a: Matrix
     :type b: Matrix
     :rtype: Union[float, Symbol]
     """
-    return a * b
+    result = matrices[0]
+    for m in matrices[1:]:
+        result *= m
+    return result
 
 
 def translation3(x, y, z):

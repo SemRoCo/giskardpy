@@ -242,6 +242,7 @@ class QProblemBuilder(object):
             with pd.option_context('display.max_rows', None, 'display.max_columns', None):
                 print(array)
 
+    @profile
     def get_cmd(self, substitutions, nWSR=None):
         """
         Uses substitutions for each symbol to compute the next commands for each joint.
@@ -253,8 +254,8 @@ class QProblemBuilder(object):
         np_big_ass_M = self.cython_big_ass_M.call2(substitutions)
         np_H = np_big_ass_M[self.shape1:, :-2].copy()
         np_A = np_big_ass_M[:self.shape1, :self.shape2].copy()
-        np_lb = np_big_ass_M[self.shape1:, -2].copy()
-        np_ub = np_big_ass_M[self.shape1:, -1].copy()
+        np_lb = np_big_ass_M[:, -2].copy()
+        np_ub = np_big_ass_M[:, -1].copy()
         np_lbA = np_big_ass_M[:self.shape1, -2].copy()
         np_ubA = np_big_ass_M[:self.shape1, -1].copy()
         # self.debug_print(np_H, np_A, np_lb, np_ub, np_lbA, np_ubA)

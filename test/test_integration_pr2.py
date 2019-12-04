@@ -2204,3 +2204,56 @@ class TestCollisionAvoidanceGoals(object):
         kitchen_setup.check_cart_goal(kitchen_setup.l_tip, expected_pose)
 
     # TODO FIXME attaching and detach of urdf objects that listen to joint states
+
+
+
+
+
+
+if __name__ == "__main__":
+    try:
+        logging.loginfo(u'deleting tmp test folder')
+        # shutil.rmtree(folder_name)
+    except Exception:
+        pass
+
+    logging.loginfo(u'init ros')
+    rospy.init_node(u'tests')
+    tf_init(60)
+    launch = roslaunch.scriptapi.ROSLaunch()
+    launch.start()
+
+    rospy.set_param('/joint_trajectory_splitter/state_topics',
+                    ['/whole_body_controller/base/state',
+                     '/whole_body_controller/body/state'])
+    rospy.set_param('/joint_trajectory_splitter/client_topics',
+                    ['/whole_body_controller/base/follow_joint_trajectory',
+                     '/whole_body_controller/body/follow_joint_trajectory'])
+    node = roslaunch.core.Node('giskardpy', 'joint_trajectory_splitter.py', name='joint_trajectory_splitter')
+    joint_trajectory_splitter = launch.launch(node)
+
+    c = PR2()
+    logging.loginfo(u'resetting giskard')
+    c.clear_world()
+    c.reset_base()
+
+    c.set_joint_goal(default_pose)
+    c.allow_all_collisions()
+    c.send_and_check_goal()
+
+    t = TestCartGoals()
+    t.test_keep_position3(c)
+
+
+    #g = giskard()
+    #r = resetted_giskard()
+    #z = zero_pose(r)
+    #t = TestCartGoals()
+    #c.test_keep_position3(zero_pose)
+
+
+
+
+
+#pytest.main(['test_integration_pr2.py::TestCartGoals::test_keep_position3'])
+

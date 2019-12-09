@@ -65,10 +65,11 @@ class Gripper:
         :type: str
         :return:
         """
-        self.giskard.set_json_goal("MoveWithConstraint", goal_name=goal, body_name=body)
-        #self.giskard.set_json_goal("CartesianPoseUpdate", root_link="base_footprint", tip_link=body, goal_name=goal)
-        self.giskard.avoid_all_collisions()
-        #self.giskard.allow_all_collisions()
+        #self.giskard.set_json_goal("MoveWithConstraint", goal_name=goal, body_name=body)
+        self.giskard.set_json_goal("FrameConstraint", goal_name=goal, body_name=body)
+        #self.giskard.set_json_goal("CartesianPoseUpdate", root_link="odom_combined", tip_link=body, goal_name=goal)
+        #self.giskard.avoid_all_collisions()
+        self.giskard.allow_all_collisions()
         self.giskard.plan_and_execute()
 
     def open_or_close_with_translation(self, goal, body, action):
@@ -82,7 +83,9 @@ class Gripper:
         :type: float
         :return:
         """
-        self.giskard.set_json_goal("TranslationalAngularConstraint", goal_name=goal, body_name=body, action=action)
+        #self.giskard.set_json_goal("TranslationalAngularConstraint", goal_name=goal, body_name=body, action=action)
+        #self.giskard.set_json_goal("FrameTranslationConstraint", goal_name=goal, body_name=body, action=action)
+        self.giskard.set_json_goal("AngularConstraint", goal_name=goal, body_name=body, action=action)
         self.giskard.allow_all_collisions()
         self.giskard.plan_and_execute()
 
@@ -236,6 +239,17 @@ def open_kitchen_island_object():
                                            "r_gripper_tool_frame", 1)
     gripper.set_kitchen_goal("kitchen_island_left_lower_drawer_main_joint", 0.48)
 
+def close_kitchen_island_object():
+    gripper = Gripper()
+    gripper.mvt_l_gripper(0.54, 0.54, 0.54, 0.54)
+    gripper.mvt_r_gripper(0.54, 0.54, 0.54, 0.54)
+    gripper.some_mvt("iai_kitchen/kitchen_island_left_lower_drawer_handle", "r_gripper_tool_frame")
+    gripper.mvt_l_gripper(0.0, 0.0, 0.0, 0.0)
+    gripper.mvt_r_gripper(0.0, 0.0, 0.0, 0.0)
+    gripper.open_or_close_with_translation("iai_kitchen/kitchen_island_left_lower_drawer_handle",
+                                           "r_gripper_tool_frame", -1)
+    gripper.set_kitchen_goal("kitchen_island_left_lower_drawer_main_joint", 0.0)
+
 
 def open_oven_door_object():
     gripper = Gripper()
@@ -247,6 +261,27 @@ def open_oven_door_object():
     gripper.open_or_close_with_translation('iai_kitchen/oven_area_oven_door_handle', 'l_gripper_tool_frame', -0.5)
     gripper.set_kitchen_goal('oven_area_oven_door_joint', 0.785)
 
+def close_oven_door_object():
+    gripper = Gripper()
+    gripper.mvt_l_gripper(0.54, 0.54, 0.54, 0.54)
+    gripper.mvt_r_gripper(0.54, 0.54, 0.54, 0.54)
+    gripper.some_mvt('iai_kitchen/oven_area_oven_door_handle', 'l_gripper_tool_frame')
+    gripper.mvt_l_gripper(0.0, 0.0, 0.0, 0.0)
+    gripper.mvt_r_gripper(0.0, 0.0, 0.0, 0.0)
+    gripper.open_or_close_with_translation('iai_kitchen/oven_area_oven_door_handle', 'l_gripper_tool_frame', 0.5)
+    gripper.set_kitchen_goal('oven_area_oven_door_joint', 0.0)
+
+
+def close_sink_area_object():
+    gripper = Gripper()
+    gripper.mvt_l_gripper(0.54, 0.54, 0.54, 0.54)
+    gripper.mvt_r_gripper(0.54, 0.54, 0.54, 0.54)
+    gripper.some_mvt('iai_kitchen/sink_area_left_middle_drawer_handle', 'l_gripper_tool_frame')
+    gripper.mvt_l_gripper(0.0, 0.0, 0.0, 0.0)
+    gripper.mvt_r_gripper(0.0, 0.0, 0.0, 0.0)
+    gripper.open_or_close_with_translation('iai_kitchen/sink_area_left_middle_drawer_handle', 'l_gripper_tool_frame',
+                                           1)
+    gripper.set_kitchen_goal('sink_area_left_middle_drawer_main_joint', 0.00)
 
 def open_sink_area_object():
     gripper = Gripper()
@@ -270,6 +305,16 @@ def open_fridge_door():
     gripper.open_or_close_with_translation('iai_kitchen/iai_fridge_door_handle', 'r_gripper_tool_frame', 1)
     gripper.set_kitchen_goal('iai_fridge_door_joint', 1.57)
 
+def close_fridge_door():
+    gripper = Gripper()
+    gripper.mvt_l_gripper(0.54, 0.54, 0.54, 0.54)
+    gripper.mvt_r_gripper(0.54, 0.54, 0.54, 0.54)
+    gripper.some_mvt('iai_kitchen/iai_fridge_door_handle', 'r_gripper_tool_frame')
+    #gripper.mvt_l_gripper(0.0, 0.0, 0.0, 0.0)
+    #gripper.mvt_r_gripper(0.0, 0.0, 0.0, 0.0)
+    gripper.open_or_close_with_translation('iai_kitchen/iai_fridge_door_handle', 'r_gripper_tool_frame', -1)
+    gripper.set_kitchen_goal('iai_fridge_door_joint', 0)
+
 def rotate_oven_knob():
     gripper = Gripper()
     gripper.mvt_l_gripper(0.54, 0.54, 0.54, 0.54)
@@ -283,6 +328,15 @@ def reset_ktichen( list_joints):
     gripper = Gripper()
     for j in list_joints:
         gripper.set_kitchen_goal(j, 0.0)
+
+def test_jacobi_fwd(l1, l2, theta1, theta2):
+    x1_d = -l1 * theta1 * np.sin(theta1) - l2 * theta1 * np.sin(theta1 + theta2) - l2 * np.sin(theta2 + theta1)
+    x2_d = l1 * np.cos(theta1) + l2 * np.cos(theta1 + theta2) + l2 * np.cos(theta2 + theta1)
+
+    x1 = l1 * np.cos(theta1) + l2 * np.cos(theta1 + theta2)
+    x2 = l1 * np.sin(theta1) + l2 * np.sin(theta1 + theta2)
+
+    return np.dot(np.array([x1_d, x2_d]), np.array([x2, x1]))
 
 if __name__ == '__main__':
     rospy.init_node('do_test_constraint')
@@ -316,11 +370,16 @@ if __name__ == '__main__':
     rospy.logout("START SOME MOVE as Test")
     #  jl1, ja1 = gripper.info_about_joints('sink_area_left_upper_drawer_main_joint')
     #  print(jl1, ja1)
-    open_fridge_door()
+    #open_fridge_door()
+    #close_fridge_door()
     #open_kitchen_island_object()
-    #open_oven_door_object()
+    #close_kitchen_island_object()
+    open_oven_door_object()
+    #close_oven_door_object()
     #open_sink_area_object()
+    #close_sink_area_object()
     #reset_ktichen(list_joint)
+    #print test_jacobi_fwd(5, 2, np.deg2rad(45), np.deg2rad(90))
     print("test is done.")
 
     # set_cart_goal_test()

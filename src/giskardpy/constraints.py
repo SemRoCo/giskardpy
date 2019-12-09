@@ -29,6 +29,8 @@ HIGH_WEIGHT = 5
 MID_WEIGHT = 1
 LOW_WEIGHT = 0.5
 ZERO_WEIGHT = 0
+OPEN = -1
+CLOSE = 1
 
 
 class Constraint(object):
@@ -1105,11 +1107,12 @@ class CartesianPoseUpdate(Constraint):
     max_speed = u'max_speed'
 
     def __init__(self, god_map, root_link, tip_link, goal_name, weight=HIGH_WEIGHT, gain=1, translation_max_speed=0.1,
-                 rotation_max_speed=0.5):
+                 rotation_max_speed=0.5, action=OPEN):
         super(CartesianPoseUpdate, self).__init__(god_map)
         # update parameter
         self.goal_name = goal_name
         self.body_name = tip_link
+        self.action = action
 
         rospy.logout("START INFO ABOUT JOINT: ")
         # split iai_kitchen and original frame name
@@ -1134,45 +1137,11 @@ class CartesianPoseUpdate(Constraint):
         # get controllable joint limits / TranslationalAngularConstraint
         self.limits = self.get_world().get_object("kitchen").get_joint_limits(joint_name)
         self.angular = False
-
-        # Firstly do constraints for movement to object and after do constraints for open or close
-
+        #  list of constraints
         self.constraints = []
 
-        # get grasp pose
-        goal_pose = tf_wrapper.lookup_pose(self.get_robot().get_root(),
-                                           goal_name)
+        goal = self.do_move_to_goal(goal_name)
 
-        rospy.logout("The goal name is: " + goal_name)
-        rospy.logout("Pose is :")
-        rospy.logout(goal_pose.pose)
-        rospy.logout("Grasp Axis is :")
-        rospy.logout(self.grasp_axis)
-
-        # convert goal msg to dictionary
-        # goal = convert_ros_message_to_dictionary(goal_pose)
-
-        # determine rotation constraint
-        # Do rotation constraints of gripper
-        # get orientation value
-        # determine rotation constraint
-        goal_rotation = quaternion_matrix([goal_pose.pose.orientation.x,
-                                           goal_pose.pose.orientation.y,
-                                           goal_pose.pose.orientation.z,
-                                           goal_pose.pose.orientation.w])  # sw.rotation_of(goal_pose)
-
-        # do fix a rotation
-        h_g = self.utils.rotation_gripper_to_object(self.grasp_axis)
-        goal_rotation = w.dot(goal_rotation, h_g)
-        new_orientation = w.quaternion_from_matrix(goal_rotation)
-        # new_orientation = quaternion_from_matrix(goal_rotation)
-        goal_pose.pose.orientation.x = new_orientation[0]
-        goal_pose.pose.orientation.y = new_orientation[1]
-        goal_pose.pose.orientation.z = new_orientation[2]
-        goal_pose.pose.orientation.w = new_orientation[3]
-
-        # update orientation of gripper for constraints orientation
-        goal = convert_ros_message_to_dictionary(goal_pose)
         self.constraints.append(CartesianPosition(god_map, root_link, tip_link, goal, weight, gain,
                                                   translation_max_speed))
         self.constraints.append(CartesianOrientationSlerp(god_map, root_link, tip_link, goal, weight, gain,
@@ -1186,15 +1155,96 @@ class CartesianPoseUpdate(Constraint):
             return self.get_controllable_joint(self.get_world().get_object("kitchen").
                                                get_parent_link_of_link(link_name))
 
+    def do_move_to_goal(self, goal_frame):
+        # Firstly do constraints for movement to object and after do constraints for open or close
+        # get grasp pose
+        goal_pose = tf_wrapper.lookup_pose(self.get_robot().get_root(),
+                                           goal_frame)
+
+        rospy.logout("The goal name is: " + goal_frame)
+        rospy.logout("Pose is :")
+        rospy.logout(goal_pose.pose)
+        rospy.logout("Grasp Axis is :")
+        rospy.logout(self.grasp_axis)
+
+        # determine rotation constraint
+        goal_rotation = quaternion_matrix([goal_pose.pose.orientation.x,
+                                           goal_pose.pose.orientation.y,
+                                           goal_pose.pose.orientation.z,
+                                           goal_pose.pose.orientation.w])
+
+        # do fix a rotation
+        h_g = self.utils.rotation_gripper_to_object(self.grasp_axis)
+        goal_rotation = w.dot(goal_rotation, h_g)
+        new_orientation = w.quaternion_from_matrix(goal_rotation)
+        goal_pose.pose.orientation.x = new_orientation[0]
+        goal_pose.pose.orientation.y = new_orientation[1]
+        goal_pose.pose.orientation.z = new_orientation[2]
+        goal_pose.pose.orientation.w = new_orientation[3]
+
+        # update orientation of gripper for constraints orientation
+        goal = convert_ros_message_to_dictionary(goal_pose)
+
+        return goal
+
+    def do_translational_or_angular_move(self, joint_name, prefix_name):
+        # get pose of grasped joint
+        goal_pose = tf_wrapper.lookup_pose(self.get_robot().get_root(),
+                                           self.body_name)
+        # get pose object to map
+        object_pose_to_map = tf_wrapper.lookup_pose("map", self.goal_name)
+
+        rospy.logout("Check if joint is translational or rotational")
+        # check typ of joint
+        if self.get_world().get_object("kitchen").is_translational_joint(joint_name):
+            for ind in range(len(self.axis)):
+                self.axis[ind] = self.action * (self.axis[ind] * self.limits[1])
+            # set new translational coordinate
+            goal_pose.pose.position.x = goal_pose.pose.position.x + self.axis[0]
+            goal_pose.pose.position.y = goal_pose.pose.position.y + self.axis[1]
+            goal_pose.pose.position.z = goal_pose.pose.position.z + self.axis[2]
+        elif self.get_world().get_object("kitchen").is_rotational_joint(joint_name):
+            self.angular = True
+            child_link = self.get_world().get_object("kitchen").get_child_link_of_joint(joint_name)
+            # pose_link_parent and goal_pose_to_map have reference to map
+            self.pose_link_parent = tf_wrapper.lookup_pose("map",
+                                                           prefix_name + "/" + child_link)
+            if joint_name == "oven_area_oven_door_joint":
+                self.axis = [0, 1, 0]
+                limit = 1.57
+                opening = limit * self.action
+            else:
+                opening = self.limits[1] * self.action
+
+            new_pose_goal = self.utils.estimated_positions_fro_circle([self.pose_link_parent.pose.position.x,
+                                                                       self.pose_link_parent.pose.position.y,
+                                                                       self.pose_link_parent.pose.position.z],
+                                                                      [object_pose_to_map.pose.position.x,
+                                                                       object_pose_to_map.pose.position.y,
+                                                                       object_pose_to_map.pose.position.z],
+                                                                      self.axis, opening)
+            # set new coordinate of gripper with angular mvt
+            goal_pose.pose.position.x = round(new_pose_goal[0], 2)
+            goal_pose.pose.position.y = round(new_pose_goal[1], 2)
+            goal_pose.pose.position.z = round(new_pose_goal[2], 2)
+            rospy.logout("end pose after rotation")
+            rospy.logout(goal_pose)
+
+            # get radius of arc
+            self.child_link_frame = prefix_name + "/" + child_link
+            self.pose_child_link = tf_wrapper.lookup_pose(self.get_robot().get_root(), self.child_link_frame)
+            self.radius = self.utils.get_distance([self.pose_link_parent.pose.position.x,
+                                                   self.pose_link_parent.pose.position.y,
+                                                   self.pose_link_parent.pose.position.z],
+                                                  [object_pose_to_map.pose.position.x,
+                                                   object_pose_to_map.pose.position.y,
+                                                   object_pose_to_map.pose.position.z])
+
     def get_constraint(self):
         soft_constraints = OrderedDict()
         for constraint in self.constraints:
             soft_constraints.update(constraint.get_constraint())
         return soft_constraints
-
-
-OPEN = -1
-CLOSE = 1
 
 
 class TranslationalAngularConstraint(Constraint):
@@ -1394,57 +1444,63 @@ class TranslationalAngularConstraint(Constraint):
         return u'{}/{}'.format(self.__class__.__name__, self.goal_name)
 
 
-class RotationalConstraint(Constraint):
-    # Symbol
-    goal_pose = u'goal_pose'
-    gain = u'gain'
+class PreprocessingConstraint(Constraint):
+    # TODO do this with multi inheritance
+    goal = u'goal'
     weight = u'weight'
+    gain = u'gain'
     max_speed = u'max_speed'
 
-    # initializiert mit god_map und name constraint
-    def __init__(self, god_map, goal_name, body_name, weight=HIGH_WEIGHT, gain=3, max_speed=0.1, action=OPEN):
-        super(RotationalConstraint, self).__init__(god_map)
+    def __init__(self, god_map, goal_name, body_name, gain=1, weight=HIGH_WEIGHT, translation_max_speed=0.1,
+                 rotation_max_speed=0.5, action=OPEN):
+        super(PreprocessingConstraint, self).__init__(god_map)
 
+        # update parameter
         self.goal_name = goal_name
-        self.body_name = body_name
-        self.h_g = None
+        # self.body_name = body_name
+        self.root_link = "odom_combined"
+
+        if not body_name.strip():
+            self.body_name = self.get_body_name(goal_name)
+        else:
+            self.body_name = body_name
+
         self.action = action
 
-        rospy.logout("START INFO ABOUT JOINT: ")
         # split iai_kitchen and original frame name
-        frame_name = goal_name.split("/")[-1]
-        prefix_name = goal_name.split("/")[0]
-        rospy.logout("Frame name without prefix: " + frame_name)
+        self.frame_name = str(self.goal_name).split("/")[-1]
+        self.prefix_name = str(self.goal_name).split("/")[0]
         # check and get controllable joint of joint
-        joint_name = self.get_controllable_joint(frame_name)
-        rospy.logout("The next controllable joint is :" + joint_name)
-        self.axis = self.get_world().get_object("kitchen").get_joint_axis(joint_name)
-        self.limits = self.get_world().get_object("kitchen").get_joint_limits(joint_name)
+        rospy.logout("Frame name without prefix: " + self.frame_name)
+        self.joint_name = self.get_controllable_joint(self.frame_name)
 
-        # get gripper pose
-        goal_pose = tf_wrapper.lookup_pose(self.get_robot().get_root(),
-                                           goal_name)
-
+        # load params
+        self.config_file_manager = ConfigFileManager()
         self.utils = Utils()
+        self.set_urdf_params()
+        self.set_config_file_params(
+            self.get_god_map().safe_get_data(identifier.data_folder) + "/pr2/config_file/config_file_002.yaml")
 
-        # check joint and get rotation
-        self.angular = self.get_world().get_object("kitchen").is_rotational_joint(joint_name)
+        #  list of constraints
+        self.constraints = []
 
-        if self.action == 1:
-            self.h_g = self.utils.rotation_gripper_to_object(self.axis)
-        elif self.action == -1:
-            self.h_g = self.utils.rotation_gripper_to_object("y_2")
+    def get_body_name(self, goal_frame):
+        body_name = goal_frame
+        return body_name
 
-        # set symbol and grasp pose in param
-        params = {self.goal_pose: goal_pose,
-                  self.gain: gain,
-                  self.weight: weight,
-                  self.max_speed: max_speed}
-        # save params
-        self.save_params_on_god_map(params)
+    def set_urdf_params(self):
+        # get grasp axis
+        self.axis = self.get_world().get_object("kitchen").get_joint_axis(self.joint_name)
+        # get joint limits
+        self.limits = self.get_world().get_object("kitchen").get_joint_limits(self.joint_name)
+        # typ of constraint, translational or angular
+        self.angular = False
 
-    def get_goal_pose(self):
-        return self.get_input_PoseStamped(self.goal_pose)
+    def set_config_file_params(self, path_file):
+        # Take info from config file,which axis to grasp
+        self.config_file_manager.load_yaml_config_file(path_file)
+        self.params_controllable_joint = self.config_file_manager.get_params_joint(joint_name=self.joint_name)
+        self.grasp_axis = self.params_controllable_joint['grasp_axis']
 
     def get_controllable_joint(self, link_name):
         joint_name = self.get_world().get_object("kitchen").get_parent_joint_of_link(link_name)
@@ -1454,77 +1510,277 @@ class RotationalConstraint(Constraint):
             return self.get_controllable_joint(self.get_world().get_object("kitchen").
                                                get_parent_link_of_link(link_name))
 
+    def move_to_goal(self, goal_frame):
+        # Firstly do constraints for movement to object and after do constraints for open or close
+        # get grasp pose
+        goal_pose = tf_wrapper.lookup_pose(self.get_robot().get_root(),
+                                           goal_frame)
+
+        rospy.logout("The goal name is: " + goal_frame)
+        rospy.logout("Pose is :")
+        rospy.logout(goal_pose.pose)
+        rospy.logout("Grasp Axis is :")
+        rospy.logout(self.grasp_axis)
+
+        # determine rotation constraint
+        goal_rotation = quaternion_matrix([goal_pose.pose.orientation.x,
+                                           goal_pose.pose.orientation.y,
+                                           goal_pose.pose.orientation.z,
+                                           goal_pose.pose.orientation.w])
+
+        # do fix a rotation
+        h_g = self.utils.rotation_gripper_to_object(self.grasp_axis)
+        goal_rotation = w.dot(goal_rotation, h_g)
+        new_orientation = w.quaternion_from_matrix(goal_rotation)
+        goal_pose.pose.orientation.x = new_orientation[0]
+        goal_pose.pose.orientation.y = new_orientation[1]
+        goal_pose.pose.orientation.z = new_orientation[2]
+        goal_pose.pose.orientation.w = new_orientation[3]
+
+        # update orientation of gripper for constraints orientation
+        goal = convert_ros_message_to_dictionary(goal_pose)
+
+        return goal
+        # return goal_pose
+
+    def do_translation_goal(self):
+        # get pose of grasped joint
+        goal_pose = tf_wrapper.lookup_pose(self.get_robot().get_root(),
+                                           self.body_name)
+
+        rospy.logout("Check if joint is translational or rotational")
+        # check typ of joint
+        if self.get_world().get_object("kitchen").is_translational_joint(self.joint_name):
+            rospy.logout("Check if joint is translational")
+            for ind in range(len(self.axis)):
+                self.axis[ind] = self.action * (self.axis[ind] * self.limits[1])
+            # set new translational coordinate
+            goal_pose.pose.position.x = goal_pose.pose.position.x + self.axis[0]
+            goal_pose.pose.position.y = goal_pose.pose.position.y + self.axis[1]
+            goal_pose.pose.position.z = goal_pose.pose.position.z + self.axis[2]
+
+        # return goal_pose
+        # update orientation of gripper for constraints orientation
+        goal = convert_ros_message_to_dictionary(goal_pose)
+
+        return goal
+
+    def do_angular_goal(self):
+        # get pose of grasped joint
+        rospy.logout("Start method do angular")
+        goal_pose = tf_wrapper.lookup_pose(self.get_robot().get_root(),
+                                           self.body_name)
+        # get pose object to map
+        object_pose_to_map = tf_wrapper.lookup_pose("map", self.goal_name)
+        self.radius = 0
+        if self.get_world().get_object("kitchen").is_rotational_joint(self.joint_name):
+            rospy.logout("Check if joint is rotational")
+            self.angular = True
+            child_link = self.get_world().get_object("kitchen").get_child_link_of_joint(self.joint_name)
+            # pose_link_parent and goal_pose_to_map have reference to map
+            self.pose_link_parent = tf_wrapper.lookup_pose("map",
+                                                           self.prefix_name + "/" + child_link)
+            utils = Utils()
+            if self.joint_name == "oven_area_oven_door_joint":
+                self.axis = [0, 1, 0]
+                limit = 1.57
+                opening = limit * self.action
+            else:
+                opening = self.limits[1] * self.action
+
+            new_pose_goal = utils.estimated_positions_fro_circle([self.pose_link_parent.pose.position.x,
+                                                                  self.pose_link_parent.pose.position.y,
+                                                                  self.pose_link_parent.pose.position.z],
+                                                                 [object_pose_to_map.pose.position.x,
+                                                                  object_pose_to_map.pose.position.y,
+                                                                  object_pose_to_map.pose.position.z],
+                                                                 self.axis, opening)
+            # set new coordinate of gripper with angular mvt
+            goal_pose.pose.position.x = round(new_pose_goal[0], 2)
+            goal_pose.pose.position.y = round(new_pose_goal[1], 2)
+            goal_pose.pose.position.z = round(new_pose_goal[2], 2)
+
+            # get radius of arc
+            self.child_link_frame = self.prefix_name + "/" + child_link
+            self.pose_child_link = tf_wrapper.lookup_pose(self.get_robot().get_root(), self.child_link_frame)
+            self.radius = utils.get_distance([self.pose_link_parent.pose.position.x,
+                                              self.pose_link_parent.pose.position.y,
+                                              self.pose_link_parent.pose.position.z],
+                                             [object_pose_to_map.pose.position.x,
+                                              object_pose_to_map.pose.position.y,
+                                              object_pose_to_map.pose.position.z])
+            rospy.logout("end method do angular")
+
+        return goal_pose
+
+    def get_goal_pose(self):
+        return self.get_input_PoseStamped(self.goal_pose)
+
+    def __str__(self):
+        return u'{}/{}'.format(self.__class__.__name__, self.goal_name)
+
     def get_constraint(self):
-        soft_constraints = {}
-
-        # determine constraint position
-        # homogen matrix for goal pose
-        goal_pose = self.get_goal_pose()
-        # get current hand/gripper pose to base_footprint
-        root_T_hand = self.get_fk(self.get_robot().get_root(), self.body_name)
-
-        goal_position = w.position_of(goal_pose)
-        weight = self.get_input_float(self.weight)
-        gain = self.get_input_float(self.gain)
-        max_speed = self.get_input_float(self.max_speed)
-
-        current_position = w.position_of(root_T_hand)
-
-        error_vector = goal_position - current_position
-        error_norm = w.norm(error_vector)
-        scale_mvt = w.diffable_min_fast(error_norm * gain, max_speed)
-        trans_control = error_vector / error_norm * scale_mvt
-
-        soft_constraints[str(self) + u'x'] = SoftConstraint(lower=trans_control[0],
-                                                            upper=trans_control[0],
-                                                            weight=weight,
-                                                            expression=current_position[0])
-        soft_constraints[str(self) + u'y'] = SoftConstraint(lower=trans_control[1],
-                                                            upper=trans_control[1],
-                                                            weight=weight,
-                                                            expression=current_position[1])
-        soft_constraints[str(self) + u'z'] = SoftConstraint(lower=trans_control[2],
-                                                            upper=trans_control[2],
-                                                            weight=weight,
-                                                            expression=current_position[2])
-
-        goal_rotation = w.rotation_of(self.get_goal_pose())
-        # apply rotation
-
-        # h_g = self.utils.rotation_gripper_to_object("y_2")
-        goal_rotation = w.dot(goal_rotation, self.h_g)
-
-        weight = self.get_input_float(self.weight)
-        gain = self.get_input_float(self.gain)
-        max_speed = self.get_input_float(self.max_speed)
-
-        current_rotation = w.rotation_of(self.get_fk(self.get_robot().get_root(), self.body_name))
-        current_evaluated_rotation = w.rotation_of(self.get_fk_evaluated(self.get_robot().get_root(), self.body_name))
-
-        axis, angle = w.diffable_axis_angle_from_matrix((current_rotation.T * goal_rotation))
-
-        capped_angle = w.diffable_max_fast(w.diffable_min_fast(gain * angle, max_speed), -max_speed)
-
-        r_rot_control = axis * capped_angle
-
-        hack = w.rotation_matrix_from_axis_angle([0, 0, 1], 0.0001)
-
-        axis, angle = w.diffable_axis_angle_from_matrix((current_rotation.T * (current_evaluated_rotation * hack)).T)
-        c_aa = (axis * angle)
-
-        soft_constraints[str(self) + u'/0'] = SoftConstraint(lower=r_rot_control[0],
-                                                             upper=r_rot_control[0],
-                                                             weight=weight,
-                                                             expression=c_aa[0])
-        soft_constraints[str(self) + u'/1'] = SoftConstraint(lower=r_rot_control[1],
-                                                             upper=r_rot_control[1],
-                                                             weight=weight,
-                                                             expression=c_aa[1])
-        soft_constraints[str(self) + u'/2'] = SoftConstraint(lower=r_rot_control[2],
-                                                             upper=r_rot_control[2],
-                                                             weight=weight,
-                                                             expression=c_aa[2])
+        soft_constraints = OrderedDict()
+        for constraint in self.constraints:
+            soft_constraints.update(constraint.get_constraint())
         return soft_constraints
+
+
+class FramePoseConstraint(PreprocessingConstraint):
+    # Symbol
+    goal_pose = u'goal_pose'
+    gain = u'gain'
+    weight = u'weight'
+    max_speed = u'max_speed'
+
+    # initializiert mit god_map und name constraint
+    def __init__(self, god_map, goal_name, body_name, weight=HIGH_WEIGHT, gain=1, translation_max_speed=0.1):
+        super(FramePoseConstraint, self).__init__(god_map, goal_name, body_name)
+
+        self.goal_name = goal_name
+        self.body_name = body_name
+
+        # load goal
+        goal_pose = self.move_to_goal(goal_frame=self.goal_name)
+        rospy.logout("The root link is: " + self.root_link)
+        rospy.logout("The goal pose: ")
+        rospy.logout(goal_pose)
+        self.constraints.append(CartesianPosition(god_map, self.root_link, self.body_name, goal_pose,
+                                                  weight, gain, translation_max_speed))
+
+    def __str__(self):
+        return u'{}/{}'.format(self.__class__.__name__, self.goal_name)
+
+
+class FrameOrientationConstraint(PreprocessingConstraint):
+    # Symbol
+    goal_pose = u'goal_pose'
+    gain = u'gain'
+    weight = u'weight'
+    max_speed = u'max_speed'
+
+    # initializiert mit god_map und name constraint
+    def __init__(self, god_map, goal_name, body_name, weight=HIGH_WEIGHT, gain=1, rotation_max_speed=0.5):
+        super(FrameOrientationConstraint, self).__init__(god_map, goal_name, body_name)
+
+        self.goal_name = goal_name
+        self.body_name = body_name
+
+        # load goal
+        goal_pose = self.move_to_goal(goal_frame=self.goal_name)
+        rospy.logout("The root link is: " + self.root_link)
+        rospy.logout("The goal pose: ")
+        rospy.logout(goal_pose)
+        self.constraints.append(CartesianOrientationSlerp(god_map, self.root_link, self.body_name, goal_pose,
+                                                          weight, gain, rotation_max_speed))
+
+    def __str__(self):
+        return u'{}/{}'.format(self.__class__.__name__, self.goal_name)
+
+
+class FrameTranslationConstraint(PreprocessingConstraint):
+    # Symbol
+    goal_pose = u'goal_pose'
+    gain = u'gain'
+    weight = u'weight'
+    max_speed = u'max_speed'
+
+    # initializiert mit god_map und name constraint
+    def __init__(self, god_map, goal_name, body_name, weight=HIGH_WEIGHT, gain=1,
+                 translation_max_speed=0.1, rotation_max_speed=0.5, action=OPEN):
+        super(FrameTranslationConstraint, self).__init__(god_map, goal_name, body_name)
+
+        self.goal_name = goal_name
+        self.body_name = body_name
+        self.action = action
+
+        # load goal
+        goal_pose = self.do_translation_goal()
+        rospy.logout("The root link is: " + self.root_link)
+        rospy.logout("The goal pose: ")
+        rospy.logout(goal_pose)
+        self.constraints.append(CartesianOrientationSlerp(god_map, self.root_link, self.body_name, goal_pose,
+                                                          weight, gain, rotation_max_speed))
+        self.constraints.append(CartesianPosition(god_map, self.root_link, self.body_name, goal_pose,
+                                                  weight, gain, translation_max_speed))
+
+    def __str__(self):
+        return u'{}/{}'.format(self.__class__.__name__, self.goal_name)
+
+
+class AngularConstraint(PreprocessingConstraint):
+    # Symbol
+    goal_pose = u'goal_pose'
+    gain = u'gain'
+    weight = u'weight'
+    max_speed = u'max_speed'
+
+    # initializiert mit god_map und name constraint
+    def __init__(self, god_map, goal_name, body_name, weight=HIGH_WEIGHT, gain=1,
+                 translation_max_speed=0.1, rotation_max_speed=0.5, action=OPEN):
+        super(AngularConstraint, self).__init__(god_map, goal_name, body_name)
+
+        self.goal_name = goal_name
+        self.body_name = body_name
+        self.action = action
+        self.weight = weight
+
+        # load goal
+        goal_pose = self.do_angular_goal()
+        rospy.logout("The root link is: " + self.root_link)
+        rospy.logout("The goal pose: ")
+        rospy.logout(goal_pose)
+        goal_pose = convert_ros_message_to_dictionary(goal_pose)
+        self.constraints.append(CartesianPosition(god_map, self.root_link, self.body_name, goal_pose,
+                                                  weight, gain, translation_max_speed))
+        self.constraints.append(CartesianOrientationSlerp(god_map, self.root_link, self.body_name, goal_pose,
+                                                          weight, gain, rotation_max_speed))
+
+    def get_constraint(self):
+        soft_constraints = OrderedDict()
+        root_T_hand = self.get_fk(self.get_robot().get_root(), self.body_name)
+        current_position = w.position_of(root_T_hand)
+        hold_radius = (current_position[0] - self.pose_child_link.pose.position.x) ** 2 + \
+                      (current_position[1] - self.pose_child_link.pose.position.y) ** 2 + \
+                      (current_position[2] - self.pose_child_link.pose.position.z) ** 2
+
+        distance_gripper_to_pose_link_parent = (self.radius) ** 2
+
+        soft_constraints[str(self) + u'radius'] = SoftConstraint(
+            lower=distance_gripper_to_pose_link_parent - hold_radius,
+            upper=distance_gripper_to_pose_link_parent - hold_radius,
+            weight=self.weight,
+            expression=hold_radius)
+        for constraint in self.constraints:
+            soft_constraints.update(constraint.get_constraint())
+        return soft_constraints
+
+    def __str__(self):
+        return u'{}/{}'.format(self.__class__.__name__, self.goal_name)
+
+
+class FrameConstraint(PreprocessingConstraint):
+    # Symbol
+    goal_pose = u'goal_pose'
+    gain = u'gain'
+    weight = u'weight'
+    max_speed = u'max_speed'
+
+    # initializiert mit god_map und name constraint
+    def __init__(self, god_map, goal_name, body_name, weight=HIGH_WEIGHT, gain=1, translation_max_speed=0.1,
+                 rotation_max_speed=0.5, action=OPEN):
+        super(FrameConstraint, self).__init__(god_map, goal_name, body_name)
+
+        self.goal_name = goal_name
+        self.body_name = body_name
+
+        # load goal
+        self.constraints.append(FramePoseConstraint(god_map, goal_name=goal_name, body_name=body_name,
+                                                    weight=weight, gain=gain,
+                                                    translation_max_speed=translation_max_speed))
+        self.constraints.append(FrameOrientationConstraint(god_map, goal_name=goal_name, body_name=body_name,
+                                                           weight=weight, gain=gain,
+                                                           rotation_max_speed=rotation_max_speed))
 
     def __str__(self):
         return u'{}/{}'.format(self.__class__.__name__, self.goal_name)

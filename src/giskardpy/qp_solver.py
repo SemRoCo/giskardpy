@@ -2,13 +2,16 @@ import numpy as np
 
 import qpoases
 from qpoases import PyReturnValue
+import casadi as ca
+import osqp
+from scipy import sparse
 
 from giskardpy.exceptions import MAX_NWSR_REACHEDException, QPSolverException
 from giskardpy import logging
 
 
 class QPSolver(object):
-    RETURN_VALUE_DICT = {value: name for name, value in vars(PyReturnValue).items()}
+    # RETURN_VALUE_DICT = {value: name for name, value in vars(PyReturnValue).items()}
 
     def __init__(self, h, j, s):
         """
@@ -22,19 +25,57 @@ class QPSolver(object):
         self.j = j
         self.s = s
         self.started = False
-        self.shape = (0,0)
+        self.shape = (0, 0)
         pass
 
-    def init(self, dim_a, dim_b):
-        self.qpProblem = qpoases.PySQProblem(dim_a, dim_b)
-        options = qpoases.PyOptions()
-        options.setToMPC()
-        options.printLevel = qpoases.PyPrintLevel.NONE
-        self.qpProblem.setOptions(options)
-        self.xdot_full = np.zeros(dim_a)
+    #@profile
+    def init_problem(self, H, g, A, lb, ub, lbA, ubA, nWSR=None):
+        I = np.identity(A.shape[1])
 
-        self.started = False
+        AI = np.concatenate((A, I))
 
+        Hs=sparse.csc_matrix(H)
+        AIs = sparse.csc_matrix(AI)
+
+        self.m = osqp.OSQP()
+        self.m.setup(P=Hs, q=g, A=AIs, l=lb, u=ub, rho=0.5,
+                                           sigma=5,
+                                           max_iter=100,
+                                           eps_abs=10.0,
+                                           eps_rel=0.01,
+                                           eps_prim_inf=100.5,
+                                           eps_dual_inf=100.5,
+                                           alpha=1.0,
+                                           delta=0.1,
+                                           polish=0,
+                                           polish_refine_iter=2,
+                                           verbose=False)
+
+        self.started = True
+        self.old_Hs = Hs
+        self.old_AIs = AIs
+        r = self.m.solve()
+        return r.x.T
+
+
+    #@profile
+    def hot_start(self, H, g, A, lb, ub, lbA, ubA, nWSR=None):
+        I = np.identity(A.shape[1])
+
+        AI = np.concatenate((A, I))
+        Hs = sparse.csc_matrix(H)
+        AIs = sparse.csc_matrix(AI)
+
+        if(not np.array_equal(AIs.nonzero(), self.old_AIs.nonzero()) or not np.array_equal(Hs.nonzero(), self.old_Hs.nonzero())):
+            return self.init_problem(H, g, A, lb, ub, lbA, ubA)
+
+
+        self.m.update(Px=Hs.data, q=g, Ax=AIs.data, l=lb, u=ub)
+
+        r = self.m.solve()
+        return r.x.T
+
+    #@profile
     def solve(self, H, g, A, lb, ub, lbA, ubA, nWSR=None):
         """
         x^T*H*x + x^T*g
@@ -62,73 +103,34 @@ class QPSolver(object):
         j_mask = H.sum(axis=1) != 0
         s_mask = j_mask[self.j:]
         h_mask = np.concatenate((np.array([True] * self.h), s_mask))
-        A = A[h_mask][:,j_mask].copy()
-        lbA = lbA[h_mask]
-        ubA = ubA[h_mask]
-        lb = lb[j_mask]
-        ub = ub[j_mask]
-        H = H[j_mask][:,j_mask]
+        A = A[h_mask][:, j_mask].copy()
+        #lbA = lbA[h_mask]
+        #ubA = ubA[h_mask]
+        jh_mask = np.concatenate((h_mask, j_mask))
+        lb = lb[jh_mask]
+        ub = ub[jh_mask]
+        H = H[j_mask][:, j_mask]
         g = np.zeros(H.shape[0])
         if A.shape != self.shape:
             self.started = False
             self.shape = A.shape
 
-        number_of_retries = 2
-        while number_of_retries > 0:
-            if nWSR is None:
-                nWSR = np.array([sum(A.shape) * 2])
-            else:
-                nWSR = np.array([nWSR])
-            number_of_retries -= 1
-            if not self.started:
-                self.init(A.shape[1], A.shape[0])
-                success = self.qpProblem.init(H, g, A, lb, ub, lbA, ubA, nWSR)
-                if success == PyReturnValue.MAX_NWSR_REACHED:
-                    self.started = False
-                    raise MAX_NWSR_REACHEDException(u'Failed to initialize QP-problem.')
-            else:
-                success = self.qpProblem.hotstart(H, g, A, lb, ub, lbA, ubA, nWSR)
-                if success == PyReturnValue.MAX_NWSR_REACHED:
-                    self.started = False
-                    raise MAX_NWSR_REACHEDException(u'Failed to hot start QP-problem.')
-            if success == PyReturnValue.SUCCESSFUL_RETURN:
-                self.started = True
-                break
-            elif success == PyReturnValue.NAN_IN_LB:
-                # TODO nans get replaced with 0 document this somewhere
-                # TODO might still be buggy when nan occur when the qp problem is already initialized
-                lb[np.isnan(lb)] = 0
-                nWSR = None
-                self.started = False
-                number_of_retries += 1
-                continue
-            elif success == PyReturnValue.NAN_IN_UB:
-                ub[np.isnan(ub)] = 0
-                nWSR = None
-                self.started = False
-                number_of_retries += 1
-                continue
-            elif success == PyReturnValue.NAN_IN_LBA:
-                lbA[np.isnan(lbA)] = 0
-                nWSR = None
-                self.started = False
-                number_of_retries += 1
-                continue
-            elif success == PyReturnValue.NAN_IN_UBA:
-                ubA[np.isnan(ubA)] = 0
-                nWSR = None
-                self.started = False
-                number_of_retries += 1
-                continue
-            else:
-                logging.loginfo(u'{}; retrying with A rounded to 5 decimal places'.format(self.RETURN_VALUE_DICT[success]))
-                r = 5
-                A = np.round(A, r)
-                nWSR = None
-                self.started = False
-        else:  # if not break
-            self.started = False
-            raise QPSolverException(self.RETURN_VALUE_DICT[success])
 
-        self.qpProblem.getPrimalSolution(self.xdot_full)
-        return self.xdot_full
+        try:
+            if(not np.array_equal(self.j_mask, j_mask) or not np.array_equal(self.s_mask, s_mask) or not np.array_equal(self.h_mask, h_mask)):
+                self.j_mask = j_mask
+                self.s_mask = s_mask
+                self.h_mask = h_mask
+                self.started = False
+        except AttributeError:
+            self.j_mask = j_mask
+            self.s_mask = s_mask
+            self.h_mask = h_mask
+
+
+
+
+        if not self.started:
+            return self.init_problem(H, g, A, lb, ub, lbA, ubA)
+        else:
+            return self.hot_start(H, g, A, lb, ub, lbA, ubA)

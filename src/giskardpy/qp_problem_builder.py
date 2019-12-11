@@ -242,7 +242,7 @@ class QProblemBuilder(object):
             with pd.option_context('display.max_rows', None, 'display.max_columns', None):
                 print(array)
 
-    @profile
+    #@profile
     def get_cmd(self, substitutions, nWSR=None):
         """
         Uses substitutions for each symbol to compute the next commands for each joint.

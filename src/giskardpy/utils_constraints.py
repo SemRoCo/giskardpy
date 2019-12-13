@@ -74,23 +74,35 @@ class Utils:
     def rotation_gripper_to_object(self, axis):
         if str(axis) == "y":
             h_g = w.Matrix([[-1, 0, 0, 0],
-                         [0, 0, 1, 0],
-                         [0, 1, 0, 0],
-                         [0, 0, 0, 1]])
+                            [0, 0, 1, 0],
+                            [0, 1, 0, 0],
+                            [0, 0, 0, 1]])
             return h_g
         elif axis == "z":
             h_g = w.Matrix([[-1, 0, 0, 0],
-                         [0, -1, 0, 0],
-                         [0, 0, 1, 0],
-                         [0, 0, 0, 1]])
+                            [0, -1, 0, 0],
+                            [0, 0, 1, 0],
+                            [0, 0, 0, 1]])
             return h_g
         elif axis == "y_2":
             h_g = w.Matrix([[-1, 0, 0, 0],
-                             [0, 0, 1, 0],
-                             [0, -1, 0, 0],
-                             [0, 0, 0, 1]])
+                            [0, 0, 1, 0],
+                            [0, -1, 0, 0],
+                            [0, 0, 0, 1]])
             return h_g
 
+    def joints_without_rotation(self):
+        return ["oven_area_oven_knob_stove_1_joint",
+                "oven_area_oven_knob_stove_2_joint",
+                "oven_area_oven_knob_stove_3_joint",
+                "oven_area_oven_knob_stove_4_joint"]
+
+    def rotate_oven_knob_stove(self):
+        h_g = w.Matrix([[0, 0, 1, 0],
+                        [0, 1, 0, 0],
+                        [-1, 0, 0, 0],
+                        [0, 0, 0, 1]])
+        return h_g
 
 
 class ConfigFileManager:
@@ -115,7 +127,7 @@ class ConfigFileManager:
                 # 'joint_type': j.joint_type,
                 'grasp_axis': ''
             }
-                                     })
+                                      })
         with open(path, 'w') as file:
             conf_f = yaml.dump(self._config_file, file)
             print conf_f

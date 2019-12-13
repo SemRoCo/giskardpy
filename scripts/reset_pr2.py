@@ -30,7 +30,7 @@ def execute_joint_goal():
     joint_goal.type = JointConstraint.JOINT
     # this can be any subset of the robots joints
     # joint_goal.goal_state is a normal sensor_msgs/JointState
-    joint_goal.goal_state.name = ["fl_caster_rotation_joint", "fl_caster_l_wheel_joint", "fl_caster_r_wheel_joint",
+    joint_goal.goal_state.name = ["odom_x_joint", "odom_y_joint", "odom_z_joint",
                                   "fr_caster_rotation_joint", "fr_caster_l_wheel_joint", "fr_caster_r_wheel_joint",
                                   "bl_caster_rotation_joint", "bl_caster_l_wheel_joint", "bl_caster_r_wheel_joint",
                                   "br_caster_rotation_joint", "br_caster_l_wheel_joint", "br_caster_r_wheel_joint",
@@ -47,7 +47,7 @@ def execute_joint_goal():
                                   "l_wrist_flex_joint", "l_wrist_roll_joint", "l_gripper_motor_slider_joint",
                                   "l_gripper_motor_screw_joint", "l_gripper_l_finger_joint", "l_gripper_r_finger_joint",
                                   "l_gripper_l_finger_tip_joint", "l_gripper_r_finger_tip_joint", "l_gripper_joint",
-                                  "odom_x_joint", "odom_y_joint", "odom_z_joint",
+                                  "fl_caster_rotation_joint", "fl_caster_l_wheel_joint", "fl_caster_r_wheel_joint"
                                   ]
     joint_goal.goal_state.position = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.1687062500000004,
                                       0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1.1400000000000001, -1.0499999999999994,

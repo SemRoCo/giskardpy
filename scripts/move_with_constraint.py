@@ -258,8 +258,8 @@ def open_oven_door_object():
     gripper.some_mvt('iai_kitchen/oven_area_oven_door_handle', 'l_gripper_tool_frame')
     gripper.mvt_l_gripper(0.0, 0.0, 0.0, 0.0)
     gripper.mvt_r_gripper(0.0, 0.0, 0.0, 0.0)
-    gripper.open_or_close_with_translation('iai_kitchen/oven_area_oven_door_handle', 'l_gripper_tool_frame', -0.5)
-    gripper.set_kitchen_goal('oven_area_oven_door_joint', 0.785)
+    gripper.open_or_close_with_translation('iai_kitchen/oven_area_oven_door_handle', 'l_gripper_tool_frame', -1)
+    gripper.set_kitchen_goal('oven_area_oven_door_joint', 1.57)
 
 def close_oven_door_object():
     gripper = Gripper()
@@ -322,7 +322,7 @@ def rotate_oven_knob():
     gripper.some_mvt('iai_kitchen/oven_area_oven_knob_stove_4', 'l_gripper_tool_frame')
     gripper.mvt_l_gripper(0.0, 0.0, 0.0, 0.0)
     gripper.mvt_r_gripper(0.0, 0.0, 0.0, 0.0)
-    gripper.do_rotational_mvt('iai_kitchen/oven_area_oven_knob_stove_4', 'l_gripper_tool_frame', 1)
+    gripper.do_rotational_mvt('iai_kitchen/oven_area_oven_knob_stove_4', 'l_gripper_tool_frame', -1)
 
 def reset_ktichen( list_joints):
     gripper = Gripper()
@@ -368,16 +368,18 @@ if __name__ == '__main__':
     ]
 
     rospy.logout("START SOME MOVE as Test")
-    #  jl1, ja1 = gripper.info_about_joints('sink_area_left_upper_drawer_main_joint')
-    #  print(jl1, ja1)
+    #gripper = Gripper()
+    #jl1, ja1 = gripper.info_about_joints('oven_area_oven_knob_stove_4_joint')
+    #print(jl1, ja1)
     #open_fridge_door()
     #close_fridge_door()
     #open_kitchen_island_object()
     #close_kitchen_island_object()
-    open_oven_door_object()
+    #open_oven_door_object()
     #close_oven_door_object()
     #open_sink_area_object()
     #close_sink_area_object()
+    rotate_oven_knob()
     #reset_ktichen(list_joint)
     #print test_jacobi_fwd(5, 2, np.deg2rad(45), np.deg2rad(90))
     print("test is done.")

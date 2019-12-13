@@ -125,25 +125,25 @@
     constraint_type: rotational
     controllable_link: ''
     'controllable_link ': ai_kitchen/oven_area_oven_knob_stove_1
-    grasp_axis: y
+    grasp_axis: z
 - name: oven_area_oven_knob_stove_2_joint
   params:
     constraint_type: rotational
     controllable_link: ''
     'controllable_link ': ai_kitchen/oven_area_oven_knob_stove_2
-    grasp_axis: y
+    grasp_axis: z
 - name: oven_area_oven_knob_stove_3_joint
   params:
     constraint_type: rotational
     controllable_link: ''
     'controllable_link ': ai_kitchen/oven_area_oven_knob_stove_3
-    grasp_axis: y
+    grasp_axis: z
 - name: oven_area_oven_knob_stove_4_joint
   params:
     constraint_type: rotational
     controllable_link: ''
     'controllable_link ': ai_kitchen/oven_area_oven_knob_stove_4
-    grasp_axis: y
+    grasp_axis: z
 - name: oven_area_oven_knob_oven_joint
   params:
     constraint_type: rotational

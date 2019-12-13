@@ -1381,6 +1381,8 @@ class PreprocessingConstraint(Constraint):
                                            goal_pose.pose.orientation.w])
 
         # do fix a rotation
+        if self.joint_name in self.utils.joints_without_rotation():
+            goal_rotation = w.dot(goal_rotation, self.utils.rotate_oven_knob_stove())
         h_g = self.utils.rotation_gripper_to_object(self.grasp_axis)
         goal_rotation = w.dot(goal_rotation, h_g)
         new_orientation = w.quaternion_from_matrix(goal_rotation)
@@ -1462,6 +1464,32 @@ class PreprocessingConstraint(Constraint):
                                               object_pose_to_map.pose.position.y,
                                               object_pose_to_map.pose.position.z])
             rospy.logout("end method do angular")
+
+        return goal_pose
+
+    def do_rotational_goal(self):
+        # get pose of grasped joint
+        rospy.logout("Start method do rotational movement")
+        goal_pose = tf_wrapper.lookup_pose(self.get_robot().get_root(),
+                                           self.body_name)
+        current_rotation_gripper = w.rotation_matrix_from_quaternion(
+            goal_pose.pose.orientation.x,
+            goal_pose.pose.orientation.y,
+            goal_pose.pose.orientation.z,
+            goal_pose.pose.orientation.w
+        )
+        # performs goal orientation, gripper rotate on x-axis
+        rotationXaxis_gripper = w.rotation_matrix_from_axis_angle([1, 0, 0], self.action * self.limits[1])
+        goal_orientation = w.dot(current_rotation_gripper,rotationXaxis_gripper)
+        goal_orientation_quaternion = w.quaternion_from_matrix(goal_orientation)
+
+        # Update goal pose
+        # the pose is the rotated gripper from object
+        goal_pose.pose.orientation.x = goal_orientation_quaternion[0]
+        goal_pose.pose.orientation.y = goal_orientation_quaternion[1]
+        goal_pose.pose.orientation.z = goal_orientation_quaternion[2]
+        goal_pose.pose.orientation.w = goal_orientation_quaternion[3]
+
 
         return goal_pose
 
@@ -1606,6 +1634,37 @@ class AngularConstraint(PreprocessingConstraint):
         for constraint in self.constraints:
             soft_constraints.update(constraint.get_constraint())
         return soft_constraints
+
+    def __str__(self):
+        return u'{}/{}'.format(self.__class__.__name__, self.goal_name)
+
+class RotationalConstraint(PreprocessingConstraint):
+    # Symbol
+    goal_pose = u'goal_pose'
+    gain = u'gain'
+    weight = u'weight'
+    max_speed = u'max_speed'
+
+    # initializiert mit god_map und name constraint
+    def __init__(self, god_map, goal_name, body_name, weight=HIGH_WEIGHT, gain=1,
+                 translation_max_speed=0.1, rotation_max_speed=0.5, action=OPEN):
+        super(RotationalConstraint, self).__init__(god_map, goal_name, body_name)
+
+        self.goal_name = goal_name
+        self.body_name = body_name
+        self.action = action
+        self.weight = weight
+
+        # load goal
+        goal_pose = self.do_rotational_goal()
+        rospy.logout("The root link is: " + self.root_link)
+        rospy.logout("The goal pose: ")
+        rospy.logout(goal_pose)
+        goal_pose = convert_ros_message_to_dictionary(goal_pose)
+        self.constraints.append(CartesianPosition(god_map, self.root_link, self.body_name, goal_pose,
+                                                  weight, gain, translation_max_speed))
+        self.constraints.append(CartesianOrientationSlerp(god_map, self.root_link, self.body_name, goal_pose,
+                                                          weight, gain, rotation_max_speed))
 
     def __str__(self):
         return u'{}/{}'.format(self.__class__.__name__, self.goal_name)

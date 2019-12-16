@@ -315,6 +315,24 @@ class URDFObject(object):
         return joint.type in MOVABLE_JOINT_TYPES and joint.mimic is not None
 
     @memoize
+    def get_mimiced_joint_name(self, joint_name):
+        return self.get_urdf_joint(joint_name).mimic.joint
+
+    @memoize
+    def get_mimic_multiplier(self, joint_name):
+        multiplier = self.get_urdf_joint(joint_name).mimic.multiplier
+        if multiplier is None:
+            return 1
+        return multiplier
+
+    @memoize
+    def get_mimic_offset(self, joint_name):
+        offset = self.get_urdf_joint(joint_name).mimic.offset
+        if offset is None:
+            return 0
+        return offset
+
+    @memoize
     def has_joint(self, name):
         return name in self._urdf_robot.joint_map
 

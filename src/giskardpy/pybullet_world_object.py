@@ -28,6 +28,7 @@ class PyBulletWorldObject(WorldObject):
         :type path_to_data_folder: str
         """
         self._pybullet_id = None
+        self.mimic_cb = {}
         self.lock = Lock()
         super(PyBulletWorldObject, self).__init__(urdf,
                                                   base_pose=base_pose,
@@ -43,6 +44,7 @@ class PyBulletWorldObject(WorldObject):
         self.self_collision_matrix = set()
         self.render = False
 
+
     @WorldObject.joint_state.setter
     def joint_state(self, value):
         """
@@ -55,6 +57,13 @@ class PyBulletWorldObject(WorldObject):
             for joint_name, singe_joint_state in value.items():
                 p.resetJointState(self._pybullet_id, self.joint_name_to_info[joint_name].joint_index,
                                   singe_joint_state.position)
+                # FIXME hack because pybullet doesn't support mimic joints
+                if joint_name in self.mimic_cb:
+                    mimic_joint, cb = self.mimic_cb[joint_name]
+                    mimiced_position = cb(singe_joint_state.position)
+                    p.resetJointState(self._pybullet_id, self.joint_name_to_info[mimic_joint].joint_index,
+                                      mimiced_position)
+
 
     @WorldObject.base_pose.setter
     def base_pose(self, value):
@@ -85,12 +94,25 @@ class PyBulletWorldObject(WorldObject):
         self.link_name_to_id[self.base_link_name] = -1
         for joint_index in range(p.getNumJoints(self._pybullet_id)):
             joint_info = JointInfo(*p.getJointInfo(self._pybullet_id, joint_index))
-            self.joint_name_to_info[joint_info.joint_name] = joint_info
+            joint_name = joint_info.joint_name
+            self.joint_name_to_info[joint_name] = joint_info
             self.joint_id_to_info[joint_info.joint_index] = joint_info
             self.joint_id_map[joint_index] = joint_info.joint_name
-            self.joint_id_map[joint_info.joint_name] = joint_index
+            self.joint_id_map[joint_name] = joint_index
             self.link_name_to_id[joint_info.link_name] = joint_index
             self.link_id_to_name[joint_index] = joint_info.link_name
+            if self.is_joint_mimic(joint_name):
+                # TODO think about how to make this hack nicer
+                offset = self.get_mimic_offset(joint_name)
+                multiplier = self.get_mimic_multiplier(joint_name)
+
+                class apply_mimic(object):
+                    def __init__(self, offset, multiplier):
+                        self.offset = offset
+                        self.multiplier = multiplier
+                    def __call__(self, position):
+                        return self.offset + position * self.multiplier
+                self.mimic_cb[self.get_mimiced_joint_name(joint_info.joint_name)] = joint_name, apply_mimic(offset, multiplier)
         self.link_name_to_id[self.get_root()] = -1
         self.link_id_to_name[-1] = self.get_root()
 

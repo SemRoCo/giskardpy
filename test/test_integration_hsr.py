@@ -10,8 +10,6 @@ from giskardpy import logging
 from giskardpy.tfwrapper import init as tf_init
 from utils_for_tests import PR2, HSR
 
-# TODO roslaunch iai_pr2_sim ros_control_sim_with_base.launch
-# TODO roslaunch iai_kitchen upload_kitchen_obj.launch
 
 default_pose = {
     u'arm_flex_joint': -2.22044604925e-16,
@@ -124,6 +122,16 @@ class TestCartGoals(object):
 
 
 class TestCollisionAvoidanceGoals(object):
+
+    def test_self_collision_avoidance(self, zero_pose):
+        """
+        :type zero_pose: HSR
+        """
+        r_goal = PoseStamped()
+        r_goal.header.frame_id = zero_pose.tip
+        r_goal.pose.position.z = 0.5
+        r_goal.pose.orientation.w = 1
+        zero_pose.set_and_check_cart_goal(r_goal, zero_pose.tip)
 
     def test_attached_collision1(self, box_setup):
         """

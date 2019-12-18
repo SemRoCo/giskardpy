@@ -25,7 +25,6 @@ class GoalToConstraints(GetGoal):
         GetGoal.__init__(self, name, as_name)
         self.used_joints = set()
 
-        self.known_constraints = set()
         self.controlled_joints = set()
         self.controllable_links = set()
         self.last_urdf = None

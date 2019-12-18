@@ -19,7 +19,7 @@ class SendTrajectory(ActionClient, GiskardBehavior):
         GiskardBehavior.__init__(self, name)
         loginfo(u'waiting for action server \'{}\' to appear'.format(action_namespace))
         ActionClient.__init__(self, name, FollowJointTrajectoryAction, None, action_namespace)
-        loginfo(u'successfully conected to action server')
+        loginfo(u'successfully connected to action server')
         self.fill_velocity_values = self.get_god_map().safe_get_data(identifier.fill_velocity_values)
 
     def setup(self, timeout):

@@ -432,8 +432,8 @@ class GiskardTestWrapper(object):
         result = self.results.get()
         return result
 
-    def send_and_check_goal(self, expected_error_code=MoveResult.SUCCESS, execute=True):
-        r = self.send_goal(execute=execute)
+    def send_and_check_goal(self, expected_error_code=MoveResult.SUCCESS, execute=True, goal=None):
+        r = self.send_goal(goal=goal, execute=execute)
         assert r.error_code == expected_error_code, \
             u'got: {}, expected: {}'.format(move_result_error_code(r.error_code),
                                             move_result_error_code(expected_error_code))

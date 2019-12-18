@@ -1,10 +1,11 @@
-import numpy as np
 from copy import deepcopy
 
+import numpy as np
 import pytest
+import roslaunch
 import rospy
 from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped, Pose
-from giskard_msgs.msg import MoveActionGoal, MoveResult, MoveGoal, CollisionEntry
+from giskard_msgs.msg import MoveActionGoal, MoveResult, MoveGoal, CollisionEntry, MoveCmd, JointConstraint
 from tf.transformations import quaternion_from_matrix, quaternion_about_axis
 
 from giskardpy import logging
@@ -64,8 +65,24 @@ def ros(request):
         logging.loginfo(u'init ros')
     rospy.init_node(u'tests')
     tf_init(60)
+    launch = roslaunch.scriptapi.ROSLaunch()
+    launch.start()
+
+    rospy.set_param('/joint_trajectory_splitter/state_topics',
+                    ['/whole_body_controller/base/state',
+                     '/whole_body_controller/body/state',
+                     '/refills_finger/state'])
+    rospy.set_param('/joint_trajectory_splitter/client_topics',
+                    ['/whole_body_controller/base/follow_joint_trajectory',
+                     '/whole_body_controller/body/follow_joint_trajectory',
+                     '/whole_body_controller/refills_finger/follow_joint_trajectory'])
+    node = roslaunch.core.Node('giskardpy', 'joint_trajectory_splitter.py', name='joint_trajectory_splitter')
+    joint_trajectory_splitter = launch.launch(node)
 
     def kill_ros():
+        joint_trajectory_splitter.stop()
+        rospy.delete_param('/joint_trajectory_splitter/state_topics')
+        rospy.delete_param('/joint_trajectory_splitter/client_topics')
         logging.loginfo(u'shutdown ros')
         rospy.signal_shutdown(u'die')
         try:
@@ -197,6 +214,50 @@ class TestJointGoals(object):
         zero_pose.allow_self_collision()
         zero_pose.send_and_check_joint_goal(floor_detection_js)
 
+    def test_empty_joint_goal(self, zero_pose):
+        """
+        :type zero_pose: Donbot
+        """
+        zero_pose.allow_self_collision()
+        zero_pose.set_joint_goal({
+            u'ur5_shoulder_pan_joint': -0.15841275850404912,
+            u'ur5_shoulder_lift_joint': -2.2956998983966272,
+            u'ur5_elbow_joint': 2.240689277648926,
+            u'ur5_wrist_1_joint': -2.608211342488424,
+            u'ur5_wrist_2_joint': -2.7356796900378626,
+            u'ur5_wrist_3_joint': -2.5249870459186,
+        })
+        zero_pose.send_and_check_joint_goal({})
+
+    def test_empty_joint_goal2(self, zero_pose):
+        """
+        :type zero_pose: Donbot
+        """
+        # zero_pose.allow_self_collision()
+        goal = MoveActionGoal()
+        move_cmd = MoveCmd()
+        joint_goal1 = JointConstraint()
+        joint_goal1.type = JointConstraint.JOINT
+        joint_goal1.goal_state.name = [u'ur5_shoulder_pan_joint',
+                                       u'ur5_shoulder_lift_joint',
+                                       u'ur5_elbow_joint',
+                                       u'ur5_wrist_1_joint',
+                                       u'ur5_wrist_2_joint',
+                                       u'ur5_wrist_3_joint']
+        joint_goal1.goal_state.position = [-0.15841275850404912,
+                                           -2.2956998983966272,
+                                           2.240689277648926,
+                                           -2.608211342488424,
+                                           -2.7356796900378626,
+                                           -2.5249870459186]
+        joint_goal2 = JointConstraint()
+        joint_goal2.type = JointConstraint.JOINT
+        move_cmd.joint_constraints.append(joint_goal1)
+        move_cmd.joint_constraints.append(joint_goal2)
+        goal.goal.cmd_seq.append(move_cmd)
+        goal.goal.type = goal.goal.PLAN_AND_EXECUTE
+        zero_pose.send_and_check_goal(goal=goal)
+
     def test_joint_movement2(self, zero_pose):
         """
         :type zero_pose: Donbot
@@ -270,6 +331,62 @@ class TestJointGoals(object):
         assert result.error_code == MoveResult.INSOLVABLE
 
 
+class TestConstraints(object):
+    def test_align_planes(self, zero_pose):
+        """
+        :type zero_pose: Donbot
+        """
+        perceive_pose_for_back = {"ur5_shoulder_pan_joint": 4.130825042724609,
+                                  "ur5_shoulder_lift_joint": -0.8224027792560022,
+                                  "ur5_elbow_joint": -1.6693022886859339,
+                                  "ur5_wrist_1_joint": -1.8567875067340296,
+                                  "ur5_wrist_2_joint": 1.6369500160217285,
+                                  "ur5_wrist_3_joint": -1.6462371985064905}
+        perceive_pose_for_shelf = {"ur5_shoulder_pan_joint": 1.6281344890594482,
+                                   "ur5_shoulder_lift_joint": -1.4734271208392542,
+                                   "ur5_elbow_joint": - 1.1555221716510218,
+                                   "ur5_wrist_1_joint": - 0.9881671110736292,
+                                   "ur5_wrist_2_joint": 1.4996352195739746,
+                                   "ur5_wrist_3_joint": - 1.4276765028582972}
+        grasp_pose = PoseStamped()
+        grasp_pose.header.frame_id = 'base_footprint'
+        grasp_pose.pose.position = Point(0.0,-0.1055, 0.8690)
+        grasp_pose.pose.orientation = Quaternion(0.9480143955486826, 0.3182273812611749, 0.0, 0.0)
+
+        box = u'box'
+        box_pose = PoseStamped()
+        box_pose.header.frame_id = u'base_footprint'
+        box_pose.pose.position = Point(0.0,-0.1055, 0.7190)
+        box_pose.pose.orientation = Quaternion(0.9480143955486826, 0.3182273812611749, 0.0, 0.0)
+
+        tip_normal = Vector3Stamped()
+        tip_normal.header.frame_id = u'refills_finger'
+        tip_normal.vector.y = 1
+
+        root_normal = Vector3Stamped()
+        root_normal.header.frame_id = u'base_footprint'
+        root_normal.vector.z = 1
+
+        zero_pose.send_and_check_joint_goal(perceive_pose_for_back)
+
+        zero_pose.set_and_check_cart_goal(grasp_pose, u'refills_tool_frame', u'base_footprint')
+        zero_pose.set_and_check_cart_goal(box_pose, u'refills_tool_frame', u'base_footprint')
+
+        zero_pose.add_box(box, [0.035, 0.12,0.15], box_pose)
+        zero_pose.attach_existing(box, u'refills_finger')
+
+        # go_up_pose = PoseStamped()
+        # go_up_pose.header.frame_id = u'refills_finger'
+        # go_up_pose.pose.position.z += 0.2
+        # go_up_pose.pose.orientation.w = 1
+        zero_pose.align_planes(u'refills_finger', tip_normal, u'base_footprint', root_normal)
+        zero_pose.set_and_check_cart_goal(grasp_pose, u'refills_tool_frame')
+
+        zero_pose.set_joint_goal(perceive_pose_for_shelf)
+        zero_pose.align_planes(u'refills_finger', tip_normal, u'base_footprint', root_normal)
+        zero_pose.send_and_check_goal()
+
+
 class TestCartGoals(object):
     def test_cart_goal_1eef(self, zero_pose):
         """
@@ -279,7 +396,7 @@ class TestCartGoals(object):
         p.header.stamp = rospy.get_rostime()
         p.header.frame_id = zero_pose.gripper_tip
         p.pose.position = Point(0, -0.1, 0)
-        p.pose.orientation = Quaternion(*quaternion_about_axis(np.pi/4, [1,0,0]))
+        p.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 4, [1, 0, 0]))
         zero_pose.allow_self_collision()
         zero_pose.set_and_check_cart_goal(p, zero_pose.gripper_tip, zero_pose.default_root)
 
@@ -332,7 +449,7 @@ class TestCartGoals(object):
 
 
 class TestCollisionAvoidanceGoals(object):
-    #kernprof -lv py.test -s test/test_integration_donbot.py::TestCollisionAvoidanceGoals::test_place_in_shelf
+    # kernprof -lv py.test -s test/test_integration_donbot.py::TestCollisionAvoidanceGoals::test_place_in_shelf
 
     def test_attach_box(self, better_pose):
         """
@@ -393,16 +510,16 @@ class TestCollisionAvoidanceGoals(object):
         :type box_setup: PR2
         """
         better_pose.attach_box(size=[0.05, 0.05, 0.2],
-                                    frame_id=better_pose.gripper_tip,
-                                    position=[0,0,0.08],
-                                    orientation=[0,0,0,1])
+                               frame_id=better_pose.gripper_tip,
+                               position=[0, 0, 0.08],
+                               orientation=[0, 0, 0, 1])
         p = PoseStamped()
         p.header.frame_id = better_pose.gripper_tip
         p.pose.position.x = 0
         p.pose.position.z = 0.15
         p.pose.position.y = -0.04
         p.pose.orientation.w = 1
-        better_pose.add_box('br', [0.2,0.01,0.1], p)
+        better_pose.add_box('br', [0.2, 0.01, 0.1], p)
 
         better_pose.allow_self_collision()
         better_pose.send_and_check_goal()
@@ -413,23 +530,23 @@ class TestCollisionAvoidanceGoals(object):
         :type box_setup: PR2
         """
         better_pose.attach_box(size=[0.05, 0.05, 0.2],
-                                    frame_id=better_pose.gripper_tip,
-                                    position=[0,0,0.08],
-                                    orientation=[0,0,0,1])
+                               frame_id=better_pose.gripper_tip,
+                               position=[0, 0, 0.08],
+                               orientation=[0, 0, 0, 1])
         p = PoseStamped()
         p.header.frame_id = better_pose.gripper_tip
         p.pose.position.x = 0
         p.pose.position.z = 0.15
         p.pose.position.y = 0.04
         p.pose.orientation.w = 1
-        better_pose.add_box('bl', [0.2,0.01,0.1], p)
+        better_pose.add_box('bl', [0.2, 0.01, 0.1], p)
         p = PoseStamped()
         p.header.frame_id = better_pose.gripper_tip
         p.pose.position.x = 0
         p.pose.position.z = 0.15
         p.pose.position.y = -0.04
         p.pose.orientation.w = 1
-        better_pose.add_box('br', [0.2,0.01,0.1], p)
+        better_pose.add_box('br', [0.2, 0.01, 0.1], p)
 
         p = PoseStamped()
         p.header.frame_id = better_pose.gripper_tip
@@ -448,36 +565,36 @@ class TestCollisionAvoidanceGoals(object):
         better_pose.attach_cylinder(height=0.3,
                                     radius=0.025,
                                     frame_id=better_pose.gripper_tip,
-                                    position=[0,0,0.13],
-                                    orientation=[0,0,0,1])
+                                    position=[0, 0, 0.13],
+                                    orientation=[0, 0, 0, 1])
         p = PoseStamped()
         p.header.frame_id = better_pose.gripper_tip
         p.pose.position.x = 0
         p.pose.position.z = 0.25
         p.pose.position.y = 0.04
-        p.pose.orientation = Quaternion(*quaternion_about_axis(np.pi/2, [0,1,0]))
-        better_pose.add_cylinder('fdown', [0.2,0.01], p)
+        p.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 2, [0, 1, 0]))
+        better_pose.add_cylinder('fdown', [0.2, 0.01], p)
         p = PoseStamped()
         p.header.frame_id = better_pose.gripper_tip
         p.pose.position.x = 0
         p.pose.position.z = 0.25
         p.pose.position.y = -0.07
-        p.pose.orientation = Quaternion(*quaternion_about_axis(np.pi/2, [0,1,0]))
-        better_pose.add_cylinder('fup', [0.2,0.01], p)
+        p.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 2, [0, 1, 0]))
+        better_pose.add_cylinder('fup', [0.2, 0.01], p)
         p = PoseStamped()
         p.header.frame_id = better_pose.gripper_tip
         p.pose.position.x = 0
         p.pose.position.z = 0.15
         p.pose.position.y = 0.07
-        p.pose.orientation = Quaternion(*quaternion_about_axis(np.pi/2, [0,1,0]))
-        better_pose.add_cylinder('bdown', [0.2,0.01], p)
+        p.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 2, [0, 1, 0]))
+        better_pose.add_cylinder('bdown', [0.2, 0.01], p)
         p = PoseStamped()
         p.header.frame_id = better_pose.gripper_tip
         p.pose.position.x = 0
         p.pose.position.z = 0.15
         p.pose.position.y = -0.04
-        p.pose.orientation = Quaternion(*quaternion_about_axis(np.pi/2, [0,1,0]))
-        better_pose.add_cylinder('bup', [0.2,0.01], p)
+        p.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 2, [0, 1, 0]))
+        better_pose.add_cylinder('bup', [0.2, 0.01], p)
 
         better_pose.send_and_check_goal()
         # TODO check traj length?
@@ -579,7 +696,6 @@ class TestCollisionAvoidanceGoals(object):
         expected_pose = Pose()
         expected_pose.orientation.w = 1
         compare_poses(map_T_root.pose, expected_pose)
-
 
     def test_unknown_body_b(self, zero_pose):
         """

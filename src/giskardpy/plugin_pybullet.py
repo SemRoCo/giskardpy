@@ -9,6 +9,7 @@ from sensor_msgs.msg import JointState
 from visualization_msgs.msg import Marker, MarkerArray
 
 import giskardpy.identifier as identifier
+from giskardpy import logging
 from giskardpy.exceptions import CorruptShapeException, UnknownBodyException, \
     UnsupportedOptionException, DuplicateNameException
 from giskardpy.plugin import GiskardBehavior
@@ -152,6 +153,7 @@ class WorldUpdatePlugin(GiskardBehavior):
             self.get_world().robot.attach_urdf_object(world_object,
                                                       req.pose.header.frame_id,
                                                       req.pose.pose)
+            logging.loginfo(u'--> attached object {} on link {}'.format(req.body.name, req.pose.header.frame_id))
             m = world_object.as_marker_msg()
             m.pose = req.pose.pose
             m.header = req.pose.header

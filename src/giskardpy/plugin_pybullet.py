@@ -71,7 +71,8 @@ class WorldUpdatePlugin(GiskardBehavior):
                         self.add_object(req)
 
                 elif req.operation == UpdateWorldRequest.REMOVE:
-                    self.detach_object(req)
+                    if self.get_robot().has_joint(req.body.name):
+                        self.detach_object(req)
                     self.remove_object(req.body.name)
                 elif req.operation == UpdateWorldRequest.ALTER:
                     self.remove_object(req.body.name)

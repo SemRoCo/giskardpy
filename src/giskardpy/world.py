@@ -97,7 +97,7 @@ class World(object):
     def remove_object(self, name):
         if self.has_object(name):
             self._objects[name].suicide()
-            logging.loginfo(u'<-- removed object {} to world'.format(name))
+            logging.loginfo(u'<-- removed object {} from world'.format(name))
             del (self._objects[name])
         else:
             raise UnknownBodyException(u'can\'t remove object \'{}\', because it doesn\' exist'.format(name))
@@ -166,6 +166,7 @@ class World(object):
         # TODO this should know the object pose and not require it as input
         self._robot.attach_urdf_object(self.get_object(name), link, pose)
         self.remove_object(name)
+        logging.loginfo(u'--> attached object {} on link {}'.format(name, link))
 
     def detach(self, joint_name, from_obj=None):
         if from_obj is None or self.robot.get_name() == from_obj:
@@ -174,6 +175,8 @@ class World(object):
             p_map = kdl_to_pose(self.robot.root_T_map.Inverse() * msg_to_kdl(p))
 
             cut_off_obj = self.robot.detach_sub_tree(joint_name)
+            parent_link = self.robot.get_parent_link_of_joint(joint_name)
+            logging.loginfo(u'<-- detached {} from link {}'.format(joint_name, parent_link))
         else:
             raise UnsupportedOptionException(u'only detach from robot supported')
         wo = WorldObject.from_urdf_object(cut_off_obj)  # type: WorldObject

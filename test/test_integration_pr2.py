@@ -945,6 +945,14 @@ class TestCollisionAvoidanceGoals(object):
         zero_pose.detach_object(pocky)
         zero_pose.remove_object(pocky)
 
+    def test_remove_attached_box(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        pocky = u'http://muh#pocky'
+        zero_pose.attach_box(pocky, [0.1, 0.02, 0.02], zero_pose.r_tip, [0.05, 0, 0])
+        zero_pose.remove_object(pocky)
+
     def test_attach_existing_box(self, zero_pose):
         """
         :type zero_pose: PR2

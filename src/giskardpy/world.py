@@ -174,8 +174,8 @@ class World(object):
             p = self.robot.get_fk_pose(self.robot.get_root(), joint_name)
             p_map = kdl_to_pose(self.robot.root_T_map.Inverse() * msg_to_kdl(p))
 
-            cut_off_obj = self.robot.detach_sub_tree(joint_name)
             parent_link = self.robot.get_parent_link_of_joint(joint_name)
+            cut_off_obj = self.robot.detach_sub_tree(joint_name)
             logging.loginfo(u'<-- detached {} from link {}'.format(joint_name, parent_link))
         else:
             raise UnsupportedOptionException(u'only detach from robot supported')

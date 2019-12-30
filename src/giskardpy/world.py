@@ -103,9 +103,8 @@ class World(object):
             raise UnknownBodyException(u'can\'t remove object \'{}\', because it doesn\' exist'.format(name))
 
     def remove_all_objects(self):
-        for object_ in self._objects.values():
-            object_.suicide()
-        self._objects = {}
+        for object_name in self._objects.keys():
+            self.remove_object(object_name)
 
     # Robot ------------------------------------------------------------------------------------------------------------
 
@@ -133,6 +132,7 @@ class World(object):
                                              joint_weights=joint_weights,
                                              ignored_pairs=ignored_pairs,
                                              added_pairs=added_pairs)
+        logging.loginfo(u'--> added {} to world'.format(robot.get_name()))
 
     @property
     def robot(self):

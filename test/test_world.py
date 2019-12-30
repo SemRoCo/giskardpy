@@ -154,32 +154,49 @@ class TestWorld(object):
     cls = WorldObject
     world_cls = World
 
+    def make_world_with_robot(self, urdf, path_to_data_folder):
+        w = self.world_cls(path_to_data_folder=path_to_data_folder)
+        r = self.cls(urdf)
+        w.add_robot(robot=r,
+                    base_pose=None,
+                    controlled_joints=r.controlled_joints,
+                    joint_vel_limit=None,
+                    joint_acc_limit=None,
+                    joint_weights=None,
+                    calc_self_collision_matrix=path_to_data_folder is not None,
+                    ignored_pairs=[],
+                    added_pairs=[])
+        return w
+
     def make_world_with_pr2(self, path_to_data_folder=None):
         """
         :rtype: World
         """
-        w = self.world_cls(path_to_data_folder=path_to_data_folder)
-        r = self.cls(pr2_urdf())
-        w.add_robot(r, None, r.controlled_joints, None, None, None, path_to_data_folder is not None, [], [], 'llvm', 0)
-        return w
+        return self.make_world_with_robot(pr2_urdf(), path_to_data_folder)
 
     def make_world_with_donbot(self, path_to_data_folder=None):
         """
         :rtype: World
         """
-        w = self.world_cls(path_to_data_folder=path_to_data_folder)
-        r = self.cls(donbot_urdf())
-        w.add_robot(r, None, r.controlled_joints, None, None, None, path_to_data_folder is not None, [], [], 'llvm', 0)
-        return w
+        return self.make_world_with_robot(donbot_urdf(), path_to_data_folder)
 
     def test_add_robot(self, function_setup):
         empty_world = self.world_cls()
         assert len(empty_world.get_objects()) == 0
         assert not empty_world.has_robot()
-        pr2 = self.cls(pr2_urdf())
-        empty_world.add_robot(pr2, None, pr2.controlled_joints, None, None, None, False, [], [], 'llvm', 0)
+        # extracting the urdf turns integers into floats
+        pr2 = self.cls(self.cls(pr2_urdf()).get_urdf_str())
+        empty_world.add_robot(robot=pr2,
+                              base_pose=None,
+                              controlled_joints=pr2.controlled_joints,
+                              joint_vel_limit=None,
+                              joint_acc_limit=None,
+                              joint_weights=None,
+                              calc_self_collision_matrix=False,
+                              ignored_pairs=[],
+                              added_pairs=[])
         assert empty_world.has_robot()
-        assert pr2 == empty_world.robot
+        assert pr2.get_urdf_str() == empty_world.robot.get_urdf_str()
         return empty_world
 
     def test_add_object(self, function_setup):
@@ -703,13 +720,13 @@ class TestWorld(object):
 
     def test_collision_goals_to_collision_matrix1(self, test_folder):
         world_with_donbot = self.make_world_with_donbot(test_folder)
-        min_dist = defaultdict(lambda : {u'zero_weight_distance': 0.05})
+        min_dist = defaultdict(lambda: {u'zero_weight_distance': 0.05})
         collision_matrix = world_with_donbot.collision_goals_to_collision_matrix([], min_dist)
         assert len(collision_matrix) == 0
         return world_with_donbot
 
     def test_collision_goals_to_collision_matrix2(self, test_folder):
-        min_dist = defaultdict(lambda : {u'zero_weight_distance': 0.05})
+        min_dist = defaultdict(lambda: {u'zero_weight_distance': 0.05})
         world_with_donbot = self.make_world_with_donbot(test_folder)
         base_collision_matrix = world_with_donbot.collision_goals_to_collision_matrix([], min_dist)
         name = u'muh'
@@ -726,7 +743,7 @@ class TestWorld(object):
         return world_with_donbot
 
     def test_collision_goals_to_collision_matrix3(self, test_folder):
-        min_dist = defaultdict(lambda : {u'zero_weight_distance': 0.05})
+        min_dist = defaultdict(lambda: {u'zero_weight_distance': 0.05})
         world_with_donbot = self.make_world_with_donbot(test_folder)
         base_collision_matrix = world_with_donbot.collision_goals_to_collision_matrix([], min_dist)
         name = u'muh'
@@ -792,7 +809,7 @@ class TestWorld(object):
         world_with_donbot = self.make_world_with_donbot(test_folder)
         name = u'muh'
         robot_link_names = list(world_with_donbot.robot.get_controlled_links())
-        min_dist = defaultdict(lambda : {u'zero_weight_distance': 0.1})
+        min_dist = defaultdict(lambda: {u'zero_weight_distance': 0.1})
 
         box = self.cls.from_world_body(make_world_body_box(name))
         world_with_donbot.add_object(box)
@@ -821,7 +838,7 @@ class TestWorld(object):
         name = u'muh'
         name2 = u'muh2'
         robot_link_names = list(world_with_donbot.robot.get_controlled_links())
-        min_dist = defaultdict(lambda : {u'zero_weight_distance': 0.05})
+        min_dist = defaultdict(lambda: {u'zero_weight_distance': 0.05})
 
         box = self.cls.from_world_body(make_world_body_box(name))
         box2 = self.cls.from_world_body(make_world_body_box(name2))
@@ -850,7 +867,7 @@ class TestWorld(object):
         name2 = u'muh2'
         robot_link_names = list(world_with_donbot.robot.get_controlled_links())
         allowed_link = robot_link_names[0]
-        min_dist = defaultdict(lambda : {u'zero_weight_distance': 0.05})
+        min_dist = defaultdict(lambda: {u'zero_weight_distance': 0.05})
 
         box = self.cls.from_world_body(make_world_body_box(name))
         box2 = self.cls.from_world_body(make_world_body_box(name2))
@@ -878,7 +895,7 @@ class TestWorld(object):
 
     def test_collision_goals_to_collision_matrix9(self, test_folder):
         world_with_pr2 = self.make_world_with_pr2(test_folder)
-        min_dist = defaultdict(lambda : {u'zero_weight_distance': 0.05})
+        min_dist = defaultdict(lambda: {u'zero_weight_distance': 0.05})
         ces = []
         collision_entry = CollisionEntry()
         collision_entry.type = CollisionEntry.ALLOW_COLLISION

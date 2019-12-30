@@ -214,6 +214,27 @@ class TestJointGoals(object):
         zero_pose.allow_self_collision()
         zero_pose.send_and_check_joint_goal(floor_detection_js)
 
+    def test_joint_movement_gaya(self, zero_pose):
+        """
+        :type zero_pose: Donbot
+        """
+        js1 = {"ur5_shoulder_pan_joint": 1.475476861000061,
+               "ur5_shoulder_lift_joint": -1.664506737385885,
+               "ur5_elbow_joint": -2.0976365248309534,
+               "ur5_wrist_1_joint": 0.6524184942245483,
+               "ur5_wrist_2_joint": 1.7044463157653809,
+               "ur5_wrist_3_joint": -1.5686963240252894}
+        js2 = {
+            "ur5_shoulder_pan_joint": 4.112661838531494,
+            "ur5_shoulder_lift_joint": - 1.6648781935321253,
+            "ur5_elbow_joint": - 1.4145501295672815,
+            "ur5_wrist_1_joint": - 1.608563248311178,
+            "ur5_wrist_2_joint": 1.5707963267948966,
+            "ur5_wrist_3_joint": - 1.6503928343402308
+        }
+        zero_pose.send_and_check_joint_goal(js2)
+        zero_pose.send_and_check_joint_goal(js1)
+
     def test_empty_joint_goal(self, zero_pose):
         """
         :type zero_pose: Donbot
@@ -350,18 +371,18 @@ class TestConstraints(object):
                                    "ur5_wrist_3_joint": - 1.4276765028582972}
         grasp_pose = PoseStamped()
         grasp_pose.header.frame_id = 'base_footprint'
-        grasp_pose.pose.position = Point(0.0,-0.1055, 0.8690)
+        grasp_pose.pose.position = Point(0.0, -0.1055, 0.8690)
         grasp_pose.pose.orientation = Quaternion(0.9480143955486826, 0.3182273812611749, 0.0, 0.0)
 
         box = u'box'
         box_pose = PoseStamped()
         box_pose.header.frame_id = u'base_footprint'
-        box_pose.pose.position = Point(0.0,-0.1055, 0.7190)
+        box_pose.pose.position = Point(0.0, -0.1055, 0.7190)
         box_pose.pose.orientation = Quaternion(0.9480143955486826, 0.3182273812611749, 0.0, 0.0)
 
-        tip_normal = Vector3Stamped()
-        tip_normal.header.frame_id = u'refills_finger'
-        tip_normal.vector.y = 1
+        # tip_normal = Vector3Stamped()
+        # tip_normal.header.frame_id = u'refills_finger'
+        # tip_normal.vector.y = 1
 
         root_normal = Vector3Stamped()
         root_normal.header.frame_id = u'base_footprint'
@@ -372,18 +393,18 @@ class TestConstraints(object):
         zero_pose.set_and_check_cart_goal(grasp_pose, u'refills_tool_frame', u'base_footprint')
         zero_pose.set_and_check_cart_goal(box_pose, u'refills_tool_frame', u'base_footprint')
 
-        zero_pose.add_box(box, [0.035, 0.12,0.15], box_pose)
+        zero_pose.add_box(box, [0.035, 0.12, 0.15], box_pose)
         zero_pose.attach_existing(box, u'refills_finger')
 
         # go_up_pose = PoseStamped()
         # go_up_pose.header.frame_id = u'refills_finger'
         # go_up_pose.pose.position.z += 0.2
         # go_up_pose.pose.orientation.w = 1
-        zero_pose.align_planes(u'refills_finger', tip_normal, u'base_footprint', root_normal)
+        zero_pose.align_planes(u'refills_finger', root_normal, u'base_footprint', root_normal)
         zero_pose.set_and_check_cart_goal(grasp_pose, u'refills_tool_frame')
 
         zero_pose.set_joint_goal(perceive_pose_for_shelf)
-        zero_pose.align_planes(u'refills_finger', tip_normal, u'base_footprint', root_normal)
+        zero_pose.align_planes(u'refills_finger', root_normal, u'base_footprint', root_normal)
         zero_pose.send_and_check_goal()
 
 

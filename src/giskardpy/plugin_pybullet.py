@@ -76,8 +76,8 @@ class WorldUpdatePlugin(GiskardBehavior):
                     #   - during attaching, bodies turn to objects
                     #   - detaching actually requires a joint name
                     #   - you might accidentally detach parts of the robot
-                    if self.get_robot().has_joint(req.body.name):
-                        self.detach_object(req)
+                    # if self.get_robot().has_joint(req.body.name):
+                    #     self.detach_object(req)
                     self.remove_object(req.body.name)
                 elif req.operation == UpdateWorldRequest.ALTER:
                     self.remove_object(req.body.name)

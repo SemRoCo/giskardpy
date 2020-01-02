@@ -104,7 +104,10 @@ class World(object):
 
     def remove_all_objects(self):
         for object_name in self._objects.keys():
-            self.remove_object(object_name)
+            # I'm not using remove object, because has object ignores hidden objects in pybullet world
+            self._objects[object_name].suicide()
+            logging.loginfo(u'<-- removed object {} from world'.format(object_name))
+        self._objects = {}
 
     # Robot ------------------------------------------------------------------------------------------------------------
 

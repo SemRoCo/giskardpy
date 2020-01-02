@@ -773,12 +773,13 @@ class TestUrdfObject(object):
         p = Pose()
         p.position = Point(0.0, 0.0, 0.0)
         p.orientation = Quaternion(0.0, 0.0, 0.0, 1.0)
-        original_parsed_pr2 = deepcopy(parsed_pr2)
+        original_links = parsed_pr2.get_link_names()
+        original_joints = parsed_pr2.get_joint_names()
         # original_urdf = parsed_pr2.get_urdf_str()
         parsed_pr2.attach_urdf_object(box, u'l_gripper_tool_frame', p)
         parsed_pr2.detach_sub_tree(u'box')
-        assert set(original_parsed_pr2.get_link_names()) == set(parsed_pr2.get_link_names())
-        assert set(original_parsed_pr2.get_joint_names()) == set(parsed_pr2.get_joint_names())
+        assert set(original_links) == set(parsed_pr2.get_link_names())
+        assert set(original_joints) == set(parsed_pr2.get_joint_names())
         # assert original_urdf == parsed_pr2.get_urdf_str()
 
     def test_detach_non_existing_object(self, function_setup):

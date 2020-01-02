@@ -40,7 +40,7 @@ def is_symbol(expression):
     return expression.shape[0] * expression.shape[1] == 1
 
 def compile_and_execute(f, params):
-    symbols = []
+    # symbols = []
     input = []
 
     # class next_symbol(object):
@@ -52,43 +52,37 @@ def compile_and_execute(f, params):
 
     # ns = next_symbol()
     symbol_params = []
+    symbol_params2 = []
+
     for i, param in enumerate(params):
         if isinstance(param, list):
             param = np.array(param)
         if isinstance(param, np.ndarray):
-            input.append(param)
-            symbol_params.append(ca.SX.sym('m', *param.shape))
-            # l2 = []
-            # for j in range(param.shape[0]):
-            #     l1 = []
-            #     if len(param.shape) == 2:
-            #         for k in range(param.shape[1]):
-            #             s = ns()
-            #             symbols.append(s)
-            #             input.append(param[j, k])
-            #             l1.append(s)
-            #         l2.append(l1)
-            #     else:
-            #         s = ns()
-            #         symbols.append(s)
-            #         input.append(param[j])
-            #         l2.append(s)
-            #
-            # p = Matrix(l2)
-            # symbol_params.append(p)
+            symbol_param = ca.SX.sym('m', *param.shape)
+            if len(param.shape) == 2:
+                l = param.shape[0]*param.shape[1]
+            else:
+                l = param.shape[0]
+
+            input.append(param.reshape((l,1)))
+            symbol_params.append(symbol_param)
+            asdf = symbol_param.T.reshape((l,1))
+            symbol_params2.extend(asdf[k] for k in range(l))
         else:
             # s = ns()
             # symbols.append(s)
-            input.append(param)
-            symbol_params.append(ca.SX.sym('s'))
+            input.append(np.array([param], ndmin=2))
+            symbol_param = ca.SX.sym('s')
+            symbol_params.append(symbol_param)
+            symbol_params2.append(symbol_param)
     # try:
     #     slow_f = Matrix([f(*symbol_params)])
     # except TypeError:
     #     slow_f = Matrix(f(*symbol_params))
-
-    fast_f = speed_up(f(*symbol_params), symbol_params)
+    fast_f = speed_up(f(*symbol_params), symbol_params2)
     # subs = {str(symbols[i]): input[i] for i in range(len(symbols))}
     # slow_f.subs()
+    input = np.concatenate(input).T[0]
     result = fast_f.call2(input)
     if result.shape[0] * result.shape[1] == 1:
         return result[0][0]
@@ -419,7 +413,10 @@ def speed_up(function, parameters, backend=u'clang'):
     try:
         f = ca.Function('f', [Matrix(parameters)], [ca.densify(function)])
     except:
+        # try:
         f = ca.Function('f', [Matrix(parameters)], ca.densify(function))
+        # except:
+        #     f = ca.Function('f', parameters, [ca.densify(function)])
     return CompiledFunction(str_params, f, 0, function.shape)
 
 

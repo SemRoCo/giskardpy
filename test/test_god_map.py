@@ -10,7 +10,7 @@ from collections import namedtuple
 from geometry_msgs.msg import PoseStamped
 from hypothesis import given
 import hypothesis.strategies as st
-from giskardpy import w, identifier
+from giskardpy import symbolic_wrapper, identifier
 from giskardpy.god_map import GodMap
 from utils_for_tests import variable_name, keys_values, lists_of_same_length, pr2_urdf
 from giskardpy.world import World
@@ -249,7 +249,7 @@ class TestGodMap(unittest.TestCase):
     def test_to_symbol(self, key, value):
         gm = GodMap()
         gm.safe_set_data([key], value)
-        self.assertTrue(w.is_symbol(gm.to_symbol([key])))
+        self.assertTrue(symbolic_wrapper.is_symbol(gm.to_symbol([key])))
         self.assertTrue(key in str(gm.to_symbol([key])))
 
     @given(lists_of_same_length([variable_name(), st.floats()], unique=True))
@@ -273,9 +273,7 @@ class TestGodMap(unittest.TestCase):
                     joint_weights=KeyDefaultDict(lambda key: 0),
                     calc_self_collision_matrix=False,
                     ignored_pairs=set(),
-                    added_pairs=set(),
-                    symengine_backend='llvm',
-                    symengine_opt_level=0)
+                    added_pairs=set())
         gm.safe_set_data([u'world'], w)
         gm_robot = gm.safe_get_data(identifier.robot)
         assert 'pr2' == gm_robot.get_name()

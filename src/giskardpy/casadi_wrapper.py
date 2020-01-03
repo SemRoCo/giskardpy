@@ -703,11 +703,13 @@ def diffable_axis_angle_from_matrix(rotation_matrix):
     :return: 3x1 Matrix, angle
     :rtype: (Matrix, Union[float, Symbol])
     """
-    # TODO nan if angle 0
+    # TODO nan if angle==0
     # TODO buggy when angle == pi
     # TODO use 'if' to make angle always positive?
     rm = rotation_matrix
     angle = (trace(rm[:3, :3]) - 1) / 2
+    angle = diffable_min_fast(angle, 1)
+    angle = diffable_max_fast(angle, -1)
     angle = acos(angle)
     x = (rm[2, 1] - rm[1, 2])
     y = (rm[0, 2] - rm[2, 0])
@@ -718,54 +720,54 @@ def diffable_axis_angle_from_matrix(rotation_matrix):
     return axis, angle
 
 
-def diffable_axis_angle_from_matrix_stable(rotation_matrix):
-    """
-    :param rotation_matrix: 4x4 or 3x3 Matrix
-    :type rotation_matrix: Matrix
-    :return: 3x1 Matrix, angle
-    :rtype: (Matrix, Union[float, Symbol])
-    """
-    # TODO buggy when angle == pi
-    rm = rotation_matrix
-    angle = (trace(rm[:3, :3]) - 1) / 2
-    angle = diffable_min_fast(angle, 1)
-    angle = diffable_max_fast(angle, -1)
-    angle = acos(angle)
-    x = (rm[2, 1] - rm[1, 2])
-    y = (rm[0, 2] - rm[2, 0])
-    z = (rm[1, 0] - rm[0, 1])
-    n = sqrt(x * x + y * y + z * z)
-    m = diffable_if_eq_zero(n, 1, n)
-    axis = Matrix([diffable_if_eq_zero(n, 0, x / m),
-                   diffable_if_eq_zero(n, 0, y / m),
-                   diffable_if_eq_zero(n, 1, z / m)])
-    return axis, angle
-
-
-def axis_angle_from_matrix(rotation_matrix):
-    """
-    :param rotation_matrix: 4x4 or 3x3 Matrix
-    :type rotation_matrix: Matrix
-    :return: 3x1 Matrix, angle
-    :rtype: (Matrix, Union[float, Symbol])
-    """
-    rm = rotation_matrix
-    angle = (trace(rm[:3, :3]) - 1) / 2
-    angle = Min(angle, 1)
-    angle = Max(angle, -1)
-    angle = acos(angle)
-    x = (rm[2, 1] - rm[1, 2])
-    y = (rm[0, 2] - rm[2, 0])
-    z = (rm[1, 0] - rm[0, 1])
-    n = sqrt(x * x + y * y + z * z)
-    m = if_eq_zero(n, 1, n)
-    axis = Matrix([if_eq_zero(n, 0, x / m),
-                   if_eq_zero(n, 0, y / m),
-                   if_eq_zero(n, 1, z / m)])
-    sign = if_eq_zero(angle, 1, diffable_sign(angle))
-    axis *= sign
-    angle = sign * angle
-    return axis, angle
+# def diffable_axis_angle_from_matrix_stable(rotation_matrix):
+#     """
+#     :param rotation_matrix: 4x4 or 3x3 Matrix
+#     :type rotation_matrix: Matrix
+#     :return: 3x1 Matrix, angle
+#     :rtype: (Matrix, Union[float, Symbol])
+#     """
+#     # TODO buggy when angle == pi
+#     rm = rotation_matrix
+#     angle = (trace(rm[:3, :3]) - 1) / 2
+#     angle = diffable_min_fast(angle, 1)
+#     angle = diffable_max_fast(angle, -1)
+#     angle = acos(angle)
+#     x = (rm[2, 1] - rm[1, 2])
+#     y = (rm[0, 2] - rm[2, 0])
+#     z = (rm[1, 0] - rm[0, 1])
+#     n = sqrt(x * x + y * y + z * z)
+#     m = diffable_if_eq_zero(n, 1, n)
+#     axis = Matrix([diffable_if_eq_zero(n, 0, x / m),
+#                    diffable_if_eq_zero(n, 0, y / m),
+#                    diffable_if_eq_zero(n, 1, z / m)])
+#     return axis, angle
+#
+#
+# def axis_angle_from_matrix(rotation_matrix):
+#     """
+#     :param rotation_matrix: 4x4 or 3x3 Matrix
+#     :type rotation_matrix: Matrix
+#     :return: 3x1 Matrix, angle
+#     :rtype: (Matrix, Union[float, Symbol])
+#     """
+#     rm = rotation_matrix
+#     angle = (trace(rm[:3, :3]) - 1) / 2
+#     angle = Min(angle, 1)
+#     angle = Max(angle, -1)
+#     angle = acos(angle)
+#     x = (rm[2, 1] - rm[1, 2])
+#     y = (rm[0, 2] - rm[2, 0])
+#     z = (rm[1, 0] - rm[0, 1])
+#     n = sqrt(x * x + y * y + z * z)
+#     m = if_eq_zero(n, 1, n)
+#     axis = Matrix([if_eq_zero(n, 0, x / m),
+#                    if_eq_zero(n, 0, y / m),
+#                    if_eq_zero(n, 1, z / m)])
+#     sign = if_eq_zero(angle, 1, diffable_sign(angle))
+#     axis *= sign
+#     angle = sign * angle
+#     return axis, angle
 
 
 def axis_angle_from_quaternion(x, y, z, w):

@@ -86,7 +86,8 @@ class Gripper:
         #self.giskard.set_json_goal("TranslationalAngularConstraint", goal_name=goal, body_name=body, action=action)
         #self.giskard.set_json_goal("FrameTranslationConstraint", goal_name=goal, body_name=body, action=action)
         self.giskard.set_json_goal("AngularConstraint", goal_name=goal, body_name=body, action=action)
-        self.giskard.allow_all_collisions()
+        #self.giskard.allow_all_collisions()
+        self.giskard.avoid_all_collisions()
         self.giskard.plan_and_execute()
 
     def do_rotational_mvt(self, goal, body, action):
@@ -371,7 +372,7 @@ if __name__ == '__main__':
     #gripper = Gripper()
     #jl1, ja1 = gripper.info_about_joints('oven_area_oven_knob_stove_4_joint')
     #print(jl1, ja1)
-    #open_fridge_door()
+    open_fridge_door()
     #close_fridge_door()
     #open_kitchen_island_object()
     #close_kitchen_island_object()
@@ -379,7 +380,7 @@ if __name__ == '__main__':
     #close_oven_door_object()
     #open_sink_area_object()
     #close_sink_area_object()
-    rotate_oven_knob()
+    #rotate_oven_knob()
     #reset_ktichen(list_joint)
     #print test_jacobi_fwd(5, 2, np.deg2rad(45), np.deg2rad(90))
     print("test is done.")

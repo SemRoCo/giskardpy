@@ -9,6 +9,7 @@ from urdf_parser_py.urdf import URDF
 import math
 import yaml
 from giskardpy import symbolic_wrapper as w
+import copy
 
 
 class Utils:
@@ -104,11 +105,78 @@ class Utils:
                         [0, 0, 0, 1]])
         return h_g
 
+    def fake_parallel_vectors(self, fake_point_on_object, fake_point_on_gripper, axis):
+        # return [x + 2 for x in fake_point_on_object], [y - 2 for y in fake_point_on_gripper]
+        pass
+
+    # pose1 is the start and pose2 the direction
+    def get_vector(self, pose1, pose2):
+        return [pose2[0] - pose1[0], pose2[1] - pose1[1], pose2[2] - pose1[2]]
+
+    def cross_product(self, u, v):
+        """
+        this method performs the cross product of two vector,
+        check if the vectors are orthogonal
+        :param u: first vector
+        :type: array float
+        :param v: second vector
+        :type: array float
+        :return: 0 if the vectors are orthogonal
+        """
+        #return ((u[1] * v[2]) - (u[2] * v[1])) + ((u[2] * v[0]) - (u[0] * v[2])) + ((u[0] * v[1]) - (u[1] * v[0]))
+        #return u[0] * v[0] + u[1] * v[1] + u[2] * v[2]
+        return round(u[0] * v[0] + u[1] * v[1] + u[2] * v[2], 2)
+
+    def cross_productaxis(self, u, v, axis):
+        grasp_axis = self.axis_converter(axis)
+        u1=[]
+        v1=[]
+        for x in range(len(grasp_axis)):
+            if grasp_axis[x] == 0:
+                u1.append(u[x])
+                v1.append(v[x])
+        return v1[0] * u1[0] + v1[1] * u1[1]
+
+    def axis_converter(self, axis):
+        if isinstance(axis, str):
+            if axis == "x":
+                return [1, 0, 0]
+            elif axis == "y":
+                return [0, 1, 0]
+            elif axis == "z":
+                return [0, 0, 1]
+
+    def create_point_on_line(self, first_point, second_point, factor):
+        """
+        this method create a new point on the line first_point - second_point
+        :param first_point: the first point of line, or this is the basis point
+        :type: array of float
+        :param second_point: any second point on the line
+        :type: array of float
+        :param factor: any factor, for forward (+) and backward (-) point
+        :return: new point on the line , array of float
+        """
+        return [first_point[0] + factor * (first_point[0] - second_point[0]),
+                first_point[1] + factor * (first_point[1] - second_point[1]),
+                first_point[2] + factor * (first_point[2] - second_point[2])]
+
+    def translate_point_on_axis(self, axis, point):
+        point_duplicate = copy.deepcopy(point)
+        return [point_duplicate[0] + axis[0],
+                point_duplicate[1] + axis[1],
+                point_duplicate[2] + axis[2]]
+
+
+
+
+
+
 
 class ConfigFileManager:
     _urdf = None
     _parsed_urdf = None
     _config_file = None
+    _pr2_palm_link = {'l_gripper_tool_frame': "l_gripper_palm_link", 'r_gripper_tool_frame': "r_gripper_palm_link"}
 
     def __init__(self):
         # initialize utils
@@ -159,3 +227,9 @@ class ConfigFileManager:
                 return jn['params']
 
         return None
+
+    def get_palm_link(self, robot_name, gripper_frame):
+        if robot_name == "pr2":
+            return self._pr2_palm_link[gripper_frame]
+
+        return -1

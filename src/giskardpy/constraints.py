@@ -21,7 +21,8 @@ from giskardpy.tfwrapper import transform_pose, transform_vector, transform_poin
 from giskardpy import tfwrapper as tf_wrapper
 from giskardpy.python_interface import GiskardWrapper
 from utils_constraints import Utils, ConfigFileManager
-
+import casadi_wrapper
+import copy
 import rospy
 
 MAX_WEIGHT = 15
@@ -1432,8 +1433,12 @@ class PreprocessingConstraint(Constraint):
             self.angular = True
             child_link = self.get_world().get_object("kitchen").get_child_link_of_joint(self.joint_name)
             # pose_link_parent and goal_pose_to_map have reference to map
-            self.pose_link_parent = tf_wrapper.lookup_pose("map",
-                                                           self.prefix_name + "/" + child_link)
+            self.pose_link_child = tf_wrapper.lookup_pose("map",
+                                                          self.prefix_name + "/" + child_link)
+            rospy.logout("the controllable joint is: ")
+            rospy.logout(self.joint_name)
+            rospy.logout("the child link of joint is: ")
+            rospy.logout(child_link)
             utils = Utils()
             if self.joint_name == "oven_area_oven_door_joint":
                 self.axis = [0, 1, 0]
@@ -1442,27 +1447,54 @@ class PreprocessingConstraint(Constraint):
             else:
                 opening = self.limits[1] * self.action
 
-            new_pose_goal = utils.estimated_positions_fro_circle([self.pose_link_parent.pose.position.x,
-                                                                  self.pose_link_parent.pose.position.y,
-                                                                  self.pose_link_parent.pose.position.z],
+            new_pose_goal = utils.estimated_positions_fro_circle([self.pose_link_child.pose.position.x,
+                                                                  self.pose_link_child.pose.position.y,
+                                                                  self.pose_link_child.pose.position.z],
                                                                  [object_pose_to_map.pose.position.x,
                                                                   object_pose_to_map.pose.position.y,
                                                                   object_pose_to_map.pose.position.z],
                                                                  self.axis, opening)
+
             # set new coordinate of gripper with angular mvt
             goal_pose.pose.position.x = round(new_pose_goal[0], 2)
             goal_pose.pose.position.y = round(new_pose_goal[1], 2)
             goal_pose.pose.position.z = round(new_pose_goal[2], 2)
 
+            # change orientation
+            orientation_gripper = quaternion_matrix([goal_pose.pose.orientation.x,
+                                                     goal_pose.pose.orientation.y,
+                                                     goal_pose.pose.orientation.z,
+                                                     goal_pose.pose.orientation.w])
+
+            rotation_z = w.rotation_matrix_from_axis_angle([0, 0, 1], opening)
+            new_orientation = w.quaternion_from_matrix(w.dot(orientation_gripper, rotation_z))
+            goal_pose.pose.orientation.x = new_orientation[0]
+            goal_pose.pose.orientation.y = new_orientation[1]
+            goal_pose.pose.orientation.z = new_orientation[2]
+            goal_pose.pose.orientation.w = new_orientation[3]
+            # done change orientation
+
             # get radius of arc
             self.child_link_frame = self.prefix_name + "/" + child_link
+            # to odom
             self.pose_child_link = tf_wrapper.lookup_pose(self.get_robot().get_root(), self.child_link_frame)
-            self.radius = utils.get_distance([self.pose_link_parent.pose.position.x,
-                                              self.pose_link_parent.pose.position.y,
-                                              self.pose_link_parent.pose.position.z],
+
+            # center link to map and object pose to map
+            self.radius = utils.get_distance([self.pose_link_child.pose.position.x,
+                                              self.pose_link_child.pose.position.y,
+                                              self.pose_link_child.pose.position.z],
                                              [object_pose_to_map.pose.position.x,
                                               object_pose_to_map.pose.position.y,
                                               object_pose_to_map.pose.position.z])
+
+            # setup for orthogonal
+            #link_parent_of_goal = self.get_world().get_object("kitchen").get_parent_link_of_link(self.frame_name)
+            #self.pose_link_parent_of_goal = tf_wrapper.lookup_pose(self.get_robot().get_root(),
+                                                                   #self.prefix_name + "/" + link_parent_of_goal)
+
+            #rospy.logout("link parent to goal handle")
+            #rospy.logout(link_parent_of_goal)
+
             rospy.logout("end method do angular")
 
         return goal_pose
@@ -1480,7 +1512,7 @@ class PreprocessingConstraint(Constraint):
         )
         # performs goal orientation, gripper rotate on x-axis
         rotationXaxis_gripper = w.rotation_matrix_from_axis_angle([1, 0, 0], self.action * self.limits[1])
-        goal_orientation = w.dot(current_rotation_gripper,rotationXaxis_gripper)
+        goal_orientation = w.dot(current_rotation_gripper, rotationXaxis_gripper)
         goal_orientation_quaternion = w.quaternion_from_matrix(goal_orientation)
 
         # Update goal pose
@@ -1489,7 +1521,6 @@ class PreprocessingConstraint(Constraint):
         goal_pose.pose.orientation.y = goal_orientation_quaternion[1]
         goal_pose.pose.orientation.z = goal_orientation_quaternion[2]
         goal_pose.pose.orientation.w = goal_orientation_quaternion[3]
-
 
         return goal_pose
 
@@ -1624,19 +1655,21 @@ class AngularConstraint(PreprocessingConstraint):
                       (current_position[1] - self.pose_child_link.pose.position.y) ** 2 + \
                       (current_position[2] - self.pose_child_link.pose.position.z) ** 2
 
-        distance_gripper_to_pose_link_parent = (self.radius) ** 2
+        distance_gripper_to_pose_link_child = (self.radius) ** 2
 
         soft_constraints[str(self) + u'radius'] = SoftConstraint(
-            lower=distance_gripper_to_pose_link_parent - hold_radius,
-            upper=distance_gripper_to_pose_link_parent - hold_radius,
+            lower=distance_gripper_to_pose_link_child - hold_radius,
+            upper=distance_gripper_to_pose_link_child - hold_radius,
             weight=self.weight,
             expression=hold_radius)
+
         for constraint in self.constraints:
             soft_constraints.update(constraint.get_constraint())
         return soft_constraints
 
     def __str__(self):
         return u'{}/{}'.format(self.__class__.__name__, self.goal_name)
+
 
 class RotationalConstraint(PreprocessingConstraint):
     # Symbol

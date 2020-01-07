@@ -1423,10 +1423,14 @@ class PreprocessingConstraint(Constraint):
     def do_angular_goal(self):
         # get pose of grasped joint
         rospy.logout("Start method do angular")
-        goal_pose = tf_wrapper.lookup_pose(self.get_robot().get_root(),
-                                           self.body_name)
+        goal_pose = tf_wrapper.lookup_pose(self.get_robot().get_root(), self.body_name)
+
+        # Hand palm link handle
+        self.palm_link = self.config_file_manager.get_palm_link("pr2", self.body_name)
+        self.palm_link_pose = tf_wrapper.lookup_pose("map", self.palm_link)
         # get pose object to map
         object_pose_to_map = tf_wrapper.lookup_pose("map", self.goal_name)
+        self.object_pose_to_robot = tf_wrapper.lookup_pose(self.get_robot().get_root(), self.goal_name)
         self.radius = 0
         if self.get_world().get_object("kitchen").is_rotational_joint(self.joint_name):
             rospy.logout("Check if joint is rotational")
@@ -1461,18 +1465,21 @@ class PreprocessingConstraint(Constraint):
             goal_pose.pose.position.z = round(new_pose_goal[2], 2)
 
             # change orientation
-            orientation_gripper = quaternion_matrix([goal_pose.pose.orientation.x,
-                                                     goal_pose.pose.orientation.y,
-                                                     goal_pose.pose.orientation.z,
-                                                     goal_pose.pose.orientation.w])
+            self.orientation_gripper = quaternion_matrix([goal_pose.pose.orientation.x,
+                                                          goal_pose.pose.orientation.y,
+                                                          goal_pose.pose.orientation.z,
+                                                          goal_pose.pose.orientation.w])
 
             rotation_z = w.rotation_matrix_from_axis_angle([0, 0, 1], opening)
-            new_orientation = w.quaternion_from_matrix(w.dot(orientation_gripper, rotation_z))
+            new_orientation = w.quaternion_from_matrix(w.dot(self.orientation_gripper, rotation_z))
             goal_pose.pose.orientation.x = new_orientation[0]
             goal_pose.pose.orientation.y = new_orientation[1]
             goal_pose.pose.orientation.z = new_orientation[2]
             goal_pose.pose.orientation.w = new_orientation[3]
             # done change orientation
+
+            # please adapt this and delete duplicate
+            self.opening = opening
 
             # get radius of arc
             self.child_link_frame = self.prefix_name + "/" + child_link
@@ -1487,13 +1494,21 @@ class PreprocessingConstraint(Constraint):
                                               object_pose_to_map.pose.position.y,
                                               object_pose_to_map.pose.position.z])
 
-            # setup for orthogonal
-            #link_parent_of_goal = self.get_world().get_object("kitchen").get_parent_link_of_link(self.frame_name)
-            #self.pose_link_parent_of_goal = tf_wrapper.lookup_pose(self.get_robot().get_root(),
-                                                                   #self.prefix_name + "/" + link_parent_of_goal)
+            # palm link distance
+            self.palm_link_distance = utils.get_distance([self.pose_link_child.pose.position.x,
+                                                          self.pose_link_child.pose.position.y,
+                                                          self.pose_link_child.pose.position.z],
+                                                         [self.palm_link_pose.pose.position.x,
+                                                          self.palm_link_pose.pose.position.y,
+                                                          self.palm_link_pose.pose.position.z])
 
-            #rospy.logout("link parent to goal handle")
-            #rospy.logout(link_parent_of_goal)
+            # setup for orthogonal
+            # link_parent_of_goal = self.get_world().get_object("kitchen").get_parent_link_of_link(self.frame_name)
+            # self.pose_link_parent_of_goal = tf_wrapper.lookup_pose(self.get_robot().get_root(),
+            # self.prefix_name + "/" + link_parent_of_goal)
+
+            # rospy.logout("link parent to goal handle")
+            # rospy.logout(link_parent_of_goal)
 
             rospy.logout("end method do angular")
 
@@ -1655,13 +1670,68 @@ class AngularConstraint(PreprocessingConstraint):
                       (current_position[1] - self.pose_child_link.pose.position.y) ** 2 + \
                       (current_position[2] - self.pose_child_link.pose.position.z) ** 2
 
-        distance_gripper_to_pose_link_child = (self.radius) ** 2
+        distance_gripper_to_pose_link_child = self.radius ** 2
 
         soft_constraints[str(self) + u'radius'] = SoftConstraint(
             lower=distance_gripper_to_pose_link_child - hold_radius,
             upper=distance_gripper_to_pose_link_child - hold_radius,
             weight=self.weight,
             expression=hold_radius)
+
+        # palm_link distance
+        root_T_palm_link = self.get_fk(self.get_robot().get_root(), self.palm_link)
+        current_position_palm_link = w.position_of(root_T_palm_link)
+        hold_distance_palm_link = (current_position_palm_link[0] - self.pose_child_link.pose.position.x) ** 2 + \
+                                  (current_position_palm_link[1] - self.pose_child_link.pose.position.y) ** 2 + \
+                                  (current_position_palm_link[2] - self.pose_child_link.pose.position.z) ** 2
+
+        distance_palm_link_to_pose_link_child = self.palm_link_distance ** 2
+
+        soft_constraints[str(self) + u'radius'] = SoftConstraint(
+            lower=distance_palm_link_to_pose_link_child - hold_distance_palm_link,
+            upper=distance_palm_link_to_pose_link_child - hold_distance_palm_link,
+            weight=self.weight,
+            expression=hold_distance_palm_link)
+        # end palm link
+
+        angle = self.utils.get_angle([self.pose_child_link.pose.position.x,
+                                      self.pose_child_link.pose.position.y,
+                                      self.pose_child_link.pose.position.z],
+                                     [current_position[0], current_position[1], current_position[2]],
+                                     [self.object_pose_to_robot.pose.position.x,
+                                      self.object_pose_to_robot.pose.position.y,
+                                      self.object_pose_to_robot.pose.position.z])
+        rospy.logout("current angle in get constraints : ")
+        rospy.logout(angle)
+        current_orientation = w.rotation_of(root_T_hand)
+        current_orientation_quaternion = w.quaternion_from_matrix(current_orientation)
+
+        rotation_z = w.rotation_matrix_from_axis_angle([0, 0, 1], angle)
+        desired_orientation = w.quaternion_from_matrix(w.dot(self.orientation_gripper, rotation_z))
+
+        soft_constraints[str(self) + u'orientation_x'] = SoftConstraint(
+            lower=desired_orientation[0],
+            upper=desired_orientation[0],
+            weight=self.weight,
+            expression=current_orientation_quaternion[0])
+
+        soft_constraints[str(self) + u'orientation_y'] = SoftConstraint(
+            lower=desired_orientation[1],
+            upper=desired_orientation[1],
+            weight=self.weight,
+            expression=current_orientation_quaternion[1])
+
+        soft_constraints[str(self) + u'orientation_z'] = SoftConstraint(
+            lower=desired_orientation[2],
+            upper=desired_orientation[2],
+            weight=self.weight,
+            expression=current_orientation_quaternion[2])
+
+        soft_constraints[str(self) + u'orientation_w'] = SoftConstraint(
+            lower=desired_orientation[3],
+            upper=desired_orientation[3],
+            weight=self.weight,
+            expression=current_orientation_quaternion[3])
 
         for constraint in self.constraints:
             soft_constraints.update(constraint.get_constraint())

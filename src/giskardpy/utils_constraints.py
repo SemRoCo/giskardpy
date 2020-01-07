@@ -166,6 +166,11 @@ class Utils:
                 point_duplicate[1] + axis[1],
                 point_duplicate[2] + axis[2]]
 
+    def get_symbol(self, value):
+        if value >= 0:
+            return 1
+        return -1
+
 
 
 

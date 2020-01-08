@@ -59,22 +59,28 @@ class WorldUpdatePlugin(GiskardBehavior):
         return res
 
     def get_object_info(self, req):
+        res = GetObjectInfoResponse()
+        res.error_codes = GetObjectInfoResponse.SUCCESS
         try:
             object = self.get_world().get_object(req.object_name)
 
-            res = GetObjectInfoResponse()
             res.pose = object.base_pose
             for key, value in object.joint_state.items():
                 res.joint_state.name.append(key)
                 res.joint_state.position.append(value.position)
                 res.joint_state.velocity.append(value.velocity)
                 res.joint_state.effort.append(value.effort)
-            return res
         except KeyError as e:
             logging.logerr('no object with the name {} was found'.format(req.object_name))
+            res.error_codes = GetObjectInfoResponse.NAME_NOT_FOUND_ERROR
+
+        return res
+
 
     def update_rviz_markers(self, req):
         l = req.object_names
+        res = UpdateRvizMarkersResponse()
+        res.error_codes = UpdateRvizMarkersResponse.SUCCESS
         ma = MarkerArray()
         if len(l) == 0:
             l = self.get_world().get_object_names()
@@ -87,11 +93,13 @@ class WorldUpdatePlugin(GiskardBehavior):
                 ma.markers.append(m)
             except TypeError as e:
                 logging.logerr('failed to convert object {} to marker: {}'.format(name, str(e)))
+                res.error_codes = UpdateRvizMarkersResponse.MARKER_CONVERSION_ERROR
             except KeyError as e:
                 logging.logerr('could not update rviz marker for object {}: no object with that name was found'.format(name))
+                res.error_codes = UpdateRvizMarkersResponse.NAME_NOT_FOUND_ERROR
 
         self.pub_collision_marker.publish(ma)
-        return UpdateRvizMarkersResponse()
+        return res
 
     def get_attached_objects(self, req):
         original_robot = URDFObject(self.get_robot().original_urdf)

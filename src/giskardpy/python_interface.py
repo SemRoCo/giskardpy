@@ -6,7 +6,8 @@ from genpy import Message
 from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped
 from giskard_msgs.msg import MoveAction, MoveGoal, WorldBody, CollisionEntry, MoveResult, Constraint, \
     MoveCmd, JointConstraint, CartesianConstraint
-from giskard_msgs.srv import UpdateWorld, UpdateWorldRequest, UpdateWorldResponse
+from giskard_msgs.srv import UpdateWorld, UpdateWorldRequest, UpdateWorldResponse, GetObjectInfo, GetObjectNames,\
+    UpdateRvizMarkers, GetAttachedObjects
 from rospy_message_converter.message_converter import convert_ros_message_to_dictionary
 from sensor_msgs.msg import JointState
 from shape_msgs.msg import SolidPrimitive
@@ -14,6 +15,7 @@ from visualization_msgs.msg import MarkerArray
 
 from giskardpy.urdf_object import URDFObject
 from giskardpy.utils import dict_to_joint_states, make_world_body_box, make_world_body_cylinder
+from giskardpy import logging
 
 
 class GiskardWrapper(object):
@@ -489,4 +491,38 @@ class GiskardWrapper(object):
         if isinstance(joint_states, dict):
             joint_states = dict_to_joint_states(joint_states)
         self.object_js_topics[object_name].publish(joint_states)
+
+    def get_object_names(self):
+        rospy.wait_for_service('/get_object_names')
+        try:
+            get_object_names = rospy.ServiceProxy('/get_object_names', GetObjectNames)
+            return get_object_names()
+        except rospy.ServiceException as e:
+            logging.logerr('Service call failed: {}'.format(str(e)))
+
+    def get_object_info(self, name):
+        rospy.wait_for_service('/get_object_info')
+        try:
+            get_object_info = rospy.ServiceProxy('/get_object_info', GetObjectInfo)
+            return get_object_info(name)
+        except rospy.ServiceException as e:
+            logging.logerr('Service call failed: {}'.format(str(e)))
+
+    def update_rviz_markers(self, object_names):
+        rospy.wait_for_service('/update_rviz_markers')
+        try:
+            update_rviz_markers = rospy.ServiceProxy('/update_rviz_markers', UpdateRvizMarkers)
+            return update_rviz_markers(object_names)
+        except rospy.ServiceException as e:
+            logging.logerr('Service call failed: {}'.format(str(e)))
+
+    def get_attached_objects(self):
+        rospy.wait_for_service('/get_attached_objects')
+        try:
+            get_attached_objects = rospy.ServiceProxy('/get_attached_objects', GetAttachedObjects)
+            return get_attached_objects()
+        except rospy.ServiceException as e:
+            logging.logerr('Service call failed: {}'.format(str(e)))
+
+
 

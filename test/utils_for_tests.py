@@ -463,6 +463,7 @@ class GiskardTestWrapper(object):
     def clear_world(self):
         assert self.wrapper.clear_world().error_codes == UpdateWorldResponse.SUCCESS
         assert len(self.get_world().get_object_names()) == 0
+        assert len(self.wrapper.get_object_names().object_names) == 0
         # assert len(self.get_robot().get_attached_objects()) == 0
         # assert self.get_world().has_object(u'plane')
 
@@ -472,15 +473,18 @@ class GiskardTestWrapper(object):
             u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
                                             update_world_error_code(expected_response))
         assert not self.get_world().has_object(name)
+        assert not name in self.wrapper.get_object_names().object_names
 
     def detach_object(self, name, expected_response=UpdateWorldResponse.SUCCESS):
         p = self.get_robot().get_fk_pose(self.get_robot().get_root(), name)
         p = transform_pose(u'map', p)
+        assert name in self.wrapper.get_attached_objects().object_names, 'there is no attached object named {}'.format(name)
         r = self.wrapper.detach_object(name)
         assert r.error_codes == expected_response, \
             u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
                                             update_world_error_code(expected_response))
         assert self.get_world().has_object(name)
+        assert not name in self.wrapper.get_attached_objects().object_names, 'the object was not detached'
         compare_poses(self.get_world().get_object(name).base_pose, p.pose, decimal=2)
 
     def add_box(self, name=u'box', size=(1, 1, 1), pose=None, expected_response=UpdateWorldResponse.SUCCESS):
@@ -492,6 +496,8 @@ class GiskardTestWrapper(object):
         o_p = self.get_world().get_object(name).base_pose
         assert self.get_world().has_object(name)
         compare_poses(p.pose, o_p)
+        assert name in self.wrapper.get_object_names().object_names
+        compare_poses(o_p, self.wrapper.get_object_info(name).pose)
 
     def add_sphere(self, name=u'sphere', size=1, pose=None):
         r = self.wrapper.add_sphere(name=name, size=size, pose=pose)
@@ -499,6 +505,9 @@ class GiskardTestWrapper(object):
             u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
                                             update_world_error_code(UpdateWorldResponse.SUCCESS))
         assert self.get_world().has_object(name)
+        assert name in self.wrapper.get_object_names().object_names
+        o_p = self.get_world().get_object(name).base_pose
+        compare_poses(o_p, self.wrapper.get_object_info(name).pose)
 
     def add_cylinder(self, name=u'cylinder', size=[1, 1], pose=None):
         r = self.wrapper.add_cylinder(name=name, size=size, pose=pose)
@@ -506,6 +515,9 @@ class GiskardTestWrapper(object):
             u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
                                             update_world_error_code(UpdateWorldResponse.SUCCESS))
         assert self.get_world().has_object(name)
+        assert name in self.wrapper.get_object_names().object_names
+        o_p = self.get_world().get_object(name).base_pose
+        compare_poses(o_p, self.wrapper.get_object_info(name).pose)
 
     def add_urdf(self, name, urdf, pose, js_topic):
         r = self.wrapper.add_urdf(name, urdf, pose, js_topic)
@@ -513,6 +525,7 @@ class GiskardTestWrapper(object):
             u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
                                             update_world_error_code(UpdateWorldResponse.SUCCESS))
         assert self.get_world().has_object(name)
+        assert name in self.wrapper.get_object_names().object_names
 
     def allow_all_collisions(self):
         self.wrapper.allow_all_collisions()
@@ -565,6 +578,8 @@ class GiskardTestWrapper(object):
             self.wait_for_synced()
             assert name in self.get_controllable_links()
             assert not self.get_world().has_object(name)
+            assert not name in self.wrapper.get_object_names().object_names
+            assert name in self.wrapper.get_attached_objects().object_names, 'object {} was not attached'
             assert scm.difference(self.get_robot().get_self_collision_matrix()) == set()
             assert len(scm) < len(self.get_robot().get_self_collision_matrix())
             compare_poses(expected_pose.pose, lookup_pose(frame_id, name).pose)
@@ -588,6 +603,8 @@ class GiskardTestWrapper(object):
             self.wait_for_synced()
             assert name in self.get_controllable_links()
             assert not self.get_world().has_object(name)
+            assert not name in self.wrapper.get_object_names().object_names
+            assert name in self.wrapper.get_attached_objects().object_names
             assert scm.difference(self.get_robot().get_self_collision_matrix()) == set()
             assert len(scm) < len(self.get_robot().get_self_collision_matrix())
             compare_poses(expected_pose.pose, lookup_pose(frame_id, name).pose)
@@ -602,6 +619,8 @@ class GiskardTestWrapper(object):
         self.wait_for_synced()
         assert name in self.get_controllable_links()
         assert not self.get_world().has_object(name)
+        assert not name in self.wrapper.get_object_names().object_names
+        assert name in self.wrapper.get_attached_objects().object_names
         assert scm.difference(self.get_robot().get_self_collision_matrix()) == set()
         assert len(scm) < len(self.get_robot().get_self_collision_matrix())
         self.loop_once()

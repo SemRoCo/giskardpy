@@ -1426,8 +1426,8 @@ class PreprocessingConstraint(Constraint):
         goal_pose = tf_wrapper.lookup_pose(self.get_robot().get_root(), self.body_name)
 
         # Hand palm link handle
-        self.palm_link = self.config_file_manager.get_palm_link("pr2", self.body_name)
-        self.palm_link_pose = tf_wrapper.lookup_pose("map", self.palm_link)
+        #self.palm_link = self.config_file_manager.get_palm_link("pr2", self.body_name)
+        #self.palm_link_pose = tf_wrapper.lookup_pose("map", self.palm_link)
         # get pose object to map
         object_pose_to_map = tf_wrapper.lookup_pose("map", self.goal_name)
         self.object_pose_to_robot = tf_wrapper.lookup_pose(self.get_robot().get_root(), self.goal_name)
@@ -1470,12 +1470,12 @@ class PreprocessingConstraint(Constraint):
                                                           goal_pose.pose.orientation.z,
                                                           goal_pose.pose.orientation.w])
 
-            rotation_z = w.rotation_matrix_from_axis_angle([0, 0, 1], opening)
-            new_orientation = w.quaternion_from_matrix(w.dot(self.orientation_gripper, rotation_z))
-            goal_pose.pose.orientation.x = new_orientation[0]
-            goal_pose.pose.orientation.y = new_orientation[1]
-            goal_pose.pose.orientation.z = new_orientation[2]
-            goal_pose.pose.orientation.w = new_orientation[3]
+            #rotation_z = w.rotation_matrix_from_axis_angle([0, 0, 1], opening)
+            #new_orientation = w.quaternion_from_matrix(w.dot(self.orientation_gripper, rotation_z))
+            #goal_pose.pose.orientation.x = new_orientation[0]
+            #goal_pose.pose.orientation.y = new_orientation[1]
+            #goal_pose.pose.orientation.z = new_orientation[2]
+            #goal_pose.pose.orientation.w = new_orientation[3]
             # done change orientation
 
             # please adapt this and delete duplicate
@@ -1493,22 +1493,6 @@ class PreprocessingConstraint(Constraint):
                                              [object_pose_to_map.pose.position.x,
                                               object_pose_to_map.pose.position.y,
                                               object_pose_to_map.pose.position.z])
-
-            # palm link distance
-            self.palm_link_distance = utils.get_distance([self.pose_link_child.pose.position.x,
-                                                          self.pose_link_child.pose.position.y,
-                                                          self.pose_link_child.pose.position.z],
-                                                         [self.palm_link_pose.pose.position.x,
-                                                          self.palm_link_pose.pose.position.y,
-                                                          self.palm_link_pose.pose.position.z])
-
-            # setup for orthogonal
-            # link_parent_of_goal = self.get_world().get_object("kitchen").get_parent_link_of_link(self.frame_name)
-            # self.pose_link_parent_of_goal = tf_wrapper.lookup_pose(self.get_robot().get_root(),
-            # self.prefix_name + "/" + link_parent_of_goal)
-
-            # rospy.logout("link parent to goal handle")
-            # rospy.logout(link_parent_of_goal)
 
             rospy.logout("end method do angular")
 
@@ -1659,11 +1643,13 @@ class AngularConstraint(PreprocessingConstraint):
         goal_pose = convert_ros_message_to_dictionary(goal_pose)
         self.constraints.append(CartesianPosition(god_map, self.root_link, self.body_name, goal_pose,
                                                   weight, gain, translation_max_speed))
-        self.constraints.append(CartesianOrientationSlerp(god_map, self.root_link, self.body_name, goal_pose,
-                                                          weight, gain, rotation_max_speed))
+        #self.constraints.append(CartesianOrientationSlerp(god_map, self.root_link, self.body_name, goal_pose,
+                                                          #weight, gain, rotation_max_speed))
 
     def get_constraint(self):
         soft_constraints = OrderedDict()
+
+        # START CONSTRAINTS HOLD RADIUS OF CERCLE
         root_T_hand = self.get_fk(self.get_robot().get_root(), self.body_name)
         current_position = w.position_of(root_T_hand)
         hold_radius = (current_position[0] - self.pose_child_link.pose.position.x) ** 2 + \
@@ -1677,61 +1663,64 @@ class AngularConstraint(PreprocessingConstraint):
             upper=distance_gripper_to_pose_link_child - hold_radius,
             weight=self.weight,
             expression=hold_radius)
+        # END CONSTRAINTS HOLD RADIUS OF CERCLE
 
-        # palm_link distance
-        root_T_palm_link = self.get_fk(self.get_robot().get_root(), self.palm_link)
-        current_position_palm_link = w.position_of(root_T_palm_link)
-        hold_distance_palm_link = (current_position_palm_link[0] - self.pose_child_link.pose.position.x) ** 2 + \
-                                  (current_position_palm_link[1] - self.pose_child_link.pose.position.y) ** 2 + \
-                                  (current_position_palm_link[2] - self.pose_child_link.pose.position.z) ** 2
-
-        distance_palm_link_to_pose_link_child = self.palm_link_distance ** 2
-
-        soft_constraints[str(self) + u'radius'] = SoftConstraint(
-            lower=distance_palm_link_to_pose_link_child - hold_distance_palm_link,
-            upper=distance_palm_link_to_pose_link_child - hold_distance_palm_link,
-            weight=self.weight,
-            expression=hold_distance_palm_link)
-        # end palm link
-
-        angle = self.utils.get_angle([self.pose_child_link.pose.position.x,
+        # START ORIENTATION CONSTRAINTS
+        # determine angle
+        angle = self.utils.get_angle_casadi([self.pose_child_link.pose.position.x,
                                       self.pose_child_link.pose.position.y,
                                       self.pose_child_link.pose.position.z],
                                      [current_position[0], current_position[1], current_position[2]],
                                      [self.object_pose_to_robot.pose.position.x,
                                       self.object_pose_to_robot.pose.position.y,
                                       self.object_pose_to_robot.pose.position.z])
-        rospy.logout("current angle in get constraints : ")
-        rospy.logout(angle)
-        current_orientation = w.rotation_of(root_T_hand)
-        current_orientation_quaternion = w.quaternion_from_matrix(current_orientation)
 
-        rotation_z = w.rotation_matrix_from_axis_angle([0, 0, 1], angle)
-        desired_orientation = w.quaternion_from_matrix(w.dot(self.orientation_gripper, rotation_z))
+        # current orientation
+        current_orientation = w.rotation_of(root_T_hand)
+        current_axis, current_angle = w.diffable_axis_angle_from_matrix(current_orientation) #w.quaternion_from_matrix(current_orientation)
+        current_axis_angle = current_axis * current_angle
+        # desired orientation
+        if self.utils.get_symbol(self.opening) > 0:
+            rotation_z = w.rotation_matrix_from_axis_angle([0, 0, 1], angle)
+        else:
+            rotation_z = w.rotation_matrix_from_axis_angle([0, 0, 1], -angle)
+        desired_axis, desired_angle = w.diffable_axis_angle_from_matrix(w.dot(self.orientation_gripper, rotation_z)) #w.quaternion_from_matrix(w.dot(self.orientation_gripper, rotation_z))
+        desired_axis_angle = desired_axis * desired_angle
 
         soft_constraints[str(self) + u'orientation_x'] = SoftConstraint(
-            lower=desired_orientation[0],
-            upper=desired_orientation[0],
+            lower=desired_axis_angle[0] - current_axis_angle[0],
+            upper=desired_axis_angle[0] - current_axis_angle[0],
             weight=self.weight,
-            expression=current_orientation_quaternion[0])
+            expression=current_axis_angle[0])
 
         soft_constraints[str(self) + u'orientation_y'] = SoftConstraint(
-            lower=desired_orientation[1],
-            upper=desired_orientation[1],
+            lower=desired_axis_angle[1] - current_axis_angle[1],
+            upper=desired_axis_angle[1] - current_axis_angle[1],
             weight=self.weight,
-            expression=current_orientation_quaternion[1])
+            expression=current_axis_angle[1])
 
         soft_constraints[str(self) + u'orientation_z'] = SoftConstraint(
-            lower=desired_orientation[2],
-            upper=desired_orientation[2],
+            lower=desired_axis_angle[2] - current_axis_angle[2],
+            upper=desired_axis_angle[2] - current_axis_angle[2],
             weight=self.weight,
-            expression=current_orientation_quaternion[2])
+            expression=current_axis_angle[2])
+        add_debug_constraint(soft_constraints, str(self) + u'desired angle x', desired_axis_angle[2])
+        add_debug_constraint(soft_constraints, str(self) + u'current angle x', current_axis_angle[2])
+        add_debug_constraint(soft_constraints, str(self) + u'desired angle', desired_angle)
+        add_debug_constraint(soft_constraints, str(self) + u'current angle', current_angle)
+        add_debug_constraint(soft_constraints, str(self) + u'angle', angle)
+        add_debug_constraint(soft_constraints, str(self) + u'pose_door_x', self.pose_child_link.pose.position.x)
+        add_debug_constraint(soft_constraints, str(self) + u'pose_door_y', self.pose_child_link.pose.position.y)
+        add_debug_constraint(soft_constraints, str(self) + u'pose_door_z', self.pose_child_link.pose.position.z)
+        add_debug_constraint(soft_constraints, str(self) + u'pose_door_handlex', self.object_pose_to_robot.pose.position.x)
+        add_debug_constraint(soft_constraints, str(self) + u'pose_door_handley', self.object_pose_to_robot.pose.position.y)
+        add_debug_constraint(soft_constraints, str(self) + u'pose_door_handlez', self.object_pose_to_robot.pose.position.z)
+        add_debug_constraint(soft_constraints, str(self) + u'current_pose_x', current_position[0])
+        add_debug_constraint(soft_constraints, str(self) + u'current_pose_y', current_position[1])
+        add_debug_constraint(soft_constraints, str(self) + u'current_pose_z', current_position[2])
 
-        soft_constraints[str(self) + u'orientation_w'] = SoftConstraint(
-            lower=desired_orientation[3],
-            upper=desired_orientation[3],
-            weight=self.weight,
-            expression=current_orientation_quaternion[3])
+
+        # END ORIENTATION CONSTRAINTS
 
         for constraint in self.constraints:
             soft_constraints.update(constraint.get_constraint())

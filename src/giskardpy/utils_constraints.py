@@ -50,6 +50,16 @@ class Utils:
     def get_distance(self, point1, point2):
         return np.linalg.norm(np.array(point2) - np.array(point1))
 
+    def get_angle_casadi(self, point1, point2, point3):
+        v12 = w.vector3(*point1) - w.vector3(*point2)
+        v13 = w.vector3(*point1) - w.vector3(*point3)
+        v23 = w.vector3(*point2) - w.vector3(*point3)
+        d12 = w.norm(v12)
+        d13 = w.norm(v13)
+        d23 = w.norm(v23)
+        #return w.acos(w.dot(v12, v13.T)[0] / (d12 * d13))
+        return w.acos((d12**2 + d13**2 - d23**2) / (2 * d12 * d13))
+
     def get_angle(self, point1, point2, point3):
         v12 = np.subtract(point1, point2)
         v13 = np.subtract(point1, point3)

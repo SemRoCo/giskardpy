@@ -269,7 +269,7 @@ def close_oven_door_object():
     gripper.some_mvt('iai_kitchen/oven_area_oven_door_handle', 'l_gripper_tool_frame')
     gripper.mvt_l_gripper(0.0, 0.0, 0.0, 0.0)
     gripper.mvt_r_gripper(0.0, 0.0, 0.0, 0.0)
-    gripper.open_or_close_with_translation('iai_kitchen/oven_area_oven_door_handle', 'l_gripper_tool_frame', 0.5)
+    gripper.open_or_close_with_translation('iai_kitchen/oven_area_oven_door_handle', 'l_gripper_tool_frame', 1)
     gripper.set_kitchen_goal('oven_area_oven_door_joint', 0.0)
 
 

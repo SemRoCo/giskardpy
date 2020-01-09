@@ -710,14 +710,18 @@ def diffable_axis_angle_from_matrix(rotation_matrix):
     # TODO buggy when angle == pi
     # TODO use 'if' to make angle always positive?
     rm = rotation_matrix
-    angle = (trace(rm[:3, :3]) - 1) / 2
-    angle = acos(angle)
+    cos_angle = (trace(rm[:3, :3]) - 1) / 2
+    cos_angle = diffable_min_fast(cos_angle, 1)
+    cos_angle = diffable_max_fast(cos_angle, -1)
+    angle = acos(cos_angle)
     x = (rm[2, 1] - rm[1, 2])
     y = (rm[0, 2] - rm[2, 0])
     z = (rm[1, 0] - rm[0, 1])
     n = sqrt(x * x + y * y + z * z)
 
-    axis = Matrix([x / n, y / n, z / n])
+    axis = Matrix([if_eq(Abs(cos_angle), 1, 0, x / n),
+                   if_eq(Abs(cos_angle), 1, 0, y / n),
+                   if_eq(Abs(cos_angle), 1, 1, z / n)])
     return axis, angle
 
 

@@ -59,16 +59,6 @@ class QPSolver(object):
         :return: x according to the equations above, len = joint constraints + soft constraints
         :type np.array
         """
-        j_mask = H.sum(axis=1) != 0
-        s_mask = j_mask[self.j:]
-        h_mask = np.concatenate((np.array([True] * self.h), s_mask))
-        A = A[h_mask][:,j_mask].copy()
-        lbA = lbA[h_mask]
-        ubA = ubA[h_mask]
-        lb = lb[j_mask]
-        ub = ub[j_mask]
-        H = H[j_mask][:,j_mask]
-        g = np.zeros(H.shape[0])
         if A.shape != self.shape:
             self.started = False
             self.shape = A.shape

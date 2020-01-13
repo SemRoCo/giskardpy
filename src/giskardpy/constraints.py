@@ -146,9 +146,10 @@ class JointPosition(Constraint):
 
         joint_goal = self.get_input_float(self.goal)
         weight = self.get_input_float(self.weight)
-        # p_gain = self.get_input_float(self.gain)
-        max_speed = self.get_input_float(self.max_speed)
         t = self.get_input_sampling_period()
+
+        max_speed = w.Min(self.get_input_float(self.max_speed) * t,
+                          self.get_robot().get_joint_velocity_limit_expr(self.joint_name))
 
         soft_constraints = OrderedDict()
 
@@ -156,7 +157,7 @@ class JointPosition(Constraint):
             err = w.shortest_angular_distance(current_joint, joint_goal)
         else:
             err = joint_goal - current_joint
-        capped_err = w.diffable_max_fast(w.diffable_min_fast(err, max_speed * t), -max_speed * t)
+        capped_err = w.diffable_max_fast(w.diffable_min_fast(err, max_speed), -max_speed)
 
         soft_constraints[str(self)] = SoftConstraint(lower=capped_err,
                                                      upper=capped_err,

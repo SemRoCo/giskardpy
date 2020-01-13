@@ -42,10 +42,8 @@ class GoalToConstraints(GetGoal):
 
         self.get_god_map().safe_set_data(identifier.constraints_identifier, {})
 
-        if self.has_robot_changed():
-            self.soft_constraints = {}
-            # TODO split soft contraints into js, coll and cart; update cart always and js/coll only when urdf changed, js maybe never
-            self.add_js_controller_soft_constraints()
+        self.soft_constraints = {}
+        # TODO we only have to update the collision constraints, if the robot changed
         self.add_collision_avoidance_soft_constraints()
 
         try:

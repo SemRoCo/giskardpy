@@ -63,8 +63,8 @@ class WorldUpdatePlugin(GiskardBehavior):
         res.error_codes = GetObjectInfoResponse.SUCCESS
         try:
             object = self.get_world().get_object(req.object_name)
-
-            res.pose = object.base_pose
+            res.pose.pose = object.base_pose
+            res.pose.header.frame_id = self.get_god_map().safe_get_data(identifier.map_frame)
             for key, value in object.joint_state.items():
                 res.joint_state.name.append(key)
                 res.joint_state.position.append(value.position)

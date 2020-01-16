@@ -152,6 +152,16 @@ class TestSympyWrapper(unittest.TestCase):
             np.float(if_result if a >= b else else_result), places=7)
 
     # fails if condition is to close too 0 or too big or too small
+    @given(limited_float(min_dist_to_zero=SMALL_NUMBER),
+           limited_float(min_dist_to_zero=SMALL_NUMBER),
+           limited_float(),
+           limited_float())
+    def test_if_less_eq(self, a, b, if_result, else_result):
+        self.assertAlmostEqual(
+            w.compile_and_execute(w.if_less_eq, [a, b, if_result, else_result]),
+            np.float(if_result if a <= b else else_result), places=7)
+
+    # fails if condition is to close too 0 or too big or too small
     # fails if if_result is too big or too small
     @given(limited_float(min_dist_to_zero=SMALL_NUMBER),
            limited_float(outer_limit=1e8),

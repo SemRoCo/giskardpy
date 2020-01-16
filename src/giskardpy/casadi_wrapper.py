@@ -346,7 +346,7 @@ def if_less_eq(a, b, if_result, else_result):
     :return: if_result if a <= b else else_result
     :rtype: Union[float, Symbol]
     """
-    return if_greater_eq(b, a, else_result, if_result)
+    return if_greater_eq(b, a, if_result, else_result)
 
 
 def if_eq_zero(condition, if_result, else_result):

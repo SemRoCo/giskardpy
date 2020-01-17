@@ -14,6 +14,7 @@ from tf.transformations import quaternion_from_matrix, quaternion_about_axis
 
 from giskardpy import logging, identifier
 from giskardpy.identifier import fk_pose
+from giskardpy.symengine_robot import Robot
 from giskardpy.tfwrapper import init as tf_init, lookup_pose, transform_pose, lookup_point, transform_point
 from utils_for_tests import PR2, compare_poses
 
@@ -227,6 +228,25 @@ def kitchen_setup(resetted_giskard):
     js = {k: 0.0 for k in resetted_giskard.get_world().get_object(object_name).get_controllable_joints()}
     resetted_giskard.set_kitchen_js(js)
     return resetted_giskard
+
+
+class TestInitialization(object):
+    def test_load_config_yaml(self, zero_pose):
+        gm = zero_pose.get_god_map()
+        robot = zero_pose.get_robot()
+        assert isinstance(robot, Robot)
+        sample_period = gm.get_data(identifier.sample_period)
+        odom_x_index = gm.get_data(identifier.b_keys).index(u'j -- (\'pr2\', \'odom_x_joint\')')
+        odom_x_lb = gm.get_data(identifier.lb)[odom_x_index]/sample_period
+        odom_x_ub = gm.get_data(identifier.ub)[odom_x_index]/sample_period
+        np.testing.assert_almost_equal(odom_x_lb, -0.5)
+        np.testing.assert_almost_equal(odom_x_ub, 0.5)
+
+        odom_z_index = gm.get_data(identifier.b_keys).index(u'j -- (\'pr2\', \'odom_z_joint\')')
+        odom_z_lb = gm.get_data(identifier.lb)[odom_z_index]/sample_period
+        odom_z_ub = gm.get_data(identifier.ub)[odom_z_index]/sample_period
+        np.testing.assert_almost_equal(odom_z_lb, -0.6)
+        np.testing.assert_almost_equal(odom_z_ub, 0.6)
 
 
 class TestFk(object):

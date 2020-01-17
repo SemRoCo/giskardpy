@@ -46,11 +46,17 @@ map_frame = general_options + [u'map_frame']
 fill_velocity_values = general_options + [u'fill_velocity_values']
 joint_convergence_threshold = general_options + [u'joint_convergence_threshold']
 
-joint_vel = general_options + [u'joint_vel_limit']
-default_joint_vel = joint_vel + [u'default']
+joint_velocity_linear_limit = general_options + [u'joint_vel_limit', u'linear']
+default_joint_velocity_linear_limit = joint_velocity_linear_limit + [u'default']
 
-joint_acc = general_options + [u'joint_acceleration_limit']
-default_joint_acc = joint_acc + [u'default']
+joint_velocity_angular_limit = general_options + [u'joint_vel_limit', u'angular']
+default_joint_velocity_angular_limit = joint_velocity_angular_limit + [u'default']
+
+joint_acceleration_linear_limit = general_options + [u'joint_acceleration_limit', u'linear']
+default_joint_acceleration_linear_limit = joint_acceleration_linear_limit + [u'default']
+
+joint_acceleration_angular_limit = general_options + [u'joint_acceleration_limit', u'angular']
+default_joint_acceleration_angular_limit = joint_acceleration_angular_limit + [u'default']
 
 joint_cost = general_options + [u'joint_weights']
 default_joint_cost_identifier = joint_cost + [u'default']

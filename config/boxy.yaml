@@ -1,26 +1,55 @@
-enable_collision_marker: True
-enable_visualization: True
-plot_trajectory: False
-debug: False
-map_frame: map 
-joint_convergence_threshold: 0.001
-wiggle_precision_threshold: 5
-max_traj_length: 30 # not implemented
-sample_period: 0.05
-default_joint_vel_limit: 0.5
-default_joint_weight: 0.0001
-joint_weights:
-  odom_x_joint: 1
-  odom_y_joint: 1
-  odom_z_joint: 1
+general_options:
+  sample_period: 0.05 # time[s] between points of generated joint trajectory
+  map_frame: map
+  fill_velocity_values: True # due to a bug, the pr2 does not want the velocity values to be filled
+  joint_convergence_threshold: 0.01 # when the velocities fall below this value, the planning succeeds
+  joint_vel_limit: # giskard will use the min of this number and limits from the urdf
+    linear:
+      default: 1
+      odom_x_joint: 0.5
+      odom_y_joint: 0.5
+    angular:
+      default: 1
+      odom_z_joint: 0.6
+  joint_acceleration_limit: # multiply your desired acc limit with sample period; experimental, don't touch
+    linear:
+      default: 100
+    angular:
+      default: 100
+  joint_weights: # the planner prefers low weight joints to achieve solutions
+    default: 0.0001
+    odom_x_joint: 1
+    odom_y_joint: 1
+    odom_z_joint: 1
+    torso_lift_joint: 0.5
+qp_solver:
+  nWSR: None # None results in a nWSR estimation that's fine most of the time
+plugins:
+  VisualizationBehavior: # planning visualization through markers, slows planning down a little bit
+    enabled: True
+  CPIMarker: # contact visualization, slows planning down a little bit
+    enabled: True
+  PlotTrajectory: # plots the joint trajectory at the end of planning, useful for debugging
+    enabled: True
+  WiggleCancel: # cancels planning if high frequencies are detected in the trajectory
+    fft_duration: 3
+    wiggle_detection_threshold: 10
+    min_wiggle_frequency: 3
+behavior_tree:
+  debug: False # prints the behavior tree state in the terminal
+  tree_tick_rate: 0.1 # how often the tree updates. lower numbers increase responsiveness, but waste cpu time while idle
 collision_avoidance:
-  default:
-    max_weight_distance: 0.0
-    low_weight_distance: 0.01
-    zero_weight_distance: 0.05
-fill_velocity_values: True
-nWSR: None # None results in a nWSR estimation thats fine most of the time
-root_link: odom_combined
-collision_time_threshold: 15
-tree_tick_rate: 0.1
-slerp: True
+  distance_thresholds:
+    default:
+      max_weight_distance: 0.0 # at this distance in [cm] the collision avoidance repells with maximum force
+      low_weight_distance: 0.01 # most goals are able to push past this threshold, if there is a conflict
+      zero_weight_distance: 0.05 # at this distance the collision avoidance becomes active
+    base_link:
+      max_weight_distance: 0.04
+      low_weight_distance: 0.06
+      zero_weight_distance: 0.09
+  self_collision_avoidance: # each pair of links in the collision matrix get push away from each other
+    ignore: [] # list pairs of links that should be removed from the self collision avoidance
+    add: [] # list pairs of links that should be added to the self collision matrix
+  external_collision_avoidance:
+    number_of_repeller: 5 # each movable joint gets pushed away from the 5 objects closest to it

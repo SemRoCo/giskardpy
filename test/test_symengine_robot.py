@@ -63,7 +63,7 @@ def parsed_boxy(function_setup):
 @pytest.fixture()
 def test_folder(request):
     """
-    :rtype: World
+    :rtype: str
     """
     folder_name = u'tmp_data/'
     def kill_pybullet():
@@ -153,8 +153,8 @@ class TestSymengineController(object):
     boxy_joint_limits = Robot(boxy_urdf()).get_all_joint_limits()
 
     def test_constraints_pr2(self, parsed_pr2):
-        assert len(parsed_pr2.hard_constraints) == 26
-        assert len(parsed_pr2.joint_constraints) == 45
+        assert len(parsed_pr2.hard_constraints) == 28
+        assert len(parsed_pr2.joint_constraints) == 48
 
     def test_constraints_donbot(self, parsed_donbot):
         assert len(parsed_donbot.hard_constraints) == 9
@@ -229,7 +229,8 @@ class TestSymengineController(object):
                     u'laser_tilt_mount_joint', u'r_shoulder_pan_joint', u'fr_caster_r_wheel_joint',
                     u'l_wrist_roll_joint', u'r_gripper_r_finger_joint', u'bl_caster_r_wheel_joint', u'l_gripper_joint',
                     u'l_gripper_l_finger_tip_joint', u'br_caster_rotation_joint', u'l_gripper_l_finger_joint',
-                    u'l_wrist_flex_joint', u'l_upper_arm_roll_joint', u'l_gripper_r_finger_joint'}
+                    u'l_wrist_flex_joint', u'l_upper_arm_roll_joint', u'l_gripper_r_finger_joint',
+                    u'odom_x_joint', u'odom_y_joint', u'odom_z_joint'}
 
         assert set(parsed_pr2.get_joint_names_controllable()).difference(expected) == set()
 

@@ -2,6 +2,7 @@ import numpy as np
 from copy import deepcopy
 
 import pytest
+import roslaunch
 import rospy
 from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped, Pose
 from giskard_msgs.msg import MoveActionGoal, MoveResult, MoveGoal, CollisionEntry
@@ -77,8 +78,22 @@ def ros(request):
         logging.loginfo(u'init ros')
     rospy.init_node(u'tests')
     tf_init(60)
+    launch = roslaunch.scriptapi.ROSLaunch()
+    launch.start()
+
+    rospy.set_param('/joint_trajectory_splitter/state_topics',
+                    ['/whole_body_controller/base/state',
+                     '/whole_body_controller/body/state'])
+    rospy.set_param('/joint_trajectory_splitter/client_topics',
+                    ['/whole_body_controller/base/follow_joint_trajectory',
+                     '/whole_body_controller/body/follow_joint_trajectory'])
+    node = roslaunch.core.Node('giskardpy', 'joint_trajectory_splitter.py', name='joint_trajectory_splitter')
+    joint_trajectory_splitter = launch.launch(node)
 
     def kill_ros():
+        joint_trajectory_splitter.stop()
+        rospy.delete_param('/joint_trajectory_splitter/state_topics')
+        rospy.delete_param('/joint_trajectory_splitter/client_topics')
         logging.loginfo(u'shutdown ros')
         rospy.signal_shutdown(u'die')
         try:

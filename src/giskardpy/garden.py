@@ -1,4 +1,5 @@
 import functools
+from itertools import combinations
 
 import py_trees
 import py_trees_ros
@@ -6,7 +7,7 @@ import rospy
 from control_msgs.msg import JointTrajectoryControllerState
 from giskard_msgs.msg import MoveAction
 from py_trees import Sequence, Selector, BehaviourTree, Blackboard
-from py_trees.meta import failure_is_success, success_is_failure, success_is_running
+from py_trees.meta import failure_is_success, success_is_failure
 from py_trees_ros.trees import BehaviourTree
 from rospy import ROSException
 
@@ -39,6 +40,7 @@ from giskardpy.pybullet_world import PyBulletWorld
 from giskardpy.utils import create_path, render_dot_tree, KeyDefaultDict
 from giskardpy.world_object import WorldObject
 
+
 def initialize_god_map():
     god_map = GodMap()
     blackboard = Blackboard
@@ -70,16 +72,25 @@ def initialize_god_map():
             break
         rospy.sleep(0.5)
 
-
-
     joint_weight_symbols = process_joint_specific_params(identifier.joint_cost,
                                                          identifier.default_joint_cost_identifier, god_map)
 
     process_joint_specific_params(identifier.distance_thresholds, identifier.default_collision_distances, god_map)
 
-    joint_vel_symbols = process_joint_specific_params(identifier.joint_vel, identifier.default_joint_vel, god_map)
+    #TODO add checks to test if joints listed as linear are actually linear
+    joint_velocity_linear_limit_symbols = process_joint_specific_params(identifier.joint_velocity_linear_limit,
+                                                                        identifier.default_joint_velocity_linear_limit,
+                                                                        god_map)
+    joint_velocity_angular_limit_symbols = process_joint_specific_params(identifier.joint_velocity_angular_limit,
+                                                                         identifier.default_joint_velocity_angular_limit,
+                                                                         god_map)
 
-    joint_acc_symbols = process_joint_specific_params(identifier.joint_acc, identifier.default_joint_acc, god_map)
+    joint_acceleration_linear_limit_symbols = process_joint_specific_params(identifier.joint_acceleration_linear_limit,
+                                                                     identifier.default_joint_acceleration_linear_limit,
+                                                                     god_map)
+    joint_acceleration_angular_limit_symbols = process_joint_specific_params(identifier.joint_acceleration_angular_limit,
+                                                                            identifier.default_joint_acceleration_angular_limit,
+                                                                            god_map)
 
     world = PyBulletWorld(god_map.safe_get_data(identifier.gui),
                           blackboard.god_map.safe_get_data(identifier.data_folder))
@@ -87,16 +98,21 @@ def initialize_god_map():
     robot = WorldObject(god_map.safe_get_data(identifier.robot_description),
                         None,
                         controlled_joints)
-    world.add_robot(robot, None, controlled_joints, joint_vel_symbols, joint_acc_symbols, joint_weight_symbols, True,
+    world.add_robot(robot, None, controlled_joints,
                     ignored_pairs=god_map.safe_get_data(identifier.ignored_self_collisions),
                     added_pairs=god_map.safe_get_data(identifier.added_self_collisions))
+
     joint_position_symbols = JointStatesInput(blackboard.god_map.to_symbol, world.robot.get_controllable_joints(),
-                                identifier.joint_states,
-                                suffix=[u'position'])
+                                              identifier.joint_states,
+                                              suffix=[u'position'])
     joint_vel_symbols = JointStatesInput(blackboard.god_map.to_symbol, world.robot.get_controllable_joints(),
-                                identifier.joint_states,
-                                suffix=[u'velocity'])
-    world.robot.reinitialize(joint_position_symbols.joint_map, joint_vel_symbols.joint_map)
+                                         identifier.joint_states,
+                                         suffix=[u'velocity'])
+    world.robot.update_joint_symbols(joint_position_symbols.joint_map, joint_vel_symbols.joint_map,
+                                     joint_weight_symbols,
+                                     joint_velocity_linear_limit_symbols, joint_velocity_angular_limit_symbols,
+                                     joint_acceleration_linear_limit_symbols, joint_acceleration_angular_limit_symbols)
+    world.robot.init_self_collision_matrix()
     return god_map
 
 def process_joint_specific_params(identifier_, default, god_map):
@@ -104,6 +120,7 @@ def process_joint_specific_params(identifier_, default, god_map):
     d.update(god_map.safe_get_data(identifier_))
     god_map.safe_set_data(identifier_, d)
     return KeyDefaultDict(lambda key: god_map.to_symbol(identifier_ + [key]))
+
 
 def grow_tree():
     action_server_name = u'giskardpy/command'

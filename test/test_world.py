@@ -34,14 +34,17 @@ def function_setup(request, module_setup):
 @pytest.fixture()
 def test_folder(request):
     """
-    :rtype: World
+    :rtype: str
     """
     folder_name = u'tmp_data/'
 
-    def kill_pybullet():
-        shutil.rmtree(folder_name)
+    def delete_test_folder():
+        try:
+            shutil.rmtree(folder_name)
+        except OSError:
+            print(u'couldn\'t delete test folder')
 
-    request.addfinalizer(kill_pybullet)
+    request.addfinalizer(delete_test_folder)
     return folder_name
 
 
@@ -82,16 +85,16 @@ class TestWorldObj(test_urdf_object.TestUrdfObject):
     cls = WorldObject
 
     def test_safe_load_collision_matrix(self, test_folder, delete_test_folder):
-        r = self.cls(donbot_urdf(), path_to_data_folder=test_folder, calc_self_collision_matrix=True)
-        r.update_self_collision_matrix()
+        r = self.cls(donbot_urdf(), path_to_data_folder=test_folder)
+        r.init_self_collision_matrix()
         scm = r.get_self_collision_matrix()
         r.safe_self_collision_matrix(test_folder)
         r.load_self_collision_matrix(test_folder)
         assert scm == r.get_self_collision_matrix()
 
     def test_safe_load_collision_matrix2(self, test_folder, delete_test_folder):
-        r = self.cls(donbot_urdf(), path_to_data_folder=test_folder, calc_self_collision_matrix=True)
-        r.update_self_collision_matrix()
+        r = self.cls(donbot_urdf(), path_to_data_folder=test_folder)
+        r.init_self_collision_matrix()
         scm = r.get_self_collision_matrix()
 
         box = self.cls.from_world_body(make_world_body_box())
@@ -144,8 +147,8 @@ class TestWorldObj(test_urdf_object.TestUrdfObject):
 class TestRobot(TestWorldObj):
     cls = Robot
 
-    def test_safe_load_collision_matrix(self, test_folder):
-        r = self.cls(donbot_urdf(), path_to_data_folder=test_folder, calc_self_collision_matrix=True)
+    def test_safe_load_collision_matrix(self, test_folder, delete_test_folder):
+        r = self.cls(donbot_urdf(), path_to_data_folder=test_folder)
         scm = r.get_self_collision_matrix()
         assert len(scm) == 0
 
@@ -160,12 +163,10 @@ class TestWorld(object):
         w.add_robot(robot=r,
                     base_pose=None,
                     controlled_joints=r.controlled_joints,
-                    joint_vel_limit=None,
-                    joint_acc_limit=None,
-                    joint_weights=None,
-                    calc_self_collision_matrix=path_to_data_folder is not None,
                     ignored_pairs=[],
                     added_pairs=[])
+        if path_to_data_folder is not None:
+            w.robot.init_self_collision_matrix()
         return w
 
     def make_world_with_pr2(self, path_to_data_folder=None):
@@ -189,10 +190,6 @@ class TestWorld(object):
         empty_world.add_robot(robot=pr2,
                               base_pose=None,
                               controlled_joints=pr2.controlled_joints,
-                              joint_vel_limit=None,
-                              joint_acc_limit=None,
-                              joint_weights=None,
-                              calc_self_collision_matrix=False,
                               ignored_pairs=[],
                               added_pairs=[])
         assert empty_world.has_robot()

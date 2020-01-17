@@ -102,29 +102,31 @@ class TestPyBulletRobot(test_world.TestRobot):
 
     def test_from_world_body_box(self, function_setup):
         wb = make_world_body_box()
-        urdf_obj = self.cls.from_world_body(wb, calc_self_collision_matrix=False)
+        urdf_obj = self.cls.from_world_body(wb)
         assert len(urdf_obj.get_link_names()) == 1
         assert len(urdf_obj.get_joint_names()) == 0
 
     def test_from_world_body_sphere(self, function_setup):
         wb = make_world_body_sphere()
-        urdf_obj = self.cls.from_world_body(wb, calc_self_collision_matrix=False)
+        urdf_obj = self.cls.from_world_body(wb)
         assert len(urdf_obj.get_link_names()) == 1
         assert len(urdf_obj.get_joint_names()) == 0
 
     def test_from_world_body_cylinder(self, function_setup):
         wb = make_world_body_cylinder()
-        urdf_obj = self.cls.from_world_body(wb, calc_self_collision_matrix=False)
+        urdf_obj = self.cls.from_world_body(wb)
         assert len(urdf_obj.get_link_names()) == 1
         assert len(urdf_obj.get_joint_names()) == 0
 
     def test_safe_load_collision_matrix(self, test_folder, delete_test_folder):
-        r = self.cls(donbot_urdf(), path_to_data_folder=test_folder, calc_self_collision_matrix=True)
+        r = self.cls(donbot_urdf(), path_to_data_folder=test_folder)
+        r.init_self_collision_matrix()
         scm = r.get_self_collision_matrix()
         assert len(scm) == 53
 
     def test_attach_urdf_object1_2(self, test_folder):
-        parsed_pr2 = self.cls(donbot_urdf(), path_to_data_folder=test_folder, calc_self_collision_matrix=True)
+        parsed_pr2 = self.cls(donbot_urdf(), path_to_data_folder=test_folder)
+        parsed_pr2.init_self_collision_matrix()
         scm = parsed_pr2.get_self_collision_matrix()
         num_of_links_before = len(parsed_pr2.get_link_names())
         num_of_joints_before = len(parsed_pr2.get_joint_names())
@@ -142,7 +144,8 @@ class TestPyBulletRobot(test_world.TestRobot):
         assert len(scm) < len(parsed_pr2.get_self_collision_matrix())
 
     def test_detach_object2(self, test_folder):
-        r = self.cls(donbot_urdf(), path_to_data_folder=test_folder, calc_self_collision_matrix=True)
+        r = self.cls(donbot_urdf(), path_to_data_folder=test_folder)
+        r.init_self_collision_matrix()
         scm = r.get_self_collision_matrix()
         box = WorldObject.from_world_body(make_world_body_box())
         p = Pose()
@@ -155,7 +158,7 @@ class TestPyBulletRobot(test_world.TestRobot):
 
     def test_reset_collision_matrix(self, test_folder):
         r = self.cls(donbot_urdf(), path_to_data_folder=test_folder)
-        r.update_self_collision_matrix()
+        r.init_self_collision_matrix()
         scm = r.get_self_collision_matrix()
 
         box = self.cls.from_world_body(make_world_body_box())

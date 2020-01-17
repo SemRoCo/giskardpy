@@ -268,10 +268,6 @@ class TestGodMap(unittest.TestCase):
         w.add_robot(robot=r,
                     base_pose=PoseStamped(),
                     controlled_joints=[],
-                    joint_vel_limit=KeyDefaultDict(lambda key: 0),
-                    joint_acc_limit=KeyDefaultDict(lambda key: 0),
-                    joint_weights=KeyDefaultDict(lambda key: 0),
-                    calc_self_collision_matrix=False,
                     ignored_pairs=set(),
                     added_pairs=set())
         gm.safe_set_data([u'world'], w)

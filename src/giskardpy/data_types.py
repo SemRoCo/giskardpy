@@ -123,7 +123,7 @@ class Collisions(object):
         """
         Collisions are saved as a list for each movable robot joint, sorted by contact distance
         :type joint_name: str
-        :rtype: ClosestPointInfo
+        :rtype: SortedKeyList
         """
         return self.external_collision[joint_name]
 
@@ -133,7 +133,7 @@ class Collisions(object):
         :type link_a: str
         :type link_b: str
         :return:
-        :rtype: ClosestPointInfo
+        :rtype: SortedKeyList
         """
         # FIXME maybe check for reverse key?
         return self.self_collisions[link_a, link_b]

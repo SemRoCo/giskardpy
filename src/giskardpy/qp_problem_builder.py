@@ -193,6 +193,7 @@ class QProblemBuilder(object):
         b_names = np.array(b_names)
         filtered_b_names = b_names[b_mask]
         filtered_bA_names = np.array(bA_names)[bA_mask]
+        filtered_H = unfiltered_H[b_mask][:,b_mask]
 
         p_lb = pd.DataFrame(lb, filtered_b_names, dtype=float).sort_index()
         p_ub = pd.DataFrame(ub, filtered_b_names, dtype=float).sort_index()
@@ -203,6 +204,8 @@ class QProblemBuilder(object):
             p_xdot = pd.DataFrame(xdot_full, filtered_b_names, dtype=float).sort_index()
             Ax = np.dot(A, xdot_full)
             p_Ax = pd.DataFrame(Ax, filtered_bA_names, dtype=float).sort_index()
+            xH = np.dot(xdot_full.T, filtered_H)
+            p_xH = pd.DataFrame(xH, filtered_b_names, dtype=float).sort_index()
 
         # p_A = pd.DataFrame(np_A, lbA, weights, dtype=float).sort_index(1).sort_index(0)
         # if self.lbAs is None:

@@ -198,19 +198,19 @@ def box_setup(pocky_pose_setup):
 
 
 @pytest.fixture()
-def fake_table_setup(zero_pose):
+def fake_table_setup(pocky_pose_setup):
     """
     :type zero_pose: PR2
     :rtype: PR2
     """
     p = PoseStamped()
     p.header.frame_id = u'map'
-    p.pose.position.x = 0.9
+    p.pose.position.x = 1.2
     p.pose.position.y = 0
-    p.pose.position.z = 0.2
+    p.pose.position.z = 0.3
     p.pose.orientation.w = 1
-    zero_pose.add_box(pose=p)
-    return zero_pose
+    pocky_pose_setup.add_box(pose=p)
+    return pocky_pose_setup
 
 
 @pytest.fixture()
@@ -1284,6 +1284,21 @@ class TestCollisionAvoidanceGoals(object):
         box_setup.send_and_check_goal(MoveResult.SUCCESS)
         box_setup.check_cpi_geq(box_setup.get_l_gripper_links(), 0.048)
         box_setup.check_cpi_geq(box_setup.get_r_gripper_links(), 0.048)
+
+    def test_avoid_collision2(self, fake_table_setup):
+        """
+        :type box_setup: PR2
+        """
+        r_goal = PoseStamped()
+        r_goal.header.frame_id = u'map'
+        r_goal.pose.position.x = 0.8
+        r_goal.pose.position.y = -0.38
+        r_goal.pose.position.z = 0.82
+        r_goal.pose.orientation = Quaternion(*quaternion_about_axis(np.pi/2, [0,1,0]))
+        fake_table_setup.set_and_check_cart_goal(r_goal, fake_table_setup.r_tip)
+        fake_table_setup.check_cpi_geq(fake_table_setup.get_l_gripper_links(), 0.048)
+        fake_table_setup.check_cpi_leq([u'r_gripper_l_finger_tip_link'], 0.04)
+        fake_table_setup.check_cpi_leq([u'r_gripper_r_finger_tip_link'], 0.04)
 
     def test_allow_collision(self, box_setup):
         """

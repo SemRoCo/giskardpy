@@ -617,7 +617,7 @@ class GiskardTestWrapper(object):
                                                                                     identifier.distance_thresholds))
         collisions = self.get_world().check_collisions(collision_matrix)
         collisions = self.get_world().transform_contact_info(collisions)
-        collision_list = collisions.external_collision[self.get_robot().get_movable_parent_joint(link)]
+        collision_list = collisions.get_external_collisions(self.get_robot().get_controlled_parent_joint(link))
         for key, self_collisions in collisions.self_collisions.items():
             if link in key:
                 collision_list.update(self_collisions)

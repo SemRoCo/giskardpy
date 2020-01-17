@@ -1453,6 +1453,30 @@ class TestCollisionAvoidanceGoals(object):
         # TODO check traj length?
         pocky_pose_setup.check_cpi_geq(['box'], 0.048)
 
+
+    def test_avoid_collision6(self, fake_table_setup):
+        """
+        :type box_setup: PR2
+        """
+        js = {
+            u'r_shoulder_pan_joint': -0.341482794236,
+            u'r_shoulder_lift_joint': 0.0301123643508,
+            u'r_upper_arm_roll_joint': -2.67555547662,
+            u'r_forearm_roll_joint': -0.472653283346,
+            u'r_elbow_flex_joint': -0.149999999999,
+            u'r_wrist_flex_joint': -1.40685144215,
+            u'r_wrist_roll_joint': 2.87855178783,
+            u'odom_x_joint': 0.0708087929675,
+            u'odom_y_joint': 0.052896931145,
+            u'odom_z_joint': 0.0105784287694,
+            u'torso_lift_joint': 0.277729421077,
+        }
+
+        fake_table_setup.send_and_check_joint_goal(js)
+        fake_table_setup.check_cpi_geq(fake_table_setup.get_l_gripper_links(), 0.048)
+        fake_table_setup.check_cpi_leq([u'r_gripper_l_finger_tip_link'], 0.04)
+        fake_table_setup.check_cpi_leq([u'r_gripper_r_finger_tip_link'], 0.04)
+
     def test_avoid_collision_with_far_object(self, pocky_pose_setup):
         """
         :type pocky_pose_setup: PR2

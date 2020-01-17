@@ -17,7 +17,7 @@ from giskardpy.input_system import PoseStampedInput, Point3Input, Vector3Input, 
 from giskardpy.qp_problem_builder import SoftConstraint
 from giskardpy.tfwrapper import transform_pose, transform_vector, transform_point
 
-WEIGHTS = [x**2 for x in range(7)]
+WEIGHTS = [0] + [6**x for x in range(7)]
 
 WEIGHT_MAX = WEIGHTS[-1]
 WEIGHT_MIN = WEIGHTS[0]
@@ -156,7 +156,7 @@ class JointPosition(Constraint):
     weight = u'weight'
     max_speed = u'max_speed'
 
-    def __init__(self, god_map, joint_name, goal, weight=WEIGHTS[1], max_speed=1):
+    def __init__(self, god_map, joint_name, goal, weight=WEIGHTS[5], max_speed=1):
         super(JointPosition, self).__init__(god_map)
         self.joint_name = joint_name
 
@@ -194,6 +194,12 @@ class JointPosition(Constraint):
         else:
             err = joint_goal - current_joint
         capped_err = w.diffable_max_fast(w.diffable_min_fast(err, max_speed), -max_speed)
+
+        weight = self.magic_weight_function(w.Abs(err),
+                                            0.0, WEIGHTS[5],
+                                            np.pi/8, WEIGHTS[4],
+                                            np.pi/6, WEIGHTS[3],
+                                            np.pi/4, WEIGHTS[1])
 
         soft_constraints[str(self)] = SoftConstraint(lower=capped_err,
                                                      upper=capped_err,

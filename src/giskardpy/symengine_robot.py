@@ -139,10 +139,10 @@ class Robot(Backend):
                 # TODO more specific exception
                 raise TypeError(u'Joint type "{}" is not supported by urdfs parser.'.format(urdf_joint.type))
 
-            if self.is_rotational_joint(joint_name):
+            if self.is_joint_rotational(joint_name):
                 joint_frame = w.dot(joint_frame,
                                     w.rotation_matrix_from_axis_angle(w.vector3(*urdf_joint.axis), joint_symbol))
-            elif self.is_translational_joint(joint_name):
+            elif self.is_joint_prismatic(joint_name):
                 translation_axis = (w.point3(*urdf_joint.axis) * joint_symbol)
                 joint_frame = w.dot(joint_frame, w.translation3(translation_axis[0],
                                                                 translation_axis[1],
@@ -234,7 +234,7 @@ class Robot(Backend):
         """
         limit = self._urdf_robot.joint_map[joint_name].limit
         t = w.Symbol(u'rosparam_general_options_sample_period')  # TODO this should be a parameter
-        if self.is_translational_joint(joint_name):
+        if self.is_joint_prismatic(joint_name):
             limit_symbol = self._joint_velocity_linear_limit[joint_name]
         else:
             limit_symbol = self._joint_velocity_angular_limit[joint_name]

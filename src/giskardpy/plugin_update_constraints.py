@@ -10,7 +10,7 @@ from rospy_message_converter.message_converter import convert_ros_message_to_dic
 
 import giskardpy.constraints
 import giskardpy.identifier as identifier
-from giskardpy.constraints import JointPosition, SelfCollisionAvoidance, ExternalCollisionAvoidance
+from giskardpy.constraints import SelfCollisionAvoidance, ExternalCollisionAvoidance
 from giskardpy.exceptions import InsolvableException, ImplementationException
 from giskardpy.plugin_action_server import GetGoal
 
@@ -95,11 +95,6 @@ class GoalToConstraints(GetGoal):
             except TypeError as e:
                 traceback.print_exc()
                 raise ImplementationException(help(c.get_constraint))
-
-    def add_js_controller_soft_constraints(self):
-        for joint_name in self.get_robot().controlled_joints:
-            c = JointPosition(self.get_god_map(), joint_name, self.get_robot().joint_state[joint_name].position, 0, 0)
-            self.soft_constraints.update(c.get_constraint())
 
     def has_robot_changed(self):
         new_urdf = self.get_robot().get_urdf_str()

@@ -350,6 +350,15 @@ class URDFObject(object):
         return self.get_joint_type(name) == CONTINUOUS_JOINT
 
     @memoize
+    def is_joint_revolute(self, name):
+        """
+        :param name: name of the joint in the urdfs
+        :type name: str
+        :rtype: bool
+        """
+        return self.get_joint_type(name) == REVOLUTE_JOINT
+
+    @memoize
     def is_joint_fixed(self, name):
         """
         :param name: name of the joint in the urdfs
@@ -367,12 +376,12 @@ class URDFObject(object):
         return self.get_joint_type(name) in JOINT_TYPES
 
     @memoize
-    def is_rotational_joint(self, name):
+    def is_joint_rotational(self, name):
         return self.get_joint_type(name) in ROTATIONAL_JOINT_TYPES
 
     @memoize
-    def is_translational_joint(self, name):
-        return self.get_joint_type(name) in TRANSLATIONAL_JOINT_TYPES
+    def is_joint_prismatic(self, name):
+        return self.get_joint_type(name) == PRISMATIC_JOINT
 
     # LINK FUNCTIONS
 

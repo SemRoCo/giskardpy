@@ -58,3 +58,7 @@ class SolverTimeoutError(QPSolverException):
 
 class MAX_NWSR_REACHEDException(QPSolverException):
     pass
+
+# -----------------------------------------------------------------------------------------------------------------------
+class ConstraintException(GiskardException):
+    pass

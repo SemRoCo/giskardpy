@@ -497,7 +497,7 @@ class GiskardTestWrapper(object):
         assert self.get_world().has_object(name)
         compare_poses(p.pose, o_p)
         assert name in self.wrapper.get_object_names().object_names
-        compare_poses(o_p, self.wrapper.get_object_info(name).pose)
+        compare_poses(o_p, self.wrapper.get_object_info(name).pose.pose)
 
     def add_sphere(self, name=u'sphere', size=1, pose=None):
         r = self.wrapper.add_sphere(name=name, size=size, pose=pose)
@@ -507,7 +507,7 @@ class GiskardTestWrapper(object):
         assert self.get_world().has_object(name)
         assert name in self.wrapper.get_object_names().object_names
         o_p = self.get_world().get_object(name).base_pose
-        compare_poses(o_p, self.wrapper.get_object_info(name).pose)
+        compare_poses(o_p, self.wrapper.get_object_info(name).pose.pose)
 
     def add_cylinder(self, name=u'cylinder', size=[1, 1], pose=None):
         r = self.wrapper.add_cylinder(name=name, size=size, pose=pose)
@@ -517,7 +517,7 @@ class GiskardTestWrapper(object):
         assert self.get_world().has_object(name)
         assert name in self.wrapper.get_object_names().object_names
         o_p = self.get_world().get_object(name).base_pose
-        compare_poses(o_p, self.wrapper.get_object_info(name).pose)
+        compare_poses(o_p, self.wrapper.get_object_info(name).pose.pose)
 
     def add_urdf(self, name, urdf, pose, js_topic):
         r = self.wrapper.add_urdf(name, urdf, pose, js_topic)

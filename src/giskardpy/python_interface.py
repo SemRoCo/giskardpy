@@ -493,36 +493,42 @@ class GiskardWrapper(object):
         self.object_js_topics[object_name].publish(joint_states)
 
     def get_object_names(self):
-        rospy.wait_for_service('/get_object_names')
-        try:
-            get_object_names = rospy.ServiceProxy('/get_object_names', GetObjectNames)
-            return get_object_names()
-        except rospy.ServiceException as e:
-            logging.logerr('Service call failed: {}'.format(str(e)))
+        """
+        returns the name of every object in the world
+        :rtype: GetObjectNamesResponse
+        """
+        rospy.wait_for_service('/get_object_names', timeout=5)
+        get_object_names = rospy.ServiceProxy('/get_object_names', GetObjectNames)
+        return get_object_names()
 
     def get_object_info(self, name):
-        rospy.wait_for_service('/get_object_info')
-        try:
-            get_object_info = rospy.ServiceProxy('/get_object_info', GetObjectInfo)
-            return get_object_info(name)
-        except rospy.ServiceException as e:
-            logging.logerr('Service call failed: {}'.format(str(e)))
+        """
+        returns the joint state, joint state topic and pose of the object with the given name
+        :type name: str
+        :rtype: GetObjectInfoResponse
+        """
+        rospy.wait_for_service('/get_object_info', timeout=5)
+        get_object_info = rospy.ServiceProxy('/get_object_info', GetObjectInfo)
+        return get_object_info(name)
 
     def update_rviz_markers(self, object_names):
-        rospy.wait_for_service('/update_rviz_markers')
-        try:
-            update_rviz_markers = rospy.ServiceProxy('/update_rviz_markers', UpdateRvizMarkers)
-            return update_rviz_markers(object_names)
-        except rospy.ServiceException as e:
-            logging.logerr('Service call failed: {}'.format(str(e)))
+        """
+        republishes visualization markers for rviz
+        :type name: list
+        :rtype: UpdateRvizMarkersResponse
+        """
+        rospy.wait_for_service('/update_rviz_markers', timeout=5)
+        update_rviz_markers = rospy.ServiceProxy('/update_rviz_markers', UpdateRvizMarkers)
+        return update_rviz_markers(object_names)
 
     def get_attached_objects(self):
-        rospy.wait_for_service('/get_attached_objects')
-        try:
-            get_attached_objects = rospy.ServiceProxy('/get_attached_objects', GetAttachedObjects)
-            return get_attached_objects()
-        except rospy.ServiceException as e:
-            logging.logerr('Service call failed: {}'.format(str(e)))
+        """
+        returns a list of all objects that are attached to the robot and the respective attachement points
+        :rtype: GetAttachedObjectsResponse
+        """
+        rospy.wait_for_service('/get_attached_objects', timeout=5)
+        get_attached_objects = rospy.ServiceProxy('/get_attached_objects', GetAttachedObjects)
+        return get_attached_objects()
 
 
 

@@ -52,14 +52,20 @@ class JointTrajectorySplitter:
 
         self.client_type = []
         for i in range(self.number_of_clients):
-            try:
-                rospy.wait_for_message(self.state_topics[i], AnyMsg)
-                type = rostopic.get_info_text(self.client_topics[i] + '/goal').split('\n')[0][6:]
-                self.client_type.append(type)
-            except rostopic.ROSTopicException:
-                logging.logerr('Joint Trajector Splitter: unknown topic \'{}/goal\' \nmissing / in front of topic name?'.format(self.client_topics[i]))
-                exit()
-
+            waiting_for_topic = True
+            while waiting_for_topic:
+                try:
+                    rospy.wait_for_message(self.state_topics[i], AnyMsg, timeout=10)
+                    waiting_for_topic = False
+                    type = rostopic.get_info_text(self.client_topics[i] + '/goal').split('\n')[0][6:]
+                    self.client_type.append(type)
+                except rostopic.ROSTopicException:
+                    logging.logerr('Joint Trajector Splitter: unknown topic \'{}/goal\' \nmissing / in front of topic name?'.format(self.client_topics[i]))
+                    exit()
+                except rospy.ROSException as e:
+                    if e.message == 'rospy shutdown':
+                        exit()
+                    logging.loginfo('Joint Trajector Splitter: waiting for state topic {}'.format(self.state_topics[i]))
 
         self.state_type = []
         for i in range(self.number_of_clients):

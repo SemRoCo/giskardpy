@@ -6,7 +6,8 @@ from genpy import Message
 from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped
 from giskard_msgs.msg import MoveAction, MoveGoal, WorldBody, CollisionEntry, MoveResult, Constraint, \
     MoveCmd, JointConstraint, CartesianConstraint
-from giskard_msgs.srv import UpdateWorld, UpdateWorldRequest, UpdateWorldResponse
+from giskard_msgs.srv import UpdateWorld, UpdateWorldRequest, UpdateWorldResponse, GetObjectInfo, GetObjectNames,\
+    UpdateRvizMarkers, GetAttachedObjects
 from rospy_message_converter.message_converter import convert_ros_message_to_dictionary
 from sensor_msgs.msg import JointState
 from shape_msgs.msg import SolidPrimitive
@@ -14,6 +15,7 @@ from visualization_msgs.msg import MarkerArray
 
 from giskardpy.urdf_object import URDFObject
 from giskardpy.utils import dict_to_joint_states, make_world_body_box, make_world_body_cylinder
+from giskardpy import logging
 
 
 class GiskardWrapper(object):
@@ -489,4 +491,44 @@ class GiskardWrapper(object):
         if isinstance(joint_states, dict):
             joint_states = dict_to_joint_states(joint_states)
         self.object_js_topics[object_name].publish(joint_states)
+
+    def get_object_names(self):
+        """
+        returns the name of every object in the world
+        :rtype: GetObjectNamesResponse
+        """
+        rospy.wait_for_service('/get_object_names', timeout=5)
+        get_object_names = rospy.ServiceProxy('/get_object_names', GetObjectNames)
+        return get_object_names()
+
+    def get_object_info(self, name):
+        """
+        returns the joint state, joint state topic and pose of the object with the given name
+        :type name: str
+        :rtype: GetObjectInfoResponse
+        """
+        rospy.wait_for_service('/get_object_info', timeout=5)
+        get_object_info = rospy.ServiceProxy('/get_object_info', GetObjectInfo)
+        return get_object_info(name)
+
+    def update_rviz_markers(self, object_names):
+        """
+        republishes visualization markers for rviz
+        :type name: list
+        :rtype: UpdateRvizMarkersResponse
+        """
+        rospy.wait_for_service('/update_rviz_markers', timeout=5)
+        update_rviz_markers = rospy.ServiceProxy('/update_rviz_markers', UpdateRvizMarkers)
+        return update_rviz_markers(object_names)
+
+    def get_attached_objects(self):
+        """
+        returns a list of all objects that are attached to the robot and the respective attachement points
+        :rtype: GetAttachedObjectsResponse
+        """
+        rospy.wait_for_service('/get_attached_objects', timeout=5)
+        get_attached_objects = rospy.ServiceProxy('/get_attached_objects', GetAttachedObjects)
+        return get_attached_objects()
+
+
 

@@ -6,6 +6,7 @@ from itertools import combinations
 from geometry_msgs.msg import PoseStamped
 
 from giskardpy import WORLD_IMPLEMENTATION, symbolic_wrapper as w
+from giskardpy.data_types import SingleJointState
 from giskardpy.pybullet_world_object import PyBulletWorldObject
 from giskardpy.qp_problem_builder import HardConstraint, JointConstraint
 from giskardpy.utils import KeyDefaultDict, \
@@ -267,3 +268,37 @@ class Robot(Backend):
         :rtype: spw.Symbol
         """
         return self._joint_velocity_symbols[joint_name]
+
+
+    def generate_joint_state(self, f):
+        """
+        :param f: lambda joint_info: float
+        :return:
+        """
+        js = {}
+        for joint_name in self.controlled_joints:
+            sjs = SingleJointState()
+            sjs.name = joint_name
+            sjs.position = f(joint_name)
+            js[joint_name] = sjs
+        return js
+
+    def link_order(self, link_a, link_b):
+        """
+        TODO find a better name
+        this function is used when deciding for which order to calculate the collisions
+        true if link_a < link_b
+        :type link_a: str
+        :type link_b: str
+        :rtype: bool
+        """
+        try:
+            self.get_controlled_parent_joint(link_a)
+        except KeyError:
+            return False
+        try:
+            self.get_controlled_parent_joint(link_b)
+        except KeyError:
+            return True
+        return link_a < link_b
+

@@ -127,7 +127,7 @@ class GoalToConstraints(GetGoal):
                                                     idx=i)
                 soft_constraints.update(constraint.get_constraint())
         for link_a, link_b in self.get_robot().get_self_collision_matrix():
-            if link_a > link_b:
+            if not self.get_robot().link_order(link_a, link_b):
                 tmp = link_a
                 link_a = link_b
                 link_b = tmp

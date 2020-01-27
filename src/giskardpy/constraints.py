@@ -112,21 +112,64 @@ class Constraint(object):
         return PointStampedInput(self.god_map.to_symbol,
                                  prefix=self.get_identifier() + [name, u'point']).get_expression()
 
+    # def limit_acceleration(self, current_value, err_f, acceleration_limit, last_velocity, max_velocity, sample_period):
+    #     sign = w.sign(err_f(current_value))
+    #     slowdown = (((w.Abs(last_velocity) - acceleration_limit) ** 2 / acceleration_limit
+    #                  + (w.Abs(last_velocity) - acceleration_limit)) / 2)
+    #     c_with_slowdown = current_value + sign * slowdown
+    #     cmd = err_f(c_with_slowdown)
+    #     vel = w.Max(w.Min(cmd, w.Min(last_velocity + acceleration_limit, max_velocity * sample_period)),
+    #               w.Max(last_velocity - acceleration_limit, -max_velocity * sample_period))
+    #     return vel
+    def limit_acceleration(self, error, acceleration_limit, last_velocity, max_velocity, sample_period):
+        max_velocity = max_velocity * sample_period
+        acceleration_limit = acceleration_limit * sample_period
+        last_velocity = last_velocity * sample_period
+        m = 1 / acceleration_limit
+        error *= m
+        acceleration_limit *= m
+        last_velocity *= m
+        max_velocity *= m
+        # last_velocity *= sample_period
+        # acceleration_limit *= acceleration_limit
+        sign = w.sign(error)
+        error = w.Abs(error)
+        error_rounded = np.floor(error)
+        cmd = w.if_greater(acceleration_limit, error,
+                           error,
+                           w.sqrt(error_rounded * 2 * acceleration_limit + (acceleration_limit / 2) ** 2) - acceleration_limit / 2)
+        cmd *= sign
+
+        vel = w.Max(w.Min(cmd, w.Min(last_velocity + acceleration_limit, max_velocity)),
+                  w.Max(last_velocity - acceleration_limit, -max_velocity))
+        return vel/m
+
+        # sign = w.sign(err_f(current_value))
+        # slowdown = (((w.Abs(last_velocity) - acceleration_limit) ** 2 / acceleration_limit
+        #              + (w.Abs(last_velocity) - acceleration_limit)) / 2)
+        # c_with_slowdown = current_value + sign * slowdown
+        # cmd = err_f(c_with_slowdown)
+        # vel = w.Max(w.Min(cmd, w.Min(last_velocity + acceleration_limit, max_velocity * sample_period)),
+        #           w.Max(last_velocity - acceleration_limit, -max_velocity * sample_period))
+        # return vel
+
 
 class JointPosition(Constraint):
     goal = u'goal'
     weight = u'weight'
     gain = u'gain'
     max_speed = u'max_speed'
+    acceleration = u'acceleration'
 
-    def __init__(self, god_map, joint_name, goal, weight=LOW_WEIGHT, gain=1, max_speed=1):
+    def __init__(self, god_map, joint_name, goal, weight=LOW_WEIGHT, gain=1, max_speed=1, acceleration=0.1):
         super(JointPosition, self).__init__(god_map)
         self.joint_name = joint_name
 
         params = {self.goal: goal,
                   self.weight: weight,
                   self.gain: gain,
-                  self.max_speed: max_speed}
+                  self.max_speed: max_speed,
+                  self.acceleration: acceleration}
         self.save_params_on_god_map(params)
 
     def get_constraint(self):
@@ -147,8 +190,10 @@ class JointPosition(Constraint):
         joint_goal = self.get_input_float(self.goal)
         weight = self.get_input_float(self.weight)
         t = self.get_input_sampling_period()
+        current_joint_velocity = self.get_robot().get_joint_velocity_symbol(self.joint_name)
 
-        max_speed = w.Min(self.get_input_float(self.max_speed) * t,
+        acceleration = self.get_input_float(self.acceleration)
+        max_speed = w.Min(self.get_input_float(self.max_speed),
                           self.get_robot().get_joint_velocity_limit_expr(self.joint_name))
 
         soft_constraints = OrderedDict()
@@ -157,7 +202,9 @@ class JointPosition(Constraint):
             err = w.shortest_angular_distance(current_joint, joint_goal)
         else:
             err = joint_goal - current_joint
-        capped_err = w.diffable_max_fast(w.diffable_min_fast(err, max_speed), -max_speed)
+        # capped_err = w.diffable_max_fast(w.diffable_min_fast(err, max_speed), -max_speed)
+
+        capped_err = self.limit_acceleration(err, acceleration, current_joint_velocity, max_speed, t)
 
         soft_constraints[str(self)] = SoftConstraint(lower=capped_err,
                                                      upper=capped_err,

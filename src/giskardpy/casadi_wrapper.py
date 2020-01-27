@@ -1110,3 +1110,9 @@ def entrywise_product(matrix1, matrix2):
         for j in range(matrix1.shape[1]):
             result[i, j] = matrix1[i, j] * matrix2[i, j]
     return result
+
+def floor(x):
+    return ca.floor(x)
+
+def ceil(x):
+    return ca.ceil(x)

@@ -234,7 +234,6 @@ class Robot(Backend):
         :rtype: float
         """
         limit = self._urdf_robot.joint_map[joint_name].limit
-        t = w.Symbol(u'rosparam_general_options_sample_period')  # TODO this should be a parameter
         if self.is_translational_joint(joint_name):
             limit_symbol = self._joint_velocity_linear_limit[joint_name]
         else:
@@ -242,7 +241,7 @@ class Robot(Backend):
         if limit is None or limit.velocity is None:
             return limit_symbol
         else:
-            return w.Min(limit.velocity, limit_symbol) * t
+            return w.Min(limit.velocity, limit_symbol)
 
     def get_joint_frame(self, joint_name):
         """

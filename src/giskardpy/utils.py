@@ -329,50 +329,56 @@ def create_path(path):
                 raise
 
 
-def plot_trajectory(tj, controlled_joints, path_to_data_folder, sample_period):
+def plot_trajectory(tj, controlled_joints, path_to_data_folder, sample_period, order=3):
     """
     :type tj: Trajectory
     :param controlled_joints: only joints in this list will be added to the plot
     :type controlled_joints: list
     """
-    # return
+    order = max(order, 2)
     if len(tj._points) <= 0:
         return
     colors = [u'b', u'g', u'r', u'c', u'm', u'y', u'k']
     line_styles = [u'', u'--', u'-.', u':']
-    fmts = [u''.join(x) for x in product(line_styles, colors)]
-    positions = []
-    velocities = []
+    fmts = [u''.join(i) for i in product(line_styles, colors)]
+    data = [[] for i in range(order)]
+    # positions = []
+    # velocities = []
     times = []
-    names = [x for x in tj._points[0.0].keys() if x in controlled_joints]
+    names = list(sorted([i for i in tj._points[0.0].keys() if i in controlled_joints]))
     for time, point in tj.items():
-        positions.append([point[joint_name].position for joint_name in names])
-        velocities.append([point[joint_name].velocity for joint_name in names])
+        for i in range(order):
+            if i == 0:
+                data[0].append([point[joint_name].position for joint_name in names])
+            elif i == 1:
+                data[1].append([point[joint_name].velocity for joint_name in names])
         times.append(time)
-    positions = np.array(positions)
-    velocities = np.array(velocities).T
+    data[0] = np.array(data[0])
+    data[1] = np.array(data[1])
+    for i in range(2, order):
+        data[i] = np.diff(data[i-1], axis=0, prepend=0)
+    # positions = np.array(positions)
+    # velocities = np.array(velocities).T
     times = np.array(times) * sample_period
 
-    f, (ax1, ax2) = plt.subplots(2, sharex=True)
-    ax1.set_title(u'position')
-    ax2.set_title(u'velocity')
+    f, axs = plt.subplots(order, sharex=True)
+    for i in range(order):
+        axs[i].set_title(u'x_{}'.format(i))
     # positions -= positions.mean(axis=0)
-    for i, position in enumerate(positions.T):
-        ax1.plot(times, position, fmts[i], label=names[i])
-        ax2.plot(times, velocities[i], fmts[i])
-    box = ax1.get_position()
-    diff = abs(positions.max() - positions.min()) * 0.1
-    ax1.set_ylim(positions.min() - diff, positions.max() + diff)
-    diff = abs(velocities.max() - velocities.min()) * 0.1
-    ax2.set_ylim(velocities.min() - diff, velocities.max() + diff)
-    ax1.set_position([box.x0, box.y0, box.width * 0.6, box.height])
-    box = ax2.get_position()
-    ax2.set_position([box.x0, box.y0, box.width * 0.6, box.height])
+    for i in range(len(controlled_joints)):
+        for j in range(order):
+            axs[j].plot(times, data[j][:,i], fmts[i], label=names[i])
+
+    for i in range(order):
+        box = axs[i].get_position()
+        axs[i].set_position([box.x0, box.y0, box.width * 0.6, box.height])
+        # diff = abs(data[0].max() - data[0].min()) * 0.1
+        # axs[0].set_ylim(data[0].min() - diff, data[0].max() + diff)
 
     # Put a legend to the right of the current axis
-    ax1.legend(loc=u'center', bbox_to_anchor=(1.45, 0), prop={'size': 10})
-    ax1.grid()
-    ax2.grid()
+    axs[0].legend(loc=u'right', bbox_to_anchor=(1.6, -0.1), prop={'size': 8})
+    for i in range(order):
+        axs[i].grid()
 
     plt.savefig(path_to_data_folder + u'trajectory.pdf')
 

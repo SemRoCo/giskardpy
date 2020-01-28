@@ -160,7 +160,8 @@ class Robot(Backend):
         for i, joint_name in enumerate(self.get_joint_names_controllable()):
             lower_limit, upper_limit = self.get_joint_limits(joint_name)
             joint_symbol = self.get_joint_position_symbol(joint_name)
-            velocity_limit = self.get_joint_velocity_limit_expr(joint_name)
+            sample_period = w.Symbol(u'rosparam_general_options_sample_period')  # TODO this should be a parameter
+            velocity_limit = self.get_joint_velocity_limit_expr(joint_name) * sample_period
 
             if not self.is_joint_continuous(joint_name):
                 self._hard_constraints[joint_name] = HardConstraint(lower=lower_limit - joint_symbol,

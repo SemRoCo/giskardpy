@@ -1,13 +1,7 @@
 from __future__ import division
 
 import errno
-import pickle
-from functools import wraps
-
-import cPickle
-import numpy as np
 import os
-import pkg_resources
 import pydot
 import pylab as plt
 import re
@@ -16,12 +10,15 @@ import subprocess
 import sys
 from collections import defaultdict, OrderedDict
 from contextlib import contextmanager
+from functools import wraps
 from itertools import product
-from numpy import pi
 
+import numpy as np
+import pkg_resources
 from geometry_msgs.msg import PointStamped, Point, Vector3Stamped, Vector3, Pose, PoseStamped, QuaternionStamped, \
     Quaternion
 from giskard_msgs.msg import WorldBody
+from numpy import pi
 from py_trees import common, Chooser, Selector, Sequence, Behaviour
 from py_trees.composites import Parallel
 from sensor_msgs.msg import JointState
@@ -70,11 +67,14 @@ class NullContextManager(object):
     def __exit__(self, *args):
         pass
 
-def np_vector(x,y,z):
-    return np.array([x,y,z,0])
 
-def np_point(x,y,z):
-    return np.array([x,y,z,1])
+def np_vector(x, y, z):
+    return np.array([x, y, z, 0])
+
+
+def np_point(x, y, z):
+    return np.array([x, y, z, 1])
+
 
 class KeyDefaultDict(defaultdict):
     """
@@ -214,6 +214,7 @@ def to_joint_state_dict(msg):
         mjs[joint_name] = sjs
     return mjs
 
+
 def to_joint_state_dict2(msg):
     """
     Converts a ROS message of type sensor_msgs/JointState into a dict that maps name to position
@@ -242,6 +243,7 @@ def dict_to_joint_states(joint_state_dict):
         js.velocity.append(0)
         js.effort.append(0)
     return js
+
 
 def normalize_quaternion_msg(quaternion):
     q = Quaternion()
@@ -342,8 +344,6 @@ def plot_trajectory(tj, controlled_joints, path_to_data_folder, sample_period, o
     line_styles = [u'', u'--', u'-.', u':']
     fmts = [u''.join(i) for i in product(line_styles, colors)]
     data = [[] for i in range(order)]
-    # positions = []
-    # velocities = []
     times = []
     names = list(sorted([i for i in tj._points[0.0].keys() if i in controlled_joints]))
     for time, point in tj.items():
@@ -356,27 +356,28 @@ def plot_trajectory(tj, controlled_joints, path_to_data_folder, sample_period, o
     data[0] = np.array(data[0])
     data[1] = np.array(data[1])
     for i in range(2, order):
-        data[i] = np.diff(data[i-1], axis=0, prepend=0)
-    # positions = np.array(positions)
-    # velocities = np.array(velocities).T
+        data[i] = np.diff(data[i - 1], axis=0, prepend=0)
     times = np.array(times) * sample_period
 
     f, axs = plt.subplots(order, sharex=True)
+    f.set_size_inches(w=6, h=order * 1.5)
+
     for i in range(order):
-        axs[i].set_title(u'x_{}'.format(i))
-    # positions -= positions.mean(axis=0)
+        if i == 0:
+            axs[i].set_title(r'$p$')
+        else:
+            axs[i].set_title(r'$\d' + 'd' * (i - 1) + 'ot{p}$')
     for i in range(len(controlled_joints)):
         for j in range(order):
-            axs[j].plot(times, data[j][:,i], fmts[i], label=names[i])
+            axs[j].plot(times, data[j][:, i], fmts[i], label=names[i])
 
     for i in range(order):
         box = axs[i].get_position()
-        axs[i].set_position([box.x0, box.y0, box.width * 0.6, box.height])
-        # diff = abs(data[0].max() - data[0].min()) * 0.1
-        # axs[0].set_ylim(data[0].min() - diff, data[0].max() + diff)
+        axs[i].set_position([box.x0, box.y0, box.width * 0.7, box.height * 0.95])
 
     # Put a legend to the right of the current axis
     axs[0].legend(loc=u'right', bbox_to_anchor=(1.6, -0.1), prop={'size': 8})
+    axs[-1].set_xlabel(u'time [s]')
     for i in range(order):
         axs[i].grid()
 
@@ -761,6 +762,7 @@ def str_to_unique_number(s):
 
 def memoize(function):
     memo = function.memo = {}
+
     @wraps(function)
     def wrapper(*args, **kwargs):
         # key = cPickle.dumps((args, kwargs))
@@ -772,4 +774,5 @@ def memoize(function):
             rv = function(*args, **kwargs)
             memo[key] = rv
             return rv
+
     return wrapper

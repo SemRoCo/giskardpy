@@ -179,7 +179,7 @@ def grow_tree():
     root.add_child(CleanUp(u'cleanup'))
     root.add_child(process_move_goal)
     if god_map.safe_get_data(identifier.enable_PlotTrajectory):
-        root.add_child(PlotTrajectory(u'plot trajectory'))
+        root.add_child(PlotTrajectory(u'plot trajectory', order=4))
     root.add_child(move_robot)
     root.add_child(SendResult(u'send result', action_server_name, MoveAction))
 

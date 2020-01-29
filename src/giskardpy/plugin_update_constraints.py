@@ -90,16 +90,16 @@ class GoalToConstraints(GetGoal):
                     params = convert_ros_message_to_dictionary(constraint)
                     del params[u'type']
                 c = C(self.god_map, **params)
-                soft_constraints = c.get_constraint()
+                soft_constraints = c.get_constraints()
                 self.soft_constraints.update(soft_constraints)
             except TypeError as e:
                 traceback.print_exc()
-                raise ImplementationException(help(c.get_constraint))
+                raise ImplementationException(help(c.make_constraints))
 
     def add_js_controller_soft_constraints(self):
         for joint_name in self.get_robot().controlled_joints:
             c = JointPosition(self.get_god_map(), joint_name, self.get_robot().joint_state[joint_name].position, 0, 0)
-            self.soft_constraints.update(c.get_constraint())
+            self.soft_constraints.update(c.make_constraints())
 
     def has_robot_changed(self):
         new_urdf = self.get_robot().get_urdf_str()
@@ -125,7 +125,7 @@ class GoalToConstraints(GetGoal):
                                                     identifier.distance_thresholds +
                                                     [joint_name, u'zero_weight_distance']),
                                                     idx=i)
-                soft_constraints.update(constraint.get_constraint())
+                soft_constraints.update(constraint.get_constraints())
         for link_a, link_b in self.get_robot().get_self_collision_matrix():
             if not self.get_robot().link_order(link_a, link_b):
                 tmp = link_a
@@ -147,6 +147,6 @@ class GoalToConstraints(GetGoal):
                                                 max_weight_distance=max_weight_distance,
                                                 low_weight_distance=low_weight_distance,
                                                 zero_weight_distance=zero_weight_distance)
-            soft_constraints.update(constraint.get_constraint())
+            soft_constraints.update(constraint.get_constraints())
 
         self.soft_constraints.update(soft_constraints)

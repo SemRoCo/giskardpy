@@ -32,7 +32,7 @@ class Constraint(object):
         constraints[str(self)] = params
         self.get_god_map().safe_set_data(identifier.constraints_identifier, constraints)
 
-    def get_constraint(self):
+    def make_constraints(self):
         pass
 
     def get_identifier(self):
@@ -112,24 +112,85 @@ class Constraint(object):
         return PointStampedInput(self.god_map.to_symbol,
                                  prefix=self.get_identifier() + [name, u'point']).get_expression()
 
+    def limit_acceleration(self, current_position, error, max_acceleration, max_velocity):
+        sample_period = self.get_input_sampling_period()
+        position_jacobian = w.jacobian(current_position, self.get_robot().get_joint_position_symbols())
+        last_velocities = w.Matrix(self.get_robot().get_joint_velocity_symbols())
+        last_velocity = w.dot(position_jacobian, last_velocities)[0]
+        max_velocity = max_velocity * sample_period
+        max_acceleration = max_acceleration * sample_period
+        last_velocity = last_velocity * sample_period
+        m = 1 / max_acceleration
+        error *= m
+        max_acceleration *= m
+        last_velocity *= m
+        max_velocity *= m
+        sign = w.sign(error)
+        error = w.Abs(error)
+        error_rounded = np.floor(error)
+        cmd = w.if_greater(max_acceleration, error,
+                           error,
+                           w.sqrt(error_rounded * 2 * max_acceleration + (
+                                   max_acceleration ** 2 / 4)) - max_acceleration / 2)
+        cmd *= sign
+
+        vel = w.Max(w.Min(cmd, w.Min(last_velocity + max_acceleration, max_velocity)),
+                    w.Max(last_velocity - max_acceleration, -max_velocity))
+        return vel / m
+
+    def limit_velocity(self, error, max_velocity):
+        sample_period = self.get_input_sampling_period()
+        max_velocity *= sample_period
+        return w.diffable_max_fast(w.diffable_min_fast(error, max_velocity), -max_velocity)
+
+    def get_constraints(self):
+        """
+        :rtype: OrderedDict
+        """
+        self.soft_constraints = OrderedDict()
+        self.make_constraints()
+        return self.soft_constraints
+
+    def add_constraint(self, name, lower, upper, weight, expression):
+        """
+        :type name: str
+        :type constraint: SoftConstraint
+        """
+        if name in self.soft_constraints:
+            raise KeyError(u'a constraint with name \'{}\' already exists'.format(name))
+        self.soft_constraints[name] = SoftConstraint(lower=lower,
+                                                     upper=upper,
+                                                     weight=weight,
+                                                     expression=expression)
+
+    def add_debug_constraint(self, name, expr):
+        """
+        Adds a constraint with weight 0 to the qp problem.
+        Used to inspect subexpressions for debugging.
+        :param name: a name to identify the expression
+        :type name: str
+        :type expr: w.Symbol
+        """
+        self.add_constraint(name, expr, expr, 1, 0)
+
 
 class JointPosition(Constraint):
     goal = u'goal'
     weight = u'weight'
-    gain = u'gain'
-    max_speed = u'max_speed'
+    max_velocity = u'max_velocity'
+    max_acceleration = u'max_acceleration'
 
-    def __init__(self, god_map, joint_name, goal, weight=LOW_WEIGHT, gain=1, max_speed=1):
+    def __init__(self, god_map, joint_name, goal, weight=LOW_WEIGHT, max_velocity=1, max_acceleration=0.1):
         super(JointPosition, self).__init__(god_map)
         self.joint_name = joint_name
 
         params = {self.goal: goal,
                   self.weight: weight,
-                  self.gain: gain,
-                  self.max_speed: max_speed}
+                  self.max_velocity: max_velocity,
+                  self.max_acceleration: max_acceleration}
         self.save_params_on_god_map(params)
 
-    def get_constraint(self):
+    def make_constraints(self):
         """
         example:
         name='JointPosition'
@@ -137,8 +198,7 @@ class JointPosition(Constraint):
             "joint_name": "torso_lift_joint", #required
             "goal_position": 0, #required
             "weight": 1, #optional
-            "gain": 10, #optional -- error is multiplied with this value
-            "max_speed": 1 #optional -- rad/s or m/s depending on joint; can not go higher than urdf limit
+            "max_velocity": 1 #optional -- rad/s or m/s depending on joint; can not go higher than urdf limit
         }'
         :return:
         """
@@ -146,24 +206,20 @@ class JointPosition(Constraint):
 
         joint_goal = self.get_input_float(self.goal)
         weight = self.get_input_float(self.weight)
-        t = self.get_input_sampling_period()
 
-        max_speed = w.Min(self.get_input_float(self.max_speed) * t,
-                          self.get_robot().get_joint_velocity_limit_expr(self.joint_name))
-
-        soft_constraints = OrderedDict()
+        max_acceleration = self.get_input_float(self.max_acceleration)
+        max_velocity = w.Min(self.get_input_float(self.max_velocity),
+                             self.get_robot().get_joint_velocity_limit_expr(self.joint_name))
 
         if self.get_robot().is_joint_continuous(self.joint_name):
             err = w.shortest_angular_distance(current_joint, joint_goal)
         else:
             err = joint_goal - current_joint
-        capped_err = w.diffable_max_fast(w.diffable_min_fast(err, max_speed), -max_speed)
+        # capped_err = w.diffable_max_fast(w.diffable_min_fast(err, max_velocity), -max_velocity)
 
-        soft_constraints[str(self)] = SoftConstraint(lower=capped_err,
-                                                     upper=capped_err,
-                                                     weight=weight,
-                                                     expression=current_joint)
-        return soft_constraints
+        capped_err = self.limit_acceleration(current_joint, err, max_acceleration, max_velocity)
+
+        self.add_constraint(str(self), lower=capped_err, upper=capped_err, weight=weight, expression=current_joint)
 
     def __str__(self):
         s = super(JointPosition, self).__str__()
@@ -171,7 +227,7 @@ class JointPosition(Constraint):
 
 
 class JointPositionList(Constraint):
-    def __init__(self, god_map, goal_state, weight=None, gain=None, max_speed=None):
+    def __init__(self, god_map, goal_state, weight=None, max_velocity=None):
         super(JointPositionList, self).__init__(god_map)
         self.constraints = []
         for i, joint_name in enumerate(goal_state[u'name']):
@@ -180,26 +236,22 @@ class JointPositionList(Constraint):
                       u'goal': goal_position}
             if weight is not None:
                 params[u'weight'] = weight
-            if gain is not None:
-                params[u'gain'] = gain
-            if max_speed is not None:
-                params[u'max_speed'] = max_speed
+            if max_velocity is not None:
+                params[u'max_velocity'] = max_velocity
             self.constraints.append(JointPosition(god_map, **params))
 
-    def get_constraint(self):
-        soft_constraints = OrderedDict()
+    def make_constraints(self):
         for constraint in self.constraints:
-            soft_constraints.update(constraint.get_constraint())
-        return soft_constraints
+            self.soft_constraints.update(constraint.get_constraints())
 
 
 class BasicCartesianConstraint(Constraint):
     goal = u'goal'
     weight = u'weight'
-    gain = u'gain'
-    max_speed = u'max_speed'
+    max_velocity = u'max_velocity'
+    max_acceleration = u'max_acceleration'
 
-    def __init__(self, god_map, root_link, tip_link, goal, weight=HIGH_WEIGHT, gain=1, max_speed=0.1):
+    def __init__(self, god_map, root_link, tip_link, goal, weight=HIGH_WEIGHT, max_velocity=0.1, max_acceleration=0.1):
         super(BasicCartesianConstraint, self).__init__(god_map)
         self.root = root_link
         self.tip = tip_link
@@ -220,8 +272,8 @@ class BasicCartesianConstraint(Constraint):
 
         params = {self.goal: goal,
                   self.weight: weight,
-                  self.gain: gain,
-                  self.max_speed: max_speed}
+                  self.max_acceleration: max_acceleration,
+                  self.max_velocity: max_velocity}
         self.save_params_on_god_map(params)
 
     def get_goal_pose(self):
@@ -234,7 +286,7 @@ class BasicCartesianConstraint(Constraint):
 
 class CartesianPosition(BasicCartesianConstraint):
 
-    def get_constraint(self):
+    def make_constraints(self):
         """
         example:
         name='CartesianPosition'
@@ -258,95 +310,86 @@ class CartesianPosition(BasicCartesianConstraint):
                                     }
                             }', #required
             "weight": 1, #optional
-            "gain": 3, #optional -- error is multiplied with this value
-            "max_speed": 0.3 #optional -- rad/s or m/s depending on joint; can not go higher than urdf limit
+            "max_velocity": 0.3 #optional -- rad/s or m/s depending on joint; can not go higher than urdf limit
         }'
         :return:
         """
 
-        goal_position = w.position_of(self.get_goal_pose())
+        r_P_g = w.position_of(self.get_goal_pose())
         weight = self.get_input_float(self.weight)
-        gain = self.get_input_float(self.gain)
-        max_speed = self.get_input_float(self.max_speed)
-        t = self.get_input_sampling_period()
+        max_velocity = self.get_input_float(self.max_velocity)
+        max_acceleration = self.get_input_float(self.max_acceleration)
 
-        current_position = w.position_of(self.get_fk(self.root, self.tip))
+        r_P_c = w.position_of(self.get_fk(self.root, self.tip))
 
-        soft_constraints = OrderedDict()
+        r_P_error = r_P_g - r_P_c
+        trans_error = w.norm(r_P_error)
 
-        trans_error_vector = goal_position - current_position
-        trans_error = w.norm(trans_error_vector)
-        trans_scale = w.diffable_min_fast(trans_error * gain, max_speed * t)
-        trans_control = w.save_division(trans_error_vector, trans_error) * trans_scale
+        trans_scale = self.limit_acceleration(w.norm(r_P_c),
+                                              trans_error,
+                                              max_acceleration,
+                                              max_velocity)
+        r_P_intermediate_error = w.save_division(r_P_error, trans_error) * trans_scale
 
-        soft_constraints[str(self) + u'x'] = SoftConstraint(lower=trans_control[0],
-                                                            upper=trans_control[0],
-                                                            weight=weight,
-                                                            expression=current_position[0])
-        soft_constraints[str(self) + u'y'] = SoftConstraint(lower=trans_control[1],
-                                                            upper=trans_control[1],
-                                                            weight=weight,
-                                                            expression=current_position[1])
-        soft_constraints[str(self) + u'z'] = SoftConstraint(lower=trans_control[2],
-                                                            upper=trans_control[2],
-                                                            weight=weight,
-                                                            expression=current_position[2])
-        return soft_constraints
+        self.add_constraint(str(self) + u'x', lower=r_P_intermediate_error[0],
+                            upper=r_P_intermediate_error[0],
+                            weight=weight,
+                            expression=r_P_c[0])
+        self.add_constraint(str(self) + u'y', lower=r_P_intermediate_error[1],
+                            upper=r_P_intermediate_error[1],
+                            weight=weight,
+                            expression=r_P_c[1])
+        self.add_constraint(str(self) + u'z', lower=r_P_intermediate_error[2],
+                            upper=r_P_intermediate_error[2],
+                            weight=weight,
+                            expression=r_P_c[2])
 
 
 class CartesianPositionX(BasicCartesianConstraint):
-    def get_constraint(self):
+    def make_constraints(self):
         goal_position = w.position_of(self.get_goal_pose())
         weight = self.get_input_float(self.weight)
-        gain = self.get_input_float(self.gain)
-        max_speed = self.get_input_float(self.max_speed)
+        max_velocity = self.get_input_float(self.max_velocity)
         t = self.get_input_sampling_period()
 
         current_position = w.position_of(self.get_fk(self.root, self.tip))
 
-        soft_constraints = OrderedDict()
-
         trans_error_vector = goal_position - current_position
         trans_error = w.norm(trans_error_vector)
-        trans_scale = w.diffable_min_fast(trans_error * gain, max_speed * t)
+        trans_scale = w.diffable_min_fast(trans_error, max_velocity * t)
         trans_control = w.save_division(trans_error_vector, trans_error) * trans_scale
 
-        soft_constraints[str(self) + u'x'] = SoftConstraint(lower=trans_control[0],
-                                                            upper=trans_control[0],
-                                                            weight=weight,
-                                                            expression=current_position[0])
-        return soft_constraints
+        self.add_constraint(str(self) + u'x', lower=trans_control[0],
+                            upper=trans_control[0],
+                            weight=weight,
+                            expression=current_position[0])
 
 
 class CartesianPositionY(BasicCartesianConstraint):
-    def get_constraint(self):
+    def make_constraints(self):
         goal_position = w.position_of(self.get_goal_pose())
         weight = self.get_input_float(self.weight)
-        gain = self.get_input_float(self.gain)
-        max_speed = self.get_input_float(self.max_speed)
+        max_velocity = self.get_input_float(self.max_velocity)
         t = self.get_input_sampling_period()
 
         current_position = w.position_of(self.get_fk(self.root, self.tip))
 
-        soft_constraints = OrderedDict()
-
         trans_error_vector = goal_position - current_position
         trans_error = w.norm(trans_error_vector)
-        trans_scale = w.diffable_min_fast(trans_error * gain, max_speed * t)
+        trans_scale = w.diffable_min_fast(trans_error, max_velocity * t)
         trans_control = w.save_division(trans_error_vector, trans_error) * trans_scale
 
-        soft_constraints[str(self) + u'y'] = SoftConstraint(lower=trans_control[1],
-                                                            upper=trans_control[1],
-                                                            weight=weight,
-                                                            expression=current_position[1])
-        return soft_constraints
+        self.add_constraint(str(self) + u'y', lower=trans_control[1],
+                            upper=trans_control[1],
+                            weight=weight,
+                            expression=current_position[1])
 
 
 class CartesianOrientation(BasicCartesianConstraint):
-    def __init__(self, god_map, root_link, tip_link, goal, weight=HIGH_WEIGHT, gain=1, max_speed=0.5):
-        super(CartesianOrientation, self).__init__(god_map, root_link, tip_link, goal, weight, gain, max_speed)
+    def __init__(self, god_map, root_link, tip_link, goal, weight=HIGH_WEIGHT, max_veloctiy=0.5, max_acceleration=0.5):
+        super(CartesianOrientation, self).__init__(god_map, root_link, tip_link, goal, weight, max_veloctiy, max_acceleration)
 
-    def get_constraint(self):
+    def make_constraints(self):
         """
         example:
         name='CartesianPosition'
@@ -370,52 +413,52 @@ class CartesianOrientation(BasicCartesianConstraint):
                                     }
                             }', #required
             "weight": 1, #optional
-            "gain": 3, #optional -- error is multiplied with this value
-            "max_speed": 0.3 #optional -- rad/s or m/s depending on joint; can not go higher than urdf limit
+            "max_velocity": 0.3 #optional -- rad/s or m/s depending on joint; can not go higher than urdf limit
         }'
         :return:
         """
         goal_rotation = w.rotation_of(self.get_goal_pose())
         weight = self.get_input_float(self.weight)
-        gain = self.get_input_float(self.gain)
-        max_speed = self.get_input_float(self.max_speed)
+        max_velocity = self.get_input_float(self.max_velocity)
+        max_acceleration = self.get_input_float(self.max_acceleration)
 
         current_rotation = w.rotation_of(self.get_fk(self.root, self.tip))
         current_evaluated_rotation = w.rotation_of(self.get_fk_evaluated(self.root, self.tip))
 
-        soft_constraints = OrderedDict()
+        hack = w.rotation_matrix_from_axis_angle([0, 0, 1], 0.0001)
+
+        axis, current_angle = w.diffable_axis_angle_from_matrix(
+            w.dot(w.dot(current_evaluated_rotation.T, hack), current_rotation))
+        c_aa = (axis * current_angle)
+
         axis, angle = w.diffable_axis_angle_from_matrix(w.dot(current_rotation.T, goal_rotation))
 
-        capped_angle = w.diffable_max_fast(w.diffable_min_fast(gain * angle, max_speed), -max_speed)
+        capped_angle = self.limit_acceleration(current_angle,
+                                               angle,
+                                               max_acceleration,
+                                               max_velocity)
 
         r_rot_control = axis * capped_angle
 
-        hack = w.rotation_matrix_from_axis_angle([0, 0, 1], 0.0001)
-
-        axis, angle = w.diffable_axis_angle_from_matrix(
-            w.dot(current_rotation.T, w.dot(current_evaluated_rotation, hack)).T)
-        c_aa = (axis * angle)
-
-        soft_constraints[str(self) + u'/0'] = SoftConstraint(lower=r_rot_control[0],
-                                                             upper=r_rot_control[0],
-                                                             weight=weight,
-                                                             expression=c_aa[0])
-        soft_constraints[str(self) + u'/1'] = SoftConstraint(lower=r_rot_control[1],
-                                                             upper=r_rot_control[1],
-                                                             weight=weight,
-                                                             expression=c_aa[1])
-        soft_constraints[str(self) + u'/2'] = SoftConstraint(lower=r_rot_control[2],
-                                                             upper=r_rot_control[2],
-                                                             weight=weight,
-                                                             expression=c_aa[2])
-        return soft_constraints
+        self.add_constraint(str(self) + u'/0', lower=r_rot_control[0],
+                            upper=r_rot_control[0],
+                            weight=weight,
+                            expression=c_aa[0])
+        self.add_constraint(str(self) + u'/1', lower=r_rot_control[1],
+                            upper=r_rot_control[1],
+                            weight=weight,
+                            expression=c_aa[1])
+        self.add_constraint(str(self) + u'/2', lower=r_rot_control[2],
+                            upper=r_rot_control[2],
+                            weight=weight,
+                            expression=c_aa[2])
 
 
 class CartesianOrientationSlerp(BasicCartesianConstraint):
-    def __init__(self, god_map, root_link, tip_link, goal, weight=HIGH_WEIGHT, gain=1, max_speed=0.5):
-        super(CartesianOrientationSlerp, self).__init__(god_map, root_link, tip_link, goal, weight, gain, max_speed)
+    def __init__(self, god_map, root_link, tip_link, goal, weight=HIGH_WEIGHT, max_velocity=0.5, max_accleration=0.5):
+        super(CartesianOrientationSlerp, self).__init__(god_map, root_link, tip_link, goal, weight, max_velocity, max_accleration)
 
-    def get_constraint(self):
+    def make_constraints(self):
         """
         example:
         name='CartesianPosition'
@@ -439,89 +482,86 @@ class CartesianOrientationSlerp(BasicCartesianConstraint):
                                     }
                             }', #required
             "weight": 1, #optional
-            "gain": 3, #optional -- error is multiplied with this value
-            "max_speed": 0.3 #optional -- rad/s or m/s depending on joint; can not go higher than urdf limit
+            "max_velocity": 0.3 #optional -- rad/s or m/s depending on joint; can not go higher than urdf limit
         }'
         :return:
         """
-        goal_rotation = w.rotation_of(self.get_goal_pose())
+        r_R_g = w.rotation_of(self.get_goal_pose())
         weight = self.get_input_float(self.weight)
-        gain = self.get_input_float(self.gain)
-        max_speed = self.get_input_float(self.max_speed)
-        t = self.get_input_sampling_period()
+        max_velocity = self.get_input_float(self.max_velocity)
+        max_acceleration = self.get_input_float(self.max_acceleration)
 
-        current_rotation = w.rotation_of(self.get_fk(self.root, self.tip))
-        current_evaluated_rotation = w.rotation_of(self.get_fk_evaluated(self.root, self.tip))
+        r_R_c = w.rotation_of(self.get_fk(self.root, self.tip))
+        r_R_c_evaluated = w.rotation_of(self.get_fk_evaluated(self.root, self.tip))
 
-        soft_constraints = OrderedDict()
+        identity = w.rotation_matrix_from_axis_angle([0, 0, 1], 0.0001)
+        c_R_c = w.dot(w.dot(r_R_c_evaluated.T, identity), r_R_c)
+        current_axis, current_angle = w.diffable_axis_angle_from_matrix(c_R_c)
+        current_angle_axis = (current_axis * current_angle)
 
-        angle = w.rotation_distance(current_rotation, goal_rotation)
-        angle = w.diffable_abs(angle)
+        error_angle = w.rotation_distance(r_R_c, r_R_g)
+        error_angle = w.diffable_abs(error_angle)
 
-        capped_angle = w.diffable_min_fast(w.save_division(max_speed * t, (gain * angle)), 1)
-        q1 = w.quaternion_from_matrix(current_rotation)
-        q2 = w.quaternion_from_matrix(goal_rotation)
-        intermediate_goal = w.diffable_slerp(q1, q2, capped_angle)
-        tmp_q = w.quaternion_diff(q1, intermediate_goal)
-        axis3, angle3 = w.axis_angle_from_quaternion(tmp_q[0], tmp_q[1], tmp_q[2], tmp_q[3])
-        r_rot_control = axis3 * angle3
+        _, angle = w.diffable_axis_angle_from_matrix(r_R_c)
+        capped_angle = self.limit_acceleration(angle,
+                                               error_angle,
+                                               max_acceleration,
+                                               max_velocity) / error_angle
 
-        hack = w.rotation_matrix_from_axis_angle([0, 0, 1], 0.0001)
-        axis2, angle2 = w.diffable_axis_angle_from_matrix(
-            w.dot(current_rotation.T, w.dot(current_evaluated_rotation, hack)).T)
-        c_aa = (axis2 * angle2)
+        r_R_c_q = w.quaternion_from_matrix(r_R_c)
+        r_R_g_q = w.quaternion_from_matrix(r_R_g)
+        r_R_g_intermediate_q = w.diffable_slerp(r_R_c_q, r_R_g_q, capped_angle)
+        c_R_g_intermediate_q = w.quaternion_diff(r_R_c_q, r_R_g_intermediate_q)
+        intermediate_error_axis, intermediate_error_angle = w.axis_angle_from_quaternion(c_R_g_intermediate_q[0],
+                                                                                         c_R_g_intermediate_q[1],
+                                                                                         c_R_g_intermediate_q[2],
+                                                                                         c_R_g_intermediate_q[3])
 
-        soft_constraints[str(self) + u'/0'] = SoftConstraint(lower=r_rot_control[0],
-                                                             upper=r_rot_control[0],
-                                                             weight=weight,
-                                                             expression=c_aa[0])
-        soft_constraints[str(self) + u'/1'] = SoftConstraint(lower=r_rot_control[1],
-                                                             upper=r_rot_control[1],
-                                                             weight=weight,
-                                                             expression=c_aa[1])
-        soft_constraints[str(self) + u'/2'] = SoftConstraint(lower=r_rot_control[2],
-                                                             upper=r_rot_control[2],
-                                                             weight=weight,
-                                                             expression=c_aa[2])
-        return soft_constraints
+        c_R_g_intermediate_aa = intermediate_error_axis * intermediate_error_angle
+
+        self.add_constraint(str(self) + u'/0', lower=c_R_g_intermediate_aa[0],
+                            upper=c_R_g_intermediate_aa[0],
+                            weight=weight,
+                            expression=current_angle_axis[0])
+        self.add_constraint(str(self) + u'/1', lower=c_R_g_intermediate_aa[1],
+                            upper=c_R_g_intermediate_aa[1],
+                            weight=weight,
+                            expression=current_angle_axis[1])
+        self.add_constraint(str(self) + u'/2', lower=c_R_g_intermediate_aa[2],
+                            upper=c_R_g_intermediate_aa[2],
+                            weight=weight,
+                            expression=current_angle_axis[2])
 
 
 class CartesianPose(Constraint):
-    # TODO do this with multi inheritance
-    goal = u'goal'
-    weight = u'weight'
-    gain = u'gain'
-    max_speed = u'max_speed'
-
-    def __init__(self, god_map, root_link, tip_link, goal, weight=HIGH_WEIGHT, gain=3, translation_max_speed=0.1,
-                 rotation_max_speed=0.5):
+    def __init__(self, god_map, root_link, tip_link, goal, weight=HIGH_WEIGHT, translation_max_velocity=0.1,
+                 translation_max_acceleration=0.1, rotation_max_velocity=0.5, rotation_max_acceleration=0.5):
         super(CartesianPose, self).__init__(god_map)
         self.constraints = []
-        self.constraints.append(CartesianPosition(god_map, root_link, tip_link, goal, weight, gain,
-                                                  translation_max_speed))
-        self.constraints.append(CartesianOrientationSlerp(god_map, root_link, tip_link, goal, weight, gain,
-                                                          rotation_max_speed))
+        self.constraints.append(CartesianPosition(god_map, root_link, tip_link, goal, weight,
+                                                  translation_max_velocity, translation_max_acceleration))
+        self.constraints.append(CartesianOrientationSlerp(god_map, root_link, tip_link, goal, weight,
+                                                          rotation_max_velocity, rotation_max_acceleration))
 
-    def get_constraint(self):
-        soft_constraints = OrderedDict()
+    def make_constraints(self):
         for constraint in self.constraints:
-            soft_constraints.update(constraint.get_constraint())
-        return soft_constraints
+            self.soft_constraints.update(constraint.make_constraints())
 
 
 class ExternalCollisionAvoidance(Constraint):
-    repel_speed = u'repel_speed'
+    repel_velocity = u'repel_velocity'
     max_weight_distance = u'max_weight_distance'
     low_weight_distance = u'low_weight_distance'
     zero_weight_distance = u'zero_weight_distance'
     root_T_link_b = u'root_T_link_b'
     link_in_chain = u'link_in_chain'
+    max_acceleration = u'max_acceleration'
     A = u'A'
     B = u'B'
     C = u'C'
 
-    def __init__(self, god_map, joint_name, repel_speed=0.1, max_weight_distance=0.0, low_weight_distance=0.01,
-                 zero_weight_distance=0.05, idx=0):
+    def __init__(self, god_map, joint_name, repel_velocity=0.1, max_weight_distance=0.0, low_weight_distance=0.01,
+                 zero_weight_distance=0.05, idx=0, max_acceleration=0.1):
         super(ExternalCollisionAvoidance, self).__init__(god_map)
         self.joint_name = joint_name
         self.robot_root = self.get_robot().get_root()
@@ -531,10 +571,11 @@ class ExternalCollisionAvoidance(Constraint):
         y = np.array([MAX_WEIGHT, LOW_WEIGHT, ZERO_WEIGHT])
         (A, B, C), _ = curve_fit(lambda t, a, b, c: a / (t + c) + b, x, y)
 
-        params = {self.repel_speed: repel_speed,
+        params = {self.repel_velocity: repel_velocity,
                   self.max_weight_distance: max_weight_distance,
                   self.low_weight_distance: low_weight_distance,
                   self.zero_weight_distance: zero_weight_distance,
+                  self.max_acceleration: max_acceleration,
                   self.A: A,
                   self.B: B,
                   self.C: C, }
@@ -573,14 +614,12 @@ class ExternalCollisionAvoidance(Constraint):
                                                                   self.idx,
                                                                   u'contact_distance'])
 
-    def get_constraint(self):
-        soft_constraints = OrderedDict()
-
+    def make_constraints(self):
         a_P_pa = self.get_closest_point_on_a()
         r_V_n = self.get_contact_normal_on_b()
         actual_distance = self.get_actual_distance()
-        repel_speed = self.get_input_float(self.repel_speed)
-        t = self.get_input_sampling_period()
+        repel_velocity = self.get_input_float(self.repel_velocity)
+        max_acceleration = self.get_input_float(self.max_acceleration)
         zero_weight_distance = self.get_input_float(self.zero_weight_distance)
         A = self.get_input_float(self.A)
         B = self.get_input_float(self.B)
@@ -598,15 +637,17 @@ class ExternalCollisionAvoidance(Constraint):
 
         weight_f = w.Max(w.Min(MAX_WEIGHT, A / (w.Max(actual_distance, 0) + C) + B), ZERO_WEIGHT)
 
-        limit = zero_weight_distance - actual_distance
-        limit = w.Min(w.Max(limit, -repel_speed * t), repel_speed * t)
+        penetration_distance = zero_weight_distance - actual_distance
 
-        soft_constraints[str(self)] = SoftConstraint(lower=limit,
-                                                     upper=1e9,
-                                                     weight=weight_f,
-                                                     expression=dist)
+        limit = self.limit_acceleration(dist,
+                                        penetration_distance,
+                                        max_acceleration,
+                                        repel_velocity)
 
-        return soft_constraints
+        self.add_constraint(str(self), lower=limit,
+                            upper=1e9,
+                            weight=weight_f,
+                            expression=dist)
 
     def __str__(self):
         s = super(ExternalCollisionAvoidance, self).__str__()
@@ -614,7 +655,7 @@ class ExternalCollisionAvoidance(Constraint):
 
 
 class SelfCollisionAvoidance(Constraint):
-    repel_speed = u'repel_speed'
+    repel_velocity = u'repel_velocity'
     max_weight_distance = u'max_weight_distance'
     low_weight_distance = u'low_weight_distance'
     zero_weight_distance = u'zero_weight_distance'
@@ -624,7 +665,7 @@ class SelfCollisionAvoidance(Constraint):
     B = u'B'
     C = u'C'
 
-    def __init__(self, god_map, link_a, link_b, repel_speed=0.1, max_weight_distance=0.0, low_weight_distance=0.01,
+    def __init__(self, god_map, link_a, link_b, repel_velocity=0.1, max_weight_distance=0.0, low_weight_distance=0.01,
                  zero_weight_distance=0.05):
         super(SelfCollisionAvoidance, self).__init__(god_map)
         self.link_a = link_a
@@ -635,7 +676,7 @@ class SelfCollisionAvoidance(Constraint):
         y = np.array([MAX_WEIGHT, LOW_WEIGHT, ZERO_WEIGHT])
         (A, B, C), _ = curve_fit(lambda t, a, b, c: a / (t + c) + b, x, y)
 
-        params = {self.repel_speed: repel_speed,
+        params = {self.repel_velocity: repel_velocity,
                   self.max_weight_distance: max_weight_distance,
                   self.low_weight_distance: low_weight_distance,
                   self.zero_weight_distance: zero_weight_distance,
@@ -668,10 +709,8 @@ class SelfCollisionAvoidance(Constraint):
                                                                   (self.link_a, self.link_b), 0,
                                                                   u'contact_distance'])
 
-    def get_constraint(self):
-        soft_constraints = OrderedDict()
-
-        repel_speed = self.get_input_float(self.repel_speed)
+    def make_constraints(self):
+        repel_velocity = self.get_input_float(self.repel_velocity)
         t = self.get_input_sampling_period()
         zero_weight_distance = self.get_input_float(self.zero_weight_distance)
         actual_distance = self.get_actual_distance()
@@ -703,13 +742,12 @@ class SelfCollisionAvoidance(Constraint):
         weight_f = w.Max(w.Min(MAX_WEIGHT, A / (w.Max(actual_distance, 0) + C) + B), ZERO_WEIGHT)
 
         limit = zero_weight_distance - actual_distance
-        limit = w.Min(w.Max(limit, -repel_speed * t), repel_speed * t)
+        limit = w.Min(w.Max(limit, -repel_velocity * t), repel_velocity * t)
 
-        soft_constraints[str(self)] = SoftConstraint(lower=limit,
-                                                     upper=1e9,
-                                                     weight=weight_f,
-                                                     expression=dist)
-        return soft_constraints
+        self.add_constraint(str(self), lower=limit,
+                            upper=1e9,
+                            weight=weight_f,
+                            expression=dist)
 
     def __str__(self):
         s = super(SelfCollisionAvoidance, self).__str__()
@@ -720,10 +758,9 @@ class AlignPlanes(Constraint):
     root_normal = u'root_normal'
     tip_normal = u'tip_normal'
     weight = u'weight'
-    gain = u'gain'
-    max_speed = u'max_speed'
+    max_velocity = u'max_velocity'
 
-    def __init__(self, god_map, root, tip, root_normal, tip_normal, weight=HIGH_WEIGHT, gain=3, max_speed=0.5):
+    def __init__(self, god_map, root, tip, root_normal, tip_normal, weight=HIGH_WEIGHT, max_velocity=0.5):
         """
         :type god_map:
         :type root: str
@@ -750,8 +787,7 @@ class AlignPlanes(Constraint):
         params = {self.root_normal: root_normal,
                   self.tip_normal: tip_normal,
                   self.weight: weight,
-                  self.gain: gain,
-                  self.max_speed: max_speed}
+                  self.max_velocity: max_velocity}
         self.save_params_on_god_map(params)
 
     def __str__(self):
@@ -764,12 +800,10 @@ class AlignPlanes(Constraint):
     def get_tip_normal_vector(self):
         return self.get_input_Vector3Stamped(self.tip_normal)
 
-    def get_constraint(self):
-        # TODO integrate gain and max_speed?
-        soft_constraints = OrderedDict()
+    def make_constraints(self):
+        # TODO integrate max_velocity?
         weight = self.get_input_float(self.weight)
-        gain = self.get_input_float(self.gain)
-        max_speed = self.get_input_float(self.max_speed)
+        # max_velocity = self.get_input_float(self.max_velocity)
         root_R_tip = w.rotation_of(self.get_fk(self.root, self.tip))
         tip_normal__tip = self.get_tip_normal_vector()
         root_normal__root = self.get_root_normal_vector()
@@ -777,19 +811,18 @@ class AlignPlanes(Constraint):
         tip_normal__root = w.dot(root_R_tip, tip_normal__tip)
         diff = root_normal__root - tip_normal__root
 
-        soft_constraints[str(self) + u'x'] = SoftConstraint(lower=diff[0],
-                                                            upper=diff[0],
-                                                            weight=weight,
-                                                            expression=tip_normal__root[0])
-        soft_constraints[str(self) + u'y'] = SoftConstraint(lower=diff[1],
-                                                            upper=diff[1],
-                                                            weight=weight,
-                                                            expression=tip_normal__root[1])
-        soft_constraints[str(self) + u'z'] = SoftConstraint(lower=diff[2],
-                                                            upper=diff[2],
-                                                            weight=weight,
-                                                            expression=tip_normal__root[2])
-        return soft_constraints
+        self.add_constraint(str(self) + u'x', lower=diff[0],
+                            upper=diff[0],
+                            weight=weight,
+                            expression=tip_normal__root[0])
+        self.add_constraint(str(self) + u'y', lower=diff[1],
+                            upper=diff[1],
+                            weight=weight,
+                            expression=tip_normal__root[1])
+        self.add_constraint(str(self) + u'z', lower=diff[2],
+                            upper=diff[2],
+                            weight=weight,
+                            expression=tip_normal__root[2])
 
 
 class GravityJoint(Constraint):
@@ -803,9 +836,7 @@ class GravityJoint(Constraint):
         params = {self.weight: weight}
         self.save_params_on_god_map(params)
 
-    def get_constraint(self):
-        soft_constraints = OrderedDict()
-
+    def make_constraints(self):
         current_joint = self.get_input_joint_position(self.joint_name)
         weight = self.get_input_float(self.weight)
 
@@ -829,12 +860,10 @@ class GravityJoint(Constraint):
         ref_axis_of_rotation = w.cross(com__parent, goal__parent)
         goal_vel *= w.sign(w.dot(ref_axis_of_rotation, axis_of_rotation))
 
-        soft_constraints[str(self)] = SoftConstraint(lower=goal_vel,  # sw.Min(goal_vel, 0),
-                                                     upper=goal_vel,  # sw.Max(goal_vel, 0),
-                                                     weight=weight,
-                                                     expression=current_joint)
-
-        return soft_constraints
+        self.add_constraint(str(self), lower=goal_vel,  # sw.Min(goal_vel, 0),
+                            upper=goal_vel,  # sw.Max(goal_vel, 0),
+                            weight=weight,
+                            expression=current_joint)
 
     def __str__(self):
         s = super(GravityJoint, self).__str__()
@@ -857,9 +886,6 @@ class UpdateGodMap(Constraint):
                 self.get_god_map().safe_set_data(next_identifier, value)
             else:
                 self.update_god_map(next_identifier, value)
-
-    def get_constraint(self):
-        return {}
 
 
 class Pointing(Constraint):
@@ -910,8 +936,7 @@ class Pointing(Constraint):
     def get_pointing_axis(self):
         return self.get_input_Vector3Stamped(self.pointing_axis)
 
-    def get_constraint(self):
-        soft_constraints = OrderedDict()
+    def make_constraints(self):
 
         weight = self.get_input_float(self.weight)
         root_T_tip = self.get_fk(self.root, self.tip)
@@ -923,36 +948,19 @@ class Pointing(Constraint):
         current_axis = w.dot(root_T_tip, pointing_axis)
         diff = goal_axis - current_axis
 
-        soft_constraints[str(self) + u'x'] = SoftConstraint(lower=diff[0],
-                                                            upper=diff[0],
-                                                            weight=weight,
-                                                            expression=current_axis[0])
-        soft_constraints[str(self) + u'y'] = SoftConstraint(lower=diff[1],
-                                                            upper=diff[1],
-                                                            weight=weight,
-                                                            expression=current_axis[1])
-        soft_constraints[str(self) + u'z'] = SoftConstraint(lower=diff[2],
-                                                            upper=diff[2],
-                                                            weight=weight,
-                                                            expression=current_axis[2])
-        return soft_constraints
+        self.add_constraint(str(self) + u'x', lower=diff[0],
+                            upper=diff[0],
+                            weight=weight,
+                            expression=current_axis[0])
+        self.add_constraint(str(self) + u'y', lower=diff[1],
+                            upper=diff[1],
+                            weight=weight,
+                            expression=current_axis[1])
+        self.add_constraint(str(self) + u'z', lower=diff[2],
+                            upper=diff[2],
+                            weight=weight,
+                            expression=current_axis[2])
 
     def __str__(self):
         s = super(Pointing, self).__str__()
         return u'{}/{}/{}'.format(s, self.root, self.tip)
-
-
-def add_debug_constraint(d, key, expr):
-    """
-    If you want to see an arbitrary evaluated expression in the matrix use this.
-    These softconstraints will not influence anything.
-    :param d: a dict where the softcontraint will be added to
-    :type: dict
-    :param key: a name to identify the debug soft contraint
-    :type key: str
-    :type expr: sw.Symbol
-    """
-    d[key] = SoftConstraint(lower=expr,
-                            upper=expr,
-                            weight=0,
-                            expression=1)

@@ -39,24 +39,24 @@ class GiskardWrapper(object):
     def get_root(self):
         return self.robot_urdf.get_root()
 
-    def set_cart_goal(self, root, tip, pose_stamped, trans_max_speed=None, rot_max_speed=None):
+    def set_cart_goal(self, root, tip, pose_stamped, trans_max_velocity=None, rot_max_velocity=None):
         """
         :param tip:
         :type tip: str
         :param pose_stamped:
         :type pose_stamped: PoseStamped
         """
-        self.set_translation_goal(root, tip, pose_stamped, max_speed=trans_max_speed)
-        self.set_rotation_goal(root, tip, pose_stamped, max_speed=rot_max_speed)
+        self.set_translation_goal(root, tip, pose_stamped, max_velocity=trans_max_velocity)
+        self.set_rotation_goal(root, tip, pose_stamped, max_velocity=rot_max_velocity)
 
-    def set_translation_goal(self, root, tip, pose_stamped, weight=None, gain=None, max_speed=None):
+    def set_translation_goal(self, root, tip, pose_stamped, weight=None, max_velocity=None):
         """
         :param tip:
         :type tip: str
         :param pose_stamped:
         :type pose_stamped: PoseStamped
         """
-        if not gain and not max_speed and not weight:
+        if not max_velocity and not weight:
             constraint = CartesianConstraint()
             constraint.type = CartesianConstraint.TRANSLATION_3D
             constraint.root_link = str(root)
@@ -70,23 +70,21 @@ class GiskardWrapper(object):
             params[u'root_link'] = root
             params[u'tip_link'] = tip
             params[u'goal'] = convert_ros_message_to_dictionary(pose_stamped)
-            if gain:
-                params[u'gain'] = gain
-            if max_speed:
-                params[u'max_speed'] = max_speed
+            if max_velocity:
+                params[u'max_velocity'] = max_velocity
             if weight:
                 params[u'weight'] = weight
             constraint.parameter_value_pair = json.dumps(params)
             self.cmd_seq[-1].constraints.append(constraint)
 
-    def set_rotation_goal(self, root, tip, pose_stamped, weight=None, gain=None, max_speed=None):
+    def set_rotation_goal(self, root, tip, pose_stamped, weight=None, max_velocity=None):
         """
         :param tip:
         :type tip: str
         :param pose_stamped:
         :type pose_stamped: PoseStamped
         """
-        if not gain and not max_speed and not weight:
+        if not max_velocity and not weight:
             constraint = CartesianConstraint()
             constraint.type = CartesianConstraint.ROTATION_3D
             constraint.root_link = str(root)
@@ -100,21 +98,19 @@ class GiskardWrapper(object):
             params[u'root_link'] = root
             params[u'tip_link'] = tip
             params[u'goal'] = convert_ros_message_to_dictionary(pose_stamped)
-            if gain:
-                params[u'gain'] = gain
-            if max_speed:
-                params[u'max_speed'] = max_speed
+            if max_velocity:
+                params[u'max_velocity'] = max_velocity
             if weight:
                 params[u'weight'] = weight
             constraint.parameter_value_pair = json.dumps(params)
             self.cmd_seq[-1].constraints.append(constraint)
 
-    def set_joint_goal(self, joint_state, weight=None, gain=None, max_speed=None):
+    def set_joint_goal(self, joint_state, weight=None, max_velocity=None):
         """
         :param joint_state:
         :type joint_state: dict
         """
-        if not weight and not gain and not max_speed:
+        if not weight and not max_velocity:
             constraint = JointConstraint()
             constraint.type = JointConstraint.JOINT
             if isinstance(joint_state, dict):
@@ -133,10 +129,8 @@ class GiskardWrapper(object):
                 params[u'goal'] = joint_position
                 if weight:
                     params[u'weight'] = weight
-                if gain:
-                    params[u'gain'] = gain
-                if max_speed:
-                    params[u'max_speed'] = max_speed
+                if max_velocity:
+                    params[u'max_velocity'] = max_velocity
                 constraint.parameter_value_pair = json.dumps(params)
                 self.cmd_seq[-1].constraints.append(constraint)
 

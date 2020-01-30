@@ -63,20 +63,14 @@ class InstantaneousController(object):
             xdot_keys.append(key)
         return weights_keys, b_keys, bA_keys, xdot_keys
 
-    def update_soft_constraints(self, soft_constraints, free_symbols=None):
+    def update_soft_constraints(self, soft_constraints):
         """
         Triggers a recompile if the number of soft constraints has changed.
         :type soft_constraints: dict
         :type free_symbols: set
         """
-        if free_symbols is not None:
-            warnings.warn(u'use of free_symbols deprecated', DeprecationWarning)
         # TODO bug if soft constraints get replaced, actual amount does not change.
         last_number_of_constraints = len(self.soft_constraints)
-        if free_symbols is not None:
-            if self.free_symbols is None:
-                self.free_symbols = set()
-            self.free_symbols.update(free_symbols)
         self.soft_constraints.update(soft_constraints)
         if last_number_of_constraints != len(self.soft_constraints):
             self.qp_problem_builder = None
@@ -92,7 +86,6 @@ class InstantaneousController(object):
                                                   self.hard_constraints,
                                                   self.soft_constraints,
                                                   self.joint_to_symbols_str.values(),
-                                                  self.free_symbols,
                                                   path_to_functions)
 
     def get_cmd(self, substitutions, nWSR=None):

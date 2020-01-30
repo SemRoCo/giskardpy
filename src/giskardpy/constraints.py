@@ -112,30 +112,30 @@ class Constraint(object):
         return PointStampedInput(self.god_map.to_symbol,
                                  prefix=self.get_identifier() + [name, u'point']).get_expression()
 
-    def limit_acceleration(self, current_position, error, acceleration_limit, max_velocity):
+    def limit_acceleration(self, current_position, error, max_acceleration, max_velocity):
         sample_period = self.get_input_sampling_period()
         position_jacobian = w.jacobian(current_position, self.get_robot().get_joint_position_symbols())
         last_velocities = w.Matrix(self.get_robot().get_joint_velocity_symbols())
         last_velocity = w.dot(position_jacobian, last_velocities)[0]
         max_velocity = max_velocity * sample_period
-        acceleration_limit = acceleration_limit * sample_period
+        max_acceleration = max_acceleration * sample_period
         last_velocity = last_velocity * sample_period
-        m = 1 / acceleration_limit
+        m = 1 / max_acceleration
         error *= m
-        acceleration_limit *= m
+        max_acceleration *= m
         last_velocity *= m
         max_velocity *= m
         sign = w.sign(error)
         error = w.Abs(error)
         error_rounded = np.floor(error)
-        cmd = w.if_greater(acceleration_limit, error,
+        cmd = w.if_greater(max_acceleration, error,
                            error,
-                           w.sqrt(error_rounded * 2 * acceleration_limit + (
-                                   acceleration_limit ** 2 / 4)) - acceleration_limit / 2)
+                           w.sqrt(error_rounded * 2 * max_acceleration + (
+                                   max_acceleration ** 2 / 4)) - max_acceleration / 2)
         cmd *= sign
 
-        vel = w.Max(w.Min(cmd, w.Min(last_velocity + acceleration_limit, max_velocity)),
-                    w.Max(last_velocity - acceleration_limit, -max_velocity))
+        vel = w.Max(w.Min(cmd, w.Min(last_velocity + max_acceleration, max_velocity)),
+                    w.Max(last_velocity - max_acceleration, -max_velocity))
         return vel / m
 
     def limit_velocity(self, error, max_velocity):
@@ -177,17 +177,17 @@ class Constraint(object):
 class JointPosition(Constraint):
     goal = u'goal'
     weight = u'weight'
-    max_speed = u'max_speed'
-    acceleration = u'acceleration'
+    max_velocity = u'max_velocity'
+    max_acceleration = u'max_acceleration'
 
-    def __init__(self, god_map, joint_name, goal, weight=LOW_WEIGHT, max_speed=1, acceleration=0.1):
+    def __init__(self, god_map, joint_name, goal, weight=LOW_WEIGHT, max_velocity=1, max_acceleration=0.1):
         super(JointPosition, self).__init__(god_map)
         self.joint_name = joint_name
 
         params = {self.goal: goal,
                   self.weight: weight,
-                  self.max_speed: max_speed,
-                  self.acceleration: acceleration}
+                  self.max_velocity: max_velocity,
+                  self.max_acceleration: max_acceleration}
         self.save_params_on_god_map(params)
 
     def make_constraints(self):
@@ -198,7 +198,7 @@ class JointPosition(Constraint):
             "joint_name": "torso_lift_joint", #required
             "goal_position": 0, #required
             "weight": 1, #optional
-            "max_speed": 1 #optional -- rad/s or m/s depending on joint; can not go higher than urdf limit
+            "max_velocity": 1 #optional -- rad/s or m/s depending on joint; can not go higher than urdf limit
         }'
         :return:
         """
@@ -207,17 +207,17 @@ class JointPosition(Constraint):
         joint_goal = self.get_input_float(self.goal)
         weight = self.get_input_float(self.weight)
 
-        acceleration = self.get_input_float(self.acceleration)
-        max_speed = w.Min(self.get_input_float(self.max_speed),
-                          self.get_robot().get_joint_velocity_limit_expr(self.joint_name))
+        max_acceleration = self.get_input_float(self.max_acceleration)
+        max_velocity = w.Min(self.get_input_float(self.max_velocity),
+                             self.get_robot().get_joint_velocity_limit_expr(self.joint_name))
 
         if self.get_robot().is_joint_continuous(self.joint_name):
             err = w.shortest_angular_distance(current_joint, joint_goal)
         else:
             err = joint_goal - current_joint
-        # capped_err = w.diffable_max_fast(w.diffable_min_fast(err, max_speed), -max_speed)
+        # capped_err = w.diffable_max_fast(w.diffable_min_fast(err, max_velocity), -max_velocity)
 
-        capped_err = self.limit_acceleration(current_joint, err, acceleration, max_speed)
+        capped_err = self.limit_acceleration(current_joint, err, max_acceleration, max_velocity)
 
         self.add_constraint(str(self), lower=capped_err, upper=capped_err, weight=weight, expression=current_joint)
 
@@ -227,7 +227,7 @@ class JointPosition(Constraint):
 
 
 class JointPositionList(Constraint):
-    def __init__(self, god_map, goal_state, weight=None, max_speed=None):
+    def __init__(self, god_map, goal_state, weight=None, max_velocity=None):
         super(JointPositionList, self).__init__(god_map)
         self.constraints = []
         for i, joint_name in enumerate(goal_state[u'name']):
@@ -236,8 +236,8 @@ class JointPositionList(Constraint):
                       u'goal': goal_position}
             if weight is not None:
                 params[u'weight'] = weight
-            if max_speed is not None:
-                params[u'max_speed'] = max_speed
+            if max_velocity is not None:
+                params[u'max_velocity'] = max_velocity
             self.constraints.append(JointPosition(god_map, **params))
 
     def make_constraints(self):
@@ -248,9 +248,10 @@ class JointPositionList(Constraint):
 class BasicCartesianConstraint(Constraint):
     goal = u'goal'
     weight = u'weight'
-    max_speed = u'max_speed'
+    max_velocity = u'max_velocity'
+    max_acceleration = u'max_acceleration'
 
-    def __init__(self, god_map, root_link, tip_link, goal, weight=HIGH_WEIGHT, max_speed=0.1):
+    def __init__(self, god_map, root_link, tip_link, goal, weight=HIGH_WEIGHT, max_velocity=0.1, max_acceleration=0.1):
         super(BasicCartesianConstraint, self).__init__(god_map)
         self.root = root_link
         self.tip = tip_link
@@ -271,7 +272,8 @@ class BasicCartesianConstraint(Constraint):
 
         params = {self.goal: goal,
                   self.weight: weight,
-                  self.max_speed: max_speed}
+                  self.max_acceleration: max_acceleration,
+                  self.max_velocity: max_velocity}
         self.save_params_on_god_map(params)
 
     def get_goal_pose(self):
@@ -308,25 +310,25 @@ class CartesianPosition(BasicCartesianConstraint):
                                     }
                             }', #required
             "weight": 1, #optional
-            "max_speed": 0.3 #optional -- rad/s or m/s depending on joint; can not go higher than urdf limit
+            "max_velocity": 0.3 #optional -- rad/s or m/s depending on joint; can not go higher than urdf limit
         }'
         :return:
         """
 
         r_P_g = w.position_of(self.get_goal_pose())
         weight = self.get_input_float(self.weight)
-        max_speed = self.get_input_float(self.max_speed)
+        max_velocity = self.get_input_float(self.max_velocity)
+        max_acceleration = self.get_input_float(self.max_acceleration)
 
         r_P_c = w.position_of(self.get_fk(self.root, self.tip))
 
         r_P_error = r_P_g - r_P_c
         trans_error = w.norm(r_P_error)
-        # trans_scale = w.diffable_min_fast(trans_error, max_speed * t)
 
         trans_scale = self.limit_acceleration(w.norm(r_P_c),
                                               trans_error,
-                                              max_speed / 2,
-                                              max_speed)
+                                              max_acceleration,
+                                              max_velocity)
         r_P_intermediate_error = w.save_division(r_P_error, trans_error) * trans_scale
 
         self.add_constraint(str(self) + u'x', lower=r_P_intermediate_error[0],
@@ -347,14 +349,14 @@ class CartesianPositionX(BasicCartesianConstraint):
     def make_constraints(self):
         goal_position = w.position_of(self.get_goal_pose())
         weight = self.get_input_float(self.weight)
-        max_speed = self.get_input_float(self.max_speed)
+        max_velocity = self.get_input_float(self.max_velocity)
         t = self.get_input_sampling_period()
 
         current_position = w.position_of(self.get_fk(self.root, self.tip))
 
         trans_error_vector = goal_position - current_position
         trans_error = w.norm(trans_error_vector)
-        trans_scale = w.diffable_min_fast(trans_error, max_speed * t)
+        trans_scale = w.diffable_min_fast(trans_error, max_velocity * t)
         trans_control = w.save_division(trans_error_vector, trans_error) * trans_scale
 
         self.add_constraint(str(self) + u'x', lower=trans_control[0],
@@ -367,14 +369,14 @@ class CartesianPositionY(BasicCartesianConstraint):
     def make_constraints(self):
         goal_position = w.position_of(self.get_goal_pose())
         weight = self.get_input_float(self.weight)
-        max_speed = self.get_input_float(self.max_speed)
+        max_velocity = self.get_input_float(self.max_velocity)
         t = self.get_input_sampling_period()
 
         current_position = w.position_of(self.get_fk(self.root, self.tip))
 
         trans_error_vector = goal_position - current_position
         trans_error = w.norm(trans_error_vector)
-        trans_scale = w.diffable_min_fast(trans_error, max_speed * t)
+        trans_scale = w.diffable_min_fast(trans_error, max_velocity * t)
         trans_control = w.save_division(trans_error_vector, trans_error) * trans_scale
 
         self.add_constraint(str(self) + u'y', lower=trans_control[1],
@@ -384,8 +386,8 @@ class CartesianPositionY(BasicCartesianConstraint):
 
 
 class CartesianOrientation(BasicCartesianConstraint):
-    def __init__(self, god_map, root_link, tip_link, goal, weight=HIGH_WEIGHT, max_speed=0.5):
-        super(CartesianOrientation, self).__init__(god_map, root_link, tip_link, goal, weight, max_speed)
+    def __init__(self, god_map, root_link, tip_link, goal, weight=HIGH_WEIGHT, max_veloctiy=0.5, max_acceleration=0.5):
+        super(CartesianOrientation, self).__init__(god_map, root_link, tip_link, goal, weight, max_veloctiy, max_acceleration)
 
     def make_constraints(self):
         """
@@ -411,13 +413,14 @@ class CartesianOrientation(BasicCartesianConstraint):
                                     }
                             }', #required
             "weight": 1, #optional
-            "max_speed": 0.3 #optional -- rad/s or m/s depending on joint; can not go higher than urdf limit
+            "max_velocity": 0.3 #optional -- rad/s or m/s depending on joint; can not go higher than urdf limit
         }'
         :return:
         """
         goal_rotation = w.rotation_of(self.get_goal_pose())
         weight = self.get_input_float(self.weight)
-        max_speed = self.get_input_float(self.max_speed)
+        max_velocity = self.get_input_float(self.max_velocity)
+        max_acceleration = self.get_input_float(self.max_acceleration)
 
         current_rotation = w.rotation_of(self.get_fk(self.root, self.tip))
         current_evaluated_rotation = w.rotation_of(self.get_fk_evaluated(self.root, self.tip))
@@ -426,17 +429,14 @@ class CartesianOrientation(BasicCartesianConstraint):
 
         axis, current_angle = w.diffable_axis_angle_from_matrix(
             w.dot(w.dot(current_evaluated_rotation.T, hack), current_rotation))
-        # axis, current_angle = w.diffable_axis_angle_from_matrix(current_rotation)
         c_aa = (axis * current_angle)
 
         axis, angle = w.diffable_axis_angle_from_matrix(w.dot(current_rotation.T, goal_rotation))
 
-        # capped_angle = w.diffable_max_fast(w.diffable_min_fast(angle, max_speed*t), -max_speed*t)
-
         capped_angle = self.limit_acceleration(current_angle,
                                                angle,
-                                               max_speed / 2,
-                                               max_speed)
+                                               max_acceleration,
+                                               max_velocity)
 
         r_rot_control = axis * capped_angle
 
@@ -455,8 +455,8 @@ class CartesianOrientation(BasicCartesianConstraint):
 
 
 class CartesianOrientationSlerp(BasicCartesianConstraint):
-    def __init__(self, god_map, root_link, tip_link, goal, weight=HIGH_WEIGHT, max_speed=0.5):
-        super(CartesianOrientationSlerp, self).__init__(god_map, root_link, tip_link, goal, weight, max_speed)
+    def __init__(self, god_map, root_link, tip_link, goal, weight=HIGH_WEIGHT, max_velocity=0.5, max_accleration=0.5):
+        super(CartesianOrientationSlerp, self).__init__(god_map, root_link, tip_link, goal, weight, max_velocity, max_accleration)
 
     def make_constraints(self):
         """
@@ -482,13 +482,14 @@ class CartesianOrientationSlerp(BasicCartesianConstraint):
                                     }
                             }', #required
             "weight": 1, #optional
-            "max_speed": 0.3 #optional -- rad/s or m/s depending on joint; can not go higher than urdf limit
+            "max_velocity": 0.3 #optional -- rad/s or m/s depending on joint; can not go higher than urdf limit
         }'
         :return:
         """
         r_R_g = w.rotation_of(self.get_goal_pose())
         weight = self.get_input_float(self.weight)
-        max_speed = self.get_input_float(self.max_speed)
+        max_velocity = self.get_input_float(self.max_velocity)
+        max_acceleration = self.get_input_float(self.max_acceleration)
 
         r_R_c = w.rotation_of(self.get_fk(self.root, self.tip))
         r_R_c_evaluated = w.rotation_of(self.get_fk_evaluated(self.root, self.tip))
@@ -504,8 +505,8 @@ class CartesianOrientationSlerp(BasicCartesianConstraint):
         _, angle = w.diffable_axis_angle_from_matrix(r_R_c)
         capped_angle = self.limit_acceleration(angle,
                                                error_angle,
-                                               max_speed/2,
-                                               max_speed) / error_angle
+                                               max_acceleration,
+                                               max_velocity) / error_angle
 
         r_R_c_q = w.quaternion_from_matrix(r_R_c)
         r_R_g_q = w.quaternion_from_matrix(r_R_g)
@@ -533,19 +534,14 @@ class CartesianOrientationSlerp(BasicCartesianConstraint):
 
 
 class CartesianPose(Constraint):
-    # TODO do this with multi inheritance
-    goal = u'goal'
-    weight = u'weight'
-    max_speed = u'max_speed'
-
-    def __init__(self, god_map, root_link, tip_link, goal, weight=HIGH_WEIGHT, translation_max_speed=0.1,
-                 rotation_max_speed=0.5):
+    def __init__(self, god_map, root_link, tip_link, goal, weight=HIGH_WEIGHT, translation_max_velocity=0.1,
+                 translation_max_acceleration=0.1, rotation_max_velocity=0.5, rotation_max_acceleration=0.5):
         super(CartesianPose, self).__init__(god_map)
         self.constraints = []
         self.constraints.append(CartesianPosition(god_map, root_link, tip_link, goal, weight,
-                                                  translation_max_speed))
+                                                  translation_max_velocity, translation_max_acceleration))
         self.constraints.append(CartesianOrientationSlerp(god_map, root_link, tip_link, goal, weight,
-                                                          rotation_max_speed))
+                                                          rotation_max_velocity, rotation_max_acceleration))
 
     def make_constraints(self):
         for constraint in self.constraints:
@@ -553,18 +549,19 @@ class CartesianPose(Constraint):
 
 
 class ExternalCollisionAvoidance(Constraint):
-    repel_speed = u'repel_speed'
+    repel_velocity = u'repel_velocity'
     max_weight_distance = u'max_weight_distance'
     low_weight_distance = u'low_weight_distance'
     zero_weight_distance = u'zero_weight_distance'
     root_T_link_b = u'root_T_link_b'
     link_in_chain = u'link_in_chain'
+    max_acceleration = u'max_acceleration'
     A = u'A'
     B = u'B'
     C = u'C'
 
-    def __init__(self, god_map, joint_name, repel_speed=0.1, max_weight_distance=0.0, low_weight_distance=0.01,
-                 zero_weight_distance=0.05, idx=0):
+    def __init__(self, god_map, joint_name, repel_velocity=0.1, max_weight_distance=0.0, low_weight_distance=0.01,
+                 zero_weight_distance=0.05, idx=0, max_acceleration=0.1):
         super(ExternalCollisionAvoidance, self).__init__(god_map)
         self.joint_name = joint_name
         self.robot_root = self.get_robot().get_root()
@@ -574,10 +571,11 @@ class ExternalCollisionAvoidance(Constraint):
         y = np.array([MAX_WEIGHT, LOW_WEIGHT, ZERO_WEIGHT])
         (A, B, C), _ = curve_fit(lambda t, a, b, c: a / (t + c) + b, x, y)
 
-        params = {self.repel_speed: repel_speed,
+        params = {self.repel_velocity: repel_velocity,
                   self.max_weight_distance: max_weight_distance,
                   self.low_weight_distance: low_weight_distance,
                   self.zero_weight_distance: zero_weight_distance,
+                  self.max_acceleration: max_acceleration,
                   self.A: A,
                   self.B: B,
                   self.C: C, }
@@ -620,7 +618,8 @@ class ExternalCollisionAvoidance(Constraint):
         a_P_pa = self.get_closest_point_on_a()
         r_V_n = self.get_contact_normal_on_b()
         actual_distance = self.get_actual_distance()
-        repel_speed = self.get_input_float(self.repel_speed)
+        repel_velocity = self.get_input_float(self.repel_velocity)
+        max_acceleration = self.get_input_float(self.max_acceleration)
         zero_weight_distance = self.get_input_float(self.zero_weight_distance)
         A = self.get_input_float(self.A)
         B = self.get_input_float(self.B)
@@ -639,12 +638,11 @@ class ExternalCollisionAvoidance(Constraint):
         weight_f = w.Max(w.Min(MAX_WEIGHT, A / (w.Max(actual_distance, 0) + C) + B), ZERO_WEIGHT)
 
         penetration_distance = zero_weight_distance - actual_distance
-        # limit = w.Min(w.Max(limit, -repel_speed * t), repel_speed * t)
 
         limit = self.limit_acceleration(dist,
                                         penetration_distance,
-                                        repel_speed / 8,
-                                        repel_speed)
+                                        max_acceleration,
+                                        repel_velocity)
 
         self.add_constraint(str(self), lower=limit,
                             upper=1e9,
@@ -657,7 +655,7 @@ class ExternalCollisionAvoidance(Constraint):
 
 
 class SelfCollisionAvoidance(Constraint):
-    repel_speed = u'repel_speed'
+    repel_velocity = u'repel_velocity'
     max_weight_distance = u'max_weight_distance'
     low_weight_distance = u'low_weight_distance'
     zero_weight_distance = u'zero_weight_distance'
@@ -667,7 +665,7 @@ class SelfCollisionAvoidance(Constraint):
     B = u'B'
     C = u'C'
 
-    def __init__(self, god_map, link_a, link_b, repel_speed=0.1, max_weight_distance=0.0, low_weight_distance=0.01,
+    def __init__(self, god_map, link_a, link_b, repel_velocity=0.1, max_weight_distance=0.0, low_weight_distance=0.01,
                  zero_weight_distance=0.05):
         super(SelfCollisionAvoidance, self).__init__(god_map)
         self.link_a = link_a
@@ -678,7 +676,7 @@ class SelfCollisionAvoidance(Constraint):
         y = np.array([MAX_WEIGHT, LOW_WEIGHT, ZERO_WEIGHT])
         (A, B, C), _ = curve_fit(lambda t, a, b, c: a / (t + c) + b, x, y)
 
-        params = {self.repel_speed: repel_speed,
+        params = {self.repel_velocity: repel_velocity,
                   self.max_weight_distance: max_weight_distance,
                   self.low_weight_distance: low_weight_distance,
                   self.zero_weight_distance: zero_weight_distance,
@@ -712,7 +710,7 @@ class SelfCollisionAvoidance(Constraint):
                                                                   u'contact_distance'])
 
     def make_constraints(self):
-        repel_speed = self.get_input_float(self.repel_speed)
+        repel_velocity = self.get_input_float(self.repel_velocity)
         t = self.get_input_sampling_period()
         zero_weight_distance = self.get_input_float(self.zero_weight_distance)
         actual_distance = self.get_actual_distance()
@@ -744,7 +742,7 @@ class SelfCollisionAvoidance(Constraint):
         weight_f = w.Max(w.Min(MAX_WEIGHT, A / (w.Max(actual_distance, 0) + C) + B), ZERO_WEIGHT)
 
         limit = zero_weight_distance - actual_distance
-        limit = w.Min(w.Max(limit, -repel_speed * t), repel_speed * t)
+        limit = w.Min(w.Max(limit, -repel_velocity * t), repel_velocity * t)
 
         self.add_constraint(str(self), lower=limit,
                             upper=1e9,
@@ -760,9 +758,9 @@ class AlignPlanes(Constraint):
     root_normal = u'root_normal'
     tip_normal = u'tip_normal'
     weight = u'weight'
-    max_speed = u'max_speed'
+    max_velocity = u'max_velocity'
 
-    def __init__(self, god_map, root, tip, root_normal, tip_normal, weight=HIGH_WEIGHT, max_speed=0.5):
+    def __init__(self, god_map, root, tip, root_normal, tip_normal, weight=HIGH_WEIGHT, max_velocity=0.5):
         """
         :type god_map:
         :type root: str
@@ -789,7 +787,7 @@ class AlignPlanes(Constraint):
         params = {self.root_normal: root_normal,
                   self.tip_normal: tip_normal,
                   self.weight: weight,
-                  self.max_speed: max_speed}
+                  self.max_velocity: max_velocity}
         self.save_params_on_god_map(params)
 
     def __str__(self):
@@ -803,9 +801,9 @@ class AlignPlanes(Constraint):
         return self.get_input_Vector3Stamped(self.tip_normal)
 
     def make_constraints(self):
-        # TODO integrate max_speed?
+        # TODO integrate max_velocity?
         weight = self.get_input_float(self.weight)
-        max_speed = self.get_input_float(self.max_speed)
+        # max_velocity = self.get_input_float(self.max_velocity)
         root_R_tip = w.rotation_of(self.get_fk(self.root, self.tip))
         tip_normal__tip = self.get_tip_normal_vector()
         root_normal__root = self.get_root_normal_vector()

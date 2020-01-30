@@ -261,6 +261,9 @@ class Robot(Backend):
         """
         return self._joint_position_symbols[joint_name]
 
+    def get_joint_position_symbols(self):
+        return [self.get_joint_position_symbol(joint_name) for joint_name in self.controlled_joints]
+
     def get_joint_velocity_symbol(self, joint_name):
         """
         :param joint_name: name of the joint in the urdfs
@@ -269,6 +272,8 @@ class Robot(Backend):
         """
         return self._joint_velocity_symbols[joint_name]
 
+    def get_joint_velocity_symbols(self):
+        return [self.get_joint_velocity_symbol(joint_name) for joint_name in self.controlled_joints]
 
     def generate_joint_state(self, f):
         """

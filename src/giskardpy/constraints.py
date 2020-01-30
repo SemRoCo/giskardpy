@@ -114,11 +114,8 @@ class Constraint(object):
 
     def limit_acceleration(self, current_position, error, acceleration_limit, max_velocity):
         sample_period = self.get_input_sampling_period()
-        position_jacobian = w.jacobian(current_position,
-                               [self.get_robot().get_joint_position_symbol(joint_name) for joint_name in
-                                self.get_robot().controlled_joints])
-        last_velocities = w.Matrix([self.get_robot().get_joint_velocity_symbol(joint_name) for joint_name in
-                                    self.get_robot().controlled_joints])
+        position_jacobian = w.jacobian(current_position, self.get_robot().get_joint_position_symbols())
+        last_velocities = w.Matrix(self.get_robot().get_joint_velocity_symbols())
         last_velocity = w.dot(position_jacobian, last_velocities)[0]
         max_velocity = max_velocity * sample_period
         acceleration_limit = acceleration_limit * sample_period
@@ -139,13 +136,6 @@ class Constraint(object):
 
         vel = w.Max(w.Min(cmd, w.Min(last_velocity + acceleration_limit, max_velocity)),
                     w.Max(last_velocity - acceleration_limit, -max_velocity))
-        if 'Slerp' in str(self):
-            for i, joint in enumerate(self.get_robot().controlled_joints):
-                self.add_debug_constraint(str(self) + '/position_jacobian/{}'.format(joint), position_jacobian[i])
-            self.add_debug_constraint(str(self) + '/last_velocity', last_velocity/m/sample_period)
-            self.add_debug_constraint(str(self) + '/cmd', vel/m/sample_period)
-            self.add_debug_constraint(str(self) + '/max_velocity', max_velocity/m/sample_period)
-            self.add_debug_constraint(str(self) + '/acceleration_limit', acceleration_limit/m/sample_period)
         return vel / m
 
     def limit_velocity(self, error, max_velocity):

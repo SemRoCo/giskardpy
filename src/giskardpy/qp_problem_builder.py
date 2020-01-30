@@ -204,7 +204,7 @@ class QProblemBuilder(object):
             Ax = np.dot(A, xdot_full)
             p_Ax = pd.DataFrame(Ax, filtered_bA_names, dtype=float).sort_index()
 
-        # p_A = pd.DataFrame(np_A, lbA, weights, dtype=float).sort_index(1).sort_index(0)
+        p_A = pd.DataFrame(A, filtered_bA_names, filtered_b_names, dtype=float).sort_index(1).sort_index(0)
         # if self.lbAs is None:
         #     self.lbAs = p_lbA
         # else:

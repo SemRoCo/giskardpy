@@ -112,13 +112,14 @@ class Constraint(object):
         return PointStampedInput(self.god_map.to_symbol,
                                  prefix=self.get_identifier() + [name, u'point']).get_expression()
 
-    def limit_acceleration(self, current_position, error, acceleration_limit, max_velocity, sample_period):
-        error_dot = w.jacobian(current_position,
+    def limit_acceleration(self, current_position, error, acceleration_limit, max_velocity):
+        sample_period = self.get_input_sampling_period()
+        position_jacobian = w.jacobian(current_position,
                                [self.get_robot().get_joint_position_symbol(joint_name) for joint_name in
                                 self.get_robot().controlled_joints])
         last_velocities = w.Matrix([self.get_robot().get_joint_velocity_symbol(joint_name) for joint_name in
                                     self.get_robot().controlled_joints])
-        last_velocity = w.dot(error_dot, last_velocities)[0]
+        last_velocity = w.dot(position_jacobian, last_velocities)[0]
         max_velocity = max_velocity * sample_period
         acceleration_limit = acceleration_limit * sample_period
         last_velocity = last_velocity * sample_period
@@ -138,7 +139,19 @@ class Constraint(object):
 
         vel = w.Max(w.Min(cmd, w.Min(last_velocity + acceleration_limit, max_velocity)),
                     w.Max(last_velocity - acceleration_limit, -max_velocity))
+        if 'Slerp' in str(self):
+            for i, joint in enumerate(self.get_robot().controlled_joints):
+                self.add_debug_constraint(str(self) + '/position_jacobian/{}'.format(joint), position_jacobian[i])
+            self.add_debug_constraint(str(self) + '/last_velocity', last_velocity/m/sample_period)
+            self.add_debug_constraint(str(self) + '/cmd', vel/m/sample_period)
+            self.add_debug_constraint(str(self) + '/max_velocity', max_velocity/m/sample_period)
+            self.add_debug_constraint(str(self) + '/acceleration_limit', acceleration_limit/m/sample_period)
         return vel / m
+
+    def limit_velocity(self, error, max_velocity):
+        sample_period = self.get_input_sampling_period()
+        max_velocity *= sample_period
+        return w.diffable_max_fast(w.diffable_min_fast(error, max_velocity), -max_velocity)
 
     def get_constraints(self):
         """
@@ -154,7 +167,7 @@ class Constraint(object):
         :type constraint: SoftConstraint
         """
         if name in self.soft_constraints:
-            raise KeyError(u'constraint with name \'{}\' already exists'.format(name))
+            raise KeyError(u'a constraint with name \'{}\' already exists'.format(name))
         self.soft_constraints[name] = SoftConstraint(lower=lower,
                                                      upper=upper,
                                                      weight=weight,
@@ -168,11 +181,7 @@ class Constraint(object):
         :type name: str
         :type expr: w.Symbol
         """
-        constraint = SoftConstraint(lower=expr,
-                                    upper=expr,
-                                    weight=0,
-                                    expression=1)
-        self.add_constraint(name, constraint)
+        self.add_constraint(name, expr, expr, 1, 0)
 
 
 class JointPosition(Constraint):
@@ -207,7 +216,6 @@ class JointPosition(Constraint):
 
         joint_goal = self.get_input_float(self.goal)
         weight = self.get_input_float(self.weight)
-        t = self.get_input_sampling_period()
 
         acceleration = self.get_input_float(self.acceleration)
         max_speed = w.Min(self.get_input_float(self.max_speed),
@@ -219,7 +227,7 @@ class JointPosition(Constraint):
             err = joint_goal - current_joint
         # capped_err = w.diffable_max_fast(w.diffable_min_fast(err, max_speed), -max_speed)
 
-        capped_err = self.limit_acceleration(current_joint, err, acceleration, max_speed, t)
+        capped_err = self.limit_acceleration(current_joint, err, acceleration, max_speed)
 
         self.add_constraint(str(self), lower=capped_err, upper=capped_err, weight=weight, expression=current_joint)
 
@@ -315,36 +323,34 @@ class CartesianPosition(BasicCartesianConstraint):
         :return:
         """
 
-        goal_position = w.position_of(self.get_goal_pose())
+        r_P_g = w.position_of(self.get_goal_pose())
         weight = self.get_input_float(self.weight)
         max_speed = self.get_input_float(self.max_speed)
-        t = self.get_input_sampling_period()
 
-        current_position = w.position_of(self.get_fk(self.root, self.tip))
+        r_P_c = w.position_of(self.get_fk(self.root, self.tip))
 
-        trans_error_vector = goal_position - current_position
-        trans_error = w.norm(trans_error_vector)
+        r_P_error = r_P_g - r_P_c
+        trans_error = w.norm(r_P_error)
         # trans_scale = w.diffable_min_fast(trans_error, max_speed * t)
 
-        trans_scale = self.limit_acceleration(w.norm(current_position),
+        trans_scale = self.limit_acceleration(w.norm(r_P_c),
                                               trans_error,
                                               max_speed / 2,
-                                              max_speed,
-                                              t)
-        trans_control = w.save_division(trans_error_vector, trans_error) * trans_scale
+                                              max_speed)
+        r_P_intermediate_error = w.save_division(r_P_error, trans_error) * trans_scale
 
-        self.add_constraint(str(self) + u'x', lower=trans_control[0],
-                            upper=trans_control[0],
+        self.add_constraint(str(self) + u'x', lower=r_P_intermediate_error[0],
+                            upper=r_P_intermediate_error[0],
                             weight=weight,
-                            expression=current_position[0])
-        self.add_constraint(str(self) + u'y', lower=trans_control[1],
-                            upper=trans_control[1],
+                            expression=r_P_c[0])
+        self.add_constraint(str(self) + u'y', lower=r_P_intermediate_error[1],
+                            upper=r_P_intermediate_error[1],
                             weight=weight,
-                            expression=current_position[1])
-        self.add_constraint(str(self) + u'z', lower=trans_control[2],
-                            upper=trans_control[2],
+                            expression=r_P_c[1])
+        self.add_constraint(str(self) + u'z', lower=r_P_intermediate_error[2],
+                            upper=r_P_intermediate_error[2],
                             weight=weight,
-                            expression=current_position[2])
+                            expression=r_P_c[2])
 
 
 class CartesianPositionX(BasicCartesianConstraint):
@@ -422,7 +428,6 @@ class CartesianOrientation(BasicCartesianConstraint):
         goal_rotation = w.rotation_of(self.get_goal_pose())
         weight = self.get_input_float(self.weight)
         max_speed = self.get_input_float(self.max_speed)
-        t = self.get_input_sampling_period()
 
         current_rotation = w.rotation_of(self.get_fk(self.root, self.tip))
         current_evaluated_rotation = w.rotation_of(self.get_fk_evaluated(self.root, self.tip))
@@ -441,8 +446,7 @@ class CartesianOrientation(BasicCartesianConstraint):
         capped_angle = self.limit_acceleration(current_angle,
                                                angle,
                                                max_speed / 2,
-                                               max_speed,
-                                               t)
+                                               max_speed)
 
         r_rot_control = axis * capped_angle
 
@@ -492,51 +496,48 @@ class CartesianOrientationSlerp(BasicCartesianConstraint):
         }'
         :return:
         """
-        goal_rotation = w.rotation_of(self.get_goal_pose())
+        r_R_g = w.rotation_of(self.get_goal_pose())
         weight = self.get_input_float(self.weight)
         max_speed = self.get_input_float(self.max_speed)
-        t = self.get_input_sampling_period()
 
-        current_rotation = w.rotation_of(self.get_fk(self.root, self.tip))
-        current_evaluated_rotation = w.rotation_of(self.get_fk_evaluated(self.root, self.tip))
+        r_R_c = w.rotation_of(self.get_fk(self.root, self.tip))
+        r_R_c_evaluated = w.rotation_of(self.get_fk_evaluated(self.root, self.tip))
 
-        hack = w.rotation_matrix_from_axis_angle([0, 0, 1], 0.0001)
-        current_axis, current_angle = w.diffable_axis_angle_from_matrix(
-            w.dot(current_rotation.T, w.dot(current_evaluated_rotation, hack)).T)
+        identity = w.rotation_matrix_from_axis_angle([0, 0, 1], 0.0001)
+        c_R_c = w.dot(w.dot(r_R_c_evaluated.T, identity), r_R_c)
+        current_axis, current_angle = w.diffable_axis_angle_from_matrix(c_R_c)
         current_angle_axis = (current_axis * current_angle)
 
-        error_angle = w.rotation_distance(current_rotation, goal_rotation)
+        error_angle = w.rotation_distance(r_R_c, r_R_g)
         error_angle = w.diffable_abs(error_angle)
 
-        # capped_angle = w.diffable_min_fast(w.save_division(max_speed * t, error_angle), 1)
-
-        capped_angle = self.limit_acceleration(current_angle,
+        _, angle = w.diffable_axis_angle_from_matrix(r_R_c)
+        capped_angle = self.limit_acceleration(angle,
                                                error_angle,
-                                               max_speed / 2,
-                                               max_speed,
-                                               t) / error_angle
+                                               max_speed/2,
+                                               max_speed) / error_angle
 
-        current_quaternion = w.quaternion_from_matrix(current_rotation)
-        goal_quaternion = w.quaternion_from_matrix(goal_rotation)
-        intermediate_goal = w.diffable_slerp(current_quaternion, goal_quaternion, capped_angle)
-        intermediate_error_q = w.quaternion_diff(current_quaternion, intermediate_goal)
-        intermediate_error_axis, intermediate_error_angle = w.axis_angle_from_quaternion(intermediate_error_q[0],
-                                                                                         intermediate_error_q[1],
-                                                                                         intermediate_error_q[2],
-                                                                                         intermediate_error_q[3])
+        r_R_c_q = w.quaternion_from_matrix(r_R_c)
+        r_R_g_q = w.quaternion_from_matrix(r_R_g)
+        r_R_g_intermediate_q = w.diffable_slerp(r_R_c_q, r_R_g_q, capped_angle)
+        c_R_g_intermediate_q = w.quaternion_diff(r_R_c_q, r_R_g_intermediate_q)
+        intermediate_error_axis, intermediate_error_angle = w.axis_angle_from_quaternion(c_R_g_intermediate_q[0],
+                                                                                         c_R_g_intermediate_q[1],
+                                                                                         c_R_g_intermediate_q[2],
+                                                                                         c_R_g_intermediate_q[3])
 
-        intermediate_error_axis_angle = intermediate_error_axis * intermediate_error_angle
+        c_R_g_intermediate_aa = intermediate_error_axis * intermediate_error_angle
 
-        self.add_constraint(str(self) + u'/0', lower=intermediate_error_axis_angle[0],
-                            upper=intermediate_error_axis_angle[0],
+        self.add_constraint(str(self) + u'/0', lower=c_R_g_intermediate_aa[0],
+                            upper=c_R_g_intermediate_aa[0],
                             weight=weight,
                             expression=current_angle_axis[0])
-        self.add_constraint(str(self) + u'/1', lower=intermediate_error_axis_angle[1],
-                            upper=intermediate_error_axis_angle[1],
+        self.add_constraint(str(self) + u'/1', lower=c_R_g_intermediate_aa[1],
+                            upper=c_R_g_intermediate_aa[1],
                             weight=weight,
                             expression=current_angle_axis[1])
-        self.add_constraint(str(self) + u'/2', lower=intermediate_error_axis_angle[2],
-                            upper=intermediate_error_axis_angle[2],
+        self.add_constraint(str(self) + u'/2', lower=c_R_g_intermediate_aa[2],
+                            upper=c_R_g_intermediate_aa[2],
                             weight=weight,
                             expression=current_angle_axis[2])
 
@@ -630,7 +631,6 @@ class ExternalCollisionAvoidance(Constraint):
         r_V_n = self.get_contact_normal_on_b()
         actual_distance = self.get_actual_distance()
         repel_speed = self.get_input_float(self.repel_speed)
-        t = self.get_input_sampling_period()
         zero_weight_distance = self.get_input_float(self.zero_weight_distance)
         A = self.get_input_float(self.A)
         B = self.get_input_float(self.B)
@@ -654,8 +654,7 @@ class ExternalCollisionAvoidance(Constraint):
         limit = self.limit_acceleration(dist,
                                         penetration_distance,
                                         repel_speed / 8,
-                                        repel_speed,
-                                        t)
+                                        repel_speed)
 
         self.add_constraint(str(self), lower=limit,
                             upper=1e9,

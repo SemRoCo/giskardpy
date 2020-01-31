@@ -1505,6 +1505,61 @@ class TestCollisionAvoidanceGoals(object):
         fake_table_setup.check_cpi_leq([u'r_gripper_l_finger_tip_link'], 0.04)
         fake_table_setup.check_cpi_leq([u'r_gripper_r_finger_tip_link'], 0.04)
 
+
+    def test_avoid_collision7(self, kitchen_setup):
+        """
+        :type box_setup: PR2
+        """
+        base_pose = PoseStamped()
+        base_pose.header.frame_id = u'map'
+        base_pose.pose.position.x = 0.8
+        base_pose.pose.position.y = 1
+        base_pose.pose.orientation = Quaternion(*quaternion_about_axis(0, [0,0,1]))
+        kitchen_setup.teleport_base(base_pose)
+        base_pose = PoseStamped()
+        base_pose.header.frame_id = u'map'
+        base_pose.pose.position.x = 0.64
+        base_pose.pose.position.y = 0.64
+        base_pose.pose.orientation = Quaternion(*quaternion_about_axis(-np.pi/4, [0,0,1]))
+        kitchen_setup.set_joint_goal(gaya_pose)
+        kitchen_setup.set_and_check_cart_goal(base_pose, 'base_footprint')
+        kitchen_setup.check_joint_state(gaya_pose)
+
+    def test_avoid_collision9(self, kitchen_setup):
+        """
+        :type box_setup: PR2
+        """
+        base_pose = PoseStamped()
+        base_pose.header.frame_id = u'map'
+        base_pose.pose.position.x = 0.8
+        base_pose.pose.position.y = 0.9
+        base_pose.pose.orientation = Quaternion(*quaternion_about_axis(np.pi/2, [0,0,1]))
+        kitchen_setup.teleport_base(base_pose)
+        base_pose.pose.orientation = Quaternion(*quaternion_about_axis(np.pi, [0,0,1]))
+        kitchen_setup.set_joint_goal(gaya_pose)
+        kitchen_setup.set_and_check_cart_goal(base_pose, 'base_footprint')
+        kitchen_setup.check_joint_state(gaya_pose)
+
+    def test_avoid_collision8(self, kitchen_setup):
+        """
+        :type box_setup: PR2
+        """
+        base_pose = PoseStamped()
+        base_pose.header.frame_id = u'map'
+        base_pose.pose.position.x = 0.8
+        base_pose.pose.position.y = 0.9
+        base_pose.pose.orientation = Quaternion(*quaternion_about_axis(0, [0,0,1]))
+        kitchen_setup.teleport_base(base_pose)
+        base_pose = PoseStamped()
+        base_pose.header.frame_id = u'map'
+        base_pose.pose.position.x = 0.64
+        base_pose.pose.position.y = 0.64
+        base_pose.pose.orientation = Quaternion(*quaternion_about_axis(-np.pi/4, [0,0,1]))
+        kitchen_setup.set_joint_goal(gaya_pose)
+        kitchen_setup.set_and_check_cart_goal(base_pose, 'base_footprint')
+        kitchen_setup.check_joint_state(gaya_pose)
+
+
     def test_avoid_collision_with_far_object(self, pocky_pose_setup):
         """
         :type pocky_pose_setup: PR2

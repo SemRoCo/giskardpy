@@ -180,7 +180,7 @@ class JointPosition(Constraint):
     max_velocity = u'max_velocity'
     max_acceleration = u'max_acceleration'
 
-    def __init__(self, god_map, joint_name, goal, weight=LOW_WEIGHT, max_velocity=1, max_acceleration=0.1):
+    def __init__(self, god_map, joint_name, goal, weight=LOW_WEIGHT, max_velocity=1, max_acceleration=1):
         super(JointPosition, self).__init__(god_map)
         self.joint_name = joint_name
 

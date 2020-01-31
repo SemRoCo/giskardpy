@@ -360,7 +360,7 @@ def plot_trajectory(tj, controlled_joints, path_to_data_folder, sample_period, o
     times = np.array(times) * sample_period
 
     f, axs = plt.subplots(order, sharex=True)
-    f.set_size_inches(w=6, h=order * 1.5)
+    f.set_size_inches(w=10, h=order * 1.5)
 
     for i in range(order):
         if i == 0:
@@ -373,15 +373,16 @@ def plot_trajectory(tj, controlled_joints, path_to_data_folder, sample_period, o
 
     for i in range(order):
         box = axs[i].get_position()
-        axs[i].set_position([box.x0, box.y0, box.width * 0.7, box.height * 0.95])
+        axs[i].set_position([box.x0-0.09, box.y0, box.width * 0.85, box.height * 0.95])
 
     # Put a legend to the right of the current axis
-    axs[0].legend(loc=u'right', bbox_to_anchor=(1.6, -0.1), prop={'size': 8})
+    axs[0].legend(loc=u'right', bbox_to_anchor=(1.5, -0.1), prop={'size': 8})
     axs[-1].set_xlabel(u'time [s]')
     for i in range(order):
         axs[i].grid()
 
     plt.savefig(path_to_data_folder + u'trajectory.pdf')
+    # plt.tight_layout()
 
 
 def resolve_ros_iris_in_urdf(input_urdf):

@@ -318,8 +318,8 @@ class JointPositionPrismatic(Constraint):
         weight = self.magic_weight_function(w.Abs(err),
                                             0.0, WEIGHTS[5],
                                             0.01, WEIGHTS[4],
-                                            0.04, WEIGHTS[3],
-                                            0.05, WEIGHTS[1])
+                                            0.05, WEIGHTS[3],
+                                            0.06, WEIGHTS[1])
         capped_err = self.limit_acceleration(current_joint, err, max_acceleration, max_velocity)
 
         self.add_constraint(str(self), lower=capped_err, upper=capped_err, weight=weight, expression=current_joint)

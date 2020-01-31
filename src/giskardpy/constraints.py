@@ -218,7 +218,7 @@ class JointPositionContinuous(Constraint):
     max_velocity = u'max_velocity'
     max_acceleration = u'max_acceleration'
 
-    def __init__(self, god_map, joint_name, goal, weight=WEIGHTS[5], max_velocity=1, max_acceleration=0.1):
+    def __init__(self, god_map, joint_name, goal, weight=WEIGHTS[5], max_velocity=1, max_acceleration=1):
         super(JointPositionContinuous, self).__init__(god_map)
         self.joint_name = joint_name
 
@@ -500,8 +500,8 @@ class CartesianPosition(BasicCartesianConstraint):
         weight = self.magic_weight_function(trans_error,
                                             0.0, WEIGHTS[5],
                                             0.01, WEIGHTS[4],
-                                            0.04, WEIGHTS[3],
-                                            0.05, WEIGHTS[1])
+                                            0.05, WEIGHTS[3],
+                                            0.06, WEIGHTS[1])
 
         self.add_constraint(str(self) + u'x', lower=r_P_intermediate_error[0],
                             upper=r_P_intermediate_error[0],
@@ -677,10 +677,13 @@ class CartesianOrientationSlerp(BasicCartesianConstraint):
         error_angle = w.diffable_abs(error_angle)
 
         _, angle = w.diffable_axis_angle_from_matrix(r_R_c)
-        capped_angle = self.limit_acceleration(angle,
-                                               error_angle,
-                                               max_acceleration,
-                                               max_velocity) / error_angle
+
+        capped_angle = self.limit_velocity(error_angle, max_velocity) / error_angle
+
+        # capped_angle = self.limit_acceleration(angle,
+        #                                        error_angle,
+        #                                        max_acceleration,
+        #                                        max_velocity) / error_angle
 
         r_R_c_q = w.quaternion_from_matrix(r_R_c)
         r_R_g_q = w.quaternion_from_matrix(r_R_g)
@@ -734,7 +737,7 @@ class ExternalCollisionAvoidance(Constraint):
     max_acceleration = u'max_acceleration'
 
     def __init__(self, god_map, joint_name, repel_velocity=0.1, max_weight_distance=0.0, low_weight_distance=0.01,
-                 zero_weight_distance=0.05, idx=0, max_acceleration=0.1):
+                 zero_weight_distance=0.05, idx=0, max_acceleration=0.01):
         super(ExternalCollisionAvoidance, self).__init__(god_map)
         self.joint_name = joint_name
         self.robot_root = self.get_robot().get_root()
@@ -804,8 +807,8 @@ class ExternalCollisionAvoidance(Constraint):
         weight_f = self.magic_weight_function(actual_distance,
                                               0.0, WEIGHT_MAX,
                                               0.01, WEIGHTS[4],
-                                              0.04, WEIGHTS[2],
-                                              0.05, WEIGHT_MIN)
+                                              0.05, WEIGHTS[2],
+                                              0.06, WEIGHT_MIN)
 
         penetration_distance = zero_weight_distance - actual_distance
 
@@ -900,8 +903,8 @@ class SelfCollisionAvoidance(Constraint):
         weight_f = self.magic_weight_function(actual_distance,
                                               0.0, WEIGHT_MAX,
                                               0.01, WEIGHTS[4],
-                                              0.04, WEIGHTS[2],
-                                              0.05, WEIGHT_MIN)
+                                              0.05, WEIGHTS[2],
+                                              0.06, WEIGHT_MIN)
 
         limit = zero_weight_distance - actual_distance
         limit = w.Min(w.Max(limit, -repel_velocity * t), repel_velocity * t)

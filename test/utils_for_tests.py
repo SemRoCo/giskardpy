@@ -1,11 +1,10 @@
 import keyword
-import numpy as np
 import yaml
 from multiprocessing import Queue
-from numpy import pi
 from threading import Thread
 
 import hypothesis.strategies as st
+import numpy as np
 import rospy
 from angles import shortest_angular_distance
 from geometry_msgs.msg import PoseStamped, Pose, Point, Quaternion
@@ -14,6 +13,7 @@ from giskard_msgs.srv import UpdateWorldResponse
 from hypothesis import assume
 from hypothesis.strategies import composite
 from iai_naive_kinematics_sim.srv import SetJointState, SetJointStateRequest
+from numpy import pi
 from py_trees import Blackboard
 from sensor_msgs.msg import JointState
 from tf.transformations import rotation_from_matrix, quaternion_matrix
@@ -141,6 +141,7 @@ def pr2_urdf():
         urdf_string = f.read()
     return urdf_string
 
+
 def pr2_without_base_urdf():
     with open(u'urdfs/pr2.urdf', u'r') as f:
         urdf_string = f.read()
@@ -187,7 +188,7 @@ def unit_vector(length, elements=None):
         v = [round(x, 4) for x in v]
         l = np.linalg.norm(v)
         if l == 0:
-            return np.array([0]*(length-1)+[1])
+            return np.array([0] * (length - 1) + [1])
         return np.array([x / l for x in v])
 
     return st.builds(normalize, vector)
@@ -316,7 +317,7 @@ class GiskardTestWrapper(object):
             if self.get_robot().is_joint_continuous(joint_name):
                 np.testing.assert_almost_equal(shortest_angular_distance(goal, current), 0, decimal=decimal)
             else:
-                np.testing.assert_almost_equal(current, goal, 1,
+                np.testing.assert_almost_equal(current, goal, decimal,
                                                err_msg=u'{} at {} insteand of {}'.format(joint_name, current, goal))
 
     def set_joint_goal(self, js):
@@ -483,7 +484,8 @@ class GiskardTestWrapper(object):
     def detach_object(self, name, expected_response=UpdateWorldResponse.SUCCESS):
         p = self.get_robot().get_fk_pose(self.get_robot().get_root(), name)
         p = transform_pose(u'map', p)
-        assert name in self.wrapper.get_attached_objects().object_names, 'there is no attached object named {}'.format(name)
+        assert name in self.wrapper.get_attached_objects().object_names, 'there is no attached object named {}'.format(
+            name)
         r = self.wrapper.detach_object(name)
         assert r.error_codes == expected_response, \
             u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
@@ -591,7 +593,7 @@ class GiskardTestWrapper(object):
         self.loop_once()
 
     def attach_cylinder(self, name=u'cylinder', height=1, radius=1, frame_id=None, position=None, orientation=None,
-                   expected_response=UpdateWorldResponse.SUCCESS):
+                        expected_response=UpdateWorldResponse.SUCCESS):
         scm = self.get_robot().get_self_collision_matrix()
         expected_pose = PoseStamped()
         expected_pose.header.frame_id = frame_id
@@ -650,12 +652,18 @@ class GiskardTestWrapper(object):
     def check_cpi_geq(self, links, distance_threshold):
         for link in links:
             collisions = self.get_external_collisions(link, distance_threshold)
-            assert collisions[0].contact_distance >= distance_threshold
+            assert collisions[0].contact_distance >= distance_threshold, \
+                u'distance for {}: {} >= {}'.format(link,
+                                                     collisions[0].contact_distance,
+                                                     distance_threshold)
 
     def check_cpi_leq(self, links, distance_threshold):
         for link in links:
             collisions = self.get_external_collisions(link, distance_threshold)
-            assert collisions[0].contact_distance <= distance_threshold
+            assert collisions[0].contact_distance <= distance_threshold, \
+                u'distance for {}: {} <= {}'.format(link,
+                                                     collisions[0].contact_distance,
+                                                     distance_threshold)
 
     def move_base(self, goal_pose):
         """
@@ -794,6 +802,7 @@ class Boxy(GiskardTestWrapper):
         self.allow_all_collisions()
         self.send_and_check_joint_goal(js)
 
+
 class HSR(GiskardTestWrapper):
     def __init__(self):
         self.tip = u'hand_palm_link'
@@ -804,9 +813,9 @@ class HSR(GiskardTestWrapper):
         js = {u'odom_x': goal_pose.pose.position.x,
               u'odom_y': goal_pose.pose.position.y,
               u'odom_t': rotation_from_matrix(quaternion_matrix([goal_pose.pose.orientation.x,
-                                                                       goal_pose.pose.orientation.y,
-                                                                       goal_pose.pose.orientation.z,
-                                                                       goal_pose.pose.orientation.w]))[0]}
+                                                                 goal_pose.pose.orientation.y,
+                                                                 goal_pose.pose.orientation.z,
+                                                                 goal_pose.pose.orientation.w]))[0]}
         self.allow_all_collisions()
         self.send_and_check_joint_goal(js)
 

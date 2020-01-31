@@ -117,9 +117,8 @@ def zero_pose(resetted_giskard):
     """
     :type giskard: Donbot
     """
-    resetted_giskard.set_joint_goal(default_js)
     resetted_giskard.allow_all_collisions()
-    resetted_giskard.send_and_check_goal()
+    resetted_giskard.send_and_check_joint_goal(default_js)
     return resetted_giskard
 
 

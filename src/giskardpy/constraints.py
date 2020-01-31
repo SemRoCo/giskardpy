@@ -292,7 +292,7 @@ class JointPositionPrismatic(Constraint):
                   self.max_acceleration: max_acceleration}
         self.save_params_on_god_map(params)
 
-    def get_constraint(self):
+    def make_constraints(self):
         """
         example:
         name='JointPosition'
@@ -348,7 +348,7 @@ class JointPositionRevolute(Constraint):
                   self.max_acceleration: max_acceleration}
         self.save_params_on_god_map(params)
 
-    def get_constraint(self):
+    def make_constraints(self):
         """
         example:
         name='JointPosition'
@@ -384,7 +384,7 @@ class JointPositionRevolute(Constraint):
         self.add_constraint(str(self), lower=capped_err, upper=capped_err, weight=weight, expression=current_joint)
 
 
-def __str__(self):
+    def __str__(self):
         s = super(JointPositionRevolute, self).__str__()
         return u'{}/{}'.format(s, self.joint_name)
 

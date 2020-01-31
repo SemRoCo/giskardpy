@@ -304,6 +304,15 @@ class TestJointGoals(object):
         zero_pose.send_and_check_goal(execute=False)
         zero_pose.check_joint_state(default_pose)
 
+
+    def test_prismatic_joint1(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        zero_pose.allow_self_collision()
+        js = {u'torso_lift_joint': 0.1}
+        zero_pose.send_and_check_joint_goal(js)
+
     # TODO test goal for unknown joint
 
 

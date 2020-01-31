@@ -209,7 +209,6 @@ class WorldObject(URDFObject):
         :param f: lambda joint_info: float
         :return:
         """
-        # TODO possible optimization, if some joints are not controlled, the collision matrix might get smaller
         js = {}
         for joint_name in self.get_controllable_joints():
             sjs = SingleJointState()

@@ -6,6 +6,7 @@ from itertools import combinations
 from geometry_msgs.msg import PoseStamped
 
 from giskardpy import WORLD_IMPLEMENTATION, symbolic_wrapper as w
+from giskardpy.data_types import SingleJointState
 from giskardpy.pybullet_world_object import PyBulletWorldObject
 from giskardpy.qp_problem_builder import HardConstraint, JointConstraint
 from giskardpy.utils import KeyDefaultDict, \
@@ -159,7 +160,8 @@ class Robot(Backend):
         for i, joint_name in enumerate(self.get_joint_names_controllable()):
             lower_limit, upper_limit = self.get_joint_limits(joint_name)
             joint_symbol = self.get_joint_position_symbol(joint_name)
-            velocity_limit = self.get_joint_velocity_limit_expr(joint_name)
+            sample_period = w.Symbol(u'rosparam_general_options_sample_period')  # TODO this should be a parameter
+            velocity_limit = self.get_joint_velocity_limit_expr(joint_name) * sample_period
 
             if not self.is_joint_continuous(joint_name):
                 self._hard_constraints[joint_name] = HardConstraint(lower=lower_limit - joint_symbol,
@@ -233,7 +235,6 @@ class Robot(Backend):
         :rtype: float
         """
         limit = self._urdf_robot.joint_map[joint_name].limit
-        t = w.Symbol(u'rosparam_general_options_sample_period')  # TODO this should be a parameter
         if self.is_joint_prismatic(joint_name):
             limit_symbol = self._joint_velocity_linear_limit[joint_name]
         else:
@@ -241,7 +242,7 @@ class Robot(Backend):
         if limit is None or limit.velocity is None:
             return limit_symbol
         else:
-            return w.Min(limit.velocity, limit_symbol) * t
+            return w.Min(limit.velocity, limit_symbol)
 
     def get_joint_frame(self, joint_name):
         """
@@ -260,6 +261,9 @@ class Robot(Backend):
         """
         return self._joint_position_symbols[joint_name]
 
+    def get_joint_position_symbols(self):
+        return [self.get_joint_position_symbol(joint_name) for joint_name in self.controlled_joints]
+
     def get_joint_velocity_symbol(self, joint_name):
         """
         :param joint_name: name of the joint in the urdfs
@@ -267,3 +271,39 @@ class Robot(Backend):
         :rtype: spw.Symbol
         """
         return self._joint_velocity_symbols[joint_name]
+
+    def get_joint_velocity_symbols(self):
+        return [self.get_joint_velocity_symbol(joint_name) for joint_name in self.controlled_joints]
+
+    def generate_joint_state(self, f):
+        """
+        :param f: lambda joint_info: float
+        :return:
+        """
+        js = {}
+        for joint_name in self.controlled_joints:
+            sjs = SingleJointState()
+            sjs.name = joint_name
+            sjs.position = f(joint_name)
+            js[joint_name] = sjs
+        return js
+
+    def link_order(self, link_a, link_b):
+        """
+        TODO find a better name
+        this function is used when deciding for which order to calculate the collisions
+        true if link_a < link_b
+        :type link_a: str
+        :type link_b: str
+        :rtype: bool
+        """
+        try:
+            self.get_controlled_parent_joint(link_a)
+        except KeyError:
+            return False
+        try:
+            self.get_controlled_parent_joint(link_b)
+        except KeyError:
+            return True
+        return link_a < link_b
+

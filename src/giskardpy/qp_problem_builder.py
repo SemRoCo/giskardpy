@@ -23,7 +23,7 @@ class QProblemBuilder(object):
     """
 
     def __init__(self, joint_constraints_dict, hard_constraints_dict, soft_constraints_dict, controlled_joint_symbols,
-                 free_symbols=None, path_to_functions=''):
+                 path_to_functions=''):
         """
         :type joint_constraints_dict: dict
         :type hard_constraints_dict: dict
@@ -33,13 +33,10 @@ class QProblemBuilder(object):
         :param path_to_functions: location where the compiled functions can be safed.
         :type path_to_functions: str
         """
-        if free_symbols is not None:
-            warnings.warn(u'use of free_symbols deprecated', DeprecationWarning)
         assert (not len(controlled_joint_symbols) > len(joint_constraints_dict))
         assert (not len(controlled_joint_symbols) < len(joint_constraints_dict))
         assert (len(hard_constraints_dict) <= len(controlled_joint_symbols))
         self.path_to_functions = path_to_functions
-        self.free_symbols = free_symbols
         self.joint_constraints_dict = joint_constraints_dict
         self.hard_constraints_dict = hard_constraints_dict
         self.soft_constraints_dict = soft_constraints_dict
@@ -140,8 +137,7 @@ class QProblemBuilder(object):
             self.big_ass_M[h + s:, c + s + 1] = self.ub
 
             t = time()
-            if self.free_symbols is None:
-                self.free_symbols = w.free_symbols(self.big_ass_M)
+            self.free_symbols = w.free_symbols(self.big_ass_M)
             self.cython_big_ass_M = w.speed_up(self.big_ass_M,
                                                self.free_symbols)
             if self.path_to_functions is not None:
@@ -207,7 +203,7 @@ class QProblemBuilder(object):
             xH = np.dot(xdot_full.T, filtered_H)
             p_xH = pd.DataFrame(xH, filtered_b_names, dtype=float).sort_index()
 
-        # p_A = pd.DataFrame(np_A, lbA, weights, dtype=float).sort_index(1).sort_index(0)
+        p_A = pd.DataFrame(A, filtered_bA_names, filtered_b_names, dtype=float).sort_index(1).sort_index(0)
         # if self.lbAs is None:
         #     self.lbAs = p_lbA
         # else:

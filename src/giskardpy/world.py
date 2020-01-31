@@ -187,7 +187,7 @@ class World(object):
         collision_matrix2 = {}
         for link1, link2 in collision_matrix:
             # FIXME should I use the minimum of both distances?
-            if link1 < link2:
+            if self.robot.link_order(link1, link2):
                 collision_matrix2[link1, robot_name, link2] = min_dist[link1][u'zero_weight_distance']
             else:
                 collision_matrix2[link2, robot_name, link1] = min_dist[link1][u'zero_weight_distance']

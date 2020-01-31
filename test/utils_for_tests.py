@@ -141,6 +141,11 @@ def pr2_urdf():
         urdf_string = f.read()
     return urdf_string
 
+def pr2_without_base_urdf():
+    with open(u'urdfs/pr2.urdf', u'r') as f:
+        urdf_string = f.read()
+    return urdf_string
+
 
 def base_bot_urdf():
     with open(u'urdfs/2d_base_bot.urdf', u'r') as f:

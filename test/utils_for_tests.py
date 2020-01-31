@@ -316,7 +316,7 @@ class GiskardTestWrapper(object):
             if self.get_robot().is_joint_continuous(joint_name):
                 np.testing.assert_almost_equal(shortest_angular_distance(goal, current), 0, decimal=decimal)
             else:
-                np.testing.assert_almost_equal(current, goal, 1,
+                np.testing.assert_almost_equal(current, goal, decimal,
                                                err_msg=u'{} at {} insteand of {}'.format(joint_name, current, goal))
 
     def set_joint_goal(self, js):

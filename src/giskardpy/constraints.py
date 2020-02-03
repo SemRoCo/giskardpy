@@ -736,7 +736,7 @@ class ExternalCollisionAvoidance(Constraint):
     link_in_chain = u'link_in_chain'
     max_acceleration = u'max_acceleration'
 
-    def __init__(self, god_map, joint_name, repel_velocity=0.1, max_weight_distance=0.0, low_weight_distance=0.01,
+    def __init__(self, god_map, joint_name, repel_velocity=0.1, max_weight_distance=0.0, low_weight_distance=0.03,
                  zero_weight_distance=0.05, idx=0, max_acceleration=0.01):
         super(ExternalCollisionAvoidance, self).__init__(god_map)
         self.joint_name = joint_name
@@ -816,6 +816,8 @@ class ExternalCollisionAvoidance(Constraint):
                                         penetration_distance,
                                         max_acceleration,
                                         repel_velocity)
+
+        # limit = self.limit_velocity(actual_distance, repel_velocity)
 
         self.add_constraint(str(self), lower=limit,
                             upper=1e9,

@@ -7,17 +7,16 @@ from collections import OrderedDict
 import numpy as np
 from geometry_msgs.msg import Vector3Stamped, Vector3
 from rospy_message_converter.message_converter import convert_dictionary_to_ros_message
-from scipy.optimize import curve_fit
 
 import giskardpy.identifier as identifier
-from giskardpy import symbolic_wrapper as w, logging
+from giskardpy import symbolic_wrapper as w
 from giskardpy.exceptions import GiskardException, ConstraintException
 from giskardpy.input_system import PoseStampedInput, Point3Input, Vector3Input, Vector3StampedInput, FrameInput, \
     PointStampedInput, TranslationInput
 from giskardpy.qp_problem_builder import SoftConstraint
-from giskardpy.tfwrapper import transform_pose, transform_vector, transform_point
+from giskardpy.tfwrapper import transform_pose, transform_vector
 
-WEIGHTS = [0] + [6**x for x in range(7)]
+WEIGHTS = [0] + [6 ** x for x in range(7)]
 
 WEIGHT_MAX = WEIGHTS[-1]
 WEIGHT_MIN = WEIGHTS[0]
@@ -224,7 +223,7 @@ class JointPositionContinuous(Constraint):
 
         if not self.get_robot().is_joint_continuous(joint_name):
             raise ConstraintException(u'{} called with non continuous joint {}'.format(self.__name__,
-                                                                                      joint_name))
+                                                                                       joint_name))
 
         params = {self.goal: goal,
                   self.weight: weight,
@@ -259,19 +258,16 @@ class JointPositionContinuous(Constraint):
 
         weight = self.magic_weight_function(w.Abs(error),
                                             0.0, WEIGHTS[5],
-                                            np.pi/8, WEIGHTS[4],
-                                            np.pi/6, WEIGHTS[3],
-                                            np.pi/4, WEIGHTS[1])
-
+                                            np.pi / 8, WEIGHTS[4],
+                                            np.pi / 6, WEIGHTS[3],
+                                            np.pi / 4, WEIGHTS[1])
 
         self.add_constraint(str(self), lower=capped_err, upper=capped_err, weight=weight, expression=current_joint)
-        self.add_debug_constraint(str(self)+'/current', current_joint)
-        self.add_debug_constraint(str(self)+'/goal', joint_goal)
-        self.add_debug_constraint(str(self)+'/error', error)
 
     def __str__(self):
         s = super(JointPositionContinuous, self).__str__()
         return u'{}/{}'.format(s, self.joint_name)
+
 
 class JointPositionPrismatic(Constraint):
     goal = u'goal'
@@ -367,7 +363,7 @@ class JointPositionRevolute(Constraint):
         weight = self.get_input_float(self.weight)
 
         max_velocity = w.Min(self.get_input_float(self.max_velocity),
-                          self.get_robot().get_joint_velocity_limit_expr(self.joint_name))
+                             self.get_robot().get_joint_velocity_limit_expr(self.joint_name))
 
         max_acceleration = self.get_input_float(self.max_acceleration)
 
@@ -382,7 +378,6 @@ class JointPositionRevolute(Constraint):
         weight = WEIGHTS[5]
 
         self.add_constraint(str(self), lower=capped_err, upper=capped_err, weight=weight, expression=current_joint)
-
 
     def __str__(self):
         s = super(JointPositionRevolute, self).__str__()
@@ -630,7 +625,8 @@ class CartesianOrientation(BasicCartesianConstraint):
 
 class CartesianOrientationSlerp(BasicCartesianConstraint):
     def __init__(self, god_map, root_link, tip_link, goal, max_velocity=0.5, max_accleration=0.5):
-        super(CartesianOrientationSlerp, self).__init__(god_map, root_link, tip_link, goal, max_velocity, max_accleration)
+        super(CartesianOrientationSlerp, self).__init__(god_map, root_link, tip_link, goal, max_velocity,
+                                                        max_accleration)
 
     def make_constraints(self):
         """
@@ -751,8 +747,6 @@ class ExternalCollisionAvoidance(Constraint):
                   self.max_acceleration: max_acceleration}
         self.save_params_on_god_map(params)
 
-
-
     def get_distance_to_closest_object(self):
         return self.get_god_map().to_symbol(identifier.closest_point + [u'get_external_collisions',
                                                                         (self.joint_name,),
@@ -848,7 +842,7 @@ class SelfCollisionAvoidance(Constraint):
         params = {self.repel_velocity: repel_velocity,
                   self.max_weight_distance: max_weight_distance,
                   self.low_weight_distance: low_weight_distance,
-                  self.zero_weight_distance: zero_weight_distance,}
+                  self.zero_weight_distance: zero_weight_distance, }
         self.save_params_on_god_map(params)
 
     def get_contact_normal_on_b(self):
@@ -877,7 +871,6 @@ class SelfCollisionAvoidance(Constraint):
 
     def make_constraints(self):
         repel_velocity = self.get_input_float(self.repel_velocity)
-        t = self.get_input_sampling_period()
         zero_weight_distance = self.get_input_float(self.zero_weight_distance)
         actual_distance = self.get_actual_distance()
 
@@ -909,12 +902,10 @@ class SelfCollisionAvoidance(Constraint):
                                               0.06, WEIGHT_MIN)
 
         limit = zero_weight_distance - actual_distance
-        limit = w.Min(w.Max(limit, -repel_velocity * t), repel_velocity * t)
+        # limit = w.Min(w.Max(limit, -repel_velocity * t), repel_velocity * t)
+        limit = self.limit_velocity(limit, repel_velocity)
 
-        self.add_constraint(str(self), lower=limit,
-                            upper=1e9,
-                            weight=weight_f,
-                            expression=dist)
+        self.add_constraint(str(self), lower=limit, upper=1e9, weight=weight_f, expression=dist)
 
     def __str__(self):
         s = super(SelfCollisionAvoidance, self).__str__()
@@ -1054,8 +1045,7 @@ class UpdateGodMap(Constraint):
             else:
                 self.update_god_map(next_identifier, value)
 
-
-#FIXME
+# FIXME
 # class Pointing(Constraint):
 #     goal_point = u'goal_point'
 #     pointing_axis = u'pointing_axis'

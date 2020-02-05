@@ -1,17 +1,14 @@
-import PyKDL
 from geometry_msgs.msg import PoseStamped
 from giskard_msgs.msg import CollisionEntry
 
-from giskardpy.data_types import ClosestPointInfo
+from giskardpy import logging
 from giskardpy.exceptions import RobotExistsException, DuplicateNameException, PhysicsWorldException, \
     UnknownBodyException, UnsupportedOptionException
 from giskardpy.symengine_robot import Robot
-from giskardpy.tfwrapper import msg_to_kdl, kdl_to_pose, np_to_kdl, to_np
-from giskardpy.urdf_object import URDFObject, FIXED_JOINT
-from giskardpy.utils import KeyDefaultDict, np_point, np_vector
+from giskardpy.tfwrapper import msg_to_kdl, kdl_to_pose
+from giskardpy.urdf_object import URDFObject
 from giskardpy.world_object import WorldObject
-from giskardpy import logging
-import numpy as np
+
 
 class World(object):
     def __init__(self, path_to_data_folder=u''):
@@ -22,7 +19,7 @@ class World(object):
         self._path_to_data_folder = path_to_data_folder
 
     # General ----------------------------------------------------------------------------------------------------------
-    
+
     def soft_reset(self):
         """
         keeps robot and other important objects like ground plane
@@ -292,13 +289,14 @@ class World(object):
             if collision_entry.body_b == robot_name:
                 for robot_link in collision_entry.link_bs:
                     if robot_link != CollisionEntry.ALL and robot_link not in robot_links:
-                        raise UnknownBodyException(u'link b \'{}\' of body \'{}\' unknown'.format(robot_link, collision_entry.body_b))
+                        raise UnknownBodyException(
+                            u'link b \'{}\' of body \'{}\' unknown'.format(robot_link, collision_entry.body_b))
             elif not self.all_body_bs(collision_entry) and not self.all_link_bs(collision_entry):
                 object_links = self.get_object(collision_entry.body_b).get_link_names()
                 for link_b in collision_entry.link_bs:
                     if link_b not in object_links:
-                        raise UnknownBodyException(u'link b \'{}\' of body \'{}\' unknown'.format(link_b, collision_entry.body_b))
-
+                        raise UnknownBodyException(
+                            u'link b \'{}\' of body \'{}\' unknown'.format(link_b, collision_entry.body_b))
 
     def split_link_bs(self, collision_goals):
         # FIXME remove the side effects of these three methods
@@ -455,21 +453,3 @@ class World(object):
                and self.all_robot_links(collision_entry) \
                and self.all_body_bs(collision_entry) \
                and self.all_link_bs(collision_entry)
-
-    
-    def transform_contact_info(self, collisions):
-        root_T_map = to_np(self.robot.root_T_map)
-        robot_root = self.robot.get_root()
-        for contact_info in collisions.items():  # type: ClosestPointInfo
-            movable_joint = self.robot.get_controlled_parent_joint(contact_info.link_a)
-            f = self.robot.get_child_link_of_joint(movable_joint)
-            f_T_r = self.robot.get_fk_np(f, robot_root)
-            contact_info.frame = f
-
-            f_P_pa = np.dot(np.dot(f_T_r, root_T_map), np_point(*contact_info.position_on_a))
-            r_P_pb = np.dot(root_T_map, np_point(*contact_info.position_on_b))
-            r_V_n = np.dot(root_T_map, np_vector(*contact_info.contact_normal))
-            contact_info.position_on_a = f_P_pa[:-1]
-            contact_info.position_on_b = r_P_pb[:-1]
-            contact_info.contact_normal = r_V_n[:-1]
-        return collisions

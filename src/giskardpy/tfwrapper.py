@@ -280,3 +280,11 @@ def to_np(kdl_thing):
                          [kdl_thing.M[1,0], kdl_thing.M[1,1], kdl_thing.M[1,2], kdl_thing.p[1]],
                          [kdl_thing.M[2,0], kdl_thing.M[2,1], kdl_thing.M[2,2], kdl_thing.p[2]],
                          [0, 0, 0, 1]])
+
+
+def np_vector(x, y, z):
+    return np.array([x, y, z, 0])
+
+
+def np_point(x, y, z):
+    return np.array([x, y, z, 1])

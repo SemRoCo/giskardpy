@@ -217,6 +217,14 @@ class URDFObject(object):
 
     @memoize
     def get_chain(self, root, tip, joints=True, links=True, fixed=True):
+        """
+        :type root: str
+        :type tip: str
+        :type joints: bool
+        :type links: bool
+        :type fixed: bool
+        :rtype: list
+        """
         root_chain, connection, tip_chain = self.get_split_chain(root, tip, joints, links, fixed)
         return root_chain + connection + tip_chain
 
@@ -682,6 +690,13 @@ class URDFObject(object):
     def has_link_visuals(self, link_name):
         link = self._urdf_robot.link_map[link_name]
         return link.visual is not None
+
+    def get_leaves(self):
+        leaves = []
+        for link_name in self.get_link_names():
+            if not self.get_child_links_of_link(link_name):
+                leaves.append(link_name)
+        return leaves
 
     def as_marker_msg(self, ns=u'', id=1):
         """

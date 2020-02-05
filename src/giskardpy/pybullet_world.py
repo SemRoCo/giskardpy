@@ -1,16 +1,15 @@
-import numpy as np
-
 import pybullet as p
 from geometry_msgs.msg import Point, Pose
 from giskard_msgs.msg import CollisionEntry
 
 import giskardpy
-from giskardpy.data_types import ClosestPointInfo, Collisions
+from giskardpy.data_types import Collision, Collisions
 from giskardpy.pybullet_world_object import PyBulletWorldObject
 from giskardpy.pybullet_wrapper import ContactInfo
 from giskardpy.utils import resolve_ros_iris
 from giskardpy.world import World
 from giskardpy.world_object import WorldObject
+
 
 class PyBulletWorld(World):
     """
@@ -44,7 +43,7 @@ class PyBulletWorld(World):
         :param self_collision_d: distances grater than this value will be ignored
         :type self_collision_d: float
         :type enable_self_collision: bool
-        :return: (robot_link, body_b, link_b) -> ContactInfo
+        :return: (robot_link, body_b, link_b) -> Collision
         :rtype: dict
         """
         collisions = Collisions(self.robot)
@@ -72,29 +71,31 @@ class PyBulletWorld(World):
                     body_b_object = self.get_object(body_b)
                 except KeyError:
                     body_b_object = self.robot
-                for contact in contacts:
+                for contact in contacts:  # type: ContactInfo
                     if link_b == CollisionEntry.ALL:
                         link_b = body_b_object.pybullet_link_id_to_name(contact.link_index_b)
-                    k = (robot_link, body_b, link_b)
-                    collisions.add(k,
-                                   ClosestPointInfo(contact.position_on_a,
-                                                        contact.position_on_b,
-                                                        contact.contact_distance,
-                                                        distance,
-                                                        robot_link,
-                                                        body_b,
-                                                        link_b,
-                                                        contact.contact_normal_on_b,
-                                                        k))
+                    if self.__should_flip_collision(contact.position_on_a, robot_link):
+                        flipped_normal = [-contact.contact_normal_on_b[0],
+                                          -contact.contact_normal_on_b[1],
+                                          -contact.contact_normal_on_b[2]]
+                        collision = Collision(robot_link, body_b, link_b,
+                                              contact.position_on_b, contact.position_on_a,
+                                              flipped_normal, contact.contact_distance)
+                        collisions.add(collision)
+                    else:
+                        collision = Collision(robot_link, body_b, link_b,
+                                              contact.position_on_a, contact.position_on_b,
+                                              contact.contact_normal_on_b, contact.contact_distance)
+                        collisions.add(collision)
         return collisions
 
-    def __should_flip_contact_info(self, contact_info):
+    def __should_flip_collision(self, position_on_a_in_map, link_a):
         """
-        :type contact_info: ContactInfo
+        :type collision: ContactInfo
         :rtype: bool
         """
         new_p = Pose()
-        new_p.position = Point(*contact_info.position_on_a)
+        new_p.position = Point(*position_on_a_in_map)
         new_p.orientation.w = 1
 
         self.__move_hack(new_p)
@@ -106,22 +107,9 @@ class PyBulletWorld(World):
                                                 body_a_id, 0.001) if
                   abs(x[8] + 0.005) < 0.0005][0])
             return not (contact_info3.body_unique_id_b == body_a_id and
-                        contact_info3.link_index_b == self.robot.get_pybullet_link_id(contact_info.link_a))
+                        contact_info3.link_index_b == self.robot.get_pybullet_link_id(link_a))
         except Exception as e:
             return True
-
-    def __flip_contact_info(self, contact_info):
-        return ClosestPointInfo(contact_info.position_on_b,
-                                contact_info.position_on_a,
-                                contact_info.contact_distance,
-                                contact_info.min_dist,
-                                contact_info.link_b,
-                                contact_info.body_b,  # this should always be robot, because we only flip for self coll
-                                contact_info.link_a,
-                                [-contact_info.contact_normal[0],
-                                 -contact_info.contact_normal[1],
-                                 -contact_info.contact_normal[2]],
-                                contact_info.old_key)
 
     def setup(self):
         self.__add_ground_plane()
@@ -169,26 +157,6 @@ class PyBulletWorld(World):
         pwo.base_pose = object_.base_pose
         pwo.joint_state = object_.joint_state
         return super(PyBulletWorld, self).add_object(pwo)
-
-    def transform_contact_info(self, collisions):
-        """
-        :param collisions: (robot_link, body_b, link_b) -> ContactInfo
-        :type collisions: dict
-        :param min_allowed_distance: (robot_link, body_b, link_b) -> min allowed distance
-        :type min_allowed_distance: dict
-        :return: robot_link -> ClosestPointInfo of closest thing
-        :rtype: Collisions
-        """
-        for collision in collisions.items():  # type: ClosestPointInfo
-            if self.__should_flip_contact_info(collision):
-                tmp = collision.position_on_a
-                collision.position_on_a = collision.position_on_b
-                collision.position_on_b = tmp
-                collision.contact_normal = [-collision.contact_normal[0],
-                                            -collision.contact_normal[1],
-                                            -collision.contact_normal[2]]
-        closest_point = super(PyBulletWorld, self).transform_contact_info(collisions)
-        return closest_point
 
     def remove_robot(self):
         self.robot.suicide()

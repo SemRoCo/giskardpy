@@ -1,10 +1,7 @@
 from py_trees import Status
 
 from giskardpy import identifier
-from giskardpy.data_types import ClosestPointInfo, Trajectory
-from giskardpy.identifier import closest_point
 from giskardpy.plugin import GiskardBehavior
-from giskardpy.utils import KeyDefaultDict
 
 
 class TimePlugin(GiskardBehavior):

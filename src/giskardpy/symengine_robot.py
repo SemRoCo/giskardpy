@@ -307,3 +307,19 @@ class Robot(Backend):
             return True
         return link_a < link_b
 
+    @memoize
+    def get_chain_reduced_to_controlled_joints(self, link_a, link_b):
+        chain = self.get_chain(link_b, link_a)
+        for i, thing in enumerate(chain):
+            if i % 2 == 1 and thing in self.controlled_joints:
+                new_link_b = chain[i - 1]
+                break
+        else:
+            raise KeyError(u'no controlled joint in chain between {} and {}'.format(link_a, link_b))
+        for i, thing in enumerate(reversed(chain)):
+            if i % 2 == 1 and thing in self.controlled_joints:
+                new_link_a = chain[len(chain) - i]
+                break
+        else:
+            raise KeyError(u'no controlled joint in chain between {} and {}'.format(link_a, link_b))
+        return new_link_a, new_link_b

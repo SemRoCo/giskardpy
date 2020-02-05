@@ -110,22 +110,25 @@ class GoalToConstraints(GetGoal):
         for joint_name in self.get_robot().controlled_joints:
             for i in range(self.get_god_map().safe_get_data(identifier.number_of_repeller)):
                 constraint = ExternalCollisionAvoidance(self.god_map, joint_name,
-                                                    max_weight_distance=self.get_god_map().safe_get_data(
-                                                    identifier.distance_thresholds +
-                                                    [joint_name, u'max_weight_distance']),
-                                                    low_weight_distance=self.get_god_map().safe_get_data(
-                                                    identifier.distance_thresholds +
-                                                    [joint_name, u'low_weight_distance']),
-                                                    zero_weight_distance=self.get_god_map().safe_get_data(
-                                                    identifier.distance_thresholds +
-                                                    [joint_name, u'zero_weight_distance']),
-                                                    idx=i)
+                                                        max_weight_distance=self.get_god_map().safe_get_data(
+                                                            identifier.distance_thresholds +
+                                                            [joint_name, u'max_weight_distance']),
+                                                        low_weight_distance=self.get_god_map().safe_get_data(
+                                                            identifier.distance_thresholds +
+                                                            [joint_name, u'low_weight_distance']),
+                                                        zero_weight_distance=self.get_god_map().safe_get_data(
+                                                            identifier.distance_thresholds +
+                                                            [joint_name, u'zero_weight_distance']),
+                                                        idx=i)
                 soft_constraints.update(constraint.get_constraints())
+        asdf = set()
         for link_a, link_b in self.get_robot().get_self_collision_matrix():
+            link_a, link_b = self.robot.get_chain_reduced_to_controlled_joints(link_a, link_b)
             if not self.get_robot().link_order(link_a, link_b):
                 tmp = link_a
                 link_a = link_b
                 link_b = tmp
+            asdf.add((link_a, link_b))
             max_weight_distance = min(self.get_god_map().safe_get_data(identifier.distance_thresholds +
                                                                        [link_a, u'max_weight_distance']),
                                       self.get_god_map().safe_get_data(identifier.distance_thresholds +
@@ -135,9 +138,9 @@ class GoalToConstraints(GetGoal):
                                       self.get_god_map().safe_get_data(identifier.distance_thresholds +
                                                                        [link_b, u'low_weight_distance']))
             zero_weight_distance = min(self.get_god_map().safe_get_data(identifier.distance_thresholds +
-                                                                       [link_a, u'zero_weight_distance']),
-                                      self.get_god_map().safe_get_data(identifier.distance_thresholds +
-                                                                       [link_b, u'zero_weight_distance']))
+                                                                        [link_a, u'zero_weight_distance']),
+                                       self.get_god_map().safe_get_data(identifier.distance_thresholds +
+                                                                        [link_b, u'zero_weight_distance']))
             constraint = SelfCollisionAvoidance(self.god_map, link_a, link_b,
                                                 max_weight_distance=max_weight_distance,
                                                 low_weight_distance=low_weight_distance,

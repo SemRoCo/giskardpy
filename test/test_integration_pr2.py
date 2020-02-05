@@ -1335,34 +1335,6 @@ class TestCollisionAvoidanceGoals(object):
         box_setup.check_cpi_geq(box_setup.get_l_gripper_links(), 0.0)
         box_setup.check_cpi_leq(box_setup.get_r_gripper_links(), 0.0)
 
-    # def test_avoid_collision2(self, pocky_pose_setup):
-    #     """
-    #     :type box_setup: PR2
-    #     """
-    #     # FIXME
-    #     p = PoseStamped()
-    #     p.header.frame_id = u'map'
-    #     p.pose.position.x = 1.1
-    #     p.pose.position.y = 0
-    #     p.pose.position.z = 0.6
-    #     p.pose.orientation.w = 1
-    #     pocky_pose_setup.add_box(size=[1, 1, 0.01], pose=p)
-    #
-    #     p = PoseStamped()
-    #     p.header.frame_id = pocky_pose_setup.r_tip
-    #     p.pose.position = Point(0.15, 0, 0)
-    #     p.pose.orientation = Quaternion(0, 0, 0, 1)
-    #     pocky_pose_setup.set_cart_goal(p, pocky_pose_setup.r_tip, pocky_pose_setup.default_root)
-    #
-    #     collision_entry = CollisionEntry()
-    #     collision_entry.type = CollisionEntry.AVOID_COLLISION
-    #     collision_entry.min_dist = 0.05
-    #     collision_entry.body_b = u'box'
-    #     pocky_pose_setup.add_collision_entries([collision_entry])
-    #
-    #     pocky_pose_setup.send_and_check_goal()
-    #     pocky_pose_setup.check_cpi_geq(pocky_pose_setup.get_l_gripper_links(), 0.048)
-    #     pocky_pose_setup.check_cpi_geq(pocky_pose_setup.get_r_gripper_links(), 0.048)
 
     def test_avoid_collision3(self, pocky_pose_setup):
         """
@@ -1994,48 +1966,48 @@ class TestCollisionAvoidanceGoals(object):
     #     # get cup from left middle drawer right side
     #     # put cup bowl and spoon in sink
 
-    # def test_pick_place_milk(self, kitchen_setup):
-    #     # FIXME
-    #     milk_name = u'milk'
-    #
-    #     # take milk out of fridge
-    #     kitchen_setup.set_kitchen_js({u'iai_fridge_door_joint': 1.56})
-    #
-    #     # spawn milk
-    #     milk_pose = PoseStamped()
-    #     milk_pose.header.frame_id = u'iai_kitchen/iai_fridge_main_middle_level'
-    #     milk_pose.pose.position = Point(0.1, 0, 0.12)
-    #     milk_pose.pose.orientation = Quaternion(0, 0, 0, 1)
-    #     kitchen_setup.add_box(milk_name, [0.05, 0.05, 0.2], milk_pose)
-    #
-    #     # grasp milk
-    #     kitchen_setup.open_r_gripper()
-    #
-    #     r_goal = deepcopy(milk_pose)
-    #     r_goal.pose.orientation = Quaternion(*quaternion_from_matrix([[-1, 0, 0, 0],
-    #                                                                   [0, -1, 0, 0],
-    #                                                                   [0, 0, 1, 0],
-    #                                                                   [0, 0, 0, 1]]))
-    #     kitchen_setup.set_cart_goal(r_goal, kitchen_setup.r_tip, kitchen_setup.default_root)
-    #     kitchen_setup.send_and_check_goal()
-    #     kitchen_setup.attach_existing(milk_name, kitchen_setup.r_tip)
-    #     # kitchen_setup.keep_position(kitchen_setup.r_tip)
-    #     kitchen_setup.close_r_gripper()
-    #
-    #     # place milk
-    #     milk_goal = PoseStamped()
-    #     milk_goal.header.frame_id = u'iai_kitchen/kitchen_island_surface'
-    #     milk_goal.pose.position = Point(.1, -.2, .13)
-    #     milk_goal.pose.orientation = Quaternion(0, 0, 0, 1)
-    #     kitchen_setup.set_cart_goal(milk_goal, milk_name, kitchen_setup.default_root)
-    #     kitchen_setup.send_and_check_goal()
-    #
-    #     # kitchen_setup.keep_position(kitchen_setup.r_tip)
-    #     kitchen_setup.open_r_gripper()
-    #
-    #     kitchen_setup.detach_object(milk_name)
-    #
-    #     kitchen_setup.send_and_check_joint_goal(gaya_pose)
+    def test_fridge(self, kitchen_setup):
+        # FIXME
+        milk_name = u'milk'
+
+        # take milk out of fridge
+        kitchen_setup.set_kitchen_js({u'iai_fridge_door_joint': 1.56})
+
+        # spawn milk
+        milk_pose = PoseStamped()
+        milk_pose.header.frame_id = u'iai_kitchen/iai_fridge_door_shelf1_bottom'
+        milk_pose.pose.position = Point(0, 0, 0.12)
+        milk_pose.pose.orientation = Quaternion(0, 0, 0, 1)
+        kitchen_setup.add_box(milk_name, [0.05, 0.05, 0.2], milk_pose)
+
+        # grasp milk
+        kitchen_setup.open_l_gripper()
+
+        l_goal = deepcopy(milk_pose)
+        l_goal.pose.orientation = Quaternion(*quaternion_from_matrix([[1, 0, 0, 0],
+                                                                      [0, 1, 0, 0],
+                                                                      [0, 0, 1, 0],
+                                                                      [0, 0, 0, 1]]))
+        kitchen_setup.set_cart_goal(l_goal, kitchen_setup.l_tip, kitchen_setup.default_root)
+        kitchen_setup.send_and_check_goal()
+        kitchen_setup.attach_existing(milk_name, kitchen_setup.l_tip)
+        # kitchen_setup.keep_position(kitchen_setup.r_tip)
+        kitchen_setup.close_l_gripper()
+
+        # place milk
+        milk_goal = PoseStamped()
+        milk_goal.header.frame_id = u'iai_kitchen/kitchen_island_surface'
+        milk_goal.pose.position = Point(.1, -.2, .13)
+        milk_goal.pose.orientation = Quaternion(0, 0, 0, 1)
+        kitchen_setup.set_cart_goal(milk_goal, milk_name, kitchen_setup.default_root)
+        kitchen_setup.send_and_check_goal()
+
+        # kitchen_setup.keep_position(kitchen_setup.r_tip)
+        kitchen_setup.open_r_gripper()
+
+        kitchen_setup.detach_object(milk_name)
+
+        kitchen_setup.send_and_check_joint_goal(gaya_pose)
 
     # def test_nan(self, kitchen_setup):
     #     while True:

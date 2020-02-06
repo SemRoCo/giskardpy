@@ -474,14 +474,16 @@ class GiskardTestWrapper(object):
         assert not self.get_world().has_object(name)
 
     def detach_object(self, name, expected_response=UpdateWorldResponse.SUCCESS):
-        p = self.get_robot().get_fk_pose(self.get_robot().get_root(), name)
-        p = transform_pose(u'map', p)
+        if expected_response == UpdateWorldResponse.SUCCESS:
+            p = self.get_robot().get_fk_pose(self.get_robot().get_root(), name)
+            p = transform_pose(u'map', p)
         r = self.wrapper.detach_object(name)
         assert r.error_codes == expected_response, \
             u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
                                             update_world_error_code(expected_response))
-        assert self.get_world().has_object(name)
-        compare_poses(self.get_world().get_object(name).base_pose, p.pose, decimal=2)
+        if expected_response == UpdateWorldResponse.SUCCESS:
+            assert self.get_world().has_object(name)
+            compare_poses(self.get_world().get_object(name).base_pose, p.pose, decimal=2)
 
     def add_box(self, name=u'box', size=(1, 1, 1), pose=None, expected_response=UpdateWorldResponse.SUCCESS):
         r = self.wrapper.add_box(name, size, pose=pose)

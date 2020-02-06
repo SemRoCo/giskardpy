@@ -1027,6 +1027,12 @@ class TestCollisionAvoidanceGoals(object):
         zero_pose.attach_box(pocky, [0.1, 0.02, 0.02], u'', [0.05, 0, 0],
                              expected_response=UpdateWorldResponse.MISSING_BODY_ERROR)
 
+    def test_detach_unknown_object(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        zero_pose.detach_object(u'nil', expected_response=UpdateWorldResponse.MISSING_BODY_ERROR)
+
     def test_add_remove_object(self, zero_pose):
         """
         :type zero_pose: PR2

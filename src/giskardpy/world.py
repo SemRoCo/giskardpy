@@ -168,6 +168,8 @@ class World(object):
         self.remove_object(name)
 
     def detach(self, joint_name, from_obj=None):
+        if joint_name not in self.robot.get_joint_names():
+            raise UnknownBodyException(u'can\'t detach: {}'.format(joint_name))
         if from_obj is None or self.robot.get_name() == from_obj:
             # this only works because attached simple objects have joint names equal to their name
             p = self.robot.get_fk_pose(self.robot.get_root(), joint_name)

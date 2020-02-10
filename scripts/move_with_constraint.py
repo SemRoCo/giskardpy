@@ -3,6 +3,8 @@
 import rospy
 import sys
 import tf
+#from control_msgs.msg import GripperCommandAction
+
 from giskardpy.python_interface import GiskardWrapper
 from geometry_msgs.msg import PoseStamped, Point, Quaternion
 from iai_naive_kinematics_sim.srv import SetJointState, SetJointStateRequest, SetJointStateResponse
@@ -24,6 +26,8 @@ import math
 import yaml
 from giskardpy import utils_constraints as uc
 from giskardpy.tfwrapper import lookup_pose, pose_to_kdl, np_to_kdl, kdl_to_pose
+import actionlib
+from control_msgs.msg import GripperCommandAction, GripperCommandGoal
 
 
 class Gripper:
@@ -38,7 +42,7 @@ class Gripper:
         rospy.logout("- Set pose kitchen")
         kitchen_pose = tf_wrapper.lookup_pose("map", "iai_kitchen/world")
         kitchen_pose.header.frame_id = "map"
-
+        # setup kitchen
         rospy.logout("- Get urdf")
         self.urdf = rospy.get_param("kitchen_description")
         self.parsed_urdf = URDF.from_xml_string(self.urdf)
@@ -48,11 +52,29 @@ class Gripper:
         self.giskard.clear_world()
         self.giskard.add_urdf(name="kitchen", urdf=self.urdf, pose=kitchen_pose, js_topic="kitchen/cram_joint_states")
 
+        # setup gripper as service
         rospy.logout("- Set right and left Gripper service proxy")
         self.l_gripper_service = rospy.ServiceProxy('/l_gripper_simulator/set_joint_states', SetJointState)
         self.r_gripper_service = rospy.ServiceProxy('/r_gripper_simulator/set_joint_states', SetJointState)
+        # setup gripper as actionlib
+        self.rgripper = actionlib.SimpleActionClient('r_gripper/gripper_command', GripperCommandAction)
+        self.lgripper = actionlib.SimpleActionClient('l_gripper/gripper_command', GripperCommandAction)
+        self.rgripper.wait_for_server()
+        self.lgripper.wait_for_server()
 
         rospy.logout("--> Gripper are ready for every task.")
+
+    def r_action_gripper(self, value=0):
+        goal = GripperCommandGoal()
+        goal.command.position = value
+        goal.command.max_effort = 10
+        self.rgripper.send_goal_and_wait(goal)
+
+    def l_action_gripper(self, value=0):
+        goal = GripperCommandGoal()
+        goal.command.position = value
+        goal.command.max_effort = 10
+        self.lgripper.send_goal_and_wait(goal)
 
     def some_mvt(self, goal, body):
         """
@@ -286,11 +308,15 @@ def close_oven_door_object():
 
 def open_dish_washer_door_object():
     gripper = Gripper()
-    gripper.mvt_l_gripper(0.54, 0.54, 0.54, 0.54)
-    gripper.mvt_r_gripper(0.54, 0.54, 0.54, 0.54)
+    #gripper.mvt_l_gripper(0.54, 0.54, 0.54, 0.54)
+    #gripper.mvt_r_gripper(0.54, 0.54, 0.54, 0.54)
+    gripper.r_action_gripper(0.54)
+    gripper.l_action_gripper(0.54)
     gripper.some_mvt('iai_kitchen/sink_area_dish_washer_door_handle', 'l_gripper_tool_frame')
-    gripper.mvt_l_gripper(0.1, 0.1, 0.1, 0.1)
-    gripper.mvt_r_gripper(0.1, 0.1, 0.1, 0.1)
+    gripper.r_action_gripper(0.1)
+    gripper.l_action_gripper(0.1)
+    #gripper.mvt_l_gripper(0.1, 0.1, 0.1, 0.1)
+    #gripper.mvt_r_gripper(0.1, 0.1, 0.1, 0.1)
     gripper.open_or_close_with_translation('iai_kitchen/sink_area_dish_washer_door_handle', 'l_gripper_tool_frame', -0.5)
     gripper.set_kitchen_goal('sink_area_dish_washer_door_joint', 0.758)
 
@@ -317,11 +343,15 @@ def close_sink_area_object():
 
 def open_sink_area_object():
     gripper = Gripper()
-    gripper.mvt_l_gripper(0.54, 0.54, 0.54, 0.54)
-    gripper.mvt_r_gripper(0.54, 0.54, 0.54, 0.54)
+    # gripper.mvt_l_gripper(0.54, 0.54, 0.54, 0.54)
+    # gripper.mvt_r_gripper(0.54, 0.54, 0.54, 0.54)
+    gripper.r_action_gripper(0.54)
+    gripper.l_action_gripper(0.54)
     gripper.some_mvt('iai_kitchen/sink_area_left_middle_drawer_handle', 'l_gripper_tool_frame')
-    gripper.mvt_l_gripper(0.1, 0.1, 0.1, 0.1)
-    gripper.mvt_r_gripper(0.1, 0.1, 0.1, 0.1)
+    gripper.r_action_gripper(0.1)
+    gripper.l_action_gripper(0.1)
+    # gripper.mvt_l_gripper(0.1, 0.1, 0.1, 0.1)
+    # gripper.mvt_r_gripper(0.1, 0.1, 0.1, 0.1)
     gripper.open_or_close_with_translation('iai_kitchen/sink_area_left_middle_drawer_handle', 'l_gripper_tool_frame',
                                            -1)
     gripper.set_kitchen_goal('sink_area_left_middle_drawer_main_joint', 0.48)
@@ -409,8 +439,8 @@ if __name__ == '__main__':
     #open_kitchen_island_object()
     #close_kitchen_island_object()
     #open_oven_door_object()
-    #open_dish_washer_door_object()
-    close_dish_washer_door_object()
+    open_dish_washer_door_object()
+    #close_dish_washer_door_object()
     #close_oven_door_object()
     #open_sink_area_object()
     #close_sink_area_object()

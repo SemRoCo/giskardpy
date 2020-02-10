@@ -1536,7 +1536,7 @@ class PreprocessingConstraint(Constraint):
         return soft_constraints
 
 
-class FramePoseConstraint(PreprocessingConstraint):
+class FramePositionConstraint(PreprocessingConstraint):
     # Symbol
     goal_pose = u'goal_pose'
     gain = u'gain'
@@ -1545,7 +1545,7 @@ class FramePoseConstraint(PreprocessingConstraint):
 
     # initializiert mit god_map und name constraint
     def __init__(self, god_map, goal_name, body_name, weight=HIGH_WEIGHT, gain=1, translation_max_speed=0.1):
-        super(FramePoseConstraint, self).__init__(god_map, goal_name, body_name)
+        super(FramePositionConstraint, self).__init__(god_map, goal_name, body_name)
 
         self.goal_name = goal_name
         self.body_name = body_name
@@ -1587,7 +1587,7 @@ class FrameOrientationConstraint(PreprocessingConstraint):
     def __str__(self):
         return u'{}/{}'.format(self.__class__.__name__, self.goal_name)
 
-
+# OpenCloseDrawer
 class FrameTranslationConstraint(PreprocessingConstraint):
     # Symbol
     goal_pose = u'goal_pose'
@@ -1617,7 +1617,7 @@ class FrameTranslationConstraint(PreprocessingConstraint):
     def __str__(self):
         return u'{}/{}'.format(self.__class__.__name__, self.goal_name)
 
-
+# OpenCloseDoor
 class AngularConstraint(PreprocessingConstraint):
     # Symbol
     goal_pose = u'goal_pose'
@@ -1704,20 +1704,18 @@ class AngularConstraint(PreprocessingConstraint):
             upper=desired_axis_angle[2] - current_axis_angle[2],
             weight=self.weight,
             expression=current_axis_angle[2])
-        add_debug_constraint(soft_constraints, str(self) + u'desired angle x', desired_axis_angle[2])
-        add_debug_constraint(soft_constraints, str(self) + u'current angle x', current_axis_angle[2])
-        add_debug_constraint(soft_constraints, str(self) + u'desired angle', desired_angle)
-        add_debug_constraint(soft_constraints, str(self) + u'current angle', current_angle)
-        add_debug_constraint(soft_constraints, str(self) + u'angle', angle)
-        add_debug_constraint(soft_constraints, str(self) + u'pose_door_x', self.pose_child_link.pose.position.x)
-        add_debug_constraint(soft_constraints, str(self) + u'pose_door_y', self.pose_child_link.pose.position.y)
-        add_debug_constraint(soft_constraints, str(self) + u'pose_door_z', self.pose_child_link.pose.position.z)
-        add_debug_constraint(soft_constraints, str(self) + u'pose_door_handlex', self.object_pose_to_robot.pose.position.x)
-        add_debug_constraint(soft_constraints, str(self) + u'pose_door_handley', self.object_pose_to_robot.pose.position.y)
-        add_debug_constraint(soft_constraints, str(self) + u'pose_door_handlez', self.object_pose_to_robot.pose.position.z)
-        add_debug_constraint(soft_constraints, str(self) + u'current_pose_x', current_position[0])
-        add_debug_constraint(soft_constraints, str(self) + u'current_pose_y', current_position[1])
-        add_debug_constraint(soft_constraints, str(self) + u'current_pose_z', current_position[2])
+        #add_debug_constraint(soft_constraints, str(self) + u'desired angle x', desired_axis_angle[0])
+        #add_debug_constraint(soft_constraints, str(self) + u'current angle x', current_axis_angle[0])
+        #add_debug_constraint(soft_constraints, str(self) + u'desired angle y', desired_axis_angle[1])
+        #add_debug_constraint(soft_constraints, str(self) + u'current angle y', current_axis_angle[1])
+        #add_debug_constraint(soft_constraints, str(self) + u'desired angle z', desired_axis_angle[2])
+        #add_debug_constraint(soft_constraints, str(self) + u'current angle z', current_axis_angle[2])
+        #add_debug_constraint(soft_constraints, str(self) + u'desired angle', desired_angle)
+        #add_debug_constraint(soft_constraints, str(self) + u'current angle', current_angle)
+        #add_debug_constraint(soft_constraints, str(self) + u'angle', angle)
+        #add_debug_constraint(soft_constraints, str(self) + u'current_hold_radius', hold_radius)
+        #add_debug_constraint(soft_constraints, str(self) + u'desired_radius', distance_gripper_to_pose_link_child)
+
 
 
         # END ORIENTATION CONSTRAINTS
@@ -1729,7 +1727,7 @@ class AngularConstraint(PreprocessingConstraint):
     def __str__(self):
         return u'{}/{}'.format(self.__class__.__name__, self.goal_name)
 
-
+# TurnRotaryKnob
 class RotationalConstraint(PreprocessingConstraint):
     # Symbol
     goal_pose = u'goal_pose'
@@ -1761,7 +1759,7 @@ class RotationalConstraint(PreprocessingConstraint):
     def __str__(self):
         return u'{}/{}'.format(self.__class__.__name__, self.goal_name)
 
-
+# MoveToPose
 class FrameConstraint(PreprocessingConstraint):
     # Symbol
     goal_pose = u'goal_pose'
@@ -1778,7 +1776,7 @@ class FrameConstraint(PreprocessingConstraint):
         self.body_name = body_name
 
         # load goal
-        self.constraints.append(FramePoseConstraint(god_map, goal_name=goal_name, body_name=body_name,
+        self.constraints.append(FramePositionConstraint(god_map, goal_name=goal_name, body_name=body_name,
                                                     weight=weight, gain=gain,
                                                     translation_max_speed=translation_max_speed))
         self.constraints.append(FrameOrientationConstraint(god_map, goal_name=goal_name, body_name=body_name,

@@ -86,8 +86,8 @@ class Gripper:
         #self.giskard.set_json_goal("TranslationalAngularConstraint", goal_name=goal, body_name=body, action=action)
         #self.giskard.set_json_goal("FrameTranslationConstraint", goal_name=goal, body_name=body, action=action)
         self.giskard.set_json_goal("AngularConstraint", goal_name=goal, body_name=body, action=action)
-        #self.giskard.allow_all_collisions()
-        self.giskard.avoid_all_collisions()
+        self.giskard.allow_all_collisions()
+        #self.giskard.avoid_all_collisions()
         self.giskard.plan_and_execute()
 
     def do_rotational_mvt(self, goal, body, action):
@@ -224,6 +224,18 @@ def set_cart_goal_test():
     poseStamp.pose = kdl_to_pose(pose)
     giskard.set_cart_goal("odom_combined", "r_gripper_tool_frame", poseStamp)
     giskard.allow_all_collisions()
+    giskard.plan_and_execute()
+
+def set_cart_goal_for_basis(x, y, z):
+    giskard = GiskardWrapper()
+    # take base_footprint
+    poseStamp = lookup_pose("odom_combined", "base_footprint")
+    # set goal pose
+    poseStamp.pose.position.x = x
+    poseStamp.pose.position.y = y
+    poseStamp.pose.position.z = z
+    giskard.set_cart_goal("odom_combined", "base_footprint", poseStamp)
+    giskard.avoid_all_collisions()
     giskard.plan_and_execute()
 
 
@@ -372,11 +384,12 @@ if __name__ == '__main__':
     #gripper = Gripper()
     #jl1, ja1 = gripper.info_about_joints('oven_area_oven_knob_stove_4_joint')
     #print(jl1, ja1)
-    open_fridge_door()
+    #set_cart_goal_for_basis(0.106, -1.088, 0.000)
+    #open_fridge_door()
     #close_fridge_door()
     #open_kitchen_island_object()
     #close_kitchen_island_object()
-    #open_oven_door_object()
+    open_oven_door_object()
     #close_oven_door_object()
     #open_sink_area_object()
     #close_sink_area_object()

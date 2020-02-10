@@ -1444,7 +1444,7 @@ class PreprocessingConstraint(Constraint):
             rospy.logout("the child link of joint is: ")
             rospy.logout(child_link)
             utils = Utils()
-            if self.joint_name == "oven_area_oven_door_joint":
+            if self.joint_name == "oven_area_oven_door_joint" or self.joint_name == "sink_area_dish_washer_door_joint":
                 self.axis = [0, 1, 0]
                 limit = 1.57
                 opening = limit * self.action

@@ -1,11 +1,10 @@
 import keyword
-import numpy as np
 import yaml
 from multiprocessing import Queue
-from numpy import pi
 from threading import Thread
 
 import hypothesis.strategies as st
+import numpy as np
 import rospy
 from angles import shortest_angular_distance
 from geometry_msgs.msg import PoseStamped, Pose, Point, Quaternion
@@ -14,6 +13,7 @@ from giskard_msgs.srv import UpdateWorldResponse
 from hypothesis import assume
 from hypothesis.strategies import composite
 from iai_naive_kinematics_sim.srv import SetJointState, SetJointStateRequest
+from numpy import pi
 from py_trees import Blackboard
 from sensor_msgs.msg import JointState
 from tf.transformations import rotation_from_matrix, quaternion_matrix
@@ -24,7 +24,6 @@ from giskardpy.identifier import robot, world
 from giskardpy.pybullet_world import PyBulletWorld
 from giskardpy.python_interface import GiskardWrapper
 from giskardpy.symengine_robot import Robot
-from giskardpy.symengine_wrappers import axis_angle_from_quaternion
 from giskardpy.tfwrapper import transform_pose, lookup_pose
 from giskardpy.utils import msg_to_list, KeyDefaultDict, dict_to_joint_states, get_ros_pkg_path, to_joint_state_dict2
 
@@ -187,7 +186,7 @@ def unit_vector(length, elements=None):
         v = [round(x, 4) for x in v]
         l = np.linalg.norm(v)
         if l == 0:
-            return np.array([0]*(length-1)+[1])
+            return np.array([0] * (length - 1) + [1])
         return np.array([x / l for x in v])
 
     return st.builds(normalize, vector)
@@ -210,7 +209,7 @@ class GiskardTestWrapper(object):
             config = yaml.load(f)
         rospy.set_param(u'~', config)
         rospy.set_param(u'~path_to_data_folder', u'tmp_data/')
-        rospy.set_param(u'~enable_gui', False)
+        rospy.set_param(u'~enable_gui', True)
 
         self.sub_result = rospy.Subscriber(u'/giskardpy/command/result', MoveActionResult, self.cb, queue_size=100)
 
@@ -385,12 +384,12 @@ class GiskardTestWrapper(object):
         self.wrapper.set_cart_goal(root, tip, goal_pose)
 
     def set_and_check_cart_goal(self, goal_pose, tip, root=None, expected_error_code=MoveResult.SUCCESS):
-        goal_pose = transform_pose(u'map', goal_pose)
+        goal_pose_in_map = transform_pose(u'map', goal_pose)
         self.set_cart_goal(goal_pose, tip, root)
         self.loop_once()
         self.send_and_check_goal(expected_error_code)
         self.loop_once()
-        self.check_cart_goal(tip, goal_pose)
+        self.check_cart_goal(tip, goal_pose_in_map)
 
     def check_cart_goal(self, tip, goal_pose):
         goal_in_base = transform_pose(u'map', goal_pose)
@@ -593,7 +592,7 @@ class GiskardTestWrapper(object):
         self.loop_once()
 
     def attach_cylinder(self, name=u'cylinder', height=1, radius=1, frame_id=None, position=None, orientation=None,
-                   expected_response=UpdateWorldResponse.SUCCESS):
+                        expected_response=UpdateWorldResponse.SUCCESS):
         scm = self.get_robot().get_self_collision_matrix()
         expected_pose = PoseStamped()
         expected_pose.header.frame_id = frame_id
@@ -690,10 +689,10 @@ class PR2(GiskardTestWrapper):
         goal_pose = transform_pose(self.default_root, goal_pose)
         js = {u'odom_x_joint': goal_pose.pose.position.x,
               u'odom_y_joint': goal_pose.pose.position.y,
-              u'odom_z_joint': float(axis_angle_from_quaternion(goal_pose.pose.orientation.x,
-                                                                goal_pose.pose.orientation.y,
-                                                                goal_pose.pose.orientation.z,
-                                                                goal_pose.pose.orientation.w)[1])}
+              u'odom_z_joint': rotation_from_matrix(quaternion_matrix([goal_pose.pose.orientation.x,
+                                                                       goal_pose.pose.orientation.y,
+                                                                       goal_pose.pose.orientation.z,
+                                                                       goal_pose.pose.orientation.w]))[0]}
         self.send_and_check_joint_goal(js)
 
     def get_l_gripper_links(self):
@@ -796,6 +795,7 @@ class Boxy(GiskardTestWrapper):
         self.allow_all_collisions()
         self.send_and_check_joint_goal(js)
 
+
 class HSR(GiskardTestWrapper):
     def __init__(self):
         self.tip = u'hand_palm_link'
@@ -806,9 +806,9 @@ class HSR(GiskardTestWrapper):
         js = {u'odom_x': goal_pose.pose.position.x,
               u'odom_y': goal_pose.pose.position.y,
               u'odom_t': rotation_from_matrix(quaternion_matrix([goal_pose.pose.orientation.x,
-                                                                       goal_pose.pose.orientation.y,
-                                                                       goal_pose.pose.orientation.z,
-                                                                       goal_pose.pose.orientation.w]))[0]}
+                                                                 goal_pose.pose.orientation.y,
+                                                                 goal_pose.pose.orientation.z,
+                                                                 goal_pose.pose.orientation.w]))[0]}
         self.allow_all_collisions()
         self.send_and_check_joint_goal(js)
 

@@ -24,7 +24,6 @@ from giskardpy.identifier import robot, world
 from giskardpy.pybullet_world import PyBulletWorld
 from giskardpy.python_interface import GiskardWrapper
 from giskardpy.symengine_robot import Robot
-from giskardpy.symengine_wrappers import axis_angle_from_quaternion
 from giskardpy.tfwrapper import transform_pose, lookup_pose
 from giskardpy.utils import msg_to_list, KeyDefaultDict, dict_to_joint_states, get_ros_pkg_path, to_joint_state_dict2
 
@@ -211,7 +210,7 @@ class GiskardTestWrapper(object):
             config = yaml.load(f)
         rospy.set_param(u'~', config)
         rospy.set_param(u'~path_to_data_folder', u'tmp_data/')
-        rospy.set_param(u'~enable_gui', False)
+        rospy.set_param(u'~enable_gui', True)
 
         self.sub_result = rospy.Subscriber(u'/giskardpy/command/result', MoveActionResult, self.cb, queue_size=100)
 
@@ -386,12 +385,12 @@ class GiskardTestWrapper(object):
         self.wrapper.set_cart_goal(root, tip, goal_pose)
 
     def set_and_check_cart_goal(self, goal_pose, tip, root=None, expected_error_code=MoveResult.SUCCESS):
-        goal_pose = transform_pose(u'map', goal_pose)
+        goal_pose_in_map = transform_pose(u'map', goal_pose)
         self.set_cart_goal(goal_pose, tip, root)
         self.loop_once()
         self.send_and_check_goal(expected_error_code)
         self.loop_once()
-        self.check_cart_goal(tip, goal_pose)
+        self.check_cart_goal(tip, goal_pose_in_map)
 
     def check_cart_goal(self, tip, goal_pose):
         goal_in_base = transform_pose(u'map', goal_pose)
@@ -698,10 +697,10 @@ class PR2(GiskardTestWrapper):
         goal_pose = transform_pose(self.default_root, goal_pose)
         js = {u'odom_x_joint': goal_pose.pose.position.x,
               u'odom_y_joint': goal_pose.pose.position.y,
-              u'odom_z_joint': float(axis_angle_from_quaternion(goal_pose.pose.orientation.x,
-                                                                goal_pose.pose.orientation.y,
-                                                                goal_pose.pose.orientation.z,
-                                                                goal_pose.pose.orientation.w)[1])}
+              u'odom_z_joint': rotation_from_matrix(quaternion_matrix([goal_pose.pose.orientation.x,
+                                                                       goal_pose.pose.orientation.y,
+                                                                       goal_pose.pose.orientation.z,
+                                                                       goal_pose.pose.orientation.w]))[0]}
         self.send_and_check_joint_goal(js)
 
     def get_l_gripper_links(self):

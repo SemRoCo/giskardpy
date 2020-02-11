@@ -204,7 +204,7 @@ class GiskardTestWrapper(object):
             config = yaml.load(f)
         rospy.set_param(u'~', config)
         rospy.set_param(u'~path_to_data_folder', u'tmp_data/')
-        rospy.set_param(u'~enable_gui', True)
+        rospy.set_param(u'~enable_gui', False)
 
         self.sub_result = rospy.Subscriber(u'/giskardpy/command/result', MoveActionResult, self.cb, queue_size=100)
 

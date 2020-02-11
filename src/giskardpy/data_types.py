@@ -160,11 +160,11 @@ class Collisions(object):
         :rtype: Collision
         """
         if collision.get_body_b() == self.robot.get_name():
-            return self.transform_self_closest_point(collision)
+            return self.transform_self_collision(collision)
         else:
-            return self.transform_external_closest_point(collision)
+            return self.transform_external_collision(collision)
 
-    def transform_self_closest_point(self, collision):
+    def transform_self_collision(self, collision):
         """
         :type collision: Collision
         :rtype: Collision
@@ -186,7 +186,7 @@ class Collisions(object):
         collision.set_contact_normal_in_root(r_V_n[:-1])
         return collision
 
-    def transform_external_closest_point(self, collision):
+    def transform_external_collision(self, collision):
         """
         :type collision: Collision
         :rtype: Collision

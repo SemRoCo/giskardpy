@@ -132,19 +132,12 @@ class Collisions(object):
         self.root_T_map = to_np(self.robot.root_T_map)
         self.robot_root = self.robot.get_root()
 
-        # FIXME I'm assuming that self collisions only has collisions for pairs of objects
-        #   which results in a list of length 1 always, which is why I don't sort to safe time
-        #   I start with a list of default collisions in case there was none
-        def f1():
-            return [self._default_collision('', '', '')]
-
-
-        def f2():
+        def default_f():
             return SortedKeyList([self._default_collision('', '', '')] * 20,
                                  key=lambda x: x.get_contact_distance())
 
-        self.self_collisions = defaultdict(f2)
-        self.external_collision = defaultdict(f2)
+        self.self_collisions = defaultdict(default_f)
+        self.external_collision = defaultdict(default_f)
         self.all_collisions = set()
 
     def add(self, collision):

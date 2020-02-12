@@ -643,10 +643,11 @@ class GiskardTestWrapper(object):
                                                                                 self.get_god_map().safe_get_data(
                                                                                     identifier.distance_thresholds))
         collisions = self.get_world().check_collisions(collision_matrix)
-        controlled_parent = self.get_robot().get_controlled_parent_joint(link)
-        collision_list = collisions.get_external_collisions(controlled_parent)
+        controlled_parent_joint = self.get_robot().get_controlled_parent_joint(link)
+        controlled_parent_link = self.get_robot().get_child_link_of_joint(controlled_parent_joint)
+        collision_list = collisions.get_external_collisions(controlled_parent_link)
         for key, self_collisions in collisions.self_collisions.items():
-            if controlled_parent in key:
+            if controlled_parent_link in key:
                 collision_list.update(self_collisions)
         return collision_list
 
@@ -655,16 +656,16 @@ class GiskardTestWrapper(object):
             collisions = self.get_external_collisions(link, distance_threshold)
             assert collisions[0].get_contact_distance() >= distance_threshold, \
                 u'distance for {}: {} >= {}'.format(link,
-                                                     collisions[0].get_contact_distance(),
-                                                     distance_threshold)
+                                                    collisions[0].get_contact_distance(),
+                                                    distance_threshold)
 
     def check_cpi_leq(self, links, distance_threshold):
         for link in links:
             collisions = self.get_external_collisions(link, distance_threshold)
-            assert collisions[0].contact_distance <= distance_threshold, \
+            assert collisions[0].get_contact_distance() <= distance_threshold, \
                 u'distance for {}: {} <= {}'.format(link,
-                                                     collisions[0].contact_distance,
-                                                     distance_threshold)
+                                                    collisions[0].get_contact_distance(),
+                                                    distance_threshold)
 
     def move_base(self, goal_pose):
         """

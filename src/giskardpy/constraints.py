@@ -732,10 +732,10 @@ class ExternalCollisionAvoidance(Constraint):
     link_in_chain = u'link_in_chain'
     max_acceleration = u'max_acceleration'
 
-    def __init__(self, god_map, joint_name, repel_velocity=0.1, max_weight_distance=0.0, low_weight_distance=0.01,
+    def __init__(self, god_map, link_name, repel_velocity=0.1, max_weight_distance=0.0, low_weight_distance=0.01,
                  zero_weight_distance=0.05, idx=0, max_acceleration=0.013):
         super(ExternalCollisionAvoidance, self).__init__(god_map)
-        self.joint_name = joint_name
+        self.link_name = link_name
         self.robot_root = self.get_robot().get_root()
         self.robot_name = self.get_robot_unsafe().get_name()
         self.idx = idx
@@ -750,7 +750,7 @@ class ExternalCollisionAvoidance(Constraint):
     def get_contact_normal_on_b_in_root(self):
         return Vector3Input(self.god_map.to_symbol,
                             prefix=identifier.closest_point + [u'get_external_collisions',
-                                                               (self.joint_name,),
+                                                               (self.link_name,),
                                                                self.idx,
                                                                u'get_contact_normal_in_root',
                                                                tuple()]).get_expression()
@@ -758,14 +758,14 @@ class ExternalCollisionAvoidance(Constraint):
     def get_closest_point_on_a_in_a(self):
         return Point3Input(self.god_map.to_symbol,
                            prefix=identifier.closest_point + [u'get_external_collisions',
-                                                              (self.joint_name,),
+                                                              (self.link_name,),
                                                               self.idx,
                                                               u'get_position_on_a_in_a',
                                                               tuple()]).get_expression()
 
     def get_actual_distance(self):
         return self.god_map.to_symbol(identifier.closest_point + [u'get_external_collisions',
-                                                                  (self.joint_name,),
+                                                                  (self.link_name,),
                                                                   self.idx,
                                                                   u'get_contact_distance',
                                                                   tuple()])
@@ -778,8 +778,7 @@ class ExternalCollisionAvoidance(Constraint):
         max_acceleration = self.get_input_float(self.max_acceleration)
         zero_weight_distance = self.get_input_float(self.zero_weight_distance)
 
-        child_link = self.get_robot().get_child_link_of_joint(self.joint_name)
-        r_T_a = self.get_fk(self.robot_root, child_link)
+        r_T_a = self.get_fk(self.robot_root, self.link_name)
 
         r_P_pa = w.dot(r_T_a, a_P_pa)
 
@@ -807,7 +806,7 @@ class ExternalCollisionAvoidance(Constraint):
 
     def __str__(self):
         s = super(ExternalCollisionAvoidance, self).__str__()
-        return u'{}/{}/{}'.format(s, self.joint_name, self.idx)
+        return u'{}/{}/{}'.format(s, self.link_name, self.idx)
 
 
 class SelfCollisionAvoidance(Constraint):

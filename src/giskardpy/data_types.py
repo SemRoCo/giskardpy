@@ -80,6 +80,9 @@ class Collision(object):
     def get_contact_normal_in_b(self):
         return self.__contact_normal_in_b
 
+    def get_contact_normal_in_root(self):
+        return self.__contact_normal_in_root
+
     def get_contact_distance(self):
         return self.__contact_distance
 
@@ -109,6 +112,9 @@ class Collision(object):
 
     def set_contact_normal_in_b(self, normal):
         self.__contact_normal_in_b = normal
+
+    def set_contact_normal_in_root(self, normal):
+        self.__contact_normal_in_root = normal
 
     def set_link_a(self, link_a):
         self.__link_a = link_a
@@ -203,7 +209,7 @@ class Collisions(object):
         r_V_n = np.dot(self.root_T_map, np_vector(*collision.get_contact_normal_in_map()))
         collision.set_position_on_a_in_a(new_a_P_pa[:-1])
         collision.set_position_on_b_in_root(r_P_pb[:-1])
-        collision.set_contact_normal_in_b(r_V_n[:-1])
+        collision.set_contact_normal_in_root(r_V_n[:-1])
         return collision
 
     def _default_collision(self, link_a, body_b, link_b):

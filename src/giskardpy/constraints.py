@@ -747,52 +747,39 @@ class ExternalCollisionAvoidance(Constraint):
                   self.max_acceleration: max_acceleration}
         self.save_params_on_god_map(params)
 
-    def get_distance_to_closest_object(self):
-        return self.get_god_map().to_symbol(identifier.closest_point + [u'get_external_collisions',
-                                                                        (self.joint_name,),
-                                                                        self.idx,
-                                                                        u'min_dist'])
-
-    def get_contact_normal_on_b(self):
+    def get_contact_normal_on_b_in_root(self):
         return Vector3Input(self.god_map.to_symbol,
                             prefix=identifier.closest_point + [u'get_external_collisions',
                                                                (self.joint_name,),
                                                                self.idx,
-                                                               u'contact_normal']).get_expression()
+                                                               u'get_contact_normal_in_root',
+                                                               tuple()]).get_expression()
 
-    def get_closest_point_on_a(self):
+    def get_closest_point_on_a_in_a(self):
         return Point3Input(self.god_map.to_symbol,
                            prefix=identifier.closest_point + [u'get_external_collisions',
                                                               (self.joint_name,),
                                                               self.idx,
-                                                              u'position_on_a']).get_expression()
-
-    def get_closest_point_on_b(self):
-        return Point3Input(self.god_map.to_symbol,
-                           prefix=identifier.closest_point + [u'get_external_collisions',
-                                                              (self.joint_name,),
-                                                              self.idx,
-                                                              u'position_on_b']).get_expression()
+                                                              u'get_position_on_a_in_a',
+                                                              tuple()]).get_expression()
 
     def get_actual_distance(self):
         return self.god_map.to_symbol(identifier.closest_point + [u'get_external_collisions',
                                                                   (self.joint_name,),
                                                                   self.idx,
-                                                                  u'contact_distance'])
+                                                                  u'get_contact_distance',
+                                                                  tuple()])
 
     def make_constraints(self):
-        a_P_pa = self.get_closest_point_on_a()
-        r_V_n = self.get_contact_normal_on_b()
+        a_P_pa = self.get_closest_point_on_a_in_a()
+        r_V_n = self.get_contact_normal_on_b_in_root()
         actual_distance = self.get_actual_distance()
         repel_velocity = self.get_input_float(self.repel_velocity)
         max_acceleration = self.get_input_float(self.max_acceleration)
         zero_weight_distance = self.get_input_float(self.zero_weight_distance)
 
-        # a_T_r = self.get_fk_evaluated(self.joint_name, self.robot_root)
         child_link = self.get_robot().get_child_link_of_joint(self.joint_name)
         r_T_a = self.get_fk(self.robot_root, child_link)
-
-        # a_P_pa = w.dot(a_T_r, r_P_pa)
 
         r_P_pa = w.dot(r_T_a, a_P_pa)
 

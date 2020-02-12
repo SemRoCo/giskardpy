@@ -138,12 +138,12 @@ class Collisions(object):
         def f1():
             return [self._default_collision('', '', '')]
 
-        self.self_collisions = defaultdict(f1)
 
         def f2():
             return SortedKeyList([self._default_collision('', '', '')] * 20,
                                  key=lambda x: x.get_contact_distance())
 
+        self.self_collisions = defaultdict(f2)
         self.external_collision = defaultdict(f2)
         self.all_collisions = set()
 
@@ -156,7 +156,7 @@ class Collisions(object):
         self.all_collisions.add(collision)
 
         if collision.get_body_b() == self.robot.get_name():
-            self.self_collisions[collision.get_link_a(), collision.get_link_b()].insert(0, collision)
+            self.self_collisions[collision.get_link_a(), collision.get_link_b()].add(collision)
         else:
             self.external_collision[collision.get_link_a()].add(collision)
 

@@ -643,10 +643,10 @@ class GiskardTestWrapper(object):
                                                                                 self.get_god_map().safe_get_data(
                                                                                     identifier.distance_thresholds))
         collisions = self.get_world().check_collisions(collision_matrix)
-        # collisions = self.get_world().transform_contact_info(collisions)
-        collision_list = collisions.get_external_collisions(self.get_robot().get_controlled_parent_joint(link))
+        controlled_parent = self.get_robot().get_controlled_parent_joint(link)
+        collision_list = collisions.get_external_collisions(controlled_parent)
         for key, self_collisions in collisions.self_collisions.items():
-            if link in key:
+            if controlled_parent in key:
                 collision_list.update(self_collisions)
         return collision_list
 

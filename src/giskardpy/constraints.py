@@ -819,12 +819,13 @@ class SelfCollisionAvoidance(Constraint):
     link_in_chain = u'link_in_chain'
 
     def __init__(self, god_map, link_a, link_b, repel_velocity=0.1, max_weight_distance=0.0, low_weight_distance=0.01,
-                 zero_weight_distance=0.05):
+                 zero_weight_distance=0.05, idx=0):
         super(SelfCollisionAvoidance, self).__init__(god_map)
         self.link_a = link_a
         self.link_b = link_b
         self.robot_root = self.get_robot().get_root()
         self.robot_name = self.get_robot_unsafe().get_name()
+        self.idx = idx
 
         params = {self.repel_velocity: repel_velocity,
                   self.max_weight_distance: max_weight_distance,
@@ -836,27 +837,30 @@ class SelfCollisionAvoidance(Constraint):
         return Vector3Input(self.god_map.to_symbol,
                             prefix=identifier.closest_point + [u'get_self_collisions',
                                                                (self.link_a, self.link_b),
-                                                               0,
+                                                               self.idx,
                                                                u'get_contact_normal_in_b',
                                                                tuple()]).get_expression()
 
     def get_position_on_a_in_a(self):
         return Point3Input(self.god_map.to_symbol,
                            prefix=identifier.closest_point + [u'get_self_collisions',
-                                                              (self.link_a, self.link_b), 0,
+                                                              (self.link_a, self.link_b),
+                                                              self.idx,
                                                               u'get_position_on_a_in_a',
                                                               tuple()]).get_expression()
 
     def get_b_T_pb(self):
         return TranslationInput(self.god_map.to_symbol,
                                 prefix=identifier.closest_point + [u'get_self_collisions',
-                                                                   (self.link_a, self.link_b), 0,
+                                                                   (self.link_a, self.link_b),
+                                                                   self.idx,
                                                                    u'get_position_on_b_in_b',
                                                                    tuple()]).get_frame()
 
     def get_actual_distance(self):
         return self.god_map.to_symbol(identifier.closest_point + [u'get_self_collisions',
-                                                                  (self.link_a, self.link_b), 0,
+                                                                  (self.link_a, self.link_b),
+                                                                  self.idx,
                                                                   u'get_contact_distance',
                                                                   tuple()])
 
@@ -888,14 +892,13 @@ class SelfCollisionAvoidance(Constraint):
                                               0.06, WEIGHT_MIN)
 
         limit = zero_weight_distance - actual_distance
-        # limit = w.Min(w.Max(limit, -repel_velocity * t), repel_velocity * t)
         limit = self.limit_velocity(limit, repel_velocity)
 
         self.add_constraint(str(self), lower=limit, upper=1e9, weight=weight_f, expression=dist)
 
     def __str__(self):
         s = super(SelfCollisionAvoidance, self).__str__()
-        return u'{}/{}/{}'.format(s, self.link_a, self.link_b)
+        return u'{}/{}/{}/{}'.format(s, self.link_a, self.link_b, self.idx)
 
 
 class AlignPlanes(Constraint):

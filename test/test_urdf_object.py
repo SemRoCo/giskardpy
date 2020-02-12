@@ -1,5 +1,3 @@
-from copy import deepcopy
-
 import pytest
 from geometry_msgs.msg import Pose, Point, Quaternion
 
@@ -1030,7 +1028,7 @@ class TestUrdfObject(object):
     def test_get_chain_joints_false2(self, function_setup):
         parsed_donbot = self.cls(donbot_urdf())
         chain = parsed_donbot.get_chain('base_link', 'plate', joints=False)
-        assert chain == ['base_link', 'base_footprint', 'plate']
+        assert chain == ['base_link', 'plate']
 
     def test_get_chain_1(self, function_setup):
         parsed_donbot = self.cls(donbot_urdf())
@@ -1040,7 +1038,7 @@ class TestUrdfObject(object):
     def test_get_chain_2(self, function_setup):
         parsed_donbot = self.cls(donbot_urdf())
         chain = parsed_donbot.get_chain('base_link', 'plate')
-        assert chain == ['base_link', 'base_footprint_joint', 'base_footprint', 'plate_joint', 'plate']
+        assert chain == ['base_link', 'plate_joint', 'plate']
 
     def test_get_sub_tree_link_names_with_collision_boxy(self, function_setup):
         parsed_boxy = self.cls(boxy_urdf())
@@ -1320,45 +1318,58 @@ class TestUrdfObject(object):
         parsed_donbot = self.cls(donbot_urdf())
         expected = {u'ur5_wrist_3_joint': {u'ur5_wrist_3_link', u'ur5_ee_link', u'gripper_base_link',
                                            u'gripper_gripper_left_link', u'gripper_finger_left_link',
-                                           u'gripper_gripper_right_link', u'gripper_finger_right_link'},
+                                           u'gripper_gripper_right_link', u'gripper_finger_right_link',
+                                           u'camera_holder_link', u'wrist_collision'},
                     u'ur5_elbow_joint': {u'ur5_forearm_link', u'ur5_wrist_1_link', u'ur5_wrist_2_link',
                                          u'ur5_wrist_3_link', u'ur5_ee_link', u'gripper_base_link',
                                          u'gripper_gripper_left_link', u'gripper_finger_left_link',
-                                         u'gripper_gripper_right_link', u'gripper_finger_right_link'},
+                                         u'gripper_gripper_right_link', u'gripper_finger_right_link',
+                                         u'camera_holder_link', u'wrist_collision'},
                     u'ur5_wrist_1_joint': {u'ur5_wrist_1_link', u'ur5_wrist_2_link', u'ur5_wrist_3_link',
                                            u'ur5_ee_link', u'gripper_base_link', u'gripper_gripper_left_link',
                                            u'gripper_finger_left_link', u'gripper_gripper_right_link',
-                                           u'gripper_finger_right_link'},
+                                           u'gripper_finger_right_link',
+                                           u'camera_holder_link', u'wrist_collision'},
                     u'odom_z_joint': {u'base_link', u'plate', u'ur5_base_link', u'ur5_shoulder_link',
                                       u'ur5_upper_arm_link', u'ur5_forearm_link', u'ur5_wrist_1_link',
                                       u'ur5_wrist_2_link', u'ur5_wrist_3_link', u'ur5_ee_link', u'gripper_base_link',
                                       u'gripper_gripper_left_link', u'gripper_finger_left_link',
-                                      u'gripper_gripper_right_link', u'gripper_finger_right_link'},
+                                      u'gripper_gripper_right_link', u'gripper_finger_right_link',
+                                      u'camera_holder_link', u'wrist_collision', u'switches', u'charger', u'wlan',
+                                      u'ur5_touchpad', u'e_stop'},
                     u'ur5_shoulder_lift_joint': {u'ur5_upper_arm_link', u'ur5_forearm_link', u'ur5_wrist_1_link',
                                                  u'ur5_wrist_2_link', u'ur5_wrist_3_link', u'ur5_ee_link',
                                                  u'gripper_base_link', u'gripper_gripper_left_link',
                                                  u'gripper_finger_left_link', u'gripper_gripper_right_link',
-                                                 u'gripper_finger_right_link'},
+                                                 u'gripper_finger_right_link',
+                                                 u'camera_holder_link', u'wrist_collision'},
                     u'odom_y_joint': {u'base_link', u'plate', u'ur5_base_link', u'ur5_shoulder_link',
                                       u'ur5_upper_arm_link', u'ur5_forearm_link', u'ur5_wrist_1_link',
                                       u'ur5_wrist_2_link', u'ur5_wrist_3_link', u'ur5_ee_link', u'gripper_base_link',
                                       u'gripper_gripper_left_link', u'gripper_finger_left_link',
-                                      u'gripper_gripper_right_link', u'gripper_finger_right_link'},
+                                      u'gripper_gripper_right_link', u'gripper_finger_right_link',
+                                      u'camera_holder_link', u'wrist_collision', u'switches', u'charger', u'wlan',
+                                      u'ur5_touchpad', u'e_stop'},
                     u'ur5_wrist_2_joint': {u'ur5_wrist_2_link', u'ur5_wrist_3_link', u'ur5_ee_link',
                                            u'gripper_base_link', u'gripper_gripper_left_link',
                                            u'gripper_finger_left_link', u'gripper_gripper_right_link',
-                                           u'gripper_finger_right_link'},
+                                           u'gripper_finger_right_link',
+                                           u'camera_holder_link', u'wrist_collision'},
                     u'odom_x_joint': {u'base_link', u'plate', u'ur5_base_link', u'ur5_shoulder_link',
                                       u'ur5_upper_arm_link', u'ur5_forearm_link', u'ur5_wrist_1_link',
                                       u'ur5_wrist_2_link', u'ur5_wrist_3_link', u'ur5_ee_link', u'gripper_base_link',
                                       u'gripper_gripper_left_link', u'gripper_finger_left_link',
-                                      u'gripper_gripper_right_link', u'gripper_finger_right_link'},
+                                      u'gripper_gripper_right_link', u'gripper_finger_right_link',
+                                      u'camera_holder_link', u'wrist_collision', u'switches', u'charger', u'wlan',
+                                      u'ur5_touchpad', u'e_stop'},
                     u'ur5_shoulder_pan_joint': {u'ur5_shoulder_link', u'ur5_upper_arm_link', u'ur5_forearm_link',
                                                 u'ur5_wrist_1_link', u'ur5_wrist_2_link', u'ur5_wrist_3_link',
                                                 u'ur5_ee_link', u'gripper_base_link', u'gripper_gripper_left_link',
                                                 u'gripper_finger_left_link', u'gripper_gripper_right_link',
-                                                u'gripper_finger_right_link'},
-                    u'gripper_joint': {u'gripper_gripper_right_link', u'gripper_finger_right_link'}}
+                                                u'gripper_finger_right_link',
+                                                u'camera_holder_link', u'wrist_collision'},
+                    u'gripper_joint': {u'gripper_gripper_right_link', u'gripper_finger_right_link'},
+                    u'refills_finger_joint': {}}
         for joint in parsed_donbot.get_joint_names_controllable():
             assert set(parsed_donbot.get_sub_tree_link_names_with_collision(joint)).difference(expected[joint]) == set()
 

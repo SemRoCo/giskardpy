@@ -157,6 +157,7 @@ class URDFObject(object):
         :rtype: URDFObject
         """
         r = up.Robot(robot_name)
+        r.version = u'1.0'
         for link in links:
             r.add_link(link)
         for joint in joints:

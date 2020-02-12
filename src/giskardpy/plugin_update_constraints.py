@@ -128,6 +128,8 @@ class GoalToConstraints(GetGoal):
                 tmp = link_a
                 link_a = link_b
                 link_b = tmp
+            if (link_a, link_b) in asdf:
+                continue
             asdf.add((link_a, link_b))
             max_weight_distance = min(self.get_god_map().safe_get_data(identifier.distance_thresholds +
                                                                        [link_a, u'max_weight_distance']),

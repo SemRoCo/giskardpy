@@ -845,53 +845,52 @@ class SelfCollisionAvoidance(Constraint):
                   self.zero_weight_distance: zero_weight_distance, }
         self.save_params_on_god_map(params)
 
-    def get_contact_normal_on_b(self):
+    def get_contact_normal_in_b(self):
         return Vector3Input(self.god_map.to_symbol,
                             prefix=identifier.closest_point + [u'get_self_collisions',
                                                                (self.link_a, self.link_b),
                                                                0,
-                                                               u'contact_normal']).get_expression()
+                                                               u'get_contact_normal_in_b',
+                                                               tuple()]).get_expression()
 
-    def get_closest_point_on_a(self):
+    def get_position_on_a_in_a(self):
         return Point3Input(self.god_map.to_symbol,
                            prefix=identifier.closest_point + [u'get_self_collisions',
                                                               (self.link_a, self.link_b), 0,
-                                                              u'position_on_a']).get_expression()
+                                                              u'get_position_on_a_in_a',
+                                                              tuple()]).get_expression()
 
-    def get_r_T_pb(self):
+    def get_b_T_pb(self):
         return TranslationInput(self.god_map.to_symbol,
                                 prefix=identifier.closest_point + [u'get_self_collisions',
                                                                    (self.link_a, self.link_b), 0,
-                                                                   u'position_on_b']).get_frame()
+                                                                   u'get_position_on_b_in_b',
+                                                                   tuple()]).get_frame()
 
     def get_actual_distance(self):
         return self.god_map.to_symbol(identifier.closest_point + [u'get_self_collisions',
                                                                   (self.link_a, self.link_b), 0,
-                                                                  u'contact_distance'])
+                                                                  u'get_contact_distance',
+                                                                  tuple()])
 
     def make_constraints(self):
         repel_velocity = self.get_input_float(self.repel_velocity)
         zero_weight_distance = self.get_input_float(self.zero_weight_distance)
         actual_distance = self.get_actual_distance()
 
-        r_T_b = self.get_fk_evaluated(self.robot_root, self.link_b)
-
         movable_joint = self.get_robot().get_controlled_parent_joint(self.link_a)
         f = self.get_robot().get_child_link_of_joint(movable_joint)
         a_T_f = self.get_fk_evaluated(self.link_a, f)
 
         b_T_a = self.get_fk(self.link_b, self.link_a)
-        pb_T_r = w.inverse_frame(self.get_r_T_pb())
-        f_P_pa = self.get_closest_point_on_a()
+        pb_T_b = w.inverse_frame(self.get_b_T_pb())
+        f_P_pa = self.get_position_on_a_in_a()
 
-        r_V_n = self.get_contact_normal_on_b()
+        pb_V_n = self.get_contact_normal_in_b()
 
-        pb_T_b = w.dot(pb_T_r, r_T_b)
         a_P_pa = w.dot(a_T_f, f_P_pa)
 
         pb_P_pa = w.dot(pb_T_b, b_T_a, a_P_pa)
-
-        pb_V_n = w.dot(pb_T_r, r_V_n)
 
         dist = w.dot(pb_V_n.T, pb_P_pa)[0]
 

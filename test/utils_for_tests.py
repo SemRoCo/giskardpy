@@ -643,7 +643,7 @@ class GiskardTestWrapper(object):
                                                                                 self.get_god_map().safe_get_data(
                                                                                     identifier.distance_thresholds))
         collisions = self.get_world().check_collisions(collision_matrix)
-        collisions = self.get_world().transform_contact_info(collisions)
+        # collisions = self.get_world().transform_contact_info(collisions)
         collision_list = collisions.get_external_collisions(self.get_robot().get_controlled_parent_joint(link))
         for key, self_collisions in collisions.self_collisions.items():
             if link in key:
@@ -653,9 +653,9 @@ class GiskardTestWrapper(object):
     def check_cpi_geq(self, links, distance_threshold):
         for link in links:
             collisions = self.get_external_collisions(link, distance_threshold)
-            assert collisions[0].contact_distance >= distance_threshold, \
+            assert collisions[0].get_contact_distance() >= distance_threshold, \
                 u'distance for {}: {} >= {}'.format(link,
-                                                     collisions[0].contact_distance,
+                                                     collisions[0].get_contact_distance(),
                                                      distance_threshold)
 
     def check_cpi_leq(self, links, distance_threshold):

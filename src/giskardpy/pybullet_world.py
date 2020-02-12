@@ -44,7 +44,7 @@ class PyBulletWorld(World):
         :type self_collision_d: float
         :type enable_self_collision: bool
         :return: (robot_link, body_b, link_b) -> Collision
-        :rtype: dict
+        :rtype: Collisions
         """
         collisions = Collisions(self.robot)
         robot_name = self.robot.get_name()

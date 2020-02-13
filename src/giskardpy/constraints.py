@@ -733,7 +733,7 @@ class ExternalCollisionAvoidance(Constraint):
     max_acceleration = u'max_acceleration'
 
     def __init__(self, god_map, link_name, repel_velocity=0.1, max_weight_distance=0.0, low_weight_distance=0.01,
-                 zero_weight_distance=0.05, idx=0, max_acceleration=0.013):
+                 zero_weight_distance=0.05, idx=0, max_acceleration=0.005):
         super(ExternalCollisionAvoidance, self).__init__(god_map)
         self.link_name = link_name
         self.robot_root = self.get_robot().get_root()

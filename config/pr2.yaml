@@ -1,6 +1,7 @@
 general_options:
   sample_period: 0.05 # time[s] between points of generated joint trajectory
   map_frame: map
+  debug: False # enables debug prints and prints the behavior tree state in the terminal
   fill_velocity_values: True # due to a bug, the pr2 does not want the velocity values to be filled
   joint_convergence_threshold: 0.01 # when the velocities fall below this value, the planning succeeds
   joint_vel_limit: # giskard will use the min of this number and limits from the urdf
@@ -36,7 +37,6 @@ plugins:
     wiggle_detection_threshold: 10
     min_wiggle_frequency: 3
 behavior_tree:
-  debug: False # prints the behavior tree state in the terminal
   tree_tick_rate: 0.1 # how often the tree updates. lower numbers increase responsiveness, but waste cpu time while idle
 collision_avoidance:
   distance_thresholds:

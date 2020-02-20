@@ -157,6 +157,7 @@ class URDFObject(object):
         :rtype: URDFObject
         """
         r = up.Robot(robot_name)
+        r.version = u'1.0'
         for link in links:
             r.add_link(link)
         for joint in joints:
@@ -587,7 +588,10 @@ class URDFObject(object):
         """
         :rtype: URDFObject
         """
-        sub_tree = self.get_sub_tree_at_joint(joint_name)
+        try:
+            sub_tree = self.get_sub_tree_at_joint(joint_name)
+        except KeyError:
+            raise KeyError(u'can\'t detach at unknown joint: {}'.format(joint_name))
         for link in sub_tree.get_link_names():
             self._urdf_robot.remove_aggregate(self.get_urdf_link(link))
         for joint in chain([joint_name], sub_tree.get_joint_names()):

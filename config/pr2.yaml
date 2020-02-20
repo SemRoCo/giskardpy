@@ -22,7 +22,7 @@ general_options:
     odom_x_joint: 1
     odom_y_joint: 1
     odom_z_joint: 1
-    torso_lift_joint: 0.5
+    torso_lift_joint: 0.001
 qp_solver:
   nWSR: None # None results in a nWSR estimation that's fine most of the time
 plugins:

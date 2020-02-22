@@ -1154,3 +1154,13 @@ def entrywise_product(matrix1, matrix2):
         for j in range(matrix1.shape[1]):
             result[i, j] = matrix1[i, j] * matrix2[i, j]
     return result
+
+def get_angle_casadi(point1, point2, point3):
+    v12 = vector3(*point1) - vector3(*point2)
+    v13 = vector3(*point1) - vector3(*point3)
+    v23 = vector3(*point2) - vector3(*point3)
+    d12 = norm(v12)
+    d13 = norm(v13)
+    d23 = norm(v23)
+    #return w.acos(w.dot(v12, v13.T)[0] / (d12 * d13))
+    return acos((d12**2 + d13**2 - d23**2) / (2 * d12 * d13))

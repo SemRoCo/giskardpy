@@ -1,6 +1,6 @@
 general_options:
+  debug: False # prints the behavior tree state in the terminal
   sample_period: 0.05 # time[s] between points of generated joint trajectory
-  debug: False # enables debug prints and prints the behavior tree state in the terminal
   map_frame: map
   fill_velocity_values: True # due to a bug, the pr2 does not want the velocity values to be filled
   joint_convergence_threshold: 0.01 # when the velocities fall below this value, the planning succeeds
@@ -18,19 +18,18 @@ general_options:
     angular:
       default: 100
   joint_weights: # the planner prefers low weight joints to achieve solutions
-    default: 0.0001
-    odom_x_joint: 1
-    odom_y_joint: 1
-    odom_z_joint: 1
-    torso_lift_joint: 0.5
+    default: 0.001
+    odom_x_joint: 0.001
+    odom_y_joint: 0.001
+    odom_z_joint: 0.001
 qp_solver:
-  nWSR: None # None results in a nWSR estimation that's fine most of the time
+  nWSR: None # None results in a nWSR estimation thats fine most of the time
 plugins:
   VisualizationBehavior: # planning visualization through markers, slows planning down a little bit
     enabled: True
   CPIMarker: # contact visualization, slows planning down a little bit
     enabled: True
-  PlotTrajectory: # plots the joint trajectory at the end of planning, useful for debugging
+  PlotTrajectory: # plots the joint trajectory at the end of planning
     enabled: True
   WiggleCancel: # cancels planning if high frequencies are detected in the trajectory
     fft_duration: 3
@@ -41,15 +40,23 @@ behavior_tree:
 collision_avoidance:
   distance_thresholds:
     default:
-      max_weight_distance: 0.0 # at this distance in [cm] the collision avoidance repells with maximum force
-      low_weight_distance: 0.01 # most goals are able to push past this threshold, if there is a conflict
-      zero_weight_distance: 0.05 # at this distance the collision avoidance becomes active
+      max_weight_distance: 0.0
+      low_weight_distance: 0.01
+      zero_weight_distance: 0.05
+    high: &high
+      max_weight_distance: 0.01
+      low_weight_distance: 0.03
+      zero_weight_distance: 0.05
+    low: &low
+      max_weight_distance: 0.005
+      low_weight_distance: 0.01
+      zero_weight_distance: 0.02
     base_link:
       max_weight_distance: 0.04
       low_weight_distance: 0.06
       zero_weight_distance: 0.09
-  self_collision_avoidance: # each pair of links in the collision matrix get push away from each other
-    ignore: [] # list pairs of links that should be removed from the self collision avoidance
-    add: [] # list pairs of links that should be added to the self collision matrix
+  self_collision_avoidance:
+    ignore: []
+    add: []
   external_collision_avoidance:
-    number_of_repeller: 5 # each movable joint gets pushed away from the 5 objects closest to it
+    number_of_repeller: 5

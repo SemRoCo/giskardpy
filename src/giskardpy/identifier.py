@@ -38,11 +38,13 @@ rosparam = [u'rosparam']
 gui = rosparam + [u'enable_gui']
 data_folder = rosparam + [u'path_to_data_folder']
 
+
 # config file
 # general options
 general_options = rosparam + [u'general_options']
 sample_period = general_options + [u'sample_period']
 map_frame = general_options + [u'map_frame']
+debug = general_options + [u'debug']
 fill_velocity_values = general_options + [u'fill_velocity_values']
 joint_convergence_threshold = general_options + [u'joint_convergence_threshold']
 
@@ -76,7 +78,6 @@ min_wiggle_frequency = plugins + [u'WiggleCancel', u'min_wiggle_frequency']
 
 # behavior tree
 behavior_tree = rosparam + [u'behavior_tree']
-debug = behavior_tree + [u'debug']
 tree_tick_rate = behavior_tree + [u'tree_tick_rate']
 
 # collision avoidance

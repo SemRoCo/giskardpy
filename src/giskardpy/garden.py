@@ -67,7 +67,7 @@ def initialize_god_map():
                                                        timeout=5.0).joint_names
         except ROSException as e:
             logging.logerr(u'state topic not available')
-            logging.logerr(e)
+            logging.logerr(str(e))
         else:
             break
         rospy.sleep(0.5)

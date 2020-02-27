@@ -4,13 +4,17 @@ from giskardpy import identifier
 
 
 def debug():
-    if debug.param == None:
-        l = identifier.debug
-        param_name = '/giskard/' + '/'.join(s for s in l[1:])
-        debug.param = rospy.get_param(param_name)
-        return debug.param
-    else:
-        return debug.param
+    try:
+        if debug.param == None:
+            l = identifier.debug
+            param_name = '/giskard/' + '/'.join(s for s in l[1:])
+            debug.param = rospy.get_param(param_name)
+            return debug.param
+        else:
+            return debug.param
+    except KeyError:
+        pass
+    return False
 
 debug.param = None
 

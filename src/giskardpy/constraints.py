@@ -503,10 +503,12 @@ class CartesianOrientationSlerp(BasicCartesianConstraint):
         error_angle = w.diffable_abs(error_angle)
 
         _, angle = w.diffable_axis_angle_from_matrix(r_R_c)
-        capped_angle = self.limit_acceleration(angle,
-                                               error_angle,
-                                               max_acceleration,
-                                               max_velocity) / error_angle
+        # capped_angle = self.limit_acceleration(angle,
+        #                                        error_angle,
+        #                                        max_acceleration,
+        #                                        max_velocity) / error_angle
+
+        capped_angle = self.limit_velocity(error_angle, max_velocity) / error_angle
 
         r_R_c_q = w.quaternion_from_matrix(r_R_c)
         r_R_g_q = w.quaternion_from_matrix(r_R_g)

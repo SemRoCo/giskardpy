@@ -72,9 +72,8 @@ plugins = rosparam + [u'plugins']
 enable_VisualizationBehavior = plugins + [u'VisualizationBehavior', u'enabled']
 enable_CPIMarker = plugins + [u'CPIMarker', u'enabled']
 enable_PlotTrajectory = plugins + [u'PlotTrajectory', u'enabled']
-fft_duration = plugins + [u'WiggleCancel', u'fft_duration']
 wiggle_detection_threshold = plugins + [u'WiggleCancel', u'wiggle_detection_threshold']
-min_wiggle_frequency = plugins + [u'WiggleCancel', u'min_wiggle_frequency']
+num_samples_in_fft = plugins + [u'WiggleCancel', u'num_samples_in_fft']
 
 # behavior tree
 behavior_tree = rosparam + [u'behavior_tree']

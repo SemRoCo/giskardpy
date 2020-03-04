@@ -10,22 +10,22 @@ import numpy as np
 import matplotlib.pyplot as plt
 from collections import defaultdict
 
-#fast
 
 class WiggleCancel(GiskardBehavior):
     def __init__(self, name):
         super(WiggleCancel, self).__init__(name)
-        self.fft_duration = self.get_god_map().safe_get_data(identifier.fft_duration)
-        self.wiggle_detection_threshold = self.get_god_map().safe_get_data(identifier.wiggle_detection_threshold)
-        self.min_wiggle_frequency = self.get_god_map().safe_get_data(identifier.min_wiggle_frequency)
-        self.sample_period = self.get_god_map().safe_get_data(identifier.sample_period)
-        self.num_points_in_fft = int(self.fft_duration / self.sample_period)
 
 
     def initialise(self):
+        super(WiggleCancel, self).initialise()
         self.past_joint_states = set()
         self.joint_dict = defaultdict(list)
-        super(WiggleCancel, self).initialise()
+        self.wiggle_detection_threshold = self.get_god_map().safe_get_data(identifier.wiggle_detection_threshold)
+        self.sample_period = self.get_god_map().safe_get_data(identifier.sample_period)
+        self.max_detectable_freq = 1 / (2 * self.sample_period)
+        self.min_wiggle_frequency = 0.7 * self.max_detectable_freq
+        self.num_samples_in_fft = self.get_god_map().safe_get_data(identifier.num_samples_in_fft)
+
 
     def update(self):
         latest_points = self.get_god_map().safe_get_data(identifier.joint_states)
@@ -33,10 +33,10 @@ class WiggleCancel(GiskardBehavior):
         for key in latest_points:
             self.joint_dict[key].append(latest_points[key].velocity)
 
-        if len(self.joint_dict.values()[0]) < self.num_points_in_fft:
+        if len(self.joint_dict.values()[0]) < self.num_samples_in_fft:
             return Status.RUNNING
 
-        if len(self.joint_dict.values()[0]) > self.num_points_in_fft:
+        if len(self.joint_dict.values()[0]) > self.num_samples_in_fft:
             for val in self.joint_dict.values():
                 del (val[0])
 
@@ -48,7 +48,7 @@ class WiggleCancel(GiskardBehavior):
         if len(joints_filtered) == 0:
             return Status.RUNNING
 
-        freq = np.fft.rfftfreq(self.num_points_in_fft, d=self.sample_period)
+        freq = np.fft.rfftfreq(self.num_samples_in_fft, d=self.sample_period)
 
         # find index in frequency list where frequency >= min_wiggle_frequency
         freq_idx = next(i for i,v in enumerate(freq) if v >= self.min_wiggle_frequency)

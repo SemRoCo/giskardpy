@@ -29,9 +29,8 @@ plugins:
   PlotTrajectory: # plots the joint trajectory at the end of planning
     enabled: True
   WiggleCancel: # cancels planning if high frequencies are detected in the trajectory
-    fft_duration: 3
     wiggle_detection_threshold: 10
-    min_wiggle_frequency: 3
+    num_samples_in_fft: 50 # the number of most recent sample points taken into account for the fft. Lower numbers are faster at detecting wiggling but also more prone to missdetections.
 behavior_tree:
   tree_tick_rate: 0.1 # how often the tree updates. lower numbers increase responsiveness, but waste cpu time while idle
 collision_avoidance:

@@ -27,6 +27,7 @@ import actionlib
 from control_msgs.msg import GripperCommandAction, GripperCommandGoal
 from pr2_controllers_msgs.msg import Pr2GripperCommandAction, Pr2GripperCommandActionGoal
 
+
 class TaskConstraint:
     """
     the class helps to select the necessary constraints, to select the gripper and to check the orientation of the base.
@@ -39,6 +40,7 @@ class TaskConstraint:
     _origin = ""
     # goal frame
     _goal = ""
+
     def __init__(self):
         print("Taskconstraint is initialized !")
         self._giskard = GiskardWrapper()
@@ -70,7 +72,7 @@ class TaskConstraint:
 
     def update_basis_orientation(self):
         """
-        This function update the orientation of the basis
+        This function update the orientation of the basis and get the next Gripper in short distance from goal
         :return:
         """
         x, y, r = self.get_current_base_position()
@@ -102,9 +104,9 @@ class TaskConstraint:
         # update basis orientation
         self.set_cart_goal_for_basis(x, y, 0, q)
 
+    #@staticmethod
     def get_x_y(self, pose):
         return [pose.pose.position.x, pose.pose.position.y, 0]
-
 
     def get_current_base_position(self):
         """
@@ -113,7 +115,8 @@ class TaskConstraint:
         """
         basis = tf_wrapper.lookup_pose(self._origin, "base_footprint")
         t, r = [basis.pose.position.x, basis.pose.position.y, basis.pose.position.z], \
-               [basis.pose.orientation.x, basis.pose.orientation.y, basis.pose.orientation.z, basis.pose.orientation.w]# self.get_msg_translation_and_rotation(self._basis, "map")
+               [basis.pose.orientation.x, basis.pose.orientation.y, basis.pose.orientation.z,
+                basis.pose.orientation.w]  # self.get_msg_translation_and_rotation(self._basis, "map")
         return self.base_position(t, r)
 
     def base_position(self, translation, rotation):

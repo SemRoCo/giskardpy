@@ -108,8 +108,8 @@ class Gripper:
         :return:
         """
         # self.giskard.set_json_goal("TranslationalAngularConstraint", goal_name=goal, body_name=body, action=action)
-        self.giskard.set_json_goal("FrameTranslationConstraint", goal_name=goal, body_name=body, action=action)
-        # self.giskard.set_json_goal("AngularConstraint", goal_name=goal, body_name=body, action=action)
+        #self.giskard.set_json_goal("FrameTranslationConstraint", goal_name=goal, body_name=body, action=action)
+        self.giskard.set_json_goal("AngularConstraint", goal_name=goal, body_name=body, action=action)
         self.giskard.allow_all_collisions()
         # self.giskard.avoid_all_collisions()
         self.giskard.plan_and_execute()
@@ -270,24 +270,24 @@ def open_kitchen_island_object():
     gripper = Gripper()
     gripper.mvt_l_gripper(0.54, 0.54, 0.54, 0.54)
     gripper.mvt_r_gripper(0.54, 0.54, 0.54, 0.54)
-    gripper.some_mvt("iai_kitchen/kitchen_island_left_lower_drawer_handle", "l_gripper_tool_frame")
+    gripper.some_mvt("iai_kitchen/kitchen_island_left_upper_drawer_handle", "r_gripper_tool_frame")
     gripper.mvt_l_gripper(0.1, 0.1, 0.1, 0.1)
     gripper.mvt_r_gripper(0.1, 0.1, 0.1, 0.1)
-    gripper.open_or_close_with_translation("iai_kitchen/kitchen_island_left_lower_drawer_handle",
-                                           "l_gripper_tool_frame", 1)
-    gripper.set_kitchen_goal("kitchen_island_left_lower_drawer_main_joint", 0.48)
+    gripper.open_or_close_with_translation("iai_kitchen/kitchen_island_left_upper_drawer_handle",
+                                           "r_gripper_tool_frame", 1)
+    gripper.set_kitchen_goal("kitchen_island_left_upper_drawer_main_joint", 0.48)
 
 
 def close_kitchen_island_object():
     gripper = Gripper()
     gripper.mvt_l_gripper(0.54, 0.54, 0.54, 0.54)
     gripper.mvt_r_gripper(0.54, 0.54, 0.54, 0.54)
-    gripper.some_mvt("iai_kitchen/kitchen_island_left_lower_drawer_handle", "r_gripper_tool_frame")
+    gripper.some_mvt("iai_kitchen/kitchen_island_left_upper_drawer_handle", "r_gripper_tool_frame")
     gripper.mvt_l_gripper(0.1, 0.1, 0.1, 0.1)
     gripper.mvt_r_gripper(0.1, 0.1, 0.1, 0.1)
-    gripper.open_or_close_with_translation("iai_kitchen/kitchen_island_left_lower_drawer_handle",
+    gripper.open_or_close_with_translation("iai_kitchen/kitchen_island_left_upper_drawer_handle",
                                            "r_gripper_tool_frame", -1)
-    gripper.set_kitchen_goal("kitchen_island_left_lower_drawer_main_joint", 0.0)
+    gripper.set_kitchen_goal("kitchen_island_left_upper_drawer_main_joint", 0.0)
 
 
 def open_oven_door_object():
@@ -314,15 +314,15 @@ def close_oven_door_object():
 
 def open_dish_washer_door_object():
     gripper = Gripper()
-    # gripper.mvt_l_gripper(0.54, 0.54, 0.54, 0.54)
-    # gripper.mvt_r_gripper(0.54, 0.54, 0.54, 0.54)
-    gripper.r_action_gripper(0.1)
-    gripper.l_action_gripper(0.1)
+    gripper.mvt_l_gripper(0.54, 0.54, 0.54, 0.54)
+    gripper.mvt_r_gripper(0.54, 0.54, 0.54, 0.54)
+    #gripper.r_action_gripper(0.1)
+    #gripper.l_action_gripper(0.1)
     gripper.some_mvt('iai_kitchen/sink_area_dish_washer_door_handle', 'l_gripper_tool_frame')
-    gripper.r_action_gripper(0.05)
-    gripper.l_action_gripper(0.05)
-    # gripper.mvt_l_gripper(0.1, 0.1, 0.1, 0.1)
-    # gripper.mvt_r_gripper(0.1, 0.1, 0.1, 0.1)
+    #gripper.r_action_gripper(0.05)
+    #gripper.l_action_gripper(0.05)
+    gripper.mvt_l_gripper(0.1, 0.1, 0.1, 0.1)
+    gripper.mvt_r_gripper(0.1, 0.1, 0.1, 0.1)
     gripper.open_or_close_with_translation('iai_kitchen/sink_area_dish_washer_door_handle', 'l_gripper_tool_frame',
                                            -0.5)
     gripper.set_kitchen_goal('sink_area_dish_washer_door_joint', 0.758)
@@ -330,9 +330,13 @@ def open_dish_washer_door_object():
 
 def close_dish_washer_door_object():
     gripper = Gripper()
+    # gripper.r_action_gripper(0.1)
+    # gripper.l_action_gripper(0.1)
     gripper.mvt_l_gripper(0.54, 0.54, 0.54, 0.54)
     gripper.mvt_r_gripper(0.54, 0.54, 0.54, 0.54)
     gripper.some_mvt('iai_kitchen/sink_area_dish_washer_door_handle', 'l_gripper_tool_frame')
+    # gripper.r_action_gripper(0.05)
+    # gripper.l_action_gripper(0.05)
     gripper.mvt_l_gripper(0.1, 0.1, 0.1, 0.1)
     gripper.mvt_r_gripper(0.1, 0.1, 0.1, 0.1)
     gripper.open_or_close_with_translation('iai_kitchen/sink_area_dish_washer_door_handle', 'l_gripper_tool_frame', 0.5)
@@ -341,9 +345,13 @@ def close_dish_washer_door_object():
 
 def close_sink_area_object():
     gripper = Gripper()
+    # gripper.r_action_gripper(0.1)
+    # gripper.l_action_gripper(0.1)
     gripper.mvt_l_gripper(0.54, 0.54, 0.54, 0.54)
     gripper.mvt_r_gripper(0.54, 0.54, 0.54, 0.54)
     gripper.some_mvt('iai_kitchen/sink_area_left_middle_drawer_handle', 'l_gripper_tool_frame')
+    # gripper.r_action_gripper(0.05)
+    # gripper.l_action_gripper(0.05)
     gripper.mvt_l_gripper(0.1, 0.1, 0.1, 0.1)
     gripper.mvt_r_gripper(0.1, 0.1, 0.1, 0.1)
     gripper.open_or_close_with_translation('iai_kitchen/sink_area_left_middle_drawer_handle', 'l_gripper_tool_frame',
@@ -369,20 +377,28 @@ def open_sink_area_object():
 
 def open_fridge_door():
     gripper = Gripper()
+    # gripper.r_action_gripper(0.1)
+    # gripper.l_action_gripper(0.1)
     gripper.mvt_l_gripper(0.54, 0.54, 0.54, 0.54)
     gripper.mvt_r_gripper(0.54, 0.54, 0.54, 0.54)
     gripper.some_mvt('iai_kitchen/iai_fridge_door_handle', 'r_gripper_tool_frame')
+    # gripper.r_action_gripper(0.05)
+    # gripper.l_action_gripper(0.05)
     gripper.mvt_l_gripper(0.1, 0.1, 0.1, 0.1)
     gripper.mvt_r_gripper(0.1, 0.1, 0.1, 0.1)
-    gripper.open_or_close_with_translation('iai_kitchen/iai_fridge_door_handle', 'r_gripper_tool_frame', 1)
-    gripper.set_kitchen_goal('iai_fridge_door_joint', 1.57)
+    gripper.open_or_close_with_translation('iai_kitchen/iai_fridge_door_handle', 'r_gripper_tool_frame', 0.5)
+    gripper.set_kitchen_goal('iai_fridge_door_joint', 0.785)
 
 
 def close_fridge_door():
     gripper = Gripper()
+    # gripper.r_action_gripper(0.1)
+    # gripper.l_action_gripper(0.1)
     gripper.mvt_l_gripper(0.54, 0.54, 0.54, 0.54)
     gripper.mvt_r_gripper(0.54, 0.54, 0.54, 0.54)
     gripper.some_mvt('iai_kitchen/iai_fridge_door_handle', 'r_gripper_tool_frame')
+    # gripper.r_action_gripper(0.05)
+    # gripper.l_action_gripper(0.05)
     gripper.mvt_l_gripper(0.1, 0.1, 0.1, 0.1)
     gripper.mvt_r_gripper(0.1, 0.1, 0.1, 0.1)
     gripper.open_or_close_with_translation('iai_kitchen/iai_fridge_door_handle', 'r_gripper_tool_frame', -1)
@@ -391,11 +407,15 @@ def close_fridge_door():
 
 def rotate_oven_knob():
     gripper = Gripper()
+    # gripper.r_action_gripper(0.1)
+    # gripper.l_action_gripper(0.1)
     gripper.mvt_l_gripper(0.54, 0.54, 0.54, 0.54)
     gripper.mvt_r_gripper(0.54, 0.54, 0.54, 0.54)
     gripper.some_mvt('iai_kitchen/oven_area_oven_knob_stove_4', 'l_gripper_tool_frame')
     gripper.mvt_l_gripper(0.1, 0.1, 0.1, 0.1)
     gripper.mvt_r_gripper(0.1, 0.1, 0.1, 0.1)
+    # gripper.r_action_gripper(0.05)
+    # gripper.l_action_gripper(0.05)
     gripper.do_rotational_mvt('iai_kitchen/oven_area_oven_knob_stove_4', 'l_gripper_tool_frame', -1)
 
 
@@ -448,26 +468,27 @@ if __name__ == '__main__':
     # gripper = Gripper()
     # jl1, ja1 = gripper.info_about_joints('oven_area_oven_knob_stove_4_joint')
     # print(jl1, ja1)
-    # set_cart_goal_for_basis(0.106, -1.088, 0.000)
-    # open_fridge_door()
+    #set_cart_goal_for_basis(0.106, -1.088, 0.000)
+    #open_fridge_door()
     # close_fridge_door()
     # open_kitchen_island_object()
     # close_kitchen_island_object()
-    # open_oven_door_object()
-    # open_dish_washer_door_object()
+    #open_oven_door_object()
+    #open_dish_washer_door_object()
     # close_dish_washer_door_object()
     # close_oven_door_object()
     # open_sink_area_object()
     # close_sink_area_object()
     # rotate_oven_knob()
-    # reset_ktichen(list_joint)
+    #reset_ktichen(list_joint)
     # print test_jacobi_fwd(5, 2, np.deg2rad(45), np.deg2rad(90))
     t = TaskConstraint()
-    # t.set_goal('iai_kitchen/oven_area_oven_door_handle')  #
-    t.set_goal("iai_kitchen/kitchen_island_left_lower_drawer_handle")
+    #t.set_goal('iai_kitchen/oven_area_oven_door_handle')  #
+    t.set_goal("iai_kitchen/kitchen_island_left_upper_drawer_handle")
     #t.set_goal("iai_kitchen/iai_fridge_door_handle")
     t.setup_orientation_basis()
     t.update_basis_orientation()
+    #open_fridge_door()
     print("test is done.")
 
     # set_cart_goal_test()

@@ -2090,12 +2090,14 @@ class TestCollisionAvoidanceGoals(object):
         # kitchen_setup.keep_position(kitchen_setup.r_tip)
         kitchen_setup.close_l_gripper()
 
+        # kitchen_setup.send_and_check_goal()
+
         # place milk
         milk_goal = PoseStamped()
         milk_goal.header.frame_id = u'iai_kitchen/kitchen_island_surface'
         milk_goal.pose.position = Point(.1, -.2, .13)
         milk_goal.pose.orientation = Quaternion(0, 0, 0, 1)
-        kitchen_setup.set_cart_goal(milk_goal, milk_name, kitchen_setup.default_root)
+        kitchen_setup.set_translation_goal(milk_goal, milk_name, kitchen_setup.default_root)
         kitchen_setup.send_and_check_goal()
 
         # kitchen_setup.keep_position(kitchen_setup.r_tip)

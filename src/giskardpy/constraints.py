@@ -691,7 +691,7 @@ class CartesianOrientationSlerp(BasicCartesianConstraint):
 
         c_R_g_intermediate_aa = intermediate_error_axis * intermediate_error_angle
 
-        weight = WEIGHTS[5]
+        weight = WEIGHTS[3]
 
         self.add_constraint(str(self) + u'/0', lower=c_R_g_intermediate_aa[0],
                             upper=c_R_g_intermediate_aa[0],
@@ -784,10 +784,10 @@ class ExternalCollisionAvoidance(Constraint):
         dist = w.dot(r_V_n.T, r_P_pa)[0]
 
         weight_f = self.magic_weight_function(actual_distance,
-                                              0.0, WEIGHT_MAX,
-                                              0.01, WEIGHTS[4],
-                                              0.05, WEIGHTS[2],
-                                              0.06, WEIGHT_MIN)
+                                              0.0, WEIGHT_MAX,  #nothing should be stronger than ca
+                                              0.01, WEIGHTS[4], # everything should stay below this to ensure ca is strong enough
+                                              0.05, WEIGHTS[2], #ca active but can get overpowered
+                                              0.06, WEIGHT_MIN) #everything is stronger than ca
 
         penetration_distance = zero_weight_distance - actual_distance
 

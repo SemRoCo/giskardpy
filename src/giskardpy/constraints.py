@@ -1023,9 +1023,10 @@ class BasePointingForward(Constraint):
     base_forward_axis_id = u'base_forward_axis'
     max_velocity = u'max_velocity'
     range_id = u'range'
+    linear_velocity_threshold_id = u'linear_velocity_threshold'
 
-    def __init__(self, god_map, base_forward_axis=None, base_footprint=None, odom=None, range=np.pi/4,
-                 max_velocity=np.pi/8):
+    def __init__(self, god_map, base_forward_axis=None, base_footprint=None, odom=None, range=np.pi/8,
+                 max_velocity=np.pi/8, linear_velocity_threshold=0.02):
         """
         :param god_map: ignore
         :type base_forward_axis: Vector3Stamped as json dict
@@ -1057,7 +1058,8 @@ class BasePointingForward(Constraint):
 
         params = {self.base_forward_axis_id: self.base_forward_axis,
                   self.max_velocity: max_velocity,
-                  self.range_id: range}
+                  self.range_id: range,
+                  self.linear_velocity_threshold_id: linear_velocity_threshold}
         self.save_params_on_god_map(params)
 
     def __str__(self):
@@ -1073,21 +1075,26 @@ class BasePointingForward(Constraint):
     def make_constraints(self):
         weight = WEIGHT_BELOW_CA
         range = self.get_input_float(self.range_id)
+        linear_velocity_threshold = self.get_input_float(self.linear_velocity_threshold_id)
 
         max_velocity = self.get_input_float(self.max_velocity)
         odom_T_base_footprint_dot = self.get_fk_velocity(self.odom, self.base_footprint)
         odom_V_goal = w.vector3(odom_T_base_footprint_dot[0],
                                 odom_T_base_footprint_dot[1],
                                 odom_T_base_footprint_dot[2])
-        odom_V_goal = w.scale(odom_V_goal, 1)
+        odom_V_goal_length_1 = w.scale(odom_V_goal, 1)
 
         odom_R_base_footprint = w.rotation_of(self.get_fk(self.odom, self.base_footprint))
         base_footprint_V_current = self.get_base_forward_axis()
         odom_V_base_footprint = w.dot(odom_R_base_footprint, base_footprint_V_current)
 
-        error = w.acos(w.dot(odom_V_goal.T, odom_V_base_footprint)[0])
-        error_limited_lb = self.limit_velocity(error+range, max_velocity)
-        error_limited_ub = self.limit_velocity(error-range, max_velocity)
+        linear_velocity = w.norm(odom_V_goal)
+
+        error = w.acos(w.dot(odom_V_goal_length_1.T, odom_V_base_footprint)[0])
+        error_limited_lb = w.if_greater_eq(linear_velocity_threshold, linear_velocity, 0,
+                                           self.limit_velocity(error+range, max_velocity))
+        error_limited_ub = w.if_greater_eq(linear_velocity_threshold, linear_velocity, 0,
+                                           self.limit_velocity(error-range, max_velocity))
         self.add_constraint(str(self) + u'/error',
                             lower=-error_limited_lb,
                             upper=-error_limited_ub,

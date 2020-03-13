@@ -10,7 +10,7 @@ from giskard_msgs.msg import CollisionEntry, MoveActionGoal, MoveResult, WorldBo
 from giskard_msgs.srv import UpdateWorldResponse, UpdateWorldRequest
 from numpy import pi
 from shape_msgs.msg import SolidPrimitive
-from tf.transformations import quaternion_from_matrix, quaternion_about_axis
+from tf.transformations import quaternion_from_matrix, quaternion_about_axis, rotation_matrix
 
 from giskardpy import logging, identifier
 from giskardpy.identifier import fk_pose
@@ -2093,13 +2093,14 @@ class TestCollisionAvoidanceGoals(object):
         # take milk out of fridge
         kitchen_setup.set_kitchen_js({u'iai_fridge_door_joint': 1.56})
 
-        base_goal = PoseStamped()
-        base_goal.header.frame_id = 'map'
-        base_goal.pose.position.x = 0.565
-        base_goal.pose.position.y = -0.5
-        base_goal.pose.orientation.z = -0.51152562713
-        base_goal.pose.orientation.w = 0.85926802151
-        kitchen_setup.teleport_base(base_goal)
+        # base_goal = PoseStamped()
+        # base_goal.header.frame_id = 'map'
+        # base_goal.pose.position.x = 0.565
+        # base_goal.pose.position.y = -0.5
+        # base_goal.pose.orientation.z = -0.51152562713
+        # base_goal.pose.orientation.w = 0.85926802151
+        # kitchen_setup.teleport_base(base_goal)
+        kitchen_setup.add_json_goal(u'BasePointingForward')
 
         # spawn milk
         milk_pose = PoseStamped()
@@ -2139,10 +2140,11 @@ class TestCollisionAvoidanceGoals(object):
         kitchen_setup.send_and_check_goal()
 
         # place milk
+        kitchen_setup.add_json_goal(u'BasePointingForward')
         milk_goal = PoseStamped()
         milk_goal.header.frame_id = u'iai_kitchen/kitchen_island_surface'
         milk_goal.pose.position = Point(.1, -.2, .13)
-        milk_goal.pose.orientation = Quaternion(0, 0, 0, 1)
+        milk_goal.pose.orientation = Quaternion(*quaternion_about_axis(np.pi, [0,0,1]))
         kitchen_setup.set_cart_goal(milk_goal, milk_name, kitchen_setup.default_root)
         kitchen_setup.send_and_check_goal()
 

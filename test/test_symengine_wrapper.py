@@ -461,12 +461,18 @@ class TestSympyWrapper(unittest.TestCase):
         r2 = quaternion_matrix(q)
         self.assertTrue(np.isclose(r1, r2).all(), msg='\n{} != \n{}'.format(r1, r2))
 
+    def test_rot_of2(self):
+        f = w.translation3(1,2,3)
+        r = w.rotation_of(f)
+        self.assertTrue(f[0,3], 1)
+        self.assertTrue(f[0,3], 2)
+        self.assertTrue(f[0,3], 3)
+
     # fails if numbers too big or too small
     @given(unit_vector(4))
     def test_trace(self, q):
         m = quaternion_matrix(q)
-        np.testing.assert_array_almost_equal(w.compile_and_execute(w.trace, [m]),
-                                             np.trace(m))
+        np.testing.assert_array_almost_equal(w.compile_and_execute(w.trace, [m]), np.trace(m))
 
     # TODO test rotation_dist
 

@@ -1022,14 +1022,17 @@ class AlignPlanes(Constraint):
 class BasePointingForward(Constraint):
     base_forward_axis_id = u'base_forward_axis'
     max_velocity = u'max_velocity'
+    range_id = u'range'
 
-    def __init__(self, god_map, base_forward_axis=None, base_footprint=None, odom=None, max_velocity=0.5):
+    def __init__(self, god_map, base_forward_axis=None, base_footprint=None, odom=None, range=np.pi/4,
+                 max_velocity=np.pi/8):
         """
-        :type god_map:
-        :type root: str
-        :type tip: str
-        :type root_normal: Vector3Stamped
-        :type tip_normal: Vector3Stamped
+        :param god_map: ignore
+        :type base_forward_axis: Vector3Stamped as json dict
+        :type base_footprint: str
+        :type odom: str
+        :type range: float
+        :type max_velocity: float
         """
         super(BasePointingForward, self).__init__(god_map)
         if odom is not None:
@@ -1053,7 +1056,8 @@ class BasePointingForward(Constraint):
             self.base_forward_axis.vector.x = 1
 
         params = {self.base_forward_axis_id: self.base_forward_axis,
-                  self.max_velocity: max_velocity}
+                  self.max_velocity: max_velocity,
+                  self.range_id: range}
         self.save_params_on_god_map(params)
 
     def __str__(self):
@@ -1067,43 +1071,28 @@ class BasePointingForward(Constraint):
         return self.get_input_Vector3Stamped(self.base_forward_axis_id)
 
     def make_constraints(self):
+        weight = WEIGHT_BELOW_CA
+        range = self.get_input_float(self.range_id)
+
         max_velocity = self.get_input_float(self.max_velocity)
         odom_T_base_footprint_dot = self.get_fk_velocity(self.odom, self.base_footprint)
         odom_V_goal = w.vector3(odom_T_base_footprint_dot[0],
                                 odom_T_base_footprint_dot[1],
                                 odom_T_base_footprint_dot[2])
+        odom_V_goal = w.scale(odom_V_goal, 1)
 
         odom_R_base_footprint = w.rotation_of(self.get_fk(self.odom, self.base_footprint))
         base_footprint_V_current = self.get_base_forward_axis()
         odom_V_base_footprint = w.dot(odom_R_base_footprint, base_footprint_V_current)
 
-        error = odom_V_goal - odom_V_base_footprint
-        error_scale = w.norm(error)
-        limited_error_scale = self.limit_velocity(error_scale, max_velocity)
-        error = w.scale(error, limited_error_scale)
-
-        weight = WEIGHT_BELOW_CA
-
-        self.add_debug_constraint(str(self)+u'/vel/x', odom_T_base_footprint_dot[0])
-        self.add_debug_constraint(str(self)+u'/vel/y', odom_T_base_footprint_dot[1])
-        self.add_debug_constraint(str(self)+u'/vel/z', odom_T_base_footprint_dot[2])
-
-        self.add_debug_constraint(str(self)+u'/current/x', odom_V_base_footprint[0])
-        self.add_debug_constraint(str(self)+u'/current/y', odom_V_base_footprint[1])
-        self.add_debug_constraint(str(self)+u'/current/z', odom_V_base_footprint[2])
-
-        self.add_constraint(str(self) + u'/x', lower=error[0],
-                            upper=error[0],
+        error = w.acos(w.dot(odom_V_goal.T, odom_V_base_footprint)[0])
+        error_limited_lb = self.limit_velocity(error+range, max_velocity)
+        error_limited_ub = self.limit_velocity(error-range, max_velocity)
+        self.add_constraint(str(self) + u'/error',
+                            lower=-error_limited_lb,
+                            upper=-error_limited_ub,
                             weight=weight,
-                            expression=odom_V_base_footprint[0])
-        self.add_constraint(str(self) + u'/y', lower=error[1],
-                            upper=error[1],
-                            weight=weight,
-                            expression=odom_V_base_footprint[1])
-        self.add_constraint(str(self) + u'/z', lower=error[2],
-                            upper=error[2],
-                            weight=weight,
-                            expression=odom_V_base_footprint[2])
+                            expression=error)
 
 class GravityJoint(Constraint):
     weight = u'weight'

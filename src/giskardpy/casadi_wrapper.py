@@ -3,11 +3,10 @@ import pickle
 
 import casadi as ca
 import numpy as np
-from casadi import sign, cos, acos, sin, sqrt, atan2, qpsol
+from casadi import sign, cos, acos, sin, sqrt, atan2
 from numpy import pi
 
 from giskardpy import logging
-from giskardpy.exceptions import SymengineException
 from giskardpy.utils import create_path
 
 pathSeparator = '_'
@@ -16,28 +15,36 @@ pathSeparator = '_'
 VERY_SMALL_NUMBER = 1e-100
 SMALL_NUMBER = 1e-10
 
+
 def diag(*args):
     return ca.diag(Matrix(args))
+
 
 def Symbol(data):
     if isinstance(data, str) or isinstance(data, unicode):
         return ca.SX.sym(data)
     return ca.SX(data)
 
+
 def jacobian(expressions, symbols):
     return ca.jacobian(expressions, Matrix(symbols))
+
 
 def equivalent(expression1, expression2):
     return ca.is_equal(ca.simplify(expression1), ca.simplify(expression2), 1)
 
+
 def free_symbols(expression):
     return ca.symvar(expression)
+
 
 def is_matrix(expression):
     return hasattr(expression, 'shape') and expression.shape[0] * expression.shape[1] > 1
 
+
 def is_symbol(expression):
     return expression.shape[0] * expression.shape[1] == 1
+
 
 def compile_and_execute(f, params):
     # symbols = []
@@ -60,13 +67,13 @@ def compile_and_execute(f, params):
         if isinstance(param, np.ndarray):
             symbol_param = ca.SX.sym('m', *param.shape)
             if len(param.shape) == 2:
-                l = param.shape[0]*param.shape[1]
+                l = param.shape[0] * param.shape[1]
             else:
                 l = param.shape[0]
 
-            input.append(param.reshape((l,1)))
+            input.append(param.reshape((l, 1)))
             symbol_params.append(symbol_param)
-            asdf = symbol_param.T.reshape((l,1))
+            asdf = symbol_param.T.reshape((l, 1))
             symbol_params2.extend(asdf[k] for k in range(l))
         else:
             # s = ns()
@@ -237,8 +244,10 @@ def diffable_if_greater(a, b, if_result, else_result):
     """
     return if_greater(a, b, if_result, else_result)
 
+
 def if_greater(a, b, if_result, else_result):
-    return ca.if_else(ca.gt(a,b), if_result, else_result)
+    return ca.if_else(ca.gt(a, b), if_result, else_result)
+
 
 def diffable_if_greater_eq_zero(condition, if_result, else_result):
     """
@@ -332,7 +341,7 @@ def if_greater_eq(a, b, if_result, else_result):
     :return: if_result if a >= b else else_result
     :rtype: Union[float, Symbol]
     """
-    return ca.if_else(ca.ge(a,b), if_result, else_result)
+    return ca.if_else(ca.ge(a, b), if_result, else_result)
 
 
 def if_less_eq(a, b, if_result, else_result):
@@ -362,7 +371,7 @@ def if_eq_zero(condition, if_result, else_result):
 
 
 def if_eq(a, b, if_result, else_result):
-    return ca.if_else(ca.eq(a,b), if_result, else_result)
+    return ca.if_else(ca.eq(a, b), if_result, else_result)
 
 
 def safe_compiled_function(f, file_name):
@@ -407,6 +416,7 @@ class CompiledFunction(object):
         self.buf.set_arg(0, memoryview(filtered_args))
         self.f_eval()
         return self.out
+
 
 def speed_up(function, parameters, backend=u'clang'):
     str_params = [str(x) for x in parameters]
@@ -511,18 +521,18 @@ def rotation_matrix_from_rpy(roll, pitch, yaw):
     # TODO don't split this into 3 matrices
 
     rx = Matrix([[1, 0, 0, 0],
-                [0, ca.cos(roll), -ca.sin(roll), 0],
-                [0, ca.sin(roll), ca.cos(roll), 0],
-                [0, 0, 0, 1]])
+                 [0, ca.cos(roll), -ca.sin(roll), 0],
+                 [0, ca.sin(roll), ca.cos(roll), 0],
+                 [0, 0, 0, 1]])
     ry = Matrix([[ca.cos(pitch), 0, ca.sin(pitch), 0],
-                [0, 1, 0, 0],
-                [-ca.sin(pitch), 0, ca.cos(pitch), 0],
-                [0, 0, 0, 1]])
+                 [0, 1, 0, 0],
+                 [-ca.sin(pitch), 0, ca.cos(pitch), 0],
+                 [0, 0, 0, 1]])
     rz = Matrix([[ca.cos(yaw), -ca.sin(yaw), 0, 0],
-                [ca.sin(yaw), ca.cos(yaw), 0, 0],
-                [0, 0, 1, 0],
-                [0, 0, 0, 1]])
-    return dot(rz,ry,rx)
+                 [ca.sin(yaw), ca.cos(yaw), 0, 0],
+                 [0, 0, 1, 0],
+                 [0, 0, 0, 1]])
+    return dot(rz, ry, rx)
 
 
 def rotation_matrix_from_axis_angle(axis, angle):
@@ -548,9 +558,9 @@ def rotation_matrix_from_axis_angle(axis, angle):
     m_vt_0_2 = m_vt_0 * axis[2]
     m_vt_1_2 = m_vt_1 * axis[2]
     return Matrix([[ct + m_vt_0 * axis[0], -m_st_2 + m_vt_0_1, m_st_1 + m_vt_0_2, 0],
-                  [m_st_2 + m_vt_0_1, ct + m_vt_1 * axis[1], -m_st_0 + m_vt_1_2, 0],
-                  [-m_st_1 + m_vt_0_2, m_st_0 + m_vt_1_2, ct + m_vt_2 * axis[2], 0],
-                  [0, 0, 0, 1]])
+                   [m_st_2 + m_vt_0_1, ct + m_vt_1 * axis[1], -m_st_0 + m_vt_1_2, 0],
+                   [-m_st_1 + m_vt_0_2, m_st_0 + m_vt_1_2, ct + m_vt_2 * axis[2], 0],
+                   [0, 0, 0, 1]])
 
 
 def rotation_matrix_from_quaternion(x, y, z, w):
@@ -569,9 +579,9 @@ def rotation_matrix_from_quaternion(x, y, z, w):
     z2 = z * z
     w2 = w * w
     return Matrix([[w2 + x2 - y2 - z2, 2 * x * y - 2 * w * z, 2 * x * z + 2 * w * y, 0],
-                  [2 * x * y + 2 * w * z, w2 - x2 + y2 - z2, 2 * y * z - 2 * w * x, 0],
-                  [2 * x * z - 2 * w * y, 2 * y * z + 2 * w * x, w2 - x2 - y2 + z2, 0],
-                  [0, 0, 0, 1]])
+                   [2 * x * y + 2 * w * z, w2 - x2 + y2 - z2, 2 * y * z - 2 * w * x, 0],
+                   [2 * x * z - 2 * w * y, 2 * y * z + 2 * w * x, w2 - x2 - y2 + z2, 0],
+                   [0, 0, 0, 1]])
 
 
 def frame_axis_angle(x, y, z, axis, angle):
@@ -668,7 +678,7 @@ def rotation_of(frame):
     r = eye(4)
     for i in range(3):
         for j in range(3):
-            r[i,j] = frame[i,j]
+            r[i, j] = frame[i, j]
     return r
 
 
@@ -950,6 +960,7 @@ def quaternion_diff(q0, q1):
 
 def cosine_distance(v0, v1):
     """
+    cosine distance ranging from 0 to 2
     :param v0: nx1 Matrix
     :type v0: Matrix
     :param v1: nx1 Matrix
@@ -1112,8 +1123,10 @@ def entrywise_product(matrix1, matrix2):
             result[i, j] = matrix1[i, j] * matrix2[i, j]
     return result
 
+
 def floor(x):
     return ca.floor(x)
+
 
 def ceil(x):
     return ca.ceil(x)

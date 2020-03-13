@@ -11,7 +11,7 @@ from tf.transformations import quaternion_matrix, quaternion_about_axis, quatern
 from transforms3d.euler import euler2axangle
 from transforms3d.quaternions import quat2mat, quat2axangle
 
-from giskardpy import w
+from giskardpy import symbolic_wrapper as w
 from utils_for_tests import limited_float, SMALL_NUMBER, unit_vector, quaternion, vector, \
     pykdl_frame_to_numpy, lists_of_same_length, angle, compare_axis_angle, angle_positive
 
@@ -449,12 +449,18 @@ class TestSympyWrapper(unittest.TestCase):
         r2 = quaternion_matrix(q)
         self.assertTrue(np.isclose(r1, r2).all(), msg='\n{} != \n{}'.format(r1, r2))
 
+    def test_rot_of2(self):
+        f = w.translation3(1,2,3)
+        r = w.rotation_of(f)
+        self.assertTrue(f[0,3], 1)
+        self.assertTrue(f[0,3], 2)
+        self.assertTrue(f[0,3], 3)
+
     # fails if numbers too big or too small
     @given(unit_vector(4))
     def test_trace(self, q):
         m = quaternion_matrix(q)
-        np.testing.assert_array_almost_equal(w.compile_and_execute(w.trace, [m]),
-                                             np.trace(m))
+        np.testing.assert_array_almost_equal(w.compile_and_execute(w.trace, [m]), np.trace(m))
 
     # TODO test rotation_dist
 

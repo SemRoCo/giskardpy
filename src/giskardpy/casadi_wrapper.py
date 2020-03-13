@@ -668,10 +668,11 @@ def rotation_of(frame):
     :return: 4x4 Matrix; sets the translation part of a frame to 0
     :rtype: Matrix
     """
-    frame[0,3] = 0
-    frame[1,3] = 0
-    frame[2,3] = 0
-    return frame
+    r = eye(4)
+    for i in range(3):
+        for j in range(3):
+            r[i,j] = frame[i,j]
+    return r
 
 
 def trace(matrix):

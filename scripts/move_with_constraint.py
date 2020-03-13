@@ -29,7 +29,7 @@ from giskardpy.tfwrapper import lookup_pose, pose_to_kdl, np_to_kdl, kdl_to_pose
 import actionlib
 from control_msgs.msg import GripperCommandAction, GripperCommandGoal
 from pr2_controllers_msgs.msg import Pr2GripperCommandAction, Pr2GripperCommandActionGoal
-from giskardpy.task_constraint import TaskConstraint
+from giskardpy.motion_task_with_constraint import MotionTaskWithConstraint
 
 
 class Gripper:
@@ -90,7 +90,7 @@ class Gripper:
         :return:
         """
         # self.giskard.set_json_goal("MoveWithConstraint", goal_name=goal, body_name=body)
-        self.giskard.set_json_goal("FrameConstraint", goal_name=goal, body_name=body)
+        self.giskard.set_json_goal("MoveToPoseConstraint", goal_name=goal, body_name=body)  # movetopose
         # self.giskard.set_json_goal("CartesianPoseUpdate", root_link="odom_combined", tip_link=body, goal_name=goal)
         # self.giskard.avoid_all_collisions()
         self.giskard.allow_all_collisions()
@@ -108,8 +108,8 @@ class Gripper:
         :return:
         """
         # self.giskard.set_json_goal("TranslationalAngularConstraint", goal_name=goal, body_name=body, action=action)
-        #self.giskard.set_json_goal("FrameTranslationConstraint", goal_name=goal, body_name=body, action=action)
-        self.giskard.set_json_goal("AngularConstraint", goal_name=goal, body_name=body, action=action)
+        self.giskard.set_json_goal("OpenCloseDrawerConstraint", goal_name=goal, body_name=body, action=action)  #  openclosedrawerconstraint
+        #self.giskard.set_json_goal("OpenCloseDoorConstraint", goal_name=goal, body_name=body, action=action)  #  openclosedoorconstraint
         self.giskard.allow_all_collisions()
         # self.giskard.avoid_all_collisions()
         self.giskard.plan_and_execute()
@@ -318,12 +318,12 @@ def open_dish_washer_door_object():
     gripper.mvt_r_gripper(0.54, 0.54, 0.54, 0.54)
     #gripper.r_action_gripper(0.1)
     #gripper.l_action_gripper(0.1)
-    gripper.some_mvt('iai_kitchen/sink_area_dish_washer_door_handle', 'l_gripper_tool_frame')
+    gripper.some_mvt('iai_kitchen/sink_area_dish_washer_door_handle', 'r_gripper_tool_frame')
     #gripper.r_action_gripper(0.05)
     #gripper.l_action_gripper(0.05)
     gripper.mvt_l_gripper(0.1, 0.1, 0.1, 0.1)
     gripper.mvt_r_gripper(0.1, 0.1, 0.1, 0.1)
-    gripper.open_or_close_with_translation('iai_kitchen/sink_area_dish_washer_door_handle', 'l_gripper_tool_frame',
+    gripper.open_or_close_with_translation('iai_kitchen/sink_area_dish_washer_door_handle', 'r_gripper_tool_frame',
                                            -0.5)
     gripper.set_kitchen_goal('sink_area_dish_washer_door_joint', 0.758)
 
@@ -334,12 +334,12 @@ def close_dish_washer_door_object():
     # gripper.l_action_gripper(0.1)
     gripper.mvt_l_gripper(0.54, 0.54, 0.54, 0.54)
     gripper.mvt_r_gripper(0.54, 0.54, 0.54, 0.54)
-    gripper.some_mvt('iai_kitchen/sink_area_dish_washer_door_handle', 'l_gripper_tool_frame')
+    gripper.some_mvt('iai_kitchen/sink_area_dish_washer_door_handle', 'r_gripper_tool_frame')
     # gripper.r_action_gripper(0.05)
     # gripper.l_action_gripper(0.05)
     gripper.mvt_l_gripper(0.1, 0.1, 0.1, 0.1)
     gripper.mvt_r_gripper(0.1, 0.1, 0.1, 0.1)
-    gripper.open_or_close_with_translation('iai_kitchen/sink_area_dish_washer_door_handle', 'l_gripper_tool_frame', 0.5)
+    gripper.open_or_close_with_translation('iai_kitchen/sink_area_dish_washer_door_handle', 'r_gripper_tool_frame', 0.5)
     gripper.set_kitchen_goal('sink_area_dish_washer_door_joint', 0)
 
 
@@ -349,12 +349,12 @@ def close_sink_area_object():
     # gripper.l_action_gripper(0.1)
     gripper.mvt_l_gripper(0.54, 0.54, 0.54, 0.54)
     gripper.mvt_r_gripper(0.54, 0.54, 0.54, 0.54)
-    gripper.some_mvt('iai_kitchen/sink_area_left_middle_drawer_handle', 'l_gripper_tool_frame')
+    gripper.some_mvt('iai_kitchen/sink_area_left_middle_drawer_handle', 'r_gripper_tool_frame')
     # gripper.r_action_gripper(0.05)
     # gripper.l_action_gripper(0.05)
     gripper.mvt_l_gripper(0.1, 0.1, 0.1, 0.1)
     gripper.mvt_r_gripper(0.1, 0.1, 0.1, 0.1)
-    gripper.open_or_close_with_translation('iai_kitchen/sink_area_left_middle_drawer_handle', 'l_gripper_tool_frame',
+    gripper.open_or_close_with_translation('iai_kitchen/sink_area_left_middle_drawer_handle', 'r_gripper_tool_frame',
                                            1)
     gripper.set_kitchen_goal('sink_area_left_middle_drawer_main_joint', 0.00)
 
@@ -365,12 +365,12 @@ def open_sink_area_object():
     gripper.mvt_r_gripper(0.54, 0.54, 0.54, 0.54)
     # gripper.r_action_gripper(0.1)
     # gripper.l_action_gripper(0.1)
-    gripper.some_mvt('iai_kitchen/sink_area_left_middle_drawer_handle', 'l_gripper_tool_frame')
+    gripper.some_mvt('iai_kitchen/sink_area_left_middle_drawer_handle', 'r_gripper_tool_frame')
     # gripper.r_action_gripper(0.05)
     # gripper.l_action_gripper(0.05)
     gripper.mvt_l_gripper(0.1, 0.1, 0.1, 0.1)
     gripper.mvt_r_gripper(0.1, 0.1, 0.1, 0.1)
-    gripper.open_or_close_with_translation('iai_kitchen/sink_area_left_middle_drawer_handle', 'l_gripper_tool_frame',
+    gripper.open_or_close_with_translation('iai_kitchen/sink_area_left_middle_drawer_handle', 'r_gripper_tool_frame',
                                            -1)
     gripper.set_kitchen_goal('sink_area_left_middle_drawer_main_joint', 0.48)
 
@@ -477,17 +477,17 @@ if __name__ == '__main__':
     #open_dish_washer_door_object()
     # close_dish_washer_door_object()
     # close_oven_door_object()
-    # open_sink_area_object()
+    open_sink_area_object()
     # close_sink_area_object()
     # rotate_oven_knob()
     #reset_ktichen(list_joint)
     # print test_jacobi_fwd(5, 2, np.deg2rad(45), np.deg2rad(90))
-    t = TaskConstraint()
+    #t = MotionTaskWithConstraint()
     #t.set_goal('iai_kitchen/oven_area_oven_door_handle')  #
-    t.set_goal("iai_kitchen/kitchen_island_left_upper_drawer_handle")
+    #t.set_goal("iai_kitchen/kitchen_island_left_upper_drawer_handle")
     #t.set_goal("iai_kitchen/iai_fridge_door_handle")
-    t.setup_orientation_basis()
-    t.update_basis_orientation()
+    #t.setup_orientation_basis()
+    #t.update_basis_orientation()
     #open_fridge_door()
     print("test is done.")
 

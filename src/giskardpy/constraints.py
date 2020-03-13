@@ -1311,7 +1311,7 @@ class PreprocessingConstraint(Constraint):
         # update parameter
         self.goal_name = goal_name
         # self.body_name = body_name
-        self.root_link = "odom_combined"
+        self.root_link = "odom" #"odom_combined"
 
         if not body_name.strip():
             self.body_name = self.get_body_name(goal_name)
@@ -1363,7 +1363,7 @@ class PreprocessingConstraint(Constraint):
             return self.get_controllable_joint(self.get_world().get_object("kitchen").
                                                get_parent_link_of_link(link_name))
 
-    def move_to_goal(self, goal_frame):
+    def create_pose_to_grasp(self, goal_frame):
         # Firstly do constraints for movement to object and after do constraints for open or close
         # get grasp pose
         goal_pose = tf_wrapper.lookup_pose(self.get_robot().get_root(),
@@ -1398,11 +1398,12 @@ class PreprocessingConstraint(Constraint):
         return goal
         # return goal_pose
 
-    def do_translation_goal(self):
+    def create_translational_motion_pose(self):
         # get pose of grasped joint
-        goal_pose = tf_wrapper.lookup_pose(self.get_robot().get_root(),
+        goal_pose = tf_wrapper.lookup_pose("map", #self.get_robot().get_root(),
                                            self.body_name)
 
+        goal_pose.header.frame_id = "map"
         rospy.logout("Check if joint is translational or rotational")
         # check typ of joint
         if self.get_world().get_object("kitchen").is_translational_joint(self.joint_name):
@@ -1420,14 +1421,12 @@ class PreprocessingConstraint(Constraint):
 
         return goal
 
-    def do_angular_goal(self):
+    def create_circular_motion_pose(self):
         # get pose of grasped joint
         rospy.logout("Start method do angular")
         goal_pose = tf_wrapper.lookup_pose(self.get_robot().get_root(), self.body_name)
+        goal_pose.header.frame_id = "map"  # to fix bug from tf map odom_combined
 
-        # Hand palm link handle
-        #self.palm_link = self.config_file_manager.get_palm_link("pr2", self.body_name)
-        #self.palm_link_pose = tf_wrapper.lookup_pose("map", self.palm_link)
         # get pose object to map
         object_pose_to_map = tf_wrapper.lookup_pose("map", self.goal_name)
         self.object_pose_to_robot = tf_wrapper.lookup_pose(self.get_robot().get_root(), self.goal_name)
@@ -1469,13 +1468,6 @@ class PreprocessingConstraint(Constraint):
                                                           goal_pose.pose.orientation.y,
                                                           goal_pose.pose.orientation.z,
                                                           goal_pose.pose.orientation.w])
-
-            #rotation_z = w.rotation_matrix_from_axis_angle([0, 0, 1], opening)
-            #new_orientation = w.quaternion_from_matrix(w.dot(self.orientation_gripper, rotation_z))
-            #goal_pose.pose.orientation.x = new_orientation[0]
-            #goal_pose.pose.orientation.y = new_orientation[1]
-            #goal_pose.pose.orientation.z = new_orientation[2]
-            #goal_pose.pose.orientation.w = new_orientation[3]
             # done change orientation
 
             # please adapt this and delete duplicate
@@ -1498,7 +1490,7 @@ class PreprocessingConstraint(Constraint):
 
         return goal_pose
 
-    def do_rotational_goal(self):
+    def create_rotational_motion_pose(self):
         # get pose of grasped joint
         rospy.logout("Start method do rotational movement")
         goal_pose = tf_wrapper.lookup_pose(self.get_robot().get_root(),
@@ -1551,7 +1543,7 @@ class FramePositionConstraint(PreprocessingConstraint):
         self.body_name = body_name
 
         # load goal
-        goal_pose = self.move_to_goal(goal_frame=self.goal_name)
+        goal_pose = self.create_pose_to_grasp(goal_frame=self.goal_name)
         rospy.logout("The root link is: " + self.root_link)
         rospy.logout("The goal pose: ")
         rospy.logout(goal_pose)
@@ -1577,7 +1569,7 @@ class FrameOrientationConstraint(PreprocessingConstraint):
         self.body_name = body_name
 
         # load goal
-        goal_pose = self.move_to_goal(goal_frame=self.goal_name)
+        goal_pose = self.create_pose_to_grasp(goal_frame=self.goal_name)
         rospy.logout("The root link is: " + self.root_link)
         rospy.logout("The goal pose: ")
         rospy.logout(goal_pose)
@@ -1588,7 +1580,7 @@ class FrameOrientationConstraint(PreprocessingConstraint):
         return u'{}/{}'.format(self.__class__.__name__, self.goal_name)
 
 # OpenCloseDrawer
-class FrameTranslationConstraint(PreprocessingConstraint):
+class OpenCloseDrawerConstraint(PreprocessingConstraint):
     # Symbol
     goal_pose = u'goal_pose'
     gain = u'gain'
@@ -1598,14 +1590,14 @@ class FrameTranslationConstraint(PreprocessingConstraint):
     # initializiert mit god_map und name constraint
     def __init__(self, god_map, goal_name, body_name, weight=HIGH_WEIGHT, gain=1,
                  translation_max_speed=0.1, rotation_max_speed=0.5, action=OPEN):
-        super(FrameTranslationConstraint, self).__init__(god_map, goal_name, body_name)
+        super(OpenCloseDrawerConstraint, self).__init__(god_map, goal_name, body_name)
 
         self.goal_name = goal_name
         self.body_name = body_name
         self.action = action
 
         # load goal
-        goal_pose = self.do_translation_goal()
+        goal_pose = self.create_translational_motion_pose()
         rospy.logout("The root link is: " + self.root_link)
         rospy.logout("The goal pose: ")
         rospy.logout(goal_pose)
@@ -1618,7 +1610,7 @@ class FrameTranslationConstraint(PreprocessingConstraint):
         return u'{}/{}'.format(self.__class__.__name__, self.goal_name)
 
 # OpenCloseDoor
-class AngularConstraint(PreprocessingConstraint):
+class OpenCloseDoorConstraint(PreprocessingConstraint):
     # Symbol
     goal_pose = u'goal_pose'
     gain = u'gain'
@@ -1628,7 +1620,7 @@ class AngularConstraint(PreprocessingConstraint):
     # initializiert mit god_map und name constraint
     def __init__(self, god_map, goal_name, body_name, weight=HIGH_WEIGHT, gain=1,
                  translation_max_speed=0.1, rotation_max_speed=0.5, action=OPEN):
-        super(AngularConstraint, self).__init__(god_map, goal_name, body_name)
+        super(OpenCloseDoorConstraint, self).__init__(god_map, goal_name, body_name)
 
         self.goal_name = goal_name
         self.body_name = body_name
@@ -1636,7 +1628,7 @@ class AngularConstraint(PreprocessingConstraint):
         self.weight = weight
 
         # load goal
-        goal_pose = self.do_angular_goal()
+        goal_pose = self.create_circular_motion_pose()
         rospy.logout("The root link is: " + self.root_link)
         rospy.logout("The goal pose: ")
         rospy.logout(goal_pose)
@@ -1728,7 +1720,7 @@ class AngularConstraint(PreprocessingConstraint):
         return u'{}/{}'.format(self.__class__.__name__, self.goal_name)
 
 # TurnRotaryKnob
-class RotationalConstraint(PreprocessingConstraint):
+class TurnRotaryKnobConstraint(PreprocessingConstraint):
     # Symbol
     goal_pose = u'goal_pose'
     gain = u'gain'
@@ -1738,7 +1730,7 @@ class RotationalConstraint(PreprocessingConstraint):
     # initializiert mit god_map und name constraint
     def __init__(self, god_map, goal_name, body_name, weight=HIGH_WEIGHT, gain=1,
                  translation_max_speed=0.1, rotation_max_speed=0.5, action=OPEN):
-        super(RotationalConstraint, self).__init__(god_map, goal_name, body_name)
+        super(TurnRotaryKnobConstraint, self).__init__(god_map, goal_name, body_name)
 
         self.goal_name = goal_name
         self.body_name = body_name
@@ -1746,7 +1738,7 @@ class RotationalConstraint(PreprocessingConstraint):
         self.weight = weight
 
         # load goal
-        goal_pose = self.do_rotational_goal()
+        goal_pose = self.create_rotational_motion_pose()
         rospy.logout("The root link is: " + self.root_link)
         rospy.logout("The goal pose: ")
         rospy.logout(goal_pose)
@@ -1760,7 +1752,7 @@ class RotationalConstraint(PreprocessingConstraint):
         return u'{}/{}'.format(self.__class__.__name__, self.goal_name)
 
 # MoveToPose
-class FrameConstraint(PreprocessingConstraint):
+class MoveToPoseConstraint(PreprocessingConstraint):
     # Symbol
     goal_pose = u'goal_pose'
     gain = u'gain'
@@ -1770,7 +1762,7 @@ class FrameConstraint(PreprocessingConstraint):
     # initializiert mit god_map und name constraint
     def __init__(self, god_map, goal_name, body_name, weight=HIGH_WEIGHT, gain=1, translation_max_speed=0.1,
                  rotation_max_speed=0.5, action=OPEN):
-        super(FrameConstraint, self).__init__(god_map, goal_name, body_name)
+        super(MoveToPoseConstraint, self).__init__(god_map, goal_name, body_name)
 
         self.goal_name = goal_name
         self.body_name = body_name

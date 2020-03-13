@@ -1,6 +1,17 @@
 <launch>
 
     <arg name="gui" default="False"/>
+    
+    <node pkg="giskardpy" type="joint_trajectory_splitter.py" name="joint_trajectory_splitter" output="screen">
+        <rosparam param="state_topics">
+            - /whole_body_controller/base/state 
+            - /whole_body_controller/body/state
+        </rosparam>
+        <rosparam param="client_topics">
+            - /whole_body_controller/base/follow_joint_trajectory
+            - /whole_body_controller/body/follow_joint_trajectory
+        </rosparam>
+    </node>
 
     <node pkg="giskardpy" type="giskard_trees.py" name="giskard" output="screen">
         <param name="path_to_data_folder" value="$(find giskardpy)/data" />

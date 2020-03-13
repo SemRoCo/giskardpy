@@ -154,7 +154,25 @@ class Constraint(object):
     def get_expr_velocity(self, expr):
         expr_jacobian = w.jacobian(expr, self.get_robot().get_joint_position_symbols())
         last_velocities = w.Matrix(self.get_robot().get_joint_velocity_symbols())
-        return w.dot(expr_jacobian, last_velocities)[0]
+        velocity = w.dot(expr_jacobian, last_velocities)
+        if velocity.shape[0] * velocity.shape[0] == 1:
+            return velocity[0]
+        else:
+            return velocity
+
+    def get_fk_velocity(self, root, tip):
+        r_T_t = self.get_fk(root, tip)
+        r_R_t = w.rotation_of(r_T_t)
+        axis, angle = w.axis_angle_from_matrix(r_R_t)
+        r_R_t_axis_angle = axis * angle
+        r_P_t = w.position_of(r_T_t)
+        fk = w.Matrix([r_P_t[0],
+                       r_P_t[1],
+                       r_P_t[2],
+                       r_R_t_axis_angle[0],
+                       r_R_t_axis_angle[1],
+                       r_R_t_axis_angle[2]])
+        return self.get_expr_velocity(fk)
 
     def limit_acceleration(self, current_position, error, max_acceleration, max_velocity, debug_prefix=None):
         sample_period = self.get_input_sampling_period()
@@ -1000,6 +1018,92 @@ class AlignPlanes(Constraint):
                             weight=weight,
                             expression=tip_normal__root[2])
 
+
+class BasePointingForward(Constraint):
+    base_forward_axis_id = u'base_forward_axis'
+    max_velocity = u'max_velocity'
+
+    def __init__(self, god_map, base_forward_axis=None, base_footprint=None, odom=None, max_velocity=0.5):
+        """
+        :type god_map:
+        :type root: str
+        :type tip: str
+        :type root_normal: Vector3Stamped
+        :type tip_normal: Vector3Stamped
+        """
+        super(BasePointingForward, self).__init__(god_map)
+        if odom is not None:
+            self.odom = odom
+        else:
+            self.odom = self.get_robot().get_root()
+        if base_footprint is not None:
+            self.base_footprint = base_footprint
+        else:
+            self.base_footprint = self.get_robot().get_non_base_movement_root()
+        if base_forward_axis is not None:
+            self.base_forward_axis = base_forward_axis
+            base_forward_axis = convert_dictionary_to_ros_message(u'geometry_msgs/Vector3Stamped', base_forward_axis)
+            base_forward_axis = transform_vector(self.base_footprint, base_forward_axis)
+            tmp = np.array([base_forward_axis.vector.x, base_forward_axis.vector.y, base_forward_axis.vector.z])
+            tmp = tmp / np.linalg.norm(tmp)
+            self.base_forward_axis.vector = Vector3(*tmp)
+        else:
+            self.base_forward_axis = Vector3Stamped()
+            self.base_forward_axis.header.frame_id = self.base_footprint
+            self.base_forward_axis.vector.x = 1
+
+        params = {self.base_forward_axis_id: self.base_forward_axis,
+                  self.max_velocity: max_velocity}
+        self.save_params_on_god_map(params)
+
+    def __str__(self):
+        s = super(BasePointingForward, self).__str__()
+        return u'{}/{}/{}_X:{}_Y:{}_Z:{}'.format(s, self.odom, self.base_footprint,
+                                                 self.base_forward_axis.vector.x,
+                                                 self.base_forward_axis.vector.y,
+                                                 self.base_forward_axis.vector.z)
+
+    def get_base_forward_axis(self):
+        return self.get_input_Vector3Stamped(self.base_forward_axis_id)
+
+    def make_constraints(self):
+        max_velocity = self.get_input_float(self.max_velocity)
+        odom_T_base_footprint_dot = self.get_fk_velocity(self.odom, self.base_footprint)
+        odom_V_goal = w.vector3(odom_T_base_footprint_dot[0],
+                                odom_T_base_footprint_dot[1],
+                                odom_T_base_footprint_dot[2])
+
+        odom_R_base_footprint = w.rotation_of(self.get_fk(self.odom, self.base_footprint))
+        base_footprint_V_current = self.get_base_forward_axis()
+        odom_V_base_footprint = w.dot(odom_R_base_footprint, base_footprint_V_current)
+
+        error = odom_V_goal - odom_V_base_footprint
+        error_scale = w.norm(error)
+        limited_error_scale = self.limit_velocity(error_scale, max_velocity)
+        error = w.scale(error, limited_error_scale)
+
+        weight = WEIGHT_BELOW_CA
+
+        self.add_debug_constraint(str(self)+u'/vel/x', odom_T_base_footprint_dot[0])
+        self.add_debug_constraint(str(self)+u'/vel/y', odom_T_base_footprint_dot[1])
+        self.add_debug_constraint(str(self)+u'/vel/z', odom_T_base_footprint_dot[2])
+
+        self.add_debug_constraint(str(self)+u'/current/x', odom_V_base_footprint[0])
+        self.add_debug_constraint(str(self)+u'/current/y', odom_V_base_footprint[1])
+        self.add_debug_constraint(str(self)+u'/current/z', odom_V_base_footprint[2])
+
+        self.add_constraint(str(self) + u'/x', lower=error[0],
+                            upper=error[0],
+                            weight=weight,
+                            expression=odom_V_base_footprint[0])
+        self.add_constraint(str(self) + u'/y', lower=error[1],
+                            upper=error[1],
+                            weight=weight,
+                            expression=odom_V_base_footprint[1])
+        self.add_constraint(str(self) + u'/z', lower=error[2],
+                            upper=error[2],
+                            weight=weight,
+                            expression=odom_V_base_footprint[2])
 
 class GravityJoint(Constraint):
     weight = u'weight'

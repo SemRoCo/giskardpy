@@ -362,6 +362,16 @@ class TestConstraints(object):
         assert pocky_pose_setup.get_god_map().get_data(identifier.joint_cost + [u'odom_x_joint']) == 1
         assert pocky_pose_setup.get_god_map().get_data(identifier.joint_cost + [u'torso_lift_joint']) == 0.5
 
+    def test_base_pointing_forward(self, zero_pose):
+        """
+        :param zero_pose: PR2
+        """
+        zero_pose.add_json_goal(u'BasePointingForward')
+        r_goal = PoseStamped()
+        r_goal.header.frame_id = zero_pose.r_tip
+        r_goal.pose.position.y = -2
+        r_goal.pose.orientation.w = 1
+        zero_pose.set_and_check_cart_goal(r_goal, zero_pose.r_tip)
 
     def test_UpdateGodMap2(self, pocky_pose_setup):
         """

@@ -1,6 +1,7 @@
 import rospy
 import sys
 import numpy as np
+import math
 from geometry_msgs.msg import PoseStamped, Point, Quaternion
 from tf.transformations import quaternion_about_axis
 from PyKDL import *
@@ -74,8 +75,15 @@ class Utils:
         d12 = w.norm(v12)
         d13 = w.norm(v13)
         d23 = w.norm(v23)
-        #return w.acos(w.dot(v12, v13.T)[0] / (d12 * d13))
-        return w.acos((d12**2 + d13**2 - d23**2) / (2 * d12 * d13))
+        # return w.acos(w.dot(v12, v13.T)[0] / (d12 * d13))
+        return w.acos((d12 ** 2 + d13 ** 2 - d23 ** 2) / (2 * d12 * d13))
+
+    def get_angle_with_atan(self, point1, point2, point3):
+        v12 = w.vector3(*point1) - w.vector3(*point2)
+        v13 = w.vector3(*point1) - w.vector3(*point3)
+        # v23 = w.vector3(*point2) - w.vector3(*point3)
+        # return (v12[0] * v13[2] - v12[1] * v13[0]) / abs(float(v12[0] * v13[2] - v12[1] * v13[0]))
+        return math.atan2(v12[1], v12[0]) - math.atan2(v13[1], v13[0])
 
     def get_angle(self, point1, point2, point3):
         v12 = np.subtract(point1, point2)
@@ -98,6 +106,10 @@ class Utils:
         return [np.cos(angle) * vector[0] + 0 * vector[1] + (np.sin(angle) * vector[2]),
                 0 * vector[0] + 1 * vector[1] + 0 * vector[2],
                 (-np.sin(angle) * vector[0]) + 0 * vector[1] + (np.cos(angle) * vector[2])]
+
+    def rotation2d(self, vector, angle):
+        return [np.cos(angle) * vector[0] - np.sin(angle) * vector[1],
+                np.sin(angle) * vector[0] + np.cos(angle) * vector[1]]
 
     def rotation_gripper_to_object(self, axis):
         if str(axis) == "y":
@@ -150,14 +162,14 @@ class Utils:
         :type: array float
         :return: 0 if the vectors are orthogonal
         """
-        #return ((u[1] * v[2]) - (u[2] * v[1])) + ((u[2] * v[0]) - (u[0] * v[2])) + ((u[0] * v[1]) - (u[1] * v[0]))
-        #return u[0] * v[0] + u[1] * v[1] + u[2] * v[2]
+        # return ((u[1] * v[2]) - (u[2] * v[1])) + ((u[2] * v[0]) - (u[0] * v[2])) + ((u[0] * v[1]) - (u[1] * v[0]))
+        # return u[0] * v[0] + u[1] * v[1] + u[2] * v[2]
         return round(u[0] * v[0] + u[1] * v[1] + u[2] * v[2], 2)
 
     def cross_productaxis(self, u, v, axis):
         grasp_axis = self.axis_converter(axis)
-        u1=[]
-        v1=[]
+        u1 = []
+        v1 = []
         for x in range(len(grasp_axis)):
             if grasp_axis[x] == 0:
                 u1.append(u[x])
@@ -197,11 +209,6 @@ class Utils:
         if value >= 0:
             return 1
         return -1
-
-
-
-
-
 
 
 class ConfigFileManager:

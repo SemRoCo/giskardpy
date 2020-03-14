@@ -29,7 +29,7 @@ from giskardpy.tfwrapper import lookup_pose, pose_to_kdl, np_to_kdl, kdl_to_pose
 import actionlib
 from control_msgs.msg import GripperCommandAction, GripperCommandGoal
 from pr2_controllers_msgs.msg import Pr2GripperCommandAction, Pr2GripperCommandActionGoal
-from giskardpy.motion_task_with_constraint import MotionTaskWithConstraint
+from giskardpy.motion_task_with_constraint_in_simulator import MotionTaskWithConstraintInSimulator
 
 
 class Gripper:
@@ -477,12 +477,12 @@ if __name__ == '__main__':
     #open_dish_washer_door_object()
     # close_dish_washer_door_object()
     # close_oven_door_object()
-    open_sink_area_object()
+    #open_sink_area_object()
     # close_sink_area_object()
     # rotate_oven_knob()
     #reset_ktichen(list_joint)
     # print test_jacobi_fwd(5, 2, np.deg2rad(45), np.deg2rad(90))
-    #t = MotionTaskWithConstraint()
+    #t = MotionTaskWithConstraintInSimulator()
     #t.set_goal('iai_kitchen/oven_area_oven_door_handle')  #
     #t.set_goal("iai_kitchen/kitchen_island_left_upper_drawer_handle")
     #t.set_goal("iai_kitchen/iai_fridge_door_handle")

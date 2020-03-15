@@ -131,6 +131,29 @@ class Utils:
                             [0, 0, 0, 1]])
             return h_g
 
+    def update_orientation_gripper(self, robot="pr2"):
+        rotation_matrix = w.Matrix([[1, 0, 0, 0],
+                                    [0, 1, 0, 0],
+                                    [0, 0, 1, 0],
+                                    [0, 0, 0, 1]])
+        if robot == "donbot":
+            rotation_matrix = w.Matrix([[0, -1, 0, 0],
+                                        [0, 0, 1, 0],
+                                        [1, 0, 0, 0],
+                                        [0, 0, 0, 1]])
+        elif robot == "boxy":
+            rotation_matrix = w.Matrix([[-1, 0, 0, 0],
+                                        [0, -1, 0, 0],
+                                        [0, 0, 1, 0],
+                                        [0, 0, 0, 1]])
+        elif robot == "hsr":
+            rotation_matrix = w.Matrix([[-1, 0, 0, 0],
+                                        [0, 0, 1, 0],
+                                        [0, -1, 0, 0],
+                                        [0, 0, 0, 1]])
+
+        return rotation_matrix
+
     def joints_without_rotation(self):
         return ["oven_area_oven_knob_stove_1_joint",
                 "oven_area_oven_knob_stove_2_joint",
@@ -266,6 +289,9 @@ class ConfigFileManager:
                 return jn['params']
 
         return None
+
+    def get_deserialized_file(self):
+        return self._config_file
 
     def get_palm_link(self, robot_name, gripper_frame):
         if robot_name == "pr2":

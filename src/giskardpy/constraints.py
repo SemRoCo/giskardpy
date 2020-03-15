@@ -1310,8 +1310,6 @@ class PreprocessingConstraint(Constraint):
 
         # update parameter
         self.goal_name = goal_name
-        # self.body_name = body_name
-        self.root_link = "odom" #"odom_combined"
 
         if not body_name.strip():
             self.body_name = self.get_body_name(goal_name)
@@ -1333,6 +1331,12 @@ class PreprocessingConstraint(Constraint):
         self.set_urdf_params()
         self.set_config_file_params(
             self.get_god_map().safe_get_data(identifier.data_folder) + "/pr2/config_file/config_file_002.yaml")
+        self._knowrobs_info_provider_substitute_object = ConfigFileManager()
+        self._knowrobs_info_provider_substitute_object.load_yaml_config_file(
+            self.get_god_map().safe_get_data(identifier.data_folder) + "/knowrobs_info_provider_substitute.yaml")
+        self._knowrobs_info_provider_substitute = self._knowrobs_info_provider_substitute_object.get_deserialized_file()
+        self._robot_typ = self._knowrobs_info_provider_substitute["current_robot"]
+        self.root_link = self._knowrobs_info_provider_substitute['robots'][self._robot_typ]['basis_parameter']
 
         #  list of constraints
         self.constraints = []
@@ -1384,8 +1388,9 @@ class PreprocessingConstraint(Constraint):
         # do fix a rotation
         if self.joint_name in self.utils.joints_without_rotation():
             goal_rotation = w.dot(goal_rotation, self.utils.rotate_oven_knob_stove())
-        h_g = self.utils.rotation_gripper_to_object(self.grasp_axis)
-        goal_rotation = w.dot(goal_rotation, h_g)
+        axis = self.utils.axis_converter(self.grasp_axis)
+        grasp_rotation = self._knowrobs_info_provider_substitute['robots'][self._robot_typ]['grasp_matrix_rotation'][str(axis)]
+        goal_rotation = w.dot(goal_rotation, w.Matrix(grasp_rotation))
         new_orientation = w.quaternion_from_matrix(goal_rotation)
         goal_pose.pose.orientation.x = new_orientation[0]
         goal_pose.pose.orientation.y = new_orientation[1]
@@ -1416,7 +1421,6 @@ class PreprocessingConstraint(Constraint):
             goal_pose.pose.position.z = goal_pose.pose.position.z + self.axis[2]
 
         # return goal_pose
-        # update orientation of gripper for constraints orientation
         goal = convert_ros_message_to_dictionary(goal_pose)
 
         return goal
@@ -1502,7 +1506,7 @@ class PreprocessingConstraint(Constraint):
             goal_pose.pose.orientation.w
         )
         # performs goal orientation, gripper rotate on x-axis
-        rotationXaxis_gripper = w.rotation_matrix_from_axis_angle([1, 0, 0], self.action * self.limits[1])
+        rotationXaxis_gripper = w.rotation_matrix_from_axis_angle(self._knowrobs_info_provider_substitute['robots'][self._robot_typ]['turn_axis'], self.action * self.limits[1])
         goal_orientation = w.dot(current_rotation_gripper, rotationXaxis_gripper)
         goal_orientation_quaternion = w.quaternion_from_matrix(goal_orientation)
 
@@ -1635,8 +1639,6 @@ class OpenCloseDoorConstraint(PreprocessingConstraint):
         goal_pose = convert_ros_message_to_dictionary(goal_pose)
         self.constraints.append(CartesianPosition(god_map, self.root_link, self.body_name, goal_pose,
                                                   weight, gain, translation_max_speed))
-        #self.constraints.append(CartesianOrientationSlerp(god_map, self.root_link, self.body_name, goal_pose,
-                                                          #weight, gain, rotation_max_speed))
 
     def get_constraint(self):
         soft_constraints = OrderedDict()
@@ -1669,13 +1671,15 @@ class OpenCloseDoorConstraint(PreprocessingConstraint):
 
         # current orientation
         current_orientation = w.rotation_of(root_T_hand)
+        # update orientation gripper according to robot
         current_axis, current_angle = w.diffable_axis_angle_from_matrix(current_orientation) #w.quaternion_from_matrix(current_orientation)
         current_axis_angle = current_axis * current_angle
-        # desired orientation
+        # desired orientation rotation axis -> PR2 "[0, 0, 1]" | DONBOT [0, -1, 0]
+        axis_rot = self._knowrobs_info_provider_substitute['robots'][self._robot_typ]['rotation_axis']
         if self.utils.get_symbol(self.opening) > 0:
-            rotation_z = w.rotation_matrix_from_axis_angle([0, 0, 1], angle)
+            rotation_z = w.rotation_matrix_from_axis_angle(axis_rot, angle)
         else:
-            rotation_z = w.rotation_matrix_from_axis_angle([0, 0, 1], -angle)
+            rotation_z = w.rotation_matrix_from_axis_angle(axis_rot, -angle)
         desired_axis, desired_angle = w.diffable_axis_angle_from_matrix(w.dot(self.orientation_gripper, rotation_z)) #w.quaternion_from_matrix(w.dot(self.orientation_gripper, rotation_z))
         desired_axis_angle = desired_axis * desired_angle
 

@@ -157,6 +157,7 @@ class URDFObject(object):
         :rtype: URDFObject
         """
         r = up.Robot(robot_name)
+        r.version = u'1.0'
         for link in links:
             r.add_link(link)
         for joint in joints:
@@ -313,6 +314,24 @@ class URDFObject(object):
         """
         joint = self.get_urdf_joint(name)
         return joint.type in MOVABLE_JOINT_TYPES and joint.mimic is not None
+
+    @memoize
+    def get_mimiced_joint_name(self, joint_name):
+        return self.get_urdf_joint(joint_name).mimic.joint
+
+    @memoize
+    def get_mimic_multiplier(self, joint_name):
+        multiplier = self.get_urdf_joint(joint_name).mimic.multiplier
+        if multiplier is None:
+            return 1
+        return multiplier
+
+    @memoize
+    def get_mimic_offset(self, joint_name):
+        offset = self.get_urdf_joint(joint_name).mimic.offset
+        if offset is None:
+            return 0
+        return offset
 
     @memoize
     def has_joint(self, name):
@@ -569,7 +588,10 @@ class URDFObject(object):
         """
         :rtype: URDFObject
         """
-        sub_tree = self.get_sub_tree_at_joint(joint_name)
+        try:
+            sub_tree = self.get_sub_tree_at_joint(joint_name)
+        except KeyError:
+            raise KeyError(u'can\'t detach at unknown joint: {}'.format(joint_name))
         for link in sub_tree.get_link_names():
             self._urdf_robot.remove_aggregate(self.get_urdf_link(link))
         for joint in chain([joint_name], sub_tree.get_joint_names()):

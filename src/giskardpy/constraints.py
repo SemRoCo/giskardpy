@@ -14,7 +14,7 @@ from giskardpy.exceptions import GiskardException
 from giskardpy.input_system import PoseStampedInput, Point3Input, Vector3Input, Vector3StampedInput, FrameInput, \
     PointStampedInput, TranslationInput
 from giskardpy.qp_problem_builder import SoftConstraint
-from giskardpy.tfwrapper import transform_pose, transform_vector, transform_point
+import giskardpy.tfwrapper as tf
 
 MAX_WEIGHT = 15
 HIGH_WEIGHT = 5
@@ -92,6 +92,25 @@ class Constraint(object):
     def get_input_float(self, name):
         key = self.get_identifier() + [name]
         return self.god_map.to_symbol(key)
+
+    def parse_and_transform_PoseStamped(self, pose_stamped_json, goal_reference_frame):
+        result = convert_dictionary_to_ros_message(u'geometry_msgs/PoseStamped', pose_stamped_json)
+        result = tf.transform_pose(goal_reference_frame, result)
+        result.pose.orientation = tf.normalize(result.pose.orientation)
+        return result
+
+    def parse_and_transform_Vector3Stamped(self, vector3_stamped_json, goal_reference_frame, normalized=False):
+        result = convert_dictionary_to_ros_message(u'geometry_msgs/Vector3Stamped', vector3_stamped_json)
+        result = tf.transform_vector(goal_reference_frame, result)
+        if normalized:
+            result.vector = tf.normalize(result.vector)
+        return result
+
+    def parse_and_transform_PointStamped(self, point_stamped_json, goal_reference_frame):
+        result = convert_dictionary_to_ros_message(u'geometry_msgs/PointStamped', point_stamped_json)
+        result = tf.transform_point(goal_reference_frame, result)
+        return result
+
 
     def get_input_PoseStamped(self, name):
         return PoseStampedInput(self.get_god_map().to_symbol,
@@ -255,20 +274,7 @@ class BasicCartesianConstraint(Constraint):
         super(BasicCartesianConstraint, self).__init__(god_map)
         self.root = root_link
         self.tip = tip_link
-        goal = convert_dictionary_to_ros_message(u'geometry_msgs/PoseStamped', goal)
-        goal = transform_pose(self.root, goal)
-
-        # make sure rotation is normalized quaternion
-        # TODO make a function out of this
-        rotation = np.array([goal.pose.orientation.x,
-                             goal.pose.orientation.y,
-                             goal.pose.orientation.z,
-                             goal.pose.orientation.w])
-        normalized_rotation = rotation / np.linalg.norm(rotation)
-        goal.pose.orientation.x = normalized_rotation[0]
-        goal.pose.orientation.y = normalized_rotation[1]
-        goal.pose.orientation.z = normalized_rotation[2]
-        goal.pose.orientation.w = normalized_rotation[3]
+        goal = self.parse_and_transform_PoseStamped(goal, self.root)
 
         params = {self.goal: goal,
                   self.weight: weight,
@@ -757,10 +763,10 @@ class SelfCollisionAvoidance(Constraint):
 
 
 class AlignPlanes(Constraint):
-    root_normal = u'root_normal'
-    tip_normal = u'tip_normal'
+    root_normal_id = u'root_normal'
+    tip_normal_id = u'tip_normal'
     weight = u'weight'
-    max_velocity = u'max_velocity'
+    max_velocity_id = u'max_velocity'
 
     def __init__(self, god_map, root, tip, root_normal, tip_normal, weight=HIGH_WEIGHT, max_velocity=0.5):
         """
@@ -774,33 +780,27 @@ class AlignPlanes(Constraint):
         self.root = root
         self.tip = tip
 
-        root_normal = convert_dictionary_to_ros_message(u'geometry_msgs/Vector3Stamped', root_normal)
-        root_normal = transform_vector(self.root, root_normal)
-        tmp = np.array([root_normal.vector.x, root_normal.vector.y, root_normal.vector.z])
-        tmp = tmp / np.linalg.norm(tmp)
-        root_normal.vector = Vector3(*tmp)
+        self.tip_normal = self.parse_and_transform_Vector3Stamped(tip_normal, self.tip, normalized=True)
+        self.root_normal = self.parse_and_transform_Vector3Stamped(root_normal, self.root, normalized=True)
 
-        tip_normal = convert_dictionary_to_ros_message(u'geometry_msgs/Vector3Stamped', tip_normal)
-        tip_normal = transform_vector(self.tip, tip_normal)
-        tmp = np.array([tip_normal.vector.x, tip_normal.vector.y, tip_normal.vector.z])
-        tmp = tmp / np.linalg.norm(tmp)
-        tip_normal.vector = Vector3(*tmp)
-
-        params = {self.root_normal: root_normal,
-                  self.tip_normal: tip_normal,
+        params = {self.root_normal_id: self.root_normal,
+                  self.tip_normal_id: self.tip_normal,
                   self.weight: weight,
-                  self.max_velocity: max_velocity}
+                  self.max_velocity_id: max_velocity}
         self.save_params_on_god_map(params)
 
     def __str__(self):
         s = super(AlignPlanes, self).__str__()
-        return u'{}/{}/{}'.format(s, self.root, self.tip)
+        return u'{}/{}/{}_X:{}_Y:{}_Z:{}'.format(s, self.root, self.tip,
+                                                 self.tip_normal.vector.x,
+                                                 self.tip_normal.vector.y,
+                                                 self.tip_normal.vector.z)
 
     def get_root_normal_vector(self):
-        return self.get_input_Vector3Stamped(self.root_normal)
+        return self.get_input_Vector3Stamped(self.root_normal_id)
 
     def get_tip_normal_vector(self):
-        return self.get_input_Vector3Stamped(self.tip_normal)
+        return self.get_input_Vector3Stamped(self.tip_normal_id)
 
     def make_constraints(self):
         # TODO integrate max_velocity?
@@ -913,19 +913,14 @@ class Pointing(Constraint):
             self.root = root
         self.tip = tip
 
-        goal_point = convert_dictionary_to_ros_message(u'geometry_msgs/PointStamped', goal_point)
-        goal_point = transform_point(self.root, goal_point)
+        goal_point = self.parse_and_transform_PointStamped(goal_point, self.root)
 
         if pointing_axis is not None:
-            pointing_axis = convert_dictionary_to_ros_message(u'geometry_msgs/Vector3Stamped', pointing_axis)
-            pointing_axis = transform_vector(self.tip, pointing_axis)
+            pointing_axis = self.parse_and_transform_Vector3Stamped(pointing_axis, self.tip, normalized=True)
         else:
             pointing_axis = Vector3Stamped()
             pointing_axis.header.frame_id = self.tip
             pointing_axis.vector.z = 1
-        tmp = np.array([pointing_axis.vector.x, pointing_axis.vector.y, pointing_axis.vector.z])
-        tmp = tmp / np.linalg.norm(tmp)  # TODO possible /0
-        pointing_axis.vector = Vector3(*tmp)
 
         params = {self.goal_point: goal_point,
                   self.pointing_axis: pointing_axis,

@@ -404,6 +404,7 @@ class GiskardTestWrapper(object):
             np.testing.assert_array_almost_equal(msg_to_list(goal_in_base.pose.orientation),
                                                  -np.array(msg_to_list(current_pose.pose.orientation)), decimal=2)
 
+
     #
     # GENERAL GOAL STUFF ###############################################################################################
     #

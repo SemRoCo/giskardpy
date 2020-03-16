@@ -5,6 +5,7 @@ import numbers
 from collections import OrderedDict
 
 import numpy as np
+from geometry_msgs.msg import PointStamped, Point
 from geometry_msgs.msg import Vector3Stamped, Vector3
 from rospy_message_converter.message_converter import convert_dictionary_to_ros_message
 
@@ -14,7 +15,7 @@ from giskardpy.exceptions import GiskardException, ConstraintException
 from giskardpy.input_system import PoseStampedInput, Point3Input, Vector3Input, Vector3StampedInput, FrameInput, \
     PointStampedInput, TranslationInput
 from giskardpy.qp_problem_builder import SoftConstraint
-from giskardpy.tfwrapper import transform_pose, transform_vector
+from giskardpy.tfwrapper import transform_pose, transform_vector, transform_point
 
 WEIGHTS = [0] + [6 ** x for x in range(7)]
 
@@ -990,6 +991,86 @@ class AlignPlanes(Constraint):
 
     def get_tip_normal_vector(self):
         return self.get_input_Vector3Stamped(self.tip_normal_id)
+
+    def make_constraints(self):
+        max_velocity = self.get_input_float(self.max_velocity_id)
+        root_R_tip = w.rotation_of(self.get_fk(self.root, self.tip))
+        tip_normal__tip = self.get_tip_normal_vector()
+        root_normal__root = self.get_root_normal_vector()
+
+        tip_normal__root = w.dot(root_R_tip, tip_normal__tip)
+        error = root_normal__root - tip_normal__root
+        error_scale = w.norm(error)
+        limited_error_scale = self.limit_velocity(error_scale, max_velocity)
+        error = w.scale(error, limited_error_scale)
+
+        weight = WEIGHT_BELOW_CA
+
+        self.add_constraint(str(self) + u'/x', lower=error[0],
+                            upper=error[0],
+                            weight=weight,
+                            expression=tip_normal__root[0])
+        self.add_constraint(str(self) + u'/y', lower=error[1],
+                            upper=error[1],
+                            weight=weight,
+                            expression=tip_normal__root[1])
+        self.add_constraint(str(self) + u'/z', lower=error[2],
+                            upper=error[2],
+                            weight=weight,
+                            expression=tip_normal__root[2])
+
+
+class GraspBar(Constraint):
+    bar_axis_id = u'bar_axis'
+    tip_grasp_axis_id = u'tip_grasp_axis'
+    bar_center_id = u'bar_center'
+    bar_length_id = u'bar_length'
+    max_velocity_id = u'max_velocity'
+
+    def __init__(self, god_map, root, tip, tip_grasp_axis, bar_center, bar_axis, bar_length, max_velocity=0.1):
+        super(GraspBar, self).__init__(god_map)
+        self.root = root
+        self.tip = tip
+
+        bar_center = convert_dictionary_to_ros_message(u'geometry_msgs/PointStamped', bar_center) # type: PointStamped
+        bar_center = transform_point(self.root, bar_center)
+        tmp = np.array([bar_center.point.x, bar_center.point.y, bar_center.point.z])
+        tmp = tmp / np.linalg.norm(tmp)
+        bar_center.point = Point(*tmp)
+
+        tip_grasp_axis = convert_dictionary_to_ros_message(u'geometry_msgs/Vector3Stamped', tip_grasp_axis) # type: Vector3Stamped
+        tip_grasp_axis = transform_vector(self.tip, tip_grasp_axis)
+        tmp = np.array([tip_grasp_axis.vector.x, tip_grasp_axis.vector.y, tip_grasp_axis.vector.z])
+        tmp = tmp / np.linalg.norm(tmp)
+        tip_grasp_axis.vector = Vector3(*tmp)
+        self.tip_normal = tip_grasp_axis
+
+        bar_axis = convert_dictionary_to_ros_message(u'geometry_msgs/Vector3Stamped', bar_axis) # type: Vector3Stamped
+        bar_axis = transform_vector(self.root, bar_axis)
+        tmp = np.array([bar_axis.vector.x, bar_axis.vector.y, bar_axis.vector.z])
+        tmp = tmp / np.linalg.norm(tmp)
+        bar_axis.vector = Vector3(*tmp)
+        self.bar_axis = bar_axis
+
+        params = {self.bar_axis_id: bar_axis,
+                  self.tip_grasp_axis_id: tip_grasp_axis,
+                  self.bar_center_id: bar_center,
+                  self.bar_length_id: bar_length,
+                  self.max_velocity_id: max_velocity}
+        self.save_params_on_god_map(params)
+
+    def __str__(self):
+        s = super(GraspBar, self).__str__()
+        return u'{}/{}/{}_X:{}_Y:{}_Z:{}'.format(s, self.root, self.tip,
+                                                 self.tip_normal.vector.x,
+                                                 self.tip_normal.vector.y,
+                                                 self.tip_normal.vector.z)
+
+    def get_root_normal_vector(self):
+        return self.get_input_Vector3Stamped(self.bar_axis_id)
+
+    def get_tip_normal_vector(self):
+        return self.get_input_Vector3Stamped(self.tip_grasp_axis_id)
 
     def make_constraints(self):
         max_velocity = self.get_input_float(self.max_velocity_id)

@@ -200,13 +200,116 @@ class Utils:
         return v1[0] * u1[0] + v1[1] * u1[1]
 
     def axis_converter(self, axis):
+        x = [1, 0, 0]
+        y = [0, 1, 0]
+        z = [0, 0, 1]
         if isinstance(axis, str):
             if axis == "x":
-                return [1, 0, 0]
+                return x
             elif axis == "y":
-                return [0, 1, 0]
+                return y
             elif axis == "z":
-                return [0, 0, 1]
+                return z
+            elif axis == "-x":
+                return [-1 * i for i in x]
+            elif axis == "-y":
+                return [-1 * i for i in y]
+            elif axis == "-z":
+                return [-1 * i for i in z]
+        if isinstance(axis, list):
+            if axis == [1, 0, 0]:
+                return 'x'
+            elif axis == [-1, 0, 0]:
+                return '-x'
+            elif axis == [0, 1, 0]:
+                return 'y'
+            elif axis == [0, -1, 0]:
+                return '-y'
+            elif axis == [0, 0, 1]:
+                return 'z'
+            elif axis == [0, 0, -1]:
+                return '-z'
+
+    def create_rotation_matrix(self, axis):
+        return np.transpose([self.axis_converter(matrix) for matrix in axis])
+
+    def create_rotation_matrix_without_free_axis(self, ta, ra, taa, raa):
+        """
+        :param axis1: ta
+        :param axis2: ra
+        :param axis_array: [taa, raa, free]
+        :return: rotation_matrix
+        """
+        index_free_axis = [0, 1, 2]
+        matrix_params = [0, 0, 0]
+        ra, raa = self.normalize_axis(self.axis_converter(ra), raa)
+        print(ra, raa)
+        ta, taa = self.normalize_axis(self.axis_converter(ta), taa)
+        print(ta, taa)
+        free_axis = self.tail_cross_product(self.axis_converter(ra), self.axis_converter(ta), raa, taa)
+        print free_axis
+        print index_free_axis
+        index_ta = ta.index(1)
+        print index_ta
+        index_ra = ra.index(1)
+        print index_ra
+        index_free = None
+        for missing_index in index_free_axis:
+            if missing_index not in [index_ta, index_ra]:
+                index_free = missing_index
+        matrix_params[index_ra] = self.axis_converter(raa)
+        matrix_params[index_ta] = self.axis_converter(taa)
+        matrix_params[index_free] = self.axis_converter(free_axis)
+        print matrix_params
+        matrix3 = self.create_rotation_matrix(matrix_params)
+        matrix4 = []
+        for arr in matrix3:
+            new_array = [x for x in arr]
+            new_array.append(0)
+            matrix4.append(new_array)
+        matrix4.append([0, 0, 0, 1])
+        print matrix4
+        return matrix4
+
+    def tail_cross_product(self, axis1, axis2, array1, array2):
+        if axis1 == "x" and axis2 == "y":
+            return [x for x in np.cross(array1, array2)]
+        elif axis1 == "y" and axis2 == "x":
+            return [ x for x in np.cross(array2, array1)]
+        elif axis1 == "y" and axis2 == "z":
+            return [x for x in np.cross(array1, array2)]
+        elif axis1 == "z" and axis2 == "y":
+            return [x for x in np.cross(array2, array1)]
+        elif axis1 == "z" and axis2 == "x":
+            return [x for x in np.cross(array1, array2)]
+        elif axis1 == "x" and axis2 == "z":
+            return [x for x in np.cross(array2, array1)]
+
+    def abs_axis(self, axis):
+        """
+        parse axis_string, symbol |<--->| axis_string
+        :param axis:
+        :return:
+        """
+        symbol = 1
+        if len(axis) == 2:
+            symbol = -1
+            axis = axis[1]
+        return symbol, axis
+
+    def normalize_axis(self, axis_string, axis_array):
+        """
+        FIX AXIS -X, -Y OR -Z AND CONVERT AXIS_STRING --> self.axis_converter(AXIS_STRING)
+        IF NEGATIV THEN AXIS_ARRAY x -1
+        :param axis_string:
+        :param axis_array:
+        :return:
+        """
+        symbol, axis = self.abs_axis(axis_string)
+        axis = self.axis_converter(axis)
+        axis_array = [symbol * x for x in axis_array]
+        return axis, axis_array
+
 
     def create_point_on_line(self, first_point, second_point, factor):
         """

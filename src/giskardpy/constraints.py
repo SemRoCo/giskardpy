@@ -1388,8 +1388,11 @@ class PreprocessingConstraint(Constraint):
         # do fix a rotation
         if self.joint_name in self.utils.joints_without_rotation():
             goal_rotation = w.dot(goal_rotation, self.utils.rotate_oven_knob_stove())
-        axis = self.utils.axis_converter(self.grasp_axis)
-        grasp_rotation = self._knowrobs_info_provider_substitute['robots'][self._robot_typ]['grasp_matrix_rotation'][str(axis)]
+        raa = self.utils.axis_converter(self.grasp_axis)
+        ta = self._knowrobs_info_provider_substitute['robots'][self._robot_typ]['turn_axis']
+        taa = self._knowrobs_info_provider_substitute['robots'][self._robot_typ]['turn_axis_array']
+        ra = self._knowrobs_info_provider_substitute['robots'][self._robot_typ]['rotation_axis']
+        grasp_rotation = self.utils.create_rotation_matrix_without_free_axis(ta, ra, taa, raa)
         goal_rotation = w.dot(goal_rotation, w.Matrix(grasp_rotation))
         new_orientation = w.quaternion_from_matrix(goal_rotation)
         goal_pose.pose.orientation.x = new_orientation[0]

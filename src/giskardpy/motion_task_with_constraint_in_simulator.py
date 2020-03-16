@@ -403,7 +403,7 @@ if __name__ == '__main__':
 
     # iai_kitchen/sink_area_left_middle_drawer_handle
     mc.execute_open_translational_motion_in_simulator('iai_kitchen/sink_area_left_middle_drawer_handle',
-                                                      'gripper_tool_frame', -1,
+                                                      'l_gripper_tool_frame', -1,
                                                       'sink_area_left_middle_drawer_main_joint', 0.48)
     # mc.execute_close_translational_motion_in_simulator('iai_kitchen/sink_area_left_middle_drawer_handle',
     # 'r_gripper_tool_frame', 1,

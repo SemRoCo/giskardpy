@@ -2,7 +2,7 @@
 # import giskardpy.utils_constraints as u
 # cf= u.ConfigFileManager()
 # r= cf.load_yaml_config_file(path + "src/giskardpy/data/knowrobs_info_provider_substitute.yaml")
-current_robot: donbot
+current_robot: pr2
 
 robots:
   pr2:
@@ -10,36 +10,28 @@ robots:
     gripper_parameter: 
     - r_gripper_tool_frame
     - l_gripper_tool_frame
-    grasp_matrix_rotation: 
-      '[0, 0, 1]': [[-1, 0, 0, 0], [0, -1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]]
-      '[0, 1, 0]': [[-1, 0, 0, 0], [0, 0, 1, 0], [0, 1, 0, 0], [0, 0, 0, 1]]
     rotation_axis: [0, 0, 1]
     turn_axis: [1, 0, 0]
+    turn_axis_array: [-1, 0, 0]
   donbot:
     basis_parameter: odom
     gripper_parameter: 
     - gripper_tool_frame
-    grasp_matrix_rotation: 
-      '[0, 0, 1]': [[0, 0, -1, 0], [-1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 0, 1]]
-      '[0, 1, 0]': [[0, 0, -1, 0], [0, 1, 0, 0], [1, 0, 0, 0], [0, 0, 0, 1]]
     rotation_axis: [0, 1, 0]
     turn_axis: [0, 0, 1]
+    turn_axis_array: [-1, 0, 0]
   boxy:
     basis_parameter: odom
     gripper_parameter: 
     - right_gripper_tool_frame
     - left_gripper_tool_frame
-    grasp_matrix_rotation: 
-      '[0, 0, 1]': [[0, 0, -1, 0], [-1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 0, 1]]
-      '[0, 1, 0]': [[0, 0, -1, 0], [0, 1, 0, 0], [1, 0, 0, 0], [0, 0, 0, 1]]
     rotation_axis: [0, -1, 0]
     turn_axis: [0, 0, 1]
+    turn_axis_array: [-1, 0, 0]
   hsr:
     basis_parameter: odom
     gripper_parameter: 
-    - hand_palm_link
-    grasp_matrix_rotation: 
-      '[0, 0, 1]': [[0, 0, -1, 0], [0, -1, 0, 0], [-1, 0, 0, 0], [0, 0, 0, 1]]
-      '[0, 1, 0]': [[0, 0, -1, 0], [-1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 0, 1]] #[[0, 0, -1, 0], [1, 0, 0, 0], [0, -1, 0, 0], [0, 0, 0, 1]]
+    - gripper_tool_frame
     rotation_axis: [-1, 0, 0] #[1, 0, 0]
     turn_axis: [0, 0, 1]
+    turn_axis_array: [-1, 0, 0]

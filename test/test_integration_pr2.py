@@ -473,6 +473,31 @@ class TestConstraints(object):
         np.testing.assert_almost_equal(expected_x.point.y, 0, 2)
         np.testing.assert_almost_equal(expected_x.point.z, 0, 2)
 
+    def test_align_planes1(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        x_gripper = Vector3Stamped()
+        x_gripper.header.frame_id = zero_pose.r_tip
+        x_gripper.vector.x = 1
+        y_gripper = Vector3Stamped()
+        y_gripper.header.frame_id = zero_pose.r_tip
+        y_gripper.vector.y = 1
+
+        x_goal = Vector3Stamped()
+        x_goal.header.frame_id = u'map'
+        x_goal.vector.x = 1
+        y_goal = Vector3Stamped()
+        y_goal.header.frame_id = u'map'
+        y_goal.vector.z = 1
+        zero_pose.align_planes(zero_pose.r_tip, x_gripper, root_normal=x_goal)
+        zero_pose.align_planes(zero_pose.r_tip, y_gripper, root_normal=y_goal)
+        zero_pose.send_and_check_goal()
+        map_T_gripper = lookup_pose(u'map', u'r_gripper_tool_frame')
+        np.testing.assert_almost_equal(map_T_gripper.pose.orientation.x, 0.7071, decimal=3)
+        np.testing.assert_almost_equal(map_T_gripper.pose.orientation.y, 0.0, decimal=3)
+        np.testing.assert_almost_equal(map_T_gripper.pose.orientation.z, 0.0, decimal=3)
+        np.testing.assert_almost_equal(map_T_gripper.pose.orientation.w, 0.7071, decimal=3)
 
 class TestCartGoals(object):
 

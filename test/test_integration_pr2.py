@@ -2123,20 +2123,21 @@ class TestCollisionAvoidanceGoals(object):
         # kitchen_setup.keep_position(kitchen_setup.r_tip)
         kitchen_setup.close_l_gripper()
 
-        x = Vector3Stamped()
-        x.header.frame_id = 'milk'
-        x.vector.x = 1
-        x_map = Vector3Stamped()
-        x_map.header.frame_id = 'iai_kitchen/iai_fridge_door'
-        x_map.vector.x = 1
-        z = Vector3Stamped()
-        z.header.frame_id = 'milk'
-        z.vector.z = 1
-        z_map = Vector3Stamped()
-        z_map.header.frame_id = 'map'
-        z_map.vector.z = 1
-        kitchen_setup.align_planes('milk', x, root_normal=x_map)
-        kitchen_setup.align_planes('milk', z, root_normal=z_map)
+        # x = Vector3Stamped()
+        # x.header.frame_id = 'milk'
+        # x.vector.x = 1
+        # x_map = Vector3Stamped()
+        # x_map.header.frame_id = 'iai_kitchen/iai_fridge_door'
+        # x_map.vector.x = 1
+        # z = Vector3Stamped()
+        # z.header.frame_id = 'milk'
+        # z.vector.z = 1
+        # z_map = Vector3Stamped()
+        # z_map.header.frame_id = 'map'
+        # z_map.vector.z = 1
+        # kitchen_setup.align_planes('milk', x, root_normal=x_map)
+        # kitchen_setup.align_planes('milk', z, root_normal=z_map)
+        kitchen_setup.keep_orientation('milk')
         kitchen_setup.send_and_check_goal()
 
         # place milk

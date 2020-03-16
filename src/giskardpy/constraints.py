@@ -1025,7 +1025,7 @@ class BasePointingForward(Constraint):
     range_id = u'range'
     linear_velocity_threshold_id = u'linear_velocity_threshold'
 
-    def __init__(self, god_map, base_forward_axis=None, base_footprint=None, odom=None, range=np.pi/8,
+    def __init__(self, god_map, base_forward_axis=None, base_footprint=None, odom=None, velocity_tip=None, range=np.pi/8,
                  max_velocity=np.pi/8, linear_velocity_threshold=0.02):
         """
         :param god_map: ignore
@@ -1044,6 +1044,10 @@ class BasePointingForward(Constraint):
             self.base_footprint = base_footprint
         else:
             self.base_footprint = self.get_robot().get_non_base_movement_root()
+        if velocity_tip is None:
+            self.velocity_tip = self.base_footprint
+        else:
+            self.velocity_tip = velocity_tip
         if base_forward_axis is not None:
             self.base_forward_axis = base_forward_axis
             base_forward_axis = convert_dictionary_to_ros_message(u'geometry_msgs/Vector3Stamped', base_forward_axis)
@@ -1078,7 +1082,7 @@ class BasePointingForward(Constraint):
         linear_velocity_threshold = self.get_input_float(self.linear_velocity_threshold_id)
 
         max_velocity = self.get_input_float(self.max_velocity)
-        odom_T_base_footprint_dot = self.get_fk_velocity(self.odom, self.base_footprint)
+        odom_T_base_footprint_dot = self.get_fk_velocity(self.odom, self.velocity_tip)
         odom_V_goal = w.vector3(odom_T_base_footprint_dot[0],
                                 odom_T_base_footprint_dot[1],
                                 odom_T_base_footprint_dot[2])

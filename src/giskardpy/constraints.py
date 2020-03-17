@@ -1310,6 +1310,7 @@ class PreprocessingConstraint(Constraint):
 
         # update parameter
         self.goal_name = goal_name
+        self.root_link = self.get_robot().get_root()
 
         if not body_name.strip():
             self.body_name = self.get_body_name(goal_name)
@@ -1335,8 +1336,7 @@ class PreprocessingConstraint(Constraint):
         self._knowrobs_info_provider_substitute_object.load_yaml_config_file(
             self.get_god_map().safe_get_data(identifier.data_folder) + "/knowrobs_info_provider_substitute.yaml")
         self._knowrobs_info_provider_substitute = self._knowrobs_info_provider_substitute_object.get_deserialized_file()
-        self._robot_typ = self._knowrobs_info_provider_substitute["current_robot"]
-        self.root_link = self._knowrobs_info_provider_substitute['robots'][self._robot_typ]['basis_parameter']
+        self._robot_typ = self.get_robot().get_name()
 
         #  list of constraints
         self.constraints = []
@@ -1390,7 +1390,7 @@ class PreprocessingConstraint(Constraint):
             goal_rotation = w.dot(goal_rotation, self.utils.rotate_oven_knob_stove())
         raa = self.utils.axis_converter(self.grasp_axis)
         ta = self._knowrobs_info_provider_substitute['robots'][self._robot_typ]['turn_axis']
-        taa = self._knowrobs_info_provider_substitute['robots'][self._robot_typ]['turn_axis_array']
+        taa = self.config_file_manager.get_deserialized_file()[0]['turn_axis_array']
         ra = self._knowrobs_info_provider_substitute['robots'][self._robot_typ]['rotation_axis']
         grasp_rotation = self.utils.create_rotation_matrix_without_free_axis(ta, ra, taa, raa)
         goal_rotation = w.dot(goal_rotation, w.Matrix(grasp_rotation))
@@ -1408,8 +1408,7 @@ class PreprocessingConstraint(Constraint):
 
     def create_translational_motion_pose(self):
         # get pose of grasped joint
-        goal_pose = tf_wrapper.lookup_pose("map", #self.get_robot().get_root(),
-                                           self.body_name)
+        goal_pose = tf_wrapper.lookup_pose("map", self.body_name)
 
         goal_pose.header.frame_id = "map"
         rospy.logout("Check if joint is translational or rotational")

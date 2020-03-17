@@ -67,9 +67,9 @@ class MotionTaskWithConstraintInSimulator:
         self._knowrobs_info_provider_substitute_object.load_yaml_config_file(
             "/home/ange-michel/Desktop/spartacus_3/giskardpy_ws/src/giskardpy/data" + "/knowrobs_info_provider_substitute.yaml")
         self._knowrobs_info_provider_substitute = self._knowrobs_info_provider_substitute_object.get_deserialized_file()
-        self._robot_typ = self._knowrobs_info_provider_substitute["current_robot"]
-        self._origin = self._knowrobs_info_provider_substitute['robots'][self._robot_typ]['basis_parameter']
-        self._list_grippers = self._knowrobs_info_provider_substitute['robots'][self._robot_typ]['gripper_parameter']
+        self._robot_typ = "hsrb" #self._knowrobs_info_provider_substitute["current_robot"]
+        self._origin = "odom" #self._knowrobs_info_provider_substitute['robots'][self._robot_typ]['basis_parameter']
+        self._list_grippers = self._knowrobs_info_provider_substitute['robots'][self._robot_typ]['endeffector_names']
 
     def set_gripper_for_simulator(self):
         # setup gripper as service
@@ -369,10 +369,10 @@ if __name__ == '__main__':
     mc = MotionTaskWithConstraintInSimulator()
     mc.set_gripper_for_simulator()
     # fridge door
-    #mc.execute_open_circular_motion_in_simulator('iai_kitchen/iai_fridge_door_handle', 'gripper_tool_frame', 0.5,
-                                                 #'iai_fridge_door_joint', 0.758)
-    # mc.execute_close_circular_motion_in_simulator('iai_kitchen/iai_fridge_door_handle', 'r_gripper_tool_frame', -0.5,
-    # 'iai_fridge_door_joint', 0.0)
+    mc.execute_open_circular_motion_in_simulator('iai_kitchen/iai_fridge_door_handle', 'gripper_tool_frame', 0.5,
+                                                 'iai_fridge_door_joint', 0.758)
+    #mc.execute_close_circular_motion_in_simulator('iai_kitchen/iai_fridge_door_handle', 'gripper_tool_frame', -0.5,
+                                                  #'iai_fridge_door_joint', 0.0)
 
     #mc.reset_kitchen(list_joint)
 
@@ -395,16 +395,16 @@ if __name__ == '__main__':
     # iai_kitchen/sink_area_dish_washer_door_handle
     #mc.execute_open_circular_motion_in_simulator('iai_kitchen/sink_area_dish_washer_door_handle',
                                                  #'gripper_tool_frame',
-                                                 #-0.5, 'sink_area_dish_washer_door_joint', 0.758) #-0.25, 'sink_area_dish_washer_door_joint', 0.379)
+                                                 #-0.25, 'sink_area_dish_washer_door_joint', 0.379) # -0.5, 'sink_area_dish_washer_door_joint', 0.758)
     # mc.execute_close_circular_motion_in_simulator('iai_kitchen/sink_area_dish_washer_door_handle',
     # 'r_gripper_tool_frame',
     # 0.5, 'sink_area_dish_washer_door_joint', 0)
     # mc.reset_kitchen(list_joint)
 
     # iai_kitchen/sink_area_left_middle_drawer_handle
-    mc.execute_open_translational_motion_in_simulator('iai_kitchen/sink_area_left_middle_drawer_handle',
-                                                      'l_gripper_tool_frame', -1,
-                                                      'sink_area_left_middle_drawer_main_joint', 0.48)
+    #mc.execute_open_translational_motion_in_simulator('iai_kitchen/sink_area_left_middle_drawer_handle',
+                                                      #'gripper_tool_frame', -1,
+                                                      #'sink_area_left_middle_drawer_main_joint', 0.48)
     # mc.execute_close_translational_motion_in_simulator('iai_kitchen/sink_area_left_middle_drawer_handle',
     # 'r_gripper_tool_frame', 1,
     # 'sink_area_left_middle_drawer_main_joint', 0.0)

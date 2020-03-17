@@ -1,3 +1,4 @@
+- turn_axis_array: [-1, 0, 0]
 - name: world_room_joint
   params:
     constraint_type: ''

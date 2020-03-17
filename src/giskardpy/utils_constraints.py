@@ -388,7 +388,7 @@ class ConfigFileManager:
 
     def get_params_joint(self, joint_name=None):
         for jn in self._config_file:
-            if jn['name'] == joint_name:
+            if jn.has_key('name') and jn['name'] == joint_name:
                 return jn['params']
 
         return None

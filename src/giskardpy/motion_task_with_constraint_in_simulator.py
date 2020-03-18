@@ -29,6 +29,8 @@ from giskardpy.tfwrapper import lookup_pose, pose_to_kdl, np_to_kdl, kdl_to_pose
 import actionlib
 from control_msgs.msg import GripperCommandAction, GripperCommandGoal
 from pr2_controllers_msgs.msg import Pr2GripperCommandAction, Pr2GripperCommandActionGoal, Pr2GripperCommandGoal
+from giskardpy import hsr_gripper as hg
+
 
 
 class MotionTaskWithConstraintInSimulator:
@@ -76,6 +78,9 @@ class MotionTaskWithConstraintInSimulator:
         rospy.logout("- Set right and left Gripper service proxy")
         self._l_gripper_service = rospy.ServiceProxy('/l_gripper_simulator/set_joint_states', SetJointState)
         self._r_gripper_service = rospy.ServiceProxy('/r_gripper_simulator/set_joint_states', SetJointState)
+
+    def set_real_gripper(self):
+        self._hsr_gripper = hg.HsrGripper()
 
     def mvt_l_gripper(self, l_finger_joint, r_finger_joint, l_finger_tip_joint, r_finger_tip_joint):
         """
@@ -126,11 +131,13 @@ class MotionTaskWithConstraintInSimulator:
     def execute_open_translational_motion_in_simulator(self, goal, body, action, joint, joint_value):
         #self.mvt_l_gripper(0.54, 0.54, 0.54, 0.54)
         #self.mvt_r_gripper(0.54, 0.54, 0.54, 0.54)
+        self._hsr_gripper.move_gripper(1, 1, 1.2)
         self._giskard.set_json_goal("MoveToPoseConstraint", goal_name=goal, body_name=body)
         self._giskard.allow_all_collisions()
         self._giskard.plan_and_execute()
         #self.mvt_l_gripper(0.1, 0.1, 0.1, 0.1)
         #self.mvt_r_gripper(0.1, 0.1, 0.1, 0.1)
+        self._hsr_gripper.move_gripper(-0.05, 1, 1.2)
         self._giskard.set_json_goal("OpenCloseDrawerConstraint", goal_name=goal, body_name=body, action=action)
         self._giskard.allow_all_collisions()
         # self.giskard.avoid_all_collisions()
@@ -139,8 +146,9 @@ class MotionTaskWithConstraintInSimulator:
                                              joint_states={joint: joint_value})
 
     def execute_close_translational_motion_in_simulator(self, goal, body, action, joint, joint_value):
-        self.mvt_l_gripper(0.54, 0.54, 0.54, 0.54)
-        self.mvt_r_gripper(0.54, 0.54, 0.54, 0.54)
+        #self.mvt_l_gripper(0.54, 0.54, 0.54, 0.54)
+        #self.mvt_r_gripper(0.54, 0.54, 0.54, 0.54)
+        self._hsr_gripper.move_gripper(1, 1, 1.2)
         self._giskard.set_json_goal("MoveToPoseConstraint", goal_name=goal, body_name=body)
         self._giskard.allow_all_collisions()
         self._giskard.plan_and_execute()
@@ -154,11 +162,13 @@ class MotionTaskWithConstraintInSimulator:
     def execute_open_circular_motion_in_simulator(self, goal, body, action, joint, joint_value):
         #self.mvt_l_gripper(0.54, 0.54, 0.54, 0.54)
         #self.mvt_r_gripper(0.54, 0.54, 0.54, 0.54)
+        self._hsr_gripper.move_gripper(1, 1, 1.2)
         self._giskard.set_json_goal("MoveToPoseConstraint", goal_name=goal, body_name=body)
         self._giskard.allow_all_collisions()
         self._giskard.plan_and_execute()
         #self.mvt_l_gripper(0.1, 0.1, 0.1, 0.1)
         #self.mvt_r_gripper(0.1, 0.1, 0.1, 0.1)
+        self._hsr_gripper.move_gripper(-0.05, 1, 1.2)
         self._giskard.set_json_goal("OpenCloseDoorConstraint", goal_name=goal, body_name=body, action=action)
         self._giskard.allow_all_collisions()
         # self.giskard.avoid_all_collisions()
@@ -167,8 +177,9 @@ class MotionTaskWithConstraintInSimulator:
                                              joint_states={joint: joint_value})
 
     def execute_close_circular_motion_in_simulator(self, goal, body, action, joint, joint_value):
-        self.mvt_l_gripper(0.54, 0.54, 0.54, 0.54)
-        self.mvt_r_gripper(0.54, 0.54, 0.54, 0.54)
+        #self.mvt_l_gripper(0.54, 0.54, 0.54, 0.54)
+        #self.mvt_r_gripper(0.54, 0.54, 0.54, 0.54)
+        self._hsr_gripper.move_gripper(1, 1, 1.2)
         self._giskard.set_json_goal("MoveToPoseConstraint", goal_name=goal, body_name=body)
         self._giskard.allow_all_collisions()
         self._giskard.plan_and_execute()
@@ -176,8 +187,8 @@ class MotionTaskWithConstraintInSimulator:
         self._giskard.allow_all_collisions()
         # self.giskard.avoid_all_collisions()
         self._giskard.plan_and_execute()
-        self._giskard.set_object_joint_state(object_name='kitchen',
-                                             joint_states={joint: joint_value})
+        #self._giskard.set_object_joint_state(object_name='kitchen',
+                                             #joint_states={joint: joint_value})
 
     def execute_rotational_motion_in_simulator(self, goal, body, action, joint, joint_value):
         self.mvt_l_gripper(0.54, 0.54, 0.54, 0.54)
@@ -367,12 +378,13 @@ if __name__ == '__main__':
     ]
     rospy.logout("START SOME MOVE as Test")
     mc = MotionTaskWithConstraintInSimulator()
-    mc.set_gripper_for_simulator()
+    mc.set_real_gripper()
+    #mc.set_gripper_for_simulator()
     # fridge door
-    mc.execute_open_circular_motion_in_simulator('iai_kitchen/iai_fridge_door_handle', 'gripper_tool_frame', 0.5,
-                                                 'iai_fridge_door_joint', 0.758)
-    #mc.execute_close_circular_motion_in_simulator('iai_kitchen/iai_fridge_door_handle', 'gripper_tool_frame', -0.5,
-                                                  #'iai_fridge_door_joint', 0.0)
+    #mc.execute_open_circular_motion_in_simulator('iai_kitchen/iai_fridge_door_handle', 'gripper_tool_frame', 0.5,
+                                                 #'iai_fridge_door_joint', 0.758)
+    mc.execute_close_circular_motion_in_simulator('iai_kitchen/iai_fridge_door_handle', 'gripper_tool_frame', -0.5,
+                                                  'iai_fridge_door_joint', 0.0)
 
     #mc.reset_kitchen(list_joint)
 
@@ -399,16 +411,16 @@ if __name__ == '__main__':
     # mc.execute_close_circular_motion_in_simulator('iai_kitchen/sink_area_dish_washer_door_handle',
     # 'r_gripper_tool_frame',
     # 0.5, 'sink_area_dish_washer_door_joint', 0)
-    # mc.reset_kitchen(list_joint)
+    #mc.reset_kitchen(list_joint)
 
     # iai_kitchen/sink_area_left_middle_drawer_handle
     #mc.execute_open_translational_motion_in_simulator('iai_kitchen/sink_area_left_middle_drawer_handle',
                                                       #'gripper_tool_frame', -1,
                                                       #'sink_area_left_middle_drawer_main_joint', 0.48)
-    # mc.execute_close_translational_motion_in_simulator('iai_kitchen/sink_area_left_middle_drawer_handle',
-    # 'r_gripper_tool_frame', 1,
-    # 'sink_area_left_middle_drawer_main_joint', 0.0)
-    # mc.reset_kitchen(list_joint)
+    #mc.execute_close_translational_motion_in_simulator('iai_kitchen/sink_area_left_middle_drawer_handle',
+                                                       #'gripper_tool_frame', 1,
+                                                       #'sink_area_left_middle_drawer_main_joint', 0.0)
+    #mc.reset_kitchen(list_joint)
 
     # iai_kitchen/oven_area_oven_knob_stove_4
     # mc.execute_rotational_motion_in_simulator('iai_kitchen/oven_area_oven_knob_stove_4', 'l_gripper_tool_frame', -1,

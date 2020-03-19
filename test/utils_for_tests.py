@@ -30,7 +30,7 @@ from giskardpy.utils import msg_to_list, KeyDefaultDict, dict_to_joint_states, g
 BIG_NUMBER = 1e100
 SMALL_NUMBER = 1e-100
 
-vector = lambda x: st.lists(limited_float(), min_size=x, max_size=x)
+vector = lambda x: st.lists(float_no_nan_no_inf(), min_size=x, max_size=x)
 
 update_world_error_codes = {value: name for name, value in vars(UpdateWorldResponse).items() if
                             isinstance(value, int) and name[0].isupper()}
@@ -65,19 +65,19 @@ def keys_values(max_length=10, value_type=st.floats(allow_nan=False)):
     return lists_of_same_length([variable_name(), value_type], max_length=max_length, unique=True)
 
 
-def compare_axis_angle(angle1, axis1, angle2, axis2, decimal=3):
+def compare_axis_angle(actual_angle, actual_axis, expected_angle, expected_axis, decimal=3):
     try:
-        np.testing.assert_array_almost_equal(axis1, axis2, decimal=decimal)
-        np.testing.assert_almost_equal(shortest_angular_distance(angle1, angle2), 0, decimal=decimal)
+        np.testing.assert_array_almost_equal(actual_axis, expected_axis, decimal=decimal)
+        np.testing.assert_almost_equal(shortest_angular_distance(actual_angle, expected_angle), 0, decimal=decimal)
     except AssertionError:
         try:
-            np.testing.assert_array_almost_equal(axis1, -axis2, decimal=decimal)
-            np.testing.assert_almost_equal(shortest_angular_distance(angle1, abs(angle2 - 2 * pi)), 0, decimal=decimal)
+            np.testing.assert_array_almost_equal(actual_axis, -expected_axis, decimal=decimal)
+            np.testing.assert_almost_equal(shortest_angular_distance(actual_angle, abs(expected_angle - 2 * pi)), 0, decimal=decimal)
         except AssertionError:
-            np.testing.assert_almost_equal(shortest_angular_distance(angle1, 0), 0, decimal=decimal)
-            np.testing.assert_almost_equal(shortest_angular_distance(0, angle2), 0, decimal=decimal)
-            assert not np.any(np.isnan(axis1))
-            assert not np.any(np.isnan(axis2))
+            np.testing.assert_almost_equal(shortest_angular_distance(actual_angle, 0), 0, decimal=decimal)
+            np.testing.assert_almost_equal(shortest_angular_distance(0, expected_angle), 0, decimal=decimal)
+            assert not np.any(np.isnan(actual_axis))
+            assert not np.any(np.isnan(expected_axis))
 
 
 def compare_poses(pose1, pose2, decimal=2):
@@ -108,8 +108,8 @@ def variable_name(draw):
 
 
 @composite
-def lists_of_same_length(draw, data_types=(), max_length=10, unique=False):
-    length = draw(st.integers(min_value=1, max_value=max_length))
+def lists_of_same_length(draw, data_types=(), min_length=1, max_length=10, unique=False):
+    length = draw(st.integers(min_value=min_length, max_value=max_length))
     lists = []
     for elements in data_types:
         lists.append(draw(st.lists(elements, min_size=length, max_size=length, unique=unique)))
@@ -164,19 +164,20 @@ def boxy_urdf():
     return urdf_string
 
 
-def limited_float(outer_limit=BIG_NUMBER, min_dist_to_zero=None):
-    f = st.floats(allow_nan=False, allow_infinity=False, max_value=outer_limit, min_value=-outer_limit)
-    # f = st.floats(allow_nan=False, allow_infinity=False)
-    if min_dist_to_zero is not None:
-        f = f.filter(lambda x: (outer_limit > abs(x) and abs(x) > min_dist_to_zero) or x == 0)
-    else:
-        f = f.filter(lambda x: abs(x) < outer_limit)
-    return f
+def float_no_nan_no_inf(outer_limit=None, min_dist_to_zero=None):
+    return st.floats(allow_nan=False, allow_infinity=False, max_value=outer_limit, min_value=outer_limit)
+    # f = st.floats(allow_nan=False, allow_infinity=False, max_value=outer_limit, min_value=-outer_limit)
+    # # f = st.floats(allow_nan=False, allow_infinity=False)
+    # if min_dist_to_zero is not None:
+    #     f = f.filter(lambda x: (outer_limit > abs(x) and abs(x) > min_dist_to_zero) or x == 0)
+    # else:
+    #     f = f.filter(lambda x: abs(x) < outer_limit)
+    # return f
 
 
 def unit_vector(length, elements=None):
     if elements is None:
-        elements = limited_float(min_dist_to_zero=1e-10)
+        elements = float_no_nan_no_inf(min_dist_to_zero=1e-10)
     vector = st.lists(elements,
                       min_size=length,
                       max_size=length).filter(lambda x: np.linalg.norm(x) > SMALL_NUMBER and

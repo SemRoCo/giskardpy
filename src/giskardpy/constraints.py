@@ -9,7 +9,7 @@ from rospy_message_converter.message_converter import convert_dictionary_to_ros_
 from scipy.optimize import curve_fit
 
 import giskardpy.identifier as identifier
-from giskardpy import symbolic_wrapper as w
+from giskardpy import cas_wrapper as w
 from giskardpy.exceptions import GiskardException
 from giskardpy.input_system import PoseStampedInput, Point3Input, Vector3Input, Vector3StampedInput, FrameInput, \
     PointStampedInput, TranslationInput
@@ -160,7 +160,7 @@ class Constraint(object):
     def limit_velocity(self, error, max_velocity):
         sample_period = self.get_input_sampling_period()
         max_velocity *= sample_period
-        return w.diffable_max_fast(w.diffable_min_fast(error, max_velocity), -max_velocity)
+        return w.Max(w.Min(error, max_velocity), -max_velocity)
 
     def get_constraints(self):
         """
@@ -234,7 +234,6 @@ class JointPosition(Constraint):
             err = w.shortest_angular_distance(current_joint, joint_goal)
         else:
             err = joint_goal - current_joint
-        # capped_err = w.diffable_max_fast(w.diffable_min_fast(err, max_velocity), -max_velocity)
 
         capped_err = self.limit_acceleration(current_joint, err, max_acceleration, max_velocity)
 
@@ -362,7 +361,7 @@ class CartesianPositionX(BasicCartesianConstraint):
 
         trans_error_vector = goal_position - current_position
         trans_error = w.norm(trans_error_vector)
-        trans_scale = w.diffable_min_fast(trans_error, max_velocity * t)
+        trans_scale = w.Min(trans_error, max_velocity * t)
         trans_control = w.save_division(trans_error_vector, trans_error) * trans_scale
 
         self.add_constraint(str(self) + u'x', lower=trans_control[0],
@@ -382,7 +381,7 @@ class CartesianPositionY(BasicCartesianConstraint):
 
         trans_error_vector = goal_position - current_position
         trans_error = w.norm(trans_error_vector)
-        trans_scale = w.diffable_min_fast(trans_error, max_velocity * t)
+        trans_scale = w.Min(trans_error, max_velocity * t)
         trans_control = w.save_division(trans_error_vector, trans_error) * trans_scale
 
         self.add_constraint(str(self) + u'y', lower=trans_control[1],
@@ -433,11 +432,11 @@ class CartesianOrientation(BasicCartesianConstraint):
 
         hack = w.rotation_matrix_from_axis_angle([0, 0, 1], 0.0001)
 
-        axis, current_angle = w.diffable_axis_angle_from_matrix(
+        axis, current_angle = w.axis_angle_from_matrix(
             w.dot(w.dot(current_evaluated_rotation.T, hack), current_rotation))
         c_aa = (axis * current_angle)
 
-        axis, angle = w.diffable_axis_angle_from_matrix(w.dot(current_rotation.T, goal_rotation))
+        axis, angle = w.axis_angle_from_matrix(w.dot(current_rotation.T, goal_rotation))
 
         capped_angle = self.limit_acceleration(current_angle,
                                                angle,
@@ -502,13 +501,13 @@ class CartesianOrientationSlerp(BasicCartesianConstraint):
 
         identity = w.rotation_matrix_from_axis_angle([0, 0, 1], 0.0001)
         c_R_c = w.dot(w.dot(r_R_c_evaluated.T, identity), r_R_c)
-        current_axis, current_angle = w.diffable_axis_angle_from_matrix(c_R_c)
+        current_axis, current_angle = w.axis_angle_from_matrix(c_R_c)
         current_angle_axis = (current_axis * current_angle)
 
         error_angle = w.rotation_distance(r_R_c, r_R_g)
-        error_angle = w.diffable_abs(error_angle)
+        error_angle = w.Abs(error_angle)
 
-        _, angle = w.diffable_axis_angle_from_matrix(r_R_c)
+        _, angle = w.axis_angle_from_matrix(r_R_c)
         # capped_angle = self.limit_acceleration(angle,
         #                                        error_angle,
         #                                        max_acceleration,
@@ -518,7 +517,7 @@ class CartesianOrientationSlerp(BasicCartesianConstraint):
 
         r_R_c_q = w.quaternion_from_matrix(r_R_c)
         r_R_g_q = w.quaternion_from_matrix(r_R_g)
-        r_R_g_intermediate_q = w.diffable_slerp(r_R_c_q, r_R_g_q, capped_angle)
+        r_R_g_intermediate_q = w.quaternion_slerp(r_R_c_q, r_R_g_q, capped_angle)
         c_R_g_intermediate_q = w.quaternion_diff(r_R_c_q, r_R_g_intermediate_q)
         intermediate_error_axis, intermediate_error_angle = w.axis_angle_from_quaternion(c_R_g_intermediate_q[0],
                                                                                          c_R_g_intermediate_q[1],

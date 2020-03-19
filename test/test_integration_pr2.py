@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 import roslaunch
 import rospy
-from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped
+from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped, PointStamped
 from giskard_msgs.msg import CollisionEntry, MoveActionGoal, MoveResult, WorldBody, MoveGoal
 from giskard_msgs.srv import UpdateWorldResponse, UpdateWorldRequest
 from numpy import pi
@@ -15,7 +15,8 @@ from tf.transformations import quaternion_from_matrix, quaternion_about_axis, ro
 from giskardpy import logging, identifier
 from giskardpy.identifier import fk_pose
 from giskardpy.symengine_robot import Robot
-from giskardpy.tfwrapper import init as tf_init, lookup_pose, transform_pose, lookup_point, transform_point
+from giskardpy.tfwrapper import init as tf_init
+import giskardpy.tfwrapper as tf
 from utils_for_tests import PR2, compare_poses
 
 # TODO roslaunch iai_pr2_sim ros_control_sim_with_base.launch
@@ -223,7 +224,7 @@ def kitchen_setup(resetted_giskard):
     resetted_giskard.send_and_check_joint_goal(gaya_pose)
     object_name = u'kitchen'
     resetted_giskard.add_urdf(object_name, rospy.get_param(u'kitchen_description'),
-                              lookup_pose(u'map', u'iai_kitchen/world'), u'/kitchen/joint_states')
+                              tf.lookup_pose(u'map', u'iai_kitchen/world'), u'/kitchen/joint_states')
     js = {k: 0.0 for k in resetted_giskard.get_world().get_object(object_name).get_controllable_joints()}
     resetted_giskard.set_kitchen_js(js)
     return resetted_giskard
@@ -252,7 +253,7 @@ class TestFk(object):
     def test_fk1(self, zero_pose):
         for root, tip in itertools.product(zero_pose.get_robot().get_link_names(), repeat=2):
             fk1 = zero_pose.get_god_map().safe_get_data(fk_pose + [(root, tip)])
-            fk2 = lookup_pose(root, tip)
+            fk2 = tf.lookup_pose(root, tip)
             compare_poses(fk1.pose, fk2.pose)
 
     def test_fk2(self, zero_pose):
@@ -260,7 +261,7 @@ class TestFk(object):
         zero_pose.attach_box(pocky, [0.1, 0.02, 0.02], zero_pose.r_tip, [0.05, 0, 0], [1, 0, 0, 0])
         for root, tip in itertools.product(zero_pose.get_robot().get_link_names(), [pocky]):
             fk1 = zero_pose.get_god_map().safe_get_data(fk_pose + [(root, tip)])
-            fk2 = lookup_pose(root, tip)
+            fk2 = tf.lookup_pose(root, tip)
             compare_poses(fk1.pose, fk2.pose)
 
 
@@ -423,7 +424,7 @@ class TestConstraints(object):
         kitchen_setup.teleport_base(base_goal)
 
         tip = u'head_mount_kinect_rgb_link'
-        goal_point = lookup_point(u'map', u'iai_kitchen/iai_fridge_door_handle')
+        goal_point = tf.lookup_point(u'map', u'iai_kitchen/iai_fridge_door_handle')
         pointing_axis = Vector3Stamped()
         pointing_axis.header.frame_id = tip
         pointing_axis.vector.x = 1
@@ -441,12 +442,12 @@ class TestConstraints(object):
         current_x.header.frame_id = tip
         current_x.vector.x = 1
 
-        expected_x = transform_point(tip, goal_point)
+        expected_x = tf.transform_point(tip, goal_point)
         np.testing.assert_almost_equal(expected_x.point.y, 0, 1)
         np.testing.assert_almost_equal(expected_x.point.z, 0, 1)
 
         tip = u'head_mount_kinect_rgb_link'
-        goal_point = lookup_point(u'map', kitchen_setup.r_tip)
+        goal_point = tf.lookup_point(u'map', kitchen_setup.r_tip)
         pointing_axis = Vector3Stamped()
         pointing_axis.header.frame_id = tip
         pointing_axis.vector.x = 1
@@ -457,7 +458,7 @@ class TestConstraints(object):
         r_goal.pose.position.x -= 0.3
         r_goal.pose.position.z += 0.6
         r_goal.pose.orientation.w = 1
-        r_goal = transform_pose(kitchen_setup.default_root, r_goal)
+        r_goal = tf.transform_pose(kitchen_setup.default_root, r_goal)
         r_goal.pose.orientation = Quaternion(*quaternion_from_matrix([[0, 0, -1, 0],
                                                                       [0, 1, 0, 0],
                                                                       [1, 0, 0, 0],
@@ -469,7 +470,7 @@ class TestConstraints(object):
         current_x.header.frame_id = tip
         current_x.vector.x = 1
 
-        expected_x = lookup_point(tip, kitchen_setup.r_tip)
+        expected_x = tf.lookup_point(tip, kitchen_setup.r_tip)
         np.testing.assert_almost_equal(expected_x.point.y, 0, 2)
         np.testing.assert_almost_equal(expected_x.point.z, 0, 2)
 
@@ -493,11 +494,93 @@ class TestConstraints(object):
         zero_pose.align_planes(zero_pose.r_tip, x_gripper, root_normal=x_goal)
         zero_pose.align_planes(zero_pose.r_tip, y_gripper, root_normal=y_goal)
         zero_pose.send_and_check_goal()
-        map_T_gripper = lookup_pose(u'map', u'r_gripper_tool_frame')
+        map_T_gripper = tf.lookup_pose(u'map', u'r_gripper_tool_frame')
         np.testing.assert_almost_equal(map_T_gripper.pose.orientation.x, 0.7071, decimal=3)
         np.testing.assert_almost_equal(map_T_gripper.pose.orientation.y, 0.0, decimal=3)
         np.testing.assert_almost_equal(map_T_gripper.pose.orientation.z, 0.0, decimal=3)
         np.testing.assert_almost_equal(map_T_gripper.pose.orientation.w, 0.7071, decimal=3)
+
+    def test_align_planes2(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        x_gripper = Vector3Stamped()
+        x_gripper.header.frame_id = zero_pose.r_tip
+        x_gripper.vector.y = 1
+
+        x_goal = Vector3Stamped()
+        x_goal.header.frame_id = u'map'
+        x_goal.vector.y = -1
+        # x_goal.vector.z = 0.2
+        x_goal.vector = tf.normalize(x_goal.vector)
+        zero_pose.align_planes(zero_pose.r_tip, x_gripper, root_normal=x_goal)
+        zero_pose.send_and_check_goal()
+
+        map_T_gripper = tf.transform_vector(u'map', x_gripper)
+        np.testing.assert_almost_equal(map_T_gripper.vector.x, x_goal.vector.x, decimal=2)
+        np.testing.assert_almost_equal(map_T_gripper.vector.y, x_goal.vector.y, decimal=2)
+        np.testing.assert_almost_equal(map_T_gripper.vector.z, x_goal.vector.z, decimal=2)
+
+    def test_grasp_fridge_handle(self, kitchen_setup):
+        """
+        :type kitchen_setup: PR2
+        """
+        handle_name = u'iai_kitchen/iai_fridge_door_handle'
+        bar_axis = Vector3Stamped()
+        bar_axis.header.frame_id = handle_name
+        bar_axis.vector.z = 1
+
+        bar_center = PointStamped()
+        bar_center.header.frame_id = handle_name
+
+        tip_grasp_axis = Vector3Stamped()
+        tip_grasp_axis.header.frame_id = kitchen_setup.r_tip
+        tip_grasp_axis.vector.z = 1
+
+        kitchen_setup.add_json_goal(u'GraspBar',
+                                    root=kitchen_setup.default_root,
+                                    tip=kitchen_setup.r_tip,
+                                    tip_grasp_axis=tip_grasp_axis,
+                                    bar_center=bar_center,
+                                    bar_axis=bar_axis,
+                                    bar_length=.4)
+        #
+        x_gripper = Vector3Stamped()
+        x_gripper.header.frame_id = kitchen_setup.r_tip
+        x_gripper.vector.x = 1
+
+        x_goal = Vector3Stamped()
+        x_goal.header.frame_id = u'iai_kitchen/iai_fridge_door_handle'
+        x_goal.vector.x = -1
+        kitchen_setup.align_planes(kitchen_setup.r_tip, x_gripper, root_normal=x_goal)
+        # kitchen_setup.allow_all_collisions()
+        kitchen_setup.send_and_check_goal()
+
+    def test_grasp_dishwasher_handle(self, kitchen_setup):
+        """
+        :type kitchen_setup: PR2
+        """
+        handle_name = u'iai_kitchen/sink_area_dish_washer_door_handle'
+        bar_axis = Vector3Stamped()
+        bar_axis.header.frame_id = handle_name
+        bar_axis.vector.y = 1
+
+        bar_center = PointStamped()
+        bar_center.header.frame_id = handle_name
+
+        tip_grasp_axis = Vector3Stamped()
+        tip_grasp_axis.header.frame_id = kitchen_setup.r_tip
+        tip_grasp_axis.vector.z = 1
+
+        kitchen_setup.add_json_goal(u'GraspBar',
+                                    root=kitchen_setup.default_root,
+                                    tip=kitchen_setup.r_tip,
+                                    tip_grasp_axis=tip_grasp_axis,
+                                    bar_center=bar_center,
+                                    bar_axis=bar_axis,
+                                    bar_length=.3)
+        kitchen_setup.allow_all_collisions()
+        kitchen_setup.send_and_check_goal()
 
 class TestCartGoals(object):
 
@@ -526,7 +609,7 @@ class TestCartGoals(object):
         r_goal = PoseStamped()
         r_goal.header.frame_id = zero_pose.r_tip
         r_goal.pose.orientation.w = 1
-        expected_pose = lookup_pose(u'torso_lift_link', zero_pose.r_tip)
+        expected_pose = tf.lookup_pose(u'torso_lift_link', zero_pose.r_tip)
         expected_pose.header.stamp = rospy.Time()
         zero_pose.set_cart_goal(r_goal, zero_pose.r_tip, u'torso_lift_link')
         zero_pose.set_joint_goal(js)
@@ -549,7 +632,7 @@ class TestCartGoals(object):
         r_goal = PoseStamped()
         r_goal.header.frame_id = zero_pose.r_tip
         r_goal.pose.orientation.w = 1
-        expected_pose = lookup_pose(zero_pose.default_root, zero_pose.r_tip)
+        expected_pose = tf.lookup_pose(zero_pose.default_root, zero_pose.r_tip)
         expected_pose.header.stamp = rospy.Time()
         zero_pose.set_cart_goal(r_goal, zero_pose.r_tip, zero_pose.default_root)
         zero_pose.set_joint_goal(js)
@@ -988,7 +1071,7 @@ class TestCollisionAvoidanceGoals(object):
         p.header.frame_id = zero_pose.r_tip
         p.pose.orientation.w = 1
         zero_pose.set_cart_goal(p, pocky, zero_pose.default_root)
-        p = transform_pose(zero_pose.default_root, p)
+        p = tf.transform_pose(zero_pose.default_root, p)
         zero_pose.send_and_check_goal()
         p2 = zero_pose.get_robot().get_fk_pose(zero_pose.default_root, pocky)
         compare_poses(p2.pose, p.pose)
@@ -1064,7 +1147,7 @@ class TestCollisionAvoidanceGoals(object):
         p.header.frame_id = zero_pose.r_tip
         p.pose.orientation.w = 1
         zero_pose.set_cart_goal(p, pocky)
-        p = transform_pose(zero_pose.default_root, p)
+        p = tf.transform_pose(zero_pose.default_root, p)
         zero_pose.send_and_check_goal()
         p2 = zero_pose.get_robot().get_fk_pose(zero_pose.default_root, pocky)
         compare_poses(p2.pose, p.pose)
@@ -2064,12 +2147,12 @@ class TestCollisionAvoidanceGoals(object):
     #     # grasp spoon
     #     kitchen_setup.keep_position(kitchen_setup.l_tip)
     #     kitchen_setup.open_r_gripper()
-    #     p = lookup_pose(u'map', kitchen_setup.r_tip)
+    #     p = tf.lookup_pose(u'map', kitchen_setup.r_tip)
     #     p.pose.position = spoon_pose.pose.position
     #     kitchen_setup.keep_position(kitchen_setup.l_tip)
     #     kitchen_setup.set_cart_goal(p, kitchen_setup.r_tip, kitchen_setup.default_root)
     #     kitchen_setup.send_and_check_goal()
-    #     current_pose = lookup_pose(u'map', kitchen_setup.r_tip)
+    #     current_pose = tf.lookup_pose(u'map', kitchen_setup.r_tip)
     #     assert current_pose.pose.position.z < 0.76
     #     kitchen_setup.allow_all_collisions()
     #     kitchen_setup.keep_position(kitchen_setup.l_tip)
@@ -2351,7 +2434,7 @@ class TestCollisionAvoidanceGoals(object):
         r_goal.pose.orientation.w = 1
         kitchen_setup.set_cart_goal(r_goal, kitchen_setup.l_tip, tray_name)
 
-        tray_goal = lookup_pose(u'base_footprint', tray_name)
+        tray_goal = tf.lookup_pose(u'base_footprint', tray_name)
         tray_goal.pose.position.y = 0
         tray_goal.pose.orientation = Quaternion(*quaternion_from_matrix([[-1, 0, 0, 0],
                                                                          [0, -1, 0, 0],
@@ -2375,7 +2458,7 @@ class TestCollisionAvoidanceGoals(object):
         r_goal.pose.orientation.w = 1
         kitchen_setup.set_cart_goal(r_goal, kitchen_setup.l_tip, tray_name)
 
-        expected_pose = lookup_pose(tray_name, kitchen_setup.l_tip)
+        expected_pose = tf.lookup_pose(tray_name, kitchen_setup.l_tip)
         expected_pose.header.stamp = rospy.Time()
 
         tray_goal = PoseStamped()

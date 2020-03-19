@@ -248,6 +248,9 @@ def diffable_if_greater(a, b, if_result, else_result):
 def if_greater(a, b, if_result, else_result):
     return ca.if_else(ca.gt(a, b), if_result, else_result)
 
+def if_less(a, b, if_result, else_result):
+    return ca.if_else(ca.lt(a, b), if_result, else_result)
+
 
 def diffable_if_greater_eq_zero(condition, if_result, else_result):
     """
@@ -1019,9 +1022,9 @@ def shortest_angular_distance(from_angle, to_angle):
     return normalize_angle(to_angle - from_angle)
 
 
-def diffable_slerp(q1, q2, t):
+def quaternion_slerp(q1, q2, t):
     """
-    !takes a long time to compile!
+    spherical linear interpolation that takes into account that q == -q
     :param q1: 4x1 Matrix
     :type q1: Matrix
     :param q2: 4x1 Matrix
@@ -1056,50 +1059,17 @@ def diffable_slerp(q1, q2, t):
                                                                 0.5 * q1 + 0.5 * q2,
                                                                 ratio_a * q1 + ratio_b * q2))
 
+def slerp(v1, v2, t):
+    """
+    spherical linear interpolation
+    :param v1: any vector
+    :param v2: vector of same length as v1
+    :param t: value between 0 and 1. 0 is v1 and 1 is v2
+    :return:
+    """
+    angle = acos(dot(v1.T, v2)[0])
+    return (sin((1-t)*angle)/sin(angle))*v1 + (sin(t*angle)/sin(angle))*v2
 
-# def piecewise_matrix(*piecewise_vector):
-#     # TODO testme
-#     # FIXME support non 2d matrices?
-#     dimensions = piecewise_vector[0][0].shape
-#     for m, condition in piecewise_vector:
-#         assert m.shape == dimensions
-#     matrix = zeros(*dimensions)
-#     for x in range(dimensions[0]):
-#         for y in range(dimensions[1]):
-#             piecewise_entry = []
-#             for m, condition in piecewise_vector:
-#                 piecewise_entry.append([m[x, y], condition])
-#             matrix[x, y] = Piecewise(*piecewise_entry)
-#     return matrix
-
-
-# def slerp(q1, q2, t):
-#     """
-#     !takes a long time to compile!
-#     :param q1: 4x1 Matrix
-#     :type q1: Matrix
-#     :param q2: 4x1 Matrix
-#     :type q2: Matrix
-#     :param t: float, 0-1
-#     :type t:  Union[float, Symbol]
-#     :return: 4x1 Matrix; Return spherical linear interpolation between two quaternions.
-#     :rtype: Matrix
-#     """
-#     #FIXME
-#     d = dot(q1, q2)
-#     d_abs = Abs(d)
-#     q1_2 = piecewise_matrix([-q1, d < 0.0], [q1, True])
-#     angle = acos(d_abs)
-#
-#     isin = 1.0 / sin(angle)
-#     q1_3 = q1_2 * sin((1.0 - t) * angle) * isin
-#     q2_2 = q2 * sin(t * angle) * isin
-#     q1_3 += q2_2
-#     return piecewise_matrix([q1, t == 0.0],
-#                             [q2, t == 1.0],
-#                             [q1, Abs(d_abs - 1.0) < _EPS],
-#                             [q1_2, Abs(angle) < _EPS],
-#                             [q1_3, True])
 
 def to_numpy(matrix):
     return np.array(matrix.tolist()).astype(float).reshape(matrix.shape)
@@ -1130,3 +1100,17 @@ def floor(x):
 
 def ceil(x):
     return ca.ceil(x)
+
+
+def distance_point_to_line_segment(point, line_start, line_end):
+    line_vec = line_end - line_start
+    pnt_vec = point - line_start
+    line_len = norm(line_vec)
+    line_unitvec = line_vec / line_len
+    pnt_vec_scaled = pnt_vec / line_len
+    t = dot(line_unitvec.T, pnt_vec_scaled)[0]
+    t = Min(Max(t, 0.0), 1.0)
+    nearest = line_vec * t
+    dist = norm(nearest - pnt_vec)
+    nearest = nearest + line_start
+    return dist, nearest

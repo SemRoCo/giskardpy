@@ -239,6 +239,15 @@ class TestSympyWrapper(unittest.TestCase):
             w.compile_and_execute(w.diffable_if_greater, [a, b, if_result, else_result]),
             np.float(if_result if a > b else else_result), places=7)
 
+    @given(limited_float(),
+           limited_float(),
+           limited_float(),
+           limited_float())
+    def test_if_less(self, a, b, if_result, else_result):
+        self.assertAlmostEqual(
+            w.compile_and_execute(w.if_less, [a, b, if_result, else_result]),
+            np.float(if_result if a < b else else_result), places=7)
+
     # fails if numbers too big or too small
     @given(unit_vector(length=3),
            angle())
@@ -694,7 +703,18 @@ class TestSympyWrapper(unittest.TestCase):
            quaternion(),
            st.floats(allow_nan=False, allow_infinity=False, min_value=0, max_value=1))
     def test_slerp(self, q1, q2, t):
-        r1 = w.compile_and_execute(w.diffable_slerp, [q1, q2, t])
+        r1 = w.compile_and_execute(w.quaternion_slerp, [q1, q2, t])
+        r2 = quaternion_slerp(q1, q2, t)
+        self.assertTrue(np.isclose(r1, r2, atol=1e-3).all() or
+                        np.isclose(r1, -r2, atol=1e-3).all(),
+                        msg='q1={} q2={} t={}\n{} != {}'.format(q1, q2, t, r1, r2))
+
+    # fails if numbers too big or too small
+    @given(unit_vector(3),
+           unit_vector(3),
+           st.floats(allow_nan=False, allow_infinity=False, min_value=0, max_value=1))
+    def test_slerp2(self, q1, q2, t):
+        r1 = w.compile_and_execute(w.quaternion_slerp, [q1, q2, t])
         r2 = quaternion_slerp(q1, q2, t)
         self.assertTrue(np.isclose(r1, r2, atol=1e-3).all() or
                         np.isclose(r1, -r2, atol=1e-3).all(),
@@ -744,3 +764,24 @@ class TestSympyWrapper(unittest.TestCase):
         r1 = w.compile_and_execute(w.entrywise_product, [m1, m2])
         r2 = m1 * m2
         np.testing.assert_array_almost_equal(r1, r2)
+
+    def test_distance_point_to_line_segment1(self):
+        p = np.array([0,0,0])
+        start = np.array([0,0,0])
+        end = np.array([0,0,1])
+        distance = w.compile_and_execute(w.distance_point_to_line_segment, [p, start, end])
+        assert distance == 0
+
+    def test_distance_point_to_line_segment2(self):
+        p = np.array([0,1,0.5])
+        start = np.array([0,0,0])
+        end = np.array([0,0,1])
+        distance = w.compile_and_execute(w.distance_point_to_line_segment, [p, start, end])
+        assert distance == 1
+
+    def test_distance_point_to_line_segment3(self):
+        p = np.array([0,1,2])
+        start = np.array([0,0,0])
+        end = np.array([0,0,1])
+        distance = w.compile_and_execute(w.distance_point_to_line_segment, [p, start, end])
+        assert distance == 1.4142135623730951

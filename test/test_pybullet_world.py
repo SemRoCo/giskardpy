@@ -10,7 +10,7 @@ import giskardpy.pybullet_wrapper as pbw
 from giskardpy import logging
 from giskardpy.pybullet_world import PyBulletWorld
 from giskardpy.pybullet_world_object import PyBulletWorldObject
-from giskardpy.symengine_robot import Robot
+from giskardpy.robot import Robot
 from giskardpy.utils import make_world_body_box, make_world_body_sphere, make_world_body_cylinder
 from giskardpy.world_object import WorldObject
 from utils_for_tests import pr2_urdf, base_bot_urdf, donbot_urdf

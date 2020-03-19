@@ -5,7 +5,7 @@ from giskard_msgs.msg import CollisionEntry
 from giskardpy.data_types import ClosestPointInfo
 from giskardpy.exceptions import RobotExistsException, DuplicateNameException, PhysicsWorldException, \
     UnknownBodyException, UnsupportedOptionException
-from giskardpy.symengine_robot import Robot
+from giskardpy.robot import Robot
 from giskardpy.tfwrapper import msg_to_kdl, kdl_to_pose, np_to_kdl, to_np
 from giskardpy.urdf_object import URDFObject, FIXED_JOINT
 from giskardpy.utils import KeyDefaultDict, np_point, np_vector

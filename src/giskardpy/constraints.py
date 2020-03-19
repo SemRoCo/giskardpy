@@ -10,10 +10,10 @@ from scipy.optimize import curve_fit
 
 import giskardpy.identifier as identifier
 from giskardpy import cas_wrapper as w
+from giskardpy.data_types import SoftConstraint
 from giskardpy.exceptions import GiskardException
 from giskardpy.input_system import PoseStampedInput, Point3Input, Vector3Input, Vector3StampedInput, FrameInput, \
     PointStampedInput, TranslationInput
-from giskardpy.qp_problem_builder import SoftConstraint
 import giskardpy.tfwrapper as tf
 
 MAX_WEIGHT = 15
@@ -55,7 +55,7 @@ class Constraint(object):
 
     def get_robot(self):
         """
-        :rtype: giskardpy.symengine_robot.Robot
+        :rtype: giskardpy.robot.Robot
         """
         return self.get_god_map().safe_get_data(identifier.robot)
 
@@ -67,7 +67,7 @@ class Constraint(object):
 
     def get_robot_unsafe(self):
         """
-        :rtype: giskardpy.symengine_robot.Robot
+        :rtype: giskardpy.robot.Robot
         """
         return self.get_god_map().get_data(identifier.robot)
 
@@ -177,10 +177,12 @@ class Constraint(object):
         """
         if name in self.soft_constraints:
             raise KeyError(u'a constraint with name \'{}\' already exists'.format(name))
-        self.soft_constraints[name] = SoftConstraint(lower=lower,
-                                                     upper=upper,
+        self.soft_constraints[name] = SoftConstraint(lbA=lower,
+                                                     ubA=upper,
                                                      weight=weight,
-                                                     expression=expression)
+                                                     expression=expression,
+                                                     lb=-1e9,
+                                                     ub=1e9)
 
     def add_debug_constraint(self, name, expr):
         """

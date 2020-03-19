@@ -12,7 +12,7 @@ import PyKDL
 import pytest
 from urdf_parser_py.urdf import URDF
 
-from giskardpy.symengine_robot import Robot
+from giskardpy.robot import Robot
 from utils_for_tests import rnd_joint_state, pr2_urdf, donbot_urdf, boxy_urdf, base_bot_urdf, compare_poses
 from giskardpy.urdf_object import hacky_urdf_parser_fix
 from kdl_parser import kdl_tree_from_urdf_model

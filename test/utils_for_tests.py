@@ -23,7 +23,7 @@ from giskardpy.garden import grow_tree
 from giskardpy.identifier import robot, world
 from giskardpy.pybullet_world import PyBulletWorld
 from giskardpy.python_interface import GiskardWrapper
-from giskardpy.symengine_robot import Robot
+from giskardpy.robot import Robot
 from giskardpy.tfwrapper import transform_pose, lookup_pose
 from giskardpy.utils import msg_to_list, KeyDefaultDict, dict_to_joint_states, get_ros_pkg_path, to_joint_state_dict2
 

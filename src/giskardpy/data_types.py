@@ -1,7 +1,10 @@
-from collections import OrderedDict, defaultdict
+from collections import OrderedDict, defaultdict, namedtuple
 
 from sortedcontainers import SortedKeyList
 
+SoftConstraint = namedtuple(u'SoftConstraint', [u'lbA', u'ubA', u'weight', u'expression', u'lb', u'ub'])
+HardConstraint = namedtuple(u'HardConstraint', [u'lower', u'upper', u'expression'])
+JointConstraint = namedtuple(u'JointConstraint', [u'lower', u'upper', u'weight'])
 
 class SingleJointState(object):
     def __init__(self, name='', position=0.0, velocity=0.0, effort=0.0):
@@ -61,7 +64,7 @@ class ClosestPointInfo(object):
 class Collisions(object):
     def __init__(self, robot):
         """
-        :type robot: giskardpy.symengine_robot.Robot
+        :type robot: giskardpy.robot.Robot
         """
         self.robot = robot
 

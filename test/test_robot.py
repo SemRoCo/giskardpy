@@ -158,7 +158,7 @@ class TestSymengineController(object):
 
     def test_constraints_donbot(self, parsed_donbot):
         assert len(parsed_donbot.hard_constraints) == 9
-        assert len(parsed_donbot.joint_constraints) == 10
+        assert len(parsed_donbot.joint_constraints) == 11
 
     def test_constraints_boxy(self, parsed_boxy):
         assert len(parsed_boxy.hard_constraints) == 26
@@ -237,7 +237,7 @@ class TestSymengineController(object):
     def test_get_joint_names_donbot(self, parsed_donbot):
         expected = {u'ur5_wrist_3_joint', u'ur5_elbow_joint', u'ur5_wrist_1_joint', u'odom_z_joint',
                     u'ur5_shoulder_lift_joint', u'odom_y_joint', u'ur5_wrist_2_joint', u'odom_x_joint',
-                    u'ur5_shoulder_pan_joint', u'gripper_joint'}
+                    u'ur5_shoulder_pan_joint', u'gripper_joint', u'refills_finger_joint'}
 
         assert set(parsed_donbot.get_joint_names_controllable()).difference(expected) == set()
 

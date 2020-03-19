@@ -120,8 +120,11 @@ class TestPyBulletRobot(test_world.TestRobot):
     def test_safe_load_collision_matrix(self, test_folder, delete_test_folder):
         r = self.cls(donbot_urdf(), path_to_data_folder=test_folder)
         r.init_self_collision_matrix()
-        scm = r.get_self_collision_matrix()
-        assert len(scm) == 53
+        expected = r.get_self_collision_matrix()
+        r.safe_self_collision_matrix(test_folder)
+        assert r.load_self_collision_matrix(test_folder)
+        actual = r.get_self_collision_matrix()
+        assert expected == actual
 
     def test_attach_urdf_object1_2(self, test_folder):
         parsed_pr2 = self.cls(donbot_urdf(), path_to_data_folder=test_folder)

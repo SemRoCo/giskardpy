@@ -15,7 +15,7 @@ from tf.transformations import quaternion_from_matrix, quaternion_about_axis
 
 from giskardpy import logging, identifier
 from giskardpy.identifier import fk_pose
-from giskardpy.symengine_robot import Robot
+from giskardpy.robot import Robot
 from giskardpy.tfwrapper import init as tf_init, lookup_pose, transform_pose, lookup_point, transform_point
 from utils_for_tests import PR2, compare_poses
 

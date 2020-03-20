@@ -4,7 +4,7 @@ from giskard_msgs.msg import CollisionEntry
 from giskardpy import logging
 from giskardpy.exceptions import RobotExistsException, DuplicateNameException, PhysicsWorldException, \
     UnknownBodyException, UnsupportedOptionException
-from giskardpy.symengine_robot import Robot
+from giskardpy.robot import Robot
 from giskardpy.tfwrapper import msg_to_kdl, kdl_to_pose
 from giskardpy.urdf_object import URDFObject
 from giskardpy.world_object import WorldObject

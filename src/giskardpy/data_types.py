@@ -1,9 +1,12 @@
-from collections import OrderedDict, defaultdict
+from collections import OrderedDict, defaultdict, namedtuple
 
 import numpy as np
 from sortedcontainers import SortedKeyList
-
 from giskardpy.tfwrapper import to_np, np_vector, np_point
+
+SoftConstraint = namedtuple(u'SoftConstraint', [u'lbA', u'ubA', u'weight', u'expression', u'lb', u'ub'])
+HardConstraint = namedtuple(u'HardConstraint', [u'lower', u'upper', u'expression'])
+JointConstraint = namedtuple(u'JointConstraint', [u'lower', u'upper', u'weight'])
 
 
 class SingleJointState(object):
@@ -126,7 +129,7 @@ class Collision(object):
 class Collisions(object):
     def __init__(self, robot):
         """
-        :type robot: giskardpy.symengine_robot.Robot
+        :type robot: giskardpy.robot.Robot
         """
         self.robot = robot
         self.root_T_map = to_np(self.robot.root_T_map)

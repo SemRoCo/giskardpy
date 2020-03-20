@@ -2,8 +2,8 @@ import hashlib
 import warnings
 from collections import OrderedDict
 from itertools import chain
-from giskardpy.qp_problem_builder import QProblemBuilder, SoftConstraint
-from giskardpy.symengine_robot import Robot
+from giskardpy.qp_problem_builder import QProblemBuilder
+from giskardpy.robot import Robot
 
 
 class InstantaneousController(object):

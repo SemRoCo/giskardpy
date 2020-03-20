@@ -9,15 +9,14 @@ from geometry_msgs.msg import Vector3Stamped, Vector3
 from rospy_message_converter.message_converter import convert_dictionary_to_ros_message
 
 import giskardpy.identifier as identifier
-import giskardpy.tfwrapper as tf
-from giskardpy import symbolic_wrapper as w
+from giskardpy import cas_wrapper as w
+from giskardpy.data_types import SoftConstraint
 from giskardpy.exceptions import GiskardException, ConstraintException
 from giskardpy.input_system import PoseStampedInput, Point3Input, Vector3Input, Vector3StampedInput, FrameInput, \
     PointStampedInput, TranslationInput
-from giskardpy.qp_problem_builder import SoftConstraint
+import giskardpy.tfwrapper as tf
 
 WEIGHTS = [0] + [6 ** x for x in range(7)]
-
 WEIGHT_MAX = WEIGHTS[-1]
 WEIGHT_ABOVE_CA = WEIGHTS[3]
 WEIGHT_BELOW_CA = WEIGHTS[1]
@@ -58,7 +57,7 @@ class Constraint(object):
 
     def get_robot(self):
         """
-        :rtype: giskardpy.symengine_robot.Robot
+        :rtype: giskardpy.robot.Robot
         """
         return self.get_god_map().safe_get_data(identifier.robot)
 
@@ -70,7 +69,7 @@ class Constraint(object):
 
     def get_robot_unsafe(self):
         """
-        :rtype: giskardpy.symengine_robot.Robot
+        :rtype: giskardpy.robot.Robot
         """
         return self.get_god_map().get_data(identifier.robot)
 
@@ -221,7 +220,7 @@ class Constraint(object):
     def limit_velocity(self, error, max_velocity):
         sample_period = self.get_input_sampling_period()
         max_velocity *= sample_period
-        return w.diffable_max_fast(w.diffable_min_fast(error, max_velocity), -max_velocity)
+        return w.Max(w.Min(error, max_velocity), -max_velocity)
 
     def get_constraints(self):
         """
@@ -239,10 +238,12 @@ class Constraint(object):
         name = str(self) + name_suffix
         if name in self.soft_constraints:
             raise KeyError(u'a constraint with name \'{}\' already exists'.format(name))
-        self.soft_constraints[name] = SoftConstraint(lower=lower,
-                                                     upper=upper,
+        self.soft_constraints[name] = SoftConstraint(lbA=lower,
+                                                     ubA=upper,
                                                      weight=weight,
-                                                     expression=expression)
+                                                     expression=expression,
+                                                     lb=-1e9,
+                                                     ub=1e9)
 
     def add_debug_constraint(self, name, expr):
         """
@@ -372,7 +373,7 @@ class JointPositionContinuous(Constraint):
                                             np.pi / 6, WEIGHTS[3],
                                             np.pi / 4, WEIGHTS[1])
 
-        self.add_constraint(str(self), lower=capped_err, upper=capped_err, weight=weight, expression=current_joint)
+        self.add_constraint('', lower=capped_err, upper=capped_err, weight=weight, expression=current_joint)
 
     def __str__(self):
         s = super(JointPositionContinuous, self).__str__()
@@ -428,7 +429,7 @@ class JointPositionPrismatic(Constraint):
                                             0.06, WEIGHTS[1])
         capped_err = self.limit_acceleration(current_joint, err, max_acceleration, max_velocity)
 
-        self.add_constraint(str(self), lower=capped_err, upper=capped_err, weight=weight, expression=current_joint)
+        self.add_constraint('', lower=capped_err, upper=capped_err, weight=weight, expression=current_joint)
 
     def __str__(self):
         s = super(JointPositionPrismatic, self).__str__()
@@ -487,7 +488,7 @@ class JointPositionRevolute(Constraint):
         #                                     np.pi / 4, WEIGHTS[1])
         weight = WEIGHTS[5]
 
-        self.add_constraint(str(self), lower=capped_err, upper=capped_err, weight=weight, expression=current_joint)
+        self.add_constraint('', lower=capped_err, upper=capped_err, weight=weight, expression=current_joint)
 
     def __str__(self):
         s = super(JointPositionRevolute, self).__str__()
@@ -593,7 +594,7 @@ class CartesianPosition(BasicCartesianConstraint):
 #
 #         trans_error_vector = goal_position - current_position
 #         trans_error = w.norm(trans_error_vector)
-#         trans_scale = w.diffable_min_fast(trans_error, max_velocity * t)
+#         trans_scale = w.Min(trans_error, max_velocity * t)
 #         trans_control = w.save_division(trans_error_vector, trans_error) * trans_scale
 #
 #         self.add_constraint(u'x', lower=trans_control[0],
@@ -613,7 +614,7 @@ class CartesianPosition(BasicCartesianConstraint):
 #
 #         trans_error_vector = goal_position - current_position
 #         trans_error = w.norm(trans_error_vector)
-#         trans_scale = w.diffable_min_fast(trans_error, max_velocity * t)
+#         trans_scale = w.Min(trans_error, max_velocity * t)
 #         trans_control = w.save_division(trans_error_vector, trans_error) * trans_scale
 #
 #         self.add_constraint(u'y', lower=trans_control[1],
@@ -663,11 +664,11 @@ class CartesianOrientation(BasicCartesianConstraint):
 
         hack = w.rotation_matrix_from_axis_angle([0, 0, 1], 0.0001)
 
-        axis, current_angle = w.diffable_axis_angle_from_matrix(
+        axis, current_angle = w.axis_angle_from_matrix(
             w.dot(w.dot(current_evaluated_rotation.T, hack), current_rotation))
         c_aa = (axis * current_angle)
 
-        axis, angle = w.diffable_axis_angle_from_matrix(w.dot(current_rotation.T, goal_rotation))
+        axis, angle = w.axis_angle_from_matrix(w.dot(current_rotation.T, goal_rotation))
 
         capped_angle = self.limit_acceleration(current_angle,
                                                angle,
@@ -735,13 +736,13 @@ class CartesianOrientationSlerp(BasicCartesianConstraint):
 
         identity = w.rotation_matrix_from_axis_angle([0, 0, 1], 0.0001)
         c_R_c = w.dot(w.dot(r_R_c_evaluated.T, identity), r_R_c)
-        current_axis, current_angle = w.diffable_axis_angle_from_matrix(c_R_c)
+        current_axis, current_angle = w.axis_angle_from_matrix(c_R_c)
         current_angle_axis = (current_axis * current_angle)
 
         error_angle = w.rotation_distance(r_R_c, r_R_g)
-        error_angle = w.diffable_abs(error_angle)
+        error_angle = w.Abs(error_angle)
 
-        _, angle = w.diffable_axis_angle_from_matrix(r_R_c)
+        _, angle = w.axis_angle_from_matrix(r_R_c)
         # capped_angle = self.limit_acceleration(angle,
         #                                        error_angle,
         #                                        max_acceleration,
@@ -760,7 +761,7 @@ class CartesianOrientationSlerp(BasicCartesianConstraint):
 
         c_R_g_intermediate_aa = intermediate_error_axis * intermediate_error_angle
 
-        weight = WEIGHTS[3]
+        weight = WEIGHT_ABOVE_CA
 
         self.add_constraint(u'/0', lower=c_R_g_intermediate_aa[0],
                             upper=c_R_g_intermediate_aa[0],
@@ -878,7 +879,7 @@ class ExternalCollisionAvoidance(Constraint):
 
         # limit = self.limit_velocity(actual_distance, repel_velocity)
 
-        self.add_constraint(str(self), lower=limit,
+        self.add_constraint('', lower=limit,
                             upper=1e9,
                             weight=weight_f,
                             expression=dist)
@@ -972,7 +973,7 @@ class SelfCollisionAvoidance(Constraint):
         limit = zero_weight_distance - actual_distance
         limit = self.limit_velocity(limit, repel_velocity)
 
-        self.add_constraint(str(self), lower=limit, upper=1e9, weight=weight_f, expression=dist)
+        self.add_constraint('', lower=limit, upper=1e9, weight=weight_f, expression=dist)
 
     def __str__(self):
         s = super(SelfCollisionAvoidance, self).__str__()
@@ -1119,7 +1120,7 @@ class BasePointingForward(Constraint):
         if base_forward_axis is not None:
             self.base_forward_axis = base_forward_axis
             base_forward_axis = convert_dictionary_to_ros_message(u'geometry_msgs/Vector3Stamped', base_forward_axis)
-            base_forward_axis = transform_vector(self.base_footprint, base_forward_axis)
+            base_forward_axis = tf.transform_vector(self.base_footprint, base_forward_axis)
             tmp = np.array([base_forward_axis.vector.x, base_forward_axis.vector.y, base_forward_axis.vector.z])
             tmp = tmp / np.linalg.norm(tmp)
             self.base_forward_axis.vector = Vector3(*tmp)
@@ -1209,7 +1210,7 @@ class GravityJoint(Constraint):
 
         weight = WEIGHTS[3]
 
-        self.add_constraint(str(self), lower=goal_vel,  # sw.Min(goal_vel, 0),
+        self.add_constraint('', lower=goal_vel,  # sw.Min(goal_vel, 0),
                             upper=goal_vel,  # sw.Max(goal_vel, 0),
                             weight=weight,
                             expression=current_joint)

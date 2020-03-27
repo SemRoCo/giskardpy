@@ -1000,13 +1000,19 @@ class Pointing(Constraint):
 
         # do some math to create your expressions and limits
         # make sure to always use function from the casadi_wrapper, here imported as "w".
+        # here are some rules of thumb that often make constraints more stable:
+        # 1) keep the expressions as simple as possible and move the "magic" into the lower/upper limits
+        # 2) don't try to minimize the number of constraints (in this example, minimizing the angle is also possible
+        #       but sometimes gets unstable)
+        # 3) you can't use the normal if! use e.g. "w.if_eq"
+        # 4) use self.limit_velocity on your error
+        # 5) giskard will calculate the derivative of "expression". so in this example, writing -diff[0] in
+        #       in expression will result in the same behavior, because goal_axis is constant.
+        #       This is also the reason, why lower/upper are limits for the derivative.
         goal_axis = goal_point - w.position_of(root_T_tip)
-        goal_axis /= w.norm(goal_axis)  # FIXME possible /0
+        goal_axis /= w.norm(goal_axis)  # FIXME avoid /0
         current_axis = w.dot(root_T_tip, pointing_axis)
         diff = goal_axis - current_axis
-
-        # recommended to use self.limit_velocity, to make constraints more stable
-        # TODO use self.max_velocity
 
         # add constraints to the current problem, after execution, it gets cleared automatically
         self.add_constraint(

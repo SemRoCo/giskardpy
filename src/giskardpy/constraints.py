@@ -151,7 +151,7 @@ class Constraint(object):
         self.make_constraints()
         return self.soft_constraints
 
-    def add_constraint(self, name, lower, upper, weight, expression):
+    def add_constraint(self, name, lower, upper, weight, expression, post_processing=False):
         """
         :type name: str
         :type constraint: SoftConstraint
@@ -161,7 +161,8 @@ class Constraint(object):
         self.soft_constraints[name] = SoftConstraint(lower=lower,
                                                      upper=upper,
                                                      weight=weight,
-                                                     expression=expression)
+                                                     expression=expression,
+                                                     post_processing=post_processing)
 
     def add_debug_constraint(self, name, expr):
         """
@@ -219,7 +220,7 @@ class JointPosition(Constraint):
 
         capped_err = self.limit_acceleration(current_joint, err, max_acceleration, max_velocity)
 
-        self.add_constraint(str(self), lower=capped_err, upper=capped_err, weight=weight, expression=current_joint)
+        self.add_constraint(str(self), lower=capped_err, upper=capped_err, weight=weight, expression=current_joint, post_processing=True)
 
     def __str__(self):
         s = super(JointPosition, self).__str__()
@@ -334,15 +335,18 @@ class CartesianPosition(BasicCartesianConstraint):
         self.add_constraint(str(self) + u'x', lower=r_P_intermediate_error[0],
                             upper=r_P_intermediate_error[0],
                             weight=weight,
-                            expression=r_P_c[0])
+                            expression=r_P_c[0],
+                            post_processing=True)
         self.add_constraint(str(self) + u'y', lower=r_P_intermediate_error[1],
                             upper=r_P_intermediate_error[1],
                             weight=weight,
-                            expression=r_P_c[1])
+                            expression=r_P_c[1],
+                            post_processing=True)
         self.add_constraint(str(self) + u'z', lower=r_P_intermediate_error[2],
                             upper=r_P_intermediate_error[2],
                             weight=weight,
-                            expression=r_P_c[2])
+                            expression=r_P_c[2],
+                            post_processing=True)
 
 
 class CartesianPositionX(BasicCartesianConstraint):
@@ -362,7 +366,8 @@ class CartesianPositionX(BasicCartesianConstraint):
         self.add_constraint(str(self) + u'x', lower=trans_control[0],
                             upper=trans_control[0],
                             weight=weight,
-                            expression=current_position[0])
+                            expression=current_position[0],
+                            post_processing=True)
 
 
 class CartesianPositionY(BasicCartesianConstraint):
@@ -382,7 +387,8 @@ class CartesianPositionY(BasicCartesianConstraint):
         self.add_constraint(str(self) + u'y', lower=trans_control[1],
                             upper=trans_control[1],
                             weight=weight,
-                            expression=current_position[1])
+                            expression=current_position[1],
+                            post_processing=True)
 
 
 class CartesianOrientation(BasicCartesianConstraint):
@@ -443,15 +449,18 @@ class CartesianOrientation(BasicCartesianConstraint):
         self.add_constraint(str(self) + u'/0', lower=r_rot_control[0],
                             upper=r_rot_control[0],
                             weight=weight,
-                            expression=c_aa[0])
+                            expression=c_aa[0],
+                            post_processing=True)
         self.add_constraint(str(self) + u'/1', lower=r_rot_control[1],
                             upper=r_rot_control[1],
                             weight=weight,
-                            expression=c_aa[1])
+                            expression=c_aa[1],
+                            post_processing=True)
         self.add_constraint(str(self) + u'/2', lower=r_rot_control[2],
                             upper=r_rot_control[2],
                             weight=weight,
-                            expression=c_aa[2])
+                            expression=c_aa[2],
+                            post_processing=True)
 
 
 class CartesianOrientationSlerp(BasicCartesianConstraint):
@@ -524,15 +533,18 @@ class CartesianOrientationSlerp(BasicCartesianConstraint):
         self.add_constraint(str(self) + u'/0', lower=c_R_g_intermediate_aa[0],
                             upper=c_R_g_intermediate_aa[0],
                             weight=weight,
-                            expression=current_angle_axis[0])
+                            expression=current_angle_axis[0],
+                            post_processing=True)
         self.add_constraint(str(self) + u'/1', lower=c_R_g_intermediate_aa[1],
                             upper=c_R_g_intermediate_aa[1],
                             weight=weight,
-                            expression=current_angle_axis[1])
+                            expression=current_angle_axis[1],
+                            post_processing=True)
         self.add_constraint(str(self) + u'/2', lower=c_R_g_intermediate_aa[2],
                             upper=c_R_g_intermediate_aa[2],
                             weight=weight,
-                            expression=current_angle_axis[2])
+                            expression=current_angle_axis[2],
+                            post_processing=True)
 
 
 class CartesianPose(Constraint):

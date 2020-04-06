@@ -30,16 +30,14 @@ class InstantaneousController(object):
         self.qp_problem_builder = None
 
 
-    def set_controlled_joints(self, joint_names):
+    def set_controlled_joints(self,controlled_joints, joint_to_symbols_str , joint_constraints, hard_constraints): #joint_names
         """
         :type joint_names: set
         """
-        self.controlled_joints = joint_names
-        self.joint_to_symbols_str = OrderedDict((x, self.robot.get_joint_position_symbol(x)) for x in self.controlled_joints)
-        self.joint_constraints = OrderedDict(((self.robot.get_name(), k), self.robot._joint_constraints[k]) for k in
-                                             self.controlled_joints)
-        self.hard_constraints = OrderedDict(((self.robot.get_name(), k), self.robot._hard_constraints[k]) for k in
-                                            self.controlled_joints if k in self.robot._hard_constraints)
+        self.controlled_joints = controlled_joints
+        self.joint_to_symbols_str = joint_to_symbols_str
+        self.joint_constraints = joint_constraints
+        self.hard_constraints = hard_constraints
 
     def get_qpdata_key_map(self):
         b_keys = []

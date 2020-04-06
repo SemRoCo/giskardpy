@@ -13,6 +13,7 @@ import giskardpy.identifier as identifier
 from giskardpy.constraints import JointPosition, SelfCollisionAvoidance, ExternalCollisionAvoidance
 from giskardpy.exceptions import InsolvableException, ImplementationException
 from giskardpy.plugin_action_server import GetGoal
+from collections import OrderedDict
 
 
 def allowed_constraint_names():
@@ -64,7 +65,6 @@ class GoalToConstraints(GetGoal):
         # self.set_unused_joint_goals_to_current()
 
         self.get_god_map().safe_set_data(identifier.collision_goal_identifier, move_cmd.collisions)
-
         self.get_god_map().safe_set_data(identifier.soft_constraint_identifier, self.soft_constraints)
         self.get_blackboard().runtime = time()
         return Status.SUCCESS

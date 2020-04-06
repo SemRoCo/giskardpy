@@ -19,6 +19,8 @@ from giskardpy.plugin_action_server import GetGoal
 from giskardpy.symengine_controller import InstantaneousController
 from giskardpy.tfwrapper import transform_pose
 from giskardpy import logging
+from collections import OrderedDict, namedtuple
+from giskardpy.qp_problem_builder import JointConstraint
 
 
 class ControllerPlugin(GiskardBehavior):
@@ -29,6 +31,10 @@ class ControllerPlugin(GiskardBehavior):
         self.soft_constraints = None
         self.qp_data = {}
         self.get_god_map().safe_set_data(identifier.qp_data, self.qp_data) # safe dict on godmap and work on ref
+        self.rc_prismatic_velocity = self.get_god_map().safe_get_data(identifier.rc_prismatic_velocity)
+        self.rc_continuous_velocity = self.get_god_map().safe_get_data(identifier.rc_continuous_velocity)
+        self.rc_revolute_velocity = self.get_god_map().safe_get_data(identifier.rc_revolute_velocity)
+        self.rc_other_velocity = self.get_god_map().safe_get_data(identifier.rc_other_velocity)
 
     def initialise(self):
         super(ControllerPlugin, self).initialise()
@@ -43,7 +49,36 @@ class ControllerPlugin(GiskardBehavior):
             self.soft_constraints = copy(new_soft_constraints)
             self.controller = InstantaneousController(self.get_robot(),
                                                   u'{}/{}/'.format(self.path_to_functions, self.get_robot().get_name()))
-            self.controller.set_controlled_joints(self.get_robot().controlled_joints)
+
+            controlled_joints = self.get_robot().controlled_joints
+            joint_to_symbols_str = OrderedDict(
+                (x, self.robot.get_joint_position_symbol(x)) for x in controlled_joints)
+
+            #make_filter_masks(self.get_god_map().safe_get_data(identifier.H), )
+
+            if(self.get_god_map().safe_get_data(identifier.check_reachability) and False):
+                joint_constraints = OrderedDict()
+                for k in controlled_joints:
+                    joint_type = self.get_robot().get_joint_type(k)
+                    weight = self.robot._joint_constraints[k].weight
+                    if joint_type == 'prismatic':
+                        joint_constraints[(self.robot.get_name(), k)] = JointConstraint(-self.rc_prismatic_velocity, self.rc_prismatic_velocity, weight)
+                    elif joint_type == 'continuous':
+                        joint_constraints[(self.robot.get_name(), k)] = JointConstraint(-self.rc_continuous_velocity, self.rc_continuous_velocity, weight)
+                    elif joint_type == 'revolute':
+                        joint_constraints[(self.robot.get_name(), k)] = JointConstraint(-self.rc_revolute_velocity, self.rc_revolute_velocity, weight)
+                    else:
+                        joint_constraints[(self.robot.get_name(), k)] = JointConstraint(-self.rc_other_velocity, self.rc_other_velocity, weight)
+            else:
+                joint_constraints = OrderedDict(((self.robot.get_name(), k), self.robot._joint_constraints[k]) for k in
+                                                     controlled_joints)
+            hard_constraints = OrderedDict(((self.robot.get_name(), k), self.robot._hard_constraints[k]) for k in
+                                                controlled_joints if k in self.robot._hard_constraints)
+
+            self.controller.set_controlled_joints(controlled_joints, joint_to_symbols_str, joint_constraints, hard_constraints)
+
+
+            #self.controller.set_controlled_joints(self.get_robot().controlled_joints)
             self.controller.update_soft_constraints(self.soft_constraints)
             # p = Process(target=self.controller.compile)
             # p.start()

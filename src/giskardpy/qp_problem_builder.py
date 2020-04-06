@@ -10,7 +10,7 @@ from giskardpy import logging, symbolic_wrapper as w
 from giskardpy.exceptions import QPSolverException
 from giskardpy.qp_solver import QPSolver
 
-SoftConstraint = namedtuple(u'SoftConstraint', [u'lower', u'upper', u'weight', u'expression'])
+SoftConstraint = namedtuple(u'SoftConstraint', [u'lower', u'upper', u'weight', u'expression', u'post_processing'])
 HardConstraint = namedtuple(u'HardConstraint', [u'lower', u'upper', u'expression'])
 JointConstraint = namedtuple(u'JointConstraint', [u'lower', u'upper', u'weight'])
 

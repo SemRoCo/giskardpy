@@ -286,6 +286,21 @@ class GiskardWrapper(object):
         else:
             self.client.send_goal(goal)
 
+    def check_reachability(self, wait=True):
+        """
+        :param wait: this function block if wait=True
+        :type wait: bool
+        :return: result from giskard
+        :rtype: MoveResult
+        """
+        goal = self._get_goal()
+        goal.type = MoveGoal.CHECK_REACHABILITY
+        if wait:
+            self.client.send_goal_and_wait(goal)
+            return self.client.get_result()
+        else:
+            self.client.send_goal(goal)
+
     def plan(self, wait=True):
         """
         :param wait: this function block if wait=True

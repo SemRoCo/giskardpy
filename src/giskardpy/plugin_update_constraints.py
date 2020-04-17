@@ -13,6 +13,7 @@ import giskardpy.identifier as identifier
 from giskardpy.constraints import JointPosition, SelfCollisionAvoidance, ExternalCollisionAvoidance
 from giskardpy.exceptions import InsolvableException, ImplementationException
 from giskardpy.plugin_action_server import GetGoal
+from giskardpy.qp_problem_builder import JointConstraint
 from collections import OrderedDict
 
 
@@ -29,6 +30,11 @@ class GoalToConstraints(GetGoal):
         self.controlled_joints = set()
         self.controllable_links = set()
         self.last_urdf = None
+
+        self.rc_prismatic_velocity = self.get_god_map().safe_get_data(identifier.rc_prismatic_velocity)
+        self.rc_continuous_velocity = self.get_god_map().safe_get_data(identifier.rc_continuous_velocity)
+        self.rc_revolute_velocity = self.get_god_map().safe_get_data(identifier.rc_revolute_velocity)
+        self.rc_other_velocity = self.get_god_map().safe_get_data(identifier.rc_other_velocity)
 
     def initialise(self):
         self.get_god_map().safe_set_data(identifier.collision_goal_identifier, None)
@@ -67,6 +73,35 @@ class GoalToConstraints(GetGoal):
         self.get_god_map().safe_set_data(identifier.collision_goal_identifier, move_cmd.collisions)
         self.get_god_map().safe_set_data(identifier.soft_constraint_identifier, self.soft_constraints)
         self.get_blackboard().runtime = time()
+
+        controlled_joints = self.get_robot().controlled_joints
+
+        if (self.get_god_map().safe_get_data(identifier.check_reachability)):
+            joint_constraints = OrderedDict()
+            for k in controlled_joints:
+                weight = self.robot._joint_constraints[k].weight
+                if self.get_robot().is_translational_joint(k):
+                    joint_constraints[(self.robot.get_name(), k)] = JointConstraint(-self.rc_prismatic_velocity,
+                                                                                    self.rc_prismatic_velocity, weight)
+                elif self.get_robot().is_joint_continuous(k):
+                    joint_constraints[(self.robot.get_name(), k)] = JointConstraint(-self.rc_continuous_velocity,
+                                                                                    self.rc_continuous_velocity, weight)
+                elif self.get_robot().is_rotational_joint(k):
+                    joint_constraints[(self.robot.get_name(), k)] = JointConstraint(-self.rc_revolute_velocity,
+                                                                                    self.rc_revolute_velocity, weight)
+                else:
+                    joint_constraints[(self.robot.get_name(), k)] = JointConstraint(-self.rc_other_velocity,
+                                                                                    self.rc_other_velocity, weight)
+        else:
+            joint_constraints = OrderedDict(((self.robot.get_name(), k), self.robot._joint_constraints[k]) for k in
+                                            controlled_joints)
+        hard_constraints = OrderedDict(((self.robot.get_name(), k), self.robot._hard_constraints[k]) for k in
+                                       controlled_joints if k in self.robot._hard_constraints)
+
+        self.get_god_map().safe_set_data(identifier.joint_constraint_identifier, joint_constraints)
+        self.get_god_map().safe_set_data(identifier.hard_constraint_identifier, hard_constraints)
+
+
         return Status.SUCCESS
 
     def parse_constraints(self, cmd):

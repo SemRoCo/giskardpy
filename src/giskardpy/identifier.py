@@ -13,6 +13,8 @@ closest_point = [u'cpi']
 collisions = [u'collisions']
 collision_goal_identifier = [u'collision_goal']
 soft_constraint_identifier = [u'soft_constraints']
+joint_constraint_identifier = [u'joint_constraints']
+hard_constraint_identifier = [u'hard_constraints']
 execute = [u'execute']
 check_reachability = [u'check_reachability']
 next_move_goal = [u'next_move_goal']
@@ -83,11 +85,11 @@ wiggle_frequency_range = plugins + [u'WiggleCancel', u'wiggle_frequency_range']
 
 # reachability check
 reachability_check = rosparam + [u'reachability_check']
-rc_sample_period = reachability_check + [u'rc_sample_period']
-rc_prismatic_velocity = reachability_check + [u'rc_prismatic_velocity']
-rc_continuous_velocity = reachability_check + [u'_continuous_velocity']
-rc_revolute_velocity = reachability_check + [u'rc_revolute_velocity']
-rc_other_velocity = reachability_check + [u'rc_other_velocity']
+rc_sample_period = reachability_check + [u'sample_period']
+rc_prismatic_velocity = reachability_check + [u'prismatic_velocity']
+rc_continuous_velocity = reachability_check + [u'continuous_velocity']
+rc_revolute_velocity = reachability_check + [u'revolute_velocity']
+rc_other_velocity = reachability_check + [u'other_velocity']
 
 
 # behavior tree

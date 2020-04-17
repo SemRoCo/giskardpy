@@ -4,41 +4,58 @@ import giskardpy.identifier as identifier
 from giskardpy.plugin import GiskardBehavior
 from giskardpy.utils import closest_point_constraint_violated
 import numpy as np
+from giskardpy import logging
 
 class WiggleCancel(GiskardBehavior):
-    def __init__(self, name):
+    def __init__(self, name, final_detection):
         super(WiggleCancel, self).__init__(name)
         self.wiggle_detection_threshold = self.get_god_map().safe_get_data(identifier.wiggle_detection_threshold)
         self.num_samples_in_fft = self.get_god_map().safe_get_data(identifier.num_samples_in_fft)
         self.wiggle_frequency_range = self.get_god_map().safe_get_data(identifier.wiggle_frequency_range)
         self.js_samples = self.get_god_map().safe_get_data(identifier.wiggle_detection_samples)
+        self.final_detection = final_detection
 
 
     def initialise(self):
         super(WiggleCancel, self).initialise()
-        self.js_samples.clear()
+        if not self.final_detection:
+            self.js_samples.clear()
         self.sample_period = self.get_god_map().safe_get_data(identifier.sample_period)
         self.max_detectable_freq = 1 / (2 * self.sample_period)
         self.min_wiggle_frequency = self.wiggle_frequency_range * self.max_detectable_freq
 
 
     def update(self):
-        latest_points = self.get_god_map().safe_get_data(identifier.joint_states)
+        if self.final_detection:
+            js_samples_array = np.array(self.js_samples.values())
+            if(len(js_samples_array) == 0):
+                logging.logwarn('sample array was empty during final wiggle detection')
+                return Status.SUCCESS
 
-        for key in latest_points:
-            self.js_samples[key].append(latest_points[key].velocity)
+            if len(js_samples_array[0]) < 4:  # if there are less than 4 sample points it makes no sense to try to detect wiggling
+                return Status.SUCCESS
 
-        if len(self.js_samples.values()[0]) < self.num_samples_in_fft:
-            return Status.RUNNING
+            if detect_wiggling(js_samples_array, self.sample_period, self.min_wiggle_frequency, self.wiggle_detection_threshold):
+                self.raise_to_blackboard(InsolvableException(u'endless wiggling detected'))
 
-        if len(self.js_samples.values()[0]) > self.num_samples_in_fft:
-            for val in self.js_samples.values():
-                del (val[0])
-
-        js_samples_array = np.array(self.js_samples.values())
-        if(detect_wiggling(js_samples_array, self.sample_period, self.min_wiggle_frequency, self.wiggle_detection_threshold)):
-            raise InsolvableException(u'endless wiggling detected')
+            return Status.SUCCESS
         else:
+            latest_points = self.get_god_map().safe_get_data(identifier.joint_states)
+
+            for key in latest_points:
+                self.js_samples[key].append(latest_points[key].velocity)
+
+            if len(self.js_samples.values()[0]) < self.num_samples_in_fft:
+                return Status.RUNNING
+
+            if len(self.js_samples.values()[0]) > self.num_samples_in_fft:
+                for val in self.js_samples.values():
+                    del (val[0])
+
+            js_samples_array = np.array(self.js_samples.values())
+            if(detect_wiggling(js_samples_array, self.sample_period, self.min_wiggle_frequency, self.wiggle_detection_threshold)):
+                raise InsolvableException(u'endless wiggling detected')
+
             return Status.RUNNING
 
 

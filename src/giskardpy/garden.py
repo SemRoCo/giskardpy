@@ -145,7 +145,7 @@ def grow_tree():
     planning_3.add_plugin(KinSimPlugin(u'kin sim'))
     planning_3.add_plugin(LogTrajPlugin(u'log'))
     planning_3.add_plugin(GoalReachedPlugin(u'goal reached'))
-    planning_3.add_plugin(WiggleCancel(u'wiggle'))
+    planning_3.add_plugin(WiggleCancel(u'wiggle', final_detection=False))
     planning_3.add_plugin(TimePlugin(u'time'))
     # ----------------------------------------------
     publish_result = failure_is_success(Selector)(u'monitor execution')
@@ -178,6 +178,7 @@ def grow_tree():
     # ----------------------------------------------
     #
     post_processing = failure_is_success(Sequence)(u'post processing')
+    post_processing.add_child(WiggleCancel(u'wiggle_cancel_final_detection', final_detection=True))
     post_processing.add_child(PostProcessing(u'post_processing'))
     # ----------------------------------------------
     # ----------------------------------------------

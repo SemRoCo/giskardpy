@@ -29,6 +29,8 @@ class ControllerPlugin(GiskardBehavior):
         self.path_to_functions = self.get_god_map().safe_get_data(identifier.data_folder)
         self.nWSR = self.get_god_map().safe_get_data(identifier.nWSR)
         self.soft_constraints = None
+        self.joint_constraints = None
+        self.hard_constraints = None
         self.qp_data = {}
         self.get_god_map().safe_set_data(identifier.qp_data, self.qp_data) # safe dict on godmap and work on ref
         self.rc_prismatic_velocity = self.get_god_map().safe_get_data(identifier.rc_prismatic_velocity)
@@ -45,8 +47,23 @@ class ControllerPlugin(GiskardBehavior):
 
     def init_controller(self):
         new_soft_constraints = self.get_god_map().safe_get_data(identifier.soft_constraint_identifier)
+        new_joint_constraints = self.get_god_map().safe_get_data(identifier.joint_constraint_identifier)
+        new_hard_constraints = self.get_god_map().safe_get_data(identifier.hard_constraint_identifier)
+
+        update = False
         if self.soft_constraints is None or set(self.soft_constraints.keys()) != set(new_soft_constraints.keys()):
             self.soft_constraints = copy(new_soft_constraints)
+            update = True
+
+        if self.joint_constraints is None or set(self.joint_constraints.keys()) != set(new_joint_constraints.keys()):
+            self.joint_constraints = copy(new_joint_constraints)
+            update = True
+
+        if self.hard_constraints is None or set(self.hard_constraints.keys()) != set(new_hard_constraints.keys()):
+            self.hard_constraints = copy(new_hard_constraints)
+            update = True
+
+        if update:
             self.controller = InstantaneousController(self.get_robot(),
                                                   u'{}/{}/'.format(self.path_to_functions, self.get_robot().get_name()))
 
@@ -54,32 +71,8 @@ class ControllerPlugin(GiskardBehavior):
             joint_to_symbols_str = OrderedDict(
                 (x, self.robot.get_joint_position_symbol(x)) for x in controlled_joints)
 
-            #make_filter_masks(self.get_god_map().safe_get_data(identifier.H), )
 
-            if(self.get_god_map().safe_get_data(identifier.check_reachability) and False):
-                joint_constraints = OrderedDict()
-                for k in controlled_joints:
-                    joint_type = self.get_robot().get_joint_type(k)
-                    weight = self.robot._joint_constraints[k].weight
-                    if joint_type == 'prismatic':
-                        joint_constraints[(self.robot.get_name(), k)] = JointConstraint(-self.rc_prismatic_velocity, self.rc_prismatic_velocity, weight)
-                    elif joint_type == 'continuous':
-                        joint_constraints[(self.robot.get_name(), k)] = JointConstraint(-self.rc_continuous_velocity, self.rc_continuous_velocity, weight)
-                    elif joint_type == 'revolute':
-                        joint_constraints[(self.robot.get_name(), k)] = JointConstraint(-self.rc_revolute_velocity, self.rc_revolute_velocity, weight)
-                    else:
-                        joint_constraints[(self.robot.get_name(), k)] = JointConstraint(-self.rc_other_velocity, self.rc_other_velocity, weight)
-            else:
-                joint_constraints = OrderedDict(((self.robot.get_name(), k), self.robot._joint_constraints[k]) for k in
-                                                     controlled_joints)
-            hard_constraints = OrderedDict(((self.robot.get_name(), k), self.robot._hard_constraints[k]) for k in
-                                                controlled_joints if k in self.robot._hard_constraints)
-
-            self.controller.set_controlled_joints(controlled_joints, joint_to_symbols_str, joint_constraints, hard_constraints)
-
-
-            #self.controller.set_controlled_joints(self.get_robot().controlled_joints)
-            self.controller.update_soft_constraints(self.soft_constraints)
+            self.controller.update_constraints(joint_to_symbols_str, self.soft_constraints, self.joint_constraints, self.hard_constraints)
             # p = Process(target=self.controller.compile)
             # p.start()
             # while p.is_alive():

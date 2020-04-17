@@ -29,15 +29,15 @@ plugins:
   PlotTrajectory: # plots the joint trajectory at the end of planning
     enabled: True
   WiggleCancel: # cancels planning if high frequencies are detected in the trajectory
-    wiggle_detection_threshold: 10
-    num_samples_in_fft: 50 # the number of sample points used for the wiggle detection
-    wiggle_frequency_range: 0.7 # frequencies in the range (max_detectable_frequency * wiggle_frequency_range) - (max_detectable_frequency) are considered as wiggling.    max_detectable_frequency = 1 / (2 * sample_period)
+    wiggle_detection_threshold: 10 # the amplitude of a frequency must exceed this threshold to be detected as wiggling
+    num_samples_in_fft: 30 # size of the moving window of sample points
+    wiggle_frequency_range: 0.7 # must be in the range [0,1]. Only frequencies in the range [max_detectable_frequency * wiggle_frequency_range, max_detectable_frequency] are considered as wiggling. So a value of 0 means that every frequency with an amplitude above wiggle_detection_threshold is detected as wiggling and a value of 1 means that only the max_detectable_frequency can trigger a wiggle detection.      max_detectable_frequency = 1 / (2 * sample_period)
 reachability_check:
-  rc_sample_period: 0.5
-  rc_prismatic_velocity: 1.0
-  rc_continuous_velocity: 0.1
-  rc_revolute_velocity: 0.1
-  rc_other_velocity: 0.1
+  sample_period: 0.5
+  prismatic_velocity: 2.0
+  continuous_velocity: 0.5
+  revolute_velocity: 0.5
+  other_velocity: 0.5
 behavior_tree:
   tree_tick_rate: 0.1 # how often the tree updates. lower numbers increase responsiveness, but waste cpu time while idle
 collision_avoidance:

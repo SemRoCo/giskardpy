@@ -776,3 +776,14 @@ def memoize(function):
             return rv
 
     return wrapper
+
+
+def make_filter_b_mask(H):
+    return H.sum(axis=1) != 0
+
+def make_filter_masks(H, num_joint_constraints, num_hard_constraints):
+    b_mask = make_filter_b_mask(H)
+    s_mask = b_mask[num_joint_constraints:]
+    bA_mask = np.concatenate((np.array([True] * num_hard_constraints), s_mask))
+    return bA_mask, b_mask
+

@@ -151,7 +151,7 @@ class Constraint(object):
         self.make_constraints()
         return self.soft_constraints
 
-    def add_constraint(self, name, lower, upper, weight, expression, post_processing=False):
+    def add_constraint(self, name, lower, upper, weight, expression, goal_constraint):
         """
         :type name: str
         :type constraint: SoftConstraint
@@ -162,7 +162,7 @@ class Constraint(object):
                                                      upper=upper,
                                                      weight=weight,
                                                      expression=expression,
-                                                     post_processing=post_processing)
+                                                     goal_constraint=goal_constraint)
 
     def add_debug_constraint(self, name, expr):
         """
@@ -180,10 +180,12 @@ class JointPosition(Constraint):
     weight = u'weight'
     max_velocity = u'max_velocity'
     max_acceleration = u'max_acceleration'
+    goal_constraint = u'goal_constraint'
 
-    def __init__(self, god_map, joint_name, goal, weight=LOW_WEIGHT, max_velocity=1, max_acceleration=1):
+    def __init__(self, god_map, joint_name, goal, weight=LOW_WEIGHT, max_velocity=1, max_acceleration=1, goal_constraint=True):
         super(JointPosition, self).__init__(god_map)
         self.joint_name = joint_name
+        self.goal_constraint = goal_constraint
 
         params = {self.goal: goal,
                   self.weight: weight,
@@ -220,7 +222,7 @@ class JointPosition(Constraint):
 
         capped_err = self.limit_acceleration(current_joint, err, max_acceleration, max_velocity)
 
-        self.add_constraint(str(self), lower=capped_err, upper=capped_err, weight=weight, expression=current_joint, post_processing=True)
+        self.add_constraint(str(self), lower=capped_err, upper=capped_err, weight=weight, expression=current_joint, goal_constraint=self.goal_constraint)
 
     def __str__(self):
         s = super(JointPosition, self).__str__()
@@ -228,7 +230,7 @@ class JointPosition(Constraint):
 
 
 class JointPositionList(Constraint):
-    def __init__(self, god_map, goal_state, weight=None, max_velocity=None):
+    def __init__(self, god_map, goal_state, weight=None, max_velocity=None, goal_constraint=None):
         super(JointPositionList, self).__init__(god_map)
         self.constraints = []
         for i, joint_name in enumerate(goal_state[u'name']):
@@ -239,6 +241,8 @@ class JointPositionList(Constraint):
                 params[u'weight'] = weight
             if max_velocity is not None:
                 params[u'max_velocity'] = max_velocity
+            if goal_constraint is not None:
+                params[u'goal_constraint'] = goal_constraint
             self.constraints.append(JointPosition(god_map, **params))
 
     def make_constraints(self):
@@ -252,10 +256,11 @@ class BasicCartesianConstraint(Constraint):
     max_velocity = u'max_velocity'
     max_acceleration = u'max_acceleration'
 
-    def __init__(self, god_map, root_link, tip_link, goal, weight=HIGH_WEIGHT, max_velocity=0.1, max_acceleration=0.1):
+    def __init__(self, god_map, root_link, tip_link, goal, weight=HIGH_WEIGHT, max_velocity=0.1, max_acceleration=0.1, goal_constraint=True):
         super(BasicCartesianConstraint, self).__init__(god_map)
         self.root = root_link
         self.tip = tip_link
+        self.goal_constraint = goal_constraint
         goal = convert_dictionary_to_ros_message(u'geometry_msgs/PoseStamped', goal)
         goal = transform_pose(self.root, goal)
 
@@ -336,17 +341,17 @@ class CartesianPosition(BasicCartesianConstraint):
                             upper=r_P_intermediate_error[0],
                             weight=weight,
                             expression=r_P_c[0],
-                            post_processing=True)
+                            goal_constraint=self.goal_constraint)
         self.add_constraint(str(self) + u'y', lower=r_P_intermediate_error[1],
                             upper=r_P_intermediate_error[1],
                             weight=weight,
                             expression=r_P_c[1],
-                            post_processing=True)
+                            goal_constraint=self.goal_constraint)
         self.add_constraint(str(self) + u'z', lower=r_P_intermediate_error[2],
                             upper=r_P_intermediate_error[2],
                             weight=weight,
                             expression=r_P_c[2],
-                            post_processing=True)
+                            goal_constraint=self.goal_constraint)
 
 
 class CartesianPositionX(BasicCartesianConstraint):
@@ -367,7 +372,7 @@ class CartesianPositionX(BasicCartesianConstraint):
                             upper=trans_control[0],
                             weight=weight,
                             expression=current_position[0],
-                            post_processing=True)
+                            goal_constraint=self.goal_constraint)
 
 
 class CartesianPositionY(BasicCartesianConstraint):
@@ -388,7 +393,7 @@ class CartesianPositionY(BasicCartesianConstraint):
                             upper=trans_control[1],
                             weight=weight,
                             expression=current_position[1],
-                            post_processing=True)
+                            goal_constraint=self.goal_constraint)
 
 
 class CartesianOrientation(BasicCartesianConstraint):
@@ -450,17 +455,17 @@ class CartesianOrientation(BasicCartesianConstraint):
                             upper=r_rot_control[0],
                             weight=weight,
                             expression=c_aa[0],
-                            post_processing=True)
+                            goal_constraint=self.goal_constraint)
         self.add_constraint(str(self) + u'/1', lower=r_rot_control[1],
                             upper=r_rot_control[1],
                             weight=weight,
                             expression=c_aa[1],
-                            post_processing=True)
+                            goal_constraint=self.goal_constraint)
         self.add_constraint(str(self) + u'/2', lower=r_rot_control[2],
                             upper=r_rot_control[2],
                             weight=weight,
                             expression=c_aa[2],
-                            post_processing=True)
+                            goal_constraint=self.goal_constraint)
 
 
 class CartesianOrientationSlerp(BasicCartesianConstraint):
@@ -534,17 +539,17 @@ class CartesianOrientationSlerp(BasicCartesianConstraint):
                             upper=c_R_g_intermediate_aa[0],
                             weight=weight,
                             expression=current_angle_axis[0],
-                            post_processing=True)
+                            goal_constraint=self.goal_constraint)
         self.add_constraint(str(self) + u'/1', lower=c_R_g_intermediate_aa[1],
                             upper=c_R_g_intermediate_aa[1],
                             weight=weight,
                             expression=current_angle_axis[1],
-                            post_processing=True)
+                            goal_constraint=self.goal_constraint)
         self.add_constraint(str(self) + u'/2', lower=c_R_g_intermediate_aa[2],
                             upper=c_R_g_intermediate_aa[2],
                             weight=weight,
                             expression=current_angle_axis[2],
-                            post_processing=True)
+                            goal_constraint=self.goal_constraint)
 
 
 class CartesianPose(Constraint):
@@ -661,7 +666,8 @@ class ExternalCollisionAvoidance(Constraint):
         self.add_constraint(str(self), lower=limit,
                             upper=1e9,
                             weight=weight_f,
-                            expression=dist)
+                            expression=dist,
+                            goal_constraint=False)
 
     def __str__(self):
         s = super(ExternalCollisionAvoidance, self).__str__()
@@ -761,7 +767,8 @@ class SelfCollisionAvoidance(Constraint):
         self.add_constraint(str(self), lower=limit,
                             upper=1e9,
                             weight=weight_f,
-                            expression=dist)
+                            expression=dist,
+                            goal_constraint=False)
 
     def __str__(self):
         s = super(SelfCollisionAvoidance, self).__str__()
@@ -774,7 +781,7 @@ class AlignPlanes(Constraint):
     weight = u'weight'
     max_velocity = u'max_velocity'
 
-    def __init__(self, god_map, root, tip, root_normal, tip_normal, weight=HIGH_WEIGHT, max_velocity=0.5):
+    def __init__(self, god_map, root, tip, root_normal, tip_normal, weight=HIGH_WEIGHT, max_velocity=0.5, goal_constraint=True):
         """
         :type god_map:
         :type root: str
@@ -785,6 +792,7 @@ class AlignPlanes(Constraint):
         super(AlignPlanes, self).__init__(god_map)
         self.root = root
         self.tip = tip
+        self.goal_constraint = goal_constraint
 
         root_normal = convert_dictionary_to_ros_message(u'geometry_msgs/Vector3Stamped', root_normal)
         root_normal = transform_vector(self.root, root_normal)
@@ -828,25 +836,29 @@ class AlignPlanes(Constraint):
         self.add_constraint(str(self) + u'x', lower=diff[0],
                             upper=diff[0],
                             weight=weight,
-                            expression=tip_normal__root[0])
+                            expression=tip_normal__root[0],
+                            goal_constraint=self.goal_constraint)
         self.add_constraint(str(self) + u'y', lower=diff[1],
                             upper=diff[1],
                             weight=weight,
-                            expression=tip_normal__root[1])
+                            expression=tip_normal__root[1],
+                            goal_constraint=self.goal_constraint)
         self.add_constraint(str(self) + u'z', lower=diff[2],
                             upper=diff[2],
                             weight=weight,
-                            expression=tip_normal__root[2])
+                            expression=tip_normal__root[2],
+                            goal_constraint=self.goal_constraint)
 
 
 class GravityJoint(Constraint):
     weight = u'weight'
 
-    def __init__(self, god_map, joint_name, object_name, weight=MAX_WEIGHT):
+    def __init__(self, god_map, joint_name, object_name, weight=MAX_WEIGHT, goal_constraint=True):
         super(GravityJoint, self).__init__(god_map)
         self.joint_name = joint_name
         self.weight = weight
         self.object_name = object_name
+        self.goal_constraint = goal_constraint
         params = {self.weight: weight}
         self.save_params_on_god_map(params)
 
@@ -877,7 +889,8 @@ class GravityJoint(Constraint):
         self.add_constraint(str(self), lower=goal_vel,  # sw.Min(goal_vel, 0),
                             upper=goal_vel,  # sw.Max(goal_vel, 0),
                             weight=weight,
-                            expression=current_joint)
+                            expression=current_joint,
+                            goal_constraint=self.goal_constraint)
 
     def __str__(self):
         s = super(GravityJoint, self).__str__()
@@ -907,7 +920,7 @@ class Pointing(Constraint):
     pointing_axis = u'pointing_axis'
     weight = u'weight'
 
-    def __init__(self, god_map, tip, goal_point, root=None, pointing_axis=None, weight=HIGH_WEIGHT):
+    def __init__(self, god_map, tip, goal_point, root=None, pointing_axis=None, weight=HIGH_WEIGHT, goal_constraint=True):
         """
         :type tip: str
         :param goal_point: json representing PointStamped
@@ -924,6 +937,7 @@ class Pointing(Constraint):
         else:
             self.root = root
         self.tip = tip
+        self.goal_constraint = goal_constraint
 
         goal_point = convert_dictionary_to_ros_message(u'geometry_msgs/PointStamped', goal_point)
         goal_point = transform_point(self.root, goal_point)
@@ -965,15 +979,18 @@ class Pointing(Constraint):
         self.add_constraint(str(self) + u'x', lower=diff[0],
                             upper=diff[0],
                             weight=weight,
-                            expression=current_axis[0])
+                            expression=current_axis[0],
+                            goal_constraint=self.goal_constraint)
         self.add_constraint(str(self) + u'y', lower=diff[1],
                             upper=diff[1],
                             weight=weight,
-                            expression=current_axis[1])
+                            expression=current_axis[1],
+                            goal_constraint=self.goal_constraint)
         self.add_constraint(str(self) + u'z', lower=diff[2],
                             upper=diff[2],
                             weight=weight,
-                            expression=current_axis[2])
+                            expression=current_axis[2],
+                            goal_constraint=self.goal_constraint)
 
     def __str__(self):
         s = super(Pointing, self).__str__()

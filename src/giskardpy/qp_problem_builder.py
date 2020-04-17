@@ -9,8 +9,9 @@ import numpy as np
 from giskardpy import logging, symbolic_wrapper as w
 from giskardpy.exceptions import QPSolverException
 from giskardpy.qp_solver import QPSolver
+from giskardpy.utils import make_filter_masks
 
-SoftConstraint = namedtuple(u'SoftConstraint', [u'lower', u'upper', u'weight', u'expression', u'post_processing'])
+SoftConstraint = namedtuple(u'SoftConstraint', [u'lower', u'upper', u'weight', u'expression', u'goal_constraint'])
 HardConstraint = namedtuple(u'HardConstraint', [u'lower', u'upper', u'expression'])
 JointConstraint = namedtuple(u'JointConstraint', [u'lower', u'upper', u'weight'])
 
@@ -244,14 +245,8 @@ class QProblemBuilder(object):
             with pd.option_context('display.max_rows', None, 'display.max_columns', None):
                 print(array)
 
-    def make_filter_masks(self, H):
-        b_mask = H.sum(axis=1) != 0
-        s_mask = b_mask[self.num_joint_constraints:]
-        bA_mask = np.concatenate((np.array([True] * self.num_hard_constraints), s_mask))
-        return bA_mask, b_mask
-
     def filter_zero_weight_constraints(self, H, A, lb, ub, lbA, ubA):
-        bA_mask, b_mask = self.make_filter_masks(H)
+        bA_mask, b_mask = make_filter_masks(H, self.num_joint_constraints, self.num_hard_constraints)
         A = A[bA_mask][:, b_mask].copy()
         lbA = lbA[bA_mask]
         ubA = ubA[bA_mask]

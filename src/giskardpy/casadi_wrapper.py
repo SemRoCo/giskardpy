@@ -665,10 +665,11 @@ def rotation_of(frame):
     :return: 4x4 Matrix; sets the translation part of a frame to 0
     :rtype: Matrix
     """
-    frame[0,3] = 0
-    frame[1,3] = 0
-    frame[2,3] = 0
-    return frame
+    r = eye(4)
+    for i in range(3):
+        for j in range(3):
+            r[i,j] = frame[i,j]
+    return r
 
 
 def trace(matrix):
@@ -1116,3 +1117,21 @@ def floor(x):
 
 def ceil(x):
     return ca.ceil(x)
+
+def sum(matrix):
+    """
+    the equivalent to np.sum(matrix)
+    """
+    return ca.sum1(ca.sum2(matrix))
+
+def sum_row(matrix):
+    """
+    the equivalent to np.sum(matrix, axis=0)
+    """
+    return ca.sum1(matrix)
+
+def sum_column(matrix):
+    """
+    the equivalent to np.sum(matrix, axis=1)
+    """
+    return ca.sum2(matrix)

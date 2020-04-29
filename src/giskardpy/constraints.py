@@ -4,17 +4,17 @@ import numbers
 from collections import OrderedDict
 
 import numpy as np
-from geometry_msgs.msg import Vector3Stamped, Vector3
+from geometry_msgs.msg import Vector3Stamped
 from rospy_message_converter.message_converter import convert_dictionary_to_ros_message
 from scipy.optimize import curve_fit
 
 import giskardpy.identifier as identifier
+import giskardpy.tfwrapper as tf
 from giskardpy import symbolic_wrapper as w
 from giskardpy.exceptions import GiskardException
 from giskardpy.input_system import PoseStampedInput, Point3Input, Vector3Input, Vector3StampedInput, FrameInput, \
     PointStampedInput, TranslationInput
 from giskardpy.qp_problem_builder import SoftConstraint
-from giskardpy.tfwrapper import transform_pose, transform_vector, transform_point
 
 MAX_WEIGHT = 15
 HIGH_WEIGHT = 5
@@ -72,6 +72,9 @@ class Constraint(object):
         return self.get_god_map().get_data(identifier.robot)
 
     def get_input_joint_position(self, joint_name):
+        """
+        returns a symbol that referes to the given joint
+        """
         key = identifier.joint_states + [joint_name, u'position']
         return self.god_map.to_symbol(key)
 
@@ -82,18 +85,66 @@ class Constraint(object):
         return self.__class__.__name__
 
     def get_fk(self, root, tip):
+        """
+        Return the homogeneous transformation matrix root_T_tip as a function that is dependent on the joint state.
+        :type root: str
+        :type tip: str
+        :return: root_T_tip
+        """
         return self.get_robot().get_fk_expression(root, tip)
 
     def get_fk_evaluated(self, root, tip):
+        """
+        Return the homogeneous transformation matrix root_T_tip. This Matrix refers to the evaluated current transform.
+        It is not dependent on the joint state.
+        :type root: str
+        :type tip: str
+        :return: root_T_tip
+        """
         return FrameInput(self.get_god_map().to_symbol,
                           prefix=identifier.fk_np +
                                  [(root, tip)]).get_frame()
 
     def get_input_float(self, name):
+        """
+        Returns a symbol that refers to the value of "name" on god map
+        :type name: str
+        :return: symbol
+        """
         key = self.get_identifier() + [name]
         return self.god_map.to_symbol(key)
 
+    def parse_and_transform_PoseStamped(self, pose_stamped_json, goal_reference_frame):
+        """
+        Takes a pose stamped json, turns it into a ros message and transforms it into the goal frame
+        :param pose_stamped_json: json representing a pose stamped
+        :type pose_stamped_json: str
+        :param goal_reference_frame: name of the goal frame
+        :type goal_reference_frame: str
+        :return:
+        """
+        result = convert_dictionary_to_ros_message(u'geometry_msgs/PoseStamped', pose_stamped_json)
+        result = tf.transform_pose(goal_reference_frame, result)
+        result.pose.orientation = tf.normalize(result.pose.orientation)
+        return result
+
+    def parse_and_transform_Vector3Stamped(self, vector3_stamped_json, goal_reference_frame, normalized=False):
+        result = convert_dictionary_to_ros_message(u'geometry_msgs/Vector3Stamped', vector3_stamped_json)
+        result = tf.transform_vector(goal_reference_frame, result)
+        if normalized:
+            result.vector = tf.normalize(result.vector)
+        return result
+
+    def parse_and_transform_PointStamped(self, point_stamped_json, goal_reference_frame):
+        result = convert_dictionary_to_ros_message(u'geometry_msgs/PointStamped', point_stamped_json)
+        result = tf.transform_point(goal_reference_frame, result)
+        return result
+
     def get_input_PoseStamped(self, name):
+        """
+        :param name: name of the god map entry
+        :return: a homogeneous transformation matrix, with symbols that refer to a pose stamped in the god map.
+        """
         return PoseStampedInput(self.get_god_map().to_symbol,
                                 translation_prefix=self.get_identifier() +
                                                    [name,
@@ -113,6 +164,9 @@ class Constraint(object):
                                  prefix=self.get_identifier() + [name, u'point']).get_expression()
 
     def limit_acceleration(self, current_position, error, max_acceleration, max_velocity):
+        """
+        experimental, don't use
+        """
         sample_period = self.get_input_sampling_period()
         position_jacobian = w.jacobian(current_position, self.get_robot().get_joint_position_symbols())
         last_velocities = w.Matrix(self.get_robot().get_joint_velocity_symbols())
@@ -139,6 +193,11 @@ class Constraint(object):
         return vel / m
 
     def limit_velocity(self, error, max_velocity):
+        """
+        :param error: expression that describes the error
+        :param max_velocity: float or expression representing the max velocity
+        :return: expression that limits the velocity of error to max_velocity
+        """
         sample_period = self.get_input_sampling_period()
         max_velocity *= sample_period
         return w.diffable_max_fast(w.diffable_min_fast(error, max_velocity), -max_velocity)
@@ -153,8 +212,15 @@ class Constraint(object):
 
     def add_constraint(self, name, lower, upper, weight, expression, goal_constraint):
         """
+        :param name: name of the constraint, make use to avoid name conflicts!
         :type name: str
-        :type constraint: SoftConstraint
+        :param lower: lower limit for the !derivative! of the expression
+        :type lower: float, or symbolic expression
+        :param upper: upper limit for the !derivative! of the expression
+        :type upper: float, or symbolic expression
+        :param weight: tells the solver how important this constraint is, if unsure, use HIGH_WEIGHT
+        :param expression: symbolic expression that describes a geometric property. make sure it as a depedency on the
+                            joint state. usually achieved through "get_fk"
         """
         if name in self.soft_constraints:
             raise KeyError(u'a constraint with name \'{}\' already exists'.format(name))
@@ -260,21 +326,24 @@ class BasicCartesianConstraint(Constraint):
         super(BasicCartesianConstraint, self).__init__(god_map)
         self.root = root_link
         self.tip = tip_link
-        self.goal_constraint = goal_constraint
-        goal = convert_dictionary_to_ros_message(u'geometry_msgs/PoseStamped', goal)
-        goal = transform_pose(self.root, goal)
 
-        # make sure rotation is normalized quaternion
-        # TODO make a function out of this
-        rotation = np.array([goal.pose.orientation.x,
-                             goal.pose.orientation.y,
-                             goal.pose.orientation.z,
-                             goal.pose.orientation.w])
-        normalized_rotation = rotation / np.linalg.norm(rotation)
-        goal.pose.orientation.x = normalized_rotation[0]
-        goal.pose.orientation.y = normalized_rotation[1]
-        goal.pose.orientation.z = normalized_rotation[2]
-        goal.pose.orientation.w = normalized_rotation[3]
+        self.goal_constraint = goal_constraint
+        #goal = convert_dictionary_to_ros_message(u'geometry_msgs/PoseStamped', goal)
+        #goal = tf.transform_pose(self.root, goal)
+#
+        ## make sure rotation is normalized quaternion
+        ## TODO make a function out of this
+        #rotation = np.array([goal.pose.orientation.x,
+        #                     goal.pose.orientation.y,
+        #                     goal.pose.orientation.z,
+        #                     goal.pose.orientation.w])
+        #normalized_rotation = rotation / np.linalg.norm(rotation)
+        #goal.pose.orientation.x = normalized_rotation[0]
+        #goal.pose.orientation.y = normalized_rotation[1]
+        #goal.pose.orientation.z = normalized_rotation[2]
+        #goal.pose.orientation.w = normalized_rotation[3]
+#
+        goal = self.parse_and_transform_PoseStamped(goal, self.root)
 
         params = {self.goal: goal,
                   self.weight: weight,
@@ -398,7 +467,8 @@ class CartesianPositionY(BasicCartesianConstraint):
 
 class CartesianOrientation(BasicCartesianConstraint):
     def __init__(self, god_map, root_link, tip_link, goal, weight=HIGH_WEIGHT, max_veloctiy=0.5, max_acceleration=0.5):
-        super(CartesianOrientation, self).__init__(god_map, root_link, tip_link, goal, weight, max_veloctiy, max_acceleration)
+        super(CartesianOrientation, self).__init__(god_map, root_link, tip_link, goal, weight, max_veloctiy,
+                                                   max_acceleration)
 
     def make_constraints(self):
         """
@@ -470,7 +540,8 @@ class CartesianOrientation(BasicCartesianConstraint):
 
 class CartesianOrientationSlerp(BasicCartesianConstraint):
     def __init__(self, god_map, root_link, tip_link, goal, weight=HIGH_WEIGHT, max_velocity=0.5, max_accleration=0.5):
-        super(CartesianOrientationSlerp, self).__init__(god_map, root_link, tip_link, goal, weight, max_velocity, max_accleration)
+        super(CartesianOrientationSlerp, self).__init__(god_map, root_link, tip_link, goal, weight, max_velocity,
+                                                        max_accleration)
 
     def make_constraints(self):
         """
@@ -776,10 +847,10 @@ class SelfCollisionAvoidance(Constraint):
 
 
 class AlignPlanes(Constraint):
-    root_normal = u'root_normal'
-    tip_normal = u'tip_normal'
+    root_normal_id = u'root_normal'
+    tip_normal_id = u'tip_normal'
     weight = u'weight'
-    max_velocity = u'max_velocity'
+    max_velocity_id = u'max_velocity'
 
     def __init__(self, god_map, root, tip, root_normal, tip_normal, weight=HIGH_WEIGHT, max_velocity=0.5, goal_constraint=True):
         """
@@ -794,33 +865,27 @@ class AlignPlanes(Constraint):
         self.tip = tip
         self.goal_constraint = goal_constraint
 
-        root_normal = convert_dictionary_to_ros_message(u'geometry_msgs/Vector3Stamped', root_normal)
-        root_normal = transform_vector(self.root, root_normal)
-        tmp = np.array([root_normal.vector.x, root_normal.vector.y, root_normal.vector.z])
-        tmp = tmp / np.linalg.norm(tmp)
-        root_normal.vector = Vector3(*tmp)
+        self.tip_normal = self.parse_and_transform_Vector3Stamped(tip_normal, self.tip, normalized=True)
+        self.root_normal = self.parse_and_transform_Vector3Stamped(root_normal, self.root, normalized=True)
 
-        tip_normal = convert_dictionary_to_ros_message(u'geometry_msgs/Vector3Stamped', tip_normal)
-        tip_normal = transform_vector(self.tip, tip_normal)
-        tmp = np.array([tip_normal.vector.x, tip_normal.vector.y, tip_normal.vector.z])
-        tmp = tmp / np.linalg.norm(tmp)
-        tip_normal.vector = Vector3(*tmp)
-
-        params = {self.root_normal: root_normal,
-                  self.tip_normal: tip_normal,
+        params = {self.root_normal_id: self.root_normal,
+                  self.tip_normal_id: self.tip_normal,
                   self.weight: weight,
-                  self.max_velocity: max_velocity}
+                  self.max_velocity_id: max_velocity}
         self.save_params_on_god_map(params)
 
     def __str__(self):
         s = super(AlignPlanes, self).__str__()
-        return u'{}/{}/{}'.format(s, self.root, self.tip)
+        return u'{}/{}/{}_X:{}_Y:{}_Z:{}'.format(s, self.root, self.tip,
+                                                 self.tip_normal.vector.x,
+                                                 self.tip_normal.vector.y,
+                                                 self.tip_normal.vector.z)
 
     def get_root_normal_vector(self):
-        return self.get_input_Vector3Stamped(self.root_normal)
+        return self.get_input_Vector3Stamped(self.root_normal_id)
 
     def get_tip_normal_vector(self):
-        return self.get_input_Vector3Stamped(self.tip_normal)
+        return self.get_input_Vector3Stamped(self.tip_normal_id)
 
     def make_constraints(self):
         # TODO integrate max_velocity?
@@ -931,7 +996,10 @@ class Pointing(Constraint):
         :type pointing_axis: str
         :type weight: float
         """
+        # always start by calling super with god map
         super(Pointing, self).__init__(god_map)
+
+        # use this space to process your input parameters, handle defaults etc
         if root is None:
             self.root = self.get_robot().get_root()
         else:
@@ -939,25 +1007,24 @@ class Pointing(Constraint):
         self.tip = tip
         self.goal_constraint = goal_constraint
 
-        goal_point = convert_dictionary_to_ros_message(u'geometry_msgs/PointStamped', goal_point)
-        goal_point = transform_point(self.root, goal_point)
+        # you receive message in json form, use these functions to turn them into the proper types and transfrom
+        # them into a goal frame
+        goal_point = self.parse_and_transform_PointStamped(goal_point, self.root)
 
         if pointing_axis is not None:
-            pointing_axis = convert_dictionary_to_ros_message(u'geometry_msgs/Vector3Stamped', pointing_axis)
-            pointing_axis = transform_vector(self.tip, pointing_axis)
+            pointing_axis = self.parse_and_transform_Vector3Stamped(pointing_axis, self.tip, normalized=True)
         else:
             pointing_axis = Vector3Stamped()
             pointing_axis.header.frame_id = self.tip
             pointing_axis.vector.z = 1
-        tmp = np.array([pointing_axis.vector.x, pointing_axis.vector.y, pointing_axis.vector.z])
-        tmp = tmp / np.linalg.norm(tmp)  # TODO possible /0
-        pointing_axis.vector = Vector3(*tmp)
 
+        # save everything, that you want to reference in expressions on the god map
         params = {self.goal_point: goal_point,
                   self.pointing_axis: pointing_axis,
                   self.weight: weight}
         self.save_params_on_god_map(params)
 
+    # make make some convenience functions to make your code more readable
     def get_goal_point(self):
         return self.get_input_PointStamped(self.goal_point)
 
@@ -965,22 +1032,46 @@ class Pointing(Constraint):
         return self.get_input_Vector3Stamped(self.pointing_axis)
 
     def make_constraints(self):
-
+        # in this function, you have to create the actual constraints
+        # start by creating references to your input params in the god map
+        # get_input functions generally return symbols referring to god map entries
         weight = self.get_input_float(self.weight)
         root_T_tip = self.get_fk(self.root, self.tip)
         goal_point = self.get_goal_point()
         pointing_axis = self.get_pointing_axis()
 
+        # do some math to create your expressions and limits
+        # make sure to always use function from the casadi_wrapper, here imported as "w".
+        # here are some rules of thumb that often make constraints more stable:
+        # 1) keep the expressions as simple as possible and move the "magic" into the lower/upper limits
+        # 2) don't try to minimize the number of constraints (in this example, minimizing the angle is also possible
+        #       but sometimes gets unstable)
+        # 3) you can't use the normal if! use e.g. "w.if_eq"
+        # 4) use self.limit_velocity on your error
+        # 5) giskard will calculate the derivative of "expression". so in this example, writing -diff[0] in
+        #       in expression will result in the same behavior, because goal_axis is constant.
+        #       This is also the reason, why lower/upper are limits for the derivative.
         goal_axis = goal_point - w.position_of(root_T_tip)
-        goal_axis /= w.norm(goal_axis)  # FIXME possible /0
+        goal_axis /= w.norm(goal_axis)  # FIXME avoid /0
         current_axis = w.dot(root_T_tip, pointing_axis)
         diff = goal_axis - current_axis
 
-        self.add_constraint(str(self) + u'x', lower=diff[0],
-                            upper=diff[0],
-                            weight=weight,
-                            expression=current_axis[0],
-                            goal_constraint=self.goal_constraint)
+        # add constraints to the current problem, after execution, it gets cleared automatically
+        self.add_constraint(
+            # name of the constraint, make use to avoid name conflicts!
+            str(self) + u'x',
+            # lower limit for the !derivative! of the expression
+            lower=diff[0],
+            # upper limit for the !derivative! of the expression
+            upper=diff[0],
+            # tells the solver how important this constraint is, if unsure, use HIGH_WEIGHT
+            weight=weight,
+            # symbolic expression that describes a geometric property. make sure it as a dependency on the
+            # joint state. usually achieved through "get_fk"
+            expression=current_axis[0],
+            # describes if this constraint must be satisfied in order to reach the goal
+            goal_constraint=self.goal_constraint)
+
         self.add_constraint(str(self) + u'y', lower=diff[1],
                             upper=diff[1],
                             weight=weight,
@@ -993,5 +1084,7 @@ class Pointing(Constraint):
                             goal_constraint=self.goal_constraint)
 
     def __str__(self):
+        # helps to make sure your constraint name is unique.
         s = super(Pointing, self).__str__()
         return u'{}/{}/{}'.format(s, self.root, self.tip)
+

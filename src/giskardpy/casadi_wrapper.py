@@ -1117,3 +1117,21 @@ def floor(x):
 
 def ceil(x):
     return ca.ceil(x)
+
+def sum(matrix):
+    """
+    the equivalent to np.sum(matrix)
+    """
+    return ca.sum1(ca.sum2(matrix))
+
+def sum_row(matrix):
+    """
+    the equivalent to np.sum(matrix, axis=0)
+    """
+    return ca.sum1(matrix)
+
+def sum_column(matrix):
+    """
+    the equivalent to np.sum(matrix, axis=1)
+    """
+    return ca.sum2(matrix)

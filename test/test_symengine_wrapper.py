@@ -13,7 +13,7 @@ from transforms3d.quaternions import quat2mat, quat2axangle
 
 from giskardpy import symbolic_wrapper as w
 from utils_for_tests import limited_float, SMALL_NUMBER, unit_vector, quaternion, vector, \
-    pykdl_frame_to_numpy, lists_of_same_length, angle, compare_axis_angle, angle_positive
+    pykdl_frame_to_numpy, lists_of_same_length, angle, compare_axis_angle, angle_positive, sq_matrix
 
 
 class TestSympyWrapper(unittest.TestCase):
@@ -744,3 +744,21 @@ class TestSympyWrapper(unittest.TestCase):
         r1 = w.compile_and_execute(w.entrywise_product, [m1, m2])
         r2 = m1 * m2
         np.testing.assert_array_almost_equal(r1, r2)
+
+    @given(sq_matrix())
+    def test_sum(self, m):
+        actual_sum = w.compile_and_execute(w.sum, [m])
+        expected_sum = np.sum(m)
+        self.assertTrue(np.isclose(actual_sum, expected_sum))
+
+    @given(sq_matrix())
+    def test_sum_row(self, m):
+        actual_sum = w.compile_and_execute(w.sum_row, [m])
+        expected_sum = np.sum(m, axis=0)
+        self.assertTrue(np.all(np.isclose(actual_sum, expected_sum)))
+
+    @given(sq_matrix())
+    def test_sum_column(self, m):
+        actual_sum = w.compile_and_execute(w.sum_column, [m])
+        expected_sum = np.sum(m, axis=1)
+        self.assertTrue(np.all(np.isclose(actual_sum, expected_sum)))

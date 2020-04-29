@@ -173,6 +173,12 @@ def limited_float(outer_limit=BIG_NUMBER, min_dist_to_zero=None):
         f = f.filter(lambda x: abs(x) < outer_limit)
     return f
 
+@composite
+def sq_matrix(draw):
+    i = draw(st.integers(min_value=1, max_value=10))
+    i_sq = i**2
+    l = draw(st.lists(limited_float(), min_size=i_sq, max_size=i_sq))
+    return np.array(l).reshape((i,i))
 
 def unit_vector(length, elements=None):
     if elements is None:

@@ -328,21 +328,6 @@ class BasicCartesianConstraint(Constraint):
         self.tip = tip_link
 
         self.goal_constraint = goal_constraint
-        #goal = convert_dictionary_to_ros_message(u'geometry_msgs/PoseStamped', goal)
-        #goal = tf.transform_pose(self.root, goal)
-#
-        ## make sure rotation is normalized quaternion
-        ## TODO make a function out of this
-        #rotation = np.array([goal.pose.orientation.x,
-        #                     goal.pose.orientation.y,
-        #                     goal.pose.orientation.z,
-        #                     goal.pose.orientation.w])
-        #normalized_rotation = rotation / np.linalg.norm(rotation)
-        #goal.pose.orientation.x = normalized_rotation[0]
-        #goal.pose.orientation.y = normalized_rotation[1]
-        #goal.pose.orientation.z = normalized_rotation[2]
-        #goal.pose.orientation.w = normalized_rotation[3]
-#
         goal = self.parse_and_transform_PoseStamped(goal, self.root)
 
         params = {self.goal: goal,
@@ -1069,7 +1054,7 @@ class Pointing(Constraint):
             # symbolic expression that describes a geometric property. make sure it as a dependency on the
             # joint state. usually achieved through "get_fk"
             expression=current_axis[0],
-            # describes if this constraint must be satisfied in order to reach the goal
+            # describes if this constraint must be fulfilled at the end of the trajectory
             goal_constraint=self.goal_constraint)
 
         self.add_constraint(str(self) + u'y', lower=diff[1],

@@ -15,6 +15,7 @@ from itertools import product
 
 import numpy as np
 import pkg_resources
+import rospy
 from geometry_msgs.msg import PointStamped, Point, Vector3Stamped, Vector3, Pose, PoseStamped, QuaternionStamped, \
     Quaternion
 from giskard_msgs.msg import WorldBody
@@ -24,6 +25,7 @@ from py_trees.composites import Parallel
 from sensor_msgs.msg import JointState
 from shape_msgs.msg import SolidPrimitive
 from tf.transformations import quaternion_multiply, quaternion_conjugate
+from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 
 from giskardpy import logging
 from giskardpy.data_types import ClosestPointInfo
@@ -776,3 +778,24 @@ def memoize(function):
             return rv
 
     return wrapper
+
+def traj_to_msg(sample_period, trajectory, controlled_joints, fill_velocity_values):
+    """
+    :type traj: giskardpy.data_types.Trajectory
+    :return: JointTrajectory
+    """
+    trajectory_msg = JointTrajectory()
+    trajectory_msg.header.stamp = rospy.get_rostime() + rospy.Duration(0.5)
+    trajectory_msg.joint_names = controlled_joints
+    for time, traj_point in trajectory.items():
+        p = JointTrajectoryPoint()
+        p.time_from_start = rospy.Duration(time*sample_period)
+        for joint_name in controlled_joints:
+            if joint_name in traj_point:
+                p.positions.append(traj_point[joint_name].position)
+                if fill_velocity_values:
+                    p.velocities.append(traj_point[joint_name].velocity)
+            else:
+                raise NotImplementedError(u'generated traj does not contain all joints')
+        trajectory_msg.points.append(p)
+    return trajectory_msg

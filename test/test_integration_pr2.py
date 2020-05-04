@@ -2246,3 +2246,149 @@ class TestCollisionAvoidanceGoals(object):
         kitchen_setup.check_cart_goal(kitchen_setup.l_tip, expected_pose)
 
     # TODO FIXME attaching and detach of urdf objects that listen to joint states
+
+
+class TestReachability():
+    def test_unreachable_goal_0(self, zero_pose):
+        js = {}
+        js['r_shoulder_lift_joint'] = 10
+        zero_pose.set_joint_goal(js)
+        zero_pose.check_reachability(expected_error_code=MoveResult.INSOLVABLE)
+
+
+    def test_unreachable_goal_1(self,zero_pose):
+        pose = PoseStamped()
+        pose.pose.position.z = -1
+        pose.header.frame_id = 'map'
+        zero_pose.set_cart_goal(root='odom_combined', tip='r_gripper_tool_frame', goal_pose=pose)
+        zero_pose.check_reachability(expected_error_code=MoveResult.INSOLVABLE)
+
+    def test_unreachable_goal_2(self, zero_pose):
+        pose = PoseStamped()
+        pose.pose.position.z = 5
+        pose.header.frame_id = 'map'
+        zero_pose.set_cart_goal(root='odom_combined', tip='r_gripper_tool_frame', goal_pose=pose)
+        zero_pose.check_reachability(expected_error_code=MoveResult.INSOLVABLE)
+
+    def test_unreachable_goal_3(self, zero_pose):
+        pose = PoseStamped()
+        pose.pose.position.z = 1.2
+        pose.header.frame_id = 'map'
+        zero_pose.set_translation_goal(root='odom_combined', tip='r_gripper_tool_frame', goal_pose=pose)
+        js = {}
+        js['r_shoulder_lift_joint'] = 1.0  # soft lower -0.3536 soft upper 1.2963
+        js['r_elbow_flex_joint'] = -0.2  # soft lower -2.1213 soft upper -0.15
+        js['torso_lift_joint'] = 0.15  # soft lower 0.0115 soft upper 0.325
+        zero_pose.set_joint_goal(js)
+        zero_pose.check_reachability(expected_error_code=MoveResult.INSOLVABLE)
+
+    def test_unreachable_goal_4(self, zero_pose):
+        pose = PoseStamped()
+        pose.pose.position.y = -2.0
+        pose.pose.position.z = 1
+        pose.header.frame_id = 'map'
+        zero_pose.set_translation_goal(root='odom_combined', tip='r_gripper_tool_frame', goal_pose=pose)
+        pose2 = PoseStamped()
+        pose2.pose.position.y = 2.0
+        pose2.pose.position.z = 1
+        pose2.header.frame_id = 'map'
+        zero_pose.set_translation_goal(root='odom_combined', tip='l_gripper_tool_frame', goal_pose=pose2)
+        zero_pose.check_reachability(expected_error_code=MoveResult.INSOLVABLE)
+
+    def test_unreachable_goal_5(self, zero_pose):
+        pose = PoseStamped()
+        pose.pose.position.x = 2
+        pose.header.frame_id = 'map'
+        zero_pose.set_cart_goal(root='r_shoulder_lift_link', tip='r_gripper_tool_frame', goal_pose=pose)
+        zero_pose.check_reachability(expected_error_code=MoveResult.INSOLVABLE)
+
+    def test_unreachable_goal_6(self, zero_pose):  # TODO torso lift joint xdot has a wrong value
+        pose = PoseStamped()
+        pose.pose.position.x = 0.0
+        pose.pose.position.y = 0.0
+        pose.pose.position.z = 0.0
+        pose.header.frame_id = 'map'
+        zero_pose.set_translation_goal(root='odom_combined', tip='base_footprint', goal_pose=pose)
+        js = {}
+        js['odom_x_joint'] = 0.01
+        zero_pose.set_joint_goal(js)
+        zero_pose.check_reachability(expected_error_code=MoveResult.INSOLVABLE)
+
+    def test_unreachable_goal_7(self, zero_pose):
+        js = {}
+        js['r_shoulder_lift_joint'] = 0.2
+        js['r_elbow_flex_joint'] = -2.5
+        js['torso_lift_joint'] = 0.15
+        zero_pose.set_joint_goal(js)
+        zero_pose.check_reachability(expected_error_code=MoveResult.INSOLVABLE)
+
+    def test_reachable_goal_0(self, zero_pose):
+        pose = PoseStamped()
+        pose.pose.position.x = 3.0
+        pose.pose.position.z = 1.0
+        pose.pose.orientation.x = 0.0
+        pose.pose.orientation.y = 0.707
+        pose.pose.orientation.z = 0.0
+        pose.pose.orientation.w = 0.707
+        pose.header.frame_id = 'map'
+        zero_pose.set_cart_goal(root='odom_combined', tip='r_gripper_tool_frame', goal_pose=pose)
+        zero_pose.check_reachability()
+
+    def test_reachable_goal_1(self, zero_pose):
+        pose = PoseStamped()
+        pose.pose.orientation.x = 0
+        pose.pose.orientation.y = 0
+        pose.pose.orientation.z = 0
+        pose.pose.orientation.w = 1
+        pose.pose.position.x = 3.0
+        pose.pose.position.z = 1.0
+        pose.header.frame_id = 'map'
+        zero_pose.set_cart_goal(root='odom_combined', tip='r_gripper_tool_frame', goal_pose=pose)
+        zero_pose.check_reachability()
+
+    def test_reachable_goal_2(self, zero_pose):
+        pose = PoseStamped()
+        pose.pose.position.x = -1.0
+        pose.pose.position.z = 1.0
+        pose.header.frame_id = 'map'
+        zero_pose.set_cart_goal(root='odom_combined', tip='r_gripper_tool_frame', goal_pose=pose)
+        zero_pose.check_reachability()
+
+    def test_reachable_goal_3(self, zero_pose):
+        pose = PoseStamped()
+        pose.pose.position.x = 1.0
+        pose.pose.position.y = 0.3
+        pose.pose.position.z = 1.0
+        pose.pose.orientation.x = -0.697
+        pose.pose.orientation.y = -0.557
+        pose.pose.orientation.z = 0.322
+        pose.pose.orientation.w = -0.317
+        pose.header.frame_id = 'map'
+        zero_pose.set_cart_goal(root='odom_combined', tip='r_gripper_tool_frame', goal_pose=pose)
+        zero_pose.check_reachability()
+
+    def test_reachable_goal_4(self, zero_pose):
+        pose = PoseStamped()
+        pose.pose.position.x = 1.0
+        pose.pose.position.y = 0.3
+        pose.pose.position.z = 1.0
+        pose.pose.orientation.x = -0.697
+        pose.pose.orientation.y = -0.557
+        pose.pose.orientation.z = 0.322
+        pose.pose.orientation.w = -0.317
+        pose.header.frame_id = 'map'
+        zero_pose.set_cart_goal(root='odom_combined', tip='r_gripper_tool_frame', goal_pose=pose)
+        js = {}
+        js['r_elbow_flex_joint'] = -0.2
+        js['torso_lift_joint'] = 0.15
+        zero_pose.set_joint_goal(js)
+        zero_pose.allow_all_collisions()
+        zero_pose.check_reachability()
+
+    def test_reachable_goal_5(self, zero_pose):
+        js = {}
+        js['r_shoulder_lift_joint'] = 0.2
+        js['r_elbow_flex_joint'] = -0.2
+        js['torso_lift_joint'] = 0.15
+        zero_pose.set_joint_goal(js)
+        zero_pose.check_reachability()

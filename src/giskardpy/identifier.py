@@ -13,7 +13,10 @@ closest_point = [u'cpi']
 collisions = [u'collisions']
 collision_goal_identifier = [u'collision_goal']
 soft_constraint_identifier = [u'soft_constraints']
+joint_constraint_identifier = [u'joint_constraints']
+hard_constraint_identifier = [u'hard_constraints']
 execute = [u'execute']
+check_reachability = [u'check_reachability']
 next_move_goal = [u'next_move_goal']
 qp_data = [u'qp_data']
 A = qp_data + [u'A']
@@ -27,6 +30,10 @@ weight_keys = qp_data + [u'weight_keys']
 b_keys = qp_data + [u'b_keys']
 bA_keys = qp_data + [u'bA_keys']
 xdot_keys = qp_data + [u'xdot_keys']
+
+wiggle_detection_samples = [u'wiggle_detection_samples']
+post_processing = [u'post_processing']
+soft_constraints = post_processing + [u'soft_constraints']
 
 
 
@@ -72,9 +79,18 @@ plugins = rosparam + [u'plugins']
 enable_VisualizationBehavior = plugins + [u'VisualizationBehavior', u'enabled']
 enable_CPIMarker = plugins + [u'CPIMarker', u'enabled']
 enable_PlotTrajectory = plugins + [u'PlotTrajectory', u'enabled']
-fft_duration = plugins + [u'WiggleCancel', u'fft_duration']
 wiggle_detection_threshold = plugins + [u'WiggleCancel', u'wiggle_detection_threshold']
-min_wiggle_frequency = plugins + [u'WiggleCancel', u'min_wiggle_frequency']
+num_samples_in_fft = plugins + [u'WiggleCancel', u'num_samples_in_fft']
+wiggle_frequency_range = plugins + [u'WiggleCancel', u'wiggle_frequency_range']
+
+# reachability check
+reachability_check = rosparam + [u'reachability_check']
+rc_sample_period = reachability_check + [u'sample_period']
+rc_prismatic_velocity = reachability_check + [u'prismatic_velocity']
+rc_continuous_velocity = reachability_check + [u'continuous_velocity']
+rc_revolute_velocity = reachability_check + [u'revolute_velocity']
+rc_other_velocity = reachability_check + [u'other_velocity']
+
 
 # behavior tree
 behavior_tree = rosparam + [u'behavior_tree']
@@ -92,3 +108,6 @@ added_self_collisions = self_collision_avoidance + [u'add']
 
 external_collision_avoidance = collision_avoidance + [u'external_collision_avoidance']
 number_of_repeller = external_collision_avoidance + [u'number_of_repeller']
+
+
+

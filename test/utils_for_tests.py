@@ -173,6 +173,12 @@ def limited_float(outer_limit=BIG_NUMBER, min_dist_to_zero=None):
         f = f.filter(lambda x: abs(x) < outer_limit)
     return f
 
+@composite
+def sq_matrix(draw):
+    i = draw(st.integers(min_value=1, max_value=10))
+    i_sq = i**2
+    l = draw(st.lists(limited_float(), min_size=i_sq, max_size=i_sq))
+    return np.array(l).reshape((i,i))
 
 def unit_vector(length, elements=None):
     if elements is None:
@@ -336,6 +342,8 @@ class GiskardTestWrapper(object):
         self.send_and_check_goal()
         self.check_joint_state(goal, decimal=decimal)
 
+
+
     #
     # CART GOAL STUFF ##################################################################################################
     #
@@ -408,20 +416,20 @@ class GiskardTestWrapper(object):
     #
     # GENERAL GOAL STUFF ###############################################################################################
     #
+    def check_reachability(self, expected_error_code=MoveResult.SUCCESS):
+        self.send_and_check_goal(expected_error_code=expected_error_code, goal_type=MoveGoal.CHECK_REACHABILITY)
+
     def get_as(self):
         return Blackboard().get(u'giskardpy/command')
 
-    def send_goal(self, goal=None, execute=True):
+    def send_goal(self, goal=None, goal_type=MoveGoal.PLAN_AND_EXECUTE):
         """
         :rtype: MoveResult
         """
         if goal is None:
             goal = MoveActionGoal()
             goal.goal = self.wrapper._get_goal()
-            if execute:
-                goal.goal.type = MoveGoal.PLAN_AND_EXECUTE
-            else:
-                goal.goal.type = MoveGoal.PLAN_ONLY
+            goal.goal.type = goal_type
         i = 0
         self.loop_once()
         t1 = Thread(target=self.get_as()._as.action_server.internal_goal_callback, args=(goal,))
@@ -437,8 +445,8 @@ class GiskardTestWrapper(object):
         result = self.results.get()
         return result
 
-    def send_and_check_goal(self, expected_error_code=MoveResult.SUCCESS, execute=True, goal=None):
-        r = self.send_goal(goal=goal, execute=execute)
+    def send_and_check_goal(self, expected_error_code=MoveResult.SUCCESS, goal_type=MoveGoal.PLAN_AND_EXECUTE, goal=None):
+        r = self.send_goal(goal=goal, goal_type=goal_type)
         assert r.error_code == expected_error_code, \
             u'got: {}, expected: {}'.format(move_result_error_code(r.error_code),
                                             move_result_error_code(expected_error_code))

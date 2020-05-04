@@ -36,15 +36,18 @@ from giskardpy.plugin_set_cmd import SetCmd
 from giskardpy.plugin_time import TimePlugin
 from giskardpy.plugin_update_constraints import GoalToConstraints
 from giskardpy.plugin_visualization import VisualizationBehavior
+from giskardpy.plugin_post_processing import PostProcessing
 from giskardpy.pybullet_world import PyBulletWorld
 from giskardpy.utils import create_path, render_dot_tree, KeyDefaultDict
 from giskardpy.world_object import WorldObject
+from collections import defaultdict
 
 
 def initialize_god_map():
     god_map = GodMap()
     blackboard = Blackboard
     blackboard.god_map = god_map
+    god_map.safe_set_data(identifier.wiggle_detection_samples, defaultdict(list))
     god_map.safe_set_data(identifier.rosparam, rospy.get_param(rospy.get_name()))
     god_map.safe_set_data(identifier.robot_description, rospy.get_param(u'robot_description'))
     path_to_data_folder = god_map.safe_get_data(identifier.data_folder)
@@ -142,7 +145,7 @@ def grow_tree():
     planning_3.add_plugin(KinSimPlugin(u'kin sim'))
     planning_3.add_plugin(LogTrajPlugin(u'log'))
     planning_3.add_plugin(GoalReachedPlugin(u'goal reached'))
-    planning_3.add_plugin(WiggleCancel(u'wiggle'))
+    planning_3.add_plugin(WiggleCancel(u'wiggle', final_detection=False))
     planning_3.add_plugin(TimePlugin(u'time'))
     # ----------------------------------------------
     publish_result = failure_is_success(Selector)(u'monitor execution')
@@ -173,6 +176,11 @@ def grow_tree():
     process_move_goal.add_child(planning_1)
     process_move_goal.add_child(SetCmd(u'set move goal', action_server_name))
     # ----------------------------------------------
+    #
+    post_processing = failure_is_success(Sequence)(u'post processing')
+    post_processing.add_child(WiggleCancel(u'wiggle_cancel_final_detection', final_detection=True))
+    post_processing.add_child(PostProcessing(u'post_processing'))
+    # ----------------------------------------------
     # ----------------------------------------------
     root = Sequence(u'root')
     root.add_child(wait_for_goal)
@@ -180,6 +188,7 @@ def grow_tree():
     root.add_child(process_move_goal)
     if god_map.safe_get_data(identifier.enable_PlotTrajectory):
         root.add_child(PlotTrajectory(u'plot trajectory', order=4))
+    root.add_child(post_processing)
     root.add_child(move_robot)
     root.add_child(SendResult(u'send result', action_server_name, MoveAction))
 

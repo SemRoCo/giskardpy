@@ -1,5 +1,5 @@
 from copy import deepcopy
-
+import numpy as np
 import pytest
 import rospy
 from geometry_msgs.msg import PoseStamped, Point, Quaternion
@@ -180,3 +180,22 @@ class TestCollisionAvoidanceGoals(object):
         base_goal.pose.position.x -= 1
         base_goal.pose.orientation.w = 1
         box_setup.move_base(base_goal)
+
+    def test_collision_avoidance(self, zero_pose):
+        """
+        :type box_setup: HSR
+        """
+        js = {u'arm_flex_joint': -np.pi/2}
+        zero_pose.send_and_check_joint_goal(js)
+
+        p = PoseStamped()
+        p.header.frame_id = u'map'
+        p.pose.position.x = 0.9
+        p.pose.position.y = 0
+        p.pose.position.z = 0.5
+        p.pose.orientation.w = 1
+        zero_pose.add_box(size=[1, 1, 0.01], pose=p)
+
+        js = {u'arm_flex_joint': 0}
+        zero_pose.send_and_check_joint_goal(js)
+

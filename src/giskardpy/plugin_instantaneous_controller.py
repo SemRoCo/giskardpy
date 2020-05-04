@@ -19,6 +19,8 @@ from giskardpy.plugin_action_server import GetGoal
 from giskardpy.symengine_controller import InstantaneousController
 from giskardpy.tfwrapper import transform_pose
 from giskardpy import logging
+from collections import OrderedDict, namedtuple
+from giskardpy.qp_problem_builder import JointConstraint
 
 
 class ControllerPlugin(GiskardBehavior):
@@ -27,8 +29,14 @@ class ControllerPlugin(GiskardBehavior):
         self.path_to_functions = self.get_god_map().safe_get_data(identifier.data_folder)
         self.nWSR = self.get_god_map().safe_get_data(identifier.nWSR)
         self.soft_constraints = None
+        self.joint_constraints = None
+        self.hard_constraints = None
         self.qp_data = {}
         self.get_god_map().safe_set_data(identifier.qp_data, self.qp_data) # safe dict on godmap and work on ref
+        self.rc_prismatic_velocity = self.get_god_map().safe_get_data(identifier.rc_prismatic_velocity)
+        self.rc_continuous_velocity = self.get_god_map().safe_get_data(identifier.rc_continuous_velocity)
+        self.rc_revolute_velocity = self.get_god_map().safe_get_data(identifier.rc_revolute_velocity)
+        self.rc_other_velocity = self.get_god_map().safe_get_data(identifier.rc_other_velocity)
 
     def initialise(self):
         super(ControllerPlugin, self).initialise()
@@ -39,12 +47,32 @@ class ControllerPlugin(GiskardBehavior):
 
     def init_controller(self):
         new_soft_constraints = self.get_god_map().safe_get_data(identifier.soft_constraint_identifier)
+        new_joint_constraints = self.get_god_map().safe_get_data(identifier.joint_constraint_identifier)
+        new_hard_constraints = self.get_god_map().safe_get_data(identifier.hard_constraint_identifier)
+
+        update = False
         if self.soft_constraints is None or set(self.soft_constraints.keys()) != set(new_soft_constraints.keys()):
             self.soft_constraints = copy(new_soft_constraints)
+            update = True
+
+        if self.joint_constraints is None or set(self.joint_constraints.keys()) != set(new_joint_constraints.keys()):
+            self.joint_constraints = copy(new_joint_constraints)
+            update = True
+
+        if self.hard_constraints is None or set(self.hard_constraints.keys()) != set(new_hard_constraints.keys()):
+            self.hard_constraints = copy(new_hard_constraints)
+            update = True
+
+        if update:
             self.controller = InstantaneousController(self.get_robot(),
                                                   u'{}/{}/'.format(self.path_to_functions, self.get_robot().get_name()))
-            self.controller.set_controlled_joints(self.get_robot().controlled_joints)
-            self.controller.update_soft_constraints(self.soft_constraints)
+
+            controlled_joints = self.get_robot().controlled_joints
+            joint_to_symbols_str = OrderedDict(
+                (x, self.robot.get_joint_position_symbol(x)) for x in controlled_joints)
+
+
+            self.controller.update_constraints(joint_to_symbols_str, self.soft_constraints, self.joint_constraints, self.hard_constraints)
             # p = Process(target=self.controller.compile)
             # p.start()
             # while p.is_alive():

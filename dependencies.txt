@@ -1,6 +1,6 @@
 # use the requirements.txt syntax to add dependencies
-symengine>=0.3.1.dev1
-numpy>=1.11.0, <=2.0
+casadi>=3.1.5
+numpy>=1.16.6, <=2.0
 urdfdom-py>=0.3.3
 rosunit>=1.14.4
 cython>=0.23.4

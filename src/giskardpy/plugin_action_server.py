@@ -7,7 +7,7 @@ from giskard_msgs.msg._MoveResult import MoveResult
 from py_trees import Blackboard, Status
 
 from giskardpy.exceptions import MAX_NWSR_REACHEDException, QPSolverException, SolverTimeoutError, InsolvableException, \
-    SymengineException, PathCollisionException, UnknownBodyException, ImplementationException
+    SymengineException, PathCollisionException, UnknownBodyException, ImplementationException, UnreachableException
 import giskardpy.identifier as identifier
 from giskardpy.logging import loginfo
 from giskardpy.plugin import GiskardBehavior
@@ -128,6 +128,7 @@ class SendResult(ActionServerBehavior):
         result = MoveResult()
         result.error_code = self.exception_to_error_code(e)
         if self.get_as().is_preempt_requested() or not result.error_code == MoveResult.SUCCESS:
+            result.error_message = e.message
             self.get_as().send_preempted(result)
         else:
             self.get_as().send_result(result)
@@ -155,6 +156,8 @@ class SendResult(ActionServerBehavior):
             error_code = MoveResult.SYMENGINE_ERROR
         elif isinstance(exception, PathCollisionException):
             error_code = MoveResult.PATH_COLLISION
+        elif isinstance(exception, UnreachableException):
+            error_code = MoveResult.UNREACHABLE
         elif isinstance(exception, ImplementationException):
             print(exception)
             error_code = MoveResult.INSOLVABLE

@@ -8,6 +8,8 @@ class ImplementationException(GiskardException):
 class InsolvableException(GiskardException):
     pass
 
+class UnreachableException(GiskardException):
+    pass
 
 # -----------------------------------------------------------------------------------------------------------------------
 class PhysicsWorldException(GiskardException):

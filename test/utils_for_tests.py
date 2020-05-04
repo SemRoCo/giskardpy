@@ -448,8 +448,9 @@ class GiskardTestWrapper(object):
     def send_and_check_goal(self, expected_error_code=MoveResult.SUCCESS, goal_type=MoveGoal.PLAN_AND_EXECUTE, goal=None):
         r = self.send_goal(goal=goal, goal_type=goal_type)
         assert r.error_code == expected_error_code, \
-            u'got: {}, expected: {}'.format(move_result_error_code(r.error_code),
-                                            move_result_error_code(expected_error_code))
+            u'got: {}, expected: {} | error_massage: {}'.format(move_result_error_code(r.error_code),
+                                                                move_result_error_code(expected_error_code),
+                                                                r.error_message)
 
     def add_waypoint(self):
         self.wrapper.add_cmd()

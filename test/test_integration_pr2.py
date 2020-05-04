@@ -67,14 +67,14 @@ default_pose = {u'r_elbow_flex_joint': -0.15,
 gaya_pose = {u'r_shoulder_pan_joint': -1.7125,
              u'r_shoulder_lift_joint': -0.25672,
              u'r_upper_arm_roll_joint': -1.46335,
-             u'r_elbow_flex_joint': -2.12216,
+             u'r_elbow_flex_joint': -2.12,
              u'r_forearm_roll_joint': 1.76632,
              u'r_wrist_flex_joint': -0.10001,
              u'r_wrist_roll_joint': 0.05106,
              u'l_shoulder_pan_joint': 1.9652,
              u'l_shoulder_lift_joint': - 0.26499,
              u'l_upper_arm_roll_joint': 1.3837,
-             u'l_elbow_flex_joint': - 2.1224,
+             u'l_elbow_flex_joint': -2.12,
              u'l_forearm_roll_joint': 16.99,
              u'l_wrist_flex_joint': - 0.10001,
              u'l_wrist_roll_joint': 0,
@@ -823,13 +823,12 @@ class TestCartGoals(object):
         """
         :type zero_pose: PR2
         """
-        root = u'base_footprint'
         p = PoseStamped()
         p.header.frame_id = zero_pose.r_tip
         p.header.stamp = rospy.get_rostime()
         p.pose.position = Point(-0.1, 0, 0)
         p.pose.orientation = Quaternion(0, 0, 0, 1)
-        zero_pose.set_cart_goal(p, zero_pose.r_tip, root)
+        zero_pose.set_cart_goal(p, zero_pose.r_tip, zero_pose.default_root)
 
         zero_pose.add_waypoint()
         p = PoseStamped()
@@ -837,7 +836,7 @@ class TestCartGoals(object):
         p.header.stamp = rospy.get_rostime()
         p.pose.position = Point(0.0, -0.1, -0.1)
         p.pose.orientation = Quaternion(0, 0, 0, 1)
-        zero_pose.set_cart_goal(p, zero_pose.r_tip, root)
+        zero_pose.set_cart_goal(p, zero_pose.r_tip, zero_pose.default_root)
 
         zero_pose.add_waypoint()
         p = PoseStamped()
@@ -845,7 +844,7 @@ class TestCartGoals(object):
         p.header.stamp = rospy.get_rostime()
         p.pose.position = Point(0.1, 0.1, 0.1)
         p.pose.orientation = Quaternion(0, 0, 0, 1)
-        zero_pose.set_cart_goal(p, zero_pose.r_tip, root)
+        zero_pose.set_cart_goal(p, zero_pose.r_tip, zero_pose.default_root)
 
         zero_pose.send_and_check_goal()
 
@@ -2253,7 +2252,7 @@ class TestReachability():
         js = {}
         js['r_shoulder_lift_joint'] = 10
         zero_pose.set_joint_goal(js)
-        zero_pose.check_reachability(expected_error_code=MoveResult.INSOLVABLE)
+        zero_pose.check_reachability(expected_error_code=MoveResult.UNREACHABLE)
 
 
     def test_unreachable_goal_1(self,zero_pose):
@@ -2261,14 +2260,14 @@ class TestReachability():
         pose.pose.position.z = -1
         pose.header.frame_id = 'map'
         zero_pose.set_cart_goal(root='odom_combined', tip='r_gripper_tool_frame', goal_pose=pose)
-        zero_pose.check_reachability(expected_error_code=MoveResult.INSOLVABLE)
+        zero_pose.check_reachability(expected_error_code=MoveResult.UNREACHABLE)
 
     def test_unreachable_goal_2(self, zero_pose):
         pose = PoseStamped()
         pose.pose.position.z = 5
         pose.header.frame_id = 'map'
         zero_pose.set_cart_goal(root='odom_combined', tip='r_gripper_tool_frame', goal_pose=pose)
-        zero_pose.check_reachability(expected_error_code=MoveResult.INSOLVABLE)
+        zero_pose.check_reachability(expected_error_code=MoveResult.UNREACHABLE)
 
     def test_unreachable_goal_3(self, zero_pose):
         pose = PoseStamped()
@@ -2280,7 +2279,7 @@ class TestReachability():
         js['r_elbow_flex_joint'] = -0.2  # soft lower -2.1213 soft upper -0.15
         js['torso_lift_joint'] = 0.15  # soft lower 0.0115 soft upper 0.325
         zero_pose.set_joint_goal(js)
-        zero_pose.check_reachability(expected_error_code=MoveResult.INSOLVABLE)
+        zero_pose.check_reachability(expected_error_code=MoveResult.UNREACHABLE)
 
     def test_unreachable_goal_4(self, zero_pose):
         pose = PoseStamped()
@@ -2293,14 +2292,14 @@ class TestReachability():
         pose2.pose.position.z = 1
         pose2.header.frame_id = 'map'
         zero_pose.set_translation_goal(root='odom_combined', tip='l_gripper_tool_frame', goal_pose=pose2)
-        zero_pose.check_reachability(expected_error_code=MoveResult.INSOLVABLE)
+        zero_pose.check_reachability(expected_error_code=MoveResult.UNREACHABLE)
 
     def test_unreachable_goal_5(self, zero_pose):
         pose = PoseStamped()
         pose.pose.position.x = 2
         pose.header.frame_id = 'map'
         zero_pose.set_cart_goal(root='r_shoulder_lift_link', tip='r_gripper_tool_frame', goal_pose=pose)
-        zero_pose.check_reachability(expected_error_code=MoveResult.INSOLVABLE)
+        zero_pose.check_reachability(expected_error_code=MoveResult.UNREACHABLE)
 
     def test_unreachable_goal_6(self, zero_pose):  # TODO torso lift joint xdot has a wrong value
         pose = PoseStamped()
@@ -2312,7 +2311,7 @@ class TestReachability():
         js = {}
         js['odom_x_joint'] = 0.01
         zero_pose.set_joint_goal(js)
-        zero_pose.check_reachability(expected_error_code=MoveResult.INSOLVABLE)
+        zero_pose.check_reachability(expected_error_code=MoveResult.UNREACHABLE)
 
     def test_unreachable_goal_7(self, zero_pose):
         js = {}
@@ -2320,7 +2319,7 @@ class TestReachability():
         js['r_elbow_flex_joint'] = -2.5
         js['torso_lift_joint'] = 0.15
         zero_pose.set_joint_goal(js)
-        zero_pose.check_reachability(expected_error_code=MoveResult.INSOLVABLE)
+        zero_pose.check_reachability(expected_error_code=MoveResult.UNREACHABLE)
 
     def test_reachable_goal_0(self, zero_pose):
         pose = PoseStamped()
@@ -2333,6 +2332,8 @@ class TestReachability():
         pose.header.frame_id = 'map'
         zero_pose.set_cart_goal(root='odom_combined', tip='r_gripper_tool_frame', goal_pose=pose)
         zero_pose.check_reachability()
+        zero_pose.set_cart_goal(root='odom_combined', tip='r_gripper_tool_frame', goal_pose=pose)
+        zero_pose.send_and_check_goal()
 
     def test_reachable_goal_1(self, zero_pose):
         pose = PoseStamped()

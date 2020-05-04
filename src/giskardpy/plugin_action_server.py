@@ -2,6 +2,7 @@ from Queue import Empty, Queue
 
 import actionlib
 import rospy
+from control_msgs.msg import FollowJointTrajectoryGoal
 from giskard_msgs.msg._MoveGoal import MoveGoal
 from giskard_msgs.msg._MoveResult import MoveResult
 from py_trees import Blackboard, Status
@@ -11,7 +12,7 @@ from giskardpy.exceptions import MAX_NWSR_REACHEDException, QPSolverException, S
 import giskardpy.identifier as identifier
 from giskardpy.logging import loginfo
 from giskardpy.plugin import GiskardBehavior
-from giskardpy.utils import plot_trajectory
+from giskardpy.utils import plot_trajectory, traj_to_msg
 
 ERROR_CODE_TO_NAME = {getattr(MoveResult, x): x for x in dir(MoveResult) if x.isupper()}
 
@@ -127,6 +128,12 @@ class SendResult(ActionServerBehavior):
         Blackboard().set('exception', None)
         result = MoveResult()
         result.error_code = self.exception_to_error_code(e)
+
+        trajectory = self.get_god_map().safe_get_data(identifier.trajectory)
+        sample_period = self.get_god_map().safe_get_data(identifier.sample_period)
+        controlled_joints = self.get_robot().controlled_joints
+        result.trajectory = traj_to_msg(sample_period, trajectory, controlled_joints, True)
+
         if self.get_as().is_preempt_requested() or not result.error_code == MoveResult.SUCCESS:
             self.get_as().send_preempted(result)
         else:

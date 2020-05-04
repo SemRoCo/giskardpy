@@ -36,10 +36,10 @@ class WorldUpdatePlugin(GiskardBehavior):
         # TODO make service name a parameter
         self.srv_update_world = rospy.Service(u'~update_world', UpdateWorld, self.update_world_cb)
         self.pub_collision_marker = rospy.Publisher(u'~visualization_marker_array', MarkerArray, queue_size=1)
-        self.get_object_names = rospy.Service('get_object_names', GetObjectNames, self.get_object_names)
-        self.get_object_info = rospy.Service('get_object_info', GetObjectInfo, self.get_object_info)
-        self.get_attached_objects = rospy.Service('get_attached_objects', GetAttachedObjects, self.get_attached_objects)
-        self.update_rviz_markers = rospy.Service('update_rviz_markers', UpdateRvizMarkers, self.update_rviz_markers)
+        self.get_object_names = rospy.Service(u'~get_object_names', GetObjectNames, self.get_object_names)
+        self.get_object_info = rospy.Service(u'~get_object_info', GetObjectInfo, self.get_object_info)
+        self.get_attached_objects = rospy.Service(u'~get_attached_objects', GetAttachedObjects, self.get_attached_objects)
+        self.update_rviz_markers = rospy.Service(u'~update_rviz_markers', UpdateRvizMarkers, self.update_rviz_markers)
         return super(WorldUpdatePlugin, self).setup(timeout)
 
     def update(self):

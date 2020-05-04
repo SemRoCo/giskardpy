@@ -943,6 +943,27 @@ def ceil(x):
     return ca.ceil(x)
 
 
+def Sum(matrix):
+    """
+    the equivalent to np.sum(matrix)
+    """
+    return ca.sum1(ca.sum2(matrix))
+
+
+def sum_row(matrix):
+    """
+    the equivalent to np.sum(matrix, axis=0)
+    """
+    return ca.sum1(matrix)
+
+
+def sum_column(matrix):
+    """
+    the equivalent to np.sum(matrix, axis=1)
+    """
+    return ca.sum2(matrix)
+
+
 def distance_point_to_line_segment(point, line_start, line_end):
     line_vec = line_end - line_start
     pnt_vec = point - line_start

@@ -5,10 +5,11 @@ import numbers
 from collections import OrderedDict
 
 import numpy as np
-from geometry_msgs.msg import Vector3Stamped, Vector3
+from geometry_msgs.msg import Vector3Stamped
 from rospy_message_converter.message_converter import convert_dictionary_to_ros_message
 
 import giskardpy.identifier as identifier
+import giskardpy.tfwrapper as tf
 from giskardpy import cas_wrapper as w
 from giskardpy.data_types import SoftConstraint
 from giskardpy.exceptions import GiskardException, ConstraintException
@@ -74,6 +75,9 @@ class Constraint(object):
         return self.get_god_map().get_data(identifier.robot)
 
     def get_input_joint_position(self, joint_name):
+        """
+        returns a symbol that referes to the given joint
+        """
         key = identifier.joint_states + [joint_name, u'position']
         return self.god_map.to_symbol(key)
 
@@ -120,18 +124,44 @@ class Constraint(object):
         return self.__class__.__name__
 
     def get_fk(self, root, tip):
+        """
+        Return the homogeneous transformation matrix root_T_tip as a function that is dependent on the joint state.
+        :type root: str
+        :type tip: str
+        :return: root_T_tip
+        """
         return self.get_robot().get_fk_expression(root, tip)
 
     def get_fk_evaluated(self, root, tip):
+        """
+        Return the homogeneous transformation matrix root_T_tip. This Matrix refers to the evaluated current transform.
+        It is not dependent on the joint state.
+        :type root: str
+        :type tip: str
+        :return: root_T_tip
+        """
         return FrameInput(self.get_god_map().to_symbol,
                           prefix=identifier.fk_np +
                                  [(root, tip)]).get_frame()
 
     def get_input_float(self, name):
+        """
+        Returns a symbol that refers to the value of "name" on god map
+        :type name: str
+        :return: symbol
+        """
         key = self.get_identifier() + [name]
         return self.god_map.to_symbol(key)
 
     def parse_and_transform_PoseStamped(self, pose_stamped_json, goal_reference_frame):
+        """
+        Takes a pose stamped json, turns it into a ros message and transforms it into the goal frame
+        :param pose_stamped_json: json representing a pose stamped
+        :type pose_stamped_json: str
+        :param goal_reference_frame: name of the goal frame
+        :type goal_reference_frame: str
+        :return:
+        """
         result = convert_dictionary_to_ros_message(u'geometry_msgs/PoseStamped', pose_stamped_json)
         result = tf.transform_pose(goal_reference_frame, result)
         result.pose.orientation = tf.normalize(result.pose.orientation)
@@ -150,6 +180,10 @@ class Constraint(object):
         return result
 
     def get_input_PoseStamped(self, name):
+        """
+        :param name: name of the god map entry
+        :return: a homogeneous transformation matrix, with symbols that refer to a pose stamped in the god map.
+        """
         return PoseStampedInput(self.get_god_map().to_symbol,
                                 translation_prefix=self.get_identifier() +
                                                    [name,
@@ -192,6 +226,9 @@ class Constraint(object):
         return self.get_expr_velocity(fk)
 
     def limit_acceleration(self, current_position, error, max_acceleration, max_velocity, debug_prefix=None):
+        """
+        experimental, don't use
+        """
         sample_period = self.get_input_sampling_period()
         last_velocity = self.get_expr_velocity(current_position)
         if debug_prefix is not None:
@@ -218,6 +255,11 @@ class Constraint(object):
         return vel / m
 
     def limit_velocity(self, error, max_velocity):
+        """
+        :param error: expression that describes the error
+        :param max_velocity: float or expression representing the max velocity
+        :return: expression that limits the velocity of error to max_velocity
+        """
         sample_period = self.get_input_sampling_period()
         max_velocity *= sample_period
         return w.Max(w.Min(error, max_velocity), -max_velocity)
@@ -232,8 +274,15 @@ class Constraint(object):
 
     def add_constraint(self, name_suffix, lower, upper, weight, expression):
         """
+        :param name: name of the constraint, make use to avoid name conflicts!
         :type name: str
-        :type constraint: SoftConstraint
+        :param lower: lower limit for the !derivative! of the expression
+        :type lower: float, or symbolic expression
+        :param upper: upper limit for the !derivative! of the expression
+        :type upper: float, or symbolic expression
+        :param weight: tells the solver how important this constraint is, if unsure, use HIGH_WEIGHT
+        :param expression: symbolic expression that describes a geometric property. make sure it as a depedency on the
+                            joint state. usually achieved through "get_fk"
         """
         name = str(self) + name_suffix
         if name in self.soft_constraints:
@@ -625,7 +674,8 @@ class CartesianPosition(BasicCartesianConstraint):
 
 class CartesianOrientation(BasicCartesianConstraint):
     def __init__(self, god_map, root_link, tip_link, goal, max_velocity=0.5, max_acceleration=0.5):
-        super(CartesianOrientation, self).__init__(god_map, root_link, tip_link, goal, max_velocity, max_acceleration)
+        super(CartesianOrientation, self).__init__(god_map, root_link, tip_link, goal, max_velocity,
+                                                   max_acceleration)
 
     def make_constraints(self):
         """
@@ -1254,13 +1304,18 @@ class Pointing(Constraint):
         :type pointing_axis: str
         :type weight: float
         """
+        # always start by calling super with god map
         super(Pointing, self).__init__(god_map)
+
+        # use this space to process your input parameters, handle defaults etc
         if root is None:
             self.root = self.get_robot().get_root()
         else:
             self.root = root
         self.tip = tip
 
+        # you receive message in json form, use these functions to turn them into the proper types and transfrom
+        # them into a goal frame
         goal_point = self.parse_and_transform_PointStamped(goal_point, self.root)
 
         if pointing_axis is not None:
@@ -1270,10 +1325,12 @@ class Pointing(Constraint):
             pointing_axis.header.frame_id = self.tip
             pointing_axis.vector.z = 1
 
+        # save everything, that you want to reference in expressions on the god map
         params = {self.goal_point: goal_point,
                   self.pointing_axis: pointing_axis}
         self.save_params_on_god_map(params)
 
+    # make make some convenience functions to make your code more readable
     def get_goal_point(self):
         return self.get_input_PointStamped(self.goal_point)
 
@@ -1281,30 +1338,56 @@ class Pointing(Constraint):
         return self.get_input_Vector3Stamped(self.pointing_axis)
 
     def make_constraints(self):
-
+        # in this function, you have to create the actual constraints
+        # start by creating references to your input params in the god map
+        # get_input functions generally return symbols referring to god map entries
         weight = WEIGHT_BELOW_CA
         root_T_tip = self.get_fk(self.root, self.tip)
         goal_point = self.get_goal_point()
         pointing_axis = self.get_pointing_axis()
 
+        # do some math to create your expressions and limits
+        # make sure to always use function from the casadi_wrapper, here imported as "w".
+        # here are some rules of thumb that often make constraints more stable:
+        # 1) keep the expressions as simple as possible and move the "magic" into the lower/upper limits
+        # 2) don't try to minimize the number of constraints (in this example, minimizing the angle is also possible
+        #       but sometimes gets unstable)
+        # 3) you can't use the normal if! use e.g. "w.if_eq"
+        # 4) use self.limit_velocity on your error
+        # 5) giskard will calculate the derivative of "expression". so in this example, writing -diff[0] in
+        #       in expression will result in the same behavior, because goal_axis is constant.
+        #       This is also the reason, why lower/upper are limits for the derivative.
         goal_axis = goal_point - w.position_of(root_T_tip)
-        goal_axis /= w.norm(goal_axis)  # FIXME possible /0
+        goal_axis /= w.norm(goal_axis)  # FIXME avoid /0
         current_axis = w.dot(root_T_tip, pointing_axis)
         diff = goal_axis - current_axis
 
-        self.add_constraint(u'x', lower=diff[0],
-                            upper=diff[0],
-                            weight=weight,
-                            expression=current_axis[0])
-        self.add_constraint(u'y', lower=diff[1],
+        # add constraints to the current problem, after execution, it gets cleared automatically
+        self.add_constraint(
+            # name of the constraint, make use to avoid name conflicts!
+            u'x',
+            # lower limit for the !derivative! of the expression
+            lower=diff[0],
+            # upper limit for the !derivative! of the expression
+            upper=diff[0],
+            # tells the solver how important this constraint is, if unsure, use HIGH_WEIGHT
+            weight=weight,
+            # symbolic expression that describes a geometric property. make sure it as a dependency on the
+            # joint state. usually achieved through "get_fk"
+            expression=current_axis[0])
+        self.add_constraint(u'y',
+                            lower=diff[1],
                             upper=diff[1],
                             weight=weight,
                             expression=current_axis[1])
-        self.add_constraint(u'z', lower=diff[2],
+        self.add_constraint(u'z',
+                            lower=diff[2],
                             upper=diff[2],
                             weight=weight,
                             expression=current_axis[2])
 
     def __str__(self):
+        # helps to make sure your constraint name is unique.
         s = super(Pointing, self).__str__()
         return u'{}/{}/{}'.format(s, self.root, self.tip)
+

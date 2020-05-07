@@ -275,8 +275,8 @@ class QProblemBuilder(object):
         np_ub = np_big_ass_M[self.shape1:, -1].copy()
         np_lbA = np_big_ass_M[:self.shape1, -2].copy()
         np_ubA = np_big_ass_M[:self.shape1, -1].copy()
-        # self.debug_print(np_H, np_A, np_lb, np_ub, np_lbA, np_ubA)
         H, A, lb, ub, lbA, ubA = self.filter_zero_weight_constraints(np_H, np_A, np_lb, np_ub, np_lbA, np_ubA)
+        # self.debug_print(np_H, A, lb, ub, lbA, ubA)
         try:
             g = np.zeros(H.shape[0])
 

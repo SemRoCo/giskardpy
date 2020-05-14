@@ -339,7 +339,7 @@ def plot_trajectory(tj, controlled_joints, path_to_data_folder, sample_period, o
     :param controlled_joints: only joints in this list will be added to the plot
     :type controlled_joints: list
     :param velocity_threshold: only joints that exceed this velocity threshold will be added to the plot. Use a negative number if you want to include every joint
-    :param scaling: this multiplier scales the space between trajectory points in the graph
+    :param scaling: this multiplier scales the space between trajectory points in the plot
     """
     order = max(order, 2)
     if len(tj._points) <= 0:

@@ -12,6 +12,7 @@ class PlotTrajectory(GiskardBehavior):
         self.order = order
         self.velocity_threshold = self.get_god_map().safe_get_data(identifier.PlotTrajectory_velocity_threshold)
         self.scaling = self.get_god_map().safe_get_data(identifier.PlotTrajectory_scaling)
+        self.normalize_position = self.get_god_map().safe_get_data(identifier.PlotTrajectory_normalize_position)
 
     def initialise(self):
         self.path_to_data_folder = self.get_god_map().safe_get_data(identifier.data_folder)
@@ -21,5 +22,5 @@ class PlotTrajectory(GiskardBehavior):
         if trajectory:
             sample_period = self.get_god_map().safe_get_data(identifier.sample_period)
             controlled_joints = self.get_robot().controlled_joints
-            plot_trajectory(trajectory, controlled_joints, self.path_to_data_folder, sample_period, self.order, self.velocity_threshold, self.scaling)
+            plot_trajectory(trajectory, controlled_joints, self.path_to_data_folder, sample_period, self.order, self.velocity_threshold, self.scaling, self.normalize_position)
         return Status.SUCCESS

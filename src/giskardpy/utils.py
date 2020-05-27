@@ -333,7 +333,9 @@ def create_path(path):
                 raise
 
 
-def plot_trajectory(tj, controlled_joints, path_to_data_folder, sample_period, order=3, velocity_threshold=0.0, scaling=0.2, normalize_position=False):
+
+
+def plot_trajectory(tj, controlled_joints, path_to_data_folder, sample_period, order=3, velocity_threshold=0.0, scaling=0.2, normalize_position=False, tick_stride=1.0):
     """
     :type tj: Trajectory
     :param controlled_joints: only joints in this list will be added to the plot
@@ -341,7 +343,17 @@ def plot_trajectory(tj, controlled_joints, path_to_data_folder, sample_period, o
     :param velocity_threshold: only joints that exceed this velocity threshold will be added to the plot. Use a negative number if you want to include every joint
     :param scaling: determines how much the x axis is scaled with the length(time) of the trajectory
     :param normalize_position: centers the joint positions around 0 on the y axis
+    :param tick_stride: the distance between ticks in the plot. if tick_stride <= 0 pyplot determines the ticks automatically
     """
+
+    def ceil(val, base=0.0, stride=1.0):
+        base = base % stride
+        return np.ceil((float)(val - base) / stride) * stride + base
+
+    def floor(val, base=0.0, stride=1.0):
+        base = base % stride
+        return np.floor((float)(val - base) / stride) * stride + base
+
     order = max(order, 2)
     if len(tj._points) <= 0:
         return
@@ -371,12 +383,19 @@ def plot_trajectory(tj, controlled_joints, path_to_data_folder, sample_period, o
 
     plt.xlim(times[0], times[-1])
 
-    ticks = np.arange(np.ceil(times[0]), np.floor(times[-1]))
-    ticks = np.insert(ticks, 0, times[0])
-    ticks = np.append(ticks, times[-1])
-    for i in range(order):
-        axs[i].set_title(r'$p' + '\'' * i + "$")
-        axs[i].xaxis.set_ticks(ticks)
+    if tick_stride > 0:
+        first = ceil(times[0], stride=tick_stride)
+        last = floor(times[-1], stride=tick_stride)
+        ticks = np.arange(first, last, tick_stride)
+        ticks = np.insert(ticks, 0, times[0])
+        ticks = np.append(ticks, last)
+        ticks = np.append(ticks, times[-1])
+        for i in range(order):
+            axs[i].set_title(r'$p' + '\'' * i + "$")
+            axs[i].xaxis.set_ticks(ticks)
+    else:
+        for i in range(order):
+            axs[i].set_title(r'$p' + '\'' * i + "$")
     for i in range(len(controlled_joints)):
         if any(abs(data[1][:, i]) > velocity_threshold):
             for j in range(order):

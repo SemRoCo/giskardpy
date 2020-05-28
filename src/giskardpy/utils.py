@@ -333,12 +333,27 @@ def create_path(path):
                 raise
 
 
-def plot_trajectory(tj, controlled_joints, path_to_data_folder, sample_period, order=3):
+
+
+def plot_trajectory(tj, controlled_joints, path_to_data_folder, sample_period, order=3, velocity_threshold=0.0, scaling=0.2, normalize_position=False, tick_stride=1.0):
     """
     :type tj: Trajectory
     :param controlled_joints: only joints in this list will be added to the plot
     :type controlled_joints: list
+    :param velocity_threshold: only joints that exceed this velocity threshold will be added to the plot. Use a negative number if you want to include every joint
+    :param scaling: determines how much the x axis is scaled with the length(time) of the trajectory
+    :param normalize_position: centers the joint positions around 0 on the y axis
+    :param tick_stride: the distance between ticks in the plot. if tick_stride <= 0 pyplot determines the ticks automatically
     """
+
+    def ceil(val, base=0.0, stride=1.0):
+        base = base % stride
+        return np.ceil((float)(val - base) / stride) * stride + base
+
+    def floor(val, base=0.0, stride=1.0):
+        base = base % stride
+        return np.floor((float)(val - base) / stride) * stride + base
+
     order = max(order, 2)
     if len(tj._points) <= 0:
         return
@@ -357,33 +372,43 @@ def plot_trajectory(tj, controlled_joints, path_to_data_folder, sample_period, o
         times.append(time)
     data[0] = np.array(data[0])
     data[1] = np.array(data[1])
+    if(normalize_position):
+        data[0] = data[0] - (data[0].max(0) + data[0].min(0)) / 2
     for i in range(2, order):
         data[i] = np.diff(data[i - 1], axis=0, prepend=0)
     times = np.array(times) * sample_period
 
-    f, axs = plt.subplots(order, sharex=True)
-    f.set_size_inches(w=6, h=order * 1.5)
+    f, axs = plt.subplots(order, sharex=True, gridspec_kw={'hspace': 0.2})
+    f.set_size_inches(w=(times[-1] - times[0]) * scaling, h=order * 3.5)
 
-    for i in range(order):
-        if i == 0:
-            axs[i].set_title(r'$p$')
-        else:
-            axs[i].set_title(r'$\d' + 'd' * (i - 1) + 'ot{p}$')
+    plt.xlim(times[0], times[-1])
+
+    if tick_stride > 0:
+        first = ceil(times[0], stride=tick_stride)
+        last = floor(times[-1], stride=tick_stride)
+        ticks = np.arange(first, last, tick_stride)
+        ticks = np.insert(ticks, 0, times[0])
+        ticks = np.append(ticks, last)
+        ticks = np.append(ticks, times[-1])
+        for i in range(order):
+            axs[i].set_title(r'$p' + '\'' * i + "$")
+            axs[i].xaxis.set_ticks(ticks)
+    else:
+        for i in range(order):
+            axs[i].set_title(r'$p' + '\'' * i + "$")
     for i in range(len(controlled_joints)):
-        for j in range(order):
-            axs[j].plot(times, data[j][:, i], fmts[i], label=names[i])
+        if any(abs(data[1][:, i]) > velocity_threshold):
+            for j in range(order):
+                axs[j].plot(times, data[j][:, i], fmts[i], label=names[i])
 
-    for i in range(order):
-        box = axs[i].get_position()
-        axs[i].set_position([box.x0, box.y0, box.width * 0.7, box.height * 0.95])
 
-    # Put a legend to the right of the current axis
-    axs[0].legend(loc=u'right', bbox_to_anchor=(1.6, -0.1), prop={'size': 8})
+    axs[0].legend(bbox_to_anchor=(1.01, 1), loc='upper left')
+
     axs[-1].set_xlabel(u'time [s]')
     for i in range(order):
         axs[i].grid()
 
-    plt.savefig(path_to_data_folder + u'trajectory.pdf')
+    plt.savefig(path_to_data_folder + u'trajectory.pdf', bbox_inches="tight")
 
 
 def resolve_ros_iris_in_urdf(input_urdf):

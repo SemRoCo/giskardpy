@@ -32,6 +32,10 @@ plugins:
     enabled: True
   PlotTrajectory: # plots the joint trajectory at the end of planning, useful for debugging
     enabled: True
+    velocity_threshold: 0.0 # only joints that exceed this velocity threshold will be added to the plot. Use a negative number if you want to include every joint
+    scaling: 5.0 # determines how much the x axis is scaled with the length(time) of the trajectory
+    normalize_position: False # centers the joint positions around 0 on the y axis
+    tick_stride: 1.0 # the distance between ticks in the plot. if tick_stride <= 0 pyplot determines the ticks automatically 
   WiggleCancel: # cancels planning if high frequencies are detected in the trajectory
     fft_duration: 3
     wiggle_detection_threshold: 10

@@ -27,7 +27,7 @@ class WorldUpdatePlugin(GiskardBehavior):
     # TODO reject changes if plugin not active or something
     def __init__(self, name):
         super(WorldUpdatePlugin, self).__init__(name)
-        self.map_frame = self.get_god_map().safe_get_data(identifier.map_frame)
+        self.map_frame = self.get_god_map().get_data(identifier.map_frame)
         self.lock = Lock()
         self.object_js_subs = {}  # JointState subscribers for articulated world objects
         self.object_joint_states = {}  # JointStates messages for articulated world objects
@@ -68,7 +68,7 @@ class WorldUpdatePlugin(GiskardBehavior):
             if req.object_name in self.object_js_subs.keys():
                 res.joint_state_topic = self.object_js_subs[req.object_name].name
             res.pose.pose = object.base_pose
-            res.pose.header.frame_id = self.get_god_map().safe_get_data(identifier.map_frame)
+            res.pose.header.frame_id = self.get_god_map().get_data(identifier.map_frame)
             for key, value in object.joint_state.items():
                 res.joint_state.name.append(key)
                 res.joint_state.position.append(value.position)
@@ -136,60 +136,62 @@ class WorldUpdatePlugin(GiskardBehavior):
         """
         # TODO block or queue updates while planning
         with self.lock:
-            try:
-                if req.operation == UpdateWorldRequest.ADD:
-                    if req.rigidly_attached:
-                        self.attach_object(req)
-                    else:
-                        self.add_object(req)
+            with self.get_god_map():
+                try:
+                    if req.operation == UpdateWorldRequest.ADD:
+                        if req.rigidly_attached:
+                            self.attach_object(req)
+                        else:
+                            self.add_object(req)
 
-                elif req.operation == UpdateWorldRequest.REMOVE:
-                    # why not to detach objects here:
-                    #   - during attaching, bodies turn to objects
-                    #   - detaching actually requires a joint name
-                    #   - you might accidentally detach parts of the robot
-                    # if self.get_robot().has_joint(req.body.name):
-                    #     self.detach_object(req)
-                    self.remove_object(req.body.name)
-                elif req.operation == UpdateWorldRequest.ALTER:
-                    self.remove_object(req.body.name)
-                    self.add_object(req)
-                elif req.operation == UpdateWorldRequest.REMOVE_ALL:
-                    self.clear_world()
-                elif req.operation == UpdateWorldRequest.DETACH:
-                    self.detach_object(req)
-                else:
-                    return UpdateWorldResponse(UpdateWorldResponse.INVALID_OPERATION,
-                                               u'Received invalid operation code: {}'.format(req.operation))
-                return UpdateWorldResponse()
-            except CorruptShapeException as e:
-                traceback.print_exc()
-                return UpdateWorldResponse(UpdateWorldResponse.CORRUPT_SHAPE_ERROR, str(e))
-            except UnknownBodyException as e:
-                return UpdateWorldResponse(UpdateWorldResponse.MISSING_BODY_ERROR, str(e))
-            except KeyError as e:
-                return UpdateWorldResponse(UpdateWorldResponse.MISSING_BODY_ERROR, str(e))
-            except DuplicateNameException as e:
-                return UpdateWorldResponse(UpdateWorldResponse.DUPLICATE_BODY_ERROR, str(e))
-            except UnsupportedOptionException as e:
-                return UpdateWorldResponse(UpdateWorldResponse.UNSUPPORTED_OPTIONS, str(e))
-            except Exception as e:
-                traceback.print_exc()
-            return UpdateWorldResponse(UpdateWorldResponse.UNSUPPORTED_OPTIONS,
-                                       u'{}: {}'.format(e.__class__.__name__,
-                                                        str(e)))
+                    elif req.operation == UpdateWorldRequest.REMOVE:
+                        # why not to detach objects here:
+                        #   - during attaching, bodies turn to objects
+                        #   - detaching actually requires a joint name
+                        #   - you might accidentally detach parts of the robot
+                        # if self.get_robot().has_joint(req.body.name):
+                        #     self.detach_object(req)
+                        self.remove_object(req.body.name)
+                    elif req.operation == UpdateWorldRequest.ALTER:
+                        self.remove_object(req.body.name)
+                        self.add_object(req)
+                    elif req.operation == UpdateWorldRequest.REMOVE_ALL:
+                        self.clear_world()
+                    elif req.operation == UpdateWorldRequest.DETACH:
+                        self.detach_object(req)
+                    else:
+                        return UpdateWorldResponse(UpdateWorldResponse.INVALID_OPERATION,
+                                                   u'Received invalid operation code: {}'.format(req.operation))
+                    return UpdateWorldResponse()
+                except CorruptShapeException as e:
+                    traceback.print_exc()
+                    return UpdateWorldResponse(UpdateWorldResponse.CORRUPT_SHAPE_ERROR, str(e))
+                except UnknownBodyException as e:
+                    return UpdateWorldResponse(UpdateWorldResponse.MISSING_BODY_ERROR, str(e))
+                except KeyError as e:
+                    return UpdateWorldResponse(UpdateWorldResponse.MISSING_BODY_ERROR, str(e))
+                except DuplicateNameException as e:
+                    return UpdateWorldResponse(UpdateWorldResponse.DUPLICATE_BODY_ERROR, str(e))
+                except UnsupportedOptionException as e:
+                    return UpdateWorldResponse(UpdateWorldResponse.UNSUPPORTED_OPTIONS, str(e))
+                except Exception as e:
+                    traceback.print_exc()
+                return UpdateWorldResponse(UpdateWorldResponse.UNSUPPORTED_OPTIONS,
+                                           u'{}: {}'.format(e.__class__.__name__,
+                                                            str(e)))
 
     def add_object(self, req):
         """
         :type req: UpdateWorldRequest
         """
+        # assumes that parent has god map lock
         world_body = req.body
         global_pose = transform_pose(self.map_frame, req.pose).pose
         world_object = WorldObject.from_world_body(world_body)
-        self.get_world().add_object(world_object)
-        self.get_world().set_object_pose(world_body.name, global_pose)
+        self.unsafe_get_world().add_object(world_object)
+        self.unsafe_get_world().set_object_pose(world_body.name, global_pose)
         try:
-            m = self.get_world().get_object(world_body.name).as_marker_msg()
+            m = self.unsafe_get_world().get_object(world_body.name).as_marker_msg()
             m.header.frame_id = self.map_frame
             self.publish_object_as_marker(m)
         except:
@@ -202,9 +204,10 @@ class WorldUpdatePlugin(GiskardBehavior):
                 rospy.Subscriber(world_body.joint_state_topic, JointState, callback, queue_size=1)
 
     def detach_object(self, req):
-        self.get_world().detach(req.body.name)
+        # assumes that parent has god map lock
+        self.unsafe_get_world().detach(req.body.name)
         try:
-            m = self.get_world().get_object(req.body.name).as_marker_msg()
+            m = self.unsafe_get_world().get_object(req.body.name).as_marker_msg()
             m.header.frame_id = self.map_frame
             self.publish_object_as_marker(m)
         except:
@@ -214,19 +217,20 @@ class WorldUpdatePlugin(GiskardBehavior):
         """
         :type req: UpdateWorldRequest
         """
-        if self.get_world().has_object(req.body.name):
+        # assumes that parent has god map lock
+        if self.unsafe_get_world().has_object(req.body.name):
             p = PoseStamped()
             p.header.frame_id = self.map_frame
-            p.pose = self.get_world().get_object(req.body.name).base_pose
+            p.pose = self.unsafe_get_world().get_object(req.body.name).base_pose
             p = transform_pose(req.pose.header.frame_id, p)
-            world_object = self.get_world().get_object(req.body.name)
-            self.get_world().attach_existing_obj_to_robot(req.body.name, req.pose.header.frame_id, p.pose)
+            world_object = self.unsafe_get_world().get_object(req.body.name)
+            self.unsafe_get_world().attach_existing_obj_to_robot(req.body.name, req.pose.header.frame_id, p.pose)
             m = world_object.as_marker_msg()
             m.header.frame_id = p.header.frame_id
             m.pose = p.pose
         else:
             world_object = WorldObject.from_world_body(req.body)
-            self.get_world().robot.attach_urdf_object(world_object,
+            self.unsafe_get_world().robot.attach_urdf_object(world_object,
                                                       req.pose.header.frame_id,
                                                       req.pose.pose)
             logging.loginfo(u'--> attached object {} on link {}'.format(req.body.name, req.pose.header.frame_id))
@@ -240,13 +244,14 @@ class WorldUpdatePlugin(GiskardBehavior):
             pass
 
     def remove_object(self, name):
+        # assumes that parent has god map lock
         try:
-            m = self.get_world().get_object(name).as_marker_msg()
+            m = self.unsafe_get_world().get_object(name).as_marker_msg()
             m.action = m.DELETE
             self.publish_object_as_marker(m)
         except:
             pass
-        self.get_world().remove_object(name)
+        self.unsafe_get_world().remove_object(name)
         if name in self.object_js_subs:
             self.object_js_subs[name].unregister()
             del (self.object_js_subs[name])
@@ -256,8 +261,9 @@ class WorldUpdatePlugin(GiskardBehavior):
                 pass
 
     def clear_world(self):
+        # assumes that parent has god map lock
         self.delete_markers()
-        self.get_world().soft_reset()
+        self.unsafe_get_world().soft_reset()
         for v in self.object_js_subs.values():
             v.unregister()
         self.object_js_subs = {}

@@ -12,12 +12,12 @@ from giskardpy import logging
 class GoalReachedPlugin(GiskardBehavior):
     def __init__(self, name):
         super(GoalReachedPlugin, self).__init__(name)
-        self.joint_convergence_threshold = self.get_god_map().safe_get_data(identifier.joint_convergence_threshold)
+        self.joint_convergence_threshold = self.get_god_map().get_data(identifier.joint_convergence_threshold)
 
     def update(self):
-        current_js = self.get_god_map().safe_get_data(identifier.joint_states)
-        sample_period = self.get_god_map().safe_get_data(identifier.sample_period)
-        planning_time = self.get_god_map().safe_get_data(identifier.time) * sample_period
+        current_js = self.get_god_map().get_data(identifier.joint_states)
+        sample_period = self.get_god_map().get_data(identifier.sample_period)
+        planning_time = self.get_god_map().get_data(identifier.time) * sample_period
         # TODO make 1 a parameter
         # FIXME this 1 s only applies to the first traj point
         if planning_time >= 1:
@@ -31,7 +31,7 @@ class GoalReachedPlugin(GiskardBehavior):
 
     def debug_print(self):
         import pandas as pd
-        qp_data = self.get_god_map().safe_get_data(identifier.qp_data)
+        qp_data = self.get_god_map().get_data(identifier.qp_data)
         np_H = qp_data[identifier.H[-1]]
         np_A = qp_data[identifier.A[-1]]
         np_lb = qp_data[identifier.lb[-1]]

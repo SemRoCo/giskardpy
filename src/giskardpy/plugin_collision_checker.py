@@ -13,7 +13,7 @@ class CollisionChecker(GiskardBehavior):
     def __init__(self, name):
         super(CollisionChecker, self).__init__(name)
         # self.default_min_dist = self.get_god_map().safe_get_data(identifier.default_collision_avoidance_distance)
-        self.map_frame = self.get_god_map().safe_get_data(identifier.map_frame)
+        self.map_frame = self.get_god_map().get_data(identifier.map_frame)
         self.lock = Lock()
         self.object_js_subs = {}  # JointState subscribers for articulated world objects
         self.object_joint_states = {}  # JointStates messages for articulated world objects
@@ -38,9 +38,9 @@ class CollisionChecker(GiskardBehavior):
         return SetBoolResponse()
 
     def initialise(self):
-        collision_goals = self.get_god_map().safe_get_data(identifier.collision_goal_identifier)
+        collision_goals = self.get_god_map().get_data(identifier.collision_goal_identifier)
         self.collision_matrix = self.get_world().collision_goals_to_collision_matrix(collision_goals,
-                                                                                     self.get_god_map().safe_get_data(
+                                                                                     self.get_god_map().get_data(
                                                                                          identifier.distance_thresholds))
 
         super(CollisionChecker, self).initialise()

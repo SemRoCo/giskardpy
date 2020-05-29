@@ -18,5 +18,5 @@ class TimePlugin(GiskardBehavior):
 
     def update(self):
         with self.god_map:
-            self.get_god_map().set_data(identifier.time, self.get_god_map().get_data(identifier.time) + 1)
+            self.get_god_map().set_data(identifier.time, self.get_god_map().unsafe_get_data(identifier.time) + 1)
         return Status.RUNNING

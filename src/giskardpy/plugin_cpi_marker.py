@@ -22,7 +22,7 @@ class CPIMarker(GiskardBehavior):
         """
         Computes closest point info for all robot links and safes it to the god map.
         """
-        collisions = self.get_god_map().safe_get_data(identifier.closest_point)
+        collisions = self.get_god_map().get_data(identifier.closest_point)
         if collisions:
             self.publish_cpi_markers(collisions)
         return Status.SUCCESS

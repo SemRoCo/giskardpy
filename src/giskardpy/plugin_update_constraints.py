@@ -31,10 +31,10 @@ class GoalToConstraints(GetGoal):
         self.controllable_links = set()
         self.last_urdf = None
 
-        self.rc_prismatic_velocity = self.get_god_map().safe_get_data(identifier.rc_prismatic_velocity)
-        self.rc_continuous_velocity = self.get_god_map().safe_get_data(identifier.rc_continuous_velocity)
-        self.rc_revolute_velocity = self.get_god_map().safe_get_data(identifier.rc_revolute_velocity)
-        self.rc_other_velocity = self.get_god_map().safe_get_data(identifier.rc_other_velocity)
+        self.rc_prismatic_velocity = self.get_god_map().get_data(identifier.rc_prismatic_velocity)
+        self.rc_continuous_velocity = self.get_god_map().get_data(identifier.rc_continuous_velocity)
+        self.rc_revolute_velocity = self.get_god_map().get_data(identifier.rc_revolute_velocity)
+        self.rc_other_velocity = self.get_god_map().get_data(identifier.rc_other_velocity)
 
     def initialise(self):
         self.get_god_map().safe_set_data(identifier.collision_goal_identifier, None)
@@ -43,7 +43,7 @@ class GoalToConstraints(GetGoal):
         # TODO make this interruptable
         # TODO try catch everything
 
-        move_cmd = self.get_god_map().safe_get_data(identifier.next_move_goal)  # type: MoveCmd
+        move_cmd = self.get_god_map().get_data(identifier.next_move_goal)  # type: MoveCmd
         if not move_cmd:
             return Status.FAILURE
 
@@ -76,7 +76,7 @@ class GoalToConstraints(GetGoal):
 
         controlled_joints = self.get_robot().controlled_joints
 
-        if (self.get_god_map().safe_get_data(identifier.check_reachability)):
+        if (self.get_god_map().get_data(identifier.check_reachability)):
             joint_constraints = OrderedDict()
             for k in controlled_joints:
                 weight = self.robot._joint_constraints[k].weight
@@ -148,15 +148,15 @@ class GoalToConstraints(GetGoal):
         """
         soft_constraints = {}
         for joint_name in self.get_robot().controlled_joints:
-            for i in range(self.get_god_map().safe_get_data(identifier.number_of_repeller)):
+            for i in range(self.get_god_map().get_data(identifier.number_of_repeller)):
                 constraint = ExternalCollisionAvoidance(self.god_map, joint_name,
-                                                    max_weight_distance=self.get_god_map().safe_get_data(
+                                                    max_weight_distance=self.get_god_map().get_data(
                                                     identifier.distance_thresholds +
                                                     [joint_name, u'max_weight_distance']),
-                                                    low_weight_distance=self.get_god_map().safe_get_data(
+                                                    low_weight_distance=self.get_god_map().get_data(
                                                     identifier.distance_thresholds +
                                                     [joint_name, u'low_weight_distance']),
-                                                    zero_weight_distance=self.get_god_map().safe_get_data(
+                                                    zero_weight_distance=self.get_god_map().get_data(
                                                     identifier.distance_thresholds +
                                                     [joint_name, u'zero_weight_distance']),
                                                     idx=i)
@@ -166,18 +166,18 @@ class GoalToConstraints(GetGoal):
                 tmp = link_a
                 link_a = link_b
                 link_b = tmp
-            max_weight_distance = min(self.get_god_map().safe_get_data(identifier.distance_thresholds +
-                                                                       [link_a, u'max_weight_distance']),
-                                      self.get_god_map().safe_get_data(identifier.distance_thresholds +
-                                                                       [link_b, u'max_weight_distance']))
-            low_weight_distance = min(self.get_god_map().safe_get_data(identifier.distance_thresholds +
-                                                                       [link_a, u'low_weight_distance']),
-                                      self.get_god_map().safe_get_data(identifier.distance_thresholds +
-                                                                       [link_b, u'low_weight_distance']))
-            zero_weight_distance = min(self.get_god_map().safe_get_data(identifier.distance_thresholds +
-                                                                       [link_a, u'zero_weight_distance']),
-                                      self.get_god_map().safe_get_data(identifier.distance_thresholds +
-                                                                       [link_b, u'zero_weight_distance']))
+            max_weight_distance = min(self.get_god_map().get_data(identifier.distance_thresholds +
+                                                                  [link_a, u'max_weight_distance']),
+                                      self.get_god_map().get_data(identifier.distance_thresholds +
+                                                                  [link_b, u'max_weight_distance']))
+            low_weight_distance = min(self.get_god_map().get_data(identifier.distance_thresholds +
+                                                                  [link_a, u'low_weight_distance']),
+                                      self.get_god_map().get_data(identifier.distance_thresholds +
+                                                                  [link_b, u'low_weight_distance']))
+            zero_weight_distance = min(self.get_god_map().get_data(identifier.distance_thresholds +
+                                                                   [link_a, u'zero_weight_distance']),
+                                      self.get_god_map().get_data(identifier.distance_thresholds +
+                                                                  [link_b, u'zero_weight_distance']))
             constraint = SelfCollisionAvoidance(self.god_map, link_a, link_b,
                                                 max_weight_distance=max_weight_distance,
                                                 low_weight_distance=low_weight_distance,

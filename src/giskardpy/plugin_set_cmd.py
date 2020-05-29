@@ -14,7 +14,7 @@ class SetCmd(GetGoal):
         self.current_goal_id = 0
         self.goal = None
         self.sample_period_backup = None
-        self.rc_sample_period = self.get_god_map().safe_get_data(identifier.rc_sample_period)
+        self.rc_sample_period = self.get_god_map().get_data(identifier.rc_sample_period)
 
     def initialise(self):
         if self.goal is None:
@@ -30,7 +30,7 @@ class SetCmd(GetGoal):
                 self.raise_to_blackboard(
                     InsolvableException(u'invalid move action goal type: {}'.format(self.goal.type)))
             if self.goal.type == MoveGoal.CHECK_REACHABILITY:
-                self.sample_period_backup = self.get_god_map().safe_get_data(identifier.sample_period)
+                self.sample_period_backup = self.get_god_map().get_data(identifier.sample_period)
                 self.get_god_map().safe_set_data(identifier.sample_period, self.rc_sample_period)
                 collision_entry = CollisionEntry()
                 collision_entry.type = CollisionEntry.ALLOW_COLLISION

@@ -85,7 +85,7 @@ class GodMap(object):
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.lock.release()
 
-    def get_data(self, identifier):
+    def unsafe_get_data(self, identifier):
         """
 
         :param identifier: Identifier in the form of ['pose', 'position', 'x'],
@@ -99,9 +99,9 @@ class GodMap(object):
         """
         return get_data(identifier, self._data, self.default_value)
 
-    def safe_get_data(self, identifier):
+    def get_data(self, identifier):
         with self.lock:
-            r = self.get_data(identifier)
+            r = self.unsafe_get_data(identifier)
         return r
 
     def to_symbol(self, identifier):
@@ -133,7 +133,7 @@ class GodMap(object):
             # if exprs is None:
             #     exprs = self.expr_to_key.keys()
             # return {expr: self.get_data(self.expr_to_key[expr]) for expr in exprs}
-            return [self.get_data(self.expr_to_key[expr]) for expr in symbols]
+            return [self.unsafe_get_data(self.expr_to_key[expr]) for expr in symbols]
 
     def get_registered_symbols(self):
         """

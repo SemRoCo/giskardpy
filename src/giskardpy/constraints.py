@@ -28,7 +28,7 @@ class Constraint(object):
         self.god_map = god_map
 
     def save_params_on_god_map(self, params):
-        constraints = self.get_god_map().safe_get_data(identifier.constraints_identifier)
+        constraints = self.get_god_map().get_data(identifier.constraints_identifier)
         constraints[str(self)] = params
         self.get_god_map().safe_set_data(identifier.constraints_identifier, constraints)
 
@@ -51,25 +51,25 @@ class Constraint(object):
         """
         :rtype: giskardpy.world.World
         """
-        return self.get_god_map().safe_get_data(identifier.world)
+        return self.get_god_map().get_data(identifier.world)
 
     def get_robot(self):
         """
         :rtype: giskardpy.symengine_robot.Robot
         """
-        return self.get_god_map().safe_get_data(identifier.robot)
+        return self.get_god_map().get_data(identifier.robot)
 
     def get_world_unsafe(self):
         """
         :rtype: giskardpy.world.World
         """
-        return self.get_god_map().get_data(identifier.world)
+        return self.get_god_map().unsafe_get_data(identifier.world)
 
     def get_robot_unsafe(self):
         """
         :rtype: giskardpy.symengine_robot.Robot
         """
-        return self.get_god_map().get_data(identifier.robot)
+        return self.get_god_map().unsafe_get_data(identifier.robot)
 
     def get_input_joint_position(self, joint_name):
         """
@@ -959,7 +959,7 @@ class UpdateGodMap(Constraint):
         for member, value in updates.items():
             next_identifier = identifier + [member]
             if isinstance(value, numbers.Number) and \
-                    isinstance(self.get_god_map().safe_get_data(next_identifier), numbers.Number):
+                    isinstance(self.get_god_map().get_data(next_identifier), numbers.Number):
                 self.get_god_map().safe_set_data(next_identifier, value)
             else:
                 self.update_god_map(next_identifier, value)

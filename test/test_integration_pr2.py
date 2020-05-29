@@ -234,16 +234,16 @@ class TestInitialization(object):
         gm = zero_pose.get_god_map()
         robot = zero_pose.get_robot()
         assert isinstance(robot, Robot)
-        sample_period = gm.get_data(identifier.sample_period)
-        odom_x_index = gm.get_data(identifier.b_keys).index(u'j -- (\'pr2\', \'odom_x_joint\')')
-        odom_x_lb = gm.get_data(identifier.lb)[odom_x_index]/sample_period
-        odom_x_ub = gm.get_data(identifier.ub)[odom_x_index]/sample_period
+        sample_period = gm.unsafe_get_data(identifier.sample_period)
+        odom_x_index = gm.unsafe_get_data(identifier.b_keys).index(u'j -- (\'pr2\', \'odom_x_joint\')')
+        odom_x_lb = gm.unsafe_get_data(identifier.lb)[odom_x_index] / sample_period
+        odom_x_ub = gm.unsafe_get_data(identifier.ub)[odom_x_index] / sample_period
         np.testing.assert_almost_equal(odom_x_lb, -0.5)
         np.testing.assert_almost_equal(odom_x_ub, 0.5)
 
-        odom_z_index = gm.get_data(identifier.b_keys).index(u'j -- (\'pr2\', \'odom_z_joint\')')
-        odom_z_lb = gm.get_data(identifier.lb)[odom_z_index]/sample_period
-        odom_z_ub = gm.get_data(identifier.ub)[odom_z_index]/sample_period
+        odom_z_index = gm.unsafe_get_data(identifier.b_keys).index(u'j -- (\'pr2\', \'odom_z_joint\')')
+        odom_z_lb = gm.unsafe_get_data(identifier.lb)[odom_z_index] / sample_period
+        odom_z_ub = gm.unsafe_get_data(identifier.ub)[odom_z_index] / sample_period
         np.testing.assert_almost_equal(odom_z_lb, -0.6)
         np.testing.assert_almost_equal(odom_z_ub, 0.6)
 
@@ -251,7 +251,7 @@ class TestInitialization(object):
 class TestFk(object):
     def test_fk1(self, zero_pose):
         for root, tip in itertools.product(zero_pose.get_robot().get_link_names(), repeat=2):
-            fk1 = zero_pose.get_god_map().safe_get_data(fk_pose + [(root, tip)])
+            fk1 = zero_pose.get_god_map().get_data(fk_pose + [(root, tip)])
             fk2 = lookup_pose(root, tip)
             compare_poses(fk1.pose, fk2.pose)
 
@@ -259,7 +259,7 @@ class TestFk(object):
         pocky = u'box'
         zero_pose.attach_box(pocky, [0.1, 0.02, 0.02], zero_pose.r_tip, [0.05, 0, 0], [1, 0, 0, 0])
         for root, tip in itertools.product(zero_pose.get_robot().get_link_names(), [pocky]):
-            fk1 = zero_pose.get_god_map().safe_get_data(fk_pose + [(root, tip)])
+            fk1 = zero_pose.get_god_map().get_data(fk_pose + [(root, tip)])
             fk2 = lookup_pose(root, tip)
             compare_poses(fk1.pose, fk2.pose)
 
@@ -356,11 +356,11 @@ class TestConstraints(object):
         }
         pocky_pose_setup.wrapper.update_god_map(updates)
         pocky_pose_setup.set_and_check_cart_goal(r_goal, pocky_pose_setup.r_tip)
-        assert pocky_pose_setup.get_god_map().get_data(identifier.joint_cost + [u'odom_x_joint']) == 0.0001
-        assert pocky_pose_setup.get_god_map().get_data(identifier.joint_cost + [u'torso_lift_joint']) == 0.5
+        assert pocky_pose_setup.get_god_map().unsafe_get_data(identifier.joint_cost + [u'odom_x_joint']) == 0.0001
+        assert pocky_pose_setup.get_god_map().unsafe_get_data(identifier.joint_cost + [u'torso_lift_joint']) == 0.5
         pocky_pose_setup.send_and_check_goal(execute=False)
-        assert pocky_pose_setup.get_god_map().get_data(identifier.joint_cost + [u'odom_x_joint']) == 1
-        assert pocky_pose_setup.get_god_map().get_data(identifier.joint_cost + [u'torso_lift_joint']) == 0.5
+        assert pocky_pose_setup.get_god_map().unsafe_get_data(identifier.joint_cost + [u'odom_x_joint']) == 1
+        assert pocky_pose_setup.get_god_map().unsafe_get_data(identifier.joint_cost + [u'torso_lift_joint']) == 0.5
 
 
     def test_UpdateGodMap2(self, pocky_pose_setup):
@@ -383,8 +383,8 @@ class TestConstraints(object):
         pocky_pose_setup.wrapper.update_god_map(updates)
         pocky_pose_setup.set_cart_goal(r_goal, pocky_pose_setup.r_tip)
         pocky_pose_setup.send_and_check_goal(expected_error_code=MoveResult.INSOLVABLE)
-        assert pocky_pose_setup.get_god_map().get_data(identifier.joint_cost + [u'odom_x_joint']) == 1
-        assert pocky_pose_setup.get_god_map().get_data(identifier.joint_cost + [u'torso_lift_joint']) == 0.5
+        assert pocky_pose_setup.get_god_map().unsafe_get_data(identifier.joint_cost + [u'odom_x_joint']) == 1
+        assert pocky_pose_setup.get_god_map().unsafe_get_data(identifier.joint_cost + [u'torso_lift_joint']) == 0.5
 
     def test_UpdateGodMap3(self, pocky_pose_setup):
         """
@@ -402,8 +402,8 @@ class TestConstraints(object):
         pocky_pose_setup.wrapper.update_god_map(updates)
         pocky_pose_setup.set_cart_goal(r_goal, pocky_pose_setup.r_tip)
         pocky_pose_setup.send_and_check_goal(expected_error_code=MoveResult.INSOLVABLE)
-        assert pocky_pose_setup.get_god_map().get_data(identifier.joint_cost + [u'odom_x_joint']) == 1
-        assert pocky_pose_setup.get_god_map().get_data(identifier.joint_cost + [u'torso_lift_joint']) == 0.5
+        assert pocky_pose_setup.get_god_map().unsafe_get_data(identifier.joint_cost + [u'odom_x_joint']) == 1
+        assert pocky_pose_setup.get_god_map().unsafe_get_data(identifier.joint_cost + [u'torso_lift_joint']) == 0.5
 
     def test_pointing(self, kitchen_setup):
         base_goal = PoseStamped()

@@ -253,7 +253,7 @@ class GiskardTestWrapper(object):
         """
         :rtype: Robot
         """
-        return self.get_god_map().safe_get_data(robot)
+        return self.get_god_map().get_data(robot)
 
     def get_god_map(self):
         """
@@ -459,7 +459,7 @@ class GiskardTestWrapper(object):
         self.wrapper.set_json_goal(constraint_type, **kwargs)
 
     def get_trajectory_msg(self):
-        trajectory = self.get_god_map().get_data(identifier.trajectory)
+        trajectory = self.get_god_map().unsafe_get_data(identifier.trajectory)
         trajectory2 = []
         for t, p in trajectory._points.items():
             trajectory2.append({joint_name: js.position for joint_name, js in p.items()})
@@ -472,7 +472,7 @@ class GiskardTestWrapper(object):
         """
         :rtype: PyBulletWorld
         """
-        return self.get_god_map().safe_get_data(world)
+        return self.get_god_map().get_data(world)
 
     def clear_world(self):
         assert self.wrapper.clear_world().error_codes == UpdateWorldResponse.SUCCESS
@@ -648,7 +648,7 @@ class GiskardTestWrapper(object):
         """
         collision_goals = [CollisionEntry(type=CollisionEntry.AVOID_ALL_COLLISIONS, min_dist=distance_threshold)]
         collision_matrix = self.get_world().collision_goals_to_collision_matrix(collision_goals,
-                                                                                self.get_god_map().safe_get_data(
+                                                                                self.get_god_map().get_data(
                                                                                     identifier.distance_thresholds))
         collisions = self.get_world().check_collisions(collision_matrix)
         collisions = self.get_world().transform_contact_info(collisions)

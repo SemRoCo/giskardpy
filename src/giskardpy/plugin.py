@@ -28,7 +28,15 @@ class GiskardBehavior(Behaviour):
         :rtype: giskardpy.world.World
         """
         if not self.world:
-            self.world = self.get_god_map().safe_get_data(world)
+            self.world = self.get_god_map().get_data(world)
+        return self.world
+
+    def unsafe_get_world(self):
+        """
+        :rtype: giskardpy.world.World
+        """
+        if not self.world:
+            self.world = self.get_god_map().unsafe_get_data(world)
         return self.world
 
     def get_robot(self):
@@ -36,7 +44,15 @@ class GiskardBehavior(Behaviour):
         :rtype: giskardpy.symengine_robot.Robot
         """
         if not self.robot:
-            self.robot = self.get_god_map().safe_get_data(robot)
+            self.robot = self.get_god_map().get_data(robot)
+        return self.robot
+
+    def unsafe_get_robot(self):
+        """
+        :rtype: giskardpy.symengine_robot.Robot
+        """
+        if not self.robot:
+            self.robot = self.get_god_map().unsafe_get_data(robot)
         return self.robot
 
     def raise_to_blackboard(self, exception):

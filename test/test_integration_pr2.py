@@ -6,6 +6,7 @@ import pytest
 import roslaunch
 import rospy
 from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped
+from sensor_msgs.msg import JointState
 from giskard_msgs.msg import CollisionEntry, MoveActionGoal, MoveResult, WorldBody, MoveGoal
 from giskard_msgs.srv import UpdateWorldResponse, UpdateWorldRequest
 from numpy import pi
@@ -330,6 +331,40 @@ class TestJointGoals(object):
         zero_pose.allow_self_collision()
         js = {u'torso_lift_joint': 0.1}
         zero_pose.send_and_check_joint_goal(js)
+
+    def test_hard_joint_limits(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        zero_pose.allow_self_collision()
+        goal_js = {u'r_elbow_flex_joint': -2.4,
+                   u'torso_lift_joint': 0.4,
+                   u'head_pan_joint': 3.5}
+        zero_pose.set_joint_goal(goal_js)
+        zero_pose.send_goal()
+        js = rospy.wait_for_message('/joint_states', JointState)
+        torso_lift_joint_state = js.position[js.name.index('torso_lift_joint')]
+        r_elbow_flex_joint_state = js.position[js.name.index('r_elbow_flex_joint')]
+        head_pan_joint_state = js.position[js.name.index('head_pan_joint')]
+
+        assert(torso_lift_joint_state <= 0.32500000000000007 and torso_lift_joint_state >= 0.0115)
+        assert(r_elbow_flex_joint_state >= -2.1213 and r_elbow_flex_joint_state <= -0.15)
+        assert (head_pan_joint_state >= -2.857 and head_pan_joint_state <= 2.857)
+
+        goal_js = {u'r_elbow_flex_joint': 0.0,
+                   u'torso_lift_joint': -0.5,
+                   u'head_pan_joint': -3.5}
+
+        zero_pose.set_joint_goal(goal_js)
+        zero_pose.send_goal()
+        js = rospy.wait_for_message('/joint_states', JointState)
+        torso_lift_joint_state = js.position[js.name.index('torso_lift_joint')]
+        r_elbow_flex_joint_state = js.position[js.name.index('r_elbow_flex_joint')]
+        head_pan_joint_state = js.position[js.name.index('head_pan_joint')]
+
+        assert (torso_lift_joint_state <= 0.325 and torso_lift_joint_state >= 0.0115)
+        assert (r_elbow_flex_joint_state >= -2.1213 and r_elbow_flex_joint_state <= -0.15)
+        assert (head_pan_joint_state >= -2.857 and head_pan_joint_state <= 2.857)
 
     # TODO test goal for unknown joint
 

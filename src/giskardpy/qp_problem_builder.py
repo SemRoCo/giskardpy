@@ -247,7 +247,10 @@ class QProblemBuilder(object):
     def make_filter_masks(self, H):
         b_mask = H.sum(axis=1) != 0
         s_mask = b_mask[self.num_joint_constraints:]
-        bA_mask = np.concatenate((np.array([True] * self.num_hard_constraints), s_mask))
+        if self.num_hard_constraints == 0:
+            bA_mask = s_mask
+        else:
+            bA_mask = np.concatenate((np.array([True] * self.num_hard_constraints), s_mask))
         return bA_mask, b_mask
 
     def filter_zero_weight_constraints(self, H, A, lb, ub, lbA, ubA):

@@ -27,7 +27,11 @@ plugins:
   CPIMarker: # contact visualization, slows planning down a little bit
     enabled: True
   PlotTrajectory: # plots the joint trajectory at the end of planning
-    enabled: True
+    enabled: False
+    velocity_threshold: 0.0 # only joints that exceed this velocity threshold will be added to the plot. Use a negative number if you want to include every joint
+    scaling: 5.0 # determines how much the x axis is scaled with the length(time) of the trajectory
+    normalize_position: False # centers the joint positions around 0 on the y axis
+    tick_stride: 1.0 # the distance between ticks in the plot. if tick_stride <= 0 pyplot determines the ticks automatically 
   WiggleCancel: # cancels planning if high frequencies are detected in the trajectory
     wiggle_detection_threshold: 10 # the amplitude of a frequency must exceed this threshold to be detected as wiggling
     num_samples_in_fft: 30 # size of the moving window of sample points

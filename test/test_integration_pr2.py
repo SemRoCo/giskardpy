@@ -319,7 +319,7 @@ class TestJointGoals(object):
     def test_plan_only(self, zero_pose):
         zero_pose.allow_self_collision()
         zero_pose.set_joint_goal(pocky_pose)
-        zero_pose.send_and_check_goal(execute=False)
+        zero_pose.send_and_check_goal(goal_type=MoveGoal.PLAN_ONLY)
         zero_pose.check_joint_state(default_pose)
 
 

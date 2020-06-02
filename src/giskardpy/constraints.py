@@ -238,7 +238,7 @@ class Constraint(object):
         :type name: str
         :type expr: w.Symbol
         """
-        self.add_constraint(name, expr, expr, 1, 0)
+        self.add_constraint(name, expr, expr, 1, 0, False)
 
 
 class JointPosition(Constraint):

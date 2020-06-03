@@ -1562,13 +1562,13 @@ class TestCollisionAvoidanceGoals(object):
         :type box_setup: PR2
         """
         attached_link_name = u'pocky'
-        box_setup.attach_box(attached_link_name, [0.1, 0.02, 0.02], box_setup.r_tip, [0.05, 0, 0])
-        box_setup.attach_box(attached_link_name, [0.1, 0.02, 0.02], box_setup.r_tip, [0.05, 0, 0],
+        box_setup.attach_box(attached_link_name, [0.2, 0.04, 0.04], box_setup.r_tip, [0.05, 0, 0])
+        box_setup.attach_box(attached_link_name, [0.2, 0.04, 0.04], box_setup.r_tip, [0.05, 0, 0],
                              expected_response=UpdateWorldResponse.DUPLICATE_BODY_ERROR)
         p = PoseStamped()
         p.header.frame_id = box_setup.r_tip
         p.header.stamp = rospy.get_rostime()
-        p.pose.position.x = -0.11
+        p.pose.position.x = -0.145
         p.pose.orientation.w = 1
         box_setup.set_and_check_cart_goal(p, box_setup.r_tip, box_setup.default_root)
         box_setup.check_cpi_geq(box_setup.get_l_gripper_links(), 0.048)

@@ -11,11 +11,17 @@ from giskardpy.exceptions import QPSolverException
 from giskardpy.qp_solver import QPSolver
 from giskardpy.utils import make_filter_masks
 
-SoftConstraint = namedtuple(u'SoftConstraint', [u'lower', u'upper', u'weight', u'expression', u'goal_constraint'])
+SoftConstraint = namedtuple(u'SoftConstraint', [u'lower',
+                                                u'upper',
+                                                u'weight',
+                                                u'expression',
+                                                u'goal_constraint',
+                                                u'lower_slack_limit',
+                                                u'upper_slack_limit'])
 HardConstraint = namedtuple(u'HardConstraint', [u'lower', u'upper', u'expression'])
 JointConstraint = namedtuple(u'JointConstraint', [u'lower', u'upper', u'weight'])
 
-BIG_NUMBER = 1e9
+# BIG_NUMBER = 1e9
 
 
 class QProblemBuilder(object):
@@ -85,8 +91,10 @@ class QProblemBuilder(object):
             weights.append(c.weight)
             lbA.append(c.lower)
             ubA.append(c.upper)
-            lb.append(-BIG_NUMBER)
-            ub.append(BIG_NUMBER)
+            lb.append(c.lower_slack_limit)
+            ub.append(c.upper_slack_limit)
+            # lb.append(-1e9)
+            # ub.append(1e9)
             assert not w.is_matrix(c.expression), u'Matrices are not allowed as soft constraint expression'
             soft_expressions.append(c.expression)
 
@@ -157,7 +165,7 @@ class QProblemBuilder(object):
 
     def debug_print(self, unfiltered_H, A, lb, ub, lbA, ubA, xdot_full=None):
         import pandas as pd
-        bA_mask, b_mask = self.make_filter_masks(unfiltered_H)
+        bA_mask, b_mask = make_filter_masks(unfiltered_H, self.num_joint_constraints, self.num_hard_constraints)
         b_names = []
         bA_names = []
         for iJ, k in enumerate(self.joint_constraints_dict.keys()):
@@ -282,7 +290,7 @@ class QProblemBuilder(object):
         if xdot_full is None:
             return None
         # TODO enable debug print in an elegant way, preferably without slowing anything down
-        # self.debug_print(np_H, A, lb, ub, lbA, ubA, xdot_full)
+        self.debug_print(np_H, A, lb, ub, lbA, ubA, xdot_full)
         return OrderedDict((observable, xdot_full[i]) for i, observable in enumerate(self.controlled_joints)), \
                np_H, np_A, np_lb, np_ub, np_lbA, np_ubA, xdot_full
 

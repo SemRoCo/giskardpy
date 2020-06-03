@@ -210,7 +210,8 @@ class Constraint(object):
         self.make_constraints()
         return self.soft_constraints
 
-    def add_constraint(self, name, lower, upper, weight, expression, goal_constraint):
+    def add_constraint(self, name, lower, upper, weight, expression, goal_constraint, lower_slack_limit=-1e9,
+                       upper_slack_limit=1e9):
         """
         :param name: name of the constraint, make use to avoid name conflicts!
         :type name: str
@@ -228,7 +229,9 @@ class Constraint(object):
                                                      upper=upper,
                                                      weight=weight,
                                                      expression=expression,
-                                                     goal_constraint=goal_constraint)
+                                                     goal_constraint=goal_constraint,
+                                                     lower_slack_limit=lower_slack_limit,
+                                                     upper_slack_limit=upper_slack_limit)
 
     def add_debug_constraint(self, name, expr):
         """
@@ -631,6 +634,7 @@ class ExternalCollisionAvoidance(Constraint):
     root_T_link_b = u'root_T_link_b'
     link_in_chain = u'link_in_chain'
     max_acceleration = u'max_acceleration'
+    max_velocity = u'max_velocity'
     A = u'A'
     B = u'B'
     C = u'C'
@@ -644,16 +648,18 @@ class ExternalCollisionAvoidance(Constraint):
         self.idx = idx
         x = np.array([max_weight_distance, low_weight_distance, zero_weight_distance])
         y = np.array([MAX_WEIGHT, LOW_WEIGHT, ZERO_WEIGHT])
-        (A, B, C), _ = curve_fit(lambda t, a, b, c: a / (t + c) + b, x, y)
+        # (A, B, C), _ = curve_fit(lambda t, a, b, c: a / (t + c) + b, x, y)
 
         params = {self.repel_velocity: repel_velocity,
                   self.max_weight_distance: max_weight_distance,
                   self.low_weight_distance: low_weight_distance,
                   self.zero_weight_distance: zero_weight_distance,
                   self.max_acceleration: max_acceleration,
-                  self.A: A,
-                  self.B: B,
-                  self.C: C, }
+                  self.max_velocity: 0.1,
+                  # self.A: A,
+                  # self.B: B,
+                  # self.C: C,
+                  }
         self.save_params_on_god_map(params)
 
     def get_distance_to_closest_object(self):
@@ -694,11 +700,12 @@ class ExternalCollisionAvoidance(Constraint):
         r_V_n = self.get_contact_normal_on_b()
         actual_distance = self.get_actual_distance()
         repel_velocity = self.get_input_float(self.repel_velocity)
+        max_velocity = self.get_input_float(self.max_velocity)
         max_acceleration = self.get_input_float(self.max_acceleration)
         zero_weight_distance = self.get_input_float(self.zero_weight_distance)
-        A = self.get_input_float(self.A)
-        B = self.get_input_float(self.B)
-        C = self.get_input_float(self.C)
+        # A = self.get_input_float(self.A)
+        # B = self.get_input_float(self.B)
+        # C = self.get_input_float(self.C)
 
         # a_T_r = self.get_fk_evaluated(self.joint_name, self.robot_root)
         child_link = self.get_robot().get_child_link_of_joint(self.joint_name)
@@ -710,7 +717,8 @@ class ExternalCollisionAvoidance(Constraint):
 
         dist = w.dot(r_V_n.T, r_P_pa)[0]
 
-        weight_f = w.Max(w.Min(MAX_WEIGHT, A / (w.Max(actual_distance, 0) + C) + B), ZERO_WEIGHT)
+        # weight_f = w.Max(w.Min(MAX_WEIGHT, A / (w.Max(actual_distance, 0) + C) + B), ZERO_WEIGHT)
+        weight_f = w.if_greater(actual_distance, 50, 0, MAX_WEIGHT)
 
         penetration_distance = zero_weight_distance - actual_distance
 
@@ -719,11 +727,25 @@ class ExternalCollisionAvoidance(Constraint):
                                         max_acceleration,
                                         repel_velocity)
 
-        self.add_constraint(str(self), lower=limit,
-                            upper=1e9,
+        upper_slack = w.if_greater(actual_distance, 50,
+                                   1e9,
+                                   w.if_greater(actual_distance, 0, actual_distance, penetration_distance))
+
+        self.add_constraint(str(self)+u'/velocity',
+                            lower=-max_velocity,
+                            upper=max_velocity,
                             weight=weight_f,
                             expression=dist,
                             goal_constraint=False)
+
+        self.add_constraint(str(self)+u'/position',
+                            lower=penetration_distance,
+                            upper=1e9,
+                            weight=weight_f,
+                            expression=dist,
+                            goal_constraint=False,
+                            lower_slack_limit=-1e9,
+                            upper_slack_limit=upper_slack)
 
     def __str__(self):
         s = super(ExternalCollisionAvoidance, self).__str__()

@@ -643,36 +643,11 @@ class CartesianPosition(BasicCartesianConstraint):
         """
 
         r_P_g = w.position_of(self.get_goal_pose())
-        weight = self.get_input_float(self.weight)
         max_velocity = self.get_input_float(self.max_velocity)
         max_acceleration = self.get_input_float(self.max_acceleration)
 
-        r_P_c = w.position_of(self.get_fk(self.root, self.tip))
-
-        r_P_error = r_P_g - r_P_c
-        trans_error = w.norm(r_P_error)
-
-        trans_scale = self.limit_acceleration(w.norm(r_P_c),
-                                              trans_error,
-                                              max_acceleration,
-                                              max_velocity)
-        r_P_intermediate_error = w.save_division(r_P_error, trans_error) * trans_scale
-
-        self.add_constraint(str(self) + u'x', lower=r_P_intermediate_error[0],
-                            upper=r_P_intermediate_error[0],
-                            weight=weight,
-                            expression=r_P_c[0],
-                            goal_constraint=self.goal_constraint)
-        self.add_constraint(str(self) + u'y', lower=r_P_intermediate_error[1],
-                            upper=r_P_intermediate_error[1],
-                            weight=weight,
-                            expression=r_P_c[1],
-                            goal_constraint=self.goal_constraint)
-        self.add_constraint(str(self) + u'z', lower=r_P_intermediate_error[2],
-                            upper=r_P_intermediate_error[2],
-                            weight=weight,
-                            expression=r_P_c[2],
-                            goal_constraint=self.goal_constraint)
+        self.add_minimize_position_constraints(r_P_g, max_velocity, max_acceleration, self.root, self.tip,
+                                               self.goal_constraint)
 
 
 

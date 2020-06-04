@@ -36,6 +36,7 @@ class PyBulletWorld(World):
     def __get_pybullet_object_id(self, name):
         return self.get_object(name).get_pybullet_id()
 
+    @profile
     def check_collisions(self, cut_off_distances):
         """
         :param cut_off_distances: (robot_link, body_b, link_b) -> cut off distance. Contacts between objects not in this
@@ -170,6 +171,7 @@ class PyBulletWorld(World):
         pwo.joint_state = object_.joint_state
         return super(PyBulletWorld, self).add_object(pwo)
 
+    @profile
     def transform_contact_info(self, collisions):
         """
         :param collisions: (robot_link, body_b, link_b) -> ContactInfo

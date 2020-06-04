@@ -12,6 +12,7 @@ import giskardpy.constraints
 import giskardpy.identifier as identifier
 from giskardpy.constraints import JointPosition, SelfCollisionAvoidance, ExternalCollisionAvoidance
 from giskardpy.exceptions import InsolvableException, ImplementationException
+from giskardpy.logging import loginfo
 from giskardpy.plugin_action_server import GetGoal
 from giskardpy.qp_problem_builder import JointConstraint
 from collections import OrderedDict
@@ -161,6 +162,8 @@ class GoalToConstraints(GetGoal):
                                                     [joint_name, u'zero_weight_distance']),
                                                     idx=i)
                 soft_constraints.update(constraint.get_constraints())
+        num_external = len(soft_constraints)
+        loginfo('adding {} external collision avoidance constraints'.format(num_external))
         for link_a, link_b in self.get_robot().get_self_collision_matrix():
             if not self.get_robot().link_order(link_a, link_b):
                 tmp = link_a
@@ -183,5 +186,5 @@ class GoalToConstraints(GetGoal):
                                                 low_weight_distance=low_weight_distance,
                                                 zero_weight_distance=zero_weight_distance)
             soft_constraints.update(constraint.get_constraints())
-
+        loginfo('adding {} self collision avoidance constraints'.format(len(soft_constraints) - num_external))
         self.soft_constraints.update(soft_constraints)

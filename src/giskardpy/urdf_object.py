@@ -12,8 +12,6 @@ from giskardpy.exceptions import DuplicateNameException, UnknownBodyException, C
 from giskardpy.utils import cube_volume, cube_surface, sphere_volume, cylinder_volume, cylinder_surface, \
     suppress_stderr, msg_to_list, KeyDefaultDict, memoize
 
-Joint = namedtuple('Joint', ['symbol', 'velocity_limit', 'lower', 'upper', 'type', 'frame'])
-
 
 def hacky_urdf_parser_fix(urdf_str):
     # TODO this function is inefficient but the tested urdfs's aren't big enough for it to be a problem
@@ -218,6 +216,14 @@ class URDFObject(object):
 
     @memoize
     def get_chain(self, root, tip, joints=True, links=True, fixed=True):
+        """
+        :type root: str
+        :type tip: str
+        :type joints: bool
+        :type links: bool
+        :type fixed: bool
+        :rtype: list
+        """
         root_chain, connection, tip_chain = self.get_split_chain(root, tip, joints, links, fixed)
         return root_chain + connection + tip_chain
 
@@ -351,6 +357,15 @@ class URDFObject(object):
         return self.get_joint_type(name) == CONTINUOUS_JOINT
 
     @memoize
+    def is_joint_revolute(self, name):
+        """
+        :param name: name of the joint in the urdfs
+        :type name: str
+        :rtype: bool
+        """
+        return self.get_joint_type(name) == REVOLUTE_JOINT
+
+    @memoize
     def is_joint_fixed(self, name):
         """
         :param name: name of the joint in the urdfs
@@ -368,12 +383,12 @@ class URDFObject(object):
         return self.get_joint_type(name) in JOINT_TYPES
 
     @memoize
-    def is_rotational_joint(self, name):
+    def is_joint_rotational(self, name):
         return self.get_joint_type(name) in ROTATIONAL_JOINT_TYPES
 
     @memoize
-    def is_translational_joint(self, name):
-        return self.get_joint_type(name) in TRANSLATIONAL_JOINT_TYPES
+    def is_joint_prismatic(self, name):
+        return self.get_joint_type(name) == PRISMATIC_JOINT
 
     # LINK FUNCTIONS
 
@@ -677,6 +692,13 @@ class URDFObject(object):
     def has_link_visuals(self, link_name):
         link = self._urdf_robot.link_map[link_name]
         return link.visual is not None
+
+    def get_leaves(self):
+        leaves = []
+        for link_name in self.get_link_names():
+            if not self.get_child_links_of_link(link_name):
+                leaves.append(link_name)
+        return leaves
 
     def as_marker_msg(self, ns=u'', id=1):
         """

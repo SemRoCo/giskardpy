@@ -1,27 +1,13 @@
-import pickle
-import warnings
-from collections import OrderedDict, namedtuple
+from collections import OrderedDict
 from time import time
 
 import numpy as np
 
-# from giskardpy import BACKEND
-from giskardpy import logging, symbolic_wrapper as w
+from giskardpy import logging, cas_wrapper as w
+from giskardpy.data_types import SoftConstraint
 from giskardpy.exceptions import QPSolverException
 from giskardpy.qp_solver import QPSolver
 from giskardpy.utils import make_filter_masks
-
-SoftConstraint = namedtuple(u'SoftConstraint', [u'lower',
-                                                u'upper',
-                                                u'weight',
-                                                u'expression',
-                                                u'goal_constraint',
-                                                u'lower_slack_limit',
-                                                u'upper_slack_limit'])
-HardConstraint = namedtuple(u'HardConstraint', [u'lower', u'upper', u'expression'])
-JointConstraint = namedtuple(u'JointConstraint', [u'lower', u'upper', u'weight'])
-
-# BIG_NUMBER = 1e9
 
 
 class QProblemBuilder(object):
@@ -48,7 +34,8 @@ class QProblemBuilder(object):
         self.hard_constraints_dict = hard_constraints_dict
         self.soft_constraints_dict = soft_constraints_dict
         self.controlled_joints = controlled_joint_symbols
-        self.make_matrices()
+        self.construct_big_ass_M()
+        self.compile_big_ass_M()
 
         self.shape1 = len(self.hard_constraints_dict) + len(self.soft_constraints_dict)
         self.shape2 = len(self.joint_constraints_dict) + len(self.soft_constraints_dict)
@@ -63,14 +50,9 @@ class QProblemBuilder(object):
         self.lbAs = None  # for debugging purposes
 
     def get_expr(self):
-        return self.cython_big_ass_M.str_params
+        return self.compiled_big_ass_M.str_params
 
-    def make_matrices(self):
-        """
-        Turns constrains into a function that computes the matrices needed for QPOases.
-        """
-        # TODO split this into smaller functions to increase readability
-        t_total = time()
+    def construct_big_ass_M(self):
         # TODO cpu intensive
         weights = []
         lb = []
@@ -79,89 +61,97 @@ class QProblemBuilder(object):
         ubA = []
         soft_expressions = []
         hard_expressions = []
-        for k, c in self.joint_constraints_dict.items():
-            weights.append(c.weight)
-            lb.append(c.lower)
-            ub.append(c.upper)
-        for k, c in self.hard_constraints_dict.items():
-            lbA.append(c.lower)
-            ubA.append(c.upper)
-            hard_expressions.append(c.expression)
-        for k, c in self.soft_constraints_dict.items():
-            weights.append(c.weight)
-            lbA.append(c.lower)
-            ubA.append(c.upper)
-            lb.append(c.lower_slack_limit)
-            ub.append(c.upper_slack_limit)
-            # lb.append(-1e9)
-            # ub.append(1e9)
-            assert not w.is_matrix(c.expression), u'Matrices are not allowed as soft constraint expression'
-            soft_expressions.append(c.expression)
+        for constraint_name, constraint in self.joint_constraints_dict.items():
+            weights.append(constraint.weight)
+            lb.append(constraint.lower)
+            ub.append(constraint.upper)
+        for constraint_name, constraint in self.hard_constraints_dict.items():
+            lbA.append(constraint.lower)
+            ubA.append(constraint.upper)
+            hard_expressions.append(constraint.expression)
+        for constraint_name, constraint in self.soft_constraints_dict.items(): # type: (str, SoftConstraint)
+            weights.append(constraint.weight)
+            lbA.append(constraint.lbA)
+            ubA.append(constraint.ubA)
+            lb.append(constraint.lower_slack_limit)
+            ub.append(constraint.upper_slack_limit)
+            assert not w.is_matrix(constraint.expression), u'Matrices are not allowed as soft constraint expression'
+            soft_expressions.append(constraint.expression)
 
-        self.cython_big_ass_M = w.load_compiled_function(self.path_to_functions)
         self.np_g = np.zeros(len(weights))
 
-        if self.cython_big_ass_M is None:
-            logging.loginfo(u'new controller with {} constraints requested; compiling'.format(len(soft_expressions)))
-            h = len(self.hard_constraints_dict)
-            s = len(self.soft_constraints_dict)
-            c = len(self.joint_constraints_dict)
+        logging.loginfo(u'constructing new controller with {} soft constraints...'.format(len(soft_expressions)))
+        self.h = len(self.hard_constraints_dict)
+        self.s = len(self.soft_constraints_dict)
+        self.j = len(self.joint_constraints_dict)
 
-            #        c           s       1      1
-            #    |----------------------------------
-            # h  | A hard    |   0    |       |
-            #    | -------------------| lbA   | ubA
-            # s  | A soft    |identity|       |
-            #    |-----------------------------------
-            # c+s| H                  | lb    | ub
-            #    | ----------------------------------
-            self.big_ass_M = w.zeros(h + s + s + c, c + s + 2)
+        self.init_big_ass_M()
 
-            self.big_ass_M[h + s:, :-2] = w.diag(*weights)
+        self.set_weights(weights)
 
-            self.lb = w.Matrix(lb)
-            self.ub = w.Matrix(ub)
+        self.construct_A_hard(hard_expressions)
+        self.construct_A_soft(soft_expressions)
 
-            # make A
-            # hard part
-            A_hard = w.Matrix(hard_expressions)
-            A_hard = w.jacobian(A_hard, self.controlled_joints)
-            self.big_ass_M[:h, :c] = A_hard
+        self.set_lbA(w.Matrix(lbA))
+        self.set_ubA(w.Matrix(ubA))
+        self.set_lb(w.Matrix(lb))
+        self.set_ub(w.Matrix(ub))
 
-            # soft part
-            A_soft = w.Matrix(soft_expressions)
-            t = time()
-            A_soft = w.jacobian(A_soft, self.controlled_joints)
-            logging.loginfo(u'jacobian took {}'.format(time() - t))
-            identity = w.eye(A_soft.shape[0])
-            self.big_ass_M[h:h + s, :c] = A_soft
-            self.big_ass_M[h:h + s, c:c + s] = identity
 
-            self.lbA = w.Matrix(lbA)
-            self.ubA = w.Matrix(ubA)
+    def compile_big_ass_M(self):
+        t = time()
+        self.free_symbols = w.free_symbols(self.big_ass_M)
+        self.compiled_big_ass_M = w.speed_up(self.big_ass_M,
+                                             self.free_symbols)
+        logging.loginfo(u'compiled symbolic expressions in {:.5f}s'.format(time() - t))
 
-            self.big_ass_M[:h + s, c + s] = self.lbA
-            self.big_ass_M[:h + s, c + s + 1] = self.ubA
-            self.big_ass_M[h + s:, c + s] = self.lb
-            self.big_ass_M[h + s:, c + s + 1] = self.ub
+    def init_big_ass_M(self):
+        """
+        #        j           s       1      1
+        #    |----------------------------------
+        # h  | A hard    |   0    |       |
+        #    | -------------------| lbA   | ubA
+        # s  | A soft    |identity|       |
+        #    |-----------------------------------
+        # j+s| H                  | lb    | ub
+        #    | ----------------------------------
+        """
+        self.big_ass_M = w.zeros(self.h + self.s * 2 + self.j,
+                                 self.j + self.s + 2)
 
-            t = time()
-            self.free_symbols = w.free_symbols(self.big_ass_M)
-            self.cython_big_ass_M = w.speed_up(self.big_ass_M,
-                                               self.free_symbols)
-            if self.path_to_functions is not None:
-                # safe_compiled_function(self.cython_big_ass_M, self.path_to_functions)
-                logging.loginfo(u'autowrap took {}'.format(time() - t))
-        else:
-            logging.loginfo(u'controller loaded {}'.format(self.path_to_functions))
-            logging.loginfo(u'controller ready {}s'.format(time() - t_total))
+    def construct_A_hard(self, hard_expressions):
+        A_hard = w.Matrix(hard_expressions)
+        A_hard = w.jacobian(A_hard, self.controlled_joints)
+        self.set_A_hard(A_hard)
 
-    def save_pickle(self, hash, f):
-        with open(u'/tmp/{}'.format(hash), u'w') as file:
-            pickle.dump(f, file)
+    def set_A_hard(self, A_hard):
+        self.big_ass_M[:self.h, :self.j] = A_hard
 
-    def load_pickle(self, hash):
-        return pickle.load(hash)
+    def construct_A_soft(self, soft_expressions):
+        A_soft = w.zeros(self.s, self.j + self.s)
+        t = time()
+        A_soft[:, :self.j] = w.jacobian(w.Matrix(soft_expressions), self.controlled_joints)
+        logging.loginfo(u'computed Jacobian in {:.5f}s'.format(time() - t))
+        A_soft[:, self.j:] = w.eye(self.s)
+        self.set_A_soft(A_soft)
+
+    def set_A_soft(self, A_soft):
+        self.big_ass_M[self.h:self.h + self.s, :self.j + self.s] = A_soft
+
+    def set_lbA(self, lbA):
+        self.big_ass_M[:self.h + self.s, self.j + self.s] = lbA
+
+    def set_ubA(self, ubA):
+        self.big_ass_M[:self.h + self.s, self.j + self.s + 1] = ubA
+
+    def set_lb(self, lb):
+        self.big_ass_M[self.h + self.s:, self.j + self.s] = lb
+
+    def set_ub(self, ub):
+        self.big_ass_M[self.h + self.s:, self.j + self.s + 1] = ub
+
+    def set_weights(self, weights):
+        self.big_ass_M[self.h + self.s:, :-2] = w.diag(*weights)
 
     def debug_print(self, unfiltered_H, A, lb, ub, lbA, ubA, xdot_full=None):
         import pandas as pd
@@ -198,6 +188,7 @@ class QProblemBuilder(object):
         b_names = np.array(b_names)
         filtered_b_names = b_names[b_mask]
         filtered_bA_names = np.array(bA_names)[bA_mask]
+        filtered_H = unfiltered_H[b_mask][:,b_mask]
 
         p_lb = pd.DataFrame(lb, filtered_b_names, dtype=float).sort_index()
         p_ub = pd.DataFrame(ub, filtered_b_names, dtype=float).sort_index()
@@ -208,14 +199,15 @@ class QProblemBuilder(object):
             p_xdot = pd.DataFrame(xdot_full, filtered_b_names, dtype=float).sort_index()
             Ax = np.dot(A, xdot_full)
             p_Ax = pd.DataFrame(Ax, filtered_bA_names, dtype=float).sort_index()
+            xH = np.dot(xdot_full.T, filtered_H)
+            p_xH = pd.DataFrame(xH, filtered_b_names, dtype=float).sort_index()
 
         p_A = pd.DataFrame(A, filtered_bA_names, filtered_b_names, dtype=float).sort_index(1).sort_index(0)
         # if self.lbAs is None:
         #     self.lbAs = p_lbA
         # else:
         #     self.lbAs = self.lbAs.T.append(p_lbA.T, ignore_index=True).T
-            # self.lbAs.T[[c for c in self.lbAs.T.columns if 'dist' in c]].plot()
-
+        # self.lbAs.T[[c for c in self.lbAs.T.columns if 'dist' in c]].plot()
 
         # arrays = [(p_weights, u'H'),
         #           (p_A, u'A'),
@@ -263,7 +255,6 @@ class QProblemBuilder(object):
         H = H[b_mask][:, b_mask]
         return H, A, lb, ub, lbA, ubA
 
-    @profile
     def get_cmd(self, substitutions, nWSR=None):
         """
         Uses substitutions for each symbol to compute the next commands for each joint.
@@ -272,7 +263,7 @@ class QProblemBuilder(object):
         :return: joint name -> joint command
         :rtype: dict
         """
-        np_big_ass_M = self.cython_big_ass_M.call2(substitutions)
+        np_big_ass_M = self.compiled_big_ass_M.call2(substitutions)
         np_H = np_big_ass_M[self.shape1:, :-2].copy()
         np_A = np_big_ass_M[:self.shape1, :self.shape2].copy()
         np_lb = np_big_ass_M[self.shape1:, -2].copy()
@@ -291,7 +282,7 @@ class QProblemBuilder(object):
         if xdot_full is None:
             return None
         # TODO enable debug print in an elegant way, preferably without slowing anything down
-        # self.debug_print(np_H, A, lb, ub, lbA, ubA, xdot_full)
+        self.debug_print(np_H, A, lb, ub, lbA, ubA, xdot_full)
         return OrderedDict((observable, xdot_full[i]) for i, observable in enumerate(self.controlled_joints)), \
                np_H, np_A, np_lb, np_ub, np_lbA, np_ubA, xdot_full
 

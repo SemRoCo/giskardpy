@@ -41,7 +41,7 @@ class GiskardBehavior(Behaviour):
 
     def get_robot(self):
         """
-        :rtype: giskardpy.symengine_robot.Robot
+        :rtype: giskardpy.robot.Robot
         """
         if not self.robot:
             self.robot = self.get_god_map().get_data(robot)

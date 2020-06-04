@@ -1,26 +1,11 @@
-import inspect
-import itertools
-import json
-import traceback
 from copy import copy
-from multiprocessing import Process
-from time import time, sleep
 
-from giskard_msgs.msg import MoveGoal, MoveCmd
 from py_trees import Status
-from rospy_message_converter.message_converter import convert_ros_message_to_dictionary
 
-import giskardpy.constraints
-from giskardpy.constraints import ExternalCollisionAvoidance, JointPosition
-from giskardpy.exceptions import InsolvableException, ImplementationException, GiskardException
 import giskardpy.identifier as identifier
 from giskardpy.plugin import GiskardBehavior
-from giskardpy.plugin_action_server import GetGoal
 from giskardpy.symengine_controller import InstantaneousController
-from giskardpy.tfwrapper import transform_pose
-from giskardpy import logging
 from collections import OrderedDict, namedtuple
-from giskardpy.qp_problem_builder import JointConstraint
 
 
 class ControllerPlugin(GiskardBehavior):
@@ -32,7 +17,7 @@ class ControllerPlugin(GiskardBehavior):
         self.joint_constraints = None
         self.hard_constraints = None
         self.qp_data = {}
-        self.get_god_map().safe_set_data(identifier.qp_data, self.qp_data) # safe dict on godmap and work on ref
+        self.get_god_map().safe_set_data(identifier.qp_data, self.qp_data)  # safe dict on godmap and work on ref
         self.rc_prismatic_velocity = self.get_god_map().get_data(identifier.rc_prismatic_velocity)
         self.rc_continuous_velocity = self.get_god_map().get_data(identifier.rc_continuous_velocity)
         self.rc_revolute_velocity = self.get_god_map().get_data(identifier.rc_revolute_velocity)
@@ -65,7 +50,8 @@ class ControllerPlugin(GiskardBehavior):
 
         if update:
             self.controller = InstantaneousController(self.get_robot(),
-                                                  u'{}/{}/'.format(self.path_to_functions, self.get_robot().get_name()))
+                                                      u'{}/{}/'.format(self.path_to_functions,
+                                                                       self.get_robot().get_name()))
 
             controlled_joints = self.get_robot().controlled_joints
             joint_to_symbols_str = OrderedDict(
@@ -73,11 +59,6 @@ class ControllerPlugin(GiskardBehavior):
 
 
             self.controller.update_constraints(joint_to_symbols_str, self.soft_constraints, self.joint_constraints, self.hard_constraints)
-            # p = Process(target=self.controller.compile)
-            # p.start()
-            # while p.is_alive():
-            #     sleep(0.05)
-            # p.join()
             self.controller.compile()
 
             self.qp_data[identifier.weight_keys[-1]], \

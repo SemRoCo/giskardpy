@@ -1040,6 +1040,11 @@ class TestUrdfObject(object):
         chain = parsed_donbot.get_chain('base_link', 'plate')
         assert chain == ['base_link', 'plate_joint', 'plate']
 
+    def test_get_leaves(self, function_setup):
+        parsed_pr2 = self.cls(pr2_urdf())
+        leaves = parsed_pr2.get_leaves()
+        print(leaves)
+
     def test_get_sub_tree_link_names_with_collision_boxy(self, function_setup):
         parsed_boxy = self.cls(boxy_urdf())
         expected = {u'left_arm_2_joint': {u'left_gripper_finger_left_link', u'left_arm_6_link',

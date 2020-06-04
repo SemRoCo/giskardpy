@@ -23,14 +23,14 @@ from giskardpy.garden import grow_tree
 from giskardpy.identifier import robot, world
 from giskardpy.pybullet_world import PyBulletWorld
 from giskardpy.python_interface import GiskardWrapper
-from giskardpy.symengine_robot import Robot
+from giskardpy.robot import Robot
 from giskardpy.tfwrapper import transform_pose, lookup_pose
 from giskardpy.utils import msg_to_list, KeyDefaultDict, dict_to_joint_states, get_ros_pkg_path, to_joint_state_dict2
 
 BIG_NUMBER = 1e100
 SMALL_NUMBER = 1e-100
 
-vector = lambda x: st.lists(limited_float(), min_size=x, max_size=x)
+vector = lambda x: st.lists(float_no_nan_no_inf(), min_size=x, max_size=x)
 
 update_world_error_codes = {value: name for name, value in vars(UpdateWorldResponse).items() if
                             isinstance(value, int) and name[0].isupper()}
@@ -65,19 +65,19 @@ def keys_values(max_length=10, value_type=st.floats(allow_nan=False)):
     return lists_of_same_length([variable_name(), value_type], max_length=max_length, unique=True)
 
 
-def compare_axis_angle(angle1, axis1, angle2, axis2, decimal=3):
+def compare_axis_angle(actual_angle, actual_axis, expected_angle, expected_axis, decimal=3):
     try:
-        np.testing.assert_array_almost_equal(axis1, axis2, decimal=decimal)
-        np.testing.assert_almost_equal(shortest_angular_distance(angle1, angle2), 0, decimal=decimal)
+        np.testing.assert_array_almost_equal(actual_axis, expected_axis, decimal=decimal)
+        np.testing.assert_almost_equal(shortest_angular_distance(actual_angle, expected_angle), 0, decimal=decimal)
     except AssertionError:
         try:
-            np.testing.assert_array_almost_equal(axis1, -axis2, decimal=decimal)
-            np.testing.assert_almost_equal(shortest_angular_distance(angle1, abs(angle2 - 2 * pi)), 0, decimal=decimal)
+            np.testing.assert_array_almost_equal(actual_axis, -expected_axis, decimal=decimal)
+            np.testing.assert_almost_equal(shortest_angular_distance(actual_angle, abs(expected_angle - 2 * pi)), 0, decimal=decimal)
         except AssertionError:
-            np.testing.assert_almost_equal(shortest_angular_distance(angle1, 0), 0, decimal=decimal)
-            np.testing.assert_almost_equal(shortest_angular_distance(0, angle2), 0, decimal=decimal)
-            assert not np.any(np.isnan(axis1))
-            assert not np.any(np.isnan(axis2))
+            np.testing.assert_almost_equal(shortest_angular_distance(actual_angle, 0), 0, decimal=decimal)
+            np.testing.assert_almost_equal(shortest_angular_distance(0, expected_angle), 0, decimal=decimal)
+            assert not np.any(np.isnan(actual_axis))
+            assert not np.any(np.isnan(expected_axis))
 
 
 def compare_poses(pose1, pose2, decimal=2):
@@ -108,8 +108,8 @@ def variable_name(draw):
 
 
 @composite
-def lists_of_same_length(draw, data_types=(), max_length=10, unique=False):
-    length = draw(st.integers(min_value=1, max_value=max_length))
+def lists_of_same_length(draw, data_types=(), min_length=1, max_length=10, unique=False):
+    length = draw(st.integers(min_value=min_length, max_value=max_length))
     lists = []
     for elements in data_types:
         lists.append(draw(st.lists(elements, min_size=length, max_size=length, unique=unique)))
@@ -140,6 +140,7 @@ def pr2_urdf():
         urdf_string = f.read()
     return urdf_string
 
+
 def pr2_without_base_urdf():
     with open(u'urdfs/pr2.urdf', u'r') as f:
         urdf_string = f.read()
@@ -164,14 +165,15 @@ def boxy_urdf():
     return urdf_string
 
 
-def limited_float(outer_limit=BIG_NUMBER, min_dist_to_zero=None):
-    f = st.floats(allow_nan=False, allow_infinity=False, max_value=outer_limit, min_value=-outer_limit)
-    # f = st.floats(allow_nan=False, allow_infinity=False)
-    if min_dist_to_zero is not None:
-        f = f.filter(lambda x: (outer_limit > abs(x) and abs(x) > min_dist_to_zero) or x == 0)
-    else:
-        f = f.filter(lambda x: abs(x) < outer_limit)
-    return f
+def float_no_nan_no_inf(outer_limit=None, min_dist_to_zero=None):
+    return st.floats(allow_nan=False, allow_infinity=False, max_value=outer_limit, min_value=outer_limit)
+    # f = st.floats(allow_nan=False, allow_infinity=False, max_value=outer_limit, min_value=-outer_limit)
+    # # f = st.floats(allow_nan=False, allow_infinity=False)
+    # if min_dist_to_zero is not None:
+    #     f = f.filter(lambda x: (outer_limit > abs(x) and abs(x) > min_dist_to_zero) or x == 0)
+    # else:
+    #     f = f.filter(lambda x: abs(x) < outer_limit)
+    # return f
 
 @composite
 def sq_matrix(draw):
@@ -182,7 +184,7 @@ def sq_matrix(draw):
 
 def unit_vector(length, elements=None):
     if elements is None:
-        elements = limited_float(min_dist_to_zero=1e-10)
+        elements = float_no_nan_no_inf(min_dist_to_zero=1e-10)
     vector = st.lists(elements,
                       min_size=length,
                       max_size=length).filter(lambda x: np.linalg.norm(x) > SMALL_NUMBER and
@@ -493,7 +495,8 @@ class GiskardTestWrapper(object):
         if expected_response == UpdateWorldResponse.SUCCESS:
             p = self.get_robot().get_fk_pose(self.get_robot().get_root(), name)
             p = transform_pose(u'map', p)
-        assert name in self.wrapper.get_attached_objects().object_names, 'there is no attached object named {}'.format(name)
+        assert name in self.wrapper.get_attached_objects().object_names, 'there is no attached object named {}'.format(
+            name)
         r = self.wrapper.detach_object(name)
         assert r.error_codes == expected_response, \
             u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
@@ -651,22 +654,29 @@ class GiskardTestWrapper(object):
                                                                                 self.get_god_map().get_data(
                                                                                     identifier.distance_thresholds))
         collisions = self.get_world().check_collisions(collision_matrix)
-        collisions = self.get_world().transform_contact_info(collisions)
-        collision_list = collisions.external_collision[self.get_robot().get_movable_parent_joint(link)]
+        controlled_parent_joint = self.get_robot().get_controlled_parent_joint(link)
+        controlled_parent_link = self.get_robot().get_child_link_of_joint(controlled_parent_joint)
+        collision_list = collisions.get_external_collisions(controlled_parent_link)
         for key, self_collisions in collisions.self_collisions.items():
-            if link in key:
+            if controlled_parent_link in key:
                 collision_list.update(self_collisions)
         return collision_list
 
     def check_cpi_geq(self, links, distance_threshold):
         for link in links:
             collisions = self.get_external_collisions(link, distance_threshold)
-            assert collisions[0].contact_distance >= distance_threshold
+            assert collisions[0].get_contact_distance() >= distance_threshold, \
+                u'distance for {}: {} >= {}'.format(link,
+                                                    collisions[0].get_contact_distance(),
+                                                    distance_threshold)
 
     def check_cpi_leq(self, links, distance_threshold):
         for link in links:
             collisions = self.get_external_collisions(link, distance_threshold)
-            assert collisions[0].contact_distance <= distance_threshold
+            assert collisions[0].get_contact_distance() <= distance_threshold, \
+                u'distance for {}: {} <= {}'.format(link,
+                                                    collisions[0].get_contact_distance(),
+                                                    distance_threshold)
 
     def move_base(self, goal_pose):
         """

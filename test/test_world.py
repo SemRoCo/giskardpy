@@ -5,7 +5,7 @@ import giskardpy
 
 giskardpy.WORLD_IMPLEMENTATION = None
 
-from giskardpy.symengine_robot import Robot
+from giskardpy.robot import Robot
 import pytest
 from geometry_msgs.msg import Pose, Point, Quaternion
 from giskard_msgs.msg import CollisionEntry

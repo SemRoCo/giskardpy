@@ -1,10 +1,13 @@
-from py_trees import Status
-from giskardpy.exceptions import PathCollisionException, InsolvableException
-import giskardpy.identifier as identifier
-from giskardpy.plugin import GiskardBehavior
-from giskardpy.utils import closest_point_constraint_violated
 import numpy as np
+from py_trees import Status
+
+import giskardpy.identifier as identifier
+from giskardpy.exceptions import InsolvableException
+from giskardpy.plugin import GiskardBehavior
 from giskardpy import logging
+
+
+# fast
 
 class WiggleCancel(GiskardBehavior):
     def __init__(self, name, final_detection):
@@ -14,7 +17,6 @@ class WiggleCancel(GiskardBehavior):
         self.wiggle_frequency_range = self.get_god_map().get_data(identifier.wiggle_frequency_range)
         self.js_samples = self.get_god_map().get_data(identifier.wiggle_detection_samples)
         self.final_detection = final_detection
-
 
     def initialise(self):
         super(WiggleCancel, self).initialise()
@@ -85,22 +87,20 @@ def detect_wiggling(js_samples, sample_period, min_wiggle_frequency, wiggle_dete
     return False
 
 
-
 class MaxTrajLength(GiskardBehavior):
     pass
 
-
-class CollisionCancel(GiskardBehavior):
-    def __init__(self, name):
-        self.collision_time_threshold = self.get_god_map().get_data(identifier.collision_time_threshold)
-        super(CollisionCancel, self).__init__(name)
-
-    def update(self):
-        time = self.get_god_map().get_data(identifier.time)
-        if time >= self.collision_time_threshold:
-            cp = self.get_god_map().get_data(identifier.closest_point)
-            if cp is not None and closest_point_constraint_violated(cp, tolerance=1):
-                self.raise_to_blackboard(PathCollisionException(
-                    u'robot is in collision after {} seconds'.format(self.collision_time_threshold)))
-                return Status.SUCCESS
-        return Status.FAILURE
+# class CollisionCancel(GiskardBehavior):
+#     def __init__(self, name):
+#         self.collision_time_threshold = self.get_god_map().get_data(identifier.collision_time_threshold)
+#         super(CollisionCancel, self).__init__(name)
+#
+#     def update(self):
+#         time = self.get_god_map().get_data(identifier.time)
+#         if time >= self.collision_time_threshold:
+#             cp = self.get_god_map().get_data(identifier.closest_point)
+#             if cp is not None and closest_point_constraint_violated(cp, tolerance=1):
+#                 self.raise_to_blackboard(PathCollisionException(
+#                     u'robot is in collision after {} seconds'.format(self.collision_time_threshold)))
+#                 return Status.SUCCESS
+#         return Status.FAILURE

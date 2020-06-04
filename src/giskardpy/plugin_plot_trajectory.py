@@ -1,9 +1,8 @@
 from py_trees import Status
 
 from giskardpy import identifier
-from giskardpy.data_types import ClosestPointInfo, Trajectory
 from giskardpy.plugin import GiskardBehavior
-from giskardpy.utils import KeyDefaultDict, plot_trajectory
+from giskardpy.utils import plot_trajectory
 
 
 class PlotTrajectory(GiskardBehavior):
@@ -23,5 +22,6 @@ class PlotTrajectory(GiskardBehavior):
         if trajectory:
             sample_period = self.get_god_map().get_data(identifier.sample_period)
             controlled_joints = self.get_robot().controlled_joints
-            plot_trajectory(trajectory, controlled_joints, self.path_to_data_folder, sample_period, self.order, self.velocity_threshold, self.scaling, self.normalize_position, self.tick_stride)
+            plot_trajectory(trajectory, controlled_joints, self.path_to_data_folder, sample_period, self.order,
+                            self.velocity_threshold, self.scaling, self.normalize_position, self.tick_stride)
         return Status.SUCCESS

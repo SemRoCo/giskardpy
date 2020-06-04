@@ -28,7 +28,6 @@ from tf.transformations import quaternion_multiply, quaternion_conjugate
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 
 from giskardpy import logging
-from giskardpy.data_types import ClosestPointInfo
 from giskardpy.data_types import SingleJointState
 from giskardpy.plugin import PluginBehavior
 from giskardpy.tfwrapper import kdl_to_pose, np_to_kdl
@@ -68,14 +67,6 @@ class NullContextManager(object):
 
     def __exit__(self, *args):
         pass
-
-
-def np_vector(x, y, z):
-    return np.array([x, y, z, 0])
-
-
-def np_point(x, y, z):
-    return np.array([x, y, z, 1])
 
 
 class KeyDefaultDict(defaultdict):
@@ -156,20 +147,20 @@ def cylinder_surface(r, h):
     return 2 * pi * r * (h + r)
 
 
-def closest_point_constraint_violated(closest_point_infos, tolerance=0.9):
-    """
-    :param closest_point_infos: dict mapping a link name to a ClosestPointInfo
-    :type closest_point_infos: dict
-    :type tolerance: float
-    :return: whether of not the contact distance for any link has been violated
-    :rtype: bool
-    """
-    for link_name, cpi_info in closest_point_infos.items():  # type: (str, ClosestPointInfo)
-        if cpi_info.contact_distance < cpi_info.min_dist * tolerance:
-            logging.loginfo(u'collision constraints violated: {}'.format(cpi_info.link_a, cpi_info.link_b,
-                                                                         cpi_info.contact_distance))
-            return True
-    return False
+# def closest_point_constraint_violated(closest_point_infos, tolerance=0.9):
+#     """
+#     :param closest_point_infos: dict mapping a link name to a ClosestPointInfo
+#     :type closest_point_infos: dict
+#     :type tolerance: float
+#     :return: whether of not the contact distance for any link has been violated
+#     :rtype: bool
+#     """
+#     for link_name, cpi_info in closest_point_infos.items():  # type: (str, Collision)
+#         if cpi_info.contact_distance < cpi_info.min_dist * tolerance:
+#             logging.loginfo(u'collision constraints violated: {}'.format(cpi_info.link_a, cpi_info.link_b,
+#                                                                          cpi_info.contact_distance))
+#             return True
+#     return False
 
 
 def qv_mult(quaternion, vector):

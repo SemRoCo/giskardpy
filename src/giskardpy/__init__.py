@@ -5,9 +5,7 @@ PRINT_LEVEL = NORMAL
 
 MAP = u'map'
 
-BACKEND = u'symengine'
-# import symengine_wrappers as symbolic_wrapper
-import casadi_wrapper as symbolic_wrapper
+import casadi_wrapper as cas_wrapper
 
 
 WORLD_IMPLEMENTATION = u'pybullet'

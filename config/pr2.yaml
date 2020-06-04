@@ -70,4 +70,4 @@ collision_avoidance:
     ignore: [] # list pairs of links that should be removed from the self collision avoidance
     add: [] # list pairs of links that should be added to the self collision matrix
   external_collision_avoidance:
-    number_of_repeller: 5 # each movable joint gets pushed away from the 5 objects closest to it
+    number_of_repeller: 7 # each movable joint gets pushed away from the 5 objects closest to it

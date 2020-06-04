@@ -2,7 +2,7 @@ import copy
 from copy import copy
 from multiprocessing import Lock
 
-from giskardpy import symbolic_wrapper as w
+from giskardpy import cas_wrapper as w
 
 def get_member(identifier, member):
     """

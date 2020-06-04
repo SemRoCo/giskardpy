@@ -5,15 +5,12 @@ from itertools import combinations
 
 from geometry_msgs.msg import PoseStamped
 
-from giskardpy import WORLD_IMPLEMENTATION, symbolic_wrapper as w
-from giskardpy.data_types import SingleJointState
+from giskardpy import WORLD_IMPLEMENTATION, cas_wrapper as w
+from giskardpy.data_types import SingleJointState, HardConstraint, JointConstraint
 from giskardpy.pybullet_world_object import PyBulletWorldObject
-from giskardpy.qp_problem_builder import HardConstraint, JointConstraint
 from giskardpy.utils import KeyDefaultDict, \
     homo_matrix_to_pose, memoize
 from giskardpy.world_object import WorldObject
-
-Joint = namedtuple(u'Joint', [u'symbol', u'velocity_limit', u'lower', u'upper', u'type', u'frame'])
 
 if WORLD_IMPLEMENTATION == u'pybullet':
     Backend = PyBulletWorldObject
@@ -140,10 +137,10 @@ class Robot(Backend):
                 # TODO more specific exception
                 raise TypeError(u'Joint type "{}" is not supported by urdfs parser.'.format(urdf_joint.type))
 
-            if self.is_rotational_joint(joint_name):
+            if self.is_joint_rotational(joint_name):
                 joint_frame = w.dot(joint_frame,
                                     w.rotation_matrix_from_axis_angle(w.vector3(*urdf_joint.axis), joint_symbol))
-            elif self.is_translational_joint(joint_name):
+            elif self.is_joint_prismatic(joint_name):
                 translation_axis = (w.point3(*urdf_joint.axis) * joint_symbol)
                 joint_frame = w.dot(joint_frame, w.translation3(translation_axis[0],
                                                                 translation_axis[1],
@@ -235,7 +232,7 @@ class Robot(Backend):
         :rtype: float
         """
         limit = self._urdf_robot.joint_map[joint_name].limit
-        if self.is_translational_joint(joint_name):
+        if self.is_joint_prismatic(joint_name):
             limit_symbol = self._joint_velocity_linear_limit[joint_name]
         else:
             limit_symbol = self._joint_velocity_angular_limit[joint_name]
@@ -307,3 +304,19 @@ class Robot(Backend):
             return True
         return link_a < link_b
 
+    @memoize
+    def get_chain_reduced_to_controlled_joints(self, link_a, link_b):
+        chain = self.get_chain(link_b, link_a)
+        for i, thing in enumerate(chain):
+            if i % 2 == 1 and thing in self.controlled_joints:
+                new_link_b = chain[i - 1]
+                break
+        else:
+            raise KeyError(u'no controlled joint in chain between {} and {}'.format(link_a, link_b))
+        for i, thing in enumerate(reversed(chain)):
+            if i % 2 == 1 and thing in self.controlled_joints:
+                new_link_a = chain[len(chain) - i]
+                break
+        else:
+            raise KeyError(u'no controlled joint in chain between {} and {}'.format(link_a, link_b))
+        return new_link_a, new_link_b

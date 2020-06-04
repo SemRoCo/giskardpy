@@ -15,7 +15,7 @@ sudo pip install pandas
 
 Now create the workspace
 ```
-source /opt/ros/kinetic/setup.bash          # start using ROS kinetic
+source /opt/ros/kinetic/setup.bash          # start using ROS kinetic. Replace with melodic, if you are using it.
 mkdir -p ~/giskardpy_ws/src                 # create directory for workspace
 cd ~/giskardpy_ws                           # go to workspace directory
 catkin init                                 # init workspace, you might have to pip install catkin-tools

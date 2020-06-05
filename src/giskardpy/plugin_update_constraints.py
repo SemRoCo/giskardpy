@@ -174,7 +174,8 @@ class GoalToConstraints(GetGoal):
             counter[link_a, link_b] += 1
 
         for link_a, link_b in counter:
-            num_of_constraints = min(number_of_repeller, counter[link_a, link_b])
+            # TODO turn 2 into parameter
+            num_of_constraints = min(2, counter[link_a, link_b])
             for i in range(num_of_constraints):
 
                 max_weight_distance = min(self.get_god_map().get_data(identifier.distance_thresholds +

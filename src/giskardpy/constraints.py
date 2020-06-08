@@ -952,6 +952,8 @@ class ExternalCollisionAvoidance(Constraint):
         #                                       0.06, WEIGHT_MIN)  # everything is stronger than ca
 
         penetration_distance = zero_weight_distance - actual_distance
+        lower_limit = self.limit_velocity(penetration_distance, repel_velocity)
+        upper_limit = self.limit_velocity(1e9, repel_velocity)
 
         # limit = self.limit_acceleration(dist,
         #                                 penetration_distance,
@@ -964,29 +966,29 @@ class ExternalCollisionAvoidance(Constraint):
 
 
         self.add_constraint(str(self)+u'/position',
-                            lower=penetration_distance,
-                            upper=1e9,
+                            lower=lower_limit,
+                            upper=upper_limit,
                             weight=weight_f,
                             expression=dist,
                             goal_constraint=False,
                             lower_slack_limit=-1e9,
                             upper_slack_limit=upper_slack)
 
-        if self.idx == 0:
-            r_P_a_evaluated = w.position_of(self.get_fk_evaluated(self.robot_root, self.link_name))
-            r_P_a_evaluated[0] += 0.001
-            r_P_a = w.position_of(r_T_a)
-            a_V_a = r_P_a_evaluated - r_P_a
-            asdf = w.norm(a_V_a[:3])
-
-            self.add_constraint(str(self)+u'/velocity',
-                                lower=-repel_velocity*sample_period,
-                                upper=repel_velocity*sample_period,
-                                weight=weight_f,
-                                expression=dist,
-                                goal_constraint=False,
-                                lower_slack_limit=-1e9,
-                                upper_slack_limit=1e9)
+        # if self.idx == 0:
+        #     r_P_a_evaluated = w.position_of(self.get_fk_evaluated(self.robot_root, self.link_name))
+        #     r_P_a_evaluated[0] += 0.001
+        #     r_P_a = w.position_of(r_T_a)
+        #     a_V_a = r_P_a_evaluated - r_P_a
+        #     asdf = w.norm(a_V_a[:3])
+        #
+        #     self.add_constraint(str(self)+u'/velocity',
+        #                         lower=-repel_velocity*sample_period,
+        #                         upper=repel_velocity*sample_period,
+        #                         weight=weight_f,
+        #                         expression=dist,
+        #                         goal_constraint=False,
+        #                         lower_slack_limit=-1e9,
+        #                         upper_slack_limit=1e9)
 
     def __str__(self):
         s = super(ExternalCollisionAvoidance, self).__str__()

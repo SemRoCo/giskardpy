@@ -164,12 +164,8 @@ class Robot(Backend):
             velocity_limit = self.get_joint_velocity_limit_expr(joint_name) * sample_period
 
             if not self.is_joint_continuous(joint_name):
-                self._hard_constraints[joint_name] = HardConstraint(lower=lower_limit - joint_symbol,
-                                                                    upper=upper_limit - joint_symbol,
-                                                                    expression=joint_symbol)
-
-                self._joint_constraints[joint_name] = JointConstraint(lower=-velocity_limit,
-                                                                      upper=velocity_limit,
+                self._joint_constraints[joint_name] = JointConstraint(lower=w.Max(-velocity_limit, lower_limit - joint_symbol),
+                                                                      upper=w.Min(velocity_limit, upper_limit - joint_symbol),
                                                                       weight=self._joint_weights[joint_name])
             else:
                 self._joint_constraints[joint_name] = JointConstraint(lower=-velocity_limit,

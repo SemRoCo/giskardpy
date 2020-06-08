@@ -6,6 +6,7 @@ import pytest
 import roslaunch
 import rospy
 from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped
+from sensor_msgs.msg import JointState
 from giskard_msgs.msg import CollisionEntry, MoveActionGoal, MoveResult, WorldBody, MoveGoal
 from giskard_msgs.srv import UpdateWorldResponse, UpdateWorldRequest
 from numpy import pi
@@ -330,6 +331,30 @@ class TestJointGoals(object):
         zero_pose.allow_self_collision()
         js = {u'torso_lift_joint': 0.1}
         zero_pose.send_and_check_joint_goal(js)
+
+    def test_hard_joint_limits(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        zero_pose.allow_self_collision()
+        r_elbow_flex_joint_limits = zero_pose.get_robot().get_joint_limits('r_elbow_flex_joint')
+        torso_lift_joint_limits = zero_pose.get_robot().get_joint_limits('torso_lift_joint')
+        head_pan_joint_limits = zero_pose.get_robot().get_joint_limits('head_pan_joint')
+
+        goal_js = {u'r_elbow_flex_joint': r_elbow_flex_joint_limits[0] - 0.2,
+                   u'torso_lift_joint': torso_lift_joint_limits[0] - 0.2,
+                   u'head_pan_joint': head_pan_joint_limits[0] - 0.2}
+        zero_pose.set_joint_goal(goal_js)
+        zero_pose.send_goal()
+        assert(not zero_pose.are_joint_limits_violated())
+
+        goal_js = {u'r_elbow_flex_joint': r_elbow_flex_joint_limits[1] + 0.2,
+                   u'torso_lift_joint': torso_lift_joint_limits[1] + 0.2,
+                   u'head_pan_joint': head_pan_joint_limits[1] + 0.2}
+
+        zero_pose.set_joint_goal(goal_js)
+        zero_pose.send_goal()
+        assert (not zero_pose.are_joint_limits_violated())
 
     # TODO test goal for unknown joint
 

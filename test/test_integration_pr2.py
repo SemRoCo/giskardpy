@@ -1798,6 +1798,37 @@ class TestCollisionAvoidanceGoals(object):
         box_setup.check_cpi_geq([attached_link_name], 0.048)
         box_setup.detach_object(attached_link_name)
 
+    def test_attached_collision2(self, box_setup):
+        """
+        :type box_setup: PR2
+        """
+        attached_link_name = u'pocky'
+        box_setup.attach_box(attached_link_name, [0.2, 0.04, 0.04], box_setup.r_tip, [0.05, 0, 0])
+        box_setup.attach_box(attached_link_name, [0.2, 0.04, 0.04], box_setup.r_tip, [0.05, 0, 0],
+                             expected_response=UpdateWorldResponse.DUPLICATE_BODY_ERROR)
+        box_setup.send_and_check_goal()
+        box_setup.check_cpi_geq(box_setup.get_l_gripper_links(), 0.048)
+        box_setup.check_cpi_geq([attached_link_name], 0.048)
+        box_setup.detach_object(attached_link_name)
+
+    def test_attached_collision3(self, box_setup):
+        """
+        :type box_setup: PR2
+        """
+        attached_link_name = u'pocky'
+        box_setup.attach_box(attached_link_name, [0.2, 0.04, 0.04], box_setup.r_tip, [0.05, 0, 0])
+        box_setup.attach_box(attached_link_name, [0.2, 0.04, 0.04], box_setup.r_tip, [0.05, 0, 0],
+                             expected_response=UpdateWorldResponse.DUPLICATE_BODY_ERROR)
+        p = PoseStamped()
+        p.header.frame_id = box_setup.r_tip
+        p.header.stamp = rospy.get_rostime()
+        p.pose.position.x = 0.
+        p.pose.orientation.w = 1
+        box_setup.set_and_check_cart_goal(p, box_setup.r_tip, box_setup.default_root)
+        box_setup.check_cpi_geq(box_setup.get_l_gripper_links(), 0.048)
+        box_setup.check_cpi_geq([attached_link_name], 0.048)
+        box_setup.detach_object(attached_link_name)
+
     def test_attached_self_collision(self, zero_pose):
         """
         :type box_setup: PR2

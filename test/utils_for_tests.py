@@ -460,12 +460,36 @@ class GiskardTestWrapper(object):
     def add_json_goal(self, constraint_type, **kwargs):
         self.wrapper.set_json_goal(constraint_type, **kwargs)
 
-    def get_trajectory_msg(self):
+    def get_result_trajectory_position(self):
         trajectory = self.get_god_map().unsafe_get_data(identifier.trajectory)
         trajectory2 = []
         for t, p in trajectory._points.items():
             trajectory2.append({joint_name: js.position for joint_name, js in p.items()})
         return trajectory2
+
+    def get_result_trajectory_velocity(self):
+        trajectory = self.get_god_map().get_data(identifier.trajectory)
+        trajectory2 = []
+        for t, p in trajectory._points.items():
+            trajectory2.append({joint_name: js.velocity for joint_name, js in p.items()})
+        return trajectory2
+
+    def are_joint_limits_violated(self):
+        controllable_joints = self.get_robot().get_controllable_joints()
+        trajectory_pos = self.get_result_trajectory_position()
+        trajectory_vel = self.get_result_trajectory_velocity()
+
+        for joint in controllable_joints:
+            joint_limits = self.get_robot().get_joint_limits(joint)
+            vel_limit = self.get_robot().get_joint_velocity_limit(joint)
+            trajectory_pos_joint = [p[joint] for p in trajectory_pos]
+            trajectory_vel_joint = [p[joint] for p in trajectory_vel]
+            if any(round(p, 7) < joint_limits[0] and round(p, 7) > joint_limits[1] for p in trajectory_pos_joint):
+                return True
+            if any(round(p, 7) < vel_limit and round(p, 7) > vel_limit for p in trajectory_vel_joint):
+                return True
+
+        return False
 
     #
     # BULLET WORLD #####################################################################################################

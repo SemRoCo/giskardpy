@@ -1,6 +1,5 @@
 from __future__ import division
 
-import math
 import numbers
 from collections import OrderedDict
 
@@ -15,15 +14,13 @@ from giskardpy.data_types import SoftConstraint
 from giskardpy.exceptions import GiskardException, ConstraintException
 from giskardpy.input_system import PoseStampedInput, Point3Input, Vector3Input, Vector3StampedInput, FrameInput, \
     PointStampedInput, TranslationInput
-import giskardpy.tfwrapper as tf
 
-WEIGHTS = [0] + [6 ** x for x in range(7)]
-WEIGHT_MAX = WEIGHTS[-1]
-WEIGHT_ABOVE_CA = WEIGHTS[3]
-WEIGHT_BELOW_CA = WEIGHTS[1]
-WEIGHT_MIN = WEIGHTS[0]
-
-WEIGHT_COLLISION_AVOIDANCE = WEIGHTS[3]
+# WEIGHTS = [0] + [6 ** x for x in range(7)]
+WEIGHT_MAX = 1000
+WEIGHT_ABOVE_CA = 100
+WEIGHT_COLLISION_AVOIDANCE = 10
+WEIGHT_BELOW_CA = 1
+WEIGHT_MIN = 0
 
 
 class Constraint(object):
@@ -84,41 +81,41 @@ class Constraint(object):
     def get_input_sampling_period(self):
         return self.god_map.to_symbol(identifier.sample_period)
 
-    def make_polynomial_function(self, x, p1x, p1y,
-                                 p2x, p2y,
-                                 min_x, min_y):
-        C = min_y
-        B = min_x
-
-        order = math.log(((p2y - min_y) / (p1y - min_y)), ((min_x - p2x) / (min_x - p1x)))
-        A = (p1y - C) / ((B - p1x) ** order)
-
-        return A * ((-x) + B) ** order + C
-
-    def make_polynomial_function2(self, x, local_max_x, local_max_y,
-                                  local_min_x, local_min_y,
-                                  order):
-        """
-        function of form x**order - x**(order-1)
-        :return:
-        """
-        order_1 = order
-        order_2 = order - 1
-        A = (order_2 / order_1) * (1 / (local_min_x - local_max_x))
-        B = (order_1 ** order_1 / order_2 ** order_2) * (local_max_y - local_min_y)
-        C = -local_max_x
-        D = local_max_y
-        return B * ((x + C) * A) ** order_1 - B * ((x + C) * A) ** order_2 + D
-
-    def magic_weight_function(self, x, p1x, p1y,
-                              p2x, p2y,
-                              saddlex, saddley,
-                              min_x, min_y):
-        f0 = p1y
-        f1 = self.make_polynomial_function(x, p1x, p1y, p2x, p2y, saddlex, saddley)
-        f2 = self.make_polynomial_function2(x, saddlex, saddley, min_x, min_y, 3)
-        f3 = min_y
-        return w.if_less_eq(x, p1x, f0, w.if_less_eq(x, saddlex, f1, w.if_less_eq(x, min_x, f2, f3)))
+    # def make_polynomial_function(self, x, p1x, p1y,
+    #                              p2x, p2y,
+    #                              min_x, min_y):
+    #     C = min_y
+    #     B = min_x
+    #
+    #     order = math.log(((p2y - min_y) / (p1y - min_y)), ((min_x - p2x) / (min_x - p1x)))
+    #     A = (p1y - C) / ((B - p1x) ** order)
+    #
+    #     return A * ((-x) + B) ** order + C
+    #
+    # def make_polynomial_function2(self, x, local_max_x, local_max_y,
+    #                               local_min_x, local_min_y,
+    #                               order):
+    #     """
+    #     function of form x**order - x**(order-1)
+    #     :return:
+    #     """
+    #     order_1 = order
+    #     order_2 = order - 1
+    #     A = (order_2 / order_1) * (1 / (local_min_x - local_max_x))
+    #     B = (order_1 ** order_1 / order_2 ** order_2) * (local_max_y - local_min_y)
+    #     C = -local_max_x
+    #     D = local_max_y
+    #     return B * ((x + C) * A) ** order_1 - B * ((x + C) * A) ** order_2 + D
+    #
+    # def magic_weight_function(self, x, p1x, p1y,
+    #                           p2x, p2y,
+    #                           saddlex, saddley,
+    #                           min_x, min_y):
+    #     f0 = p1y
+    #     f1 = self.make_polynomial_function(x, p1x, p1y, p2x, p2y, saddlex, saddley)
+    #     f2 = self.make_polynomial_function2(x, saddlex, saddley, min_x, min_y, 3)
+    #     f3 = min_y
+    #     return w.if_less_eq(x, p1x, f0, w.if_less_eq(x, saddlex, f1, w.if_less_eq(x, min_x, f2, f3)))
 
     def __str__(self):
         return self.__class__.__name__
@@ -264,6 +261,11 @@ class Constraint(object):
         max_velocity *= sample_period
         return w.Max(w.Min(error, max_velocity), -max_velocity)
 
+    def normalize_error(self, velocity_limit, weight):
+        sample_period = self.get_input_sampling_period()
+        result = weight * (1. / (sample_period * velocity_limit)) ** 2
+        return result
+
     def get_constraints(self):
         """
         :rtype: OrderedDict
@@ -292,7 +294,7 @@ class Constraint(object):
                                                      ubA=upper,
                                                      weight=weight,
                                                      expression=expression,
-                                                     goal_constraint=goal_constraint,
+                                                     goal_constraint=False,
                                                      lower_slack_limit=lower_slack_limit,
                                                      upper_slack_limit=upper_slack_limit)
 
@@ -326,11 +328,12 @@ class Constraint(object):
                                               max_velocity)
         r_P_intermediate_error = w.save_division(r_P_error, trans_error) * trans_scale
 
-        weight = self.magic_weight_function(trans_error,
-                                            0.0, WEIGHTS[5],
-                                            0.01, WEIGHTS[4],
-                                            0.05, WEIGHTS[3],
-                                            0.06, WEIGHTS[1])
+        # weight = self.magic_weight_function(trans_error,
+        #                                     0.0, WEIGHTS[5],
+        #                                     0.01, WEIGHTS[4],
+        #                                     0.05, WEIGHTS[3],
+        #                                     0.06, WEIGHTS[1])
+        weight = self.normalize_error(max_velocity, WEIGHT_ABOVE_CA)
 
         self.add_constraint(u'/x',
                             lower=r_P_intermediate_error[0],
@@ -361,7 +364,7 @@ class Constraint(object):
         root_V_goal_normal_intermediate = w.slerp(root_V_tip_normal, root_V_goal_normal, angle_limited)
         error = root_V_goal_normal_intermediate - root_V_tip_normal
 
-        weight = WEIGHT_ABOVE_CA
+        weight = self.normalize_error(max_velocity, WEIGHT_BELOW_CA)
 
         self.add_constraint(u'/rot/x', lower=error[0],
                             upper=error[0],
@@ -387,7 +390,8 @@ class JointPositionContinuous(Constraint):
     max_acceleration = u'max_acceleration'
     goal_constraint = u'goal_constraint'
 
-    def __init__(self, god_map, joint_name, goal, weight=WEIGHTS[5], max_velocity=1, max_acceleration=1, goal_constraint=True):
+    def __init__(self, god_map, joint_name, goal, weight=WEIGHT_BELOW_CA, max_velocity=1, max_acceleration=1,
+                 goal_constraint=True):
         super(JointPositionContinuous, self).__init__(god_map)
         self.joint_name = joint_name
         self.goal_constraint = goal_constraint
@@ -427,13 +431,19 @@ class JointPositionContinuous(Constraint):
         # capped_err = self.limit_acceleration(current_joint, error, max_acceleration, max_velocity)
         capped_err = self.limit_velocity(error, max_velocity)
 
-        weight = self.magic_weight_function(w.Abs(error),
-                                            0.0, WEIGHTS[5],
-                                            np.pi / 8, WEIGHTS[4],
-                                            np.pi / 6, WEIGHTS[3],
-                                            np.pi / 4, WEIGHTS[1])
+        # weight = self.magic_weight_function(w.Abs(error),
+        #                                     0.0, WEIGHTS[5],
+        #                                     np.pi / 8, WEIGHTS[4],
+        #                                     np.pi / 6, WEIGHTS[3],
+        #                                     np.pi / 4, WEIGHTS[1])
 
-        self.add_constraint('', lower=capped_err, upper=capped_err, weight=weight, expression=current_joint,
+        weight = self.normalize_error(max_velocity, weight)
+
+        self.add_constraint('',
+                            lower=capped_err,
+                            upper=capped_err,
+                            weight=weight,
+                            expression=current_joint,
                             goal_constraint=True)
 
     def __str__(self):
@@ -447,7 +457,7 @@ class JointPositionPrismatic(Constraint):
     max_velocity = u'max_velocity'
     max_acceleration = u'max_acceleration'
 
-    def __init__(self, god_map, joint_name, goal, weight=None, max_velocity=0.1, max_acceleration=0.1):
+    def __init__(self, god_map, joint_name, goal, weight=WEIGHT_BELOW_CA, max_velocity=0.1, max_acceleration=0.1):
         # TODO add goal constraint
         super(JointPositionPrismatic, self).__init__(god_map)
         self.joint_name = joint_name
@@ -484,14 +494,20 @@ class JointPositionPrismatic(Constraint):
         max_acceleration = self.get_input_float(self.max_acceleration)
 
         err = joint_goal - current_joint
-        weight = self.magic_weight_function(w.Abs(err),
-                                            0.0, WEIGHTS[5],
-                                            0.01, WEIGHTS[4],
-                                            0.05, WEIGHTS[3],
-                                            0.06, WEIGHTS[1])
+        # weight = self.magic_weight_function(w.Abs(err),
+        #                                     0.0, WEIGHTS[5],
+        #                                     0.01, WEIGHTS[4],
+        #                                     0.05, WEIGHTS[3],
+        #                                     0.06, WEIGHTS[1])
         capped_err = self.limit_acceleration(current_joint, err, max_acceleration, max_velocity)
 
-        self.add_constraint('', lower=capped_err, upper=capped_err, weight=weight, expression=current_joint,
+        weight = self.normalize_error(max_velocity, weight)
+
+        self.add_constraint('',
+                            lower=capped_err,
+                            upper=capped_err,
+                            weight=weight,
+                            expression=current_joint,
                             goal_constraint=True)
 
     def __str__(self):
@@ -505,7 +521,7 @@ class JointPositionRevolute(Constraint):
     max_velocity = u'max_velocity'
     max_acceleration = u'max_acceleration'
 
-    def __init__(self, god_map, joint_name, goal, weight=None, max_velocity=1, max_acceleration=1):
+    def __init__(self, god_map, joint_name, goal, weight=WEIGHT_BELOW_CA, max_velocity=1, max_acceleration=1):
         super(JointPositionRevolute, self).__init__(god_map)
         self.joint_name = joint_name
         if not self.get_robot().is_joint_revolute(joint_name):
@@ -549,9 +565,14 @@ class JointPositionRevolute(Constraint):
         #                                     np.pi / 8, WEIGHTS[4],
         #                                     np.pi / 6, WEIGHTS[3],
         #                                     np.pi / 4, WEIGHTS[1])
-        weight = WEIGHTS[5]
+        # weight = WEIGHTS[5]
+        weight = self.normalize_error(max_velocity, weight)
 
-        self.add_constraint('', lower=capped_err, upper=capped_err, weight=weight, expression=current_joint,
+        self.add_constraint('',
+                            lower=capped_err,
+                            upper=capped_err,
+                            weight=weight,
+                            expression=current_joint,
                             goal_constraint=True)
 
     def __str__(self):
@@ -591,7 +612,8 @@ class BasicCartesianConstraint(Constraint):
     max_velocity = u'max_velocity'
     max_acceleration = u'max_acceleration'
 
-    def __init__(self, god_map, root_link, tip_link, goal, max_velocity=0.1, max_acceleration=0.1, goal_constraint=True):
+    def __init__(self, god_map, root_link, tip_link, goal, max_velocity=0.1, max_acceleration=0.1,
+                 goal_constraint=True):
         super(BasicCartesianConstraint, self).__init__(god_map)
         self.root = root_link
         self.tip = tip_link
@@ -649,7 +671,6 @@ class CartesianPosition(BasicCartesianConstraint):
 
         self.add_minimize_position_constraints(r_P_g, max_velocity, max_acceleration, self.root, self.tip,
                                                self.goal_constraint)
-
 
 
 # class CartesianPositionX(BasicCartesianConstraint):
@@ -748,7 +769,8 @@ class CartesianOrientation(BasicCartesianConstraint):
 
         r_rot_control = axis * capped_angle
 
-        weight = WEIGHTS[5]
+        weight = WEIGHT_BELOW_CA
+        weight = self.normalize_error(max_velocity, weight)
 
         self.add_constraint(u'/0', lower=r_rot_control[0],
                             upper=r_rot_control[0],
@@ -835,19 +857,24 @@ class CartesianOrientationSlerp(BasicCartesianConstraint):
 
         c_R_g_intermediate_aa = intermediate_error_axis * intermediate_error_angle
 
+        # weight = WEIGHT_BELOW_CA
         weight = WEIGHT_ABOVE_CA
+        weight = self.normalize_error(max_velocity, weight)
 
-        self.add_constraint(u'/0', lower=c_R_g_intermediate_aa[0],
+        self.add_constraint(u'/0',
+                            lower=c_R_g_intermediate_aa[0],
                             upper=c_R_g_intermediate_aa[0],
                             weight=weight,
                             expression=current_angle_axis[0],
                             goal_constraint=self.goal_constraint)
-        self.add_constraint(u'/1', lower=c_R_g_intermediate_aa[1],
+        self.add_constraint(u'/1',
+                            lower=c_R_g_intermediate_aa[1],
                             upper=c_R_g_intermediate_aa[1],
                             weight=weight,
                             expression=current_angle_axis[1],
                             goal_constraint=self.goal_constraint)
-        self.add_constraint(u'/2', lower=c_R_g_intermediate_aa[2],
+        self.add_constraint(u'/2',
+                            lower=c_R_g_intermediate_aa[2],
                             upper=c_R_g_intermediate_aa[2],
                             weight=weight,
                             expression=current_angle_axis[2],
@@ -924,6 +951,13 @@ class ExternalCollisionAvoidance(Constraint):
                                                                   u'get_contact_distance',
                                                                   tuple()])
 
+    def get_number_of_external_collisions(self):
+        return self.god_map.to_symbol(identifier.closest_point + [u'get_number_of_external_collisions',
+                                                                  (self.link_name,)])
+
+    def get_max_number_of_repeller(self):
+        return self.god_map.to_symbol(identifier.number_of_repeller)
+
     def make_constraints(self):
         a_P_pa = self.get_closest_point_on_a_in_a()
         r_P_pb = self.get_closest_point_on_b_in_root()
@@ -934,6 +968,8 @@ class ExternalCollisionAvoidance(Constraint):
         max_acceleration = self.get_input_float(self.max_acceleration)
         zero_weight_distance = self.get_input_float(self.zero_weight_distance)
         sample_period = self.get_input_sampling_period()
+        number_of_external_collisions = self.get_number_of_external_collisions()
+        num_repeller = self.get_max_number_of_repeller()
 
         r_T_a = self.get_fk(self.robot_root, self.link_name)
 
@@ -942,33 +978,37 @@ class ExternalCollisionAvoidance(Constraint):
 
         dist = w.dot(r_V_n.T, r_V_pb_pa)[0]
 
-        # weight_f = w.Max(w.Min(MAX_WEIGHT, A / (w.Max(actual_distance, 0) + C) + B), ZERO_WEIGHT)
-        weight_f = w.if_greater(actual_distance, 50, 0, WEIGHT_MAX)
-        # weight_f = self.magic_weight_function(actual_distance,
-        #                                       0.0, WEIGHT_MAX,  # nothing should be stronger than ca
-        #                                       0.01, WEIGHTS[4],
-        #                                       # everything should stay below this to ensure ca is strong enough
-        #                                       0.05, WEIGHTS[2],  # ca active but can get overpowered
-        #                                       0.06, WEIGHT_MIN)  # everything is stronger than ca
+        weight = w.if_greater(actual_distance, 50, 0, WEIGHT_COLLISION_AVOIDANCE)
+        weight = self.normalize_error(repel_velocity, weight)
+        weight = w.save_division(weight,  # divide by number of active repeller per link
+                                 w.Min(number_of_external_collisions, num_repeller))
 
         penetration_distance = zero_weight_distance - actual_distance
         lower_limit = self.limit_velocity(penetration_distance, repel_velocity)
-        upper_limit = self.limit_velocity(1e9, repel_velocity)
+        # upper_limit = self.limit_velocity(1e9, repel_velocity)
+        upper_limit = 1e9
 
+        slack_limit = self.limit_velocity(actual_distance, repel_velocity)
+
+        # self.add_debug_constraint('/distance', actual_distance)
         # limit = self.limit_acceleration(dist,
         #                                 penetration_distance,
         #                                 max_acceleration,
         #                                 repel_velocity)
 
+        # upper_slack = w.if_greater(actual_distance, 50,
+        #                            1e9,
+        #                            w.if_greater(actual_distance, 0, actual_distance, penetration_distance))
         upper_slack = w.if_greater(actual_distance, 50,
                                    1e9,
-                                   w.if_greater(actual_distance, 0, actual_distance, penetration_distance))
+                                   w.if_greater(actual_distance, 0, 2*slack_limit, 0))
+        # self.add_debug_constraint('/pen', penetration_distance)
+        # self.add_debug_constraint('/actual', actual_distance)
 
-
-        self.add_constraint(str(self)+u'/position',
+        self.add_constraint(u'/position',
                             lower=lower_limit,
                             upper=upper_limit,
-                            weight=weight_f,
+                            weight=weight,
                             expression=dist,
                             goal_constraint=False,
                             lower_slack_limit=-1e9,
@@ -1049,10 +1089,19 @@ class SelfCollisionAvoidance(Constraint):
                                                                   u'get_contact_distance',
                                                                   tuple()])
 
+    def get_number_of_self_collisions(self):
+        return self.god_map.to_symbol(identifier.closest_point + [u'get_number_of_self_collisions',
+                                                                  (self.link_a, self.link_b)])
+
+    def get_max_number_of_repeller(self):
+        return self.god_map.to_symbol(identifier.number_of_repeller)
+
     def make_constraints(self):
         repel_velocity = self.get_input_float(self.repel_velocity)
         zero_weight_distance = self.get_input_float(self.zero_weight_distance)
         actual_distance = self.get_actual_distance()
+        number_of_self_collisions = self.get_number_of_self_collisions()
+        num_repeller = self.get_max_number_of_repeller()
 
         movable_joint = self.get_robot().get_controlled_parent_joint(self.link_a)
         f = self.get_robot().get_child_link_of_joint(movable_joint)
@@ -1070,17 +1119,48 @@ class SelfCollisionAvoidance(Constraint):
 
         dist = w.dot(pb_V_n.T, pb_P_pa)[0]
 
-        weight_f = self.magic_weight_function(actual_distance,
-                                              0.0, WEIGHT_MAX,
-                                              0.01, WEIGHTS[4],
-                                              0.05, WEIGHTS[2],
-                                              0.06, WEIGHT_MIN)
+        # weight_f = self.magic_weight_function(actual_distance,
+        #                                       0.0, WEIGHT_MAX,
+        #                                       0.01, WEIGHTS[4],
+        #                                       0.05, WEIGHTS[2],
+        #                                       0.06, WEIGHT_MIN)
+        # weight_f = WEIGHT_COLLISION_AVOIDANCE
+        weight = w.if_greater(actual_distance, 50, 0, WEIGHT_COLLISION_AVOIDANCE)
+        weight = self.normalize_error(repel_velocity, weight)
+        weight = w.save_division(weight,  # divide by number of active repeller per link
+                                 w.Min(number_of_self_collisions, num_repeller))
 
-        limit = zero_weight_distance - actual_distance
-        limit = self.limit_velocity(limit, repel_velocity)
 
-        self.add_constraint('', lower=limit, upper=1e9, weight=weight_f, expression=dist,
-                            goal_constraint=False)
+        # limit = zero_weight_distance - actual_distance
+        # limit = self.limit_velocity(limit, repel_velocity)
+
+        penetration_distance = zero_weight_distance - actual_distance
+        lower_limit = self.limit_velocity(penetration_distance, repel_velocity)
+        # upper_limit = self.limit_velocity(1e9, repel_velocity)
+        upper_limit = 1e9
+        slack_limit = self.limit_velocity(actual_distance, repel_velocity)
+
+        # self.add_debug_constraint('/pen', penetration_distance)
+
+        # self.add_constraint('',
+        #                     lower=limit,
+        #                     upper=1e9,
+        #                     weight=weight,
+        #                     expression=dist,
+        #                     goal_constraint=False)
+
+        upper_slack = w.if_greater(actual_distance, 50,
+                                   1e9,
+                                   w.if_greater(actual_distance, 0, 2*slack_limit, 0))
+
+        self.add_constraint(u'/position',
+                            lower=lower_limit,
+                            upper=upper_limit,
+                            weight=weight,
+                            expression=dist,
+                            goal_constraint=False,
+                            lower_slack_limit=-1e9,
+                            upper_slack_limit=upper_slack)
 
     def __str__(self):
         s = super(SelfCollisionAvoidance, self).__str__()
@@ -1130,7 +1210,8 @@ class AlignPlanes(Constraint):
         max_velocity = self.get_input_float(self.max_velocity_id)
         tip_normal__tip = self.get_tip_normal_vector()
         root_normal__root = self.get_root_normal_vector()
-        self.add_minimize_vector_angle_constraints(max_velocity, self.root, self.tip, tip_normal__tip, root_normal__root)
+        self.add_minimize_vector_angle_constraints(max_velocity, self.root, self.tip, tip_normal__tip,
+                                                   root_normal__root, False)
 
 
 class GraspBar(Constraint):
@@ -1179,7 +1260,12 @@ class GraspBar(Constraint):
         tip_V_tip_grasp_axis = self.get_tip_grasp_axis_vector()
         root_P_bar_center = self.get_bar_center_point()
 
-        self.add_minimize_vector_angle_constraints(max_velocity, self.root, self.tip, tip_V_tip_grasp_axis, root_V_bar_axis)
+        self.add_minimize_vector_angle_constraints(max_velocity,
+                                                   self.root,
+                                                   self.tip,
+                                                   tip_V_tip_grasp_axis,
+                                                   root_V_bar_axis,
+                                                   goal_constraint=False)
 
         root_P_tip = w.position_of(self.get_fk(self.root, self.tip))
 
@@ -1192,7 +1278,8 @@ class GraspBar(Constraint):
                                                0.1,
                                                0.1,
                                                self.root,
-                                               self.tip)
+                                               self.tip,
+                                               False)
 
 
 class BasePointingForward(Constraint):
@@ -1254,11 +1341,13 @@ class BasePointingForward(Constraint):
         return self.get_input_Vector3Stamped(self.base_forward_axis_id)
 
     def make_constraints(self):
-        weight = WEIGHT_BELOW_CA
         range = self.get_input_float(self.range_id)
         linear_velocity_threshold = self.get_input_float(self.linear_velocity_threshold_id)
-
         max_velocity = self.get_input_float(self.max_velocity)
+
+        weight = WEIGHT_BELOW_CA
+        weight = self.normalize_error(max_velocity, weight)
+
         odom_T_base_footprint_dot = self.get_fk_velocity(self.odom, self.velocity_tip)
         odom_V_goal = w.vector3(odom_T_base_footprint_dot[0],
                                 odom_T_base_footprint_dot[1],
@@ -1318,9 +1407,12 @@ class GravityJoint(Constraint):
         ref_axis_of_rotation = w.cross(com__parent, goal__parent)
         goal_vel *= w.sign(w.dot(ref_axis_of_rotation, axis_of_rotation))
 
-        weight = WEIGHTS[3]
+        weight = WEIGHT_BELOW_CA
+        # TODO set a reasonable velocity limit
+        weight = self.normalize_error(0.1, weight)
 
-        self.add_constraint('', lower=goal_vel,  # sw.Min(goal_vel, 0),
+        self.add_constraint('',
+                            lower=goal_vel,  # sw.Min(goal_vel, 0),
                             upper=goal_vel,  # sw.Max(goal_vel, 0),
                             weight=weight,
                             expression=current_joint,
@@ -1404,6 +1496,8 @@ class Pointing(Constraint):
         # start by creating references to your input params in the god map
         # get_input functions generally return symbols referring to god map entries
         weight = WEIGHT_BELOW_CA
+        # TODO set a reasonable velocity limit
+        weight = self.normalize_error(0.1, weight)
         root_T_tip = self.get_fk(self.root, self.tip)
         goal_point = self.get_goal_point()
         pointing_axis = self.get_pointing_axis()
@@ -1457,4 +1551,3 @@ class Pointing(Constraint):
         # helps to make sure your constraint name is unique.
         s = super(Pointing, self).__str__()
         return u'{}/{}/{}'.format(s, self.root, self.tip)
-

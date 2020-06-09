@@ -199,7 +199,7 @@ class QProblemBuilder(object):
             p_xdot = pd.DataFrame(xdot_full, filtered_b_names, dtype=float).sort_index()
             Ax = np.dot(A, xdot_full)
             p_Ax = pd.DataFrame(Ax, filtered_bA_names, dtype=float).sort_index()
-            xH = np.dot(xdot_full.T, filtered_H)
+            xH = np.dot((xdot_full**2).T, filtered_H)
             p_xH = pd.DataFrame(xH, filtered_b_names, dtype=float).sort_index()
 
         p_A = pd.DataFrame(A, filtered_bA_names, filtered_b_names, dtype=float).sort_index(1).sort_index(0)
@@ -282,7 +282,7 @@ class QProblemBuilder(object):
         if xdot_full is None:
             return None
         # TODO enable debug print in an elegant way, preferably without slowing anything down
-        self.debug_print(np_H, A, lb, ub, lbA, ubA, xdot_full)
+        # self.debug_print(np_H, A, lb, ub, lbA, ubA, xdot_full)
         return OrderedDict((observable, xdot_full[i]) for i, observable in enumerate(self.controlled_joints)), \
                np_H, np_A, np_lb, np_ub, np_lbA, np_ubA, xdot_full
 

@@ -145,6 +145,8 @@ class Collisions(object):
         self.self_collisions = defaultdict(default_f)
         self.external_collision = defaultdict(default_f)
         self.all_collisions = set()
+        self.number_of_self_collisions = defaultdict(int)
+        self.number_of_external_collisions = defaultdict(int)
 
     def add(self, collision):
         """
@@ -155,9 +157,13 @@ class Collisions(object):
         self.all_collisions.add(collision)
 
         if collision.get_body_b() == self.robot.get_name():
-            self.self_collisions[collision.get_link_a(), collision.get_link_b()].add(collision)
+            key = collision.get_link_a(), collision.get_link_b()
+            self.self_collisions[key].add(collision)
+            self.number_of_self_collisions[key] = min(20, self.number_of_self_collisions[key] + 1)
         else:
-            self.external_collision[collision.get_link_a()].add(collision)
+            key = collision.get_link_a()
+            self.external_collision[key].add(collision)
+            self.number_of_external_collisions[key] = min(20, self.number_of_external_collisions[key] + 1)
 
     def transform_closest_point(self, collision):
         """
@@ -222,6 +228,9 @@ class Collisions(object):
         """
         return self.external_collision[joint_name]
 
+    def get_number_of_external_collisions(self, joint_name):
+        return self.number_of_external_collisions[joint_name]
+
     def get_self_collisions(self, link_a, link_b):
         """
         Make sure that link_a < link_b, the reverse collision is not saved.
@@ -232,6 +241,9 @@ class Collisions(object):
         """
         # FIXME maybe check for reverse key?
         return self.self_collisions[link_a, link_b]
+
+    def get_number_of_self_collisions(self, link_a, link_b):
+        return self.number_of_self_collisions[link_a, link_b]
 
     def __contains__(self, item):
         return item in self.self_collisions or item in self.external_collision

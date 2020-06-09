@@ -1448,6 +1448,33 @@ class TestCollisionAvoidanceGoals(object):
         zero_pose.send_goal()
         zero_pose.check_cpi_geq(zero_pose.get_l_gripper_links(), 0.048)
 
+    def test_get_out_of_self_collision(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        goal_js = {
+            u'l_elbow_flex_joint': -1.43286344265,
+            u'l_forearm_roll_joint': 1.26465060073,
+            u'l_shoulder_lift_joint': 0.47990329056,
+            u'l_shoulder_pan_joint': 0.281272240139,
+            u'l_upper_arm_roll_joint': 0.528415402668,
+            u'l_wrist_flex_joint': -1.18811419869,
+            u'l_wrist_roll_joint': 2.26884630124,
+        }
+        zero_pose.allow_all_collisions()
+        zero_pose.send_and_check_joint_goal(goal_js)
+
+        p = PoseStamped()
+        p.header.frame_id = zero_pose.l_tip
+        p.header.stamp = rospy.get_rostime()
+        p.pose.position.x = 0.15
+        p.pose.orientation.w = 1
+        zero_pose.set_cart_goal(p, zero_pose.l_tip, zero_pose.default_root)
+        zero_pose.allow_all_collisions()
+        zero_pose.send_goal()
+        zero_pose.send_goal()
+        zero_pose.check_cpi_geq(zero_pose.get_l_gripper_links(), 0.048)
+
     def test_avoid_collision(self, box_setup):
         """
         :type box_setup: PR2
@@ -2414,6 +2441,8 @@ class TestCollisionAvoidanceGoals(object):
 
         kitchen_setup.detach_object(bowl_name)
         kitchen_setup.detach_object(cup_name)
+        kitchen_setup.allow_collision([], cup_name, [])
+        kitchen_setup.allow_collision([], bowl_name, [])
         kitchen_setup.send_and_check_joint_goal(gaya_pose)
 
         # fixme

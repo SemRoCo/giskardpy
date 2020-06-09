@@ -918,7 +918,7 @@ def to_numpy(matrix):
 
 def save_division(nominator, denominator, if_nan=0):
     save_denominator = if_eq_zero(denominator, 1, denominator)
-    return nominator * if_eq_zero(denominator, if_nan, 1 / save_denominator)
+    return nominator * if_eq_zero(denominator, if_nan, 1. / save_denominator)
 
 
 def entrywise_product(matrix1, matrix2):

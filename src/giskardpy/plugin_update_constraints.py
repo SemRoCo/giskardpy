@@ -127,6 +127,7 @@ class GoalToConstraints(GetGoal):
                     params = convert_ros_message_to_dictionary(constraint)
                     del params[u'type']
                 c = C(self.god_map, **params)
+
                 soft_constraints = c.get_constraints()
                 self.soft_constraints.update(soft_constraints)
             except TypeError as e:

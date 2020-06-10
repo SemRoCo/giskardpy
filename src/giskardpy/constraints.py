@@ -364,7 +364,7 @@ class Constraint(object):
         root_V_goal_normal_intermediate = w.slerp(root_V_tip_normal, root_V_goal_normal, angle_limited)
         error = root_V_goal_normal_intermediate - root_V_tip_normal
 
-        weight = self.normalize_error(max_velocity, WEIGHT_BELOW_CA)
+        weight = self.normalize_error(max_velocity, WEIGHT_ABOVE_CA)
 
         self.add_constraint(u'/rot/x', lower=error[0],
                             upper=error[0],
@@ -390,7 +390,7 @@ class JointPositionContinuous(Constraint):
     max_acceleration = u'max_acceleration'
     goal_constraint = u'goal_constraint'
 
-    def __init__(self, god_map, joint_name, goal, weight=WEIGHT_BELOW_CA, max_velocity=1, max_acceleration=1,
+    def __init__(self, god_map, joint_name, goal, weight=WEIGHT_BELOW_CA, max_velocity=1423, max_acceleration=1,
                  goal_constraint=True):
         super(JointPositionContinuous, self).__init__(god_map)
         self.joint_name = joint_name
@@ -457,7 +457,7 @@ class JointPositionPrismatic(Constraint):
     max_velocity = u'max_velocity'
     max_acceleration = u'max_acceleration'
 
-    def __init__(self, god_map, joint_name, goal, weight=WEIGHT_BELOW_CA, max_velocity=0.1, max_acceleration=0.1):
+    def __init__(self, god_map, joint_name, goal, weight=WEIGHT_BELOW_CA, max_velocity=4535, max_acceleration=0.1):
         # TODO add goal constraint
         super(JointPositionPrismatic, self).__init__(god_map)
         self.joint_name = joint_name
@@ -499,7 +499,8 @@ class JointPositionPrismatic(Constraint):
         #                                     0.01, WEIGHTS[4],
         #                                     0.05, WEIGHTS[3],
         #                                     0.06, WEIGHTS[1])
-        capped_err = self.limit_acceleration(current_joint, err, max_acceleration, max_velocity)
+        # capped_err = self.limit_acceleration(current_joint, err, max_acceleration, max_velocity)
+        capped_err = self.limit_velocity(err, max_velocity)
 
         weight = self.normalize_error(max_velocity, weight)
 
@@ -521,7 +522,7 @@ class JointPositionRevolute(Constraint):
     max_velocity = u'max_velocity'
     max_acceleration = u'max_acceleration'
 
-    def __init__(self, god_map, joint_name, goal, weight=WEIGHT_BELOW_CA, max_velocity=1, max_acceleration=1):
+    def __init__(self, god_map, joint_name, goal, weight=WEIGHT_BELOW_CA, max_velocity=3451, max_acceleration=1):
         super(JointPositionRevolute, self).__init__(god_map)
         self.joint_name = joint_name
         if not self.get_robot().is_joint_revolute(joint_name):
@@ -558,7 +559,8 @@ class JointPositionRevolute(Constraint):
         max_acceleration = self.get_input_float(self.max_acceleration)
 
         err = joint_goal - current_joint
-        capped_err = self.limit_acceleration(current_joint, err, max_acceleration, max_velocity)
+        # capped_err = self.limit_acceleration(current_joint, err, max_acceleration, max_velocity)
+        capped_err = self.limit_velocity(err, max_velocity)
 
         # weight = self.magic_weight_function(w.Abs(err),
         #                                     0.0, WEIGHTS[5],

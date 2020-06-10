@@ -160,14 +160,17 @@ class Robot(Backend):
             sample_period = w.Symbol(u'rosparam_general_options_sample_period')  # TODO this should be a parameter
             velocity_limit = self.get_joint_velocity_limit_expr(joint_name) * sample_period
 
+            weight = self._joint_weights[joint_name]
+            weight = weight * (1. / (velocity_limit)) ** 2
+
             if not self.is_joint_continuous(joint_name):
                 self._joint_constraints[joint_name] = JointConstraint(lower=w.Max(-velocity_limit, lower_limit - joint_symbol),
                                                                       upper=w.Min(velocity_limit, upper_limit - joint_symbol),
-                                                                      weight=self._joint_weights[joint_name])
+                                                                      weight=weight)
             else:
                 self._joint_constraints[joint_name] = JointConstraint(lower=-velocity_limit,
                                                                       upper=velocity_limit,
-                                                                      weight=self._joint_weights[joint_name])
+                                                                      weight=weight)
 
     def get_fk_expression(self, root_link, tip_link):
         """

@@ -18,11 +18,11 @@ general_options:
     angular:
       default: 100
   joint_weights: # the planner prefers low weight joints to achieve solutions
-    default: 0.0001
-    odom_x_joint: 1
-    odom_y_joint: 1
-    odom_z_joint: 1
-    torso_lift_joint: 0.001
+    default: 0.001
+    odom_x_joint: 0.01
+    odom_y_joint: 0.01
+    odom_z_joint: 0.01
+    torso_lift_joint: 0.01
 qp_solver:
   nWSR: None # None results in a nWSR estimation that's fine most of the time
 plugins:

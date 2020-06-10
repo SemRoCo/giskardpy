@@ -26,7 +26,7 @@ from giskardpy.plugin_collision_marker import CollisionMarker
 from giskardpy.plugin_goal_reached import GoalReachedPlugin
 from giskardpy.plugin_if import IF
 from giskardpy.plugin_instantaneous_controller import ControllerPlugin
-from giskardpy.plugin_interrupts import WiggleCancel
+from giskardpy.plugin_interrupts import WiggleCancel, MaxTrajLength
 from giskardpy.plugin_kinematic_sim import KinSimPlugin
 from giskardpy.plugin_log_trajectory import LogTrajPlugin
 from giskardpy.plugin_plot_trajectory import PlotTrajectory
@@ -147,6 +147,7 @@ def grow_tree():
     planning_3.add_plugin(GoalReachedPlugin(u'goal reached'))
     planning_3.add_plugin(WiggleCancel(u'wiggle', final_detection=False))
     planning_3.add_plugin(TimePlugin(u'time'))
+    planning_3.add_plugin(MaxTrajLength(u'traj length check'))
     # ----------------------------------------------
     publish_result = failure_is_success(Selector)(u'monitor execution')
     publish_result.add_child(GoalCanceled(u'goal canceled', action_server_name))

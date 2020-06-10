@@ -87,8 +87,18 @@ def detect_wiggling(js_samples, sample_period, min_wiggle_frequency, wiggle_dete
     return False
 
 
+
 class MaxTrajLength(GiskardBehavior):
-    pass
+    def update(self):
+        t = self.get_god_map().get_data(identifier.time)
+        sample_period = self.get_god_map().get_data(identifier.sample_period)
+        t = t * sample_period
+        if t > 30:
+            raise InsolvableException(u'trajectory too long')
+
+        return Status.RUNNING
+
+
 
 # class CollisionCancel(GiskardBehavior):
 #     def __init__(self, name):

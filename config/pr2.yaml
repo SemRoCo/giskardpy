@@ -41,11 +41,11 @@ plugins:
     num_samples_in_fft: 30 # size of the moving window of sample points
     wiggle_frequency_range: 0.7 # must be in the range [0,1]. Only frequencies in the range [max_detectable_frequency * wiggle_frequency_range, max_detectable_frequency] are considered as wiggling. So a value of 0 means that every frequency with an amplitude above wiggle_detection_threshold is detected as wiggling and a value of 1 means that only the max_detectable_frequency can trigger a wiggle detection.      max_detectable_frequency = 1 / (2 * sample_period)
 reachability_check:
-  sample_period: 0.5
+  sample_period: 0.25
   prismatic_velocity: 2.0
-  continuous_velocity: 0.5
-  revolute_velocity: 0.5
-  other_velocity: 0.5
+  continuous_velocity: 1
+  revolute_velocity: 1
+  other_velocity: 1
 behavior_tree:
   tree_tick_rate: 0.1 # how often the tree updates. lower numbers increase responsiveness, but waste cpu time while idle
 collision_avoidance:

@@ -12,26 +12,36 @@ from giskardpy import logging
 class GoalReachedPlugin(GiskardBehavior):
     def __init__(self, name, window_size=None):
         super(GoalReachedPlugin, self).__init__(name)
+        sample_period = self.get_god_map().get_data(identifier.sample_period)
         if window_size is None:
-            self.window_size = self.get_god_map().get_data(identifier.sample_period) * 5
+            self.window_size = sample_period * 5
         else:
             self.window_size = window_size
 
         self.above_threshold_time = 0
         self.joint_convergence_threshold = self.get_god_map().get_data(identifier.joint_convergence_threshold)
+        self.thresholds = []
+        for joint_name in self.get_robot().controlled_joints:
+            velocity_limit = self.get_robot().get_joint_velocity_limit(joint_name)
+            self.thresholds.append(velocity_limit * sample_period * self.joint_convergence_threshold)
+        self.thresholds = np.array(self.thresholds)
+        self.number_of_controlled_joints = len(self.thresholds)
 
     def update(self):
-        current_js = self.get_god_map().get_data(identifier.joint_states)
+        # current_js = self.get_god_map().get_data(identifier.joint_states)
         sample_period = self.get_god_map().get_data(identifier.sample_period)
         planning_time = self.get_god_map().get_data(identifier.time) * sample_period
 
-        below_threshold = np.abs([v.velocity for v in current_js.values()]).max() < self.joint_convergence_threshold
-        if below_threshold and planning_time - self.above_threshold_time >= self.window_size:
-            logging.loginfo(u'found goal trajectory with length {}s in {}s'.format(planning_time,
-                                                                         time() - self.get_blackboard().runtime))
-            return Status.SUCCESS
-        if not below_threshold:
-            self.above_threshold_time = planning_time
+        # below_threshold = np.abs([v.velocity for v in current_js.values()]).max() < self.joint_convergence_threshold
+        if planning_time - self.above_threshold_time >= self.window_size:
+            x_dot_full = self.get_god_map().get_data(identifier.xdot_full)
+            below_threshold = np.all(np.abs(x_dot_full[:self.number_of_controlled_joints]) < self.thresholds)
+            if below_threshold:
+                logging.loginfo(u'found goal trajectory with length {}s in {}s'.format(planning_time,
+                                                                             time() - self.get_blackboard().runtime))
+                return Status.SUCCESS
+        # if not below_threshold:
+        # self.above_threshold_time = planning_time
         return Status.RUNNING
 
 

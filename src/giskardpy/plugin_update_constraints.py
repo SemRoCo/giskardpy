@@ -2,6 +2,7 @@ import inspect
 import itertools
 import json
 import traceback
+from collections import OrderedDict
 from collections import defaultdict
 from time import time
 
@@ -16,7 +17,6 @@ from giskardpy.data_types import JointConstraint
 from giskardpy.exceptions import InsolvableException, ImplementationException
 from giskardpy.logging import loginfo
 from giskardpy.plugin_action_server import GetGoal
-from collections import OrderedDict
 
 
 def allowed_constraint_names():
@@ -79,21 +79,49 @@ class GoalToConstraints(GetGoal):
         controlled_joints = self.get_robot().controlled_joints
 
         if (self.get_god_map().get_data(identifier.check_reachability)):
+            from giskardpy import cas_wrapper as w
             joint_constraints = OrderedDict()
-            for k in controlled_joints:
-                weight = self.robot._joint_constraints[k].weight
-                if self.get_robot().is_joint_prismatic(k):
-                    joint_constraints[(self.robot.get_name(), k)] = JointConstraint(-self.rc_prismatic_velocity,
-                                                                                    self.rc_prismatic_velocity, weight)
-                elif self.get_robot().is_joint_continuous(k):
-                    joint_constraints[(self.robot.get_name(), k)] = JointConstraint(-self.rc_continuous_velocity,
-                                                                                    self.rc_continuous_velocity, weight)
-                elif self.get_robot().is_joint_revolute(k):
-                    joint_constraints[(self.robot.get_name(), k)] = JointConstraint(-self.rc_revolute_velocity,
-                                                                                    self.rc_revolute_velocity, weight)
+            # for k in controlled_joints:
+            #     weight = self.robot._joint_constraints[k].weight
+            #     if self.get_robot().is_joint_prismatic(k):
+            #         joint_constraints[(self.robot.get_name(), k)] = JointConstraint(-self.rc_prismatic_velocity,
+            #                                                                         self.rc_prismatic_velocity, weight)
+            #     elif self.get_robot().is_joint_continuous(k):
+            #         joint_constraints[(self.robot.get_name(), k)] = JointConstraint(-self.rc_continuous_velocity,
+            #                                                                         self.rc_continuous_velocity, weight)
+            #     elif self.get_robot().is_joint_revolute(k):
+            #         joint_constraints[(self.robot.get_name(), k)] = JointConstraint(-self.rc_revolute_velocity,
+            #                                                                         self.rc_revolute_velocity, weight)
+            #     else:
+            #         joint_constraints[(self.robot.get_name(), k)] = JointConstraint(-self.rc_other_velocity,
+            #                                                                         self.rc_other_velocity, weight)
+            for i, joint_name in enumerate(controlled_joints):
+                lower_limit, upper_limit = self.get_robot().get_joint_limits(joint_name)
+                joint_symbol = self.get_robot().get_joint_position_symbol(joint_name)
+                sample_period = w.Symbol(u'rosparam_general_options_sample_period')  # TODO this should be a parameter
+                # velocity_limit = self.get_robot().get_joint_velocity_limit_expr(joint_name) * sample_period
+                if self.get_robot().is_joint_prismatic(joint_name):
+                    velocity_limit = self.rc_prismatic_velocity * sample_period
+                elif self.get_robot().is_joint_continuous(joint_name):
+                    velocity_limit = self.rc_continuous_velocity * sample_period
+                elif self.get_robot().is_joint_revolute(joint_name):
+                    velocity_limit = self.rc_revolute_velocity * sample_period
                 else:
-                    joint_constraints[(self.robot.get_name(), k)] = JointConstraint(-self.rc_other_velocity,
-                                                                                    self.rc_other_velocity, weight)
+                    velocity_limit = self.rc_other_velocity * sample_period
+
+                weight = self.get_robot()._joint_weights[joint_name]
+                weight = weight * (1. / (self.rc_prismatic_velocity)) ** 2
+
+                if not self.get_robot().is_joint_continuous(joint_name):
+                    joint_constraints[(self.get_robot().get_name(), joint_name)] = JointConstraint(
+                        lower=w.Max(-velocity_limit, lower_limit - joint_symbol),
+                        upper=w.Min(velocity_limit, upper_limit - joint_symbol),
+                        weight=weight)
+                else:
+                    joint_constraints[(self.get_robot().get_name(), joint_name)] = JointConstraint(
+                        lower=-velocity_limit,
+                        upper=velocity_limit,
+                        weight=weight)
         else:
             joint_constraints = OrderedDict(((self.robot.get_name(), k), self.robot._joint_constraints[k]) for k in
                                             controlled_joints)
@@ -102,7 +130,6 @@ class GoalToConstraints(GetGoal):
 
         self.get_god_map().safe_set_data(identifier.joint_constraint_identifier, joint_constraints)
         self.get_god_map().safe_set_data(identifier.hard_constraint_identifier, hard_constraints)
-
 
         return Status.SUCCESS
 
@@ -178,24 +205,23 @@ class GoalToConstraints(GetGoal):
             # TODO turn 2 into parameter
             num_of_constraints = min(2, counter[link_a, link_b])
             for i in range(num_of_constraints):
-
                 max_weight_distance = min(self.get_god_map().get_data(identifier.distance_thresholds +
-                                                                  [link_a, u'max_weight_distance']),
-                                      self.get_god_map().get_data(identifier.distance_thresholds +
-                                                                  [link_b, u'max_weight_distance']))
+                                                                      [link_a, u'max_weight_distance']),
+                                          self.get_god_map().get_data(identifier.distance_thresholds +
+                                                                      [link_b, u'max_weight_distance']))
                 low_weight_distance = min(self.get_god_map().get_data(identifier.distance_thresholds +
                                                                       [link_a, u'low_weight_distance']),
                                           self.get_god_map().get_data(identifier.distance_thresholds +
                                                                       [link_b, u'low_weight_distance']))
                 zero_weight_distance = min(self.get_god_map().get_data(identifier.distance_thresholds +
                                                                        [link_a, u'zero_weight_distance']),
-                                          self.get_god_map().get_data(identifier.distance_thresholds +
-                                                                      [link_b, u'zero_weight_distance']))
+                                           self.get_god_map().get_data(identifier.distance_thresholds +
+                                                                       [link_b, u'zero_weight_distance']))
                 constraint = SelfCollisionAvoidance(self.god_map, link_a, link_b,
                                                     max_weight_distance=max_weight_distance,
                                                     low_weight_distance=low_weight_distance,
                                                     zero_weight_distance=zero_weight_distance,
-                                                        idx=i)
+                                                    idx=i)
                 soft_constraints.update(constraint.get_constraints())
         loginfo('adding {} self collision avoidance constraints'.format(len(soft_constraints) - num_external))
         self.soft_constraints.update(soft_constraints)

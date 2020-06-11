@@ -294,7 +294,7 @@ class Constraint(object):
                                                      ubA=upper,
                                                      weight=weight,
                                                      expression=expression,
-                                                     goal_constraint=False,
+                                                     goal_constraint=goal_constraint,
                                                      lower_slack_limit=lower_slack_limit,
                                                      upper_slack_limit=upper_slack_limit)
 
@@ -444,7 +444,7 @@ class JointPositionContinuous(Constraint):
                             upper=capped_err,
                             weight=weight,
                             expression=current_joint,
-                            goal_constraint=True)
+                            goal_constraint=self.goal_constraint)
 
     def __str__(self):
         s = super(JointPositionContinuous, self).__str__()
@@ -457,10 +457,12 @@ class JointPositionPrismatic(Constraint):
     max_velocity = u'max_velocity'
     max_acceleration = u'max_acceleration'
 
-    def __init__(self, god_map, joint_name, goal, weight=WEIGHT_BELOW_CA, max_velocity=4535, max_acceleration=0.1):
+    def __init__(self, god_map, joint_name, goal, weight=WEIGHT_BELOW_CA, max_velocity=4535, max_acceleration=0.1,
+                 goal_constraint=True):
         # TODO add goal constraint
         super(JointPositionPrismatic, self).__init__(god_map)
         self.joint_name = joint_name
+        self.goal_constraint = goal_constraint
         if not self.get_robot().is_joint_prismatic(joint_name):
             raise ConstraintException(u'{} called with non prismatic joint {}'.format(self.__name__,
                                                                                       joint_name))
@@ -509,7 +511,7 @@ class JointPositionPrismatic(Constraint):
                             upper=capped_err,
                             weight=weight,
                             expression=current_joint,
-                            goal_constraint=True)
+                            goal_constraint=self.goal_constraint)
 
     def __str__(self):
         s = super(JointPositionPrismatic, self).__str__()
@@ -522,9 +524,11 @@ class JointPositionRevolute(Constraint):
     max_velocity = u'max_velocity'
     max_acceleration = u'max_acceleration'
 
-    def __init__(self, god_map, joint_name, goal, weight=WEIGHT_BELOW_CA, max_velocity=3451, max_acceleration=1):
+    def __init__(self, god_map, joint_name, goal, weight=WEIGHT_BELOW_CA, max_velocity=3451, max_acceleration=1,
+                 goal_constraint=True):
         super(JointPositionRevolute, self).__init__(god_map)
         self.joint_name = joint_name
+        self.goal_constraint = goal_constraint
         if not self.get_robot().is_joint_revolute(joint_name):
             raise ConstraintException(u'{} called with non prismatic joint {}'.format(self.__name__,
                                                                                       joint_name))
@@ -575,7 +579,7 @@ class JointPositionRevolute(Constraint):
                             upper=capped_err,
                             weight=weight,
                             expression=current_joint,
-                            goal_constraint=True)
+                            goal_constraint=self.goal_constraint)
 
     def __str__(self):
         s = super(JointPositionRevolute, self).__str__()
@@ -717,9 +721,9 @@ class CartesianPosition(BasicCartesianConstraint):
 
 
 class CartesianOrientation(BasicCartesianConstraint):
-    def __init__(self, god_map, root_link, tip_link, goal, max_velocity=0.5, max_acceleration=0.5):
+    def __init__(self, god_map, root_link, tip_link, goal, max_velocity=0.5, max_acceleration=0.5, goal_constraint=True):
         super(CartesianOrientation, self).__init__(god_map, root_link, tip_link, goal, max_velocity,
-                                                   max_acceleration)
+                                                   max_acceleration, goal_constraint)
 
     def make_constraints(self):
         """
@@ -792,9 +796,9 @@ class CartesianOrientation(BasicCartesianConstraint):
 
 
 class CartesianOrientationSlerp(BasicCartesianConstraint):
-    def __init__(self, god_map, root_link, tip_link, goal, max_velocity=0.5, max_accleration=0.5):
+    def __init__(self, god_map, root_link, tip_link, goal, max_velocity=0.5, max_accleration=0.5, goal_constraint=True):
         super(CartesianOrientationSlerp, self).__init__(god_map, root_link, tip_link, goal, max_velocity,
-                                                        max_accleration)
+                                                        max_accleration, goal_constraint)
 
     def make_constraints(self):
         """
@@ -885,13 +889,14 @@ class CartesianOrientationSlerp(BasicCartesianConstraint):
 
 class CartesianPose(Constraint):
     def __init__(self, god_map, root_link, tip_link, goal, translation_max_velocity=0.1,
-                 translation_max_acceleration=0.1, rotation_max_velocity=0.5, rotation_max_acceleration=0.5):
+                 translation_max_acceleration=0.1, rotation_max_velocity=0.5, rotation_max_acceleration=0.5,
+                 goal_constraint=True):
         super(CartesianPose, self).__init__(god_map)
         self.constraints = []
         self.constraints.append(CartesianPosition(god_map, root_link, tip_link, goal,
-                                                  translation_max_velocity, translation_max_acceleration))
+                                                  translation_max_velocity, translation_max_acceleration, goal_constraint))
         self.constraints.append(CartesianOrientationSlerp(god_map, root_link, tip_link, goal,
-                                                          rotation_max_velocity, rotation_max_acceleration))
+                                                          rotation_max_velocity, rotation_max_acceleration, goal_constraint))
 
     def make_constraints(self):
         for constraint in self.constraints:
@@ -1213,7 +1218,7 @@ class AlignPlanes(Constraint):
         tip_normal__tip = self.get_tip_normal_vector()
         root_normal__root = self.get_root_normal_vector()
         self.add_minimize_vector_angle_constraints(max_velocity, self.root, self.tip, tip_normal__tip,
-                                                   root_normal__root, False)
+                                                   root_normal__root, self.goal_constraint)
 
 
 class GraspBar(Constraint):
@@ -1223,10 +1228,12 @@ class GraspBar(Constraint):
     bar_length_id = u'bar_length'
     max_velocity_id = u'max_velocity'
 
-    def __init__(self, god_map, root, tip, tip_grasp_axis, bar_center, bar_axis, bar_length, max_velocity=0.1):
+    def __init__(self, god_map, root, tip, tip_grasp_axis, bar_center, bar_axis, bar_length, max_velocity=0.1,
+                 goal_constraint=True):
         super(GraspBar, self).__init__(god_map)
         self.root = root
         self.tip = tip
+        self.goal_constraint = goal_constraint
 
         bar_center = self.parse_and_transform_PointStamped(bar_center, self.root)
 
@@ -1267,7 +1274,7 @@ class GraspBar(Constraint):
                                                    self.tip,
                                                    tip_V_tip_grasp_axis,
                                                    root_V_bar_axis,
-                                                   goal_constraint=False)
+                                                   goal_constraint=self.goal_constraint)
 
         root_P_tip = w.position_of(self.get_fk(self.root, self.tip))
 
@@ -1281,7 +1288,7 @@ class GraspBar(Constraint):
                                                0.1,
                                                self.root,
                                                self.tip,
-                                               False)
+                                               self.goal_constraint)
 
 
 class BasePointingForward(Constraint):

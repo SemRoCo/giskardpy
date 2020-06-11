@@ -25,8 +25,9 @@ class PostProcessing(GiskardBehavior):
         if isinstance(e, InsolvableException):
             return Status.FAILURE
 
-        if not self.check_reachability_xdot():
-            return Status.FAILURE
+        if self.get_god_map().get_data(identifier.check_reachability):
+            if not self.check_reachability_xdot():
+                return Status.FAILURE
 
         return Status.SUCCESS
 

@@ -35,36 +35,39 @@ class ControllerPlugin(GiskardBehavior):
         new_joint_constraints = self.get_god_map().get_data(identifier.joint_constraint_identifier)
         new_hard_constraints = self.get_god_map().get_data(identifier.hard_constraint_identifier)
 
-        update = False
-        if self.soft_constraints is None or set(self.soft_constraints.keys()) != set(new_soft_constraints.keys()):
-            self.soft_constraints = copy(new_soft_constraints)
-            update = True
+        # update = False
+        # if self.soft_constraints is None or set(self.soft_constraints.keys()) != set(new_soft_constraints.keys()):
+        self.soft_constraints = copy(new_soft_constraints)
+            # update = True
 
-        if self.joint_constraints is None or set(self.joint_constraints.keys()) != set(new_joint_constraints.keys()):
-            self.joint_constraints = copy(new_joint_constraints)
-            update = True
+        # if self.joint_constraints is None or set(self.joint_constraints.keys()) != set(new_joint_constraints.keys()):
+        self.joint_constraints = copy(new_joint_constraints)
+            # update = True
 
-        if self.hard_constraints is None or set(self.hard_constraints.keys()) != set(new_hard_constraints.keys()):
-            self.hard_constraints = copy(new_hard_constraints)
-            update = True
+        # if self.hard_constraints is None or set(self.hard_constraints.keys()) != set(new_hard_constraints.keys()):
+        self.hard_constraints = copy(new_hard_constraints)
+            # update = True
 
-        if update:
-            self.controller = InstantaneousController(self.get_robot(),
-                                                      u'{}/{}/'.format(self.path_to_functions,
-                                                                       self.get_robot().get_name()))
+        # if update:
+        self.controller = InstantaneousController(self.get_robot(),
+                                                  u'{}/{}/'.format(self.path_to_functions,
+                                                                   self.get_robot().get_name()))
 
-            controlled_joints = self.get_robot().controlled_joints
-            joint_to_symbols_str = OrderedDict(
-                (x, self.robot.get_joint_position_symbol(x)) for x in controlled_joints)
+        controlled_joints = self.get_robot().controlled_joints
+        joint_to_symbols_str = OrderedDict(
+            (x, self.robot.get_joint_position_symbol(x)) for x in controlled_joints)
 
 
-            self.controller.update_constraints(joint_to_symbols_str, self.soft_constraints, self.joint_constraints, self.hard_constraints)
-            self.controller.compile()
+        self.controller.update_constraints(joint_to_symbols_str,
+                                           self.soft_constraints,
+                                           self.joint_constraints,
+                                           self.hard_constraints)
+        self.controller.compile()
 
-            self.qp_data[identifier.weight_keys[-1]], \
-            self.qp_data[identifier.b_keys[-1]], \
-            self.qp_data[identifier.bA_keys[-1]], \
-            self.qp_data[identifier.xdot_keys[-1]] = self.controller.get_qpdata_key_map()
+        self.qp_data[identifier.weight_keys[-1]], \
+        self.qp_data[identifier.b_keys[-1]], \
+        self.qp_data[identifier.bA_keys[-1]], \
+        self.qp_data[identifier.xdot_keys[-1]] = self.controller.get_qpdata_key_map()
 
     def update(self):
         last_cmd = self.get_god_map().get_data(identifier.cmd)

@@ -604,7 +604,8 @@ class TestConstraints(object):
                                     bar_center=bar_center,
                                     bar_axis=bar_axis,
                                     bar_length=.3)
-        kitchen_setup.allow_all_collisions()
+        kitchen_setup.allow_collision([], u'kitchen', [u'sink_area_dish_washer_door_handle'])
+        # kitchen_setup.allow_all_collisions()
         kitchen_setup.send_and_check_goal()
 
 class TestCartGoals(object):
@@ -2329,7 +2330,7 @@ class TestCollisionAvoidanceGoals(object):
                                     tip_grasp_axis=tip_grasp_axis,
                                     bar_center=bar_center,
                                     bar_axis=bar_axis,
-                                    bar_length=.2)
+                                    bar_length=.15)
 
         x = Vector3Stamped()
         x.header.frame_id = kitchen_setup.l_tip

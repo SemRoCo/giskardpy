@@ -158,7 +158,10 @@ class SendResult(ActionServerBehavior):
         elif isinstance(exception, SolverTimeoutError):
             error_code = MoveResult.SOLVER_TIMEOUT
         elif isinstance(exception, InsolvableException):
-            error_code = MoveResult.INSOLVABLE
+            if self.get_god_map().get_data(identifier.check_reachability):
+                error_code = MoveResult.UNREACHABLE
+            else:
+                error_code = MoveResult.INSOLVABLE
         elif isinstance(exception, SymengineException):
             error_code = MoveResult.SYMENGINE_ERROR
         elif isinstance(exception, PathCollisionException):

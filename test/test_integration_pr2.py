@@ -2607,15 +2607,18 @@ class TestReachability():
 
     def test_unreachable_goal_1(self,zero_pose):
         pose = PoseStamped()
-        pose.pose.position.z = -1
-        pose.header.frame_id = 'map'
-        zero_pose.set_cart_goal(root='odom_combined', tip='r_gripper_tool_frame', goal_pose=pose)
+        pose.header.frame_id = zero_pose.r_tip
+        pose.pose.position.z = -2
+        pose.pose.orientation.w = 1
+        zero_pose.set_cart_goal(root=zero_pose.default_root, tip=zero_pose.r_tip, goal_pose=pose)
         zero_pose.check_reachability(expected_error_code=MoveResult.UNREACHABLE)
+
 
     def test_unreachable_goal_2(self, zero_pose):
         pose = PoseStamped()
         pose.pose.position.z = 5
         pose.header.frame_id = 'map'
+        pose.pose.orientation.w = 1
         zero_pose.set_cart_goal(root='odom_combined', tip='r_gripper_tool_frame', goal_pose=pose)
         zero_pose.check_reachability(expected_error_code=MoveResult.UNREACHABLE)
 
@@ -2623,6 +2626,7 @@ class TestReachability():
         pose = PoseStamped()
         pose.pose.position.z = 1.2
         pose.header.frame_id = 'map'
+        pose.pose.orientation.w = 1
         zero_pose.set_translation_goal(root='odom_combined', tip='r_gripper_tool_frame', goal_pose=pose)
         js = {}
         js['r_shoulder_lift_joint'] = 1.0  # soft lower -0.3536 soft upper 1.2963
@@ -2636,11 +2640,13 @@ class TestReachability():
         pose.pose.position.y = -2.0
         pose.pose.position.z = 1
         pose.header.frame_id = 'map'
+        pose.pose.orientation.w = 1
         zero_pose.set_translation_goal(root='odom_combined', tip='r_gripper_tool_frame', goal_pose=pose)
         pose2 = PoseStamped()
         pose2.pose.position.y = 2.0
         pose2.pose.position.z = 1
         pose2.header.frame_id = 'map'
+        pose.pose.orientation.w = 1
         zero_pose.set_translation_goal(root='odom_combined', tip='l_gripper_tool_frame', goal_pose=pose2)
         zero_pose.check_reachability(expected_error_code=MoveResult.UNREACHABLE)
 
@@ -2648,6 +2654,7 @@ class TestReachability():
         pose = PoseStamped()
         pose.pose.position.x = 2
         pose.header.frame_id = 'map'
+        pose.pose.orientation.w = 1
         zero_pose.set_cart_goal(root='r_shoulder_lift_link', tip='r_gripper_tool_frame', goal_pose=pose)
         zero_pose.check_reachability(expected_error_code=MoveResult.UNREACHABLE)
 
@@ -2657,6 +2664,7 @@ class TestReachability():
         pose.pose.position.y = 0.0
         pose.pose.position.z = 0.0
         pose.header.frame_id = 'map'
+        pose.pose.orientation.w = 1
         zero_pose.set_translation_goal(root='odom_combined', tip='base_footprint', goal_pose=pose)
         js = {}
         js['odom_x_joint'] = 0.01
@@ -2683,7 +2691,7 @@ class TestReachability():
         zero_pose.set_cart_goal(root='odom_combined', tip='r_gripper_tool_frame', goal_pose=pose)
         zero_pose.check_reachability()
         zero_pose.set_cart_goal(root='odom_combined', tip='r_gripper_tool_frame', goal_pose=pose)
-        zero_pose.send_and_check_goal()
+        zero_pose.send_and_check_goal(goal_type=MoveGoal.PLAN_ONLY)
 
     def test_reachable_goal_1(self, zero_pose):
         pose = PoseStamped()
@@ -2696,6 +2704,8 @@ class TestReachability():
         pose.header.frame_id = 'map'
         zero_pose.set_cart_goal(root='odom_combined', tip='r_gripper_tool_frame', goal_pose=pose)
         zero_pose.check_reachability()
+        zero_pose.set_cart_goal(root='odom_combined', tip='r_gripper_tool_frame', goal_pose=pose)
+        zero_pose.send_and_check_goal(goal_type=MoveGoal.PLAN_ONLY)
 
     def test_reachable_goal_2(self, zero_pose):
         pose = PoseStamped()
@@ -2704,6 +2714,8 @@ class TestReachability():
         pose.header.frame_id = 'map'
         zero_pose.set_cart_goal(root='odom_combined', tip='r_gripper_tool_frame', goal_pose=pose)
         zero_pose.check_reachability()
+        zero_pose.set_cart_goal(root='odom_combined', tip='r_gripper_tool_frame', goal_pose=pose)
+        zero_pose.send_and_check_goal(goal_type=MoveGoal.PLAN_ONLY)
 
     def test_reachable_goal_3(self, zero_pose):
         pose = PoseStamped()
@@ -2717,6 +2729,8 @@ class TestReachability():
         pose.header.frame_id = 'map'
         zero_pose.set_cart_goal(root='odom_combined', tip='r_gripper_tool_frame', goal_pose=pose)
         zero_pose.check_reachability()
+        zero_pose.set_cart_goal(root='odom_combined', tip='r_gripper_tool_frame', goal_pose=pose)
+        zero_pose.send_and_check_goal(goal_type=MoveGoal.PLAN_ONLY)
 
     def test_reachable_goal_4(self, zero_pose):
         pose = PoseStamped()
@@ -2736,6 +2750,11 @@ class TestReachability():
         zero_pose.allow_all_collisions()
         zero_pose.check_reachability()
 
+        zero_pose.set_cart_goal(root='odom_combined', tip='r_gripper_tool_frame', goal_pose=pose)
+        zero_pose.set_joint_goal(js)
+        zero_pose.allow_all_collisions()
+        zero_pose.send_and_check_goal(goal_type=MoveGoal.PLAN_ONLY)
+
     def test_reachable_goal_5(self, zero_pose):
         js = {}
         js['r_shoulder_lift_joint'] = 0.2
@@ -2743,3 +2762,5 @@ class TestReachability():
         js['torso_lift_joint'] = 0.15
         zero_pose.set_joint_goal(js)
         zero_pose.check_reachability()
+        zero_pose.set_joint_goal(js)
+        zero_pose.send_and_check_goal(goal_type=MoveGoal.PLAN_ONLY)

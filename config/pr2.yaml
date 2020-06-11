@@ -3,7 +3,7 @@ general_options:
   map_frame: map
   debug: False # enables debug prints and prints the behavior tree state in the terminal
   fill_velocity_values: True # due to a bug, the pr2 does not want the velocity values to be filled
-  joint_convergence_threshold: 0.01 # when the velocities fall below this value, the planning succeeds
+  joint_convergence_threshold: 0.02 # when the velocities fall below this value, the planning succeeds
   joint_vel_limit: # giskard will use the min of this number and limits from the urdf
     linear:
       default: 1
@@ -41,7 +41,7 @@ plugins:
     num_samples_in_fft: 30 # size of the moving window of sample points
     wiggle_frequency_range: 0.7 # must be in the range [0,1]. Only frequencies in the range [max_detectable_frequency * wiggle_frequency_range, max_detectable_frequency] are considered as wiggling. So a value of 0 means that every frequency with an amplitude above wiggle_detection_threshold is detected as wiggling and a value of 1 means that only the max_detectable_frequency can trigger a wiggle detection.      max_detectable_frequency = 1 / (2 * sample_period)
 reachability_check:
-  sample_period: 0.25
+  sample_period: 0.5
   prismatic_velocity: 2.0
   continuous_velocity: 1
   revolute_velocity: 1

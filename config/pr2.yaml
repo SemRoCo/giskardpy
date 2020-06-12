@@ -31,15 +31,15 @@ plugins:
   CPIMarker: # contact visualization, slows planning down a little bit
     enabled: True
   PlotTrajectory: # plots the joint trajectory at the end of planning, useful for debugging
-    enabled: True
+    enabled: False
     velocity_threshold: 0.0 # only joints that exceed this velocity threshold will be added to the plot. Use a negative number if you want to include every joint
     scaling: 5.0 # determines how much the x axis is scaled with the length(time) of the trajectory
     normalize_position: False # centers the joint positions around 0 on the y axis
     tick_stride: 0.5 # the distance between ticks in the plot. if tick_stride <= 0 pyplot determines the ticks automatically
   WiggleCancel: # cancels planning if high frequencies are detected in the trajectory
-    wiggle_detection_threshold: 10 # the amplitude of a frequency must exceed this threshold to be detected as wiggling
-    num_samples_in_fft: 30 # size of the moving window of sample points
-    wiggle_frequency_range: 0.7 # must be in the range [0,1]. Only frequencies in the range [max_detectable_frequency * wiggle_frequency_range, max_detectable_frequency] are considered as wiggling. So a value of 0 means that every frequency with an amplitude above wiggle_detection_threshold is detected as wiggling and a value of 1 means that only the max_detectable_frequency can trigger a wiggle detection.      max_detectable_frequency = 1 / (2 * sample_period)
+    wiggle_detection_threshold: 8 # the amplitude of a frequency must exceed this threshold to be detected as wiggling
+    num_samples_in_fft: 20 # size of the moving window of sample points
+    wiggle_frequency_range: 0.4 # must be in the range [0,1]. Only frequencies in the range [max_detectable_frequency * wiggle_frequency_range, max_detectable_frequency] are considered as wiggling. So a value of 0 means that every frequency with an amplitude above wiggle_detection_threshold is detected as wiggling and a value of 1 means that only the max_detectable_frequency can trigger a wiggle detection.      max_detectable_frequency = 1 / (2 * sample_period)
 reachability_check:
   sample_period: 0.5
   prismatic_velocity: 2.0

@@ -30,6 +30,7 @@ from giskardpy.plugin_interrupts import WiggleCancel, MaxTrajLength
 from giskardpy.plugin_kinematic_sim import KinSimPlugin
 from giskardpy.plugin_log_trajectory import LogTrajPlugin
 from giskardpy.plugin_plot_trajectory import PlotTrajectory
+from giskardpy.plugin_plot_trajectory_fft import PlotTrajectoryFFT
 from giskardpy.plugin_pybullet import WorldUpdatePlugin
 from giskardpy.plugin_send_trajectory import SendTrajectory
 from giskardpy.plugin_set_cmd import SetCmd
@@ -189,6 +190,7 @@ def grow_tree():
     root.add_child(process_move_goal)
     if god_map.get_data(identifier.enable_PlotTrajectory):
         root.add_child(PlotTrajectory(u'plot trajectory', order=3))
+        root.add_child(PlotTrajectoryFFT(u'plot fft', joint_name=u'r_wrist_flex_joint'))
     root.add_child(post_processing)
     root.add_child(move_robot)
     root.add_child(SendResult(u'send result', action_server_name, MoveAction))

@@ -832,3 +832,21 @@ def make_filter_masks(H, num_joint_constraints, num_hard_constraints):
 
 
 
+
+def trajectory_to_np(tj, joint_names):
+    """
+    :type tj: Trajectory
+    :return:
+    """
+    names = list(sorted([i for i in tj._points[0.0].keys() if i in joint_names]))
+    position = []
+    velocity = []
+    times = []
+    for time, point in tj.items():
+        position.append([point[joint_name].position for joint_name in names])
+        velocity.append([point[joint_name].velocity for joint_name in names])
+        times.append(time)
+    position = np.array(position)
+    velocity = np.array(velocity)
+    times = np.array(times)
+    return names, position, velocity, times

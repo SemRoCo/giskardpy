@@ -41,6 +41,7 @@ class PostProcessing(GiskardBehavior):
         soft_constraints_filtered = [(i, soft_constraints[i]) for i in xdot_keys_filtered]
 
         xdotfull = self.get_god_map().get_data(identifier.xdot_full)
+
         if isinstance(xdotfull, int):
             return True
         controllable_joints = self.get_robot().controlled_joints

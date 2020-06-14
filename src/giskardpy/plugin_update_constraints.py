@@ -28,6 +28,7 @@ class GoalToConstraints(GetGoal):
         self.controlled_joints = set()
         self.controllable_links = set()
         self.last_urdf = None
+        self.allowed_types = [x for x in inspect.getmembers(giskardpy.constraints) if inspect.isclass(x[1])]
 
     def initialise(self):
         self.get_god_map().safe_set_data(identifier.collision_goal_identifier, None)
@@ -75,14 +76,12 @@ class GoalToConstraints(GetGoal):
         :rtype: dict
         """
         for constraint in itertools.chain(cmd.constraints, cmd.joint_constraints, cmd.cartesian_constraints):
-            if constraint.type not in allowed_constraint_names():
-                # TODO test me
-                raise InsolvableException(u'unknown constraint')
             try:
-                C = eval(u'giskardpy.constraints.{}'.format(constraint.type))
-            except NameError as e:
+                C = next(x for x in self.allowed_types if constraint.type == x[0])[1]
+            except StopIteration:
                 # TODO return next best constraint type
-                raise ImplementationException(u'unsupported constraint type')
+                available_constraints = '\n'.join([x[0] for x in self.allowed_types]) + '\n'
+                raise InsolvableException(u'unknown constraint {}. available constraint types:\n{}'.format(constraint.type ,available_constraints))
             try:
                 if hasattr(constraint, u'parameter_value_pair'):
                     params = json.loads(constraint.parameter_value_pair)
@@ -92,9 +91,12 @@ class GoalToConstraints(GetGoal):
                 c = C(self.god_map, **params)
                 soft_constraints = c.get_constraints()
                 self.soft_constraints.update(soft_constraints)
-            except TypeError as e:
+            except:
                 traceback.print_exc()
-                raise ImplementationException(help(c.make_constraints))
+                doc_string = C.make_constraints.__doc__
+                if doc_string is None:
+                    doc_string = 'there is no documentation for this function'
+                raise ImplementationException(doc_string)
 
     def add_js_controller_soft_constraints(self):
         for joint_name in self.get_robot().controlled_joints:

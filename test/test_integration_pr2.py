@@ -7,7 +7,7 @@ import roslaunch
 import rospy
 from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped
 from sensor_msgs.msg import JointState
-from giskard_msgs.msg import CollisionEntry, MoveActionGoal, MoveResult, WorldBody, MoveGoal
+from giskard_msgs.msg import CollisionEntry, MoveActionGoal, MoveResult, WorldBody, MoveGoal, MoveCmd, JointConstraint, CartesianConstraint
 from giskard_msgs.srv import UpdateWorldResponse, UpdateWorldRequest
 from numpy import pi
 from shape_msgs.msg import SolidPrimitive
@@ -356,6 +356,7 @@ class TestJointGoals(object):
         zero_pose.send_goal()
         assert (not zero_pose.are_joint_limits_violated())
 
+
     # TODO test goal for unknown joint
 
 
@@ -513,6 +514,46 @@ class TestConstraints(object):
         np.testing.assert_almost_equal(map_T_gripper.pose.orientation.y, 0.0, decimal=3)
         np.testing.assert_almost_equal(map_T_gripper.pose.orientation.z, 0.0, decimal=3)
         np.testing.assert_almost_equal(map_T_gripper.pose.orientation.w, 0.7071, decimal=3)
+
+    def test_wrong_constraint_type(self, zero_pose):
+        cmd = MoveCmd()
+        jc = JointConstraint()
+        jc.type = 'wrong type'
+        jc.goal_state.name = ['r_elbow_flex_joint']
+        jc.goal_state.position = [-1.0]
+        cmd.joint_constraints.append(jc)
+        zero_pose.append_cmd(cmd)
+        zero_pose.send_goal()
+
+    def test_python_code_in_constraint_type(self, zero_pose):
+        cmd = MoveCmd()
+        jc = JointConstraint()
+        jc.type = 'print("asd")'
+        jc.goal_state.name = ['r_elbow_flex_joint']
+        jc.goal_state.position = [-1.0]
+        cmd.joint_constraints.append(jc)
+        zero_pose.append_cmd(cmd)
+        zero_pose.send_goal()
+
+    def test_wrong_params1(self, zero_pose):
+        cmd = MoveCmd()
+        jc = JointConstraint()
+        jc.type = 'JointPositionList'
+        jc.goal_state.name = 'r_elbow_flex_joint'
+        jc.goal_state.position = [-1.0]
+        cmd.joint_constraints.append(jc)
+        zero_pose.append_cmd(cmd)
+        zero_pose.send_goal()
+
+    def test_wrong_params2(self, zero_pose):
+        cmd = MoveCmd()
+        jc = JointConstraint()
+        jc.type = 'JointPositionList'
+        jc.goal_state.name = 5432
+        jc.goal_state.position = 'test'
+        cmd.joint_constraints.append(jc)
+        zero_pose.append_cmd(cmd)
+        zero_pose.send_goal()
 
 class TestCartGoals(object):
 

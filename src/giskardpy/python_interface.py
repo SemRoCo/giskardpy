@@ -269,6 +269,9 @@ class GiskardWrapper(object):
         # move_cmd.max_trajectory_length = max_trajectory_length
         self.cmd_seq.append(move_cmd)
 
+    def append_cmd(self, cmd):
+        self.cmd_seq.append(cmd)
+
     def clear_cmds(self):
         """
         Removes all move commands from the current goal, collision entries are left untouched.

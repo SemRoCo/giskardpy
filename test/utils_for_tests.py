@@ -417,9 +417,6 @@ class GiskardTestWrapper(object):
     def get_as(self):
         return Blackboard().get(u'giskardpy/command')
 
-    def append_cmd(self, cmd):
-        self.wrapper.append_cmd(cmd)
-
     def send_goal(self, goal=None, execute=True):
         """
         :rtype: MoveResult

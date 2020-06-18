@@ -2,6 +2,7 @@ import inspect
 import itertools
 import json
 import traceback
+import difflib
 from time import time
 
 from giskard_msgs.msg import MoveCmd
@@ -15,10 +16,6 @@ from giskardpy.exceptions import InsolvableException, ImplementationException
 from giskardpy.plugin_action_server import GetGoal
 
 
-def allowed_constraint_names():
-    return [x[0] for x in inspect.getmembers(giskardpy.constraints) if inspect.isclass(x[1])]
-
-
 class GoalToConstraints(GetGoal):
     # FIXME no error msg when constraint has missing parameter
     def __init__(self, name, as_name):
@@ -28,7 +25,7 @@ class GoalToConstraints(GetGoal):
         self.controlled_joints = set()
         self.controllable_links = set()
         self.last_urdf = None
-        self.allowed_types = [x for x in inspect.getmembers(giskardpy.constraints) if inspect.isclass(x[1])]
+        self.allowed_constraint_types = {x[0]:x[1] for x in inspect.getmembers(giskardpy.constraints) if inspect.isclass(x[1])}
 
     def initialise(self):
         self.get_god_map().safe_set_data(identifier.collision_goal_identifier, None)
@@ -77,11 +74,12 @@ class GoalToConstraints(GetGoal):
         """
         for constraint in itertools.chain(cmd.constraints, cmd.joint_constraints, cmd.cartesian_constraints):
             try:
-                C = next(x for x in self.allowed_types if constraint.type == x[0])[1]
-            except StopIteration:
+                C = self.allowed_constraint_types[constraint.type]
+            except KeyError:
                 # TODO return next best constraint type
-                available_constraints = '\n'.join([x[0] for x in self.allowed_types]) + '\n'
+                available_constraints = '\n'.join([x for x in self.allowed_constraint_types.keys()]) + '\n'
                 raise InsolvableException(u'unknown constraint {}. available constraint types:\n{}'.format(constraint.type ,available_constraints))
+
             try:
                 if hasattr(constraint, u'parameter_value_pair'):
                     params = json.loads(constraint.parameter_value_pair)

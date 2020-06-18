@@ -516,44 +516,36 @@ class TestConstraints(object):
         np.testing.assert_almost_equal(map_T_gripper.pose.orientation.w, 0.7071, decimal=3)
 
     def test_wrong_constraint_type(self, zero_pose):
-        cmd = MoveCmd()
-        jc = JointConstraint()
-        jc.type = 'wrong type'
-        jc.goal_state.name = ['r_elbow_flex_joint']
-        jc.goal_state.position = [-1.0]
-        cmd.joint_constraints.append(jc)
-        zero_pose.append_cmd(cmd)
-        zero_pose.send_goal()
+        goal_state = JointState()
+        goal_state.name = ['r_elbow_flex_joint']
+        goal_state.position = [-1.0]
+        kwargs = {u'goal_state': goal_state}
+        zero_pose.add_json_goal('wrong_type', **kwargs)
+        zero_pose.send_and_check_goal(expected_error_code=MoveResult.INSOLVABLE)
 
     def test_python_code_in_constraint_type(self, zero_pose):
-        cmd = MoveCmd()
-        jc = JointConstraint()
-        jc.type = 'print("asd")'
-        jc.goal_state.name = ['r_elbow_flex_joint']
-        jc.goal_state.position = [-1.0]
-        cmd.joint_constraints.append(jc)
-        zero_pose.append_cmd(cmd)
-        zero_pose.send_goal()
+        goal_state = JointState()
+        goal_state.name = ['r_elbow_flex_joint']
+        goal_state.position = [-1.0]
+        kwargs = {u'goal_state': goal_state}
+        zero_pose.add_json_goal('print("asd")', **kwargs)
+        zero_pose.send_and_check_goal(expected_error_code=MoveResult.INSOLVABLE)
 
     def test_wrong_params1(self, zero_pose):
-        cmd = MoveCmd()
-        jc = JointConstraint()
-        jc.type = 'JointPositionList'
-        jc.goal_state.name = 'r_elbow_flex_joint'
-        jc.goal_state.position = [-1.0]
-        cmd.joint_constraints.append(jc)
-        zero_pose.append_cmd(cmd)
-        zero_pose.send_goal()
+        goal_state = JointState()
+        goal_state.name = 'r_elbow_flex_joint'
+        goal_state.position = [-1.0]
+        kwargs = {u'goal_state': goal_state}
+        zero_pose.add_json_goal('JointPositionList', **kwargs)
+        zero_pose.send_and_check_goal(expected_error_code=MoveResult.INSOLVABLE)
 
     def test_wrong_params2(self, zero_pose):
-        cmd = MoveCmd()
-        jc = JointConstraint()
-        jc.type = 'JointPositionList'
-        jc.goal_state.name = 5432
-        jc.goal_state.position = 'test'
-        cmd.joint_constraints.append(jc)
-        zero_pose.append_cmd(cmd)
-        zero_pose.send_goal()
+        goal_state = JointState()
+        goal_state.name = [5432]
+        goal_state.position = 'test'
+        kwargs = {u'goal_state': goal_state}
+        zero_pose.add_json_goal('JointPositionList', **kwargs)
+        zero_pose.send_and_check_goal(expected_error_code=MoveResult.INSOLVABLE)
 
 class TestCartGoals(object):
 

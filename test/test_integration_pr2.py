@@ -520,7 +520,7 @@ class TestConstraints(object):
         goal_state.name = ['r_elbow_flex_joint']
         goal_state.position = [-1.0]
         kwargs = {u'goal_state': goal_state}
-        zero_pose.add_json_goal('wrong_type', **kwargs)
+        zero_pose.add_json_goal('jointpos', **kwargs)
         zero_pose.send_and_check_goal(expected_error_code=MoveResult.INSOLVABLE)
 
     def test_python_code_in_constraint_type(self, zero_pose):

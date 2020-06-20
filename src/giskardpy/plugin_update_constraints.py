@@ -76,9 +76,18 @@ class GoalToConstraints(GetGoal):
             try:
                 C = self.allowed_constraint_types[constraint.type]
             except KeyError:
-                # TODO return next best constraint type
-                available_constraints = '\n'.join([x for x in self.allowed_constraint_types.keys()]) + '\n'
-                raise InsolvableException(u'unknown constraint {}. available constraint types:\n{}'.format(constraint.type ,available_constraints))
+                matches = ''
+                for s in self.allowed_constraint_types.keys():
+                    sm = difflib.SequenceMatcher(None, constraint.type.lower(), s.lower())
+                    ratio = sm.ratio()
+                    if ratio >= 0.5:
+                        matches = matches + s + '\n'
+                if matches != '':
+                    raise InsolvableException(
+                        u'unknown constraint {}. did you mean one of these?:\n{}'.format(constraint.type,matches))
+                else:
+                    available_constraints = '\n'.join([x for x in self.allowed_constraint_types.keys()]) + '\n'
+                    raise InsolvableException(u'unknown constraint {}. available constraint types:\n{}'.format(constraint.type ,available_constraints))
 
             try:
                 if hasattr(constraint, u'parameter_value_pair'):

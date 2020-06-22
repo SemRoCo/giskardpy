@@ -53,7 +53,7 @@ class GoalToConstraints(GetGoal):
 
         self.soft_constraints = {}
         # TODO we only have to update the collision constraints, if the robot changed
-        self.add_collision_avoidance_soft_constraints()
+        # self.add_collision_avoidance_soft_constraints()
 
         try:
             self.parse_constraints(move_cmd)

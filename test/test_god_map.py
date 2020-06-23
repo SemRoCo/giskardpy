@@ -251,6 +251,19 @@ class TestGodMap(unittest.TestCase):
         db.safe_set_data([key1], d)
         self.assertEqual(key5, db.get_data([key1, key2, (key3, key4), 0]))
         self.assertEqual(key5, db.get_data([key1, key2, (key3, key4), 0]))
+        self.assertEqual(key5, db.get_data([key1, key2, (key3, key4), 0]))
+
+    def test_clear_cache(self):
+        db = GodMap()
+
+        d = {'b': 'c'}
+        db.safe_set_data(['a'], d)
+        self.assertEqual('c', db.get_data(['a', 'b']))
+        db.clear_cache()
+        class C(object):
+            b = 'c'
+        db.safe_set_data(['a'], C())
+        self.assertEqual('c', db.get_data(['a', 'b']))
 
     @given(variable_name(),
            variable_name(),

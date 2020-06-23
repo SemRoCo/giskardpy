@@ -4,6 +4,7 @@ from multiprocessing import Lock
 
 from giskardpy import cas_wrapper as w
 
+# @profile
 def get_member(identifier, member):
     """
     :param identifier:
@@ -31,92 +32,52 @@ class GetMember(object):
         self.member = member
         self.default_value = default_value
 
+    # @profile
     def __call__(self, a):
+        return self.c(a)
+
+    def c(self, a):
         try:
             r = a[self.member]
-            self.__call__ = self.return_dict
+            self.c = self.return_dict
             return r
         except TypeError:
             if callable(a):
                 r = a(*self.member)
-                self.__call__ = self.return_function_result
+                self.c = self.return_function_result
                 return r
             try:
                 r = getattr(a, self.member)
-                self.__call__ = self.return_attribute
+                self.c = self.return_attribute
                 return r
             except TypeError:
                 pass
         except IndexError:
             r = a[int(self.member)]
-            self.__call__ = self.return_list
+            self.c = self.return_list
             return r
         except RuntimeError:
             pass
         return self.default_value
 
+    # @profile
     def return_dict(self, a):
         return a[self.member]
 
+    # @profile
     def return_list(self, a):
         return a[int(self.member)]
 
+    # @profile
     def return_attribute(self, a):
         return getattr(a, self.member)
 
+    # @profile
     def return_function_result(self, a):
         return a(*self.member)
 
 
-# def get_member_f(identifier, member):
-#     """
-#     :param identifier:
-#     :type identifier: Union[None, dict, list, tuple, object]
-#     :param member:
-#     :type member: str
-#     :return:
-#     """
-#     class f(object):
-#         def __init__(self, member):
-#             self.member = member
-#
-#         def __call__(self, a):
-#             try:
-#                 r = a[self.member]
-#                 self.__call__ = self.return_dict
-#                 return r
-#             except TypeError:
-#                 if callable(identifier):
-#                     r = a(*self.member)
-#                     self.__call__ = self.return_function_result
-#                     return r
-#                 try:
-#                     r = getattr(a, self.member)
-#                     self.__call__ = self.return_attribute
-#                     return r
-#                 except TypeError:
-#                     pass
-#             except IndexError:
-#                 r = a[int(self.member)]
-#                 self.__call__ = self.return_list
-#                 return r
-#             except RuntimeError:
-#                 pass
-#
-#         def return_dict(self, a):
-#             return a[self.member]
-#
-#         def return_list(self, a):
-#             return a[int(self.member)]
-#
-#         def return_attribute(self, a):
-#             return getattr(a, self.member)
-#
-#         def return_function_result(self, a):
-#             return a(*self.member)
-#     return f(member)
-
-
+# @profile
 def get_data(identifier, data, default_value=0.0):
     """
     :param identifier: Identifier in the form of ['pose', 'position', 'x'],
@@ -133,9 +94,9 @@ def get_data(identifier, data, default_value=0.0):
     fs = []
     try:
         for member in identifier:
-            get_member = GetMember(member, default_value)
-            fs.append(get_member)
-            result = get_member(result)
+            f = GetMember(member, default_value)
+            fs.append(f)
+            result = f(result)
     except AttributeError:
         return default_value, None
     except KeyError as e:
@@ -185,6 +146,7 @@ class GodMap(object):
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.lock.release()
 
+    # @profile
     def unsafe_get_data(self, identifier):
         """
 
@@ -214,6 +176,7 @@ class GodMap(object):
         return r
 
     def clear_cache(self):
+        # TODO should be possibile without clear cache
         self.shortcuts = {}
 
     def to_symbol(self, identifier):

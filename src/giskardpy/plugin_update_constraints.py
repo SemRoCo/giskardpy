@@ -95,15 +95,21 @@ class GoalToConstraints(GetGoal):
                 else:
                     params = convert_ros_message_to_dictionary(constraint)
                     del params[u'type']
+
                 c = C(self.god_map, **params)
+            except:
+                doc_string = C.make_constraints.__doc__
+                error_msg = 'wrong parameters for {} \n'.format(C.__name__)
+                if doc_string is not None:
+                    error_msg = error_msg + doc_string
+                raise ValueError(error_msg)
+            try:
                 soft_constraints = c.get_constraints()
                 self.soft_constraints.update(soft_constraints)
             except:
                 traceback.print_exc()
-                doc_string = C.make_constraints.__doc__
-                if doc_string is None:
-                    doc_string = 'there is no documentation for this function'
-                raise ImplementationException(doc_string)
+                raise ImplementationException()
+
 
     def add_js_controller_soft_constraints(self):
         for joint_name in self.get_robot().controlled_joints:

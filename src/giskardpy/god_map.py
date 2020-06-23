@@ -26,6 +26,96 @@ def get_member(identifier, member):
     except RuntimeError:
         pass
 
+class GetMember(object):
+    def __init__(self, member, default_value):
+        self.member = member
+        self.default_value = default_value
+
+    def __call__(self, a):
+        try:
+            r = a[self.member]
+            self.__call__ = self.return_dict
+            return r
+        except TypeError:
+            if callable(a):
+                r = a(*self.member)
+                self.__call__ = self.return_function_result
+                return r
+            try:
+                r = getattr(a, self.member)
+                self.__call__ = self.return_attribute
+                return r
+            except TypeError:
+                pass
+        except IndexError:
+            r = a[int(self.member)]
+            self.__call__ = self.return_list
+            return r
+        except RuntimeError:
+            pass
+        return self.default_value
+
+    def return_dict(self, a):
+        return a[self.member]
+
+    def return_list(self, a):
+        return a[int(self.member)]
+
+    def return_attribute(self, a):
+        return getattr(a, self.member)
+
+    def return_function_result(self, a):
+        return a(*self.member)
+
+
+# def get_member_f(identifier, member):
+#     """
+#     :param identifier:
+#     :type identifier: Union[None, dict, list, tuple, object]
+#     :param member:
+#     :type member: str
+#     :return:
+#     """
+#     class f(object):
+#         def __init__(self, member):
+#             self.member = member
+#
+#         def __call__(self, a):
+#             try:
+#                 r = a[self.member]
+#                 self.__call__ = self.return_dict
+#                 return r
+#             except TypeError:
+#                 if callable(identifier):
+#                     r = a(*self.member)
+#                     self.__call__ = self.return_function_result
+#                     return r
+#                 try:
+#                     r = getattr(a, self.member)
+#                     self.__call__ = self.return_attribute
+#                     return r
+#                 except TypeError:
+#                     pass
+#             except IndexError:
+#                 r = a[int(self.member)]
+#                 self.__call__ = self.return_list
+#                 return r
+#             except RuntimeError:
+#                 pass
+#
+#         def return_dict(self, a):
+#             return a[self.member]
+#
+#         def return_list(self, a):
+#             return a[int(self.member)]
+#
+#         def return_attribute(self, a):
+#             return getattr(a, self.member)
+#
+#         def return_function_result(self, a):
+#             return a(*self.member)
+#     return f(member)
+
 
 def get_data(identifier, data, default_value=0.0):
     """
@@ -40,20 +130,29 @@ def get_data(identifier, data, default_value=0.0):
     """
     # TODO deal with unused identifiers
     result = data
+    fs = []
     try:
         for member in identifier:
-            result = get_member(result, member)
+            get_member = GetMember(member, default_value)
+            fs.append(get_member)
+            result = get_member(result)
     except AttributeError:
-        return default_value
+        return default_value, None
     except KeyError as e:
         # traceback.print_exc()
         # raise KeyError(identifier)
         # TODO is this really a good idea?
         # I do this because it automatically sets weights for unused goals to 0
-        return default_value
+        return default_value, None
     except IndexError:
-        return default_value
-    return result
+        return default_value, None
+    def shortcut(d):
+        # TODO can this be done without a loop?
+        r = d
+        for f in fs:
+            r = f(r)
+        return r
+    return result, shortcut
 
 
 class GodMap(object):
@@ -62,17 +161,18 @@ class GodMap(object):
     """
 
     # TODO give this fucker a lock
-    def __init__(self):
+    def __init__(self, default_value=0.0):
         self._data = {}
         self.expr_separator = u'_'
         self.key_to_expr = {}
         self.expr_to_key = {}
-        self.default_value = 0
+        self.default_value = default_value
         self.last_expr_values = {}
+        self.shortcuts = {}
         self.lock = Lock()
 
     def __copy__(self):
-        god_map_copy = GodMap()
+        god_map_copy = GodMap(self.default_value)
         god_map_copy._data = copy(self._data)
         god_map_copy.key_to_expr = copy(self.key_to_expr)
         god_map_copy.expr_to_key = copy(self.expr_to_key)
@@ -97,12 +197,24 @@ class GodMap(object):
         :type identifier: list
         :return: object that is saved at key
         """
-        return get_data(identifier, self._data, self.default_value)
+        identifier = tuple(identifier)
+        if identifier not in self.shortcuts:
+            result, shortcut = get_data(identifier, self._data, self.default_value)
+            if shortcut:
+                self.shortcuts[identifier] = shortcut
+            return result
+        try:
+            return self.shortcuts[identifier](self._data)
+        except:
+            return self.default_value
 
     def get_data(self, identifier):
         with self.lock:
             r = self.unsafe_get_data(identifier)
         return r
+
+    def clear_cache(self):
+        self.shortcuts = {}
 
     def to_symbol(self, identifier):
         """

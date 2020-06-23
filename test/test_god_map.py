@@ -1,14 +1,13 @@
 import numpy as np
 
 import giskardpy
-from giskardpy.utils import KeyDefaultDict
 
 giskardpy.WORLD_IMPLEMENTATION = None
 import unittest
 from collections import namedtuple
 
 from geometry_msgs.msg import PoseStamped
-from hypothesis import given
+from hypothesis import given, assume
 import hypothesis.strategies as st
 from giskardpy import identifier
 from giskardpy import cas_wrapper as w
@@ -21,6 +20,16 @@ PKG = u'giskardpy'
 
 
 class TestGodMap(unittest.TestCase):
+    @given(variable_name(),
+           variable_name(),
+           st.integers(),
+           st.integers())
+    def test_god_map_key_error(self, key, wrong_key, number, default_value):
+        assume(key != wrong_key)
+        db = GodMap(default_value)
+        db.safe_set_data([key], number)
+        self.assertEqual(db.get_data([wrong_key]), default_value, msg=u'key={}, number={}'.format(key, number))
+
     @given(variable_name(),
            st.integers())
     def test_set_get_integer(self, key, number):
@@ -82,6 +91,18 @@ class TestGodMap(unittest.TestCase):
         for i, name in enumerate(class_names):
             c = db.get_data(class_names[:i + 1])
             self.assertEqual(type(c).__name__, name)
+
+    def test_attribute_error(self):
+        db = GodMap()
+        class C(object):
+            asdf = 1
+        db.set_data(['c'], C())
+        self.assertEqual(db.get_data(['c', 'a']), db.default_value)
+
+    def test_index_error(self):
+        db = GodMap()
+        db.set_data(['l'], [1,2,3])
+        self.assertEqual(db.get_data(['l', '5']), db.default_value)
 
     @given(variable_name(),
            keys_values())
@@ -174,7 +195,7 @@ class TestGodMap(unittest.TestCase):
         db = GodMap()
         f = lambda x: x
         db.safe_set_data([key], f)
-        self.assertEqual(db.get_data([key, [key2]]), key2)
+        self.assertEqual(db.get_data([key, (key2,)]), key2)
 
     @given(variable_name(),
            variable_name(),
@@ -229,6 +250,7 @@ class TestGodMap(unittest.TestCase):
         d = {key2: a}
         db.safe_set_data([key1], d)
         self.assertEqual(key5, db.get_data([key1, key2, (key3, key4), 0]))
+        self.assertEqual(key5, db.get_data([key1, key2, (key3, key4), 0]))
 
     @given(variable_name(),
            variable_name(),
@@ -243,7 +265,7 @@ class TestGodMap(unittest.TestCase):
         a = MUH()
         d = {key2: a}
         db.safe_set_data([key1], d)
-        self.assertEqual(key3, db.get_data([key1, key2, [], 0]))
+        self.assertEqual(key3, db.get_data([key1, key2, tuple(), 0]))
 
     @given(variable_name(),
            st.integers())

@@ -15,6 +15,7 @@ class CleanUp(GiskardBehavior):
         self.general_options = deepcopy(self.get_god_map().get_data(identifier.general_options))
 
     def initialise(self):
+        self.get_god_map().clear_cache()
         self.get_god_map().safe_set_data(identifier.closest_point, {})
         # self.get_god_map().safe_set_data(identifier.closest_point, None)
         self.get_god_map().safe_set_data(identifier.time, 1)

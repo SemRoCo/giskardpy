@@ -25,6 +25,7 @@ class CleanUp(GiskardBehavior):
         self.get_god_map().safe_set_data(identifier.trajectory, trajectory)
         # to reverse update godmap changes
         self.get_god_map().safe_set_data(identifier.general_options, deepcopy(self.general_options))
+        self.get_god_map().safe_set_data(identifier.next_move_goal, None)
 
     def update(self):
         return Status.SUCCESS

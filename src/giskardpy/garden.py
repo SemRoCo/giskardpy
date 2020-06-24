@@ -39,6 +39,7 @@ from giskardpy.plugin_update_constraints import GoalToConstraints
 from giskardpy.plugin_visualization import VisualizationBehavior
 from giskardpy.plugin_post_processing import PostProcessing
 # from giskardpy.pybullet_world import PyBulletWorld
+from giskardpy.pybullet_world import PyBulletWorld
 from giskardpy.utils import create_path, render_dot_tree, KeyDefaultDict
 from giskardpy.world import World
 from giskardpy.world_object import WorldObject
@@ -97,7 +98,7 @@ def initialize_god_map():
                                                                             identifier.default_joint_acceleration_angular_limit,
                                                                             god_map)
 
-    world = World(blackboard.god_map.get_data(identifier.data_folder))
+    world = PyBulletWorld(False, blackboard.god_map.get_data(identifier.data_folder))
     god_map.safe_set_data(identifier.world, world)
     robot = WorldObject(god_map.get_data(identifier.robot_description),
                         None,
@@ -132,21 +133,21 @@ def grow_tree():
     god_map = initialize_god_map()
     # ----------------------------------------------
     wait_for_goal = Sequence(u'wait for goal')
-    # wait_for_goal.add_child(TFPlugin(u'tf'))
+    wait_for_goal.add_child(TFPlugin(u'tf'))
     wait_for_goal.add_child(ConfigurationPlugin(u'js'))
-    # wait_for_goal.add_child(WorldUpdatePlugin(u'pybullet updater'))
+    wait_for_goal.add_child(WorldUpdatePlugin(u'pybullet updater'))
     wait_for_goal.add_child(GoalReceived(u'has goal', action_server_name, MoveAction))
     wait_for_goal.add_child(ConfigurationPlugin(u'js'))
     # ----------------------------------------------
     planning_3 = PluginBehavior(u'planning III', sleep=0)
-    # planning_3.add_plugin(CollisionChecker(u'coll'))
+    planning_3.add_plugin(CollisionChecker(u'coll'))
     # if god_map.safe_get_data(identifier.enable_collision_marker):
     #     planning_3.add_plugin(success_is_running(CPIMarker)(u'cpi marker'))
     planning_3.add_plugin(ControllerPlugin(u'controller'))
     planning_3.add_plugin(KinSimPlugin(u'kin sim'))
     planning_3.add_plugin(LogTrajPlugin(u'log'))
     planning_3.add_plugin(GoalReachedPlugin(u'goal reached'))
-    # planning_3.add_plugin(WiggleCancel(u'wiggle', final_detection=False))
+    planning_3.add_plugin(WiggleCancel(u'wiggle', final_detection=False))
     planning_3.add_plugin(TimePlugin(u'time'))
     # planning_3.add_plugin(MaxTrajLength(u'traj length check'))
     # ----------------------------------------------
@@ -158,10 +159,10 @@ def grow_tree():
     planning_2 = failure_is_success(Selector)(u'planning II')
     planning_2.add_child(GoalCanceled(u'goal canceled', action_server_name))
     # planning.add_child(CollisionCancel(u'in collision', collision_time_threshold))
-    # if god_map.get_data(identifier.enable_VisualizationBehavior):
-    #     planning_2.add_child(success_is_failure(VisualizationBehavior)(u'visualization'))
-    # if god_map.get_data(identifier.enable_CPIMarker):
-    #     planning_2.add_child(success_is_failure(CollisionMarker)(u'cpi marker'))
+    if god_map.get_data(identifier.enable_VisualizationBehavior):
+        planning_2.add_child(success_is_failure(VisualizationBehavior)(u'visualization'))
+    if god_map.get_data(identifier.enable_CPIMarker):
+        planning_2.add_child(success_is_failure(CollisionMarker)(u'cpi marker'))
     planning_2.add_child(planning_3)
     # ----------------------------------------------
     move_robot = failure_is_success(Sequence)(u'move robot')
@@ -179,19 +180,19 @@ def grow_tree():
     process_move_goal.add_child(SetCmd(u'set move goal', action_server_name))
     # ----------------------------------------------
     #
-    # post_processing = failure_is_success(Sequence)(u'post processing')
-    # post_processing.add_child(WiggleCancel(u'wiggle_cancel_final_detection', final_detection=True))
-    # post_processing.add_child(PostProcessing(u'post_processing'))
+    post_processing = failure_is_success(Sequence)(u'post processing')
+    post_processing.add_child(WiggleCancel(u'wiggle_cancel_final_detection', final_detection=True))
+    post_processing.add_child(PostProcessing(u'post_processing'))
     # ----------------------------------------------
     # ----------------------------------------------
     root = Sequence(u'root')
     root.add_child(wait_for_goal)
     root.add_child(CleanUp(u'cleanup'))
     root.add_child(process_move_goal)
-    # if god_map.get_data(identifier.enable_PlotTrajectory):
-    #     root.add_child(PlotTrajectory(u'plot trajectory', order=3))
-    #     root.add_child(PlotTrajectoryFFT(u'plot fft', joint_name=u'r_wrist_flex_joint'))
-    # root.add_child(post_processing)
+    if god_map.get_data(identifier.enable_PlotTrajectory):
+        root.add_child(PlotTrajectory(u'plot trajectory', order=3))
+        root.add_child(PlotTrajectoryFFT(u'plot fft', joint_name=u'r_wrist_flex_joint'))
+    root.add_child(post_processing)
     root.add_child(move_robot)
     root.add_child(SendResult(u'send result', action_server_name, MoveAction))
 

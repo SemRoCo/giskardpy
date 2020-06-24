@@ -731,6 +731,19 @@ class TestCartGoals(object):
         self.test_cart_goal_1eef(zero_pose)
         self.test_cart_goal_1eef2(zero_pose)
 
+
+    def test_cart_goal_1eef4(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        p = PoseStamped()
+        p.header.stamp = rospy.get_rostime()
+        p.header.frame_id = u'map'
+        p.pose.position = Point(2., 0, 1.)
+        p.pose.orientation = Quaternion(0, 0, 0, 1)
+        zero_pose.allow_all_collisions()
+        zero_pose.set_and_check_cart_goal(p, zero_pose.r_tip, zero_pose.default_root)
+
     def test_cart_goal_2eef(self, zero_pose):
         """
         :type zero_pose: PR2

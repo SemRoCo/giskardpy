@@ -53,7 +53,7 @@ class GoalToConstraints(GetGoal):
 
         self.soft_constraints = {}
         # TODO we only have to update the collision constraints, if the robot changed
-        # self.add_collision_avoidance_soft_constraints()
+        self.add_collision_avoidance_soft_constraints()
 
         try:
             self.parse_constraints(move_cmd)
@@ -81,20 +81,6 @@ class GoalToConstraints(GetGoal):
         if (self.get_god_map().get_data(identifier.check_reachability)):
             from giskardpy import cas_wrapper as w
             joint_constraints = OrderedDict()
-            # for k in controlled_joints:
-            #     weight = self.robot._joint_constraints[k].weight
-            #     if self.get_robot().is_joint_prismatic(k):
-            #         joint_constraints[(self.robot.get_name(), k)] = JointConstraint(-self.rc_prismatic_velocity,
-            #                                                                         self.rc_prismatic_velocity, weight)
-            #     elif self.get_robot().is_joint_continuous(k):
-            #         joint_constraints[(self.robot.get_name(), k)] = JointConstraint(-self.rc_continuous_velocity,
-            #                                                                         self.rc_continuous_velocity, weight)
-            #     elif self.get_robot().is_joint_revolute(k):
-            #         joint_constraints[(self.robot.get_name(), k)] = JointConstraint(-self.rc_revolute_velocity,
-            #                                                                         self.rc_revolute_velocity, weight)
-            #     else:
-            #         joint_constraints[(self.robot.get_name(), k)] = JointConstraint(-self.rc_other_velocity,
-            #                                                                         self.rc_other_velocity, weight)
             for i, joint_name in enumerate(controlled_joints):
                 lower_limit, upper_limit = self.get_robot().get_joint_limits(joint_name)
                 joint_symbol = self.get_robot().get_joint_position_symbol(joint_name)

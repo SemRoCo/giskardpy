@@ -55,9 +55,14 @@ class Collision(object):
     # TODO why no named tuple?
     def __init__(self, link_a, body_b, link_b, position_on_a, position_on_b, contact_normal, contact_distance):
         self.__position_on_a = position_on_a
+        self.__position_on_a_in_a = position_on_a
         self.__position_on_b = position_on_b
+        self.__position_on_b_in_b = position_on_b
+        self.__position_on_b_in_root = position_on_b
         self.__contact_distance = contact_distance
         self.__contact_normal = contact_normal
+        self.__contact_normal_in_root = contact_normal
+        self.__contact_normal_in_b = contact_normal
         self.__original_link_a = link_a
         self.__link_a = link_a
         self.__body_b = body_b
@@ -130,6 +135,8 @@ class Collision(object):
 
 
 class Collisions(object):
+
+
     def __init__(self, robot):
         """
         :type robot: giskardpy.robot.Robot
@@ -148,6 +155,7 @@ class Collisions(object):
         self.number_of_self_collisions = defaultdict(int)
         self.number_of_external_collisions = defaultdict(int)
 
+
     def add(self, collision):
         """
         :type collision: Collision
@@ -165,6 +173,7 @@ class Collisions(object):
             self.external_collision[key].add(collision)
             self.number_of_external_collisions[key] = min(20, self.number_of_external_collisions[key] + 1)
 
+
     def transform_closest_point(self, collision):
         """
         :type collision: Collision
@@ -174,6 +183,7 @@ class Collisions(object):
             return self.transform_self_collision(collision)
         else:
             return self.transform_external_collision(collision)
+
 
     def transform_self_collision(self, collision):
         """
@@ -199,6 +209,7 @@ class Collisions(object):
         collision.set_contact_normal_in_b(new_b_V_n[:-1])
         return collision
 
+
     def transform_external_collision(self, collision):
         """
         :type collision: Collision
@@ -217,8 +228,10 @@ class Collisions(object):
         collision.set_contact_normal_in_root(r_V_n[:-1])
         return collision
 
+
     def _default_collision(self, link_a, body_b, link_b):
         return Collision(link_a, body_b, link_b, [0, 0, 0], [0, 0, 0], [0, 0, 1], 100)
+
 
     def get_external_collisions(self, joint_name):
         """
@@ -228,8 +241,10 @@ class Collisions(object):
         """
         return self.external_collision[joint_name]
 
+
     def get_number_of_external_collisions(self, joint_name):
         return self.number_of_external_collisions[joint_name]
+
 
     def get_self_collisions(self, link_a, link_b):
         """
@@ -242,11 +257,14 @@ class Collisions(object):
         # FIXME maybe check for reverse key?
         return self.self_collisions[link_a, link_b]
 
+
     def get_number_of_self_collisions(self, link_a, link_b):
         return self.number_of_self_collisions[link_a, link_b]
 
+
     def __contains__(self, item):
         return item in self.self_collisions or item in self.external_collision
+
 
     def items(self):
         return self.all_collisions

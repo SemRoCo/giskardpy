@@ -8,4 +8,4 @@ MAP = u'map'
 import casadi_wrapper as cas_wrapper
 
 
-WORLD_IMPLEMENTATION = u''
+WORLD_IMPLEMENTATION = u'pybullet'

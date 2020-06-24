@@ -871,6 +871,30 @@ class UpdateGodMap(Constraint):
     def get_constraint(self):
         return {}
 
+class UpdateYaml(Constraint):
+
+    def __init__(self, god_map, updates):
+        super(UpdateYaml, self).__init__(god_map)
+        self.update_yaml([], updates)
+
+    def update_yaml(self, identifier, updates):
+        if not isinstance(updates, dict):
+            raise GiskardException(u'{} used incorrectly, {} not a dict or number'.format(str(self), updates))
+        for member, value in updates.items():
+            if len(identifier) == 0 and member in self.get_god_map().safe_get_data(identifier)[u'rosparam'].keys():
+                next_identifier = identifier + [u'rosparam'] + [member]
+            elif identifier[0] == u'rosparam' and member in self.get_god_map().safe_get_data(identifier).keys():
+                next_identifier = identifier + [member]
+            else:
+                raise TypeError("Access to god_map denied, false parameter of Update Connstraint")
+            if isinstance(value, numbers.Number) and \
+                    isinstance(self.get_god_map().safe_get_data(next_identifier), numbers.Number):
+                self.get_god_map().safe_set_data(next_identifier, value)
+            else:
+                self.update_yaml(next_identifier, value)
+
+    def get_constraint(self):
+        return {}
 
 class Pointing(Constraint):
     goal_point = u'goal_point'

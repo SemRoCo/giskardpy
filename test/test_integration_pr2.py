@@ -194,7 +194,7 @@ def box_setup(pocky_pose_setup):
     p.pose.position.y = 0
     p.pose.position.z = 0.5
     p.pose.orientation.w = 1
-    pocky_pose_setup.add_box(size=[1,1,1], pose=p)
+    pocky_pose_setup.add_box(size=[1, 1, 1], pose=p)
     return pocky_pose_setup
 
 
@@ -308,6 +308,30 @@ class TestJointGoals(object):
 
 
 class TestConstraints(object):
+    def test_UpdateYaml(self, pocky_pose_setup):
+        """
+        :type pocky_pose_setup: PR2
+        """
+        r_goal = PoseStamped()
+        r_goal.header.frame_id = pocky_pose_setup.r_tip
+        r_goal.pose.orientation.w = 1
+        r_goal.pose.position.x += 0.1
+        updates = {
+            u'general_options': {
+                u'joint_weights': {
+                    u'odom_x_joint': 0.0999,
+                    u'odom_y_joint': 0.0999,
+                    u'odom_z_joint': 0.0888
+                }
+            }
+        }
+        pocky_pose_setup.wrapper.update_yaml(updates)
+        pocky_pose_setup.set_and_check_cart_goal(r_goal, pocky_pose_setup.r_tip)
+        assert pocky_pose_setup.get_god_map().get_data(identifier.joint_cost + [u'odom_x_joint']) == 0.0999
+        assert pocky_pose_setup.get_god_map().get_data(identifier.joint_cost + [u'odom_y_joint']) == 0.0999
+        assert pocky_pose_setup.get_god_map().get_data(identifier.joint_cost + [u'odom_z_joint']) == 0.0888
+        assert pocky_pose_setup.get_god_map().get_data(identifier.joint_cost + [u'torso_lift_joint']) == 0.5
+
     def test_UpdateGodMap(self, pocky_pose_setup):
         """
         :type pocky_pose_setup: PR2
@@ -1329,22 +1353,22 @@ class TestCollisionAvoidanceGoals(object):
         """
         pocky_pose_setup.attach_box(size=[0.2, 0.05, 0.05],
                                     frame_id=pocky_pose_setup.r_tip,
-                                    position=[0.08,0,0],
-                                    orientation=[0,0,0,1])
+                                    position=[0.08, 0, 0],
+                                    orientation=[0, 0, 0, 1])
         p = PoseStamped()
         p.header.frame_id = pocky_pose_setup.r_tip
         p.pose.position.x = 0.15
         p.pose.position.y = 0.04
         p.pose.position.z = 0
         p.pose.orientation.w = 1
-        pocky_pose_setup.add_box('bl', [0.1,0.01,0.2], p)
+        pocky_pose_setup.add_box('bl', [0.1, 0.01, 0.2], p)
         p = PoseStamped()
         p.header.frame_id = pocky_pose_setup.r_tip
         p.pose.position.x = 0.15
         p.pose.position.y = -0.04
         p.pose.position.z = 0
         p.pose.orientation.w = 1
-        pocky_pose_setup.add_box('br', [0.1,0.01,0.2], p)
+        pocky_pose_setup.add_box('br', [0.1, 0.01, 0.2], p)
 
         p = PoseStamped()
         p.header.frame_id = pocky_pose_setup.r_tip
@@ -1360,32 +1384,32 @@ class TestCollisionAvoidanceGoals(object):
         """
         :type box_setup: PR2
         """
-        #fixme
+        # fixme
         pocky_pose_setup.attach_box(size=[0.2, 0.05, 0.05],
                                     frame_id=pocky_pose_setup.r_tip,
-                                    position=[0.08,0,0],
-                                    orientation=[0,0,0,1])
+                                    position=[0.08, 0, 0],
+                                    orientation=[0, 0, 0, 1])
         p = PoseStamped()
         p.header.frame_id = pocky_pose_setup.r_tip
         p.pose.position.x = 0.2
         p.pose.position.y = 0
         p.pose.position.z = 0
         p.pose.orientation.w = 1
-        pocky_pose_setup.add_box('b1', [0.01,0.2,0.2], p)
+        pocky_pose_setup.add_box('b1', [0.01, 0.2, 0.2], p)
         p = PoseStamped()
         p.header.frame_id = pocky_pose_setup.r_tip
         p.pose.position.x = 0.15
         p.pose.position.y = 0.04
         p.pose.position.z = 0
         p.pose.orientation.w = 1
-        pocky_pose_setup.add_box('bl', [0.1,0.01,0.2], p)
+        pocky_pose_setup.add_box('bl', [0.1, 0.01, 0.2], p)
         p = PoseStamped()
         p.header.frame_id = pocky_pose_setup.r_tip
         p.pose.position.x = 0.15
         p.pose.position.y = -0.04
         p.pose.position.z = 0
         p.pose.orientation.w = 1
-        pocky_pose_setup.add_box('br', [0.1,0.01,0.2], p)
+        pocky_pose_setup.add_box('br', [0.1, 0.01, 0.2], p)
 
         # p = PoseStamped()
         # p.header.frame_id = pocky_pose_setup.r_tip
@@ -1401,25 +1425,25 @@ class TestCollisionAvoidanceGoals(object):
         """
         :type box_setup: PR2
         """
-        #fixme
+        # fixme
         pocky_pose_setup.attach_box(size=[0.2, 0.05, 0.05],
                                     frame_id=pocky_pose_setup.r_tip,
-                                    position=[0.08,0,0],
-                                    orientation=[0,0,0,1])
+                                    position=[0.08, 0, 0],
+                                    orientation=[0, 0, 0, 1])
         p = PoseStamped()
         p.header.frame_id = pocky_pose_setup.r_tip
         p.pose.position.x = 0.12
         p.pose.position.y = 0.04
         p.pose.position.z = 0
         p.pose.orientation.w = 1
-        pocky_pose_setup.add_cylinder('bl', [0.2,0.01], p)
+        pocky_pose_setup.add_cylinder('bl', [0.2, 0.01], p)
         p = PoseStamped()
         p.header.frame_id = pocky_pose_setup.r_tip
         p.pose.position.x = 0.12
         p.pose.position.y = -0.04
         p.pose.position.z = 0
         p.pose.orientation.w = 1
-        pocky_pose_setup.add_cylinder('br', [0.2,0.01], p)
+        pocky_pose_setup.add_cylinder('br', [0.2, 0.01], p)
 
         pocky_pose_setup.send_and_check_goal()
         # TODO check traj length?
@@ -1678,7 +1702,7 @@ class TestCollisionAvoidanceGoals(object):
     # TODO test plan only
 
     def test_attached_two_items(self, zero_pose):
-        #FIXME visualization bug
+        # FIXME visualization bug
         box1_name = u'box1'
         box2_name = u'box2'
 
@@ -2013,8 +2037,6 @@ class TestCollisionAvoidanceGoals(object):
     #     kitchen_setup.set_cart_goal(tool_frame_goal, kitchen_setup.l_tip, kitchen_setup.default_root)
     #     kitchen_setup.send_and_check_goal(execute=False)
 
-
-
     def test_bowl_and_cup(self, kitchen_setup):
         bowl_name = u'bowl'
         cup_name = u'cup'
@@ -2095,7 +2117,7 @@ class TestCollisionAvoidanceGoals(object):
         kitchen_setup.detach_object(cup_name)
         kitchen_setup.send_and_check_joint_goal(gaya_pose)
 
-        #fixme
+        # fixme
         # self.close_drawer(kitchen_setup, kitchen_setup.l_tip, u'iai_kitchen/sink_area_left_middle_drawer_handle',
         #                   u'sink_area_left_middle_drawer_main_joint')
 

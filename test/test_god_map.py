@@ -38,6 +38,14 @@ class TestGodMap(unittest.TestCase):
         self.assertEqual(db.get_data([key]), number, msg=u'key={}, number={}'.format(key, number))
 
     @given(variable_name(),
+           st.integers())
+    def test_set_get_integer2(self, key, number):
+        db = GodMap()
+        db.safe_set_data([key], number)
+        self.assertEqual(db.get_data([key]), number, msg=u'key={}, number={}'.format(key, number))
+        self.assertEqual(db.get_data([key]), number, msg=u'key={}, number={}'.format(key, number))
+
+    @given(variable_name(),
            st.floats(allow_nan=False))
     def test_set_get_float(self, key, number):
         db = GodMap()

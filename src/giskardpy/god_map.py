@@ -28,14 +28,85 @@ def get_member(identifier, member):
         pass
 
 class GetMember(object):
-    def __init__(self, member, default_value):
-        self.member = member
+    def __init__(self, default_value):
+        self.member = None
         self.default_value = default_value
+        self.child = None
+
+    # @profile
+    def init_call(self, identifier, data):
+        self.member = identifier[0]
+        sub_data = self.c(data)
+        if len(identifier) == 2:
+            self.child = GetMemberLeaf(self.default_value)
+            return self.child.init_call(identifier[-1], sub_data)
+        elif len(identifier) > 2:
+            self.child = GetMember(self.default_value)
+            return self.child.init_call(identifier[1:], sub_data)
+        return sub_data
+
 
     # @profile
     def __call__(self, a):
         return self.c(a)
 
+    # @profile
+    def c(self, a):
+        try:
+            r = a[self.member]
+            self.c = self.return_dict
+            return r
+        except TypeError:
+            if callable(a):
+                r = a(*self.member)
+                self.c = self.return_function_result
+                return r
+            try:
+                r = getattr(a, self.member)
+                self.c = self.return_attribute
+                return r
+            except TypeError:
+                pass
+        except IndexError:
+            r = a[int(self.member)]
+            self.c = self.return_list
+            return r
+        except RuntimeError:
+            pass
+        return self.default_value
+
+    # @profile
+    def return_dict(self, a):
+        return self.child.c(a[self.member])
+
+    # @profile
+    def return_list(self, a):
+        return self.child.c(a[int(self.member)])
+
+    # @profile
+    def return_attribute(self, a):
+        return self.child.c(getattr(a, self.member))
+
+    # @profile
+    def return_function_result(self, a):
+        return self.child.c(a(*self.member))
+
+class GetMemberLeaf(object):
+    def __init__(self, default_value):
+        self.member = None
+        self.default_value = default_value
+        self.child = None
+
+    def init_call(self, member, data):
+        self.member = member
+        return self.c(data)
+
+
+    # @profile
+    def __call__(self, a):
+        return self.c(a)
+
+    # @profile
     def c(self, a):
         try:
             r = a[self.member]
@@ -90,13 +161,19 @@ def get_data(identifier, data, default_value=0.0):
     :return: object that is saved at key
     """
     # TODO deal with unused identifiers
-    result = data
-    fs = []
+    # result = data
+    # fs = []
     try:
-        for member in identifier:
-            f = GetMember(member, default_value)
-            fs.append(f)
-            result = f(result)
+        if len(identifier) == 1:
+            shortcut = GetMemberLeaf(default_value)
+            result = shortcut.init_call(identifier[0], data)
+        else:
+            shortcut = GetMember(default_value)
+            result = shortcut.init_call(identifier, data)
+        # for member in identifier:
+        #     f = GetMember(member, default_value)
+            # fs.append(f)
+            # result = f(result)
     except AttributeError:
         return default_value, None
     except KeyError as e:
@@ -107,12 +184,12 @@ def get_data(identifier, data, default_value=0.0):
         return default_value, None
     except IndexError:
         return default_value, None
-    def shortcut(d):
+    # def shortcut(d):
         # TODO can this be done without a loop?
-        r = d
-        for f in fs:
-            r = f(r)
-        return r
+        # r = d
+        # for f in fs:
+        #     r = f(r)
+        # return r
     return result, shortcut
 
 
@@ -166,7 +243,7 @@ class GodMap(object):
                 self.shortcuts[identifier] = shortcut
             return result
         try:
-            return self.shortcuts[identifier](self._data)
+            return self.shortcuts[identifier].c(self._data)
         except:
             return self.default_value
 

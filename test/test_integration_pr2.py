@@ -356,6 +356,7 @@ class TestJointGoals(object):
         zero_pose.send_goal()
         assert (not zero_pose.are_joint_limits_violated())
 
+
     # TODO test goal for unknown joint
 
 
@@ -513,6 +514,38 @@ class TestConstraints(object):
         np.testing.assert_almost_equal(map_T_gripper.pose.orientation.y, 0.0, decimal=3)
         np.testing.assert_almost_equal(map_T_gripper.pose.orientation.z, 0.0, decimal=3)
         np.testing.assert_almost_equal(map_T_gripper.pose.orientation.w, 0.7071, decimal=3)
+
+    def test_wrong_constraint_type(self, zero_pose):
+        goal_state = JointState()
+        goal_state.name = ['r_elbow_flex_joint']
+        goal_state.position = [-1.0]
+        kwargs = {u'goal_state': goal_state}
+        zero_pose.add_json_goal('jointpos', **kwargs)
+        zero_pose.send_and_check_goal(expected_error_code=MoveResult.INSOLVABLE)
+
+    def test_python_code_in_constraint_type(self, zero_pose):
+        goal_state = JointState()
+        goal_state.name = ['r_elbow_flex_joint']
+        goal_state.position = [-1.0]
+        kwargs = {u'goal_state': goal_state}
+        zero_pose.add_json_goal('print("asd")', **kwargs)
+        zero_pose.send_and_check_goal(expected_error_code=MoveResult.INSOLVABLE)
+
+    def test_wrong_params1(self, zero_pose):
+        goal_state = JointState()
+        goal_state.name = 'r_elbow_flex_joint'
+        goal_state.position = [-1.0]
+        kwargs = {u'goal_state': goal_state}
+        zero_pose.add_json_goal('JointPositionList', **kwargs)
+        zero_pose.send_and_check_goal(expected_error_code=MoveResult.INSOLVABLE)
+
+    def test_wrong_params2(self, zero_pose):
+        goal_state = JointState()
+        goal_state.name = [5432]
+        goal_state.position = 'test'
+        kwargs = {u'goal_state': goal_state}
+        zero_pose.add_json_goal('JointPositionList', **kwargs)
+        zero_pose.send_and_check_goal(expected_error_code=MoveResult.INSOLVABLE)
 
 class TestCartGoals(object):
 

@@ -7,7 +7,7 @@ from collections import defaultdict
 import difflib
 from time import time
 
-from giskard_msgs.msg import MoveCmd
+from giskard_msgs.msg import MoveCmd, CollisionEntry
 from py_trees import Status
 from rospy_message_converter.message_converter import convert_ros_message_to_dictionary
 
@@ -50,8 +50,7 @@ class GoalToConstraints(GetGoal):
         self.get_god_map().safe_set_data(identifier.constraints_identifier, {})
 
         self.soft_constraints = {}
-        # TODO we only have to update the collision constraints, if the robot changed
-        self.add_collision_avoidance_soft_constraints()
+        self.add_collision_avoidance_soft_constraints(move_cmd.collisions)
 
         try:
             self.parse_constraints(move_cmd)
@@ -67,8 +66,6 @@ class GoalToConstraints(GetGoal):
             self.raise_to_blackboard(e)
             traceback.print_exc()
             return Status.SUCCESS
-
-        # self.set_unused_joint_goals_to_current()
 
         self.get_god_map().safe_set_data(identifier.collision_goal_identifier, move_cmd.collisions)
         self.get_god_map().safe_set_data(identifier.soft_constraint_identifier, self.soft_constraints)
@@ -122,6 +119,7 @@ class GoalToConstraints(GetGoal):
         :type cmd: MoveCmd
         :rtype: dict
         """
+
         for constraint in itertools.chain(cmd.constraints, cmd.joint_constraints, cmd.cartesian_constraints):
             try:
                 C = self.allowed_constraint_types[constraint.type]
@@ -167,12 +165,17 @@ class GoalToConstraints(GetGoal):
         self.last_urdf = new_urdf
         return result
 
-    def add_collision_avoidance_soft_constraints(self):
+    def add_collision_avoidance_soft_constraints(self, collision_cmd):
         """
         Adds a constraint for each link that pushed it away from its closest point.
+        :type collision_cmd: list of CollisionEntry
         """
-        self.add_external_collision_avoidance_constraints()
-        self.add_self_collision_avoidance_constraints()
+        # FIXME this only catches the most obvious cases
+        if not collision_cmd or not self.get_world().is_allow_all_collision(collision_cmd[-1]):
+            self.add_external_collision_avoidance_constraints()
+        if not collision_cmd or (not self.get_world().is_allow_all_collision(collision_cmd[-1]) and
+            not self.get_world().is_allow_all_self_collision(collision_cmd[-1])):
+            self.add_self_collision_avoidance_constraints()
 
 
     def add_external_collision_avoidance_constraints(self):

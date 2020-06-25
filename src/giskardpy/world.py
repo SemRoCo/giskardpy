@@ -426,16 +426,6 @@ class World(object):
     def is_allow_collision(self, collision_entry):
         return collision_entry.type in [CollisionEntry.ALLOW_COLLISION, CollisionEntry.ALLOW_ALL_COLLISIONS]
 
-    def is_avoid_all_collision(self, collision_entry):
-        """
-        :type collision_entry: CollisionEntry
-        :return: bool
-        """
-        return self.is_avoid_collision(collision_entry) \
-               and self.all_robot_links(collision_entry) \
-               and self.all_body_bs(collision_entry) \
-               and self.all_link_bs(collision_entry)
-
     def is_avoid_all_self_collision(self, collision_entry):
         """
         :type collision_entry: CollisionEntry
@@ -444,6 +434,26 @@ class World(object):
         return self.is_avoid_collision(collision_entry) \
                and self.all_robot_links(collision_entry) \
                and collision_entry.body_b == self.robot.get_name() \
+               and self.all_link_bs(collision_entry)
+
+    def is_allow_all_self_collision(self, collision_entry):
+        """
+        :type collision_entry: CollisionEntry
+        :return: bool
+        """
+        return self.is_allow_collision(collision_entry) \
+               and self.all_robot_links(collision_entry) \
+               and collision_entry.body_b == self.robot.get_name() \
+               and self.all_link_bs(collision_entry)
+
+    def is_avoid_all_collision(self, collision_entry):
+        """
+        :type collision_entry: CollisionEntry
+        :return: bool
+        """
+        return self.is_avoid_collision(collision_entry) \
+               and self.all_robot_links(collision_entry) \
+               and self.all_body_bs(collision_entry) \
                and self.all_link_bs(collision_entry)
 
     def is_allow_all_collision(self, collision_entry):

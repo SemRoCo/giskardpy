@@ -4,6 +4,7 @@ import json
 import traceback
 from collections import OrderedDict
 from collections import defaultdict
+import difflib
 from time import time
 
 from giskard_msgs.msg import MoveCmd
@@ -19,10 +20,6 @@ from giskardpy.logging import loginfo
 from giskardpy.plugin_action_server import GetGoal
 
 
-def allowed_constraint_names():
-    return [x[0] for x in inspect.getmembers(giskardpy.constraints) if inspect.isclass(x[1])]
-
-
 class GoalToConstraints(GetGoal):
     # FIXME no error msg when constraint has missing parameter
     def __init__(self, name, as_name):
@@ -32,6 +29,7 @@ class GoalToConstraints(GetGoal):
         self.controlled_joints = set()
         self.controllable_links = set()
         self.last_urdf = None
+        self.allowed_constraint_types = {x[0]:x[1] for x in inspect.getmembers(giskardpy.constraints) if inspect.isclass(x[1])}
 
         self.rc_prismatic_velocity = self.get_god_map().get_data(identifier.rc_prismatic_velocity)
         self.rc_continuous_velocity = self.get_god_map().get_data(identifier.rc_continuous_velocity)
@@ -125,27 +123,43 @@ class GoalToConstraints(GetGoal):
         :rtype: dict
         """
         for constraint in itertools.chain(cmd.constraints, cmd.joint_constraints, cmd.cartesian_constraints):
-            if constraint.type not in allowed_constraint_names():
-                # TODO test me
-                raise InsolvableException(u'unknown constraint')
             try:
-                C = eval(u'giskardpy.constraints.{}'.format(constraint.type))
-            except NameError as e:
-                # TODO return next best constraint type
-                raise ImplementationException(u'unsupported constraint type')
+                C = self.allowed_constraint_types[constraint.type]
+            except KeyError:
+                matches = ''
+                for s in self.allowed_constraint_types.keys():
+                    sm = difflib.SequenceMatcher(None, constraint.type.lower(), s.lower())
+                    ratio = sm.ratio()
+                    if ratio >= 0.5:
+                        matches = matches + s + '\n'
+                if matches != '':
+                    raise InsolvableException(
+                        u'unknown constraint {}. did you mean one of these?:\n{}'.format(constraint.type,matches))
+                else:
+                    available_constraints = '\n'.join([x for x in self.allowed_constraint_types.keys()]) + '\n'
+                    raise InsolvableException(u'unknown constraint {}. available constraint types:\n{}'.format(constraint.type ,available_constraints))
+
             try:
                 if hasattr(constraint, u'parameter_value_pair'):
                     params = json.loads(constraint.parameter_value_pair)
                 else:
                     params = convert_ros_message_to_dictionary(constraint)
                     del params[u'type']
-                c = C(self.god_map, **params)
 
+                c = C(self.god_map, **params)
+            except:
+                doc_string = C.make_constraints.__doc__
+                error_msg = 'wrong parameters for {} \n'.format(C.__name__)
+                if doc_string is not None:
+                    error_msg = error_msg + doc_string
+                raise ValueError(error_msg)
+            try:
                 soft_constraints = c.get_constraints()
                 self.soft_constraints.update(soft_constraints)
-            except TypeError as e:
+            except:
                 traceback.print_exc()
-                raise ImplementationException(help(c.make_constraints))
+                raise ImplementationException()
+
 
     def has_robot_changed(self):
         new_urdf = self.get_robot().get_urdf_str()

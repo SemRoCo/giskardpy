@@ -161,6 +161,90 @@ class TestRobot(TestWorldObj):
         scm = r.get_self_collision_matrix()
         assert len(scm) == 0
 
+    def test_get_controlled_leaf_joints(self, test_folder, delete_test_folder):
+        r = self.cls(pr2_urdf(), path_to_data_folder=test_folder)
+        r.controlled_joints = [u'torso_lift_joint',
+                               u'r_upper_arm_roll_joint',
+                               u'r_shoulder_pan_joint',
+                               u'r_shoulder_lift_joint',
+                               u'r_forearm_roll_joint',
+                               u'r_elbow_flex_joint',
+                               u'r_wrist_flex_joint',
+                               u'r_wrist_roll_joint',
+                               u'l_upper_arm_roll_joint',
+                               u'l_shoulder_pan_joint',
+                               u'l_shoulder_lift_joint',
+                               u'l_forearm_roll_joint',
+                               u'l_elbow_flex_joint',
+                               u'l_wrist_flex_joint',
+                               u'l_wrist_roll_joint',
+                               u'head_pan_joint',
+                               u'head_tilt_joint',
+                               u'odom_x_joint',
+                               u'odom_y_joint',
+                               u'odom_z_joint']
+
+        r = r.get_controlled_leaf_joints()
+        assert r == {
+            'l_wrist_roll_joint', 'r_wrist_roll_joint', 'odom_z_joint', 'l_forearm_roll_joint', 'torso_lift_joint',
+            'head_tilt_joint', 'r_forearm_roll_joint'
+        }
+
+    def test_get_controlled_leaf_joints2(self, test_folder, delete_test_folder):
+        r = self.cls(donbot_urdf(), path_to_data_folder=test_folder)
+        r.controlled_joints = [u'ur5_shoulder_pan_joint',
+                               u'ur5_shoulder_lift_joint',
+                               u'ur5_elbow_joint',
+                               u'ur5_wrist_1_joint',
+                               u'ur5_wrist_2_joint',
+                               u'ur5_wrist_3_joint',
+                               u'odom_x_joint',
+                               u'odom_y_joint',
+                               u'odom_z_joint']
+
+        r = r.get_controlled_leaf_joints()
+        assert r == {
+            'odom_z_joint', 'ur5_wrist_3_joint'
+        }
+
+    def test_get_directly_controllable_collision_links(self, test_folder, delete_test_folder):
+        r = self.cls(pr2_urdf(), path_to_data_folder=test_folder)
+        r.controlled_joints = [u'torso_lift_joint',
+                               u'r_upper_arm_roll_joint',
+                               u'r_shoulder_pan_joint',
+                               u'r_shoulder_lift_joint',
+                               u'r_forearm_roll_joint',
+                               u'r_elbow_flex_joint',
+                               u'r_wrist_flex_joint',
+                               u'r_wrist_roll_joint',
+                               u'l_upper_arm_roll_joint',
+                               u'l_shoulder_pan_joint',
+                               u'l_shoulder_lift_joint',
+                               u'l_forearm_roll_joint',
+                               u'l_elbow_flex_joint',
+                               u'l_wrist_flex_joint',
+                               u'l_wrist_roll_joint',
+                               u'head_pan_joint',
+                               u'head_tilt_joint',
+                               u'odom_x_joint',
+                               u'odom_y_joint',
+                               u'odom_z_joint']
+
+        result = r.get_directly_controllable_collision_links(u'odom_x_joint')
+        assert result == []
+        result = r.get_directly_controllable_collision_links(u'odom_y_joint')
+        assert result == []
+        result = r.get_directly_controllable_collision_links(u'odom_z_joint')
+        assert result == [u'base_link']
+        result = r.get_directly_controllable_collision_links(u'l_elbow_flex_joint')
+        assert result == [u'l_elbow_flex_link']
+        result = r.get_directly_controllable_collision_links(u'r_wrist_roll_joint')
+        assert result == [u'r_wrist_roll_link']
+        result = r.get_directly_controllable_collision_links(u'br_caster_l_wheel_joint')
+        assert result == []
+
+
+
 
 class TestWorld(object):
     cls = WorldObject

@@ -70,11 +70,52 @@ class Robot(Backend):
             joint = self.get_parent_joint_of_joint(joint)
         return joint
 
+    @memoize
+    def get_controlled_leaf_joints(self):
+        leaves = self.get_leaves()
+        result = []
+        for link_name in leaves:
+            has_collision = self.has_link_collision(link_name)
+            joint_name = self.get_parent_joint_of_link(link_name)
+            while True:
+                if joint_name is None:
+                    break
+                if joint_name in self.controlled_joints:
+                    if has_collision:
+                        result.append(joint_name)
+                    break
+                parent_link = self.get_parent_link_of_joint(joint_name)
+                has_collision = has_collision or self.has_link_collision(parent_link)
+                joint_name = self.get_parent_joint_of_joint(joint_name)
+            else: # if not break
+                pass
+        return set(result)
+
+    @memoize
+    def get_directly_controllable_collision_links(self, joint_name):
+        if joint_name not in self.controlled_joints:
+            return []
+        link_name = self.get_child_link_of_joint(joint_name)
+        links = [link_name]
+        collision_links = []
+        while links:
+            link_name = links.pop(0)
+            parent_joint = self.get_parent_joint_of_link(link_name)
+
+            if parent_joint != joint_name and parent_joint in self.controlled_joints:
+                continue
+            if self.has_link_collision(link_name):
+                collision_links.append(link_name)
+            else:
+                child_links = self.get_child_links_of_link(link_name)
+                links.extend(child_links)
+        return collision_links
+
     def get_joint_state_positions(self):
         try:
             return self.__joint_state_positions
         except:
-            return {str(self._joint_position_symbols[x]): 0 for x in self.get_controllable_joints()}
+            return {str(self._joint_position_symbols[x]): 0 for x in self.get_movable_joints()}
 
     def reinitialize(self):
         """
@@ -119,7 +160,7 @@ class Robot(Backend):
 
     def _create_frames_expressions(self):
         for joint_name, urdf_joint in self._urdf_robot.joint_map.items():
-            if self.is_joint_controllable(joint_name):
+            if self.is_joint_movable(joint_name):
                 joint_symbol = self.get_joint_position_symbol(joint_name)
             if self.is_joint_mimic(joint_name):
                 multiplier = 1 if urdf_joint.mimic.multiplier is None else urdf_joint.mimic.multiplier

@@ -157,9 +157,36 @@ class GoalToConstraints(GetGoal):
         """
         Adds a constraint for each link that pushed it away from its closest point.
         """
+        self.add_external_collision_avoidance_constraints()
+        self.add_self_collision_avoidance_constraints()
+
+
+    def add_external_collision_avoidance_constraints(self):
         soft_constraints = {}
         number_of_repeller = self.get_god_map().get_data(identifier.number_of_repeller)
-        for joint_name in self.get_robot().controlled_joints:
+        eef_joints = self.get_robot().get_controlled_leaf_joints()
+        # TODO add root joint?
+        remaining_joints = [joint_name for joint_name in self.get_robot().controlled_joints
+                            if joint_name not in eef_joints]
+        for joint_name in remaining_joints:
+            child_links = self.get_robot().get_directly_controllable_collision_links(joint_name)
+            if child_links:
+                child_link = self.get_robot().get_child_link_of_joint(joint_name)
+                constraint = ExternalCollisionAvoidance(self.god_map, child_link,
+                                                        max_weight_distance=self.get_god_map().get_data(
+                                                            identifier.distance_thresholds +
+                                                            [joint_name, u'max_weight_distance']),
+                                                        low_weight_distance=self.get_god_map().get_data(
+                                                            identifier.distance_thresholds +
+                                                            [joint_name, u'low_weight_distance']),
+                                                        zero_weight_distance=self.get_god_map().get_data(
+                                                            identifier.distance_thresholds +
+                                                            [joint_name, u'zero_weight_distance']),
+                                                        idx=0)
+                soft_constraints.update(constraint.get_constraints())
+
+
+        for joint_name in eef_joints:
             child_link = self.get_robot().get_child_link_of_joint(joint_name)
             for i in range(number_of_repeller):
                 constraint = ExternalCollisionAvoidance(self.god_map, child_link,
@@ -175,10 +202,13 @@ class GoalToConstraints(GetGoal):
                                                         idx=i)
                 soft_constraints.update(constraint.get_constraints())
 
-        # TODO turn this into a function
-        counter = defaultdict(int)
         num_external = len(soft_constraints)
         loginfo('adding {} external collision avoidance constraints'.format(num_external))
+        self.soft_constraints.update(soft_constraints)
+
+    def add_self_collision_avoidance_constraints(self):
+        counter = defaultdict(int)
+        soft_constraints = {}
         for link_a, link_b in self.get_robot().get_self_collision_matrix():
             link_a, link_b = self.robot.get_chain_reduced_to_controlled_joints(link_a, link_b)
             if not self.get_robot().link_order(link_a, link_b):
@@ -189,7 +219,7 @@ class GoalToConstraints(GetGoal):
 
         for link_a, link_b in counter:
             # TODO turn 2 into parameter
-            num_of_constraints = min(2, counter[link_a, link_b])
+            num_of_constraints = min(1, counter[link_a, link_b])
             for i in range(num_of_constraints):
                 max_weight_distance = min(self.get_god_map().get_data(identifier.distance_thresholds +
                                                                       [link_a, u'max_weight_distance']),
@@ -209,5 +239,5 @@ class GoalToConstraints(GetGoal):
                                                     zero_weight_distance=zero_weight_distance,
                                                     idx=i)
                 soft_constraints.update(constraint.get_constraints())
-        loginfo('adding {} self collision avoidance constraints'.format(len(soft_constraints) - num_external))
+        loginfo('adding {} self collision avoidance constraints'.format(len(soft_constraints)))
         self.soft_constraints.update(soft_constraints)

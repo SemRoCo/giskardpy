@@ -1043,7 +1043,17 @@ class TestUrdfObject(object):
     def test_get_leaves(self, function_setup):
         parsed_pr2 = self.cls(pr2_urdf())
         leaves = parsed_pr2.get_leaves()
-        print(leaves)
+        assert len(leaves) == 40
+
+    def test_get_controllable_parent_joint(self, function_setup):
+        parsed_pr2 = self.cls(pr2_urdf())
+        joint = parsed_pr2.get_movable_parent_joint(u'r_gripper_tool_frame')
+        assert joint == u'r_wrist_roll_joint'
+
+    def test_get_link_names_from_joint_chain(self, function_setup):
+        parsed_pr2 = self.cls(pr2_urdf())
+        result = parsed_pr2.get_link_names_from_joint_chain(u'odom_x_joint', u'odom_y_joint')
+        assert result == [u'odom_x_frame']
 
     def test_get_sub_tree_link_names_with_collision_boxy(self, function_setup):
         parsed_boxy = self.cls(boxy_urdf())
@@ -1383,7 +1393,7 @@ class TestUrdfObject(object):
 
     def test_get_first_link_with_collision(self, function_setup):
         parsed_pr2 = self.cls(pr2_urdf())
-        assert parsed_pr2.get_first_link_with_collision() == u'base_link'
+        assert parsed_pr2.get_first_child_links_with_collision(u'odom_combined') == u'base_link'
 
     def test_get_non_base_movement_root(self, function_setup):
         parsed_donbot = self.cls(donbot_urdf())

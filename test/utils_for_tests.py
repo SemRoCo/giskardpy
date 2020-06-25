@@ -475,7 +475,7 @@ class GiskardTestWrapper(object):
         return trajectory2
 
     def are_joint_limits_violated(self):
-        controllable_joints = self.get_robot().get_controllable_joints()
+        controllable_joints = self.get_robot().get_movable_joints()
         trajectory_pos = self.get_result_trajectory_position()
         trajectory_vel = self.get_result_trajectory_velocity()
 

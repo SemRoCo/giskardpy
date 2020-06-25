@@ -73,19 +73,19 @@ def test_folder(request):
     return folder_name
 
 
-def trajectory_rollout(controller, goal, time_limit=10, frequency=100, precision=0.0025):
-    current_js = OrderedDict()
-    for joint_name in controller.robot.joint_states_input.joint_map:
-        current_js[joint_name] = 0.0
-    state = OrderedDict()
-    state.update(current_js)
-    state.update(goal)
-    for i in range(100):
-        next_cmd = controller.get_cmd(state)
-        for joint_name, vel in next_cmd.items():
-            current_js[joint_name] += vel
-        state.update(current_js)
-    return current_js
+# def trajectory_rollout(controller, goal, time_limit=10, frequency=100, precision=0.0025):
+#     current_js = OrderedDict()
+#     for joint_name in controller.robot.joint_states_input.joint_map:
+#         current_js[joint_name] = 0.0
+#     state = OrderedDict()
+#     state.update(current_js)
+#     state.update(goal)
+#     for i in range(100):
+#         next_cmd = controller.get_cmd(state)
+#         for joint_name, vel in next_cmd.items():
+#             current_js[joint_name] += vel
+#         state.update(current_js)
+#     return current_js
 
 
 class KDL(object):

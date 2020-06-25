@@ -967,7 +967,7 @@ class ExternalCollisionAvoidance(Constraint):
 
     def make_constraints(self):
         a_P_pa = self.get_closest_point_on_a_in_a()
-        r_P_pb = self.get_closest_point_on_b_in_root()
+        # r_P_pb = self.get_closest_point_on_b_in_root()
         r_V_n = self.get_contact_normal_on_b_in_root()
         actual_distance = self.get_actual_distance()
         repel_velocity = self.get_input_float(self.repel_velocity)
@@ -981,7 +981,7 @@ class ExternalCollisionAvoidance(Constraint):
         r_T_a = self.get_fk(self.robot_root, self.link_name)
 
         r_P_pa = w.dot(r_T_a, a_P_pa)
-        r_V_pb_pa = r_P_pa - r_P_pb
+        r_V_pb_pa = r_P_pa #- r_P_pb
 
         dist = w.dot(r_V_n.T, r_V_pb_pa)[0]
 

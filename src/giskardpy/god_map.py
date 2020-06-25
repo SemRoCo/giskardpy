@@ -237,7 +237,7 @@ class GodMap(object):
         return r
 
     def clear_cache(self):
-        # TODO should be possibile without clear cache
+        # TODO should be possible without clear cache
         self.shortcuts = {}
 
     def to_symbol(self, identifier):

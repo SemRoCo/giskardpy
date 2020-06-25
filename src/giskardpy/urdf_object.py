@@ -224,6 +224,8 @@ class URDFObject(object):
         :type fixed: bool
         :rtype: list
         """
+        if root == tip:
+            return [root]
         root_chain, connection, tip_chain = self.get_split_chain(root, tip, joints, links, fixed)
         return root_chain + connection + tip_chain
 
@@ -255,7 +257,7 @@ class URDFObject(object):
         :return: returns the names of all movable joints which are not mimic.
         :rtype: list
         """
-        return [joint_name for joint_name in self.get_joint_names() if self.is_joint_controllable(joint_name)]
+        return [joint_name for joint_name in self.get_joint_names() if self.is_joint_movable(joint_name)]
 
     @memoize
     def get_all_joint_limits(self):
@@ -264,7 +266,7 @@ class URDFObject(object):
         :rtype: dict
         """
         return {joint_name: self.get_joint_limits(joint_name) for joint_name in self.get_joint_names()
-                if self.is_joint_controllable(joint_name)}
+                if self.is_joint_movable(joint_name)}
 
     @memoize
     def get_joint_limits(self, joint_name):
@@ -301,7 +303,7 @@ class URDFObject(object):
         return joint.axis
 
     @memoize
-    def is_joint_controllable(self, name):
+    def is_joint_movable(self, name):
         """
         :param name: name of the joint in the urdfs
         :type name: str
@@ -402,6 +404,13 @@ class URDFObject(object):
         """
         return self._urdf_robot.get_chain(root_link, tip_link, False, True, False)
 
+    def get_link_names_from_joint_chain(self, root_joint, tip_joint):
+        links1 = self.get_chain(self.get_parent_link_of_joint(root_joint), self.get_child_link_of_joint(tip_joint))
+        links2 = self.get_chain(self.get_parent_link_of_joint(tip_joint), self.get_child_link_of_joint(root_joint))
+        if len(links1) > len(links2):
+            return links2
+        return links1
+
     @memoize
     def get_link_names(self):
         """
@@ -499,19 +508,19 @@ class URDFObject(object):
         return self._urdf_robot.get_root()
 
     @memoize
-    def get_first_link_with_collision(self):
-        l = self.get_root()
-        while not self.has_link_collision(l):
-            children = self.get_child_links_of_link(l)
+    def get_first_child_links_with_collision(self, link_name):
+        while not self.has_link_collision(link_name):
+            children = self.get_child_links_of_link(link_name)
             children_with_collision = [x for x in children if self.has_link_collision(x)]
             if len(children_with_collision) > 1 or len(children) > 1:
                 raise TypeError(u'first collision link is not unique')
             elif len(children_with_collision) == 1:
-                l = children_with_collision[0]
+                link_name = children_with_collision[0]
                 break
             else:
-                l = children[0]
-        return l
+                link_name = children[0]
+        return link_name
+
 
     @memoize
     def get_non_base_movement_root(self):
@@ -524,7 +533,7 @@ class URDFObject(object):
     def __get_non_base_movement_root_helper(self, link_name):
         if self.has_link_collision(link_name):
             parent_joint = self.get_parent_joint_of_link(link_name)
-            if self.is_joint_controllable(parent_joint):
+            if self.is_joint_movable(parent_joint):
                 return link_name
             else:
                 return None
@@ -533,7 +542,7 @@ class URDFObject(object):
                 child_result = self.__get_non_base_movement_root_helper(child)
                 if child_result is None:
                     parent_joint = self.get_parent_joint_of_link(link_name)
-                    if parent_joint is not None and self.is_joint_controllable(parent_joint):
+                    if parent_joint is not None and self.is_joint_movable(parent_joint):
                         return link_name
                     else:
                         return None
@@ -639,9 +648,8 @@ class URDFObject(object):
 
     @memoize
     def get_movable_parent_joint(self, link_name):
-        # TODO add tests
         joint = self.get_parent_joint_of_link(link_name)
-        while self.is_joint_fixed(joint):
+        while not self.is_joint_movable(joint):
             joint = self.get_parent_joint_of_joint(joint)
         return joint
 
@@ -678,8 +686,8 @@ class URDFObject(object):
                (link_b == self.get_parent_link_of_link(link_a))
 
     @memoize
-    def get_controllable_joints(self):
-        return [joint_name for joint_name in self.get_joint_names() if self.is_joint_controllable(joint_name)]
+    def get_movable_joints(self):
+        return [joint_name for joint_name in self.get_joint_names() if self.is_joint_movable(joint_name)]
 
     def __eq__(self, o):
         """

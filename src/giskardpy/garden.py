@@ -107,10 +107,10 @@ def initialize_god_map():
                     ignored_pairs=god_map.get_data(identifier.ignored_self_collisions),
                     added_pairs=god_map.get_data(identifier.added_self_collisions))
 
-    joint_position_symbols = JointStatesInput(blackboard.god_map.to_symbol, world.robot.get_controllable_joints(),
+    joint_position_symbols = JointStatesInput(blackboard.god_map.to_symbol, world.robot.get_movable_joints(),
                                               identifier.joint_states,
                                               suffix=[u'position'])
-    joint_vel_symbols = JointStatesInput(blackboard.god_map.to_symbol, world.robot.get_controllable_joints(),
+    joint_vel_symbols = JointStatesInput(blackboard.god_map.to_symbol, world.robot.get_movable_joints(),
                                          identifier.joint_states,
                                          suffix=[u'velocity'])
     world.robot.update_joint_symbols(joint_position_symbols.joint_map, joint_vel_symbols.joint_map,

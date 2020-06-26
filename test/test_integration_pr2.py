@@ -2737,6 +2737,7 @@ class TestReachability():
         zero_pose.set_cart_goal(root='odom_combined', tip='r_gripper_tool_frame', goal_pose=pose)
         zero_pose.check_reachability()
         zero_pose.set_cart_goal(root='odom_combined', tip='r_gripper_tool_frame', goal_pose=pose)
+        zero_pose.allow_all_collisions()
         zero_pose.send_and_check_goal(goal_type=MoveGoal.PLAN_ONLY)
 
     def test_reachable_goal_1(self, zero_pose):

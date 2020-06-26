@@ -50,7 +50,8 @@ class GoalToConstraints(GetGoal):
         self.get_god_map().safe_set_data(identifier.constraints_identifier, {})
 
         self.soft_constraints = {}
-        self.add_collision_avoidance_soft_constraints(move_cmd.collisions)
+        if not (self.get_god_map().get_data(identifier.check_reachability)):
+            self.add_collision_avoidance_soft_constraints(move_cmd.collisions)
 
         try:
             self.parse_constraints(move_cmd)

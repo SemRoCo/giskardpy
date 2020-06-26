@@ -6,14 +6,14 @@ general_options:
   joint_convergence_threshold: 0.001 # when the velocities fall below this value, the planning succeeds
   joint_vel_limit: # giskard will use the min of this number and limits from the urdf
     linear:
-      default: 0.02
+      default: 0.5
       odom_x_joint: 0.5
       odom_y_joint: 0.5
     angular:
-      default: 0.02
+      default: 0.5
       odom_z_joint: 0.6
-      left_arm_5_joint: 0.05
-      left_arm_6_joint: 0.2
+      left_arm_5_joint: 0.5
+      left_arm_6_joint: 0.5
   joint_acceleration_limit: # multiply your desired acc limit with sample period; experimental, don't touch
     linear:
       default: 100

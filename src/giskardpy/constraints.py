@@ -937,7 +937,7 @@ class UpdateGodMap(Constraint):
                 self.get_god_map().safe_set_data(next_identifier, value)
             else:
                 self.update_god_map(next_identifier, value)
-
+                
     def get_constraint(self):
         return {}
 
@@ -965,7 +965,7 @@ class UpdateYaml(Constraint):
 
     def get_constraint(self):
         return {}
-
+      
 class Pointing(Constraint):
     goal_point = u'goal_point'
     pointing_axis = u'pointing_axis'

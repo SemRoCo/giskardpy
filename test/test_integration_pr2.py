@@ -368,10 +368,12 @@ class TestConstraints(object):
         r_goal.pose.position.x += 0.1
         updates = {
             u'rosparam': {
-                u'joint_weights': {
-                    u'odom_x_joint': 0.0001,
-                    u'odom_y_joint': 0.0001,
-                    u'odom_z_joint': 0.0001
+                u'general_options': {
+                    u'joint_weights': {
+                        u'odom_x_joint': 0.0001,
+                        u'odom_y_joint': 0.0001,
+                        u'odom_z_joint': 0.0001
+                    }
                 }
             }
         }
@@ -405,7 +407,7 @@ class TestConstraints(object):
         assert pocky_pose_setup.get_god_map().get_data(identifier.joint_cost + [u'odom_x_joint']) == 0.0999
         assert pocky_pose_setup.get_god_map().get_data(identifier.joint_cost + [u'odom_y_joint']) == 0.0999
         assert pocky_pose_setup.get_god_map().get_data(identifier.joint_cost + [u'odom_z_joint']) == 0.0888
-        assert pocky_pose_setup.get_god_map().get_data(identifier.joint_cost + [u'torso_lift_joint']) == 0.5
+        assert pocky_pose_setup.get_god_map().get_data(identifier.joint_cost + [u'torso_lift_joint']) == 0.
 
     def test_UpdateGodMap2(self, pocky_pose_setup):
         """

@@ -9,6 +9,7 @@ from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 import giskardpy.identifier as identifier
 from giskardpy.logging import loginfo
 from giskardpy.plugin import GiskardBehavior
+from giskardpy.utils import traj_to_msg
 
 
 class SendTrajectory(ActionClient, GiskardBehavior):
@@ -19,43 +20,25 @@ class SendTrajectory(ActionClient, GiskardBehavior):
         GiskardBehavior.__init__(self, name)
         loginfo(u'waiting for action server \'{}\' to appear'.format(action_namespace))
         ActionClient.__init__(self, name, FollowJointTrajectoryAction, None, action_namespace)
-        loginfo(u'successfully conected to action server')
+        loginfo(u'successfully connected to action server')
         self.fill_velocity_values = self.get_god_map().safe_get_data(identifier.fill_velocity_values)
 
     def setup(self, timeout):
         # TODO get this from god map
-        self.controller_joints = rospy.wait_for_message(u'/whole_body_controller/state',
-                                                        JointTrajectoryControllerState).joint_names
+        # self.controller_joints = rospy.wait_for_message(u'/whole_body_controller/state',
+        #                                                 JointTrajectoryControllerState).joint_names
         return super(SendTrajectory, self).setup(timeout)
 
     def initialise(self):
         super(SendTrajectory, self).initialise()
         trajectory = self.get_god_map().safe_get_data(identifier.trajectory)
         goal = FollowJointTrajectoryGoal()
-        goal.trajectory = self.traj_to_msg(trajectory)
+        sample_period = self.get_god_map().safe_get_data(identifier.sample_period)
+        controlled_joints = self.get_robot().controlled_joints
+        goal.trajectory = traj_to_msg(sample_period, trajectory, controlled_joints, self.fill_velocity_values)
         self.action_goal = goal
 
-    def traj_to_msg(self, trajectory):
-        """
-        :type traj: giskardpy.data_types.Trajectory
-        :return: JointTrajectory
-        """
-        sample_period = self.get_god_map().safe_get_data(identifier.sample_period)
-        trajectory_msg = JointTrajectory()
-        trajectory_msg.header.stamp = rospy.get_rostime() + rospy.Duration(0.5)
-        trajectory_msg.joint_names = self.controller_joints
-        for time, traj_point in trajectory.items():
-            p = JointTrajectoryPoint()
-            p.time_from_start = rospy.Duration(time*sample_period)
-            for joint_name in self.controller_joints:
-                if joint_name in traj_point:
-                    p.positions.append(traj_point[joint_name].position)
-                    if self.fill_velocity_values:
-                        p.velocities.append(traj_point[joint_name].velocity)
-                else:
-                    raise NotImplementedError(u'generated traj does not contain all joints')
-            trajectory_msg.points.append(p)
-        return trajectory_msg
+
 
     def update(self):
         """

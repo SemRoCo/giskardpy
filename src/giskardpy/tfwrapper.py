@@ -202,6 +202,21 @@ def msg_to_kdl(msg):
     else:
         raise TypeError(u'can\'t convert {} to kdl'.format(type(msg)))
 
+def normalize(msg):
+    if isinstance(msg, Quaternion):
+        rotation = np.array([msg.x,
+                             msg.y,
+                             msg.z,
+                             msg.w])
+        normalized_rotation = rotation / np.linalg.norm(rotation)
+        return Quaternion(*normalized_rotation)
+    elif isinstance(msg, Vector3):
+        tmp = np.array([msg.x,
+                        msg.y,
+                        msg.z])
+        tmp = tmp / np.linalg.norm(tmp)
+        return Vector3(*tmp)
+
 
 def kdl_to_pose(frame):
     """

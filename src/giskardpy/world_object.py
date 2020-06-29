@@ -3,7 +3,7 @@ import hashlib
 import numpy as np
 import os
 import pickle
-from itertools import product
+from itertools import product, combinations
 from time import time
 
 from geometry_msgs.msg import Pose, Quaternion
@@ -104,7 +104,7 @@ class WorldObject(URDFObject):
         """
         return self._self_collision_matrix
 
-    def calc_collision_matrix(self, link_combinations, d=0.05, d2=0.0, num_rnd_tries=2000):
+    def calc_collision_matrix(self, link_combinations=None, d=0.05, d2=0.0, num_rnd_tries=2000):
         """
         :param link_combinations: set with link name tuples
         :type link_combinations: set
@@ -209,7 +209,6 @@ class WorldObject(URDFObject):
         :param f: lambda joint_info: float
         :return:
         """
-        # TODO possible optimization, if some joints are not controlled, the collision matrix might get smaller
         js = {}
         for joint_name in self.get_controllable_joints():
             sjs = SingleJointState()
@@ -228,8 +227,11 @@ class WorldObject(URDFObject):
         self._self_collision_matrix = {(link1, link2) for link1, link2 in self.get_self_collision_matrix()
                                        if link1 != object_name and link2 != object_name}
 
+    def init_self_collision_matrix(self):
+        self.update_self_collision_matrix(added_links=set(combinations(self.get_link_names_with_collision(), 2)))
+
     def update_self_collision_matrix(self, added_links=None, removed_links=None):
-        if self._calc_self_collision_matrix and not self.load_self_collision_matrix(self.path_to_data_folder):
+        if not self.load_self_collision_matrix(self.path_to_data_folder):
             if added_links is None:
                 added_links = set()
             if removed_links is None:

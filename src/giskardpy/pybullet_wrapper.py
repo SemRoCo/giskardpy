@@ -61,6 +61,7 @@ def load_urdf_string_into_bullet(urdf_string, pose=None):
                         [pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w],
                         flags=p.URDF_USE_SELF_COLLISION_EXCLUDE_PARENT)
     os.remove(filename)
+    logging.logdebug(u'--> added {} to pybullet'.format(object_name))
     return id
 
 

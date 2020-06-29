@@ -97,20 +97,21 @@ class World(object):
     def remove_object(self, name):
         if self.has_object(name):
             self._objects[name].suicide()
-            logging.loginfo(u'<-- removed object {} to world'.format(name))
+            logging.loginfo(u'<-- removed object {} from world'.format(name))
             del (self._objects[name])
         else:
             raise UnknownBodyException(u'can\'t remove object \'{}\', because it doesn\' exist'.format(name))
 
     def remove_all_objects(self):
-        for object_ in self._objects.values():
-            object_.suicide()
+        for object_name in self._objects.keys():
+            # I'm not using remove object, because has object ignores hidden objects in pybullet world
+            self._objects[object_name].suicide()
+            logging.loginfo(u'<-- removed object {} from world'.format(object_name))
         self._objects = {}
 
     # Robot ------------------------------------------------------------------------------------------------------------
 
-    def add_robot(self, robot, base_pose, controlled_joints, joint_vel_limit, joint_acc_limit, joint_weights,
-                  calc_self_collision_matrix, ignored_pairs, added_pairs):
+    def add_robot(self, robot, base_pose, controlled_joints, ignored_pairs, added_pairs):
         """
         :type robot: giskardpy.world_object.WorldObject
         :type controlled_joints: list
@@ -127,12 +128,9 @@ class World(object):
                                              base_pose=base_pose,
                                              controlled_joints=controlled_joints,
                                              path_to_data_folder=self._path_to_data_folder,
-                                             joint_vel_limit=joint_vel_limit,
-                                             joint_acc_limit=joint_acc_limit,
-                                             calc_self_collision_matrix=calc_self_collision_matrix,
-                                             joint_weights=joint_weights,
                                              ignored_pairs=ignored_pairs,
                                              added_pairs=added_pairs)
+        logging.loginfo(u'--> added {} to world'.format(robot.get_name()))
 
     @property
     def robot(self):
@@ -166,14 +164,19 @@ class World(object):
         # TODO this should know the object pose and not require it as input
         self._robot.attach_urdf_object(self.get_object(name), link, pose)
         self.remove_object(name)
+        logging.loginfo(u'--> attached object {} on link {}'.format(name, link))
 
     def detach(self, joint_name, from_obj=None):
+        if joint_name not in self.robot.get_joint_names():
+            raise UnknownBodyException(u'can\'t detach: {}'.format(joint_name))
         if from_obj is None or self.robot.get_name() == from_obj:
             # this only works because attached simple objects have joint names equal to their name
             p = self.robot.get_fk_pose(self.robot.get_root(), joint_name)
             p_map = kdl_to_pose(self.robot.root_T_map.Inverse() * msg_to_kdl(p))
 
+            parent_link = self.robot.get_parent_link_of_joint(joint_name)
             cut_off_obj = self.robot.detach_sub_tree(joint_name)
+            logging.loginfo(u'<-- detached {} from link {}'.format(joint_name, parent_link))
         else:
             raise UnsupportedOptionException(u'only detach from robot supported')
         wo = WorldObject.from_urdf_object(cut_off_obj)  # type: WorldObject
@@ -186,7 +189,7 @@ class World(object):
         collision_matrix2 = {}
         for link1, link2 in collision_matrix:
             # FIXME should I use the minimum of both distances?
-            if link1 < link2:
+            if self.robot.link_order(link1, link2):
                 collision_matrix2[link1, robot_name, link2] = min_dist[link1][u'zero_weight_distance']
             else:
                 collision_matrix2[link2, robot_name, link1] = min_dist[link1][u'zero_weight_distance']

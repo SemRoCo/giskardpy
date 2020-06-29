@@ -3,18 +3,24 @@ from multiprocessing import Lock
 
 import rospy
 from geometry_msgs.msg import PoseStamped
-from giskard_msgs.srv import UpdateWorld, UpdateWorldResponse, UpdateWorldRequest
+from giskard_msgs.srv import UpdateWorld, UpdateWorldResponse, UpdateWorldRequest, GetObjectNames,\
+    GetObjectNamesResponse, GetObjectInfo, GetObjectInfoResponse, UpdateRvizMarkers, UpdateRvizMarkersResponse,\
+    GetAttachedObjects, GetAttachedObjectsResponse
 from py_trees import Status
 from sensor_msgs.msg import JointState
 from visualization_msgs.msg import Marker, MarkerArray
 
 import giskardpy.identifier as identifier
+from giskardpy import logging
 from giskardpy.exceptions import CorruptShapeException, UnknownBodyException, \
     UnsupportedOptionException, DuplicateNameException
 from giskardpy.plugin import GiskardBehavior
 from giskardpy.tfwrapper import transform_pose
 from giskardpy.utils import to_joint_state_dict
 from giskardpy.world_object import WorldObject
+from giskardpy import  logging
+from giskardpy.urdf_object import URDFObject
+
 
 
 class WorldUpdatePlugin(GiskardBehavior):
@@ -30,6 +36,10 @@ class WorldUpdatePlugin(GiskardBehavior):
         # TODO make service name a parameter
         self.srv_update_world = rospy.Service(u'~update_world', UpdateWorld, self.update_world_cb)
         self.pub_collision_marker = rospy.Publisher(u'~visualization_marker_array', MarkerArray, queue_size=1)
+        self.get_object_names = rospy.Service(u'~get_object_names', GetObjectNames, self.get_object_names)
+        self.get_object_info = rospy.Service(u'~get_object_info', GetObjectInfo, self.get_object_info)
+        self.get_attached_objects = rospy.Service(u'~get_attached_objects', GetAttachedObjects, self.get_attached_objects)
+        self.update_rviz_markers = rospy.Service(u'~update_rviz_markers', UpdateRvizMarkers, self.update_rviz_markers)
         return super(WorldUpdatePlugin, self).setup(timeout)
 
     def update(self):
@@ -42,6 +52,69 @@ class WorldUpdatePlugin(GiskardBehavior):
                 self.get_world().get_object(object_name).joint_state = object_joint_state
 
         return Status.SUCCESS
+
+    def get_object_names(self, req):
+        object_names = self.get_world().get_object_names()
+        res = GetObjectNamesResponse()
+        res.object_names = object_names
+        return res
+
+    def get_object_info(self, req):
+        res = GetObjectInfoResponse()
+        res.error_codes = GetObjectInfoResponse.SUCCESS
+        try:
+            object = self.get_world().get_object(req.object_name)
+            res.joint_state_topic = ''
+            if req.object_name in self.object_js_subs.keys():
+                res.joint_state_topic = self.object_js_subs[req.object_name].name
+            res.pose.pose = object.base_pose
+            res.pose.header.frame_id = self.get_god_map().safe_get_data(identifier.map_frame)
+            for key, value in object.joint_state.items():
+                res.joint_state.name.append(key)
+                res.joint_state.position.append(value.position)
+                res.joint_state.velocity.append(value.velocity)
+                res.joint_state.effort.append(value.effort)
+        except KeyError as e:
+            logging.logerr('no object with the name {} was found'.format(req.object_name))
+            res.error_codes = GetObjectInfoResponse.NAME_NOT_FOUND_ERROR
+
+        return res
+
+
+    def update_rviz_markers(self, req):
+        l = req.object_names
+        res = UpdateRvizMarkersResponse()
+        res.error_codes = UpdateRvizMarkersResponse.SUCCESS
+        ma = MarkerArray()
+        if len(l) == 0:
+            l = self.get_world().get_object_names()
+        for name in l:
+            try:
+                m = self.get_world().get_object(name).as_marker_msg()
+                m.action = m.ADD
+                m.header.frame_id = 'map'
+                m.ns = u'world' + m.ns
+                ma.markers.append(m)
+            except TypeError as e:
+                logging.logerr('failed to convert object {} to marker: {}'.format(name, str(e)))
+                res.error_codes = UpdateRvizMarkersResponse.MARKER_CONVERSION_ERROR
+            except KeyError as e:
+                logging.logerr('could not update rviz marker for object {}: no object with that name was found'.format(name))
+                res.error_codes = UpdateRvizMarkersResponse.NAME_NOT_FOUND_ERROR
+
+        self.pub_collision_marker.publish(ma)
+        return res
+
+    def get_attached_objects(self, req):
+        original_robot = URDFObject(self.get_robot().original_urdf)
+        link_names = self.get_robot().get_link_names()
+        original_link_names = original_robot.get_link_names()
+        attached_objects = list(set(link_names).difference(original_link_names))
+        attachment_points = [self.get_robot().get_parent_link_of_joint(object) for object in attached_objects]
+        res = GetAttachedObjectsResponse()
+        res.object_names = attached_objects
+        res.attachment_points = attachment_points
+        return res
 
     def object_js_cb(self, object_name, msg):
         """
@@ -71,6 +144,12 @@ class WorldUpdatePlugin(GiskardBehavior):
                         self.add_object(req)
 
                 elif req.operation == UpdateWorldRequest.REMOVE:
+                    # why not to detach objects here:
+                    #   - during attaching, bodies turn to objects
+                    #   - detaching actually requires a joint name
+                    #   - you might accidentally detach parts of the robot
+                    # if self.get_robot().has_joint(req.body.name):
+                    #     self.detach_object(req)
                     self.remove_object(req.body.name)
                 elif req.operation == UpdateWorldRequest.ALTER:
                     self.remove_object(req.body.name)
@@ -150,6 +229,7 @@ class WorldUpdatePlugin(GiskardBehavior):
             self.get_world().robot.attach_urdf_object(world_object,
                                                       req.pose.header.frame_id,
                                                       req.pose.pose)
+            logging.loginfo(u'--> attached object {} on link {}'.format(req.body.name, req.pose.header.frame_id))
             m = world_object.as_marker_msg()
             m.pose = req.pose.pose
             m.header = req.pose.header

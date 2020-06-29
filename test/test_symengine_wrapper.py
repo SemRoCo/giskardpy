@@ -11,9 +11,9 @@ from tf.transformations import quaternion_matrix, quaternion_about_axis, quatern
 from transforms3d.euler import euler2axangle
 from transforms3d.quaternions import quat2mat, quat2axangle
 
-from giskardpy import w
+from giskardpy import symbolic_wrapper as w
 from utils_for_tests import limited_float, SMALL_NUMBER, unit_vector, quaternion, vector, \
-    pykdl_frame_to_numpy, lists_of_same_length, angle, compare_axis_angle, angle_positive
+    pykdl_frame_to_numpy, lists_of_same_length, angle, compare_axis_angle, angle_positive, sq_matrix
 
 
 class TestSympyWrapper(unittest.TestCase):
@@ -32,6 +32,7 @@ class TestSympyWrapper(unittest.TestCase):
         expected = w.Matrix([[1,1],[2*a,0],[0,2*b]])
         for i in range(expected.shape[0]):
             for j in range(expected.shape[1]):
+
                 assert w.equivalent(jac[i,j], expected[i,j])
 
     # fails if numbers too small or big
@@ -44,7 +45,7 @@ class TestSympyWrapper(unittest.TestCase):
     # @given(limited_float(min_dist_to_zero=SMALL_NUMBER))
     # def test_heaviside(self, f1):
     #     # r1 = float(w.diffable_heaviside(f1))
-    #     # r2 = 0 if f1 < 0 else 1
+    #     # r2 = 0 if f1 < 0 else 1s
     #     np.heaviside()
     #     self.assertAlmostEqual(w.compile_and_execute(w.diffable_heaviside, [f1]),
     #                            0 if f1 < 0 else 1, places=7)
@@ -102,8 +103,9 @@ class TestSympyWrapper(unittest.TestCase):
     def test_matrix3(self, x_dim, y_dim):
         data = [[(i)+(j*x_dim) for j in range(y_dim)] for i in range(x_dim)]
         m = w.Matrix(data)
-        self.assertEqual(float(m[0,0]), 0)
-        self.assertEqual(float(m[x_dim-1,y_dim-1]), (x_dim*y_dim)-1)
+        m2 = w.Matrix(m)
+        # self.assertEqual(float(m[0,0]), 0)
+        # self.assertEqual(float(m[x_dim-1,y_dim-1]), (x_dim*y_dim)-1)
 
 
     # fails if numbers too big
@@ -148,6 +150,16 @@ class TestSympyWrapper(unittest.TestCase):
         self.assertAlmostEqual(
             w.compile_and_execute(w.if_greater_eq, [a, b, if_result, else_result]),
             np.float(if_result if a >= b else else_result), places=7)
+
+    # fails if condition is to close too 0 or too big or too small
+    @given(limited_float(min_dist_to_zero=SMALL_NUMBER),
+           limited_float(min_dist_to_zero=SMALL_NUMBER),
+           limited_float(),
+           limited_float())
+    def test_if_less_eq(self, a, b, if_result, else_result):
+        self.assertAlmostEqual(
+            w.compile_and_execute(w.if_less_eq, [a, b, if_result, else_result]),
+            np.float(if_result if a <= b else else_result), places=7)
 
     # fails if condition is to close too 0 or too big or too small
     # fails if if_result is too big or too small
@@ -449,26 +461,29 @@ class TestSympyWrapper(unittest.TestCase):
         r2 = quaternion_matrix(q)
         self.assertTrue(np.isclose(r1, r2).all(), msg='\n{} != \n{}'.format(r1, r2))
 
+    def test_rot_of2(self):
+        f = w.translation3(1,2,3)
+        r = w.rotation_of(f)
+        self.assertTrue(f[0,3], 1)
+        self.assertTrue(f[0,3], 2)
+        self.assertTrue(f[0,3], 3)
+
     # fails if numbers too big or too small
     @given(unit_vector(4))
     def test_trace(self, q):
         m = quaternion_matrix(q)
-        np.testing.assert_array_almost_equal(w.compile_and_execute(w.trace, [m]),
-                                             np.trace(m))
+        np.testing.assert_array_almost_equal(w.compile_and_execute(w.trace, [m]), np.trace(m))
 
     # TODO test rotation_dist
 
     # fails if numbers too big or too small
-    # TODO nan if angle 0
-    # TODO use 'if' to make angle always positive?
     @given(unit_vector(length=3),
            angle_positive())
     def test_axis_angle_from_matrix(self, axis, angle):
-        assume(angle > 0.0001)
-        assume(angle < np.pi - 0.0001)
         m = rotation_matrix(angle, axis)
         axis2 = w.compile_and_execute(lambda x: w.diffable_axis_angle_from_matrix(x)[0], [m])
         angle2 = w.compile_and_execute(lambda x: w.diffable_axis_angle_from_matrix(x)[1], [m])
+        angle, axis, _ = rotation_from_matrix(m)
         if angle < 0:
             angle = -angle
             axis = [-x for x in axis]
@@ -481,8 +496,7 @@ class TestSympyWrapper(unittest.TestCase):
     # fails if numbers too big or too small
     @given(unit_vector(length=3),
            angle_positive())
-    def test_axis_angle_from_matrix_stable(self, axis, angle):
-        assume(angle < np.pi - 0.0001)
+    def test_axis_angle_from_matrix2(self, axis, angle):
         m = rotation_matrix(angle, axis)
         axis2 = w.compile_and_execute(lambda x: w.axis_angle_from_matrix(x)[0], [m])
         angle2 = w.compile_and_execute(lambda x: w.axis_angle_from_matrix(x)[1], [m])
@@ -730,3 +744,21 @@ class TestSympyWrapper(unittest.TestCase):
         r1 = w.compile_and_execute(w.entrywise_product, [m1, m2])
         r2 = m1 * m2
         np.testing.assert_array_almost_equal(r1, r2)
+
+    @given(sq_matrix())
+    def test_sum(self, m):
+        actual_sum = w.compile_and_execute(w.sum, [m])
+        expected_sum = np.sum(m)
+        self.assertTrue(np.isclose(actual_sum, expected_sum))
+
+    @given(sq_matrix())
+    def test_sum_row(self, m):
+        actual_sum = w.compile_and_execute(w.sum_row, [m])
+        expected_sum = np.sum(m, axis=0)
+        self.assertTrue(np.all(np.isclose(actual_sum, expected_sum)))
+
+    @given(sq_matrix())
+    def test_sum_column(self, m):
+        actual_sum = w.compile_and_execute(w.sum_column, [m])
+        expected_sum = np.sum(m, axis=1)
+        self.assertTrue(np.all(np.isclose(actual_sum, expected_sum)))

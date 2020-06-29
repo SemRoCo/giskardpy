@@ -40,7 +40,7 @@ def is_symbol(expression):
     return expression.shape[0] * expression.shape[1] == 1
 
 def compile_and_execute(f, params):
-    symbols = []
+    # symbols = []
     input = []
 
     # class next_symbol(object):
@@ -52,43 +52,37 @@ def compile_and_execute(f, params):
 
     # ns = next_symbol()
     symbol_params = []
+    symbol_params2 = []
+
     for i, param in enumerate(params):
         if isinstance(param, list):
             param = np.array(param)
         if isinstance(param, np.ndarray):
-            input.append(param)
-            symbol_params.append(ca.SX.sym('m', *param.shape))
-            # l2 = []
-            # for j in range(param.shape[0]):
-            #     l1 = []
-            #     if len(param.shape) == 2:
-            #         for k in range(param.shape[1]):
-            #             s = ns()
-            #             symbols.append(s)
-            #             input.append(param[j, k])
-            #             l1.append(s)
-            #         l2.append(l1)
-            #     else:
-            #         s = ns()
-            #         symbols.append(s)
-            #         input.append(param[j])
-            #         l2.append(s)
-            #
-            # p = Matrix(l2)
-            # symbol_params.append(p)
+            symbol_param = ca.SX.sym('m', *param.shape)
+            if len(param.shape) == 2:
+                l = param.shape[0]*param.shape[1]
+            else:
+                l = param.shape[0]
+
+            input.append(param.reshape((l,1)))
+            symbol_params.append(symbol_param)
+            asdf = symbol_param.T.reshape((l,1))
+            symbol_params2.extend(asdf[k] for k in range(l))
         else:
             # s = ns()
             # symbols.append(s)
-            input.append(param)
-            symbol_params.append(ca.SX.sym('s'))
+            input.append(np.array([param], ndmin=2))
+            symbol_param = ca.SX.sym('s')
+            symbol_params.append(symbol_param)
+            symbol_params2.append(symbol_param)
     # try:
     #     slow_f = Matrix([f(*symbol_params)])
     # except TypeError:
     #     slow_f = Matrix(f(*symbol_params))
-
-    fast_f = speed_up(f(*symbol_params), symbol_params)
+    fast_f = speed_up(f(*symbol_params), symbol_params2)
     # subs = {str(symbols[i]): input[i] for i in range(len(symbols))}
     # slow_f.subs()
+    input = np.concatenate(input).T[0]
     result = fast_f.call2(input)
     if result.shape[0] * result.shape[1] == 1:
         return result[0][0]
@@ -352,7 +346,7 @@ def if_less_eq(a, b, if_result, else_result):
     :return: if_result if a <= b else else_result
     :rtype: Union[float, Symbol]
     """
-    return if_greater_eq(b, a, else_result, if_result)
+    return if_greater_eq(b, a, if_result, else_result)
 
 
 def if_eq_zero(condition, if_result, else_result):
@@ -419,7 +413,10 @@ def speed_up(function, parameters, backend=u'clang'):
     try:
         f = ca.Function('f', [Matrix(parameters)], [ca.densify(function)])
     except:
+        # try:
         f = ca.Function('f', [Matrix(parameters)], ca.densify(function))
+        # except:
+        #     f = ca.Function('f', parameters, [ca.densify(function)])
     return CompiledFunction(str_params, f, 0, function.shape)
 
 
@@ -668,10 +665,11 @@ def rotation_of(frame):
     :return: 4x4 Matrix; sets the translation part of a frame to 0
     :rtype: Matrix
     """
-    frame[0,3] = 0
-    frame[1,3] = 0
-    frame[2,3] = 0
-    return frame
+    r = eye(4)
+    for i in range(3):
+        for j in range(3):
+            r[i,j] = frame[i,j]
+    return r
 
 
 def trace(matrix):
@@ -706,8 +704,17 @@ def diffable_axis_angle_from_matrix(rotation_matrix):
     :return: 3x1 Matrix, angle
     :rtype: (Matrix, Union[float, Symbol])
     """
-    # TODO nan if angle 0
-    # TODO buggy when angle == pi
+    return axis_angle_from_matrix(rotation_matrix)
+
+
+def axis_angle_from_matrix(rotation_matrix):
+    """
+    MAKE SURE MATRIX IS NORMALIZED
+    :param rotation_matrix: 4x4 or 3x3 Matrix
+    :type rotation_matrix: Matrix
+    :return: 3x1 Matrix, angle
+    :rtype: (Matrix, Union[float, Symbol])
+    """
     # TODO use 'if' to make angle always positive?
     rm = rotation_matrix
     cos_angle = (trace(rm[:3, :3]) - 1) / 2
@@ -722,56 +729,6 @@ def diffable_axis_angle_from_matrix(rotation_matrix):
     axis = Matrix([if_eq(Abs(cos_angle), 1, 0, x / n),
                    if_eq(Abs(cos_angle), 1, 0, y / n),
                    if_eq(Abs(cos_angle), 1, 1, z / n)])
-    return axis, angle
-
-
-def diffable_axis_angle_from_matrix_stable(rotation_matrix):
-    """
-    :param rotation_matrix: 4x4 or 3x3 Matrix
-    :type rotation_matrix: Matrix
-    :return: 3x1 Matrix, angle
-    :rtype: (Matrix, Union[float, Symbol])
-    """
-    # TODO buggy when angle == pi
-    rm = rotation_matrix
-    angle = (trace(rm[:3, :3]) - 1) / 2
-    angle = diffable_min_fast(angle, 1)
-    angle = diffable_max_fast(angle, -1)
-    angle = acos(angle)
-    x = (rm[2, 1] - rm[1, 2])
-    y = (rm[0, 2] - rm[2, 0])
-    z = (rm[1, 0] - rm[0, 1])
-    n = sqrt(x * x + y * y + z * z)
-    m = diffable_if_eq_zero(n, 1, n)
-    axis = Matrix([diffable_if_eq_zero(n, 0, x / m),
-                   diffable_if_eq_zero(n, 0, y / m),
-                   diffable_if_eq_zero(n, 1, z / m)])
-    return axis, angle
-
-
-def axis_angle_from_matrix(rotation_matrix):
-    """
-    :param rotation_matrix: 4x4 or 3x3 Matrix
-    :type rotation_matrix: Matrix
-    :return: 3x1 Matrix, angle
-    :rtype: (Matrix, Union[float, Symbol])
-    """
-    rm = rotation_matrix
-    angle = (trace(rm[:3, :3]) - 1) / 2
-    angle = Min(angle, 1)
-    angle = Max(angle, -1)
-    angle = acos(angle)
-    x = (rm[2, 1] - rm[1, 2])
-    y = (rm[0, 2] - rm[2, 0])
-    z = (rm[1, 0] - rm[0, 1])
-    n = sqrt(x * x + y * y + z * z)
-    m = if_eq_zero(n, 1, n)
-    axis = Matrix([if_eq_zero(n, 0, x / m),
-                   if_eq_zero(n, 0, y / m),
-                   if_eq_zero(n, 1, z / m)])
-    sign = if_eq_zero(angle, 1, diffable_sign(angle))
-    axis *= sign
-    angle = sign * angle
     return axis, angle
 
 
@@ -1155,12 +1112,26 @@ def entrywise_product(matrix1, matrix2):
             result[i, j] = matrix1[i, j] * matrix2[i, j]
     return result
 
-def get_angle_casadi(point1, point2, point3):
-    v12 = vector3(*point1) - vector3(*point2)
-    v13 = vector3(*point1) - vector3(*point3)
-    v23 = vector3(*point2) - vector3(*point3)
-    d12 = norm(v12)
-    d13 = norm(v13)
-    d23 = norm(v23)
-    #return w.acos(w.dot(v12, v13.T)[0] / (d12 * d13))
-    return acos((d12**2 + d13**2 - d23**2) / (2 * d12 * d13))
+def floor(x):
+    return ca.floor(x)
+
+def ceil(x):
+    return ca.ceil(x)
+
+def Sum(matrix):
+    """
+    the equivalent to np.sum(matrix)
+    """
+    return ca.sum1(ca.sum2(matrix))
+
+def sum_row(matrix):
+    """
+    the equivalent to np.sum(matrix, axis=0)
+    """
+    return ca.sum1(matrix)
+
+def sum_column(matrix):
+    """
+    the equivalent to np.sum(matrix, axis=1)
+    """
+    return ca.sum2(matrix)

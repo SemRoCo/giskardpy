@@ -6,6 +6,7 @@ from itertools import combinations
 from geometry_msgs.msg import PoseStamped
 
 from giskardpy import WORLD_IMPLEMENTATION, symbolic_wrapper as w
+from giskardpy.data_types import SingleJointState
 from giskardpy.pybullet_world_object import PyBulletWorldObject
 from giskardpy.qp_problem_builder import HardConstraint, JointConstraint
 from giskardpy.utils import KeyDefaultDict, \
@@ -21,8 +22,7 @@ else:
 
 
 class Robot(Backend):
-    def __init__(self, urdf, joint_weights=None, base_pose=None, controlled_joints=None, path_to_data_folder=u'',
-                 joint_vel_limit=None, joint_acc_limit=None, calc_self_collision_matrix=True, *args, **kwargs):
+    def __init__(self, urdf, base_pose=None, controlled_joints=None, path_to_data_folder=u'', *args, **kwargs):
         """
         :param urdf:
         :type urdf: str
@@ -35,25 +35,15 @@ class Robot(Backend):
         self._fks = {}
         self._evaluated_fks = {}
         self._joint_to_frame = {}
-        if joint_weights is None:
-            self._joint_weights = defaultdict(lambda: 0)
-        else:
-            self._joint_weights = joint_weights
-        if joint_vel_limit is None:
-            self._joint_velocity_limit = defaultdict(lambda: 100)  # use urdf limits per default
-        else:
-            self._joint_velocity_limit = joint_vel_limit
-
-        if joint_acc_limit is None:
-            self._joint_acc_limit = defaultdict(lambda: 100)  # no acceleration limit per default
-        else:
-            self._joint_acc_limit = joint_acc_limit
         self._joint_position_symbols = KeyDefaultDict(lambda x: w.Symbol(x))  # don't iterate over this map!!
         self._joint_velocity_symbols = KeyDefaultDict(lambda x: 0)  # don't iterate over this map!!
-        super(Robot, self).__init__(urdf, base_pose, controlled_joints, path_to_data_folder, calc_self_collision_matrix,
-                                    *args, **kwargs)
+        self._joint_velocity_linear_limit = KeyDefaultDict(lambda x: 10000) # don't overwrite urdf limits by default
+        self._joint_velocity_angular_limit = KeyDefaultDict(lambda x: 100000)
+        self._joint_acc_linear_limit = defaultdict(lambda: 100)  # no acceleration limit per default
+        self._joint_acc_angular_limit = defaultdict(lambda: 100)  # no acceleration limit per default
+        self._joint_weights = defaultdict(lambda: 0)
+        super(Robot, self).__init__(urdf, base_pose, controlled_joints, path_to_data_folder, *args, **kwargs)
         self.reinitialize()
-        self.update_self_collision_matrix(added_links=set(combinations(self.get_link_names_with_collision(), 2)))
 
     @property
     def hard_constraints(self):
@@ -89,24 +79,46 @@ class Robot(Backend):
         except:
             return {str(self._joint_position_symbols[x]): 0 for x in self.get_controllable_joints()}
 
-    def reinitialize(self, joint_position_symbols=None, joint_vel_symbols=None):
+    def reinitialize(self):
         """
         :param joint_position_symbols: maps urdfs joint names to symbols
         :type joint_position_symbols: dict
         """
         super(Robot, self).reinitialize()
-        if joint_position_symbols is not None:
-            # TODO don't change the input parameter
-            self._joint_position_symbols = joint_position_symbols
-            self._joint_velocity_symbols = joint_vel_symbols
         self._fk_expressions = {}
         self._create_frames_expressions()
         self._create_constraints()
         self.init_fast_fks()
 
+    def set_joint_position_symbols(self, symbols):
+        self._joint_position_symbols = symbols
+
+    def set_joint_velocity_limit_symbols(self, linear, angular):
+        self._joint_velocity_linear_limit = linear
+        self._joint_velocity_angular_limit = angular
+
+    def set_joint_velocity_symbols(self, symbols):
+        self._joint_velocity_symbols = symbols
+
+    def set_joint_acceleration_limit_symbols(self, linear, angular):
+        self._joint_acc_linear_limit = linear
+        self._joint_acc_angular_limit = angular
+
+    def set_joint_weight_symbols(self, symbols):
+        self._joint_weights = symbols
+
+    def update_joint_symbols(self, position, velocity, weights,
+                             linear_velocity_limit, angular_velocity_limit,
+                             linear_acceleration_limit, angular_acceleration_limit):
+        self.set_joint_position_symbols(position)
+        self.set_joint_velocity_symbols(velocity)
+        self.set_joint_weight_symbols(weights)
+        self.set_joint_velocity_limit_symbols(linear_velocity_limit, angular_velocity_limit)
+        self.set_joint_acceleration_limit_symbols(linear_acceleration_limit, angular_acceleration_limit)
+        self.reinitialize()
+
     def update_self_collision_matrix(self, added_links=None, removed_links=None):
-        if self._calc_self_collision_matrix:
-            super(Robot, self).update_self_collision_matrix(added_links, removed_links)
+        super(Robot, self).update_self_collision_matrix(added_links, removed_links)
 
     def _create_frames_expressions(self):
         for joint_name, urdf_joint in self._urdf_robot.joint_map.items():
@@ -129,7 +141,8 @@ class Robot(Backend):
                 raise TypeError(u'Joint type "{}" is not supported by urdfs parser.'.format(urdf_joint.type))
 
             if self.is_rotational_joint(joint_name):
-                joint_frame = w.dot(joint_frame, w.rotation_matrix_from_axis_angle(w.vector3(*urdf_joint.axis), joint_symbol))
+                joint_frame = w.dot(joint_frame,
+                                    w.rotation_matrix_from_axis_angle(w.vector3(*urdf_joint.axis), joint_symbol))
             elif self.is_translational_joint(joint_name):
                 translation_axis = (w.point3(*urdf_joint.axis) * joint_symbol)
                 joint_frame = w.dot(joint_frame, w.translation3(translation_axis[0],
@@ -147,37 +160,16 @@ class Robot(Backend):
         for i, joint_name in enumerate(self.get_joint_names_controllable()):
             lower_limit, upper_limit = self.get_joint_limits(joint_name)
             joint_symbol = self.get_joint_position_symbol(joint_name)
-            velocity_limit = self.get_joint_velocity_limit_expr(joint_name)
+            sample_period = w.Symbol(u'rosparam_general_options_sample_period')  # TODO this should be a parameter
+            velocity_limit = self.get_joint_velocity_limit_expr(joint_name) * sample_period
 
             if not self.is_joint_continuous(joint_name):
-                self._hard_constraints[joint_name] = HardConstraint(lower=lower_limit - joint_symbol,
-                                                                    upper=upper_limit - joint_symbol,
-                                                                    expression=joint_symbol)
-
-                self._joint_constraints[joint_name] = JointConstraint(lower=w.Max(lower_limit - joint_symbol,
-                                                                                  w.Max(-velocity_limit,
-                                                                                        self.get_joint_velocity_symbol(
-                                                                                                joint_name) -
-                                                                                        self._joint_acc_limit[
-                                                                                                joint_name])),
-                                                                      upper=w.Min(upper_limit - joint_symbol,
-                                                                                  w.Min(velocity_limit,
-                                                                                        self.get_joint_velocity_symbol(
-                                                                                                joint_name) +
-                                                                                        self._joint_acc_limit[
-                                                                                                joint_name])),
+                self._joint_constraints[joint_name] = JointConstraint(lower=w.Max(-velocity_limit, lower_limit - joint_symbol),
+                                                                      upper=w.Min(velocity_limit, upper_limit - joint_symbol),
                                                                       weight=self._joint_weights[joint_name])
             else:
-                self._joint_constraints[joint_name] = JointConstraint(lower=w.Max(-velocity_limit,
-                                                                                  self.get_joint_velocity_symbol(
-                                                                                        joint_name) -
-                                                                                  self._joint_acc_limit[
-                                                                                        joint_name]),
-                                                                      upper=w.Min(velocity_limit,
-                                                                                  self.get_joint_velocity_symbol(
-                                                                                        joint_name) +
-                                                                                  self._joint_acc_limit[
-                                                                                        joint_name]),
+                self._joint_constraints[joint_name] = JointConstraint(lower=-velocity_limit,
+                                                                      upper=velocity_limit,
                                                                       weight=self._joint_weights[joint_name])
 
     def get_fk_expression(self, root_link, tip_link):
@@ -239,11 +231,14 @@ class Robot(Backend):
         :rtype: float
         """
         limit = self._urdf_robot.joint_map[joint_name].limit
-        t = w.Symbol(u'rosparam_general_options_sample_period')  # TODO this should be a parameter
-        if limit is None or limit.velocity is None:
-            return self._joint_velocity_limit[joint_name]
+        if self.is_translational_joint(joint_name):
+            limit_symbol = self._joint_velocity_linear_limit[joint_name]
         else:
-            return w.Min(limit.velocity, self._joint_velocity_limit[joint_name]) * t
+            limit_symbol = self._joint_velocity_angular_limit[joint_name]
+        if limit is None or limit.velocity is None:
+            return limit_symbol
+        else:
+            return w.Min(limit.velocity, limit_symbol)
 
     def get_joint_frame(self, joint_name):
         """
@@ -262,6 +257,9 @@ class Robot(Backend):
         """
         return self._joint_position_symbols[joint_name]
 
+    def get_joint_position_symbols(self):
+        return [self.get_joint_position_symbol(joint_name) for joint_name in self.controlled_joints]
+
     def get_joint_velocity_symbol(self, joint_name):
         """
         :param joint_name: name of the joint in the urdfs
@@ -269,3 +267,39 @@ class Robot(Backend):
         :rtype: spw.Symbol
         """
         return self._joint_velocity_symbols[joint_name]
+
+    def get_joint_velocity_symbols(self):
+        return [self.get_joint_velocity_symbol(joint_name) for joint_name in self.controlled_joints]
+
+    def generate_joint_state(self, f):
+        """
+        :param f: lambda joint_info: float
+        :return:
+        """
+        js = {}
+        for joint_name in self.controlled_joints:
+            sjs = SingleJointState()
+            sjs.name = joint_name
+            sjs.position = f(joint_name)
+            js[joint_name] = sjs
+        return js
+
+    def link_order(self, link_a, link_b):
+        """
+        TODO find a better name
+        this function is used when deciding for which order to calculate the collisions
+        true if link_a < link_b
+        :type link_a: str
+        :type link_b: str
+        :rtype: bool
+        """
+        try:
+            self.get_controlled_parent_joint(link_a)
+        except KeyError:
+            return False
+        try:
+            self.get_controlled_parent_joint(link_b)
+        except KeyError:
+            return True
+        return link_a < link_b
+

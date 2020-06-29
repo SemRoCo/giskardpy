@@ -1,20 +1,21 @@
 import itertools
-import numpy as np
 from copy import deepcopy
 
-import roslaunch
-from numpy import pi
-
+import numpy as np
 import pytest
+import roslaunch
 import rospy
 from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped
+from sensor_msgs.msg import JointState
 from giskard_msgs.msg import CollisionEntry, MoveActionGoal, MoveResult, WorldBody, MoveGoal
 from giskard_msgs.srv import UpdateWorldResponse, UpdateWorldRequest
+from numpy import pi
 from shape_msgs.msg import SolidPrimitive
 from tf.transformations import quaternion_from_matrix, quaternion_about_axis
 
 from giskardpy import logging, identifier
 from giskardpy.identifier import fk_pose
+from giskardpy.symengine_robot import Robot
 from giskardpy.tfwrapper import init as tf_init, lookup_pose, transform_pose, lookup_point, transform_point
 from utils_for_tests import PR2, compare_poses
 
@@ -168,9 +169,8 @@ def zero_pose(resetted_giskard):
     """
     :type giskard: PR2
     """
-    resetted_giskard.set_joint_goal(default_pose)
     resetted_giskard.allow_all_collisions()
-    resetted_giskard.send_and_check_goal()
+    resetted_giskard.send_and_check_joint_goal(default_pose)
     return resetted_giskard
 
 
@@ -228,6 +228,25 @@ def kitchen_setup(resetted_giskard):
     js = {k: 0.0 for k in resetted_giskard.get_world().get_object(object_name).get_controllable_joints()}
     resetted_giskard.set_kitchen_js(js)
     return resetted_giskard
+
+
+class TestInitialization(object):
+    def test_load_config_yaml(self, zero_pose):
+        gm = zero_pose.get_god_map()
+        robot = zero_pose.get_robot()
+        assert isinstance(robot, Robot)
+        sample_period = gm.get_data(identifier.sample_period)
+        odom_x_index = gm.get_data(identifier.b_keys).index(u'j -- (\'pr2\', \'odom_x_joint\')')
+        odom_x_lb = gm.get_data(identifier.lb)[odom_x_index]/sample_period
+        odom_x_ub = gm.get_data(identifier.ub)[odom_x_index]/sample_period
+        np.testing.assert_almost_equal(odom_x_lb, -0.5)
+        np.testing.assert_almost_equal(odom_x_ub, 0.5)
+
+        odom_z_index = gm.get_data(identifier.b_keys).index(u'j -- (\'pr2\', \'odom_z_joint\')')
+        odom_z_lb = gm.get_data(identifier.lb)[odom_z_index]/sample_period
+        odom_z_ub = gm.get_data(identifier.ub)[odom_z_index]/sample_period
+        np.testing.assert_almost_equal(odom_z_lb, -0.6)
+        np.testing.assert_almost_equal(odom_z_ub, 0.6)
 
 
 class TestFk(object):
@@ -304,10 +323,66 @@ class TestJointGoals(object):
         zero_pose.send_and_check_goal(execute=False)
         zero_pose.check_joint_state(default_pose)
 
-    # TODO test goal for unknown joint
+
+    def test_prismatic_joint1(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        zero_pose.allow_self_collision()
+        js = {u'torso_lift_joint': 0.1}
+        zero_pose.send_and_check_joint_goal(js)
+
+    def test_hard_joint_limits(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        zero_pose.allow_self_collision()
+        r_elbow_flex_joint_limits = zero_pose.get_robot().get_joint_limits('r_elbow_flex_joint')
+        torso_lift_joint_limits = zero_pose.get_robot().get_joint_limits('torso_lift_joint')
+        head_pan_joint_limits = zero_pose.get_robot().get_joint_limits('head_pan_joint')
+
+        goal_js = {u'r_elbow_flex_joint': r_elbow_flex_joint_limits[0] - 0.2,
+                   u'torso_lift_joint': torso_lift_joint_limits[0] - 0.2,
+                   u'head_pan_joint': head_pan_joint_limits[0] - 0.2}
+        zero_pose.set_joint_goal(goal_js)
+        zero_pose.send_goal()
+        assert(not zero_pose.are_joint_limits_violated())
+
+        goal_js = {u'r_elbow_flex_joint': r_elbow_flex_joint_limits[1] + 0.2,
+                   u'torso_lift_joint': torso_lift_joint_limits[1] + 0.2,
+                   u'head_pan_joint': head_pan_joint_limits[1] + 0.2}
+
+        zero_pose.set_joint_goal(goal_js)
+        zero_pose.send_goal()
+        assert (not zero_pose.are_joint_limits_violated())
 
 
 class TestConstraints(object):
+    def test_UpdateGodMap(self, pocky_pose_setup):
+        """
+        :type pocky_pose_setup: PR2
+        """
+        r_goal = PoseStamped()
+        r_goal.header.frame_id = pocky_pose_setup.r_tip
+        r_goal.pose.orientation.w = 1
+        r_goal.pose.position.x += 0.1
+        updates = {
+            u'rosparam': {
+                u'joint_weights': {
+                    u'odom_x_joint': 0.0001,
+                    u'odom_y_joint': 0.0001,
+                    u'odom_z_joint': 0.0001
+                }
+            }
+        }
+        pocky_pose_setup.wrapper.update_god_map(updates)
+        pocky_pose_setup.set_and_check_cart_goal(r_goal, pocky_pose_setup.r_tip)
+        assert pocky_pose_setup.get_god_map().get_data(identifier.joint_cost + [u'odom_x_joint']) == 0.0001
+        assert pocky_pose_setup.get_god_map().get_data(identifier.joint_cost + [u'torso_lift_joint']) == 0.5
+        pocky_pose_setup.send_and_check_goal(execute=False)
+        assert pocky_pose_setup.get_god_map().get_data(identifier.joint_cost + [u'odom_x_joint']) == 1
+        assert pocky_pose_setup.get_god_map().get_data(identifier.joint_cost + [u'torso_lift_joint']) == 0.5
+
     def test_UpdateYaml(self, pocky_pose_setup):
         """
         :type pocky_pose_setup: PR2
@@ -330,28 +405,6 @@ class TestConstraints(object):
         assert pocky_pose_setup.get_god_map().get_data(identifier.joint_cost + [u'odom_x_joint']) == 0.0999
         assert pocky_pose_setup.get_god_map().get_data(identifier.joint_cost + [u'odom_y_joint']) == 0.0999
         assert pocky_pose_setup.get_god_map().get_data(identifier.joint_cost + [u'odom_z_joint']) == 0.0888
-        assert pocky_pose_setup.get_god_map().get_data(identifier.joint_cost + [u'torso_lift_joint']) == 0.5
-
-    def test_UpdateGodMap(self, pocky_pose_setup):
-        """
-        :type pocky_pose_setup: PR2
-        """
-        r_goal = PoseStamped()
-        r_goal.header.frame_id = pocky_pose_setup.r_tip
-        r_goal.pose.orientation.w = 1
-        r_goal.pose.position.x += 0.1
-        updates = {
-            u'rosparam': {
-                u'joint_weights': {
-                    u'odom_x_joint': 0.0001,
-                    u'odom_y_joint': 0.0001,
-                    u'odom_z_joint': 0.0001
-                }
-            }
-        }
-        pocky_pose_setup.wrapper.update_god_map(updates)
-        pocky_pose_setup.set_and_check_cart_goal(r_goal, pocky_pose_setup.r_tip)
-        assert pocky_pose_setup.get_god_map().get_data(identifier.joint_cost + [u'odom_x_joint']) == 0.0001
         assert pocky_pose_setup.get_god_map().get_data(identifier.joint_cost + [u'torso_lift_joint']) == 0.5
 
     def test_UpdateGodMap2(self, pocky_pose_setup):
@@ -454,6 +507,63 @@ class TestConstraints(object):
         np.testing.assert_almost_equal(expected_x.point.y, 0, 2)
         np.testing.assert_almost_equal(expected_x.point.z, 0, 2)
 
+    def test_align_planes1(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        x_gripper = Vector3Stamped()
+        x_gripper.header.frame_id = zero_pose.r_tip
+        x_gripper.vector.x = 1
+        y_gripper = Vector3Stamped()
+        y_gripper.header.frame_id = zero_pose.r_tip
+        y_gripper.vector.y = 1
+
+        x_goal = Vector3Stamped()
+        x_goal.header.frame_id = u'map'
+        x_goal.vector.x = 1
+        y_goal = Vector3Stamped()
+        y_goal.header.frame_id = u'map'
+        y_goal.vector.z = 1
+        zero_pose.align_planes(zero_pose.r_tip, x_gripper, root_normal=x_goal)
+        zero_pose.align_planes(zero_pose.r_tip, y_gripper, root_normal=y_goal)
+        zero_pose.send_and_check_goal()
+        map_T_gripper = lookup_pose(u'map', u'r_gripper_tool_frame')
+        np.testing.assert_almost_equal(map_T_gripper.pose.orientation.x, 0.7071, decimal=3)
+        np.testing.assert_almost_equal(map_T_gripper.pose.orientation.y, 0.0, decimal=3)
+        np.testing.assert_almost_equal(map_T_gripper.pose.orientation.z, 0.0, decimal=3)
+        np.testing.assert_almost_equal(map_T_gripper.pose.orientation.w, 0.7071, decimal=3)
+
+    def test_wrong_constraint_type(self, zero_pose):
+        goal_state = JointState()
+        goal_state.name = ['r_elbow_flex_joint']
+        goal_state.position = [-1.0]
+        kwargs = {u'goal_state': goal_state}
+        zero_pose.add_json_goal('jointpos', **kwargs)
+        zero_pose.send_and_check_goal(expected_error_code=MoveResult.INSOLVABLE)
+
+    def test_python_code_in_constraint_type(self, zero_pose):
+        goal_state = JointState()
+        goal_state.name = ['r_elbow_flex_joint']
+        goal_state.position = [-1.0]
+        kwargs = {u'goal_state': goal_state}
+        zero_pose.add_json_goal('print("asd")', **kwargs)
+        zero_pose.send_and_check_goal(expected_error_code=MoveResult.INSOLVABLE)
+
+    def test_wrong_params1(self, zero_pose):
+        goal_state = JointState()
+        goal_state.name = 'r_elbow_flex_joint'
+        goal_state.position = [-1.0]
+        kwargs = {u'goal_state': goal_state}
+        zero_pose.add_json_goal('JointPositionList', **kwargs)
+        zero_pose.send_and_check_goal(expected_error_code=MoveResult.INSOLVABLE)
+
+    def test_wrong_params2(self, zero_pose):
+        goal_state = JointState()
+        goal_state.name = [5432]
+        goal_state.position = 'test'
+        kwargs = {u'goal_state': goal_state}
+        zero_pose.add_json_goal('JointPositionList', **kwargs)
+        zero_pose.send_and_check_goal(expected_error_code=MoveResult.INSOLVABLE)
 
 class TestCartGoals(object):
 
@@ -964,6 +1074,14 @@ class TestCollisionAvoidanceGoals(object):
         zero_pose.detach_object(pocky)
         zero_pose.remove_object(pocky)
 
+    def test_remove_attached_box(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        pocky = u'http://muh#pocky'
+        zero_pose.attach_box(pocky, [0.1, 0.02, 0.02], zero_pose.r_tip, [0.05, 0, 0])
+        zero_pose.remove_object(pocky)
+
     def test_attach_existing_box(self, zero_pose):
         """
         :type zero_pose: PR2
@@ -1041,6 +1159,12 @@ class TestCollisionAvoidanceGoals(object):
         pocky = u'http://muh#pocky'
         zero_pose.attach_box(pocky, [0.1, 0.02, 0.02], u'', [0.05, 0, 0],
                              expected_response=UpdateWorldResponse.MISSING_BODY_ERROR)
+
+    def test_detach_unknown_object(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        zero_pose.detach_object(u'nil', expected_response=UpdateWorldResponse.MISSING_BODY_ERROR)
 
     def test_add_remove_object(self, zero_pose):
         """
@@ -1318,34 +1442,6 @@ class TestCollisionAvoidanceGoals(object):
         box_setup.check_cpi_geq(box_setup.get_l_gripper_links(), 0.0)
         box_setup.check_cpi_leq(box_setup.get_r_gripper_links(), 0.0)
 
-    # def test_avoid_collision2(self, pocky_pose_setup):
-    #     """
-    #     :type box_setup: PR2
-    #     """
-    #     # FIXME
-    #     p = PoseStamped()
-    #     p.header.frame_id = u'map'
-    #     p.pose.position.x = 1.1
-    #     p.pose.position.y = 0
-    #     p.pose.position.z = 0.6
-    #     p.pose.orientation.w = 1
-    #     pocky_pose_setup.add_box(size=[1, 1, 0.01], pose=p)
-    #
-    #     p = PoseStamped()
-    #     p.header.frame_id = pocky_pose_setup.r_tip
-    #     p.pose.position = Point(0.15, 0, 0)
-    #     p.pose.orientation = Quaternion(0, 0, 0, 1)
-    #     pocky_pose_setup.set_cart_goal(p, pocky_pose_setup.r_tip, pocky_pose_setup.default_root)
-    #
-    #     collision_entry = CollisionEntry()
-    #     collision_entry.type = CollisionEntry.AVOID_COLLISION
-    #     collision_entry.min_dist = 0.05
-    #     collision_entry.body_b = u'box'
-    #     pocky_pose_setup.add_collision_entries([collision_entry])
-    #
-    #     pocky_pose_setup.send_and_check_goal()
-    #     pocky_pose_setup.check_cpi_geq(pocky_pose_setup.get_l_gripper_links(), 0.048)
-    #     pocky_pose_setup.check_cpi_geq(pocky_pose_setup.get_r_gripper_links(), 0.048)
 
     def test_avoid_collision3(self, pocky_pose_setup):
         """
@@ -1543,13 +1639,13 @@ class TestCollisionAvoidanceGoals(object):
         :type box_setup: PR2
         """
         attached_link_name = u'pocky'
-        box_setup.attach_box(attached_link_name, [0.1, 0.02, 0.02], box_setup.r_tip, [0.05, 0, 0])
-        box_setup.attach_box(attached_link_name, [0.1, 0.02, 0.02], box_setup.r_tip, [0.05, 0, 0],
+        box_setup.attach_box(attached_link_name, [0.2, 0.04, 0.04], box_setup.r_tip, [0.05, 0, 0])
+        box_setup.attach_box(attached_link_name, [0.2, 0.04, 0.04], box_setup.r_tip, [0.05, 0, 0],
                              expected_response=UpdateWorldResponse.DUPLICATE_BODY_ERROR)
         p = PoseStamped()
         p.header.frame_id = box_setup.r_tip
         p.header.stamp = rospy.get_rostime()
-        p.pose.position.x = -0.11
+        p.pose.position.x = -0.15
         p.pose.orientation.w = 1
         box_setup.set_and_check_cart_goal(p, box_setup.r_tip, box_setup.default_root)
         box_setup.check_cpi_geq(box_setup.get_l_gripper_links(), 0.048)
@@ -1977,48 +2073,48 @@ class TestCollisionAvoidanceGoals(object):
     #     # get cup from left middle drawer right side
     #     # put cup bowl and spoon in sink
 
-    # def test_pick_place_milk(self, kitchen_setup):
-    #     # FIXME
-    #     milk_name = u'milk'
-    #
-    #     # take milk out of fridge
-    #     kitchen_setup.set_kitchen_js({u'iai_fridge_door_joint': 1.56})
-    #
-    #     # spawn milk
-    #     milk_pose = PoseStamped()
-    #     milk_pose.header.frame_id = u'iai_kitchen/iai_fridge_main_middle_level'
-    #     milk_pose.pose.position = Point(0.1, 0, 0.12)
-    #     milk_pose.pose.orientation = Quaternion(0, 0, 0, 1)
-    #     kitchen_setup.add_box(milk_name, [0.05, 0.05, 0.2], milk_pose)
-    #
-    #     # grasp milk
-    #     kitchen_setup.open_r_gripper()
-    #
-    #     r_goal = deepcopy(milk_pose)
-    #     r_goal.pose.orientation = Quaternion(*quaternion_from_matrix([[-1, 0, 0, 0],
-    #                                                                   [0, -1, 0, 0],
-    #                                                                   [0, 0, 1, 0],
-    #                                                                   [0, 0, 0, 1]]))
-    #     kitchen_setup.set_cart_goal(r_goal, kitchen_setup.r_tip, kitchen_setup.default_root)
-    #     kitchen_setup.send_and_check_goal()
-    #     kitchen_setup.attach_existing(milk_name, kitchen_setup.r_tip)
-    #     # kitchen_setup.keep_position(kitchen_setup.r_tip)
-    #     kitchen_setup.close_r_gripper()
-    #
-    #     # place milk
-    #     milk_goal = PoseStamped()
-    #     milk_goal.header.frame_id = u'iai_kitchen/kitchen_island_surface'
-    #     milk_goal.pose.position = Point(.1, -.2, .13)
-    #     milk_goal.pose.orientation = Quaternion(0, 0, 0, 1)
-    #     kitchen_setup.set_cart_goal(milk_goal, milk_name, kitchen_setup.default_root)
-    #     kitchen_setup.send_and_check_goal()
-    #
-    #     # kitchen_setup.keep_position(kitchen_setup.r_tip)
-    #     kitchen_setup.open_r_gripper()
-    #
-    #     kitchen_setup.detach_object(milk_name)
-    #
-    #     kitchen_setup.send_and_check_joint_goal(gaya_pose)
+    def test_fridge(self, kitchen_setup):
+        # FIXME
+        milk_name = u'milk'
+
+        # take milk out of fridge
+        kitchen_setup.set_kitchen_js({u'iai_fridge_door_joint': 1.56})
+
+        # spawn milk
+        milk_pose = PoseStamped()
+        milk_pose.header.frame_id = u'iai_kitchen/iai_fridge_door_shelf1_bottom'
+        milk_pose.pose.position = Point(0, 0, 0.12)
+        milk_pose.pose.orientation = Quaternion(0, 0, 0, 1)
+        kitchen_setup.add_box(milk_name, [0.05, 0.05, 0.2], milk_pose)
+
+        # grasp milk
+        kitchen_setup.open_l_gripper()
+
+        l_goal = deepcopy(milk_pose)
+        l_goal.pose.orientation = Quaternion(*quaternion_from_matrix([[1, 0, 0, 0],
+                                                                      [0, 1, 0, 0],
+                                                                      [0, 0, 1, 0],
+                                                                      [0, 0, 0, 1]]))
+        kitchen_setup.set_cart_goal(l_goal, kitchen_setup.l_tip, kitchen_setup.default_root)
+        kitchen_setup.send_and_check_goal()
+        kitchen_setup.attach_existing(milk_name, kitchen_setup.l_tip)
+        # kitchen_setup.keep_position(kitchen_setup.r_tip)
+        kitchen_setup.close_l_gripper()
+
+        # place milk
+        milk_goal = PoseStamped()
+        milk_goal.header.frame_id = u'iai_kitchen/kitchen_island_surface'
+        milk_goal.pose.position = Point(.1, -.2, .13)
+        milk_goal.pose.orientation = Quaternion(0, 0, 0, 1)
+        kitchen_setup.set_cart_goal(milk_goal, milk_name, kitchen_setup.default_root)
+        kitchen_setup.send_and_check_goal()
+
+        # kitchen_setup.keep_position(kitchen_setup.r_tip)
+        kitchen_setup.open_r_gripper()
+
+        kitchen_setup.detach_object(milk_name)
+
+        kitchen_setup.send_and_check_joint_goal(gaya_pose)
 
     # def test_nan(self, kitchen_setup):
     #     while True:

@@ -6,7 +6,8 @@ from genpy import Message
 from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped
 from giskard_msgs.msg import MoveAction, MoveGoal, WorldBody, CollisionEntry, MoveResult, Constraint, \
     MoveCmd, JointConstraint, CartesianConstraint
-from giskard_msgs.srv import UpdateWorld, UpdateWorldRequest, UpdateWorldResponse
+from giskard_msgs.srv import UpdateWorld, UpdateWorldRequest, UpdateWorldResponse, GetObjectInfo, GetObjectNames,\
+    UpdateRvizMarkers, GetAttachedObjects
 from rospy_message_converter.message_converter import convert_ros_message_to_dictionary
 from sensor_msgs.msg import JointState
 from shape_msgs.msg import SolidPrimitive
@@ -14,6 +15,7 @@ from visualization_msgs.msg import MarkerArray
 
 from giskardpy.urdf_object import URDFObject
 from giskardpy.utils import dict_to_joint_states, make_world_body_box, make_world_body_cylinder
+from giskardpy import logging
 
 
 class GiskardWrapper(object):
@@ -21,6 +23,10 @@ class GiskardWrapper(object):
         if giskard_topic is not None:
             self.client = SimpleActionClient(giskard_topic, MoveAction)
             self.update_world = rospy.ServiceProxy(u'{}/update_world'.format(ns), UpdateWorld)
+            self.get_object_names = rospy.ServiceProxy(u'{}/get_object_names'.format(ns), GetObjectNames)
+            self.get_object_info = rospy.ServiceProxy(u'{}/get_object_info'.format(ns), GetObjectInfo)
+            self.update_rviz_markers = rospy.ServiceProxy(u'{}/update_rviz_markers'.format(ns), UpdateRvizMarkers)
+            self.get_attached_objects = rospy.ServiceProxy(u'{}/get_attached_objects'.format(ns), GetAttachedObjects)
             self.marker_pub = rospy.Publisher(u'visualization_marker_array', MarkerArray, queue_size=10)
             rospy.wait_for_service(u'{}/update_world'.format(ns))
             self.client.wait_for_server()
@@ -37,24 +43,24 @@ class GiskardWrapper(object):
     def get_root(self):
         return self.robot_urdf.get_root()
 
-    def set_cart_goal(self, root, tip, pose_stamped, trans_max_speed=None, rot_max_speed=None):
+    def set_cart_goal(self, root, tip, pose_stamped, trans_max_velocity=None, rot_max_velocity=None):
         """
         :param tip:
         :type tip: str
         :param pose_stamped:
         :type pose_stamped: PoseStamped
         """
-        self.set_translation_goal(root, tip, pose_stamped, max_speed=trans_max_speed)
-        self.set_rotation_goal(root, tip, pose_stamped, max_speed=rot_max_speed)
+        self.set_translation_goal(root, tip, pose_stamped, max_velocity=trans_max_velocity)
+        self.set_rotation_goal(root, tip, pose_stamped, max_velocity=rot_max_velocity)
 
-    def set_translation_goal(self, root, tip, pose_stamped, weight=None, gain=None, max_speed=None):
+    def set_translation_goal(self, root, tip, pose_stamped, weight=None, max_velocity=None):
         """
         :param tip:
         :type tip: str
         :param pose_stamped:
         :type pose_stamped: PoseStamped
         """
-        if not gain and not max_speed and not weight:
+        if not max_velocity and not weight:
             constraint = CartesianConstraint()
             constraint.type = CartesianConstraint.TRANSLATION_3D
             constraint.root_link = str(root)
@@ -68,23 +74,21 @@ class GiskardWrapper(object):
             params[u'root_link'] = root
             params[u'tip_link'] = tip
             params[u'goal'] = convert_ros_message_to_dictionary(pose_stamped)
-            if gain:
-                params[u'gain'] = gain
-            if max_speed:
-                params[u'max_speed'] = max_speed
+            if max_velocity:
+                params[u'max_velocity'] = max_velocity
             if weight:
                 params[u'weight'] = weight
             constraint.parameter_value_pair = json.dumps(params)
             self.cmd_seq[-1].constraints.append(constraint)
 
-    def set_rotation_goal(self, root, tip, pose_stamped, weight=None, gain=None, max_speed=None):
+    def set_rotation_goal(self, root, tip, pose_stamped, weight=None, max_velocity=None):
         """
         :param tip:
         :type tip: str
         :param pose_stamped:
         :type pose_stamped: PoseStamped
         """
-        if not gain and not max_speed and not weight:
+        if not max_velocity and not weight:
             constraint = CartesianConstraint()
             constraint.type = CartesianConstraint.ROTATION_3D
             constraint.root_link = str(root)
@@ -98,21 +102,19 @@ class GiskardWrapper(object):
             params[u'root_link'] = root
             params[u'tip_link'] = tip
             params[u'goal'] = convert_ros_message_to_dictionary(pose_stamped)
-            if gain:
-                params[u'gain'] = gain
-            if max_speed:
-                params[u'max_speed'] = max_speed
+            if max_velocity:
+                params[u'max_velocity'] = max_velocity
             if weight:
                 params[u'weight'] = weight
             constraint.parameter_value_pair = json.dumps(params)
             self.cmd_seq[-1].constraints.append(constraint)
 
-    def set_joint_goal(self, joint_state, weight=None, gain=None, max_speed=None):
+    def set_joint_goal(self, joint_state, weight=None, max_velocity=None):
         """
         :param joint_state:
         :type joint_state: dict
         """
-        if not weight and not gain and not max_speed:
+        if not weight and not max_velocity:
             constraint = JointConstraint()
             constraint.type = JointConstraint.JOINT
             if isinstance(joint_state, dict):
@@ -131,10 +133,8 @@ class GiskardWrapper(object):
                 params[u'goal'] = joint_position
                 if weight:
                     params[u'weight'] = weight
-                if gain:
-                    params[u'gain'] = gain
-                if max_speed:
-                    params[u'max_speed'] = max_speed
+                if max_velocity:
+                    params[u'max_velocity'] = max_velocity
                 constraint.parameter_value_pair = json.dumps(params)
                 self.cmd_seq[-1].constraints.append(constraint)
 
@@ -492,4 +492,36 @@ class GiskardWrapper(object):
         if isinstance(joint_states, dict):
             joint_states = dict_to_joint_states(joint_states)
         self.object_js_topics[object_name].publish(joint_states)
+
+    def get_object_names(self):
+        """
+        returns the name of every object in the world
+        :rtype: GetObjectNamesResponse
+        """
+        return self.get_object_names()
+
+    def get_object_info(self, name):
+        """
+        returns the joint state, joint state topic and pose of the object with the given name
+        :type name: str
+        :rtype: GetObjectInfoResponse
+        """
+        return self.get_object_info(name)
+
+    def update_rviz_markers(self, object_names):
+        """
+        republishes visualization markers for rviz
+        :type name: list
+        :rtype: UpdateRvizMarkersResponse
+        """
+        return self.update_rviz_markers(object_names)
+
+    def get_attached_objects(self):
+        """
+        returns a list of all objects that are attached to the robot and the respective attachement points
+        :rtype: GetAttachedObjectsResponse
+        """
+        return self.get_attached_objects()
+
+
 

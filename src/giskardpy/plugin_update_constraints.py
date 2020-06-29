@@ -2,6 +2,7 @@ import inspect
 import itertools
 import json
 import traceback
+import difflib
 from time import time
 
 from giskard_msgs.msg import MoveCmd
@@ -15,20 +16,16 @@ from giskardpy.exceptions import InsolvableException, ImplementationException
 from giskardpy.plugin_action_server import GetGoal
 
 
-def allowed_constraint_names():
-    return [x[0] for x in inspect.getmembers(giskardpy.constraints) if inspect.isclass(x[1])]
-
-
 class GoalToConstraints(GetGoal):
     # FIXME no error msg when constraint has missing parameter
     def __init__(self, name, as_name):
         GetGoal.__init__(self, name, as_name)
         self.used_joints = set()
 
-        self.known_constraints = set()
         self.controlled_joints = set()
         self.controllable_links = set()
         self.last_urdf = None
+        self.allowed_constraint_types = {x[0]:x[1] for x in inspect.getmembers(giskardpy.constraints) if inspect.isclass(x[1])}
 
     def initialise(self):
         self.get_god_map().safe_set_data(identifier.collision_goal_identifier, None)
@@ -43,10 +40,8 @@ class GoalToConstraints(GetGoal):
 
         self.get_god_map().safe_set_data(identifier.constraints_identifier, {})
 
-        if self.has_robot_changed():
-            self.soft_constraints = {}
-            # TODO split soft contraints into js, coll and cart; update cart always and js/coll only when urdf changed, js maybe never
-            self.add_js_controller_soft_constraints()
+        self.soft_constraints = {}
+        # TODO we only have to update the collision constraints, if the robot changed
         self.add_collision_avoidance_soft_constraints()
 
         try:
@@ -78,31 +73,48 @@ class GoalToConstraints(GetGoal):
         :rtype: dict
         """
         for constraint in itertools.chain(cmd.constraints, cmd.joint_constraints, cmd.cartesian_constraints):
-            if constraint.type not in allowed_constraint_names():
-                # TODO test me
-                raise InsolvableException(u'unknown constraint')
             try:
-                C = eval(u'giskardpy.constraints.{}'.format(constraint.type))
-            except NameError as e:
-                # TODO return next best constraint type
-                raise ImplementationException(u'unsupported constraint type')
+                C = self.allowed_constraint_types[constraint.type]
+            except KeyError:
+                matches = ''
+                for s in self.allowed_constraint_types.keys():
+                    sm = difflib.SequenceMatcher(None, constraint.type.lower(), s.lower())
+                    ratio = sm.ratio()
+                    if ratio >= 0.5:
+                        matches = matches + s + '\n'
+                if matches != '':
+                    raise InsolvableException(
+                        u'unknown constraint {}. did you mean one of these?:\n{}'.format(constraint.type,matches))
+                else:
+                    available_constraints = '\n'.join([x for x in self.allowed_constraint_types.keys()]) + '\n'
+                    raise InsolvableException(u'unknown constraint {}. available constraint types:\n{}'.format(constraint.type ,available_constraints))
+
             try:
                 if hasattr(constraint, u'parameter_value_pair'):
                     params = json.loads(constraint.parameter_value_pair)
                 else:
                     params = convert_ros_message_to_dictionary(constraint)
                     del params[u'type']
+
                 c = C(self.god_map, **params)
-                soft_constraints = c.get_constraint()
+            except:
+                doc_string = C.make_constraints.__doc__
+                error_msg = 'wrong parameters for {} \n'.format(C.__name__)
+                if doc_string is not None:
+                    error_msg = error_msg + doc_string
+                raise ValueError(error_msg)
+            try:
+                soft_constraints = c.get_constraints()
                 self.soft_constraints.update(soft_constraints)
-            except TypeError as e:
+            except:
                 traceback.print_exc()
-                raise ImplementationException(help(c.get_constraint))
+                raise ImplementationException()
+
 
     def add_js_controller_soft_constraints(self):
         for joint_name in self.get_robot().controlled_joints:
             c = JointPosition(self.get_god_map(), joint_name, self.get_robot().joint_state[joint_name].position, 0, 0)
-            self.soft_constraints.update(c.get_constraint())
+            self.soft_constraints.update(c.make_constraints())
 
     def has_robot_changed(self):
         new_urdf = self.get_robot().get_urdf_str()
@@ -128,9 +140,9 @@ class GoalToConstraints(GetGoal):
                                                     identifier.distance_thresholds +
                                                     [joint_name, u'zero_weight_distance']),
                                                     idx=i)
-                soft_constraints.update(constraint.get_constraint())
+                soft_constraints.update(constraint.get_constraints())
         for link_a, link_b in self.get_robot().get_self_collision_matrix():
-            if link_a > link_b:
+            if not self.get_robot().link_order(link_a, link_b):
                 tmp = link_a
                 link_a = link_b
                 link_b = tmp
@@ -150,6 +162,6 @@ class GoalToConstraints(GetGoal):
                                                 max_weight_distance=max_weight_distance,
                                                 low_weight_distance=low_weight_distance,
                                                 zero_weight_distance=zero_weight_distance)
-            soft_constraints.update(constraint.get_constraint())
+            soft_constraints.update(constraint.get_constraints())
 
         self.soft_constraints.update(soft_constraints)

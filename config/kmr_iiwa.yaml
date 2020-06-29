@@ -1,6 +1,6 @@
 general_options:
+  debug: False # prints the behavior tree state in the terminal
   sample_period: 0.05 # time[s] between points of generated joint trajectory
-  debug: False # enables debug prints and prints the behavior tree state in the terminal
   map_frame: map
   fill_velocity_values: True # due to a bug, the pr2 does not want the velocity values to be filled
   joint_convergence_threshold: 0.01 # when the velocities fall below this value, the planning succeeds
@@ -19,9 +19,9 @@ general_options:
       default: 100
   joint_weights: # the planner prefers low weight joints to achieve solutions
     default: 0.001
-    odom_x_joint: 0.1
-    odom_y_joint: 0.1
-    odom_z_joint: 0.1
+    odom_x_joint: 0.001
+    odom_y_joint: 0.001
+    odom_z_joint: 0.001
 qp_solver:
   nWSR: None # None results in a nWSR estimation thats fine most of the time
 plugins:
@@ -59,14 +59,8 @@ collision_avoidance:
       max_weight_distance: 0.04
       low_weight_distance: 0.06
       zero_weight_distance: 0.09
-    ur5_wrist_1_link: *low
-    ur5_wrist_2_link: *low
-    ur5_wrist_3_link: *low
-    ur5_forearm_link: *low
-    ur5_upper_arm_link: *low
   self_collision_avoidance:
     ignore: []
-    add:
-      - [plate, ur5_upper_arm_link]
+    add: []
   external_collision_avoidance:
     number_of_repeller: 5

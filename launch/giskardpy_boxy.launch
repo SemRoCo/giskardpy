@@ -16,7 +16,7 @@
       - /whole_body_controller/torso/follow_joint_trajectory
       - /scaled_pos_traj_controller/follow_joint_trajectory
       - /whole_body_controller/left_arm/follow_joint_trajectory
-      - /whole_body_controller/left_arm/follow_joint_trajectory
+      - /whole_body_controller/right_arm/follow_joint_trajectory
     </rosparam>
   </node>
 

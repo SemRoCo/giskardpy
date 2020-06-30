@@ -21,7 +21,6 @@ class OutColor:
 
 class JSObserver(rospy.Subscriber):
     def __init__(self, robot, topic, message_type):
-        self.robot = robot
         self.joint_limits = robot.get_all_joint_limits()
         super(JSObserver, self).__init__(topic, message_type, self.js_cb)
 

@@ -2,16 +2,6 @@
 
   <arg name="gui" default="false" />
 
-  <node pkg="giskardpy" type="joint_trajectory_splitter.py" name="joint_trajectory_splitter" output="screen">
-    <rosparam param="enable_self_collision">False</rosparam>
-    <rosparam param="state_topics">
-      - /whole_body_controller/state
-    </rosparam>
-    <rosparam param="client_topics">
-      - /whole_body_controller/follow_joint_trajectory
-    </rosparam>
-  </node>
-
   <node pkg="giskardpy" type="giskard_trees.py" name="giskard" output="screen">
     <param name="path_to_data_folder" value="$(find giskardpy)/data" />
     <param name="enable_gui" value="$(arg gui)"/>
@@ -19,6 +9,7 @@
   </node>
 
   <node pkg="giskardpy" type="interactive_marker.py" name="giskard_interactive_marker" output="screen">
+    <rosparam param="enable_self_collision">False</rosparam>
     <rosparam param="interactive_marker_chains">
       - [odom, base_footprint]
       - [odom, triangle_base_link]

@@ -3,9 +3,11 @@ from __future__ import division
 import numbers
 from collections import OrderedDict
 
+import PyKDL as kdl
 import numpy as np
 from geometry_msgs.msg import Vector3Stamped, Vector3
 from rospy_message_converter.message_converter import convert_dictionary_to_ros_message
+from tf.transformations import rotation_matrix
 
 import giskardpy.identifier as identifier
 import giskardpy.tfwrapper as tf
@@ -13,9 +15,9 @@ from giskardpy import cas_wrapper as w
 from giskardpy.data_types import SoftConstraint
 from giskardpy.exceptions import GiskardException, ConstraintException
 from giskardpy.input_system import PoseStampedInput, Point3Input, Vector3Input, Vector3StampedInput, FrameInput, \
-    PointStampedInput, TranslationInput
-
+    PointStampedInput, TranslationInput, InputArray
 # WEIGHTS = [0] + [6 ** x for x in range(7)]
+
 WEIGHT_MAX = 1000
 WEIGHT_ABOVE_CA = 100
 WEIGHT_COLLISION_AVOIDANCE = 10
@@ -76,6 +78,13 @@ class Constraint(object):
         returns a symbol that referes to the given joint
         """
         key = identifier.joint_states + [joint_name, u'position']
+        return self.god_map.to_symbol(key)
+
+    def get_input_object_joint_position(self, object_name, joint_name):
+        """
+        returns a symbol that referes to the given joint
+        """
+        key = identifier.world + [u'get_object', (object_name,), u'joint_state', joint_name, u'position']
         return self.god_map.to_symbol(key)
 
     def get_input_sampling_period(self):
@@ -198,6 +207,10 @@ class Constraint(object):
     def get_input_PointStamped(self, name):
         return PointStampedInput(self.god_map.to_symbol,
                                  prefix=self.get_identifier() + [name, u'point']).get_expression()
+
+    def get_input_np_frame(self, name):
+        return FrameInput(self.get_god_map().to_symbol,
+                          prefix=self.get_identifier() + [name]).get_frame()
 
     def get_expr_velocity(self, expr):
         expr_jacobian = w.jacobian(expr, self.get_robot().get_joint_position_symbols())
@@ -380,6 +393,56 @@ class Constraint(object):
                             upper=error[2],
                             weight=weight,
                             expression=root_V_tip_normal[2],
+                            goal_constraint=goal_constraint)
+
+    def add_minimize_rotation_constraints(self, root_R_tipGoal, root, tip, max_velocity=np.pi / 4, goal_constraint=True):
+        root_R_tipCurrent = w.rotation_of(self.get_fk(root, tip))
+        root_R_tipCurrent_evaluated = w.rotation_of(self.get_fk_evaluated(root, tip))
+
+        identity = w.rotation_matrix_from_axis_angle([0, 0, 1], 0.0001)
+        tipCurrentEvaluated_R_tipCurrent = w.dot(w.dot(root_R_tipCurrent_evaluated.T, identity), root_R_tipCurrent)
+        current_axis, current_angle = w.axis_angle_from_matrix(tipCurrentEvaluated_R_tipCurrent)
+        current_angle_axis = (current_axis * current_angle)
+
+        error_angle = w.rotation_distance(root_R_tipCurrent, root_R_tipGoal)
+        error_angle = w.Abs(error_angle)
+
+        _, angle = w.axis_angle_from_matrix(root_R_tipCurrent)
+
+        capped_angle = self.limit_velocity(error_angle, max_velocity) / error_angle
+
+        r_R_c_q = w.quaternion_from_matrix(root_R_tipCurrent)
+        r_R_g_q = w.quaternion_from_matrix(root_R_tipGoal)
+        r_R_g_intermediate_q = w.quaternion_slerp(r_R_c_q, r_R_g_q, capped_angle)
+        c_R_g_intermediate_q = w.quaternion_diff(r_R_c_q, r_R_g_intermediate_q)
+        intermediate_error_axis, intermediate_error_angle = w.axis_angle_from_quaternion(c_R_g_intermediate_q[0],
+                                                                                         c_R_g_intermediate_q[1],
+                                                                                         c_R_g_intermediate_q[2],
+                                                                                         c_R_g_intermediate_q[3])
+
+        c_R_g_intermediate_aa = intermediate_error_axis * intermediate_error_angle
+
+        # weight = WEIGHT_BELOW_CA
+        weight = WEIGHT_ABOVE_CA
+        weight = self.normalize_error(max_velocity, weight)
+
+        self.add_constraint(u'/rot/0',
+                            lower=c_R_g_intermediate_aa[0],
+                            upper=c_R_g_intermediate_aa[0],
+                            weight=weight,
+                            expression=current_angle_axis[0],
+                            goal_constraint=goal_constraint)
+        self.add_constraint(u'/rot/1',
+                            lower=c_R_g_intermediate_aa[1],
+                            upper=c_R_g_intermediate_aa[1],
+                            weight=weight,
+                            expression=current_angle_axis[1],
+                            goal_constraint=goal_constraint)
+        self.add_constraint(u'/rot/2',
+                            lower=c_R_g_intermediate_aa[2],
+                            upper=c_R_g_intermediate_aa[2],
+                            weight=weight,
+                            expression=current_angle_axis[2],
                             goal_constraint=goal_constraint)
 
 
@@ -721,7 +784,8 @@ class CartesianPosition(BasicCartesianConstraint):
 
 
 class CartesianOrientation(BasicCartesianConstraint):
-    def __init__(self, god_map, root_link, tip_link, goal, max_velocity=0.5, max_acceleration=0.5, goal_constraint=True):
+    def __init__(self, god_map, root_link, tip_link, goal, max_velocity=0.5, max_acceleration=0.5,
+                 goal_constraint=True):
         super(CartesianOrientation, self).__init__(god_map, root_link, tip_link, goal, max_velocity,
                                                    max_acceleration, goal_constraint)
 
@@ -833,58 +897,8 @@ class CartesianOrientationSlerp(BasicCartesianConstraint):
         max_velocity = self.get_input_float(self.max_velocity)
         max_acceleration = self.get_input_float(self.max_acceleration)
 
-        r_R_c = w.rotation_of(self.get_fk(self.root, self.tip))
-        r_R_c_evaluated = w.rotation_of(self.get_fk_evaluated(self.root, self.tip))
+        self.add_minimize_rotation_constraints(r_R_g, self.root, self.tip, max_velocity, self.goal_constraint)
 
-        identity = w.rotation_matrix_from_axis_angle([0, 0, 1], 0.0001)
-        c_R_c = w.dot(w.dot(r_R_c_evaluated.T, identity), r_R_c)
-        current_axis, current_angle = w.axis_angle_from_matrix(c_R_c)
-        current_angle_axis = (current_axis * current_angle)
-
-        error_angle = w.rotation_distance(r_R_c, r_R_g)
-        error_angle = w.Abs(error_angle)
-
-        _, angle = w.axis_angle_from_matrix(r_R_c)
-        # capped_angle = self.limit_acceleration(angle,
-        #                                        error_angle,
-        #                                        max_acceleration,
-        #                                        max_velocity) / error_angle
-
-        capped_angle = self.limit_velocity(error_angle, max_velocity) / error_angle
-
-        r_R_c_q = w.quaternion_from_matrix(r_R_c)
-        r_R_g_q = w.quaternion_from_matrix(r_R_g)
-        r_R_g_intermediate_q = w.quaternion_slerp(r_R_c_q, r_R_g_q, capped_angle)
-        c_R_g_intermediate_q = w.quaternion_diff(r_R_c_q, r_R_g_intermediate_q)
-        intermediate_error_axis, intermediate_error_angle = w.axis_angle_from_quaternion(c_R_g_intermediate_q[0],
-                                                                                         c_R_g_intermediate_q[1],
-                                                                                         c_R_g_intermediate_q[2],
-                                                                                         c_R_g_intermediate_q[3])
-
-        c_R_g_intermediate_aa = intermediate_error_axis * intermediate_error_angle
-
-        # weight = WEIGHT_BELOW_CA
-        weight = WEIGHT_ABOVE_CA
-        weight = self.normalize_error(max_velocity, weight)
-
-        self.add_constraint(u'/0',
-                            lower=c_R_g_intermediate_aa[0],
-                            upper=c_R_g_intermediate_aa[0],
-                            weight=weight,
-                            expression=current_angle_axis[0],
-                            goal_constraint=self.goal_constraint)
-        self.add_constraint(u'/1',
-                            lower=c_R_g_intermediate_aa[1],
-                            upper=c_R_g_intermediate_aa[1],
-                            weight=weight,
-                            expression=current_angle_axis[1],
-                            goal_constraint=self.goal_constraint)
-        self.add_constraint(u'/2',
-                            lower=c_R_g_intermediate_aa[2],
-                            upper=c_R_g_intermediate_aa[2],
-                            weight=weight,
-                            expression=current_angle_axis[2],
-                            goal_constraint=self.goal_constraint)
 
 
 class CartesianPose(Constraint):
@@ -894,9 +908,11 @@ class CartesianPose(Constraint):
         super(CartesianPose, self).__init__(god_map)
         self.constraints = []
         self.constraints.append(CartesianPosition(god_map, root_link, tip_link, goal,
-                                                  translation_max_velocity, translation_max_acceleration, goal_constraint))
+                                                  translation_max_velocity, translation_max_acceleration,
+                                                  goal_constraint))
         self.constraints.append(CartesianOrientationSlerp(god_map, root_link, tip_link, goal,
-                                                          rotation_max_velocity, rotation_max_acceleration, goal_constraint))
+                                                          rotation_max_velocity, rotation_max_acceleration,
+                                                          goal_constraint))
 
     def make_constraints(self):
         for constraint in self.constraints:
@@ -981,7 +997,7 @@ class ExternalCollisionAvoidance(Constraint):
         r_T_a = self.get_fk(self.robot_root, self.link_name)
 
         r_P_pa = w.dot(r_T_a, a_P_pa)
-        r_V_pb_pa = r_P_pa #- r_P_pb
+        r_V_pb_pa = r_P_pa  # - r_P_pb
 
         dist = w.dot(r_V_n.T, r_V_pb_pa)[0]
 
@@ -1008,7 +1024,7 @@ class ExternalCollisionAvoidance(Constraint):
         #                            w.if_greater(actual_distance, 0, actual_distance, penetration_distance))
         upper_slack = w.if_greater(actual_distance, 50,
                                    1e9,
-                                   w.if_greater(actual_distance, 0, 2*slack_limit, 0))
+                                   w.if_greater(actual_distance, 0, 2 * slack_limit, 0))
         # self.add_debug_constraint('/pen', penetration_distance)
         # self.add_debug_constraint('/actual', actual_distance)
 
@@ -1137,7 +1153,6 @@ class SelfCollisionAvoidance(Constraint):
         weight = w.save_division(weight,  # divide by number of active repeller per link
                                  w.Min(number_of_self_collisions, num_repeller))
 
-
         # limit = zero_weight_distance - actual_distance
         # limit = self.limit_velocity(limit, repel_velocity)
 
@@ -1158,7 +1173,7 @@ class SelfCollisionAvoidance(Constraint):
 
         upper_slack = w.if_greater(actual_distance, 50,
                                    1e9,
-                                   w.if_greater(actual_distance, 0, 2*slack_limit, 0))
+                                   w.if_greater(actual_distance, 0, 2 * slack_limit, 0))
 
         self.add_constraint(u'/position',
                             lower=lower_limit,
@@ -1559,4 +1574,226 @@ class Pointing(Constraint):
     def __str__(self):
         # helps to make sure your constraint name is unique.
         s = super(Pointing, self).__str__()
+        return u'{}/{}/{}'.format(s, self.root, self.tip)
+
+
+class OpenDoor(Constraint):
+    gripper_up_axis_id = u'gripper_up_axis'
+    gripper_front_axis_id = u'gripper_up_axis'
+    angle_goal_id = u'angle_goal'
+    hinge_pose_id = u'hinge_frame'
+    hinge_axis_id = u'hinge_axis'
+    handle_pose_id = u'handle_pose'
+    handle_perpendicular_axis_id = u'handle_perpendicular_axis'
+    handle_axis_id = u'handle_axis'
+    root_T_handleGoal_id = u'root_T_handleGoal'
+    hinge0_T_tipGoal_id = u'hinge0_T_tipGoal'
+    hinge0_T_tipStartProjected_id = u'hinge0_T_tipStartProjected'
+    root_T_hinge0_id = u'root_T_hinge0'
+    root_T_tipGoal_id = u'root_T_tipGoal'
+    weight = u'weight'
+
+    def __init__(self, god_map, tip, object_name, handle_link, angle_goal, root=None):
+        super(OpenDoor, self).__init__(god_map)
+
+        if root is None:
+            self.root = self.get_robot().get_root()
+        else:
+            self.root = root
+        self.tip = tip
+
+        self.angle_goal = angle_goal
+
+        # if gripper_up_axis is not None:
+        #     gripper_up_axis = self.parse_and_transform_Vector3Stamped(gripper_up_axis, self.tip, normalized=True)
+        # else:
+        #     gripper_up_axis = Vector3Stamped()
+        #     gripper_up_axis.header.frame_id = self.tip
+        #     gripper_up_axis.vector.z = 1
+
+        # if gripper_front_axis is not None:
+        #     gripper_front_axis = self.parse_and_transform_Vector3Stamped(gripper_front_axis, self.tip, normalized=True)
+        # else:
+        #     gripper_front_axis = Vector3Stamped()
+        #     gripper_front_axis.header.frame_id = self.tip
+        #     gripper_front_axis.vector.z = 1
+
+        # if handle_axis is not None:
+        #     handle_axis = self.parse_and_transform_Vector3Stamped(handle_axis, self.root, normalized=True)
+        # else:
+        #     handle_axis = Vector3Stamped()
+        #     handle_axis.header.frame_id = self.tip
+        #     handle_axis.vector.z = 1
+
+        # if handle_perpendicular_axis is not None:
+        #     handle_perpendicular_axis = self.parse_and_transform_Vector3Stamped(handle_perpendicular_axis,
+        #                                                                         self.root, normalized=True)
+        # else:
+        #     handle_perpendicular_axis = Vector3Stamped()
+        #     handle_perpendicular_axis.header.frame_id = self.tip
+        #     handle_perpendicular_axis.vector.z = 1
+
+        self.handle_link = handle_link
+        handle_frame_id = u'iai_kitchen/' + handle_link
+        handle_pose = tf.lookup_pose(self.root, handle_frame_id)
+
+        # go up until movable joint for door
+        # calculate cartesian goal
+        # add hold handle constraints
+        # add distance to joint
+        # add align planes
+        # fix orientation
+
+        self.object_name = object_name
+        environment_object = self.get_world().get_object(object_name)
+        self.hinge_joint = environment_object.get_movable_parent_joint(handle_link)
+        hinge_child = environment_object.get_child_link_of_joint(self.hinge_joint)
+
+        hinge_frame_id = u'iai_kitchen/' + hinge_child
+
+        hinge_V_hinge_axis = kdl.Vector(*environment_object.get_joint_axis(self.hinge_joint))
+        hinge_V_hinge_axis_msg = Vector3Stamped()
+        hinge_V_hinge_axis_msg.header.frame_id = hinge_frame_id
+        hinge_V_hinge_axis_msg.vector.x = hinge_V_hinge_axis[0]
+        hinge_V_hinge_axis_msg.vector.y = hinge_V_hinge_axis[1]
+        hinge_V_hinge_axis_msg.vector.z = hinge_V_hinge_axis[2]
+
+        root_V_hinge_axis_msg = tf.transform_vector(self.root, hinge_V_hinge_axis_msg)
+
+        hingeStart_T_tipStart = tf.msg_to_kdl(tf.lookup_pose(hinge_frame_id, self.tip))
+
+        hinge_pose = tf.lookup_pose(self.root, hinge_frame_id)
+
+        root_T_hingeStart = tf.msg_to_kdl(hinge_pose)
+        hinge_T_handle = tf.msg_to_kdl(tf.lookup_pose(hinge_frame_id, handle_frame_id)) # constant
+        hinge_joint_current = environment_object.joint_state[self.hinge_joint].position
+        hinge0_T_hingeStart = kdl.Frame(kdl.Rotation().Rot(hinge_V_hinge_axis, hinge_joint_current))
+
+        # hinge0_T_handle0 = kdl.dot(hinge0_T_hingeStart, hinge_T_handle)
+        hinge0_T_tipStart = hinge0_T_hingeStart * hingeStart_T_tipStart
+        # hinge0_P_handle0 = hinge0_T_handle0.p
+        hinge0_P_tipStart = hinge0_T_tipStart.p
+
+        projection = kdl.dot(hinge0_P_tipStart, hinge_V_hinge_axis)
+        hinge0_P_tipStartProjected = hinge0_P_tipStart - hinge_V_hinge_axis * -projection
+
+        # start_tip_angle = angle_between_vector(hinge0_P_handle0, hinge0_P_tipStartProjected)
+        # start_tip_angle_offset = start_tip_angle - hinge_joint_current
+
+        # root_T_hinge0 = np.dot(root_T_hingeStart, np.invert(hinge0_T_hingeStart))
+        # root_T_handle0 = np.dot(root_T_hinge0, hinge_T_handle)
+
+        # handle_V_hinge_axis = hinge_T_handle.M.Inverse() * hinge_V_hinge_axis
+        # hinge0_T_handleGoal = hinge_T_handle
+        # hinge0_T_handleGoal.p = hinge_T_handle.p
+        hinge0_T_hingeCurrent = kdl.Frame(kdl.Rotation().Rot(hinge_V_hinge_axis, hinge_joint_current))
+        root_T_hinge0 = root_T_hingeStart * hinge0_T_hingeCurrent.Inverse()
+        root_T_handleGoal = root_T_hinge0 * kdl.Frame(kdl.Rotation().Rot(hinge_V_hinge_axis, angle_goal)) * hinge_T_handle
+
+        handleStart_T_tipStart = tf.msg_to_kdl(tf.lookup_pose(handle_frame_id, self.tip))
+        root_T_tipGoal = tf.kdl_to_np(root_T_handleGoal * handleStart_T_tipStart)
+
+        hinge0_T_tipGoal = tf.kdl_to_np(hinge0_T_tipStart)
+        hinge0_T_tipStartProjected = tf.kdl_to_np(kdl.Frame(hinge0_P_tipStartProjected))
+
+        params = {
+            # self.gripper_up_axis_id: gripper_up_axis,
+            # self.gripper_front_axis_id: gripper_front_axis,
+            self.angle_goal_id: angle_goal,
+
+            self.hinge_pose_id: hinge_pose,
+            self.handle_pose_id: handle_pose,
+            self.hinge_axis_id: root_V_hinge_axis_msg,
+            self.root_T_handleGoal_id: root_T_handleGoal,
+            self.hinge0_T_tipGoal_id: hinge0_T_tipGoal,
+            self.root_T_hinge0_id: root_T_hinge0,
+            self.hinge0_T_tipStartProjected_id: hinge0_T_tipStartProjected,
+            self.root_T_tipGoal_id: root_T_tipGoal,
+        }
+        self.save_params_on_god_map(params)
+
+    def get_gripper_up_axis(self):
+        return self.get_input_PointStamped(self.gripper_up_axis_id)
+
+    def get_gripper_front_axis(self):
+        return self.get_input_Vector3Stamped(self.gripper_front_axis_id)
+
+    def get_hinge_pose(self):
+        return self.get_input_PoseStamped(self.hinge_pose_id)
+
+    def get_handle_pose(self):
+        return self.get_input_PoseStamped(self.handle_pose_id)
+
+    def get_hinge_axis(self):
+        return self.get_input_Vector3Stamped(self.hinge_axis_id)
+
+    # def get_handle_axis(self):
+    #     return self.get_input_Vector3Stamped(self.handle_axis_id)
+
+    # def get_handle_perpendicular_axis(self):
+    #     return self.get_input_Vector3Stamped(self.handle_perpendicular_axis_id)
+
+    def get_angle_goal(self):
+        return self.get_input_float(self.angle_goal_id)
+
+    def make_constraints(self):
+        weight = WEIGHT_BELOW_CA
+        weight = self.normalize_error(0.1, weight)
+        root_T_tip = self.get_fk(self.root, self.tip)
+        root_T_hinge = self.get_hinge_pose()
+        root_T_handle = self.get_handle_pose()
+        # tip_V_up_axis = self.get_gripper_up_axis()
+        # tip_V_front_axis = self.get_gripper_front_axis()
+        # root_V_handle_axis = self.get_handle_axis()
+        # root_V_handle_perpendicular_axis = self.get_handle_perpendicular_axis()
+        hinge_V_hinge_axis = self.get_hinge_axis()[:3]
+        root_T_handleGoal = self.get_input_np_frame(self.root_T_handleGoal_id)
+        # angle_goal = self.get_angle_goal()
+        # hinge_joint_symbol = self.get_input_object_joint_position(self.object_name, self.hinge_joint)
+        hinge_T_root = w.inverse_frame(root_T_hinge)
+        root_T_tipGoal = self.get_input_np_frame(self.root_T_tipGoal_id)
+
+
+
+        self.add_minimize_position_constraints(w.position_of(root_T_tipGoal), 0.1, 0.1, self.root, self.tip, False)
+
+
+
+        hinge_P_handleCurrent = w.position_of(w.dot(hinge_T_root, root_T_handle))
+        hinge_P_tip = w.position_of(w.dot(hinge_T_root, root_T_tip))
+        dist_goal = w.norm(hinge_P_handleCurrent)
+        dist_expr = w.norm(hinge_P_tip)
+        self.add_constraint(u'/dist',
+                            dist_goal,
+                            dist_goal,
+                            WEIGHT_BELOW_CA,
+                            dist_expr,
+                            False)
+
+
+        root_T_hinge0 = self.get_input_np_frame(self.root)
+        root_T_tipCurrent = self.get_fk_evaluated(self.root, self.tip)
+
+        hinge0_T_tipCurrent = w.dot(w.inverse_frame(root_T_hinge0), root_T_tipCurrent)
+        hinge0_P_tipStartProjected = w.position_of(self.get_input_np_frame(self.hinge0_T_tipStartProjected_id))
+        hinge0_P_tipCurrent = w.position_of(hinge0_T_tipCurrent)[:3]
+
+        projection = w.dot(hinge0_P_tipCurrent.T, hinge_V_hinge_axis)
+        hinge0_P_tipCurrentProjected = hinge0_P_tipCurrent - hinge_V_hinge_axis * -projection
+
+        current_tip_angle_projected = w.angle_between_vector(hinge0_P_tipStartProjected, hinge0_P_tipCurrentProjected)
+
+        hinge0_T_hingeCurrent = w.rotation_matrix_from_axis_angle(hinge_V_hinge_axis, current_tip_angle_projected)
+
+        root_T_hingeCurrent = w.dot(root_T_hinge0, hinge0_T_hingeCurrent)
+
+        hinge0_R_tipGoal = self.get_input_np_frame(self.hinge0_T_tipGoal_id)
+        root_R_tipGoal = w.dot(root_T_hingeCurrent, hinge0_R_tipGoal)
+
+        self.add_minimize_rotation_constraints(root_R_tipGoal, self.root, self.tip)
+
+
+
+    def __str__(self):
+        s = super(OpenDoor, self).__str__()
         return u'{}/{}/{}'.format(s, self.root, self.tip)

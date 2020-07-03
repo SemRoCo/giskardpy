@@ -2,7 +2,7 @@ from collections import OrderedDict, defaultdict, namedtuple
 
 import numpy as np
 from sortedcontainers import SortedKeyList
-from giskardpy.tfwrapper import to_np, np_vector, np_point
+from giskardpy.tfwrapper import kdl_to_np, np_vector, np_point
 
 SoftConstraint = namedtuple(u'SoftConstraint', [u'lbA', u'ubA',
                                                 u'weight', u'expression', u'goal_constraint',
@@ -142,7 +142,7 @@ class Collisions(object):
         :type robot: giskardpy.robot.Robot
         """
         self.robot = robot
-        self.root_T_map = to_np(self.robot.root_T_map)
+        self.root_T_map = kdl_to_np(self.robot.root_T_map)
         self.robot_root = self.robot.get_root()
 
         def default_f():

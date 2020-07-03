@@ -146,7 +146,7 @@ class GoalToConstraints(GetGoal):
                     del params[u'type']
 
                 c = C(self.god_map, **params)
-            except:
+            except Exception as e:
                 doc_string = C.make_constraints.__doc__
                 error_msg = 'wrong parameters for {} \n'.format(C.__name__)
                 if doc_string is not None:
@@ -155,7 +155,7 @@ class GoalToConstraints(GetGoal):
             try:
                 soft_constraints = c.get_constraints()
                 self.soft_constraints.update(soft_constraints)
-            except:
+            except Exception as e:
                 traceback.print_exc()
                 raise ImplementationException()
 

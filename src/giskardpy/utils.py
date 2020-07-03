@@ -24,8 +24,10 @@ from py_trees import common, Chooser, Selector, Sequence, Behaviour
 from py_trees.composites import Parallel
 from sensor_msgs.msg import JointState
 from shape_msgs.msg import SolidPrimitive
+from std_msgs.msg import ColorRGBA
 from tf.transformations import quaternion_multiply, quaternion_conjugate
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
+from visualization_msgs.msg import Marker
 
 from giskardpy import logging
 from giskardpy.data_types import SingleJointState
@@ -850,3 +852,26 @@ def trajectory_to_np(tj, joint_names):
     velocity = np.array(velocity)
     times = np.array(times)
     return names, position, velocity, times
+
+def publish_marker_sphere(position, frame_id=u'map', radius=0.05, id_=0):
+    m = Marker()
+    m.action = m.ADD
+    m.ns = u'debug'
+    m.id = id_
+    m.type = m.SPHERE
+    m.header.frame_id = frame_id
+    m.pose.position.x = position[0]
+    m.pose.position.y = position[1]
+    m.pose.position.z = position[2]
+    m.color = ColorRGBA(1,0,0,1)
+    m.scale.x = radius
+    m.scale.y = radius
+    m.scale.z = radius
+
+    pub = rospy.Publisher('/visualization_marker', Marker, queue_size=1)
+    while pub.get_num_connections() < 1:
+        # wait for a connection to publisher
+        # you can do whatever you like here or simply do nothing
+        pass
+
+    pub.publish(m)

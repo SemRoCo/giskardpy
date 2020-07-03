@@ -982,3 +982,8 @@ def distance_point_to_line_segment(point, line_start, line_end):
     nearest = nearest + line_start
     return dist, nearest
 
+
+def angle_between_vector(v1, v2):
+    v1 = v1[:3]
+    v2 = v2[:3]
+    return acos(dot(v1.T, v2) / (norm(v1) * norm(v2)))

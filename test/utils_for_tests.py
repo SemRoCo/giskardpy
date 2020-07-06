@@ -842,7 +842,7 @@ class Boxy(GiskardTestWrapper):
         self.camera_tip = u'camera_link'
         self.r_tip = u'right_gripper_tool_frame'
         self.l_tip = u'left_gripper_tool_frame'
-        super(Boxy, self).__init__(u'boxy.yaml')
+        super(Boxy, self).__init__(u'boxy_sim.yaml')
 
     def move_base(self, goal_pose):
         goal_pose = transform_pose(self.default_root, goal_pose)

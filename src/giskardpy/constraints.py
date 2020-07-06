@@ -1284,7 +1284,7 @@ class GraspBar(Constraint):
         tip_V_tip_grasp_axis = self.get_tip_grasp_axis_vector()
         root_P_bar_center = self.get_bar_center_point()
 
-        self.add_minimize_vector_angle_constraints(max_velocity,
+        self.add_minimize_vector_angle_constraints(max_velocity*5,
                                                    self.root,
                                                    self.tip,
                                                    tip_V_tip_grasp_axis,
@@ -1578,19 +1578,13 @@ class Pointing(Constraint):
 
 
 class OpenDoor(Constraint):
-    gripper_up_axis_id = u'gripper_up_axis'
-    gripper_front_axis_id = u'gripper_up_axis'
-    angle_goal_id = u'angle_goal'
     hinge_pose_id = u'hinge_frame'
     hinge_axis_id = u'hinge_axis'
-    handle_pose_id = u'handle_pose'
-    handle_perpendicular_axis_id = u'handle_perpendicular_axis'
-    handle_axis_id = u'handle_axis'
-    root_T_handleGoal_id = u'root_T_handleGoal'
     hinge0_T_tipGoal_id = u'hinge0_T_tipGoal'
     hinge0_T_tipStartProjected_id = u'hinge0_T_tipStartProjected'
     root_T_hinge0_id = u'root_T_hinge0'
     root_T_tipGoal_id = u'root_T_tipGoal'
+    hinge0_P_tipStart_norm_id = u'hinge0_P_tipStart_norm'
     weight = u'weight'
 
     def __init__(self, god_map, tip, object_name, handle_link, angle_goal, root=None):
@@ -1604,45 +1598,8 @@ class OpenDoor(Constraint):
 
         self.angle_goal = angle_goal
 
-        # if gripper_up_axis is not None:
-        #     gripper_up_axis = self.parse_and_transform_Vector3Stamped(gripper_up_axis, self.tip, normalized=True)
-        # else:
-        #     gripper_up_axis = Vector3Stamped()
-        #     gripper_up_axis.header.frame_id = self.tip
-        #     gripper_up_axis.vector.z = 1
-
-        # if gripper_front_axis is not None:
-        #     gripper_front_axis = self.parse_and_transform_Vector3Stamped(gripper_front_axis, self.tip, normalized=True)
-        # else:
-        #     gripper_front_axis = Vector3Stamped()
-        #     gripper_front_axis.header.frame_id = self.tip
-        #     gripper_front_axis.vector.z = 1
-
-        # if handle_axis is not None:
-        #     handle_axis = self.parse_and_transform_Vector3Stamped(handle_axis, self.root, normalized=True)
-        # else:
-        #     handle_axis = Vector3Stamped()
-        #     handle_axis.header.frame_id = self.tip
-        #     handle_axis.vector.z = 1
-
-        # if handle_perpendicular_axis is not None:
-        #     handle_perpendicular_axis = self.parse_and_transform_Vector3Stamped(handle_perpendicular_axis,
-        #                                                                         self.root, normalized=True)
-        # else:
-        #     handle_perpendicular_axis = Vector3Stamped()
-        #     handle_perpendicular_axis.header.frame_id = self.tip
-        #     handle_perpendicular_axis.vector.z = 1
-
         self.handle_link = handle_link
         handle_frame_id = u'iai_kitchen/' + handle_link
-        handle_pose = tf.lookup_pose(self.root, handle_frame_id)
-
-        # go up until movable joint for door
-        # calculate cartesian goal
-        # add hold handle constraints
-        # add distance to joint
-        # add align planes
-        # fix orientation
 
         self.object_name = object_name
         environment_object = self.get_world().get_object(object_name)
@@ -1669,23 +1626,12 @@ class OpenDoor(Constraint):
         hinge_joint_current = environment_object.joint_state[self.hinge_joint].position
         hinge0_T_hingeStart = kdl.Frame(kdl.Rotation().Rot(hinge_V_hinge_axis, hinge_joint_current))
 
-        # hinge0_T_handle0 = kdl.dot(hinge0_T_hingeStart, hinge_T_handle)
         hinge0_T_tipStart = hinge0_T_hingeStart * hingeStart_T_tipStart
-        # hinge0_P_handle0 = hinge0_T_handle0.p
         hinge0_P_tipStart = hinge0_T_tipStart.p
 
         projection = kdl.dot(hinge0_P_tipStart, hinge_V_hinge_axis)
         hinge0_P_tipStartProjected = hinge0_P_tipStart - hinge_V_hinge_axis * -projection
 
-        # start_tip_angle = angle_between_vector(hinge0_P_handle0, hinge0_P_tipStartProjected)
-        # start_tip_angle_offset = start_tip_angle - hinge_joint_current
-
-        # root_T_hinge0 = np.dot(root_T_hingeStart, np.invert(hinge0_T_hingeStart))
-        # root_T_handle0 = np.dot(root_T_hinge0, hinge_T_handle)
-
-        # handle_V_hinge_axis = hinge_T_handle.M.Inverse() * hinge_V_hinge_axis
-        # hinge0_T_handleGoal = hinge_T_handle
-        # hinge0_T_handleGoal.p = hinge_T_handle.p
         hinge0_T_hingeCurrent = kdl.Frame(kdl.Rotation().Rot(hinge_V_hinge_axis, hinge_joint_current))
         root_T_hinge0 = root_T_hingeStart * hinge0_T_hingeCurrent.Inverse()
         root_T_handleGoal = root_T_hinge0 * kdl.Frame(kdl.Rotation().Rot(hinge_V_hinge_axis, angle_goal)) * hinge_T_handle
@@ -1696,86 +1642,56 @@ class OpenDoor(Constraint):
         hinge0_T_tipGoal = tf.kdl_to_np(hinge0_T_tipStart)
         hinge0_T_tipStartProjected = tf.kdl_to_np(kdl.Frame(hinge0_P_tipStartProjected))
 
-        params = {
-            # self.gripper_up_axis_id: gripper_up_axis,
-            # self.gripper_front_axis_id: gripper_front_axis,
-            self.angle_goal_id: angle_goal,
+        hinge0_P_tipStart_norm = np.linalg.norm(tf.kdl_to_np(hinge0_P_tipStart))
 
+        params = {
             self.hinge_pose_id: hinge_pose,
-            self.handle_pose_id: handle_pose,
             self.hinge_axis_id: root_V_hinge_axis_msg,
-            self.root_T_handleGoal_id: root_T_handleGoal,
             self.hinge0_T_tipGoal_id: hinge0_T_tipGoal,
-            self.root_T_hinge0_id: root_T_hinge0,
+            self.root_T_hinge0_id: tf.kdl_to_np(root_T_hinge0),
             self.hinge0_T_tipStartProjected_id: hinge0_T_tipStartProjected,
             self.root_T_tipGoal_id: root_T_tipGoal,
+            self.hinge0_P_tipStart_norm_id: hinge0_P_tipStart_norm,
         }
         self.save_params_on_god_map(params)
-
-    def get_gripper_up_axis(self):
-        return self.get_input_PointStamped(self.gripper_up_axis_id)
-
-    def get_gripper_front_axis(self):
-        return self.get_input_Vector3Stamped(self.gripper_front_axis_id)
 
     def get_hinge_pose(self):
         return self.get_input_PoseStamped(self.hinge_pose_id)
 
-    def get_handle_pose(self):
-        return self.get_input_PoseStamped(self.handle_pose_id)
-
     def get_hinge_axis(self):
         return self.get_input_Vector3Stamped(self.hinge_axis_id)
-
-    # def get_handle_axis(self):
-    #     return self.get_input_Vector3Stamped(self.handle_axis_id)
-
-    # def get_handle_perpendicular_axis(self):
-    #     return self.get_input_Vector3Stamped(self.handle_perpendicular_axis_id)
-
-    def get_angle_goal(self):
-        return self.get_input_float(self.angle_goal_id)
 
     def make_constraints(self):
         weight = WEIGHT_BELOW_CA
         weight = self.normalize_error(0.1, weight)
         root_T_tip = self.get_fk(self.root, self.tip)
         root_T_hinge = self.get_hinge_pose()
-        root_T_handle = self.get_handle_pose()
-        # tip_V_up_axis = self.get_gripper_up_axis()
-        # tip_V_front_axis = self.get_gripper_front_axis()
-        # root_V_handle_axis = self.get_handle_axis()
-        # root_V_handle_perpendicular_axis = self.get_handle_perpendicular_axis()
         hinge_V_hinge_axis = self.get_hinge_axis()[:3]
-        root_T_handleGoal = self.get_input_np_frame(self.root_T_handleGoal_id)
-        # angle_goal = self.get_angle_goal()
-        # hinge_joint_symbol = self.get_input_object_joint_position(self.object_name, self.hinge_joint)
         hinge_T_root = w.inverse_frame(root_T_hinge)
         root_T_tipGoal = self.get_input_np_frame(self.root_T_tipGoal_id)
-
-
+        root_T_hinge0 = self.get_input_np_frame(self.root_T_hinge0_id)
+        root_T_tipCurrent = self.get_fk_evaluated(self.root, self.tip)
+        hinge0_R_tipGoal = self.get_input_np_frame(self.hinge0_T_tipGoal_id)
+        dist_goal = self.get_input_float(self.hinge0_P_tipStart_norm_id)
+        hinge0_T_tipStartProjected = self.get_input_np_frame(self.hinge0_T_tipStartProjected_id)
 
         self.add_minimize_position_constraints(w.position_of(root_T_tipGoal), 0.1, 0.1, self.root, self.tip, False)
 
 
+        hinge_P_tip = w.position_of(w.dot(hinge_T_root, root_T_tip))[:3]
 
-        hinge_P_handleCurrent = w.position_of(w.dot(hinge_T_root, root_T_handle))
-        hinge_P_tip = w.position_of(w.dot(hinge_T_root, root_T_tip))
-        dist_goal = w.norm(hinge_P_handleCurrent)
         dist_expr = w.norm(hinge_P_tip)
+        weight = self.normalize_error(0.1, weight)
         self.add_constraint(u'/dist',
-                            dist_goal,
-                            dist_goal,
-                            WEIGHT_BELOW_CA,
+                            dist_goal - dist_expr,
+                            dist_goal - dist_expr,
+                            weight,
                             dist_expr,
                             False)
 
 
-        root_T_hinge0 = self.get_input_np_frame(self.root)
-        root_T_tipCurrent = self.get_fk_evaluated(self.root, self.tip)
-
         hinge0_T_tipCurrent = w.dot(w.inverse_frame(root_T_hinge0), root_T_tipCurrent)
-        hinge0_P_tipStartProjected = w.position_of(self.get_input_np_frame(self.hinge0_T_tipStartProjected_id))
+        hinge0_P_tipStartProjected = w.position_of(hinge0_T_tipStartProjected)
         hinge0_P_tipCurrent = w.position_of(hinge0_T_tipCurrent)[:3]
 
         projection = w.dot(hinge0_P_tipCurrent.T, hinge_V_hinge_axis)
@@ -1787,11 +1703,9 @@ class OpenDoor(Constraint):
 
         root_T_hingeCurrent = w.dot(root_T_hinge0, hinge0_T_hingeCurrent)
 
-        hinge0_R_tipGoal = self.get_input_np_frame(self.hinge0_T_tipGoal_id)
         root_R_tipGoal = w.dot(root_T_hingeCurrent, hinge0_R_tipGoal)
 
         self.add_minimize_rotation_constraints(root_R_tipGoal, self.root, self.tip)
-
 
 
     def __str__(self):

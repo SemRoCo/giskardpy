@@ -638,7 +638,6 @@ class TestConstraints(object):
                                     bar_center=bar_center,
                                     bar_axis=bar_axis,
                                     bar_length=.4)
-        #
         x_gripper = Vector3Stamped()
         x_gripper.header.frame_id = kitchen_setup.r_tip
         x_gripper.vector.x = 1
@@ -657,6 +656,55 @@ class TestConstraints(object):
                                     angle_goal=1)
         kitchen_setup.allow_all_collisions()
         kitchen_setup.send_and_check_goal()
+        kitchen_setup.set_kitchen_js({u'iai_fridge_door_joint': 1})
+
+    def test_open_dishwasher(self, kitchen_setup):
+        """
+        :type kitchen_setup: PR2
+        """
+        handle_frame_id = u'iai_kitchen/sink_area_dish_washer_door_handle'
+        handle_name = u'sink_area_dish_washer_door_handle'
+        bar_axis = Vector3Stamped()
+        bar_axis.header.frame_id = handle_frame_id
+        bar_axis.vector.y = 1
+
+        bar_center = PointStamped()
+        bar_center.header.frame_id = handle_frame_id
+
+        tip_grasp_axis = Vector3Stamped()
+        tip_grasp_axis.header.frame_id = kitchen_setup.l_tip
+        tip_grasp_axis.vector.z = 1
+
+        kitchen_setup.add_json_goal(u'GraspBar',
+                                    root=kitchen_setup.default_root,
+                                    tip=kitchen_setup.l_tip,
+                                    tip_grasp_axis=tip_grasp_axis,
+                                    bar_center=bar_center,
+                                    bar_axis=bar_axis,
+                                    bar_length=.3)
+        # kitchen_setup.allow_collision([], u'kitchen', [handle_name])
+        kitchen_setup.allow_all_collisions()
+
+        x_gripper = Vector3Stamped()
+        x_gripper.header.frame_id = kitchen_setup.l_tip
+        x_gripper.vector.x = 1
+
+        x_goal = Vector3Stamped()
+        x_goal.header.frame_id = handle_frame_id
+        x_goal.vector.x = -1
+        kitchen_setup.align_planes(kitchen_setup.l_tip, x_gripper, root_normal=x_goal)
+        # kitchen_setup.allow_all_collisions()
+
+        kitchen_setup.send_and_check_goal()
+
+        kitchen_setup.add_json_goal(u'OpenDoor',
+                                    tip=kitchen_setup.l_tip,
+                                    object_name=u'kitchen',
+                                    handle_link=handle_name,
+                                    angle_goal=1)
+        kitchen_setup.allow_all_collisions()
+        kitchen_setup.send_and_check_goal()
+        kitchen_setup.set_kitchen_js({u'sink_area_dish_washer_door_joint': 1})
 
     def test_grasp_dishwasher_handle(self, kitchen_setup):
         """

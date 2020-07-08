@@ -321,6 +321,15 @@ class Constraint(object):
         """
         self.add_constraint(name, expr, expr, 1, 0, False)
 
+    def add_debug_matrix(self, name, matrix_expr):
+        for x in range(matrix_expr.shape[0]):
+            for y in range(matrix_expr.shape[1]):
+                self.add_debug_constraint(name + u'/{},{}'.format(x,y), matrix_expr[x,y])
+
+    def add_debug_vector(self, name, vector_expr):
+        for x in range(vector_expr.shape[0]):
+                self.add_debug_constraint(name + u'/{}'.format(x), vector_expr[x])
+
     def add_minimize_position_constraints(self, r_P_g, max_velocity, max_acceleration, root, tip, goal_constraint):
         """
         :param r_P_g: position of goal relative to root frame
@@ -1579,7 +1588,7 @@ class Pointing(Constraint):
 
 class OpenDoor(Constraint):
     hinge_pose_id = u'hinge_frame'
-    hinge_axis_id = u'hinge_axis'
+    hinge_V_hinge_axis_msg_id = u'hinge_axis'
     hinge0_T_tipGoal_id = u'hinge0_T_tipGoal'
     hinge0_T_tipStartProjected_id = u'hinge0_T_tipStartProjected'
     root_T_hinge0_id = u'root_T_hinge0'
@@ -1615,9 +1624,8 @@ class OpenDoor(Constraint):
         hinge_V_hinge_axis_msg.vector.y = hinge_V_hinge_axis[1]
         hinge_V_hinge_axis_msg.vector.z = hinge_V_hinge_axis[2]
 
-        root_V_hinge_axis_msg = tf.transform_vector(self.root, hinge_V_hinge_axis_msg)
-
         hingeStart_T_tipStart = tf.msg_to_kdl(tf.lookup_pose(hinge_frame_id, self.tip))
+        # handleStart_T_tipStart = tf.msg_to_kdl(tf.lookup_pose(handle_frame_id, self.tip))
 
         hinge_pose = tf.lookup_pose(self.root, hinge_frame_id)
 
@@ -1626,11 +1634,13 @@ class OpenDoor(Constraint):
         hinge_joint_current = environment_object.joint_state[self.hinge_joint].position
         hinge0_T_hingeStart = kdl.Frame(kdl.Rotation().Rot(hinge_V_hinge_axis, hinge_joint_current))
 
+        # hinge0_T_tip0 = hinge_T_handle * handleStart_T_tipStart
         hinge0_T_tipStart = hinge0_T_hingeStart * hingeStart_T_tipStart
-        hinge0_P_tipStart = hinge0_T_tipStart.p
+        hingeStart_P_tipStart = hingeStart_T_tipStart.p
 
-        projection = kdl.dot(hinge0_P_tipStart, hinge_V_hinge_axis)
-        hinge0_P_tipStartProjected = hinge0_P_tipStart - hinge_V_hinge_axis * -projection
+        projection = kdl.dot(hingeStart_P_tipStart, hinge_V_hinge_axis)
+        hinge0_P_tipStartProjected = hingeStart_P_tipStart - hinge_V_hinge_axis * projection
+
 
         hinge0_T_hingeCurrent = kdl.Frame(kdl.Rotation().Rot(hinge_V_hinge_axis, hinge_joint_current))
         root_T_hinge0 = root_T_hingeStart * hinge0_T_hingeCurrent.Inverse()
@@ -1639,14 +1649,14 @@ class OpenDoor(Constraint):
         handleStart_T_tipStart = tf.msg_to_kdl(tf.lookup_pose(handle_frame_id, self.tip))
         root_T_tipGoal = tf.kdl_to_np(root_T_handleGoal * handleStart_T_tipStart)
 
-        hinge0_T_tipGoal = tf.kdl_to_np(hinge0_T_tipStart)
+        hinge0_T_tipGoal = tf.kdl_to_np(hingeStart_T_tipStart)
         hinge0_T_tipStartProjected = tf.kdl_to_np(kdl.Frame(hinge0_P_tipStartProjected))
 
-        hinge0_P_tipStart_norm = np.linalg.norm(tf.kdl_to_np(hinge0_P_tipStart))
+        hinge0_P_tipStart_norm = np.linalg.norm(tf.kdl_to_np(hingeStart_P_tipStart))
 
         params = {
             self.hinge_pose_id: hinge_pose,
-            self.hinge_axis_id: root_V_hinge_axis_msg,
+            self.hinge_V_hinge_axis_msg_id: hinge_V_hinge_axis_msg,
             self.hinge0_T_tipGoal_id: hinge0_T_tipGoal,
             self.root_T_hinge0_id: tf.kdl_to_np(root_T_hinge0),
             self.hinge0_T_tipStartProjected_id: hinge0_T_tipStartProjected,
@@ -1659,7 +1669,7 @@ class OpenDoor(Constraint):
         return self.get_input_PoseStamped(self.hinge_pose_id)
 
     def get_hinge_axis(self):
-        return self.get_input_Vector3Stamped(self.hinge_axis_id)
+        return self.get_input_Vector3Stamped(self.hinge_V_hinge_axis_msg_id)
 
     def make_constraints(self):
         weight = WEIGHT_BELOW_CA
@@ -1671,7 +1681,7 @@ class OpenDoor(Constraint):
         root_T_tipGoal = self.get_input_np_frame(self.root_T_tipGoal_id)
         root_T_hinge0 = self.get_input_np_frame(self.root_T_hinge0_id)
         root_T_tipCurrent = self.get_fk_evaluated(self.root, self.tip)
-        hinge0_R_tipGoal = self.get_input_np_frame(self.hinge0_T_tipGoal_id)
+        hinge0_R_tipGoal = w.rotation_of(self.get_input_np_frame(self.hinge0_T_tipGoal_id))
         dist_goal = self.get_input_float(self.hinge0_P_tipStart_norm_id)
         hinge0_T_tipStartProjected = self.get_input_np_frame(self.hinge0_T_tipStartProjected_id)
 
@@ -1695,7 +1705,7 @@ class OpenDoor(Constraint):
         hinge0_P_tipCurrent = w.position_of(hinge0_T_tipCurrent)[:3]
 
         projection = w.dot(hinge0_P_tipCurrent.T, hinge_V_hinge_axis)
-        hinge0_P_tipCurrentProjected = hinge0_P_tipCurrent - hinge_V_hinge_axis * -projection
+        hinge0_P_tipCurrentProjected = hinge0_P_tipCurrent - hinge_V_hinge_axis * projection
 
         current_tip_angle_projected = w.angle_between_vector(hinge0_P_tipStartProjected, hinge0_P_tipCurrentProjected)
 

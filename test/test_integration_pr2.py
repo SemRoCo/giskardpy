@@ -653,19 +653,23 @@ class TestConstraints(object):
                                     tip=kitchen_setup.r_tip,
                                     object_name=u'kitchen',
                                     handle_link=handle_name,
-                                    angle_goal=1)
+                                    angle_goal=1.5)
         kitchen_setup.allow_all_collisions()
         kitchen_setup.send_and_check_goal()
-        kitchen_setup.set_kitchen_js({u'iai_fridge_door_joint': 1})
+        kitchen_setup.set_kitchen_js({u'iai_fridge_door_joint': 1.5})
 
-        kitchen_setup.add_json_goal(u'OpenDoor',
-                                    tip=kitchen_setup.r_tip,
-                                    object_name=u'kitchen',
-                                    handle_link=handle_name,
-                                    angle_goal=0)
-        kitchen_setup.allow_all_collisions()
+        # kitchen_setup.add_json_goal(u'OpenDoor',
+        #                             tip=kitchen_setup.r_tip,
+        #                             object_name=u'kitchen',
+        #                             handle_link=handle_name,
+        #                             angle_goal=0)
+        # kitchen_setup.allow_all_collisions()
+        # kitchen_setup.send_and_check_goal()
+        # kitchen_setup.set_kitchen_js({u'iai_fridge_door_joint': 0})
+
         kitchen_setup.send_and_check_goal()
-        kitchen_setup.set_kitchen_js({u'iai_fridge_door_joint': 0})
+
+        kitchen_setup.send_and_check_joint_goal(gaya_pose)
 
     def test_open_close_oven(self, kitchen_setup):
         """
@@ -729,7 +733,7 @@ class TestConstraints(object):
         """
         :type kitchen_setup: PR2
         """
-        goal_angle = 0.5
+        goal_angle = 0.7
         handle_frame_id = u'iai_kitchen/sink_area_dish_washer_door_handle'
         handle_name = u'sink_area_dish_washer_door_handle'
         bar_axis = Vector3Stamped()

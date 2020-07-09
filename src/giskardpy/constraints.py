@@ -1625,17 +1625,13 @@ class OpenDoor(Constraint):
         hinge_V_hinge_axis_msg.vector.z = hinge_V_hinge_axis[2]
 
         hingeStart_T_tipStart = tf.msg_to_kdl(tf.lookup_pose(hinge_frame_id, self.tip))
-        # handleStart_T_tipStart = tf.msg_to_kdl(tf.lookup_pose(handle_frame_id, self.tip))
 
         hinge_pose = tf.lookup_pose(self.root, hinge_frame_id)
 
         root_T_hingeStart = tf.msg_to_kdl(hinge_pose)
         hinge_T_handle = tf.msg_to_kdl(tf.lookup_pose(hinge_frame_id, handle_frame_id)) # constant
         hinge_joint_current = environment_object.joint_state[self.hinge_joint].position
-        hinge0_T_hingeStart = kdl.Frame(kdl.Rotation().Rot(hinge_V_hinge_axis, hinge_joint_current))
 
-        # hinge0_T_tip0 = hinge_T_handle * handleStart_T_tipStart
-        hinge0_T_tipStart = hinge0_T_hingeStart * hingeStart_T_tipStart
         hingeStart_P_tipStart = hingeStart_T_tipStart.p
 
         projection = kdl.dot(hingeStart_P_tipStart, hinge_V_hinge_axis)

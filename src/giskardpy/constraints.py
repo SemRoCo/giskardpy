@@ -7,7 +7,6 @@ import PyKDL as kdl
 import numpy as np
 from geometry_msgs.msg import Vector3Stamped, Vector3
 from rospy_message_converter.message_converter import convert_dictionary_to_ros_message
-from tf.transformations import rotation_matrix
 
 import giskardpy.identifier as identifier
 import giskardpy.tfwrapper as tf
@@ -15,8 +14,8 @@ from giskardpy import cas_wrapper as w
 from giskardpy.data_types import SoftConstraint
 from giskardpy.exceptions import GiskardException, ConstraintException
 from giskardpy.input_system import PoseStampedInput, Point3Input, Vector3Input, Vector3StampedInput, FrameInput, \
-    PointStampedInput, TranslationInput, InputArray
-# WEIGHTS = [0] + [6 ** x for x in range(7)]
+    PointStampedInput, TranslationInput
+from giskardpy.logging import logwarn
 
 WEIGHT_MAX = 1000
 WEIGHT_ABOVE_CA = 100
@@ -324,11 +323,11 @@ class Constraint(object):
     def add_debug_matrix(self, name, matrix_expr):
         for x in range(matrix_expr.shape[0]):
             for y in range(matrix_expr.shape[1]):
-                self.add_debug_constraint(name + u'/{},{}'.format(x,y), matrix_expr[x,y])
+                self.add_debug_constraint(name + u'/{},{}'.format(x, y), matrix_expr[x, y])
 
     def add_debug_vector(self, name, vector_expr):
         for x in range(vector_expr.shape[0]):
-                self.add_debug_constraint(name + u'/{}'.format(x), vector_expr[x])
+            self.add_debug_constraint(name + u'/{}'.format(x), vector_expr[x])
 
     def add_minimize_position_constraints(self, r_P_g, max_velocity, max_acceleration, root, tip, goal_constraint):
         """
@@ -404,7 +403,8 @@ class Constraint(object):
                             expression=root_V_tip_normal[2],
                             goal_constraint=goal_constraint)
 
-    def add_minimize_rotation_constraints(self, root_R_tipGoal, root, tip, max_velocity=np.pi / 4, goal_constraint=True):
+    def add_minimize_rotation_constraints(self, root_R_tipGoal, root, tip, max_velocity=np.pi / 4,
+                                          goal_constraint=True):
         root_R_tipCurrent = w.rotation_of(self.get_fk(root, tip))
         root_R_tipCurrent_evaluated = w.rotation_of(self.get_fk_evaluated(root, tip))
 
@@ -909,7 +909,6 @@ class CartesianOrientationSlerp(BasicCartesianConstraint):
         self.add_minimize_rotation_constraints(r_R_g, self.root, self.tip, max_velocity, self.goal_constraint)
 
 
-
 class CartesianPose(Constraint):
     def __init__(self, god_map, root_link, tip_link, goal, translation_max_velocity=0.1,
                  translation_max_acceleration=0.1, rotation_max_velocity=0.5, rotation_max_acceleration=0.5,
@@ -1293,7 +1292,7 @@ class GraspBar(Constraint):
         tip_V_tip_grasp_axis = self.get_tip_grasp_axis_vector()
         root_P_bar_center = self.get_bar_center_point()
 
-        self.add_minimize_vector_angle_constraints(max_velocity*5,
+        self.add_minimize_vector_angle_constraints(max_velocity * 5,
                                                    self.root,
                                                    self.tip,
                                                    tip_V_tip_grasp_axis,
@@ -1629,7 +1628,7 @@ class OpenDoor(Constraint):
         hinge_pose = tf.lookup_pose(self.root, hinge_frame_id)
 
         root_T_hingeStart = tf.msg_to_kdl(hinge_pose)
-        hinge_T_handle = tf.msg_to_kdl(tf.lookup_pose(hinge_frame_id, handle_frame_id)) # constant
+        hinge_T_handle = tf.msg_to_kdl(tf.lookup_pose(hinge_frame_id, handle_frame_id))  # constant
         hinge_joint_current = environment_object.joint_state[self.hinge_joint].position
 
         hingeStart_P_tipStart = hingeStart_T_tipStart.p
@@ -1637,10 +1636,10 @@ class OpenDoor(Constraint):
         projection = kdl.dot(hingeStart_P_tipStart, hinge_V_hinge_axis)
         hinge0_P_tipStartProjected = hingeStart_P_tipStart - hinge_V_hinge_axis * projection
 
-
         hinge0_T_hingeCurrent = kdl.Frame(kdl.Rotation().Rot(hinge_V_hinge_axis, hinge_joint_current))
         root_T_hinge0 = root_T_hingeStart * hinge0_T_hingeCurrent.Inverse()
-        root_T_handleGoal = root_T_hinge0 * kdl.Frame(kdl.Rotation().Rot(hinge_V_hinge_axis, angle_goal)) * hinge_T_handle
+        root_T_handleGoal = root_T_hinge0 * kdl.Frame(
+            kdl.Rotation().Rot(hinge_V_hinge_axis, angle_goal)) * hinge_T_handle
 
         handleStart_T_tipStart = tf.msg_to_kdl(tf.lookup_pose(handle_frame_id, self.tip))
         root_T_tipGoal = tf.kdl_to_np(root_T_handleGoal * handleStart_T_tipStart)
@@ -1683,7 +1682,6 @@ class OpenDoor(Constraint):
 
         self.add_minimize_position_constraints(w.position_of(root_T_tipGoal), 0.1, 0.1, self.root, self.tip, False)
 
-
         hinge_P_tip = w.position_of(w.dot(hinge_T_root, root_T_tip))[:3]
 
         dist_expr = w.norm(hinge_P_tip)
@@ -1694,7 +1692,6 @@ class OpenDoor(Constraint):
                             weight,
                             dist_expr,
                             False)
-
 
         hinge0_T_tipCurrent = w.dot(w.inverse_frame(root_T_hinge0), root_T_tipCurrent)
         hinge0_P_tipStartProjected = w.position_of(hinge0_T_tipStartProjected)
@@ -1713,7 +1710,45 @@ class OpenDoor(Constraint):
 
         self.add_minimize_rotation_constraints(root_R_tipGoal, self.root, self.tip)
 
-
     def __str__(self):
         s = super(OpenDoor, self).__str__()
         return u'{}/{}/{}'.format(s, self.root, self.tip)
+
+
+class Open(Constraint):
+    def __init__(self, god_map, tip, object_name, handle_link, root=None):
+        super(Open, self).__init__(god_map)
+        self.constraints = []
+        environment_object = self.get_world().get_object(object_name)
+        joint_name = environment_object.get_movable_parent_joint(handle_link)
+        if environment_object.is_joint_revolute(joint_name):
+            min_limit, max_limit = environment_object.get_joint_limits(joint_name)
+            self.constraints.append(OpenDoor(god_map, tip, object_name, handle_link, max_limit, root))
+        elif environment_object.is_joint_prismatic(joint_name):
+            pass
+        else:
+            logwarn(u'Opening containers with joint of type "{}" not supported'.format(
+                environment_object.get_joint_type(joint_name)))
+
+    def make_constraints(self):
+        for constraint in self.constraints:
+            self.soft_constraints.update(constraint.get_constraints())
+
+class Close(Constraint):
+    def __init__(self, god_map, tip, object_name, handle_link, root=None):
+        super(Close, self).__init__(god_map)
+        self.constraints = []
+        environment_object = self.get_world().get_object(object_name)
+        joint_name = environment_object.get_movable_parent_joint(handle_link)
+        if environment_object.is_joint_revolute(joint_name):
+            min_limit, max_limit = environment_object.get_joint_limits(joint_name)
+            self.constraints.append(OpenDoor(god_map, tip, object_name, handle_link, min_limit, root))
+        elif environment_object.is_joint_prismatic(joint_name):
+            pass
+        else:
+            logwarn(u'Opening containers with joint of type "{}" not supported'.format(
+                environment_object.get_joint_type(joint_name)))
+
+    def make_constraints(self):
+        for constraint in self.constraints:
+            self.soft_constraints.update(constraint.get_constraints())

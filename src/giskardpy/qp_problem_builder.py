@@ -7,7 +7,7 @@ from giskardpy import logging, cas_wrapper as w
 from giskardpy.data_types import SoftConstraint
 from giskardpy.exceptions import QPSolverException
 from giskardpy.qp_solver import QPSolver
-from giskardpy.utils import make_filter_masks
+from giskardpy.utils import make_filter_masks, create_path
 
 
 class QProblemBuilder(object):
@@ -202,6 +202,8 @@ class QProblemBuilder(object):
             xH = np.dot((xdot_full**2).T, filtered_H)
             p_xH = pd.DataFrame(xH, filtered_b_names, dtype=float).sort_index()
             xHx = np.dot(np.dot(xdot_full.T, filtered_H), xdot_full)
+        else:
+            p_xdot = None
 
         p_A = pd.DataFrame(A, filtered_bA_names, filtered_b_names, dtype=float).sort_index(1).sort_index(0)
         # if self.lbAs is None:
@@ -219,7 +221,17 @@ class QProblemBuilder(object):
         # for a, name in arrays:
         #     self.check_for_nan(name, a)
         #     self.check_for_big_numbers(name, a)
+        # self.save_all(p_weights, p_A, p_lbA, p_ubA, p_lb, p_ub, p_xdot)
         pass
+
+    def save_all(self, weights, A, lbA, ubA, lb, ub, xdot=None):
+        if xdot is not None:
+            print_pd_dfs([weights, A, lbA, ubA, lb, ub, xdot],
+                         ['weights', 'A', 'lbA', 'ubA', 'lb', 'ub', 'xdot'])
+        else:
+            print_pd_dfs([weights, A, lbA, ubA, lb, ub],
+                         ['weights', 'A', 'lbA', 'ubA', 'lb', 'ub'])
+
 
     def check_for_nan(self, name, p_array):
         p_filtered = p_array.apply(lambda x: zip(x.index[x.isnull()].tolist(), x[x.isnull()]), 1)
@@ -287,5 +299,13 @@ class QProblemBuilder(object):
         return OrderedDict((observable, xdot_full[i]) for i, observable in enumerate(self.controlled_joints)), \
                np_H, np_A, np_lb, np_ub, np_lbA, np_ubA, xdot_full
 
-# with pd.option_context('display.max_rows', None, 'display.max_columns', None):
-#     print(df)
+def print_pd_dfs(dfs, names):
+    import pandas as pd
+    import datetime
+    folder_name = u'debug_matrices/{}'.format(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+    for df, name in zip(dfs, names):
+        path = u'{}/{}.debug'.format(folder_name, name)
+        create_path(path)
+        with pd.option_context('display.max_rows', None, 'display.max_columns', None):
+            with open(path, 'w') as f:
+                f.write(str(df))

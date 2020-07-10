@@ -367,27 +367,35 @@ class TestConstraints(object):
         :type pocky_pose_setup: PR2
         """
         r_goal = PoseStamped()
-        r_goal.header.frame_id = pocky_pose_setup.r_tip
+        r_goal.header.frame_id = u'base_footprint'
         r_goal.pose.orientation.w = 1
         r_goal.pose.position.x += 0.1
         updates = {
             u'rosparam': {
                 u'general_options': {
                     u'joint_weights': {
-                        u'odom_x_joint': 0.0001,
-                        u'odom_y_joint': 0.0001,
-                        u'odom_z_joint': 0.0001
+                        u'odom_x_joint': 1000000,
+                        u'odom_y_joint': 1000000,
+                        u'odom_z_joint': 1000000
                     }
                 }
             }
         }
+
+        old_pose = tf.lookup_pose(u'map', u'base_footprint')
+
         pocky_pose_setup.wrapper.update_god_map(updates)
-        pocky_pose_setup.set_and_check_cart_goal(r_goal, pocky_pose_setup.r_tip)
-        assert pocky_pose_setup.get_god_map().unsafe_get_data(identifier.joint_cost + [u'odom_x_joint']) == 0.0001
-        assert pocky_pose_setup.get_god_map().unsafe_get_data(identifier.joint_cost + [u'torso_lift_joint']) == 0.5
-        pocky_pose_setup.send_and_check_goal(execute=False)
-        assert pocky_pose_setup.get_god_map().unsafe_get_data(identifier.joint_cost + [u'odom_x_joint']) == 1
-        assert pocky_pose_setup.get_god_map().unsafe_get_data(identifier.joint_cost + [u'torso_lift_joint']) == 0.5
+        pocky_pose_setup.set_cart_goal(r_goal, u'base_footprint')
+        pocky_pose_setup.send_and_check_goal()
+
+        new_pose = tf.lookup_pose(u'map', u'base_footprint')
+        compare_poses(old_pose.pose, new_pose.pose)
+
+        assert pocky_pose_setup.get_god_map().unsafe_get_data(identifier.joint_cost + [u'odom_x_joint']) == 1000000
+        assert pocky_pose_setup.get_god_map().unsafe_get_data(identifier.joint_cost + [u'torso_lift_joint']) == 0.01
+        pocky_pose_setup.set_and_check_cart_goal(r_goal, u'base_footprint')
+        assert pocky_pose_setup.get_god_map().unsafe_get_data(identifier.joint_cost + [u'odom_x_joint']) == 0.01
+        assert pocky_pose_setup.get_god_map().unsafe_get_data(identifier.joint_cost + [u'torso_lift_joint']) == 0.01
 
     def test_base_pointing_forward(self, zero_pose):
         """
@@ -658,18 +666,108 @@ class TestConstraints(object):
         kitchen_setup.send_and_check_goal()
         kitchen_setup.set_kitchen_js({u'iai_fridge_door_joint': 1.5})
 
-        # kitchen_setup.add_json_goal(u'OpenDoor',
-        #                             tip=kitchen_setup.r_tip,
-        #                             object_name=u'kitchen',
-        #                             handle_link=handle_name,
-        #                             angle_goal=0)
-        # kitchen_setup.allow_all_collisions()
-        # kitchen_setup.send_and_check_goal()
-        # kitchen_setup.set_kitchen_js({u'iai_fridge_door_joint': 0})
+        kitchen_setup.add_json_goal(u'OpenDoor',
+                                    tip=kitchen_setup.r_tip,
+                                    object_name=u'kitchen',
+                                    handle_link=handle_name,
+                                    angle_goal=0)
+        kitchen_setup.allow_all_collisions()
+        kitchen_setup.send_and_check_goal()
+        kitchen_setup.set_kitchen_js({u'iai_fridge_door_joint': 0})
 
         kitchen_setup.send_and_check_goal()
 
         kitchen_setup.send_and_check_joint_goal(gaya_pose)
+
+    def test_open_close_fridge2(self, kitchen_setup):
+        """
+        :type kitchen_setup: PR2
+        """
+        handle_frame_id = u'iai_kitchen/iai_fridge_door_handle'
+        handle_name = u'iai_fridge_door_handle'
+        bar_axis = Vector3Stamped()
+        bar_axis.header.frame_id = handle_frame_id
+        bar_axis.vector.z = 1
+
+        bar_center = PointStamped()
+        bar_center.header.frame_id = handle_frame_id
+
+        tip_grasp_axis = Vector3Stamped()
+        tip_grasp_axis.header.frame_id = kitchen_setup.r_tip
+        tip_grasp_axis.vector.z = 1
+
+        kitchen_setup.add_json_goal(u'GraspBar',
+                                    root=kitchen_setup.default_root,
+                                    tip=kitchen_setup.r_tip,
+                                    tip_grasp_axis=tip_grasp_axis,
+                                    bar_center=bar_center,
+                                    bar_axis=bar_axis,
+                                    bar_length=.4)
+        x_gripper = Vector3Stamped()
+        x_gripper.header.frame_id = kitchen_setup.r_tip
+        x_gripper.vector.x = 1
+
+        x_goal = Vector3Stamped()
+        x_goal.header.frame_id = handle_frame_id
+        x_goal.vector.x = -1
+        # kitchen_setup.align_planes(kitchen_setup.r_tip, x_gripper, root_normal=x_goal)
+        kitchen_setup.allow_all_collisions()
+        updates = {
+            u'rosparam': {
+                u'general_options': {
+                    u'joint_weights': {
+                        u'odom_x_joint': 0.001,
+                        u'odom_y_joint': 0.001,
+                        u'odom_z_joint': 0.001
+                    }
+                }
+            }
+        }
+        kitchen_setup.wrapper.update_god_map(updates)
+        kitchen_setup.send_and_check_goal()
+
+        kitchen_setup.add_json_goal(u'Open',
+                                    tip=kitchen_setup.r_tip,
+                                    object_name=u'kitchen',
+                                    handle_link=handle_name)
+        kitchen_setup.allow_all_collisions()
+
+        updates = {
+            u'rosparam': {
+                u'general_options': {
+                    u'joint_weights': {
+                        u'odom_x_joint': 0.0001,
+                        u'odom_y_joint': 0.0001,
+                        u'odom_z_joint': 0.0001
+                    }
+                }
+            }
+        }
+        kitchen_setup.wrapper.update_god_map(updates)
+
+        kitchen_setup.send_and_check_goal()
+        kitchen_setup.set_kitchen_js({u'iai_fridge_door_joint': np.pi/2})
+
+        kitchen_setup.add_json_goal(u'Close',
+                                    tip=kitchen_setup.r_tip,
+                                    object_name=u'kitchen',
+                                    handle_link=handle_name)
+        kitchen_setup.allow_all_collisions()
+        updates = {
+            u'rosparam': {
+                u'general_options': {
+                    u'joint_weights': {
+                        u'odom_x_joint': 0.001,
+                        u'odom_y_joint': 0.001,
+                        u'odom_z_joint': 0.001
+                    }
+                }
+            }
+        }
+        kitchen_setup.wrapper.update_god_map(updates)
+        kitchen_setup.send_and_check_goal()
+        kitchen_setup.set_kitchen_js({u'iai_fridge_door_joint': 0})
+
 
     def test_open_close_oven(self, kitchen_setup):
         """
@@ -729,7 +827,7 @@ class TestConstraints(object):
         kitchen_setup.send_and_check_goal()
         kitchen_setup.set_kitchen_js({u'oven_area_oven_door_joint': 0})
 
-    def test_open_dishwasher(self, kitchen_setup):
+    def test_open_close_dishwasher(self, kitchen_setup):
         """
         :type kitchen_setup: PR2
         """

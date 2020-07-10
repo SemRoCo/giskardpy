@@ -366,6 +366,9 @@ class TestConstraints(object):
         """
         :type pocky_pose_setup: PR2
         """
+        old_torso_value = pocky_pose_setup.get_god_map().get_data(identifier.joint_cost + [u'torso_lift_joint'])
+        old_odom_x_value = pocky_pose_setup.get_god_map().get_data(identifier.joint_cost + [u'odom_x_joint'])
+
         r_goal = PoseStamped()
         r_goal.header.frame_id = u'base_footprint'
         r_goal.pose.orientation.w = 1
@@ -412,43 +415,55 @@ class TestConstraints(object):
         """
         :type pocky_pose_setup: PR2
         """
+        old_torso_value = pocky_pose_setup.get_god_map().get_data(identifier.joint_cost + [u'torso_lift_joint'])
+        old_odom_x_value = pocky_pose_setup.get_god_map().get_data(identifier.joint_cost + [u'odom_x_joint'])
+        old_odom_y_value = pocky_pose_setup.get_god_map().get_data(identifier.joint_cost + [u'odom_y_joint'])
+
         r_goal = PoseStamped()
         r_goal.header.frame_id = pocky_pose_setup.r_tip
         r_goal.pose.orientation.w = 1
         r_goal.pose.position.x += 0.1
         updates = {
             u'rosparam': {
-                u'joint_weights': {
-                    u'odom_x_joint': u'asdf',
-                    u'odom_y_joint': 0.0001,
-                    u'odom_z_joint': 0.0001
+                u'general_options': {
+                    u'joint_weights': {
+                        u'odom_x_joint': u'asdf',
+                        u'odom_y_joint': 0.0001,
+                        u'odom_z_joint': 0.0001
+                    }
                 }
             }
         }
         pocky_pose_setup.wrapper.update_god_map(updates)
         pocky_pose_setup.set_cart_goal(r_goal, pocky_pose_setup.r_tip)
         pocky_pose_setup.send_and_check_goal(expected_error_code=MoveResult.INSOLVABLE)
-        assert pocky_pose_setup.get_god_map().unsafe_get_data(identifier.joint_cost + [u'odom_x_joint']) == 1
-        assert pocky_pose_setup.get_god_map().unsafe_get_data(identifier.joint_cost + [u'torso_lift_joint']) == 0.5
+        assert pocky_pose_setup.get_god_map().unsafe_get_data(identifier.joint_cost + [u'odom_x_joint']) == old_odom_x_value
+        assert pocky_pose_setup.get_god_map().unsafe_get_data(identifier.joint_cost + [u'odom_y_joint']) == 0.0001
+        assert pocky_pose_setup.get_god_map().get_data(identifier.joint_cost + [u'torso_lift_joint']) == old_torso_value
 
     def test_UpdateGodMap3(self, pocky_pose_setup):
         """
         :type pocky_pose_setup: PR2
         """
+        old_torso_value = pocky_pose_setup.get_god_map().get_data(identifier.joint_cost + [u'torso_lift_joint'])
+        old_odom_x_value = pocky_pose_setup.get_god_map().get_data(identifier.joint_cost + [u'odom_x_joint'])
+
         r_goal = PoseStamped()
         r_goal.header.frame_id = pocky_pose_setup.r_tip
         r_goal.pose.orientation.w = 1
         r_goal.pose.position.x += 0.1
         updates = {
             u'rosparam': {
-                u'joint_weights': u'asdf'
+                u'general_options': {
+                    u'joint_weights': u'asdf'
+                }
             }
         }
         pocky_pose_setup.wrapper.update_god_map(updates)
         pocky_pose_setup.set_cart_goal(r_goal, pocky_pose_setup.r_tip)
         pocky_pose_setup.send_and_check_goal(expected_error_code=MoveResult.INSOLVABLE)
-        assert pocky_pose_setup.get_god_map().unsafe_get_data(identifier.joint_cost + [u'odom_x_joint']) == 1
-        assert pocky_pose_setup.get_god_map().unsafe_get_data(identifier.joint_cost + [u'torso_lift_joint']) == 0.5
+        assert pocky_pose_setup.get_god_map().unsafe_get_data(identifier.joint_cost + [u'odom_x_joint']) == old_odom_x_value
+        assert pocky_pose_setup.get_god_map().unsafe_get_data(identifier.joint_cost + [u'torso_lift_joint']) == old_torso_value
 
     def test_pointing(self, kitchen_setup):
         base_goal = PoseStamped()

@@ -1,17 +1,14 @@
 import numpy as np
-from copy import deepcopy
-
 import pytest
 import roslaunch
 import rospy
-from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped, Pose
-from giskard_msgs.msg import MoveActionGoal, MoveResult, MoveGoal, CollisionEntry
+from geometry_msgs.msg import PoseStamped, Quaternion, Vector3Stamped
 from tf.transformations import quaternion_from_matrix
-
+import giskardpy.tfwrapper as tf
 from giskardpy import logging
-from giskardpy.tfwrapper import lookup_transform, init as tf_init, lookup_pose, lookup_point, transform_point, \
+from giskardpy.tfwrapper import lookup_transform, init as tf_init, lookup_point, transform_point, \
     transform_pose
-from utils_for_tests import Donbot, compare_poses, Boxy
+from utils_for_tests import Donbot, Boxy
 
 # TODO roslaunch iai_donbot_sim ros_control_sim.launch
 
@@ -63,7 +60,6 @@ better_js = {
     u'right_arm_6_joint': 0.01,
 }
 
-
 folder_name = u'tmp_data/'
 
 
@@ -82,11 +78,21 @@ def ros(request):
     launch.start()
 
     rospy.set_param('/joint_trajectory_splitter/state_topics',
-                    ['/whole_body_controller/base/state',
-                     '/whole_body_controller/body/state'])
+                    [
+                        '/whole_body_controller/base/state',
+                        '/whole_body_controller/torso/state',
+                        '/whole_body_controller/neck/state',
+                        '/whole_body_controller/left_arm/state',
+                        '/whole_body_controller/right_arm/state',
+                    ])
     rospy.set_param('/joint_trajectory_splitter/client_topics',
-                    ['/whole_body_controller/base/follow_joint_trajectory',
-                     '/whole_body_controller/body/follow_joint_trajectory'])
+                    [
+                        '/whole_body_controller/base/follow_joint_trajectory',
+                        '/whole_body_controller/torso/follow_joint_trajectory',
+                        '/whole_body_controller/neck/follow_joint_trajectory',
+                        '/whole_body_controller/left_arm/follow_joint_trajectory',
+                        '/whole_body_controller/right_arm/follow_joint_trajectory',
+                    ])
     node = roslaunch.core.Node('giskardpy', 'joint_trajectory_splitter.py', name='joint_trajectory_splitter')
     joint_trajectory_splitter = launch.launch(node)
 
@@ -146,7 +152,6 @@ def better_pose(resetted_giskard):
     return resetted_giskard
 
 
-
 @pytest.fixture()
 def fake_table_setup(zero_pose):
     """
@@ -164,11 +169,16 @@ def fake_table_setup(zero_pose):
 
 
 @pytest.fixture()
-def kitchen_setup(zero_pose):
+def kitchen_setup(better_pose):
+    # better_pose.allow_all_collisions()
+    # better_pose.send_and_check_joint_goal(gaya_pose)
     object_name = u'kitchen'
-    zero_pose.add_urdf(object_name, rospy.get_param(u'kitchen_description'), u'/kitchen/joint_states',
-                       lookup_transform(u'map', u'iai_kitchen/world'))
-    return zero_pose
+    better_pose.add_urdf(object_name, rospy.get_param(u'kitchen_description'),
+                              tf.lookup_pose(u'map', u'iai_kitchen/world'), u'/kitchen/joint_states')
+    js = {k: 0.0 for k in better_pose.get_world().get_object(object_name).get_movable_joints()}
+    better_pose.set_kitchen_js(js)
+    return better_pose
+
 
 
 class TestJointGoals(object):
@@ -179,8 +189,9 @@ class TestJointGoals(object):
         zero_pose.allow_self_collision()
         zero_pose.send_and_check_joint_goal(better_js)
 
+
 class TestConstraints(object):
-  def test_pointing(self, better_pose):
+    def test_pointing(self, better_pose):
         tip = u'head_mount_kinect2_rgb_optical_frame'
         goal_point = lookup_point(u'map', better_pose.r_tip)
         better_pose.wrapper.pointing(tip, goal_point)
@@ -203,10 +214,10 @@ class TestConstraints(object):
         r_goal.pose.position.z -= 0.5
         r_goal.pose.orientation.w = 1
         r_goal = transform_pose(better_pose.default_root, r_goal)
-        r_goal.pose.orientation = Quaternion(*quaternion_from_matrix([[0,0,1,0],
-                                                                      [0,-1,0,0],
-                                                                      [1,0,0,0],
-                                                                      [0,0,0,1]]))
+        r_goal.pose.orientation = Quaternion(*quaternion_from_matrix([[0, 0, 1, 0],
+                                                                      [0, -1, 0, 0],
+                                                                      [1, 0, 0, 0],
+                                                                      [0, 0, 0, 1]]))
 
         better_pose.set_and_check_cart_goal(r_goal, better_pose.r_tip, u'base_footprint')
 
@@ -217,3 +228,6 @@ class TestConstraints(object):
         expected_x = lookup_point(tip, better_pose.r_tip)
         np.testing.assert_almost_equal(expected_x.point.y, 0, 2)
         np.testing.assert_almost_equal(expected_x.point.x, 0, 2)
+
+    def test_open_drawer(self, kitchen_setup):
+        pass

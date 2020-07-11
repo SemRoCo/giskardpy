@@ -100,6 +100,7 @@ rc_other_velocity = reachability_check + [u'other_velocity']
 # behavior tree
 behavior_tree = rosparam + [u'behavior_tree']
 tree_tick_rate = behavior_tree + [u'tree_tick_rate']
+tree_manager = behavior_tree + [u'tree_manager']
 
 # collision avoidance
 collision_avoidance = rosparam + [u'collision_avoidance']

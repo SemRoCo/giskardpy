@@ -34,7 +34,7 @@ class CollisionMarker(GiskardBehavior):
         :type collisions: Collisions
         """
         m = Marker()
-        m.header.frame_id = self.get_robot().get_root()
+        m.header.frame_id = self.get_god_map().get_data(identifier.map_frame)
         m.action = Marker.ADD
         m.type = Marker.LINE_LIST
         m.id = 1337

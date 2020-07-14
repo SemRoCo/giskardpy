@@ -1716,14 +1716,18 @@ class OpenDoor(Constraint):
 
 
 class Open(Constraint):
-    def __init__(self, god_map, tip, object_name, handle_link, root=None):
+    def __init__(self, god_map, tip, object_name, handle_link, root=None, goal_joint_state=None):
         super(Open, self).__init__(god_map)
         self.constraints = []
         environment_object = self.get_world().get_object(object_name)
         joint_name = environment_object.get_movable_parent_joint(handle_link)
         if environment_object.is_joint_revolute(joint_name):
             min_limit, max_limit = environment_object.get_joint_limits(joint_name)
-            self.constraints.append(OpenDoor(god_map, tip, object_name, handle_link, max_limit, root))
+            if goal_joint_state:
+                goal_joint_state = min(max_limit, goal_joint_state)
+            else:
+                goal_joint_state = max_limit
+            self.constraints.append(OpenDoor(god_map, tip, object_name, handle_link, goal_joint_state, root))
         elif environment_object.is_joint_prismatic(joint_name):
             pass
         else:
@@ -1735,14 +1739,18 @@ class Open(Constraint):
             self.soft_constraints.update(constraint.get_constraints())
 
 class Close(Constraint):
-    def __init__(self, god_map, tip, object_name, handle_link, root=None):
+    def __init__(self, god_map, tip, object_name, handle_link, root=None, goal_joint_state=None):
         super(Close, self).__init__(god_map)
         self.constraints = []
         environment_object = self.get_world().get_object(object_name)
         joint_name = environment_object.get_movable_parent_joint(handle_link)
         if environment_object.is_joint_revolute(joint_name):
             min_limit, max_limit = environment_object.get_joint_limits(joint_name)
-            self.constraints.append(OpenDoor(god_map, tip, object_name, handle_link, min_limit, root))
+            if goal_joint_state:
+                goal_joint_state = max(min_limit, goal_joint_state)
+            else:
+                goal_joint_state = min_limit
+            self.constraints.append(OpenDoor(god_map, tip, object_name, handle_link, goal_joint_state, root))
         elif environment_object.is_joint_prismatic(joint_name):
             pass
         else:

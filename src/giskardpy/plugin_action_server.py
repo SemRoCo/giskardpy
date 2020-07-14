@@ -135,7 +135,10 @@ class SendResult(ActionServerBehavior):
         result.trajectory = traj_to_msg(sample_period, trajectory, controlled_joints, True)
 
         if self.get_as().is_preempt_requested() or not result.error_code == MoveResult.SUCCESS:
-            result.error_message = e.message
+            try:
+                result.error_message = e.message
+            except:
+                result.error_message = u'preempt requested, but there was no giskard exception'
             self.get_as().send_preempted(result)
         else:
             self.get_as().send_result(result)

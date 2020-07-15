@@ -658,6 +658,76 @@ class JointPositionRevolute(Constraint):
         return u'{}/{}'.format(s, self.joint_name)
 
 
+class AviodJointLimitsRevolute(Constraint):
+    goal = u'goal'
+    weight = u'weight'
+    max_velocity = u'max_velocity'
+    max_acceleration = u'max_acceleration'
+
+    def __init__(self, god_map, joint_name, weight=WEIGHT_BELOW_CA, max_velocity=3451):
+        super(AviodJointLimitsRevolute, self).__init__(god_map)
+        self.joint_name = joint_name
+        if not self.get_robot().is_joint_revolute(joint_name):
+            raise ConstraintException(u'{} called with non prismatic joint {}'.format(self.__name__,
+                                                                                      joint_name))
+
+        params = {self.weight: weight,
+                  self.max_velocity: max_velocity,}
+        self.save_params_on_god_map(params)
+
+    def make_constraints(self):
+        """
+        example:
+        name='JointPosition'
+        parameter_value_pair='{
+            "joint_name": "torso_lift_joint", #required
+            "goal_position": 0, #required
+            "weight": 1, #optional
+            "gain": 10, #optional -- error is multiplied with this value
+            "max_speed": 1 #optional -- rad/s or m/s depending on joint; can not go higher than urdf limit
+        }'
+        :return:
+        """
+        joint_symbol = self.get_input_joint_position(self.joint_name)
+        lower_limit, upper_limit = self.get_robot().get_joint_limits(self.joint_name)
+
+        weight = 0
+
+        max_velocity = w.Min(self.get_input_float(self.max_velocity),
+                             self.get_robot().get_joint_velocity_limit_expr(self.joint_name))
+
+        range = upper_limit - lower_limit
+
+        lower_limit2 = lower_limit - range * 0.01
+        upper_limit2 = upper_limit + range * 0.01
+
+        outer_weight = 1 / 10. * ((1 / 4. * ((upper_limit2 - lower_limit2) ** 2. /
+                                              ((upper_limit2 - joint_symbol) * (joint_symbol - lower_limit2)))) - 1)
+        center = (upper_limit + lower_limit) / 2.
+
+        lower_weight = w.if_less_eq(joint_symbol, center, outer_weight, weight)
+        upper_weight = w.if_greater_eq(joint_symbol, center, outer_weight, weight)
+
+        lower_weight = lower_weight * (1. / (max_velocity)) ** 2
+        upper_weight = upper_weight * (1. / (max_velocity)) ** 2
+        self.add_constraint(u'/lower',
+                            lower=0,
+                            upper=1e9,
+                            weight=lower_weight,
+                            expression=joint_symbol,
+                            goal_constraint=False)
+        self.add_constraint(u'/upper',
+                            lower=-1e9,
+                            upper=0,
+                            weight=upper_weight,
+                            expression=joint_symbol,
+                            goal_constraint=False)
+
+    def __str__(self):
+        s = super(AviodJointLimitsRevolute, self).__str__()
+        return u'{}/{}'.format(s, self.joint_name)
+
+
 class JointPositionList(Constraint):
     def __init__(self, god_map, goal_state, weight=None, max_velocity=None, goal_constraint=None):
         super(JointPositionList, self).__init__(god_map)
@@ -1737,6 +1807,7 @@ class Open(Constraint):
     def make_constraints(self):
         for constraint in self.constraints:
             self.soft_constraints.update(constraint.get_constraints())
+
 
 class Close(Constraint):
     def __init__(self, god_map, tip, object_name, handle_link, root=None, goal_joint_state=None):

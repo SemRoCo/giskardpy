@@ -738,7 +738,7 @@ class TestConstraints(object):
                 }
             }
         }
-        kitchen_setup.wrapper.update_god_map(updates)
+        # kitchen_setup.wrapper.update_god_map(updates)
         kitchen_setup.send_and_check_goal()
 
         kitchen_setup.add_json_goal(u'Open',
@@ -758,7 +758,7 @@ class TestConstraints(object):
                 }
             }
         }
-        kitchen_setup.wrapper.update_god_map(updates)
+        # kitchen_setup.wrapper.update_god_map(updates)
 
         kitchen_setup.send_and_check_goal()
         kitchen_setup.set_kitchen_js({u'iai_fridge_door_joint': np.pi/2})
@@ -779,7 +779,7 @@ class TestConstraints(object):
                 }
             }
         }
-        kitchen_setup.wrapper.update_god_map(updates)
+        # kitchen_setup.wrapper.update_god_map(updates)
         kitchen_setup.send_and_check_goal()
         kitchen_setup.set_kitchen_js({u'iai_fridge_door_joint': 0})
 

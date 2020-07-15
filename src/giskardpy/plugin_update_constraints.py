@@ -13,7 +13,7 @@ from rospy_message_converter.message_converter import convert_ros_message_to_dic
 
 import giskardpy.constraints
 import giskardpy.identifier as identifier
-from giskardpy.constraints import SelfCollisionAvoidance, ExternalCollisionAvoidance
+from giskardpy.constraints import SelfCollisionAvoidance, ExternalCollisionAvoidance, AviodJointLimitsRevolute
 from giskardpy.data_types import JointConstraint
 from giskardpy.exceptions import InsolvableException, ImplementationException
 from giskardpy.logging import loginfo
@@ -109,6 +109,11 @@ class GoalToConstraints(GetGoal):
                                             controlled_joints)
         hard_constraints = OrderedDict(((self.robot.get_name(), k), self.robot._hard_constraints[k]) for k in
                                        controlled_joints if k in self.robot._hard_constraints)
+
+        for joint_name in self.get_robot().controlled_joints:
+            if self.get_robot().is_joint_revolute(joint_name):
+                c = AviodJointLimitsRevolute(self.god_map, joint_name)
+                self.soft_constraints.update(c.get_constraints())
 
         self.get_god_map().safe_set_data(identifier.joint_constraint_identifier, joint_constraints)
         self.get_god_map().safe_set_data(identifier.hard_constraint_identifier, hard_constraints)

@@ -329,7 +329,8 @@ class Constraint(object):
         for x in range(vector_expr.shape[0]):
             self.add_debug_constraint(name + u'/{}'.format(x), vector_expr[x])
 
-    def add_minimize_position_constraints(self, r_P_g, max_velocity, max_acceleration, root, tip, goal_constraint):
+    def add_minimize_position_constraints(self, r_P_g, max_velocity, max_acceleration, root, tip, goal_constraint,
+                                          weight=WEIGHT_BELOW_CA):
         """
         :param r_P_g: position of goal relative to root frame
         :param max_velocity:
@@ -691,6 +692,7 @@ class BasicCartesianConstraint(Constraint):
     max_acceleration = u'max_acceleration'
 
     def __init__(self, god_map, root_link, tip_link, goal, max_velocity=0.1, max_acceleration=0.1,
+                 weight=WEIGHT_ABOVE_CA,
                  goal_constraint=True):
         super(BasicCartesianConstraint, self).__init__(god_map)
         self.root = root_link
@@ -701,7 +703,8 @@ class BasicCartesianConstraint(Constraint):
 
         params = {self.goal: goal,
                   self.max_acceleration: max_acceleration,
-                  self.max_velocity: max_velocity}
+                  self.max_velocity: max_velocity,
+                  self.weight: weight}
         self.save_params_on_god_map(params)
 
     def get_goal_pose(self):
@@ -1595,7 +1598,7 @@ class OpenDoor(Constraint):
     hinge0_P_tipStart_norm_id = u'hinge0_P_tipStart_norm'
     weight = u'weight'
 
-    def __init__(self, god_map, tip, object_name, handle_link, angle_goal, root=None):
+    def __init__(self, god_map, tip, object_name, handle_link, angle_goal, root=None, weight=WEIGHT_BELOW_CA):
         super(OpenDoor, self).__init__(god_map)
 
         if root is None:
@@ -1657,6 +1660,7 @@ class OpenDoor(Constraint):
             self.hinge0_T_tipStartProjected_id: hinge0_T_tipStartProjected,
             self.root_T_tipGoal_id: root_T_tipGoal,
             self.hinge0_P_tipStart_norm_id: hinge0_P_tipStart_norm,
+            self.weight: weight,
         }
         self.save_params_on_god_map(params)
 
@@ -1667,7 +1671,7 @@ class OpenDoor(Constraint):
         return self.get_input_Vector3Stamped(self.hinge_V_hinge_axis_msg_id)
 
     def make_constraints(self):
-        weight = WEIGHT_BELOW_CA
+        weight = self.get_input_float(self.weight)
         weight = self.normalize_error(0.1, weight)
         root_T_tip = self.get_fk(self.root, self.tip)
         root_T_hinge = self.get_hinge_pose()
@@ -1716,7 +1720,7 @@ class OpenDoor(Constraint):
 
 
 class Open(Constraint):
-    def __init__(self, god_map, tip, object_name, handle_link, root=None, goal_joint_state=None):
+    def __init__(self, god_map, tip, object_name, handle_link, root=None, goal_joint_state=None, weight=WEIGHT_BELOW_CA):
         super(Open, self).__init__(god_map)
         self.constraints = []
         environment_object = self.get_world().get_object(object_name)
@@ -1727,7 +1731,7 @@ class Open(Constraint):
                 goal_joint_state = min(max_limit, goal_joint_state)
             else:
                 goal_joint_state = max_limit
-            self.constraints.append(OpenDoor(god_map, tip, object_name, handle_link, goal_joint_state, root))
+            self.constraints.append(OpenDoor(god_map, tip, object_name, handle_link, goal_joint_state, root, weight))
         elif environment_object.is_joint_prismatic(joint_name):
             pass
         else:
@@ -1739,7 +1743,7 @@ class Open(Constraint):
             self.soft_constraints.update(constraint.get_constraints())
 
 class Close(Constraint):
-    def __init__(self, god_map, tip, object_name, handle_link, root=None, goal_joint_state=None):
+    def __init__(self, god_map, tip, object_name, handle_link, root=None, goal_joint_state=None, weight=WEIGHT_BELOW_CA):
         super(Close, self).__init__(god_map)
         self.constraints = []
         environment_object = self.get_world().get_object(object_name)
@@ -1750,7 +1754,7 @@ class Close(Constraint):
                 goal_joint_state = max(min_limit, goal_joint_state)
             else:
                 goal_joint_state = min_limit
-            self.constraints.append(OpenDoor(god_map, tip, object_name, handle_link, goal_joint_state, root))
+            self.constraints.append(OpenDoor(god_map, tip, object_name, handle_link, goal_joint_state, root, weight))
         elif environment_object.is_joint_prismatic(joint_name):
             pass
         else:

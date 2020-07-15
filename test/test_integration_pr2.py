@@ -846,7 +846,16 @@ class TestConstraints(object):
         """
         :type kitchen_setup: PR2
         """
-        goal_angle = 0.7
+        p = PoseStamped()
+        p.header.frame_id = u'map'
+        p.pose.orientation.w = 1
+        p.pose.position.x = 0.5
+        p.pose.position.y = 0.2
+        kitchen_setup.teleport_base(p)
+
+        hand = kitchen_setup.r_tip
+
+        goal_angle = np.pi/4
         handle_frame_id = u'iai_kitchen/sink_area_dish_washer_door_handle'
         handle_name = u'sink_area_dish_washer_door_handle'
         bar_axis = Vector3Stamped()
@@ -857,12 +866,12 @@ class TestConstraints(object):
         bar_center.header.frame_id = handle_frame_id
 
         tip_grasp_axis = Vector3Stamped()
-        tip_grasp_axis.header.frame_id = kitchen_setup.l_tip
+        tip_grasp_axis.header.frame_id = hand
         tip_grasp_axis.vector.z = 1
 
         kitchen_setup.add_json_goal(u'GraspBar',
                                     root=kitchen_setup.default_root,
-                                    tip=kitchen_setup.l_tip,
+                                    tip=hand,
                                     tip_grasp_axis=tip_grasp_axis,
                                     bar_center=bar_center,
                                     bar_axis=bar_axis,
@@ -871,31 +880,32 @@ class TestConstraints(object):
         kitchen_setup.allow_all_collisions()
 
         x_gripper = Vector3Stamped()
-        x_gripper.header.frame_id = kitchen_setup.l_tip
+        x_gripper.header.frame_id = hand
         x_gripper.vector.x = 1
 
         x_goal = Vector3Stamped()
         x_goal.header.frame_id = handle_frame_id
         x_goal.vector.x = -1
-        kitchen_setup.align_planes(kitchen_setup.l_tip, x_gripper, root_normal=x_goal)
+        kitchen_setup.align_planes(hand, x_gripper, root_normal=x_goal)
         # kitchen_setup.allow_all_collisions()
 
         kitchen_setup.send_and_check_goal()
 
-        kitchen_setup.add_json_goal(u'OpenDoor',
-                                    tip=kitchen_setup.l_tip,
+        kitchen_setup.add_json_goal(u'Open',
+                                    tip=hand,
                                     object_name=u'kitchen',
                                     handle_link=handle_name,
-                                    angle_goal=goal_angle)
-        kitchen_setup.allow_all_collisions()
+                                    goal_joint_state=goal_angle,
+                                    # weight=100
+                                    )
+        # kitchen_setup.allow_all_collisions()
         kitchen_setup.send_and_check_goal()
         kitchen_setup.set_kitchen_js({u'sink_area_dish_washer_door_joint': goal_angle})
 
-        kitchen_setup.add_json_goal(u'OpenDoor',
-                                    tip=kitchen_setup.l_tip,
+        kitchen_setup.add_json_goal(u'Close',
+                                    tip=hand,
                                     object_name=u'kitchen',
-                                    handle_link=handle_name,
-                                    angle_goal=0)
+                                    handle_link=handle_name)
         kitchen_setup.allow_all_collisions()
         kitchen_setup.send_and_check_goal()
         kitchen_setup.set_kitchen_js({u'sink_area_dish_washer_door_joint': 0})
@@ -2927,6 +2937,121 @@ class TestCollisionAvoidanceGoals(object):
         kitchen_setup.check_cart_goal(kitchen_setup.l_tip, expected_pose)
 
     # TODO FIXME attaching and detach of urdf objects that listen to joint states
+
+    def test_dishwasher_milestone(self, kitchen_setup):
+        """
+        :type kitchen_setup: PR2
+        """
+        p = PoseStamped()
+        p.header.frame_id = u'map'
+        p.pose.orientation.w = 1
+        p.pose.position.x = 0.5
+        p.pose.position.y = 0.2
+        kitchen_setup.teleport_base(p)
+
+        hand = kitchen_setup.r_tip
+
+        goal_angle = np.pi/4
+        handle_frame_id = u'iai_kitchen/sink_area_dish_washer_door_handle'
+        handle_name = u'sink_area_dish_washer_door_handle'
+        bar_axis = Vector3Stamped()
+        bar_axis.header.frame_id = handle_frame_id
+        bar_axis.vector.y = 1
+
+        bar_center = PointStamped()
+        bar_center.header.frame_id = handle_frame_id
+
+        tip_grasp_axis = Vector3Stamped()
+        tip_grasp_axis.header.frame_id = hand
+        tip_grasp_axis.vector.z = 1
+
+        kitchen_setup.add_json_goal(u'GraspBar',
+                                    root=kitchen_setup.default_root,
+                                    tip=hand,
+                                    tip_grasp_axis=tip_grasp_axis,
+                                    bar_center=bar_center,
+                                    bar_axis=bar_axis,
+                                    bar_length=.3)
+        # kitchen_setup.allow_collision([], u'kitchen', [handle_name])
+        kitchen_setup.allow_all_collisions()
+
+        gripper_axis = Vector3Stamped()
+        gripper_axis.header.frame_id = hand
+        gripper_axis.vector.x = 1
+
+        world_axis = Vector3Stamped()
+        world_axis.header.frame_id = handle_frame_id
+        world_axis.vector.x = -1
+        kitchen_setup.align_planes(hand, gripper_axis, root_normal=world_axis)
+        # kitchen_setup.allow_all_collisions()
+
+        kitchen_setup.send_and_check_goal()
+
+        kitchen_setup.add_json_goal(u'Open',
+                                    tip=hand,
+                                    object_name=u'kitchen',
+                                    handle_link=handle_name,
+                                    goal_joint_state=goal_angle,
+                                    # weight=100
+                                    )
+        # kitchen_setup.allow_all_collisions()
+        kitchen_setup.send_and_check_goal()
+        kitchen_setup.set_kitchen_js({u'sink_area_dish_washer_door_joint': goal_angle})
+        # ----------------------------------------------------------------------------------------
+        kitchen_setup.send_and_check_joint_goal(gaya_pose)
+
+        tray_handle_frame_id = u'iai_kitchen/sink_area_dish_washer_tray_handle_front_side'
+        tray_handle_name = u'sink_area_dish_washer_tray_handle_front_side'
+        bar_axis = Vector3Stamped()
+        bar_axis.header.frame_id = tray_handle_frame_id
+        bar_axis.vector.y = 1
+
+        bar_center = PointStamped()
+        bar_center.header.frame_id = tray_handle_frame_id
+
+        tip_grasp_axis = Vector3Stamped()
+        tip_grasp_axis.header.frame_id = hand
+        tip_grasp_axis.vector.z = 1
+
+        kitchen_setup.add_json_goal(u'GraspBar',
+                                    root=kitchen_setup.default_root,
+                                    tip=hand,
+                                    tip_grasp_axis=tip_grasp_axis,
+                                    bar_center=bar_center,
+                                    bar_axis=bar_axis,
+                                    bar_length=.3)
+        # kitchen_setup.allow_collision([], u'kitchen', [handle_name])
+        kitchen_setup.send_and_check_goal()
+
+        p = tf.lookup_pose(tray_handle_frame_id, hand)
+        p.pose.position.x += 0.3
+
+        # p = tf.transform_pose(hand, p)
+
+        # kitchen_setup.add_json_goal(u'CartesianPosition',
+        #                             root_link=kitchen_setup.default_root,
+        #                             tip_link=hand,
+        #                             goal=p)
+        kitchen_setup.set_and_check_cart_goal(p, hand)
+
+        # gripper_axis = Vector3Stamped()
+        # gripper_axis.header.frame_id = hand
+        # gripper_axis.vector.z = 1
+        #
+        # world_axis = Vector3Stamped()
+        # world_axis.header.frame_id = tray_handle_frame_id
+        # world_axis.vector.y = 1
+        # kitchen_setup.align_planes(hand, gripper_axis, root_normal=world_axis)
+        # kitchen_setup.send_and_check_goal()
+
+        #------------------------------------------------------------------------------------------
+        # kitchen_setup.add_json_goal(u'Close',
+        #                             tip=hand,
+        #                             object_name=u'kitchen',
+        #                             handle_link=handle_name)
+        # kitchen_setup.allow_all_collisions()
+        # kitchen_setup.send_and_check_goal()
+        # kitchen_setup.set_kitchen_js({u'sink_area_dish_washer_door_joint': 0})
 
 
 class TestReachability():

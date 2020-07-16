@@ -1717,7 +1717,35 @@ class OpenDoor(Constraint):
 
 class OpenDrawer(Constraint):
     def __init__(self, god_map, tip, object_name, handle_link, distance_goal, root=None):
+        """
+        :type tip: str
+        :type object_name str
+        :type handle_link str
+        :type distance_goal float
+        :param root: default is root link of robot
+        :type root: str
+        """
+
         super(OpenDoor, self).__init__(god_map)
+
+        # Process input parameters
+        if root is None:
+            self.root = self.get_robot().get_root()
+        else:
+            self.root = root
+        self.tip = tip
+
+        self.distance_goal = distance_goal
+
+        self.handle_link = handle_link
+        handle_frame_id = u'iai_kitchen/' + handle_link
+
+        self.object_name = object_name
+        environment_object = self.get_world().get_object(object_name)
+        self.hinge_joint = environment_object.get_movable_parent_joint(handle_link)
+        hinge_child = environment_object.get_child_link_of_joint(self.hinge_joint)
+
+        hinge_frame_id = u'iai_kitchen/' + hinge_child
         pass
 
     def make_constraints(self):

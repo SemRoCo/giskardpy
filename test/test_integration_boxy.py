@@ -229,7 +229,7 @@ class TestConstraints(object):
         np.testing.assert_almost_equal(expected_x.point.y, 0, 2)
         np.testing.assert_almost_equal(expected_x.point.x, 0, 2)
 
-    def test_open_drawer(self, kitchen_setup):
+    def test_open_drawer(self, kitchen_setup):  # where is the kitchen_setup actually loaded
         """"
         :type kitchen_setup: Boxy
         """
@@ -245,7 +245,7 @@ class TestConstraints(object):
         tip_grasp_axis = Vector3Stamped()
         # TODO: Verify that tip on boxy is actually called like that
         tip_grasp_axis.header.frame_id = kitchen_setup.r_tip
-        tip_grasp_axis.vector.x = 1 # The same as bar axis???
+        tip_grasp_axis.vector.x = 1  # The same as bar axis???
 
         kitchen_setup.add_json_goal(u'GraspBar',
                                     root=kitchen_setup.default_root,
@@ -260,7 +260,7 @@ class TestConstraints(object):
 
         x_goal = Vector3Stamped()
         x_goal.header.frame_id = handle_frame_id
-        x_goal.vector.x = -1 # TODO: Ask Simon: why
+        x_goal.vector.x = -1  # TODO: Ask Simon: why
 
         kitchen_setup.align_planes(kitchen_setup.r_tip,
                                    x_gripper,
@@ -268,6 +268,15 @@ class TestConstraints(object):
         kitchen_setup.send_and_check_goal()
 
         # From here on new (= OpenDrawer)
-        # TODO:
+        kitchen_setup.add_json_goal(u'OpenDrawer',
+                                    tip=kitchen_setup.r_tip,
+                                    object_name=u'kitchen',
+                                    handle_link=handle_name,
+                                    distance_goal=0.4)  # TODO: check distance in kitchen URDF
+        kitchen_setup.allow_all_collisions()
+        kitchen_setup.send_and_check_goal()
+        kitchen_setup.set_kitchen_js({u'sink_area_left_middle_drawer_main_joint': 0.4})
+        kitchen_setup.send_and_check_goal()
+        
 
         pass

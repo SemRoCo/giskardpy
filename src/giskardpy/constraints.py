@@ -1715,6 +1715,19 @@ class OpenDoor(Constraint):
         return u'{}/{}/{}'.format(s, self.root, self.tip)
 
 
+class OpenDrawer(Constraint):
+    def __init__(self, god_map, tip, object_name, handle_link, distance_goal, root=None):
+        super(OpenDoor, self).__init__(god_map)
+        pass
+
+    def make_constraints(self):
+        pass
+
+    def __str__(self):
+        s = super(OpenDrawer, self).__str__()
+        return u'{}/{}/{}'.format(s, self.root, self.tip)
+
+
 class Open(Constraint):
     def __init__(self, god_map, tip, object_name, handle_link, root=None):
         super(Open, self).__init__(god_map)

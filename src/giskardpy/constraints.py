@@ -1716,17 +1716,23 @@ class OpenDoor(Constraint):
 
 
 class OpenDrawer(Constraint):
+    root_t_tipGoal_id = u'root_t_tipGoal'
+
     def __init__(self, god_map, tip, object_name, handle_link, distance_goal, root=None):
         """
         :type tip: str
+        :param tip: tip of manipulator (gripper) which is used
         :type object_name str
+        :param object_name
         :type handle_link str
+        :param handle_link handle to grasp
         :type distance_goal float
-        :param root: default is root link of robot
+        :param distance_goal distance to pull drawer
         :type root: str
+        :param root: default is root link of robot
         """
 
-        super(OpenDoor, self).__init__(god_map)
+        super(OpenDrawer, self).__init__(god_map)
 
         # Process input parameters
         if root is None:
@@ -1742,14 +1748,32 @@ class OpenDrawer(Constraint):
 
         self.object_name = object_name
         environment_object = self.get_world().get_object(object_name)
+        # Get movable joint
         self.hinge_joint = environment_object.get_movable_parent_joint(handle_link)
+        # Child of joint TODO: why do we need this?
         hinge_child = environment_object.get_child_link_of_joint(self.hinge_joint)
 
+        # Get joint limits TODO: check of desired goal is within limits
+        min_limit, max_limit = environment_object.get_joint_limits(self.hinge_joint)
+
         hinge_frame_id = u'iai_kitchen/' + hinge_child
-        pass
+
+        # TODO: get params, which ones?
+        # TODO: get axis on which to move
+
+        params = {
+            self.root_t_tipGoal_id: ''
+        }
+
+        self.save_params_on_god_map(params)
 
     def make_constraints(self):
-        pass
+        # TODO: Calculate goal position
+
+        self.constraints.append(u'CartesianPosition',
+                                self.root,
+                                self.tip,
+                                root_t_tipGoal)
 
     def __str__(self):
         s = super(OpenDrawer, self).__str__()

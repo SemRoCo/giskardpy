@@ -277,6 +277,7 @@ class TestConstraints(object):
         kitchen_setup.send_and_check_goal()
         kitchen_setup.set_kitchen_js({u'sink_area_left_middle_drawer_main_joint': 0.4})
         kitchen_setup.send_and_check_goal()
-        
+
+        # TODO: calculate real and desired value and compare
 
         pass

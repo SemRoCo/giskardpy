@@ -1734,6 +1734,8 @@ class OpenDrawer(Constraint):
 
         super(OpenDrawer, self).__init__(god_map)
 
+        self.constraints = []  # init empty list
+
         # Process input parameters
         if root is None:
             self.root = self.get_robot().get_root()
@@ -1758,9 +1760,13 @@ class OpenDrawer(Constraint):
 
         hinge_frame_id = u'iai_kitchen/' + hinge_child
 
-        # TODO: get params, which ones?
-        # TODO: get axis on which to move
+        # TODO: calculate current position???
 
+        # TODO: calculate goal position
+
+        # TODO: calculate axis to move on (prismatic joint axis)
+
+        # TODO: Save everything in god map
         params = {
             self.root_t_tipGoal_id: ''
         }
@@ -1768,12 +1774,19 @@ class OpenDrawer(Constraint):
         self.save_params_on_god_map(params)
 
     def make_constraints(self):
-        # TODO: Calculate goal position
+        # TODO: create constrain(s)
+        # TODO: grasp handle (maybe here)
+        # TODO: open drawer
 
-        self.constraints.append(u'CartesianPosition',
-                                self.root,
-                                self.tip,
-                                root_t_tipGoal)
+        self.constraints.append(
+            CartesianPosition(
+                self.root,
+                self.tip,
+                root_t_tipGoal))
+
+        # Execute constraints
+        for constraint in self.constraints:
+            self.soft_constraints.update(constraint.get_constraints())
 
     def __str__(self):
         s = super(OpenDrawer, self).__str__()

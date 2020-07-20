@@ -127,7 +127,7 @@ class WorldObject(URDFObject):
         for link_a, link_b in link_combinations:
             if self.are_linked(link_a, link_b) or link_a == link_b:
                 always.add((link_a, link_b))
-        always = always.difference({tuple(x) for x in self.ignored_pairs})
+        always = always.union(self.ignored_pairs)
         rest = link_combinations.difference(always)
         self.joint_state = self.get_zero_joint_state()
         always = always.union(self.check_collisions(rest, d))

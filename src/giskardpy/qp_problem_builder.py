@@ -165,20 +165,7 @@ class QProblemBuilder(object):
         for iH, k in enumerate(self.hard_constraints_dict.keys()):
             key = 'h -- ' + str(k)
             bA_names.append(key)
-            # upper_bound = ubA[iH]
-            # lower_bound = lbA[iH]
-            # if np.sign(upper_bound) == np.sign(lower_bound):
-            #     logging.logwarn(u'{} out of bounds'.format(k))
-            #     if upper_bound > 0:
-            #         logging.logwarn(u'{} value below lower bound by {}'.format(k, lower_bound))
-            #         vel = np_ub[iH]
-            #         if abs(vel) < abs(lower_bound):
-            #             logging.logerr(u'joint vel of {} to low to get back into bound in one iteration'.format(vel))
-            #     else:
-            #         logging.logwarn(u'{} value above upper bound by {}'.format(k, abs(upper_bound)))
-            #         vel = np_lb[iH]
-            #         if abs(vel) < abs(lower_bound):
-            #             logging.logerr(u'joint vel of {} to low to get back into bound in one iteration'.format(vel))
+
 
         for iS, k in enumerate(self.soft_constraints_dict.keys()):
             key = 's -- ' + str(k)
@@ -202,6 +189,9 @@ class QProblemBuilder(object):
             xH = np.dot((xdot_full**2).T, filtered_H)
             p_xH = pd.DataFrame(xH, filtered_b_names, dtype=float).sort_index()
             xHx = np.dot(np.dot(xdot_full.T, filtered_H), xdot_full)
+            x_soft = xdot_full[len(xdot_full) - len(lbA):]
+            p_lbA_minus_x = pd.DataFrame(lbA - x_soft, filtered_bA_names, dtype=float).sort_index()
+            p_ubA_minus_x = pd.DataFrame(ubA - x_soft, filtered_bA_names, dtype=float).sort_index()
         else:
             p_xdot = None
 

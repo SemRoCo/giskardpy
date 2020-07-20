@@ -76,8 +76,8 @@ class GiskardWrapper(object):
             params[u'goal'] = convert_ros_message_to_dictionary(pose_stamped)
             if max_velocity:
                 params[u'max_velocity'] = max_velocity
-            if weight:
-                params[u'weight'] = weight
+            # if weight:
+            #     params[u'weight'] = weight
             constraint.parameter_value_pair = json.dumps(params)
             self.cmd_seq[-1].constraints.append(constraint)
 
@@ -104,8 +104,8 @@ class GiskardWrapper(object):
             params[u'goal'] = convert_ros_message_to_dictionary(pose_stamped)
             if max_velocity:
                 params[u'max_velocity'] = max_velocity
-            if weight:
-                params[u'weight'] = weight
+            # if weight:
+            #     params[u'weight'] = weight
             constraint.parameter_value_pair = json.dumps(params)
             self.cmd_seq[-1].constraints.append(constraint)
 

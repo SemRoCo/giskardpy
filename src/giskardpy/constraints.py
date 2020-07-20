@@ -1755,10 +1755,23 @@ class OpenDrawer(Constraint):
         # Child of joint TODO: why do we need this?
         hinge_child = environment_object.get_child_link_of_joint(self.hinge_joint)
 
+        hinge_frame_id = u'iai_kitchen/' + hinge_child
+
+        # Get movable axis of drawer (= prismatic joint)
+        hinge_drawer_axis = kdl.Vector(*environment_object.get_joint_axis(self.hinge_joint))
+        hinge_drawer_axis_msg = Vector3Stamped()
+        hinge_drawer_axis_msg.header.frame_id = hinge_frame_id
+        hinge_drawer_axis_msg.vector.x = hinge_drawer_axis[0]
+        hinge_drawer_axis_msg.vector.y = hinge_drawer_axis[1]
+        hinge_drawer_axis_msg.vector.z = hinge_drawer_axis[2]
+
         # Get joint limits TODO: check of desired goal is within limits
         min_limit, max_limit = environment_object.get_joint_limits(self.hinge_joint)
 
         hinge_frame_id = u'iai_kitchen/' + hinge_child
+
+        hinge_start_t_tip_start = tf.msg_to_kdl(tf.lookup_pose(hinge_frame_id, self.tip))
+        hinge_pose = tf.lookup_pose(self.root, hinge_frame_id)
 
         # TODO: calculate current position???
 
@@ -1768,13 +1781,13 @@ class OpenDrawer(Constraint):
 
         # TODO: Save everything in god map
         params = {
-            self.root_t_tipGoal_id: ''
+            self.root_t_tip_goal_id: root_t_tip_goal
         }
 
         self.save_params_on_god_map(params)
 
     def make_constraints(self):
-        # TODO: create constrain(s)
+        # TODO: create constraint(s)
         # TODO: grasp handle (maybe here)
         # TODO: open drawer
 
@@ -1782,7 +1795,7 @@ class OpenDrawer(Constraint):
             CartesianPosition(
                 self.root,
                 self.tip,
-                root_t_tipGoal))
+                root_t_tip_goal))
 
         # Execute constraints
         for constraint in self.constraints:

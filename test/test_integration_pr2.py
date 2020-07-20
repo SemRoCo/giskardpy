@@ -2995,7 +2995,7 @@ class TestCollisionAvoidanceGoals(object):
 
     # TODO FIXME attaching and detach of urdf objects that listen to joint states
 
-    def test_dishwasher_milestone(self, kitchen_setup):
+    def test_ease_dishwasher(self, kitchen_setup):
         """
         :type kitchen_setup: PR2
         """

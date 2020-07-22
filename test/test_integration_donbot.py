@@ -7,9 +7,8 @@ import rospy
 from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped, Pose
 from giskard_msgs.msg import MoveActionGoal, MoveResult, MoveGoal, CollisionEntry, MoveCmd, JointConstraint
 from tf.transformations import quaternion_from_matrix, quaternion_about_axis
-
 from giskardpy import logging
-from giskardpy.tfwrapper import lookup_transform, init as tf_init, lookup_pose
+import giskardpy.tfwrapper as tf
 from utils_for_tests import Donbot, compare_poses
 
 # TODO roslaunch iai_donbot_sim ros_control_sim.launch
@@ -64,7 +63,7 @@ def ros(request):
 
         logging.loginfo(u'init ros')
     rospy.init_node(u'tests')
-    tf_init(60)
+    tf.init(60)
     launch = roslaunch.scriptapi.ROSLaunch()
     launch.start()
 
@@ -201,7 +200,7 @@ def shelf_setup(better_pose):
 def kitchen_setup(zero_pose):
     object_name = u'kitchen'
     zero_pose.add_urdf(object_name, rospy.get_param(u'kitchen_description'), u'/kitchen/joint_states',
-                       lookup_transform(u'map', u'iai_kitchen/world'))
+                       tf.lookup_transform(u'map', u'iai_kitchen/world'))
     return zero_pose
 
 
@@ -406,6 +405,43 @@ class TestConstraints(object):
         zero_pose.align_planes(u'refills_finger', root_normal, u'base_footprint', root_normal)
         zero_pose.send_and_check_goal()
 
+    def test_pointing(self, better_pose):
+        tip = u'rs_camera_link'
+        goal_point = tf.lookup_point(u'map', u'base_footprint')
+        better_pose.wrapper.pointing(tip, goal_point)
+        better_pose.send_and_check_goal()
+
+        current_x = Vector3Stamped()
+        current_x.header.frame_id = tip
+        current_x.vector.z = 1
+
+        expected_x = tf.transform_point(tip, goal_point)
+        np.testing.assert_almost_equal(expected_x.point.y, 0, 2)
+        np.testing.assert_almost_equal(expected_x.point.x, 0, 2)
+
+        # goal_point = tf.lookup_point(u'map', tip)
+        # better_pose.wrapper.pointing(tip, goal_point, root=tip)
+        #
+        # r_goal = PoseStamped()
+        # r_goal.header.frame_id = tip
+        # r_goal.pose.position.x -= 0.2
+        # r_goal.pose.position.z -= 0.5
+        # r_goal.pose.orientation.w = 1
+        # r_goal = tf.transform_pose(better_pose.default_root, r_goal)
+        # r_goal.pose.orientation = Quaternion(*quaternion_from_matrix([[0, 0, 1, 0],
+        #                                                               [0, -1, 0, 0],
+        #                                                               [1, 0, 0, 0],
+        #                                                               [0, 0, 0, 1]]))
+        #
+        # better_pose.set_and_check_cart_goal(r_goal, better_pose.r_tip, u'base_footprint')
+        #
+        # current_x = Vector3Stamped()
+        # current_x.header.frame_id = tip
+        # current_x.vector.z = 1
+        #
+        # expected_x = tf.lookup_point(tip, better_pose.r_tip)
+        # np.testing.assert_almost_equal(expected_x.point.y, 0, 2)
+        # np.testing.assert_almost_equal(expected_x.point.x, 0, 2)
 
 class TestCartGoals(object):
     def test_cart_goal_1eef(self, zero_pose):
@@ -712,7 +748,7 @@ class TestCollisionAvoidanceGoals(object):
 
     def test_avoid_self_collision2(self, self_collision_pose):
         self_collision_pose.send_and_check_goal()
-        map_T_root = lookup_pose(u'map', u'base_footprint')
+        map_T_root = tf.lookup_pose(u'map', u'base_footprint')
         expected_pose = Pose()
         expected_pose.orientation.w = 1
         compare_poses(map_T_root.pose, expected_pose)

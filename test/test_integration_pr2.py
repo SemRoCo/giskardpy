@@ -3062,6 +3062,7 @@ class TestCollisionAvoidanceGoals(object):
         bar_axis = Vector3Stamped()
         bar_axis.header.frame_id = tray_handle_frame_id
         bar_axis.vector.y = 1
+        bar_axis.vector.z = -0.1
 
         bar_center = PointStamped()
         bar_center.header.frame_id = tray_handle_frame_id

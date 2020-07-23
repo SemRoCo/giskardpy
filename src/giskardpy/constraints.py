@@ -1716,7 +1716,7 @@ class OpenDoor(Constraint):
 
 
 class OpenDrawer(Constraint):
-    root_t_tipGoal_id = u'root_t_tipGoal'
+    root_t_tip_goal_id = u'root_t_tipGoal'
 
     def __init__(self, god_map, tip, object_name, handle_link, distance_goal, root=None):
         """
@@ -1788,7 +1788,6 @@ class OpenDrawer(Constraint):
 
     def make_constraints(self):
         # TODO: create constraint(s)
-        # TODO: grasp handle (maybe here)
         # TODO: open drawer
 
         self.constraints.append(

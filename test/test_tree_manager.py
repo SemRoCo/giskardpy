@@ -5,13 +5,191 @@ from py_trees.meta import failure_is_success, success_is_failure
 from py_trees import display, Blackboard
 from py_trees_ros.trees import BehaviourTree
 from py_trees.behaviour import Behaviour
+from py_trees.common import Status
 from giskardpy.tree_manager import TreeManager
 from giskardpy.god_map import GodMap
+from giskardpy import logging
+from giskardpy import identifier
+
+import roslaunch
+import rospy
+from giskardpy.tfwrapper import init as tf_init
+from utils_for_tests import PR2
+from copy import deepcopy
+
+from giskardpy.plugin import GiskardBehavior
+
+
+default_pose = {u'r_elbow_flex_joint': -0.15,
+                u'r_forearm_roll_joint': 0,
+                u'r_shoulder_lift_joint': 0,
+                u'r_shoulder_pan_joint': 0,
+                u'r_upper_arm_roll_joint': 0,
+                u'r_wrist_flex_joint': -0.10001,
+                u'r_wrist_roll_joint': 0,
+
+                u'l_elbow_flex_joint': -0.15,
+                u'l_forearm_roll_joint': 0,
+                u'l_shoulder_lift_joint': 0,
+                u'l_shoulder_pan_joint': 0,
+                u'l_upper_arm_roll_joint': 0,
+                u'l_wrist_flex_joint': -0.10001,
+                u'l_wrist_roll_joint': 0,
+
+                u'torso_lift_joint': 0.2,
+                u'head_pan_joint': 0,
+                u'head_tilt_joint': 0,
+                }
+
+pocky_pose = {u'r_elbow_flex_joint': -1.29610152504,
+              u'r_forearm_roll_joint': -0.0301682323805,
+              u'r_shoulder_lift_joint': 1.20324921318,
+              u'r_shoulder_pan_joint': -0.73456435706,
+              u'r_upper_arm_roll_joint': -0.70790051778,
+              u'r_wrist_flex_joint': -0.10001,
+              u'r_wrist_roll_joint': 0.258268529825,
+
+              u'l_elbow_flex_joint': -1.29610152504,
+              u'l_forearm_roll_joint': 0.0301682323805,
+              u'l_shoulder_lift_joint': 1.20324921318,
+              u'l_shoulder_pan_joint': 0.73456435706,
+              u'l_upper_arm_roll_joint': 0.70790051778,
+              u'l_wrist_flex_joint': -0.1001,
+              u'l_wrist_roll_joint': -0.258268529825,
+
+              u'torso_lift_joint': 0.2,
+              u'head_pan_joint': 0,
+              u'head_tilt_joint': 0,
+              }
+
+
+@pytest.fixture(scope='module')#scope='function'
+def ros(request):
+    #uuid = roslaunch.rlutil.get_or_generate_uuid(None, False)
+    #roslaunch.configure_logging(uuid)
+    #launch_iai = roslaunch.parent.ROSLaunchParent(uuid,
+    #                                          ['/home/kevin/Documents/catkin_ws/src/iai_pr2/iai_pr2_sim/launch/ros_control_sim_with_base.launch'])
+    #launch_iai.start()
+    try:
+        logging.loginfo(u'deleting tmp test folder')
+        # shutil.rmtree(folder_name)
+    except Exception:
+        pass
+    logging.loginfo(u'init ros')
+    rospy.init_node(u'tests')
+    tf_init(60)
+    launch = roslaunch.scriptapi.ROSLaunch()
+    launch.start()
+
+    rospy.set_param('/joint_trajectory_splitter/state_topics',
+                    ['/whole_body_controller/base/state',
+                     '/whole_body_controller/body/state'])
+    rospy.set_param('/joint_trajectory_splitter/client_topics',
+                    ['/whole_body_controller/base/follow_joint_trajectory',
+                     '/whole_body_controller/body/follow_joint_trajectory'])
+    node = roslaunch.core.Node('giskardpy', 'joint_trajectory_splitter.py', name='joint_trajectory_splitter')
+    joint_trajectory_splitter = launch.launch(node)
+
+    def kill_ros():
+        joint_trajectory_splitter.stop()
+        rospy.delete_param('/joint_trajectory_splitter/state_topics')
+        rospy.delete_param('/joint_trajectory_splitter/client_topics')
+        logging.loginfo(u'shutdown ros')
+        #rospy.signal_shutdown(u'die')
+        #launch_iai.shutdown()
+        try:
+            logging.loginfo(u'deleting tmp test folder')
+            # shutil.rmtree(folder_name)
+        except Exception:
+            pass
+
+    request.addfinalizer(kill_ros)
+
+
+#tree_backup = None
+
+
+@pytest.fixture(scope='module')#scope='function'
+def giskard(request, ros):
+    c = PR2()
+    #tree_backup = deepcopy(c.tree)
+    def kill_giskard():
+        c.tear_down()
+    request.addfinalizer(kill_giskard)
+    return c
+    #c.get_world().remove_all_objects()
+    #c.get_world().remove_robot()
+    #if len(c.get_world().get_object_names()) != 0:
+    #    c.remove_object(c.get_world().ground_plane_name)
+
+@pytest.fixture()
+def resetted_giskard(request, giskard):
+    """
+    :type giskard: PR2
+    """
+    logging.loginfo(u'resetting giskard')
+    giskard.reset_base()
+    def fin():
+        giskard.get_world().remove_all_objects()
+        giskard.get_world().remove_robot()
+        #giskard.tree.root.shutdown()
+        #giskard.tree = grow_tree()
+        #giskard.tree = tree_backup
+    request.addfinalizer(fin)
+    return giskard
+
+
+@pytest.fixture()
+def zero_pose(resetted_giskard):
+    """
+    :type giskard: PR2
+    """
+    resetted_giskard.allow_all_collisions()
+    resetted_giskard.send_and_check_joint_goal(default_pose)
+    return resetted_giskard
+
+
 
 
 class TestBehavior(Behaviour):
     def __init__(self, name):
         super(TestBehavior, self).__init__(name)
+
+class RemovesItselfBehavior(GiskardBehavior):
+    def __init__(self, name):
+        super(RemovesItselfBehavior, self).__init__(name)
+        self.tree_manager = self.get_god_map().get_data(identifier.tree_manager)
+
+    def update(self):
+        self.tree_manager.remove_node(self.name)
+        return Status.RUNNING
+
+class GiskardTestBehavior(GiskardBehavior):
+    def __init__(self, name, return_status = Status.SUCCESS):
+        super(GiskardTestBehavior, self).__init__(name)
+        self.tree_manager = self.get_god_map().get_data(identifier.tree_manager)
+        self.executed = False
+        self.return_status = return_status
+
+    def update(self):
+        self.executed = True
+        return self.return_status
+
+class ReplaceBehavior(GiskardBehavior):
+    def __init__(self, name, new_behavior, old_behavior_name, parent_name, position, return_status = Status.SUCCESS):
+        super(ReplaceBehavior, self).__init__(name)
+        self.tree_manager = self.get_god_map().get_data(identifier.tree_manager)
+        self.new_behavior = new_behavior
+        self.parent_name = parent_name
+        self.position = position
+        self.old_behavior_name = old_behavior_name
+        self.return_status = return_status
+
+    def update(self):
+        self.tree_manager.remove_node(self.old_behavior_name)
+        self.tree_manager.insert_node(self.new_behavior, self.parent_name, self.position)
+        return self.return_status
+
 
 
 
@@ -252,6 +430,7 @@ class TestTreeManager():
         assert 'visualization' not in display.ascii_tree(tree.root)
         assert not (tree_manager.enable_node('visualization'))
         assert tree_manager.insert_node(visualization, 'wait for goal', 3)
+        assert 'visualization'in tree_manager.tree_nodes.keys()
         assert 'visualization' in display.ascii_tree(tree.root)
         assert 'visualization' not in [x.node.name for x in tree_manager.tree_nodes['wait for goal'].disabled_children]
         assert 'visualization' in [x.node.name for x in tree_manager.tree_nodes['wait for goal'].enabled_children]
@@ -448,3 +627,64 @@ class TestTreeManager():
         --> send traj
 --> send result
 """
+
+
+
+class TestTreeManagerGiskardIntegration():
+    def test_disable_enable_vis_before_execution(self, zero_pose):
+        tree_manager = zero_pose.get_god_map().get_data(identifier.tree_manager)
+        assert (tree_manager.disable_node('visualization'))
+        zero_pose.allow_self_collision()
+        zero_pose.send_and_check_joint_goal(pocky_pose)
+        assert (tree_manager.enable_node('visualization'))
+        zero_pose.send_and_check_joint_goal(default_pose)
+
+    def test_disable_enable_move_robot_before_execution(self, zero_pose):
+        tree_manager = zero_pose.get_god_map().get_data(identifier.tree_manager)
+        assert (tree_manager.disable_node('move robot'))
+        assert (tree_manager.enable_node('move robot'))
+        zero_pose.allow_self_collision()
+        zero_pose.send_and_check_joint_goal(pocky_pose)
+
+    def test_enable_disable_plugin_behavior_node_before_execution(self, zero_pose):
+        tree_manager = zero_pose.get_god_map().get_data(identifier.tree_manager)
+        assert tree_manager.disable_node('coll')
+        assert tree_manager.enable_node('coll')
+        zero_pose.allow_self_collision()
+        zero_pose.send_and_check_joint_goal(pocky_pose)
+
+    def test_remove_plugin_behavior_node_during_execution(self, zero_pose):
+        tree_manager = zero_pose.get_god_map().get_data(identifier.tree_manager)
+        planningIII = tree_manager.tree_nodes['planning III'].node
+        removes_itself = RemovesItselfBehavior('removesitself')
+        tree_manager.insert_node(removes_itself, 'planning III')
+        assert 'removesitself' in [x for x in planningIII.get_plugins()]
+        zero_pose.allow_self_collision()
+        zero_pose.send_and_check_joint_goal(pocky_pose)
+        assert 'removesitself' not in [x for x in planningIII.get_plugins()]
+
+    def test_replace_plugin_behavior_node_during_execution(self, zero_pose):
+        tree_manager = zero_pose.get_god_map().get_data(identifier.tree_manager)
+        planningIII = tree_manager.tree_nodes['planning III'].node
+        test_behavior = GiskardTestBehavior('test_behavior', Status.RUNNING)
+        replaces_itself = ReplaceBehavior('replace', test_behavior, 'replace', 'planning III', 3, Status.RUNNING)
+        tree_manager.insert_node(replaces_itself, 'planning III', 3)
+        assert 'replace' in [x for x in planningIII.get_plugins()]
+        zero_pose.allow_self_collision()
+        zero_pose.send_and_check_joint_goal(pocky_pose)
+        assert 'replace' not in [x for x in planningIII.get_plugins()]
+        assert 'test_behavior' in [x for x in planningIII.get_plugins()]
+        assert test_behavior.executed
+
+    def test_replace_node_during_execution(self, zero_pose):
+        tree_manager = zero_pose.get_god_map().get_data(identifier.tree_manager)
+        planningII = tree_manager.tree_nodes['planning II'].node
+        test_behavior = GiskardTestBehavior('test_behavior', Status.FAILURE)
+        replaces_itself = ReplaceBehavior('replace', test_behavior, 'replace', 'planning II', 3, Status.FAILURE)
+        tree_manager.insert_node(replaces_itself, 'planning II', 3)
+        assert 'replace' in [x.name for x in planningII.children]
+        zero_pose.allow_self_collision()
+        zero_pose.send_and_check_joint_goal(pocky_pose)
+        assert 'replace' not in [x.name for x in planningII.children]
+        assert 'test_behavior' in [x.name for x in planningII.children]
+        assert test_behavior.executed

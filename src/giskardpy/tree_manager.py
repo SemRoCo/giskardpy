@@ -1,10 +1,3 @@
-from py_trees import Sequence, Selector, BehaviourTree, Blackboard
-from py_trees.meta import failure_is_success, success_is_failure
-from py_trees_ros.trees import BehaviourTree
-import rospy
-from collections import namedtuple
-from collections import defaultdict
-from giskard_msgs.srv import DisableNode, DisableNodeResponse
 from giskardpy.plugin import PluginBehavior
 from giskardpy import logging
 from sortedcontainers import SortedList
@@ -148,7 +141,7 @@ class TreeManager():
         return False
 
 
-    def insert_node(self, node, parent_name, position=-1): #todo: plugin behavior in pluginbehavior does not work
+    def insert_node(self, node, parent_name, position=-1):
         if node.name in self.tree_nodes.keys():
             print("node with that name already exists")
             return False
@@ -158,7 +151,11 @@ class TreeManager():
             logging.loginfo("parent does not exist")
             return False
 
-        return parent.add_child(TreeManager.ManagerNode(node=node, parent=parent, position=position))
+        tree_node = TreeManager.ManagerNode(node=node, parent=parent, position=position)
+        if parent.add_child(tree_node):
+            self.tree_nodes[node.name] = tree_node
+            return True
+        return False
 
     def remove_node(self, node_name):
         if node_name in self.tree_nodes.keys():

@@ -153,7 +153,7 @@ class QProblemBuilder(object):
     def set_weights(self, weights):
         self.big_ass_M[self.h + self.s:, :-2] = w.diag(*weights)
 
-    def debug_print(self, unfiltered_H, A, lb, ub, lbA, ubA, xdot_full=None):
+    def debug_print(self, unfiltered_H, A, lb, ub, lbA, ubA, xdot_full=None, actually_print=False):
         import pandas as pd
         bA_mask, b_mask = make_filter_masks(unfiltered_H, self.num_joint_constraints, self.num_hard_constraints)
         b_names = []
@@ -165,20 +165,7 @@ class QProblemBuilder(object):
         for iH, k in enumerate(self.hard_constraints_dict.keys()):
             key = 'h -- ' + str(k)
             bA_names.append(key)
-            # upper_bound = ubA[iH]
-            # lower_bound = lbA[iH]
-            # if np.sign(upper_bound) == np.sign(lower_bound):
-            #     logging.logwarn(u'{} out of bounds'.format(k))
-            #     if upper_bound > 0:
-            #         logging.logwarn(u'{} value below lower bound by {}'.format(k, lower_bound))
-            #         vel = np_ub[iH]
-            #         if abs(vel) < abs(lower_bound):
-            #             logging.logerr(u'joint vel of {} to low to get back into bound in one iteration'.format(vel))
-            #     else:
-            #         logging.logwarn(u'{} value above upper bound by {}'.format(k, abs(upper_bound)))
-            #         vel = np_lb[iH]
-            #         if abs(vel) < abs(lower_bound):
-            #             logging.logerr(u'joint vel of {} to low to get back into bound in one iteration'.format(vel))
+
 
         for iS, k in enumerate(self.soft_constraints_dict.keys()):
             key = 's -- ' + str(k)
@@ -190,18 +177,21 @@ class QProblemBuilder(object):
         filtered_bA_names = np.array(bA_names)[bA_mask]
         filtered_H = unfiltered_H[b_mask][:,b_mask]
 
-        p_lb = pd.DataFrame(lb, filtered_b_names, dtype=float).sort_index()
-        p_ub = pd.DataFrame(ub, filtered_b_names, dtype=float).sort_index()
-        p_lbA = pd.DataFrame(lbA, filtered_bA_names, dtype=float).sort_index()
-        p_ubA = pd.DataFrame(ubA, filtered_bA_names, dtype=float).sort_index()
-        p_weights = pd.DataFrame(unfiltered_H.dot(np.ones(unfiltered_H.shape[0])), b_names, dtype=float).sort_index()
+        p_lb = pd.DataFrame(lb, filtered_b_names, [u'data'], dtype=float).sort_index()
+        p_ub = pd.DataFrame(ub, filtered_b_names, [u'data'], dtype=float).sort_index()
+        p_lbA = pd.DataFrame(lbA, filtered_bA_names, [u'data'], dtype=float).sort_index()
+        p_ubA = pd.DataFrame(ubA, filtered_bA_names, [u'data'], dtype=float).sort_index()
+        p_weights = pd.DataFrame(unfiltered_H.dot(np.ones(unfiltered_H.shape[0])), b_names, [u'data'], dtype=float).sort_index()
         if xdot_full is not None:
-            p_xdot = pd.DataFrame(xdot_full, filtered_b_names, dtype=float).sort_index()
+            p_xdot = pd.DataFrame(xdot_full, filtered_b_names, [u'data'], dtype=float).sort_index()
             Ax = np.dot(A, xdot_full)
-            p_Ax = pd.DataFrame(Ax, filtered_bA_names, dtype=float).sort_index()
+            p_Ax = pd.DataFrame(Ax, filtered_bA_names, [u'data'], dtype=float).sort_index()
             xH = np.dot((xdot_full**2).T, filtered_H)
-            p_xH = pd.DataFrame(xH, filtered_b_names, dtype=float).sort_index()
+            p_xH = pd.DataFrame(xH, filtered_b_names, [u'data'], dtype=float).sort_index()
             xHx = np.dot(np.dot(xdot_full.T, filtered_H), xdot_full)
+            x_soft = xdot_full[len(xdot_full) - len(lbA):]
+            p_lbA_minus_x = pd.DataFrame(lbA - x_soft, filtered_bA_names, [u'data'], dtype=float).sort_index()
+            p_ubA_minus_x = pd.DataFrame(ubA - x_soft, filtered_bA_names, [u'data'], dtype=float).sort_index()
         else:
             p_xdot = None
 
@@ -212,17 +202,25 @@ class QProblemBuilder(object):
         #     self.lbAs = self.lbAs.T.append(p_lbA.T, ignore_index=True).T
         # self.lbAs.T[[c for c in self.lbAs.T.columns if 'dist' in c]].plot()
 
-        # arrays = [(p_weights, u'H'),
-        #           (p_A, u'A'),
-        #           (p_lbA, u'lbA'),
-        #           (p_ubA, u'ubA'),
-        #           (p_lb, u'lb'),
-        #           (p_ub, u'ub')]
-        # for a, name in arrays:
-        #     self.check_for_nan(name, a)
-        #     self.check_for_big_numbers(name, a)
         # self.save_all(p_weights, p_A, p_lbA, p_ubA, p_lb, p_ub, p_xdot)
-        pass
+        if actually_print:
+            arrays = [(p_weights, u'H'),
+                      (p_A, u'A'),
+                      (p_lbA, u'lbA'),
+                      (p_ubA, u'ubA'),
+                      (p_lb, u'lb'),
+                      (p_ub, u'ub')]
+            for a, name in arrays:
+                self.check_for_nan(name, a)
+                # self.check_for_big_numbers(name, a)
+            self.joint_limit_check(p_lb, p_ub)
+
+    def joint_limit_check(self, p_lb, p_ub):
+        violations = (p_ub - p_lb)[p_lb.data > p_ub.data]
+        if len(violations) > 0:
+            logging.logerr(u'The following joints are outside of their limits: \n {}'.format(violations))
+        else:
+            logging.loginfo(u'All joints are within limits')
 
     def save_all(self, weights, A, lbA, ubA, lb, ub, xdot=None):
         if xdot is not None:
@@ -237,20 +235,20 @@ class QProblemBuilder(object):
         p_filtered = p_array.apply(lambda x: zip(x.index[x.isnull()].tolist(), x[x.isnull()]), 1)
         p_filtered = p_filtered[p_filtered.apply(lambda x: len(x)) > 0]
         if len(p_filtered) > 0:
-            logging.logwarn(u'{} has the following nans:'.format(name))
+            logging.logerr(u'{} has the following nans:'.format(name))
             self.print_pandas_array(p_filtered)
         else:
-            logging.loginfo(u'no nans')
+            logging.loginfo(u'{} has no nans'.format(name))
 
-    def check_for_big_numbers(self, name, p_array, big=1e5):
-        # FIXME fails if condition is true on first entry
-        p_filtered = p_array.apply(lambda x: zip(x.index[abs(x) > big].tolist(), x[x > big]), 1)
-        p_filtered = p_filtered[p_filtered.apply(lambda x: len(x)) > 0]
-        if len(p_filtered) > 0:
-            logging.logwarn(u'{} has the following big numbers:'.format(name))
-            self.print_pandas_array(p_filtered)
-        else:
-            logging.loginfo(u'no big numbers')
+    # def check_for_big_numbers(self, name, p_array, big=1e5):
+    #     # FIXME fails if condition is true on first entry
+    #     p_filtered = p_array.apply(lambda x: zip(x.index[abs(x) > big].tolist(), x[x > big]), 1)
+    #     p_filtered = p_filtered[p_filtered.apply(lambda x: len(x)) > 0]
+    #     if len(p_filtered) > 0:
+    #         logging.logwarn(u'{} has the following big numbers:'.format(name))
+    #         self.print_pandas_array(p_filtered)
+    #     else:
+    #         logging.loginfo(u'no big numbers')
 
     def print_pandas_array(self, array):
         import pandas as pd
@@ -290,12 +288,12 @@ class QProblemBuilder(object):
 
             xdot_full = self.qp_solver.solve(H, g, A, lb, ub, lbA, ubA, nWSR)
         except QPSolverException as e:
-            self.debug_print(np_H, A, lb, ub, lbA, ubA)
+            self.debug_print(np_H, A, lb, ub, lbA, ubA, actually_print=True)
             raise e
         if xdot_full is None:
             return None
         # TODO enable debug print in an elegant way, preferably without slowing anything down
-        self.debug_print(np_H, A, lb, ub, lbA, ubA, xdot_full)
+        # self.debug_print(np_H, A, lb, ub, lbA, ubA, xdot_full)
         return OrderedDict((observable, xdot_full[i]) for i, observable in enumerate(self.controlled_joints)), \
                np_H, np_A, np_lb, np_ub, np_lbA, np_ubA, xdot_full
 

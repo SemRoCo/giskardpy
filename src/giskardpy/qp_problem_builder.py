@@ -21,8 +21,7 @@ class QProblemBuilder(object):
         :type joint_constraints_dict: dict
         :type hard_constraints_dict: dict
         :type soft_constraints_dict: dict
-        :type controlled_joint_symbols: set
-        :type free_symbols: set
+        :type controlled_joint_symbols: list
         :param path_to_functions: location where the compiled functions can be safed.
         :type path_to_functions: str
         """
@@ -44,9 +43,7 @@ class QProblemBuilder(object):
         self.num_joint_constraints = len(self.joint_constraints_dict)
         self.num_soft_constraints = len(self.soft_constraints_dict)
 
-        self.qp_solver = QPSolver(self.num_hard_constraints,
-                                  self.num_joint_constraints,
-                                  self.num_soft_constraints)
+        self.qp_solver = QPSolver()
         self.lbAs = None  # for debugging purposes
 
     def get_expr(self):
@@ -59,12 +56,14 @@ class QProblemBuilder(object):
         ub = []
         lbA = []
         ubA = []
+        linear_weight = []
         soft_expressions = []
         hard_expressions = []
         for constraint_name, constraint in self.joint_constraints_dict.items():
             weights.append(constraint.weight)
             lb.append(constraint.lower)
             ub.append(constraint.upper)
+            linear_weight.append(constraint.linear_weight)
         for constraint_name, constraint in self.hard_constraints_dict.items():
             lbA.append(constraint.lower)
             ubA.append(constraint.upper)
@@ -75,6 +74,7 @@ class QProblemBuilder(object):
             ubA.append(constraint.ubA)
             lb.append(constraint.lower_slack_limit)
             ub.append(constraint.upper_slack_limit)
+            linear_weight.append(constraint.linear_weight)
             assert not w.is_matrix(constraint.expression), u'Matrices are not allowed as soft constraint expression'
             soft_expressions.append(constraint.expression)
 
@@ -96,6 +96,7 @@ class QProblemBuilder(object):
         self.set_ubA(w.Matrix(ubA))
         self.set_lb(w.Matrix(lb))
         self.set_ub(w.Matrix(ub))
+        self.set_linear_weights(w.Matrix(linear_weight))
 
 
     def compile_big_ass_M(self):
@@ -107,17 +108,17 @@ class QProblemBuilder(object):
 
     def init_big_ass_M(self):
         """
-        #        j           s       1      1
-        #    |----------------------------------
-        # h  | A hard    |   0    |       |
-        #    | -------------------| lbA   | ubA
-        # s  | A soft    |identity|       |
-        #    |-----------------------------------
-        # j+s| H                  | lb    | ub
-        #    | ----------------------------------
+        #        j           s       1      1     1
+        #    |--------------------------------------|
+        # h  | A hard    |   0    |       |     |   |
+        #    | -------------------| lbA   | ubA | 0 |
+        # s  | A soft    |identity|       |     |   |
+        #    |--------------------------------------|
+        # j+s| H                  | lb    | ub  | g |
+        #    | -------------------------------------|
         """
         self.big_ass_M = w.zeros(self.h + self.s * 2 + self.j,
-                                 self.j + self.s + 2)
+                                 self.j + self.s + 3)
 
     def construct_A_hard(self, hard_expressions):
         A_hard = w.Matrix(hard_expressions)
@@ -150,10 +151,13 @@ class QProblemBuilder(object):
     def set_ub(self, ub):
         self.big_ass_M[self.h + self.s:, self.j + self.s + 1] = ub
 
-    def set_weights(self, weights):
-        self.big_ass_M[self.h + self.s:, :-2] = w.diag(*weights)
+    def set_linear_weights(self, linear_weights):
+        self.big_ass_M[self.h + self.s:, self.j + self.s + 2] = linear_weights
 
-    def debug_print(self, unfiltered_H, A, lb, ub, lbA, ubA, xdot_full=None, actually_print=False):
+    def set_weights(self, weights):
+        self.big_ass_M[self.h + self.s:, :-3] = w.diag(*weights)
+
+    def debug_print(self, unfiltered_H, A, lb, ub, lbA, ubA, g, xdot_full=None, actually_print=False):
         import pandas as pd
         bA_mask, b_mask = make_filter_masks(unfiltered_H, self.num_joint_constraints, self.num_hard_constraints)
         b_names = []
@@ -179,6 +183,7 @@ class QProblemBuilder(object):
 
         p_lb = pd.DataFrame(lb, filtered_b_names, [u'data'], dtype=float).sort_index()
         p_ub = pd.DataFrame(ub, filtered_b_names, [u'data'], dtype=float).sort_index()
+        p_g = pd.DataFrame(g, filtered_b_names, [u'data'], dtype=float).sort_index()
         p_lbA = pd.DataFrame(lbA, filtered_bA_names, [u'data'], dtype=float).sort_index()
         p_ubA = pd.DataFrame(ubA, filtered_bA_names, [u'data'], dtype=float).sort_index()
         p_weights = pd.DataFrame(unfiltered_H.dot(np.ones(unfiltered_H.shape[0])), b_names, [u'data'], dtype=float).sort_index()
@@ -188,6 +193,7 @@ class QProblemBuilder(object):
             p_Ax = pd.DataFrame(Ax, filtered_bA_names, [u'data'], dtype=float).sort_index()
             xH = np.dot((xdot_full**2).T, filtered_H)
             p_xH = pd.DataFrame(xH, filtered_b_names, [u'data'], dtype=float).sort_index()
+            p_xg = p_g * p_xdot
             xHx = np.dot(np.dot(xdot_full.T, filtered_H), xdot_full)
             x_soft = xdot_full[len(xdot_full) - len(lbA):]
             p_lbA_minus_x = pd.DataFrame(lbA - x_soft, filtered_bA_names, [u'data'], dtype=float).sort_index()
@@ -256,44 +262,44 @@ class QProblemBuilder(object):
             with pd.option_context('display.max_rows', None, 'display.max_columns', None):
                 print(array)
 
-    def filter_zero_weight_constraints(self, H, A, lb, ub, lbA, ubA):
+    def filter_zero_weight_constraints(self, H, A, lb, ub, lbA, ubA, g):
         bA_mask, b_mask = make_filter_masks(H, self.num_joint_constraints, self.num_hard_constraints)
         A = A[bA_mask][:, b_mask].copy()
         lbA = lbA[bA_mask]
         ubA = ubA[bA_mask]
         lb = lb[b_mask]
         ub = ub[b_mask]
+        g = g[b_mask]
         H = H[b_mask][:, b_mask]
-        return H, A, lb, ub, lbA, ubA
+        return H, A, lb, ub, lbA, ubA, g
 
     def get_cmd(self, substitutions, nWSR=None):
         """
         Uses substitutions for each symbol to compute the next commands for each joint.
-        :param substitutions: symbol -> value
-        :type substitutions: dict
+        :param substitutions:
+        :type substitutions: list
         :return: joint name -> joint command
         :rtype: dict
         """
         np_big_ass_M = self.compiled_big_ass_M.call2(substitutions)
-        np_H = np_big_ass_M[self.shape1:, :-2].copy()
+        np_H = np_big_ass_M[self.shape1:, :-3].copy()
         np_A = np_big_ass_M[:self.shape1, :self.shape2].copy()
-        np_lb = np_big_ass_M[self.shape1:, -2].copy()
-        np_ub = np_big_ass_M[self.shape1:, -1].copy()
-        np_lbA = np_big_ass_M[:self.shape1, -2].copy()
-        np_ubA = np_big_ass_M[:self.shape1, -1].copy()
-        H, A, lb, ub, lbA, ubA = self.filter_zero_weight_constraints(np_H, np_A, np_lb, np_ub, np_lbA, np_ubA)
+        np_lb = np_big_ass_M[self.shape1:, -3].copy()
+        np_ub = np_big_ass_M[self.shape1:, -2].copy()
+        np_g = np_big_ass_M[self.shape1:, -1].copy()
+        np_lbA = np_big_ass_M[:self.shape1, -3].copy()
+        np_ubA = np_big_ass_M[:self.shape1, -2].copy()
+        H, A, lb, ub, lbA, ubA, g = self.filter_zero_weight_constraints(np_H, np_A, np_lb, np_ub, np_lbA, np_ubA, np_g)
         # self.debug_print(np_H, A, lb, ub, lbA, ubA)
         try:
-            g = np.zeros(H.shape[0])
-
             xdot_full = self.qp_solver.solve(H, g, A, lb, ub, lbA, ubA, nWSR)
         except QPSolverException as e:
-            self.debug_print(np_H, A, lb, ub, lbA, ubA, actually_print=True)
+            self.debug_print(np_H, A, lb, ub, lbA, ubA, g, actually_print=True)
             raise e
         if xdot_full is None:
             return None
         # TODO enable debug print in an elegant way, preferably without slowing anything down
-        # self.debug_print(np_H, A, lb, ub, lbA, ubA, xdot_full)
+        self.debug_print(np_H, A, lb, ub, lbA, ubA, g, xdot_full)
         return OrderedDict((observable, xdot_full[i]) for i, observable in enumerate(self.controlled_joints)), \
                np_H, np_A, np_lb, np_ub, np_lbA, np_ubA, xdot_full
 

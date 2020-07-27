@@ -287,7 +287,7 @@ class Constraint(object):
         return self.soft_constraints
 
     def add_constraint(self, name_suffix, lower, upper, weight, expression, goal_constraint, lower_slack_limit=-1e9,
-                       upper_slack_limit=1e9):
+                       upper_slack_limit=1e9, linear_weight=0):
         """
         :param name: name of the constraint, make use to avoid name conflicts!
         :type name: str
@@ -308,7 +308,8 @@ class Constraint(object):
                                                      expression=expression,
                                                      goal_constraint=goal_constraint,
                                                      lower_slack_limit=lower_slack_limit,
-                                                     upper_slack_limit=upper_slack_limit)
+                                                     upper_slack_limit=upper_slack_limit,
+                                                     linear_weight=linear_weight)
 
     def add_debug_constraint(self, name, expr):
         """
@@ -604,7 +605,7 @@ class JointPositionRevolute(Constraint):
         self.joint_name = joint_name
         self.goal_constraint = goal_constraint
         if not self.get_robot().is_joint_revolute(joint_name):
-            raise ConstraintException(u'{} called with non prismatic joint {}'.format(self.__name__,
+            raise ConstraintException(u'{} called with non revolute joint {}'.format(self.__name__,
                                                                                       joint_name))
 
         params = {self.goal: goal,

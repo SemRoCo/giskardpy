@@ -218,6 +218,8 @@ class GiskardTestWrapper(object):
         rospy.set_param(u'~', config)
         rospy.set_param(u'~path_to_data_folder', u'tmp_data/')
         rospy.set_param(u'~enable_gui', False)
+        rospy.set_param(u'~plugins/PlotTrajectory/enabled', True)
+
 
         self.sub_result = rospy.Subscriber(u'/giskardpy/command/result', MoveActionResult, self.cb, queue_size=100)
 

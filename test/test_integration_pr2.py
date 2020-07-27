@@ -279,7 +279,23 @@ class TestJointGoals(object):
         :type zero_pose: PR2
         """
         zero_pose.allow_self_collision()
+        # zero_pose.send_and_check_goal()
         zero_pose.send_and_check_joint_goal(pocky_pose)
+
+    def test_joint_maximum(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        joints = [j for j in zero_pose.get_robot().controlled_joints if not zero_pose.get_robot().is_joint_continuous(j)]
+        goal_state = {j:zero_pose.get_robot().get_joint_limits(j)[1] for j in joints}
+        del goal_state[u'odom_x_joint']
+        del goal_state[u'odom_y_joint']
+        zero_pose.allow_self_collision()
+        # zero_pose.set_joint_goal(goal_state)
+        # zero_pose.send_and_check_goal()
+        zero_pose.send_and_check_joint_goal(goal_state)
+        zero_pose.allow_self_collision()
+        zero_pose.send_and_check_goal()
 
     def test_partial_joint_state_goal1(self, zero_pose):
         """
@@ -2620,7 +2636,7 @@ class TestCollisionAvoidanceGoals(object):
     #     # get cup from left middle drawer right side
     #     # put cup bowl and spoon in sink
 
-    def test_fridge(self, kitchen_setup):
+    def test_ease_fridge(self, kitchen_setup):
         milk_name = u'milk'
 
         # take milk out of fridge
@@ -2640,6 +2656,12 @@ class TestCollisionAvoidanceGoals(object):
         milk_pose.header.frame_id = u'iai_kitchen/iai_fridge_door_shelf1_bottom'
         milk_pose.pose.position = Point(0, 0, 0.12)
         milk_pose.pose.orientation = Quaternion(0, 0, 0, 1)
+
+        milk_pre_pose = PoseStamped()
+        milk_pre_pose.header.frame_id = u'iai_kitchen/iai_fridge_door_shelf1_bottom'
+        milk_pre_pose.pose.position = Point(0, 0, 0.22)
+        milk_pre_pose.pose.orientation = Quaternion(0, 0, 0, 1)
+
         kitchen_setup.add_box(milk_name, [0.05, 0.05, 0.2], milk_pose)
 
         # grasp milk
@@ -2672,13 +2694,13 @@ class TestCollisionAvoidanceGoals(object):
                                     tip_grasp_axis=tip_grasp_axis,
                                     bar_center=bar_center,
                                     bar_axis=bar_axis,
-                                    bar_length=.15)
+                                    bar_length=.12)
 
         x = Vector3Stamped()
         x.header.frame_id = kitchen_setup.l_tip
         x.vector.x = 1
         x_map = Vector3Stamped()
-        x_map.header.frame_id = 'iai_kitchen/iai_fridge_door'
+        x_map.header.frame_id = u'iai_kitchen/iai_fridge_door'
         x_map.vector.x = 1
         # z = Vector3Stamped()
         # z.header.frame_id = 'milk'
@@ -2688,7 +2710,7 @@ class TestCollisionAvoidanceGoals(object):
         # z_map.vector.z = 1
         kitchen_setup.align_planes(kitchen_setup.l_tip, x, root_normal=x_map)
 
-        kitchen_setup.allow_collision([], milk_name, [])
+        # kitchen_setup.allow_collision([], milk_name, [])
         kitchen_setup.send_and_check_goal()
 
 
@@ -2710,16 +2732,22 @@ class TestCollisionAvoidanceGoals(object):
         # z_map.vector.z = 1
         # kitchen_setup.align_planes('milk', x, root_normal=x_map)
         # kitchen_setup.align_planes('milk', z, root_normal=z_map)
-        kitchen_setup.keep_orientation('milk')
+        # kitchen_setup.keep_orientation(u'milk')
+        kitchen_setup.set_cart_goal(milk_pre_pose, milk_name, kitchen_setup.default_root)
+        kitchen_setup.send_and_check_goal()
+        kitchen_setup.send_and_check_joint_goal(gaya_pose)
+
+        # place milk back
+
+        # kitchen_setup.add_json_goal(u'BasePointingForward')
+        # milk_goal = PoseStamped()
+        # milk_goal.header.frame_id = u'iai_kitchen/kitchen_island_surface'
+        # milk_goal.pose.position = Point(.1, -.2, .13)
+        # milk_goal.pose.orientation = Quaternion(*quaternion_about_axis(np.pi, [0,0,1]))
+        kitchen_setup.set_cart_goal(milk_pre_pose, milk_name, kitchen_setup.default_root)
         kitchen_setup.send_and_check_goal()
 
-        # place milk
-        kitchen_setup.add_json_goal(u'BasePointingForward')
-        milk_goal = PoseStamped()
-        milk_goal.header.frame_id = u'iai_kitchen/kitchen_island_surface'
-        milk_goal.pose.position = Point(.1, -.2, .13)
-        milk_goal.pose.orientation = Quaternion(*quaternion_about_axis(np.pi, [0,0,1]))
-        kitchen_setup.set_cart_goal(milk_goal, milk_name, kitchen_setup.default_root)
+        kitchen_setup.set_cart_goal(milk_pose, milk_name, kitchen_setup.default_root)
         kitchen_setup.send_and_check_goal()
 
         # kitchen_setup.keep_position(kitchen_setup.r_tip)

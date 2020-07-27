@@ -7,9 +7,10 @@ from giskardpy.tfwrapper import kdl_to_np, np_vector, np_point
 SoftConstraint = namedtuple(u'SoftConstraint', [u'lbA', u'ubA',
                                                 u'weight', u'expression', u'goal_constraint',
                                                 u'lower_slack_limit',
-                                                u'upper_slack_limit'])
+                                                u'upper_slack_limit',
+                                                u'linear_weight'])
 HardConstraint = namedtuple(u'HardConstraint', [u'lower', u'upper', u'expression'])
-JointConstraint = namedtuple(u'JointConstraint', [u'lower', u'upper', u'weight'])
+JointConstraint = namedtuple(u'JointConstraint', [u'lower', u'upper', u'weight', u'linear_weight'])
 
 
 class SingleJointState(object):

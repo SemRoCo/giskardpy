@@ -1,11 +1,14 @@
 #!/usr/bin/env python
 
 from __future__ import division
+
+from defusedxml import minidom
+
 import rospy
 import random
 from Tkinter import *
 from giskardpy.python_interface import GiskardWrapper
-import xml.dom.minidom
+# import xml.dom.minidom
 from sensor_msgs.msg import JointState
 from math import pi
 from control_msgs.msg import JointTrajectoryControllerState
@@ -47,12 +50,12 @@ class JointGoalPublisher(object):
                     limit = joint.getElementsByTagName('limits')[0]
                     minval = float(limit.getElementsByTagName('min')[0].childNodes[0].nodeValue)
                     maxval = float(limit.getElementsByTagName('max')[0].childNodes[0].nodeValue)
-                if minval == maxval:  # this is fixed joint
-                    continue
+                    if minval == maxval:  # this is fixed joint
+                        continue
 
-                self.joint_list.append(name)
-                joint = {'min':minval*pi/180.0, 'max':maxval*pi/180.0, 'zero':0, 'position':0, 'velocity':0, 'effort':0}
-                self.free_joints[name] = joint
+                    self.joint_list.append(name)
+                    joint = {'min':minval*pi/180.0, 'max':maxval*pi/180.0, 'zero':0, 'position':0, 'velocity':0, 'effort':0}
+                    self.free_joints[name] = joint
 
     def init_urdf(self, robot):
         """
@@ -161,7 +164,7 @@ class JointGoalPublisher(object):
         self.giskard_joints = msg.joint_names
 
 
-        robot = xml.dom.minidom.parseString(description)
+        robot = minidom.parseString(description)
         if robot.getElementsByTagName('COLLADA'):
             self.init_collada(robot)
         else:

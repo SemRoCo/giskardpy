@@ -1279,38 +1279,21 @@ class SelfCollisionAvoidance(Constraint):
 
         dist = w.dot(pb_V_n.T, pb_P_pa)[0]
 
-        # weight_f = self.magic_weight_function(actual_distance,
-        #                                       0.0, WEIGHT_MAX,
-        #                                       0.01, WEIGHTS[4],
-        #                                       0.05, WEIGHTS[2],
-        #                                       0.06, WEIGHT_MIN)
-        # weight_f = WEIGHT_COLLISION_AVOIDANCE
         weight = w.if_greater(actual_distance, 50, 0, WEIGHT_COLLISION_AVOIDANCE)
         weight = self.normalize_error(repel_velocity, weight)
         weight = w.save_division(weight,  # divide by number of active repeller per link
                                  w.Min(number_of_self_collisions, num_repeller))
 
-        # limit = zero_weight_distance - actual_distance
-        # limit = self.limit_velocity(limit, repel_velocity)
-
         penetration_distance = zero_weight_distance - actual_distance
         lower_limit = self.limit_velocity(penetration_distance, repel_velocity)
-        # upper_limit = self.limit_velocity(1e9, repel_velocity)
         upper_limit = 1e9
         slack_limit = self.limit_velocity(actual_distance, repel_velocity)
 
-        # self.add_debug_constraint('/pen', penetration_distance)
 
-        # self.add_constraint('',
-        #                     lower=limit,
-        #                     upper=1e9,
-        #                     weight=weight,
-        #                     expression=dist,
-        #                     goal_constraint=False)
-
-        upper_slack = w.if_greater(actual_distance, 50,
+        upper_slack = w.if_greater(actual_distance, 50,  # assuming that distance of unchecked closest points is 100
                                    1e9,
-                                   w.if_greater(actual_distance, 0, 2 * slack_limit, 0))
+                                   w.Max(0, lower_limit + actual_distance)
+                                   )
 
         self.add_constraint(u'/position',
                             lower=lower_limit,

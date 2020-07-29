@@ -1,3 +1,4 @@
+from __future__ import division
 import itertools
 from copy import deepcopy
 
@@ -6,18 +7,19 @@ import pytest
 import roslaunch
 import rospy
 from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped, PointStamped
-from sensor_msgs.msg import JointState
 from giskard_msgs.msg import CollisionEntry, MoveActionGoal, MoveResult, WorldBody, MoveGoal
 from giskard_msgs.srv import UpdateWorldResponse, UpdateWorldRequest
 from numpy import pi
+from sensor_msgs.msg import JointState
 from shape_msgs.msg import SolidPrimitive
-from tf.transformations import quaternion_from_matrix, quaternion_about_axis, rotation_matrix
+from tf.transformations import quaternion_from_matrix, quaternion_about_axis
 
+import giskardpy.tfwrapper as tf
 from giskardpy import logging, identifier
 from giskardpy.identifier import fk_pose
 from giskardpy.robot import Robot
 from giskardpy.tfwrapper import init as tf_init
-import giskardpy.tfwrapper as tf
+from giskardpy.utils import to_joint_state_dict2
 from utils_for_tests import PR2, compare_poses
 
 # TODO roslaunch iai_pr2_sim ros_control_sim_with_base.launch
@@ -282,20 +284,6 @@ class TestJointGoals(object):
         # zero_pose.send_and_check_goal()
         zero_pose.send_and_check_joint_goal(pocky_pose)
 
-    def test_joint_maximum(self, zero_pose):
-        """
-        :type zero_pose: PR2
-        """
-        joints = [j for j in zero_pose.get_robot().controlled_joints if not zero_pose.get_robot().is_joint_continuous(j)]
-        goal_state = {j:zero_pose.get_robot().get_joint_limits(j)[1] for j in joints}
-        del goal_state[u'odom_x_joint']
-        del goal_state[u'odom_y_joint']
-        zero_pose.allow_self_collision()
-        # zero_pose.set_joint_goal(goal_state)
-        # zero_pose.send_and_check_goal()
-        zero_pose.send_and_check_joint_goal(goal_state)
-        zero_pose.allow_self_collision()
-        zero_pose.send_and_check_goal()
 
     def test_partial_joint_state_goal1(self, zero_pose):
         """
@@ -340,7 +328,6 @@ class TestJointGoals(object):
         zero_pose.send_and_check_goal(goal_type=MoveGoal.PLAN_ONLY)
         zero_pose.check_joint_state(default_pose)
 
-
     def test_prismatic_joint1(self, zero_pose):
         """
         :type zero_pose: PR2
@@ -363,7 +350,7 @@ class TestJointGoals(object):
                    u'head_pan_joint': head_pan_joint_limits[0] - 0.2}
         zero_pose.set_joint_goal(goal_js)
         zero_pose.send_goal()
-        assert(not zero_pose.are_joint_limits_violated())
+        assert (not zero_pose.are_joint_limits_violated())
 
         goal_js = {u'r_elbow_flex_joint': r_elbow_flex_joint_limits[1] + 0.2,
                    u'torso_lift_joint': torso_lift_joint_limits[1] + 0.2,
@@ -373,11 +360,68 @@ class TestJointGoals(object):
         zero_pose.send_goal()
         assert (not zero_pose.are_joint_limits_violated())
 
-
     # TODO test goal for unknown joint
 
 
 class TestConstraints(object):
+    def test_AvoidJointLimits1(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        percentage = 10
+        zero_pose.allow_self_collision()
+        zero_pose.add_json_goal(u'AvoidJointLimits',
+                                percentage=percentage)
+        zero_pose.send_and_check_goal()
+
+        joint_non_continuous = [j for j in zero_pose.get_robot().controlled_joints if
+                  not zero_pose.get_robot().is_joint_continuous(j)]
+
+        current_joint_state = to_joint_state_dict2(zero_pose.get_current_joint_state())
+        percentage *= 0.99 # if will not reach the exact percentager, because the weight is so low
+        for joint in joint_non_continuous:
+            position = current_joint_state[joint]
+            lower_limit, upper_limit = zero_pose.get_robot().get_joint_limits(joint)
+            joint_range = upper_limit - lower_limit
+            center = (upper_limit + lower_limit) / 2.
+            upper_limit2 = center + joint_range/2. * (1-percentage/100.)
+            lower_limit2 = center - joint_range/2. * (1-percentage/100.)
+            assert position <= upper_limit2 and position >= lower_limit2
+
+    def test_AvoidJointLimits2(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        percentage = 10
+        joints = [j for j in zero_pose.get_robot().controlled_joints if
+                  not zero_pose.get_robot().is_joint_continuous(j)]
+        goal_state = {j: zero_pose.get_robot().get_joint_limits(j)[1] for j in joints}
+        del goal_state[u'odom_x_joint']
+        del goal_state[u'odom_y_joint']
+        zero_pose.allow_self_collision()
+        zero_pose.add_json_goal(u'AvoidJointLimits',
+                                percentage=percentage)
+        zero_pose.send_and_check_joint_goal(goal_state)
+
+        zero_pose.allow_self_collision()
+        zero_pose.add_json_goal(u'AvoidJointLimits',
+                                percentage=percentage)
+        zero_pose.send_and_check_goal()
+
+        joint_non_continuous = [j for j in zero_pose.get_robot().controlled_joints if
+                  not zero_pose.get_robot().is_joint_continuous(j)]
+
+        current_joint_state = to_joint_state_dict2(zero_pose.get_current_joint_state())
+        percentage *= 0.99 # if will not reach the exact percentager, because the weight is so low
+        for joint in joint_non_continuous:
+            position = current_joint_state[joint]
+            lower_limit, upper_limit = zero_pose.get_robot().get_joint_limits(joint)
+            joint_range = upper_limit - lower_limit
+            center = (upper_limit + lower_limit) / 2.
+            upper_limit2 = center + joint_range/2. * (1-percentage/100.)
+            lower_limit2 = center - joint_range/2. * (1-percentage/100.)
+            assert position <= upper_limit2 and position >= lower_limit2
+
     def test_UpdateGodMap(self, pocky_pose_setup):
         """
         :type pocky_pose_setup: PR2
@@ -453,7 +497,8 @@ class TestConstraints(object):
         pocky_pose_setup.wrapper.update_god_map(updates)
         pocky_pose_setup.set_cart_goal(r_goal, pocky_pose_setup.r_tip)
         pocky_pose_setup.send_and_check_goal(expected_error_code=MoveResult.INSOLVABLE)
-        assert pocky_pose_setup.get_god_map().unsafe_get_data(identifier.joint_cost + [u'odom_x_joint']) == old_odom_x_value
+        assert pocky_pose_setup.get_god_map().unsafe_get_data(
+            identifier.joint_cost + [u'odom_x_joint']) == old_odom_x_value
         assert pocky_pose_setup.get_god_map().unsafe_get_data(identifier.joint_cost + [u'odom_y_joint']) == 0.0001
         assert pocky_pose_setup.get_god_map().get_data(identifier.joint_cost + [u'torso_lift_joint']) == old_torso_value
 
@@ -478,8 +523,10 @@ class TestConstraints(object):
         pocky_pose_setup.wrapper.update_god_map(updates)
         pocky_pose_setup.set_cart_goal(r_goal, pocky_pose_setup.r_tip)
         pocky_pose_setup.send_and_check_goal(expected_error_code=MoveResult.INSOLVABLE)
-        assert pocky_pose_setup.get_god_map().unsafe_get_data(identifier.joint_cost + [u'odom_x_joint']) == old_odom_x_value
-        assert pocky_pose_setup.get_god_map().unsafe_get_data(identifier.joint_cost + [u'torso_lift_joint']) == old_torso_value
+        assert pocky_pose_setup.get_god_map().unsafe_get_data(
+            identifier.joint_cost + [u'odom_x_joint']) == old_odom_x_value
+        assert pocky_pose_setup.get_god_map().unsafe_get_data(
+            identifier.joint_cost + [u'torso_lift_joint']) == old_torso_value
 
     def test_pointing(self, kitchen_setup):
         base_goal = PoseStamped()
@@ -686,6 +733,7 @@ class TestConstraints(object):
         x_goal.vector.x = -1
         kitchen_setup.align_planes(kitchen_setup.r_tip, x_gripper, root_normal=x_goal)
         # kitchen_setup.allow_all_collisions()
+        kitchen_setup.add_json_goal(u'AvoidJointLimits', percentage=10)
         kitchen_setup.send_and_check_goal()
 
         kitchen_setup.add_json_goal(u'OpenDoor',
@@ -694,6 +742,7 @@ class TestConstraints(object):
                                     handle_link=handle_name,
                                     angle_goal=1.5)
         kitchen_setup.allow_all_collisions()
+        kitchen_setup.add_json_goal(u'AvoidJointLimits')
         kitchen_setup.send_and_check_goal()
         kitchen_setup.set_kitchen_js({u'iai_fridge_door_joint': 1.5})
 
@@ -777,7 +826,7 @@ class TestConstraints(object):
         # kitchen_setup.wrapper.update_god_map(updates)
 
         kitchen_setup.send_and_check_goal()
-        kitchen_setup.set_kitchen_js({u'iai_fridge_door_joint': np.pi/2})
+        kitchen_setup.set_kitchen_js({u'iai_fridge_door_joint': np.pi / 2})
 
         kitchen_setup.add_json_goal(u'Close',
                                     tip=kitchen_setup.r_tip,
@@ -798,7 +847,6 @@ class TestConstraints(object):
         # kitchen_setup.wrapper.update_god_map(updates)
         kitchen_setup.send_and_check_goal()
         kitchen_setup.set_kitchen_js({u'iai_fridge_door_joint': 0})
-
 
     def test_open_close_oven(self, kitchen_setup):
         """
@@ -871,7 +919,7 @@ class TestConstraints(object):
 
         hand = kitchen_setup.r_tip
 
-        goal_angle = np.pi/4
+        goal_angle = np.pi / 4
         handle_frame_id = u'iai_kitchen/sink_area_dish_washer_door_handle'
         handle_name = u'sink_area_dish_washer_door_handle'
         bar_axis = Vector3Stamped()
@@ -952,6 +1000,7 @@ class TestConstraints(object):
         kitchen_setup.allow_collision([], u'kitchen', [u'sink_area_dish_washer_door_handle'])
         # kitchen_setup.allow_all_collisions()
         kitchen_setup.send_and_check_goal()
+
 
 class TestCartGoals(object):
 
@@ -1075,7 +1124,6 @@ class TestCartGoals(object):
         """
         self.test_cart_goal_1eef(zero_pose)
         self.test_cart_goal_1eef2(zero_pose)
-
 
     def test_cart_goal_1eef4(self, zero_pose):
         """
@@ -1856,7 +1904,7 @@ class TestCollisionAvoidanceGoals(object):
         r_goal.pose.position.x = 0.8
         r_goal.pose.position.y = -0.38
         r_goal.pose.position.z = 0.82
-        r_goal.pose.orientation = Quaternion(*quaternion_about_axis(np.pi/2, [0,1,0]))
+        r_goal.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 2, [0, 1, 0]))
         fake_table_setup.set_and_check_cart_goal(r_goal, fake_table_setup.r_tip)
         fake_table_setup.check_cpi_geq(fake_table_setup.get_l_gripper_links(), 0.048)
         fake_table_setup.check_cpi_leq([u'r_gripper_l_finger_tip_link'], 0.04)
@@ -1883,7 +1931,6 @@ class TestCollisionAvoidanceGoals(object):
 
         box_setup.check_cpi_geq(box_setup.get_l_gripper_links(), 0.0)
         box_setup.check_cpi_leq(box_setup.get_r_gripper_links(), 0.0)
-
 
     def test_avoid_collision3(self, pocky_pose_setup):
         """
@@ -1997,7 +2044,6 @@ class TestCollisionAvoidanceGoals(object):
 
         pocky_pose_setup.send_and_check_goal()
 
-
     def test_avoid_collision6(self, fake_table_setup):
         """
         :type box_setup: PR2
@@ -2022,7 +2068,6 @@ class TestCollisionAvoidanceGoals(object):
         fake_table_setup.check_cpi_leq([u'r_gripper_l_finger_tip_link'], 0.04)
         fake_table_setup.check_cpi_leq([u'r_gripper_r_finger_tip_link'], 0.04)
 
-
     def test_avoid_collision7(self, kitchen_setup):
         """
         :type box_setup: PR2
@@ -2031,13 +2076,13 @@ class TestCollisionAvoidanceGoals(object):
         base_pose.header.frame_id = u'map'
         base_pose.pose.position.x = 0.8
         base_pose.pose.position.y = 1
-        base_pose.pose.orientation = Quaternion(*quaternion_about_axis(0, [0,0,1]))
+        base_pose.pose.orientation = Quaternion(*quaternion_about_axis(0, [0, 0, 1]))
         kitchen_setup.teleport_base(base_pose)
         base_pose = PoseStamped()
         base_pose.header.frame_id = u'map'
         base_pose.pose.position.x = 0.64
         base_pose.pose.position.y = 0.64
-        base_pose.pose.orientation = Quaternion(*quaternion_about_axis(-np.pi/4, [0,0,1]))
+        base_pose.pose.orientation = Quaternion(*quaternion_about_axis(-np.pi / 4, [0, 0, 1]))
         kitchen_setup.set_joint_goal(gaya_pose)
         kitchen_setup.set_and_check_cart_goal(base_pose, u'base_footprint')
         kitchen_setup.check_joint_state(gaya_pose)
@@ -2050,9 +2095,9 @@ class TestCollisionAvoidanceGoals(object):
         base_pose.header.frame_id = u'map'
         base_pose.pose.position.x = 0.8
         base_pose.pose.position.y = 0.9
-        base_pose.pose.orientation = Quaternion(*quaternion_about_axis(np.pi/2, [0,0,1]))
+        base_pose.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 2, [0, 0, 1]))
         kitchen_setup.teleport_base(base_pose)
-        base_pose.pose.orientation = Quaternion(*quaternion_about_axis(np.pi, [0,0,1]))
+        base_pose.pose.orientation = Quaternion(*quaternion_about_axis(np.pi, [0, 0, 1]))
         kitchen_setup.set_joint_goal(gaya_pose)
         kitchen_setup.set_and_check_cart_goal(base_pose, u'base_footprint')
         kitchen_setup.check_joint_state(gaya_pose)
@@ -2065,17 +2110,16 @@ class TestCollisionAvoidanceGoals(object):
         base_pose.header.frame_id = u'map'
         base_pose.pose.position.x = 0.8
         base_pose.pose.position.y = 0.9
-        base_pose.pose.orientation = Quaternion(*quaternion_about_axis(0, [0,0,1]))
+        base_pose.pose.orientation = Quaternion(*quaternion_about_axis(0, [0, 0, 1]))
         kitchen_setup.teleport_base(base_pose)
         base_pose = PoseStamped()
         base_pose.header.frame_id = u'map'
         base_pose.pose.position.x = 0.64
         base_pose.pose.position.y = 0.64
-        base_pose.pose.orientation = Quaternion(*quaternion_about_axis(-np.pi/4, [0,0,1]))
+        base_pose.pose.orientation = Quaternion(*quaternion_about_axis(-np.pi / 4, [0, 0, 1]))
         kitchen_setup.set_joint_goal(gaya_pose)
         kitchen_setup.set_and_check_cart_goal(base_pose, 'base_footprint')
         kitchen_setup.check_joint_state(gaya_pose)
-
 
     def test_avoid_collision_with_far_object(self, pocky_pose_setup):
         """
@@ -2713,7 +2757,6 @@ class TestCollisionAvoidanceGoals(object):
         # kitchen_setup.allow_collision([], milk_name, [])
         kitchen_setup.send_and_check_goal()
 
-
         kitchen_setup.attach_existing(milk_name, kitchen_setup.l_tip)
         # kitchen_setup.keep_position(kitchen_setup.r_tip)
         kitchen_setup.close_l_gripper()
@@ -3036,7 +3079,7 @@ class TestCollisionAvoidanceGoals(object):
 
         hand = kitchen_setup.r_tip
 
-        goal_angle = np.pi/4
+        goal_angle = np.pi / 4
         handle_frame_id = u'iai_kitchen/sink_area_dish_washer_door_handle'
         handle_name = u'sink_area_dish_washer_door_handle'
         bar_axis = Vector3Stamped()
@@ -3130,7 +3173,7 @@ class TestCollisionAvoidanceGoals(object):
         # kitchen_setup.align_planes(hand, gripper_axis, root_normal=world_axis)
         # kitchen_setup.send_and_check_goal()
 
-        #------------------------------------------------------------------------------------------
+        # ------------------------------------------------------------------------------------------
         # kitchen_setup.add_json_goal(u'Close',
         #                             tip=hand,
         #                             object_name=u'kitchen',
@@ -3147,15 +3190,13 @@ class TestReachability():
         zero_pose.set_joint_goal(js)
         zero_pose.check_reachability(expected_error_code=MoveResult.UNREACHABLE)
 
-
-    def test_unreachable_goal_1(self,zero_pose):
+    def test_unreachable_goal_1(self, zero_pose):
         pose = PoseStamped()
         pose.header.frame_id = zero_pose.r_tip
         pose.pose.position.z = -2
         pose.pose.orientation.w = 1
         zero_pose.set_cart_goal(root=zero_pose.default_root, tip=zero_pose.r_tip, goal_pose=pose)
         zero_pose.check_reachability(expected_error_code=MoveResult.UNREACHABLE)
-
 
     def test_unreachable_goal_2(self, zero_pose):
         pose = PoseStamped()

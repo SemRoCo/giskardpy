@@ -207,35 +207,10 @@ class Robot(Backend):
             weight = weight * (1. / (velocity_limit)) ** 2
 
             if not self.is_joint_continuous(joint_name):
-                joint_range = upper_limit - lower_limit
-                lower_limit2 = lower_limit - joint_range * 0.0001
-                upper_limit2 = upper_limit + joint_range * 0.0001
-                soft_threshold = upper_limit - joint_range * 0.05
-                normalization_factor = (1/4)*((upper_limit2 - lower_limit2) **2/
-                               ((upper_limit2 - upper_limit)*(upper_limit - lower_limit2)))
-
-                linear_weight = ((1 / 4. * ((upper_limit2 - lower_limit2) ** 2. /
-                                                     ((upper_limit2 - joint_symbol) * (
-                                                                 joint_symbol - lower_limit2)))))
-                linear_weight /= normalization_factor
-
-                soft_threshold = (1/4)*((upper_limit2 - lower_limit2) **2/
-                               ((upper_limit2 - soft_threshold)*(soft_threshold - lower_limit2)))
-                soft_threshold /= normalization_factor
-
-                linear_weight -= soft_threshold
-                linear_weight = w.Max(linear_weight, 0)
-                linear_weight *= 0.01
-
-                center = (upper_limit + lower_limit) / 2.
-                sign = w.sign(center - joint_symbol)
-                linear_weight *= -sign
-
-                linear_weight = linear_weight * (1. / (velocity_limit)) ** 2
                 self._joint_constraints[joint_name] = JointConstraint(lower=w.Max(-velocity_limit, lower_limit - joint_symbol),
                                                                       upper=w.Min(velocity_limit, upper_limit - joint_symbol),
                                                                       weight=weight,
-                                                                      linear_weight=linear_weight)
+                                                                      linear_weight=0)
             else:
                 self._joint_constraints[joint_name] = JointConstraint(lower=-velocity_limit,
                                                                       upper=velocity_limit,

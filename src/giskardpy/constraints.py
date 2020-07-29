@@ -472,7 +472,7 @@ class JointPositionContinuous(Constraint):
         self.goal_constraint = goal_constraint
 
         if not self.get_robot().is_joint_continuous(joint_name):
-            raise ConstraintException(u'{} called with non continuous joint {}'.format(self.__name__,
+            raise ConstraintException(u'{} called with non continuous joint {}'.format(self.__class__.__name__,
                                                                                        joint_name))
 
         params = {self.goal: goal,
@@ -539,7 +539,7 @@ class JointPositionPrismatic(Constraint):
         self.joint_name = joint_name
         self.goal_constraint = goal_constraint
         if not self.get_robot().is_joint_prismatic(joint_name):
-            raise ConstraintException(u'{} called with non prismatic joint {}'.format(self.__name__,
+            raise ConstraintException(u'{} called with non prismatic joint {}'.format(self.__class__.__name__,
                                                                                       joint_name))
 
         params = {self.goal: goal,
@@ -605,8 +605,8 @@ class JointPositionRevolute(Constraint):
         self.joint_name = joint_name
         self.goal_constraint = goal_constraint
         if not self.get_robot().is_joint_revolute(joint_name):
-            raise ConstraintException(u'{} called with non revolute joint {}'.format(self.__name__,
-                                                                                      joint_name))
+            raise ConstraintException(u'{} called with non revolute joint {}'.format(self.__class__.__name__,
+                                                                                     joint_name))
 
         params = {self.goal: goal,
                   self.weight: weight,
@@ -661,73 +661,113 @@ class JointPositionRevolute(Constraint):
         return u'{}/{}'.format(s, self.joint_name)
 
 
-class AviodJointLimitsRevolute(Constraint):
+class AvoidJointLimitsRevolute(Constraint):
     goal = u'goal'
     weight = u'weight'
     max_velocity = u'max_velocity'
-    max_acceleration = u'max_acceleration'
+    percentage = u'percentage'
 
-    def __init__(self, god_map, joint_name, weight=WEIGHT_BELOW_CA, max_velocity=3451):
-        super(AviodJointLimitsRevolute, self).__init__(god_map)
+    def __init__(self, god_map, joint_name, weight=0.1, max_velocity=1e9,
+                 percentage=5):
+        super(AvoidJointLimitsRevolute, self).__init__(god_map)
         self.joint_name = joint_name
         if not self.get_robot().is_joint_revolute(joint_name):
-            raise ConstraintException(u'{} called with non prismatic joint {}'.format(self.__name__,
+            raise ConstraintException(u'{} called with non prismatic joint {}'.format(self.__class__.__name__,
                                                                                       joint_name))
 
         params = {self.weight: weight,
-                  self.max_velocity: max_velocity,}
+                  self.max_velocity: max_velocity,
+                  self.percentage: percentage}
         self.save_params_on_god_map(params)
 
     def make_constraints(self):
-        """
-        example:
-        name='JointPosition'
-        parameter_value_pair='{
-            "joint_name": "torso_lift_joint", #required
-            "goal_position": 0, #required
-            "weight": 1, #optional
-            "gain": 10, #optional -- error is multiplied with this value
-            "max_speed": 1 #optional -- rad/s or m/s depending on joint; can not go higher than urdf limit
-        }'
-        :return:
-        """
         joint_symbol = self.get_input_joint_position(self.joint_name)
+        percentage = self.get_input_float(self.percentage) / 100.
         lower_limit, upper_limit = self.get_robot().get_joint_limits(self.joint_name)
-
-        weight = 0
-
         max_velocity = w.Min(self.get_input_float(self.max_velocity),
                              self.get_robot().get_joint_velocity_limit_expr(self.joint_name))
 
-        range = upper_limit - lower_limit
-
-        lower_limit2 = lower_limit - range * 0.01
-        upper_limit2 = upper_limit + range * 0.01
-
-        outer_weight = 1 / 10. * ((1 / 4. * ((upper_limit2 - lower_limit2) ** 2. /
-                                              ((upper_limit2 - joint_symbol) * (joint_symbol - lower_limit2)))) - 1)
+        joint_range = upper_limit - lower_limit
         center = (upper_limit + lower_limit) / 2.
 
-        lower_weight = w.if_less_eq(joint_symbol, center, outer_weight, weight)
-        upper_weight = w.if_greater_eq(joint_symbol, center, outer_weight, weight)
+        current_joint = self.get_input_joint_position(self.joint_name)
 
-        lower_weight = lower_weight * (1. / (max_velocity)) ** 2
-        upper_weight = upper_weight * (1. / (max_velocity)) ** 2
-        self.add_constraint(u'/lower',
-                            lower=0,
-                            upper=1e9,
-                            weight=lower_weight,
-                            expression=joint_symbol,
-                            goal_constraint=False)
-        self.add_constraint(u'/upper',
-                            lower=-1e9,
-                            upper=0,
-                            weight=upper_weight,
+        upper_goal = center + joint_range / 2. * (1 - percentage)
+        lower_goal = center - joint_range / 2. * (1 - percentage)
+
+        upper_err = upper_goal - current_joint
+        lower_err = lower_goal - current_joint
+
+        upper_err_capped = self.limit_velocity(upper_err, max_velocity)
+        lower_err_capped = self.limit_velocity(lower_err, max_velocity)
+
+        weight = 0.1
+        weight = self.normalize_error(max_velocity, weight)
+
+        self.add_constraint(u'',
+                            lower=lower_err_capped,
+                            upper=upper_err_capped,
+                            weight=weight,
                             expression=joint_symbol,
                             goal_constraint=False)
 
     def __str__(self):
-        s = super(AviodJointLimitsRevolute, self).__str__()
+        s = super(AvoidJointLimitsRevolute, self).__str__()
+        return u'{}/{}'.format(s, self.joint_name)
+
+
+class AvoidJointLimitsPrismatic(Constraint):
+    goal = u'goal'
+    weight = u'weight'
+    max_velocity = u'max_velocity'
+    percentage = u'percentage'
+
+    def __init__(self, god_map, joint_name, weight=0.1, max_velocity=1e9,
+                 percentage=5):
+        super(AvoidJointLimitsPrismatic, self).__init__(god_map)
+        self.joint_name = joint_name
+        if not self.get_robot().is_joint_prismatic(joint_name):
+            raise ConstraintException(u'{} called with non prismatic joint {}'.format(self.__class__.__name__,
+                                                                                      joint_name))
+
+        params = {self.weight: weight,
+                  self.max_velocity: max_velocity,
+                  self.percentage: percentage}
+        self.save_params_on_god_map(params)
+
+    def make_constraints(self):
+        joint_symbol = self.get_input_joint_position(self.joint_name)
+        percentage = self.get_input_float(self.percentage) / 100.
+        lower_limit, upper_limit = self.get_robot().get_joint_limits(self.joint_name)
+        max_velocity = w.Min(self.get_input_float(self.max_velocity),
+                             self.get_robot().get_joint_velocity_limit_expr(self.joint_name))
+
+        joint_range = upper_limit - lower_limit
+        center = (upper_limit + lower_limit) / 2.
+
+        current_joint = self.get_input_joint_position(self.joint_name)
+
+        upper_goal = center + joint_range / 2. * (1 - percentage)
+        lower_goal = center - joint_range / 2. * (1 - percentage)
+
+        upper_err = upper_goal - current_joint
+        lower_err = lower_goal - current_joint
+
+        upper_err_capped = self.limit_velocity(upper_err, max_velocity)
+        lower_err_capped = self.limit_velocity(lower_err, max_velocity)
+
+        weight = 0.1
+        weight = self.normalize_error(max_velocity, weight)
+
+        self.add_constraint(u'',
+                            lower=lower_err_capped,
+                            upper=upper_err_capped,
+                            weight=weight,
+                            expression=joint_symbol,
+                            goal_constraint=False)
+
+    def __str__(self):
+        s = super(AvoidJointLimitsPrismatic, self).__str__()
         return u'{}/{}'.format(s, self.joint_name)
 
 
@@ -751,6 +791,25 @@ class JointPositionList(Constraint):
                 self.constraints.append(JointPositionRevolute(god_map, **params))
             elif self.get_robot().is_joint_prismatic(joint_name):
                 self.constraints.append(JointPositionPrismatic(god_map, **params))
+
+    def make_constraints(self):
+        for constraint in self.constraints:
+            self.soft_constraints.update(constraint.get_constraints())
+
+
+class AvoidJointLimits(Constraint):
+    def __init__(self, god_map, percentage=15):
+        super(AvoidJointLimits, self).__init__(god_map)
+        self.constraints = []
+        for joint_name in self.get_robot().controlled_joints:
+            if self.get_robot().is_joint_revolute(joint_name):
+                self.constraints.append(AvoidJointLimitsRevolute(god_map,
+                                                                 joint_name=joint_name,
+                                                                 percentage=percentage))
+            elif self.get_robot().is_joint_prismatic(joint_name):
+                self.constraints.append(AvoidJointLimitsPrismatic(god_map,
+                                                                 joint_name=joint_name,
+                                                                 percentage=percentage))
 
     def make_constraints(self):
         for constraint in self.constraints:
@@ -1117,10 +1176,10 @@ class ExternalCollisionAvoidance(Constraint):
         lower_limit = self.limit_velocity(penetration_distance, repel_velocity)
         upper_limit = 1e9
 
-        upper_slack = w.if_greater(actual_distance, 50, # assuming that distance of unchecked closest points is 100
+        upper_slack = w.if_greater(actual_distance, 50,  # assuming that distance of unchecked closest points is 100
                                    1e9,
                                    w.Max(0, lower_limit + actual_distance)
-        )
+                                   )
 
         self.add_constraint(u'/position',
                             lower=lower_limit,
@@ -1130,7 +1189,6 @@ class ExternalCollisionAvoidance(Constraint):
                             goal_constraint=False,
                             lower_slack_limit=-1e9,
                             upper_slack_limit=upper_slack)
-
 
     def __str__(self):
         s = super(ExternalCollisionAvoidance, self).__str__()
@@ -1493,6 +1551,7 @@ class BasePointingForward(Constraint):
 
 class GravityJoint(Constraint):
     weight = u'weight'
+
     # FIXME
 
     def __init__(self, god_map, joint_name, object_name, goal_constraint=True):

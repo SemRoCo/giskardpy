@@ -1760,7 +1760,8 @@ class OpenDrawer(Constraint):
         hinge_frame_id = u'iai_kitchen/' + hinge_child
 
         # Get movable axis of drawer (= prismatic joint)
-        hinge_drawer_axis = kdl.Vector(*environment_object.get_joint_axis(self.hinge_joint))
+        hinge_drawer_axis = kdl.Vector(
+            *environment_object.get_joint_axis(self.hinge_joint))
         hinge_drawer_axis_msg = Vector3Stamped()
         hinge_drawer_axis_msg.header.frame_id = hinge_frame_id
         hinge_drawer_axis_msg.vector.x = hinge_drawer_axis[0]
@@ -1768,11 +1769,13 @@ class OpenDrawer(Constraint):
         hinge_drawer_axis_msg.vector.z = hinge_drawer_axis[2]
 
         # Get joint limits TODO: check of desired goal is within limits
-        min_limit, max_limit = environment_object.get_joint_limits(self.hinge_joint)
+        min_limit, max_limit = environment_object.get_joint_limits(
+            self.hinge_joint)
 
         hinge_frame_id = u'iai_kitchen/' + hinge_child
 
-        hinge_start_t_tip_start = tf.msg_to_kdl(tf.lookup_pose(hinge_frame_id, self.tip))
+        hinge_start_t_tip_start = tf.msg_to_kdl(
+            tf.lookup_pose(hinge_frame_id, self.tip))
         hinge_pose = tf.lookup_pose(self.root, hinge_frame_id)
 
         # TODO: calculate current position???

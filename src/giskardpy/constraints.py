@@ -1716,7 +1716,9 @@ class OpenDoor(Constraint):
 
 
 class OpenDrawer(Constraint):
-    root_t_tip_goal_id = u'root_t_tipGoal'
+    hinge_pose_id = u'hinge_frame'  # frame of the hinge TODO: is that necessary
+    hinge_V_hinge_axis_msg_id = u'hinge_axis'  # axis vector of the hinge
+    root_T_tip_goal_id = u'root_T_tipGoal'  # goal of the gripper tip (where to move)
 
     def __init__(self, god_map, tip, object_name, handle_link, distance_goal, root=None):
         """
@@ -1781,7 +1783,7 @@ class OpenDrawer(Constraint):
 
         # TODO: Save everything in god map
         params = {
-            self.root_t_tip_goal_id: root_t_tip_goal
+            self.root_T_tip_goal_id: root_T_tip_goal
         }
 
         self.save_params_on_god_map(params)
@@ -1794,7 +1796,7 @@ class OpenDrawer(Constraint):
             CartesianPosition(
                 self.root,
                 self.tip,
-                root_t_tip_goal))
+                self.root_T_tip_goal))
 
         # Execute constraints
         for constraint in self.constraints:

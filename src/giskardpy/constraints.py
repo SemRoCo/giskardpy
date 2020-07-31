@@ -1729,7 +1729,8 @@ class OpenDrawer(Constraint):
         :type handle_link str
         :param handle_link handle to grasp
         :type distance_goal float
-        :param distance_goal distance to pull drawer
+        :param distance_goal
+               relative opening distance 0 = close, 1 = fully open
         :type root: str
         :param root: default is root link of robot
         """
@@ -1774,7 +1775,7 @@ class OpenDrawer(Constraint):
 
         hinge_frame_id = u'iai_kitchen/' + hinge_child
 
-        hinge_start_t_tip_start = tf.msg_to_kdl(
+        hinge_start_T_tip_start = tf.msg_to_kdl(
             tf.lookup_pose(hinge_frame_id, self.tip))
         hinge_pose = tf.lookup_pose(self.root, hinge_frame_id)
 
@@ -1799,7 +1800,9 @@ class OpenDrawer(Constraint):
             CartesianPosition(
                 self.root,
                 self.tip,
-                self.root_T_tip_goal))
+                self.root_T_tip_goal
+            )
+        )
 
         # Execute constraints
         for constraint in self.constraints:

@@ -1,7 +1,7 @@
 # giskardpy
 The core python library of the Giskard framework for constraint- and optimization-based robot motion control.
 
-## Installation instructions for 16.04/kinetic
+## Installation instructions. Tested with Ubuntu 16.04 + ROS kinetic and 18.04 + melodic
 
 Install the following python packages:
 ```
@@ -15,7 +15,7 @@ sudo pip install pandas
 
 Now create the workspace
 ```
-source /opt/ros/kinetic/setup.bash          # start using ROS kinetic
+source /opt/ros/kinetic/setup.bash          # start using ROS kinetic. Replace with melodic, if you are using it.
 mkdir -p ~/giskardpy_ws/src                 # create directory for workspace
 cd ~/giskardpy_ws                           # go to workspace directory
 catkin init                                 # init workspace, you might have to pip install catkin-tools

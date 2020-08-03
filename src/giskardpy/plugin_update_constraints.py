@@ -232,9 +232,7 @@ class GoalToConstraints(GetGoal):
         for link_a, link_b in self.get_robot().get_self_collision_matrix():
             link_a, link_b = self.robot.get_chain_reduced_to_controlled_joints(link_a, link_b)
             if not self.get_robot().link_order(link_a, link_b):
-                tmp = link_a
-                link_a = link_b
-                link_b = tmp
+                link_a, link_b = link_b, link_a
             counter[link_a, link_b] += 1
 
         for link_a, link_b in counter:

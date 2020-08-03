@@ -1,4 +1,5 @@
 from __future__ import division
+
 import itertools
 from copy import deepcopy
 
@@ -284,7 +285,6 @@ class TestJointGoals(object):
         # zero_pose.send_and_check_goal()
         zero_pose.send_and_check_joint_goal(pocky_pose)
 
-
     def test_partial_joint_state_goal1(self, zero_pose):
         """
         :type zero_pose: PR2
@@ -375,17 +375,17 @@ class TestConstraints(object):
         zero_pose.send_and_check_goal()
 
         joint_non_continuous = [j for j in zero_pose.get_robot().controlled_joints if
-                  not zero_pose.get_robot().is_joint_continuous(j)]
+                                not zero_pose.get_robot().is_joint_continuous(j)]
 
         current_joint_state = to_joint_state_dict2(zero_pose.get_current_joint_state())
-        percentage *= 0.99 # if will not reach the exact percentager, because the weight is so low
+        percentage *= 0.99  # if will not reach the exact percentager, because the weight is so low
         for joint in joint_non_continuous:
             position = current_joint_state[joint]
             lower_limit, upper_limit = zero_pose.get_robot().get_joint_limits(joint)
             joint_range = upper_limit - lower_limit
             center = (upper_limit + lower_limit) / 2.
-            upper_limit2 = center + joint_range/2. * (1-percentage/100.)
-            lower_limit2 = center - joint_range/2. * (1-percentage/100.)
+            upper_limit2 = center + joint_range / 2. * (1 - percentage / 100.)
+            lower_limit2 = center - joint_range / 2. * (1 - percentage / 100.)
             assert position <= upper_limit2 and position >= lower_limit2
 
     def test_AvoidJointLimits2(self, zero_pose):
@@ -409,17 +409,17 @@ class TestConstraints(object):
         zero_pose.send_and_check_goal()
 
         joint_non_continuous = [j for j in zero_pose.get_robot().controlled_joints if
-                  not zero_pose.get_robot().is_joint_continuous(j)]
+                                not zero_pose.get_robot().is_joint_continuous(j)]
 
         current_joint_state = to_joint_state_dict2(zero_pose.get_current_joint_state())
-        percentage *= 0.99 # if will not reach the exact percentager, because the weight is so low
+        percentage *= 0.99  # if will not reach the exact percentager, because the weight is so low
         for joint in joint_non_continuous:
             position = current_joint_state[joint]
             lower_limit, upper_limit = zero_pose.get_robot().get_joint_limits(joint)
             joint_range = upper_limit - lower_limit
             center = (upper_limit + lower_limit) / 2.
-            upper_limit2 = center + joint_range/2. * (1-percentage/100.)
-            lower_limit2 = center - joint_range/2. * (1-percentage/100.)
+            upper_limit2 = center + joint_range / 2. * (1 - percentage / 100.)
+            lower_limit2 = center - joint_range / 2. * (1 - percentage / 100.)
             assert position <= upper_limit2 and position >= lower_limit2
 
     def test_UpdateGodMap(self, pocky_pose_setup):
@@ -1281,17 +1281,17 @@ class TestCartGoals(object):
         p.header.frame_id = pocky_pose_setup.r_tip
         p.pose.position = Point(0.1, 0, 0)
         p.pose.orientation = Quaternion(0, 0, 0, 1)
-        pocky_pose_setup.set_cart_goal(p, pocky_pose_setup.r_tip, pocky_pose_setup.default_root)
+        pocky_pose_setup.set_and_check_cart_goal(p, pocky_pose_setup.r_tip, pocky_pose_setup.default_root)
 
         # box_setup.wrapper.avoid_collision()
 
-        collision_entry = CollisionEntry()
-        collision_entry.type = CollisionEntry.AVOID_COLLISION
-        collision_entry.min_dist = 0.05
-        collision_entry.body_b = u'box'
-        pocky_pose_setup.add_collision_entries([collision_entry])
-
-        pocky_pose_setup.send_and_check_goal(expected_error_code=MoveResult.INSOLVABLE)
+        # collision_entry = CollisionEntry()
+        # collision_entry.type = CollisionEntry.AVOID_COLLISION
+        # collision_entry.min_dist = 0.05
+        # collision_entry.body_b = u'box'
+        # pocky_pose_setup.add_collision_entries([collision_entry])
+        #
+        # pocky_pose_setup.send_and_check_goal(expected_error_code=MoveResult.INSOLVABLE)
 
     def test_hot_init_failed(self, zero_pose):
         """
@@ -1423,6 +1423,19 @@ class TestCollisionAvoidanceGoals(object):
     def test_open_drawer(self, kitchen_setup):
         self.open_drawer(kitchen_setup, kitchen_setup.l_tip, u'iai_kitchen/sink_area_left_middle_drawer_handle',
                          u'sink_area_left_middle_drawer_main_joint')
+
+    def test_handover(self, pocky_pose_setup):
+        pocky_pose_setup.attach_box(size=[0.2, 0.05, 0.05],
+                                    frame_id=pocky_pose_setup.r_tip,
+                                    position=[0.08, 0, 0],
+                                    orientation=[0, 0, 0, 1])
+        l_goal = PoseStamped()
+        l_goal.header.frame_id = pocky_pose_setup.r_tip
+        l_goal.pose.position.x = 0.08
+        l_goal.pose.orientation = Quaternion(*quaternion_about_axis(np.pi, [0, 0, 1]))
+
+        pocky_pose_setup.set_and_check_cart_goal(l_goal, tip=pocky_pose_setup.l_tip,
+                                                 root=pocky_pose_setup.r_tip)
 
     def test_add_box(self, zero_pose):
         """
@@ -1855,6 +1868,31 @@ class TestCollisionAvoidanceGoals(object):
         zero_pose.send_goal()
         zero_pose.check_cpi_geq(zero_pose.get_l_gripper_links(), 0.048)
 
+    def test_avoid_self_collision2(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        goal_js = {
+            u'r_elbow_flex_joint': -1.43286344265,
+            u'r_forearm_roll_joint': -1.26465060073,
+            u'r_shoulder_lift_joint': 0.47990329056,
+            u'r_shoulder_pan_joint': -0.281272240139,
+            u'r_upper_arm_roll_joint': -0.528415402668,
+            u'r_wrist_flex_joint': -1.18811419869,
+            u'r_wrist_roll_joint': 2.26884630124,
+        }
+        zero_pose.allow_all_collisions()
+        zero_pose.send_and_check_joint_goal(goal_js)
+
+        p = PoseStamped()
+        p.header.frame_id = zero_pose.r_tip
+        p.header.stamp = rospy.get_rostime()
+        p.pose.position.x = 0.2
+        p.pose.orientation.w = 1
+        zero_pose.set_cart_goal(p, zero_pose.r_tip, zero_pose.default_root)
+        zero_pose.send_goal()
+        zero_pose.check_cpi_geq(zero_pose.get_r_gripper_links(), 0.048)
+
     def test_get_out_of_self_collision(self, zero_pose):
         """
         :type zero_pose: PR2
@@ -2026,7 +2064,7 @@ class TestCollisionAvoidanceGoals(object):
         pocky_pose_setup.attach_box(size=[0.2, 0.05, 0.05],
                                     frame_id=pocky_pose_setup.r_tip,
                                     position=[0.08, 0, 0],
-                                    orientation=[0, 0, 0, 1])
+                                    orientation=quaternion_about_axis(0.01, [1, 0, 0]).tolist())
         p = PoseStamped()
         p.header.frame_id = pocky_pose_setup.r_tip
         p.pose.position.x = 0.12
@@ -2062,7 +2100,7 @@ class TestCollisionAvoidanceGoals(object):
             u'odom_z_joint': 0.0105784287694,
             u'torso_lift_joint': 0.277729421077,
         }
-
+        # fake_table_setup.allow_all_collisions()
         fake_table_setup.send_and_check_joint_goal(js)
         fake_table_setup.check_cpi_geq(fake_table_setup.get_l_gripper_links(), 0.048)
         fake_table_setup.check_cpi_leq([u'r_gripper_l_finger_tip_link'], 0.04)
@@ -2278,7 +2316,7 @@ class TestCollisionAvoidanceGoals(object):
         zero_pose.send_goal()
 
         attached_link_name = u'pocky'
-        zero_pose.attach_box(attached_link_name, [0.08, 0.02, 0.02], zero_pose.l_tip, [0.04, 0, 0], [0, 0, 0, 1])
+        zero_pose.attach_box(attached_link_name, [0.16, 0.04, 0.04], zero_pose.l_tip, [0.04, 0, 0], [0, 0, 0, 1])
 
         zero_pose.set_joint_goal({u'r_forearm_roll_joint': 0.0,
                                   u'r_shoulder_lift_joint': 0.0,
@@ -2296,6 +2334,99 @@ class TestCollisionAvoidanceGoals(object):
         p.pose.orientation.w = 1
         zero_pose.set_cart_goal(p, zero_pose.l_tip, zero_pose.default_root)
         zero_pose.send_goal()
+
+        zero_pose.check_cpi_geq(zero_pose.get_l_gripper_links(), 0.048)
+        zero_pose.check_cpi_geq([attached_link_name], 0.048)
+        zero_pose.detach_object(attached_link_name)
+
+    def test_attached_self_collision2(self, zero_pose):
+        """
+        :type box_setup: PR2
+        """
+
+        collision_pose = {
+            u'r_elbow_flex_joint': - 1.1343683863086362,
+            u'r_forearm_roll_joint': -7.517553513504836,
+            u'r_shoulder_lift_joint': 0.5726770101613905,
+            u'r_shoulder_pan_joint': -0.1592669164939349,
+            u'r_upper_arm_roll_joint': -0.5532568387077381,
+            u'r_wrist_flex_joint': - 1.215660155912625,
+            u'r_wrist_roll_joint': -4.249300323527076,
+            u'torso_lift_joint': 0.2
+        }
+
+        zero_pose.set_joint_goal(collision_pose)
+        zero_pose.send_goal()
+
+        attached_link_name = u'box'
+        zero_pose.attach_box(attached_link_name, [0.16, 0.04, 0.04], zero_pose.r_tip, [0.04, 0, 0], [0, 0, 0, 1])
+
+        js_goal = {u'l_forearm_roll_joint': 0.0,
+                   u'l_shoulder_lift_joint': 0.0,
+                   u'odom_x_joint': 0.0,
+                   u'odom_y_joint': 0.0,
+                   u'odom_z_joint': 0.0,
+                   u'l_shoulder_pan_joint': 0.0,
+                   u'l_upper_arm_roll_joint': 0.0,
+                   u'l_wrist_flex_joint': -0.11,
+                   u'l_wrist_roll_joint': 0.0,
+                   u'l_elbow_flex_joint': -0.16,
+                   u'torso_lift_joint': 0.2}
+        zero_pose.set_joint_goal(js_goal)
+
+        p = PoseStamped()
+        p.header.frame_id = zero_pose.r_tip
+        p.header.stamp = rospy.get_rostime()
+        p.pose.position.z = 0.20
+        p.pose.orientation.w = 1
+        zero_pose.set_and_check_cart_goal(p, zero_pose.r_tip, zero_pose.default_root)
+
+        zero_pose.check_cpi_geq(zero_pose.get_r_gripper_links(), 0.048)
+        zero_pose.check_cpi_geq([attached_link_name], 0.048)
+        zero_pose.detach_object(attached_link_name)
+
+    def test_attached_self_collision3(self, zero_pose):
+        """
+        :type box_setup: PR2
+        """
+
+        collision_pose = {
+            u'l_elbow_flex_joint': - 1.1343683863086362,
+            u'l_forearm_roll_joint': 7.517553513504836,
+            u'l_shoulder_lift_joint': 0.5726770101613905,
+            u'l_shoulder_pan_joint': 0.1592669164939349,
+            u'l_upper_arm_roll_joint': 0.5532568387077381,
+            u'l_wrist_flex_joint': - 1.215660155912625,
+            u'l_wrist_roll_joint': 4.249300323527076,
+            u'torso_lift_joint': 0.2}
+
+        zero_pose.set_joint_goal(collision_pose)
+        zero_pose.send_goal()
+
+        attached_link_name = u'pocky'
+        zero_pose.attach_box(attached_link_name, [0.1, 0.04, 0.04], zero_pose.l_tip, [0.02, 0, 0], [0, 0, 0, 1])
+
+        js_goal = {u'r_forearm_roll_joint': 0.0,
+                   u'r_shoulder_lift_joint': 0.0,
+                   u'odom_x_joint': 0.0,
+                   u'odom_y_joint': 0.0,
+                   u'odom_z_joint': 0.0,
+                   u'r_shoulder_pan_joint': 0.0,
+                   u'r_upper_arm_roll_joint': 0.0,
+                   u'r_wrist_flex_joint': -0.11,
+                   u'r_wrist_roll_joint': 0.0,
+                   u'r_elbow_flex_joint': -0.16,
+                   u'torso_lift_joint': 0.2}
+
+        zero_pose.set_joint_goal(js_goal)
+
+        p = PoseStamped()
+        p.header.frame_id = zero_pose.l_tip
+        p.header.stamp = rospy.get_rostime()
+        p.pose.position.z = 0.25
+        p.pose.orientation.w = 1
+        zero_pose.set_and_check_cart_goal(p, zero_pose.l_tip, zero_pose.default_root)
+        zero_pose.check_joint_state(js_goal)
 
         zero_pose.check_cpi_geq(zero_pose.get_l_gripper_links(), 0.048)
         zero_pose.check_cpi_geq([attached_link_name], 0.048)

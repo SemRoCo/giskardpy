@@ -134,6 +134,17 @@ class Collision(object):
     def set_link_b(self, link_b):
         self.__link_b = link_b
 
+    def reverse(self):
+        return Collision(link_a=self.get_original_link_b(),
+                      body_b=self.get_body_b(),
+                      link_b=self.get_original_link_a(),
+                      position_on_a=self.get_position_on_b_in_map(),
+                      position_on_b=self.get_position_on_a_in_map(),
+                      contact_normal=[-self.__contact_normal[0],
+                                      -self.__contact_normal[1],
+                                      -self.__contact_normal[2]],
+                      contact_distance=self.get_contact_distance())
+
 
 class Collisions(object):
 
@@ -194,6 +205,10 @@ class Collisions(object):
         link_a = collision.get_original_link_a()
         link_b = collision.get_original_link_b()
         new_link_a, new_link_b = self.robot.get_chain_reduced_to_controlled_joints(link_a, link_b)
+        if new_link_a > new_link_b:
+            collision = collision.reverse()
+            new_link_a, new_link_b = new_link_b, new_link_a
+
         new_b_T_r = self.robot.get_fk_np(new_link_b, self.robot_root)
         new_a_T_r = self.robot.get_fk_np(new_link_a, self.robot_root)
         collision.set_link_a(new_link_a)

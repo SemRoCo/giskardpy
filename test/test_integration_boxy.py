@@ -245,7 +245,7 @@ class TestConstraints(object):
         tip_grasp_axis = Vector3Stamped()
         # TODO: Verify that tip on boxy is actually called like that
         tip_grasp_axis.header.frame_id = kitchen_setup.r_tip
-        tip_grasp_axis.vector.x = 1  # The same as bar axis???
+        tip_grasp_axis.vector.x = 1
 
         kitchen_setup.add_json_goal(u'GraspBar',
                                     root=kitchen_setup.default_root,
@@ -253,7 +253,7 @@ class TestConstraints(object):
                                     tip_grasp_axis=tip_grasp_axis,
                                     bar_center=bar_center,
                                     bar_axis=bar_axis,
-                                    bar_length=0.4) # TODO: check for real length
+                                    bar_length=0.4)  # TODO: check for real length
         x_gripper = Vector3Stamped()
         x_gripper.header.frame_id = kitchen_setup.r_tip
         x_gripper.vector.x = 1

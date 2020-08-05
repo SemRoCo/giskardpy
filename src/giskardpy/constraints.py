@@ -1816,6 +1816,7 @@ class Open(Constraint):
             min_limit, max_limit = environment_object.get_joint_limits(joint_name)
             self.constraints.append(OpenDoor(god_map, tip, object_name, handle_link, max_limit, root))
         elif environment_object.is_joint_prismatic(joint_name):
+            # TODO: add OpenDrawer here with max_limit as goal
             pass
         else:
             logwarn(u'Opening containers with joint of type "{}" not supported'.format(

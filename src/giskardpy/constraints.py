@@ -1770,18 +1770,17 @@ class OpenDrawer(Constraint):
 
         hinge_frame_id = u'iai_kitchen/' + hinge_child
 
-        hinge_start_t_tip_start = tf.msg_to_kdl(tf.lookup_pose(hinge_frame_id, self.tip))
+        hinge_start_T_tip_start = tf.msg_to_kdl(tf.lookup_pose(hinge_frame_id, self.tip))
         hinge_pose = tf.lookup_pose(self.root, hinge_frame_id)
 
-        # TODO: calculate current position???
+        root_T_tip_current = tf.lookup_pose(self.root, tip)
 
         # TODO: calculate goal position
-
-        # TODO: calculate axis to move on (prismatic joint axis)
+        root_T_tip_goal = root_T_tip_current * hinge_drawer_axis_msg.vector
 
         # TODO: Save everything in god map
         params = {
-            self.root_t_tip_goal_id: root_t_tip_goal
+            self.root_t_tip_goal_id: root_T_tip_goal
         }
 
         self.save_params_on_god_map(params)
@@ -1790,11 +1789,13 @@ class OpenDrawer(Constraint):
         # TODO: create constraint(s)
         # TODO: open drawer
 
+        root_T_tip_goal = self.root_t_tip_goal_id
+
         self.constraints.append(
             CartesianPosition(
                 self.root,
                 self.tip,
-                root_t_tip_goal))
+                root_T_tip_goal))
 
         # Execute constraints
         for constraint in self.constraints:

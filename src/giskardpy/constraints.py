@@ -1716,7 +1716,9 @@ class OpenDoor(Constraint):
 
 
 class OpenDrawer(Constraint):
-    root_t_tip_goal_id = u'root_t_tipGoal'
+    hinge_pose_id = u'hinge_frame'  # frame of the hinge TODO: is that necessary
+    hinge_V_hinge_axis_msg_id = u'hinge_axis'  # axis vector of the hinge
+    root_T_tip_goal_id = u'root_T_tipGoal'  # goal of the gripper tip (where to move)
 
     def __init__(self, god_map, tip, object_name, handle_link, distance_goal, root=None):
         """
@@ -1727,7 +1729,8 @@ class OpenDrawer(Constraint):
         :type handle_link str
         :param handle_link handle to grasp
         :type distance_goal float
-        :param distance_goal distance to pull drawer
+        :param distance_goal
+               relative opening distance 0 = close, 1 = fully open
         :type root: str
         :param root: default is root link of robot
         """
@@ -1758,7 +1761,8 @@ class OpenDrawer(Constraint):
         hinge_frame_id = u'iai_kitchen/' + hinge_child
 
         # Get movable axis of drawer (= prismatic joint)
-        hinge_drawer_axis = kdl.Vector(*environment_object.get_joint_axis(self.hinge_joint))
+        hinge_drawer_axis = kdl.Vector(
+            *environment_object.get_joint_axis(self.hinge_joint))
         hinge_drawer_axis_msg = Vector3Stamped()
         hinge_drawer_axis_msg.header.frame_id = hinge_frame_id
         hinge_drawer_axis_msg.vector.x = hinge_drawer_axis[0]
@@ -1766,11 +1770,13 @@ class OpenDrawer(Constraint):
         hinge_drawer_axis_msg.vector.z = hinge_drawer_axis[2]
 
         # Get joint limits TODO: check of desired goal is within limits
-        min_limit, max_limit = environment_object.get_joint_limits(self.hinge_joint)
+        min_limit, max_limit = environment_object.get_joint_limits(
+            self.hinge_joint)
 
         hinge_frame_id = u'iai_kitchen/' + hinge_child
 
-        hinge_start_T_tip_start = tf.msg_to_kdl(tf.lookup_pose(hinge_frame_id, self.tip))
+        hinge_start_T_tip_start = tf.msg_to_kdl(
+            tf.lookup_pose(hinge_frame_id, self.tip))
         hinge_pose = tf.lookup_pose(self.root, hinge_frame_id)
 
         root_T_tip_current = tf.lookup_pose(self.root, tip)
@@ -1780,7 +1786,7 @@ class OpenDrawer(Constraint):
 
         # TODO: Save everything in god map
         params = {
-            self.root_t_tip_goal_id: root_T_tip_goal
+            self.root_T_tip_goal_id: root_T_tip_goal
         }
 
         self.save_params_on_god_map(params)

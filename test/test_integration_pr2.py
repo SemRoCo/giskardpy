@@ -163,6 +163,8 @@ def resetted_giskard(giskard):
     :type giskard: PR2
     """
     logging.loginfo(u'resetting giskard')
+    giskard.open_l_gripper()
+    giskard.open_r_gripper()
     giskard.clear_world()
     giskard.reset_base()
     return giskard
@@ -1424,18 +1426,34 @@ class TestCollisionAvoidanceGoals(object):
         self.open_drawer(kitchen_setup, kitchen_setup.l_tip, u'iai_kitchen/sink_area_left_middle_drawer_handle',
                          u'sink_area_left_middle_drawer_main_joint')
 
-    def test_handover(self, pocky_pose_setup):
-        pocky_pose_setup.attach_box(size=[0.2, 0.05, 0.05],
-                                    frame_id=pocky_pose_setup.r_tip,
-                                    position=[0.08, 0, 0],
-                                    orientation=[0, 0, 0, 1])
-        l_goal = PoseStamped()
-        l_goal.header.frame_id = pocky_pose_setup.r_tip
-        l_goal.pose.position.x = 0.08
-        l_goal.pose.orientation = Quaternion(*quaternion_about_axis(np.pi, [0, 0, 1]))
+    def test_handover(self, kitchen_setup):
+        js = {
+            "l_shoulder_pan_joint": 1.0252138037286773,
+            "l_shoulder_lift_joint": - 0.06966848987919201,
+            "l_upper_arm_roll_joint": 1.1765832782526544,
+            "l_elbow_flex_joint": - 1.9323726623855864,
+            "l_forearm_roll_joint": 1.3824994377973336,
+            "l_wrist_flex_joint": - 1.8416233909065576,
+            "l_wrist_roll_joint": 2.907373693068033,
+        }
+        kitchen_setup.send_and_check_joint_goal(js)
 
-        pocky_pose_setup.set_and_check_cart_goal(l_goal, tip=pocky_pose_setup.l_tip,
-                                                 root=pocky_pose_setup.r_tip)
+        kitchen_setup.attach_box(size=[0.08, 0.16, 0.16],
+                                 frame_id=kitchen_setup.l_tip,
+                                 position=[0.0, -0.08, 0],
+                                 orientation=[0, 0, 0, 1])
+        kitchen_setup.close_l_gripper()
+        r_goal = PoseStamped()
+        r_goal.header.frame_id = kitchen_setup.l_tip
+        r_goal.pose.position.x = 0.05
+        r_goal.pose.position.y = -0.08
+        r_goal.pose.orientation = Quaternion(*quaternion_about_axis(np.pi, [0, 0, 1]))
+        # kitchen_setup.allow_all_collisions()
+        kitchen_setup.set_cart_goal(r_goal,
+                                    tip=kitchen_setup.r_tip,
+                                    root=kitchen_setup.l_tip)
+        kitchen_setup.send_and_check_goal()
+        kitchen_setup.check_cart_goal(kitchen_setup.r_tip, r_goal)
 
     def test_add_box(self, zero_pose):
         """

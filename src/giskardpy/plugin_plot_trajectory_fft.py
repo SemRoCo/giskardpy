@@ -2,6 +2,7 @@ from py_trees import Status
 
 from giskardpy import identifier
 from giskardpy.data_types import Trajectory
+from giskardpy.logging import logwarn
 from giskardpy.plugin import GiskardBehavior
 from giskardpy.utils import trajectory_to_np
 import numpy as np
@@ -20,7 +21,10 @@ class PlotTrajectoryFFT(GiskardBehavior):
         if trajectory:
             sample_period = self.get_god_map().get_data(identifier.sample_period)
             controlled_joints = self.get_robot().controlled_joints
-            plot_fft(trajectory, controlled_joints, self.path_to_data_folder, sample_period, self.joint_name)
+            try:
+                plot_fft(trajectory, controlled_joints, self.path_to_data_folder, sample_period, self.joint_name)
+            except:
+                logwarn(u'failed to save trajectory pdf')
         return Status.SUCCESS
 
 def plot_fft(tj, controlled_joints, path_to_data_folder, sample_period, joint_name):

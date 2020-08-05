@@ -769,6 +769,8 @@ class PR2(GiskardTestWrapper):
         sjs.state.name = [u'r_gripper_l_finger_joint', u'r_gripper_r_finger_joint', u'r_gripper_l_finger_tip_joint',
                           u'r_gripper_r_finger_tip_joint']
         sjs.state.position = [0.54, 0.54, 0.54, 0.54]
+        sjs.state.velocity = [0, 0, 0, 0]
+        sjs.state.effort = [0, 0, 0, 0]
         self.r_gripper.call(sjs)
 
     def close_r_gripper(self):
@@ -776,6 +778,8 @@ class PR2(GiskardTestWrapper):
         sjs.state.name = [u'r_gripper_l_finger_joint', u'r_gripper_r_finger_joint', u'r_gripper_l_finger_tip_joint',
                           u'r_gripper_r_finger_tip_joint']
         sjs.state.position = [0, 0, 0, 0]
+        sjs.state.velocity = [0, 0, 0, 0]
+        sjs.state.effort = [0, 0, 0, 0]
         self.r_gripper.call(sjs)
 
     def open_l_gripper(self):
@@ -783,14 +787,18 @@ class PR2(GiskardTestWrapper):
         sjs.state.name = [u'l_gripper_l_finger_joint', u'l_gripper_r_finger_joint', u'l_gripper_l_finger_tip_joint',
                           u'l_gripper_r_finger_tip_joint']
         sjs.state.position = [0.54, 0.54, 0.54, 0.54]
-        self.r_gripper.call(sjs)
+        sjs.state.velocity = [0, 0, 0, 0]
+        sjs.state.effort = [0, 0, 0, 0]
+        self.l_gripper.call(sjs)
 
     def close_l_gripper(self):
         sjs = SetJointStateRequest()
         sjs.state.name = [u'l_gripper_l_finger_joint', u'l_gripper_r_finger_joint', u'l_gripper_l_finger_tip_joint',
                           u'l_gripper_r_finger_tip_joint']
         sjs.state.position = [0, 0, 0, 0]
-        self.r_gripper.call(sjs)
+        sjs.state.velocity = [0,0,0,0]
+        sjs.state.effort = [0,0,0,0]
+        self.l_gripper.call(sjs)
 
     def move_pr2_base(self, goal_pose):
         """

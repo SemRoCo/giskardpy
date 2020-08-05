@@ -78,25 +78,39 @@ def initialize_god_map():
             break
         rospy.sleep(0.5)
 
-    joint_weight_symbols = process_joint_specific_params(identifier.joint_cost,
-                                                         identifier.default_joint_cost_identifier, god_map)
+    joint_weight_symbols = process_joint_specific_params(identifier.joint_weight,
+                                                         identifier.joint_weight_default,
+                                                         identifier.joint_weight_override,
+                                                         god_map)
 
-    process_joint_specific_params(identifier.distance_thresholds, identifier.default_collision_distances, god_map)
+    process_joint_specific_params(identifier.self_collision_avoidance_distance,
+                                  identifier.self_collision_avoidance_default_threshold,
+                                  identifier.self_collision_avoidance_default_override,
+                                  god_map)
+
+    process_joint_specific_params(identifier.external_collision_avoidance_distance,
+                                  identifier.external_collision_avoidance_default_threshold,
+                                  identifier.external_collision_avoidance_default_override,
+                                  god_map)
 
     #TODO add checks to test if joints listed as linear are actually linear
     joint_velocity_linear_limit_symbols = process_joint_specific_params(identifier.joint_velocity_linear_limit,
-                                                                        identifier.default_joint_velocity_linear_limit,
+                                                                        identifier.joint_velocity_linear_limit_default,
+                                                                        identifier.joint_velocity_linear_limit_override,
                                                                         god_map)
     joint_velocity_angular_limit_symbols = process_joint_specific_params(identifier.joint_velocity_angular_limit,
-                                                                         identifier.default_joint_velocity_angular_limit,
+                                                                         identifier.joint_velocity_angular_limit_default,
+                                                                         identifier.joint_velocity_angular_limit_override,
                                                                          god_map)
 
     joint_acceleration_linear_limit_symbols = process_joint_specific_params(identifier.joint_acceleration_linear_limit,
-                                                                     identifier.default_joint_acceleration_linear_limit,
-                                                                     god_map)
-    joint_acceleration_angular_limit_symbols = process_joint_specific_params(identifier.joint_acceleration_angular_limit,
-                                                                            identifier.default_joint_acceleration_angular_limit,
+                                                                            identifier.joint_acceleration_linear_limit_default,
+                                                                            identifier.joint_acceleration_linear_limit_override,
                                                                             god_map)
+    joint_acceleration_angular_limit_symbols = process_joint_specific_params(identifier.joint_acceleration_angular_limit,
+                                                                             identifier.joint_acceleration_angular_limit_default,
+                                                                             identifier.joint_acceleration_angular_limit_override,
+                                                                             god_map)
 
     world = PyBulletWorld(False, blackboard.god_map.get_data(identifier.data_folder))
     god_map.safe_set_data(identifier.world, world)
@@ -120,9 +134,10 @@ def initialize_god_map():
     world.robot.init_self_collision_matrix()
     return god_map
 
-def process_joint_specific_params(identifier_, default, god_map):
-    d = KeyDefaultDict(lambda key: god_map.unsafe_get_data(default))
-    d.update(god_map.get_data(identifier_))
+def process_joint_specific_params(identifier_, default, override, god_map):
+    default_value = god_map.unsafe_get_data(default)
+    d = defaultdict(lambda: default_value)
+    d.update(god_map.get_data(override))
     god_map.safe_set_data(identifier_, d)
     return KeyDefaultDict(lambda key: god_map.to_symbol(identifier_ + [key]))
 

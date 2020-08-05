@@ -1,5 +1,6 @@
 import keyword
 import yaml
+from collections import defaultdict
 from multiprocessing import Queue
 from threading import Thread
 
@@ -677,8 +678,7 @@ class GiskardTestWrapper(object):
         """
         collision_goals = [CollisionEntry(type=CollisionEntry.AVOID_ALL_COLLISIONS, min_dist=distance_threshold)]
         collision_matrix = self.get_world().collision_goals_to_collision_matrix(collision_goals,
-                                                                                self.get_god_map().get_data(
-                                                                                    identifier.distance_thresholds))
+                                                                                defaultdict(lambda:0.3))
         collisions = self.get_world().check_collisions(collision_matrix)
         controlled_parent_joint = self.get_robot().get_controlled_parent_joint(link)
         controlled_parent_link = self.get_robot().get_child_link_of_joint(controlled_parent_joint)

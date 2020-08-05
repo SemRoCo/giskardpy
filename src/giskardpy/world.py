@@ -187,9 +187,9 @@ class World(object):
         for link1, link2 in collision_matrix:
             # FIXME should I use the minimum of both distances?
             if self.robot.link_order(link1, link2):
-                collision_matrix2[link1, robot_name, link2] = min_dist[link1][u'zero_weight_distance']
+                collision_matrix2[link1, robot_name, link2] = min_dist[link1]
             else:
-                collision_matrix2[link2, robot_name, link1] = min_dist[link1][u'zero_weight_distance']
+                collision_matrix2[link2, robot_name, link1] = min_dist[link1]
         return collision_matrix2
 
     def collision_goals_to_collision_matrix(self, collision_goals, min_dist):
@@ -199,7 +199,7 @@ class World(object):
         :return: dict mapping (robot_link, body_b, link_b) -> min allowed distance
         :rtype: dict
         """
-        collision_goals = self.verify_collision_entries(collision_goals, min_dist)
+        collision_goals = self.verify_collision_entries(collision_goals)
         min_allowed_distance = {}
         for collision_entry in collision_goals:  # type: CollisionEntry
             if self.is_avoid_all_self_collision(collision_entry):
@@ -217,12 +217,12 @@ class World(object):
                     del min_allowed_distance[key]
 
             elif self.is_avoid_collision(collision_entry):
-                min_allowed_distance[key] = min_dist[key[0]][u'zero_weight_distance']
+                min_allowed_distance[key] = min_dist[key[0]]
             else:
                 raise Exception('todo')
         return min_allowed_distance
 
-    def verify_collision_entries(self, collision_goals, min_dist):
+    def verify_collision_entries(self, collision_goals):
         for ce in collision_goals:  # type: CollisionEntry
             if ce.type in [CollisionEntry.ALLOW_ALL_COLLISIONS,
                            CollisionEntry.AVOID_ALL_COLLISIONS]:

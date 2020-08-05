@@ -428,8 +428,8 @@ class TestConstraints(object):
         """
         :type pocky_pose_setup: PR2
         """
-        old_torso_value = pocky_pose_setup.get_god_map().get_data(identifier.joint_cost + [u'torso_lift_joint'])
-        old_odom_x_value = pocky_pose_setup.get_god_map().get_data(identifier.joint_cost + [u'odom_x_joint'])
+        old_torso_value = pocky_pose_setup.get_god_map().get_data(identifier.joint_weight + [u'torso_lift_joint'])
+        old_odom_x_value = pocky_pose_setup.get_god_map().get_data(identifier.joint_weight + [u'odom_x_joint'])
 
         r_goal = PoseStamped()
         r_goal.header.frame_id = u'base_footprint'
@@ -456,11 +456,11 @@ class TestConstraints(object):
         new_pose = tf.lookup_pose(u'map', u'base_footprint')
         compare_poses(old_pose.pose, new_pose.pose)
 
-        assert pocky_pose_setup.get_god_map().unsafe_get_data(identifier.joint_cost + [u'odom_x_joint']) == 1000000
-        assert pocky_pose_setup.get_god_map().unsafe_get_data(identifier.joint_cost + [u'torso_lift_joint']) == 0.01
+        assert pocky_pose_setup.get_god_map().unsafe_get_data(identifier.joint_weight + [u'odom_x_joint']) == 1000000
+        assert pocky_pose_setup.get_god_map().unsafe_get_data(identifier.joint_weight + [u'torso_lift_joint']) == 0.01
         pocky_pose_setup.set_and_check_cart_goal(r_goal, u'base_footprint')
-        assert pocky_pose_setup.get_god_map().unsafe_get_data(identifier.joint_cost + [u'odom_x_joint']) == 0.01
-        assert pocky_pose_setup.get_god_map().unsafe_get_data(identifier.joint_cost + [u'torso_lift_joint']) == 0.01
+        assert pocky_pose_setup.get_god_map().unsafe_get_data(identifier.joint_weight + [u'odom_x_joint']) == 0.01
+        assert pocky_pose_setup.get_god_map().unsafe_get_data(identifier.joint_weight + [u'torso_lift_joint']) == 0.01
 
     def test_base_pointing_forward(self, zero_pose):
         """
@@ -477,9 +477,9 @@ class TestConstraints(object):
         """
         :type pocky_pose_setup: PR2
         """
-        old_torso_value = pocky_pose_setup.get_god_map().get_data(identifier.joint_cost + [u'torso_lift_joint'])
-        old_odom_x_value = pocky_pose_setup.get_god_map().get_data(identifier.joint_cost + [u'odom_x_joint'])
-        old_odom_y_value = pocky_pose_setup.get_god_map().get_data(identifier.joint_cost + [u'odom_y_joint'])
+        old_torso_value = pocky_pose_setup.get_god_map().get_data(identifier.joint_weight + [u'torso_lift_joint'])
+        old_odom_x_value = pocky_pose_setup.get_god_map().get_data(identifier.joint_weight + [u'odom_x_joint'])
+        old_odom_y_value = pocky_pose_setup.get_god_map().get_data(identifier.joint_weight + [u'odom_y_joint'])
 
         r_goal = PoseStamped()
         r_goal.header.frame_id = pocky_pose_setup.r_tip
@@ -500,16 +500,17 @@ class TestConstraints(object):
         pocky_pose_setup.set_cart_goal(r_goal, pocky_pose_setup.r_tip)
         pocky_pose_setup.send_and_check_goal(expected_error_code=MoveResult.INSOLVABLE)
         assert pocky_pose_setup.get_god_map().unsafe_get_data(
-            identifier.joint_cost + [u'odom_x_joint']) == old_odom_x_value
-        assert pocky_pose_setup.get_god_map().unsafe_get_data(identifier.joint_cost + [u'odom_y_joint']) == 0.0001
-        assert pocky_pose_setup.get_god_map().get_data(identifier.joint_cost + [u'torso_lift_joint']) == old_torso_value
+            identifier.joint_weight + [u'odom_x_joint']) == old_odom_x_value
+        assert pocky_pose_setup.get_god_map().unsafe_get_data(identifier.joint_weight + [u'odom_y_joint']) == 0.0001
+        assert pocky_pose_setup.get_god_map().get_data(
+            identifier.joint_weight + [u'torso_lift_joint']) == old_torso_value
 
     def test_UpdateGodMap3(self, pocky_pose_setup):
         """
         :type pocky_pose_setup: PR2
         """
-        old_torso_value = pocky_pose_setup.get_god_map().get_data(identifier.joint_cost + [u'torso_lift_joint'])
-        old_odom_x_value = pocky_pose_setup.get_god_map().get_data(identifier.joint_cost + [u'odom_x_joint'])
+        old_torso_value = pocky_pose_setup.get_god_map().get_data(identifier.joint_weight + [u'torso_lift_joint'])
+        old_odom_x_value = pocky_pose_setup.get_god_map().get_data(identifier.joint_weight + [u'odom_x_joint'])
 
         r_goal = PoseStamped()
         r_goal.header.frame_id = pocky_pose_setup.r_tip
@@ -526,9 +527,9 @@ class TestConstraints(object):
         pocky_pose_setup.set_cart_goal(r_goal, pocky_pose_setup.r_tip)
         pocky_pose_setup.send_and_check_goal(expected_error_code=MoveResult.INSOLVABLE)
         assert pocky_pose_setup.get_god_map().unsafe_get_data(
-            identifier.joint_cost + [u'odom_x_joint']) == old_odom_x_value
+            identifier.joint_weight + [u'odom_x_joint']) == old_odom_x_value
         assert pocky_pose_setup.get_god_map().unsafe_get_data(
-            identifier.joint_cost + [u'torso_lift_joint']) == old_torso_value
+            identifier.joint_weight + [u'torso_lift_joint']) == old_torso_value
 
     def test_pointing(self, kitchen_setup):
         base_goal = PoseStamped()
@@ -1575,6 +1576,22 @@ class TestCollisionAvoidanceGoals(object):
         relative_pose = zero_pose.get_robot().get_fk_pose(zero_pose.r_tip, pocky).pose
         compare_poses(p.pose, relative_pose)
 
+    def test_add_attach_detach_remove_add(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        object_name = u'muh'
+        p = PoseStamped()
+        p.header.frame_id = u'map'
+        p.pose.position = Point(1.2, 0, 1.6)
+        p.pose.orientation = Quaternion(0.0, 0.0, 0.47942554, 0.87758256)
+        zero_pose.add_box(object_name, pose=p)
+        zero_pose.attach_existing(object_name, frame_id=zero_pose.r_tip)
+        zero_pose.detach_object(object_name)
+        zero_pose.remove_object(object_name)
+        zero_pose.add_box(object_name, pose=p)
+        assert zero_pose.wrapper.get_attached_objects().object_names == []
+
     def test_attach_existing_box2(self, zero_pose):
         """
         :type zero_pose: PR2
@@ -1950,6 +1967,23 @@ class TestCollisionAvoidanceGoals(object):
         box_setup.send_and_check_goal(MoveResult.SUCCESS)
         box_setup.check_cpi_geq(box_setup.get_l_gripper_links(), 0.048)
         box_setup.check_cpi_geq(box_setup.get_r_gripper_links(), 0.048)
+
+    def test_collision_override(self, box_setup):
+        """
+        :type box_setup: PR2
+        """
+        p = PoseStamped()
+        p.header.frame_id = box_setup.default_root
+        p.pose.position.x += 0.5
+        p.pose.orientation = Quaternion(*quaternion_about_axis(np.pi, [0, 0, 1]))
+        box_setup.teleport_base(p)
+        # ce = CollisionEntry()
+        # ce.type = CollisionEntry.AVOID_COLLISION
+        # ce.body_b = u'box'
+        # ce.min_dist = 0.05
+        # box_setup.add_collision_entries([ce])
+        box_setup.send_and_check_goal()
+        box_setup.check_cpi_geq([u'base_link'], 0.099)
 
     def test_avoid_collision2(self, fake_table_setup):
         """
@@ -3040,6 +3074,8 @@ class TestCollisionAvoidanceGoals(object):
 
         kitchen_setup.set_cart_goal(bowl_goal, bowl_name, kitchen_setup.default_root)
         kitchen_setup.set_cart_goal(cup_goal, cup_name, kitchen_setup.default_root)
+        kitchen_setup.add_json_goal(u'AvoidJointLimits',
+                                    percentage=15)
         kitchen_setup.send_and_check_goal()
 
         kitchen_setup.detach_object(bowl_name)
@@ -3106,8 +3142,17 @@ class TestCollisionAvoidanceGoals(object):
         # kitchen_setup.allow_collision([CollisionEntry.ALL], spoon_name, [CollisionEntry.ALL])
         kitchen_setup.set_cart_goal(l_goal, kitchen_setup.l_tip, kitchen_setup.default_root)
         kitchen_setup.send_and_check_goal()
-
         kitchen_setup.attach_existing(spoon_name, kitchen_setup.l_tip)
+
+        l_goal.pose.position.z += .2
+        # kitchen_setup.allow_collision([CollisionEntry.ALL], spoon_name, [CollisionEntry.ALL])
+        kitchen_setup.set_cart_goal(l_goal, kitchen_setup.l_tip, kitchen_setup.default_root)
+        kitchen_setup.send_and_check_goal()
+
+        l_goal.pose.position.z -= .2
+        # kitchen_setup.allow_collision([CollisionEntry.ALL], spoon_name, [CollisionEntry.ALL])
+        kitchen_setup.set_cart_goal(l_goal, kitchen_setup.l_tip, kitchen_setup.default_root)
+        kitchen_setup.send_and_check_goal()
 
         kitchen_setup.send_and_check_joint_goal(gaya_pose)
         # base_goal = PoseStamped()

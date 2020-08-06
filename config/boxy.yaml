@@ -1,30 +1,37 @@
 general_options:
   sample_period: 0.05 # time[s] between points of generated joint trajectory
-  debug: False # enables debug prints and prints the behavior tree state in the terminal
   map_frame: map
+  debug: False # enables debug prints and prints the behavior tree state in the terminal
   fill_velocity_values: True # due to a bug, the pr2 does not want the velocity values to be filled
-  joint_convergence_threshold: 0.001 # when the velocities fall below this value, the planning succeeds
-  joint_vel_limit: # giskard will use the min of this number and limits from the urdf
-    linear:
+  joint_convergence_threshold: 0.01 # when the velocities fall below this value, the planning succeeds
+  joint_vel_limit: # giskard will use the min of this number and limits from the
+    linear: # m/s
       default: 0.02
-      odom_x_joint: 0.5
-      odom_y_joint: 0.5
-    angular:
+      override:
+        odom_x_joint: 0.5
+        odom_y_joint: 0.5
+    angular: # rad/s
       default: 0.02
-      odom_z_joint: 0.6
-      left_arm_5_joint: 0.05
-      left_arm_6_joint: 0.2
+      override:
+        odom_z_joint: 0.6
+        left_arm_5_joint: 0.05
+        left_arm_6_joint: 0.2
   joint_acceleration_limit: # multiply your desired acc limit with sample period; experimental, don't touch
     linear:
       default: 100
+      override: {}
     angular:
       default: 100
-  joint_weights: # the planner prefers low weight joints to achieve solutions
-    default: 0.0001
-    odom_x_joint: 1
-    odom_y_joint: 1
-    odom_z_joint: 1
-    torso_lift_joint: 0.5
+      override: {}
+  joint_weights:
+    # the planner prefers low weight joints to achieve solutions
+    # higher weights reduce wiggling, but lower the maximum joint velocity, which might make the planner stop too early
+    default: 0.01
+    override:
+      odom_x_joint: 0.05
+      odom_y_joint: 0.05
+      odom_z_joint: 0.05
+      torso_lift_joint: 0.05
 qp_solver:
   nWSR: None # None results in a nWSR estimation that's fine most of the time
 plugins:
@@ -35,33 +42,44 @@ plugins:
   PlotTrajectory: # plots the joint trajectory at the end of planning, useful for debugging
     enabled: False
     velocity_threshold: 0.0 # only joints that exceed this velocity threshold will be added to the plot. Use a negative number if you want to include every joint
-    scaling: 5.0 # determines how much the x axis is scaled with the length(time) of the trajectory
+    scaling: 2.5 # determines how much the x axis is scaled with the length(time) of the trajectory
     normalize_position: False # centers the joint positions around 0 on the y axis
-    tick_stride: 1.0 # the distance between ticks in the plot. if tick_stride <= 0 pyplot determines the ticks automatically 
+    tick_stride: 0.5 # the distance between ticks in the plot. if tick_stride <= 0 pyplot determines the ticks automatically
   WiggleCancel: # cancels planning if high frequencies are detected in the trajectory
-    wiggle_detection_threshold: 10 # the amplitude of a frequency must exceed this threshold to be detected as wiggling
-    num_samples_in_fft: 30 # size of the moving window of sample points
-    wiggle_frequency_range: 0.7 # must be in the range [0,1]. Only frequencies in the range [max_detectable_frequency * wiggle_frequency_range, max_detectable_frequency] are considered as wiggling. So a value of 0 means that every frequency with an amplitude above wiggle_detection_threshold is detected as wiggling and a value of 1 means that only the max_detectable_frequency can trigger a wiggle detection.      max_detectable_frequency = 1 / (2 * sample_period)
+    wiggle_detection_threshold: 8 # the amplitude of a frequency must exceed this threshold to be detected as wiggling
+    num_samples_in_fft: 20 # size of the moving window of sample points
+    wiggle_frequency_range: 0.4 # must be in the range [0,1]. Only frequencies in the range [max_detectable_frequency * wiggle_frequency_range, max_detectable_frequency] are considered as wiggling. So a value of 0 means that every frequency with an amplitude above wiggle_detection_threshold is detected as wiggling and a value of 1 means that only the max_detectable_frequency can trigger a wiggle detection.      max_detectable_frequency = 1 / (2 * sample_period)
 reachability_check:
   sample_period: 0.5
   prismatic_velocity: 2.0
-  continuous_velocity: 0.5
-  revolute_velocity: 0.5
-  other_velocity: 0.5
+  continuous_velocity: 1
+  revolute_velocity: 1
+  other_velocity: 1
 behavior_tree:
   tree_tick_rate: 0.1 # how often the tree updates. lower numbers increase responsiveness, but waste cpu time while idle
 collision_avoidance:
-  distance_thresholds:
-    default:
-      max_weight_distance: 0.0 # at this distance in [cm] the collision avoidance repells with maximum force
-      low_weight_distance: 0.01 # most goals are able to push past this threshold, if there is a conflict
-      zero_weight_distance: 0.05 # at this distance the collision avoidance becomes active
-    base_link:
-      max_weight_distance: 0.04
-      low_weight_distance: 0.06
-      zero_weight_distance: 0.09
-  self_collision_avoidance: # each pair of links in the collision matrix get push away from each other
-    ignore: [] # list pairs of links that should be removed from the self collision avoidance
-    add: [] # list pairs of links that should be added to the self collision matrix
   external_collision_avoidance:
-    number_of_repeller: 5 # each movable joint gets pushed away from the 5 objects closest to it
+    distance_thresholds: # external thresholds are per joint, they therefore count for all directly controlled links
+      default:
+        hard_threshold: 0.0 # at this distance in [cm] that can not be surpassed
+        soft_threshold: 0.05 # robot links are pushed to that distance, but it can be overpowered with high weight constraints
+      override:
+        odom_z_joint: # this affects all links between this and the next controlled joint
+          hard_threshold: 0.05 # at this distance in [cm] that can not be surpassed
+          soft_threshold: 0.1 # robot links are pushed to that distance, but it can be overpowered with high weight constraints
+    # each controlled joint gets pushed away from its X nearest objects
+    # to reduce the runtime, you can set different values for joints that control end effectors
+    number_of_repeller:
+      default: 1
+      end_effector_joints: 4
+  self_collision_avoidance:
+    distance_thresholds: # thresholds for self collision avoidance are set for each link pair
+      default: &default # you can set variables and reuse them
+        hard_threshold: 0.0 # at this distance in [cm] that can not be surpassed
+        soft_threshold: 0.05 # robot links are pushed to that distance, but it can be overpowered with high weight constraints
+      override: {}
+    ignore: [] # list pairs of links that should be removed from the self collision avoidance
+#    ignore: #example
+#      - [base_link, l_upper_arm_link]
+    add: [] # list pairs of links that should be added to the self collision matrix
+    number_of_repeller: 1 # each movable joint gets pushed away from the X objects closest to it

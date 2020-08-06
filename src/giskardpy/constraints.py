@@ -6,6 +6,7 @@ from collections import OrderedDict
 import PyKDL as kdl
 import numpy as np
 from geometry_msgs.msg import Vector3Stamped, Vector3
+from giskard_msgs.msg import Constraint as Constraint_msg
 from rospy_message_converter.message_converter import convert_dictionary_to_ros_message
 
 import giskardpy.identifier as identifier
@@ -17,11 +18,11 @@ from giskardpy.input_system import PoseStampedInput, Point3Input, Vector3Input, 
     PointStampedInput, TranslationInput
 from giskardpy.logging import logwarn
 
-WEIGHT_MAX = 1000
-WEIGHT_ABOVE_CA = 100
-WEIGHT_COLLISION_AVOIDANCE = 10
-WEIGHT_BELOW_CA = 1
-WEIGHT_MIN = 0
+WEIGHT_MAX = Constraint_msg.WEIGHT_MAX
+WEIGHT_ABOVE_CA = Constraint_msg.WEIGHT_ABOVE_CA
+WEIGHT_COLLISION_AVOIDANCE = Constraint_msg.WEIGHT_COLLISION_AVOIDANCE
+WEIGHT_BELOW_CA = Constraint_msg.WEIGHT_BELOW_CA
+WEIGHT_MIN = Constraint_msg.WEIGHT_MIN
 
 
 class Constraint(object):

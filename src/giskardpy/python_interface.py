@@ -15,7 +15,6 @@ from visualization_msgs.msg import MarkerArray
 
 from giskardpy.urdf_object import URDFObject
 from giskardpy.utils import dict_to_joint_states, make_world_body_box, make_world_body_cylinder
-from giskardpy import logging
 
 
 class GiskardWrapper(object):
@@ -138,12 +137,14 @@ class GiskardWrapper(object):
                 constraint.parameter_value_pair = json.dumps(params)
                 self.cmd_seq[-1].constraints.append(constraint)
 
-    def align_planes(self, tip, tip_normal, root=None, root_normal=None):
+    def align_planes(self, tip, tip_normal, root=None, root_normal=None, weight=None):
         """
         :type tip: str
         :type tip_normal: Vector3Stamped
         :type root: str
         :type root_normal: Vector3Stamped
+        :param weight: see giskard_msgs/Constraint
+        :type weight: float
         :return:
         """
         root = root if root else self.get_root()
@@ -152,8 +153,14 @@ class GiskardWrapper(object):
             root_normal = Vector3Stamped()
             root_normal.header.frame_id = self.get_root()
             root_normal.vector.z = 1
+
         root_normal = convert_ros_message_to_dictionary(root_normal)
-        self.set_json_goal(u'AlignPlanes', tip=tip, tip_normal=tip_normal, root=root, root_normal=root_normal)
+        params = {u'tip': tip,
+                  u'tip_normal': tip_normal,
+                  u'root': root, u'root_normal': root_normal}
+        if weight is not None:
+            params[u'weight'] = weight
+        self.set_json_goal(u'AlignPlanes', **params)
 
     def gravity_controlled_joint(self, joint_name, object_name):
         self.set_json_goal(u'GravityJoint', joint_name=joint_name, object_name=object_name)
@@ -162,8 +169,8 @@ class GiskardWrapper(object):
         self.set_json_goal(u'UpdateGodMap', updates=updates)
 
     def pointing(self, tip, goal_point, root=None, pointing_axis=None, weight=None):
-        kwargs = {u'tip':tip,
-                  u'goal_point':goal_point}
+        kwargs = {u'tip': tip,
+                  u'goal_point': goal_point}
         if root is not None:
             kwargs[u'root'] = root
         if pointing_axis is not None:
@@ -535,6 +542,3 @@ class GiskardWrapper(object):
         :rtype: GetAttachedObjectsResponse
         """
         return self.get_attached_objects()
-
-
-

@@ -206,7 +206,7 @@ def grow_tree():
     root.add_child(process_move_goal)
     if god_map.get_data(identifier.enable_PlotTrajectory):
         root.add_child(PlotTrajectory(u'plot trajectory', order=3))
-        root.add_child(PlotTrajectoryFFT(u'plot fft', joint_name=u'r_wrist_flex_joint'))
+        # root.add_child(PlotTrajectoryFFT(u'plot fft', joint_name=u'r_wrist_flex_joint'))
     root.add_child(post_processing)
     root.add_child(move_robot)
     root.add_child(SendResult(u'send result', action_server_name, MoveAction))

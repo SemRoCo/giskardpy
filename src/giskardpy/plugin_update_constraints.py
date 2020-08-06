@@ -225,24 +225,31 @@ class GoalToConstraints(GetGoal):
     def add_self_collision_avoidance_constraints(self):
         counter = defaultdict(int)
         soft_constraints = {}
-        for link_a, link_b in self.get_robot().get_self_collision_matrix():
-            link_a, link_b = self.robot.get_chain_reduced_to_controlled_joints(link_a, link_b)
+        for link_a_o, link_b_o in self.get_robot().get_self_collision_matrix():
+            link_a, link_b = self.robot.get_chain_reduced_to_controlled_joints(link_a_o, link_b_o)
             if not self.get_robot().link_order(link_a, link_b):
                 link_a, link_b = link_b, link_a
             counter[link_a, link_b] += 1
 
         for link_a, link_b in counter:
-            # TODO turn 2 into parameter
             num_of_constraints = min(1, counter[link_a, link_b])
             for i in range(num_of_constraints):
                 thresholds = self.get_god_map().get_data(identifier.self_collision_avoidance_distance)
-                key = (link_a, link_b)
-                if key not in thresholds:
-                    key = link_a # FIXME maybe use the min/max from link a and b?
-                hard_threshold = self.get_god_map().get_data(identifier.self_collision_avoidance_distance +
-                                                             [key, u'hard_threshold'])
-                soft_threshold = self.get_god_map().get_data(identifier.self_collision_avoidance_distance +
-                                                             [key, u'soft_threshold'])
+                key = u'{}, {}'.format(link_a, link_b)
+                key_r = u'{}, {}'.format(link_b, link_a)
+                if key in thresholds:
+                    hard_threshold = thresholds[key][u'hard_threshold']
+                    soft_threshold = thresholds[key][u'soft_threshold']
+                elif key_r in thresholds:
+                    hard_threshold = thresholds[key_r][u'hard_threshold']
+                    soft_threshold = thresholds[key_r][u'soft_threshold']
+                else:
+                    # TODO minimum is not the best if i reduce to the links next to the controlled chains
+                    #   should probably add symbols that retrieve the values for the current pair
+                    hard_threshold = min(thresholds[link_a][u'hard_threshold'],
+                                         thresholds[link_b][u'hard_threshold'])
+                    soft_threshold = min(thresholds[link_a][u'soft_threshold'],
+                                         thresholds[link_b][u'soft_threshold'])
                 constraint = SelfCollisionAvoidance(self.god_map,
                                                     link_a=link_a,
                                                     link_b=link_b,

@@ -5,7 +5,8 @@ import pytest
 import roslaunch
 import rospy
 from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped, Pose
-from giskard_msgs.msg import MoveActionGoal, MoveResult, MoveGoal, CollisionEntry, MoveCmd, JointConstraint
+from giskard_msgs.msg import MoveActionGoal, MoveResult, MoveGoal, CollisionEntry, MoveCmd, JointConstraint, \
+    Constraint as Constraint_msg
 from tf.transformations import quaternion_from_matrix, quaternion_about_axis
 from giskardpy import logging
 import giskardpy.tfwrapper as tf
@@ -108,6 +109,7 @@ def resetted_giskard(giskard):
     logging.loginfo(u'resetting giskard')
     giskard.clear_world()
     giskard.reset_base()
+    giskard.open_gripper()
     return giskard
 
 
@@ -667,6 +669,8 @@ class TestCollisionAvoidanceGoals(object):
         box_pose.pose.position.z = .1
         shelf_setup.add_box(box, [0.05, 0.05, 0.2], box_pose)
 
+        shelf_setup.open_gripper()
+
         grasp_pose = deepcopy(box_pose)
         grasp_pose.pose.position.z += 0.05
         grasp_pose.pose.orientation = Quaternion(*quaternion_from_matrix([[-1, 0, 0, 0],
@@ -699,7 +703,8 @@ class TestCollisionAvoidanceGoals(object):
         box_goal = PoseStamped()
         box_goal.header.frame_id = box
         box_goal.pose.position.y = -0.2
-        grasp_pose.pose.orientation.w = 1
+        box_goal.pose.orientation.w = 1
+        # shelf_setup.set_cart_goal(box_goal, box)
         shelf_setup.set_translation_goal(box_goal, box)
 
         tip_normal = Vector3Stamped()
@@ -709,7 +714,16 @@ class TestCollisionAvoidanceGoals(object):
         root_normal = Vector3Stamped()
         root_normal.header.frame_id = u'base_footprint'
         root_normal.vector.z = 1
-        shelf_setup.align_planes(box, tip_normal, u'base_footprint', root_normal)
+        shelf_setup.align_planes(box, tip_normal, u'odom', root_normal, weight=Constraint_msg.WEIGHT_ABOVE_CA)
+
+        tip_normal = Vector3Stamped()
+        tip_normal.header.frame_id = box
+        tip_normal.vector.y = 1
+
+        root_normal = Vector3Stamped()
+        root_normal.header.frame_id = u'map'
+        root_normal.vector.y = 1
+        shelf_setup.align_planes(box, tip_normal, u'odom', root_normal, weight=Constraint_msg.WEIGHT_ABOVE_CA)
         shelf_setup.send_and_check_goal()
 
     def test_allow_self_collision2(self, zero_pose):

@@ -14,6 +14,7 @@ from giskard_msgs.srv import UpdateWorldResponse
 from hypothesis import assume
 from hypothesis.strategies import composite
 from iai_naive_kinematics_sim.srv import SetJointState, SetJointStateRequest
+from iai_wsg_50_msgs.msg import PositionCmd
 from numpy import pi
 from py_trees import Blackboard
 from sensor_msgs.msg import JointState
@@ -378,8 +379,8 @@ class GiskardTestWrapper(object):
         goal.pose.orientation.w = 1
         self.set_rotation_goal(goal, tip, root)
 
-    def align_planes(self, tip, tip_normal, root=None, root_normal=None):
-        self.wrapper.align_planes(tip, tip_normal, root, root_normal)
+    def align_planes(self, tip, tip_normal, root=None, root_normal=None, weight=None):
+        self.wrapper.align_planes(tip, tip_normal, root, root_normal, weight)
 
     def set_rotation_goal(self, goal_pose, tip, root=None):
         if not root:
@@ -817,6 +818,7 @@ class Donbot(GiskardTestWrapper):
     def __init__(self):
         self.camera_tip = u'camera_link'
         self.gripper_tip = u'gripper_tool_frame'
+        self.gripper_pub = rospy.Publisher(u'/wsg_50_driver/goal_position', PositionCmd, queue_size=10)
         super(Donbot, self).__init__(u'donbot.yaml')
 
     def move_base(self, goal_pose):
@@ -829,6 +831,27 @@ class Donbot(GiskardTestWrapper):
                                                                        goal_pose.pose.orientation.w]))[0]}
         self.allow_all_collisions()
         self.send_and_check_joint_goal(js)
+
+    def open_gripper(self):
+        self.set_gripper(0.109)
+
+    def close_gripper(self):
+        self.set_gripper(0)
+
+    def set_gripper(self, width, gripper_joint=u'gripper_joint'):
+        """
+        :param width: goal width in m
+        :type width: float
+        """
+        width = max(0.0065, min(0.109, width))
+        goal = PositionCmd()
+        goal.pos = width * 1000
+        self.gripper_pub.publish(goal)
+        rospy.sleep(0.5)
+        js = self.get_current_joint_state()
+        index = js.name.index(gripper_joint)
+        np.testing.assert_almost_equal(js.position[index], width, decimal=3)
+
 
 class KMR_IIWA(GiskardTestWrapper):
     def __init__(self):

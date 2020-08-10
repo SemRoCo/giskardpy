@@ -1826,12 +1826,11 @@ class Open(Constraint):
         self.constraints = []
         environment_object = self.get_world().get_object(object_name)
         joint_name = environment_object.get_movable_parent_joint(handle_link)
+        min_limit, max_limit = environment_object.get_joint_limits(joint_name)
         if environment_object.is_joint_revolute(joint_name):
-            min_limit, max_limit = environment_object.get_joint_limits(joint_name)
             self.constraints.append(OpenDoor(god_map, tip, object_name, handle_link, max_limit, root))
         elif environment_object.is_joint_prismatic(joint_name):
-            # TODO: add OpenDrawer here with max_limit as goal
-            pass
+            self.constraints.append(OpenDrawer(god_map, tip, object_name, handle_link, max_limit, root))
         else:
             logwarn(u'Opening containers with joint of type "{}" not supported'.format(
                 environment_object.get_joint_type(joint_name)))
@@ -1846,11 +1845,11 @@ class Close(Constraint):
         self.constraints = []
         environment_object = self.get_world().get_object(object_name)
         joint_name = environment_object.get_movable_parent_joint(handle_link)
+        min_limit, max_limit = environment_object.get_joint_limits(joint_name)
         if environment_object.is_joint_revolute(joint_name):
-            min_limit, max_limit = environment_object.get_joint_limits(joint_name)
             self.constraints.append(OpenDoor(god_map, tip, object_name, handle_link, min_limit, root))
         elif environment_object.is_joint_prismatic(joint_name):
-            pass
+            self.constraints.append(OpenDrawer(god_map, tip, object_name, handle_link, min_limit, root))
         else:
             logwarn(u'Opening containers with joint of type "{}" not supported'.format(
                 environment_object.get_joint_type(joint_name)))

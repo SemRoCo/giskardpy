@@ -91,12 +91,10 @@ class PluginBehavior(GiskardBehavior):
             raise KeyError(u'A plugin with name "{}" already exists.'.format(name))
         with self.status_lock:
             self._plugins[name] = plugin
-        return True
 
     def remove_plugin(self, plugin_name):
         with self.status_lock:
             del self._plugins[plugin_name]
-        return True
 
     def setup(self, timeout):
         self.start_plugins()

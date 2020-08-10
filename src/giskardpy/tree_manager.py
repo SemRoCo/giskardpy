@@ -22,35 +22,26 @@ class TreeManager():
             return self.node == other.node and self.parent == other.parent
 
         def disable_child(self, manager_node):
-            if manager_node in self.enabled_children:
-                self.disabled_children.add(manager_node)
-                self.enabled_children.remove(manager_node)
-                if isinstance(self.node, PluginBehavior):
-                    self.node.remove_plugin(manager_node.node.name)
-                else:
-                    self.node.remove_child(manager_node.node)
-                return True
+            self.enabled_children.remove(manager_node)
+            self.disabled_children.add(manager_node)
+            if isinstance(self.node, PluginBehavior):
+                self.node.remove_plugin(manager_node.node.name)
             else:
-                logging.loginfo("node is not in the list of enabled children")
-            return False
+                self.node.remove_child(manager_node.node)
 
         def enable_child(self, manager_node):
-            if manager_node in self.disabled_children:
-                self.disabled_children.remove(manager_node)
-                self.enabled_children.add(manager_node)
-                if isinstance(self.node, PluginBehavior):
-                    return self.node.add_plugin(manager_node.node)
-                else:
-                    idx = self.enabled_children.index(manager_node)
-                    self.node.insert_child(manager_node.node, idx)
-                return True
-            logging.loginfo("node is not in the list of disabled children")
-            return False
+            self.disabled_children.remove(manager_node)
+            self.enabled_children.add(manager_node)
+            if isinstance(self.node, PluginBehavior):
+                self.node.add_plugin(manager_node.node)
+            else:
+                idx = self.enabled_children.index(manager_node)
+                self.node.insert_child(manager_node.node, idx)
 
         def add_child(self, manager_node):
             if isinstance(self.node, PluginBehavior):
                 self.enabled_children.add(manager_node)
-                return self.node.add_plugin(manager_node.node)
+                self.node.add_plugin(manager_node.node)
             else:
                 if manager_node.position < 0:
                     manager_node.position = 0
@@ -68,18 +59,16 @@ class TreeManager():
                         c.position += 1
                 self.node.insert_child(manager_node.node, idx)
                 self.enabled_children.add(manager_node)
-                return True
 
         def remove_child(self, manager_node):
             if isinstance(self.node, PluginBehavior):
                 if manager_node in self.enabled_children:
                     self.enabled_children.remove(manager_node)
                     self.node.remove_plugin(manager_node.node.name)
-                    return True
-                if manager_node in self.disabled_children:
+                elif manager_node in self.disabled_children:
                     self.disabled_children.remove(manager_node)
-                    return True
-                return False
+                else:
+                    raise RuntimeError('could not remove node from parent. this probably means that the tree is inconsistent')
             else:
                 if manager_node in self.enabled_children:
                     self.enabled_children.remove(manager_node)
@@ -87,15 +76,13 @@ class TreeManager():
                 elif(manager_node in self.disabled_children):
                     self.disabled_children.remove(manager_node)
                 else:
-                    logging.loginfo("no such node")
-                    return False
+                    raise RuntimeError('could not remove node. this probably means that the tree is inconsistent')
                 idx = self.disabled_children.bisect_right(manager_node)
                 for c in list(self.disabled_children.islice(start=idx)):
                     c.position -= 1
                 idx = self.enabled_children.bisect_right(manager_node)
                 for c in list(self.enabled_children.islice(start=idx)):
                     c.position -= 1
-                return True
 
     def __init__(self, tree):
         self.tree = tree
@@ -118,52 +105,36 @@ class TreeManager():
 
 
     def disable_node(self, node_name):
-        if node_name in self.tree_nodes.keys():
-            t = self.tree_nodes[node_name]
-            if t.parent != None:
-                return t.parent.disable_child(t)
-            else:
-                logging.logwarn('cannot disable root node')
-                return False
-        logging.loginfo("no node with that name")
-        return False
+        t = self.tree_nodes[node_name]
+        if t.parent != None:
+            return t.parent.disable_child(t)
+        else:
+            logging.logwarn('cannot disable root node')
+            return False
 
 
     def enable_node(self, node_name):
-        if node_name in self.tree_nodes.keys():
-            t = self.tree_nodes[node_name]
-            if t.parent != None:
-                return t.parent.enable_child(t)
-            else:
-                logging.loginfo('root node')
-                return False
-        logging.loginfo('there is no node with that name')
-        return False
+        t = self.tree_nodes[node_name]
+        if t.parent != None:
+            t.parent.enable_child(t)
+        else:
+            logging.loginfo('root node')
 
 
     def insert_node(self, node, parent_name, position=-1):
         if node.name in self.tree_nodes.keys():
-            print("node with that name already exists")
-            return False
-        try:
-            parent = self.tree_nodes[parent_name]
-        except:
-            logging.loginfo("parent does not exist")
-            return False
-
+            raise ValueError('node with that name already exists')
+        parent = self.tree_nodes[parent_name]
         tree_node = TreeManager.ManagerNode(node=node, parent=parent, position=position)
-        if parent.add_child(tree_node):
-            self.tree_nodes[node.name] = tree_node
-            return True
-        return False
+        parent.add_child(tree_node)
+        self.tree_nodes[node.name] = tree_node
 
     def remove_node(self, node_name):
-        if node_name in self.tree_nodes.keys():
-            node = self.tree_nodes[node_name]
-            parent = node.parent
-            del self.tree_nodes[node_name]
-            return parent.remove_child(node)
-        else:
-            logging.loginfo('there is no node with that name')
-            return False
+        node = self.tree_nodes[node_name]
+        parent = node.parent
+        del self.tree_nodes[node_name]
+        parent.remove_child(node)
+
+    def get_node(self, node_name):
+        return self.tree_nodes[node_name].node
 

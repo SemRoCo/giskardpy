@@ -1778,6 +1778,8 @@ class OpenDrawer(Constraint):
         # Get joint limits TODO: check of desired goal is within limits
         min_limit, max_limit = environment_object.get_joint_limits(
             self.hinge_joint)
+        # FIXME: doesn't work
+        # current_joint_pos = environment_object.joint_state(self.hinge_joint).position
 
         # Avoid invalid values
         if distance_goal < min_limit:
@@ -1792,9 +1794,11 @@ class OpenDrawer(Constraint):
         hinge_pose = tf.lookup_pose(self.root, hinge_frame_id)
 
         root_T_tip_current = tf.msg_to_kdl(tf.lookup_pose(self.root, tip))
-        hinge_drawer_axis_kdl = tf.msg_to_kdl(hinge_drawer_axis_msg)
+        hinge_drawer_axis_kdl = tf.msg_to_kdl(hinge_drawer_axis_msg)  # get axis of joint
         root_T_hinge = tf.msg_to_kdl(tf.lookup_pose(self.root, hinge_frame_id))
 
+        # FIXME: fix direction of movement
+        # tip_current_V_tip_goal = hinge_drawer_axis_kdl * (self.distance_goal - current_joint_pos)
         tip_current_V_tip_goal = hinge_drawer_axis_kdl * self.distance_goal
 
         root_V_hinge_drawer = root_T_hinge.M * tip_current_V_tip_goal  # get vector in hinge frame

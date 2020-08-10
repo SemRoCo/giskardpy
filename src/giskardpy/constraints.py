@@ -6,14 +6,19 @@ from collections import OrderedDict
 import PyKDL as kdl
 import numpy as np
 from geometry_msgs.msg import Vector3Stamped, Vector3
-from rospy_message_converter.message_converter import convert_dictionary_to_ros_message
+from rospy_message_converter.json_message_converter import convert_ros_message_to_json
+from rospy_message_converter.message_converter import \
+    convert_dictionary_to_ros_message, \
+    convert_ros_message_to_dictionary
 
 import giskardpy.identifier as identifier
 import giskardpy.tfwrapper as tf
 from giskardpy import cas_wrapper as w
 from giskardpy.data_types import SoftConstraint
 from giskardpy.exceptions import GiskardException, ConstraintException
-from giskardpy.input_system import PoseStampedInput, Point3Input, Vector3Input, Vector3StampedInput, FrameInput, \
+from giskardpy.input_system import \
+    PoseStampedInput, Point3Input, Vector3Input, \
+    Vector3StampedInput, FrameInput, \
     PointStampedInput, TranslationInput
 from giskardpy.logging import logwarn
 
@@ -924,7 +929,7 @@ class CartesianPose(Constraint):
 
     def make_constraints(self):
         for constraint in self.constraints:
-            self.soft_constraints.update(constraint.make_constraints())
+            self.soft_constraints.update(constraint.get_constraints())
 
 
 class ExternalCollisionAvoidance(Constraint):

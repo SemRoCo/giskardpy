@@ -137,7 +137,9 @@ def initialize_god_map():
 def process_joint_specific_params(identifier_, default, override, god_map):
     default_value = god_map.unsafe_get_data(default)
     d = defaultdict(lambda: default_value)
-    d.update(god_map.get_data(override))
+    override = god_map.get_data(override)
+    if isinstance(override, dict):
+        d.update(override)
     god_map.safe_set_data(identifier_, d)
     return KeyDefaultDict(lambda key: god_map.to_symbol(identifier_ + [key]))
 

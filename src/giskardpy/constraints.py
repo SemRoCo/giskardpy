@@ -2,6 +2,7 @@ from __future__ import division
 
 import numbers
 from collections import OrderedDict
+from copy import deepcopy
 
 import PyKDL as kdl
 import numpy as np
@@ -1760,7 +1761,7 @@ class OpenDrawer(Constraint):
         environment_object = self.get_world().get_object(object_name)
         # Get movable joint
         self.hinge_joint = environment_object.get_movable_parent_joint(handle_link)
-        # Child of joint TODO: why do we need this?
+        # Child of joint
         hinge_child = environment_object.get_child_link_of_joint(self.hinge_joint)
 
         hinge_frame_id = u'iai_kitchen/' + hinge_child
@@ -1778,36 +1779,38 @@ class OpenDrawer(Constraint):
         min_limit, max_limit = environment_object.get_joint_limits(
             self.hinge_joint)
 
+        # Avoid invalid values
+        if distance_goal < min_limit:
+            self.distance_goal = min_limit
+        if distance_goal > max_limit:
+            self.distance_goal = max_limit
+
         hinge_frame_id = u'iai_kitchen/' + hinge_child
 
         hinge_start_T_tip_start = tf.msg_to_kdl(
             tf.lookup_pose(hinge_frame_id, self.tip))
         hinge_pose = tf.lookup_pose(self.root, hinge_frame_id)
 
-        root_T_tip_current = tf.lookup_pose(self.root, tip)
+        root_T_tip_current = tf.msg_to_kdl(tf.lookup_pose(self.root, tip))
+        hinge_drawer_axis_kdl = tf.msg_to_kdl(hinge_drawer_axis_msg)
+        root_T_hinge = tf.msg_to_kdl(tf.lookup_pose(self.root, hinge_frame_id))
 
-        # TODO: calculate goal position
-        root_T_tip_goal = root_T_tip_current * hinge_drawer_axis_msg.vector
+        tip_current_V_tip_goal = hinge_drawer_axis_kdl * self.distance_goal
 
-        # TODO: Save everything in god map
-        params = {
-            self.root_T_tip_goal_id: root_T_tip_goal
-        }
+        root_V_hinge_drawer = root_T_hinge.M * tip_current_V_tip_goal  # get vector in hinge frame
+        root_T_tip_goal = deepcopy(root_T_tip_current)
+        root_T_tip_goal.p += root_V_hinge_drawer
 
-        self.save_params_on_god_map(params)
-
-    def make_constraints(self):
-        # TODO: create constraint(s)
-        # TODO: open drawer
-
-        root_T_tip_goal = self.root_t_tip_goal_id
+        root_T_tip_goal_dict = convert_ros_message_to_dictionary(tf.kdl_to_pose_stamped(root_T_tip_goal, self.root))
 
         self.constraints.append(
-            CartesianPosition(
+            CartesianPose(
+                god_map,
                 self.root,
                 self.tip,
-                root_T_tip_goal))
+                root_T_tip_goal_dict))
 
+    def make_constraints(self):
         # Execute constraints
         for constraint in self.constraints:
             self.soft_constraints.update(constraint.get_constraints())

@@ -189,7 +189,6 @@ def point_to_kdl(point):
     """
     return PyKDL.Vector(point.x, point.y, point.z)
 
-
 def twist_to_kdl(twist):
     t = PyKDL.Twist()
     t.vel[0] = twist.linear.x
@@ -220,6 +219,10 @@ def msg_to_kdl(msg):
         return twist_to_kdl(msg)
     elif isinstance(msg, TwistStamped):
         return twist_to_kdl(msg.twist)
+    elif isinstance(msg, Vector3Stamped):
+        return point_to_kdl(msg.vector)
+    elif isinstance(msg, Vector3):
+        return point_to_kdl(msg)
     else:
         raise TypeError(u'can\'t convert {} to kdl'.format(type(msg)))
 

@@ -1788,22 +1788,23 @@ class OpenDrawer(Constraint):
 
         hinge_frame_id = u'iai_kitchen/' + hinge_child
 
-        hinge_start_T_tip_start = tf.msg_to_kdl(
-            tf.lookup_pose(hinge_frame_id, self.tip))
-        hinge_pose = tf.lookup_pose(self.root, hinge_frame_id)
-
+        # Get frame of current tip pose
         root_T_tip_current = tf.msg_to_kdl(tf.lookup_pose(self.root, tip))
         hinge_drawer_axis_kdl = tf.msg_to_kdl(hinge_drawer_axis_msg)  # get axis of joint
+        # Get transform from hinge to root
         root_T_hinge = tf.msg_to_kdl(tf.lookup_pose(self.root, hinge_frame_id))
 
+        # Get translation vector from current to goal position
         tip_current_V_tip_goal = hinge_drawer_axis_kdl * (self.distance_goal - current_joint_pos)
-        # tip_current_V_tip_goal = hinge_drawer_axis_kdl * self.distance_goal
 
         root_V_hinge_drawer = root_T_hinge.M * tip_current_V_tip_goal  # get vector in hinge frame
-        root_T_tip_goal = deepcopy(root_T_tip_current)
+        root_T_tip_goal = deepcopy(root_T_tip_current)  # copy object to manipulate it
+        # Add translation vector to current position (= get frame of goal position)
         root_T_tip_goal.p += root_V_hinge_drawer
 
-        root_T_tip_goal_dict = convert_ros_message_to_dictionary(tf.kdl_to_pose_stamped(root_T_tip_goal, self.root))
+        # Convert goal pose to dict for Giskard
+        root_T_tip_goal_dict = convert_ros_message_to_dictionary(
+            tf.kdl_to_pose_stamped(root_T_tip_goal, self.root))
 
         self.constraints.append(
             CartesianPose(
@@ -1840,6 +1841,7 @@ class Open(Constraint):
     def make_constraints(self):
         for constraint in self.constraints:
             self.soft_constraints.update(constraint.get_constraints())
+
 
 class Close(Constraint):
     def __init__(self, god_map, tip, object_name, handle_link, root=None):

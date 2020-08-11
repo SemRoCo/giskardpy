@@ -253,35 +253,42 @@ class TestConstraints(object):
                                     bar_center=bar_center,
                                     bar_axis=bar_axis,
                                     bar_length=0.4)
+
+        # Create gripper from kitchen object
         x_gripper = Vector3Stamped()
         x_gripper.header.frame_id = kitchen_setup.l_tip
         x_gripper.vector.z = 1
 
+        # Get goal for grasping the handle
         x_goal = Vector3Stamped()
         x_goal.header.frame_id = handle_frame_id
         x_goal.vector.x = -1
 
+        # Align planes for gripper to be horizontal/vertical
         kitchen_setup.align_planes(kitchen_setup.l_tip,
                                    x_gripper,
                                    root_normal=x_goal)
         kitchen_setup.allow_all_collisions()  # makes execution faster
-        kitchen_setup.send_and_check_goal()
+        kitchen_setup.send_and_check_goal()  # send goal to Giskard
 
         kitchen_setup.add_json_goal(u'Open',
                                     tip=kitchen_setup.l_tip,
                                     object_name=u'kitchen',
                                     handle_link=handle_name)
         kitchen_setup.allow_all_collisions()  # makes execution faster
-        kitchen_setup.send_and_check_goal()
+        kitchen_setup.send_and_check_goal()  # send goal to Giskard
+        # Update kitchen object
         kitchen_setup.set_kitchen_js({u'sink_area_left_middle_drawer_main_joint': 0.48})
 
+        # Close drawer partially
         kitchen_setup.add_json_goal(u'OpenDrawer',
                                     tip=kitchen_setup.l_tip,
                                     object_name=u'kitchen',
                                     handle_link=handle_name,
                                     distance_goal=0.2)
         kitchen_setup.allow_all_collisions()  # makes execution faster
-        kitchen_setup.send_and_check_goal()
+        kitchen_setup.send_and_check_goal()  # send goal to Giskard
+        # Update kitchen object
         kitchen_setup.set_kitchen_js({u'sink_area_left_middle_drawer_main_joint': 0.2})
 
         kitchen_setup.add_json_goal(u'Close',
@@ -289,7 +296,8 @@ class TestConstraints(object):
                                     object_name=u'kitchen',
                                     handle_link=handle_name)
         kitchen_setup.allow_all_collisions()  # makes execution faster
-        kitchen_setup.send_and_check_goal()
+        kitchen_setup.send_and_check_goal()  # send goal to Giskard
+        # Update kitchen object
         kitchen_setup.set_kitchen_js({u'sink_area_left_middle_drawer_main_joint': 0.0})
 
         pass

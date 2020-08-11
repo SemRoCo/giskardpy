@@ -2,19 +2,24 @@ from __future__ import division
 
 import numbers
 from collections import OrderedDict
+from copy import deepcopy
 
 import PyKDL as kdl
 import numpy as np
 from geometry_msgs.msg import Vector3Stamped, Vector3
 from giskard_msgs.msg import Constraint as Constraint_msg
-from rospy_message_converter.message_converter import convert_dictionary_to_ros_message
+from rospy_message_converter.message_converter import \
+    convert_dictionary_to_ros_message, \
+    convert_ros_message_to_dictionary
 
 import giskardpy.identifier as identifier
 import giskardpy.tfwrapper as tf
 from giskardpy import cas_wrapper as w
 from giskardpy.data_types import SoftConstraint
 from giskardpy.exceptions import GiskardException, ConstraintException
-from giskardpy.input_system import PoseStampedInput, Point3Input, Vector3Input, Vector3StampedInput, FrameInput, \
+from giskardpy.input_system import \
+    PoseStampedInput, Point3Input, Vector3Input, \
+    Vector3StampedInput, FrameInput, \
     PointStampedInput, TranslationInput
 from giskardpy.logging import logwarn
 
@@ -1083,7 +1088,7 @@ class CartesianPose(Constraint):
 
     def make_constraints(self):
         for constraint in self.constraints:
-            self.soft_constraints.update(constraint.make_constraints())
+            self.soft_constraints.update(constraint.get_constraints())
 
 
 class ExternalCollisionAvoidance(Constraint):
@@ -1844,6 +1849,108 @@ class OpenDoor(Constraint):
         return u'{}/{}/{}'.format(s, self.root, self.tip)
 
 
+class OpenDrawer(Constraint):
+    hinge_pose_id = u'hinge_frame'  # frame of the hinge TODO: is that necessary
+    hinge_V_hinge_axis_msg_id = u'hinge_axis'  # axis vector of the hinge
+    root_T_tip_goal_id = u'root_T_tipGoal'  # goal of the gripper tip (where to move)
+
+    def __init__(self, god_map, tip, object_name, handle_link, distance_goal, root=None):
+        """
+        :type tip: str
+        :param tip: tip of manipulator (gripper) which is used
+        :type object_name str
+        :param object_name
+        :type handle_link str
+        :param handle_link handle to grasp
+        :type distance_goal float
+        :param distance_goal
+               relative opening distance 0 = close, 1 = fully open
+        :type root: str
+        :param root: default is root link of robot
+        """
+
+        super(OpenDrawer, self).__init__(god_map)
+
+        self.constraints = []  # init empty list
+
+        # Process input parameters
+        if root is None:
+            self.root = self.get_robot().get_root()
+        else:
+            self.root = root
+        self.tip = tip
+
+        self.distance_goal = distance_goal
+
+        self.handle_link = handle_link
+        handle_frame_id = u'iai_kitchen/' + handle_link
+
+        self.object_name = object_name
+        environment_object = self.get_world().get_object(object_name)
+        # Get movable joint
+        self.hinge_joint = environment_object.get_movable_parent_joint(handle_link)
+        # Child of joint
+        hinge_child = environment_object.get_child_link_of_joint(self.hinge_joint)
+
+        hinge_frame_id = u'iai_kitchen/' + hinge_child
+
+        # Get movable axis of drawer (= prismatic joint)
+        hinge_drawer_axis = kdl.Vector(
+            *environment_object.get_joint_axis(self.hinge_joint))
+        hinge_drawer_axis_msg = Vector3Stamped()
+        hinge_drawer_axis_msg.header.frame_id = hinge_frame_id
+        hinge_drawer_axis_msg.vector.x = hinge_drawer_axis[0]
+        hinge_drawer_axis_msg.vector.y = hinge_drawer_axis[1]
+        hinge_drawer_axis_msg.vector.z = hinge_drawer_axis[2]
+
+        # Get joint limits TODO: check of desired goal is within limits
+        min_limit, max_limit = environment_object.get_joint_limits(
+            self.hinge_joint)
+        current_joint_pos = environment_object.joint_state[self.hinge_joint].position
+
+        # Avoid invalid values
+        if distance_goal < min_limit:
+            self.distance_goal = min_limit
+        if distance_goal > max_limit:
+            self.distance_goal = max_limit
+
+        hinge_frame_id = u'iai_kitchen/' + hinge_child
+
+        # Get frame of current tip pose
+        root_T_tip_current = tf.msg_to_kdl(tf.lookup_pose(self.root, tip))
+        hinge_drawer_axis_kdl = tf.msg_to_kdl(hinge_drawer_axis_msg)  # get axis of joint
+        # Get transform from hinge to root
+        root_T_hinge = tf.msg_to_kdl(tf.lookup_pose(self.root, hinge_frame_id))
+
+        # Get translation vector from current to goal position
+        tip_current_V_tip_goal = hinge_drawer_axis_kdl * (self.distance_goal - current_joint_pos)
+
+        root_V_hinge_drawer = root_T_hinge.M * tip_current_V_tip_goal  # get vector in hinge frame
+        root_T_tip_goal = deepcopy(root_T_tip_current)  # copy object to manipulate it
+        # Add translation vector to current position (= get frame of goal position)
+        root_T_tip_goal.p += root_V_hinge_drawer
+
+        # Convert goal pose to dict for Giskard
+        root_T_tip_goal_dict = convert_ros_message_to_dictionary(
+            tf.kdl_to_pose_stamped(root_T_tip_goal, self.root))
+
+        self.constraints.append(
+            CartesianPose(
+                god_map,
+                self.root,
+                self.tip,
+                root_T_tip_goal_dict))
+
+    def make_constraints(self):
+        # Execute constraints
+        for constraint in self.constraints:
+            self.soft_constraints.update(constraint.get_constraints())
+
+    def __str__(self):
+        s = super(OpenDrawer, self).__str__()
+        return u'{}/{}/{}'.format(s, self.root, self.tip)
+
+
 class Open(Constraint):
     def __init__(self, god_map, tip, object_name, handle_link, root=None, goal_joint_state=None,
                  weight=WEIGHT_BELOW_CA):
@@ -1851,12 +1958,15 @@ class Open(Constraint):
         self.constraints = []
         environment_object = self.get_world().get_object(object_name)
         joint_name = environment_object.get_movable_parent_joint(handle_link)
-        if environment_object.is_joint_revolute(joint_name):
+
+        if environment_object.is_joint_revolute(joint_name) or environment_object.is_joint_prismatic(joint_name):
             min_limit, max_limit = environment_object.get_joint_limits(joint_name)
             if goal_joint_state:
                 goal_joint_state = min(max_limit, goal_joint_state)
             else:
                 goal_joint_state = max_limit
+
+        if environment_object.is_joint_revolute(joint_name):
             self.constraints.append(OpenDoor(god_map=god_map,
                                              tip=tip,
                                              object_name=object_name,
@@ -1865,7 +1975,12 @@ class Open(Constraint):
                                              root=root,
                                              weight=weight))
         elif environment_object.is_joint_prismatic(joint_name):
-            pass
+            self.constraints.append(OpenDrawer(god_map,
+                                               tip=tip,
+                                               object_name=object_name,
+                                               handle_link=handle_link,
+                                               distance_goal=goal_joint_state,
+                                               root=root))
         else:
             logwarn(u'Opening containers with joint of type "{}" not supported'.format(
                 environment_object.get_joint_type(joint_name)))
@@ -1882,12 +1997,15 @@ class Close(Constraint):
         self.constraints = []
         environment_object = self.get_world().get_object(object_name)
         joint_name = environment_object.get_movable_parent_joint(handle_link)
-        if environment_object.is_joint_revolute(joint_name):
+
+        if environment_object.is_joint_revolute(joint_name) or environment_object.is_joint_prismatic(joint_name):
             min_limit, max_limit = environment_object.get_joint_limits(joint_name)
             if goal_joint_state:
                 goal_joint_state = max(min_limit, goal_joint_state)
             else:
                 goal_joint_state = min_limit
+
+        if environment_object.is_joint_revolute(joint_name):
             self.constraints.append(OpenDoor(god_map=god_map,
                                              tip=tip,
                                              object_name=object_name,
@@ -1896,7 +2014,12 @@ class Close(Constraint):
                                              root=root,
                                              weight=weight))
         elif environment_object.is_joint_prismatic(joint_name):
-            pass
+            self.constraints.append(OpenDrawer(god_map,
+                                               tip=tip,
+                                               object_name=object_name,
+                                               handle_link=handle_link,
+                                               distance_goal=goal_joint_state,
+                                               root=root))
         else:
             logwarn(u'Opening containers with joint of type "{}" not supported'.format(
                 environment_object.get_joint_type(joint_name)))

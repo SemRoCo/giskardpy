@@ -243,7 +243,6 @@ class TestConstraints(object):
         bar_center.header.frame_id = handle_frame_id
 
         tip_grasp_axis = Vector3Stamped()
-        # TODO: Verify that tip on boxy is actually called like that
         tip_grasp_axis.header.frame_id = kitchen_setup.l_tip
         tip_grasp_axis.vector.y = 1
 
@@ -253,7 +252,7 @@ class TestConstraints(object):
                                     tip_grasp_axis=tip_grasp_axis,
                                     bar_center=bar_center,
                                     bar_axis=bar_axis,
-                                    bar_length=0.4)  # TODO: check for real length
+                                    bar_length=0.4)
         x_gripper = Vector3Stamped()
         x_gripper.header.frame_id = kitchen_setup.l_tip
         x_gripper.vector.z = 1
@@ -278,21 +277,47 @@ class TestConstraints(object):
         kitchen_setup.set_kitchen_js({u'sink_area_left_middle_drawer_main_joint': 0.48})
         kitchen_setup.send_and_check_goal()
 
+        kitchen_setup.add_json_goal(u'GraspBar',
+                                    root=kitchen_setup.default_root,
+                                    tip=kitchen_setup.l_tip,
+                                    tip_grasp_axis=tip_grasp_axis,
+                                    bar_center=bar_center,
+                                    bar_axis=bar_axis,
+                                    bar_length=0.4)
+        kitchen_setup.align_planes(kitchen_setup.l_tip,
+                                   x_gripper,
+                                   root_normal=x_goal)
+        kitchen_setup.allow_all_collisions()  # makes execution faster
+        kitchen_setup.send_and_check_goal()
+
         kitchen_setup.add_json_goal(u'OpenDrawer',
                                     tip=kitchen_setup.l_tip,
                                     object_name=u'kitchen',
                                     handle_link=handle_name,
-                                    distance_goal=0.3)
-        # kitchen_setup.allow_all_collisions()
+                                    distance_goal=0.2)
+        kitchen_setup.allow_all_collisions()  # makes execution faster
         kitchen_setup.send_and_check_goal()
-        kitchen_setup.set_kitchen_js({u'sink_area_left_middle_drawer_main_joint': 0.3})
+        kitchen_setup.set_kitchen_js({u'sink_area_left_middle_drawer_main_joint': 0.2})
+        kitchen_setup.send_and_check_goal()
+
+        kitchen_setup.add_json_goal(u'GraspBar',
+                                    root=kitchen_setup.default_root,
+                                    tip=kitchen_setup.l_tip,
+                                    tip_grasp_axis=tip_grasp_axis,
+                                    bar_center=bar_center,
+                                    bar_axis=bar_axis,
+                                    bar_length=0.4)
+        kitchen_setup.align_planes(kitchen_setup.l_tip,
+                                   x_gripper,
+                                   root_normal=x_goal)
+        kitchen_setup.allow_all_collisions()  # makes execution faster
         kitchen_setup.send_and_check_goal()
 
         kitchen_setup.add_json_goal(u'Close',
                                     tip=kitchen_setup.l_tip,
                                     object_name=u'kitchen',
                                     handle_link=handle_name)
-        # kitchen_setup.allow_all_collisions()
+        kitchen_setup.allow_all_collisions()  # makes execution faster
         kitchen_setup.send_and_check_goal()
         kitchen_setup.set_kitchen_js({u'sink_area_left_middle_drawer_main_joint': 0.0})
         kitchen_setup.send_and_check_goal()

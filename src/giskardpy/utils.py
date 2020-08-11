@@ -216,7 +216,7 @@ def to_joint_state_dict2(msg):
     :param msg: ROS message to convert.
     :type msg: JointState
     :return: Corresponding MultiJointState instance.
-    :rtype: OrderedDict[str, SingleJointState]
+    :rtype: OrderedDict[str, float]
     """
     js = OrderedDict()
     for i, joint_name in enumerate(msg.name):

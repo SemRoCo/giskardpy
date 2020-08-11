@@ -1,10 +1,10 @@
+import difflib
 import inspect
 import itertools
 import json
 import traceback
 from collections import OrderedDict
 from collections import defaultdict
-import difflib
 from time import time
 
 from giskard_msgs.msg import MoveCmd, CollisionEntry
@@ -29,7 +29,8 @@ class GoalToConstraints(GetGoal):
         self.controlled_joints = set()
         self.controllable_links = set()
         self.last_urdf = None
-        self.allowed_constraint_types = {x[0]:x[1] for x in inspect.getmembers(giskardpy.constraints) if inspect.isclass(x[1])}
+        self.allowed_constraint_types = {x[0]: x[1] for x in inspect.getmembers(giskardpy.constraints) if
+                                         inspect.isclass(x[1])}
 
         self.rc_prismatic_velocity = self.get_god_map().get_data(identifier.rc_prismatic_velocity)
         self.rc_continuous_velocity = self.get_god_map().get_data(identifier.rc_continuous_velocity)
@@ -98,12 +99,14 @@ class GoalToConstraints(GetGoal):
                     joint_constraints[(self.get_robot().get_name(), joint_name)] = JointConstraint(
                         lower=w.Max(-velocity_limit, lower_limit - joint_symbol),
                         upper=w.Min(velocity_limit, upper_limit - joint_symbol),
-                        weight=weight)
+                        weight=weight,
+                        linear_weight=0)
                 else:
                     joint_constraints[(self.get_robot().get_name(), joint_name)] = JointConstraint(
                         lower=-velocity_limit,
                         upper=velocity_limit,
-                        weight=weight)
+                        weight=weight,
+                        linear_weight=0)
         else:
             joint_constraints = OrderedDict(((self.robot.get_name(), k), self.robot._joint_constraints[k]) for k in
                                             controlled_joints)
@@ -133,10 +136,12 @@ class GoalToConstraints(GetGoal):
                         matches = matches + s + '\n'
                 if matches != '':
                     raise InsolvableException(
-                        u'unknown constraint {}. did you mean one of these?:\n{}'.format(constraint.type,matches))
+                        u'unknown constraint {}. did you mean one of these?:\n{}'.format(constraint.type, matches))
                 else:
                     available_constraints = '\n'.join([x for x in self.allowed_constraint_types.keys()]) + '\n'
-                    raise InsolvableException(u'unknown constraint {}. available constraint types:\n{}'.format(constraint.type ,available_constraints))
+                    raise InsolvableException(
+                        u'unknown constraint {}. available constraint types:\n{}'.format(constraint.type,
+                                                                                         available_constraints))
 
             try:
                 if hasattr(constraint, u'parameter_value_pair'):
@@ -148,7 +153,7 @@ class GoalToConstraints(GetGoal):
                 c = C(self.god_map, **params)
             except Exception as e:
                 doc_string = C.make_constraints.__doc__
-                error_msg = 'wrong parameters for {} \n'.format(C.__name__)
+                error_msg = 'wrong parameters for {} \n {} \n'.format(C.__name__, e.message)
                 if doc_string is not None:
                     error_msg = error_msg + doc_string
                 raise ValueError(error_msg)
@@ -158,7 +163,6 @@ class GoalToConstraints(GetGoal):
             except Exception as e:
                 traceback.print_exc()
                 raise ImplementationException()
-
 
     def has_robot_changed(self):
         new_urdf = self.get_robot().get_urdf_str()
@@ -175,9 +179,8 @@ class GoalToConstraints(GetGoal):
         if not collision_cmd or not self.get_world().is_allow_all_collision(collision_cmd[-1]):
             self.add_external_collision_avoidance_constraints()
         if not collision_cmd or (not self.get_world().is_allow_all_collision(collision_cmd[-1]) and
-            not self.get_world().is_allow_all_self_collision(collision_cmd[-1])):
+                                 not self.get_world().is_allow_all_self_collision(collision_cmd[-1])):
             self.add_self_collision_avoidance_constraints()
-
 
     def add_external_collision_avoidance_constraints(self):
         soft_constraints = {}
@@ -202,7 +205,6 @@ class GoalToConstraints(GetGoal):
                                                             [joint_name, u'zero_weight_distance']),
                                                         idx=0)
                 soft_constraints.update(constraint.get_constraints())
-
 
         for joint_name in eef_joints:
             child_link = self.get_robot().get_child_link_of_joint(joint_name)
@@ -230,9 +232,7 @@ class GoalToConstraints(GetGoal):
         for link_a, link_b in self.get_robot().get_self_collision_matrix():
             link_a, link_b = self.robot.get_chain_reduced_to_controlled_joints(link_a, link_b)
             if not self.get_robot().link_order(link_a, link_b):
-                tmp = link_a
-                link_a = link_b
-                link_b = tmp
+                link_a, link_b = link_b, link_a
             counter[link_a, link_b] += 1
 
         for link_a, link_b in counter:

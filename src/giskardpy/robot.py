@@ -1,3 +1,4 @@
+from __future__ import division
 import traceback
 from collections import namedtuple, OrderedDict, defaultdict
 from copy import deepcopy
@@ -108,7 +109,8 @@ class Robot(Backend):
                 collision_links.append(link_name)
             else:
                 child_links = self.get_child_links_of_link(link_name)
-                links.extend(child_links)
+                if child_links:
+                    links.extend(child_links)
         return collision_links
 
     def get_joint_state_positions(self):
@@ -207,11 +209,13 @@ class Robot(Backend):
             if not self.is_joint_continuous(joint_name):
                 self._joint_constraints[joint_name] = JointConstraint(lower=w.Max(-velocity_limit, lower_limit - joint_symbol),
                                                                       upper=w.Min(velocity_limit, upper_limit - joint_symbol),
-                                                                      weight=weight)
+                                                                      weight=weight,
+                                                                      linear_weight=0)
             else:
                 self._joint_constraints[joint_name] = JointConstraint(lower=-velocity_limit,
                                                                       upper=velocity_limit,
-                                                                      weight=weight)
+                                                                      weight=weight,
+                                                                      linear_weight=0)
 
     def get_fk_expression(self, root_link, tip_link):
         """

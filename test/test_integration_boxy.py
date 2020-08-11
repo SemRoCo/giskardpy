@@ -267,7 +267,6 @@ class TestConstraints(object):
         kitchen_setup.allow_all_collisions()  # makes execution faster
         kitchen_setup.send_and_check_goal()
 
-        # From here on new (= OpenDrawer)
         kitchen_setup.add_json_goal(u'Open',
                                     tip=kitchen_setup.l_tip,
                                     object_name=u'kitchen',
@@ -275,20 +274,6 @@ class TestConstraints(object):
         kitchen_setup.allow_all_collisions()  # makes execution faster
         kitchen_setup.send_and_check_goal()
         kitchen_setup.set_kitchen_js({u'sink_area_left_middle_drawer_main_joint': 0.48})
-        kitchen_setup.send_and_check_goal()
-
-        kitchen_setup.add_json_goal(u'GraspBar',
-                                    root=kitchen_setup.default_root,
-                                    tip=kitchen_setup.l_tip,
-                                    tip_grasp_axis=tip_grasp_axis,
-                                    bar_center=bar_center,
-                                    bar_axis=bar_axis,
-                                    bar_length=0.4)
-        kitchen_setup.align_planes(kitchen_setup.l_tip,
-                                   x_gripper,
-                                   root_normal=x_goal)
-        kitchen_setup.allow_all_collisions()  # makes execution faster
-        kitchen_setup.send_and_check_goal()
 
         kitchen_setup.add_json_goal(u'OpenDrawer',
                                     tip=kitchen_setup.l_tip,
@@ -298,20 +283,6 @@ class TestConstraints(object):
         kitchen_setup.allow_all_collisions()  # makes execution faster
         kitchen_setup.send_and_check_goal()
         kitchen_setup.set_kitchen_js({u'sink_area_left_middle_drawer_main_joint': 0.2})
-        kitchen_setup.send_and_check_goal()
-
-        kitchen_setup.add_json_goal(u'GraspBar',
-                                    root=kitchen_setup.default_root,
-                                    tip=kitchen_setup.l_tip,
-                                    tip_grasp_axis=tip_grasp_axis,
-                                    bar_center=bar_center,
-                                    bar_axis=bar_axis,
-                                    bar_length=0.4)
-        kitchen_setup.align_planes(kitchen_setup.l_tip,
-                                   x_gripper,
-                                   root_normal=x_goal)
-        kitchen_setup.allow_all_collisions()  # makes execution faster
-        kitchen_setup.send_and_check_goal()
 
         kitchen_setup.add_json_goal(u'Close',
                                     tip=kitchen_setup.l_tip,
@@ -320,6 +291,5 @@ class TestConstraints(object):
         kitchen_setup.allow_all_collisions()  # makes execution faster
         kitchen_setup.send_and_check_goal()
         kitchen_setup.set_kitchen_js({u'sink_area_left_middle_drawer_main_joint': 0.0})
-        kitchen_setup.send_and_check_goal()
 
         pass

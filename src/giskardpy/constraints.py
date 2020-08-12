@@ -1317,7 +1317,7 @@ class AlignPlanes(Constraint):
     max_velocity_id = u'max_velocity'
     weight_id = u'weight'
 
-    def __init__(self, god_map, root, tip, root_normal, tip_normal, max_velocity=0.5, weight=WEIGHT_BELOW_CA,
+    def __init__(self, god_map, root, tip, root_normal, tip_normal, max_velocity=0.5, weight=WEIGHT_ABOVE_CA,
                  goal_constraint=True):
         """
         :type god_map:

@@ -1039,7 +1039,7 @@ class TestConstraints(object):
         kitchen_setup.align_planes(kitchen_setup.l_tip,
                                    x_gripper,
                                    root_normal=x_goal)
-        kitchen_setup.allow_all_collisions()
+        # kitchen_setup.allow_all_collisions()
         kitchen_setup.send_and_check_goal()
 
         kitchen_setup.add_json_goal(u'Open',

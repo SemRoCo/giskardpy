@@ -875,3 +875,33 @@ def publish_marker_sphere(position, frame_id=u'map', radius=0.05, id_=0):
         pass
 
     pub.publish(m)
+
+def publish_marker_vector(start, end, diameter_shaft=0.01, diameter_head=0.02,  id_=0):
+    """
+    assumes points to be in frame map
+    :type start: Point
+    :type end: Point
+    :type diameter_shaft: float
+    :type diameter_head: float
+    :type id_: int
+    """
+    m = Marker()
+    m.action = m.ADD
+    m.ns = u'debug'
+    m.id = id_
+    m.type = m.ARROW
+    m.points.append(start)
+    m.points.append(end)
+    m.color = ColorRGBA(1,0,0,1)
+    m.scale.x = diameter_shaft
+    m.scale.y = diameter_head
+    m.scale.z = 0
+
+    pub = rospy.Publisher('/visualization_marker', Marker, queue_size=1)
+    while pub.get_num_connections() < 1:
+        # wait for a connection to publisher
+        # you can do whatever you like here or simply do nothing
+        pass
+    rospy.sleep(0.3)
+
+    pub.publish(m)

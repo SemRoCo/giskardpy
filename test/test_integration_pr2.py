@@ -20,7 +20,7 @@ from giskardpy import logging, identifier
 from giskardpy.identifier import fk_pose
 from giskardpy.robot import Robot
 from giskardpy.tfwrapper import init as tf_init
-from giskardpy.utils import to_joint_state_dict2
+from giskardpy.utils import to_joint_state_dict2, publish_marker_vector
 from utils_for_tests import PR2, compare_poses
 
 # TODO roslaunch iai_pr2_sim ros_control_sim_with_base.launch
@@ -366,6 +366,35 @@ class TestJointGoals(object):
 
 
 class TestConstraints(object):
+
+    def test_CartesianPoseStraight(self, zero_pose):
+        zero_pose.close_l_gripper()
+        goal_position = PoseStamped()
+        goal_position.header.frame_id = u'base_link'
+        goal_position.pose.position.x = 0.3
+        goal_position.pose.position.y = 0.5
+        goal_position.pose.position.z = 1
+        goal_position.pose.orientation.w = 1
+
+        start_pose = tf.lookup_pose(u'map', zero_pose.l_tip)
+        map_T_goal_position = tf.transform_pose(u'map', goal_position)
+
+        object_pose = PoseStamped()
+        object_pose.header.frame_id = u'map'
+        object_pose.pose.position.x = (start_pose.pose.position.x + map_T_goal_position.pose.position.x) / 2.
+        object_pose.pose.position.y = (start_pose.pose.position.y + map_T_goal_position.pose.position.y) / 2.
+        object_pose.pose.position.z = (start_pose.pose.position.z + map_T_goal_position.pose.position.z) / 2.
+        object_pose.pose.position.z += 0.08
+        object_pose.pose.orientation.w = 1
+
+        zero_pose.add_sphere(u'sphere', 0.05, pose=object_pose)
+
+        publish_marker_vector(start_pose.pose.position, map_T_goal_position.pose.position)
+        zero_pose.set_translation_goal(goal_position, zero_pose.l_tip)
+        zero_pose.send_and_check_goal()
+
+
+
     def test_AvoidJointLimits1(self, zero_pose):
         """
         :type zero_pose: PR2
@@ -944,7 +973,7 @@ class TestConstraints(object):
                                     bar_axis=bar_axis,
                                     bar_length=.3)
         # kitchen_setup.allow_collision([], u'kitchen', [handle_name])
-        kitchen_setup.allow_all_collisions()
+        # kitchen_setup.allow_all_collisions()
 
         x_gripper = Vector3Stamped()
         x_gripper.header.frame_id = hand

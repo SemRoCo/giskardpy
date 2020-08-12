@@ -2055,6 +2055,17 @@ class TestCollisionAvoidanceGoals(object):
         box_setup.send_and_check_goal()
         box_setup.check_cpi_geq([u'base_link'], 0.099)
 
+    def test_collision_override2(self, kitchen_setup):
+        """
+        :type box_setup: PR2
+        """
+        goal = PoseStamped()
+        goal.header.frame_id = u'base_footprint'
+        goal.pose.position.x += 1
+        goal.pose.orientation.w = 1
+        kitchen_setup.set_and_check_cart_goal(goal, u'base_footprint')
+        kitchen_setup.check_cpi_geq([u'base_link'], 0.049)
+
     def test_avoid_collision2(self, fake_table_setup):
         """
         :type box_setup: PR2

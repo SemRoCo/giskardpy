@@ -1181,7 +1181,7 @@ class ExternalCollisionAvoidance(Constraint):
 
         upper_slack = w.if_greater(actual_distance, 50,  # assuming that distance of unchecked closest points is 100
                                    1e9,
-                                   w.Max(hard_threshold, lower_limit + actual_distance - hard_threshold)
+                                   w.Max(0, lower_limit + actual_distance - hard_threshold)
                                    )
 
         self.add_constraint(u'/position',

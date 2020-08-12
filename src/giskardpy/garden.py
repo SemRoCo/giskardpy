@@ -190,6 +190,10 @@ def grow_tree():
     planning_1 = success_is_failure(Sequence)(u'planning I')
     planning_1.add_child(GoalToConstraints(u'update constraints', action_server_name))
     planning_1.add_child(planning_2)
+    if god_map.get_data(identifier.enable_VisualizationBehavior):
+        planning_1.add_child(VisualizationBehavior(u'visualization'))
+    if god_map.get_data(identifier.enable_CPIMarker):
+        planning_1.add_child(CollisionMarker(u'cpi marker'))
     # ----------------------------------------------
     # ----------------------------------------------
     process_move_goal = failure_is_success(Selector)(u'process move goal')

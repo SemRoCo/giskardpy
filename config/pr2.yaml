@@ -62,9 +62,24 @@ collision_avoidance:
         hard_threshold: 0.0 # at this distance in [cm] that can not be surpassed
         soft_threshold: 0.05 # robot links are pushed to that distance, but it can be overpowered with high weight constraints
       override:
+        zero: &zero
+          hard_threshold: 0.0
+          soft_threshold: 0.0
         odom_z_joint: # this affects all links between this and the next controlled joint
           hard_threshold: 0.05 # at this distance in [cm] that can not be surpassed
           soft_threshold: 0.1 # robot links are pushed to that distance, but it can be overpowered with high weight constraints
+        bl_caster_l_wheel_link: *zero
+        bl_caster_r_wheel_link: *zero
+        bl_caster_rotation_link: *zero
+        br_caster_l_wheel_link: *zero
+        br_caster_r_wheel_link: *zero
+        br_caster_rotation_link: *zero
+        fl_caster_l_wheel_link: *zero
+        fl_caster_r_wheel_link: *zero
+        fl_caster_rotation_link: *zero
+        fr_caster_l_wheel_link: *zero
+        fr_caster_r_wheel_link: *zero
+        fr_caster_rotation_link: *zero
     # each controlled joint gets pushed away from its X nearest objects
     # to reduce the runtime, you can set different values for joints that control end effectors
     number_of_repeller:
@@ -79,6 +94,18 @@ collision_avoidance:
         # examples, that don't have an affect:
         base_link: *default  # this would count for all pairs containing 'base_link', if not specified otherwise
         base_link, r_upper_arm_link: *default # you can set thresholds for specific pairs
+        bl_caster_l_wheel_link: *zero
+        bl_caster_r_wheel_link: *zero
+        bl_caster_rotation_link: *zero
+        br_caster_l_wheel_link: *zero
+        br_caster_r_wheel_link: *zero
+        br_caster_rotation_link: *zero
+        fl_caster_l_wheel_link: *zero
+        fl_caster_r_wheel_link: *zero
+        fl_caster_rotation_link: *zero
+        fr_caster_l_wheel_link: *zero
+        fr_caster_r_wheel_link: *zero
+        fr_caster_rotation_link: *zero
     ignore: [] # list pairs of links that should be removed from the self collision avoidance
 #    ignore: #example
 #      - [base_link, l_upper_arm_link]

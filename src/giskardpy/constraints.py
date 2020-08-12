@@ -892,6 +892,39 @@ class CartesianPosition(BasicCartesianConstraint):
                                                self.goal_constraint, weight)
 
 
+class CartesianPositionStraight(BasicCartesianConstraint):
+
+    def make_constraints(self):
+        """
+        example:
+        name='CartesianPositionStraight'
+        parameter_value_pair='{
+            "root": "base_footprint", #required
+            "tip": "r_gripper_tool_frame", #required
+            "goal_position": {"header":
+                                {"stamp":
+                                    {"secs": 0,
+                                    "nsecs": 0},
+                                "frame_id": "",
+                                "seq": 0},
+                            "pose": {"position":
+                                        {"y": 0.0,
+                                        "x": 0.0,
+                                        "z": 0.0},
+                                    "orientation": {"y": 0.0,
+                                                    "x": 0.0,
+                                                    "z": 0.0,
+                                                    "w": 0.0}
+                                    }
+                            }', #required
+            "weight": 1, #optional
+            "max_velocity": 0.3 #optional -- rad/s or m/s depending on joint; can not go higher than urdf limit
+        }'
+        :return:
+        """
+        # TODO: do something
+
+
 # class CartesianPositionX(BasicCartesianConstraint):
 # FIXME
 #     def make_constraints(self):

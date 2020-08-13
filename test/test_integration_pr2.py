@@ -3011,7 +3011,7 @@ class TestCollisionAvoidanceGoals(object):
         kitchen_setup.align_planes(kitchen_setup.l_tip, x, root_normal=x_map)
 
         # kitchen_setup.allow_collision([], milk_name, [])
-        kitchen_setup.add_json_goal(u'AvoidJointLimits', percentage=15)
+        # kitchen_setup.add_json_goal(u'AvoidJointLimits', percentage=15)
         kitchen_setup.send_and_check_goal()
 
         kitchen_setup.attach_existing(milk_name, kitchen_setup.l_tip)
@@ -3051,7 +3051,7 @@ class TestCollisionAvoidanceGoals(object):
         kitchen_setup.send_and_check_goal()
 
         # kitchen_setup.keep_position(kitchen_setup.r_tip)
-        kitchen_setup.open_r_gripper()
+        kitchen_setup.open_l_gripper()
 
         kitchen_setup.detach_object(milk_name)
 

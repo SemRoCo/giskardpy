@@ -42,4 +42,6 @@ class TFPlugin(GiskardBehavior):
             pass
         except UnboundLocalError as e:
             pass
+        except IOError as e:
+            pass
         return Status.SUCCESS

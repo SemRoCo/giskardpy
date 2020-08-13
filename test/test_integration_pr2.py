@@ -824,18 +824,6 @@ class TestConstraints(object):
         x_goal.vector.x = -1
         # kitchen_setup.align_planes(kitchen_setup.r_tip, x_gripper, root_normal=x_goal)
         kitchen_setup.allow_all_collisions()
-        updates = {
-            u'rosparam': {
-                u'general_options': {
-                    u'joint_weights': {
-                        u'odom_x_joint': 0.001,
-                        u'odom_y_joint': 0.001,
-                        u'odom_z_joint': 0.001
-                    }
-                }
-            }
-        }
-        # kitchen_setup.wrapper.update_god_map(updates)
         kitchen_setup.send_and_check_goal()
 
         kitchen_setup.add_json_goal(u'Open',
@@ -843,19 +831,6 @@ class TestConstraints(object):
                                     object_name=u'kitchen',
                                     handle_link=handle_name)
         kitchen_setup.allow_all_collisions()
-
-        updates = {
-            u'rosparam': {
-                u'general_options': {
-                    u'joint_weights': {
-                        u'odom_x_joint': 0.0001,
-                        u'odom_y_joint': 0.0001,
-                        u'odom_z_joint': 0.0001
-                    }
-                }
-            }
-        }
-        # kitchen_setup.wrapper.update_god_map(updates)
 
         kitchen_setup.send_and_check_goal()
         kitchen_setup.set_kitchen_js({u'iai_fridge_door_joint': np.pi / 2})
@@ -865,18 +840,6 @@ class TestConstraints(object):
                                     object_name=u'kitchen',
                                     handle_link=handle_name)
         kitchen_setup.allow_all_collisions()
-        updates = {
-            u'rosparam': {
-                u'general_options': {
-                    u'joint_weights': {
-                        u'odom_x_joint': 0.001,
-                        u'odom_y_joint': 0.001,
-                        u'odom_z_joint': 0.001
-                    }
-                }
-            }
-        }
-        # kitchen_setup.wrapper.update_god_map(updates)
         kitchen_setup.send_and_check_goal()
         kitchen_setup.set_kitchen_js({u'iai_fridge_door_joint': 0})
 
@@ -3048,6 +3011,7 @@ class TestCollisionAvoidanceGoals(object):
         kitchen_setup.align_planes(kitchen_setup.l_tip, x, root_normal=x_map)
 
         # kitchen_setup.allow_collision([], milk_name, [])
+        kitchen_setup.add_json_goal(u'AvoidJointLimits', percentage=15)
         kitchen_setup.send_and_check_goal()
 
         kitchen_setup.attach_existing(milk_name, kitchen_setup.l_tip)
@@ -3184,8 +3148,7 @@ class TestCollisionAvoidanceGoals(object):
 
         kitchen_setup.set_cart_goal(bowl_goal, bowl_name, kitchen_setup.default_root)
         kitchen_setup.set_cart_goal(cup_goal, cup_name, kitchen_setup.default_root)
-        kitchen_setup.add_json_goal(u'AvoidJointLimits',
-                                    percentage=15)
+        kitchen_setup.add_json_goal(u'AvoidJointLimits', percentage=15)
         kitchen_setup.send_and_check_goal()
 
         kitchen_setup.detach_object(bowl_name)

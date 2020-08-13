@@ -269,6 +269,16 @@ class Constraint(object):
                     w.Max(last_velocity - max_acceleration, -max_velocity))
         return vel / m
 
+    def add_max_force_constraint(self, name, expression):
+        expr_jacobian = w.jacobian(expression, self.get_robot().get_joint_position_symbols())
+        total_derivative = w.Sum(w.Abs(expr_jacobian))
+        self.add_constraint(name,
+                            lower=100,
+                            upper=100,
+                            weight=10,
+                            expression=total_derivative,
+                            goal_constraint=False)
+
     def limit_velocity(self, error, max_velocity):
         """
         :param error: expression that describes the error

@@ -9,8 +9,6 @@ from visualization_msgs.msg import Marker, MarkerArray
 from giskardpy.tfwrapper import pose_to_kdl, kdl_to_pose
 from plugin import GiskardBehavior
 
-# TODO ensure one last update after planning
-
 class VisualizationBehavior(GiskardBehavior):
     def setup(self, timeout):
         self.publisher = rospy.Publisher(u'~visualization_marker_array', MarkerArray, queue_size=1)

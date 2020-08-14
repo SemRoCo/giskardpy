@@ -970,6 +970,15 @@ def sum_column(matrix):
 
 
 def distance_point_to_line_segment(point, line_start, line_end):
+    """
+    :param point: current position of an object (i. e.) gripper tip
+    :type point: 4x1 matrix
+    :param line_start: start of the approached line
+    :type line_start: 4x1 matrix
+    :param line_end: end of the approached line
+    :type line_end: 4x1 matrix
+    :return:
+    """
     line_vec = line_end - line_start
     pnt_vec = point - line_start
     line_len = norm(line_vec)

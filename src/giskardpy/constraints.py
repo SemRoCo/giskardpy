@@ -922,7 +922,16 @@ class CartesianPositionStraight(BasicCartesianConstraint):
         }'
         :return:
         """
-        # TODO: do something
+        r_P_g = w.position_of(self.get_goal_pose())
+        t_P_g = w.position_of(self.tip)
+        max_velocity = self.get_input_float(self.max_velocity)
+        max_acceleration = self.get_input_float(self.max_acceleration)
+        weight = self.get_input_float(self.weight)
+
+        self.add_minimize_position_constraints(r_P_g, max_velocity, max_acceleration, self.root, self.tip,
+                                               self.goal_constraint, weight)
+
+        # self.add_minimize_position_constraints()
 
 
 # class CartesianPositionX(BasicCartesianConstraint):

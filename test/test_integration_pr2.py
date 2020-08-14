@@ -1616,6 +1616,21 @@ class TestCollisionAvoidanceGoals(object):
         zero_pose.detach_object(pocky)
         zero_pose.remove_object(pocky)
 
+    def test_attach_remove_box2(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        zero_pose.send_and_check_joint_goal(gaya_pose)
+        pocky = u'http://muh#pocky'
+        p = PoseStamped()
+        p.header.frame_id = zero_pose.r_tip
+        p.pose.orientation.w = 1
+        zero_pose.add_box(pocky, pose=p)
+        for i in range(10):
+            zero_pose.attach_existing(pocky, zero_pose.r_tip)
+            zero_pose.detach_object(pocky)
+        zero_pose.remove_object(pocky)
+
     def test_remove_attached_box(self, zero_pose):
         """
         :type zero_pose: PR2

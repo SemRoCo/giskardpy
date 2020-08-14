@@ -49,7 +49,7 @@ class GiskardBehavior(Behaviour):
 
     def unsafe_get_robot(self):
         """
-        :rtype: giskardpy.symengine_robot.Robot
+        :rtype: giskardpy.robot.Robot
         """
         if not self.robot:
             self.robot = self.get_god_map().unsafe_get_data(robot)

@@ -240,6 +240,7 @@ class Robot(Backend):
             p.header.frame_id = root
             p.pose = homo_matrix_to_pose(homo_m)
         except Exception as e:
+            print(e)
             traceback.print_exc()
             pass
         return p

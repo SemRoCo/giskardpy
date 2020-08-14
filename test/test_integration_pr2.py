@@ -17,6 +17,7 @@ from tf.transformations import quaternion_from_matrix, quaternion_about_axis
 
 import giskardpy.tfwrapper as tf
 from giskardpy import logging, identifier
+from giskardpy.constraints import WEIGHT_ABOVE_CA
 from giskardpy.identifier import fk_pose
 from giskardpy.robot import Robot
 from giskardpy.tfwrapper import init as tf_init
@@ -834,6 +835,48 @@ class TestConstraints(object):
 
         kitchen_setup.send_and_check_goal()
         kitchen_setup.set_kitchen_js({u'iai_fridge_door_joint': np.pi / 2})
+
+        kitchen_setup.add_json_goal(u'Close',
+                                    tip=kitchen_setup.r_tip,
+                                    object_name=u'kitchen',
+                                    handle_link=handle_name)
+        kitchen_setup.allow_all_collisions()
+        kitchen_setup.send_and_check_goal()
+        kitchen_setup.set_kitchen_js({u'iai_fridge_door_joint': 0})
+
+    def test_close_fridge_with_elbow(self, kitchen_setup):
+        """
+        :type kitchen_setup: PR2
+        """
+        base_pose = PoseStamped()
+        base_pose.header.frame_id = u'map'
+        base_pose.pose.position.y = -1.5
+        base_pose.pose.orientation.w = 1
+        kitchen_setup.teleport_base(base_pose)
+
+        handle_frame_id = u'iai_kitchen/iai_fridge_door_handle'
+        handle_name = u'iai_fridge_door_handle'
+
+        kitchen_setup.set_kitchen_js({u'iai_fridge_door_joint': np.pi / 2})
+
+        elbow = u'r_elbow_flex_link'
+
+
+        tip_axis = Vector3Stamped()
+        tip_axis.header.frame_id = kitchen_setup.r_tip
+        tip_axis.vector.x = 1
+
+        env_axis = Vector3Stamped()
+        env_axis.header.frame_id = handle_frame_id
+        env_axis.vector.z = 1
+        kitchen_setup.align_planes(elbow, tip_axis, root_normal=env_axis, weight=WEIGHT_ABOVE_CA)
+        kitchen_setup.send_and_check_goal()
+        elbow_pose = PoseStamped()
+        elbow_pose.header.frame_id = handle_frame_id
+        elbow_pose.pose.position.x += 0.1
+        elbow_pose.pose.orientation.w = 1
+        kitchen_setup.set_translation_goal(elbow_pose, elbow)
+        kitchen_setup.send_and_check_goal()
 
         kitchen_setup.add_json_goal(u'Close',
                                     tip=kitchen_setup.r_tip,

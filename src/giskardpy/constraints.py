@@ -941,20 +941,22 @@ class CartesianPositionStraight(BasicCartesianConstraint):
                                                self.tip,
                                                self.goal_constraint,
                                                weight,
-                                               prefix=u'uno')
+                                               prefix=u'goal')
 
+        # FIXME: are these updates somehow in the background?
+        #  Then the "start" point would be moving as well.
         dist, nearest = w.distance_point_to_line_segment(root_P_tip,
                                                          root_P_tip,
                                                          r_P_g)
 
         # Constraint to stick to the line
         self.add_minimize_position_constraints(r_P_g=nearest,
-                                               max_velocity=0.1,
-                                               max_acceleration=0.1,
+                                               max_velocity=max_velocity,
+                                               max_acceleration=max_acceleration,
                                                root=self.root,
                                                tip=self.tip,
                                                goal_constraint=self.goal_constraint,
-                                               prefix=u'zwei')
+                                               prefix=u'line')
 
 
 # class CartesianPositionX(BasicCartesianConstraint):

@@ -1574,6 +1574,20 @@ class TestCollisionAvoidanceGoals(object):
         m = zero_pose.get_world().get_object(object_name).as_marker_msg()
         compare_poses(m.pose, p.pose)
 
+    def test_add_mesh(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        object_name = u'muh'
+        p = PoseStamped()
+        p.header.frame_id = u'map'
+        p.pose.position = Point(1.2, 0, 1.6)
+        p.pose.orientation = Quaternion(0.0, 0.0, 0.47942554, 0.87758256)
+        zero_pose.add_mesh(object_name, path=u'urdfs/bowl.obj', pose=p)
+        # m = zero_pose.get_world().get_object(object_name).as_marker_msg()
+        # compare_poses(m.pose, p.pose)
+        pass
+
     def test_add_box_twice(self, zero_pose):
         """
         :type zero_pose: PR2

@@ -219,7 +219,7 @@ class GiskardTestWrapper(object):
             config = yaml.load(f)
         rospy.set_param(u'~', config)
         rospy.set_param(u'~path_to_data_folder', u'tmp_data/')
-        rospy.set_param(u'~enable_gui', False)
+        rospy.set_param(u'~enable_gui', True)
         rospy.set_param(u'~plugins/PlotTrajectory/enabled', True)
 
 
@@ -558,6 +558,14 @@ class GiskardTestWrapper(object):
 
     def add_cylinder(self, name=u'cylinder', size=[1, 1], pose=None):
         r = self.wrapper.add_cylinder(name=name, size=size, pose=pose)
+        assert r.error_codes == UpdateWorldResponse.SUCCESS, \
+            u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
+                                            update_world_error_code(UpdateWorldResponse.SUCCESS))
+        assert self.get_world().has_object(name)
+        assert name in self.wrapper.get_object_names().object_names
+
+    def add_mesh(self, name=u'cylinder', path=u'', pose=None):
+        r = self.wrapper.add_mesh(name=name, mesh=path, pose=pose)
         assert r.error_codes == UpdateWorldResponse.SUCCESS, \
             u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
                                             update_world_error_code(UpdateWorldResponse.SUCCESS))

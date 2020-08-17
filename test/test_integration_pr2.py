@@ -876,10 +876,12 @@ class TestConstraints(object):
         elbow_pose.pose.position.x += 0.1
         elbow_pose.pose.orientation.w = 1
         kitchen_setup.set_translation_goal(elbow_pose, elbow)
+        kitchen_setup.align_planes(elbow, tip_axis, root_normal=env_axis, weight=WEIGHT_ABOVE_CA)
+        kitchen_setup.allow_all_collisions()
         kitchen_setup.send_and_check_goal()
 
         kitchen_setup.add_json_goal(u'Close',
-                                    tip=kitchen_setup.r_tip,
+                                    tip=elbow,
                                     object_name=u'kitchen',
                                     handle_link=handle_name)
         kitchen_setup.allow_all_collisions()
@@ -1560,6 +1562,18 @@ class TestCollisionAvoidanceGoals(object):
                                     root=kitchen_setup.l_tip)
         kitchen_setup.send_and_check_goal()
         kitchen_setup.check_cart_goal(kitchen_setup.r_tip, r_goal)
+
+        kitchen_setup.detach_object('box')
+        kitchen_setup.attach_existing('box', kitchen_setup.r_tip)
+
+        r_goal2 = PoseStamped()
+        r_goal2.header.frame_id = 'box'
+        r_goal2.pose.position.x -= -.1
+        r_goal2.pose.orientation.w = 1
+
+        kitchen_setup.set_cart_goal(r_goal2, u'box', root=kitchen_setup.l_tip)
+        kitchen_setup.send_and_check_goal()
+        # kitchen_setup.check_cart_goal(u'box', r_goal2)
 
     def test_add_box(self, zero_pose):
         """

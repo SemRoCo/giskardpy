@@ -151,7 +151,7 @@ class TreeManager(object):
         :return:
         """
         t = self.tree_nodes[node_name]
-        if t.parent != None:
+        if t.parent is not None:
             return t.parent.disable_child(t)
         else:
             logging.logwarn('cannot disable root node')
@@ -166,7 +166,7 @@ class TreeManager(object):
         :return:
         """
         t = self.tree_nodes[node_name]
-        if t.parent != None:
+        if t.parent is not None:
             t.parent.enable_child(t)
         else:
             logging.loginfo('root node')

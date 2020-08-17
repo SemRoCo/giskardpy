@@ -317,15 +317,17 @@ class Constraint(object):
                                                      upper_slack_limit=upper_slack_limit,
                                                      linear_weight=linear_weight)
 
-    def add_debug_constraint(self, name, expr):
+    def add_debug_constraint(self, name, expr, prefix=u''):
         """
         Adds a constraint with weight 0 to the qp problem.
         Used to inspect subexpressions for debugging.
         :param name: a name to identify the expression
+        :param prefix: name prefix to distinguish different constraints
         :type name: str
         :type expr: w.Symbol
+        :type prefix: str
         """
-        self.add_constraint(name, expr, expr, 1, 0, False)
+        self.add_constraint(prefix, name, expr, expr, 1, 0, False)
 
     def add_debug_matrix(self, name, matrix_expr):
         for x in range(matrix_expr.shape[0]):
@@ -337,7 +339,7 @@ class Constraint(object):
             self.add_debug_constraint(name + u'/{}'.format(x), vector_expr[x])
 
     def add_minimize_position_constraints(self, r_P_g, max_velocity, max_acceleration, root, tip, goal_constraint,
-                                          weight=WEIGHT_BELOW_CA):
+                                          weight=WEIGHT_BELOW_CA, prefix=u''):
         """
         :param r_P_g: position of goal relative to root frame
         :param max_velocity:
@@ -364,19 +366,19 @@ class Constraint(object):
         #                                     0.06, WEIGHTS[1])
         weight = self.normalize_error(max_velocity, weight)
 
-        self.add_constraint(u'/x',
+        self.add_constraint(u'/' + prefix + u'/x',
                             lower=r_P_intermediate_error[0],
                             upper=r_P_intermediate_error[0],
                             weight=weight,
                             expression=r_P_c[0],
                             goal_constraint=goal_constraint)
-        self.add_constraint(u'/y',
+        self.add_constraint(u'/' + prefix + u'/y',
                             lower=r_P_intermediate_error[1],
                             upper=r_P_intermediate_error[1],
                             weight=weight,
                             expression=r_P_c[1],
                             goal_constraint=goal_constraint)
-        self.add_constraint(u'/z',
+        self.add_constraint(u'/' + prefix + u'/z',
                             lower=r_P_intermediate_error[2],
                             upper=r_P_intermediate_error[2],
                             weight=weight,
@@ -384,7 +386,7 @@ class Constraint(object):
                             goal_constraint=goal_constraint)
 
     def add_minimize_vector_angle_constraints(self, max_velocity, root, tip, tip_V_tip_normal, root_V_goal_normal,
-                                              weight=WEIGHT_BELOW_CA, goal_constraint=False):
+                                              weight=WEIGHT_BELOW_CA, goal_constraint=False, prefix=u''):
         root_R_tip = w.rotation_of(self.get_fk(root, tip))
         root_V_tip_normal = w.dot(root_R_tip, tip_V_tip_normal)
 
@@ -395,19 +397,19 @@ class Constraint(object):
 
         weight = self.normalize_error(max_velocity, weight)
 
-        self.add_constraint(u'/rot/x',
+        self.add_constraint(u'/' + prefix + u'/rot/x',
                             lower=error[0],
                             upper=error[0],
                             weight=weight,
                             expression=root_V_tip_normal[0],
                             goal_constraint=goal_constraint)
-        self.add_constraint(u'/rot/y',
+        self.add_constraint(u'/' + prefix + u'/rot/y',
                             lower=error[1],
                             upper=error[1],
                             weight=weight,
                             expression=root_V_tip_normal[1],
                             goal_constraint=goal_constraint)
-        self.add_constraint(u'/rot/z',
+        self.add_constraint(u'/' + prefix + u'/rot/z',
                             lower=error[2],
                             upper=error[2],
                             weight=weight,
@@ -415,7 +417,7 @@ class Constraint(object):
                             goal_constraint=goal_constraint)
 
     def add_minimize_rotation_constraints(self, root_R_tipGoal, root, tip, max_velocity=np.pi / 4,
-                                          weight=WEIGHT_BELOW_CA, goal_constraint=True):
+                                          weight=WEIGHT_BELOW_CA, goal_constraint=True, prefix=u''):
         root_R_tipCurrent = w.rotation_of(self.get_fk(root, tip))
         root_R_tipCurrent_evaluated = w.rotation_of(self.get_fk_evaluated(root, tip))
 
@@ -444,19 +446,19 @@ class Constraint(object):
 
         weight = self.normalize_error(max_velocity, weight)
 
-        self.add_constraint(u'/rot/0',
+        self.add_constraint(u'/' + prefix + u'/rot/0',
                             lower=c_R_g_intermediate_aa[0],
                             upper=c_R_g_intermediate_aa[0],
                             weight=weight,
                             expression=current_angle_axis[0],
                             goal_constraint=goal_constraint)
-        self.add_constraint(u'/rot/1',
+        self.add_constraint(u'/' + prefix + u'/rot/1',
                             lower=c_R_g_intermediate_aa[1],
                             upper=c_R_g_intermediate_aa[1],
                             weight=weight,
                             expression=current_angle_axis[1],
                             goal_constraint=goal_constraint)
-        self.add_constraint(u'/rot/2',
+        self.add_constraint(u'/' + prefix + u'/rot/2',
                             lower=c_R_g_intermediate_aa[2],
                             upper=c_R_g_intermediate_aa[2],
                             weight=weight,

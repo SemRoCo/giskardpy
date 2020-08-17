@@ -393,8 +393,6 @@ class TestConstraints(object):
         zero_pose.set_translation_goal(goal_position, zero_pose.l_tip)
         zero_pose.send_and_check_goal()
 
-
-
     def test_AvoidJointLimits1(self, zero_pose):
         """
         :type zero_pose: PR2

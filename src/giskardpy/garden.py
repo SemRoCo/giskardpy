@@ -16,7 +16,7 @@ import giskardpy.pybullet_wrapper as pbw
 from giskardpy import logging
 from giskardpy.god_map import GodMap
 from giskardpy.input_system import JointStatesInput
-from giskardpy.plugin import PluginBehavior
+from giskardpy.plugin import PluginBehavior, SuccessPlugin
 from giskardpy.plugin_action_server import GoalReceived, SendResult, GoalCanceled
 from giskardpy.plugin_attached_tf_publicher import TFPlugin
 from giskardpy.plugin_cleanup import CleanUp
@@ -191,7 +191,7 @@ def grow_tree():
     planning_1.add_child(GoalToConstraints(u'update constraints', action_server_name))
     planning_1.add_child(planning_2)
     if god_map.get_data(identifier.enable_VisualizationBehavior):
-        planning_1.add_child(VisualizationBehavior(u'visualization'))
+        planning_1.add_child(VisualizationBehavior(u'visualization', ensure_publish=True))
     if god_map.get_data(identifier.enable_CPIMarker):
         planning_1.add_child(CollisionMarker(u'cpi marker'))
     # ----------------------------------------------

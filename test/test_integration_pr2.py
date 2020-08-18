@@ -1594,12 +1594,28 @@ class TestCollisionAvoidanceGoals(object):
         """
         object_name = u'muh'
         p = PoseStamped()
-        p.header.frame_id = u'map'
-        p.pose.position = Point(1.2, 0, 1.6)
-        p.pose.orientation = Quaternion(0.0, 0.0, 0.47942554, 0.87758256)
-        zero_pose.add_mesh(object_name, path=u'urdfs/bowl.obj', pose=p)
+        p.header.frame_id = zero_pose.r_tip
+        p.pose.position = Point(0.1,0,0)
+        p.pose.orientation = Quaternion(0,0,0,1)
+        zero_pose.add_mesh(object_name, path=u'package://giskardpy/test/urdfs/bowl_decomposed_into_21_parts.dae', pose=p)
         # m = zero_pose.get_world().get_object(object_name).as_marker_msg()
         # compare_poses(m.pose, p.pose)
+        pass
+
+    def test_mesh_collision_avoidance(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        zero_pose.close_r_gripper()
+        object_name = u'muh'
+        p = PoseStamped()
+        p.header.frame_id = zero_pose.r_tip
+        p.pose.position = Point(0.01,0,0)
+        p.pose.orientation = Quaternion(*quaternion_about_axis(-np.pi/2, [0,1,0]))
+        zero_pose.add_mesh(object_name, path=u'package://giskardpy/test/urdfs/bowl_decomposed_into_21_parts.dae', pose=p)
+        # m = zero_pose.get_world().get_object(object_name).as_marker_msg()
+        # compare_poses(m.pose, p.pose)
+        zero_pose.send_and_check_goal()
         pass
 
     def test_add_box_twice(self, zero_pose):

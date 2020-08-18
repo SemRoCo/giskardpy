@@ -737,6 +737,10 @@ class URDFObject(object):
             m.scale = Vector3(geometry.radius * 2,
                               geometry.radius * 2,
                               geometry.length)
+        elif isinstance(geometry, up.Mesh):
+            m.type = Marker.MESH_RESOURCE
+            m.scale = Vector3(1,1,1)
+            m.mesh_resource = geometry.filename
         else:
             raise Exception(u'world body type {} can\'t be converted to marker'.format(geometry.__class__.__name__))
         m.color = ColorRGBA(0, 1, 0, 0.5)

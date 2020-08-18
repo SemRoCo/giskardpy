@@ -950,6 +950,7 @@ class CartesianPositionStraight(BasicCartesianConstraint):
                                                          r_P_g)
 
         # Constraint to stick to the line
+        self.add_debug_vector(u'start_point', root_P_tip)
         self.add_minimize_position_constraints(r_P_g=nearest,
                                                max_velocity=max_velocity,
                                                max_acceleration=max_acceleration,

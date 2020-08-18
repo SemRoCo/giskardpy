@@ -927,14 +927,15 @@ class CartesianPositionStraight(BasicCartesianConstraint):
         }'
         :return:
         """
-        r_P_g = w.position_of(self.get_goal_pose())
+        root_P_goal = w.position_of(self.get_goal_pose())
         root_P_tip = w.position_of(self.get_fk(self.root, self.tip))
+        root_V_start = w.position_of(tf.lookup_transform(self.root, self.tip))
         max_velocity = self.get_input_float(self.max_velocity)
         max_acceleration = self.get_input_float(self.max_acceleration)
         weight = self.get_input_float(self.weight)
 
         # Constraint to go to goal pos
-        self.add_minimize_position_constraints(r_P_g,
+        self.add_minimize_position_constraints(root_P_goal,
                                                max_velocity,
                                                max_acceleration,
                                                self.root,
@@ -946,9 +947,8 @@ class CartesianPositionStraight(BasicCartesianConstraint):
         # FIXME: are these updates somehow in the background?
         #  Then the "start" point would be moving as well.
         dist, nearest = w.distance_point_to_line_segment(root_P_tip,
-                                                         root_P_tip,
-                                                         r_P_g)
-
+                                                         root_V_start,
+                                                         root_P_goal)
         # Constraint to stick to the line
         self.add_debug_vector(u'start_point', root_P_tip)
         self.add_minimize_position_constraints(r_P_g=nearest,

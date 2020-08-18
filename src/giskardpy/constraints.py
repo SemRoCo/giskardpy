@@ -317,7 +317,7 @@ class Constraint(object):
                                                      upper_slack_limit=upper_slack_limit,
                                                      linear_weight=linear_weight)
 
-    def add_debug_constraint(self, name, expr, prefix=u''):
+    def add_debug_constraint(self, name, expr):
         """
         Adds a constraint with weight 0 to the qp problem.
         Used to inspect subexpressions for debugging.
@@ -327,7 +327,7 @@ class Constraint(object):
         :type expr: w.Symbol
         :type prefix: str
         """
-        self.add_constraint(prefix, name, expr, expr, 1, 0, False)
+        self.add_constraint(name, expr, expr, 1, 0, False)
 
     def add_debug_matrix(self, name, matrix_expr):
         for x in range(matrix_expr.shape[0]):

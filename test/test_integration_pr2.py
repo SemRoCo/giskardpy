@@ -1597,7 +1597,7 @@ class TestCollisionAvoidanceGoals(object):
         p.header.frame_id = zero_pose.r_tip
         p.pose.position = Point(0.1,0,0)
         p.pose.orientation = Quaternion(0,0,0,1)
-        zero_pose.add_mesh(object_name, path=u'package://giskardpy/test/urdfs/bowl_decomposed_into_21_parts.dae', pose=p)
+        zero_pose.add_mesh(object_name, path=u'package://giskardpy/test/urdfs/meshes/bowl_21.obj', pose=p)
         # m = zero_pose.get_world().get_object(object_name).as_marker_msg()
         # compare_poses(m.pose, p.pose)
         pass
@@ -1612,7 +1612,7 @@ class TestCollisionAvoidanceGoals(object):
         p.header.frame_id = zero_pose.r_tip
         p.pose.position = Point(0.01,0,0)
         p.pose.orientation = Quaternion(*quaternion_about_axis(-np.pi/2, [0,1,0]))
-        zero_pose.add_mesh(object_name, path=u'package://giskardpy/test/urdfs/bowl_decomposed_into_21_parts.dae', pose=p)
+        zero_pose.add_mesh(object_name, path=u'package://giskardpy/test/urdfs/meshes/cup_11.obj', pose=p)
         # m = zero_pose.get_world().get_object(object_name).as_marker_msg()
         # compare_poses(m.pose, p.pose)
         zero_pose.send_and_check_goal()
@@ -3114,6 +3114,7 @@ class TestCollisionAvoidanceGoals(object):
 
         # kitchen_setup.allow_collision([], milk_name, [])
         # kitchen_setup.add_json_goal(u'AvoidJointLimits', percentage=15)
+        kitchen_setup.allow_all_collisions()
         kitchen_setup.send_and_check_goal()
 
         kitchen_setup.attach_existing(milk_name, kitchen_setup.l_tip)

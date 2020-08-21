@@ -854,44 +854,44 @@ class BasicCartesianConstraint(Constraint):
         return u'{}/{}/{}'.format(s, self.root, self.tip)
 
 
-class CartesianPosition(BasicCartesianConstraint):
-
-    def make_constraints(self):
-        """
-        example:
-        name='CartesianPosition'
-        parameter_value_pair='{
-            "root": "base_footprint", #required
-            "tip": "r_gripper_tool_frame", #required
-            "goal_position": {"header":
-                                {"stamp":
-                                    {"secs": 0,
-                                    "nsecs": 0},
-                                "frame_id": "",
-                                "seq": 0},
-                            "pose": {"position":
-                                        {"y": 0.0,
-                                        "x": 0.0,
-                                        "z": 0.0},
-                                    "orientation": {"y": 0.0,
-                                                    "x": 0.0,
-                                                    "z": 0.0,
-                                                    "w": 0.0}
-                                    }
-                            }', #required
-            "weight": 1, #optional
-            "max_velocity": 0.3 #optional -- rad/s or m/s depending on joint; can not go higher than urdf limit
-        }'
-        :return:
-        """
-
-        r_P_g = w.position_of(self.get_goal_pose())
-        max_velocity = self.get_input_float(self.max_velocity)
-        max_acceleration = self.get_input_float(self.max_acceleration)
-        weight = self.get_input_float(self.weight)
-
-        self.add_minimize_position_constraints(r_P_g, max_velocity, max_acceleration, self.root, self.tip,
-                                               self.goal_constraint, weight)
+# class CartesianPosition(BasicCartesianConstraint):
+#
+#     def make_constraints(self):
+#         """
+#         example:
+#         name='CartesianPosition'
+#         parameter_value_pair='{
+#             "root": "base_footprint", #required
+#             "tip": "r_gripper_tool_frame", #required
+#             "goal_position": {"header":
+#                                 {"stamp":
+#                                     {"secs": 0,
+#                                     "nsecs": 0},
+#                                 "frame_id": "",
+#                                 "seq": 0},
+#                             "pose": {"position":
+#                                         {"y": 0.0,
+#                                         "x": 0.0,
+#                                         "z": 0.0},
+#                                     "orientation": {"y": 0.0,
+#                                                     "x": 0.0,
+#                                                     "z": 0.0,
+#                                                     "w": 0.0}
+#                                     }
+#                             }', #required
+#             "weight": 1, #optional
+#             "max_velocity": 0.3 #optional -- rad/s or m/s depending on joint; can not go higher than urdf limit
+#         }'
+#         :return:
+#         """
+#
+#         r_P_g = w.position_of(self.get_goal_pose())
+#         max_velocity = self.get_input_float(self.max_velocity)
+#         max_acceleration = self.get_input_float(self.max_acceleration)
+#         weight = self.get_input_float(self.weight)
+#
+#         self.add_minimize_position_constraints(r_P_g, max_velocity, max_acceleration, self.root, self.tip,
+#                                                self.goal_constraint, weight)
 
 
 class CartesianPositionStraight(BasicCartesianConstraint):
@@ -929,7 +929,7 @@ class CartesianPositionStraight(BasicCartesianConstraint):
         """
         root_P_goal = w.position_of(self.get_goal_pose())
         root_P_tip = w.position_of(self.get_fk(self.root, self.tip))
-        root_V_start = w.position_of(tf.lookup_transform(self.root, self.tip))
+        root_V_start = tf.lookup_transform(self.root, self.tip).transform.translation
         max_velocity = self.get_input_float(self.max_velocity)
         max_acceleration = self.get_input_float(self.max_acceleration)
         weight = self.get_input_float(self.weight)
@@ -944,8 +944,8 @@ class CartesianPositionStraight(BasicCartesianConstraint):
                                                weight,
                                                prefix=u'goal')
 
-        # FIXME: are these updates somehow in the background?
-        #  Then the "start" point would be moving as well.
+        # FIXME: type error. Mixed calc with Vector3 and SX (expression)
+        #        Both same or can we make it working?
         dist, nearest = w.distance_point_to_line_segment(root_P_tip,
                                                          root_V_start,
                                                          root_P_goal)

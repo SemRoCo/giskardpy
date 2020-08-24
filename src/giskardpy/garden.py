@@ -50,20 +50,20 @@ def initialize_god_map():
     god_map = GodMap()
     blackboard = Blackboard
     blackboard.god_map = god_map
-    god_map.safe_set_data(identifier.wiggle_detection_samples, defaultdict(list))
-    god_map.safe_set_data(identifier.rosparam, rospy.get_param(rospy.get_name()))
-    god_map.safe_set_data(identifier.robot_description, rospy.get_param(u'robot_description'))
+    god_map.set_data(identifier.wiggle_detection_samples, defaultdict(list))
+    god_map.set_data(identifier.rosparam, rospy.get_param(rospy.get_name()))
+    god_map.set_data(identifier.robot_description, rospy.get_param(u'robot_description'))
     path_to_data_folder = god_map.get_data(identifier.data_folder)
     # fix path to data folder
     if not path_to_data_folder.endswith(u'/'):
         path_to_data_folder += u'/'
-    god_map.safe_set_data(identifier.data_folder, path_to_data_folder)
+    god_map.set_data(identifier.data_folder, path_to_data_folder)
 
     # fix nWSR
     nWSR = god_map.get_data(identifier.nWSR)
     if nWSR == u'None':
         nWSR = None
-    god_map.safe_set_data(identifier.nWSR, nWSR)
+    god_map.set_data(identifier.nWSR, nWSR)
 
     pbw.start_pybullet(god_map.get_data(identifier.gui))
     while not rospy.is_shutdown():
@@ -113,7 +113,7 @@ def initialize_god_map():
                                                                              god_map)
 
     world = PyBulletWorld(False, blackboard.god_map.get_data(identifier.data_folder))
-    god_map.safe_set_data(identifier.world, world)
+    god_map.set_data(identifier.world, world)
     robot = WorldObject(god_map.get_data(identifier.robot_description),
                         None,
                         controlled_joints)
@@ -140,7 +140,7 @@ def process_joint_specific_params(identifier_, default, override, god_map):
     override = god_map.get_data(override)
     if isinstance(override, dict):
         d.update(override)
-    god_map.safe_set_data(identifier_, d)
+    god_map.set_data(identifier_, d)
     return KeyDefaultDict(lambda key: god_map.to_symbol(identifier_ + [key]))
 
 
@@ -195,24 +195,24 @@ def grow_tree():
     if god_map.get_data(identifier.enable_CPIMarker):
         planning_1.add_child(CollisionMarker(u'cpi marker'))
     # ----------------------------------------------
+    post_processing = failure_is_success(Sequence)(u'post planning')
+    post_processing.add_child(WiggleCancel(u'final wiggle detection', final_detection=True))
+    post_processing.add_child(PostProcessing(u'evaluate result'))
+    post_processing.add_child(PostProcessing(u'check reachability'))
     # ----------------------------------------------
     process_move_goal = failure_is_success(Selector)(u'process move goal')
     process_move_goal.add_child(planning_1)
+    process_move_goal.add_child(post_processing)
     process_move_goal.add_child(SetCmd(u'set move goal', action_server_name))
-    # ----------------------------------------------
-    #
-    post_processing = failure_is_success(Sequence)(u'post processing')
-    post_processing.add_child(WiggleCancel(u'wiggle_cancel_final_detection', final_detection=True))
-    post_processing.add_child(PostProcessing(u'post_processing'))
+    if god_map.get_data(identifier.enable_PlotTrajectory):
+        process_move_goal.add_child(success_is_failure(PlotTrajectory)(u'plot trajectory', order=3))
+
     # ----------------------------------------------
     # ----------------------------------------------
     root = Sequence(u'root')
     root.add_child(wait_for_goal)
     root.add_child(CleanUp(u'cleanup'))
     root.add_child(process_move_goal)
-    if god_map.get_data(identifier.enable_PlotTrajectory):
-        root.add_child(PlotTrajectory(u'plot trajectory', order=3))
-        # root.add_child(PlotTrajectoryFFT(u'plot fft', joint_name=u'r_wrist_flex_joint'))
     root.add_child(post_processing)
     root.add_child(move_robot)
     root.add_child(SendResult(u'send result', action_server_name, MoveAction))

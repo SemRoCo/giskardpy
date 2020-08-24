@@ -37,7 +37,7 @@ class Constraint(object):
     def save_params_on_god_map(self, params):
         constraints = self.get_god_map().get_data(identifier.constraints_identifier)
         constraints[str(self)] = params
-        self.get_god_map().safe_set_data(identifier.constraints_identifier, constraints)
+        self.get_god_map().set_data(identifier.constraints_identifier, constraints)
 
     def make_constraints(self):
         pass
@@ -1609,7 +1609,7 @@ class UpdateGodMap(Constraint):
             next_identifier = identifier + [member]
             if isinstance(value, numbers.Number) and \
                     isinstance(self.get_god_map().get_data(next_identifier), numbers.Number):
-                self.get_god_map().safe_set_data(next_identifier, value)
+                self.get_god_map().set_data(next_identifier, value)
             else:
                 self.update_god_map(next_identifier, value)
 

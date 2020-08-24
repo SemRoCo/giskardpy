@@ -1526,6 +1526,36 @@ class TestCartGoals(object):
 
         pass
 
+
+    def test_waypoints_with_fail(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        p = PoseStamped()
+        p.header.frame_id = zero_pose.r_tip
+        p.header.stamp = rospy.get_rostime()
+        p.pose.position = Point(-0.1, 0, 0)
+        p.pose.orientation = Quaternion(0, 0, 0, 1)
+        zero_pose.set_cart_goal(p, zero_pose.r_tip, zero_pose.default_root)
+
+        zero_pose.add_waypoint()
+        p = PoseStamped()
+        p.header.frame_id = zero_pose.r_tip
+        p.header.stamp = rospy.get_rostime()
+        p.pose.position = Point(0.0, -0.1, -10.1)
+        p.pose.orientation = Quaternion(0, 0, 0, 1)
+        zero_pose.set_cart_goal(p, zero_pose.r_tip, zero_pose.default_root)
+
+        zero_pose.add_waypoint()
+        p = PoseStamped()
+        p.header.frame_id = zero_pose.r_tip
+        p.header.stamp = rospy.get_rostime()
+        p.pose.position = Point(0.1, 0.1, 0.1)
+        p.pose.orientation = Quaternion(0, 0, 0, 1)
+        zero_pose.set_cart_goal(p, zero_pose.r_tip, zero_pose.default_root)
+
+        zero_pose.send_and_check_goal()
+
     # TODO test translation and orientation goal in different frame
 
 
@@ -1876,6 +1906,17 @@ class TestCollisionAvoidanceGoals(object):
 
         req = UpdateWorldRequest(UpdateWorldRequest.ADD, wb, True, pose)
         assert kitchen_setup.wrapper.update_world.call(req).error_codes == UpdateWorldResponse.UNSUPPORTED_OPTIONS
+
+    def test_infeasible(self, kitchen_setup):
+        """
+        :type kitchen_setup: PR2
+        """
+        pose = PoseStamped()
+        pose.header.frame_id = u'map'
+        pose.pose.position = Point(2,0,0)
+        pose.pose.orientation = Quaternion(w=1)
+        kitchen_setup.teleport_base(pose)
+        kitchen_setup.send_and_check_goal()
 
     def test_link_b_set_but_body_b_not(self, box_setup):
         """

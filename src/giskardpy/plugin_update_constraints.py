@@ -38,7 +38,7 @@ class GoalToConstraints(GetGoal):
         self.rc_other_velocity = self.get_god_map().get_data(identifier.rc_other_velocity)
 
     def initialise(self):
-        self.get_god_map().safe_set_data(identifier.collision_goal, None)
+        self.get_god_map().set_data(identifier.collision_goal, None)
 
     def update(self):
         # TODO make this interruptable
@@ -48,7 +48,7 @@ class GoalToConstraints(GetGoal):
         if not move_cmd:
             return Status.FAILURE
 
-        self.get_god_map().safe_set_data(identifier.constraints_identifier, {})
+        self.get_god_map().set_data(identifier.constraints_identifier, {})
 
         self.soft_constraints = {}
         if not (self.get_god_map().get_data(identifier.check_reachability)):
@@ -69,8 +69,8 @@ class GoalToConstraints(GetGoal):
             traceback.print_exc()
             return Status.SUCCESS
 
-        self.get_god_map().safe_set_data(identifier.collision_goal, move_cmd.collisions)
-        self.get_god_map().safe_set_data(identifier.soft_constraint_identifier, self.soft_constraints)
+        self.get_god_map().set_data(identifier.collision_goal, move_cmd.collisions)
+        self.get_god_map().set_data(identifier.soft_constraint_identifier, self.soft_constraints)
         self.get_blackboard().runtime = time()
 
         controlled_joints = self.get_robot().controlled_joints
@@ -113,8 +113,8 @@ class GoalToConstraints(GetGoal):
         hard_constraints = OrderedDict(((self.robot.get_name(), k), self.robot._hard_constraints[k]) for k in
                                        controlled_joints if k in self.robot._hard_constraints)
 
-        self.get_god_map().safe_set_data(identifier.joint_constraint_identifier, joint_constraints)
-        self.get_god_map().safe_set_data(identifier.hard_constraint_identifier, hard_constraints)
+        self.get_god_map().set_data(identifier.joint_constraint_identifier, joint_constraints)
+        self.get_god_map().set_data(identifier.hard_constraint_identifier, hard_constraints)
 
         return Status.SUCCESS
 

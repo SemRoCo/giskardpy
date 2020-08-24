@@ -34,6 +34,7 @@ xdot_keys = qp_data + [u'xdot_keys']
 wiggle_detection_samples = [u'wiggle_detection_samples']
 post_processing = [u'post_processing']
 soft_constraints = post_processing + [u'soft_constraints']
+result_message = [u'result_message']
 
 
 

@@ -14,6 +14,7 @@ from rospy_message_converter.message_converter import \
 
 import giskardpy.identifier as identifier
 import giskardpy.tfwrapper as tf
+import tf_conversions as tc
 from giskardpy import cas_wrapper as w
 from giskardpy.data_types import SoftConstraint
 from giskardpy.exceptions import GiskardException, ConstraintException
@@ -929,7 +930,7 @@ class CartesianPositionStraight(BasicCartesianConstraint):
         """
         root_P_goal = w.position_of(self.get_goal_pose())
         root_P_tip = w.position_of(self.get_fk(self.root, self.tip))
-        root_V_start = tf.lookup_transform(self.root, self.tip).transform.translation
+        root_V_start = w.Matrix(tf.transform_stamped_to_pq(tf.lookup_transform(self.root, self.tip))[0])
         max_velocity = self.get_input_float(self.max_velocity)
         max_acceleration = self.get_input_float(self.max_acceleration)
         weight = self.get_input_float(self.weight)

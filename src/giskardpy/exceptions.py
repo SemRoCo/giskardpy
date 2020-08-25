@@ -62,6 +62,10 @@ class UnknownConstraintException(ConstraintException, KeyError):
 class ConstraintInitalizationException(ConstraintException):
     pass
 
+# int64 INVALID_GOAL
+class InvalidGoalException(ConstraintException):
+    pass
+
 # errors during planning------------------------------------------------------------------------------------------------
 # int64 PLANNING_ERROR=13 # if no planning code fits
 class PlanningException(GiskardException):
@@ -77,7 +81,7 @@ class UnreachableException(PlanningException):
 
 # errors during execution
 # int64 EXECUTION_ERROR # if no execution code fits
-# int64 PREEMPTED # goal got cancled via action server interface
+# int64 PREEMPTED # goal got canceled via action server interface
 class ExecutionException(GiskardException):
     pass
 

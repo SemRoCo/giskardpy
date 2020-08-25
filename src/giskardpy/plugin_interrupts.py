@@ -2,7 +2,7 @@ import numpy as np
 from py_trees import Status
 
 import giskardpy.identifier as identifier
-from giskardpy.exceptions import InsolvableException
+from giskardpy.exceptions import ShakingException
 from giskardpy.plugin import GiskardBehavior
 from giskardpy import logging
 
@@ -31,14 +31,14 @@ class WiggleCancel(GiskardBehavior):
         if self.final_detection:
             js_samples_array = np.array(self.js_samples.values())
             if(len(js_samples_array) == 0):
-                logging.logwarn('sample array was empty during final wiggle detection')
+                logging.logwarn(u'sample array was empty during final wiggle detection')
                 return Status.SUCCESS
 
             if len(js_samples_array[0]) < 4:  # if there are less than 4 sample points it makes no sense to try to detect wiggling
                 return Status.SUCCESS
 
             if detect_wiggling(js_samples_array, self.sample_period, self.min_wiggle_frequency, self.wiggle_detection_threshold):
-                self.raise_to_blackboard(InsolvableException(u'endless wiggling detected'))
+                self.raise_to_blackboard(ShakingException(u'shaky trajectory detected'))
 
             return Status.SUCCESS
         else:
@@ -56,7 +56,7 @@ class WiggleCancel(GiskardBehavior):
 
             js_samples_array = np.array(self.js_samples.values())
             if(detect_wiggling(js_samples_array, self.sample_period, self.min_wiggle_frequency, self.wiggle_detection_threshold)):
-                raise InsolvableException(u'endless wiggling detected')
+                raise ShakingException(u'shaky trajectory detected')
 
             return Status.RUNNING
 
@@ -88,15 +88,15 @@ def detect_wiggling(js_samples, sample_period, min_wiggle_frequency, wiggle_dete
 
 
 
-class MaxTrajLength(GiskardBehavior):
-    def update(self):
-        t = self.get_god_map().get_data(identifier.time)
-        sample_period = self.get_god_map().get_data(identifier.sample_period)
-        t = t * sample_period
-        if t > 30:
-            raise InsolvableException(u'trajectory too long')
-
-        return Status.RUNNING
+# class MaxTrajLength(GiskardBehavior):
+#     def update(self):
+#         t = self.get_god_map().get_data(identifier.time)
+#         sample_period = self.get_god_map().get_data(identifier.sample_period)
+#         t = t * sample_period
+#         if t > 30:
+#             raise InsolvableException(u'trajectory too long')
+#
+#         return Status.RUNNING
 
 
 

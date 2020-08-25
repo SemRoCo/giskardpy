@@ -1493,8 +1493,7 @@ class TestCartGoals(object):
         zero_pose.add_waypoint()
         zero_pose.set_joint_goal(gaya_pose)
 
-        zero_pose.send_and_check_goal()
-        traj = zero_pose.get_trajectory_msg()
+        traj = zero_pose.send_and_check_goal()
         for i, joint_state in enumerate(traj):
             try:
                 zero_pose.compare_joint_state(joint_state, pocky_pose)

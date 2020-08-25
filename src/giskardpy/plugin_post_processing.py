@@ -3,10 +3,10 @@ from giskard_msgs.msg import MoveResult
 from py_trees import Status
 
 import giskardpy.identifier as identifier
-from giskardpy.exceptions import InsolvableException, UnreachableException, MAX_NWSR_REACHEDException, \
+from giskardpy.exceptions import UnreachableException, MAX_NWSR_REACHEDException, \
     QPSolverException, UnknownBodyException, ImplementationException, InfeasibleException, OutOfJointLimitsException, \
     HardConstraintsViolatedException, PhysicsWorldException, ConstraintException, UnknownConstraintException, \
-    ConstraintInitalizationException, PlanningException, ShakingException
+    ConstraintInitalizationException, PlanningException, ShakingException, ExecutionException, InvalidGoalException
 from giskardpy.plugin import GiskardBehavior
 from giskardpy.utils import make_filter_b_mask
 
@@ -67,25 +67,22 @@ class PostProcessing(GiskardBehavior):
                 error_code = MoveResult.UNKNOWN_CONSTRAINT
             elif isinstance(exception, ConstraintInitalizationException):
                 error_code = MoveResult.CONSTRAINT_INITIALIZATION_ERROR
+            elif isinstance(exception, InvalidGoalException):
+                error_code = MoveResult.INVALID_GOAL
         # planning exceptions
         elif isinstance(exception, PlanningException):
             error_code = MoveResult.PLANNING_ERROR
             if isinstance(exception, ShakingException):
                 error_code = MoveResult.SHAKING
             elif isinstance(exception, UnreachableException):
-                error_code = MoveResult.UNREACHABLE
+                if self.get_god_map().get_data(identifier.check_reachability):
+                    error_code = MoveResult.UNREACHABLE
+                else:
+                    error_code = MoveResult.ERROR
         # execution exceptions
-        elif isinstance(exception, QPSolverException):
-            error_code = MoveResult.QP_SOLVER_ERROR
-        elif isinstance(exception, UnknownBodyException):
-            error_code = MoveResult.UNKNOWN_OBJECT
-        elif isinstance(exception, InsolvableException):
-            if self.get_god_map().get_data(identifier.check_reachability):
-                error_code = MoveResult.UNREACHABLE
-            else:
-                error_code = MoveResult.ERROR
-        elif isinstance(exception, UnreachableException):
-            error_code = MoveResult.UNREACHABLE
+        elif isinstance(exception, ExecutionException):
+            error_code = MoveResult.EXECUTION_ERROR
+
         elif isinstance(exception, ImplementationException):
             print(exception)
             error_code = MoveResult.ERROR

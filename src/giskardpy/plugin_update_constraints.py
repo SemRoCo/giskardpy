@@ -15,7 +15,7 @@ import giskardpy.constraints
 import giskardpy.identifier as identifier
 from giskardpy.constraints import SelfCollisionAvoidance, ExternalCollisionAvoidance
 from giskardpy.data_types import JointConstraint
-from giskardpy.exceptions import InsolvableException, ImplementationException
+from giskardpy.exceptions import ImplementationException, UnknownConstraintException, InvalidGoalException
 from giskardpy.logging import loginfo
 from giskardpy.plugin_action_server import GetGoal
 
@@ -57,11 +57,7 @@ class GoalToConstraints(GetGoal):
         try:
             self.parse_constraints(move_cmd)
         except AttributeError:
-            self.raise_to_blackboard(InsolvableException(u'couldn\'t transform goal'))
-            traceback.print_exc()
-            return Status.SUCCESS
-        except InsolvableException as e:
-            self.raise_to_blackboard(e)
+            self.raise_to_blackboard(InvalidGoalException(u'couldn\'t transform goal'))
             traceback.print_exc()
             return Status.SUCCESS
         except Exception as e:
@@ -135,11 +131,11 @@ class GoalToConstraints(GetGoal):
                     if ratio >= 0.5:
                         matches = matches + s + '\n'
                 if matches != '':
-                    raise InsolvableException(
+                    raise UnknownConstraintException(
                         u'unknown constraint {}. did you mean one of these?:\n{}'.format(constraint.type, matches))
                 else:
                     available_constraints = '\n'.join([x for x in self.allowed_constraint_types.keys()]) + '\n'
-                    raise InsolvableException(
+                    raise UnknownConstraintException(
                         u'unknown constraint {}. available constraint types:\n{}'.format(constraint.type,
                                                                                          available_constraints))
 

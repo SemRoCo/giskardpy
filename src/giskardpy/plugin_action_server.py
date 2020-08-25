@@ -7,7 +7,7 @@ from giskard_msgs.msg._MoveGoal import MoveGoal
 from giskard_msgs.msg._MoveResult import MoveResult
 from py_trees import Blackboard, Status
 
-from giskardpy.exceptions import MAX_NWSR_REACHEDException, QPSolverException, InsolvableException, \
+from giskardpy.exceptions import MAX_NWSR_REACHEDException, QPSolverException, \
     UnknownBodyException, ImplementationException, UnreachableException
 import giskardpy.identifier as identifier
 from giskardpy.logging import loginfo
@@ -127,7 +127,7 @@ class SendResult(ActionServerBehavior):
         e = self.get_blackboard_exception()
         Blackboard().set('exception', None)
         result = MoveResult()
-        result.error_codes = self.exception_to_error_code(e)
+        # result.error_codes = self.exception_to_error_code(e)
 
         trajectory = self.get_god_map().get_data(identifier.trajectory)
         sample_period = self.get_god_map().get_data(identifier.sample_period)
@@ -146,28 +146,28 @@ class SendResult(ActionServerBehavior):
 
 
 
-    def exception_to_error_code(self, exception):
-        """
-        :type exception: Exception
-        :rtype: int
-        """
-        error_code = MoveResult.SUCCESS
-        if isinstance(exception, MAX_NWSR_REACHEDException):
-            error_code = MoveResult.MAX_NWSR_REACHED
-        elif isinstance(exception, QPSolverException):
-            error_code = MoveResult.QP_SOLVER_ERROR
-        elif isinstance(exception, UnknownBodyException):
-            error_code = MoveResult.UNKNOWN_OBJECT
-        elif isinstance(exception, InsolvableException):
-            if self.get_god_map().get_data(identifier.check_reachability):
-                error_code = MoveResult.UNREACHABLE
-            else:
-                error_code = MoveResult.ERROR
-        elif isinstance(exception, UnreachableException):
-            error_code = MoveResult.UNREACHABLE
-        elif isinstance(exception, ImplementationException):
-            print(exception)
-            error_code = MoveResult.ERROR
-        elif exception is not None:
-            error_code = MoveResult.ERROR
-        return error_code
+    # def exception_to_error_code(self, exception):
+    #     """
+    #     :type exception: Exception
+    #     :rtype: int
+    #     """
+    #     error_code = MoveResult.SUCCESS
+    #     if isinstance(exception, MAX_NWSR_REACHEDException):
+    #         error_code = MoveResult.MAX_NWSR_REACHED
+    #     elif isinstance(exception, QPSolverException):
+    #         error_code = MoveResult.QP_SOLVER_ERROR
+    #     elif isinstance(exception, UnknownBodyException):
+    #         error_code = MoveResult.UNKNOWN_OBJECT
+    #     elif isinstance(exception, InsolvableException):
+    #         if self.get_god_map().get_data(identifier.check_reachability):
+    #             error_code = MoveResult.UNREACHABLE
+    #         else:
+    #             error_code = MoveResult.ERROR
+    #     elif isinstance(exception, UnreachableException):
+    #         error_code = MoveResult.UNREACHABLE
+    #     elif isinstance(exception, ImplementationException):
+    #         print(exception)
+    #         error_code = MoveResult.ERROR
+    #     elif exception is not None:
+    #         error_code = MoveResult.ERROR
+    #     return error_code

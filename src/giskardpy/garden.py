@@ -26,7 +26,7 @@ from giskardpy.plugin_collision_marker import CollisionMarker
 from giskardpy.plugin_goal_reached import GoalReachedPlugin
 from giskardpy.plugin_if import IF
 from giskardpy.plugin_instantaneous_controller import ControllerPlugin
-from giskardpy.plugin_interrupts import WiggleCancel, MaxTrajLength
+from giskardpy.plugin_interrupts import WiggleCancel
 from giskardpy.plugin_kinematic_sim import KinSimPlugin
 from giskardpy.plugin_log_trajectory import LogTrajPlugin
 from giskardpy.plugin_plot_trajectory import PlotTrajectory
@@ -200,9 +200,15 @@ def grow_tree():
     post_processing.add_child(PostProcessing(u'evaluate result'))
     post_processing.add_child(PostProcessing(u'check reachability'))
     # ----------------------------------------------
+    planning = success_is_failure(Sequence)(u'planning')
+    planning.add_child(IF(u'goal_set?', identifier.next_move_goal))
+    planning.add_child(planning_1)
+    planning.add_child(post_processing)
+
     process_move_goal = failure_is_success(Selector)(u'process move goal')
-    process_move_goal.add_child(planning_1)
-    process_move_goal.add_child(post_processing)
+    process_move_goal.add_child(planning)
+    # process_move_goal.add_child(planning_1)
+    # process_move_goal.add_child(post_processing)
     process_move_goal.add_child(SetCmd(u'set move goal', action_server_name))
     if god_map.get_data(identifier.enable_PlotTrajectory):
         process_move_goal.add_child(success_is_failure(PlotTrajectory)(u'plot trajectory', order=3))

@@ -2,17 +2,14 @@ from Queue import Empty, Queue
 
 import actionlib
 import rospy
-from control_msgs.msg import FollowJointTrajectoryGoal
 from giskard_msgs.msg._MoveGoal import MoveGoal
 from giskard_msgs.msg._MoveResult import MoveResult
 from py_trees import Blackboard, Status
 
-from giskardpy.exceptions import MAX_NWSR_REACHEDException, QPSolverException, \
-    UnknownBodyException, ImplementationException, UnreachableException
 import giskardpy.identifier as identifier
-from giskardpy.logging import loginfo
+from giskardpy.exceptions import PreemptedException
 from giskardpy.plugin import GiskardBehavior
-from giskardpy.utils import plot_trajectory, traj_to_msg
+from giskardpy.utils import traj_to_msg
 
 ERROR_CODE_TO_NAME = {getattr(MoveResult, x): x for x in dir(MoveResult) if x.isupper()}
 
@@ -52,9 +49,14 @@ class ActionServerHandler(object):
         pass
 
     def send_preempted(self, result=None):
-        # TODO put shit in queue
         def call_me_now():
             self._as.set_preempted(result)
+
+        self.result_queue.put(call_me_now)
+
+    def send_aborted(self, result=None):
+        def call_me_now():
+            self._as.set_aborted(result)
 
         self.result_queue.put(call_me_now)
 
@@ -112,7 +114,9 @@ class GetGoal(ActionServerBehavior):
 
 class GoalCanceled(ActionServerBehavior):
     def update(self):
-        if self.get_as().is_preempt_requested() or self.get_blackboard_exception() is not None:
+        if self.get_as().is_preempt_requested():
+            self.raise_to_blackboard(PreemptedException(u''))
+        if self.get_blackboard_exception() is not None:
             return Status.SUCCESS
         else:
             return Status.FAILURE
@@ -123,51 +127,42 @@ class SendResult(ActionServerBehavior):
         super(SendResult, self).__init__(name, as_name, action_type)
 
     def update(self):
-        # TODO get result from god map or blackboard
-        e = self.get_blackboard_exception()
-        Blackboard().set('exception', None)
-        result = MoveResult()
-        # result.error_codes = self.exception_to_error_code(e)
+        skip_failures = self.get_god_map().get_data(identifier.skip_failures)
+        Blackboard().set('exception', None) # FIXME move this to reset?
+        result = self.get_god_map().get_data(identifier.result_message)
 
         trajectory = self.get_god_map().get_data(identifier.trajectory)
         sample_period = self.get_god_map().get_data(identifier.sample_period)
         controlled_joints = self.get_robot().controlled_joints
         result.trajectory = traj_to_msg(sample_period, trajectory, controlled_joints, True)
 
-        if self.get_as().is_preempt_requested() or not result.error_codes == MoveResult.SUCCESS:
-            try:
-                result.error_messages = e.message
-            except:
-                result.error_messages = u'preempt requested, but there was no giskard exception'
+        if result.error_codes[-1] == MoveResult.PREEMPTED:
             self.get_as().send_preempted(result)
+            return Status.SUCCESS
+        if skip_failures:
+            if not self.any_goal_succeeded(result):
+                self.get_as().send_aborted(result)
+                return Status.SUCCESS
+
         else:
-            self.get_as().send_result(result)
+            if not self.all_goals_succeeded(result):
+                self.get_as().send_aborted(result)
+                return Status.SUCCESS
+        self.get_as().send_result(result)
         return Status.SUCCESS
 
+    def any_goal_succeeded(self, result):
+        """
+        :type result: MoveResult
+        :rtype: bool
+        """
+        return MoveResult.SUCCESS in result.error_codes
+
+    def all_goals_succeeded(self, result):
+        """
+        :type result: MoveResult
+        :rtype: bool
+        """
+        return len([x for x in result.error_codes if x != MoveResult.SUCCESS]) == 0
 
 
-    # def exception_to_error_code(self, exception):
-    #     """
-    #     :type exception: Exception
-    #     :rtype: int
-    #     """
-    #     error_code = MoveResult.SUCCESS
-    #     if isinstance(exception, MAX_NWSR_REACHEDException):
-    #         error_code = MoveResult.MAX_NWSR_REACHED
-    #     elif isinstance(exception, QPSolverException):
-    #         error_code = MoveResult.QP_SOLVER_ERROR
-    #     elif isinstance(exception, UnknownBodyException):
-    #         error_code = MoveResult.UNKNOWN_OBJECT
-    #     elif isinstance(exception, InsolvableException):
-    #         if self.get_god_map().get_data(identifier.check_reachability):
-    #             error_code = MoveResult.UNREACHABLE
-    #         else:
-    #             error_code = MoveResult.ERROR
-    #     elif isinstance(exception, UnreachableException):
-    #         error_code = MoveResult.UNREACHABLE
-    #     elif isinstance(exception, ImplementationException):
-    #         print(exception)
-    #         error_code = MoveResult.ERROR
-    #     elif exception is not None:
-    #         error_code = MoveResult.ERROR
-    #     return error_code

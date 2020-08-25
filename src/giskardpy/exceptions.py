@@ -85,6 +85,9 @@ class UnreachableException(PlanningException):
 class ExecutionException(GiskardException):
     pass
 
+class PreemptedException(ExecutionException):
+    pass
+
 
 # -----------------------------------------------------------------------------------------------------------------------
 class ImplementationException(GiskardException):

@@ -313,7 +313,7 @@ class TestJointGoals(object):
         goal = MoveActionGoal()
         goal.goal.type = MoveGoal.UNDEFINED
         result = zero_pose.send_goal(goal)
-        assert result.error_code == MoveResult.INSOLVABLE
+        assert result.error_codes[0] == MoveResult.INVALID_GOAL
 
     def test_empty_goal(self, zero_pose):
         """
@@ -393,8 +393,6 @@ class TestConstraints(object):
         publish_marker_vector(start_pose.pose.position, map_T_goal_position.pose.position)
         zero_pose.set_translation_goal(goal_position, zero_pose.l_tip)
         zero_pose.send_and_check_goal()
-
-
 
     def test_AvoidJointLimits1(self, zero_pose):
         """
@@ -861,7 +859,6 @@ class TestConstraints(object):
 
         elbow = u'r_elbow_flex_link'
 
-
         tip_axis = Vector3Stamped()
         tip_axis.header.frame_id = kitchen_setup.r_tip
         tip_axis.vector.x = 1
@@ -1111,6 +1108,7 @@ class TestConstraints(object):
         # TODO: calculate real and desired value and compare
 
         pass
+
 
 class TestCartGoals(object):
 
@@ -1494,29 +1492,32 @@ class TestCartGoals(object):
         zero_pose.set_joint_goal(gaya_pose)
 
         traj = zero_pose.send_and_check_goal()
-        for i, joint_state in enumerate(traj):
+        for i, p in enumerate(traj.points):
+            js = {joint_name: position for joint_name, position in zip(traj.joint_names, p.positions)}
             try:
-                zero_pose.compare_joint_state(joint_state, pocky_pose)
+                zero_pose.compare_joint_state(js, pocky_pose)
                 break
             except AssertionError:
                 pass
         else:  # if no break
             assert False, u'pocky pose not in trajectory'
 
-        traj = traj[i:]
-        for i, joint_state in enumerate(traj):
+        traj.points = traj.points[i:]
+        for i, p in enumerate(traj.points):
+            js = {joint_name: position for joint_name, position in zip(traj.joint_names, p.positions)}
             try:
-                zero_pose.compare_joint_state(joint_state, pick_up_pose)
+                zero_pose.compare_joint_state(js, pick_up_pose)
                 break
             except AssertionError:
                 pass
         else:  # if no break
             assert False, u'pick_up_pose not in trajectory'
 
-        traj = traj[i:]
-        for i, joint_state in enumerate(traj):
+        traj.points = traj.points[i:]
+        for i, p in enumerate(traj.points):
+            js = {joint_name: position for joint_name, position in zip(traj.joint_names, p.positions)}
             try:
-                zero_pose.compare_joint_state(joint_state, gaya_pose)
+                zero_pose.compare_joint_state(js, gaya_pose)
                 break
             except AssertionError:
                 pass
@@ -1525,35 +1526,166 @@ class TestCartGoals(object):
 
         pass
 
-
     def test_waypoints_with_fail(self, zero_pose):
         """
         :type zero_pose: PR2
         """
-        p = PoseStamped()
-        p.header.frame_id = zero_pose.r_tip
-        p.header.stamp = rospy.get_rostime()
-        p.pose.position = Point(-0.1, 0, 0)
-        p.pose.orientation = Quaternion(0, 0, 0, 1)
-        zero_pose.set_cart_goal(p, zero_pose.r_tip, zero_pose.default_root)
-
+        zero_pose.set_joint_goal(pocky_pose)
         zero_pose.add_waypoint()
-        p = PoseStamped()
-        p.header.frame_id = zero_pose.r_tip
-        p.header.stamp = rospy.get_rostime()
-        p.pose.position = Point(0.0, -0.1, -10.1)
-        p.pose.orientation = Quaternion(0, 0, 0, 1)
-        zero_pose.set_cart_goal(p, zero_pose.r_tip, zero_pose.default_root)
-
+        zero_pose.add_json_goal(u'muh')
         zero_pose.add_waypoint()
-        p = PoseStamped()
-        p.header.frame_id = zero_pose.r_tip
-        p.header.stamp = rospy.get_rostime()
-        p.pose.position = Point(0.1, 0.1, 0.1)
-        p.pose.orientation = Quaternion(0, 0, 0, 1)
-        zero_pose.set_cart_goal(p, zero_pose.r_tip, zero_pose.default_root)
+        zero_pose.set_joint_goal(gaya_pose)
 
-        zero_pose.send_and_check_goal()
+        traj = zero_pose.send_and_check_goal(expected_error_codes=[MoveResult.SUCCESS,
+                                                                   MoveResult.UNKNOWN_CONSTRAINT,
+                                                                   MoveResult.SUCCESS],
+                                             goal_type=MoveGoal.PLAN_AND_EXECUTE_AND_SKIP_FAILURES)
+
+        for i, p in enumerate(traj.points):
+            js = {joint_name: position for joint_name, position in zip(traj.joint_names, p.positions)}
+            try:
+                zero_pose.compare_joint_state(js, pocky_pose)
+                break
+            except AssertionError:
+                pass
+        else:  # if no break
+            assert False, u'pocky pose not in trajectory'
+
+        traj.points = traj.points[i:]
+        for i, p in enumerate(traj.points):
+            js = {joint_name: position for joint_name, position in zip(traj.joint_names, p.positions)}
+            try:
+                zero_pose.compare_joint_state(js, gaya_pose)
+                break
+            except AssertionError:
+                pass
+        else:  # if no break
+            assert False, u'gaya_pose not in trajectory'
+
+    def test_waypoints_with_fail1(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        zero_pose.add_json_goal(u'muh')
+        zero_pose.add_waypoint()
+        zero_pose.set_joint_goal(pocky_pose)
+        zero_pose.add_waypoint()
+        zero_pose.set_joint_goal(gaya_pose)
+
+        traj = zero_pose.send_and_check_goal(expected_error_codes=[MoveResult.UNKNOWN_CONSTRAINT,
+                                                                   MoveResult.SUCCESS,
+                                                                   MoveResult.SUCCESS],
+                                             goal_type=MoveGoal.PLAN_AND_EXECUTE_AND_SKIP_FAILURES)
+
+        for i, p in enumerate(traj.points):
+            js = {joint_name: position for joint_name, position in zip(traj.joint_names, p.positions)}
+            try:
+                zero_pose.compare_joint_state(js, pocky_pose)
+                break
+            except AssertionError:
+                pass
+        else:  # if no break
+            assert False, u'pocky pose not in trajectory'
+
+        traj.points = traj.points[i:]
+        for i, p in enumerate(traj.points):
+            js = {joint_name: position for joint_name, position in zip(traj.joint_names, p.positions)}
+            try:
+                zero_pose.compare_joint_state(js, gaya_pose)
+                break
+            except AssertionError:
+                pass
+        else:  # if no break
+            assert False, u'gaya_pose not in trajectory'
+
+    def test_waypoints_with_fail2(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        zero_pose.set_joint_goal(pocky_pose)
+        zero_pose.add_waypoint()
+        zero_pose.set_joint_goal(gaya_pose)
+        zero_pose.add_waypoint()
+        zero_pose.add_json_goal(u'muh')
+
+        traj = zero_pose.send_and_check_goal(expected_error_codes=[MoveResult.SUCCESS,
+                                                                   MoveResult.SUCCESS,
+                                                                   MoveResult.UNKNOWN_CONSTRAINT,],
+                                             goal_type=MoveGoal.PLAN_AND_EXECUTE_AND_SKIP_FAILURES)
+
+        for i, p in enumerate(traj.points):
+            js = {joint_name: position for joint_name, position in zip(traj.joint_names, p.positions)}
+            try:
+                zero_pose.compare_joint_state(js, pocky_pose)
+                break
+            except AssertionError:
+                pass
+        else:  # if no break
+            assert False, u'pocky pose not in trajectory'
+
+        traj.points = traj.points[i:]
+        for i, p in enumerate(traj.points):
+            js = {joint_name: position for joint_name, position in zip(traj.joint_names, p.positions)}
+            try:
+                zero_pose.compare_joint_state(js, gaya_pose)
+                break
+            except AssertionError:
+                pass
+        else:  # if no break
+            assert False, u'gaya_pose not in trajectory'
+
+    def test_waypoints_with_fail3(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        zero_pose.set_joint_goal(pocky_pose)
+        zero_pose.add_waypoint()
+        zero_pose.add_json_goal(u'muh')
+        zero_pose.add_waypoint()
+        zero_pose.set_joint_goal(gaya_pose)
+
+        traj = zero_pose.send_and_check_goal(expected_error_codes=[MoveResult.SUCCESS,
+                                                                   MoveResult.UNKNOWN_CONSTRAINT,
+                                                                   MoveResult.PREEMPTED],
+                                             goal_type=MoveGoal.PLAN_AND_EXECUTE)
+
+        for i, p in enumerate(traj.points):
+            js = {joint_name: position for joint_name, position in zip(traj.joint_names, p.positions)}
+            try:
+                zero_pose.compare_joint_state(js, default_pose)
+                break
+            except AssertionError:
+                pass
+        else:  # if no break
+            assert False, u'pocky pose not in trajectory'
+
+
+    def test_skip_failures1(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        zero_pose.add_json_goal(u'muh')
+        zero_pose.send_and_check_goal(expected_error_codes=[MoveResult.UNKNOWN_CONSTRAINT,],
+                                             goal_type=MoveGoal.PLAN_AND_EXECUTE_AND_SKIP_FAILURES)
+
+    def test_skip_failures2(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        zero_pose.set_joint_goal(pocky_pose)
+        traj = zero_pose.send_and_check_goal(expected_error_codes=[MoveResult.SUCCESS,],
+                                             goal_type=MoveGoal.PLAN_AND_EXECUTE_AND_SKIP_FAILURES)
+
+        for i, p in enumerate(traj.points):
+            js = {joint_name: position for joint_name, position in zip(traj.joint_names, p.positions)}
+            try:
+                zero_pose.compare_joint_state(js, pocky_pose)
+                break
+            except AssertionError:
+                pass
+        else:  # if no break
+            assert False, u'pocky pose not in trajectory'
+
 
     # TODO test translation and orientation goal in different frame
 
@@ -1624,8 +1756,8 @@ class TestCollisionAvoidanceGoals(object):
         object_name = u'muh'
         p = PoseStamped()
         p.header.frame_id = zero_pose.r_tip
-        p.pose.position = Point(0.1,0,0)
-        p.pose.orientation = Quaternion(0,0,0,1)
+        p.pose.position = Point(0.1, 0, 0)
+        p.pose.orientation = Quaternion(0, 0, 0, 1)
         zero_pose.add_mesh(object_name, path=u'package://giskardpy/test/urdfs/meshes/bowl_21.obj', pose=p)
         # m = zero_pose.get_world().get_object(object_name).as_marker_msg()
         # compare_poses(m.pose, p.pose)
@@ -1639,8 +1771,8 @@ class TestCollisionAvoidanceGoals(object):
         object_name = u'muh'
         p = PoseStamped()
         p.header.frame_id = zero_pose.r_tip
-        p.pose.position = Point(0.01,0,0)
-        p.pose.orientation = Quaternion(*quaternion_about_axis(-np.pi/2, [0,1,0]))
+        p.pose.position = Point(0.01, 0, 0)
+        p.pose.orientation = Quaternion(*quaternion_about_axis(-np.pi / 2, [0, 1, 0]))
         zero_pose.add_mesh(object_name, path=u'package://giskardpy/test/urdfs/meshes/cup_11.obj', pose=p)
         # m = zero_pose.get_world().get_object(object_name).as_marker_msg()
         # compare_poses(m.pose, p.pose)
@@ -1912,7 +2044,7 @@ class TestCollisionAvoidanceGoals(object):
         """
         pose = PoseStamped()
         pose.header.frame_id = u'map'
-        pose.pose.position = Point(2,0,0)
+        pose.pose.position = Point(2, 0, 0)
         pose.pose.orientation = Quaternion(w=1)
         kitchen_setup.teleport_base(pose)
         kitchen_setup.send_and_check_goal()

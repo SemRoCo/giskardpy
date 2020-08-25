@@ -4,9 +4,10 @@ from py_trees import Status
 
 import giskardpy.identifier as identifier
 from giskardpy.exceptions import UnreachableException, MAX_NWSR_REACHEDException, \
-    QPSolverException, UnknownBodyException, ImplementationException, InfeasibleException, OutOfJointLimitsException, \
+    QPSolverException, UnknownBodyException, ImplementationException, OutOfJointLimitsException, \
     HardConstraintsViolatedException, PhysicsWorldException, ConstraintException, UnknownConstraintException, \
-    ConstraintInitalizationException, PlanningException, ShakingException, ExecutionException, InvalidGoalException
+    ConstraintInitalizationException, PlanningException, ShakingException, ExecutionException, InvalidGoalException, \
+    PreemptedException
 from giskardpy.plugin import GiskardBehavior
 from giskardpy.utils import make_filter_b_mask
 
@@ -28,22 +29,26 @@ class PostProcessing(GiskardBehavior):
         if self.get_god_map().get_data(identifier.check_reachability):
             self.check_reachability_xdot()
         e = self.get_blackboard_exception()
-        self.clear_blackboard_exception()
+        # self.clear_blackboard_exception()
+
+        cmd_id = self.get_god_map().get_data(identifier.cmd_id)
 
         result = self.get_god_map().get_data(identifier.result_message)
         error_code, error_message = self.exception_to_error_code(e)
-        result.error_codes.append(error_code)
-        result.error_messages.append(error_message)
+        result.error_codes[cmd_id] = error_code
+        result.error_messages[cmd_id] = error_message
+        self.get_god_map().set_data(identifier.result_message, result)
         return Status.SUCCESS
-
-
 
     def exception_to_error_code(self, exception):
         """
         :type exception: Exception
         :rtype: int
         """
-        error_message = u''
+        try:
+            error_message = str(exception)
+        except:
+            pass
         error_code = MoveResult.SUCCESS
 
         # qp exceptions
@@ -82,6 +87,8 @@ class PostProcessing(GiskardBehavior):
         # execution exceptions
         elif isinstance(exception, ExecutionException):
             error_code = MoveResult.EXECUTION_ERROR
+            if isinstance(exception, PreemptedException):
+                error_code = MoveResult.PREEMPTED
 
         elif isinstance(exception, ImplementationException):
             print(exception)

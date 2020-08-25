@@ -187,7 +187,7 @@ def grow_tree():
     move_robot.add_child(publish_result)
     # ----------------------------------------------
     # ----------------------------------------------
-    planning_1 = success_is_failure(Sequence)(u'planning I')
+    planning_1 = Sequence(u'planning I')
     planning_1.add_child(GoalToConstraints(u'update constraints', action_server_name))
     planning_1.add_child(planning_2)
     if god_map.get_data(identifier.enable_VisualizationBehavior):
@@ -198,7 +198,7 @@ def grow_tree():
     post_processing = failure_is_success(Sequence)(u'post planning')
     post_processing.add_child(WiggleCancel(u'final wiggle detection', final_detection=True))
     post_processing.add_child(PostProcessing(u'evaluate result'))
-    post_processing.add_child(PostProcessing(u'check reachability'))
+    # post_processing.add_child(PostProcessing(u'check reachability'))
     # ----------------------------------------------
     planning = success_is_failure(Sequence)(u'planning')
     planning.add_child(IF(u'goal_set?', identifier.next_move_goal))
@@ -219,7 +219,6 @@ def grow_tree():
     root.add_child(wait_for_goal)
     root.add_child(CleanUp(u'cleanup'))
     root.add_child(process_move_goal)
-    root.add_child(post_processing)
     root.add_child(move_robot)
     root.add_child(SendResult(u'send result', action_server_name, MoveAction))
 

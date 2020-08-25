@@ -450,11 +450,15 @@ class GiskardTestWrapper(object):
         result = self.results.get()
         return result
 
-    def send_and_check_goal(self, expected_error_code=MoveResult.SUCCESS, goal_type=MoveGoal.PLAN_AND_EXECUTE, goal=None):
+    def send_and_check_goal(self, expected_error_codes=None, goal_type=MoveGoal.PLAN_AND_EXECUTE, goal=None):
         r = self.send_goal(goal=goal, goal_type=goal_type)
         for i in range(len(r.error_codes)):
             error_code = r.error_codes[i]
             error_message = r.error_messages[i]
+            if expected_error_codes is None:
+                expected_error_code = MoveResult.SUCCESS
+            else:
+                expected_error_code = expected_error_codes[i]
             assert error_code == expected_error_code, \
                 u'got: {}, expected: {} | error_massage: {}'.format(move_result_error_code(error_code),
                                                                     move_result_error_code(expected_error_code),

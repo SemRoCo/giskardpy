@@ -930,7 +930,7 @@ class CartesianPositionStraight(BasicCartesianConstraint):
         """
         root_P_goal = w.position_of(self.get_goal_pose())
         root_P_tip = w.position_of(self.get_fk(self.root, self.tip))
-        root_V_start = w.Matrix(tf.transform_stamped_to_pq(tf.lookup_transform(self.root, self.tip))[0])
+        root_V_start = w.point3(*tf.transform_stamped_to_pq(tf.lookup_transform(self.root, self.tip))[0])
         max_velocity = self.get_input_float(self.max_velocity)
         max_acceleration = self.get_input_float(self.max_acceleration)
         weight = self.get_input_float(self.weight)
@@ -945,13 +945,13 @@ class CartesianPositionStraight(BasicCartesianConstraint):
                                                weight,
                                                prefix=u'goal')
 
+        self.add_debug_vector(u'start_point', root_P_goal)
         # FIXME: type error. Mixed calc with Vector3 and SX (expression)
         #        Both same or can we make it working?
         dist, nearest = w.distance_point_to_line_segment(root_P_tip,
                                                          root_V_start,
                                                          root_P_goal)
         # Constraint to stick to the line
-        self.add_debug_vector(u'start_point', root_P_tip)
         self.add_minimize_position_constraints(r_P_g=nearest,
                                                max_velocity=max_velocity,
                                                max_acceleration=max_acceleration,

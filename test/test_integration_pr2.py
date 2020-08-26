@@ -402,8 +402,7 @@ class TestConstraints(object):
         """
         percentage = 10
         zero_pose.allow_self_collision()
-        zero_pose.add_json_goal(u'AvoidJointLimits',
-                                percentage=percentage)
+        zero_pose.add_json_goal(u'AvoidJointLimits', percentage=percentage)
         zero_pose.send_and_check_goal()
 
         joint_non_continuous = [j for j in zero_pose.get_robot().controlled_joints if
@@ -444,7 +443,7 @@ class TestConstraints(object):
                                 not zero_pose.get_robot().is_joint_continuous(j)]
 
         current_joint_state = to_joint_state_dict2(zero_pose.get_current_joint_state())
-        percentage *= 0.99  # if will not reach the exact percentager, because the weight is so low
+        percentage *= 0.92  # if will not reach the exact percentage, because the weight is so low
         for joint in joint_non_continuous:
             position = current_joint_state[joint]
             lower_limit, upper_limit = zero_pose.get_robot().get_joint_limits(joint)
@@ -3292,8 +3291,9 @@ class TestCollisionAvoidanceGoals(object):
     #     kitchen_setup.set_cart_goal(cup_goal, kitchen_setup.r_tip, kitchen_setup.default_root)
     #     kitchen_setup.send_and_check_goal()
 
-    def test_spoon(self, kitchen_setup):
+    def test_ease_spoon(self, kitchen_setup):
         spoon_name = u'spoon'
+        percentage = 30
 
         # spawn cup
         cup_pose = PoseStamped()
@@ -3303,7 +3303,7 @@ class TestCollisionAvoidanceGoals(object):
 
         kitchen_setup.add_box(spoon_name, [0.1, 0.02, 0.01], cup_pose)
 
-        kitchen_setup.send_and_check_joint_goal(gaya_pose)
+        # kitchen_setup.send_and_check_joint_goal(gaya_pose)
 
         # grasp spoon
         l_goal = deepcopy(cup_pose)
@@ -3312,22 +3312,26 @@ class TestCollisionAvoidanceGoals(object):
                                                                       [0, -1, 0, 0],
                                                                       [-1, 0, 0, 0],
                                                                       [0, 0, 0, 1]]))
+        kitchen_setup.add_json_goal(u'AvoidJointLimits', percentage=percentage)
         kitchen_setup.set_and_check_cart_goal(l_goal, kitchen_setup.l_tip, kitchen_setup.default_root)
 
         l_goal.pose.position.z -= .2
         # kitchen_setup.allow_collision([CollisionEntry.ALL], spoon_name, [CollisionEntry.ALL])
         kitchen_setup.set_cart_goal(l_goal, kitchen_setup.l_tip, kitchen_setup.default_root)
+        kitchen_setup.add_json_goal(u'AvoidJointLimits', percentage=percentage)
         kitchen_setup.send_and_check_goal()
         kitchen_setup.attach_existing(spoon_name, kitchen_setup.l_tip)
 
         l_goal.pose.position.z += .2
         # kitchen_setup.allow_collision([CollisionEntry.ALL], spoon_name, [CollisionEntry.ALL])
         kitchen_setup.set_cart_goal(l_goal, kitchen_setup.l_tip, kitchen_setup.default_root)
+        kitchen_setup.add_json_goal(u'AvoidJointLimits', percentage=percentage)
         kitchen_setup.send_and_check_goal()
 
         l_goal.pose.position.z -= .2
         # kitchen_setup.allow_collision([CollisionEntry.ALL], spoon_name, [CollisionEntry.ALL])
         kitchen_setup.set_cart_goal(l_goal, kitchen_setup.l_tip, kitchen_setup.default_root)
+        kitchen_setup.add_json_goal(u'AvoidJointLimits', percentage=percentage)
         kitchen_setup.send_and_check_goal()
 
         kitchen_setup.send_and_check_joint_goal(gaya_pose)

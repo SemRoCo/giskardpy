@@ -5,7 +5,8 @@ import numpy as np
 
 from giskardpy import logging, cas_wrapper as w
 from giskardpy.data_types import SoftConstraint
-from giskardpy.exceptions import QPSolverException
+from giskardpy.exceptions import QPSolverException, InfeasibleException, OutOfJointLimitsException, \
+    HardConstraintsViolatedException
 from giskardpy.qp_solver import QPSolver
 from giskardpy.utils import make_filter_masks, create_path
 
@@ -209,24 +210,16 @@ class QProblemBuilder(object):
         # self.lbAs.T[[c for c in self.lbAs.T.columns if 'dist' in c]].plot()
 
         # self.save_all(p_weights, p_A, p_lbA, p_ubA, p_lb, p_ub, p_xdot)
-        if actually_print:
-            arrays = [(p_weights, u'H'),
-                      (p_A, u'A'),
-                      (p_lbA, u'lbA'),
-                      (p_ubA, u'ubA'),
-                      (p_lb, u'lb'),
-                      (p_ub, u'ub')]
-            for a, name in arrays:
-                self.check_for_nan(name, a)
-                # self.check_for_big_numbers(name, a)
-            self.joint_limit_check(p_lb, p_ub)
+        return p_weights, p_A, p_lbA, p_ubA, p_lb, p_ub
 
-    def joint_limit_check(self, p_lb, p_ub):
+
+    def are_joint_limits_violated(self, p_lb, p_ub):
         violations = (p_ub - p_lb)[p_lb.data > p_ub.data]
         if len(violations) > 0:
             logging.logerr(u'The following joints are outside of their limits: \n {}'.format(violations))
-        else:
-            logging.loginfo(u'All joints are within limits')
+            return True
+        logging.loginfo(u'All joints are within limits')
+        return False
 
     def save_all(self, weights, A, lbA, ubA, lb, ub, xdot=None):
         if xdot is not None:
@@ -237,24 +230,15 @@ class QProblemBuilder(object):
                          ['weights', 'A', 'lbA', 'ubA', 'lb', 'ub'])
 
 
-    def check_for_nan(self, name, p_array):
+    def is_nan_in_array(self, name, p_array):
         p_filtered = p_array.apply(lambda x: zip(x.index[x.isnull()].tolist(), x[x.isnull()]), 1)
         p_filtered = p_filtered[p_filtered.apply(lambda x: len(x)) > 0]
         if len(p_filtered) > 0:
             logging.logerr(u'{} has the following nans:'.format(name))
             self.print_pandas_array(p_filtered)
-        else:
-            logging.loginfo(u'{} has no nans'.format(name))
-
-    # def check_for_big_numbers(self, name, p_array, big=1e5):
-    #     # FIXME fails if condition is true on first entry
-    #     p_filtered = p_array.apply(lambda x: zip(x.index[abs(x) > big].tolist(), x[x > big]), 1)
-    #     p_filtered = p_filtered[p_filtered.apply(lambda x: len(x)) > 0]
-    #     if len(p_filtered) > 0:
-    #         logging.logwarn(u'{} has the following big numbers:'.format(name))
-    #         self.print_pandas_array(p_filtered)
-    #     else:
-    #         logging.loginfo(u'no big numbers')
+            return True
+        logging.loginfo(u'{} has no nans'.format(name))
+        return False
 
     def print_pandas_array(self, array):
         import pandas as pd
@@ -294,7 +278,22 @@ class QProblemBuilder(object):
         try:
             xdot_full = self.qp_solver.solve(H, g, A, lb, ub, lbA, ubA, nWSR)
         except QPSolverException as e:
-            self.debug_print(np_H, A, lb, ub, lbA, ubA, g, actually_print=True)
+            p_weights, p_A, p_lbA, p_ubA, p_lb, p_ub = self.debug_print(np_H, A, lb, ub, lbA, ubA, g, actually_print=True)
+            if isinstance(e, InfeasibleException):
+                arrays = [(p_weights, u'H'),
+                          (p_A, u'A'),
+                          (p_lbA, u'lbA'),
+                          (p_ubA, u'ubA'),
+                          (p_lb, u'lb'),
+                          (p_ub, u'ub')]
+                any_nan = False
+                for a, name in arrays:
+                    any_nan |= self.is_nan_in_array(name, a)
+                if any_nan:
+                    raise e
+                if self.are_joint_limits_violated(p_lb, p_ub):
+                    raise OutOfJointLimitsException(e)
+                raise HardConstraintsViolatedException(e)
             raise e
         if xdot_full is None:
             return None

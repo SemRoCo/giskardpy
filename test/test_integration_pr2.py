@@ -645,35 +645,35 @@ class TestConstraints(object):
 
     def test_wrong_constraint_type(self, zero_pose):
         goal_state = JointState()
-        goal_state.name = ['r_elbow_flex_joint']
+        goal_state.name = [u'r_elbow_flex_joint']
         goal_state.position = [-1.0]
         kwargs = {u'goal_state': goal_state}
-        zero_pose.add_json_goal('jointpos', **kwargs)
-        zero_pose.send_and_check_goal(expected_error_code=MoveResult.INSOLVABLE)
+        zero_pose.add_json_goal(u'jointpos', **kwargs)
+        zero_pose.send_and_check_goal(expected_error_codes=[MoveResult.UNKNOWN_CONSTRAINT])
 
     def test_python_code_in_constraint_type(self, zero_pose):
         goal_state = JointState()
-        goal_state.name = ['r_elbow_flex_joint']
+        goal_state.name = [u'r_elbow_flex_joint']
         goal_state.position = [-1.0]
         kwargs = {u'goal_state': goal_state}
-        zero_pose.add_json_goal('print("asd")', **kwargs)
-        zero_pose.send_and_check_goal(expected_error_code=MoveResult.INSOLVABLE)
+        zero_pose.add_json_goal(u'print("asd")', **kwargs)
+        zero_pose.send_and_check_goal(expected_error_codes=[MoveResult.UNKNOWN_CONSTRAINT])
 
     def test_wrong_params1(self, zero_pose):
         goal_state = JointState()
-        goal_state.name = 'r_elbow_flex_joint'
+        goal_state.name = u'r_elbow_flex_joint'
         goal_state.position = [-1.0]
         kwargs = {u'goal_state': goal_state}
-        zero_pose.add_json_goal('JointPositionList', **kwargs)
-        zero_pose.send_and_check_goal(expected_error_code=MoveResult.INSOLVABLE)
+        zero_pose.add_json_goal(u'JointPositionList', **kwargs)
+        zero_pose.send_and_check_goal(expected_error_codes=[MoveResult.CONSTRAINT_INITIALIZATION_ERROR])
 
     def test_wrong_params2(self, zero_pose):
         goal_state = JointState()
         goal_state.name = [5432]
-        goal_state.position = 'test'
+        goal_state.position = u'test'
         kwargs = {u'goal_state': goal_state}
-        zero_pose.add_json_goal('JointPositionList', **kwargs)
-        zero_pose.send_and_check_goal(expected_error_code=MoveResult.INSOLVABLE)
+        zero_pose.add_json_goal(u'JointPositionList', **kwargs)
+        zero_pose.send_and_check_goal(expected_error_codes=[MoveResult.CONSTRAINT_INITIALIZATION_ERROR])
 
     def test_align_planes2(self, zero_pose):
         """
@@ -2047,7 +2047,7 @@ class TestCollisionAvoidanceGoals(object):
         pose.pose.position = Point(2, 0, 0)
         pose.pose.orientation = Quaternion(w=1)
         kitchen_setup.teleport_base(pose)
-        kitchen_setup.send_and_check_goal()
+        kitchen_setup.send_and_check_goal(expected_error_codes=[MoveResult.HARD_CONSTRAINTS_VIOLATED])
 
     def test_link_b_set_but_body_b_not(self, box_setup):
         """

@@ -792,6 +792,8 @@ class JointPositionList(Constraint):
         super(JointPositionList, self).__init__(god_map)
         self.constraints = []
         for i, joint_name in enumerate(goal_state[u'name']):
+            if not self.get_robot().has_joint(joint_name):
+                raise KeyError(u'unknown joint "{}"'.format(joint_name))
             goal_position = goal_state[u'position'][i]
             params = {u'joint_name': joint_name,
                       u'goal': goal_position}

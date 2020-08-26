@@ -48,7 +48,7 @@ class PostProcessing(GiskardBehavior):
         try:
             error_message = str(exception)
         except:
-            pass
+            error_message = u''
         error_code = MoveResult.SUCCESS
 
         # qp exceptions

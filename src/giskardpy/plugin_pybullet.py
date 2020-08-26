@@ -8,6 +8,7 @@ from giskard_msgs.srv import UpdateWorld, UpdateWorldResponse, UpdateWorldReques
     GetAttachedObjects, GetAttachedObjectsResponse
 from py_trees import Status
 from sensor_msgs.msg import JointState
+from std_srvs.srv import Trigger, TriggerResponse
 from visualization_msgs.msg import Marker, MarkerArray
 
 import giskardpy.identifier as identifier
@@ -16,11 +17,12 @@ from giskardpy.exceptions import CorruptShapeException, UnknownBodyException, \
     UnsupportedOptionException, DuplicateNameException
 from giskardpy.plugin import GiskardBehavior
 from giskardpy.tfwrapper import transform_pose
-from giskardpy.utils import to_joint_state_dict
+from giskardpy.utils import to_joint_state_dict, to_joint_state_position_dict, position_dict_to_joint_states, \
+    dict_to_joint_states, print_joint_state, print_dict
 from giskardpy.world_object import WorldObject
 from giskardpy import  logging
 from giskardpy.urdf_object import URDFObject
-
+from rospy_message_converter.message_converter import convert_ros_message_to_dictionary
 
 
 class WorldUpdatePlugin(GiskardBehavior):
@@ -40,7 +42,49 @@ class WorldUpdatePlugin(GiskardBehavior):
         self.get_object_info = rospy.Service(u'~get_object_info', GetObjectInfo, self.get_object_info)
         self.get_attached_objects = rospy.Service(u'~get_attached_objects', GetAttachedObjects, self.get_attached_objects)
         self.update_rviz_markers = rospy.Service(u'~update_rviz_markers', UpdateRvizMarkers, self.update_rviz_markers)
+        self.dump_state_srv = rospy.Service(u'~dump_state', Trigger, self.dump_state_cb)
         return super(WorldUpdatePlugin, self).setup(timeout)
+
+    def dump_state_cb(self, data):
+        try:
+            robot_js = dict_to_joint_states(self.get_robot().joint_state)
+            print(u'robot_joint_state:')
+            print_joint_state(robot_js)
+            robot_base_pose = PoseStamped()
+            robot_base_pose.header.frame_id = 'map'
+            robot_base_pose.pose = self.get_robot().base_pose
+            print(u'robot_base_pose')
+            print_dict(convert_ros_message_to_dictionary(robot_base_pose))
+
+            original_robot = URDFObject(self.get_robot().original_urdf)
+            link_names = self.get_robot().get_link_names()
+            original_link_names = original_robot.get_link_names()
+            attached_objects = list(set(link_names).difference(original_link_names))
+            for object_name in attached_objects:
+                print(u'attached objects ---------------------------')
+                parent = self.get_robot().get_parent_link_of_joint(object_name)
+                print(u'{} base pose'.format(object_name))
+                print_dict(convert_ros_message_to_dictionary(self.get_robot().get_fk_pose(parent, object_name)))
+                world_object = self.get_robot().get_sub_tree_at_joint(object_name)
+                object_links = world_object.get_link_names()
+                if len(object_links) == 1:
+                    print(u'{} shape'.format(object_name))
+                    print(world_object.get_urdf_link(world_object.get_link_names()[0]))
+
+            for object_name, world_object in self.get_world().get_objects().items(): # type: (str, WorldObject)
+                print(u'world objects ---------------------------')
+                print(u'{} joint state:'.format(object_name))
+                print_joint_state(dict_to_joint_states(world_object.joint_state))
+                print(u'{} base pose'.format(object_name))
+                print_dict(convert_ros_message_to_dictionary(world_object.base_pose))
+                object_links = world_object.get_link_names()
+                if len(object_links) == 1:
+                    print(u'{} shape'.format(object_name))
+                    print(world_object.get_urdf_link(world_object.get_link_names()[0]))
+        except:
+            print('failed to print pls try again')
+            return TriggerResponse()
+        return TriggerResponse()
 
     def update(self):
         """

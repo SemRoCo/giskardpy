@@ -27,7 +27,7 @@ from giskardpy.pybullet_world import PyBulletWorld
 from giskardpy.python_interface import GiskardWrapper
 from giskardpy.robot import Robot
 from giskardpy.tfwrapper import transform_pose, lookup_pose
-from giskardpy.utils import msg_to_list, KeyDefaultDict, dict_to_joint_states, get_ros_pkg_path, to_joint_state_dict2
+from giskardpy.utils import msg_to_list, KeyDefaultDict, position_dict_to_joint_states, get_ros_pkg_path, to_joint_state_position_dict
 
 BIG_NUMBER = 1e100
 SMALL_NUMBER = 1e-100
@@ -299,7 +299,7 @@ class GiskardTestWrapper(object):
         if topic is None:
             self.wrapper.set_object_joint_state(object_name, joint_state)
         else:
-            self.joint_state_publisher[topic].publish(dict_to_joint_states(joint_state))
+            self.joint_state_publisher[topic].publish(position_dict_to_joint_states(joint_state))
             rospy.sleep(.5)
 
         self.wait_for_synced()
@@ -337,7 +337,7 @@ class GiskardTestWrapper(object):
         self.wrapper.set_joint_goal(js)
 
     def check_joint_state(self, expected, decimal=2):
-        current_joint_state = to_joint_state_dict2(self.get_current_joint_state())
+        current_joint_state = to_joint_state_position_dict(self.get_current_joint_state())
         self.compare_joint_state(current_joint_state, expected, decimal=decimal)
 
     def send_and_check_joint_goal(self, goal, decimal=2):
@@ -362,7 +362,7 @@ class GiskardTestWrapper(object):
                                                                        goal_pose.pose.orientation.z,
                                                                        goal_pose.pose.orientation.w]))[0]}
         goal = SetJointStateRequest()
-        goal.state = dict_to_joint_states(js)
+        goal.state = position_dict_to_joint_states(js)
         self.set_base.call(goal)
 
     def keep_position(self, tip, root=None):

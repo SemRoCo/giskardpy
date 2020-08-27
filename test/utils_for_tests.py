@@ -364,6 +364,9 @@ class GiskardTestWrapper(object):
         goal = SetJointStateRequest()
         goal.state = position_dict_to_joint_states(js)
         self.set_base.call(goal)
+        self.loop_once()
+        rospy.sleep(0.5)
+        self.loop_once()
 
     def keep_position(self, tip, root=None):
         if root is None:

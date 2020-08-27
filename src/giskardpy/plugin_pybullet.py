@@ -1,4 +1,5 @@
 import traceback
+from datetime import datetime
 from multiprocessing import Lock
 
 import rospy
@@ -18,7 +19,7 @@ from giskardpy.exceptions import CorruptShapeException, UnknownBodyException, \
 from giskardpy.plugin import GiskardBehavior
 from giskardpy.tfwrapper import transform_pose
 from giskardpy.utils import to_joint_state_dict, to_joint_state_position_dict, position_dict_to_joint_states, \
-    dict_to_joint_states, print_joint_state, print_dict
+    dict_to_joint_states, print_joint_state, print_dict, create_path, write_dict
 from giskardpy.world_object import WorldObject
 from giskardpy import  logging
 from giskardpy.urdf_object import URDFObject
@@ -47,40 +48,47 @@ class WorldUpdatePlugin(GiskardBehavior):
 
     def dump_state_cb(self, data):
         try:
-            robot_js = dict_to_joint_states(self.get_robot().joint_state)
-            print(u'robot_joint_state:')
-            print_joint_state(robot_js)
-            robot_base_pose = PoseStamped()
-            robot_base_pose.header.frame_id = 'map'
-            robot_base_pose.pose = self.get_robot().base_pose
-            print(u'robot_base_pose')
-            print_dict(convert_ros_message_to_dictionary(robot_base_pose))
+            path = self.get_god_map().get_data(identifier.data_folder)
+            new_path = u'{}/{}_dump.txt'.format(path, datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+            # create_path(new_path)
+            with open(new_path, u'w') as f:
+                robot_js = dict_to_joint_states(self.get_robot().joint_state)
+                f.write(u'robot_joint_state:\n')
+                write_dict(to_joint_state_position_dict(robot_js), f)
+                robot_base_pose = PoseStamped()
+                robot_base_pose.header.frame_id = 'map'
+                robot_base_pose.pose = self.get_robot().base_pose
+                f.write(u'robot_base_pose\n')
+                write_dict(convert_ros_message_to_dictionary(robot_base_pose), f)
 
-            original_robot = URDFObject(self.get_robot().original_urdf)
-            link_names = self.get_robot().get_link_names()
-            original_link_names = original_robot.get_link_names()
-            attached_objects = list(set(link_names).difference(original_link_names))
-            for object_name in attached_objects:
-                print(u'attached objects ---------------------------')
-                parent = self.get_robot().get_parent_link_of_joint(object_name)
-                print(u'{} base pose'.format(object_name))
-                print_dict(convert_ros_message_to_dictionary(self.get_robot().get_fk_pose(parent, object_name)))
-                world_object = self.get_robot().get_sub_tree_at_joint(object_name)
-                object_links = world_object.get_link_names()
-                if len(object_links) == 1:
-                    print(u'{} shape'.format(object_name))
-                    print(world_object.get_urdf_link(world_object.get_link_names()[0]))
+                original_robot = URDFObject(self.get_robot().original_urdf)
+                link_names = self.get_robot().get_link_names()
+                original_link_names = original_robot.get_link_names()
+                attached_objects = list(set(link_names).difference(original_link_names))
+                for object_name in attached_objects:
+                    f.write(u'attached objects ---------------------------\n')
+                    parent = self.get_robot().get_parent_link_of_joint(object_name)
+                    f.write(u'{} base pose\n'.format(object_name))
+                    write_dict(convert_ros_message_to_dictionary(self.get_robot().get_fk_pose(parent, object_name)), f)
+                    world_object = self.get_robot().get_sub_tree_at_joint(object_name)
+                    object_links = world_object.get_link_names()
+                    if len(object_links) == 1:
+                        f.write(u'{} shape\n'.format(object_name))
+                        f.write(str(world_object.get_urdf_link(world_object.get_link_names()[0])))
+                        f.write(u'\n')
 
-            for object_name, world_object in self.get_world().get_objects().items(): # type: (str, WorldObject)
-                print(u'world objects ---------------------------')
-                print(u'{} joint state:'.format(object_name))
-                print_joint_state(dict_to_joint_states(world_object.joint_state))
-                print(u'{} base pose'.format(object_name))
-                print_dict(convert_ros_message_to_dictionary(world_object.base_pose))
-                object_links = world_object.get_link_names()
-                if len(object_links) == 1:
-                    print(u'{} shape'.format(object_name))
-                    print(world_object.get_urdf_link(world_object.get_link_names()[0]))
+                for object_name, world_object in self.get_world().get_objects().items(): # type: (str, WorldObject)
+                    f.write(u'world objects ---------------------------\n')
+                    f.write(u'{} joint state:\n'.format(object_name))
+                    write_dict(to_joint_state_position_dict((dict_to_joint_states(world_object.joint_state))), f)
+                    f.write(u'{} base pose\n'.format(object_name))
+                    write_dict(convert_ros_message_to_dictionary(world_object.base_pose),f)
+                    object_links = world_object.get_link_names()
+                    if len(object_links) == 1:
+                        f.write(u'{} shape\n'.format(object_name))
+                        f.write(str(world_object.get_urdf_link(world_object.get_link_names()[0])))
+                        f.write(u'\n')
+
         except:
             print('failed to print pls try again')
             return TriggerResponse()

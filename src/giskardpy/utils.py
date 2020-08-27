@@ -232,6 +232,12 @@ def print_dict(d):
         print("\'{}\': {},".format(key, value))
     print('}')
 
+def write_dict(d, f):
+    f.write('{\n')
+    for key, value in d.items():
+        f.write("\'{}\': {},\n".format(key, value))
+    f.write('}\n')
+
 def position_dict_to_joint_states(joint_state_dict):
     """
     :param joint_state_dict: maps joint_name to position

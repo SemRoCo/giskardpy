@@ -3413,7 +3413,7 @@ class TestCollisionAvoidanceGoals(object):
 
     def test_ease_spoon(self, kitchen_setup):
         spoon_name = u'spoon'
-        percentage = 30
+        percentage = 40
 
         # spawn cup
         cup_pose = PoseStamped()
@@ -3455,32 +3455,52 @@ class TestCollisionAvoidanceGoals(object):
         kitchen_setup.send_and_check_goal()
 
         kitchen_setup.send_and_check_joint_goal(gaya_pose)
-        # base_goal = PoseStamped()
-        # base_goal.header.frame_id = u'base_footprint'
-        # base_goal.pose.position.x = -.1
-        # base_goal.pose.orientation = Quaternion(*quaternion_about_axis(pi, [0, 0, 1]))
-        # kitchen_setup.teleport_base(base_goal)
-        #
-        # # place bowl and cup
-        # bowl_goal = PoseStamped()
-        # bowl_goal.header.frame_id = u'iai_kitchen/kitchen_island_surface'
-        # bowl_goal.pose.position = Point(.2, 0, .05)
-        # bowl_goal.pose.orientation = Quaternion(0, 0, 0, 1)
-        #
-        # cup_goal = PoseStamped()
-        # cup_goal.header.frame_id = u'iai_kitchen/kitchen_island_surface'
-        # cup_goal.pose.position = Point(.15, 0.25, .07)
-        # cup_goal.pose.orientation = Quaternion(0, 0, 0, 1)
-        #
-        # kitchen_setup.set_cart_goal(bowl_goal, bowl_name, kitchen_setup.default_root)
-        # kitchen_setup.set_cart_goal(cup_goal, cup_name, kitchen_setup.default_root)
-        # kitchen_setup.send_and_check_goal()
-        #
-        # kitchen_setup.detach_object(bowl_name)
-        # kitchen_setup.detach_object(cup_name)
-        # kitchen_setup.allow_collision([], cup_name, [])
-        # kitchen_setup.allow_collision([], bowl_name, [])
-        # kitchen_setup.send_and_check_joint_goal(gaya_pose)
+
+    def test_ease_place_on_new_table(self, kitchen_setup):
+        percentage = 40
+        js = {
+            u'torso_lift_joint': 0.262343532164,
+            u'head_pan_joint': 0.0308852063639,
+            u'head_tilt_joint': 0.710418818732,
+            u'r_upper_arm_roll_joint': -1.4635104674,
+            u'r_shoulder_pan_joint': -1.59535749265,
+            u'r_shoulder_lift_joint': -0.0235854289628,
+            u'r_forearm_roll_joint': -123.897562601,
+            u'r_elbow_flex_joint': -1.72694302293,
+            u'r_wrist_flex_joint': -0.480010977079,
+            u'r_wrist_roll_joint': 88.0157228707,
+            u'l_upper_arm_roll_joint': 1.90635809306,
+            u'l_shoulder_pan_joint': 0.352841136964,
+            u'l_shoulder_lift_joint': -0.35035444474,
+            u'l_forearm_roll_joint': 32.5396842176,
+            u'l_elbow_flex_joint': -0.543731998795,
+            u'l_wrist_flex_joint': -1.68825444756,
+            u'l_wrist_roll_joint': -12.6846818117,
+        }
+        kitchen_setup.send_and_check_joint_goal(js)
+        base_pose = PoseStamped()
+        base_pose.header.frame_id = u'map'
+        base_pose.pose.position = Point(-2.8, 0.188, -0.000)
+        base_pose.pose.orientation = Quaternion(-0.001, -0.001, 0.993, -0.114)
+        # kitchen_setup.allow_all_collisions()
+        kitchen_setup.teleport_base(base_pose)
+
+        object_name = u'box'
+        kitchen_setup.attach_box(name=object_name,
+                                 size=[0.10, 0.14, 0.14],
+                                 frame_id=kitchen_setup.l_tip,
+                                 position=[0.0175, 0.025, 0],
+                                 orientation=[0,0,0,1])
+
+        l_goal = PoseStamped()
+        l_goal.header.stamp = rospy.get_rostime()
+        l_goal.header.frame_id = kitchen_setup.l_tip
+        l_goal.pose.position.x += 0.2
+        l_goal.pose.orientation.w = 1
+        kitchen_setup.add_json_goal(u'AvoidJointLimits', percentage=percentage)
+        kitchen_setup.set_and_check_cart_goal(l_goal, tip=kitchen_setup.l_tip)
+
+
 
     def test_tray(self, kitchen_setup):
         tray_name = u'tray'

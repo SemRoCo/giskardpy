@@ -394,8 +394,6 @@ class TestConstraints(object):
         zero_pose.set_translation_goal(goal_position, zero_pose.l_tip)
         zero_pose.send_and_check_goal()
 
-
-
     def test_AvoidJointLimits1(self, zero_pose):
         """
         :type zero_pose: PR2
@@ -860,7 +858,6 @@ class TestConstraints(object):
 
         elbow = u'r_elbow_flex_link'
 
-
         tip_axis = Vector3Stamped()
         tip_axis.header.frame_id = kitchen_setup.r_tip
         tip_axis.vector.x = 1
@@ -1110,6 +1107,7 @@ class TestConstraints(object):
         # TODO: calculate real and desired value and compare
 
         pass
+
 
 class TestCartGoals(object):
 
@@ -1594,8 +1592,8 @@ class TestCollisionAvoidanceGoals(object):
         object_name = u'muh'
         p = PoseStamped()
         p.header.frame_id = zero_pose.r_tip
-        p.pose.position = Point(0.1,0,0)
-        p.pose.orientation = Quaternion(0,0,0,1)
+        p.pose.position = Point(0.1, 0, 0)
+        p.pose.orientation = Quaternion(0, 0, 0, 1)
         zero_pose.add_mesh(object_name, path=u'package://giskardpy/test/urdfs/meshes/bowl_21.obj', pose=p)
         # m = zero_pose.get_world().get_object(object_name).as_marker_msg()
         # compare_poses(m.pose, p.pose)
@@ -1609,8 +1607,8 @@ class TestCollisionAvoidanceGoals(object):
         object_name = u'muh'
         p = PoseStamped()
         p.header.frame_id = zero_pose.r_tip
-        p.pose.position = Point(0.01,0,0)
-        p.pose.orientation = Quaternion(*quaternion_about_axis(-np.pi/2, [0,1,0]))
+        p.pose.position = Point(0.01, 0, 0)
+        p.pose.orientation = Quaternion(*quaternion_about_axis(-np.pi / 2, [0, 1, 0]))
         zero_pose.add_mesh(object_name, path=u'package://giskardpy/test/urdfs/meshes/cup_11.obj', pose=p)
         # m = zero_pose.get_world().get_object(object_name).as_marker_msg()
         # compare_poses(m.pose, p.pose)
@@ -3170,7 +3168,6 @@ class TestCollisionAvoidanceGoals(object):
 
         # spawn milk
 
-
         cereal_pose = PoseStamped()
         cereal_pose.header.frame_id = drawer_frame_id
         cereal_pose.pose.position = Point(0.123, -0.03, 0.11)
@@ -3183,8 +3180,8 @@ class TestCollisionAvoidanceGoals(object):
         kitchen_setup.open_l_gripper()
         grasp_pose = PoseStamped()
         grasp_pose.header.frame_id = cereal_name
-        grasp_pose.pose.position = Point(0.1,0,0)
-        grasp_pose.pose.orientation = Quaternion(0,0,1,0)
+        grasp_pose.pose.position = Point(0.1, 0, 0)
+        grasp_pose.pose.orientation = Quaternion(0, 0, 1, 0)
         box_T_r_goal = tf.msg_to_kdl(grasp_pose)
         box_T_r_goal_pre = deepcopy(box_T_r_goal)
         box_T_r_goal_pre.p[0] += 0.1
@@ -3480,7 +3477,7 @@ class TestCollisionAvoidanceGoals(object):
         kitchen_setup.send_and_check_joint_goal(js)
         base_pose = PoseStamped()
         base_pose.header.frame_id = u'map'
-        base_pose.pose.position = Point(-2.8, 0.188, -0.000)
+        base_pose.pose.position = Point(-2.8, 0.188, -0.000)  # -2.695
         base_pose.pose.orientation = Quaternion(-0.001, -0.001, 0.993, -0.114)
         # kitchen_setup.allow_all_collisions()
         kitchen_setup.teleport_base(base_pose)
@@ -3490,17 +3487,33 @@ class TestCollisionAvoidanceGoals(object):
                                  size=[0.10, 0.14, 0.14],
                                  frame_id=kitchen_setup.l_tip,
                                  position=[0.0175, 0.025, 0],
-                                 orientation=[0,0,0,1])
+                                 orientation=[0, 0, 0, 1])
 
         l_goal = PoseStamped()
         l_goal.header.stamp = rospy.get_rostime()
         l_goal.header.frame_id = kitchen_setup.l_tip
         l_goal.pose.position.x += 0.2
+        # l_goal.pose.position.z -= 0.1
         l_goal.pose.orientation.w = 1
         kitchen_setup.add_json_goal(u'AvoidJointLimits', percentage=percentage)
+
+        js = {
+            u'r_upper_arm_roll_joint': -1.4635104674,
+            u'r_shoulder_pan_joint': -1.59535749265,
+            u'r_shoulder_lift_joint': -0.0235854289628,
+            u'r_forearm_roll_joint': -123.897562601,
+            u'r_elbow_flex_joint': -1.72694302293,
+            u'r_wrist_flex_joint': -0.480010977079,
+            u'r_wrist_roll_joint': 88.0157228707,
+        }
+        kitchen_setup.set_joint_goal(js)
+
+        # base_pose.header.frame_id = u'base_footprint'
+        # base_pose.pose.position = Point(0,0,0)
+        # base_pose.pose.orientation = Quaternion(0,0,0,1)
+        # kitchen_setup.set_cart_goal(base_pose, u'base_footprint')
+
         kitchen_setup.set_and_check_cart_goal(l_goal, tip=kitchen_setup.l_tip)
-
-
 
     def test_tray(self, kitchen_setup):
         tray_name = u'tray'

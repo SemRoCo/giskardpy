@@ -49,7 +49,7 @@ class SetCmd(GetGoal):
         # TODO goal checks should probably be its own plugin?
         if self.get_blackboard_exception():
             self.goal = None
-            self.get_god_map().safe_set_data(identifier.next_move_goal, None)
+            # self.get_god_map().safe_set_data(identifier.next_move_goal, None)
             return Status.SUCCESS
 
         try:
@@ -57,7 +57,7 @@ class SetCmd(GetGoal):
             self.get_god_map().safe_set_data(identifier.next_move_goal, move_cmd)
         except IndexError:
             self.goal = None
-            self.get_god_map().safe_set_data(identifier.next_move_goal, None)
+            # self.get_god_map().safe_set_data(identifier.next_move_goal, None)
             return Status.SUCCESS
 
         return Status.RUNNING

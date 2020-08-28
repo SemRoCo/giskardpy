@@ -1,6 +1,7 @@
 from __future__ import division
 
 import errno
+import json
 import os
 import pydot
 import pylab as plt
@@ -233,10 +234,8 @@ def print_dict(d):
     print('}')
 
 def write_dict(d, f):
-    f.write('{\n')
-    for key, value in d.items():
-        f.write("\'{}\': {},\n".format(key, value))
-    f.write('}\n')
+    json.dump(d,f, sort_keys=True, indent=4, separators=(',', ': '))
+    f.write('\n')
 
 def position_dict_to_joint_states(joint_state_dict):
     """

@@ -1,5 +1,6 @@
 import itertools
 from collections import defaultdict
+from copy import deepcopy
 from multiprocessing import Lock
 
 import rospy
@@ -54,7 +55,7 @@ class CollisionChecker(GiskardBehavior):
 
         max_distances = defaultdict(lambda: max_distance)
 
-        self.collision_matrix = self.get_world().collision_goals_to_collision_matrix(collision_goals, max_distances)
+        self.collision_matrix = self.get_world().collision_goals_to_collision_matrix(deepcopy(collision_goals), max_distances)
 
         super(CollisionChecker, self).initialise()
 

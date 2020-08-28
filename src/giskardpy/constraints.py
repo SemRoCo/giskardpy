@@ -679,24 +679,24 @@ class JointPositionRevolute(Constraint):
 
 class AvoidJointLimitsRevolute(Constraint):
     goal = u'goal'
-    weight = u'weight'
+    weight_id = u'weight'
     max_velocity = u'max_velocity'
     percentage = u'percentage'
 
-    def __init__(self, god_map, joint_name, weight=0.1, max_velocity=1e9,
-                 percentage=5):
+    def __init__(self, god_map, joint_name, weight=0.1, max_velocity=1e9, percentage=5):
         super(AvoidJointLimitsRevolute, self).__init__(god_map)
         self.joint_name = joint_name
         if not self.get_robot().is_joint_revolute(joint_name):
             raise ConstraintException(u'{} called with non prismatic joint {}'.format(self.__class__.__name__,
                                                                                       joint_name))
 
-        params = {self.weight: weight,
+        params = {self.weight_id: weight,
                   self.max_velocity: max_velocity,
                   self.percentage: percentage}
         self.save_params_on_god_map(params)
 
     def make_constraints(self):
+        weight = self.get_input_float(self.weight_id)
         joint_symbol = self.get_input_joint_position(self.joint_name)
         percentage = self.get_input_float(self.percentage) / 100.
         lower_limit, upper_limit = self.get_robot().get_joint_limits(self.joint_name)
@@ -717,7 +717,6 @@ class AvoidJointLimitsRevolute(Constraint):
         upper_err_capped = self.limit_velocity(upper_err, max_velocity)
         lower_err_capped = self.limit_velocity(lower_err, max_velocity)
 
-        weight = 0.1
         weight = self.normalize_error(max_velocity, weight)
 
         self.add_constraint(u'',
@@ -734,24 +733,24 @@ class AvoidJointLimitsRevolute(Constraint):
 
 class AvoidJointLimitsPrismatic(Constraint):
     goal = u'goal'
-    weight = u'weight'
+    weight_id = u'weight'
     max_velocity = u'max_velocity'
     percentage = u'percentage'
 
-    def __init__(self, god_map, joint_name, weight=0.1, max_velocity=1e9,
-                 percentage=5):
+    def __init__(self, god_map, joint_name, weight=0.1, max_velocity=1e9, percentage=5):
         super(AvoidJointLimitsPrismatic, self).__init__(god_map)
         self.joint_name = joint_name
         if not self.get_robot().is_joint_prismatic(joint_name):
             raise ConstraintException(u'{} called with non prismatic joint {}'.format(self.__class__.__name__,
                                                                                       joint_name))
 
-        params = {self.weight: weight,
+        params = {self.weight_id: weight,
                   self.max_velocity: max_velocity,
-                  self.percentage: percentage}
+                  self.percentage: percentage,}
         self.save_params_on_god_map(params)
 
     def make_constraints(self):
+        weight = self.get_input_float(self.weight_id)
         joint_symbol = self.get_input_joint_position(self.joint_name)
         percentage = self.get_input_float(self.percentage) / 100.
         lower_limit, upper_limit = self.get_robot().get_joint_limits(self.joint_name)
@@ -772,7 +771,6 @@ class AvoidJointLimitsPrismatic(Constraint):
         upper_err_capped = self.limit_velocity(upper_err, max_velocity)
         lower_err_capped = self.limit_velocity(lower_err, max_velocity)
 
-        weight = 0.1
         weight = self.normalize_error(max_velocity, weight)
 
         self.add_constraint(u'',
@@ -816,18 +814,20 @@ class JointPositionList(Constraint):
 
 
 class AvoidJointLimits(Constraint):
-    def __init__(self, god_map, percentage=15):
+    def __init__(self, god_map, percentage=15, weight=1):
         super(AvoidJointLimits, self).__init__(god_map)
         self.constraints = []
         for joint_name in self.get_robot().controlled_joints:
             if self.get_robot().is_joint_revolute(joint_name):
                 self.constraints.append(AvoidJointLimitsRevolute(god_map,
                                                                  joint_name=joint_name,
-                                                                 percentage=percentage))
+                                                                 percentage=percentage,
+                                                                 weight=weight))
             elif self.get_robot().is_joint_prismatic(joint_name):
                 self.constraints.append(AvoidJointLimitsPrismatic(god_map,
                                                                  joint_name=joint_name,
-                                                                 percentage=percentage))
+                                                                 percentage=percentage,
+                                                                  weight=weight))
 
     def make_constraints(self):
         for constraint in self.constraints:

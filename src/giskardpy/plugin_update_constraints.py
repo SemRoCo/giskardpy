@@ -16,7 +16,7 @@ import giskardpy.identifier as identifier
 from giskardpy.constraints import SelfCollisionAvoidance, ExternalCollisionAvoidance
 from giskardpy.data_types import JointConstraint
 from giskardpy.exceptions import ImplementationException, UnknownConstraintException, InvalidGoalException, \
-    ConstraintInitalizationException
+    ConstraintInitalizationException, GiskardException
 from giskardpy.logging import loginfo
 from giskardpy.plugin_action_server import GetGoal
 
@@ -154,13 +154,17 @@ class GoalToConstraints(GetGoal):
                 error_msg = u'Initialization of "{}" constraint failed: \n {} \n'.format(C.__name__, e)
                 if doc_string is not None:
                     error_msg = error_msg + doc_string
-                raise ConstraintInitalizationException(error_msg)
+                if not isinstance(e, GiskardException):
+                    raise ConstraintInitalizationException(error_msg)
+                raise e
             try:
                 soft_constraints = c.get_constraints()
                 self.soft_constraints.update(soft_constraints)
             except Exception as e:
                 traceback.print_exc()
-                raise ConstraintInitalizationException(e)
+                if not isinstance(e, GiskardException):
+                    raise ConstraintInitalizationException(e)
+                raise e
 
     def has_robot_changed(self):
         new_urdf = self.get_robot().get_urdf_str()

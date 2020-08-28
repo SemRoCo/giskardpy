@@ -14,7 +14,7 @@ from shape_msgs.msg import SolidPrimitive
 from visualization_msgs.msg import MarkerArray
 
 from giskardpy.urdf_object import URDFObject
-from giskardpy.utils import dict_to_joint_states, make_world_body_box, make_world_body_cylinder
+from giskardpy.utils import position_dict_to_joint_states, make_world_body_box, make_world_body_cylinder
 
 
 class GiskardWrapper(object):
@@ -510,7 +510,7 @@ class GiskardWrapper(object):
 
     def set_object_joint_state(self, object_name, joint_states):
         if isinstance(joint_states, dict):
-            joint_states = dict_to_joint_states(joint_states)
+            joint_states = position_dict_to_joint_states(joint_states)
         self.object_js_topics[object_name].publish(joint_states)
 
     def get_object_names(self):

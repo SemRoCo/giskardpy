@@ -30,7 +30,7 @@ from giskardpy.plugin_interrupts import WiggleCancel
 from giskardpy.plugin_kinematic_sim import KinSimPlugin
 from giskardpy.plugin_log_trajectory import LogTrajPlugin
 from giskardpy.plugin_plot_trajectory import PlotTrajectory
-from giskardpy.plugin_plot_trajectory_fft import PlotTrajectoryFFT
+#from giskardpy.plugin_plot_trajectory_fft import PlotTrajectoryFFT
 from giskardpy.plugin_pybullet import WorldUpdatePlugin
 from giskardpy.plugin_send_trajectory import SendTrajectory
 from giskardpy.plugin_set_cmd import SetCmd
@@ -44,6 +44,7 @@ from giskardpy.utils import create_path, render_dot_tree, KeyDefaultDict
 from giskardpy.world import World
 from giskardpy.world_object import WorldObject
 from collections import defaultdict
+from giskardpy.tree_manager import TreeManager
 
 
 def initialize_god_map():
@@ -151,10 +152,10 @@ def grow_tree():
     # ----------------------------------------------
     wait_for_goal = Sequence(u'wait for goal')
     wait_for_goal.add_child(TFPlugin(u'tf'))
-    wait_for_goal.add_child(ConfigurationPlugin(u'js'))
+    wait_for_goal.add_child(ConfigurationPlugin(u'js1'))
     wait_for_goal.add_child(WorldUpdatePlugin(u'pybullet updater'))
     wait_for_goal.add_child(GoalReceived(u'has goal', action_server_name, MoveAction))
-    wait_for_goal.add_child(ConfigurationPlugin(u'js'))
+    wait_for_goal.add_child(ConfigurationPlugin(u'js2'))
     # ----------------------------------------------
     planning_3 = PluginBehavior(u'planning III', sleep=0)
     planning_3.add_plugin(CollisionChecker(u'coll'))
@@ -237,4 +238,6 @@ def grow_tree():
     render_dot_tree(root, name=path)
 
     tree.setup(30)
+    tree_m = TreeManager(tree)
+    god_map.set_data(identifier.tree_manager, tree_m)
     return tree

@@ -68,7 +68,7 @@ class SetCmd(GetGoal):
         skip_failures = self.get_god_map().get_data(identifier.skip_failures)
         if not skip_failures and self.get_blackboard_exception():
             self.goal = None
-            self.get_god_map().set_data(identifier.next_move_goal, None)
+            # self.get_god_map().set_data(identifier.next_move_goal, None)
             return Status.SUCCESS
 
         try:
@@ -78,7 +78,7 @@ class SetCmd(GetGoal):
             self.get_god_map().set_data(identifier.cmd_id, cmd_id)
         except IndexError:
             self.goal = None
-            self.get_god_map().set_data(identifier.next_move_goal, None)
+            # self.get_god_map().set_data(identifier.next_move_goal, None)
             return Status.SUCCESS
 
         return Status.RUNNING

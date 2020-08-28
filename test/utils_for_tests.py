@@ -27,7 +27,7 @@ from giskardpy.pybullet_world import PyBulletWorld
 from giskardpy.python_interface import GiskardWrapper
 from giskardpy.robot import Robot
 from giskardpy.tfwrapper import transform_pose, lookup_pose
-from giskardpy.utils import msg_to_list, KeyDefaultDict, dict_to_joint_states, get_ros_pkg_path, to_joint_state_dict2
+from giskardpy.utils import msg_to_list, KeyDefaultDict, position_dict_to_joint_states, get_ros_pkg_path, to_joint_state_position_dict
 
 BIG_NUMBER = 1e100
 SMALL_NUMBER = 1e-100
@@ -299,7 +299,7 @@ class GiskardTestWrapper(object):
         if topic is None:
             self.wrapper.set_object_joint_state(object_name, joint_state)
         else:
-            self.joint_state_publisher[topic].publish(dict_to_joint_states(joint_state))
+            self.joint_state_publisher[topic].publish(position_dict_to_joint_states(joint_state))
             rospy.sleep(.5)
 
         self.wait_for_synced()
@@ -337,7 +337,7 @@ class GiskardTestWrapper(object):
         self.wrapper.set_joint_goal(js)
 
     def check_joint_state(self, expected, decimal=2):
-        current_joint_state = to_joint_state_dict2(self.get_current_joint_state())
+        current_joint_state = to_joint_state_position_dict(self.get_current_joint_state())
         self.compare_joint_state(current_joint_state, expected, decimal=decimal)
 
     def send_and_check_joint_goal(self, goal, decimal=2):
@@ -361,8 +361,11 @@ class GiskardTestWrapper(object):
                                                                        goal_pose.pose.orientation.z,
                                                                        goal_pose.pose.orientation.w]))[0]}
         goal = SetJointStateRequest()
-        goal.state = dict_to_joint_states(js)
+        goal.state = position_dict_to_joint_states(js)
         self.set_base.call(goal)
+        self.loop_once()
+        rospy.sleep(0.5)
+        self.loop_once()
 
     def keep_position(self, tip, root=None):
         if root is None:
@@ -396,11 +399,11 @@ class GiskardTestWrapper(object):
             root = self.default_root
         self.wrapper.set_cart_goal(root, tip, goal_pose)
 
-    def set_and_check_cart_goal(self, goal_pose, tip, root=None, expected_error_code=MoveResult.SUCCESS):
+    def set_and_check_cart_goal(self, goal_pose, tip, root=None, expected_error_codes=None):
         goal_pose_in_map = transform_pose(u'map', goal_pose)
         self.set_cart_goal(goal_pose, tip, root)
         self.loop_once()
-        self.send_and_check_goal(expected_error_code)
+        self.send_and_check_goal(expected_error_codes)
         self.loop_once()
         self.check_cart_goal(tip, goal_pose_in_map)
 
@@ -421,13 +424,13 @@ class GiskardTestWrapper(object):
     #
     # GENERAL GOAL STUFF ###############################################################################################
     #
-    def check_reachability(self, expected_error_code=MoveResult.SUCCESS):
-        self.send_and_check_goal(expected_error_code=expected_error_code, goal_type=MoveGoal.CHECK_REACHABILITY)
+    def check_reachability(self, expected_error_codes=None):
+        self.send_and_check_goal(expected_error_codes=expected_error_codes, goal_type=MoveGoal.PLAN_AND_CHECK_REACHABILITY)
 
     def get_as(self):
         return Blackboard().get(u'giskardpy/command')
 
-    def send_goal(self, goal=None, goal_type=MoveGoal.PLAN_AND_EXECUTE):
+    def send_goal(self, goal=None, goal_type=MoveGoal.PLAN_AND_EXECUTE, wait=True):
         """
         :rtype: MoveResult
         """
@@ -449,6 +452,26 @@ class GiskardTestWrapper(object):
         self.loop_once()
         result = self.results.get()
         return result
+
+    def send_goal_and_dont_wait(self, goal=None, goal_type=MoveGoal.PLAN_AND_EXECUTE):
+        if goal is None:
+            goal = MoveActionGoal()
+            goal.goal = self.wrapper._get_goal()
+            goal.goal.type = goal_type
+        i = 0
+        self.loop_once()
+        t1 = Thread(target=self.get_as()._as.action_server.internal_goal_callback, args=(goal,))
+        self.loop_once()
+        t1.start()
+        # sleeper = rospy.Rate(self.tick_rate)
+        # while self.results.empty():
+        #     self.loop_once()
+        #     sleeper.sleep()
+        #     i += 1
+        # t1.join()
+        # self.loop_once()
+        # result = self.results.get()
+        return t1
 
     def send_and_check_goal(self, expected_error_codes=None, goal_type=MoveGoal.PLAN_AND_EXECUTE, goal=None):
         r = self.send_goal(goal=goal, goal_type=goal_type)

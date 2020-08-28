@@ -958,7 +958,8 @@ class CartesianPositionStraight(BasicCartesianConstraint):
                                                root=self.root,
                                                tip=self.tip,
                                                goal_constraint=self.goal_constraint,
-                                               prefix=u'line')
+                                               prefix=u'line',
+                                               weight=weight)
 
 
 # class CartesianPositionX(BasicCartesianConstraint):

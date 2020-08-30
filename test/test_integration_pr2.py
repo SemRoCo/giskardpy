@@ -357,9 +357,6 @@ class TestJointGoals(object):
         assert (not zero_pose.are_joint_limits_violated())
 
 
-    # TODO test goal for unknown joint
-
-
 class TestConstraints(object):
     def test_UpdateGodMap(self, pocky_pose_setup):
         """
@@ -391,6 +388,29 @@ class TestConstraints(object):
         assert pocky_pose_setup.get_god_map().get_data(identifier.joint_cost + [u'odom_x_joint']) == old_odom_x_value
         assert pocky_pose_setup.get_god_map().get_data(identifier.joint_cost + [u'torso_lift_joint']) == old_torso_value
 
+    def test_UpdateYaml(self, pocky_pose_setup):
+        """
+        :type pocky_pose_setup: PR2
+        """
+        r_goal = PoseStamped()
+        r_goal.header.frame_id = pocky_pose_setup.r_tip
+        r_goal.pose.orientation.w = 1
+        r_goal.pose.position.x += 0.1
+        updates = {
+            u'general_options': {
+                u'joint_weights': {
+                    u'odom_x_joint': 0.0999,
+                    u'odom_y_joint': 0.0999,
+                    u'odom_z_joint': 0.0888
+                }
+            }
+        }
+        pocky_pose_setup.wrapper.update_yaml(updates)
+        pocky_pose_setup.set_and_check_cart_goal(r_goal, pocky_pose_setup.r_tip)
+        assert pocky_pose_setup.get_god_map().get_data(identifier.joint_cost + [u'odom_x_joint']) == 0.0999
+        assert pocky_pose_setup.get_god_map().get_data(identifier.joint_cost + [u'odom_y_joint']) == 0.0999
+        assert pocky_pose_setup.get_god_map().get_data(identifier.joint_cost + [u'odom_z_joint']) == 0.0888
+        assert pocky_pose_setup.get_god_map().get_data(identifier.joint_cost + [u'torso_lift_joint']) == 0.
 
     def test_UpdateGodMap2(self, pocky_pose_setup):
         """

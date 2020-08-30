@@ -161,6 +161,9 @@ class GiskardWrapper(object):
     def update_god_map(self, updates):
         self.set_json_goal(u'UpdateGodMap', updates=updates)
 
+    def update_yaml(self, updates):
+        self.set_json_goal(u'UpdateYaml', updates=updates)
+
     def pointing(self, tip, goal_point, root=None, pointing_axis=None, weight=None):
         kwargs = {u'tip':tip,
                   u'goal_point':goal_point}

@@ -20,7 +20,7 @@ class SetCmd(GetGoal):
             self.goal = self.pop_goal()  # type: MoveGoal
             self.get_god_map().set_data(identifier.cmd_id, -1)
             empty_result = MoveResult()
-            empty_result.error_codes = [MoveResult.PREEMPTED for _ in self.goal.cmd_seq]
+            empty_result.error_codes = [MoveResult.ERROR for _ in self.goal.cmd_seq]
             empty_result.error_messages = [u'' for _ in self.goal.cmd_seq]
             self.traj = []
             if len(self.goal.cmd_seq) == 0:

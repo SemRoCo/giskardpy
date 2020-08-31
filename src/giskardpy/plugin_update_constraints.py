@@ -40,6 +40,7 @@ class GoalToConstraints(GetGoal):
 
     def initialise(self):
         self.get_god_map().set_data(identifier.collision_goal, None)
+        self.clear_blackboard_exception()
 
     def update(self):
         # TODO make this interruptable

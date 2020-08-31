@@ -1402,20 +1402,30 @@ class TestCartGoals(object):
 
 
     def test_interrupt1(self, zero_pose):
-        #FIXME
         p = PoseStamped()
         p.header.frame_id = u'base_footprint'
         p.pose.position = Point(2, 0, 0)
         p.pose.orientation = Quaternion(0, 0, 0, 1)
         zero_pose.set_cart_goal(p, u'base_footprint')
-        thread = zero_pose.send_goal_and_dont_wait()
-        zero_pose.loop_once()
-        rospy.sleep(.5)
-        zero_pose.loop_once()
-        zero_pose.wrapper.interrupt()
-        thread.join(1)
-        result = zero_pose.results.get()
+        result = zero_pose.send_goal_and_dont_wait(stop_after=20)
         assert result.error_codes[0] == MoveResult.PREEMPTED
+
+    def test_interrupt_way_points1(self, zero_pose):
+        p = PoseStamped()
+        p.header.frame_id = u'base_footprint'
+        p.pose.position = Point(0, 0, 0)
+        p.pose.orientation = Quaternion(0, 0, 0, 1)
+        zero_pose.set_cart_goal(deepcopy(p), u'base_footprint')
+        zero_pose.add_waypoint()
+        p.pose.position.x += 1
+        zero_pose.set_cart_goal(deepcopy(p), u'base_footprint')
+        zero_pose.add_waypoint()
+        p.pose.position.x += 1
+        zero_pose.set_cart_goal(p, u'base_footprint')
+        result = zero_pose.send_goal_and_dont_wait(stop_after=10)
+        assert result.error_codes[0] == MoveResult.SUCCESS
+        assert result.error_codes[1] == MoveResult.PREEMPTED
+        assert result.error_codes[2] == MoveResult.PREEMPTED
 
     def test_hot_init_failed(self, zero_pose):
         """
@@ -1662,7 +1672,7 @@ class TestCartGoals(object):
 
         traj = zero_pose.send_and_check_goal(expected_error_codes=[MoveResult.SUCCESS,
                                                                    MoveResult.UNKNOWN_CONSTRAINT,
-                                                                   MoveResult.PREEMPTED],
+                                                                   MoveResult.ERROR],
                                              goal_type=MoveGoal.PLAN_AND_EXECUTE)
 
         for i, p in enumerate(traj.points):

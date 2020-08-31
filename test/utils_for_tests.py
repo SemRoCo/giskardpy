@@ -7,6 +7,7 @@ from threading import Thread
 import hypothesis.strategies as st
 import numpy as np
 import rospy
+from actionlib_msgs.msg import GoalID
 from angles import shortest_angular_distance
 from geometry_msgs.msg import PoseStamped, Pose, Point, Quaternion
 from giskard_msgs.msg import MoveActionResult, CollisionEntry, MoveActionGoal, MoveResult, MoveGoal
@@ -27,7 +28,8 @@ from giskardpy.pybullet_world import PyBulletWorld
 from giskardpy.python_interface import GiskardWrapper
 from giskardpy.robot import Robot
 from giskardpy.tfwrapper import transform_pose, lookup_pose
-from giskardpy.utils import msg_to_list, KeyDefaultDict, position_dict_to_joint_states, get_ros_pkg_path, to_joint_state_position_dict
+from giskardpy.utils import msg_to_list, KeyDefaultDict, position_dict_to_joint_states, get_ros_pkg_path, \
+    to_joint_state_position_dict
 
 BIG_NUMBER = 1e100
 SMALL_NUMBER = 1e-100
@@ -74,7 +76,8 @@ def compare_axis_angle(actual_angle, actual_axis, expected_angle, expected_axis,
     except AssertionError:
         try:
             np.testing.assert_array_almost_equal(actual_axis, -expected_axis, decimal=decimal)
-            np.testing.assert_almost_equal(shortest_angular_distance(actual_angle, abs(expected_angle - 2 * pi)), 0, decimal=decimal)
+            np.testing.assert_almost_equal(shortest_angular_distance(actual_angle, abs(expected_angle - 2 * pi)), 0,
+                                           decimal=decimal)
         except AssertionError:
             np.testing.assert_almost_equal(shortest_angular_distance(actual_angle, 0), 0, decimal=decimal)
             np.testing.assert_almost_equal(shortest_angular_distance(0, expected_angle), 0, decimal=decimal)
@@ -177,12 +180,14 @@ def float_no_nan_no_inf(outer_limit=None, min_dist_to_zero=None):
     #     f = f.filter(lambda x: abs(x) < outer_limit)
     # return f
 
+
 @composite
 def sq_matrix(draw):
     i = draw(st.integers(min_value=1, max_value=10))
-    i_sq = i**2
+    i_sq = i ** 2
     l = draw(st.lists(limited_float(), min_size=i_sq, max_size=i_sq))
-    return np.array(l).reshape((i,i))
+    return np.array(l).reshape((i, i))
+
 
 def unit_vector(length, elements=None):
     if elements is None:
@@ -222,8 +227,8 @@ class GiskardTestWrapper(object):
         rospy.set_param(u'~enable_gui', False)
         rospy.set_param(u'~plugins/PlotTrajectory/enabled', True)
 
-
         self.sub_result = rospy.Subscriber(u'/giskardpy/command/result', MoveActionResult, self.cb, queue_size=100)
+        self.cancel_goal = rospy.Publisher(u'/giskardpy/command/cancel', GoalID, queue_size=100)
 
         self.tree = grow_tree()
         self.loop_once()
@@ -348,7 +353,6 @@ class GiskardTestWrapper(object):
         self.send_and_check_goal()
         self.check_joint_state(goal, decimal=decimal)
 
-
     #
     # CART GOAL STUFF ##################################################################################################
     #
@@ -420,12 +424,16 @@ class GiskardTestWrapper(object):
             np.testing.assert_array_almost_equal(msg_to_list(goal_in_base.pose.orientation),
                                                  -np.array(msg_to_list(current_pose.pose.orientation)), decimal=2)
 
-
     #
     # GENERAL GOAL STUFF ###############################################################################################
     #
+
+    def interrupt(self):
+        self.cancel_goal.publish(GoalID())
+
     def check_reachability(self, expected_error_codes=None):
-        self.send_and_check_goal(expected_error_codes=expected_error_codes, goal_type=MoveGoal.PLAN_AND_CHECK_REACHABILITY)
+        self.send_and_check_goal(expected_error_codes=expected_error_codes,
+                                 goal_type=MoveGoal.PLAN_AND_CHECK_REACHABILITY)
 
     def get_as(self):
         return Blackboard().get(u'giskardpy/command')
@@ -453,7 +461,7 @@ class GiskardTestWrapper(object):
         result = self.results.get()
         return result
 
-    def send_goal_and_dont_wait(self, goal=None, goal_type=MoveGoal.PLAN_AND_EXECUTE):
+    def send_goal_and_dont_wait(self, goal=None, goal_type=MoveGoal.PLAN_AND_EXECUTE, stop_after=20):
         if goal is None:
             goal = MoveActionGoal()
             goal.goal = self.wrapper._get_goal()
@@ -463,15 +471,17 @@ class GiskardTestWrapper(object):
         t1 = Thread(target=self.get_as()._as.action_server.internal_goal_callback, args=(goal,))
         self.loop_once()
         t1.start()
-        # sleeper = rospy.Rate(self.tick_rate)
-        # while self.results.empty():
-        #     self.loop_once()
-        #     sleeper.sleep()
-        #     i += 1
-        # t1.join()
-        # self.loop_once()
-        # result = self.results.get()
-        return t1
+        sleeper = rospy.Rate(self.tick_rate)
+        while self.results.empty():
+            self.loop_once()
+            sleeper.sleep()
+            i += 1
+            if i > stop_after:
+                self.interrupt()
+        t1.join()
+        self.loop_once()
+        result = self.results.get()
+        return result
 
     def send_and_check_goal(self, expected_error_codes=None, goal_type=MoveGoal.PLAN_AND_EXECUTE, goal=None):
         r = self.send_goal(goal=goal, goal_type=goal_type)
@@ -483,9 +493,10 @@ class GiskardTestWrapper(object):
             else:
                 expected_error_code = expected_error_codes[i]
             assert error_code == expected_error_code, \
-                u'got: {}, expected: {} | error_massage: {}'.format(move_result_error_code(error_code),
-                                                                    move_result_error_code(expected_error_code),
-                                                                    error_message)
+                u'in goal {}; got: {}, expected: {} | error_massage: {}'.format(i, move_result_error_code(error_code),
+                                                                                move_result_error_code(
+                                                                                    expected_error_code),
+                                                                                error_message)
         return r.trajectory
 
     def add_waypoint(self):
@@ -717,7 +728,7 @@ class GiskardTestWrapper(object):
         """
         collision_goals = [CollisionEntry(type=CollisionEntry.AVOID_ALL_COLLISIONS, min_dist=distance_threshold)]
         collision_matrix = self.get_world().collision_goals_to_collision_matrix(collision_goals,
-                                                                                defaultdict(lambda:0.3))
+                                                                                defaultdict(lambda: 0.3))
         collisions = self.get_world().check_collisions(collision_matrix)
         controlled_parent_joint = self.get_robot().get_controlled_parent_joint(link)
         controlled_parent_link = self.get_robot().get_child_link_of_joint(controlled_parent_joint)
@@ -835,8 +846,8 @@ class PR2(GiskardTestWrapper):
         sjs.state.name = [u'l_gripper_l_finger_joint', u'l_gripper_r_finger_joint', u'l_gripper_l_finger_tip_joint',
                           u'l_gripper_r_finger_tip_joint']
         sjs.state.position = [0, 0, 0, 0]
-        sjs.state.velocity = [0,0,0,0]
-        sjs.state.effort = [0,0,0,0]
+        sjs.state.velocity = [0, 0, 0, 0]
+        sjs.state.effort = [0, 0, 0, 0]
         self.l_gripper.call(sjs)
 
     def move_pr2_base(self, goal_pose):
@@ -907,6 +918,7 @@ class KMR_IIWA(GiskardTestWrapper):
                                                                        goal_pose.pose.orientation.w]))[0]}
         self.allow_all_collisions()
         self.send_and_check_joint_goal(js)
+
 
 class Boxy(GiskardTestWrapper):
     def __init__(self):

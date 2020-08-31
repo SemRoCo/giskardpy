@@ -37,6 +37,10 @@ class PostProcessing(GiskardBehavior):
         error_code, error_message = self.exception_to_error_code(e)
         result.error_codes[cmd_id] = error_code
         result.error_messages[cmd_id] = error_message
+        if error_code == MoveResult.PREEMPTED:
+            for i in range(len(result.error_codes)-cmd_id):
+                result.error_codes[cmd_id + i] = error_code
+                result.error_messages[cmd_id + i] = error_message
         self.get_god_map().set_data(identifier.result_message, result)
         return Status.SUCCESS
 

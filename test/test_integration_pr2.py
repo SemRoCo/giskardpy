@@ -459,7 +459,7 @@ class TestConstraints(object):
         old_odom_x_value = pocky_pose_setup.get_god_map().get_data(identifier.joint_weight + [u'odom_x_joint'])
 
         r_goal = PoseStamped()
-        r_goal.header.frame_id = u'base_footprint'
+        r_goal.header.frame_id = pocky_pose_setup.r_tip
         r_goal.pose.orientation.w = 1
         r_goal.pose.position.x += 0.1
         updates = {
@@ -477,17 +477,39 @@ class TestConstraints(object):
         old_pose = tf.lookup_pose(u'map', u'base_footprint')
 
         pocky_pose_setup.wrapper.update_god_map(updates)
-        pocky_pose_setup.set_cart_goal(r_goal, u'base_footprint')
-        pocky_pose_setup.send_and_check_goal()
+        pocky_pose_setup.set_and_check_cart_goal(r_goal, pocky_pose_setup.r_tip)
 
         new_pose = tf.lookup_pose(u'map', u'base_footprint')
         compare_poses(old_pose.pose, new_pose.pose)
 
         assert pocky_pose_setup.get_god_map().unsafe_get_data(identifier.joint_weight + [u'odom_x_joint']) == 1000000
-        assert pocky_pose_setup.get_god_map().unsafe_get_data(identifier.joint_weight + [u'torso_lift_joint']) == 0.01
-        pocky_pose_setup.set_and_check_cart_goal(r_goal, u'base_footprint')
-        assert pocky_pose_setup.get_god_map().unsafe_get_data(identifier.joint_weight + [u'odom_x_joint']) == 0.01
-        assert pocky_pose_setup.get_god_map().unsafe_get_data(identifier.joint_weight + [u'torso_lift_joint']) == 0.01
+        assert pocky_pose_setup.get_god_map().unsafe_get_data(identifier.joint_weight + [u'torso_lift_joint']) == old_torso_value
+
+        updates = {
+            u'rosparam': {
+                u'general_options': {
+                    u'joint_weights': {
+                        u'odom_x_joint': 0.0001,
+                        u'odom_y_joint': 0.0001,
+                        u'odom_z_joint': 0.0001
+                    }
+                }
+            }
+        }
+        # old_pose = tf.lookup_pose(u'map', u'base_footprint')
+        # old_pose.pose.position.x += 0.1
+        pocky_pose_setup.wrapper.update_god_map(updates)
+        pocky_pose_setup.set_and_check_cart_goal(r_goal, pocky_pose_setup.r_tip)
+
+        new_pose = tf.lookup_pose(u'map', u'base_footprint')
+
+        # compare_poses(old_pose.pose, new_pose.pose)
+        assert new_pose.pose.position.x >= 0.08
+        assert pocky_pose_setup.get_god_map().unsafe_get_data(identifier.joint_weight + [u'odom_x_joint']) == 0.0001
+        assert pocky_pose_setup.get_god_map().unsafe_get_data(identifier.joint_weight + [u'torso_lift_joint']) == old_torso_value
+        pocky_pose_setup.send_and_check_goal()
+        assert pocky_pose_setup.get_god_map().unsafe_get_data(identifier.joint_weight + [u'odom_x_joint']) == old_odom_x_value
+        assert pocky_pose_setup.get_god_map().unsafe_get_data(identifier.joint_weight + [u'torso_lift_joint']) == old_torso_value
 
     def test_base_pointing_forward(self, zero_pose):
         """

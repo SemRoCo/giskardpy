@@ -42,17 +42,7 @@ class CollisionChecker(GiskardBehavior):
 
     def initialise(self):
         collision_goals = self.get_god_map().get_data(identifier.collision_goal)
-        external_distance_thresholds = self.get_god_map().get_data(identifier.external_collision_avoidance_distance)
-        self_distance_thresholds = self.get_god_map().get_data(identifier.self_collision_avoidance_distance)
-
-        # trigger default factory... FIXME pls
-        external_distance_thresholds[0]
-        self_distance_thresholds[0]
-
-        max_distance = 0
-        for thresholds in itertools.chain(external_distance_thresholds.values(), self_distance_thresholds.values()):
-            max_distance = max(max_distance, thresholds[u'soft_threshold']) # FIXME get rid of hardcoded string
-
+        max_distance = self.get_god_map().get_data(identifier.maximum_collision_threshold)
         max_distances = defaultdict(lambda: max_distance)
 
         self.collision_matrix = self.get_world().collision_goals_to_collision_matrix(deepcopy(collision_goals), max_distances)

@@ -109,6 +109,7 @@ tree_manager = behavior_tree + [u'tree_manager']
 
 # collision avoidance
 collision_avoidance = rosparam + [u'collision_avoidance']
+maximum_collision_threshold = collision_avoidance + [u'maximum_collision_threshold']
 
 self_collision_avoidance = collision_avoidance + [u'self_collision_avoidance']
 self_collision_avoidance_distance = self_collision_avoidance + [u'distance_thresholds']

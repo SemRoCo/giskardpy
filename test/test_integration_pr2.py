@@ -2466,8 +2466,9 @@ class TestCollisionAvoidanceGoals(object):
         r_goal.pose.position.y = -0.38
         r_goal.pose.position.z = 0.82
         r_goal.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 2, [0, 1, 0]))
+        fake_table_setup.avoid_all_collisions(0.1)
         fake_table_setup.set_and_check_cart_goal(r_goal, fake_table_setup.r_tip)
-        fake_table_setup.check_cpi_geq(fake_table_setup.get_l_gripper_links(), 0.048)
+        fake_table_setup.check_cpi_geq(fake_table_setup.get_l_gripper_links(), 0.1)
         fake_table_setup.check_cpi_leq([u'r_gripper_l_finger_tip_link'], 0.04)
         fake_table_setup.check_cpi_leq([u'r_gripper_r_finger_tip_link'], 0.04)
 

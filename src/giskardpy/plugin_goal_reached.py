@@ -12,6 +12,8 @@ from giskardpy import logging
 class GoalReachedPlugin(GiskardBehavior):
     def __init__(self, name, window_size=None):
         super(GoalReachedPlugin, self).__init__(name)
+        translation_cut_off = 0.005 #m/s
+        rotation_cut_off = 0.02 #rad/s
         sample_period = self.get_god_map().get_data(identifier.sample_period)
         if window_size is None:
             self.window_size = sample_period * 5
@@ -25,7 +27,13 @@ class GoalReachedPlugin(GiskardBehavior):
             velocity_limit = self.get_robot().get_joint_velocity_limit(joint_name)
             if velocity_limit is None:
                 velocity_limit = 1
-            self.thresholds.append(velocity_limit * sample_period * self.joint_convergence_threshold)
+            velocity_limit *= self.joint_convergence_threshold
+            if self.get_robot().is_joint_prismatic(joint_name):
+                velocity_limit = max(translation_cut_off, velocity_limit)
+            elif self.get_robot().is_joint_rotational(joint_name):
+                velocity_limit = max(rotation_cut_off, velocity_limit)
+            velocity_limit *= sample_period
+            self.thresholds.append(velocity_limit)
         self.thresholds = np.array(self.thresholds)
         self.number_of_controlled_joints = len(self.thresholds)
 

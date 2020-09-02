@@ -761,6 +761,7 @@ class TestConstraints(object):
         """
         :type kitchen_setup: PR2
         """
+        percentage = 50
         handle_frame_id = u'iai_kitchen/iai_fridge_door_handle'
         handle_name = u'iai_fridge_door_handle'
         bar_axis = Vector3Stamped()
@@ -790,7 +791,7 @@ class TestConstraints(object):
         x_goal.vector.x = -1
         kitchen_setup.align_planes(kitchen_setup.r_tip, x_gripper, root_normal=x_goal, weight=WEIGHT_ABOVE_CA)
         # kitchen_setup.allow_all_collisions()
-        kitchen_setup.add_json_goal(u'AvoidJointLimits', percentage=10)
+        kitchen_setup.add_json_goal(u'AvoidJointLimits', percentage=percentage)
         kitchen_setup.send_and_check_goal()
 
         kitchen_setup.add_json_goal(u'OpenDoor',
@@ -799,7 +800,7 @@ class TestConstraints(object):
                                     handle_link=handle_name,
                                     angle_goal=1.5)
         kitchen_setup.allow_all_collisions()
-        kitchen_setup.add_json_goal(u'AvoidJointLimits')
+        kitchen_setup.add_json_goal(u'AvoidJointLimits', percentage=percentage)
         kitchen_setup.send_and_check_goal()
         kitchen_setup.set_kitchen_js({u'iai_fridge_door_joint': 1.5})
 
@@ -809,6 +810,7 @@ class TestConstraints(object):
                                     handle_link=handle_name,
                                     angle_goal=0)
         kitchen_setup.allow_all_collisions()
+        kitchen_setup.add_json_goal(u'AvoidJointLimits', percentage=percentage)
         kitchen_setup.send_and_check_goal()
         kitchen_setup.set_kitchen_js({u'iai_fridge_door_joint': 0})
 
@@ -3551,7 +3553,7 @@ class TestCollisionAvoidanceGoals(object):
     def test_bowl_and_cup(self, kitchen_setup):
         bowl_name = u'bowl'
         cup_name = u'cup'
-        percentage = 40
+        percentage = 50
 
         self.open_drawer(kitchen_setup, kitchen_setup.l_tip, u'iai_kitchen/sink_area_left_middle_drawer_handle',
                          u'sink_area_left_middle_drawer_main_joint')
@@ -3571,7 +3573,6 @@ class TestCollisionAvoidanceGoals(object):
         bowl_pose.pose.orientation = Quaternion(0, 0, 0, 1)
 
         kitchen_setup.add_cylinder(bowl_name, [0.05, 0.07], bowl_pose)
-
         kitchen_setup.send_and_check_joint_goal(gaya_pose)
 
         # grasp bowl
@@ -3625,7 +3626,7 @@ class TestCollisionAvoidanceGoals(object):
 
         kitchen_setup.set_cart_goal(bowl_goal, bowl_name, kitchen_setup.default_root)
         kitchen_setup.set_cart_goal(cup_goal, cup_name, kitchen_setup.default_root)
-        kitchen_setup.add_json_goal(u'AvoidJointLimits', percentage=15)
+        kitchen_setup.add_json_goal(u'AvoidJointLimits', percentage=percentage)
         kitchen_setup.send_and_check_goal()
 
         kitchen_setup.detach_object(bowl_name)

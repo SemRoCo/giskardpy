@@ -1,6 +1,7 @@
 import keyword
 import yaml
 from collections import defaultdict
+from copy import deepcopy
 from multiprocessing import Queue
 from threading import Thread
 
@@ -618,17 +619,20 @@ class GiskardTestWrapper(object):
                                   min_dist=min_dist))
         self.add_collision_entries(ces)
 
-    def attach_box(self, name=u'box', size=None, frame_id=None, position=None, orientation=None,
+    def attach_box(self, name=u'box', size=None, frame_id=None, position=None, orientation=None, pose=None,
                    expected_response=UpdateWorldResponse.SUCCESS):
         scm = self.get_robot().get_self_collision_matrix()
-        expected_pose = PoseStamped()
-        expected_pose.header.frame_id = frame_id
-        expected_pose.pose.position = Point(*position)
-        if orientation:
-            expected_pose.pose.orientation = Quaternion(*orientation)
+        if pose is None:
+            expected_pose = PoseStamped()
+            expected_pose.header.frame_id = frame_id
+            expected_pose.pose.position = Point(*position)
+            if orientation:
+                expected_pose.pose.orientation = Quaternion(*orientation)
+            else:
+                expected_pose.pose.orientation = Quaternion(0, 0, 0, 1)
         else:
-            expected_pose.pose.orientation = Quaternion(0, 0, 0, 1)
-        r = self.wrapper.attach_box(name, size, frame_id, position, orientation)
+            expected_pose = deepcopy(pose)
+        r = self.wrapper.attach_box(name, size, frame_id, position, orientation, pose)
         assert r.error_codes == expected_response, \
             u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
                                             update_world_error_code(expected_response))

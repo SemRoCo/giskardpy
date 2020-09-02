@@ -22,6 +22,7 @@ from giskardpy.identifier import fk_pose
 from giskardpy.robot import Robot
 from giskardpy.tfwrapper import init as tf_init
 from giskardpy.utils import to_joint_state_position_dict, publish_marker_vector
+from rospy_message_converter.message_converter import convert_dictionary_to_ros_message
 from utils_for_tests import PR2, compare_poses
 
 # TODO roslaunch iai_pr2_sim ros_control_sim_with_base.launch
@@ -483,7 +484,8 @@ class TestConstraints(object):
         compare_poses(old_pose.pose, new_pose.pose)
 
         assert pocky_pose_setup.get_god_map().unsafe_get_data(identifier.joint_weight + [u'odom_x_joint']) == 1000000
-        assert pocky_pose_setup.get_god_map().unsafe_get_data(identifier.joint_weight + [u'torso_lift_joint']) == old_torso_value
+        assert pocky_pose_setup.get_god_map().unsafe_get_data(
+            identifier.joint_weight + [u'torso_lift_joint']) == old_torso_value
 
         updates = {
             u'rosparam': {
@@ -506,10 +508,13 @@ class TestConstraints(object):
         # compare_poses(old_pose.pose, new_pose.pose)
         assert new_pose.pose.position.x >= 0.08
         assert pocky_pose_setup.get_god_map().unsafe_get_data(identifier.joint_weight + [u'odom_x_joint']) == 0.0001
-        assert pocky_pose_setup.get_god_map().unsafe_get_data(identifier.joint_weight + [u'torso_lift_joint']) == old_torso_value
+        assert pocky_pose_setup.get_god_map().unsafe_get_data(
+            identifier.joint_weight + [u'torso_lift_joint']) == old_torso_value
         pocky_pose_setup.send_and_check_goal()
-        assert pocky_pose_setup.get_god_map().unsafe_get_data(identifier.joint_weight + [u'odom_x_joint']) == old_odom_x_value
-        assert pocky_pose_setup.get_god_map().unsafe_get_data(identifier.joint_weight + [u'torso_lift_joint']) == old_torso_value
+        assert pocky_pose_setup.get_god_map().unsafe_get_data(
+            identifier.joint_weight + [u'odom_x_joint']) == old_odom_x_value
+        assert pocky_pose_setup.get_god_map().unsafe_get_data(
+            identifier.joint_weight + [u'torso_lift_joint']) == old_torso_value
 
     def test_base_pointing_forward(self, zero_pose):
         """
@@ -1549,6 +1554,276 @@ class TestCartGoals(object):
 
 
 class TestCollisionAvoidanceGoals(object):
+    def test_bug2020_09_01_10_52_23_dump(self, kitchen_setup):
+        map_T_odom = tf.pose_to_kdl(convert_dictionary_to_ros_message(u'geometry_msgs/PoseStamped',
+                                                                      {
+                                                                          "header": {
+                                                                              "frame_id": "map",
+                                                                              "seq": 0,
+                                                                              "stamp": {
+                                                                                  "nsecs": 0,
+                                                                                  "secs": 0
+                                                                              }
+                                                                          },
+                                                                          "pose": {
+                                                                              "orientation": {
+                                                                                  "w": -0.12723351841134276,
+                                                                                  "x": 0.004750630931312908,
+                                                                                  "y": -0.002122779146878978,
+                                                                                  "z": 0.9918591417671758
+                                                                              },
+                                                                              "position": {
+                                                                                  "x": -1.7428391289558658,
+                                                                                  "y": -0.12408773112315571,
+                                                                                  "z": -0.007148481224539375
+                                                                              }
+                                                                          }
+                                                                      }
+                                                                      ).pose)
+
+        odom_T_base_footprint = PoseStamped()
+        odom_T_base_footprint.pose.position = Point(
+            0.6219273123274539,
+            -0.2898733974256114,
+            0
+        )
+        odom_T_base_footprint.pose.orientation = Quaternion(*quaternion_about_axis(
+            -0.08682781557061732,
+            [0, 0, 1]))
+        odom_T_base_footprint = tf.pose_to_kdl(odom_T_base_footprint.pose)
+        map_T_base_footprint = tf.kdl_to_pose_stamped(map_T_odom * odom_T_base_footprint, u'map')
+
+        kitchen_setup.teleport_base(map_T_base_footprint)
+
+        js = {
+            "l_elbow_flex_joint": -2.121008899318323,
+            "l_forearm_roll_joint": -1.8532434817397747,
+            "l_shoulder_lift_joint": -0.2649135724042734,
+            "l_shoulder_pan_joint": 1.965457751174253,
+            "l_upper_arm_roll_joint": 1.3837617139225473,
+            "l_wrist_flex_joint": -0.09987430147959442,
+            "l_wrist_roll_joint": -6.283214397492735,
+            "r_elbow_flex_joint": -2.0636796976104463,
+            "r_forearm_roll_joint": -1.3014792140577125,
+            "r_shoulder_lift_joint": -0.3063862569009784,
+            "r_shoulder_pan_joint": -1.1845552036446647,
+            "r_upper_arm_roll_joint": -1.6440700018925993,
+            "r_wrist_flex_joint": -1.2848159054998414,
+            "r_wrist_roll_joint": 10.59059159681988,
+            "torso_lift_joint": 0.2623345200475086,
+        }
+        kitchen_setup.send_and_check_joint_goal(js)
+
+        box_pose = convert_dictionary_to_ros_message(u'geometry_msgs/PoseStamped',
+                                                     {
+                                                         "header": {
+                                                             "frame_id": "r_wrist_roll_link",
+                                                             "seq": 0,
+                                                             "stamp": {
+                                                                 "nsecs": 0,
+                                                                 "secs": 0
+                                                             }
+                                                         },
+                                                         "pose": {
+                                                             "orientation": {
+                                                                 "w": 0.7110270195399259,
+                                                                 "x": -0.013000494027886993,
+                                                                 "y": -0.7030267155229984,
+                                                                 "z": -0.005000190010958694
+                                                             },
+                                                             "position": {
+                                                                 "x": 0.195,
+                                                                 "y": 0.042,
+                                                                 "z": -0.025
+                                                             }
+                                                         }
+                                                     }
+                                                     )
+        kitchen_setup.attach_box(u'bowl_1',
+                                 size=[0.171740325292, 0.171745332082, 0.10578233401],
+                                 frame_id='r_wrist_roll_link', pose=box_pose)
+
+        wrong_odom_T_goal = convert_dictionary_to_ros_message(u'geometry_msgs/PoseStamped',
+                                                              {
+                                                                  "header": {
+                                                                      "frame_id": "odom_combined",
+                                                                      "seq": 0,
+                                                                      "stamp": {
+                                                                          "nsecs": 299463987,
+                                                                          "secs": 1598957538
+                                                                      }
+                                                                  },
+                                                                  "pose": {
+                                                                      "orientation": {
+                                                                          "w": 0.05829362594256854,
+                                                                          "x": 0.7015518104463911,
+                                                                          "y": 0.06265052702054284,
+                                                                          "z": -0.7074615096733994
+                                                                      },
+                                                                      "position": {
+                                                                          "x": 1.5215232236071157,
+                                                                          "y": -0.33849610230191063,
+                                                                          "z": 0.993610017525968
+                                                                      }
+                                                                  }
+                                                              }
+                                                              )
+
+        map_T_cart_goal = tf.kdl_to_pose_stamped(map_T_odom * tf.pose_to_kdl(wrong_odom_T_goal.pose), u'map')
+
+        kitchen_setup.add_json_goal(u'AvoidJointLimits', percentage=40)
+        kitchen_setup.set_and_check_cart_goal(map_T_cart_goal, kitchen_setup.r_tip)
+
+    def test_bug2020_09_01_11_22_51_dump(self, kitchen_setup):
+        map_T_odom = tf.pose_to_kdl(convert_dictionary_to_ros_message(u'geometry_msgs/PoseStamped',
+                                                                      {
+                                                                          "header": {
+                                                                              "frame_id": "map",
+                                                                              "seq": 0,
+                                                                              "stamp": {
+                                                                                  "nsecs": 0,
+                                                                                  "secs": 0
+                                                                              }
+                                                                          },
+                                                                          "pose": {
+                                                                              "orientation": {
+                                                                                  "w": 0.2402549656091816,
+                                                                                  "x": -0.0024454268609120245,
+                                                                                  "y": -0.002852994168366019,
+                                                                                  "z": 0.9707025454854202
+                                                                              },
+                                                                              "position": {
+                                                                                  "x": -2.1180501887755714,
+                                                                                  "y": 0.7919687518861623,
+                                                                                  "z": -0.017022869821609603
+                                                                              }
+                                                                          }
+                                                                      }
+                                                                      ).pose)
+
+        odom_T_base_footprint = PoseStamped()
+        odom_T_base_footprint.pose.position = Point(
+            -2.3774013091929227,
+            -1.3334991298858108,
+            0
+        )
+        odom_T_base_footprint.pose.orientation = Quaternion(*quaternion_about_axis(
+            -1.7025919013405562,
+            [0, 0, 1]))
+        odom_T_base_footprint = tf.pose_to_kdl(odom_T_base_footprint.pose)
+        map_T_base_footprint = tf.kdl_to_pose_stamped(map_T_odom * odom_T_base_footprint, u'map')
+
+        kitchen_setup.teleport_base(map_T_base_footprint)
+
+        js = {
+            "l_elbow_flex_joint": -1.727087793643744,
+            "l_forearm_roll_joint": -1.852954246305023,
+            "l_shoulder_lift_joint": -0.023564256787264204,
+            "l_shoulder_pan_joint": 1.5953626112926687,
+            "l_upper_arm_roll_joint": 1.384242778401657,
+            "l_wrist_flex_joint": -0.4799682274696515,
+            "l_wrist_roll_joint": -6.283649486693731,
+            "r_elbow_flex_joint": -1.2901697866882575,
+            "r_forearm_roll_joint": -8.797767517806948,
+            "r_shoulder_lift_joint": -0.007343203726731174,
+            "r_shoulder_pan_joint": -0.015571898911165505,
+            "r_upper_arm_roll_joint": -0.28570426771329305,
+            "r_wrist_flex_joint": -1.1989728061433444,
+            "r_wrist_roll_joint": 15.769936954395696,
+            "torso_lift_joint": 0.26230693418016243,
+        }
+        kitchen_setup.send_and_check_joint_goal(js)
+
+        kitchen_setup.set_kitchen_js(
+            {
+                "fridge_area_lower_drawer_main_joint": 0.0,
+                "iai_fridge_door_joint": 0.0,
+                "kitchen_island_left_lower_drawer_main_joint": 0.0,
+                "kitchen_island_left_upper_drawer_main_joint": 0.0,
+                "kitchen_island_middle_lower_drawer_main_joint": 0.0,
+                "kitchen_island_middle_upper_drawer_main_joint": 0.0,
+                "kitchen_island_right_lower_drawer_main_joint": 0.0,
+                "kitchen_island_right_upper_drawer_main_joint": 0.0,
+                "oven_area_area_left_drawer_main_joint": 0.0,
+                "oven_area_area_middle_lower_drawer_main_joint": 0.0,
+                "oven_area_area_middle_upper_drawer_main_joint": 0.0,
+                "oven_area_area_right_drawer_main_joint": 0.48,
+                "oven_area_oven_door_joint": 0.0,
+                "oven_area_oven_knob_oven_joint": 0.0,
+                "oven_area_oven_knob_stove_1_joint": 0.0,
+                "oven_area_oven_knob_stove_2_joint": 0.0,
+                "oven_area_oven_knob_stove_3_joint": 0.0,
+                "oven_area_oven_knob_stove_4_joint": 0.0,
+                "sink_area_dish_washer_door_joint": 0.0,
+                "sink_area_dish_washer_main_joint": 0.0,
+                "sink_area_dish_washer_tray_main": 0.0,
+                "sink_area_left_bottom_drawer_main_joint": 0.0,
+                "sink_area_left_middle_drawer_main_joint": 0.0,
+                "sink_area_left_upper_drawer_main_joint": 0.0,
+                "sink_area_trash_drawer_main_joint": 0.0
+            }
+        )
+
+        box_pose = convert_dictionary_to_ros_message(u'geometry_msgs/PoseStamped',
+                                                     {
+                                                         "header": {
+                                                             "frame_id": "r_wrist_roll_link",
+                                                             "seq": 0,
+                                                             "stamp": {
+                                                                 "nsecs": 0,
+                                                                 "secs": 0
+                                                             }
+                                                         },
+                                                         "pose": {
+                                                             "orientation": {
+                                                                 "w": 0.9999890001814967,
+                                                                 "x": -0.0029999670005432843,
+                                                                 "y": -0.0029999670005467277,
+                                                                 "z": 0.001999978000361496
+                                                             },
+                                                             "position": {
+                                                                 "x": 0.208,
+                                                                 "y": 0.01,
+                                                                 "z": -0.033
+                                                             }
+                                                         }
+                                                     }
+                                                     )
+        kitchen_setup.attach_box(u'bowl_1',
+                                 size=[0.152831586202, 0.06345692873, 0.228943316142],
+                                 frame_id='r_wrist_roll_link', pose=box_pose)
+
+        wrong_odom_T_goal = convert_dictionary_to_ros_message(u'geometry_msgs/PoseStamped',
+                                                              {
+                                                                  "header": {
+                                                                      "frame_id": "odom_combined",
+                                                                      "seq": 0,
+                                                                      "stamp": {
+                                                                          "nsecs": 0,
+                                                                          "secs": 0
+                                                                      }
+                                                                  },
+                                                                  "pose": {
+                                                                      "orientation": {
+                                                                          "w": 0.8487663514523268,
+                                                                          "x": -0.0026119368041485624,
+                                                                          "y": 0.009552505316512186,
+                                                                          "z": -0.5286753547595905
+                                                                      },
+                                                                      "position": {
+                                                                          "x": -2.475719357850976,
+                                                                          "y": -2.0207340645247847,
+                                                                          "z": 1.4500665049676453
+                                                                      }
+                                                                  }
+                                                              }
+                                                              )
+
+        map_T_cart_goal = tf.kdl_to_pose_stamped(map_T_odom * tf.pose_to_kdl(wrong_odom_T_goal.pose), u'map')
+
+        kitchen_setup.add_json_goal(u'AvoidJointLimits', percentage=40)
+        kitchen_setup.set_and_check_cart_goal(map_T_cart_goal, kitchen_setup.r_tip)
+
     def test_open_drawer(self, kitchen_setup):
         self.open_drawer(kitchen_setup, kitchen_setup.l_tip, u'iai_kitchen/sink_area_left_middle_drawer_handle',
                          u'sink_area_left_middle_drawer_main_joint')

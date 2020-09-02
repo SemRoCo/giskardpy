@@ -22,6 +22,7 @@ from sensor_msgs.msg import JointState
 from tf.transformations import rotation_from_matrix, quaternion_matrix
 
 from giskardpy import logging, identifier
+from giskardpy.constraints import WEIGHT_ABOVE_CA
 from giskardpy.garden import grow_tree
 from giskardpy.identifier import robot, world
 from giskardpy.pybullet_world import PyBulletWorld
@@ -396,14 +397,18 @@ class GiskardTestWrapper(object):
             root = self.default_root
         self.wrapper.set_translation_goal(root, tip, goal_pose)
 
-    def set_cart_goal(self, goal_pose, tip, root=None):
+    def set_cart_goal(self, goal_pose, tip, root=None, weight=None):
         if not root:
             root = self.default_root
-        self.wrapper.set_cart_goal(root, tip, goal_pose)
+        if weight is not None:
+            self.wrapper.set_cart_goal(root, tip, goal_pose, weight)
+        else:
+            self.wrapper.set_cart_goal(root, tip, goal_pose)
 
-    def set_and_check_cart_goal(self, goal_pose, tip, root=None, expected_error_code=MoveResult.SUCCESS):
+    def set_and_check_cart_goal(self, goal_pose, tip, root=None, weight=None,
+                                expected_error_code=MoveResult.SUCCESS):
         goal_pose_in_map = transform_pose(u'map', goal_pose)
-        self.set_cart_goal(goal_pose, tip, root)
+        self.set_cart_goal(goal_pose, tip, root, weight)
         self.loop_once()
         self.send_and_check_goal(expected_error_code)
         self.loop_once()

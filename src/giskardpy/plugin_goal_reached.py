@@ -12,7 +12,7 @@ from giskardpy import logging
 class GoalReachedPlugin(GiskardBehavior):
     def __init__(self, name, window_size=None):
         super(GoalReachedPlugin, self).__init__(name)
-        translation_cut_off = 0.005 #m/s
+        translation_cut_off = 0.003 #m/s
         rotation_cut_off = 0.02 #rad/s
         sample_period = self.get_god_map().get_data(identifier.sample_period)
         if window_size is None:

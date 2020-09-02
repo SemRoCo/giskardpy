@@ -17,7 +17,7 @@ from tf.transformations import quaternion_from_matrix, quaternion_about_axis
 
 import giskardpy.tfwrapper as tf
 from giskardpy import logging, identifier
-from giskardpy.constraints import WEIGHT_ABOVE_CA
+from giskardpy.constraints import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
 from giskardpy.identifier import fk_pose
 from giskardpy.robot import Robot
 from giskardpy.tfwrapper import init as tf_init
@@ -1556,7 +1556,7 @@ class TestCartGoals(object):
 
 
 class TestCollisionAvoidanceGoals(object):
-    def test_bug2020_09_01_10_52_23_dump(self, kitchen_setup):
+    def test_bug2020_09_02_11_52_21_dump(self, kitchen_setup):
         map_T_odom = tf.pose_to_kdl(convert_dictionary_to_ros_message(u'geometry_msgs/PoseStamped',
                                                                       {
                                                                           "header": {
@@ -1569,15 +1569,15 @@ class TestCollisionAvoidanceGoals(object):
                                                                           },
                                                                           "pose": {
                                                                               "orientation": {
-                                                                                  "w": -0.12723351841134276,
-                                                                                  "x": 0.004750630931312908,
-                                                                                  "y": -0.002122779146878978,
-                                                                                  "z": 0.9918591417671758
+                                                                                  "w": 0.9907124990298876,
+                                                                                  "x": -0.004530583180313736,
+                                                                                  "y": 0.003707430414081215,
+                                                                                  "z": -0.13584724156833777
                                                                               },
                                                                               "position": {
-                                                                                  "x": -1.7428391289558658,
-                                                                                  "y": -0.12408773112315571,
-                                                                                  "z": -0.007148481224539375
+                                                                                  "x": -0.2989784139083874,
+                                                                                  "y": -0.644299033123408,
+                                                                                  "z": -0.0046400968427768976
                                                                               }
                                                                           }
                                                                       }
@@ -1585,12 +1585,12 @@ class TestCollisionAvoidanceGoals(object):
 
         odom_T_base_footprint = PoseStamped()
         odom_T_base_footprint.pose.position = Point(
-            0.6219273123274539,
-            -0.2898733974256114,
+            -1.4807876704123586,
+            0.44216787977956584,
             0
         )
         odom_T_base_footprint.pose.orientation = Quaternion(*quaternion_about_axis(
-            -0.08682781557061732,
+            0.2796229462716709,
             [0, 0, 1]))
         odom_T_base_footprint = tf.pose_to_kdl(odom_T_base_footprint.pose)
         map_T_base_footprint = tf.kdl_to_pose_stamped(map_T_odom * odom_T_base_footprint, u'map')
@@ -1599,20 +1599,20 @@ class TestCollisionAvoidanceGoals(object):
 
         js = {
             "l_elbow_flex_joint": -2.121008899318323,
-            "l_forearm_roll_joint": -1.8532434817397747,
-            "l_shoulder_lift_joint": -0.2649135724042734,
-            "l_shoulder_pan_joint": 1.965457751174253,
-            "l_upper_arm_roll_joint": 1.3837617139225473,
-            "l_wrist_flex_joint": -0.09987430147959442,
-            "l_wrist_roll_joint": -6.283214397492735,
-            "r_elbow_flex_joint": -2.0636796976104463,
-            "r_forearm_roll_joint": -1.3014792140577125,
-            "r_shoulder_lift_joint": -0.3063862569009784,
-            "r_shoulder_pan_joint": -1.1845552036446647,
-            "r_upper_arm_roll_joint": -1.6440700018925993,
-            "r_wrist_flex_joint": -1.2848159054998414,
-            "r_wrist_roll_joint": 10.59059159681988,
-            "torso_lift_joint": 0.2623345200475086,
+            "l_forearm_roll_joint": -1.8527228579572208,
+            "l_shoulder_lift_joint": -0.26381383840391553,
+            "l_shoulder_pan_joint": 2.1042434286298475,
+            "l_upper_arm_roll_joint": 1.3839220687489173,
+            "l_wrist_flex_joint": -0.09996131931979324,
+            "l_wrist_roll_joint": -6.282344219090744,
+            "r_elbow_flex_joint": -2.1208641286069394,
+            "r_forearm_roll_joint": -17.08314793464878,
+            "r_shoulder_lift_joint": -0.25706741673108136,
+            "r_shoulder_pan_joint": -1.712587449591307,
+            "r_upper_arm_roll_joint": -1.4633501125737376,
+            "r_wrist_flex_joint": -0.10002450226778681,
+            "r_wrist_roll_joint": 25.183178835783142,
+            "torso_lift_joint": 0.2631247287575463,
         }
         kitchen_setup.send_and_check_joint_goal(js)
 
@@ -1651,30 +1651,29 @@ class TestCollisionAvoidanceGoals(object):
                                                                       "frame_id": "odom_combined",
                                                                       "seq": 0,
                                                                       "stamp": {
-                                                                          "nsecs": 299463987,
-                                                                          "secs": 1598957538
+                                                                          "nsecs": 0,
+                                                                          "secs": 0
                                                                       }
                                                                   },
                                                                   "pose": {
                                                                       "orientation": {
-                                                                          "w": 0.05829362594256854,
-                                                                          "x": 0.7015518104463911,
-                                                                          "y": 0.06265052702054284,
-                                                                          "z": -0.7074615096733994
+                                                                          "w": 1,
+                                                                          "x": 0,
+                                                                          "y": 0,
+                                                                          "z": 0,
                                                                       },
                                                                       "position": {
-                                                                          "x": 1.5215232236071157,
-                                                                          "y": -0.33849610230191063,
-                                                                          "z": 0.993610017525968
+                                                                          "x": 0,
+                                                                          "y": 2,
+                                                                          "z": 0
                                                                       }
                                                                   }
                                                               }
                                                               )
 
         map_T_cart_goal = tf.kdl_to_pose_stamped(map_T_odom * tf.pose_to_kdl(wrong_odom_T_goal.pose), u'map')
-
-        kitchen_setup.add_json_goal(u'AvoidJointLimits', percentage=40)
-        kitchen_setup.set_and_check_cart_goal(map_T_cart_goal, kitchen_setup.r_tip)
+        kitchen_setup.avoid_all_collisions(0.2)
+        kitchen_setup.set_and_check_cart_goal(map_T_cart_goal, u'base_footprint')
 
     def test_bug2020_09_01_11_22_51_dump(self, kitchen_setup):
         map_T_odom = tf.pose_to_kdl(convert_dictionary_to_ros_message(u'geometry_msgs/PoseStamped',
@@ -2682,6 +2681,68 @@ class TestCollisionAvoidanceGoals(object):
         kitchen_setup.set_joint_goal(gaya_pose)
         kitchen_setup.set_and_check_cart_goal(base_pose, 'base_footprint')
         kitchen_setup.check_joint_state(gaya_pose)
+
+    def test_go_around_kitchen_island(self, kitchen_setup):
+        """
+        :type box_setup: PR2
+        """
+        tip = u'base_footprint'
+        base_pose = PoseStamped()
+        base_pose.header.frame_id = u'map'
+        base_pose.pose.position.x = 0
+        base_pose.pose.position.y = 1.5
+        base_pose.pose.orientation = Quaternion(*quaternion_about_axis(0, [0, 0, 1]))
+        kitchen_setup.teleport_base(base_pose)
+        base_pose = PoseStamped()
+        base_pose.header.frame_id = tip
+        base_pose.pose.position.x = -2.3
+        base_pose.pose.position.y = 0
+        base_pose.pose.orientation = Quaternion(*quaternion_about_axis(np.pi, [0, 0, 1]))
+
+        avoidance_hint = Vector3Stamped()
+        avoidance_hint.header.frame_id = u'map'
+        avoidance_hint.vector.y = -1
+        kitchen_setup.avoid_all_collisions(0.1)
+        kitchen_setup.add_json_goal(u'CollisionAvoidanceHint',
+                                    link_name=u'base_footprint',
+                                    soft_threshold=0.2,
+                                    max_velocity=1,
+                                    avoidance_hint=avoidance_hint)
+        kitchen_setup.set_joint_goal(gaya_pose)
+
+        kitchen_setup.set_and_check_cart_goal(base_pose, tip, weight=WEIGHT_BELOW_CA)
+
+    def test_go_around_kitchen_island2(self, kitchen_setup):
+        """
+        :type box_setup: PR2
+        """
+        tip = u'base_footprint'
+        base_pose = PoseStamped()
+        base_pose.header.frame_id = u'map'
+        base_pose.pose.position.x = 0
+        base_pose.pose.position.y = .2
+        base_pose.pose.orientation = Quaternion(*quaternion_about_axis(np.pi, [0, 0, 1]))
+        kitchen_setup.teleport_base(base_pose)
+        base_pose = PoseStamped()
+        base_pose.header.frame_id = tip
+        base_pose.pose.position.x = 2.3
+        base_pose.pose.position.y = 0
+        base_pose.pose.orientation = Quaternion(*quaternion_about_axis(0, [0, 0, 1]))
+
+        avoidance_hint = Vector3Stamped()
+        avoidance_hint.header.frame_id = u'map'
+        avoidance_hint.vector.y = -1
+
+        ce = CollisionEntry()
+        ce.body_b = ''
+        ce.link_bs = []
+        ce.min_dist = 0.5
+        ce.robot_links = []
+        ce.type = 2
+        kitchen_setup.add_collision_entries([ce])
+
+        kitchen_setup.set_joint_goal(gaya_pose)
+        kitchen_setup.set_and_check_cart_goal(base_pose, tip, weight=WEIGHT_BELOW_CA)
 
     def test_avoid_collision_with_far_object(self, pocky_pose_setup):
         """

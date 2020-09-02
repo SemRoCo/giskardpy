@@ -179,7 +179,8 @@ class GoalToConstraints(GetGoal):
         # FIXME this only catches the most obvious cases
         soft_threshold = None
         for collision_cmd in collision_cmds:
-            if self.get_world().is_avoid_all_collision(collision_cmd):
+            if collision_cmd.type == CollisionEntry.AVOID_ALL_COLLISIONS or \
+                    self.get_world().is_avoid_all_collision(collision_cmd):
                 soft_threshold = collision_cmd.min_dist
 
         if not collision_cmds or not self.get_world().is_allow_all_collision(collision_cmds[-1]):

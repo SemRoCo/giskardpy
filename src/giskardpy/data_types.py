@@ -110,8 +110,14 @@ class Collision(object):
     def get_link_b(self):
         return self.__link_b
 
+    def get_link_b_hash(self):
+        return self.get_link_b().__hash__()
+
     def get_body_b(self):
         return self.__body_b
+
+    def get_body_b_hash(self):
+        return self.get_body_b().__hash__()
 
     def set_position_on_a_in_a(self, position):
         self.__position_on_a_in_a = position

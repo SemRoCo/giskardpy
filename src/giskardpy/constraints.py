@@ -1218,30 +1218,28 @@ class ExternalCollisionAvoidance(Constraint):
 
 class CollisionAvoidanceHint(Constraint):
     max_velocity_id = u'max_velocity'
-    hard_threshold_id = u'hard_threshold'
-    soft_threshold_id = u'soft_threshold'
-    num_repeller_id = u'num_repeller'
+    threshold_id = u'threshold'
     avoidance_hint_id = u'avoidance_hint'
     weight_id = u'weight'
 
-    def __init__(self, god_map, link_name, avoidance_hint, max_velocity=0.1, hard_threshold=0.0, soft_threshold=0.05, idx=0,
-                 num_repeller=1, weight=WEIGHT_ABOVE_CA):
+    def __init__(self, god_map, link_name, avoidance_hint, body_b, link_b, max_velocity=0.1, threshold=0.05, idx=0,
+                 weight=WEIGHT_ABOVE_CA):
         super(CollisionAvoidanceHint, self).__init__(god_map)
         self.link_name = link_name
         self.robot_root = self.get_robot().get_root()
         self.robot_name = self.get_robot_unsafe().get_name()
         self.idx = idx
+        self.body_b = body_b.__hash__()
+        self.link_b = link_b.__hash__()
 
         maximum_collision_threshold = self.get_god_map().get_data(identifier.maximum_collision_threshold)
-        maximum_collision_threshold = max(maximum_collision_threshold, soft_threshold)
+        maximum_collision_threshold = max(maximum_collision_threshold, threshold)
         self.get_god_map().set_data(identifier.maximum_collision_threshold, maximum_collision_threshold)
 
         self.avoidance_hint = self.parse_and_transform_Vector3Stamped(avoidance_hint, self.robot_root, normalized=True)
 
         params = {self.max_velocity_id: max_velocity,
-                  self.hard_threshold_id: hard_threshold,
-                  self.soft_threshold_id: soft_threshold,
-                  self.num_repeller_id: num_repeller,
+                  self.threshold_id: threshold,
                   self.avoidance_hint_id: self.avoidance_hint,
                   self.weight_id: weight,
                   }
@@ -1282,15 +1280,27 @@ class CollisionAvoidanceHint(Constraint):
         return self.god_map.to_symbol(identifier.closest_point + [u'get_number_of_external_collisions',
                                                                   (self.link_name,)])
 
+    def get_body_b(self):
+        return self.god_map.to_symbol(identifier.closest_point + [u'get_external_collisions',
+                                                                  (self.link_name,), 0, u'get_body_b_hash', tuple()])
+
+    def get_link_b(self):
+        return self.god_map.to_symbol(identifier.closest_point + [u'get_external_collisions',
+                                                                  (self.link_name,), 0, u'get_link_b_hash', tuple()])
+
     def make_constraints(self):
         weight = self.get_input_float(self.weight_id)
         actual_distance = self.get_actual_distance()
         max_velocity = self.get_input_float(self.max_velocity_id)
-        threshold = self.get_input_float(self.soft_threshold_id)
+        threshold = self.get_input_float(self.threshold_id)
+        body_b_hash = self.get_body_b()
+        link_b_hash = self.get_link_b()
 
         root_T_a = self.get_fk(self.robot_root, self.link_name)
 
         weight = w.if_less_eq(actual_distance, threshold, weight, 0)
+        weight = w.if_eq(body_b_hash, self.body_b, weight, 0)
+        weight = w.if_eq(link_b_hash, self.link_b, weight, 0)
         weight = self.normalize_weight(max_velocity, weight)
 
         root_V_avoidance_hint = self.get_input_Vector3Stamped(self.avoidance_hint_id)
@@ -1301,8 +1311,6 @@ class CollisionAvoidanceHint(Constraint):
 
         root_P_a = w.position_of(root_T_a)
         expr = w.dot(root_V_avoidance_hint[:3].T, root_P_a[:3])
-
-        self.add_debug_constraint(u'/actual_distance', actual_distance)
 
         self.add_constraint(u'/avoidance_hint',
                             lower=error_capped,

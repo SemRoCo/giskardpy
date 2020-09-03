@@ -2691,13 +2691,12 @@ class TestCollisionAvoidanceGoals(object):
         base_pose.header.frame_id = u'map'
         base_pose.pose.position.x = 0
         base_pose.pose.position.y = 1.5
-        base_pose.pose.orientation = Quaternion(*quaternion_about_axis(0, [0, 0, 1]))
+        base_pose.pose.orientation = Quaternion(*quaternion_about_axis(np.pi, [0, 0, 1]))
         kitchen_setup.teleport_base(base_pose)
         base_pose = PoseStamped()
         base_pose.header.frame_id = tip
-        base_pose.pose.position.x = -2.3
-        base_pose.pose.position.y = 0
-        base_pose.pose.orientation = Quaternion(*quaternion_about_axis(np.pi, [0, 0, 1]))
+        base_pose.pose.position.x = 2.3
+        base_pose.pose.orientation = Quaternion(*quaternion_about_axis(0, [0, 0, 1]))
 
         avoidance_hint = Vector3Stamped()
         avoidance_hint.header.frame_id = u'map'
@@ -2705,8 +2704,42 @@ class TestCollisionAvoidanceGoals(object):
         kitchen_setup.avoid_all_collisions(0.1)
         kitchen_setup.add_json_goal(u'CollisionAvoidanceHint',
                                     link_name=u'base_footprint',
-                                    soft_threshold=0.2,
+                                    threshold=0.3,
                                     max_velocity=1,
+                                    body_b=u'kitchen',
+                                    link_b=u'kitchen_island',
+                                    avoidance_hint=avoidance_hint)
+        kitchen_setup.set_joint_goal(gaya_pose)
+
+        kitchen_setup.set_and_check_cart_goal(base_pose, tip, weight=WEIGHT_BELOW_CA)
+
+    def test_drive_into_wall_with_CollisionAvoidanceHint(self, kitchen_setup):
+        """
+        :type box_setup: PR2
+        """
+        tip = u'base_footprint'
+        base_pose = PoseStamped()
+        base_pose.header.frame_id = u'map'
+        base_pose.pose.position.x = 0
+        base_pose.pose.position.y = 1.5
+        base_pose.pose.orientation = Quaternion(*quaternion_about_axis(0, [0, 0, 1]))
+        kitchen_setup.teleport_base(base_pose)
+        base_pose = PoseStamped()
+        base_pose.header.frame_id = tip
+        base_pose.pose.position.x = 1
+        base_pose.pose.position.y = 0
+        base_pose.pose.orientation = Quaternion(*quaternion_about_axis(0, [0, 0, 1]))
+
+        avoidance_hint = Vector3Stamped()
+        avoidance_hint.header.frame_id = u'map'
+        avoidance_hint.vector.y = -1
+        kitchen_setup.avoid_all_collisions(0.1)
+        kitchen_setup.add_json_goal(u'CollisionAvoidanceHint',
+                                    link_name=u'base_footprint',
+                                    threshold=0.3,
+                                    max_velocity=1,
+                                    body_b=u'kitchen',
+                                    link_b=u'kitchen_island',
                                     avoidance_hint=avoidance_hint)
         kitchen_setup.set_joint_goal(gaya_pose)
 

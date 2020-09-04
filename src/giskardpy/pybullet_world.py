@@ -1,9 +1,11 @@
 import pybullet as p
 from geometry_msgs.msg import Point, Pose
 from giskard_msgs.msg import CollisionEntry
+from pybullet import error
 
 import giskardpy
 from giskardpy.data_types import Collision, Collisions
+from giskardpy.exceptions import CorruptShapeException
 from giskardpy.pybullet_world_object import PyBulletWorldObject
 from giskardpy.pybullet_wrapper import ContactInfo
 from giskardpy.utils import resolve_ros_iris
@@ -153,9 +155,14 @@ class PyBulletWorld(World):
         :return:
         """
         # TODO create from world object to avoid basepose and joint state getting lost?
-        pwo = PyBulletWorldObject.from_urdf_object(object_)
-        pwo.base_pose = object_.base_pose
-        pwo.joint_state = object_.joint_state
+        try:
+            pwo = PyBulletWorldObject.from_urdf_object(object_)
+            pwo.base_pose = object_.base_pose
+            pwo.joint_state = object_.joint_state
+        except Exception as e:
+            if isinstance(e, error):
+                raise CorruptShapeException(e)
+            raise e
         return super(PyBulletWorld, self).add_object(pwo)
 
     def remove_robot(self):

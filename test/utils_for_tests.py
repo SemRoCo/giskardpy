@@ -573,15 +573,19 @@ class GiskardTestWrapper(object):
         assert self.get_world().has_object(name)
         assert name in self.wrapper.get_object_names().object_names
 
-    def add_mesh(self, name=u'cylinder', path=u'', pose=None):
+    def add_mesh(self, name=u'cylinder', path=u'', pose=None, expected_error=UpdateWorldResponse.SUCCESS):
         r = self.wrapper.add_mesh(name=name, mesh=path, pose=pose)
-        assert r.error_codes == UpdateWorldResponse.SUCCESS, \
+        assert r.error_codes == expected_error, \
             u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
-                                            update_world_error_code(UpdateWorldResponse.SUCCESS))
-        assert self.get_world().has_object(name)
-        assert name in self.wrapper.get_object_names().object_names
-        o_p = self.get_world().get_object(name).base_pose
-        compare_poses(o_p, self.wrapper.get_object_info(name).pose.pose)
+                                            update_world_error_code(expected_error))
+        if expected_error == UpdateWorldResponse.SUCCESS:
+            assert self.get_world().has_object(name)
+            assert name in self.wrapper.get_object_names().object_names
+            o_p = self.get_world().get_object(name).base_pose
+            compare_poses(o_p, self.wrapper.get_object_info(name).pose.pose)
+        else:
+            assert not self.get_world().has_object(name)
+            assert name not in self.wrapper.get_object_names().object_names
 
     def add_urdf(self, name, urdf, pose, js_topic):
         r = self.wrapper.add_urdf(name, urdf, pose, js_topic)

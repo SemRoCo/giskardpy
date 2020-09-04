@@ -229,6 +229,10 @@ class WorldUpdatePlugin(GiskardBehavior):
                     return UpdateWorldResponse()
                 except CorruptShapeException as e:
                     traceback.print_exc()
+                    if req.body.type == req.body.MESH_BODY:
+                        return UpdateWorldResponse(UpdateWorldResponse.CORRUPT_MESH_ERROR, str(e))
+                    elif req.body.type == req.body.URDF_BODY:
+                        return UpdateWorldResponse(UpdateWorldResponse.CORRUPT_URDF_ERROR, str(e))
                     return UpdateWorldResponse(UpdateWorldResponse.CORRUPT_SHAPE_ERROR, str(e))
                 except UnknownBodyException as e:
                     return UpdateWorldResponse(UpdateWorldResponse.MISSING_BODY_ERROR, str(e))

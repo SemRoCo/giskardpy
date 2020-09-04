@@ -1897,6 +1897,19 @@ class TestCollisionAvoidanceGoals(object):
         # compare_poses(m.pose, p.pose)
         pass
 
+    def test_add_non_existing_mesh(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        object_name = u'muh'
+        p = PoseStamped()
+        p.header.frame_id = zero_pose.r_tip
+        p.pose.position = Point(0.1, 0, 0)
+        p.pose.orientation = Quaternion(0, 0, 0, 1)
+        zero_pose.add_mesh(object_name, path=u'package://giskardpy/test/urdfs/meshes/muh.obj', pose=p,
+                           expected_error=UpdateWorldResponse.CORRUPT_MESH_ERROR)
+        pass
+
     def test_mesh_collision_avoidance(self, zero_pose):
         """
         :type zero_pose: PR2

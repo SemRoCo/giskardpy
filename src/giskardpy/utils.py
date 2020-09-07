@@ -1,6 +1,7 @@
 from __future__ import division
 
 import errno
+import json
 import os
 import pydot
 import pylab as plt
@@ -24,11 +25,12 @@ from py_trees import common, Chooser, Selector, Sequence, Behaviour
 from py_trees.composites import Parallel
 from sensor_msgs.msg import JointState
 from shape_msgs.msg import SolidPrimitive
+from std_msgs.msg import ColorRGBA
 from tf.transformations import quaternion_multiply, quaternion_conjugate
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
+from visualization_msgs.msg import Marker
 
 from giskardpy import logging
-from giskardpy.data_types import ClosestPointInfo
 from giskardpy.data_types import SingleJointState
 from giskardpy.plugin import PluginBehavior
 from giskardpy.tfwrapper import kdl_to_pose, np_to_kdl
@@ -68,14 +70,6 @@ class NullContextManager(object):
 
     def __exit__(self, *args):
         pass
-
-
-def np_vector(x, y, z):
-    return np.array([x, y, z, 0])
-
-
-def np_point(x, y, z):
-    return np.array([x, y, z, 1])
 
 
 class KeyDefaultDict(defaultdict):
@@ -156,20 +150,20 @@ def cylinder_surface(r, h):
     return 2 * pi * r * (h + r)
 
 
-def closest_point_constraint_violated(closest_point_infos, tolerance=0.9):
-    """
-    :param closest_point_infos: dict mapping a link name to a ClosestPointInfo
-    :type closest_point_infos: dict
-    :type tolerance: float
-    :return: whether of not the contact distance for any link has been violated
-    :rtype: bool
-    """
-    for link_name, cpi_info in closest_point_infos.items():  # type: (str, ClosestPointInfo)
-        if cpi_info.contact_distance < cpi_info.min_dist * tolerance:
-            logging.loginfo(u'collision constraints violated: {}'.format(cpi_info.link_a, cpi_info.link_b,
-                                                                         cpi_info.contact_distance))
-            return True
-    return False
+# def closest_point_constraint_violated(closest_point_infos, tolerance=0.9):
+#     """
+#     :param closest_point_infos: dict mapping a link name to a ClosestPointInfo
+#     :type closest_point_infos: dict
+#     :type tolerance: float
+#     :return: whether of not the contact distance for any link has been violated
+#     :rtype: bool
+#     """
+#     for link_name, cpi_info in closest_point_infos.items():  # type: (str, Collision)
+#         if cpi_info.contact_distance < cpi_info.min_dist * tolerance:
+#             logging.loginfo(u'collision constraints violated: {}'.format(cpi_info.link_a, cpi_info.link_b,
+#                                                                          cpi_info.contact_distance))
+#             return True
+#     return False
 
 
 def qv_mult(quaternion, vector):
@@ -217,21 +211,33 @@ def to_joint_state_dict(msg):
     return mjs
 
 
-def to_joint_state_dict2(msg):
+def to_joint_state_position_dict(msg):
     """
     Converts a ROS message of type sensor_msgs/JointState into a dict that maps name to position
     :param msg: ROS message to convert.
     :type msg: JointState
     :return: Corresponding MultiJointState instance.
-    :rtype: OrderedDict[str, SingleJointState]
+    :rtype: OrderedDict[str, float]
     """
     js = OrderedDict()
     for i, joint_name in enumerate(msg.name):
         js[joint_name] = msg.position[i]
     return js
 
+def print_joint_state(joint_msg):
+    print_dict(to_joint_state_position_dict(joint_msg))
 
-def dict_to_joint_states(joint_state_dict):
+def print_dict(d):
+    print('{')
+    for key, value in d.items():
+        print("\'{}\': {},".format(key, value))
+    print('}')
+
+def write_dict(d, f):
+    json.dump(d,f, sort_keys=True, indent=4, separators=(',', ': '))
+    f.write('\n')
+
+def position_dict_to_joint_states(joint_state_dict):
     """
     :param joint_state_dict: maps joint_name to position
     :type joint_state_dict: dict
@@ -246,6 +252,21 @@ def dict_to_joint_states(joint_state_dict):
         js.effort.append(0)
     return js
 
+
+def dict_to_joint_states(joint_state_dict):
+    """
+    :param joint_state_dict: maps joint_name to position
+    :type joint_state_dict: dict
+    :return: velocity and effort are filled with 0
+    :rtype: JointState
+    """
+    js = JointState()
+    for k, v in sorted(joint_state_dict.items()):
+        js.name.append(k)
+        js.position.append(v.position)
+        js.velocity.append(v.velocity)
+        js.effort.append(0)
+    return js
 
 def normalize_quaternion_msg(quaternion):
     q = Quaternion()
@@ -824,3 +845,91 @@ def traj_to_msg(sample_period, trajectory, controlled_joints, fill_velocity_valu
                 raise NotImplementedError(u'generated traj does not contain all joints')
         trajectory_msg.points.append(p)
     return trajectory_msg
+
+def make_filter_b_mask(H):
+    return H.sum(axis=1) != 0
+
+def make_filter_masks(H, num_joint_constraints, num_hard_constraints):
+    b_mask = make_filter_b_mask(H)
+    s_mask = b_mask[num_joint_constraints:]
+    if num_hard_constraints == 0:
+        bA_mask = s_mask
+    else:
+        bA_mask = np.concatenate((np.array([True] * num_hard_constraints), s_mask))
+
+    return bA_mask, b_mask
+
+
+
+
+
+def trajectory_to_np(tj, joint_names):
+    """
+    :type tj: Trajectory
+    :return:
+    """
+    names = list(sorted([i for i in tj._points[0.0].keys() if i in joint_names]))
+    position = []
+    velocity = []
+    times = []
+    for time, point in tj.items():
+        position.append([point[joint_name].position for joint_name in names])
+        velocity.append([point[joint_name].velocity for joint_name in names])
+        times.append(time)
+    position = np.array(position)
+    velocity = np.array(velocity)
+    times = np.array(times)
+    return names, position, velocity, times
+
+def publish_marker_sphere(position, frame_id=u'map', radius=0.05, id_=0):
+    m = Marker()
+    m.action = m.ADD
+    m.ns = u'debug'
+    m.id = id_
+    m.type = m.SPHERE
+    m.header.frame_id = frame_id
+    m.pose.position.x = position[0]
+    m.pose.position.y = position[1]
+    m.pose.position.z = position[2]
+    m.color = ColorRGBA(1,0,0,1)
+    m.scale.x = radius
+    m.scale.y = radius
+    m.scale.z = radius
+
+    pub = rospy.Publisher('/visualization_marker', Marker, queue_size=1)
+    while pub.get_num_connections() < 1:
+        # wait for a connection to publisher
+        # you can do whatever you like here or simply do nothing
+        pass
+
+    pub.publish(m)
+
+def publish_marker_vector(start, end, diameter_shaft=0.01, diameter_head=0.02,  id_=0):
+    """
+    assumes points to be in frame map
+    :type start: Point
+    :type end: Point
+    :type diameter_shaft: float
+    :type diameter_head: float
+    :type id_: int
+    """
+    m = Marker()
+    m.action = m.ADD
+    m.ns = u'debug'
+    m.id = id_
+    m.type = m.ARROW
+    m.points.append(start)
+    m.points.append(end)
+    m.color = ColorRGBA(1,0,0,1)
+    m.scale.x = diameter_shaft
+    m.scale.y = diameter_head
+    m.scale.z = 0
+
+    pub = rospy.Publisher('/visualization_marker', Marker, queue_size=1)
+    while pub.get_num_connections() < 1:
+        # wait for a connection to publisher
+        # you can do whatever you like here or simply do nothing
+        pass
+    rospy.sleep(0.3)
+
+    pub.publish(m)

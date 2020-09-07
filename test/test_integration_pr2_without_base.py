@@ -15,7 +15,7 @@ from tf.transformations import quaternion_from_matrix, quaternion_about_axis
 
 from giskardpy import logging, identifier
 from giskardpy.identifier import fk_pose
-from giskardpy.symengine_robot import Robot
+from giskardpy.robot import Robot
 from giskardpy.tfwrapper import init as tf_init, lookup_pose, transform_pose, lookup_point, transform_point
 from utils_for_tests import PR2, compare_poses
 
@@ -223,7 +223,7 @@ def kitchen_setup(resetted_giskard):
     object_name = u'kitchen'
     resetted_giskard.add_urdf(object_name, rospy.get_param(u'kitchen_description'),
                               lookup_pose(u'map', u'iai_kitchen/world'), u'/kitchen/joint_states')
-    js = {k: 0.0 for k in resetted_giskard.get_world().get_object(object_name).get_controllable_joints()}
+    js = {k: 0.0 for k in resetted_giskard.get_world().get_object(object_name).get_movable_joints()}
     resetted_giskard.set_kitchen_js(js)
     return resetted_giskard
 

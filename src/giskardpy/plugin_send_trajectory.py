@@ -21,7 +21,7 @@ class SendTrajectory(ActionClient, GiskardBehavior):
         loginfo(u'waiting for action server \'{}\' to appear'.format(action_namespace))
         ActionClient.__init__(self, name, FollowJointTrajectoryAction, None, action_namespace)
         loginfo(u'successfully connected to action server')
-        self.fill_velocity_values = self.get_god_map().safe_get_data(identifier.fill_velocity_values)
+        self.fill_velocity_values = self.get_god_map().get_data(identifier.fill_velocity_values)
 
     def setup(self, timeout):
         # TODO get this from god map
@@ -31,13 +31,12 @@ class SendTrajectory(ActionClient, GiskardBehavior):
 
     def initialise(self):
         super(SendTrajectory, self).initialise()
-        trajectory = self.get_god_map().safe_get_data(identifier.trajectory)
+        trajectory = self.get_god_map().get_data(identifier.trajectory)
         goal = FollowJointTrajectoryGoal()
-        sample_period = self.get_god_map().safe_get_data(identifier.sample_period)
+        sample_period = self.get_god_map().get_data(identifier.sample_period)
         controlled_joints = self.get_robot().controlled_joints
         goal.trajectory = traj_to_msg(sample_period, trajectory, controlled_joints, self.fill_velocity_values)
         self.action_goal = goal
-
 
 
     def update(self):

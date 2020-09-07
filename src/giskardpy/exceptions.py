@@ -8,6 +8,8 @@ class ImplementationException(GiskardException):
 class InsolvableException(GiskardException):
     pass
 
+class UnreachableException(GiskardException):
+    pass
 
 # -----------------------------------------------------------------------------------------------------------------------
 class PhysicsWorldException(GiskardException):
@@ -57,4 +59,8 @@ class SolverTimeoutError(QPSolverException):
 
 
 class MAX_NWSR_REACHEDException(QPSolverException):
+    pass
+
+# -----------------------------------------------------------------------------------------------------------------------
+class ConstraintException(GiskardException):
     pass

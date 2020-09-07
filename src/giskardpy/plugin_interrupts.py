@@ -1,84 +1,116 @@
-from py_trees import Status
-from time import time
-
-from giskardpy import logging
-from giskardpy.exceptions import PathCollisionException, InsolvableException
-import giskardpy.identifier as identifier
-from giskardpy.plugin import GiskardBehavior
-from giskardpy.utils import closest_point_constraint_violated
 import numpy as np
-import matplotlib.pyplot as plt
-from collections import defaultdict
+from py_trees import Status
 
-#fast
+import giskardpy.identifier as identifier
+from giskardpy.exceptions import InsolvableException
+from giskardpy.plugin import GiskardBehavior
+from giskardpy import logging
+
+
+# fast
 
 class WiggleCancel(GiskardBehavior):
-    def __init__(self, name):
+    def __init__(self, name, final_detection):
         super(WiggleCancel, self).__init__(name)
-        self.fft_duration = self.get_god_map().safe_get_data(identifier.fft_duration)
-        self.wiggle_detection_threshold = self.get_god_map().safe_get_data(identifier.wiggle_detection_threshold)
-        self.min_wiggle_frequency = self.get_god_map().safe_get_data(identifier.min_wiggle_frequency)
-        self.sample_period = self.get_god_map().safe_get_data(identifier.sample_period)
-        self.num_points_in_fft = int(self.fft_duration / self.sample_period)
-
+        self.wiggle_detection_threshold = self.get_god_map().get_data(identifier.wiggle_detection_threshold)
+        self.num_samples_in_fft = self.get_god_map().get_data(identifier.num_samples_in_fft)
+        self.wiggle_frequency_range = self.get_god_map().get_data(identifier.wiggle_frequency_range)
+        self.js_samples = self.get_god_map().get_data(identifier.wiggle_detection_samples)
+        self.final_detection = final_detection
 
     def initialise(self):
-        self.past_joint_states = set()
-        self.joint_dict = defaultdict(list)
         super(WiggleCancel, self).initialise()
+        if not self.final_detection:
+            self.js_samples.clear()
+        self.sample_period = self.get_god_map().get_data(identifier.sample_period)
+        self.max_detectable_freq = 1 / (2 * self.sample_period)
+        self.min_wiggle_frequency = self.wiggle_frequency_range * self.max_detectable_freq
+
 
     def update(self):
-        latest_points = self.get_god_map().safe_get_data(identifier.joint_states)
+        if self.final_detection:
+            js_samples_array = np.array(self.js_samples.values())
+            if(len(js_samples_array) == 0):
+                logging.logwarn('sample array was empty during final wiggle detection')
+                return Status.SUCCESS
 
-        for key in latest_points:
-            self.joint_dict[key].append(latest_points[key].velocity)
+            if len(js_samples_array[0]) < 4:  # if there are less than 4 sample points it makes no sense to try to detect wiggling
+                return Status.SUCCESS
 
-        if len(self.joint_dict.values()[0]) < self.num_points_in_fft:
-            return Status.RUNNING
+            if detect_wiggling(js_samples_array, self.sample_period, self.min_wiggle_frequency, self.wiggle_detection_threshold):
+                self.raise_to_blackboard(InsolvableException(u'endless wiggling detected'))
 
-        if len(self.joint_dict.values()[0]) > self.num_points_in_fft:
-            for val in self.joint_dict.values():
-                del (val[0])
+            return Status.SUCCESS
+        else:
+            latest_points = self.get_god_map().get_data(identifier.joint_states)
 
-        # remove joints that arent moving
-        joints_filtered = np.array(self.joint_dict.values())
-        joints_filtered = [i for i in joints_filtered if
-                           np.any(np.abs(i) > 0.1)]
+            for key in latest_points:
+                self.js_samples[key].append(latest_points[key].velocity)
 
-        if len(joints_filtered) == 0:
-            return Status.RUNNING
+            if len(self.js_samples.values()[0]) < self.num_samples_in_fft:
+                return Status.RUNNING
 
-        freq = np.fft.rfftfreq(self.num_points_in_fft, d=self.sample_period)
+            if len(self.js_samples.values()[0]) > self.num_samples_in_fft:
+                for val in self.js_samples.values():
+                    del (val[0])
 
-        # find index in frequency list where frequency >= min_wiggle_frequency
-        freq_idx = next(i for i,v in enumerate(freq) if v >= self.min_wiggle_frequency)
-
-        fft = np.fft.rfft(joints_filtered, axis=1)
-        fft = [np.abs(i.real) for i in fft]
-
-        for j in fft:
-            if np.any(j[freq_idx:] > self.wiggle_detection_threshold):
+            js_samples_array = np.array(self.js_samples.values())
+            if(detect_wiggling(js_samples_array, self.sample_period, self.min_wiggle_frequency, self.wiggle_detection_threshold)):
                 raise InsolvableException(u'endless wiggling detected')
+
+            return Status.RUNNING
+
+
+def detect_wiggling(js_samples, sample_period, min_wiggle_frequency, wiggle_detection_threshold):
+    # remove joints that arent moving
+    joints_filtered = [i for i in js_samples if
+                       np.any(np.abs(i) > 0.1)]
+
+    if len(joints_filtered) == 0:
+        return False
+
+    freq = np.fft.rfftfreq(len(js_samples[0]), d=sample_period)
+
+    # find index in frequency list where frequency >= min_wiggle_frequency
+    try:
+        freq_idx = next(i for i, v in enumerate(freq) if v >= min_wiggle_frequency)
+    except StopIteration:
+        return False
+
+    fft = np.fft.rfft(joints_filtered, axis=1)
+    fft = [np.abs(i.real) for i in fft]
+
+    for j in fft:
+        if np.any(j[freq_idx:] > wiggle_detection_threshold):
+            return True
+
+    return False
+
+
+
+class MaxTrajLength(GiskardBehavior):
+    def update(self):
+        t = self.get_god_map().get_data(identifier.time)
+        sample_period = self.get_god_map().get_data(identifier.sample_period)
+        t = t * sample_period
+        if t > 30:
+            raise InsolvableException(u'trajectory too long')
 
         return Status.RUNNING
 
 
 
-class MaxTrajLength(GiskardBehavior):
-    pass
-
-
-class CollisionCancel(GiskardBehavior):
-    def __init__(self, name):
-        self.collision_time_threshold = self.get_god_map().safe_get_data(identifier.collision_time_threshold)
-        super(CollisionCancel, self).__init__(name)
-
-    def update(self):
-        time = self.get_god_map().safe_get_data(identifier.time)
-        if time >= self.collision_time_threshold:
-            cp = self.get_god_map().safe_get_data(identifier.closest_point)
-            if cp is not None and closest_point_constraint_violated(cp, tolerance=1):
-                self.raise_to_blackboard(PathCollisionException(
-                    u'robot is in collision after {} seconds'.format(self.collision_time_threshold)))
-                return Status.SUCCESS
-        return Status.FAILURE
+# class CollisionCancel(GiskardBehavior):
+#     def __init__(self, name):
+#         self.collision_time_threshold = self.get_god_map().get_data(identifier.collision_time_threshold)
+#         super(CollisionCancel, self).__init__(name)
+#
+#     def update(self):
+#         time = self.get_god_map().get_data(identifier.time)
+#         if time >= self.collision_time_threshold:
+#             cp = self.get_god_map().get_data(identifier.closest_point)
+#             if cp is not None and closest_point_constraint_violated(cp, tolerance=1):
+#                 self.raise_to_blackboard(PathCollisionException(
+#                     u'robot is in collision after {} seconds'.format(self.collision_time_threshold)))
+#                 return Status.SUCCESS
+#         return Status.FAILURE

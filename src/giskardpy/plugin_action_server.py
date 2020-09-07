@@ -8,7 +8,7 @@ from giskard_msgs.msg._MoveResult import MoveResult
 from py_trees import Blackboard, Status
 
 from giskardpy.exceptions import MAX_NWSR_REACHEDException, QPSolverException, SolverTimeoutError, InsolvableException, \
-    SymengineException, PathCollisionException, UnknownBodyException, ImplementationException
+    SymengineException, PathCollisionException, UnknownBodyException, ImplementationException, UnreachableException
 import giskardpy.identifier as identifier
 from giskardpy.logging import loginfo
 from giskardpy.plugin import GiskardBehavior
@@ -129,12 +129,16 @@ class SendResult(ActionServerBehavior):
         result = MoveResult()
         result.error_code = self.exception_to_error_code(e)
 
-        trajectory = self.get_god_map().safe_get_data(identifier.trajectory)
-        sample_period = self.get_god_map().safe_get_data(identifier.sample_period)
+        trajectory = self.get_god_map().get_data(identifier.trajectory)
+        sample_period = self.get_god_map().get_data(identifier.sample_period)
         controlled_joints = self.get_robot().controlled_joints
         result.trajectory = traj_to_msg(sample_period, trajectory, controlled_joints, True)
 
         if self.get_as().is_preempt_requested() or not result.error_code == MoveResult.SUCCESS:
+            try:
+                result.error_message = e.message
+            except:
+                result.error_message = u'preempt requested, but there was no giskard exception'
             self.get_as().send_preempted(result)
         else:
             self.get_as().send_result(result)
@@ -157,11 +161,16 @@ class SendResult(ActionServerBehavior):
         elif isinstance(exception, SolverTimeoutError):
             error_code = MoveResult.SOLVER_TIMEOUT
         elif isinstance(exception, InsolvableException):
-            error_code = MoveResult.INSOLVABLE
+            if self.get_god_map().get_data(identifier.check_reachability):
+                error_code = MoveResult.UNREACHABLE
+            else:
+                error_code = MoveResult.INSOLVABLE
         elif isinstance(exception, SymengineException):
             error_code = MoveResult.SYMENGINE_ERROR
         elif isinstance(exception, PathCollisionException):
             error_code = MoveResult.PATH_COLLISION
+        elif isinstance(exception, UnreachableException):
+            error_code = MoveResult.UNREACHABLE
         elif isinstance(exception, ImplementationException):
             print(exception)
             error_code = MoveResult.INSOLVABLE

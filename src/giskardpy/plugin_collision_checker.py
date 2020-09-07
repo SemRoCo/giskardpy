@@ -1,3 +1,6 @@
+import itertools
+from collections import defaultdict
+from copy import deepcopy
 from multiprocessing import Lock
 
 import rospy
@@ -13,7 +16,7 @@ class CollisionChecker(GiskardBehavior):
     def __init__(self, name):
         super(CollisionChecker, self).__init__(name)
         # self.default_min_dist = self.get_god_map().safe_get_data(identifier.default_collision_avoidance_distance)
-        self.map_frame = self.get_god_map().safe_get_data(identifier.map_frame)
+        self.map_frame = self.get_god_map().get_data(identifier.map_frame)
         self.lock = Lock()
         self.object_js_subs = {}  # JointState subscribers for articulated world objects
         self.object_joint_states = {}  # JointStates messages for articulated world objects
@@ -38,10 +41,11 @@ class CollisionChecker(GiskardBehavior):
         return SetBoolResponse()
 
     def initialise(self):
-        collision_goals = self.get_god_map().safe_get_data(identifier.collision_goal_identifier)
-        self.collision_matrix = self.get_world().collision_goals_to_collision_matrix(collision_goals,
-                                                                                     self.get_god_map().safe_get_data(
-                                                                                         identifier.distance_thresholds))
+        collision_goals = self.get_god_map().get_data(identifier.collision_goal)
+        max_distance = self.get_god_map().get_data(identifier.maximum_collision_threshold)
+        max_distances = defaultdict(lambda: max_distance)
+
+        self.collision_matrix = self.get_world().collision_goals_to_collision_matrix(deepcopy(collision_goals), max_distances)
 
         super(CollisionChecker, self).initialise()
 
@@ -49,8 +53,6 @@ class CollisionChecker(GiskardBehavior):
         """
         Computes closest point info for all robot links and safes it to the god map.
         """
-        with self.lock:
-            collisions = self.get_world().check_collisions(self.collision_matrix)
-            closest_points = self.get_world().transform_contact_info(collisions)
-            self.god_map.safe_set_data(identifier.closest_point, closest_points)
+        collisions = self.get_world().check_collisions(self.collision_matrix)
+        self.god_map.safe_set_data(identifier.closest_point, collisions)
         return Status.RUNNING

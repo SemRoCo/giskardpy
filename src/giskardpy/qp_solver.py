@@ -10,20 +10,15 @@ from giskardpy import logging
 class QPSolver(object):
     RETURN_VALUE_DICT = {value: name for name, value in vars(PyReturnValue).items()}
 
-    def __init__(self, h, j, s):
+    def __init__(self):
         """
         :param dim_a: number of joint constraints + number of soft constraints
         :type int
         :param dim_b: number of hard constraints + number of soft constraints
         :type int
         """
-        # self.init(dim_a, dim_b)
-        self.h = h
-        self.j = j
-        self.s = s
         self.started = False
         self.shape = (0,0)
-        pass
 
     def init(self, dim_a, dim_b):
         self.qpProblem = qpoases.PySQProblem(dim_a, dim_b)

@@ -10,28 +10,54 @@ from giskardpy import logging
 #fast
 
 class GoalReachedPlugin(GiskardBehavior):
-    def __init__(self, name):
+    def __init__(self, name, window_size=None):
         super(GoalReachedPlugin, self).__init__(name)
-        self.joint_convergence_threshold = self.get_god_map().safe_get_data(identifier.joint_convergence_threshold)
+        translation_cut_off = 0.003 #m/s
+        rotation_cut_off = 0.02 #rad/s
+        sample_period = self.get_god_map().get_data(identifier.sample_period)
+        if window_size is None:
+            self.window_size = sample_period * 5
+        else:
+            self.window_size = window_size
+
+        self.above_threshold_time = 0
+        self.joint_convergence_threshold = self.get_god_map().get_data(identifier.joint_convergence_threshold)
+        self.thresholds = []
+        for joint_name in self.get_robot().controlled_joints:
+            velocity_limit = self.get_robot().get_joint_velocity_limit(joint_name)
+            if velocity_limit is None:
+                velocity_limit = 1
+            velocity_limit *= self.joint_convergence_threshold
+            if self.get_robot().is_joint_prismatic(joint_name):
+                velocity_limit = max(translation_cut_off, velocity_limit)
+            elif self.get_robot().is_joint_rotational(joint_name):
+                velocity_limit = max(rotation_cut_off, velocity_limit)
+            velocity_limit *= sample_period
+            self.thresholds.append(velocity_limit)
+        self.thresholds = np.array(self.thresholds)
+        self.number_of_controlled_joints = len(self.thresholds)
 
     def update(self):
-        current_js = self.get_god_map().safe_get_data(identifier.joint_states)
-        sample_period = self.get_god_map().safe_get_data(identifier.sample_period)
-        planning_time = self.get_god_map().safe_get_data(identifier.time) * sample_period
-        # TODO make 1 a parameter
-        # FIXME this 1 s only applies to the first traj point
-        if planning_time >= 1:
-            if np.abs([v.velocity for v in current_js.values()]).max() < self.joint_convergence_threshold:
+        # current_js = self.get_god_map().get_data(identifier.joint_states)
+        sample_period = self.get_god_map().get_data(identifier.sample_period)
+        planning_time = self.get_god_map().get_data(identifier.time) * sample_period
+
+        # below_threshold = np.abs([v.velocity for v in current_js.values()]).max() < self.joint_convergence_threshold
+        if planning_time - self.above_threshold_time >= self.window_size:
+            x_dot_full = self.get_god_map().get_data(identifier.xdot_full)
+            below_threshold = np.all(np.abs(x_dot_full[:self.number_of_controlled_joints]) < self.thresholds)
+            if below_threshold:
                 logging.loginfo(u'found goal trajectory with length {}s in {}s'.format(planning_time,
                                                                              time() - self.get_blackboard().runtime))
-                # self.debug_print()
                 return Status.SUCCESS
+        # if not below_threshold:
+        # self.above_threshold_time = planning_time
         return Status.RUNNING
 
 
     def debug_print(self):
         import pandas as pd
-        qp_data = self.get_god_map().safe_get_data(identifier.qp_data)
+        qp_data = self.get_god_map().get_data(identifier.qp_data)
         np_H = qp_data[identifier.H[-1]]
         np_A = qp_data[identifier.A[-1]]
         np_lb = qp_data[identifier.lb[-1]]

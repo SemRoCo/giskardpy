@@ -6,16 +6,15 @@ from genpy import Message
 from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped
 from giskard_msgs.msg import MoveAction, MoveGoal, WorldBody, CollisionEntry, MoveResult, Constraint, \
     MoveCmd, JointConstraint, CartesianConstraint
-from giskard_msgs.srv import UpdateWorld, UpdateWorldRequest, UpdateWorldResponse, GetObjectInfo, GetObjectNames,\
-    UpdateRvizMarkers, GetAttachedObjects
+from giskard_msgs.srv import UpdateWorld, UpdateWorldRequest, UpdateWorldResponse, GetObjectInfo, GetObjectNames, \
+    UpdateRvizMarkers, GetAttachedObjects, GetAttachedObjectsResponse, GetObjectNamesResponse
 from rospy_message_converter.message_converter import convert_ros_message_to_dictionary
 from sensor_msgs.msg import JointState
 from shape_msgs.msg import SolidPrimitive
 from visualization_msgs.msg import MarkerArray
 
 from giskardpy.urdf_object import URDFObject
-from giskardpy.utils import dict_to_joint_states, make_world_body_box, make_world_body_cylinder
-from giskardpy import logging
+from giskardpy.utils import position_dict_to_joint_states, make_world_body_box, make_world_body_cylinder
 
 
 class GiskardWrapper(object):
@@ -43,15 +42,15 @@ class GiskardWrapper(object):
     def get_root(self):
         return self.robot_urdf.get_root()
 
-    def set_cart_goal(self, root, tip, pose_stamped, trans_max_velocity=None, rot_max_velocity=None):
+    def set_cart_goal(self, root, tip, pose_stamped, trans_max_velocity=None, rot_max_velocity=None, weight=None):
         """
         :param tip:
         :type tip: str
         :param pose_stamped:
         :type pose_stamped: PoseStamped
         """
-        self.set_translation_goal(root, tip, pose_stamped, max_velocity=trans_max_velocity)
-        self.set_rotation_goal(root, tip, pose_stamped, max_velocity=rot_max_velocity)
+        self.set_translation_goal(root, tip, pose_stamped, max_velocity=trans_max_velocity, weight=weight)
+        self.set_rotation_goal(root, tip, pose_stamped, max_velocity=rot_max_velocity, weight=weight)
 
     def set_translation_goal(self, root, tip, pose_stamped, weight=None, max_velocity=None):
         """
@@ -138,12 +137,14 @@ class GiskardWrapper(object):
                 constraint.parameter_value_pair = json.dumps(params)
                 self.cmd_seq[-1].constraints.append(constraint)
 
-    def align_planes(self, tip, tip_normal, root=None, root_normal=None):
+    def align_planes(self, tip, tip_normal, root=None, root_normal=None, weight=None):
         """
         :type tip: str
         :type tip_normal: Vector3Stamped
         :type root: str
         :type root_normal: Vector3Stamped
+        :param weight: see giskard_msgs/Constraint
+        :type weight: float
         :return:
         """
         root = root if root else self.get_root()
@@ -152,8 +153,14 @@ class GiskardWrapper(object):
             root_normal = Vector3Stamped()
             root_normal.header.frame_id = self.get_root()
             root_normal.vector.z = 1
+
         root_normal = convert_ros_message_to_dictionary(root_normal)
-        self.set_json_goal(u'AlignPlanes', tip=tip, tip_normal=tip_normal, root=root, root_normal=root_normal)
+        params = {u'tip': tip,
+                  u'tip_normal': tip_normal,
+                  u'root': root, u'root_normal': root_normal}
+        if weight is not None:
+            params[u'weight'] = weight
+        self.set_json_goal(u'AlignPlanes', **params)
 
     def gravity_controlled_joint(self, joint_name, object_name):
         self.set_json_goal(u'GravityJoint', joint_name=joint_name, object_name=object_name)
@@ -162,8 +169,8 @@ class GiskardWrapper(object):
         self.set_json_goal(u'UpdateGodMap', updates=updates)
 
     def pointing(self, tip, goal_point, root=None, pointing_axis=None, weight=None):
-        kwargs = {u'tip':tip,
-                  u'goal_point':goal_point}
+        kwargs = {u'tip': tip,
+                  u'goal_point': goal_point}
         if root is not None:
             kwargs[u'root'] = root
         if pointing_axis is not None:
@@ -284,6 +291,21 @@ class GiskardWrapper(object):
         :rtype: MoveResult
         """
         goal = self._get_goal()
+        if wait:
+            self.client.send_goal_and_wait(goal)
+            return self.client.get_result()
+        else:
+            self.client.send_goal(goal)
+
+    def check_reachability(self, wait=True):
+        """
+        :param wait: this function block if wait=True
+        :type wait: bool
+        :return: result from giskard
+        :rtype: MoveResult
+        """
+        goal = self._get_goal()
+        goal.type = MoveGoal.CHECK_REACHABILITY
         if wait:
             self.client.send_goal_and_wait(goal)
             return self.client.get_result()
@@ -415,7 +437,7 @@ class GiskardWrapper(object):
         req = UpdateWorldRequest(UpdateWorldRequest.ADD, object, False, pose)
         return self.update_world.call(req)
 
-    def attach_box(self, name=u'box', size=None, frame_id=None, position=None, orientation=None):
+    def attach_box(self, name=u'box', size=None, frame_id=None, position=None, orientation=None, pose=None):
         """
         :type name: str
         :type size: list
@@ -424,12 +446,14 @@ class GiskardWrapper(object):
         :type orientation: list
         :rtype: UpdateWorldResponse
         """
+
         box = make_world_body_box(name, size[0], size[1], size[2])
-        pose = PoseStamped()
-        pose.header.stamp = rospy.Time.now()
-        pose.header.frame_id = str(frame_id) if frame_id is not None else u'map'
-        pose.pose.position = Point(*(position if position is not None else [0, 0, 0]))
-        pose.pose.orientation = Quaternion(*(orientation if orientation is not None else [0, 0, 0, 1]))
+        if pose is None:
+            pose = PoseStamped()
+            pose.header.stamp = rospy.Time.now()
+            pose.header.frame_id = str(frame_id) if frame_id is not None else u'map'
+            pose.pose.position = Point(*(position if position is not None else [0, 0, 0]))
+            pose.pose.orientation = Quaternion(*(orientation if orientation is not None else [0, 0, 0, 1]))
 
         req = UpdateWorldRequest(UpdateWorldRequest.ADD, box, True, pose)
         return self.update_world.call(req)
@@ -487,7 +511,7 @@ class GiskardWrapper(object):
 
     def set_object_joint_state(self, object_name, joint_states):
         if isinstance(joint_states, dict):
-            joint_states = dict_to_joint_states(joint_states)
+            joint_states = position_dict_to_joint_states(joint_states)
         self.object_js_topics[object_name].publish(joint_states)
 
     def get_object_names(self):
@@ -519,6 +543,3 @@ class GiskardWrapper(object):
         :rtype: GetAttachedObjectsResponse
         """
         return self.get_attached_objects()
-
-
-

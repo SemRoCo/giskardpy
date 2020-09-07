@@ -12,7 +12,7 @@ import PyKDL
 import pytest
 from urdf_parser_py.urdf import URDF
 
-from giskardpy.symengine_robot import Robot
+from giskardpy.robot import Robot
 from utils_for_tests import rnd_joint_state, pr2_urdf, donbot_urdf, boxy_urdf, base_bot_urdf, compare_poses
 from giskardpy.urdf_object import hacky_urdf_parser_fix
 from kdl_parser import kdl_tree_from_urdf_model
@@ -73,19 +73,19 @@ def test_folder(request):
     return folder_name
 
 
-def trajectory_rollout(controller, goal, time_limit=10, frequency=100, precision=0.0025):
-    current_js = OrderedDict()
-    for joint_name in controller.robot.joint_states_input.joint_map:
-        current_js[joint_name] = 0.0
-    state = OrderedDict()
-    state.update(current_js)
-    state.update(goal)
-    for i in range(100):
-        next_cmd = controller.get_cmd(state)
-        for joint_name, vel in next_cmd.items():
-            current_js[joint_name] += vel
-        state.update(current_js)
-    return current_js
+# def trajectory_rollout(controller, goal, time_limit=10, frequency=100, precision=0.0025):
+#     current_js = OrderedDict()
+#     for joint_name in controller.robot.joint_states_input.joint_map:
+#         current_js[joint_name] = 0.0
+#     state = OrderedDict()
+#     state.update(current_js)
+#     state.update(goal)
+#     for i in range(100):
+#         next_cmd = controller.get_cmd(state)
+#         for joint_name, vel in next_cmd.items():
+#             current_js[joint_name] += vel
+#         state.update(current_js)
+#     return current_js
 
 
 class KDL(object):
@@ -158,7 +158,7 @@ class TestSymengineController(object):
 
     def test_constraints_donbot(self, parsed_donbot):
         assert len(parsed_donbot.hard_constraints) == 9
-        assert len(parsed_donbot.joint_constraints) == 10
+        assert len(parsed_donbot.joint_constraints) == 11
 
     def test_constraints_boxy(self, parsed_boxy):
         assert len(parsed_boxy.hard_constraints) == 26
@@ -237,7 +237,7 @@ class TestSymengineController(object):
     def test_get_joint_names_donbot(self, parsed_donbot):
         expected = {u'ur5_wrist_3_joint', u'ur5_elbow_joint', u'ur5_wrist_1_joint', u'odom_z_joint',
                     u'ur5_shoulder_lift_joint', u'odom_y_joint', u'ur5_wrist_2_joint', u'odom_x_joint',
-                    u'ur5_shoulder_pan_joint', u'gripper_joint'}
+                    u'ur5_shoulder_pan_joint', u'gripper_joint', u'refills_finger_joint'}
 
         assert set(parsed_donbot.get_joint_names_controllable()).difference(expected) == set()
 

@@ -1,3 +1,4 @@
+from __future__ import division
 import traceback
 from collections import namedtuple, OrderedDict, defaultdict
 from copy import deepcopy
@@ -5,15 +6,12 @@ from itertools import combinations
 
 from geometry_msgs.msg import PoseStamped
 
-from giskardpy import WORLD_IMPLEMENTATION, symbolic_wrapper as w
-from giskardpy.data_types import SingleJointState
+from giskardpy import WORLD_IMPLEMENTATION, cas_wrapper as w
+from giskardpy.data_types import SingleJointState, HardConstraint, JointConstraint
 from giskardpy.pybullet_world_object import PyBulletWorldObject
-from giskardpy.qp_problem_builder import HardConstraint, JointConstraint
 from giskardpy.utils import KeyDefaultDict, \
     homo_matrix_to_pose, memoize
 from giskardpy.world_object import WorldObject
-
-Joint = namedtuple(u'Joint', [u'symbol', u'velocity_limit', u'lower', u'upper', u'type', u'frame'])
 
 if WORLD_IMPLEMENTATION == u'pybullet':
     Backend = PyBulletWorldObject
@@ -73,11 +71,53 @@ class Robot(Backend):
             joint = self.get_parent_joint_of_joint(joint)
         return joint
 
+    @memoize
+    def get_controlled_leaf_joints(self):
+        leaves = self.get_leaves()
+        result = []
+        for link_name in leaves:
+            has_collision = self.has_link_collision(link_name)
+            joint_name = self.get_parent_joint_of_link(link_name)
+            while True:
+                if joint_name is None:
+                    break
+                if joint_name in self.controlled_joints:
+                    if has_collision:
+                        result.append(joint_name)
+                    break
+                parent_link = self.get_parent_link_of_joint(joint_name)
+                has_collision = has_collision or self.has_link_collision(parent_link)
+                joint_name = self.get_parent_joint_of_joint(joint_name)
+            else: # if not break
+                pass
+        return set(result)
+
+    @memoize
+    def get_directly_controllable_collision_links(self, joint_name):
+        if joint_name not in self.controlled_joints:
+            return []
+        link_name = self.get_child_link_of_joint(joint_name)
+        links = [link_name]
+        collision_links = []
+        while links:
+            link_name = links.pop(0)
+            parent_joint = self.get_parent_joint_of_link(link_name)
+
+            if parent_joint != joint_name and parent_joint in self.controlled_joints:
+                continue
+            if self.has_link_collision(link_name):
+                collision_links.append(link_name)
+            else:
+                child_links = self.get_child_links_of_link(link_name)
+                if child_links:
+                    links.extend(child_links)
+        return collision_links
+
     def get_joint_state_positions(self):
         try:
             return self.__joint_state_positions
         except:
-            return {str(self._joint_position_symbols[x]): 0 for x in self.get_controllable_joints()}
+            return {str(self._joint_position_symbols[x]): 0 for x in self.get_movable_joints()}
 
     def reinitialize(self):
         """
@@ -122,7 +162,7 @@ class Robot(Backend):
 
     def _create_frames_expressions(self):
         for joint_name, urdf_joint in self._urdf_robot.joint_map.items():
-            if self.is_joint_controllable(joint_name):
+            if self.is_joint_movable(joint_name):
                 joint_symbol = self.get_joint_position_symbol(joint_name)
             if self.is_joint_mimic(joint_name):
                 multiplier = 1 if urdf_joint.mimic.multiplier is None else urdf_joint.mimic.multiplier
@@ -140,10 +180,10 @@ class Robot(Backend):
                 # TODO more specific exception
                 raise TypeError(u'Joint type "{}" is not supported by urdfs parser.'.format(urdf_joint.type))
 
-            if self.is_rotational_joint(joint_name):
+            if self.is_joint_rotational(joint_name):
                 joint_frame = w.dot(joint_frame,
                                     w.rotation_matrix_from_axis_angle(w.vector3(*urdf_joint.axis), joint_symbol))
-            elif self.is_translational_joint(joint_name):
+            elif self.is_joint_prismatic(joint_name):
                 translation_axis = (w.point3(*urdf_joint.axis) * joint_symbol)
                 joint_frame = w.dot(joint_frame, w.translation3(translation_axis[0],
                                                                 translation_axis[1],
@@ -163,14 +203,19 @@ class Robot(Backend):
             sample_period = w.Symbol(u'rosparam_general_options_sample_period')  # TODO this should be a parameter
             velocity_limit = self.get_joint_velocity_limit_expr(joint_name) * sample_period
 
+            weight = self._joint_weights[joint_name]
+            weight = weight * (1. / (velocity_limit)) ** 2
+
             if not self.is_joint_continuous(joint_name):
                 self._joint_constraints[joint_name] = JointConstraint(lower=w.Max(-velocity_limit, lower_limit - joint_symbol),
                                                                       upper=w.Min(velocity_limit, upper_limit - joint_symbol),
-                                                                      weight=self._joint_weights[joint_name])
+                                                                      weight=weight,
+                                                                      linear_weight=0)
             else:
                 self._joint_constraints[joint_name] = JointConstraint(lower=-velocity_limit,
                                                                       upper=velocity_limit,
-                                                                      weight=self._joint_weights[joint_name])
+                                                                      weight=weight,
+                                                                      linear_weight=0)
 
     def get_fk_expression(self, root_link, tip_link):
         """
@@ -195,6 +240,7 @@ class Robot(Backend):
             p.header.frame_id = root
             p.pose = homo_matrix_to_pose(homo_m)
         except Exception as e:
+            print(e)
             traceback.print_exc()
             pass
         return p
@@ -231,7 +277,7 @@ class Robot(Backend):
         :rtype: float
         """
         limit = self._urdf_robot.joint_map[joint_name].limit
-        if self.is_translational_joint(joint_name):
+        if self.is_joint_prismatic(joint_name):
             limit_symbol = self._joint_velocity_linear_limit[joint_name]
         else:
             limit_symbol = self._joint_velocity_angular_limit[joint_name]
@@ -303,3 +349,19 @@ class Robot(Backend):
             return True
         return link_a < link_b
 
+    @memoize
+    def get_chain_reduced_to_controlled_joints(self, link_a, link_b):
+        chain = self.get_chain(link_b, link_a)
+        for i, thing in enumerate(chain):
+            if i % 2 == 1 and thing in self.controlled_joints:
+                new_link_b = chain[i - 1]
+                break
+        else:
+            raise KeyError(u'no controlled joint in chain between {} and {}'.format(link_a, link_b))
+        for i, thing in enumerate(reversed(chain)):
+            if i % 2 == 1 and thing in self.controlled_joints:
+                new_link_a = chain[len(chain) - i]
+                break
+        else:
+            raise KeyError(u'no controlled joint in chain between {} and {}'.format(link_a, link_b))
+        return new_link_a, new_link_b

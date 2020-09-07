@@ -2,7 +2,8 @@ import copy
 from copy import copy
 from multiprocessing import Lock
 
-from giskardpy import symbolic_wrapper as w
+from giskardpy import cas_wrapper as w
+
 
 def get_member(identifier, member):
     """
@@ -26,6 +27,127 @@ def get_member(identifier, member):
     except RuntimeError:
         pass
 
+class GetMember(object):
+    def __init__(self, default_value):
+        self.member = None
+        self.default_value = default_value
+        self.child = None
+
+
+    def init_call(self, identifier, data):
+        self.member = identifier[0]
+        sub_data = self.c(data)
+        if len(identifier) == 2:
+            self.child = GetMemberLeaf(self.default_value)
+            return self.child.init_call(identifier[-1], sub_data)
+        elif len(identifier) > 2:
+            self.child = GetMember(self.default_value)
+            return self.child.init_call(identifier[1:], sub_data)
+        return sub_data
+
+
+
+    def __call__(self, a):
+        return self.c(a)
+
+
+    def c(self, a):
+        try:
+            r = a[self.member]
+            self.c = self.return_dict
+            return r
+        except TypeError:
+            if callable(a):
+                r = a(*self.member)
+                self.c = self.return_function_result
+                return r
+            try:
+                r = getattr(a, self.member)
+                self.c = self.return_attribute
+                return r
+            except TypeError:
+                pass
+        except IndexError:
+            r = a[int(self.member)]
+            self.c = self.return_list
+            return r
+        except RuntimeError:
+            pass
+        return self.default_value
+
+
+    def return_dict(self, a):
+        return self.child.c(a[self.member])
+
+
+    def return_list(self, a):
+        return self.child.c(a[int(self.member)])
+
+
+    def return_attribute(self, a):
+        return self.child.c(getattr(a, self.member))
+
+
+    def return_function_result(self, a):
+        return self.child.c(a(*self.member))
+
+class GetMemberLeaf(object):
+    def __init__(self, default_value):
+        self.member = None
+        self.default_value = default_value
+        self.child = None
+
+    def init_call(self, member, data):
+        self.member = member
+        return self.c(data)
+
+
+
+    def __call__(self, a):
+        return self.c(a)
+
+
+    def c(self, a):
+        try:
+            r = a[self.member]
+            self.c = self.return_dict
+            return r
+        except TypeError:
+            if callable(a):
+                r = a(*self.member)
+                self.c = self.return_function_result
+                return r
+            try:
+                r = getattr(a, self.member)
+                self.c = self.return_attribute
+                return r
+            except TypeError:
+                pass
+        except IndexError:
+            r = a[int(self.member)]
+            self.c = self.return_list
+            return r
+        except RuntimeError:
+            pass
+        return self.default_value
+
+
+    def return_dict(self, a):
+        return a[self.member]
+
+
+    def return_list(self, a):
+        return a[int(self.member)]
+
+
+    def return_attribute(self, a):
+        return getattr(a, self.member)
+
+
+    def return_function_result(self, a):
+        return a(*self.member)
+
+
 
 def get_data(identifier, data, default_value=0.0):
     """
@@ -38,22 +160,24 @@ def get_data(identifier, data, default_value=0.0):
     :type identifier: list
     :return: object that is saved at key
     """
-    # TODO deal with unused identifiers
-    result = data
     try:
-        for member in identifier:
-            result = get_member(result, member)
+        if len(identifier) == 1:
+            shortcut = GetMemberLeaf(default_value)
+            result = shortcut.init_call(identifier[0], data)
+        else:
+            shortcut = GetMember(default_value)
+            result = shortcut.init_call(identifier, data)
     except AttributeError:
-        return default_value
+        return default_value, None
     except KeyError as e:
         # traceback.print_exc()
         # raise KeyError(identifier)
         # TODO is this really a good idea?
         # I do this because it automatically sets weights for unused goals to 0
-        return default_value
+        return default_value, None
     except IndexError:
-        return default_value
-    return result
+        return default_value, None
+    return result, shortcut
 
 
 class GodMap(object):
@@ -62,17 +186,18 @@ class GodMap(object):
     """
 
     # TODO give this fucker a lock
-    def __init__(self):
+    def __init__(self, default_value=0.0):
         self._data = {}
         self.expr_separator = u'_'
         self.key_to_expr = {}
         self.expr_to_key = {}
-        self.default_value = 0
+        self.default_value = default_value
         self.last_expr_values = {}
+        self.shortcuts = {}
         self.lock = Lock()
 
     def __copy__(self):
-        god_map_copy = GodMap()
+        god_map_copy = GodMap(self.default_value)
         god_map_copy._data = copy(self._data)
         god_map_copy.key_to_expr = copy(self.key_to_expr)
         god_map_copy.expr_to_key = copy(self.expr_to_key)
@@ -85,7 +210,8 @@ class GodMap(object):
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.lock.release()
 
-    def get_data(self, identifier):
+
+    def unsafe_get_data(self, identifier):
         """
 
         :param identifier: Identifier in the form of ['pose', 'position', 'x'],
@@ -97,12 +223,22 @@ class GodMap(object):
         :type identifier: list
         :return: object that is saved at key
         """
-        return get_data(identifier, self._data, self.default_value)
+        identifier = tuple(identifier)
+        if identifier not in self.shortcuts:
+            result, shortcut = get_data(identifier, self._data, self.default_value)
+            if shortcut:
+                self.shortcuts[identifier] = shortcut
+            return result
+        return self.shortcuts[identifier].c(self._data)
 
-    def safe_get_data(self, identifier):
+    def get_data(self, identifier):
         with self.lock:
-            r = self.get_data(identifier)
+            r = self.unsafe_get_data(identifier)
         return r
+
+    def clear_cache(self):
+        # TODO should be possible without clear cache
+        self.shortcuts = {}
 
     def to_symbol(self, identifier):
         """
@@ -133,7 +269,7 @@ class GodMap(object):
             # if exprs is None:
             #     exprs = self.expr_to_key.keys()
             # return {expr: self.get_data(self.expr_to_key[expr]) for expr in exprs}
-            return [self.get_data(self.expr_to_key[expr]) for expr in symbols]
+            return [self.unsafe_get_data(self.expr_to_key[expr]) for expr in symbols]
 
     def get_registered_symbols(self):
         """

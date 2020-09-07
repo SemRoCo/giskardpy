@@ -1,10 +1,7 @@
 from py_trees import Status
 
 from giskardpy import identifier
-from giskardpy.data_types import ClosestPointInfo, Trajectory
-from giskardpy.identifier import closest_point
 from giskardpy.plugin import GiskardBehavior
-from giskardpy.utils import KeyDefaultDict
 
 
 class TimePlugin(GiskardBehavior):
@@ -18,5 +15,5 @@ class TimePlugin(GiskardBehavior):
 
     def update(self):
         with self.god_map:
-            self.get_god_map().set_data(identifier.time, self.get_god_map().get_data(identifier.time) + 1)
+            self.get_god_map().set_data(identifier.time, self.get_god_map().unsafe_get_data(identifier.time) + 1)
         return Status.RUNNING

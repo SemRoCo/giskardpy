@@ -72,7 +72,7 @@ class WorldObject(URDFObject):
     def controlled_joints(self):
         # FIXME reinitialize does not handle newly added or removed controllable joints
         if self._controlled_joints is None:
-            self._controlled_joints = self.get_controllable_joints()
+            self._controlled_joints = self.get_movable_joints()
         return self._controlled_joints
 
     @controlled_joints.setter
@@ -210,7 +210,7 @@ class WorldObject(URDFObject):
         :return:
         """
         js = {}
-        for joint_name in self.get_controllable_joints():
+        for joint_name in self.get_movable_joints():
             sjs = SingleJointState()
             sjs.name = joint_name
             sjs.position = f(joint_name)

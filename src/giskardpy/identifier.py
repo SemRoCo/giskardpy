@@ -8,12 +8,15 @@ constraints_identifier = [u'constraints']
 trajectory = [u'traj']
 time = [u'time']
 cmd = [u'cmd']
-last_cmd = [u'last_cmd']
+# last_cmd = [u'last_cmd']
 closest_point = [u'cpi']
-collisions = [u'collisions']
-collision_goal_identifier = [u'collision_goal']
+# collisions = [u'collisions']
+collision_goal = [u'collision_goal']
 soft_constraint_identifier = [u'soft_constraints']
+joint_constraint_identifier = [u'joint_constraints']
+hard_constraint_identifier = [u'hard_constraints']
 execute = [u'execute']
+check_reachability = [u'check_reachability']
 next_move_goal = [u'next_move_goal']
 qp_data = [u'qp_data']
 A = qp_data + [u'A']
@@ -27,6 +30,10 @@ weight_keys = qp_data + [u'weight_keys']
 b_keys = qp_data + [u'b_keys']
 bA_keys = qp_data + [u'bA_keys']
 xdot_keys = qp_data + [u'xdot_keys']
+
+wiggle_detection_samples = [u'wiggle_detection_samples']
+post_processing = [u'post_processing']
+soft_constraints = post_processing + [u'soft_constraints']
 
 
 
@@ -49,19 +56,24 @@ fill_velocity_values = general_options + [u'fill_velocity_values']
 joint_convergence_threshold = general_options + [u'joint_convergence_threshold']
 
 joint_velocity_linear_limit = general_options + [u'joint_vel_limit', u'linear']
-default_joint_velocity_linear_limit = joint_velocity_linear_limit + [u'default']
+joint_velocity_linear_limit_default = joint_velocity_linear_limit + [u'default']
+joint_velocity_linear_limit_override = joint_velocity_linear_limit + [u'override']
 
 joint_velocity_angular_limit = general_options + [u'joint_vel_limit', u'angular']
-default_joint_velocity_angular_limit = joint_velocity_angular_limit + [u'default']
+joint_velocity_angular_limit_default = joint_velocity_angular_limit + [u'default']
+joint_velocity_angular_limit_override = joint_velocity_angular_limit + [u'override']
 
 joint_acceleration_linear_limit = general_options + [u'joint_acceleration_limit', u'linear']
-default_joint_acceleration_linear_limit = joint_acceleration_linear_limit + [u'default']
+joint_acceleration_linear_limit_default = joint_acceleration_linear_limit + [u'default']
+joint_acceleration_linear_limit_override = joint_acceleration_linear_limit + [u'override']
 
 joint_acceleration_angular_limit = general_options + [u'joint_acceleration_limit', u'angular']
-default_joint_acceleration_angular_limit = joint_acceleration_angular_limit + [u'default']
+joint_acceleration_angular_limit_default = joint_acceleration_angular_limit + [u'default']
+joint_acceleration_angular_limit_override = joint_acceleration_angular_limit + [u'override']
 
-joint_cost = general_options + [u'joint_weights']
-default_joint_cost_identifier = joint_cost + [u'default']
+joint_weight = general_options + [u'joint_weights']
+joint_weight_default = joint_weight + [u'default']
+joint_weight_override = joint_weight + [u'override']
 
 # qp solver
 qp_solver = rosparam + [u'qp_solver']
@@ -78,21 +90,41 @@ PlotTrajectory_normalize_position = plugins + [u'PlotTrajectory', u'normalize_po
 PlotTrajectory_tick_stride = plugins + [u'PlotTrajectory', u'tick_stride']
 fft_duration = plugins + [u'WiggleCancel', u'fft_duration']
 wiggle_detection_threshold = plugins + [u'WiggleCancel', u'wiggle_detection_threshold']
-min_wiggle_frequency = plugins + [u'WiggleCancel', u'min_wiggle_frequency']
+num_samples_in_fft = plugins + [u'WiggleCancel', u'num_samples_in_fft']
+wiggle_frequency_range = plugins + [u'WiggleCancel', u'wiggle_frequency_range']
+
+# reachability check
+reachability_check = rosparam + [u'reachability_check']
+rc_sample_period = reachability_check + [u'sample_period']
+rc_prismatic_velocity = reachability_check + [u'prismatic_velocity']
+rc_continuous_velocity = reachability_check + [u'continuous_velocity']
+rc_revolute_velocity = reachability_check + [u'revolute_velocity']
+rc_other_velocity = reachability_check + [u'other_velocity']
+
 
 # behavior tree
 behavior_tree = rosparam + [u'behavior_tree']
 tree_tick_rate = behavior_tree + [u'tree_tick_rate']
+tree_manager = behavior_tree + [u'tree_manager']
 
 # collision avoidance
 collision_avoidance = rosparam + [u'collision_avoidance']
-
-distance_thresholds = collision_avoidance + [u'distance_thresholds']
-default_collision_distances = distance_thresholds + [u'default']
+maximum_collision_threshold = collision_avoidance + [u'maximum_collision_threshold']
 
 self_collision_avoidance = collision_avoidance + [u'self_collision_avoidance']
+self_collision_avoidance_distance = self_collision_avoidance + [u'distance_thresholds']
+self_collision_avoidance_default_threshold = self_collision_avoidance_distance + [u'default']
+self_collision_avoidance_default_override = self_collision_avoidance_distance + [u'override']
 ignored_self_collisions = self_collision_avoidance + [u'ignore']
 added_self_collisions = self_collision_avoidance + [u'add']
+self_collision_avoidance_repeller = self_collision_avoidance + [u'number_of_repeller']
 
 external_collision_avoidance = collision_avoidance + [u'external_collision_avoidance']
-number_of_repeller = external_collision_avoidance + [u'number_of_repeller']
+external_collision_avoidance_distance = external_collision_avoidance + [u'distance_thresholds']
+external_collision_avoidance_default_threshold = external_collision_avoidance_distance + [u'default']
+external_collision_avoidance_default_override = external_collision_avoidance_distance + [u'override']
+external_collision_avoidance_repeller = external_collision_avoidance + [u'number_of_repeller', u'default']
+external_collision_avoidance_repeller_eef = external_collision_avoidance + [u'number_of_repeller', u'end_effector_joints']
+
+
+

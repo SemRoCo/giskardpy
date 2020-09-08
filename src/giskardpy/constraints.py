@@ -915,10 +915,11 @@ class CartesianVelocityLimit(Constraint):
     percentage = u'percentage'
 
     def __init__(self, god_map, root_link, tip_link, weight=WEIGHT_ABOVE_CA, max_linear_velocity=0.1,
-                 max_angular_velocity=0.5):
+                 max_angular_velocity=0.5, hard=True):
         super(CartesianVelocityLimit, self).__init__(god_map)
         self.root_link = root_link
         self.tip_link = tip_link
+        self.hard = hard
 
         params = {self.weight_id: weight,
                   self.max_linear_velocity_id: max_linear_velocity,
@@ -935,32 +936,43 @@ class CartesianVelocityLimit(Constraint):
         root_T_tip = self.get_fk(self.root_link, self.tip_link)
         tip_evaluated_T_root = self.get_fk_evaluated(self.tip_link, self.root_link)
         root_P_tip = w.position_of(root_T_tip)
-        tip_evaluated_P_tip = w.dot(tip_evaluated_T_root, root_P_tip)
 
-        expr = w.norm(tip_evaluated_P_tip)
 
         linear_weight = self.normalize_weight(max_linear_velocity, weight)
 
         self.add_debug_vector('/root_P_tip' , root_P_tip)
 
-        self.add_constraint(u'/linea',
-                            lower=-max_linear_velocity*sample_period,
-                            upper=max_linear_velocity*sample_period,
-                            weight=linear_weight,
-                            expression=expr,
-                            goal_constraint=False)
-        self.add_constraint(u'/lineax',
+        if self.hard:
+            slack_limit = 0
+        else:
+            slack_limit = 1e9
+
+        self.add_constraint(u'/linear/x',
                             lower=-max_linear_velocity*sample_period,
                             upper=max_linear_velocity*sample_period,
                             weight=linear_weight,
                             expression=root_P_tip[0],
-                            goal_constraint=False)
-        self.add_constraint(u'/lineary',
+                            goal_constraint=False,
+                            lower_slack_limit=-slack_limit,
+                            upper_slack_limit=slack_limit)
+        self.add_constraint(u'/linear/y',
                             lower=-max_linear_velocity*sample_period,
                             upper=max_linear_velocity*sample_period,
                             weight=linear_weight,
                             expression=root_P_tip[1],
-                            goal_constraint=False)
+                            goal_constraint=False,
+                            lower_slack_limit=-slack_limit,
+                            upper_slack_limit=slack_limit
+                            )
+        self.add_constraint(u'/linear/z',
+                            lower=-max_linear_velocity*sample_period,
+                            upper=max_linear_velocity*sample_period,
+                            weight=linear_weight,
+                            expression=root_P_tip[2],
+                            goal_constraint=False,
+                            lower_slack_limit=-slack_limit,
+                            upper_slack_limit=slack_limit
+                            )
 
         root_R_tip = w.rotation_of(root_T_tip)
         tip_evaluated_R_root = w.rotation_of(tip_evaluated_T_root)
@@ -970,12 +982,37 @@ class CartesianVelocityLimit(Constraint):
         axis, angle = w.axis_angle_from_matrix(w.dot(w.dot(tip_evaluated_R_root, hack), root_R_tip))
         angular_weight = self.normalize_weight(max_angular_velocity, weight)
 
-        self.add_constraint(u'/angular',
+        axis_angle = axis*angle
+
+        self.add_constraint(u'/angular/x',
                             lower=-max_angular_velocity*sample_period,
                             upper=max_angular_velocity*sample_period,
                             weight=angular_weight,
-                            expression=angle,
-                            goal_constraint=False)
+                            expression=axis_angle[0],
+                            goal_constraint=False,
+                            lower_slack_limit=-slack_limit,
+                            upper_slack_limit=slack_limit
+                            )
+
+        self.add_constraint(u'/angular/y',
+                            lower=-max_angular_velocity*sample_period,
+                            upper=max_angular_velocity*sample_period,
+                            weight=angular_weight,
+                            expression=axis_angle[1],
+                            goal_constraint=False,
+                            lower_slack_limit=-slack_limit,
+                            upper_slack_limit=slack_limit
+                            )
+
+        self.add_constraint(u'/angular/z',
+                            lower=-max_angular_velocity*sample_period,
+                            upper=max_angular_velocity*sample_period,
+                            weight=angular_weight,
+                            expression=axis_angle[2],
+                            goal_constraint=False,
+                            lower_slack_limit=-slack_limit,
+                            upper_slack_limit=slack_limit
+                            )
 
     def __str__(self):
         s = super(CartesianVelocityLimit, self).__str__()

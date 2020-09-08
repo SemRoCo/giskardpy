@@ -401,17 +401,17 @@ class TestConstraints(object):
         zero_pose.add_json_goal(u'CartesianVelocityLimit',
                                 root_link=zero_pose.default_root,
                                 tip_link=u'base_footprint',
-                                max_linear_velocity=linear_velocity/2,
-                                max_angular_velocity=angular_velocity/2
+                                max_linear_velocity=0.1,
+                                max_angular_velocity=0.2
                                 )
         goal_position = PoseStamped()
-        goal_position.header.frame_id = u'base_footprint'
+        goal_position.header.frame_id = u'r_gripper_tool_frame'
         goal_position.pose.position.x = 1
         goal_position.pose.position.y = 0
         goal_position.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 4, [0, 0, 1]))
 
         zero_pose.set_and_check_cart_goal(goal_pose=goal_position,
-                                          tip=u'base_footprint',
+                                          tip=u'r_gripper_tool_frame',
                                           linear_velocity=linear_velocity,
                                           angular_velocity=angular_velocity
                                           )

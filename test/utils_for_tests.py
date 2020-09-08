@@ -387,28 +387,30 @@ class GiskardTestWrapper(object):
     def align_planes(self, tip, tip_normal, root=None, root_normal=None, weight=None):
         self.wrapper.align_planes(tip, tip_normal, root, root_normal, weight)
 
-    def set_rotation_goal(self, goal_pose, tip, root=None):
+    def set_rotation_goal(self, goal_pose, tip, root=None, max_velocity=None):
         if not root:
             root = self.default_root
-        self.wrapper.set_rotation_goal(root, tip, goal_pose)
+        self.wrapper.set_rotation_goal(root, tip, goal_pose, max_velocity=max_velocity)
 
-    def set_translation_goal(self, goal_pose, tip, root=None):
+    def set_translation_goal(self, goal_pose, tip, root=None, max_velocity=None):
         if not root:
             root = self.default_root
-        self.wrapper.set_translation_goal(root, tip, goal_pose)
+        self.wrapper.set_translation_goal(root, tip, goal_pose, max_velocity=max_velocity)
 
-    def set_cart_goal(self, goal_pose, tip, root=None, weight=None):
+    def set_cart_goal(self, goal_pose, tip, root=None, weight=None, linear_velocity=None, angular_velocity=None):
         if not root:
             root = self.default_root
         if weight is not None:
-            self.wrapper.set_cart_goal(root, tip, goal_pose, weight)
+            self.wrapper.set_cart_goal(root, tip, goal_pose, weight=weight, trans_max_velocity=linear_velocity,
+                                       rot_max_velocity=angular_velocity)
         else:
-            self.wrapper.set_cart_goal(root, tip, goal_pose)
+            self.wrapper.set_cart_goal(root, tip, goal_pose, trans_max_velocity=linear_velocity,
+                                       rot_max_velocity=angular_velocity)
 
-    def set_and_check_cart_goal(self, goal_pose, tip, root=None, weight=None,
+    def set_and_check_cart_goal(self, goal_pose, tip, root=None, weight=None, linear_velocity=None, angular_velocity=None,
                                 expected_error_code=MoveResult.SUCCESS):
         goal_pose_in_map = transform_pose(u'map', goal_pose)
-        self.set_cart_goal(goal_pose, tip, root, weight)
+        self.set_cart_goal(goal_pose, tip, root, weight, linear_velocity=linear_velocity, angular_velocity=angular_velocity)
         self.loop_once()
         self.send_and_check_goal(expected_error_code)
         self.loop_once()

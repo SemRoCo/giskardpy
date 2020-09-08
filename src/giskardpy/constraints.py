@@ -361,10 +361,7 @@ class Constraint(object):
         r_P_error = r_P_g - r_P_c
         trans_error = w.norm(r_P_error)
 
-        trans_scale = self.limit_acceleration(w.norm(r_P_c),
-                                              trans_error,
-                                              max_acceleration,
-                                              max_velocity)
+        trans_scale = self.limit_velocity(trans_error,max_velocity)
         r_P_intermediate_error = w.save_division(r_P_error, trans_error) * trans_scale
 
         # weight = self.magic_weight_function(trans_error,
@@ -908,6 +905,81 @@ class CartesianPosition(BasicCartesianConstraint):
 
         self.add_minimize_position_constraints(r_P_g, max_velocity, max_acceleration, self.root, self.tip,
                                                self.goal_constraint, weight)
+
+
+class CartesianVelocityLimit(Constraint):
+    goal = u'goal'
+    weight_id = u'weight'
+    max_linear_velocity_id = u'max_linear_velocity'
+    max_angular_velocity_id = u'max_angular_velocity'
+    percentage = u'percentage'
+
+    def __init__(self, god_map, root_link, tip_link, weight=WEIGHT_ABOVE_CA, max_linear_velocity=0.1,
+                 max_angular_velocity=0.5):
+        super(CartesianVelocityLimit, self).__init__(god_map)
+        self.root_link = root_link
+        self.tip_link = tip_link
+
+        params = {self.weight_id: weight,
+                  self.max_linear_velocity_id: max_linear_velocity,
+                  self.max_angular_velocity_id: max_angular_velocity
+                  }
+        self.save_params_on_god_map(params)
+
+    def make_constraints(self):
+        weight = self.get_input_float(self.weight_id)
+        max_linear_velocity = self.get_input_float(self.max_linear_velocity_id)
+        max_angular_velocity = self.get_input_float(self.max_angular_velocity_id)
+        sample_period = self.get_input_sampling_period()
+
+        root_T_tip = self.get_fk(self.root_link, self.tip_link)
+        tip_evaluated_T_root = self.get_fk_evaluated(self.tip_link, self.root_link)
+        root_P_tip = w.position_of(root_T_tip)
+        tip_evaluated_P_tip = w.dot(tip_evaluated_T_root, root_P_tip)
+
+        expr = w.norm(tip_evaluated_P_tip)
+
+        linear_weight = self.normalize_weight(max_linear_velocity, weight)
+
+        self.add_debug_vector('/root_P_tip' , root_P_tip)
+
+        self.add_constraint(u'/linea',
+                            lower=-max_linear_velocity*sample_period,
+                            upper=max_linear_velocity*sample_period,
+                            weight=linear_weight,
+                            expression=expr,
+                            goal_constraint=False)
+        self.add_constraint(u'/lineax',
+                            lower=-max_linear_velocity*sample_period,
+                            upper=max_linear_velocity*sample_period,
+                            weight=linear_weight,
+                            expression=root_P_tip[0],
+                            goal_constraint=False)
+        self.add_constraint(u'/lineary',
+                            lower=-max_linear_velocity*sample_period,
+                            upper=max_linear_velocity*sample_period,
+                            weight=linear_weight,
+                            expression=root_P_tip[1],
+                            goal_constraint=False)
+
+        root_R_tip = w.rotation_of(root_T_tip)
+        tip_evaluated_R_root = w.rotation_of(tip_evaluated_T_root)
+
+        hack = w.rotation_matrix_from_axis_angle([0, 0, 1], 0.0001)
+
+        axis, angle = w.axis_angle_from_matrix(w.dot(w.dot(tip_evaluated_R_root, hack), root_R_tip))
+        angular_weight = self.normalize_weight(max_angular_velocity, weight)
+
+        self.add_constraint(u'/angular',
+                            lower=-max_angular_velocity*sample_period,
+                            upper=max_angular_velocity*sample_period,
+                            weight=angular_weight,
+                            expression=angle,
+                            goal_constraint=False)
+
+    def __str__(self):
+        s = super(CartesianVelocityLimit, self).__str__()
+        return u'{}/{}/{}'.format(s, self.root_link, self.tip_link)
 
 
 # class CartesianPositionX(BasicCartesianConstraint):

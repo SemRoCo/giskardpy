@@ -7,13 +7,13 @@ general_options:
   joint_vel_limit: # giskard will use the min of this number and limits from the urdf
     linear: # m/s
       default: 1
-#      override:
-#        odom_x_joint: 1
-#        odom_y_joint: 1
+      override:
+        odom_x_joint: 1
+        odom_y_joint: 1
     angular: # rad/s
       default: 1
-#      override:
-#        odom_z_joint: 3.14
+      override:
+        odom_z_joint: 3.14
   joint_acceleration_limit: # multiply your desired acc limit with sample period; experimental, don't touch
     linear:
       default: 100

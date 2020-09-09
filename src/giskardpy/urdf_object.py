@@ -479,7 +479,7 @@ class URDFObject(object):
         pass
 
     @memoize
-    def has_link_collision(self, link_name, volume_threshold=1e-6, surface_threshold=1e-4):
+    def has_link_collision(self, link_name, volume_threshold=1.001e-6, surface_threshold=0.00061):
         """
         :type link: str
         :param volume_threshold: m**3, ignores simple geometry shapes with a volume less than this

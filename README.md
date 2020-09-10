@@ -11,6 +11,7 @@ sudo pip install casadi
 sudo pip install sortedcontainers
 sudo pip install hypothesis # only needed if you want to run tests
 sudo pip install pandas
+sudo pip install numpy==1.16
 ```
 
 Now create the workspace

@@ -169,6 +169,7 @@ class Collisions(object):
 
         self.self_collisions = defaultdict(default_f)
         self.external_collision = defaultdict(default_f)
+        self.external_collision_long_key = defaultdict(lambda : self._default_collision('', '', ''))
         self.all_collisions = set()
         self.number_of_self_collisions = defaultdict(int)
         self.number_of_external_collisions = defaultdict(int)
@@ -190,6 +191,13 @@ class Collisions(object):
             key = collision.get_link_a()
             self.external_collision[key].add(collision)
             self.number_of_external_collisions[key] = min(20, self.number_of_external_collisions[key] + 1)
+            key_long = (collision.get_original_link_a(),collision.get_body_b(), collision.get_original_link_b())
+            if key_long not in self.external_collision_long_key:
+                self.external_collision_long_key[key_long] = collision
+            else:
+                self.external_collision_long_key[key_long] = min(collision, self.external_collision_long_key[key_long],
+                                                            key=lambda x: x.get_contact_distance())
+
 
 
     def transform_closest_point(self, collision):
@@ -262,6 +270,14 @@ class Collisions(object):
         :rtype: SortedKeyList
         """
         return self.external_collision[joint_name]
+
+    def get_external_collisions_long_key(self, link_a, body_b, link_b):
+        """
+        Collisions are saved as a list for each movable robot joint, sorted by contact distance
+        :type joint_name: str
+        :rtype: SortedKeyList
+        """
+        return self.external_collision_long_key[link_a, body_b, link_b]
 
 
     def get_number_of_external_collisions(self, joint_name):

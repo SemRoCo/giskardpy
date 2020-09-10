@@ -1,4 +1,4 @@
-import pybullet as p
+import giskardpy.pybullet_wrapper as p
 from geometry_msgs.msg import Point, Pose
 from giskard_msgs.msg import CollisionEntry
 from pybullet import error

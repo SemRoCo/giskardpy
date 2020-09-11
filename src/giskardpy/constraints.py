@@ -1499,17 +1499,12 @@ class SelfCollisionAvoidance(Constraint):
         number_of_self_collisions = self.get_number_of_self_collisions()
         num_repeller = self.get_input_float(self.num_repeller_id)
 
-        movable_joint = self.get_robot().get_controlled_parent_joint(self.link_a)
-        f = self.get_robot().get_child_link_of_joint(movable_joint)
-        a_T_f = self.get_fk_evaluated(self.link_a, f)
-
         b_T_a = self.get_fk(self.link_b, self.link_a)
         pb_T_b = w.inverse_frame(self.get_b_T_pb())
-        f_P_pa = self.get_position_on_a_in_a()
+        a_P_pa = self.get_position_on_a_in_a()
 
         pb_V_n = self.get_contact_normal_in_b()
 
-        a_P_pa = w.dot(a_T_f, f_P_pa)
 
         pb_P_pa = w.dot(pb_T_b, b_T_a, a_P_pa)
 

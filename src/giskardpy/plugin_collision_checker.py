@@ -43,7 +43,6 @@ class CollisionChecker(GiskardBehavior):
 
     def initialise(self):
         collision_goals = self.get_god_map().get_data(identifier.collision_goal)
-        # max_distance = self.get_god_map().get_data(identifier.maximum_collision_threshold)
         external_distances = self.get_god_map().get_data(identifier.external_collision_avoidance_distance)
         self_distances = self.get_god_map().get_data(identifier.self_collision_avoidance_distance)
         default_distance = max(external_distances.default_factory()[u'soft_threshold'],

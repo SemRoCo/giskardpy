@@ -1430,12 +1430,6 @@ class CollisionAvoidanceHint(Constraint):
         root_P_a = w.position_of(root_T_a)
         expr = w.dot(root_V_avoidance_hint[:3].T, root_P_a[:3])
 
-        # self.add_debug_constraint(u'/error', error)
-        # self.add_debug_constraint(u'/w2', weight*(error/threshold2))
-        # self.add_debug_constraint(u'/actual_distance', actual_distance)
-        # self.add_debug_constraint(u'/threshold', threshold)
-        # self.add_debug_constraint(u'/threshold2', threshold2)
-
         self.add_constraint(u'/avoidance_hint',
                             lower=error_capped,
                             upper=error_capped,

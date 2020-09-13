@@ -20,6 +20,7 @@ class CollisionChecker(GiskardBehavior):
         self.lock = Lock()
         self.object_js_subs = {}  # JointState subscribers for articulated world objects
         self.object_joint_states = {}  # JointStates messages for articulated world objects
+        self.get_god_map().set_data(identifier.added_collision_checks, {})
 
     def setup(self, timeout=10.0):
         super(CollisionChecker, self).setup(timeout)
@@ -42,8 +43,34 @@ class CollisionChecker(GiskardBehavior):
 
     def initialise(self):
         collision_goals = self.get_god_map().get_data(identifier.collision_goal)
-        max_distance = self.get_god_map().get_data(identifier.maximum_collision_threshold)
-        max_distances = defaultdict(lambda: max_distance)
+        # max_distance = self.get_god_map().get_data(identifier.maximum_collision_threshold)
+        external_distances = self.get_god_map().get_data(identifier.external_collision_avoidance_distance)
+        self_distances = self.get_god_map().get_data(identifier.self_collision_avoidance_distance)
+        default_distance = max(external_distances.default_factory()[u'soft_threshold'],
+                               self_distances.default_factory()[u'soft_threshold'])
+        max_distances = defaultdict(lambda: default_distance)
+
+        for link_name in self.get_robot().get_links_with_collision():
+            controlled_parent_joint = self.get_robot().get_controlled_parent_joint(link_name)
+            distance = external_distances[controlled_parent_joint][u'soft_threshold']
+            for child_link_name in self.get_robot().get_directly_controllable_collision_links(controlled_parent_joint):
+                max_distances[child_link_name] = distance
+
+        for link_name in self_distances:
+            distance = self_distances[link_name][u'soft_threshold']
+            if link_name in max_distances:
+                max_distances[link_name] = max(distance, max_distances[link_name])
+            else:
+                max_distances[link_name] = distance
+
+        added_checks = self.get_god_map().get_data(identifier.added_collision_checks)
+        for link_name, distance in added_checks.items():
+            if link_name in max_distances:
+                max_distances[link_name] = max(distance, max_distances[link_name])
+            else:
+                max_distances[link_name] = distance
+
+
 
         self.collision_matrix = self.get_world().collision_goals_to_collision_matrix(deepcopy(collision_goals), max_distances)
 

@@ -1349,9 +1349,12 @@ class CollisionAvoidanceHint(Constraint):
             threshold2 = max(threshold2, threshold)
 
 
-        maximum_collision_threshold = self.get_god_map().get_data(identifier.maximum_collision_threshold)
-        maximum_collision_threshold = max(maximum_collision_threshold, threshold2)
-        self.get_god_map().set_data(identifier.maximum_collision_threshold, maximum_collision_threshold)
+        added_checks = self.get_god_map().get_data(identifier.added_collision_checks)
+        if link_name in added_checks:
+            added_checks[link_name] = max(added_checks[link_name], threshold2)
+        else:
+            added_checks[link_name] = threshold2
+        self.get_god_map().set_data(identifier.added_collision_checks, added_checks)
 
         self.avoidance_hint = self.parse_and_transform_Vector3Stamped(avoidance_hint, self.robot_root, normalized=True)
 

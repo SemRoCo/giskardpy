@@ -63,11 +63,11 @@ class PyBulletWorld(World):
             robot_link_id = self.robot.get_pybullet_link_id(robot_link)
             if body_b == robot_name or link_b != CollisionEntry.ALL:
                 contacts = [ContactInfo(*x) for x in p.getClosestPoints(self.robot.get_pybullet_id(), object_id,
-                                                                        distance * 2,
+                                                                        distance * 1.1,
                                                                         robot_link_id, link_b_id)]
             else:
                 contacts = [ContactInfo(*x) for x in p.getClosestPoints(self.robot.get_pybullet_id(), object_id,
-                                                                        distance * 2,
+                                                                        distance * 1.1,
                                                                         robot_link_id)]
             if len(contacts) > 0:
                 try:

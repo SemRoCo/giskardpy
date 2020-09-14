@@ -35,7 +35,7 @@ class World(object):
         self.soft_reset()
         self.remove_robot()
 
-    def check_collisions(self, cut_off_distances):
+    def check_collisions(self, cut_off_distances, collision_list_size=20):
         pass
 
     # Objects ----------------------------------------------------------------------------------------------------------

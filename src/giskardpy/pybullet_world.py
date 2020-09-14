@@ -37,7 +37,8 @@ class PyBulletWorld(World):
     def __get_pybullet_object_id(self, name):
         return self.get_object(name).get_pybullet_id()
 
-    def check_collisions(self, cut_off_distances):
+    # @profile
+    def check_collisions(self, cut_off_distances, collision_list_size=15):
         """
         :param cut_off_distances: (robot_link, body_b, link_b) -> cut off distance. Contacts between objects not in this
                                     dict or further away than the cut off distance will be ignored.
@@ -48,7 +49,7 @@ class PyBulletWorld(World):
         :return: (robot_link, body_b, link_b) -> Collision
         :rtype: Collisions
         """
-        collisions = Collisions(self.robot)
+        collisions = Collisions(self.robot, collision_list_size)
         robot_name = self.robot.get_name()
         for (robot_link, body_b, link_b), distance in cut_off_distances.items():
             if robot_name == body_b:

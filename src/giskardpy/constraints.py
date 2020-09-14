@@ -1332,8 +1332,8 @@ class CollisionAvoidanceHint(Constraint):
     avoidance_hint_id = u'avoidance_hint'
     weight_id = u'weight'
 
-    def __init__(self, god_map, link_name, avoidance_hint, body_b, link_b, max_velocity=0.1, threshold=0.05,
-                 threshold2=None, weight=WEIGHT_ABOVE_CA):
+    def __init__(self, god_map, link_name, avoidance_hint, body_b, link_b, max_velocity=0.1, max_threshold=0.05,
+                 spring_threshold=None, weight=WEIGHT_ABOVE_CA):
         super(CollisionAvoidanceHint, self).__init__(god_map)
         self.link_name = link_name
         self.robot_root = self.get_robot().get_root()
@@ -1343,24 +1343,25 @@ class CollisionAvoidanceHint(Constraint):
         self.link_b = link_b
         self.body_b_hash = body_b.__hash__()
         self.link_b_hash = link_b.__hash__()
-        if threshold2 is None:
-            threshold2 = threshold + 0.2
+
+        if spring_threshold is None:
+            spring_threshold = max_threshold
         else:
-            threshold2 = max(threshold2, threshold)
+            spring_threshold = max(spring_threshold, max_threshold)
 
 
         added_checks = self.get_god_map().get_data(identifier.added_collision_checks)
         if link_name in added_checks:
-            added_checks[link_name] = max(added_checks[link_name], threshold2)
+            added_checks[link_name] = max(added_checks[link_name], spring_threshold)
         else:
-            added_checks[link_name] = threshold2
+            added_checks[link_name] = spring_threshold
         self.get_god_map().set_data(identifier.added_collision_checks, added_checks)
 
         self.avoidance_hint = self.parse_and_transform_Vector3Stamped(avoidance_hint, self.robot_root, normalized=True)
 
         params = {self.max_velocity_id: max_velocity,
-                  self.threshold_id: threshold,
-                  self.threshold2_id: threshold2,
+                  self.threshold_id: max_threshold,
+                  self.threshold2_id: spring_threshold,
                   self.avoidance_hint_id: self.avoidance_hint,
                   self.weight_id: weight,
                   }
@@ -1405,27 +1406,31 @@ class CollisionAvoidanceHint(Constraint):
         weight = self.get_input_float(self.weight_id)
         actual_distance = self.get_actual_distance()
         max_velocity = self.get_input_float(self.max_velocity_id)
-        threshold = self.get_input_float(self.threshold_id)
-        threshold2 = self.get_input_float(self.threshold2_id)
+        max_threshold = self.get_input_float(self.threshold_id)
+        spring_threshold = self.get_input_float(self.threshold2_id)
         body_b_hash = self.get_body_b()
         link_b_hash = self.get_link_b()
         actual_distance_capped = w.Max(actual_distance, 0)
 
         root_T_a = self.get_fk(self.robot_root, self.link_name)
 
-        threshold2 -= threshold
-        error = threshold2 - actual_distance_capped - threshold
-        error = w.Max(error, 0)
+        spring_error = spring_threshold - actual_distance_capped
+        spring_error = w.Max(spring_error, 0)
 
-        weight = w.if_less_eq(actual_distance, threshold, weight, weight*((error/threshold2)**2))
+        spring_weight = w.if_eq(spring_threshold, max_threshold, 0,
+                                weight * (spring_error / (spring_threshold - max_threshold))**2)
+
+
+        weight = w.if_less_eq(actual_distance, max_threshold, weight,
+                              spring_weight)
         weight = w.if_eq(body_b_hash, self.body_b_hash, weight, 0)
         weight = w.if_eq(link_b_hash, self.link_b_hash, weight, 0)
         weight = self.normalize_weight(max_velocity, weight)
 
         root_V_avoidance_hint = self.get_input_Vector3Stamped(self.avoidance_hint_id)
 
-        penetration_distance = threshold - actual_distance_capped
-        error_capped = self.limit_velocity(penetration_distance, max_velocity)
+        # penetration_distance = threshold - actual_distance_capped
+        error_capped = self.limit_velocity(max_velocity, max_velocity)
 
         root_P_a = w.position_of(root_T_a)
         expr = w.dot(root_V_avoidance_hint[:3].T, root_P_a[:3])

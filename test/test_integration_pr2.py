@@ -2177,7 +2177,7 @@ class TestCollisionAvoidanceGoals(object):
         ], 'kitchen', [])
         kitchen_setup.set_and_check_cart_goal(map_T_cart_goal, kitchen_setup.r_tip)
 
-    def test_bug2020_09_09_13_41_21_dump(self, kitchen_setup):
+    def test_bug2020_09_09_13_41_21_dump_corner_drawer_shaking(self, kitchen_setup):
         map_T_odom = tf.pose_to_kdl(convert_dictionary_to_ros_message(u'geometry_msgs/PoseStamped',
                                                                       {
                                                                           "header": {
@@ -2287,7 +2287,8 @@ class TestCollisionAvoidanceGoals(object):
         avoidance_hint.vector.y = -1
         kitchen_setup.add_json_goal(u'CollisionAvoidanceHint',
                                     link_name=u'base_link',
-                                    threshold=0.3,
+                                    max_threshold=0.3,
+                                    # spring_threshold=0.5,
                                     max_velocity=1,
                                     body_b=u'kitchen',
                                     link_b=u'kitchen_island',
@@ -2413,7 +2414,7 @@ class TestCollisionAvoidanceGoals(object):
         avoidance_hint.vector.y = -1
         kitchen_setup.add_json_goal(u'CollisionAvoidanceHint',
                                     link_name=u'base_footprint',
-                                    threshold=0.3,
+                                    max_threshold=0.3,
                                     max_velocity=1,
                                     body_b=u'kitchen',
                                     link_b=u'kitchen_island',
@@ -3320,15 +3321,17 @@ class TestCollisionAvoidanceGoals(object):
         avoidance_hint.vector.y = -1
         kitchen_setup.avoid_all_collisions(0.1)
         kitchen_setup.add_json_goal(u'CollisionAvoidanceHint',
-                                    link_name=u'base_footprint',
-                                    threshold=0.3,
+                                    link_name=u'base_link',
+                                    max_threshold=0.3,
+                                    spring_threshold=0.35,
                                     max_velocity=1,
                                     body_b=u'kitchen',
                                     link_b=u'kitchen_island',
+                                    weight=WEIGHT_COLLISION_AVOIDANCE,
                                     avoidance_hint=avoidance_hint)
         kitchen_setup.set_joint_goal(gaya_pose)
 
-        kitchen_setup.set_and_check_cart_goal(base_pose, tip, weight=WEIGHT_BELOW_CA)
+        kitchen_setup.set_and_check_cart_goal(base_pose, tip, weight=WEIGHT_BELOW_CA, linear_velocity=0.5)
 
     def test_drive_into_wall_with_CollisionAvoidanceHint(self, kitchen_setup):
         """

@@ -74,19 +74,22 @@ class PyBulletWorld(World):
                     body_b_object = self.get_object(body_b)
                 except KeyError:
                     body_b_object = self.robot
+                pass
                 for contact in contacts:  # type: ContactInfo
                     if link_b == CollisionEntry.ALL:
-                        link_b = body_b_object.pybullet_link_id_to_name(contact.link_index_b)
+                        link_b_tmp = body_b_object.pybullet_link_id_to_name(contact.link_index_b)
+                    else:
+                        link_b_tmp = link_b
                     if self.__should_flip_collision(contact.position_on_a, robot_link):
                         flipped_normal = [-contact.contact_normal_on_b[0],
                                           -contact.contact_normal_on_b[1],
                                           -contact.contact_normal_on_b[2]]
-                        collision = Collision(robot_link, body_b, link_b,
+                        collision = Collision(robot_link, body_b, link_b_tmp,
                                               contact.position_on_b, contact.position_on_a,
                                               flipped_normal, contact.contact_distance)
                         collisions.add(collision)
                     else:
-                        collision = Collision(robot_link, body_b, link_b,
+                        collision = Collision(robot_link, body_b, link_b_tmp,
                                               contact.position_on_a, contact.position_on_b,
                                               contact.contact_normal_on_b, contact.contact_distance)
                         collisions.add(collision)

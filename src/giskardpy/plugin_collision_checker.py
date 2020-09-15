@@ -46,7 +46,9 @@ class CollisionChecker(GiskardBehavior):
         external_distances = self.get_god_map().get_data(identifier.external_collision_avoidance_distance)
         self_distances = self.get_god_map().get_data(identifier.self_collision_avoidance_distance)
         default_distance = max(external_distances.default_factory()[u'soft_threshold'],
-                               self_distances.default_factory()[u'soft_threshold'])
+                               self_distances.default_factory()[u'soft_threshold'],
+                            self.get_god_map().get_data(identifier.maximum_collision_threshold))
+
         max_distances = defaultdict(lambda: default_distance)
 
         for link_name in self.get_robot().get_links_with_collision():

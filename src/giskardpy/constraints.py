@@ -1287,6 +1287,7 @@ class ExternalCollisionAvoidance(Constraint):
         # zero_weight_distance = self.get_input_float(self.zero_weight_distance)
         hard_threshold = self.get_input_float(self.hard_threshold_id)
         soft_threshold = self.get_input_float(self.soft_threshold_id)
+        spring_threshold = soft_threshold * 1.05
         # sample_period = self.get_input_sampling_period()
         number_of_external_collisions = self.get_number_of_external_collisions()
         num_repeller = self.get_input_float(self.num_repeller_id)
@@ -1298,12 +1299,9 @@ class ExternalCollisionAvoidance(Constraint):
 
         dist = w.dot(r_V_n.T, r_V_pb_pa)[0]
 
-        weight = w.if_greater(actual_distance, 50, 0, WEIGHT_COLLISION_AVOIDANCE)
-        weight = self.normalize_weight(max_velocity, weight)
-        weight = w.save_division(weight,  # divide by number of active repeller per link
-                                 w.Min(number_of_external_collisions, num_repeller))
 
         penetration_distance = soft_threshold - actual_distance
+        # spring_penetration_distance = spring_threshold - actual_distance
         lower_limit = self.limit_velocity(penetration_distance, max_velocity)
         upper_limit = 1e9
 
@@ -1311,6 +1309,24 @@ class ExternalCollisionAvoidance(Constraint):
                                    1e9,
                                    w.Max(0, lower_limit + actual_distance - hard_threshold)
                                    )
+
+        weight = w.if_greater(actual_distance, 50, 0, WEIGHT_COLLISION_AVOIDANCE)
+
+        # spring_error = spring_threshold - actual_distance
+        # spring_error = w.Max(spring_error, 0)
+
+        # spring_weight = w.if_eq(spring_threshold, soft_threshold, 0,
+        #                         weight * (spring_error / (spring_threshold - soft_threshold))**2)
+
+
+        # weight = w.if_less_eq(actual_distance, soft_threshold, weight,
+        #                       spring_weight)
+
+        weight = self.normalize_weight(max_velocity, weight)
+        weight = w.save_division(weight,  # divide by number of active repeller per link
+                                 w.Min(number_of_external_collisions, num_repeller))
+
+        # weight = self.normalize_weight(max_velocity, weight)
 
         self.add_constraint(u'/position',
                             lower=lower_limit,

@@ -68,11 +68,14 @@ collision_avoidance:
         5cm: &5cm
           hard_threshold: 0.0
           soft_threshold: 0.05
+        25mm: &25mm
+          hard_threshold: 0.0
+          soft_threshold: 0.025
         odom_z_joint: # this affects all links between this and the next controlled joint
           hard_threshold: 0.05 # at this distance in [cm] that can not be surpassed
           soft_threshold: 0.1 # robot links are pushed to that distance, but it can be overpowered with high weight constraints
-        r_forearm_roll_joint: *5cm
-        l_forearm_roll_joint: *5cm
+        r_forearm_roll_joint: *25mm
+        l_forearm_roll_joint: *25mm
         r_elbow_flex_joint: *5cm
         l_elbow_flex_joint: *5cm
         r_wrist_roll_joint: *5cm

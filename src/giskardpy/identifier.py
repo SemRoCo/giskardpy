@@ -31,7 +31,6 @@ b_keys = qp_data + [u'b_keys']
 bA_keys = qp_data + [u'bA_keys']
 xdot_keys = qp_data + [u'xdot_keys']
 
-wiggle_detection_samples = [u'wiggle_detection_samples']
 post_processing = [u'post_processing']
 soft_constraints = post_processing + [u'soft_constraints']
 
@@ -53,7 +52,6 @@ sample_period = general_options + [u'sample_period']
 map_frame = general_options + [u'map_frame']
 debug = general_options + [u'debug']
 fill_velocity_values = general_options + [u'fill_velocity_values']
-joint_convergence_threshold = general_options + [u'joint_convergence_threshold']
 
 joint_velocity_linear_limit = general_options + [u'joint_vel_limit', u'linear']
 joint_velocity_linear_limit_default = joint_velocity_linear_limit + [u'default']
@@ -90,8 +88,11 @@ PlotTrajectory_normalize_position = plugins + [u'PlotTrajectory', u'normalize_po
 PlotTrajectory_tick_stride = plugins + [u'PlotTrajectory', u'tick_stride']
 fft_duration = plugins + [u'WiggleCancel', u'fft_duration']
 amplitude_threshold = plugins + [u'WiggleCancel', u'amplitude_threshold']
-num_samples_in_fft = plugins + [u'WiggleCancel', u'num_samples_in_fft']
+num_samples_in_fft = plugins + [u'WiggleCancel', u'window_size']
 frequency_range = plugins + [u'WiggleCancel', u'frequency_range']
+
+joint_convergence_threshold = plugins + [u'GoalReached', u'joint_convergence_threshold']
+GoalReached_window_size = plugins + [u'GoalReached', u'window_size']
 
 # reachability check
 reachability_check = rosparam + [u'reachability_check']

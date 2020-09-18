@@ -13,21 +13,15 @@ from giskardpy.plugin_goal_reached import make_velocity_threshold
 
 
 class WiggleCancel(GiskardBehavior):
-    def __init__(self, name, final_detection):
+    def __init__(self, name):
         super(WiggleCancel, self).__init__(name)
         self.amplitude_threshold = self.get_god_map().get_data(identifier.amplitude_threshold)
         self.num_samples_in_fft = self.get_god_map().get_data(identifier.num_samples_in_fft)
         self.frequency_range = self.get_god_map().get_data(identifier.frequency_range)
-        self.final_detection = final_detection
 
     def initialise(self):
         super(WiggleCancel, self).initialise()
-        if self.final_detection:
-            self.js_samples = self.get_god_map().get_data(identifier.wiggle_detection_samples)
-        else:
-            self.js_samples = []
-            self.get_god_map().set_data(identifier.wiggle_detection_samples, self.js_samples)
-
+        self.js_samples = []
         self.sample_period = self.get_god_map().get_data(identifier.sample_period)
         self.max_detectable_freq = 1 / (2 * self.sample_period)
         self.min_wiggle_frequency = self.frequency_range * self.max_detectable_freq
@@ -45,39 +39,25 @@ class WiggleCancel(GiskardBehavior):
         self.js_samples = [[] for _ in range(len(self.keys))]
 
     def update(self):
-        if self.final_detection:
-            js_samples_array = np.array(self.js_samples.values())
-            if(len(js_samples_array) == 0):
-                logging.logwarn('sample array was empty during final wiggle detection')
-                return Status.SUCCESS
+        latest_points = self.get_god_map().get_data(identifier.joint_states)
 
-            if len(js_samples_array[0]) < 4:  # if there are less than 4 sample points it makes no sense to try to detect wiggling
-                return Status.SUCCESS
+        for i, key in enumerate(self.keys):
+            self.js_samples[i].append(latest_points[key].velocity)
 
-            if detect_shaking(js_samples_array, self.sample_period, self.min_wiggle_frequency, self.amplitude_threshold):
-                self.raise_to_blackboard(InsolvableException(u'endless wiggling detected'))
-
-            return Status.SUCCESS
-        else:
-            latest_points = self.get_god_map().get_data(identifier.joint_states)
-
-            for i, key in enumerate(self.keys):
-                self.js_samples[i].append(latest_points[key].velocity)
-
-            if len(self.js_samples[0]) < self.num_samples_in_fft:
-                return Status.RUNNING
-
-            if len(self.js_samples[0]) > self.num_samples_in_fft:
-                for i in range(len(self.js_samples)):
-                    self.js_samples[i].pop(0)
-
-            js_samples_array = np.array(self.js_samples)
-            plot=False
-            if(detect_shaking(js_samples_array, self.sample_period, self.min_wiggle_frequency,
-                              self.amplitude_threshold, self.thresholds, self.velocity_limits, plot)):
-                raise InsolvableException(u'endless wiggling detected')
-
+        if len(self.js_samples[0]) < self.num_samples_in_fft:
             return Status.RUNNING
+
+        if len(self.js_samples[0]) > self.num_samples_in_fft:
+            for i in range(len(self.js_samples)):
+                self.js_samples[i].pop(0)
+
+        js_samples_array = np.array(self.js_samples)
+        plot=False
+        if(detect_shaking(js_samples_array, self.sample_period, self.min_wiggle_frequency,
+                          self.amplitude_threshold, self.thresholds, self.velocity_limits, plot)):
+            raise InsolvableException(u'endless wiggling detected')
+
+        return Status.RUNNING
 
 
 def detect_shaking(js_samples, sample_period, min_wiggle_frequency, amplitude_threshold, moving_thresholds,

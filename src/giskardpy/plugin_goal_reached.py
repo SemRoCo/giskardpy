@@ -34,13 +34,9 @@ def make_velocity_threshold(god_map,
 
 
 class GoalReachedPlugin(GiskardBehavior):
-    def __init__(self, name, window_size=None):
+    def __init__(self, name):
         super(GoalReachedPlugin, self).__init__(name)
-        sample_period = self.get_god_map().get_data(identifier.sample_period)
-        if window_size is None:
-            self.window_size = sample_period * 5
-        else:
-            self.window_size = window_size
+        self.window_size = self.get_god_map().get_data(identifier.GoalReached_window_size)
 
         self.above_threshold_time = 0
 
@@ -49,8 +45,7 @@ class GoalReachedPlugin(GiskardBehavior):
 
     def update(self):
         # current_js = self.get_god_map().get_data(identifier.joint_states)
-        sample_period = self.get_god_map().get_data(identifier.sample_period)
-        planning_time = self.get_god_map().get_data(identifier.time) * sample_period
+        planning_time = self.get_god_map().get_data(identifier.time)
 
         # below_threshold = np.abs([v.velocity for v in current_js.values()]).max() < self.joint_convergence_threshold
         if planning_time - self.above_threshold_time >= self.window_size:

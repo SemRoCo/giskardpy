@@ -7,7 +7,7 @@ import rospy
 from control_msgs.msg import JointTrajectoryControllerState
 from giskard_msgs.msg import MoveAction
 from py_trees import Sequence, Selector, BehaviourTree, Blackboard
-from py_trees.meta import failure_is_success, success_is_failure
+from py_trees.meta import failure_is_success, success_is_failure, failure_is_running
 from py_trees_ros.trees import BehaviourTree
 from rospy import ROSException
 
@@ -29,6 +29,7 @@ from giskardpy.plugin_instantaneous_controller import ControllerPlugin
 from giskardpy.plugin_interrupts import WiggleCancel, MaxTrajLength
 from giskardpy.plugin_kinematic_sim import KinSimPlugin
 from giskardpy.plugin_log_trajectory import LogTrajPlugin
+from giskardpy.plugin_loop_detector import LoopDetector
 from giskardpy.plugin_plot_trajectory import PlotTrajectory
 #from giskardpy.plugin_plot_trajectory_fft import PlotTrajectoryFFT
 from giskardpy.plugin_pybullet import WorldUpdatePlugin
@@ -164,9 +165,10 @@ def grow_tree():
     planning_3.add_plugin(KinSimPlugin(u'kin sim'))
     planning_3.add_plugin(LogTrajPlugin(u'log'))
     planning_3.add_plugin(WiggleCancel(u'wiggle'))
+    planning_3.add_plugin(LoopDetector(u'loop detector'))
     planning_3.add_plugin(GoalReachedPlugin(u'goal reached'))
     planning_3.add_plugin(TimePlugin(u'time'))
-    # planning_3.add_plugin(MaxTrajLength(u'traj length check'))
+    planning_3.add_plugin(MaxTrajLength(u'traj length check'))
     # ----------------------------------------------
     publish_result = failure_is_success(Selector)(u'monitor execution')
     publish_result.add_child(GoalCanceled(u'goal canceled', action_server_name))

@@ -332,21 +332,21 @@ class GiskardTestWrapper(object):
                 np.testing.assert_almost_equal(current, goal, decimal,
                                                err_msg=u'{} at {} insteand of {}'.format(joint_name, current, goal))
 
-    def set_joint_goal(self, js):
+    def set_joint_goal(self, js, weight=None):
         """
         :rtype js: dict
         """
-        self.wrapper.set_joint_goal(js)
+        self.wrapper.set_joint_goal(js, weight=weight)
 
     def check_joint_state(self, expected, decimal=2):
         current_joint_state = to_joint_state_position_dict(self.get_current_joint_state())
         self.compare_joint_state(current_joint_state, expected, decimal=decimal)
 
-    def send_and_check_joint_goal(self, goal, decimal=2):
+    def send_and_check_joint_goal(self, goal, weight=None, decimal=2):
         """
         :type goal: dict
         """
-        self.set_joint_goal(goal)
+        self.set_joint_goal(goal, weight=weight)
         self.send_and_check_goal()
         self.check_joint_state(goal, decimal=decimal)
 

@@ -124,18 +124,23 @@ class GiskardWrapper(object):
                 constraint.goal_state = joint_state
             self.cmd_seq[-1].joint_constraints.append(constraint)
         elif isinstance(joint_state, dict):
-            for joint_name, joint_position in joint_state.items():
-                constraint = Constraint()
-                constraint.type = u'JointPosition'
-                params = {}
-                params[u'joint_name'] = joint_name
-                params[u'goal'] = joint_position
-                if weight:
-                    params[u'weight'] = weight
-                if max_velocity:
-                    params[u'max_velocity'] = max_velocity
-                constraint.parameter_value_pair = json.dumps(params)
-                self.cmd_seq[-1].constraints.append(constraint)
+            constraint = Constraint()
+            constraint.type = JointConstraint.JOINT
+            if not isinstance(joint_state, JointState):
+                goal_state = JointState()
+                for joint_name, joint_position in joint_state.items():
+                    goal_state.name.append(joint_name)
+                    goal_state.position.append(joint_position)
+            else:
+                goal_state = joint_state
+            params = {}
+            params[u'goal_state'] = convert_ros_message_to_dictionary(goal_state)
+            if weight:
+                params[u'weight'] = weight
+            if max_velocity:
+                params[u'max_velocity'] = max_velocity
+            constraint.parameter_value_pair = json.dumps(params)
+            self.cmd_seq[-1].constraints.append(constraint)
 
     def align_planes(self, tip, tip_normal, root=None, root_normal=None, weight=None):
         """

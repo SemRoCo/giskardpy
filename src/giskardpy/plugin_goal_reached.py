@@ -37,6 +37,7 @@ class GoalReachedPlugin(GiskardBehavior):
     def __init__(self, name):
         super(GoalReachedPlugin, self).__init__(name)
         self.window_size = self.get_god_map().get_data(identifier.GoalReached_window_size)
+        self.sample_period = self.get_god_map().get_data(identifier.sample_period)
 
         self.above_threshold_time = 0
 
@@ -52,7 +53,7 @@ class GoalReachedPlugin(GiskardBehavior):
             x_dot_full = self.get_god_map().get_data(identifier.xdot_full)
             below_threshold = np.all(np.abs(x_dot_full[:self.number_of_controlled_joints]) < self.thresholds)
             if below_threshold:
-                logging.loginfo(u'found goal trajectory with length {}s in {}s'.format(planning_time,
+                logging.loginfo(u'found goal trajectory with length {}s in {}s'.format(planning_time*self.sample_period,
                                                                                        time() - self.get_blackboard().runtime))
                 return Status.SUCCESS
         # if not below_threshold:

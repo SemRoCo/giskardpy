@@ -323,7 +323,7 @@ class Robot(Backend):
         :return:
         """
         js = {}
-        for joint_name in self.controlled_joints:
+        for joint_name in sorted(self.controlled_joints):
             sjs = SingleJointState()
             sjs.name = joint_name
             sjs.position = f(joint_name)

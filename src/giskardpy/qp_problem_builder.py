@@ -311,4 +311,4 @@ def print_pd_dfs(dfs, names):
         create_path(path)
         with pd.option_context('display.max_rows', None, 'display.max_columns', None):
             with open(path, 'w') as f:
-                f.write(str(df))
+                f.write(df.to_csv())

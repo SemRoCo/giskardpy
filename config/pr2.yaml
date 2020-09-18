@@ -3,7 +3,6 @@ general_options:
   map_frame: map
   debug: False # enables debug prints and prints the behavior tree state in the terminal
   fill_velocity_values: True # due to a bug, the pr2 does not want the velocity values to be filled
-  joint_convergence_threshold: 0.01 # when the velocities fall below this value, the planning succeeds
   joint_vel_limit: # giskard will use the min of this number and limits from the urdf
     linear: # m/s
       default: 1
@@ -33,6 +32,9 @@ general_options:
 qp_solver:
   nWSR: None # None results in a nWSR estimation that's fine most of the time
 plugins:
+  GoalReached:
+    joint_convergence_threshold: 0.02 # when the velocities fall below this value, the planning succeeds
+    window_size: 21 # in sample points, should be identical to WiggleCancel window_size
   VisualizationBehavior: # planning visualization through markers, slows planning down a little bit
     enabled: True
   CPIMarker: # contact visualization, slows planning down a little bit
@@ -44,9 +46,9 @@ plugins:
     normalize_position: False # centers the joint positions around 0 on the y axis
     tick_stride: 0.5 # the distance between ticks in the plot. if tick_stride <= 0 pyplot determines the ticks automatically
   WiggleCancel: # cancels planning if high frequencies are detected in the trajectory
-    wiggle_detection_threshold: 8 # the amplitude of a frequency must exceed this threshold to be detected as wiggling
-    num_samples_in_fft: 20 # size of the moving window of sample points
-    wiggle_frequency_range: 0.4 # must be in the range [0,1]. Only frequencies in the range [max_detectable_frequency * wiggle_frequency_range, max_detectable_frequency] are considered as wiggling. So a value of 0 means that every frequency with an amplitude above wiggle_detection_threshold is detected as wiggling and a value of 1 means that only the max_detectable_frequency can trigger a wiggle detection.      max_detectable_frequency = 1 / (2 * sample_period)
+    amplitude_threshold: 0.15 # the amplitude of a frequency must exceed this threshold to be detected as wiggling
+    window_size: 21 # size of the moving window of sample points
+    frequency_range: 0.4 # must be in the range [0,1]. Only frequencies in the range [max_detectable_frequency * wiggle_frequency_range, max_detectable_frequency] are considered as wiggling. So a value of 0 means that every frequency with an amplitude above wiggle_detection_threshold is detected as wiggling and a value of 1 means that only the max_detectable_frequency can trigger a wiggle detection.      max_detectable_frequency = 1 / (2 * sample_period)
 reachability_check:
   sample_period: 0.5
   prismatic_velocity: 2.0
@@ -68,11 +70,14 @@ collision_avoidance:
         5cm: &5cm
           hard_threshold: 0.0
           soft_threshold: 0.05
+        25mm: &25mm
+          hard_threshold: 0.0
+          soft_threshold: 0.025
         odom_z_joint: # this affects all links between this and the next controlled joint
           hard_threshold: 0.05 # at this distance in [cm] that can not be surpassed
           soft_threshold: 0.1 # robot links are pushed to that distance, but it can be overpowered with high weight constraints
-        r_forearm_roll_joint: *5cm
-        l_forearm_roll_joint: *5cm
+        r_forearm_roll_joint: *25mm
+        l_forearm_roll_joint: *25mm
         r_elbow_flex_joint: *5cm
         l_elbow_flex_joint: *5cm
         r_wrist_roll_joint: *5cm

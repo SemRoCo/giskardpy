@@ -1,6 +1,7 @@
 import keyword
 import yaml
 from collections import defaultdict
+from copy import deepcopy
 from multiprocessing import Queue
 from threading import Thread
 
@@ -22,6 +23,7 @@ from sensor_msgs.msg import JointState
 from tf.transformations import rotation_from_matrix, quaternion_matrix
 
 from giskardpy import logging, identifier
+from giskardpy.constraints import WEIGHT_ABOVE_CA
 from giskardpy.garden import grow_tree
 from giskardpy.identifier import robot, world
 from giskardpy.pybullet_world import PyBulletWorld
@@ -388,28 +390,35 @@ class GiskardTestWrapper(object):
     def align_planes(self, tip, tip_normal, root=None, root_normal=None, weight=None):
         self.wrapper.align_planes(tip, tip_normal, root, root_normal, weight)
 
-    def set_rotation_goal(self, goal_pose, tip, root=None):
+    def set_rotation_goal(self, goal_pose, tip, root=None, max_velocity=None):
         if not root:
             root = self.default_root
-        self.wrapper.set_rotation_goal(root, tip, goal_pose)
+        self.wrapper.set_rotation_goal(root, tip, goal_pose, max_velocity=max_velocity)
 
-    def set_translation_goal(self, goal_pose, tip, root=None):
+    def set_translation_goal(self, goal_pose, tip, root=None, max_velocity=None):
         if not root:
             root = self.default_root
-        self.wrapper.set_translation_goal(root, tip, goal_pose)
+        self.wrapper.set_translation_goal(root, tip, goal_pose, max_velocity=max_velocity)
 
-    def set_cart_goal(self, goal_pose, tip, root=None):
+    def set_cart_goal(self, goal_pose, tip, root=None, weight=None, linear_velocity=None, angular_velocity=None):
         if not root:
             root = self.default_root
-        self.wrapper.set_cart_goal(root, tip, goal_pose)
+        if weight is not None:
+            self.wrapper.set_cart_goal(root, tip, goal_pose, weight=weight, trans_max_velocity=linear_velocity,
+                                       rot_max_velocity=angular_velocity)
+        else:
+            self.wrapper.set_cart_goal(root, tip, goal_pose, trans_max_velocity=linear_velocity,
+                                       rot_max_velocity=angular_velocity)
 
-    def set_and_check_cart_goal(self, goal_pose, tip, root=None, expected_error_codes=None):
+    def set_and_check_cart_goal(self, goal_pose, tip, root=None, weight=None, linear_velocity=None, angular_velocity=None,
+                                expected_error_codes=None):
         goal_pose_in_map = transform_pose(u'map', goal_pose)
-        self.set_cart_goal(goal_pose, tip, root)
+        self.set_cart_goal(goal_pose, tip, root, weight, linear_velocity=linear_velocity, angular_velocity=angular_velocity)
         self.loop_once()
         self.send_and_check_goal(expected_error_codes)
         self.loop_once()
-        self.check_cart_goal(tip, goal_pose_in_map)
+        if expected_error_codes is None:
+            self.check_cart_goal(tip, goal_pose_in_map)
 
     def check_cart_goal(self, tip, goal_pose):
         goal_in_base = transform_pose(u'map', goal_pose)
@@ -605,15 +614,19 @@ class GiskardTestWrapper(object):
         assert self.get_world().has_object(name)
         assert name in self.wrapper.get_object_names().object_names
 
-    def add_mesh(self, name=u'cylinder', path=u'', pose=None):
+    def add_mesh(self, name=u'cylinder', path=u'', pose=None, expected_error=UpdateWorldResponse.SUCCESS):
         r = self.wrapper.add_mesh(name=name, mesh=path, pose=pose)
-        assert r.error_codes == UpdateWorldResponse.SUCCESS, \
+        assert r.error_codes == expected_error, \
             u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
-                                            update_world_error_code(UpdateWorldResponse.SUCCESS))
-        assert self.get_world().has_object(name)
-        assert name in self.wrapper.get_object_names().object_names
-        o_p = self.get_world().get_object(name).base_pose
-        compare_poses(o_p, self.wrapper.get_object_info(name).pose.pose)
+                                            update_world_error_code(expected_error))
+        if expected_error == UpdateWorldResponse.SUCCESS:
+            assert self.get_world().has_object(name)
+            assert name in self.wrapper.get_object_names().object_names
+            o_p = self.get_world().get_object(name).base_pose
+            compare_poses(o_p, self.wrapper.get_object_info(name).pose.pose)
+        else:
+            assert not self.get_world().has_object(name)
+            assert name not in self.wrapper.get_object_names().object_names
 
     def add_urdf(self, name, urdf, pose, js_topic):
         r = self.wrapper.add_urdf(name, urdf, pose, js_topic)
@@ -656,17 +669,20 @@ class GiskardTestWrapper(object):
                                   min_dist=min_dist))
         self.add_collision_entries(ces)
 
-    def attach_box(self, name=u'box', size=None, frame_id=None, position=None, orientation=None,
+    def attach_box(self, name=u'box', size=None, frame_id=None, position=None, orientation=None, pose=None,
                    expected_response=UpdateWorldResponse.SUCCESS):
         scm = self.get_robot().get_self_collision_matrix()
-        expected_pose = PoseStamped()
-        expected_pose.header.frame_id = frame_id
-        expected_pose.pose.position = Point(*position)
-        if orientation:
-            expected_pose.pose.orientation = Quaternion(*orientation)
+        if pose is None:
+            expected_pose = PoseStamped()
+            expected_pose.header.frame_id = frame_id
+            expected_pose.pose.position = Point(*position)
+            if orientation:
+                expected_pose.pose.orientation = Quaternion(*orientation)
+            else:
+                expected_pose.pose.orientation = Quaternion(0, 0, 0, 1)
         else:
-            expected_pose.pose.orientation = Quaternion(0, 0, 0, 1)
-        r = self.wrapper.attach_box(name, size, frame_id, position, orientation)
+            expected_pose = deepcopy(pose)
+        r = self.wrapper.attach_box(name, size, frame_id, position, orientation, pose)
         assert r.error_codes == expected_response, \
             u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
                                             update_world_error_code(expected_response))

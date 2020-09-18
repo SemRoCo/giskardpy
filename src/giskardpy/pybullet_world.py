@@ -1,9 +1,11 @@
-import pybullet as p
+import giskardpy.pybullet_wrapper as p
 from geometry_msgs.msg import Point, Pose
 from giskard_msgs.msg import CollisionEntry
+from pybullet import error
 
 import giskardpy
 from giskardpy.data_types import Collision, Collisions
+from giskardpy.exceptions import CorruptShapeException
 from giskardpy.pybullet_world_object import PyBulletWorldObject
 from giskardpy.pybullet_wrapper import ContactInfo
 from giskardpy.utils import resolve_ros_iris
@@ -35,7 +37,8 @@ class PyBulletWorld(World):
     def __get_pybullet_object_id(self, name):
         return self.get_object(name).get_pybullet_id()
 
-    def check_collisions(self, cut_off_distances):
+    # @profile
+    def check_collisions(self, cut_off_distances, collision_list_size=15):
         """
         :param cut_off_distances: (robot_link, body_b, link_b) -> cut off distance. Contacts between objects not in this
                                     dict or further away than the cut off distance will be ignored.
@@ -46,7 +49,7 @@ class PyBulletWorld(World):
         :return: (robot_link, body_b, link_b) -> Collision
         :rtype: Collisions
         """
-        collisions = Collisions(self.robot)
+        collisions = Collisions(self.robot, collision_list_size)
         robot_name = self.robot.get_name()
         for (robot_link, body_b, link_b), distance in cut_off_distances.items():
             if robot_name == body_b:
@@ -71,19 +74,22 @@ class PyBulletWorld(World):
                     body_b_object = self.get_object(body_b)
                 except KeyError:
                     body_b_object = self.robot
+                pass
                 for contact in contacts:  # type: ContactInfo
                     if link_b == CollisionEntry.ALL:
-                        link_b = body_b_object.pybullet_link_id_to_name(contact.link_index_b)
+                        link_b_tmp = body_b_object.pybullet_link_id_to_name(contact.link_index_b)
+                    else:
+                        link_b_tmp = link_b
                     if self.__should_flip_collision(contact.position_on_a, robot_link):
                         flipped_normal = [-contact.contact_normal_on_b[0],
                                           -contact.contact_normal_on_b[1],
                                           -contact.contact_normal_on_b[2]]
-                        collision = Collision(robot_link, body_b, link_b,
+                        collision = Collision(robot_link, body_b, link_b_tmp,
                                               contact.position_on_b, contact.position_on_a,
                                               flipped_normal, contact.contact_distance)
                         collisions.add(collision)
                     else:
-                        collision = Collision(robot_link, body_b, link_b,
+                        collision = Collision(robot_link, body_b, link_b_tmp,
                                               contact.position_on_a, contact.position_on_b,
                                               contact.contact_normal_on_b, contact.contact_distance)
                         collisions.add(collision)
@@ -153,9 +159,14 @@ class PyBulletWorld(World):
         :return:
         """
         # TODO create from world object to avoid basepose and joint state getting lost?
-        pwo = PyBulletWorldObject.from_urdf_object(object_)
-        pwo.base_pose = object_.base_pose
-        pwo.joint_state = object_.joint_state
+        try:
+            pwo = PyBulletWorldObject.from_urdf_object(object_)
+            pwo.base_pose = object_.base_pose
+            pwo.joint_state = object_.joint_state
+        except Exception as e:
+            if isinstance(e, error):
+                raise CorruptShapeException(e)
+            raise e
         return super(PyBulletWorld, self).add_object(pwo)
 
     def remove_robot(self):

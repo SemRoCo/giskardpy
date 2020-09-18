@@ -4,6 +4,7 @@ import string
 from collections import namedtuple
 
 import pybullet as p
+from pybullet import getClosestPoints
 from geometry_msgs.msg import Pose, PoseStamped, Point, Quaternion
 
 import giskardpy

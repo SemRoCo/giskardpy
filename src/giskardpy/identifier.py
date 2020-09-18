@@ -89,9 +89,9 @@ PlotTrajectory_scaling = plugins + [u'PlotTrajectory', u'scaling']
 PlotTrajectory_normalize_position = plugins + [u'PlotTrajectory', u'normalize_position']
 PlotTrajectory_tick_stride = plugins + [u'PlotTrajectory', u'tick_stride']
 fft_duration = plugins + [u'WiggleCancel', u'fft_duration']
-wiggle_detection_threshold = plugins + [u'WiggleCancel', u'wiggle_detection_threshold']
+amplitude_threshold = plugins + [u'WiggleCancel', u'amplitude_threshold']
 num_samples_in_fft = plugins + [u'WiggleCancel', u'num_samples_in_fft']
-wiggle_frequency_range = plugins + [u'WiggleCancel', u'wiggle_frequency_range']
+frequency_range = plugins + [u'WiggleCancel', u'frequency_range']
 
 # reachability check
 reachability_check = rosparam + [u'reachability_check']

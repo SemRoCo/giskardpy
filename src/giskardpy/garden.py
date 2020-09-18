@@ -51,7 +51,6 @@ def initialize_god_map():
     god_map = GodMap()
     blackboard = Blackboard
     blackboard.god_map = god_map
-    god_map.safe_set_data(identifier.wiggle_detection_samples, defaultdict(list))
     god_map.safe_set_data(identifier.rosparam, rospy.get_param(rospy.get_name()))
     god_map.safe_set_data(identifier.robot_description, rospy.get_param(u'robot_description'))
     path_to_data_folder = god_map.get_data(identifier.data_folder)
@@ -203,7 +202,7 @@ def grow_tree():
     # ----------------------------------------------
     #
     post_processing = failure_is_success(Sequence)(u'post processing')
-    post_processing.add_child(WiggleCancel(u'wiggle_cancel_final_detection', final_detection=True))
+    # post_processing.add_child(WiggleCancel(u'wiggle_cancel_final_detection', final_detection=True))
     post_processing.add_child(PostProcessing(u'post_processing'))
     # ----------------------------------------------
     # ----------------------------------------------

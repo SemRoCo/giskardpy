@@ -1287,7 +1287,8 @@ class ExternalCollisionAvoidance(Constraint):
         # zero_weight_distance = self.get_input_float(self.zero_weight_distance)
         hard_threshold = self.get_input_float(self.hard_threshold_id)
         soft_threshold = self.get_input_float(self.soft_threshold_id)
-        spring_threshold = soft_threshold * 1.05
+        # spring_threshold = soft_threshold
+        # soft_threshold = soft_threshold * 0.5
         # sample_period = self.get_input_sampling_period()
         number_of_external_collisions = self.get_number_of_external_collisions()
         num_repeller = self.get_input_float(self.num_repeller_id)

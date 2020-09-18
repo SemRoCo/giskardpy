@@ -414,7 +414,8 @@ class GiskardTestWrapper(object):
         self.loop_once()
         self.send_and_check_goal(expected_error_code)
         self.loop_once()
-        self.check_cart_goal(tip, goal_pose_in_map)
+        if expected_error_code == MoveResult.SUCCESS:
+            self.check_cart_goal(tip, goal_pose_in_map)
 
     def check_cart_goal(self, tip, goal_pose):
         goal_in_base = transform_pose(u'map', goal_pose)

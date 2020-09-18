@@ -1361,9 +1361,16 @@ class TestCartGoals(object):
                                                                       [0, 0, 1, 0],
                                                                       [0, 0, 0, 1]]))
 
-        kitchen_setup.set_cart_goal(l_goal, kitchen_setup.l_tip)
-        kitchen_setup.set_cart_goal(r_goal, kitchen_setup.r_tip)
+        kitchen_setup.set_cart_goal(l_goal, kitchen_setup.l_tip, weight=WEIGHT_BELOW_CA)
+        kitchen_setup.set_cart_goal(r_goal, kitchen_setup.r_tip, weight=WEIGHT_BELOW_CA)
         # kitchen_setup.allow_collision([], tray_name, [])
+        # kitchen_setup.allow_all_collisions()
+        kitchen_setup.add_json_goal(u'CartesianVelocityLimit',
+                                root_link=kitchen_setup.default_root,
+                                tip_link=u'base_footprint',
+                                max_linear_velocity=0.1,
+                                max_angular_velocity=0.2
+                                )
         kitchen_setup.send_and_check_goal()
 
     def test_wiggle2(self, zero_pose):
@@ -1438,7 +1445,8 @@ class TestCartGoals(object):
         p.header.frame_id = pocky_pose_setup.r_tip
         p.pose.position = Point(0.1, 0, 0)
         p.pose.orientation = Quaternion(0, 0, 0, 1)
-        pocky_pose_setup.set_and_check_cart_goal(p, pocky_pose_setup.r_tip, pocky_pose_setup.default_root)
+        pocky_pose_setup.set_and_check_cart_goal(p, pocky_pose_setup.r_tip, pocky_pose_setup.default_root,
+                                                 expected_error_code=MoveResult.INSOLVABLE)
 
         # box_setup.wrapper.avoid_collision()
 

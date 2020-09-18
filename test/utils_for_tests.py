@@ -23,7 +23,6 @@ from sensor_msgs.msg import JointState
 from tf.transformations import rotation_from_matrix, quaternion_matrix
 
 from giskardpy import logging, identifier
-from giskardpy.constraints import WEIGHT_ABOVE_CA
 from giskardpy.garden import grow_tree
 from giskardpy.identifier import robot, world
 from giskardpy.pybullet_world import PyBulletWorld
@@ -187,7 +186,7 @@ def float_no_nan_no_inf(outer_limit=None, min_dist_to_zero=None):
 def sq_matrix(draw):
     i = draw(st.integers(min_value=1, max_value=10))
     i_sq = i ** 2
-    l = draw(st.lists(limited_float(), min_size=i_sq, max_size=i_sq))
+    l = draw(st.lists(float_no_nan_no_inf(), min_size=i_sq, max_size=i_sq))
     return np.array(l).reshape((i, i))
 
 
@@ -224,13 +223,13 @@ class GiskardTestWrapper(object):
     def __init__(self, config_file):
         with open(get_ros_pkg_path(u'giskardpy') + u'/config/' + config_file) as f:
             config = yaml.load(f)
-        rospy.set_param(u'~', config)
-        rospy.set_param(u'~path_to_data_folder', u'tmp_data/')
-        rospy.set_param(u'~enable_gui', False)
-        rospy.set_param(u'~plugins/PlotTrajectory/enabled', True)
+        rospy.set_param('~', config)
+        rospy.set_param('~path_to_data_folder', u'tmp_data/')
+        rospy.set_param('~enable_gui', False)
+        rospy.set_param('~plugins/PlotTrajectory/enabled', True)
 
-        self.sub_result = rospy.Subscriber(u'/giskardpy/command/result', MoveActionResult, self.cb, queue_size=100)
-        self.cancel_goal = rospy.Publisher(u'/giskardpy/command/cancel', GoalID, queue_size=100)
+        self.sub_result = rospy.Subscriber('/giskardpy/command/result', MoveActionResult, self.cb, queue_size=100)
+        self.cancel_goal = rospy.Publisher('/giskardpy/command/cancel', GoalID, queue_size=100)
 
         self.tree = grow_tree()
         self.loop_once()
@@ -239,8 +238,8 @@ class GiskardTestWrapper(object):
         self.results = Queue(100)
         self.default_root = self.get_robot().get_root()
         self.map = u'map'
-        self.simple_base_pose_pub = rospy.Publisher(u'/move_base_simple/goal', PoseStamped, queue_size=10)
-        self.set_base = rospy.ServiceProxy(u'/base_simulator/set_joint_states', SetJointState)
+        self.simple_base_pose_pub = rospy.Publisher('/move_base_simple/goal', PoseStamped, queue_size=10)
+        self.set_base = rospy.ServiceProxy('/base_simulator/set_joint_states', SetJointState)
         self.tick_rate = 10
 
         def create_publisher(topic):
@@ -296,7 +295,7 @@ class GiskardTestWrapper(object):
         """
         :rtype: JointState
         """
-        return rospy.wait_for_message(u'joint_states', JointState)
+        return rospy.wait_for_message('joint_states', JointState)
 
     def tear_down(self):
         rospy.sleep(1)
@@ -335,7 +334,7 @@ class GiskardTestWrapper(object):
                 np.testing.assert_almost_equal(shortest_angular_distance(goal, current), 0, decimal=decimal)
             else:
                 np.testing.assert_almost_equal(current, goal, decimal,
-                                               err_msg=u'{} at {} insteand of {}'.format(joint_name, current, goal))
+                                               err_msg='{} at {} insteand of {}'.format(joint_name, current, goal))
 
     def set_joint_goal(self, js):
         """
@@ -582,7 +581,7 @@ class GiskardTestWrapper(object):
         if expected_response == UpdateWorldResponse.SUCCESS:
             assert self.get_world().has_object(name)
             assert not name in self.wrapper.get_attached_objects().object_names, 'the object was not detached'
-        compare_poses(self.get_world().get_object(name).base_pose, p.pose, decimal=2)
+            compare_poses(self.get_world().get_object(name).base_pose, p.pose, decimal=2)
 
     def add_box(self, name=u'box', size=(1, 1, 1), pose=None, expected_response=UpdateWorldResponse.SUCCESS):
         r = self.wrapper.add_box(name, size, pose=pose)

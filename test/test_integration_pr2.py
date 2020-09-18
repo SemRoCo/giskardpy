@@ -123,7 +123,7 @@ def ros(request):
         pass
 
     logging.loginfo(u'init ros')
-    rospy.init_node(u'tests')
+    rospy.init_node('tests')
     tf_init(60)
     launch = roslaunch.scriptapi.ROSLaunch()
     launch.start()
@@ -142,7 +142,7 @@ def ros(request):
         rospy.delete_param('/joint_trajectory_splitter/state_topics')
         rospy.delete_param('/joint_trajectory_splitter/client_topics')
         logging.loginfo(u'shutdown ros')
-        rospy.signal_shutdown(u'die')
+        rospy.signal_shutdown('die')
         try:
             logging.loginfo(u'deleting tmp test folder')
             # shutil.rmtree(folder_name)
@@ -175,7 +175,7 @@ def resetted_giskard(giskard):
 @pytest.fixture()
 def zero_pose(resetted_giskard):
     """
-    :type giskard: PR2
+    :type resetted_giskard: PR2
     """
     resetted_giskard.allow_all_collisions()
     resetted_giskard.send_and_check_joint_goal(default_pose)
@@ -209,7 +209,7 @@ def box_setup(pocky_pose_setup):
 @pytest.fixture()
 def fake_table_setup(pocky_pose_setup):
     """
-    :type zero_pose: PR2
+    :type pocky_pose_setup: PR2
     :rtype: PR2
     """
     p = PoseStamped()
@@ -573,7 +573,7 @@ class TestConstraints(object):
         }
         pocky_pose_setup.wrapper.update_god_map(updates)
         pocky_pose_setup.set_cart_goal(r_goal, pocky_pose_setup.r_tip)
-        pocky_pose_setup.send_and_check_goal(expected_error_code=MoveResult.INSOLVABLE)
+        pocky_pose_setup.send_and_check_goal(expected_error_codes=[MoveResult.ERROR])
         assert pocky_pose_setup.get_god_map().unsafe_get_data(
             identifier.joint_weight + [u'odom_x_joint']) == old_odom_x_value
         assert pocky_pose_setup.get_god_map().unsafe_get_data(identifier.joint_weight + [u'odom_y_joint']) == 0.0001
@@ -600,7 +600,7 @@ class TestConstraints(object):
         }
         pocky_pose_setup.wrapper.update_god_map(updates)
         pocky_pose_setup.set_cart_goal(r_goal, pocky_pose_setup.r_tip)
-        pocky_pose_setup.send_and_check_goal(expected_error_code=MoveResult.INSOLVABLE)
+        pocky_pose_setup.send_and_check_goal(expected_error_codes=[MoveResult.ERROR])
         assert pocky_pose_setup.get_god_map().unsafe_get_data(
             identifier.joint_weight + [u'odom_x_joint']) == old_odom_x_value
         assert pocky_pose_setup.get_god_map().unsafe_get_data(
@@ -1366,11 +1366,11 @@ class TestCartGoals(object):
         # kitchen_setup.allow_collision([], tray_name, [])
         # kitchen_setup.allow_all_collisions()
         kitchen_setup.add_json_goal(u'CartesianVelocityLimit',
-                                root_link=kitchen_setup.default_root,
-                                tip_link=u'base_footprint',
-                                max_linear_velocity=0.1,
-                                max_angular_velocity=0.2
-                                )
+                                    root_link=kitchen_setup.default_root,
+                                    tip_link=u'base_footprint',
+                                    max_linear_velocity=0.1,
+                                    max_angular_velocity=0.2
+                                    )
         kitchen_setup.send_and_check_goal()
 
     def test_wiggle2(self, zero_pose):
@@ -1431,7 +1431,7 @@ class TestCartGoals(object):
 
     def test_wiggle4(self, pocky_pose_setup):
         """
-        :type box_setup: PR2
+        :type pocky_pose_setup: PR2
         """
         p = PoseStamped()
         p.header.frame_id = u'map'
@@ -1446,7 +1446,7 @@ class TestCartGoals(object):
         p.pose.position = Point(0.1, 0, 0)
         p.pose.orientation = Quaternion(0, 0, 0, 1)
         pocky_pose_setup.set_and_check_cart_goal(p, pocky_pose_setup.r_tip, pocky_pose_setup.default_root,
-                                                 expected_error_code=MoveResult.INSOLVABLE)
+                                                 expected_error_codes=[MoveResult.SHAKING])
 
         # box_setup.wrapper.avoid_collision()
 
@@ -1457,7 +1457,6 @@ class TestCartGoals(object):
         # pocky_pose_setup.add_collision_entries([collision_entry])
         #
         # pocky_pose_setup.send_and_check_goal(expected_error_code=MoveResult.INSOLVABLE)
-
 
     def test_interrupt1(self, zero_pose):
         p = PoseStamped()
@@ -1694,7 +1693,7 @@ class TestCartGoals(object):
 
         traj = zero_pose.send_and_check_goal(expected_error_codes=[MoveResult.SUCCESS,
                                                                    MoveResult.SUCCESS,
-                                                                   MoveResult.UNKNOWN_CONSTRAINT,],
+                                                                   MoveResult.UNKNOWN_CONSTRAINT, ],
                                              goal_type=MoveGoal.PLAN_AND_EXECUTE_AND_SKIP_FAILURES)
 
         for i, p in enumerate(traj.points):
@@ -1743,21 +1742,20 @@ class TestCartGoals(object):
         else:  # if no break
             assert False, u'pocky pose not in trajectory'
 
-
     def test_skip_failures1(self, zero_pose):
         """
         :type zero_pose: PR2
         """
         zero_pose.add_json_goal(u'muh')
-        zero_pose.send_and_check_goal(expected_error_codes=[MoveResult.UNKNOWN_CONSTRAINT,],
-                                             goal_type=MoveGoal.PLAN_AND_EXECUTE_AND_SKIP_FAILURES)
+        zero_pose.send_and_check_goal(expected_error_codes=[MoveResult.UNKNOWN_CONSTRAINT, ],
+                                      goal_type=MoveGoal.PLAN_AND_EXECUTE_AND_SKIP_FAILURES)
 
     def test_skip_failures2(self, zero_pose):
         """
         :type zero_pose: PR2
         """
         zero_pose.set_joint_goal(pocky_pose)
-        traj = zero_pose.send_and_check_goal(expected_error_codes=[MoveResult.SUCCESS,],
+        traj = zero_pose.send_and_check_goal(expected_error_codes=[MoveResult.SUCCESS, ],
                                              goal_type=MoveGoal.PLAN_AND_EXECUTE_AND_SKIP_FAILURES)
 
         for i, p in enumerate(traj.points):
@@ -1769,7 +1767,6 @@ class TestCartGoals(object):
                 pass
         else:  # if no break
             assert False, u'pocky pose not in trajectory'
-
 
     # TODO test translation and orientation goal in different frame
 
@@ -1892,7 +1889,8 @@ class TestCollisionAvoidanceGoals(object):
 
         map_T_cart_goal = tf.kdl_to_pose_stamped(map_T_odom * tf.pose_to_kdl(wrong_odom_T_goal.pose), u'map')
         kitchen_setup.avoid_all_collisions(0.2)
-        kitchen_setup.set_and_check_cart_goal(map_T_cart_goal, u'base_footprint', expected_error_code=MoveResult.INSOLVABLE)
+        kitchen_setup.set_and_check_cart_goal(map_T_cart_goal, u'base_footprint',
+                                              expected_error_codes=[MoveResult.SHAKING])
 
     def test_bug2020_09_01_11_22_51_dump(self, kitchen_setup):
         map_T_odom = tf.pose_to_kdl(convert_dictionary_to_ros_message(u'geometry_msgs/PoseStamped',
@@ -2207,7 +2205,8 @@ class TestCollisionAvoidanceGoals(object):
             "r_gripper_l_finger_tip_frame",
             "r_gripper_palm_link"
         ], 'kitchen', [])
-        kitchen_setup.set_and_check_cart_goal(map_T_cart_goal, kitchen_setup.r_tip, expected_error_code=MoveResult.INSOLVABLE)
+        kitchen_setup.set_and_check_cart_goal(map_T_cart_goal, kitchen_setup.r_tip,
+                                              expected_error_codes=[MoveResult.SHAKING])
 
     def test_bug2020_09_08_10_01_32_dump(self, kitchen_setup):
         map_T_odom = tf.pose_to_kdl(convert_dictionary_to_ros_message(u'geometry_msgs/PoseStamped',
@@ -2529,7 +2528,8 @@ class TestCollisionAvoidanceGoals(object):
                                     max_linear_velocity=0.1,
                                     max_angular_velocity=0.2,
                                     )
-        kitchen_setup.set_and_check_cart_goal(map_T_cart_goal, kitchen_setup.r_tip, expected_error_code=MoveResult.INSOLVABLE)
+        kitchen_setup.set_and_check_cart_goal(map_T_cart_goal, kitchen_setup.r_tip,
+                                              expected_error_codes=[MoveResult.SHAKING])
 
     def test_bug2020_09_16_14_21_09_dump_grasp_wiggle_drawer(self, kitchen_setup):
         map_T_odom = tf.pose_to_kdl(convert_dictionary_to_ros_message(u'geometry_msgs/PoseStamped',
@@ -2941,7 +2941,7 @@ class TestCollisionAvoidanceGoals(object):
         kitchen_setup.set_joint_goal(gaya_pose)
         kitchen_setup.avoid_all_collisions(0.2)
         kitchen_setup.set_cart_goal(map_T_cart_goal, 'base_footprint', linear_velocity=0.5,
-                                              weight=WEIGHT_BELOW_CA)
+                                    weight=WEIGHT_BELOW_CA)
         kitchen_setup.send_and_check_goal()
 
     def test_bug2020_09_15_09_59_29_dump_corner_drawer_shaking(self, kitchen_setup):
@@ -3068,7 +3068,7 @@ class TestCollisionAvoidanceGoals(object):
         kitchen_setup.set_joint_goal(gaya_pose)
         kitchen_setup.avoid_all_collisions(0.2)
         kitchen_setup.set_cart_goal(map_T_cart_goal, 'base_footprint', linear_velocity=0.5,
-                                              weight=WEIGHT_BELOW_CA)
+                                    weight=WEIGHT_BELOW_CA)
         kitchen_setup.send_and_check_goal()
 
     def test_bug2020_09_15_15_35_15_dump_shaky_nav(self, kitchen_setup):
@@ -3211,8 +3211,7 @@ class TestCollisionAvoidanceGoals(object):
 
         kitchen_setup.avoid_all_collisions(0.2)
         kitchen_setup.set_and_check_cart_goal(map_T_cart_goal, 'base_footprint', linear_velocity=0.5,
-                                              weight=WEIGHT_BELOW_CA, expected_error_code=MoveResult.INSOLVABLE)
-
+                                              weight=WEIGHT_BELOW_CA, expected_error_codes=[MoveResult.SHAKING])
 
     def test_bug2020_09_15_10_41_17_dump_wiggling(self, kitchen_setup):
         map_T_odom = tf.pose_to_kdl(convert_dictionary_to_ros_message(u'geometry_msgs/PoseStamped',
@@ -3388,7 +3387,7 @@ class TestCollisionAvoidanceGoals(object):
         # tip_normal.vector.z = 1
         # kitchen_setup.align_planes('bowl_1', tip_normal, weight=WEIGHT_ABOVE_CA)
         kitchen_setup.set_cart_goal(map_T_cart_goal, 'base_footprint', linear_velocity=0.5,
-                                              weight=WEIGHT_BELOW_CA)
+                                    weight=WEIGHT_BELOW_CA)
         kitchen_setup.send_and_check_goal()
 
     def test_bug2020_09_11_11_59_57_dump(self, kitchen_setup):
@@ -3574,7 +3573,7 @@ class TestCollisionAvoidanceGoals(object):
         kitchen_setup.set_joint_goal(gaya_pose)
         kitchen_setup.avoid_all_collisions(0.2)
         kitchen_setup.set_cart_goal(map_T_cart_goal, 'base_footprint', linear_velocity=0.5,
-                                              weight=WEIGHT_BELOW_CA)
+                                    weight=WEIGHT_BELOW_CA)
         kitchen_setup.send_and_check_goal()
 
     def test_bug2020_09_09_14_33_36_dump_endless_wiggling(self, kitchen_setup):
@@ -4254,7 +4253,7 @@ class TestCollisionAvoidanceGoals(object):
         ce.type = CollisionEntry.AVOID_COLLISION
         ce.link_bs = [u'asdf']
         box_setup.add_collision_entries([ce])
-        box_setup.send_and_check_goal(MoveResult.INSOLVABLE)
+        box_setup.send_and_check_goal(expected_error_codes=[MoveResult.ERROR])
 
     def test_unknown_robot_link(self, box_setup):
         """
@@ -4497,7 +4496,7 @@ class TestCollisionAvoidanceGoals(object):
 
     def test_collision_override2(self, kitchen_setup):
         """
-        :type box_setup: PR2
+        :type kitchen_setup: PR2
         """
         goal = PoseStamped()
         goal.header.frame_id = u'base_footprint'
@@ -4508,7 +4507,7 @@ class TestCollisionAvoidanceGoals(object):
 
     def test_avoid_collision2(self, fake_table_setup):
         """
-        :type box_setup: PR2
+        :type fake_table_setup: PR2
         """
         r_goal = PoseStamped()
         r_goal.header.frame_id = u'map'
@@ -4546,7 +4545,7 @@ class TestCollisionAvoidanceGoals(object):
 
     def test_avoid_collision3(self, pocky_pose_setup):
         """
-        :type box_setup: PR2
+        :type pocky_pose_setup: PR2
         """
         pocky_pose_setup.attach_box(size=[0.2, 0.05, 0.05],
                                     frame_id=pocky_pose_setup.r_tip,
@@ -4579,7 +4578,7 @@ class TestCollisionAvoidanceGoals(object):
 
     def test_avoid_collision4(self, pocky_pose_setup):
         """
-        :type box_setup: PR2
+        :type pocky_pose_setup: PR2
         """
         pocky_pose_setup.attach_box(size=[0.2, 0.05, 0.05],
                                     frame_id=pocky_pose_setup.r_tip,
@@ -4632,7 +4631,7 @@ class TestCollisionAvoidanceGoals(object):
 
     def test_avoid_collision5(self, pocky_pose_setup):
         """
-        :type box_setup: PR2
+        :type pocky_pose_setup: PR2
         """
         # fixme
         pocky_pose_setup.attach_box(size=[0.2, 0.05, 0.05],
@@ -4658,7 +4657,7 @@ class TestCollisionAvoidanceGoals(object):
 
     def test_avoid_collision6(self, fake_table_setup):
         """
-        :type box_setup: PR2
+        :type fake_table_setup: PR2
         """
         # FIXME
         js = {
@@ -4682,7 +4681,7 @@ class TestCollisionAvoidanceGoals(object):
 
     def test_avoid_collision7(self, kitchen_setup):
         """
-        :type box_setup: PR2
+        :type kitchen_setup: PR2
         """
         base_pose = PoseStamped()
         base_pose.header.frame_id = u'map'
@@ -4701,7 +4700,7 @@ class TestCollisionAvoidanceGoals(object):
 
     def test_avoid_collision9(self, kitchen_setup):
         """
-        :type box_setup: PR2
+        :type kitchen_setup: PR2
         """
         base_pose = PoseStamped()
         base_pose.header.frame_id = u'map'
@@ -4716,7 +4715,7 @@ class TestCollisionAvoidanceGoals(object):
 
     def test_avoid_collision8(self, kitchen_setup):
         """
-        :type box_setup: PR2
+        :type kitchen_setup: PR2
         """
         base_pose = PoseStamped()
         base_pose.header.frame_id = u'map'
@@ -4735,7 +4734,7 @@ class TestCollisionAvoidanceGoals(object):
 
     def test_go_around_kitchen_island(self, kitchen_setup):
         """
-        :type box_setup: PR2
+        :type kitchen_setup: PR2
         """
         tip = u'base_footprint'
         base_pose = PoseStamped()
@@ -4768,7 +4767,7 @@ class TestCollisionAvoidanceGoals(object):
 
     def test_drive_into_wall_with_CollisionAvoidanceHint(self, kitchen_setup):
         """
-        :type box_setup: PR2
+        :type kitchen_setup: PR2
         """
         tip = u'base_footprint'
         base_pose = PoseStamped()
@@ -4800,7 +4799,7 @@ class TestCollisionAvoidanceGoals(object):
 
     def test_go_around_kitchen_island2(self, kitchen_setup):
         """
-        :type box_setup: PR2
+        :type kitchen_setup: PR2
         """
         tip = u'base_footprint'
         base_pose = PoseStamped()
@@ -4970,7 +4969,7 @@ class TestCollisionAvoidanceGoals(object):
 
     def test_attached_self_collision(self, zero_pose):
         """
-        :type box_setup: PR2
+        :type zero_pose: PR2
         """
 
         collision_pose = {
@@ -5012,7 +5011,7 @@ class TestCollisionAvoidanceGoals(object):
 
     def test_attached_self_collision2(self, zero_pose):
         """
-        :type box_setup: PR2
+        :type zero_pose: PR2
         """
 
         collision_pose = {
@@ -5058,7 +5057,7 @@ class TestCollisionAvoidanceGoals(object):
 
     def test_attached_self_collision3(self, zero_pose):
         """
-        :type box_setup: PR2
+        :type zero_pose: PR2
         """
 
         collision_pose = {
@@ -6193,7 +6192,7 @@ class TestReachability():
         zero_pose.check_reachability(expected_error_codes=[MoveResult.UNREACHABLE])
 
     def test_unreachable_goal_4(self, zero_pose):
-        #FIXME
+        # FIXME
         pose = PoseStamped()
         pose.pose.position.y = -2.0
         pose.pose.position.z = 1

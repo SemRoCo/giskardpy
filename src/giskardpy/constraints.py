@@ -8,9 +8,6 @@ import PyKDL as kdl
 import numpy as np
 from geometry_msgs.msg import Vector3Stamped, Vector3
 from giskard_msgs.msg import Constraint as Constraint_msg
-from rospy_message_converter.message_converter import \
-    convert_dictionary_to_ros_message, \
-    convert_ros_message_to_dictionary
 
 import giskardpy.identifier as identifier
 import giskardpy.tfwrapper as tf
@@ -22,6 +19,9 @@ from giskardpy.input_system import \
     Vector3StampedInput, FrameInput, \
     PointStampedInput, TranslationInput
 from giskardpy.logging import logwarn
+from rospy_message_converter.message_converter import \
+    convert_dictionary_to_ros_message, \
+    convert_ros_message_to_dictionary
 
 WEIGHT_MAX = Constraint_msg.WEIGHT_MAX
 WEIGHT_ABOVE_CA = Constraint_msg.WEIGHT_ABOVE_CA
@@ -302,11 +302,12 @@ class Constraint(object):
         self.make_constraints()
         return self.soft_constraints
 
-    def add_constraint(self, name_suffix, lower, upper, weight, expression, goal_constraint=False, lower_slack_limit=-1e9,
+    def add_constraint(self, name_suffix, lower, upper, weight, expression, goal_constraint=False,
+                       lower_slack_limit=-1e9,
                        upper_slack_limit=1e9, linear_weight=0):
         """
-        :param name: name of the constraint, make use to avoid name conflicts!
-        :type name: str
+        :param name_suffix: name of the constraint, make use to avoid name conflicts!
+        :type name_suffix: Union[str, unicode]
         :param lower: lower limit for the !derivative! of the expression
         :type lower: float, or symbolic expression
         :param upper: upper limit for the !derivative! of the expression
@@ -361,7 +362,7 @@ class Constraint(object):
         r_P_error = r_P_g - r_P_c
         trans_error = w.norm(r_P_error)
 
-        trans_scale = self.limit_velocity(trans_error,max_velocity)
+        trans_scale = self.limit_velocity(trans_error, max_velocity)
         r_P_intermediate_error = w.save_division(r_P_error, trans_error) * trans_scale
 
         # weight = self.magic_weight_function(trans_error,
@@ -747,7 +748,7 @@ class AvoidJointLimitsPrismatic(Constraint):
 
         params = {self.weight_id: weight,
                   self.max_velocity: max_velocity,
-                  self.percentage: percentage,}
+                  self.percentage: percentage, }
         self.save_params_on_god_map(params)
 
     def make_constraints(self):
@@ -830,8 +831,8 @@ class AvoidJointLimits(Constraint):
                                                                  weight=weight))
             elif self.get_robot().is_joint_prismatic(joint_name):
                 self.constraints.append(AvoidJointLimitsPrismatic(god_map,
-                                                                 joint_name=joint_name,
-                                                                 percentage=percentage,
+                                                                  joint_name=joint_name,
+                                                                  percentage=percentage,
                                                                   weight=weight))
 
     def make_constraints(self):
@@ -939,10 +940,9 @@ class CartesianVelocityLimit(Constraint):
         tip_evaluated_T_root = self.get_fk_evaluated(self.tip_link, self.root_link)
         root_P_tip = w.position_of(root_T_tip)
 
-
         linear_weight = self.normalize_weight(max_linear_velocity, weight)
 
-        self.add_debug_vector('/root_P_tip' , root_P_tip)
+        self.add_debug_vector('/root_P_tip', root_P_tip)
 
         if self.hard:
             slack_limit = 0
@@ -950,16 +950,16 @@ class CartesianVelocityLimit(Constraint):
             slack_limit = 1e9
 
         self.add_constraint(u'/linear/x',
-                            lower=-max_linear_velocity*sample_period,
-                            upper=max_linear_velocity*sample_period,
+                            lower=-max_linear_velocity * sample_period,
+                            upper=max_linear_velocity * sample_period,
                             weight=linear_weight,
                             expression=root_P_tip[0],
                             goal_constraint=False,
                             lower_slack_limit=-slack_limit,
                             upper_slack_limit=slack_limit)
         self.add_constraint(u'/linear/y',
-                            lower=-max_linear_velocity*sample_period,
-                            upper=max_linear_velocity*sample_period,
+                            lower=-max_linear_velocity * sample_period,
+                            upper=max_linear_velocity * sample_period,
                             weight=linear_weight,
                             expression=root_P_tip[1],
                             goal_constraint=False,
@@ -967,8 +967,8 @@ class CartesianVelocityLimit(Constraint):
                             upper_slack_limit=slack_limit
                             )
         self.add_constraint(u'/linear/z',
-                            lower=-max_linear_velocity*sample_period,
-                            upper=max_linear_velocity*sample_period,
+                            lower=-max_linear_velocity * sample_period,
+                            upper=max_linear_velocity * sample_period,
                             weight=linear_weight,
                             expression=root_P_tip[2],
                             goal_constraint=False,
@@ -984,11 +984,11 @@ class CartesianVelocityLimit(Constraint):
         axis, angle = w.axis_angle_from_matrix(w.dot(w.dot(tip_evaluated_R_root, hack), root_R_tip))
         angular_weight = self.normalize_weight(max_angular_velocity, weight)
 
-        axis_angle = axis*angle
+        axis_angle = axis * angle
 
         self.add_constraint(u'/angular/x',
-                            lower=-max_angular_velocity*sample_period,
-                            upper=max_angular_velocity*sample_period,
+                            lower=-max_angular_velocity * sample_period,
+                            upper=max_angular_velocity * sample_period,
                             weight=angular_weight,
                             expression=axis_angle[0],
                             goal_constraint=False,
@@ -997,8 +997,8 @@ class CartesianVelocityLimit(Constraint):
                             )
 
         self.add_constraint(u'/angular/y',
-                            lower=-max_angular_velocity*sample_period,
-                            upper=max_angular_velocity*sample_period,
+                            lower=-max_angular_velocity * sample_period,
+                            upper=max_angular_velocity * sample_period,
                             weight=angular_weight,
                             expression=axis_angle[1],
                             goal_constraint=False,
@@ -1007,8 +1007,8 @@ class CartesianVelocityLimit(Constraint):
                             )
 
         self.add_constraint(u'/angular/z',
-                            lower=-max_angular_velocity*sample_period,
-                            upper=max_angular_velocity*sample_period,
+                            lower=-max_angular_velocity * sample_period,
+                            upper=max_angular_velocity * sample_period,
                             weight=angular_weight,
                             expression=axis_angle[2],
                             goal_constraint=False,
@@ -1235,7 +1235,6 @@ class ExternalCollisionAvoidance(Constraint):
         self.robot_name = self.get_robot_unsafe().get_name()
         self.idx = idx
 
-
         params = {self.max_velocity_id: max_velocity,
                   self.hard_threshold_id: hard_threshold,
                   self.soft_threshold_id: soft_threshold,
@@ -1302,7 +1301,6 @@ class ExternalCollisionAvoidance(Constraint):
 
         dist = w.dot(r_V_n.T, r_V_pb_pa)[0]
 
-
         penetration_distance = soft_threshold - actual_distance
         # spring_penetration_distance = spring_threshold - actual_distance
         lower_limit = self.limit_velocity(penetration_distance, max_velocity)
@@ -1320,7 +1318,6 @@ class ExternalCollisionAvoidance(Constraint):
 
         # spring_weight = w.if_eq(spring_threshold, soft_threshold, 0,
         #                         weight * (spring_error / (spring_threshold - soft_threshold))**2)
-
 
         # weight = w.if_less_eq(actual_distance, soft_threshold, weight,
         #                       spring_weight)
@@ -1367,7 +1364,6 @@ class CollisionAvoidanceHint(Constraint):
             spring_threshold = max_threshold
         else:
             spring_threshold = max(spring_threshold, max_threshold)
-
 
         added_checks = self.get_god_map().get_data(identifier.added_collision_checks)
         if link_name in added_checks:
@@ -1437,8 +1433,7 @@ class CollisionAvoidanceHint(Constraint):
         spring_error = w.Max(spring_error, 0)
 
         spring_weight = w.if_eq(spring_threshold, max_threshold, 0,
-                                weight * (spring_error / (spring_threshold - max_threshold))**2)
-
+                                weight * (spring_error / (spring_threshold - max_threshold)) ** 2)
 
         weight = w.if_less_eq(actual_distance, max_threshold, weight,
                               spring_weight)
@@ -1538,7 +1533,6 @@ class SelfCollisionAvoidance(Constraint):
 
         pb_V_n = self.get_contact_normal_in_b()
 
-
         pb_P_pa = w.dot(pb_T_b, b_T_a, a_P_pa)
 
         dist = w.dot(pb_V_n.T, pb_P_pa)[0]
@@ -1552,7 +1546,6 @@ class SelfCollisionAvoidance(Constraint):
         lower_limit = self.limit_velocity(penetration_distance, repel_velocity)
         upper_limit = 1e9
         # slack_limit = self.limit_velocity(actual_distance, repel_velocity)
-
 
         upper_slack = w.if_greater(actual_distance, 50,  # assuming that distance of unchecked closest points is 100
                                    1e9,

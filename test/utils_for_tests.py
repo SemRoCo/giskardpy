@@ -346,13 +346,14 @@ class GiskardTestWrapper(object):
         current_joint_state = to_joint_state_position_dict(self.get_current_joint_state())
         self.compare_joint_state(current_joint_state, expected, decimal=decimal)
 
-    def send_and_check_joint_goal(self, goal, weight=None, decimal=2):
+    def send_and_check_joint_goal(self, goal, weight=None, decimal=2, expected_error_codes=None):
         """
         :type goal: dict
         """
         self.set_joint_goal(goal, weight=weight)
-        self.send_and_check_goal()
-        self.check_joint_state(goal, decimal=decimal)
+        self.send_and_check_goal(expected_error_codes=expected_error_codes)
+        if expected_error_codes == [MoveResult.SUCCESS]:
+            self.check_joint_state(goal, decimal=decimal)
 
     #
     # CART GOAL STUFF ##################################################################################################
@@ -572,8 +573,8 @@ class GiskardTestWrapper(object):
         if expected_response == UpdateWorldResponse.SUCCESS:
             p = self.get_robot().get_fk_pose(self.get_robot().get_root(), name)
             p = transform_pose(u'map', p)
-        assert name in self.wrapper.get_attached_objects().object_names, 'there is no attached object named {}'.format(
-            name)
+            assert name in self.wrapper.get_attached_objects().object_names, \
+                'there is no attached object named {}'.format(name)
         r = self.wrapper.detach_object(name)
         assert r.error_codes == expected_response, \
             u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),

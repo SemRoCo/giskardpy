@@ -1,6 +1,7 @@
 from py_trees import Status
-
+from time import time
 import giskardpy.identifier as identifier
+from giskardpy import logging
 from giskardpy.plugin import GiskardBehavior
 
 
@@ -19,9 +20,13 @@ class LoopDetector(GiskardBehavior):
 
     def update(self):
         current_js = self.get_god_map().get_data(identifier.joint_states)
-        time = self.get_god_map().get_data(identifier.time)
+        planning_time = self.get_god_map().get_data(identifier.time)
         rounded_js = self.round_js(current_js)
-        if time >= self.window_size and rounded_js in self.past_joint_states:
+        if planning_time >= self.window_size and rounded_js in self.past_joint_states:
+            sample_period = self.get_god_map().get_data(identifier.sample_period)
+            logging.loginfo(u'found loop, stopped planning.')
+            logging.loginfo(u'found goal trajectory with length {}s in {}s'.format(planning_time * sample_period,
+                                                                                   time() - self.get_blackboard().runtime))
             return Status.SUCCESS
         self.past_joint_states.add(rounded_js)
         return Status.RUNNING

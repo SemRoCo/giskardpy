@@ -1,15 +1,10 @@
-import numpy as np
 from py_trees import Status
-from sortedcontainers import SortedDict
-import matplotlib.pyplot as plt
+
 import giskardpy.identifier as identifier
-from giskardpy.exceptions import InsolvableException
 from giskardpy.plugin import GiskardBehavior
-from giskardpy import logging
 
 
 # fast
-from giskardpy.plugin_goal_reached import make_velocity_threshold
 
 
 class LoopDetector(GiskardBehavior):
@@ -40,6 +35,3 @@ class LoopDetector(GiskardBehavior):
         """
         # FIXME weird non deterministic error, happens because pluginbehavior is not stopped fast enough?
         return tuple(round(x.position, self.precision) for x in js.values())
-
-
-

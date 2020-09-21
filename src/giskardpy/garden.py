@@ -168,7 +168,7 @@ def grow_tree():
     planning_3.add_plugin(LoopDetector(u'loop detector'))
     planning_3.add_plugin(GoalReachedPlugin(u'goal reached'))
     planning_3.add_plugin(TimePlugin(u'time'))
-    planning_3.add_plugin(MaxTrajLength(u'traj length check'))
+    # planning_3.add_plugin(MaxTrajLength(u'traj length check'))
     # ----------------------------------------------
     publish_result = failure_is_success(Selector)(u'monitor execution')
     publish_result.add_child(GoalCanceled(u'goal canceled', action_server_name))

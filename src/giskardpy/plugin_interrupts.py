@@ -1,13 +1,10 @@
+import matplotlib.pyplot as plt
 import numpy as np
 from py_trees import Status
-from sortedcontainers import SortedDict
-import matplotlib.pyplot as plt
+
 import giskardpy.identifier as identifier
 from giskardpy.exceptions import ShakingException
 from giskardpy.plugin import GiskardBehavior
-from giskardpy import logging
-
-
 # fast
 from giskardpy.plugin_goal_reached import make_velocity_threshold
 
@@ -28,11 +25,13 @@ class WiggleCancel(GiskardBehavior):
         self.keys = []
         self.thresholds = []
         self.velocity_limits = []
-        for joint_name, threshold in zip(self.get_robot().controlled_joints, make_velocity_threshold(self.get_god_map())):
+        for joint_name, threshold in zip(self.get_robot().controlled_joints,
+                                         make_velocity_threshold(self.get_god_map())):
             velocity_limit = self.get_robot().get_joint_velocity_limit(joint_name)
             self.keys.append(joint_name)
             self.thresholds.append(threshold)
             self.velocity_limits.append(velocity_limit)
+        self.keys = np.array(self.keys)
         self.key_set = set(self.keys)
         self.thresholds = np.array(self.thresholds)
         self.velocity_limits = np.array(self.velocity_limits)
@@ -52,59 +51,73 @@ class WiggleCancel(GiskardBehavior):
                 self.js_samples[i].pop(0)
 
         js_samples_array = np.array(self.js_samples)
-        plot=False
-        if(detect_shaking(js_samples_array, self.sample_period, self.min_wiggle_frequency,
-                          self.amplitude_threshold, self.thresholds, self.velocity_limits, plot)):
-            raise ShakingException(u'shaky trajectory detected')
+        plot = False
+        self.detect_shaking(js_samples_array, self.sample_period, self.min_wiggle_frequency,
+                            self.amplitude_threshold, self.thresholds, self.velocity_limits, plot)
 
         return Status.RUNNING
 
+    def make_mask(self, js_samples, moving_thresholds):
+        return np.any(js_samples.T > moving_thresholds, axis=0)
 
-def detect_shaking(js_samples, sample_period, min_wiggle_frequency, amplitude_threshold, moving_thresholds,
-                   velocity_limits, plot=False):
-    N = len(js_samples[0]) -1
-    # remove joints that arent moving
-    mask = np.any(js_samples.T > moving_thresholds, axis=0)
-    amplitude_threshold = velocity_limits[mask] * amplitude_threshold * N # acceleration limit is basically vel*2
-    joints_filtered = js_samples[mask]
-    joints_filtered = np.diff(joints_filtered)
-    # joints_filtered = (joints_filtered.T - joints_filtered.mean(axis=1)).T
+    def detect_shaking(self, js_samples, sample_period, min_wiggle_frequency, amplitude_threshold, moving_thresholds,
+                       velocity_limits, plot=False):
+        N = len(js_samples[0]) - 1
+        # remove joints that arent moving
+        mask = self.make_mask(js_samples, moving_thresholds)
+        amplitude_thresholds = velocity_limits[mask] * amplitude_threshold * N  # acceleration limit is basically vel*2
+        joints_filtered = js_samples[mask]
+        joints_filtered = np.diff(joints_filtered)
+        # joints_filtered = (joints_filtered.T - joints_filtered.mean(axis=1)).T
 
-    if len(joints_filtered) == 0:
-        return False
+        if len(joints_filtered) == 0:
+            return False
 
-    freq = np.fft.rfftfreq(N, d=sample_period)
+        freq = np.fft.rfftfreq(N, d=sample_period)
 
-    # find index in frequency list where frequency >= min_wiggle_frequency
-    try:
-        freq_idx = next(i for i, v in enumerate(freq) if v >= min_wiggle_frequency)
-    except StopIteration:
-        return False
+        # find index in frequency list where frequency >= min_wiggle_frequency
+        try:
+            freq_idx = next(i for i, v in enumerate(freq) if v >= min_wiggle_frequency)
+        except StopIteration:
+            return False
 
-    fft = np.fft.rfft(joints_filtered, axis=1)
-    fft = [np.abs(i.real) for i in fft]
+        fft = np.fft.rfft(joints_filtered, axis=1)
+        fft = [np.abs(i.real) for i in fft]
 
-    if plot:
-        y = joints_filtered
+        if plot:
+            y = joints_filtered
 
-        x = np.linspace(0, N*sample_period, N)
-        y = np.array(y)
-        fig, ax = plt.subplots()
-        for yy in y:
-            ax.plot(x, yy)
-        plt.show()
+            x = np.linspace(0, N * sample_period, N)
+            y = np.array(y)
+            fig, ax = plt.subplots()
+            for yy in y:
+                ax.plot(x, yy)
+            plt.show()
 
-        fig, ax = plt.subplots()
-        for i, yy in enumerate(y):
-            yf = fft[i]
-            # yf = np.fft.rfft(yy)
-            xf = np.fft.rfftfreq(N, d=sample_period)
-            plt.plot(xf, np.abs(yf.real), label=u'real')
-            # plt.plot(xf, np.abs(yf.imag), label=u'img')
-        plt.show()
+            fig, ax = plt.subplots()
+            for i, yy in enumerate(y):
+                yf = fft[i]
+                # yf = np.fft.rfft(yy)
+                xf = np.fft.rfftfreq(N, d=sample_period)
+                plt.plot(xf, np.abs(yf.real), label=u'real')
+                # plt.plot(xf, np.abs(yf.imag), label=u'img')
+            plt.show()
 
-    return np.any(np.array(fft)[:,freq_idx:].T > amplitude_threshold)
-
+        fft = np.array(fft)
+        violations = fft[:, freq_idx:].T > amplitude_thresholds
+        if np.any(violations):
+            filtered_keys = self.keys[mask]
+            violation_str = u''
+            for i in range(violations.shape[1]):
+                if np.any(violations[:, i]):
+                    joint = filtered_keys[i]
+                    velocity_limit = velocity_limits[i]
+                    hertz_str = ','.join(u'{} hertz: {} > {}'.format(freq[freq_idx:][j],
+                                                                     fft[:, freq_idx:].T[:, i][j] / N / velocity_limit,
+                                                                     amplitude_threshold) for j, x in
+                                         enumerate(violations[:, i]) if x)
+                    violation_str += u'\nshaking of joint: \'{}\' at '.format(joint) + hertz_str
+            raise ShakingException(u'endless wiggling detected' + violation_str)
 
 
 # class MaxTrajLength(GiskardBehavior):
@@ -116,5 +129,3 @@ def detect_shaking(js_samples, sample_period, min_wiggle_frequency, amplitude_th
 #             raise InsolvableException(u'trajectory too long')
 #
 #         return Status.RUNNING
-
-

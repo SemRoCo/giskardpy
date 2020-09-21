@@ -5542,7 +5542,7 @@ class TestCollisionAvoidanceGoals(object):
         kitchen_setup.send_and_check_joint_goal(gaya_pose)
 
     def test_ease_cereal(self, kitchen_setup):
-        # FIXME
+        # FIXME shaky af
         cereal_name = u'cereal'
         drawer_frame_id = u'iai_kitchen/oven_area_area_right_drawer_board_3_link'
 
@@ -6133,7 +6133,6 @@ class TestReachability():
         zero_pose.check_reachability(expected_error_codes=[MoveResult.UNREACHABLE])
 
     def test_unreachable_goal_4(self, zero_pose):
-        # FIXME
         pose = PoseStamped()
         pose.pose.position.y = -2.0
         pose.pose.position.z = 1

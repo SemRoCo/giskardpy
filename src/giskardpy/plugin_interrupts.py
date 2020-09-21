@@ -118,18 +118,3 @@ def detect_shaking(js_samples, sample_period, min_wiggle_frequency, amplitude_th
 #         return Status.RUNNING
 
 
-
-# class CollisionCancel(GiskardBehavior):
-#     def __init__(self, name):
-#         self.collision_time_threshold = self.get_god_map().get_data(identifier.collision_time_threshold)
-#         super(CollisionCancel, self).__init__(name)
-#
-#     def update(self):
-#         time = self.get_god_map().get_data(identifier.time)
-#         if time >= self.collision_time_threshold:
-#             cp = self.get_god_map().get_data(identifier.closest_point)
-#             if cp is not None and closest_point_constraint_violated(cp, tolerance=1):
-#                 self.raise_to_blackboard(PathCollisionException(
-#                     u'robot is in collision after {} seconds'.format(self.collision_time_threshold)))
-#                 return Status.SUCCESS
-#         return Status.FAILURE

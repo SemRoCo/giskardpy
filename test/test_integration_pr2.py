@@ -413,7 +413,8 @@ class TestConstraints(object):
         zero_pose.set_and_check_cart_goal(goal_pose=goal_position,
                                           tip=u'r_gripper_tool_frame',
                                           linear_velocity=linear_velocity,
-                                          angular_velocity=angular_velocity
+                                          angular_velocity=angular_velocity,
+                                          weight=WEIGHT_BELOW_CA
                                           )
 
     def test_AvoidJointLimits1(self, zero_pose):
@@ -452,7 +453,8 @@ class TestConstraints(object):
         zero_pose.allow_self_collision()
         zero_pose.add_json_goal(u'AvoidJointLimits',
                                 percentage=percentage)
-        zero_pose.send_and_check_joint_goal(goal_state)
+        zero_pose.set_joint_goal(goal_state)
+        zero_pose.send_and_check_goal()
 
         zero_pose.allow_self_collision()
         zero_pose.add_json_goal(u'AvoidJointLimits',
@@ -463,7 +465,7 @@ class TestConstraints(object):
                                 not zero_pose.get_robot().is_joint_continuous(j)]
 
         current_joint_state = to_joint_state_position_dict(zero_pose.get_current_joint_state())
-        percentage *= 0.92  # if will not reach the exact percentage, because the weight is so low
+        percentage *= 0.9  # if will not reach the exact percentage, because the weight is so low
         for joint in joint_non_continuous:
             position = current_joint_state[joint]
             lower_limit, upper_limit = zero_pose.get_robot().get_joint_limits(joint)
@@ -537,16 +539,23 @@ class TestConstraints(object):
         assert pocky_pose_setup.get_god_map().unsafe_get_data(
             identifier.joint_weight + [u'torso_lift_joint']) == old_torso_value
 
-    def test_base_pointing_forward(self, zero_pose):
+    def test_base_pointing_forward(self, pocky_pose_setup):
         """
-        :param zero_pose: PR2
+        :param pocky_pose_setup: PR2
         """
-        zero_pose.add_json_goal(u'BasePointingForward')
+        # FIXME
+        pocky_pose_setup.add_json_goal(u'BasePointingForward')
         r_goal = PoseStamped()
-        r_goal.header.frame_id = zero_pose.r_tip
+        r_goal.header.frame_id = pocky_pose_setup.r_tip
         r_goal.pose.position.y = -2
         r_goal.pose.orientation.w = 1
-        zero_pose.set_and_check_cart_goal(r_goal, zero_pose.r_tip)
+        pocky_pose_setup.add_json_goal(u'CartesianVelocityLimit',
+                                root_link=pocky_pose_setup.default_root,
+                                tip_link=u'base_footprint',
+                                max_linear_velocity=0.1,
+                                max_angular_velocity=0.2
+                                )
+        pocky_pose_setup.set_and_check_cart_goal(r_goal, pocky_pose_setup.r_tip, weight=WEIGHT_BELOW_CA)
 
     def test_UpdateGodMap2(self, pocky_pose_setup):
         """
@@ -626,6 +635,12 @@ class TestConstraints(object):
         base_goal.pose.position.y = 2
         base_goal.pose.orientation = Quaternion(*quaternion_about_axis(1, [0, 0, 1]))
         kitchen_setup.wrapper.pointing(tip, goal_point, pointing_axis=pointing_axis)
+        kitchen_setup.add_json_goal(u'CartesianVelocityLimit',
+                                root_link=kitchen_setup.default_root,
+                                tip_link=u'base_footprint',
+                                max_linear_velocity=0.1,
+                                max_angular_velocity=0.2
+                                )
         kitchen_setup.move_base(base_goal)
 
         current_x = Vector3Stamped()
@@ -654,7 +669,8 @@ class TestConstraints(object):
                                                                       [1, 0, 0, 0],
                                                                       [0, 0, 0, 1]]))
 
-        kitchen_setup.set_and_check_cart_goal(r_goal, kitchen_setup.r_tip, u'base_footprint')
+        kitchen_setup.set_and_check_cart_goal(r_goal, kitchen_setup.r_tip, u'base_footprint',
+                                              weight=WEIGHT_BELOW_CA)
 
         current_x = Vector3Stamped()
         current_x.header.frame_id = tip

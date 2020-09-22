@@ -1177,21 +1177,6 @@ class TestConstraints(object):
         """"
         :type kitchen_setup: Boxy
         """
-        # handle_frame_id = [u'iai_kitchen/oven_area_area_middle_upper_drawer_handle',
-        #                    u'iai_kitchen/oven_area_area_middle_lower_drawer_handle',
-        #                    u'iai_kitchen/sink_area_left_upper_drawer_handle',
-        #                    u'iai_kitchen/sink_area_left_middle_drawer_handle',
-        #                    u'iai_kitchen/sink_area_left_bottom_drawer_handle',
-        #                    u'iai_kitchen/sink_area_trash_drawer_handle',
-        #                    u'iai_kitchen/fridge_area_lower_drawer_handle',
-        #                    u'iai_kitchen/kitchen_island_left_upper_drawer_handle',
-        #                    u'iai_kitchen/kitchen_island_left_lower_drawer_handle',
-        #                    u'iai_kitchen/kitchen_island_middle_upper_drawer_handle',
-        #                    u'iai_kitchen/kitchen_island_middle_lower_drawer_handle',
-        #                    u'iai_kitchen/kitchen_island_right_upper_drawer_handle',
-        #                    u'iai_kitchen/kitchen_island_right_lower_drawer_handle',
-        #                    u'iai_kitchen/oven_area_area_left_drawer_handle',
-        #                    u'iai_kitchen/oven_area_area_right_drawer_handle']
         handle_name = [u'oven_area_area_middle_upper_drawer_handle',
                        u'oven_area_area_middle_lower_drawer_handle',
                        u'sink_area_left_upper_drawer_handle',

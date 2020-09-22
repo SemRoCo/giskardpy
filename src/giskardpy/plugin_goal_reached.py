@@ -1,51 +1,64 @@
-import numpy as np
 from time import time
 
+import numpy as np
 from py_trees import Status
 
 import giskardpy.identifier as identifier
-from giskardpy.plugin import GiskardBehavior
 from giskardpy import logging
+from giskardpy.plugin import GiskardBehavior
 
-#fast
+
+# fast
+
+def make_velocity_threshold(god_map,
+                            min_translation_cut_off=0.003,
+                            min_rotation_cut_off=0.02,
+                            max_translation_cut_off=0.01,
+                            max_rotation_cut_off=0.13):
+    joint_convergence_threshold = god_map.get_data(identifier.joint_convergence_threshold)
+    robot = god_map.get_data(identifier.robot)
+    sample_period = god_map.get_data(identifier.sample_period)
+    thresholds = []
+    for joint_name in robot.controlled_joints:
+        velocity_limit = robot.get_joint_velocity_limit(joint_name)
+        if velocity_limit is None:
+            velocity_limit = 1
+        velocity_limit *= joint_convergence_threshold
+        if robot.is_joint_prismatic(joint_name):
+            velocity_limit = min(max(min_translation_cut_off, velocity_limit), max_translation_cut_off)
+        elif robot.is_joint_rotational(joint_name):
+            velocity_limit = min(max(min_rotation_cut_off, velocity_limit), max_rotation_cut_off)
+        velocity_limit *= sample_period
+        thresholds.append(velocity_limit)
+    return np.array(thresholds)
+
 
 class GoalReachedPlugin(GiskardBehavior):
-    def __init__(self, name, window_size=None):
+    def __init__(self, name):
         super(GoalReachedPlugin, self).__init__(name)
-        sample_period = self.get_god_map().get_data(identifier.sample_period)
-        if window_size is None:
-            self.window_size = sample_period * 5
-        else:
-            self.window_size = window_size
+        self.window_size = self.get_god_map().get_data(identifier.GoalReached_window_size)
+        self.sample_period = self.get_god_map().get_data(identifier.sample_period)
 
         self.above_threshold_time = 0
-        self.joint_convergence_threshold = self.get_god_map().get_data(identifier.joint_convergence_threshold)
-        self.thresholds = []
-        for joint_name in self.get_robot().controlled_joints:
-            velocity_limit = self.get_robot().get_joint_velocity_limit(joint_name)
-            if velocity_limit is None:
-                velocity_limit = 1
-            self.thresholds.append(velocity_limit * sample_period * self.joint_convergence_threshold)
-        self.thresholds = np.array(self.thresholds)
+
+        self.thresholds = make_velocity_threshold(self.get_god_map())
         self.number_of_controlled_joints = len(self.thresholds)
 
     def update(self):
         # current_js = self.get_god_map().get_data(identifier.joint_states)
-        sample_period = self.get_god_map().get_data(identifier.sample_period)
-        planning_time = self.get_god_map().get_data(identifier.time) * sample_period
+        planning_time = self.get_god_map().get_data(identifier.time)
 
         # below_threshold = np.abs([v.velocity for v in current_js.values()]).max() < self.joint_convergence_threshold
         if planning_time - self.above_threshold_time >= self.window_size:
             x_dot_full = self.get_god_map().get_data(identifier.xdot_full)
             below_threshold = np.all(np.abs(x_dot_full[:self.number_of_controlled_joints]) < self.thresholds)
             if below_threshold:
-                logging.loginfo(u'found goal trajectory with length {}s in {}s'.format(planning_time,
-                                                                             time() - self.get_blackboard().runtime))
+                logging.loginfo(u'found goal trajectory with length {}s in {}s'.format(planning_time*self.sample_period,
+                                                                                       time() - self.get_blackboard().runtime))
                 return Status.SUCCESS
         # if not below_threshold:
         # self.above_threshold_time = planning_time
         return Status.RUNNING
-
 
     def debug_print(self):
         import pandas as pd
@@ -76,7 +89,7 @@ class GoalReachedPlugin(GiskardBehavior):
         p_weights = pd.DataFrame(np_H.dot(np.ones(np_H.shape[0])), weights).sort_index()
         p_xdot = pd.DataFrame(xdot_full, xdot).sort_index()
         p_A = pd.DataFrame(np_A, lbA, weights).sort_index(1).sort_index(0)
-            # self.lbAs.T[[c for c in self.lbAs.T.columns if 'dist' in c]].plot()
+        # self.lbAs.T[[c for c in self.lbAs.T.columns if 'dist' in c]].plot()
         # arrays = [(p_weights, u'H'),
         #           (p_A, u'A'),
         #           (p_lbA, u'lbA'),

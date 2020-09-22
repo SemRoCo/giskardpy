@@ -2,10 +2,11 @@
 import rospy
 from sensor_msgs.msg._JointState import JointState
 
+from giskardpy.utils import print_joint_state
+
 
 def cb(data):
-    for i, joint_name in enumerate(data.name):
-        print("{}: {}".format(joint_name, data.position[i]))
+    print_joint_state(data)
     rospy.signal_shutdown('time is up')
 
 if __name__ == '__main__':

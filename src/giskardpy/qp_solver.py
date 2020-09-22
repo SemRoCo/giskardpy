@@ -3,7 +3,7 @@ import numpy as np
 import qpoases
 from qpoases import PyReturnValue
 
-from giskardpy.exceptions import MAX_NWSR_REACHEDException, QPSolverException
+from giskardpy.exceptions import MAX_NWSR_REACHEDException, QPSolverException, InfeasibleException
 from giskardpy import logging
 
 
@@ -113,7 +113,14 @@ class QPSolver(object):
                 self.started = False
         else:  # if not break
             self.started = False
-            raise QPSolverException(self.RETURN_VALUE_DICT[success])
+            message = u''.format(self.RETURN_VALUE_DICT[success])
+            if success in [PyReturnValue.INIT_FAILED_INFEASIBILITY,
+                           PyReturnValue.QP_INFEASIBLE,
+                           PyReturnValue.HOTSTART_STOPPED_INFEASIBILITY,
+                           PyReturnValue.ADDBOUND_FAILED_INFEASIBILITY,
+                           PyReturnValue.ADDCONSTRAINT_FAILED_INFEASIBILITY]:
+                raise InfeasibleException(message)
+            raise QPSolverException(message)
 
         self.qpProblem.getPrimalSolution(self.xdot_full)
         return self.xdot_full

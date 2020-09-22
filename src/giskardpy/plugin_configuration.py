@@ -52,5 +52,5 @@ class ConfigurationPlugin(GiskardBehavior):
         base_pose = lookup_pose(self.map_frame, robot_frame)
         self.get_robot().base_pose = base_pose.pose
 
-        self.god_map.safe_set_data(identifier.joint_states, self.mjs)
+        self.god_map.set_data(identifier.joint_states, self.mjs)
         return Status.SUCCESS

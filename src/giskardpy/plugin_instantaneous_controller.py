@@ -18,7 +18,7 @@ class ControllerPlugin(GiskardBehavior):
         self.joint_constraints = None
         self.hard_constraints = None
         self.qp_data = {}
-        self.get_god_map().safe_set_data(identifier.qp_data, self.qp_data)  # safe dict on godmap and work on ref
+        self.get_god_map().set_data(identifier.qp_data, self.qp_data)  # safe dict on godmap and work on ref
         self.rc_prismatic_velocity = self.get_god_map().get_data(identifier.rc_prismatic_velocity)
         self.rc_continuous_velocity = self.get_god_map().get_data(identifier.rc_continuous_velocity)
         self.rc_revolute_velocity = self.get_god_map().get_data(identifier.rc_revolute_velocity)
@@ -83,6 +83,6 @@ class ControllerPlugin(GiskardBehavior):
         self.qp_data[identifier.lbA[-1]], \
         self.qp_data[identifier.ubA[-1]], \
         self.qp_data[identifier.xdot_full[-1]] = self.controller.get_cmd(expr, self.nWSR)
-        self.get_god_map().safe_set_data(identifier.cmd, next_cmd)
+        self.get_god_map().set_data(identifier.cmd, next_cmd)
 
         return Status.RUNNING

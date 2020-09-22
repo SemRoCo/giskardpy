@@ -1139,6 +1139,7 @@ class TestConstraints(object):
         joint_name = [str(item).decode("utf-8").replace(u'handle', u'main_joint').encode("utf-8") for item in handle_name]
 
         for i_handle_id, i_handle_name, i_joint_name in zip(handle_frame_id, handle_name, joint_name):
+            rospy.loginfo('=== Opening drawer: ' + str(i_handle_name).decode('utf-8') + ' ===')
             bar_axis = Vector3Stamped()
             bar_axis.header.frame_id = i_handle_id
             bar_axis.vector.y = 1
@@ -1168,7 +1169,7 @@ class TestConstraints(object):
             kitchen_setup.align_planes(kitchen_setup.l_tip,
                                        x_gripper,
                                        root_normal=x_goal)
-            # kitchen_setup.allow_all_collisions()
+            kitchen_setup.allow_all_collisions()
             kitchen_setup.send_and_check_goal()
 
             kitchen_setup.add_json_goal(u'Open',
@@ -1178,7 +1179,7 @@ class TestConstraints(object):
             kitchen_setup.allow_all_collisions()  # makes execution faster
             kitchen_setup.send_and_check_goal()  # send goal to Giskard
             # Update kitchen object
-            kitchen_setup.set_kitchen_js({i_joint_name: 0.48})
+            kitchen_setup.set_kitchen_js({i_joint_name: 0.48})  # TODO: get real value from URDF
 
             # Close drawer partially
             kitchen_setup.add_json_goal(u'OpenDrawer',
@@ -1199,8 +1200,6 @@ class TestConstraints(object):
             kitchen_setup.send_and_check_goal()  # send goal to Giskard
             # Update kitchen object
             kitchen_setup.set_kitchen_js({i_joint_name: 0.0})
-
-        # TODO: calculate real and desired value and compare
 
         pass
 

@@ -1228,6 +1228,7 @@ class TestConstraints(object):
                                        x_gripper,
                                        root_normal=x_goal)
             kitchen_setup.allow_all_collisions()
+            kitchen_setup.avoid_self_collision()
             kitchen_setup.send_and_check_goal()
 
             kitchen_setup.add_json_goal(u'Open',
@@ -1235,6 +1236,7 @@ class TestConstraints(object):
                                         object_name=u'kitchen',
                                         handle_link=i_handle_name)
             kitchen_setup.allow_all_collisions()  # makes execution faster
+            kitchen_setup.avoid_self_collision()
             kitchen_setup.send_and_check_goal()  # send goal to Giskard
             # Update kitchen object
             kitchen_setup.set_kitchen_js({i_joint_name: 0.48})  # TODO: get real value from URDF
@@ -1246,6 +1248,7 @@ class TestConstraints(object):
                                         handle_link=i_handle_name,
                                         distance_goal=0.2)
             kitchen_setup.allow_all_collisions()  # makes execution faster
+            kitchen_setup.avoid_self_collision()
             kitchen_setup.send_and_check_goal()  # send goal to Giskard
             # Update kitchen object
             kitchen_setup.set_kitchen_js({i_joint_name: 0.2})
@@ -1255,6 +1258,7 @@ class TestConstraints(object):
                                         object_name=u'kitchen',
                                         handle_link=i_handle_name)
             kitchen_setup.allow_all_collisions()  # makes execution faster
+            kitchen_setup.avoid_self_collision()
             kitchen_setup.send_and_check_goal()  # send goal to Giskard
             # Update kitchen object
             kitchen_setup.set_kitchen_js({i_joint_name: 0.0})

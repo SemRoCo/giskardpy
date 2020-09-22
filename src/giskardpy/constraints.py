@@ -979,6 +979,7 @@ class CartesianPositionStraight(BasicCartesianConstraint):
                                                prefix=u'line',
                                                weight=WEIGHT_ABOVE_CA)
 
+
 class CartesianVelocityLimit(Constraint):
     goal = u'goal'
     weight_id = u'weight'

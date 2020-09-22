@@ -122,9 +122,10 @@ class GoalToConstraints(GetGoal):
         :type cmd: MoveCmd
         :rtype: dict
         """
-
+        loginfo(u'parsing goal message')
         for constraint in itertools.chain(cmd.constraints, cmd.joint_constraints, cmd.cartesian_constraints):
             try:
+                loginfo(u'adding constraint of type: \'{}\''.format(constraint.type))
                 C = self.allowed_constraint_types[constraint.type]
             except KeyError:
                 matches = ''
@@ -167,6 +168,7 @@ class GoalToConstraints(GetGoal):
                 if not isinstance(e, GiskardException):
                     raise ConstraintInitalizationException(e)
                 raise e
+        loginfo(u'done parsing goal message')
 
     def has_robot_changed(self):
         new_urdf = self.get_robot().get_urdf_str()

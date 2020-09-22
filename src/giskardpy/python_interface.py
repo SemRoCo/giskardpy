@@ -253,6 +253,14 @@ class GiskardWrapper(object):
         collision_entry.link_bs = [CollisionEntry.ALL]
         self.set_collision_entries([collision_entry])
 
+    def avoid_self_collision(self):
+        collision_entry = CollisionEntry()
+        collision_entry.type = CollisionEntry.AVOID_COLLISION
+        collision_entry.robot_links = [CollisionEntry.ALL]
+        collision_entry.body_b = self.get_robot_name()
+        collision_entry.link_bs = [CollisionEntry.ALL]
+        self.set_collision_entries([collision_entry])
+
     def set_self_collision_distance(self, min_dist=0.05):
         collision_entry = CollisionEntry()
         collision_entry.type = CollisionEntry.AVOID_COLLISION

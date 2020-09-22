@@ -643,11 +643,11 @@ class GiskardTestWrapper(object):
         self.wrapper.avoid_all_collisions(distance)
         self.loop_once()
 
-    def enable_self_collision(self):
-        pass
-
     def allow_self_collision(self):
         self.wrapper.allow_self_collision()
+
+    def avoid_self_collision(self):
+        self.wrapper.avoid_self_collision()
 
     def add_collision_entries(self, collisions_entries):
         self.wrapper.set_collision_entries(collisions_entries)

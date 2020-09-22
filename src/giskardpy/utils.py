@@ -1,6 +1,7 @@
 from __future__ import division
 
 import errno
+import json
 import os
 import pydot
 import pylab as plt
@@ -8,7 +9,7 @@ import re
 import rospkg
 import subprocess
 import sys
-from collections import defaultdict, OrderedDict
+from collections import defaultdict, OrderedDict, deque
 from contextlib import contextmanager
 from functools import wraps
 from itertools import product
@@ -210,7 +211,7 @@ def to_joint_state_dict(msg):
     return mjs
 
 
-def to_joint_state_dict2(msg):
+def to_joint_state_position_dict(msg):
     """
     Converts a ROS message of type sensor_msgs/JointState into a dict that maps name to position
     :param msg: ROS message to convert.
@@ -223,8 +224,20 @@ def to_joint_state_dict2(msg):
         js[joint_name] = msg.position[i]
     return js
 
+def print_joint_state(joint_msg):
+    print_dict(to_joint_state_position_dict(joint_msg))
 
-def dict_to_joint_states(joint_state_dict):
+def print_dict(d):
+    print('{')
+    for key, value in d.items():
+        print("\'{}\': {},".format(key, value))
+    print('}')
+
+def write_dict(d, f):
+    json.dump(d,f, sort_keys=True, indent=4, separators=(',', ': '))
+    f.write('\n')
+
+def position_dict_to_joint_states(joint_state_dict):
     """
     :param joint_state_dict: maps joint_name to position
     :type joint_state_dict: dict
@@ -239,6 +252,21 @@ def dict_to_joint_states(joint_state_dict):
         js.effort.append(0)
     return js
 
+
+def dict_to_joint_states(joint_state_dict):
+    """
+    :param joint_state_dict: maps joint_name to position
+    :type joint_state_dict: dict
+    :return: velocity and effort are filled with 0
+    :rtype: JointState
+    """
+    js = JointState()
+    for k, v in sorted(joint_state_dict.items()):
+        js.name.append(k)
+        js.position.append(v.position)
+        js.velocity.append(v.velocity)
+        js.effort.append(0)
+    return js
 
 def normalize_quaternion_msg(quaternion):
     q = Quaternion()
@@ -906,3 +934,22 @@ def publish_marker_vector(start, end, diameter_shaft=0.01, diameter_head=0.02,  
     rospy.sleep(0.3)
 
     pub.publish(m)
+
+class FIFOSet(set):
+    def __init__(self, data, max_length=None):
+        if len(data) > max_length:
+            raise ValueError('len(data) > max_length')
+        super(FIFOSet, self).__init__(data)
+        self.max_length = max_length
+        self._data_queue = deque(data)
+
+    def add(self, item):
+        if len(self._data_queue) == self.max_length:
+            to_delete = self._data_queue.popleft()
+            super(FIFOSet, self).remove(to_delete)
+            self._data_queue.append(item)
+        super(FIFOSet, self).add(item)
+
+    def remove(self, item):
+        self.remove(item)
+        self._data_queue.remove(item)

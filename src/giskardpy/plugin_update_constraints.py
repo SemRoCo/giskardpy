@@ -15,7 +15,8 @@ import giskardpy.constraints
 import giskardpy.identifier as identifier
 from giskardpy.constraints import SelfCollisionAvoidance, ExternalCollisionAvoidance
 from giskardpy.data_types import JointConstraint
-from giskardpy.exceptions import InsolvableException, ImplementationException
+from giskardpy.exceptions import ImplementationException, UnknownConstraintException, InvalidGoalException, \
+    ConstraintInitalizationException, GiskardException
 from giskardpy.logging import loginfo
 from giskardpy.plugin_action_server import GetGoal
 
@@ -38,7 +39,8 @@ class GoalToConstraints(GetGoal):
         self.rc_other_velocity = self.get_god_map().get_data(identifier.rc_other_velocity)
 
     def initialise(self):
-        self.get_god_map().safe_set_data(identifier.collision_goal, None)
+        self.get_god_map().set_data(identifier.collision_goal, None)
+        self.clear_blackboard_exception()
 
     def update(self):
         # TODO make this interruptable
@@ -48,20 +50,17 @@ class GoalToConstraints(GetGoal):
         if not move_cmd:
             return Status.FAILURE
 
-        self.get_god_map().safe_set_data(identifier.constraints_identifier, {})
+        self.get_god_map().set_data(identifier.constraints_identifier, {})
 
         self.soft_constraints = {}
         if not (self.get_god_map().get_data(identifier.check_reachability)):
+            self.get_god_map().set_data(identifier.maximum_collision_threshold, 0)
             self.add_collision_avoidance_soft_constraints(move_cmd.collisions)
 
         try:
             self.parse_constraints(move_cmd)
         except AttributeError:
-            self.raise_to_blackboard(InsolvableException(u'couldn\'t transform goal'))
-            traceback.print_exc()
-            return Status.SUCCESS
-        except InsolvableException as e:
-            self.raise_to_blackboard(e)
+            self.raise_to_blackboard(InvalidGoalException(u'couldn\'t transform goal'))
             traceback.print_exc()
             return Status.SUCCESS
         except Exception as e:
@@ -69,8 +68,8 @@ class GoalToConstraints(GetGoal):
             traceback.print_exc()
             return Status.SUCCESS
 
-        self.get_god_map().safe_set_data(identifier.collision_goal, move_cmd.collisions)
-        self.get_god_map().safe_set_data(identifier.soft_constraint_identifier, self.soft_constraints)
+        self.get_god_map().set_data(identifier.collision_goal, move_cmd.collisions)
+        self.get_god_map().set_data(identifier.soft_constraint_identifier, self.soft_constraints)
         self.get_blackboard().runtime = time()
 
         controlled_joints = self.get_robot().controlled_joints
@@ -113,8 +112,8 @@ class GoalToConstraints(GetGoal):
         hard_constraints = OrderedDict(((self.robot.get_name(), k), self.robot._hard_constraints[k]) for k in
                                        controlled_joints if k in self.robot._hard_constraints)
 
-        self.get_god_map().safe_set_data(identifier.joint_constraint_identifier, joint_constraints)
-        self.get_god_map().safe_set_data(identifier.hard_constraint_identifier, hard_constraints)
+        self.get_god_map().set_data(identifier.joint_constraint_identifier, joint_constraints)
+        self.get_god_map().set_data(identifier.hard_constraint_identifier, hard_constraints)
 
         return Status.SUCCESS
 
@@ -135,11 +134,11 @@ class GoalToConstraints(GetGoal):
                     if ratio >= 0.5:
                         matches = matches + s + '\n'
                 if matches != '':
-                    raise InsolvableException(
+                    raise UnknownConstraintException(
                         u'unknown constraint {}. did you mean one of these?:\n{}'.format(constraint.type, matches))
                 else:
                     available_constraints = '\n'.join([x for x in self.allowed_constraint_types.keys()]) + '\n'
-                    raise InsolvableException(
+                    raise UnknownConstraintException(
                         u'unknown constraint {}. available constraint types:\n{}'.format(constraint.type,
                                                                                          available_constraints))
 
@@ -152,17 +151,22 @@ class GoalToConstraints(GetGoal):
 
                 c = C(self.god_map, **params)
             except Exception as e:
+                traceback.print_exc()
                 doc_string = C.make_constraints.__doc__
-                error_msg = 'wrong parameters for {} \n {} \n'.format(C.__name__, e.message)
+                error_msg = u'Initialization of "{}" constraint failed: \n {} \n'.format(C.__name__, e)
                 if doc_string is not None:
                     error_msg = error_msg + doc_string
-                raise ValueError(error_msg)
+                if not isinstance(e, GiskardException):
+                    raise ConstraintInitalizationException(error_msg)
+                raise e
             try:
                 soft_constraints = c.get_constraints()
                 self.soft_constraints.update(soft_constraints)
             except Exception as e:
                 traceback.print_exc()
-                raise ImplementationException()
+                if not isinstance(e, GiskardException):
+                    raise ConstraintInitalizationException(e)
+                raise e
 
     def has_robot_changed(self):
         new_urdf = self.get_robot().get_urdf_str()
@@ -170,23 +174,30 @@ class GoalToConstraints(GetGoal):
         self.last_urdf = new_urdf
         return result
 
-    def add_collision_avoidance_soft_constraints(self, collision_cmd):
+    def add_collision_avoidance_soft_constraints(self, collision_cmds):
         """
         Adds a constraint for each link that pushed it away from its closest point.
-        :type collision_cmd: list of CollisionEntry
+        :type collision_cmds: list of CollisionEntry
         """
         # FIXME this only catches the most obvious cases
-        if not collision_cmd or not self.get_world().is_allow_all_collision(collision_cmd[-1]):
-            self.add_external_collision_avoidance_constraints()
-        if not collision_cmd or (not self.get_world().is_allow_all_collision(collision_cmd[-1]) and
-                                 not self.get_world().is_allow_all_self_collision(collision_cmd[-1])):
+        soft_threshold = None
+        for collision_cmd in collision_cmds:
+            if collision_cmd.type == CollisionEntry.AVOID_ALL_COLLISIONS or \
+                    self.get_world().is_avoid_all_collision(collision_cmd):
+                soft_threshold = collision_cmd.min_dist
+
+        if not collision_cmds or not self.get_world().is_allow_all_collision(collision_cmds[-1]):
+            self.add_external_collision_avoidance_constraints(soft_threshold_override=soft_threshold)
+        if not collision_cmds or (not self.get_world().is_allow_all_collision(collision_cmds[-1]) and
+                                  not self.get_world().is_allow_all_self_collision(collision_cmds[-1])):
             self.add_self_collision_avoidance_constraints()
 
-    def add_external_collision_avoidance_constraints(self):
+    def add_external_collision_avoidance_constraints(self, soft_threshold_override=None):
         soft_constraints = {}
         number_of_repeller = self.get_god_map().get_data(identifier.external_collision_avoidance_repeller)
         number_of_repeller_eef = self.get_god_map().get_data(identifier.external_collision_avoidance_repeller_eef)
         eef_joints = self.get_robot().get_controlled_leaf_joints()
+        maximum_distance = self.get_god_map().get_data(identifier.maximum_collision_threshold)
         # TODO add root joint?
         remaining_joints = [joint_name for joint_name in self.get_robot().controlled_joints
                             if joint_name not in eef_joints]
@@ -197,12 +208,17 @@ class GoalToConstraints(GetGoal):
                     child_link = self.get_robot().get_child_link_of_joint(joint_name)
                     hard_threshold = self.get_god_map().get_data(identifier.external_collision_avoidance_distance +
                                                                 [joint_name, u'hard_threshold'])
-                    soft_threshold = self.get_god_map().get_data(identifier.external_collision_avoidance_distance +
-                                                                [joint_name, u'soft_threshold'])
+                    if soft_threshold_override is not None:
+                        soft_threshold = soft_threshold_override
+                    else:
+                        soft_threshold = self.get_god_map().get_data(identifier.external_collision_avoidance_distance +
+                                                                    [joint_name, u'soft_threshold'])
+                    maximum_distance = max(maximum_distance, soft_threshold)
                     constraint = ExternalCollisionAvoidance(self.god_map, child_link,
                                                             hard_threshold=hard_threshold,
                                                             soft_threshold=soft_threshold,
-                                                            idx=i)
+                                                            idx=i,
+                                                            num_repeller=number_of_repeller)
                     soft_constraints.update(constraint.get_constraints())
 
         for joint_name in eef_joints:
@@ -210,21 +226,29 @@ class GoalToConstraints(GetGoal):
             for i in range(number_of_repeller_eef):
                 hard_threshold = self.get_god_map().get_data(identifier.external_collision_avoidance_distance +
                                                              [joint_name, u'hard_threshold'])
-                soft_threshold = self.get_god_map().get_data(identifier.external_collision_avoidance_distance +
-                                                             [joint_name, u'soft_threshold'])
+                if soft_threshold_override is not None:
+                    soft_threshold = soft_threshold_override
+                else:
+                    soft_threshold = self.get_god_map().get_data(identifier.external_collision_avoidance_distance +
+                                                                 [joint_name, u'soft_threshold'])
+                maximum_distance = max(maximum_distance, soft_threshold)
                 constraint = ExternalCollisionAvoidance(self.god_map, child_link,
                                                         hard_threshold=hard_threshold,
                                                         soft_threshold=soft_threshold,
-                                                        idx=i)
+                                                        idx=i,
+                                                        num_repeller=number_of_repeller_eef)
                 soft_constraints.update(constraint.get_constraints())
 
         num_external = len(soft_constraints)
         loginfo('adding {} external collision avoidance constraints'.format(num_external))
         self.soft_constraints.update(soft_constraints)
+        self.get_god_map().set_data(identifier.maximum_collision_threshold, maximum_distance)
 
     def add_self_collision_avoidance_constraints(self):
         counter = defaultdict(int)
         soft_constraints = {}
+        number_of_repeller = self.get_god_map().get_data(identifier.self_collision_avoidance_repeller)
+        maximum_distance = self.get_god_map().get_data(identifier.maximum_collision_threshold)
         for link_a_o, link_b_o in self.get_robot().get_self_collision_matrix():
             link_a, link_b = self.robot.get_chain_reduced_to_controlled_joints(link_a_o, link_b_o)
             if not self.get_robot().link_order(link_a, link_b):
@@ -250,12 +274,15 @@ class GoalToConstraints(GetGoal):
                                          thresholds[link_b][u'hard_threshold'])
                     soft_threshold = min(thresholds[link_a][u'soft_threshold'],
                                          thresholds[link_b][u'soft_threshold'])
+                maximum_distance = max(maximum_distance, soft_threshold)
                 constraint = SelfCollisionAvoidance(self.god_map,
                                                     link_a=link_a,
                                                     link_b=link_b,
                                                     hard_threshold=hard_threshold,
                                                     soft_threshold=soft_threshold,
-                                                    idx=i)
+                                                    idx=i,
+                                                    num_repeller=number_of_repeller)
                 soft_constraints.update(constraint.get_constraints())
         loginfo('adding {} self collision avoidance constraints'.format(len(soft_constraints)))
         self.soft_constraints.update(soft_constraints)
+        self.get_god_map().set_data(identifier.maximum_collision_threshold, maximum_distance)

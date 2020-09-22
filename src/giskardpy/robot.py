@@ -240,6 +240,7 @@ class Robot(Backend):
             p.header.frame_id = root
             p.pose = homo_matrix_to_pose(homo_m)
         except Exception as e:
+            print(e)
             traceback.print_exc()
             pass
         return p
@@ -322,7 +323,7 @@ class Robot(Backend):
         :return:
         """
         js = {}
-        for joint_name in self.controlled_joints:
+        for joint_name in sorted(self.controlled_joints):
             sjs = SingleJointState()
             sjs.name = joint_name
             sjs.position = f(joint_name)

@@ -479,7 +479,7 @@ class URDFObject(object):
         pass
 
     @memoize
-    def has_link_collision(self, link_name, volume_threshold=1e-6, surface_threshold=1e-4):
+    def has_link_collision(self, link_name, volume_threshold=1.001e-6, surface_threshold=0.00061):
         """
         :type link: str
         :param volume_threshold: m**3, ignores simple geometry shapes with a volume less than this
@@ -737,6 +737,10 @@ class URDFObject(object):
             m.scale = Vector3(geometry.radius * 2,
                               geometry.radius * 2,
                               geometry.length)
+        elif isinstance(geometry, up.Mesh):
+            m.type = Marker.MESH_RESOURCE
+            m.scale = Vector3(1,1,1)
+            m.mesh_resource = geometry.filename
         else:
             raise Exception(u'world body type {} can\'t be converted to marker'.format(geometry.__class__.__name__))
         m.color = ColorRGBA(0, 1, 0, 0.5)

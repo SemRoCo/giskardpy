@@ -35,7 +35,7 @@ class World(object):
         self.soft_reset()
         self.remove_robot()
 
-    def check_collisions(self, cut_off_distances):
+    def check_collisions(self, cut_off_distances, collision_list_size=20):
         pass
 
     # Objects ----------------------------------------------------------------------------------------------------------
@@ -61,7 +61,7 @@ class World(object):
 
     def get_object(self, name):
         """
-        :type name: str
+        :type name: Union[str, unicode]
         :rtype: WorldObject
         """
         return self._objects[name]
@@ -78,14 +78,14 @@ class World(object):
     def has_object(self, name):
         """
         Checks for objects with the same name.
-        :type name: str
+        :type name: Union[str, unicode]
         :rtype: bool
         """
         return name in self.get_objects()
 
     def set_object_joint_state(self, name, joint_state):
         """
-        :type name: str
+        :type name: Union[str, unicode]
         :param joint_state: joint name -> SingleJointState
         :type joint_state: dict
         """

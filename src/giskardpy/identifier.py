@@ -15,9 +15,13 @@ collision_goal = [u'collision_goal']
 soft_constraint_identifier = [u'soft_constraints']
 joint_constraint_identifier = [u'joint_constraints']
 hard_constraint_identifier = [u'hard_constraints']
+
 execute = [u'execute']
+skip_failures = [u'skip_failures']
 check_reachability = [u'check_reachability']
 next_move_goal = [u'next_move_goal']
+cmd_id = [u'cmd_id']
+
 qp_data = [u'qp_data']
 A = qp_data + [u'A']
 H = qp_data + [u'H']
@@ -31,9 +35,9 @@ b_keys = qp_data + [u'b_keys']
 bA_keys = qp_data + [u'bA_keys']
 xdot_keys = qp_data + [u'xdot_keys']
 
-wiggle_detection_samples = [u'wiggle_detection_samples']
 post_processing = [u'post_processing']
 soft_constraints = post_processing + [u'soft_constraints']
+result_message = [u'result_message']
 
 
 
@@ -53,7 +57,6 @@ sample_period = general_options + [u'sample_period']
 map_frame = general_options + [u'map_frame']
 debug = general_options + [u'debug']
 fill_velocity_values = general_options + [u'fill_velocity_values']
-joint_convergence_threshold = general_options + [u'joint_convergence_threshold']
 
 joint_velocity_linear_limit = general_options + [u'joint_vel_limit', u'linear']
 joint_velocity_linear_limit_default = joint_velocity_linear_limit + [u'default']
@@ -89,9 +92,12 @@ PlotTrajectory_scaling = plugins + [u'PlotTrajectory', u'scaling']
 PlotTrajectory_normalize_position = plugins + [u'PlotTrajectory', u'normalize_position']
 PlotTrajectory_tick_stride = plugins + [u'PlotTrajectory', u'tick_stride']
 fft_duration = plugins + [u'WiggleCancel', u'fft_duration']
-wiggle_detection_threshold = plugins + [u'WiggleCancel', u'wiggle_detection_threshold']
-num_samples_in_fft = plugins + [u'WiggleCancel', u'num_samples_in_fft']
-wiggle_frequency_range = plugins + [u'WiggleCancel', u'wiggle_frequency_range']
+amplitude_threshold = plugins + [u'WiggleCancel', u'amplitude_threshold']
+num_samples_in_fft = plugins + [u'WiggleCancel', u'window_size']
+frequency_range = plugins + [u'WiggleCancel', u'frequency_range']
+
+joint_convergence_threshold = plugins + [u'GoalReached', u'joint_convergence_threshold']
+GoalReached_window_size = plugins + [u'GoalReached', u'window_size']
 
 # reachability check
 reachability_check = rosparam + [u'reachability_check']
@@ -105,9 +111,12 @@ rc_other_velocity = reachability_check + [u'other_velocity']
 # behavior tree
 behavior_tree = rosparam + [u'behavior_tree']
 tree_tick_rate = behavior_tree + [u'tree_tick_rate']
+tree_manager = behavior_tree + [u'tree_manager']
 
 # collision avoidance
 collision_avoidance = rosparam + [u'collision_avoidance']
+maximum_collision_threshold = collision_avoidance + [u'maximum_collision_threshold']
+added_collision_checks = collision_avoidance + [u'added_collision_checks']
 
 self_collision_avoidance = collision_avoidance + [u'self_collision_avoidance']
 self_collision_avoidance_distance = self_collision_avoidance + [u'distance_thresholds']

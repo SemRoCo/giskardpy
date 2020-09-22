@@ -44,7 +44,7 @@ class CollisionMarker(GiskardBehavior):
             for collision in collisions.items():  # type: Collision
                 red_threshold = 0.05  # TODO don't hardcode this
                 yellow_threshold = red_threshold * 2
-                green_threshold = red_threshold * 3
+                green_threshold = yellow_threshold * 2
                 contact_distance = collision.get_contact_distance()
                 if contact_distance < green_threshold:
                     m.points.append(Point(*collision.get_position_on_a_in_map()))

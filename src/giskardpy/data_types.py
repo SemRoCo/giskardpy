@@ -110,8 +110,16 @@ class Collision(object):
     def get_link_b(self):
         return self.__link_b
 
+    # @profile
+    def get_link_b_hash(self):
+        return self.get_link_b().__hash__()
+
     def get_body_b(self):
         return self.__body_b
+
+    # @profile
+    def get_body_b_hash(self):
+        return self.get_body_b().__hash__()
 
     def set_position_on_a_in_a(self, position):
         self.__position_on_a_in_a = position
@@ -149,25 +157,37 @@ class Collision(object):
 class Collisions(object):
 
 
-    def __init__(self, robot):
+    def __init__(self, robot, collision_list_size):
         """
         :type robot: giskardpy.robot.Robot
         """
         self.robot = robot
         self.root_T_map = kdl_to_np(self.robot.root_T_map)
         self.robot_root = self.robot.get_root()
+        self.collision_list_size = collision_list_size
 
+        # @profile
+        def sort(x):
+            return x.get_contact_distance()
+
+
+
+        # @profile
         def default_f():
-            return SortedKeyList([self._default_collision('', '', '')] * 20,
-                                 key=lambda x: x.get_contact_distance())
+            return SortedKeyList([self._default_collision('', '', '')] * collision_list_size,
+                                 key=sort)
+
+        self.default_result = default_f()
 
         self.self_collisions = defaultdict(default_f)
         self.external_collision = defaultdict(default_f)
+        self.external_collision_long_key = defaultdict(lambda : self._default_collision('', '', ''))
         self.all_collisions = set()
         self.number_of_self_collisions = defaultdict(int)
         self.number_of_external_collisions = defaultdict(int)
 
 
+    # @profile
     def add(self, collision):
         """
         :type collision: Collision
@@ -179,11 +199,20 @@ class Collisions(object):
         if collision.get_body_b() == self.robot.get_name():
             key = collision.get_link_a(), collision.get_link_b()
             self.self_collisions[key].add(collision)
-            self.number_of_self_collisions[key] = min(20, self.number_of_self_collisions[key] + 1)
+            self.number_of_self_collisions[key] = min(self.collision_list_size,
+                                                      self.number_of_self_collisions[key] + 1)
         else:
             key = collision.get_link_a()
             self.external_collision[key].add(collision)
-            self.number_of_external_collisions[key] = min(20, self.number_of_external_collisions[key] + 1)
+            self.number_of_external_collisions[key] = min(self.collision_list_size,
+                                                          self.number_of_external_collisions[key] + 1)
+            key_long = (collision.get_original_link_a(),collision.get_body_b(), collision.get_original_link_b())
+            if key_long not in self.external_collision_long_key:
+                self.external_collision_long_key[key_long] = collision
+            else:
+                self.external_collision_long_key[key_long] = min(collision, self.external_collision_long_key[key_long],
+                                                            key=lambda x: x.get_contact_distance())
+
 
 
     def transform_closest_point(self, collision):
@@ -248,20 +277,31 @@ class Collisions(object):
     def _default_collision(self, link_a, body_b, link_b):
         return Collision(link_a, body_b, link_b, [0, 0, 0], [0, 0, 0], [0, 0, 1], 100)
 
-
+    # @profile
     def get_external_collisions(self, joint_name):
         """
         Collisions are saved as a list for each movable robot joint, sorted by contact distance
         :type joint_name: str
         :rtype: SortedKeyList
         """
-        return self.external_collision[joint_name]
+        if joint_name in self.external_collision:
+            return self.external_collision[joint_name]
+        return self.default_result
+
+    def get_external_collisions_long_key(self, link_a, body_b, link_b):
+        """
+        Collisions are saved as a list for each movable robot joint, sorted by contact distance
+        :type joint_name: str
+        :rtype: SortedKeyList
+        """
+        return self.external_collision_long_key[link_a, body_b, link_b]
 
 
     def get_number_of_external_collisions(self, joint_name):
         return self.number_of_external_collisions[joint_name]
 
 
+    # @profile
     def get_self_collisions(self, link_a, link_b):
         """
         Make sure that link_a < link_b, the reverse collision is not saved.
@@ -271,7 +311,9 @@ class Collisions(object):
         :rtype: SortedKeyList
         """
         # FIXME maybe check for reverse key?
-        return self.self_collisions[link_a, link_b]
+        if (link_a, link_b) in self.self_collisions:
+            return self.self_collisions[link_a, link_b]
+        return self.default_result
 
 
     def get_number_of_self_collisions(self, link_a, link_b):

@@ -277,7 +277,7 @@ class GodMap(object):
         """
         return self.key_to_expr.values()
 
-    def set_data(self, identifier, value):
+    def unsafe_set_data(self, identifier, value):
         """
 
         :param identifier: e.g. ['pose', 'position', 'x']
@@ -308,6 +308,6 @@ class GodMap(object):
             else:
                 self._data[namespace] = value
 
-    def safe_set_data(self, identifier, value):
+    def set_data(self, identifier, value):
         with self.lock:
-            self.set_data(identifier, value)
+            self.unsafe_set_data(identifier, value)

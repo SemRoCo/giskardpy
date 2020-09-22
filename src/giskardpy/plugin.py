@@ -1,6 +1,7 @@
 import traceback
 from collections import OrderedDict
 from multiprocessing import Lock
+from threading import RLock
 from threading import Thread
 
 import rospy
@@ -8,6 +9,7 @@ from py_trees import Behaviour, Blackboard, Status
 
 from giskardpy.identifier import world, robot
 from giskardpy import logging
+import time
 
 
 class GiskardBehavior(Behaviour):
@@ -49,7 +51,7 @@ class GiskardBehavior(Behaviour):
 
     def unsafe_get_robot(self):
         """
-        :rtype: giskardpy.symengine_robot.Robot
+        :rtype: giskardpy.robot.Robot
         """
         if not self.robot:
             self.robot = self.get_god_map().unsafe_get_data(robot)
@@ -64,13 +66,16 @@ class GiskardBehavior(Behaviour):
     def get_blackboard_exception(self):
         return self.get_blackboard().get('exception')
 
+    def clear_blackboard_exception(self):
+        self.get_blackboard().set('exception', None)
+
 
 class PluginBehavior(GiskardBehavior):
 
     def __init__(self, name, sleep=.5):
         self._plugins = OrderedDict()
         self.set_status(Status.INVALID)
-        self.status_lock = Lock()
+        self.status_lock = RLock()
         self.sleep = sleep
         self.looped_once = False
         super(PluginBehavior, self).__init__(name)
@@ -87,7 +92,12 @@ class PluginBehavior(GiskardBehavior):
         name = plugin.name
         if name in self._plugins:
             raise KeyError(u'A plugin with name "{}" already exists.'.format(name))
-        self._plugins[name] = plugin
+        with self.status_lock:
+            self._plugins[name] = plugin
+
+    def remove_plugin(self, plugin_name):
+        with self.status_lock:
+            del self._plugins[plugin_name]
 
     def setup(self, timeout):
         self.start_plugins()

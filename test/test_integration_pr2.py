@@ -2962,6 +2962,172 @@ class TestCollisionAvoidanceGoals(object):
             "r_wrist_roll_joint":0.05106258161229582
         })
 
+    def test_bug2020_09_22_16_31_19_dump_shaking_fridge(self, kitchen_setup):
+        map_T_odom = tf.pose_to_kdl(convert_dictionary_to_ros_message(u'geometry_msgs/PoseStamped',
+                                                                      {
+                                                                          "header": {
+                                                                              "frame_id": "map",
+                                                                              "seq": 0,
+                                                                              "stamp": {
+                                                                                  "nsecs": 0,
+                                                                                  "secs": 0
+                                                                              }
+                                                                          },
+                                                                          "pose": {
+                                                                              "orientation": {
+                                                                                  "w": 0.9961110256200812,
+                                                                                  "x": 0.006263023182666383,
+                                                                                  "y": -0.005177686432095072,
+                                                                                  "z": -0.087731355523178
+                                                                              },
+                                                                              "position": {
+                                                                                  "x": -0.02804723533322183,
+                                                                                  "y": 1.521016808728904,
+                                                                                  "z": 0.024661551440549212
+                                                                              }
+                                                                          }
+                                                                      }
+                                                                      ).pose)
+
+        odom_T_base_footprint = PoseStamped()
+        odom_T_base_footprint.pose.position = Point(
+            0.749872459564353,
+            -2.3662978157179393,
+            0
+        )
+        odom_T_base_footprint.pose.orientation = Quaternion(*quaternion_about_axis(
+            -0.02447645526466663,
+            [0, 0, 1]))
+        odom_T_base_footprint = tf.pose_to_kdl(odom_T_base_footprint.pose)
+        map_T_base_footprint = tf.kdl_to_pose_stamped(map_T_odom * odom_T_base_footprint, u'map')
+
+        kitchen_setup.teleport_base(map_T_base_footprint)
+
+        js = {
+            "l_elbow_flex_joint": -1.1999776334963197,
+            "l_forearm_roll_joint": 125.80793083810454,
+            "l_shoulder_lift_joint": 0.3304654964048785,
+            "l_shoulder_pan_joint": 0.31122201505031577,
+            "l_upper_arm_roll_joint": 1.501462156478044,
+            "l_wrist_flex_joint": -0.4758783889802891,
+            "l_wrist_roll_joint": 17.44974655277518,
+            "r_elbow_flex_joint": -1.727087793643744,
+            "r_forearm_roll_joint": -67.3347966744268,
+            "r_shoulder_lift_joint": -0.023585428962786495,
+            "r_shoulder_pan_joint": -1.595440399265886,
+            "r_upper_arm_roll_joint": -1.4726506925031908,
+            "r_wrist_flex_joint": -0.4799775086785738,
+            "r_wrist_roll_joint": 37.75032336915375,
+            "torso_lift_joint": 0.2481805522141022,
+        }
+        kitchen_setup.allow_all_collisions()
+        kitchen_setup.send_and_check_joint_goal(js)
+
+        kitchen_setup.set_kitchen_js(
+            {
+                "fridge_area_lower_drawer_main_joint": 0.0,
+                "iai_fridge_door_joint": 1.5707,
+                "kitchen_island_left_lower_drawer_main_joint": 0.0,
+                "kitchen_island_left_upper_drawer_main_joint": 0.0,
+                "kitchen_island_middle_lower_drawer_main_joint": 0.0,
+                "kitchen_island_middle_upper_drawer_main_joint": 0.0,
+                "kitchen_island_right_lower_drawer_main_joint": 0.0,
+                "kitchen_island_right_upper_drawer_main_joint": 0.0,
+                "oven_area_area_left_drawer_main_joint": 0.0,
+                "oven_area_area_middle_lower_drawer_main_joint": 0.0,
+                "oven_area_area_middle_upper_drawer_main_joint": 0.0,
+                "oven_area_area_right_drawer_main_joint": 0.0,
+                "oven_area_oven_door_joint": 0.0,
+                "oven_area_oven_knob_oven_joint": 0.0,
+                "oven_area_oven_knob_stove_1_joint": 0.0,
+                "oven_area_oven_knob_stove_2_joint": 0.0,
+                "oven_area_oven_knob_stove_3_joint": 0.0,
+                "oven_area_oven_knob_stove_4_joint": 0.0,
+                "sink_area_dish_washer_door_joint": 0.0,
+                "sink_area_dish_washer_main_joint": 0.0,
+                "sink_area_dish_washer_tray_main": 0.0,
+                "sink_area_left_bottom_drawer_main_joint": 0.0,
+                "sink_area_left_middle_drawer_main_joint": 0.0,
+                "sink_area_left_upper_drawer_main_joint": 0.0,
+                "sink_area_trash_drawer_main_joint": 0.0
+            }
+        )
+
+        tip = "l_wrist_roll_link"
+        box_pose = convert_dictionary_to_ros_message(u'geometry_msgs/PoseStamped',
+                                                     {
+                                                         "header": {
+                                                             "frame_id": "l_wrist_roll_link",
+                                                             "seq": 0,
+                                                             "stamp": {
+                                                                 "nsecs": 0,
+                                                                 "secs": 0
+                                                             }
+                                                         },
+                                                         "pose": {
+                                                             "orientation": {
+                                                                 "w": 0.003999824012358274,
+                                                                 "x": 0.005999736017402663,
+                                                                 "y": -0.005999736017408128,
+                                                                 "z": 0.9999560029037843
+                                                             },
+                                                             "position": {
+                                                                 "x": 0.229,
+                                                                 "y": -0.006,
+                                                                 "z": -0.028
+                                                             }
+                                                         }
+                                                     }
+                                                     )
+        kitchen_setup.attach_box(u'bowl_1',
+                                 size=[0.0695257345835, 0.0704464276632, 0.199114735921],
+                                 frame_id=tip, pose=box_pose)
+
+        kitchen_setup.add_json_goal(u'CartesianVelocityLimit',
+                                    root_link=u'odom_combined',
+                                    # root_link=u'base_footprint',
+                                    tip_link='l_wrist_roll_link',
+                                    max_linear_velocity=0.05,
+                                    max_angular_velocity=0.25,
+                                    )
+
+        kitchen_setup.add_json_goal(u'CartesianVelocityLimit',
+                                    root_link=u'odom_combined',
+                                    # root_link=u'base_footprint',
+                                    tip_link='r_wrist_roll_link',
+                                    max_linear_velocity=0.05,
+                                    max_angular_velocity=0.25,
+                                    )
+
+        # kitchen_setup.add_json_goal(u'CartesianVelocityLimit',
+        #                             root_link=u'odom_combined',
+        #                             tip_link='base_footprint',
+        #                             max_linear_velocity=1,
+        #                             max_angular_velocity=1,
+        #                             )
+
+        # base_goal = PoseStamped()
+        # base_goal.header.frame_id = 'base_footprint'
+        # base_goal.pose.orientation.w = 1
+        # kitchen_setup.set_cart_goal(base_goal, 'base_footprint')
+
+        kitchen_setup.send_and_check_joint_goal({
+            "l_shoulder_pan_joint":1.9652919379395388,
+            "l_shoulder_lift_joint":-0.26499816732737785,
+            "l_upper_arm_roll_joint":1.3837617139225473,
+            "l_elbow_flex_joint":-2.1224566064321584,
+            "l_forearm_roll_joint":16.99646118944817,
+            "l_wrist_flex_joint":-0.07350789589924167,
+            "l_wrist_roll_joint":0.0,
+            "r_shoulder_pan_joint":-1.712587449591307,
+            "r_shoulder_lift_joint":-0.2567290370386635,
+            "r_upper_arm_roll_joint":-1.4633501125737374,
+            "r_elbow_flex_joint":-2.1221670650093913,
+            "r_forearm_roll_joint":1.7663253481913623,
+            "r_wrist_flex_joint":-0.07942669250968948,
+            "r_wrist_roll_joint":0.05106258161229582
+        })
+
 
     def test_bug2020_09_16_15_09_36_dump_grasp_wiggle_drawer(self, kitchen_setup):
         map_T_odom = tf.pose_to_kdl(convert_dictionary_to_ros_message(u'geometry_msgs/PoseStamped',

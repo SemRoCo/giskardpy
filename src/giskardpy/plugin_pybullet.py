@@ -50,7 +50,7 @@ class WorldUpdatePlugin(GiskardBehavior):
     def dump_state_cb(self, data):
         try:
             path = self.get_god_map().unsafe_get_data(identifier.data_folder)
-            new_path = u'{}/{}_dump.txt'.format(path, datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+            new_path = u'{}/{}_dump.txt'.format(path, datetime.now().strftime('%Y-%m-%d-%H-%M-%S'))
             robot = self.unsafe_get_robot()
             world = self.unsafe_get_world()
             with open(new_path, u'w') as f:

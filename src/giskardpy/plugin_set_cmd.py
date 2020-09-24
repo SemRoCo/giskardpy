@@ -47,6 +47,7 @@ class SetCmd(GetGoal):
 
             self.get_god_map().set_data(identifier.execute, self.is_execute(self.goal.type))
             self.get_god_map().set_data(identifier.skip_failures, self.is_skip_failures(self.goal.type))
+            self.get_god_map().set_data(identifier.cut_off_shaking, self.is_cut_off_shaking(self.goal.type))
 
     def is_plan(self, goal_type, plan_code=1):
         return plan_code in self.get_set_bits(goal_type)
@@ -59,6 +60,9 @@ class SetCmd(GetGoal):
 
     def is_check_reachability(self, goal_type, check_reachability_code=2):
         return check_reachability_code in self.get_set_bits(goal_type)
+
+    def is_cut_off_shaking(self, goal_type, cut_off_shaking=16):
+        return cut_off_shaking in self.get_set_bits(goal_type)
 
     def get_set_bits(self, goal_type):
         return [2 ** i * int(bit) for i, bit in enumerate(reversed("{0:b}".format(goal_type))) if int(bit) != 0]

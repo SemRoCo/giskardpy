@@ -58,8 +58,16 @@ class WiggleCancel(GiskardBehavior):
 
         js_samples_array = np.array(self.js_samples)
         plot = False
-        self.detect_shaking(js_samples_array, self.sample_period, self.min_wiggle_frequency,
-                            self.amplitude_threshold, self.thresholds, self.velocity_limits, plot)
+        try:
+            self.detect_shaking(js_samples_array, self.sample_period, self.min_wiggle_frequency,
+                                self.amplitude_threshold, self.thresholds, self.velocity_limits, plot)
+        except ShakingException as e:
+            if self.get_god_map().get_data(identifier.cut_off_shaking):
+                trajectory = self.get_god_map().get_data(identifier.trajectory)
+                for i in range(self.num_samples_in_fft):
+                    trajectory.delete_last()
+                return Status.SUCCESS
+            raise e
 
         return Status.RUNNING
 

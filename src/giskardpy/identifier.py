@@ -20,6 +20,7 @@ hard_constraint_identifier = [u'hard_constraints']
 execute = [u'execute']
 skip_failures = [u'skip_failures']
 check_reachability = [u'check_reachability']
+cut_off_shaking = [u'cut_off_shaking']
 next_move_goal = [u'next_move_goal']
 cmd_id = [u'cmd_id']
 

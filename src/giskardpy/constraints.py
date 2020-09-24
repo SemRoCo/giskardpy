@@ -1983,7 +1983,7 @@ class OpenDoor(Constraint):
     hinge0_P_tipStart_norm_id = u'hinge0_P_tipStart_norm'
     weight_id = u'weight'
 
-    def __init__(self, god_map, tip, object_name, handle_link, angle_goal, root=None, weight=WEIGHT_BELOW_CA):
+    def __init__(self, god_map, tip, object_name, handle_link, angle_goal, root=None, weight=WEIGHT_ABOVE_CA):
         super(OpenDoor, self).__init__(god_map)
 
         if root is None:
@@ -2056,8 +2056,7 @@ class OpenDoor(Constraint):
         return self.get_input_Vector3Stamped(self.hinge_V_hinge_axis_msg_id)
 
     def make_constraints(self):
-        weight = self.get_input_float(self.weight_id)
-        weight = self.normalize_weight(0.1, weight)
+        base_weight = self.get_input_float(self.weight_id)
         root_T_tip = self.get_fk(self.root, self.tip)
         root_T_hinge = self.get_hinge_pose()
         hinge_V_hinge_axis = self.get_hinge_axis()[:3]
@@ -2069,12 +2068,13 @@ class OpenDoor(Constraint):
         dist_goal = self.get_input_float(self.hinge0_P_tipStart_norm_id)
         hinge0_T_tipStartProjected = self.get_input_np_frame(self.hinge0_T_tipStartProjected_id)
 
-        self.add_minimize_position_constraints(w.position_of(root_T_tipGoal), 0.1, 0.1, self.root, self.tip, False)
+        self.add_minimize_position_constraints(w.position_of(root_T_tipGoal), 0.1, 0.1, self.root, self.tip, False,
+                                               weight=base_weight)
 
         hinge_P_tip = w.position_of(w.dot(hinge_T_root, root_T_tip))[:3]
 
         dist_expr = w.norm(hinge_P_tip)
-        weight = self.normalize_weight(0.1, weight)
+        weight = self.normalize_weight(0.1, base_weight)
         self.add_constraint(u'/dist',
                             dist_goal - dist_expr,
                             dist_goal - dist_expr,
@@ -2097,7 +2097,7 @@ class OpenDoor(Constraint):
 
         root_R_tipGoal = w.dot(root_T_hingeCurrent, hinge0_R_tipGoal)
 
-        self.add_minimize_rotation_constraints(root_R_tipGoal, self.root, self.tip)
+        self.add_minimize_rotation_constraints(root_R_tipGoal, self.root, self.tip, weight=base_weight)
 
     def __str__(self):
         s = super(OpenDoor, self).__str__()
@@ -2109,7 +2109,7 @@ class OpenDrawer(Constraint):
     hinge_V_hinge_axis_msg_id = u'hinge_axis'  # axis vector of the hinge
     root_T_tip_goal_id = u'root_T_tipGoal'  # goal of the gripper tip (where to move)
 
-    def __init__(self, god_map, tip, object_name, handle_link, distance_goal, root=None):
+    def __init__(self, god_map, tip, object_name, handle_link, distance_goal, root=None, weight=WEIGHT_ABOVE_CA):
         """
         :type tip: str
         :param tip: tip of manipulator (gripper) which is used
@@ -2194,7 +2194,8 @@ class OpenDrawer(Constraint):
                 god_map,
                 self.root,
                 self.tip,
-                root_T_tip_goal_dict))
+                root_T_tip_goal_dict,
+                weight=weight))
 
     def make_constraints(self):
         # Execute constraints
@@ -2208,7 +2209,7 @@ class OpenDrawer(Constraint):
 
 class Open(Constraint):
     def __init__(self, god_map, tip, object_name, handle_link, root=None, goal_joint_state=None,
-                 weight=WEIGHT_BELOW_CA):
+                 weight=WEIGHT_ABOVE_CA):
         super(Open, self).__init__(god_map)
         self.constraints = []
         environment_object = self.get_world().get_object(object_name)
@@ -2235,7 +2236,8 @@ class Open(Constraint):
                                                object_name=object_name,
                                                handle_link=handle_link,
                                                distance_goal=goal_joint_state,
-                                               root=root))
+                                               root=root,
+                                               weight=weight))
         else:
             logwarn(u'Opening containers with joint of type "{}" not supported'.format(
                 environment_object.get_joint_type(joint_name)))
@@ -2247,7 +2249,7 @@ class Open(Constraint):
 
 class Close(Constraint):
     def __init__(self, god_map, tip, object_name, handle_link, root=None, goal_joint_state=None,
-                 weight=WEIGHT_BELOW_CA):
+                 weight=WEIGHT_ABOVE_CA):
         super(Close, self).__init__(god_map)
         self.constraints = []
         environment_object = self.get_world().get_object(object_name)
@@ -2274,7 +2276,8 @@ class Close(Constraint):
                                                object_name=object_name,
                                                handle_link=handle_link,
                                                distance_goal=goal_joint_state,
-                                               root=root))
+                                               root=root,
+                                               weight=weight))
         else:
             logwarn(u'Opening containers with joint of type "{}" not supported'.format(
                 environment_object.get_joint_type(joint_name)))

@@ -3,11 +3,12 @@ import traceback
 from collections import namedtuple, OrderedDict, defaultdict
 from copy import deepcopy
 from itertools import combinations
-
+from giskardpy import identifier
 from geometry_msgs.msg import PoseStamped
 
 from giskardpy import WORLD_IMPLEMENTATION, cas_wrapper as w
 from giskardpy.data_types import SingleJointState, HardConstraint, JointConstraint
+from giskardpy.god_map import GodMap
 from giskardpy.pybullet_world_object import PyBulletWorldObject
 from giskardpy.utils import KeyDefaultDict, \
     homo_matrix_to_pose, memoize
@@ -127,7 +128,7 @@ class Robot(Backend):
         super(Robot, self).reinitialize()
         self._fk_expressions = {}
         self._create_frames_expressions()
-        self._create_constraints()
+        # self._create_constraints()
         self.init_fast_fks()
 
     def set_joint_position_symbols(self, symbols):
@@ -191,24 +192,28 @@ class Robot(Backend):
 
             self._joint_to_frame[joint_name] = joint_frame
 
-    def _create_constraints(self):
+    def _create_constraints(self, god_map):
         """
         Creates hard and joint constraints.
+        :type god_map: GodMap
         """
         self._hard_constraints = OrderedDict()
         self._joint_constraints = OrderedDict()
         for i, joint_name in enumerate(self.get_joint_names_controllable()):
             lower_limit, upper_limit = self.get_joint_limits(joint_name)
             joint_symbol = self.get_joint_position_symbol(joint_name)
-            sample_period = w.Symbol(u'rosparam_general_options_sample_period')  # TODO this should be a parameter
+            sample_period = god_map.to_symbol(identifier.sample_period)
             velocity_limit = self.get_joint_velocity_limit_expr(joint_name) * sample_period
 
             weight = self._joint_weights[joint_name]
             weight = weight * (1. / (velocity_limit)) ** 2
+            last_joint_velocity = god_map.to_symbol(identifier.last_joint_states + [joint_name, u'velocity'])
 
             if not self.is_joint_continuous(joint_name):
-                self._joint_constraints[joint_name] = JointConstraint(lower=w.Max(-velocity_limit, lower_limit - joint_symbol),
-                                                                      upper=w.Min(velocity_limit, upper_limit - joint_symbol),
+                self._joint_constraints[joint_name] = JointConstraint(lower=w.Max(-velocity_limit,
+                                                                                  lower_limit - joint_symbol),
+                                                                      upper=w.Min(velocity_limit,
+                                                                                  upper_limit - joint_symbol),
                                                                       weight=weight,
                                                                       linear_weight=0)
             else:

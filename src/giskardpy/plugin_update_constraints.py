@@ -52,6 +52,8 @@ class GoalToConstraints(GetGoal):
 
         self.get_god_map().set_data(identifier.constraints_identifier, {})
 
+        self.get_robot()._create_constraints(self.get_god_map())
+
         self.soft_constraints = {}
         if not (self.get_god_map().get_data(identifier.check_reachability)):
             self.get_god_map().set_data(identifier.maximum_collision_threshold, 0)

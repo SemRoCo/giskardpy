@@ -39,4 +39,5 @@ class KinSimPlugin(GiskardBehavior):
             self.get_god_map().set_data(identifier.joint_states, next_js)
         else:
             self.get_god_map().set_data(identifier.joint_states, current_js)
+        self.get_god_map().set_data(identifier.last_joint_states, current_js)
         return Status.RUNNING

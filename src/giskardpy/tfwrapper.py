@@ -305,6 +305,7 @@ def np_to_kdl(matrix):
                      matrix[2, 3])
     return PyKDL.Frame(r, p)
 
+
 def kdl_to_np(kdl_thing):
     if isinstance(kdl_thing, PyKDL.Wrench):
         return np.array([kdl_thing.force[0],
@@ -343,6 +344,7 @@ def angle_between_vector(v1, v2):
         v2 = kdl_to_np(v2)
     return np.arccos(np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2)))
 
+
 def np_vector(x, y, z):
     return np.array([x, y, z, 0])
 
@@ -350,13 +352,14 @@ def np_vector(x, y, z):
 def np_point(x, y, z):
     return np.array([x, y, z, 1])
 
-### Code copied from user jarvisschultz from ROS answers
-#   https://answers.ros.org/question/332407/transformstamped-to-transformation-matrix-python/
-def pose_to_pq(msg):
+
+# Code copied from user jarvisschultz from ROS answers
+# https://answers.ros.org/question/332407/transformstamped-to-transformation-matrix-python/
+def pose_to_np(msg):
     """Convert a C{geometry_msgs/Pose} into position/quaternion np arrays
 
-    @param msg: ROS message to be converted
-    @return:
+    :param msg: ROS message to be converted
+    :return:
       - p: position as a np.array
       - q: quaternion as a numpy array (order = [x,y,z,w])
     """
@@ -366,22 +369,22 @@ def pose_to_pq(msg):
     return p, q
 
 
-def pose_stamped_to_pq(msg):
+def pose_stamped_to_np(msg):
     """Convert a C{geometry_msgs/PoseStamped} into position/quaternion np arrays
 
-    @param msg: ROS message to be converted
-    @return:
-      - p: position as a np.array
-      - q: quaternion as a numpy array (order = [x,y,z,w])
+    :param msg: ROS message to be converted
+    :return:
+        - p: position as a np.array
+        - q: quaternion as a numpy array (order = [x,y,z,w])
     """
-    return pose_to_pq(msg.pose)
+    return pose_to_np(msg.pose)
 
 
-def transform_to_pq(msg):
+def transform_to_np(msg):
     """Convert a C{geometry_msgs/Transform} into position/quaternion np arrays
 
-    @param msg: ROS message to be converted
-    @return:
+    :param msg: ROS message to be converted
+    :return:
       - p: position as a np.array
       - q: quaternion as a numpy array (order = [x,y,z,w])
     """
@@ -391,33 +394,34 @@ def transform_to_pq(msg):
     return p, q
 
 
-def transform_stamped_to_pq(msg):
+def transform_stamped_to_np(msg):
     """Convert a C{geometry_msgs/TransformStamped} into position/quaternion np arrays
 
-    @param msg: ROS message to be converted
-    @return:
+    :param msg: ROS message to be converted
+    :return:
       - p: position as a np.array
       - q: quaternion as a numpy array (order = [x,y,z,w])
+
     """
-    return transform_to_pq(msg.transform)
+    return transform_to_np(msg.transform)
 
 
-def msg_to_se3(msg):
+def msg_to_homogeneous_matrix(msg):
     """Conversion from geometric ROS messages into SE(3)
 
-    @param msg: Message to transform. Acceptable types - C{geometry_msgs/Pose}, C{geometry_msgs/PoseStamped},
+    :param msg: Message to transform. Acceptable types - C{geometry_msgs/Pose}, C{geometry_msgs/PoseStamped},
     C{geometry_msgs/Transform}, or C{geometry_msgs/TransformStamped}
-    @return: a 4x4 SE(3) matrix as a numpy array
+    :return: a 4x4 SE(3) matrix as a numpy array
     @note: Throws TypeError if we receive an incorrect type.
     """
     if isinstance(msg, Pose):
-        p, q = pose_to_pq(msg)
+        p, q = pose_to_np(msg)
     elif isinstance(msg, PoseStamped):
-        p, q = pose_stamped_to_pq(msg)
+        p, q = pose_stamped_to_np(msg)
     elif isinstance(msg, Transform):
-        p, q = transform_to_pq(msg)
+        p, q = transform_to_np(msg)
     elif isinstance(msg, TransformStamped):
-        p, q = transform_stamped_to_pq(msg)
+        p, q = transform_stamped_to_np(msg)
     else:
         raise TypeError("Invalid type for conversion to SE(3)")
     norm = np.linalg.norm(q)
@@ -430,7 +434,7 @@ def msg_to_se3(msg):
     g = tr.quaternion_matrix(q)
     g[0:3, -1] = p
     return g
-### end of copied code
+# end of copied code
 
 def publish_frame_marker(pose_stamped, id_=1, length=0.1):
     """

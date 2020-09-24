@@ -11,7 +11,6 @@ from giskard_msgs.msg import Constraint as Constraint_msg
 
 import giskardpy.identifier as identifier
 import giskardpy.tfwrapper as tf
-import tf_conversions as tc
 from giskardpy import cas_wrapper as w
 from giskardpy.data_types import SoftConstraint
 from giskardpy.exceptions import GiskardException, ConstraintException
@@ -334,10 +333,8 @@ class Constraint(object):
         Adds a constraint with weight 0 to the qp problem.
         Used to inspect subexpressions for debugging.
         :param name: a name to identify the expression
-        :param prefix: name prefix to distinguish different constraints
         :type name: str
         :type expr: w.Symbol
-        :type prefix: str
         """
         self.add_constraint(name, expr, expr, 1, 0, False)
 
@@ -358,6 +355,8 @@ class Constraint(object):
         :param max_acceleration:
         :param root:
         :param tip:
+        :param prefix: name prefix to distinguish different constraints
+        :type prefix: str
         :return:
         """
         r_P_c = w.position_of(self.get_fk(root, tip))
@@ -375,19 +374,19 @@ class Constraint(object):
         #                                     0.06, WEIGHTS[1])
         weight = self.normalize_weight(max_velocity, weight)
 
-        self.add_constraint(u'/' + prefix + u'/x',
+        self.add_constraint(u'/{}/x'.format(prefix),
                             lower=r_P_intermediate_error[0],
                             upper=r_P_intermediate_error[0],
                             weight=weight,
                             expression=r_P_c[0],
                             goal_constraint=goal_constraint)
-        self.add_constraint(u'/' + prefix + u'/y',
+        self.add_constraint(u'/{}/y'.format(prefix),
                             lower=r_P_intermediate_error[1],
                             upper=r_P_intermediate_error[1],
                             weight=weight,
                             expression=r_P_c[1],
                             goal_constraint=goal_constraint)
-        self.add_constraint(u'/' + prefix + u'/z',
+        self.add_constraint(u'/{}/z'.format(prefix),
                             lower=r_P_intermediate_error[2],
                             upper=r_P_intermediate_error[2],
                             weight=weight,
@@ -406,19 +405,19 @@ class Constraint(object):
 
         weight = self.normalize_weight(max_velocity, weight)
 
-        self.add_constraint(u'/' + prefix + u'/rot/x',
+        self.add_constraint(u'/{}/rot/x'.format(prefix),
                             lower=error[0],
                             upper=error[0],
                             weight=weight,
                             expression=root_V_tip_normal[0],
                             goal_constraint=goal_constraint)
-        self.add_constraint(u'/' + prefix + u'/rot/y',
+        self.add_constraint(u'/{}/rot/y'.format(prefix),
                             lower=error[1],
                             upper=error[1],
                             weight=weight,
                             expression=root_V_tip_normal[1],
                             goal_constraint=goal_constraint)
-        self.add_constraint(u'/' + prefix + u'/rot/z',
+        self.add_constraint(u'/{}/rot/z'.format(prefix),
                             lower=error[2],
                             upper=error[2],
                             weight=weight,
@@ -455,19 +454,19 @@ class Constraint(object):
 
         weight = self.normalize_weight(max_velocity, weight)
 
-        self.add_constraint(u'/' + prefix + u'/rot/0',
+        self.add_constraint(u'/{}/rot/0'.format(prefix),
                             lower=c_R_g_intermediate_aa[0],
                             upper=c_R_g_intermediate_aa[0],
                             weight=weight,
                             expression=current_angle_axis[0],
                             goal_constraint=goal_constraint)
-        self.add_constraint(u'/' + prefix + u'/rot/1',
+        self.add_constraint(u'/{}/rot/1'.format(prefix),
                             lower=c_R_g_intermediate_aa[1],
                             upper=c_R_g_intermediate_aa[1],
                             weight=weight,
                             expression=current_angle_axis[1],
                             goal_constraint=goal_constraint)
-        self.add_constraint(u'/' + prefix + u'/rot/2',
+        self.add_constraint(u'/{}/rot/2'.format(prefix),
                             lower=c_R_g_intermediate_aa[2],
                             upper=c_R_g_intermediate_aa[2],
                             weight=weight,
@@ -948,7 +947,7 @@ class CartesianPositionStraight(BasicCartesianConstraint):
         """
         root_P_goal = w.position_of(self.get_goal_pose())
         root_P_tip = w.position_of(self.get_fk(self.root, self.tip))
-        root_V_start = w.point3(*tf.transform_stamped_to_pq(tf.lookup_transform(self.root, self.tip))[0])
+        root_V_start = w.point3(*tf.transform_stamped_to_np(tf.lookup_transform(self.root, self.tip))[0])
         max_velocity = self.get_input_float(self.max_velocity)
         max_acceleration = self.get_input_float(self.max_acceleration)
         weight = self.get_input_float(self.weight)
@@ -963,9 +962,7 @@ class CartesianPositionStraight(BasicCartesianConstraint):
                                                weight,
                                                prefix=u'goal')
 
-        self.add_debug_vector(u'start_point', root_P_goal)
-        # FIXME: type error. Mixed calc with Vector3 and SX (expression)
-        #        Both same or can we make it working?
+        # self.add_debug_vector(u'start_point', root_P_goal)
         dist, nearest = w.distance_point_to_line_segment(root_P_tip,
                                                          root_V_start,
                                                          root_P_goal)

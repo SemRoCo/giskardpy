@@ -1195,10 +1195,10 @@ class TestConstraints(object):
                        u'oven_area_area_right_drawer_handle']
 
         handle_frame_id = [u'iai_kitchen/' + item for item in handle_name]
-        joint_name = [str(item).decode("utf-8").replace(u'handle', u'main_joint').encode("utf-8") for item in handle_name]
+        joint_name = [item.replace(u'handle', u'main_joint') for item in handle_name]
 
         for i_handle_id, i_handle_name, i_joint_name in zip(handle_frame_id, handle_name, joint_name):
-            rospy.loginfo('=== Opening drawer: ' + str(i_handle_name).decode('utf-8') + ' ===')
+            logging.loginfo('=== Opening drawer: {} ==='.format(i_handle_name.replace(u'_handle', u'')))
             bar_axis = Vector3Stamped()
             bar_axis.header.frame_id = i_handle_id
             bar_axis.vector.y = 1

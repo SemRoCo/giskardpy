@@ -34,7 +34,7 @@ def generate_msg(msg):
         return generate_debug_msg(msg)
     else:
         node_name = rospy.get_name()
-        new_msg = '[' + node_name + ']' + ': ' + msg
+        new_msg = '[{}]: {}'.format(node_name, msg)
         return new_msg
 
 

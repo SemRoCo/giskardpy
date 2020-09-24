@@ -3470,12 +3470,12 @@ class TestCollisionAvoidanceGoals(object):
 
         kitchen_setup.add_json_goal(u'AvoidJointLimits', percentage=40)
 
-        # kitchen_setup.add_json_goal(u'CartesianVelocityLimit',
-        #                             root_link=u'odom_combined',
-        #                             tip_link='base_footprint',
-        #                             max_linear_velocity=0.05,
-        #                             max_angular_velocity=0.1,
-        #                             )
+        kitchen_setup.add_json_goal(u'CartesianVelocityLimit',
+                                    root_link=u'odom_combined',
+                                    tip_link='base_footprint',
+                                    max_linear_velocity=0.05,
+                                    max_angular_velocity=0.1,
+                                    )
         # avoidance_hint = Vector3Stamped()
         # avoidance_hint.header.frame_id = u'base_footprint'
         # avoidance_hint.vector.y = 1
@@ -3489,7 +3489,8 @@ class TestCollisionAvoidanceGoals(object):
         #                             link_b=u'r_wrist_flex_link',
         #                             weight=WEIGHT_COLLISION_AVOIDANCE,
         #                             avoidance_hint=avoidance_hint)
-        kitchen_setup.set_and_check_cart_goal(map_T_cart_goal, kitchen_setup.r_tip)
+        kitchen_setup.set_cart_goal(map_T_cart_goal, kitchen_setup.r_tip)
+        kitchen_setup.send_and_check_goal(goal_type=MoveGoal.PLAN_AND_EXECUTE_AND_CUT_OFF_SHAKING)
 
     def test_bug2020_09_23_14_41_39_dump_shaking_dishwasher(self, kitchen_setup):
         # fixme
@@ -5780,6 +5781,32 @@ class TestCollisionAvoidanceGoals(object):
         pocky_pose_setup.add_cylinder('br', [0.2, 0.01], p)
 
         pocky_pose_setup.send_and_check_goal(expected_error_codes=[MoveResult.SHAKING])
+
+    def test_avoid_collision5_cut_off(self, pocky_pose_setup):
+        """
+        :type pocky_pose_setup: PR2
+        """
+        pocky_pose_setup.attach_box(size=[0.2, 0.05, 0.05],
+                                    frame_id=pocky_pose_setup.r_tip,
+                                    position=[0.08, 0, 0],
+                                    orientation=quaternion_about_axis(0.01, [1, 0, 0]).tolist())
+        p = PoseStamped()
+        p.header.frame_id = pocky_pose_setup.r_tip
+        p.pose.position.x = 0.12
+        p.pose.position.y = 0.04
+        p.pose.position.z = 0
+        p.pose.orientation.w = 1
+        pocky_pose_setup.add_cylinder('bl', [0.2, 0.01], p)
+        p = PoseStamped()
+        p.header.frame_id = pocky_pose_setup.r_tip
+        p.pose.position.x = 0.12
+        p.pose.position.y = -0.04
+        p.pose.position.z = 0
+        p.pose.orientation.w = 1
+        pocky_pose_setup.add_cylinder('br', [0.2, 0.01], p)
+
+        pocky_pose_setup.send_and_check_goal(goal_type=MoveGoal.PLAN_AND_EXECUTE_AND_CUT_OFF_SHAKING,
+                                             expected_error_codes=[MoveResult.SHAKING])
 
     def test_avoid_collision6(self, fake_table_setup):
         """

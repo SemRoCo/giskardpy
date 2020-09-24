@@ -3,6 +3,7 @@ import numpy as np
 from py_trees import Status
 
 import giskardpy.identifier as identifier
+from giskardpy import logging
 from giskardpy.exceptions import ShakingException
 from giskardpy.plugin import GiskardBehavior
 # fast
@@ -66,7 +67,10 @@ class WiggleCancel(GiskardBehavior):
                 trajectory = self.get_god_map().get_data(identifier.trajectory)
                 for i in range(self.num_samples_in_fft):
                     trajectory.delete_last()
-                return Status.SUCCESS
+                if len(trajectory.keys()) >= self.num_samples_in_fft:
+                    logging.loginfo(str(e))
+                    logging.loginfo(u'cutting off last second')
+                    return Status.SUCCESS
             raise e
 
         return Status.RUNNING

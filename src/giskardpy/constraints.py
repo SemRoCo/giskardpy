@@ -1285,7 +1285,7 @@ class CartesianPose(Constraint):
                  weight=WEIGHT_ABOVE_CA, goal_constraint=True):
         super(CartesianPose, self).__init__(god_map)
         self.constraints = []
-        self.constraints.append(CartesianPositionStraight(god_map=god_map,
+        self.constraints.append(CartesianPosition(god_map=god_map,
                                                   root_link=root_link,
                                                   tip_link=tip_link,
                                                   goal=goal,
@@ -1293,6 +1293,34 @@ class CartesianPose(Constraint):
                                                   max_acceleration=translation_max_acceleration,
                                                   weight=weight,
                                                   goal_constraint=goal_constraint))
+        self.constraints.append(CartesianOrientationSlerp(god_map=god_map,
+                                                          root_link=root_link,
+                                                          tip_link=tip_link,
+                                                          goal=goal,
+                                                          max_velocity=rotation_max_velocity,
+                                                          max_accleration=rotation_max_acceleration,
+                                                          weight=weight,
+                                                          goal_constraint=goal_constraint))
+
+    def make_constraints(self):
+        for constraint in self.constraints:
+            self.soft_constraints.update(constraint.get_constraints())
+
+
+class CartesianPoseStraight(Constraint):
+    def __init__(self, god_map, root_link, tip_link, goal, translation_max_velocity=0.1,
+                 translation_max_acceleration=0.1, rotation_max_velocity=0.5, rotation_max_acceleration=0.5,
+                 weight=WEIGHT_ABOVE_CA, goal_constraint=True):
+        super(CartesianPoseStraight, self).__init__(god_map)
+        self.constraints = []
+        self.constraints.append(CartesianPositionStraight(god_map=god_map,
+                                                          root_link=root_link,
+                                                          tip_link=tip_link,
+                                                          goal=goal,
+                                                          max_velocity=translation_max_velocity,
+                                                          max_acceleration=translation_max_acceleration,
+                                                          weight=weight,
+                                                          goal_constraint=goal_constraint))
         self.constraints.append(CartesianOrientationSlerp(god_map=god_map,
                                                           root_link=root_link,
                                                           tip_link=tip_link,
@@ -2277,7 +2305,7 @@ class OpenDrawer(Constraint):
             tf.kdl_to_pose_stamped(root_T_tip_goal, self.root))
 
         self.constraints.append(
-            CartesianPose(
+            CartesianPoseStraight(
                 god_map,
                 self.root,
                 self.tip,

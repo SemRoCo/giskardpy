@@ -942,8 +942,6 @@ class CartesianVelocityLimit(Constraint):
 
         linear_weight = self.normalize_weight(max_linear_velocity, weight)
 
-        self.add_debug_vector('/root_P_tip', root_P_tip)
-
         if self.hard:
             slack_limit = 0
         else:

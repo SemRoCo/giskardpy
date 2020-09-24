@@ -15,6 +15,8 @@ class WiggleCancel(GiskardBehavior):
         self.amplitude_threshold = self.get_god_map().get_data(identifier.amplitude_threshold)
         self.num_samples_in_fft = self.get_god_map().get_data(identifier.num_samples_in_fft)
         self.frequency_range = self.get_god_map().get_data(identifier.frequency_range)
+        self.max_angular_velocity = 10.5
+        self.max_linear_velocity = 10.5
 
     def initialise(self):
         super(WiggleCancel, self).initialise()
@@ -27,7 +29,11 @@ class WiggleCancel(GiskardBehavior):
         self.velocity_limits = []
         for joint_name, threshold in zip(self.get_robot().controlled_joints,
                                          make_velocity_threshold(self.get_god_map())):
-            velocity_limit = self.get_robot().get_joint_velocity_limit(joint_name)
+            velocity_limit = self.get_robot().get_joint_velocity_limit_expr_evaluated(joint_name, self.god_map)
+            if self.get_robot().is_joint_prismatic(joint_name):
+                velocity_limit = min(self.max_linear_velocity, velocity_limit)
+            else:
+                velocity_limit = min(self.max_angular_velocity, velocity_limit)
             self.keys.append(joint_name)
             self.thresholds.append(threshold)
             self.velocity_limits.append(velocity_limit)
@@ -65,7 +71,8 @@ class WiggleCancel(GiskardBehavior):
         N = len(js_samples[0]) - 1
         # remove joints that arent moving
         mask = self.make_mask(js_samples, moving_thresholds)
-        amplitude_thresholds = velocity_limits[mask] * amplitude_threshold * N  # acceleration limit is basically vel*2
+        velocity_limits = velocity_limits[mask]
+        amplitude_thresholds = velocity_limits * amplitude_threshold * N  # acceleration limit is basically vel*2
         joints_filtered = js_samples[mask]
         joints_filtered = np.diff(joints_filtered)
         # joints_filtered = (joints_filtered.T - joints_filtered.mean(axis=1)).T
@@ -112,7 +119,7 @@ class WiggleCancel(GiskardBehavior):
                 if np.any(violations[:, i]):
                     joint = filtered_keys[i]
                     velocity_limit = velocity_limits[i]
-                    hertz_str = ','.join(u'{} hertz: {} > {}'.format(freq[freq_idx:][j],
+                    hertz_str = u', '.join(u'{} hertz: {} > {}'.format(freq[freq_idx:][j],
                                                                      fft[:, freq_idx:].T[:, i][j] / N / velocity_limit,
                                                                      amplitude_threshold) for j, x in
                                          enumerate(violations[:, i]) if x)

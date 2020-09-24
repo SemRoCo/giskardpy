@@ -917,6 +917,22 @@ class CartesianPosition(BasicCartesianConstraint):
 
 
 class CartesianPositionStraight(BasicCartesianConstraint):
+    start = u'start'
+
+    def __init__(self, god_map, root_link, tip_link, goal, max_velocity, max_acceleration, weight, goal_constraint):
+        super(CartesianPositionStraight, self).__init__(god_map,
+                                                        root_link,
+                                                        tip_link,
+                                                        goal,
+                                                        max_velocity,
+                                                        max_acceleration,
+                                                        weight,
+                                                        goal_constraint)
+
+        start = tf.lookup_pose(self.root, self.tip)
+
+        params = {self.start: start}
+        self.save_params_on_god_map(params)
 
     def get_tip_pose(self):
         return self.get_input_PoseStamped(self.tip)
@@ -951,7 +967,7 @@ class CartesianPositionStraight(BasicCartesianConstraint):
         """
         root_P_goal = w.position_of(self.get_goal_pose())
         root_P_tip = w.position_of(self.get_fk(self.root, self.tip))
-        root_V_start = w.point3(*tf.transform_stamped_to_np(tf.lookup_transform(self.root, self.tip))[0])
+        root_V_start = w.position_of(self.get_input_PoseStamped(self.start))
         max_velocity = self.get_input_float(self.max_velocity)
         max_acceleration = self.get_input_float(self.max_acceleration)
         weight = self.get_input_float(self.weight)

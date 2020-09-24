@@ -55,7 +55,7 @@ def transform_pose(target_frame, pose):
         new_pose = do_transform_pose(pose, transform)
         return new_pose
     except ExtrapolationException as e:
-        logging.logwarn(e)
+        logging.logwarn(str(e))
 
 
 def transform_vector(target_frame, vector):
@@ -77,7 +77,7 @@ def transform_vector(target_frame, vector):
         new_pose = do_transform_vector3(vector, transform)
         return new_pose
     except ExtrapolationException as e:
-        logging.logwarn(e)
+        logging.logwarn(str(e))
 
 
 def transform_point(target_frame, point):
@@ -99,7 +99,7 @@ def transform_point(target_frame, point):
         new_pose = do_transform_point(point, transform)
         return new_pose
     except ExtrapolationException as e:
-        logging.logwarn(e)
+        logging.logwarn(str(e))
 
 
 def lookup_transform(target_frame, source_frame, time=None):

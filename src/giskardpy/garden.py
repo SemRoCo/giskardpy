@@ -7,7 +7,7 @@ import rospy
 from control_msgs.msg import JointTrajectoryControllerState
 from giskard_msgs.msg import MoveAction
 from py_trees import Sequence, Selector, BehaviourTree, Blackboard
-from py_trees.meta import failure_is_success, success_is_failure, failure_is_running
+from py_trees.meta import failure_is_success, success_is_failure, failure_is_running, running_is_success
 from py_trees_ros.trees import BehaviourTree
 from rospy import ROSException
 
@@ -18,6 +18,7 @@ from giskardpy.god_map import GodMap
 from giskardpy.input_system import JointStatesInput
 from giskardpy.plugin import PluginBehavior, SuccessPlugin
 from giskardpy.plugin_action_server import GoalReceived, SendResult, GoalCanceled
+from giskardpy.plugin_append_zero_velocity import AppendZeroVelocity
 from giskardpy.plugin_attached_tf_publicher import TFPlugin
 from giskardpy.plugin_cleanup import CleanUp
 from giskardpy.plugin_collision_checker import CollisionChecker
@@ -191,6 +192,12 @@ def grow_tree():
     planning_1 = Sequence(u'planning I')
     planning_1.add_child(GoalToConstraints(u'update constraints', action_server_name))
     planning_1.add_child(planning_2)
+    planning_1.add_child(running_is_success(TimePlugin)(u'time for zero velocity'))
+    planning_1.add_child(AppendZeroVelocity(u'append zero velocity'))
+    planning_1.add_child(running_is_success(LogTrajPlugin)(u'log zero velocity'))
+    # planning_1.add_child(running_is_success(TimePlugin)(u'time for zero velocity'))
+    # planning_1.add_child(AppendZeroVelocity(u'append zero velocity'))
+    # planning_1.add_child(running_is_success(LogTrajPlugin)(u'log zero velocity'))
     if god_map.get_data(identifier.enable_VisualizationBehavior):
         planning_1.add_child(VisualizationBehavior(u'visualization', ensure_publish=True))
     if god_map.get_data(identifier.enable_CPIMarker):

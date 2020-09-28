@@ -67,6 +67,8 @@ class WiggleCancel(GiskardBehavior):
                 trajectory = self.get_god_map().get_data(identifier.trajectory)
                 for i in range(self.num_samples_in_fft):
                     trajectory.delete_last()
+                # time = self.get_god_map().get_data(identifier.time)
+                # self.get_god_map().set_data(identifier.time, len(trajectory.keys()))
                 if len(trajectory.keys()) >= self.num_samples_in_fft:
                     logging.loginfo(str(e))
                     logging.loginfo(u'cutting off last second')

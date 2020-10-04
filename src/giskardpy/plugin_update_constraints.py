@@ -131,7 +131,7 @@ class GoalToConstraints(GetGoal):
             except KeyError:
                 matches = ''
                 for s in self.allowed_constraint_types.keys():
-                    sm = difflib.SequenceMatcher(None, constraint.type.lower(), s.lower())
+                    sm = difflib.SequenceMatcher(None, str(constraint.type).lower(), s.lower())
                     ratio = sm.ratio()
                     if ratio >= 0.5:
                         matches = matches + s + '\n'

@@ -387,42 +387,42 @@ class GiskardTestWrapper(object):
         goal.pose.orientation.w = 1
         self.set_rotation_goal(goal, tip, root)
 
-    def align_planes(self, tip, tip_normal, root=None, root_normal=None, weight=None):
-        self.wrapper.align_planes(tip, tip_normal, root, root_normal, weight)
+    def align_planes(self, tip_link, tip_normal, root_link=None, root_normal=None, weight=None):
+        self.wrapper.align_planes(tip_link, tip_normal, root_link, root_normal, weight)
 
-    def set_rotation_goal(self, goal_pose, tip, root=None, max_velocity=None):
-        if not root:
-            root = self.default_root
-        self.wrapper.set_rotation_goal(root, tip, goal_pose, max_velocity=max_velocity)
+    def set_rotation_goal(self, goal_pose, tip_link, root_link=None, max_velocity=None):
+        if not root_link:
+            root_link = self.default_root
+        self.wrapper.set_rotation_goal(root_link, tip_link, goal_pose, max_velocity=max_velocity)
 
-    def set_translation_goal(self, goal_pose, tip, root=None, max_velocity=None):
-        if not root:
-            root = self.default_root
-        self.wrapper.set_translation_goal(root, tip, goal_pose, max_velocity=max_velocity)
+    def set_translation_goal(self, goal_pose, tip_link, root_link=None, max_velocity=None):
+        if not root_link:
+            root_link = self.default_root
+        self.wrapper.set_translation_goal(root_link, tip_link, goal_pose, max_velocity=max_velocity)
 
-    def set_cart_goal(self, goal_pose, tip, root=None, weight=None, linear_velocity=None, angular_velocity=None):
-        if not root:
-            root = self.default_root
+    def set_cart_goal(self, goal_pose, tip_link, root_link=None, weight=None, linear_velocity=None, angular_velocity=None):
+        if not root_link:
+            root_link = self.default_root
         if weight is not None:
-            self.wrapper.set_cart_goal(root, tip, goal_pose, weight=weight, trans_max_velocity=linear_velocity,
+            self.wrapper.set_cart_goal(root_link, tip_link, goal_pose, weight=weight, trans_max_velocity=linear_velocity,
                                        rot_max_velocity=angular_velocity)
         else:
-            self.wrapper.set_cart_goal(root, tip, goal_pose, trans_max_velocity=linear_velocity,
+            self.wrapper.set_cart_goal(root_link, tip_link, goal_pose, trans_max_velocity=linear_velocity,
                                        rot_max_velocity=angular_velocity)
 
-    def set_and_check_cart_goal(self, goal_pose, tip, root=None, weight=None, linear_velocity=None, angular_velocity=None,
+    def set_and_check_cart_goal(self, goal_pose, tip_link, root_link=None, weight=None, linear_velocity=None, angular_velocity=None,
                                 expected_error_codes=None):
         goal_pose_in_map = transform_pose(u'map', goal_pose)
-        self.set_cart_goal(goal_pose, tip, root, weight, linear_velocity=linear_velocity, angular_velocity=angular_velocity)
+        self.set_cart_goal(goal_pose, tip_link, root_link, weight, linear_velocity=linear_velocity, angular_velocity=angular_velocity)
         self.loop_once()
         self.send_and_check_goal(expected_error_codes)
         self.loop_once()
         if expected_error_codes is None:
-            self.check_cart_goal(tip, goal_pose_in_map)
+            self.check_cart_goal(tip_link, goal_pose_in_map)
 
-    def check_cart_goal(self, tip, goal_pose):
+    def check_cart_goal(self, tip_link, goal_pose):
         goal_in_base = transform_pose(u'map', goal_pose)
-        current_pose = lookup_pose(u'map', tip)
+        current_pose = lookup_pose(u'map', tip_link)
         np.testing.assert_array_almost_equal(msg_to_list(goal_in_base.pose.position),
                                              msg_to_list(current_pose.pose.position), decimal=2)
 

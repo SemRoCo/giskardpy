@@ -280,6 +280,10 @@ class QProblemBuilder(object):
         except QPSolverException as e:
             p_weights, p_A, p_lbA, p_ubA, p_lb, p_ub = self.debug_print(np_H, A, lb, ub, lbA, ubA, g, actually_print=True)
             if isinstance(e, InfeasibleException):
+                if self.are_joint_limits_violated(p_lb, p_ub):
+                    raise OutOfJointLimitsException(e)
+                raise HardConstraintsViolatedException(e)
+            if isinstance(e, QPSolverException):
                 arrays = [(p_weights, u'H'),
                           (p_A, u'A'),
                           (p_lbA, u'lbA'),
@@ -291,9 +295,6 @@ class QProblemBuilder(object):
                     any_nan |= self.is_nan_in_array(name, a)
                 if any_nan:
                     raise e
-                if self.are_joint_limits_violated(p_lb, p_ub):
-                    raise OutOfJointLimitsException(e)
-                raise HardConstraintsViolatedException(e)
             raise e
         if xdot_full is None:
             return None

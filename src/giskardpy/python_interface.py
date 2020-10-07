@@ -8,13 +8,14 @@ from giskard_msgs.msg import MoveAction, MoveGoal, WorldBody, CollisionEntry, Mo
     MoveCmd, JointConstraint, CartesianConstraint
 from giskard_msgs.srv import UpdateWorld, UpdateWorldRequest, UpdateWorldResponse, GetObjectInfo, GetObjectNames, \
     UpdateRvizMarkers, GetAttachedObjects, GetAttachedObjectsResponse, GetObjectNamesResponse
-from rospy_message_converter.message_converter import convert_ros_message_to_dictionary
 from sensor_msgs.msg import JointState
 from shape_msgs.msg import SolidPrimitive
 from visualization_msgs.msg import MarkerArray
 
+from giskardpy.constraints import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA
 from giskardpy.urdf_object import URDFObject
 from giskardpy.utils import position_dict_to_joint_states, make_world_body_box, make_world_body_cylinder
+from rospy_message_converter.message_converter import convert_ros_message_to_dictionary
 
 
 class GiskardWrapper(object):
@@ -42,36 +43,36 @@ class GiskardWrapper(object):
     def get_root(self):
         return self.robot_urdf.get_root()
 
-    def set_cart_goal(self, root, tip, pose_stamped, trans_max_velocity=None, rot_max_velocity=None, weight=None):
+    def set_cart_goal(self, root_link, tip_link, pose_stamped, trans_max_velocity=None, rot_max_velocity=None, weight=None):
         """
-        :param tip:
-        :type tip: str
+        :param tip_link:
+        :type tip_link: str
         :param pose_stamped:
         :type pose_stamped: PoseStamped
         """
-        self.set_translation_goal(root, tip, pose_stamped, max_velocity=trans_max_velocity, weight=weight)
-        self.set_rotation_goal(root, tip, pose_stamped, max_velocity=rot_max_velocity, weight=weight)
+        self.set_translation_goal(root_link, tip_link, pose_stamped, max_velocity=trans_max_velocity, weight=weight)
+        self.set_rotation_goal(root_link, tip_link, pose_stamped, max_velocity=rot_max_velocity, weight=weight)
 
-    def set_translation_goal(self, root, tip, pose_stamped, weight=None, max_velocity=None):
+    def set_translation_goal(self, root_link, tip_link, pose_stamped, weight=None, max_velocity=None):
         """
-        :param tip:
-        :type tip: str
+        :param tip_link:
+        :type tip_link: str
         :param pose_stamped:
         :type pose_stamped: PoseStamped
         """
         if not max_velocity and not weight:
             constraint = CartesianConstraint()
             constraint.type = CartesianConstraint.TRANSLATION_3D
-            constraint.root_link = str(root)
-            constraint.tip_link = str(tip)
+            constraint.root_link = str(root_link)
+            constraint.tip_link = str(tip_link)
             constraint.goal = pose_stamped
             self.cmd_seq[-1].cartesian_constraints.append(constraint)
         else:
             constraint = Constraint()
             constraint.type = u'CartesianPosition'
             params = {}
-            params[u'root_link'] = root
-            params[u'tip_link'] = tip
+            params[u'root_link'] = root_link
+            params[u'tip_link'] = tip_link
             params[u'goal'] = convert_ros_message_to_dictionary(pose_stamped)
             if max_velocity:
                 params[u'max_velocity'] = max_velocity
@@ -80,26 +81,26 @@ class GiskardWrapper(object):
             constraint.parameter_value_pair = json.dumps(params)
             self.cmd_seq[-1].constraints.append(constraint)
 
-    def set_rotation_goal(self, root, tip, pose_stamped, weight=None, max_velocity=None):
+    def set_rotation_goal(self, root_link, tip_link, pose_stamped, weight=None, max_velocity=None):
         """
-        :param tip:
-        :type tip: str
+        :param tip_link:
+        :type tip_link: str
         :param pose_stamped:
         :type pose_stamped: PoseStamped
         """
         if not max_velocity and not weight:
             constraint = CartesianConstraint()
             constraint.type = CartesianConstraint.ROTATION_3D
-            constraint.root_link = str(root)
-            constraint.tip_link = str(tip)
+            constraint.root_link = str(root_link)
+            constraint.tip_link = str(tip_link)
             constraint.goal = pose_stamped
             self.cmd_seq[-1].cartesian_constraints.append(constraint)
         else:
             constraint = Constraint()
             constraint.type = u'CartesianOrientationSlerp'
             params = {}
-            params[u'root_link'] = root
-            params[u'tip_link'] = tip
+            params[u'root_link'] = root_link
+            params[u'tip_link'] = tip_link
             params[u'goal'] = convert_ros_message_to_dictionary(pose_stamped)
             if max_velocity:
                 params[u'max_velocity'] = max_velocity
@@ -142,47 +143,125 @@ class GiskardWrapper(object):
             constraint.parameter_value_pair = json.dumps(params)
             self.cmd_seq[-1].constraints.append(constraint)
 
-    def align_planes(self, tip, tip_normal, root=None, root_normal=None, weight=None):
+    def align_planes(self, tip_link, tip_normal, root_link=None, root_normal=None, max_angular_velocity=None,
+                     weight=WEIGHT_ABOVE_CA):
         """
-        :type tip: str
+        This Goal will use the kinematic chain between tip and root normal to align both
+        :param root_link: name of the root link for the kinematic chain, default robot root link
+        :type root_link: str
+        :param tip_link: name of the tip link for the kinematic chain
+        :type tip_link: str
+        :param tip_normal: normal at the tip of the kin chain
         :type tip_normal: Vector3Stamped
-        :type root: str
+        :param root_normal: normal at the root of the kin chain
         :type root_normal: Vector3Stamped
-        :param weight: see giskard_msgs/Constraint
+        :param max_angular_velocity: rad/s, default 0.5
+        :type max_angular_velocity: float
         :type weight: float
-        :return:
         """
-        root = root if root else self.get_root()
-        tip_normal = convert_ros_message_to_dictionary(tip_normal)
+        root_link = root_link if root_link else self.get_root()
         if not root_normal:
             root_normal = Vector3Stamped()
             root_normal.header.frame_id = self.get_root()
             root_normal.vector.z = 1
 
-        root_normal = convert_ros_message_to_dictionary(root_normal)
-        params = {u'tip': tip,
+        params = {u'tip_link': tip_link,
                   u'tip_normal': tip_normal,
-                  u'root': root, u'root_normal': root_normal}
+                  u'root_link': root_link,
+                  u'root_normal': root_normal}
         if weight is not None:
             params[u'weight'] = weight
+        if max_angular_velocity is not None:
+            params[u'max_angular_velocity'] = max_angular_velocity
         self.set_json_goal(u'AlignPlanes', **params)
+
+    def avoid_joint_limits(self, percentage=15, weight=WEIGHT_BELOW_CA):
+        """
+        This goal will push joints away from their position limits
+        :param percentage: float, default 15, if limits are 0-100, the constraint will push into the 15-85 range
+        :param weight: float, default WEIGHT_BELOW_CA
+        """
+        self.set_json_goal(u'AvoidJointLimits', percentage=percentage, weight=weight)
+
+    def limit_cartesian_velocity(self, root_link, tip_link, weight=WEIGHT_ABOVE_CA, max_linear_velocity=0.1,
+                                 max_angular_velocity=0.5, hard=True):
+        """
+        This goal will limit the cartesian velocity of the tip link relative to root link
+        :param root_link: root link of the kin chain
+        :type root_link: str
+        :param tip_link: tip link of the kin chain
+        :type tip_link: str
+        :param weight: default WEIGHT_ABOVE_CA
+        :type weight: float
+        :param max_linear_velocity: m/s, default 0.1
+        :type max_linear_velocity: float
+        :param max_angular_velocity: rad/s, default 0.5
+        :type max_angular_velocity: float
+        :param hard: default True, will turn this into a hard constraint, that will always be satisfied, can could
+                                make some goal combination infeasible
+        :type hard: bool
+        """
+        self.set_json_goal(u'CartesianVelocityLimit',
+                           root_link=root_link,
+                           tip_link=tip_link,
+                           weight=weight,
+                           max_linear_velocity=max_linear_velocity,
+                           max_angular_velocity=max_angular_velocity,
+                           hard=hard)
+
+    def grasp_bar(self, root_link, tip_link, tip_grasp_axis, bar_center, bar_axis, bar_length,
+                  max_linear_velocity=0.1, max_angular_velocity=0.5, weight=WEIGHT_ABOVE_CA):
+        """
+        This goal can be used to grasp bars. It's like a cartesian goal with some freedom along one axis.
+        :param root_link: root link of the kin chain
+        :type root_link: str
+        :param tip_link: tip link of the kin chain
+        :type tip_link: str
+        :param tip_grasp_axis: this axis of the tip will be aligned with bar_axis
+        :type tip_grasp_axis: Vector3Stamped
+        :param bar_center: center of the bar
+        :type bar_center: PointStamped
+        :param bar_axis: tip_grasp_axis will be aligned with this vector
+        :type bar_axis: Vector3Stamped
+        :param bar_length: length of the bar
+        :type bar_length: float
+        :param max_linear_velocity: m/s, default 0.1
+        :type max_linear_velocity: float
+        :param max_angular_velocity: rad/s, default 0.5
+        :type max_angular_velocity: float
+        :param weight: default WEIGHT_ABOVE_CA
+        :type weight: float
+        """
+        self.set_json_goal(u'GraspBar',
+                           root_link=root_link,
+                           tip_link=tip_link,
+                           tip_grasp_axis=tip_grasp_axis,
+                           bar_center=bar_center,
+                           bar_axis=bar_axis,
+                           bar_length=bar_length,
+                           max_linear_velocity=max_linear_velocity,
+                           max_angular_velocity=max_angular_velocity,
+                           weight=weight)
 
     def gravity_controlled_joint(self, joint_name, object_name):
         self.set_json_goal(u'GravityJoint', joint_name=joint_name, object_name=object_name)
 
     def update_god_map(self, updates):
+        """
+        don't use, it's only for hacks :)
+        """
         self.set_json_goal(u'UpdateGodMap', updates=updates)
 
-    def pointing(self, tip, goal_point, root=None, pointing_axis=None, weight=None):
-        kwargs = {u'tip': tip,
+    def pointing(self, tip_link, goal_point, root_link=None, pointing_axis=None, weight=None):
+        kwargs = {u'tip_link': tip_link,
                   u'goal_point': goal_point}
-        if root is not None:
-            kwargs[u'root'] = root
+        if root_link is not None:
+            kwargs[u'root_link'] = root_link
         if pointing_axis is not None:
-            kwargs[u'pointing_axis'] = convert_ros_message_to_dictionary(pointing_axis)
+            kwargs[u'pointing_axis'] = pointing_axis
         if weight is not None:
             kwargs[u'weight'] = weight
-        kwargs[u'goal_point'] = convert_ros_message_to_dictionary(goal_point)
+        kwargs[u'goal_point'] = goal_point
         self.set_json_goal(u'Pointing', **kwargs)
 
     def set_json_goal(self, constraint_type, **kwargs):

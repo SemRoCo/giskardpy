@@ -702,12 +702,12 @@ class AvoidJointLimitsRevolute(Constraint):
     max_velocity = u'max_velocity'
     percentage = u'percentage'
 
-    def __init__(self, god_map, joint_name, weight=0.1, max_velocity=1e9, percentage=5):
+    def __init__(self, god_map, joint_name, weight=0.1, max_linear_velocity=1e9, percentage=5):
         """
         This goal will push revolute joints away from their position limits
         :param joint_name: str
         :param weight: float, default WEIGHT_BELOW_CA
-        :param max_velocity: float, default 1e9, meaning the urdf/config limit will kick in
+        :param max_linear_velocity: float, default 1e9, meaning the urdf/config limit will kick in
         :param percentage: float, default 15, if limits are 0-100, the constraint will push into the 15-85 range
         """
         super(AvoidJointLimitsRevolute, self).__init__(god_map)
@@ -717,7 +717,7 @@ class AvoidJointLimitsRevolute(Constraint):
                                                                                       joint_name))
 
         params = {self.weight_id: weight,
-                  self.max_velocity: max_velocity,
+                  self.max_velocity: max_linear_velocity,
                   self.percentage: percentage}
         self.save_params_on_god_map(params)
 
@@ -767,12 +767,12 @@ class AvoidJointLimitsPrismatic(Constraint):
     max_velocity = u'max_velocity'
     percentage = u'percentage'
 
-    def __init__(self, god_map, joint_name, weight=0.1, max_velocity=1e9, percentage=5):
+    def __init__(self, god_map, joint_name, weight=0.1, max_angular_velocity=1e9, percentage=5):
         """
         This goal will push prismatic joints away from their position limits
         :param joint_name: str
         :param weight: float, default WEIGHT_BELOW_CA
-        :param max_velocity: float, default 1e9, meaning the urdf/config limit will kick in
+        :param max_angular_velocity: float, default 1e9, meaning the urdf/config limit will kick in
         :param percentage: float, default 15, if limits are 0-100, the constraint will push into the 15-85 range
         """
         super(AvoidJointLimitsPrismatic, self).__init__(god_map)
@@ -782,7 +782,7 @@ class AvoidJointLimitsPrismatic(Constraint):
                                                                                       joint_name))
 
         params = {self.weight_id: weight,
-                  self.max_velocity: max_velocity,
+                  self.max_velocity: max_angular_velocity,
                   self.percentage: percentage, }
         self.save_params_on_god_map(params)
 
@@ -1247,15 +1247,14 @@ class CartesianOrientationSlerp(BasicCartesianConstraint):
 
 
 class CartesianPose(Constraint):
-    def __init__(self, god_map, root_link, tip_link, goal, translation_max_velocity=0.1,
-                 translation_max_acceleration=0.1, rotation_max_velocity=0.5, rotation_max_acceleration=0.5,
-                 weight=WEIGHT_ABOVE_CA, goal_constraint=False):
+    def __init__(self, god_map, root_link, tip_link, goal, max_linear_velocity=0.1,
+                 max_angular_velocity=0.5, weight=WEIGHT_ABOVE_CA, goal_constraint=False):
         """
         This goal will use the kinematic chain between root and tip link to move tip link into the goal pose
         :param root_link: str, name of the root link of the kin chain
         :param tip_link: str, name of the tip link of the kin chain
         :param goal: PoseStamped as json
-        :param translation_max_velocity: float, m/s, default 0.1
+        :param max_linear_velocity: float, m/s, default 0.1
         :param translation_max_acceleration: float, rad/s, default 0.5
         :param weight: float, default WEIGHT_ABOVE_CA
         """
@@ -1265,16 +1264,14 @@ class CartesianPose(Constraint):
                                                   root_link=root_link,
                                                   tip_link=tip_link,
                                                   goal=goal,
-                                                  max_velocity=translation_max_velocity,
-                                                  max_acceleration=translation_max_acceleration,
+                                                  max_velocity=max_linear_velocity,
                                                   weight=weight,
                                                   goal_constraint=goal_constraint))
         self.constraints.append(CartesianOrientationSlerp(god_map=god_map,
                                                           root_link=root_link,
                                                           tip_link=tip_link,
                                                           goal=goal,
-                                                          max_velocity=rotation_max_velocity,
-                                                          max_accleration=rotation_max_acceleration,
+                                                          max_velocity=max_angular_velocity,
                                                           weight=weight,
                                                           goal_constraint=goal_constraint))
 
@@ -1414,16 +1411,17 @@ class CollisionAvoidanceHint(Constraint):
     avoidance_hint_id = u'avoidance_hint'
     weight_id = u'weight'
 
-    def __init__(self, god_map, link_name, avoidance_hint, body_b, link_b, max_velocity=0.1, root_link=None,
+    def __init__(self, god_map, tip_link, avoidance_hint, object_name, object_link_name, max_linear_velocity=0.1,
+                 root_link=None,
                  max_threshold=0.05, spring_threshold=None, weight=WEIGHT_ABOVE_CA):
         """
         This goal pushes the link_name in the direction of avoidance_hint, if it is closer than spring_threshold
         to body_b/link_b.
-        :param link_name: str, name of the robot link, has to have a collision body
+        :param tip_link: str, name of the robot link, has to have a collision body
         :param avoidance_hint: Vector3Stamped as json, direction in which the robot link will get pushed
-        :param body_b: str, name of the environment object, can be the robot, e.g. kitchen
-        :param link_b: str, name of the link of the environment object. e.g. fridge handle
-        :param max_velocity: float, m/s, default 0.1
+        :param object_name: str, name of the environment object, can be the robot, e.g. kitchen
+        :param object_link_name: str, name of the link of the environment object. e.g. fridge handle
+        :param max_linear_velocity: float, m/s, default 0.1
         :param root_link: str, default robot root, name of the root link for the kinematic chain
         :param max_threshold: float, default 0.05, distance at which the force has reached weight
         :param spring_threshold: float, default max_threshold, need to be >= than max_threshold weight increases from
@@ -1431,17 +1429,17 @@ class CollisionAvoidanceHint(Constraint):
         :param weight: float, default WEIGHT_ABOVE_CA
         """
         super(CollisionAvoidanceHint, self).__init__(god_map)
-        self.link_name = link_name
+        self.link_name = tip_link
         if root_link is None:
             self.root_link = self.get_robot().get_root()
         else:
             self.root_link = root_link
         self.robot_name = self.get_robot_unsafe().get_name()
-        self.key = (link_name, body_b, link_b)
-        self.body_b = body_b
-        self.link_b = link_b
-        self.body_b_hash = body_b.__hash__()
-        self.link_b_hash = link_b.__hash__()
+        self.key = (tip_link, object_name, object_link_name)
+        self.body_b = object_name
+        self.link_b = object_link_name
+        self.body_b_hash = object_name.__hash__()
+        self.link_b_hash = object_link_name.__hash__()
 
         if spring_threshold is None:
             spring_threshold = max_threshold
@@ -1449,15 +1447,15 @@ class CollisionAvoidanceHint(Constraint):
             spring_threshold = max(spring_threshold, max_threshold)
 
         added_checks = self.get_god_map().get_data(identifier.added_collision_checks)
-        if link_name in added_checks:
-            added_checks[link_name] = max(added_checks[link_name], spring_threshold)
+        if tip_link in added_checks:
+            added_checks[tip_link] = max(added_checks[tip_link], spring_threshold)
         else:
-            added_checks[link_name] = spring_threshold
+            added_checks[tip_link] = spring_threshold
         self.get_god_map().set_data(identifier.added_collision_checks, added_checks)
 
         self.avoidance_hint = self.parse_and_transform_Vector3Stamped(avoidance_hint, self.root_link, normalized=True)
 
-        params = {self.max_velocity_id: max_velocity,
+        params = {self.max_velocity_id: max_linear_velocity,
                   self.threshold_id: max_threshold,
                   self.threshold2_id: spring_threshold,
                   self.avoidance_hint_id: self.avoidance_hint,
@@ -1655,21 +1653,22 @@ class AlignPlanes(Constraint):
     max_velocity_id = u'max_velocity'
     weight_id = u'weight'
 
-    def __init__(self, god_map, root, tip, root_normal, tip_normal, max_velocity=0.5, weight=WEIGHT_ABOVE_CA,
+    def __init__(self, god_map, root_link, tip_link, root_normal, tip_normal,
+                 max_angular_velocity=0.5, weight=WEIGHT_ABOVE_CA,
                  goal_constraint=False):
         """
         This Goal will use the kinematic chain between tip and root normal to align both
-        :param root: str, name of the root link for the kinematic chain
-        :param tip: str, name of the tip link for the kinematic chain
+        :param root_link: str, name of the root link for the kinematic chain
+        :param tip_link: str, name of the tip link for the kinematic chain
         :param tip_normal: Vector3Stamped as json, normal at the tip of the kin chain
         :param root_normal: Vector3Stamped as json, normal at the root of the kin chain
-        :param max_velocity: float, rad/s, default 0.5
+        :param max_angular_velocity: float, rad/s, default 0.5
         :param weight: float, default is WEIGHT_ABOVE_CA
         :param goal_constraint: bool, default False
         """
         super(AlignPlanes, self).__init__(god_map)
-        self.root = root
-        self.tip = tip
+        self.root = root_link
+        self.tip = tip_link
         self.goal_constraint = goal_constraint
 
         self.tip_normal = self.parse_and_transform_Vector3Stamped(tip_normal, self.tip, normalized=True)
@@ -1677,7 +1676,7 @@ class AlignPlanes(Constraint):
 
         params = {self.root_normal_id: self.root_normal,
                   self.tip_normal_id: self.tip_normal,
-                  self.max_velocity_id: max_velocity,
+                  self.max_velocity_id: max_angular_velocity,
                   self.weight_id: weight}
         self.save_params_on_god_map(params)
 
@@ -1717,24 +1716,24 @@ class GraspBar(Constraint):
     rotation_max_velocity_id = u'rotation_max_velocity'
     weight_id = u'weight'
 
-    def __init__(self, god_map, root, tip, tip_grasp_axis, bar_center, bar_axis, bar_length,
-                 translation_max_velocity=0.1, rotation_max_velocity=0.5, weight=WEIGHT_ABOVE_CA,
+    def __init__(self, god_map, root_link, tip_link, tip_grasp_axis, bar_center, bar_axis, bar_length,
+                 max_linear_velocity=0.1, max_angular_velocity=0.5, weight=WEIGHT_ABOVE_CA,
                  goal_constraint=False):
         """
-        This goal can be used to graps bars. It's like a cartesian goal with some freedom along one axis.
-        :param root: str, root link of the kin chain
-        :param tip: str, tip link of the kin chain
+        This goal can be used to grasp bars. It's like a cartesian goal with some freedom along one axis.
+        :param root_link: str, root link of the kin chain
+        :param tip_link: str, tip link of the kin chain
         :param tip_grasp_axis: Vector3Stamped as json, this axis of the tip will be aligned with bar_axis
         :param bar_center: PointStamped as json, center of the bar
         :param bar_axis: Vector3Stamped as json, tip_grasp_axis will be aligned with this vector
         :param bar_length: float, length of the bar
-        :param translation_max_velocity: float, m/s, default 0.1
-        :param rotation_max_velocity: float, rad/s, default 0.5
+        :param max_linear_velocity: float, m/s, default 0.1
+        :param max_angular_velocity: float, rad/s, default 0.5
         :param weight: float default WEIGHT_ABOVE_CA
         """
         super(GraspBar, self).__init__(god_map)
-        self.root = root
-        self.tip = tip
+        self.root = root_link
+        self.tip = tip_link
         self.goal_constraint = goal_constraint
 
         bar_center = self.parse_and_transform_PointStamped(bar_center, self.root)
@@ -1747,8 +1746,8 @@ class GraspBar(Constraint):
                   self.tip_grasp_axis_id: tip_grasp_axis,
                   self.bar_center_id: bar_center,
                   self.bar_length_id: bar_length,
-                  self.translation_max_velocity_id: translation_max_velocity,
-                  self.rotation_max_velocity_id: rotation_max_velocity,
+                  self.translation_max_velocity_id: max_linear_velocity,
+                  self.rotation_max_velocity_id: max_angular_velocity,
                   self.weight_id: weight}
         self.save_params_on_god_map(params)
 
@@ -1973,12 +1972,12 @@ class Pointing(Constraint):
     pointing_axis = u'pointing_axis'
     weight_id = u'weight'
 
-    def __init__(self, god_map, tip, goal_point, root=None, pointing_axis=None, weight=WEIGHT_BELOW_CA,
+    def __init__(self, god_map, tip_link, goal_point, root_link=None, pointing_axis=None, weight=WEIGHT_BELOW_CA,
                  goal_constraint=True):
         """
-        :param tip: str, name of the tip of the kin chain
+        :param tip_link: str, name of the tip of the kin chain
         :param goal_point: PointStamped as json, where the pointing_axis will point towards
-        :param root: str, name of the root of the kin chain
+        :param root_link: str, name of the root of the kin chain
         :param pointing_axis: Vector3Stamped as json, default is z axis, this axis will point towards the goal_point
         :param weight: float, default WEIGHT_BELOW_CA
         """
@@ -1986,11 +1985,11 @@ class Pointing(Constraint):
         super(Pointing, self).__init__(god_map)
 
         # use this space to process your input parameters, handle defaults etc
-        if root is None:
+        if root_link is None:
             self.root = self.get_robot().get_root()
         else:
-            self.root = root
-        self.tip = tip
+            self.root = root_link
+        self.tip = tip_link
         self.goal_constraint = goal_constraint
 
         # you receive message in json form, use these functions to turn them into the proper types and transfrom
@@ -2089,23 +2088,23 @@ class OpenDoor(Constraint):
     hinge0_P_tipStart_norm_id = u'hinge0_P_tipStart_norm'
     weight_id = u'weight'
 
-    def __init__(self, god_map, tip, object_name, handle_link, angle_goal, root=None, weight=WEIGHT_ABOVE_CA):
+    def __init__(self, god_map, tip_link, object_name, object_link_name, angle_goal, root_link=None, weight=WEIGHT_ABOVE_CA):
         super(OpenDoor, self).__init__(god_map)
 
-        if root is None:
+        if root_link is None:
             self.root = self.get_robot().get_root()
         else:
-            self.root = root
-        self.tip = tip
+            self.root = root_link
+        self.tip = tip_link
 
         self.angle_goal = angle_goal
 
-        self.handle_link = handle_link
-        handle_frame_id = u'iai_kitchen/' + handle_link
+        self.handle_link = object_link_name
+        handle_frame_id = u'iai_kitchen/' + object_link_name
 
         self.object_name = object_name
         environment_object = self.get_world().get_object(object_name)
-        self.hinge_joint = environment_object.get_movable_parent_joint(handle_link)
+        self.hinge_joint = environment_object.get_movable_parent_joint(object_link_name)
         hinge_child = environment_object.get_child_link_of_joint(self.hinge_joint)
 
         hinge_frame_id = u'iai_kitchen/' + hinge_child
@@ -2215,19 +2214,19 @@ class OpenDrawer(Constraint):
     hinge_V_hinge_axis_msg_id = u'hinge_axis'  # axis vector of the hinge
     root_T_tip_goal_id = u'root_T_tipGoal'  # goal of the gripper tip (where to move)
 
-    def __init__(self, god_map, tip, object_name, handle_link, distance_goal, root=None, weight=WEIGHT_ABOVE_CA):
+    def __init__(self, god_map, tip_link, object_name, object_link_name, distance_goal, root_link=None, weight=WEIGHT_ABOVE_CA):
         """
-        :type tip: str
-        :param tip: tip of manipulator (gripper) which is used
+        :type tip_link: str
+        :param tip_link: tip of manipulator (gripper) which is used
         :type object_name str
         :param object_name
-        :type handle_link str
-        :param handle_link handle to grasp
+        :type object_link_name str
+        :param object_link_name handle to grasp
         :type distance_goal float
         :param distance_goal
                relative opening distance 0 = close, 1 = fully open
-        :type root: str
-        :param root: default is root link of robot
+        :type root_link: str
+        :param root_link: default is root link of robot
         """
 
         super(OpenDrawer, self).__init__(god_map)
@@ -2235,21 +2234,21 @@ class OpenDrawer(Constraint):
         self.constraints = []  # init empty list
 
         # Process input parameters
-        if root is None:
+        if root_link is None:
             self.root = self.get_robot().get_root()
         else:
-            self.root = root
-        self.tip = tip
+            self.root = root_link
+        self.tip = tip_link
 
         self.distance_goal = distance_goal
 
-        self.handle_link = handle_link
-        handle_frame_id = u'iai_kitchen/' + handle_link
+        self.handle_link = object_link_name
+        handle_frame_id = u'iai_kitchen/' + object_link_name
 
         self.object_name = object_name
         environment_object = self.get_world().get_object(object_name)
         # Get movable joint
-        self.hinge_joint = environment_object.get_movable_parent_joint(handle_link)
+        self.hinge_joint = environment_object.get_movable_parent_joint(object_link_name)
         # Child of joint
         hinge_child = environment_object.get_child_link_of_joint(self.hinge_joint)
 
@@ -2278,7 +2277,7 @@ class OpenDrawer(Constraint):
         hinge_frame_id = u'iai_kitchen/' + hinge_child
 
         # Get frame of current tip pose
-        root_T_tip_current = tf.msg_to_kdl(tf.lookup_pose(self.root, tip))
+        root_T_tip_current = tf.msg_to_kdl(tf.lookup_pose(self.root, tip_link))
         hinge_drawer_axis_kdl = tf.msg_to_kdl(hinge_drawer_axis_msg)  # get axis of joint
         # Get transform from hinge to root
         root_T_hinge = tf.msg_to_kdl(tf.lookup_pose(self.root, hinge_frame_id))
@@ -2314,12 +2313,12 @@ class OpenDrawer(Constraint):
 
 
 class Open(Constraint):
-    def __init__(self, god_map, tip, object_name, handle_link, root=None, goal_joint_state=None,
+    def __init__(self, god_map, tip_link, object_name, object_link_name, root_link=None, goal_joint_state=None,
                  weight=WEIGHT_ABOVE_CA):
         super(Open, self).__init__(god_map)
         self.constraints = []
         environment_object = self.get_world().get_object(object_name)
-        joint_name = environment_object.get_movable_parent_joint(handle_link)
+        joint_name = environment_object.get_movable_parent_joint(object_link_name)
 
         if environment_object.is_joint_revolute(joint_name) or environment_object.is_joint_prismatic(joint_name):
             min_limit, max_limit = environment_object.get_joint_limits(joint_name)
@@ -2330,19 +2329,19 @@ class Open(Constraint):
 
         if environment_object.is_joint_revolute(joint_name):
             self.constraints.append(OpenDoor(god_map=god_map,
-                                             tip=tip,
+                                             tip_link=tip_link,
                                              object_name=object_name,
-                                             handle_link=handle_link,
+                                             object_link_name=object_link_name,
                                              angle_goal=goal_joint_state,
-                                             root=root,
+                                             root_link=root_link,
                                              weight=weight))
         elif environment_object.is_joint_prismatic(joint_name):
             self.constraints.append(OpenDrawer(god_map,
-                                               tip=tip,
+                                               tip_link=tip_link,
                                                object_name=object_name,
-                                               handle_link=handle_link,
+                                               object_link_name=object_link_name,
                                                distance_goal=goal_joint_state,
-                                               root=root,
+                                               root_link=root_link,
                                                weight=weight))
         else:
             logwarn(u'Opening containers with joint of type "{}" not supported'.format(
@@ -2354,12 +2353,12 @@ class Open(Constraint):
 
 
 class Close(Constraint):
-    def __init__(self, god_map, tip, object_name, handle_link, root=None, goal_joint_state=None,
+    def __init__(self, god_map, tip_link, object_name, object_link_name, root_link=None, goal_joint_state=None,
                  weight=WEIGHT_ABOVE_CA):
         super(Close, self).__init__(god_map)
         self.constraints = []
         environment_object = self.get_world().get_object(object_name)
-        joint_name = environment_object.get_movable_parent_joint(handle_link)
+        joint_name = environment_object.get_movable_parent_joint(object_link_name)
 
         if environment_object.is_joint_revolute(joint_name) or environment_object.is_joint_prismatic(joint_name):
             min_limit, max_limit = environment_object.get_joint_limits(joint_name)
@@ -2370,19 +2369,19 @@ class Close(Constraint):
 
         if environment_object.is_joint_revolute(joint_name):
             self.constraints.append(OpenDoor(god_map=god_map,
-                                             tip=tip,
+                                             tip_link=tip_link,
                                              object_name=object_name,
-                                             handle_link=handle_link,
+                                             object_link_name=object_link_name,
                                              angle_goal=goal_joint_state,
-                                             root=root,
+                                             root_link=root_link,
                                              weight=weight))
         elif environment_object.is_joint_prismatic(joint_name):
             self.constraints.append(OpenDrawer(god_map,
-                                               tip=tip,
+                                               tip_link=tip_link,
                                                object_name=object_name,
-                                               handle_link=handle_link,
+                                               object_link_name=object_link_name,
                                                distance_goal=goal_joint_state,
-                                               root=root,
+                                               root_link=root_link,
                                                weight=weight))
         else:
             logwarn(u'Opening containers with joint of type "{}" not supported'.format(

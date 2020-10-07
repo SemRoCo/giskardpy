@@ -155,7 +155,7 @@ class GoalToConstraints(GetGoal):
                 c = C(self.god_map, **params)
             except Exception as e:
                 traceback.print_exc()
-                doc_string = C.make_constraints.__doc__
+                doc_string = C.__init__.__doc__
                 error_msg = u'Initialization of "{}" constraint failed: \n {} \n'.format(C.__name__, e)
                 if doc_string is not None:
                     error_msg = error_msg + doc_string

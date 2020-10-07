@@ -480,7 +480,14 @@ class JointPositionContinuous(Constraint):
     goal_constraint = u'goal_constraint'
 
     def __init__(self, god_map, joint_name, goal, weight=WEIGHT_BELOW_CA, max_velocity=1423, max_acceleration=1,
-                 goal_constraint=True):
+                 goal_constraint=False):
+        """
+        This goal will move a continuous joint to the goal position
+        :param joint_name: str
+        :param goal: float
+        :param weight: float, default WEIGHT_BELOW_CA
+        :param max_velocity: float, rad/s, default 1423, meaning the urdf/config limits are active
+        """
         super(JointPositionContinuous, self).__init__(god_map)
         self.joint_name = joint_name
         self.goal_constraint = goal_constraint
@@ -547,7 +554,14 @@ class JointPositionPrismatic(Constraint):
     max_acceleration = u'max_acceleration'
 
     def __init__(self, god_map, joint_name, goal, weight=WEIGHT_BELOW_CA, max_velocity=4535, max_acceleration=0.1,
-                 goal_constraint=True):
+                 goal_constraint=False):
+        """
+        This goal will move a prismatic joint to the goal position
+        :param joint_name: str
+        :param goal: float
+        :param weight: float, default WEIGHT_BELOW_CA
+        :param max_velocity: float, m/s, default 4535, meaning the urdf/config limits are active
+        """
         # TODO add goal constraint
         super(JointPositionPrismatic, self).__init__(god_map)
         self.joint_name = joint_name
@@ -615,6 +629,13 @@ class JointPositionRevolute(Constraint):
 
     def __init__(self, god_map, joint_name, goal, weight=WEIGHT_BELOW_CA, max_velocity=3451, max_acceleration=1,
                  goal_constraint=True):
+        """
+        This goal will move a revolute joint to the goal position
+        :param joint_name: str
+        :param goal: float
+        :param weight: float, default WEIGHT_BELOW_CA
+        :param max_velocity: float, rad/s, default 3451, meaning the urdf/config limits are active
+        """
         super(JointPositionRevolute, self).__init__(god_map)
         self.joint_name = joint_name
         self.goal_constraint = goal_constraint
@@ -682,6 +703,13 @@ class AvoidJointLimitsRevolute(Constraint):
     percentage = u'percentage'
 
     def __init__(self, god_map, joint_name, weight=0.1, max_velocity=1e9, percentage=5):
+        """
+        This goal will push revolute joints away from their position limits
+        :param joint_name: str
+        :param weight: float, default WEIGHT_BELOW_CA
+        :param max_velocity: float, default 1e9, meaning the urdf/config limit will kick in
+        :param percentage: float, default 15, if limits are 0-100, the constraint will push into the 15-85 range
+        """
         super(AvoidJointLimitsRevolute, self).__init__(god_map)
         self.joint_name = joint_name
         if not self.get_robot().is_joint_revolute(joint_name):
@@ -740,6 +768,13 @@ class AvoidJointLimitsPrismatic(Constraint):
     percentage = u'percentage'
 
     def __init__(self, god_map, joint_name, weight=0.1, max_velocity=1e9, percentage=5):
+        """
+        This goal will push prismatic joints away from their position limits
+        :param joint_name: str
+        :param weight: float, default WEIGHT_BELOW_CA
+        :param max_velocity: float, default 1e9, meaning the urdf/config limit will kick in
+        :param percentage: float, default 15, if limits are 0-100, the constraint will push into the 15-85 range
+        """
         super(AvoidJointLimitsPrismatic, self).__init__(god_map)
         self.joint_name = joint_name
         if not self.get_robot().is_joint_prismatic(joint_name):
@@ -793,6 +828,12 @@ class AvoidJointLimitsPrismatic(Constraint):
 
 class JointPositionList(Constraint):
     def __init__(self, god_map, goal_state, weight=None, max_velocity=None, goal_constraint=None):
+        """
+        This goal takes a joint state and adds the other JointPosition goals depending on their type
+        :param goal_state: JointState as json
+        :param weight: float, default is the default of the added joint goals
+        :param max_velocity: float, default is the default of the added joint goals
+        """
         super(JointPositionList, self).__init__(god_map)
         self.constraints = []
         for i, joint_name in enumerate(goal_state[u'name']):
@@ -821,6 +862,11 @@ class JointPositionList(Constraint):
 
 class AvoidJointLimits(Constraint):
     def __init__(self, god_map, percentage=15, weight=WEIGHT_BELOW_CA):
+        """
+        This goal will push joints away from their position limits
+        :param percentage: float, default 15, if limits are 0-100, the constraint will push into the 15-85 range
+        :param weight: float, default WEIGHT_BELOW_CA
+        """
         super(AvoidJointLimits, self).__init__(god_map)
         self.constraints = []
         for joint_name in self.get_robot().controlled_joints:
@@ -848,7 +894,10 @@ class BasicCartesianConstraint(Constraint):
 
     def __init__(self, god_map, root_link, tip_link, goal, max_velocity=0.1, max_acceleration=0.1,
                  weight=WEIGHT_ABOVE_CA,
-                 goal_constraint=True):
+                 goal_constraint=False):
+        """
+        dont use me
+        """
         super(BasicCartesianConstraint, self).__init__(god_map)
         self.root = root_link
         self.tip = tip_link
@@ -872,35 +921,21 @@ class BasicCartesianConstraint(Constraint):
 
 class CartesianPosition(BasicCartesianConstraint):
 
-    def make_constraints(self):
-        """
-        example:
-        name='CartesianPosition'
-        parameter_value_pair='{
-            "root": "base_footprint", #required
-            "tip": "r_gripper_tool_frame", #required
-            "goal_position": {"header":
-                                {"stamp":
-                                    {"secs": 0,
-                                    "nsecs": 0},
-                                "frame_id": "",
-                                "seq": 0},
-                            "pose": {"position":
-                                        {"y": 0.0,
-                                        "x": 0.0,
-                                        "z": 0.0},
-                                    "orientation": {"y": 0.0,
-                                                    "x": 0.0,
-                                                    "z": 0.0,
-                                                    "w": 0.0}
-                                    }
-                            }', #required
-            "weight": 1, #optional
-            "max_velocity": 0.3 #optional -- rad/s or m/s depending on joint; can not go higher than urdf limit
-        }'
-        :return:
-        """
 
+    def __init__(self, god_map, root_link, tip_link, goal, max_velocity=0.1, max_acceleration=0.1,
+                 weight=WEIGHT_ABOVE_CA, goal_constraint=False):
+        """
+        This goal will use the kinematic chain between root and tip link to achieve a goal position for tip link
+        :param root_link: str, root link of kinematic chain
+        :param tip_link: str, tip link of kinematic chain
+        :param goal: PoseStamped as json
+        :param max_velocity: float, m/s, default 0.1
+        :param weight: float, default WEIGHT_ABOVE_CA
+        """
+        super(CartesianPosition, self).__init__(god_map, root_link, tip_link, goal, max_velocity, max_acceleration,
+                                                weight, goal_constraint)
+
+    def make_constraints(self):
         r_P_g = w.position_of(self.get_goal_pose())
         max_velocity = self.get_input_float(self.max_velocity)
         max_acceleration = self.get_input_float(self.max_acceleration)
@@ -919,6 +954,16 @@ class CartesianVelocityLimit(Constraint):
 
     def __init__(self, god_map, root_link, tip_link, weight=WEIGHT_ABOVE_CA, max_linear_velocity=0.1,
                  max_angular_velocity=0.5, hard=True):
+        """
+        This goal will limit the cartesian velocity of the tip link relative to root link
+        :param root_link: str, root link of the kin chain
+        :param tip_link: str, tip link of the kin chain
+        :param weight: float, default WEIGHT_ABOVE_CA
+        :param max_linear_velocity: float, m/s, default 0.1
+        :param max_angular_velocity: float, rad/s, default 0.5
+        :param hard: bool, default True, will turn this into a hard constraint, that will always be satisfied, can could
+                                make some goal combination infeasible
+        """
         super(CartesianVelocityLimit, self).__init__(god_map)
         self.root_link = root_link
         self.tip_link = tip_link
@@ -1063,6 +1108,9 @@ class CartesianVelocityLimit(Constraint):
 class CartesianOrientation(BasicCartesianConstraint):
     def __init__(self, god_map, root_link, tip_link, goal, max_velocity=0.5, max_acceleration=0.5,
                  weight=WEIGHT_ABOVE_CA, goal_constraint=True):
+        """
+        Don't use me
+        """
         super(CartesianOrientation, self).__init__(god_map=god_map,
                                                    root_link=root_link,
                                                    tip_link=tip_link,
@@ -1144,7 +1192,15 @@ class CartesianOrientation(BasicCartesianConstraint):
 
 class CartesianOrientationSlerp(BasicCartesianConstraint):
     def __init__(self, god_map, root_link, tip_link, goal, max_velocity=0.5, max_accleration=0.5,
-                 weight=WEIGHT_ABOVE_CA, goal_constraint=True):
+                 weight=WEIGHT_ABOVE_CA, goal_constraint=False):
+        """
+        This goal will the kinematic chain from root_link to tip_link to achieve a rotation goal for the tip link
+        :param root_link: str, root link of the kinematic chain
+        :param tip_link: str, tip link of the kinematic chain
+        :param goal: PoseStamped as json
+        :param max_velocity: float, rad/s, default 0.5
+        :param weight: float, default WEIGHT_ABOVE_CA
+        """
         super(CartesianOrientationSlerp, self).__init__(god_map=god_map,
                                                         root_link=root_link,
                                                         tip_link=tip_link,
@@ -1193,7 +1249,16 @@ class CartesianOrientationSlerp(BasicCartesianConstraint):
 class CartesianPose(Constraint):
     def __init__(self, god_map, root_link, tip_link, goal, translation_max_velocity=0.1,
                  translation_max_acceleration=0.1, rotation_max_velocity=0.5, rotation_max_acceleration=0.5,
-                 weight=WEIGHT_ABOVE_CA, goal_constraint=True):
+                 weight=WEIGHT_ABOVE_CA, goal_constraint=False):
+        """
+        This goal will use the kinematic chain between root and tip link to move tip link into the goal pose
+        :param root_link: str, name of the root link of the kin chain
+        :param tip_link: str, name of the tip link of the kin chain
+        :param goal: PoseStamped as json
+        :param translation_max_velocity: float, m/s, default 0.1
+        :param translation_max_acceleration: float, rad/s, default 0.5
+        :param weight: float, default WEIGHT_ABOVE_CA
+        """
         super(CartesianPose, self).__init__(god_map)
         self.constraints = []
         self.constraints.append(CartesianPosition(god_map=god_map,
@@ -1227,6 +1292,9 @@ class ExternalCollisionAvoidance(Constraint):
 
     def __init__(self, god_map, link_name, max_velocity=0.1, hard_threshold=0.0, soft_threshold=0.05, idx=0,
                  num_repeller=1, max_acceleration=0.005):
+        """
+        Don't use me
+        """
         super(ExternalCollisionAvoidance, self).__init__(god_map)
         self.link_name = link_name
         self.robot_root = self.get_robot().get_root()
@@ -1346,11 +1414,28 @@ class CollisionAvoidanceHint(Constraint):
     avoidance_hint_id = u'avoidance_hint'
     weight_id = u'weight'
 
-    def __init__(self, god_map, link_name, avoidance_hint, body_b, link_b, max_velocity=0.1, max_threshold=0.05,
-                 spring_threshold=None, weight=WEIGHT_ABOVE_CA):
+    def __init__(self, god_map, link_name, avoidance_hint, body_b, link_b, max_velocity=0.1, root_link=None,
+                 max_threshold=0.05, spring_threshold=None, weight=WEIGHT_ABOVE_CA):
+        """
+        This goal pushes the link_name in the direction of avoidance_hint, if it is closer than spring_threshold
+        to body_b/link_b.
+        :param link_name: str, name of the robot link, has to have a collision body
+        :param avoidance_hint: Vector3Stamped as json, direction in which the robot link will get pushed
+        :param body_b: str, name of the environment object, can be the robot, e.g. kitchen
+        :param link_b: str, name of the link of the environment object. e.g. fridge handle
+        :param max_velocity: float, m/s, default 0.1
+        :param root_link: str, default robot root, name of the root link for the kinematic chain
+        :param max_threshold: float, default 0.05, distance at which the force has reached weight
+        :param spring_threshold: float, default max_threshold, need to be >= than max_threshold weight increases from
+                                        sprint_threshold to max_threshold linearly, to smooth motions
+        :param weight: float, default WEIGHT_ABOVE_CA
+        """
         super(CollisionAvoidanceHint, self).__init__(god_map)
         self.link_name = link_name
-        self.robot_root = self.get_robot().get_root()
+        if root_link is None:
+            self.root_link = self.get_robot().get_root()
+        else:
+            self.root_link = root_link
         self.robot_name = self.get_robot_unsafe().get_name()
         self.key = (link_name, body_b, link_b)
         self.body_b = body_b
@@ -1370,7 +1455,7 @@ class CollisionAvoidanceHint(Constraint):
             added_checks[link_name] = spring_threshold
         self.get_god_map().set_data(identifier.added_collision_checks, added_checks)
 
-        self.avoidance_hint = self.parse_and_transform_Vector3Stamped(avoidance_hint, self.robot_root, normalized=True)
+        self.avoidance_hint = self.parse_and_transform_Vector3Stamped(avoidance_hint, self.root_link, normalized=True)
 
         params = {self.max_velocity_id: max_velocity,
                   self.threshold_id: max_threshold,
@@ -1425,7 +1510,7 @@ class CollisionAvoidanceHint(Constraint):
         link_b_hash = self.get_link_b()
         actual_distance_capped = w.Max(actual_distance, 0)
 
-        root_T_a = self.get_fk(self.robot_root, self.link_name)
+        root_T_a = self.get_fk(self.root_link, self.link_name)
 
         spring_error = spring_threshold - actual_distance_capped
         spring_error = w.Max(spring_error, 0)
@@ -1570,14 +1655,17 @@ class AlignPlanes(Constraint):
     max_velocity_id = u'max_velocity'
     weight_id = u'weight'
 
-    def __init__(self, god_map, root, tip, root_normal, tip_normal, max_velocity=0.5, weight=WEIGHT_BELOW_CA,
-                 goal_constraint=True):
+    def __init__(self, god_map, root, tip, root_normal, tip_normal, max_velocity=0.5, weight=WEIGHT_ABOVE_CA,
+                 goal_constraint=False):
         """
-        :type god_map:
-        :type root: str
-        :type tip: str
-        :type root_normal: Vector3Stamped
-        :type tip_normal: Vector3Stamped
+        This Goal will use the kinematic chain between tip and root normal to align both
+        :param root: str, name of the root link for the kinematic chain
+        :param tip: str, name of the tip link for the kinematic chain
+        :param tip_normal: Vector3Stamped as json, normal at the tip of the kin chain
+        :param root_normal: Vector3Stamped as json, normal at the root of the kin chain
+        :param max_velocity: float, rad/s, default 0.5
+        :param weight: float, default is WEIGHT_ABOVE_CA
+        :param goal_constraint: bool, default False
         """
         super(AlignPlanes, self).__init__(god_map)
         self.root = root
@@ -1625,11 +1713,25 @@ class GraspBar(Constraint):
     tip_grasp_axis_id = u'tip_grasp_axis'
     bar_center_id = u'bar_center'
     bar_length_id = u'bar_length'
-    max_velocity_id = u'max_velocity'
+    translation_max_velocity_id = u'translation_max_velocity'
+    rotation_max_velocity_id = u'rotation_max_velocity'
     weight_id = u'weight'
 
-    def __init__(self, god_map, root, tip, tip_grasp_axis, bar_center, bar_axis, bar_length, max_velocity=0.1,
-                 weight=WEIGHT_ABOVE_CA, goal_constraint=True):
+    def __init__(self, god_map, root, tip, tip_grasp_axis, bar_center, bar_axis, bar_length,
+                 translation_max_velocity=0.1, rotation_max_velocity=0.5, weight=WEIGHT_ABOVE_CA,
+                 goal_constraint=False):
+        """
+        This goal can be used to graps bars. It's like a cartesian goal with some freedom along one axis.
+        :param root: str, root link of the kin chain
+        :param tip: str, tip link of the kin chain
+        :param tip_grasp_axis: Vector3Stamped as json, this axis of the tip will be aligned with bar_axis
+        :param bar_center: PointStamped as json, center of the bar
+        :param bar_axis: Vector3Stamped as json, tip_grasp_axis will be aligned with this vector
+        :param bar_length: float, length of the bar
+        :param translation_max_velocity: float, m/s, default 0.1
+        :param rotation_max_velocity: float, rad/s, default 0.5
+        :param weight: float default WEIGHT_ABOVE_CA
+        """
         super(GraspBar, self).__init__(god_map)
         self.root = root
         self.tip = tip
@@ -1645,7 +1747,8 @@ class GraspBar(Constraint):
                   self.tip_grasp_axis_id: tip_grasp_axis,
                   self.bar_center_id: bar_center,
                   self.bar_length_id: bar_length,
-                  self.max_velocity_id: max_velocity,
+                  self.translation_max_velocity_id: translation_max_velocity,
+                  self.rotation_max_velocity_id: rotation_max_velocity,
                   self.weight_id: weight}
         self.save_params_on_god_map(params)
 
@@ -1663,7 +1766,8 @@ class GraspBar(Constraint):
         return self.get_input_PointStamped(self.bar_center_id)
 
     def make_constraints(self):
-        max_velocity = self.get_input_float(self.max_velocity_id)
+        translation_max_velocity = self.get_input_float(self.translation_max_velocity_id)
+        rotation_max_velocity = self.get_input_float(self.rotation_max_velocity_id)
         weight = self.get_input_float(self.weight_id)
 
         bar_length = self.get_input_float(self.bar_length_id)
@@ -1671,7 +1775,7 @@ class GraspBar(Constraint):
         tip_V_tip_grasp_axis = self.get_tip_grasp_axis_vector()
         root_P_bar_center = self.get_bar_center_point()
 
-        self.add_minimize_vector_angle_constraints(max_velocity=max_velocity * 5,
+        self.add_minimize_vector_angle_constraints(max_velocity=rotation_max_velocity,
                                                    root=self.root,
                                                    tip=self.tip,
                                                    tip_V_tip_normal=tip_V_tip_grasp_axis,
@@ -1687,7 +1791,7 @@ class GraspBar(Constraint):
         dist, nearest = w.distance_point_to_line_segment(root_P_tip, root_P_line_start, root_P_line_end)
 
         self.add_minimize_position_constraints(r_P_g=nearest,
-                                               max_velocity=0.1,
+                                               max_velocity=translation_max_velocity,
                                                max_acceleration=0.1,
                                                root=self.root,
                                                tip=self.tip,
@@ -1705,6 +1809,7 @@ class BasePointingForward(Constraint):
     def __init__(self, god_map, base_forward_axis=None, base_footprint=None, odom=None, velocity_tip=None,
                  range=np.pi / 8, max_velocity=np.pi / 8, linear_velocity_threshold=0.02, weight=WEIGHT_BELOW_CA):
         """
+        dont use
         :param god_map: ignore
         :type base_forward_axis: Vector3Stamped as json dict
         :type base_footprint: str
@@ -1793,6 +1898,9 @@ class GravityJoint(Constraint):
     # FIXME
 
     def __init__(self, god_map, joint_name, object_name, goal_constraint=True):
+        """
+        don't use me
+        """
         super(GravityJoint, self).__init__(god_map)
         self.joint_name = joint_name
         self.object_name = object_name
@@ -1842,6 +1950,9 @@ class GravityJoint(Constraint):
 class UpdateGodMap(Constraint):
 
     def __init__(self, god_map, updates):
+        """
+        Modifies the core data structure of giskard, only used for hacks, and you know what you are doing :)
+        """
         super(UpdateGodMap, self).__init__(god_map)
         self.update_god_map([], updates)
 
@@ -1865,14 +1976,11 @@ class Pointing(Constraint):
     def __init__(self, god_map, tip, goal_point, root=None, pointing_axis=None, weight=WEIGHT_BELOW_CA,
                  goal_constraint=True):
         """
-        :type tip: str
-        :param goal_point: json representing PointStamped
-        :type goal_point: str
-        :param root: default is root link of robot
-        :type root: str
-        :param pointing_axis: json representing Vector3Stamped, default is z axis
-        :type pointing_axis: str
-        :type weight: float
+        :param tip: str, name of the tip of the kin chain
+        :param goal_point: PointStamped as json, where the pointing_axis will point towards
+        :param root: str, name of the root of the kin chain
+        :param pointing_axis: Vector3Stamped as json, default is z axis, this axis will point towards the goal_point
+        :param weight: float, default WEIGHT_BELOW_CA
         """
         # always start by calling super with god map
         super(Pointing, self).__init__(god_map)

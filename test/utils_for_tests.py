@@ -301,20 +301,16 @@ class GiskardTestWrapper(object):
         rospy.sleep(1)
         logging.loginfo(u'stopping plugins')
 
-    def set_object_joint_state(self, object_name, joint_state, topic=None):
-        if topic is None:
-            self.wrapper.set_object_joint_state(object_name, joint_state)
-        else:
-            self.joint_state_publisher[topic].publish(position_dict_to_joint_states(joint_state))
-            rospy.sleep(.5)
-
+    def set_object_joint_state(self, object_name, joint_state):
+        self.wrapper.set_object_joint_state(object_name, joint_state)
+        rospy.sleep(0.5)
         self.wait_for_synced()
         current_js = self.get_world().get_object(object_name).joint_state
         for joint_name, state in joint_state.items():
             np.testing.assert_almost_equal(current_js[joint_name].position, state, 2)
 
     def set_kitchen_js(self, joint_state, object_name=u'kitchen'):
-        self.set_object_joint_state(object_name, joint_state, topic=u'/kitchen/cram_joint_states')
+        self.set_object_joint_state(object_name, joint_state)
 
     #
     # JOINT GOAL STUFF #################################################################################################
@@ -628,8 +624,8 @@ class GiskardTestWrapper(object):
             assert not self.get_world().has_object(name)
             assert name not in self.wrapper.get_object_names().object_names
 
-    def add_urdf(self, name, urdf, pose, js_topic):
-        r = self.wrapper.add_urdf(name, urdf, pose, js_topic)
+    def add_urdf(self, name, urdf, pose, js_topic, set_js_topic):
+        r = self.wrapper.add_urdf(name, urdf, pose, js_topic, set_js_topic=set_js_topic)
         assert r.error_codes == UpdateWorldResponse.SUCCESS, \
             u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
                                             update_world_error_code(UpdateWorldResponse.SUCCESS))

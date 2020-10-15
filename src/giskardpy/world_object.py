@@ -210,7 +210,7 @@ class WorldObject(URDFObject):
         :return:
         """
         js = {}
-        for joint_name in self.get_movable_joints():
+        for joint_name in sorted(self.get_movable_joints()):
             sjs = SingleJointState()
             sjs.name = joint_name
             sjs.position = f(joint_name)

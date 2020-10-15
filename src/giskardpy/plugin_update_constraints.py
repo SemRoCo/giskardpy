@@ -15,7 +15,8 @@ import giskardpy.constraints
 import giskardpy.identifier as identifier
 from giskardpy.constraints import SelfCollisionAvoidance, ExternalCollisionAvoidance
 from giskardpy.data_types import JointConstraint
-from giskardpy.exceptions import InsolvableException, ImplementationException
+from giskardpy.exceptions import ImplementationException, UnknownConstraintException, InvalidGoalException, \
+    ConstraintInitalizationException, GiskardException
 from giskardpy.logging import loginfo
 from giskardpy.plugin_action_server import GetGoal
 
@@ -38,7 +39,8 @@ class GoalToConstraints(GetGoal):
         self.rc_other_velocity = self.get_god_map().get_data(identifier.rc_other_velocity)
 
     def initialise(self):
-        self.get_god_map().safe_set_data(identifier.collision_goal, None)
+        self.get_god_map().set_data(identifier.collision_goal, None)
+        self.clear_blackboard_exception()
 
     def update(self):
         # TODO make this interruptable
@@ -48,7 +50,9 @@ class GoalToConstraints(GetGoal):
         if not move_cmd:
             return Status.FAILURE
 
-        self.get_god_map().safe_set_data(identifier.constraints_identifier, {})
+        self.get_god_map().set_data(identifier.constraints_identifier, {})
+
+        self.get_robot()._create_constraints(self.get_god_map())
 
         self.soft_constraints = {}
         if not (self.get_god_map().get_data(identifier.check_reachability)):
@@ -58,11 +62,7 @@ class GoalToConstraints(GetGoal):
         try:
             self.parse_constraints(move_cmd)
         except AttributeError:
-            self.raise_to_blackboard(InsolvableException(u'couldn\'t transform goal'))
-            traceback.print_exc()
-            return Status.SUCCESS
-        except InsolvableException as e:
-            self.raise_to_blackboard(e)
+            self.raise_to_blackboard(InvalidGoalException(u'couldn\'t transform goal'))
             traceback.print_exc()
             return Status.SUCCESS
         except Exception as e:
@@ -70,8 +70,8 @@ class GoalToConstraints(GetGoal):
             traceback.print_exc()
             return Status.SUCCESS
 
-        self.get_god_map().safe_set_data(identifier.collision_goal, move_cmd.collisions)
-        self.get_god_map().safe_set_data(identifier.soft_constraint_identifier, self.soft_constraints)
+        self.get_god_map().set_data(identifier.collision_goal, move_cmd.collisions)
+        self.get_god_map().set_data(identifier.soft_constraint_identifier, self.soft_constraints)
         self.get_blackboard().runtime = time()
 
         controlled_joints = self.get_robot().controlled_joints
@@ -114,8 +114,8 @@ class GoalToConstraints(GetGoal):
         hard_constraints = OrderedDict(((self.robot.get_name(), k), self.robot._hard_constraints[k]) for k in
                                        controlled_joints if k in self.robot._hard_constraints)
 
-        self.get_god_map().safe_set_data(identifier.joint_constraint_identifier, joint_constraints)
-        self.get_god_map().safe_set_data(identifier.hard_constraint_identifier, hard_constraints)
+        self.get_god_map().set_data(identifier.joint_constraint_identifier, joint_constraints)
+        self.get_god_map().set_data(identifier.hard_constraint_identifier, hard_constraints)
 
         return Status.SUCCESS
 
@@ -124,9 +124,10 @@ class GoalToConstraints(GetGoal):
         :type cmd: MoveCmd
         :rtype: dict
         """
-
+        loginfo(u'parsing goal message')
         for constraint in itertools.chain(cmd.constraints, cmd.joint_constraints, cmd.cartesian_constraints):
             try:
+                loginfo(u'adding constraint of type: \'{}\''.format(constraint.type))
                 C = self.allowed_constraint_types[constraint.type]
             except KeyError:
                 matches = ''
@@ -136,11 +137,11 @@ class GoalToConstraints(GetGoal):
                     if ratio >= 0.5:
                         matches = matches + s + '\n'
                 if matches != '':
-                    raise InsolvableException(
+                    raise UnknownConstraintException(
                         u'unknown constraint {}. did you mean one of these?:\n{}'.format(constraint.type, matches))
                 else:
                     available_constraints = '\n'.join([x for x in self.allowed_constraint_types.keys()]) + '\n'
-                    raise InsolvableException(
+                    raise UnknownConstraintException(
                         u'unknown constraint {}. available constraint types:\n{}'.format(constraint.type,
                                                                                          available_constraints))
 
@@ -153,17 +154,23 @@ class GoalToConstraints(GetGoal):
 
                 c = C(self.god_map, **params)
             except Exception as e:
-                doc_string = C.make_constraints.__doc__
-                error_msg = 'wrong parameters for {} \n {} \n'.format(C.__name__, e.message)
+                traceback.print_exc()
+                doc_string = C.__init__.__doc__
+                error_msg = u'Initialization of "{}" constraint failed: \n {} \n'.format(C.__name__, e)
                 if doc_string is not None:
                     error_msg = error_msg + doc_string
-                raise ValueError(error_msg)
+                if not isinstance(e, GiskardException):
+                    raise ConstraintInitalizationException(error_msg)
+                raise e
             try:
                 soft_constraints = c.get_constraints()
                 self.soft_constraints.update(soft_constraints)
             except Exception as e:
                 traceback.print_exc()
-                raise ImplementationException()
+                if not isinstance(e, GiskardException):
+                    raise ConstraintInitalizationException(e)
+                raise e
+        loginfo(u'done parsing goal message')
 
     def has_robot_changed(self):
         new_urdf = self.get_robot().get_urdf_str()

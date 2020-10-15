@@ -66,6 +66,9 @@ class GiskardBehavior(Behaviour):
     def get_blackboard_exception(self):
         return self.get_blackboard().get('exception')
 
+    def clear_blackboard_exception(self):
+        self.get_blackboard().set('exception', None)
+
 
 class PluginBehavior(GiskardBehavior):
 

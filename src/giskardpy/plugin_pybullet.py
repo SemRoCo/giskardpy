@@ -139,7 +139,7 @@ class WorldUpdatePlugin(GiskardBehavior):
                                                                                                 world_object.base_pose.orientation.w))
 
                     f.write("{}_pose.header.frame_id = \"map\"\n".format(object_name))
-                    f.write("zero_pose.add_urdf(name={0}_name, urdf={0}_urdf, pose={0}_pose, js_topic={0}_js_topic)\n".format(object_name))
+                    f.write("zero_pose.add_urdf(name={0}_name, urdf={0}_urdf, pose={0}_pose, js_topic={0}_js_topic, set_js_topic=None)\n".format(object_name))
                     f.write("{}_joint_state = ".format(object_name))
                     write_dict(to_joint_state_position_dict((dict_to_joint_states(world_object.joint_state))), f)
                     f.write("zero_pose.set_object_joint_state({0}_name, {0}_joint_state)\n\n".format(object_name))

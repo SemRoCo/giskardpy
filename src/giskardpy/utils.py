@@ -9,7 +9,7 @@ import re
 import rospkg
 import subprocess
 import sys
-from collections import defaultdict, OrderedDict
+from collections import defaultdict, OrderedDict, deque
 from contextlib import contextmanager
 from functools import wraps
 from itertools import product
@@ -933,3 +933,22 @@ def publish_marker_vector(start, end, diameter_shaft=0.01, diameter_head=0.02,  
     rospy.sleep(0.3)
 
     pub.publish(m)
+
+class FIFOSet(set):
+    def __init__(self, data, max_length=None):
+        if len(data) > max_length:
+            raise ValueError('len(data) > max_length')
+        super(FIFOSet, self).__init__(data)
+        self.max_length = max_length
+        self._data_queue = deque(data)
+
+    def add(self, item):
+        if len(self._data_queue) == self.max_length:
+            to_delete = self._data_queue.popleft()
+            super(FIFOSet, self).remove(to_delete)
+            self._data_queue.append(item)
+        super(FIFOSet, self).add(item)
+
+    def remove(self, item):
+        self.remove(item)
+        self._data_queue.remove(item)

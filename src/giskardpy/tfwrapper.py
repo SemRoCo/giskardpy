@@ -39,7 +39,7 @@ def wait_for_transform(target_frame, source_frame, time, timeout):
 def transform_pose(target_frame, pose):
     """
     Transforms a pose stamped into a different target frame.
-    :type target_frame: str
+    :type target_frame: Union[str, unicode]
     :type pose: PoseStamped
     :return: Transformed pose of None on loop failure
     :rtype: PoseStamped
@@ -55,13 +55,13 @@ def transform_pose(target_frame, pose):
         new_pose = do_transform_pose(pose, transform)
         return new_pose
     except ExtrapolationException as e:
-        logging.logwarn(e)
+        logging.logwarn(str(e))
 
 
 def transform_vector(target_frame, vector):
     """
     Transforms a pose stamped into a different target frame.
-    :type target_frame: str
+    :type target_frame: Union[str, unicode]
     :type vector: Vector3Stamped
     :return: Transformed pose of None on loop failure
     :rtype: Vector3Stamped
@@ -77,13 +77,13 @@ def transform_vector(target_frame, vector):
         new_pose = do_transform_vector3(vector, transform)
         return new_pose
     except ExtrapolationException as e:
-        logging.logwarn(e)
+        logging.logwarn(str(e))
 
 
 def transform_point(target_frame, point):
     """
     Transforms a pose stamped into a different target frame.
-    :type target_frame: str
+    :type target_frame: Union[str, unicode]
     :type point: PointStamped
     :return: Transformed pose of None on loop failure
     :rtype: PointStamped
@@ -99,7 +99,7 @@ def transform_point(target_frame, point):
         new_pose = do_transform_point(point, transform)
         return new_pose
     except ExtrapolationException as e:
-        logging.logwarn(e)
+        logging.logwarn(str(e))
 
 
 def lookup_transform(target_frame, source_frame, time=None):
@@ -123,8 +123,8 @@ def lookup_transform(target_frame, source_frame, time=None):
 
 def lookup_pose(target_frame, source_frame, time=None):
     """
-    :type target_frame: str
-    :type source_frame: str
+    :type target_frame: Union[str, unicode]
+    :type source_frame: Union[str, unicode]
     :return: target_frame <- source_frame
     :rtype: PoseStamped
     """
@@ -138,8 +138,8 @@ def lookup_pose(target_frame, source_frame, time=None):
 
 def lookup_point(target_frame, source_frame, time=None):
     """
-    :type target_frame: str
-    :type source_frame: str
+    :type target_frame: Union[str, unicode]
+    :type source_frame: Union[str, unicode]
     :return: target_frame <- source_frame
     :rtype: PointStamped
     """
@@ -184,7 +184,7 @@ def quaternion_to_kdl(pose):
 
 def point_to_kdl(point):
     """
-    :type point: Point
+    :type point: Union[Point, Vector]
     :rtype: PyKDL.Vector
     """
     return PyKDL.Vector(point.x, point.y, point.z)
@@ -427,7 +427,7 @@ def publish_frame_marker(pose_stamped, id_=1, length=0.1):
     pub.publish(ma)
 
 if __name__ == u'__main__':
-    rospy.init_node(u'tf_wrapper_debug')
+    rospy.init_node('tf_wrapper_debug')
     p = PoseStamped()
     p.header.frame_id = u'map'
     p.pose.position.x = 1

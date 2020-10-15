@@ -202,7 +202,8 @@ def shelf_setup(better_pose):
 def kitchen_setup(zero_pose):
     object_name = u'kitchen'
     zero_pose.add_urdf(object_name, rospy.get_param(u'kitchen_description'), u'/kitchen/joint_states',
-                       tf.lookup_transform(u'map', u'iai_kitchen/world'))
+                       tf.lookup_transform(u'map', u'iai_kitchen/world'),
+                       set_js_topic=u'/kitchen/cram_joint_states')
     return zero_pose
 
 

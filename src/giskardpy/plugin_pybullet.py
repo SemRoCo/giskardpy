@@ -27,6 +27,7 @@ from giskardpy.urdf_object import URDFObject
 from rospy_message_converter.message_converter import convert_ros_message_to_dictionary
 
 import os
+import time
 
 class WorldUpdatePlugin(GiskardBehavior):
     # TODO reject changes if plugin not active or something
@@ -51,7 +52,7 @@ class WorldUpdatePlugin(GiskardBehavior):
     def dump_state_cb(self, data):
         try:
             path = self.get_god_map().unsafe_get_data(identifier.data_folder)
-            folder_name = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            folder_name = datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
             folder_path = '{}{}'.format(path, folder_name)
             os.mkdir(folder_path)
             robot = self.unsafe_get_robot()
@@ -100,22 +101,13 @@ class WorldUpdatePlugin(GiskardBehavior):
                     f.write('with open(\'{}/{}.urdf\', \"r\") as f:\n'.format(folder_path, object_name))
                     f.write("   {}_urdf = f.read()\n".format(object_name))
                     f.write("{0}_name = \"{0}\"\n".format(object_name))
-                    f.write("{}_pose = PoseStamped()\n".format(object_name))
-                    f.write("{}_pose.header.stamp = rospy.Time.now()\n".format(object_name))
-                    f.write("{0}_pose.pose.position = Point({1}, {2}, {3})\n".format(object_name,
-                                                                                     pose.pose.position.x,
-                                                                                     pose.pose.position.y,
-                                                                                     pose.pose.position.z, ))
-                    f.write("{0}_pose.pose.orientation = Quaternion({1}, {2}, {3}, {4})\n".format(object_name,
-                                                                                                  pose.pose.orientation.x,
-                                                                                                  pose.pose.orientation.y,
-                                                                                                  pose.pose.orientation.z,
-                                                                                                  pose.pose.orientation.w))
-                    f.write("{0}_pose.header.frame_id = \"{1}\"\n".format(object_name, parent))
+                    f.write("{}_pose_stamped_dict = ".format(object_name))
+                    write_dict(convert_ros_message_to_dictionary(pose), f)
+                    f.write("{0}_pose_stamped = convert_dictionary_to_ros_message('geometry_msgs/PoseStamped', {0}_pose_stamped_dict)\n".format(object_name))
                     f.write(
-                        "zero_pose.add_urdf(name={0}_name, urdf={0}_urdf, pose={0}_pose)\n".format(object_name))
+                        "zero_pose.add_urdf(name={0}_name, urdf={0}_urdf, pose={0}_pose_stamped)\n".format(object_name))
                     f.write(
-                        "zero_pose.attach_object(name={0}_name, link_frame_id=\'{1}\')\n".format(object_name, parent))
+                        "zero_pose.attach_existing(name={0}_name, frame_id=\'{1}\')\n".format(object_name, parent))
 
                 for object_name, world_object in world.get_objects().items(): # type: (str, WorldObject)
                     f.write("#add {}\n".format(object_name))
@@ -126,20 +118,13 @@ class WorldUpdatePlugin(GiskardBehavior):
                     f.write("   {}_urdf = f.read()\n".format(object_name))
                     f.write("{0}_name = \"{0}\"\n".format(object_name))
                     f.write("{0}_js_topic = \"{0}_js_topic\"\n".format(object_name))
-                    f.write("{}_pose = PoseStamped()\n".format(object_name))
-                    f.write("{}_pose.header.stamp = rospy.Time.now()\n".format(object_name))
-                    f.write("{0}_pose.pose.position = Point({1}, {2}, {3})\n".format(object_name,
-                                                                                     world_object.base_pose.position.x,
-                                                                                     world_object.base_pose.position.y,
-                                                                                     world_object.base_pose.position.z,))
-                    f.write("{0}_pose.pose.orientation = Quaternion({1}, {2}, {3}, {4})\n".format(object_name,
-                                                                                                world_object.base_pose.orientation.x,
-                                                                                                world_object.base_pose.orientation.y,
-                                                                                                world_object.base_pose.orientation.z,
-                                                                                                world_object.base_pose.orientation.w))
-
-                    f.write("{}_pose.header.frame_id = \"map\"\n".format(object_name))
-                    f.write("zero_pose.add_urdf(name={0}_name, urdf={0}_urdf, pose={0}_pose, js_topic={0}_js_topic, set_js_topic=None)\n".format(object_name))
+                    f.write("{}_pose_dict = ".format(object_name))
+                    write_dict(convert_ros_message_to_dictionary(world_object.base_pose), f)
+                    f.write("{0}_pose = convert_dictionary_to_ros_message('geometry_msgs/Pose', {0}_pose_dict)\n".format(object_name))
+                    f.write("{}_pose_stamped = PoseStamped()\n".format(object_name))
+                    f.write("{0}_pose_stamped.pose = {0}_pose\n".format(object_name))
+                    f.write("{0}_pose_stamped.header.frame_id = \"map\"\n".format(object_name))
+                    f.write("zero_pose.add_urdf(name={0}_name, urdf={0}_urdf, pose={0}_pose_stamped, js_topic={0}_js_topic, set_js_topic=None)\n".format(object_name))
                     f.write("{}_joint_state = ".format(object_name))
                     write_dict(to_joint_state_position_dict((dict_to_joint_states(world_object.joint_state))), f)
                     f.write("zero_pose.set_object_joint_state({0}_name, {0}_joint_state)\n\n".format(object_name))
@@ -159,10 +144,13 @@ class WorldUpdatePlugin(GiskardBehavior):
                     f.write(u'#no goal\n')
             logging.loginfo(u'saved dump to {}'.format(folder_path))
         except:
-            print('failed to print pls try again')
+            logging.logerr('failed to dump state pls try again')
+            res = TriggerResponse()
+            res.message = 'failed to dump state pls try again'
             return TriggerResponse()
         res = TriggerResponse()
         res.success = True
+        res.message = 'saved dump to {}'.format(folder_path)
         return res
 
     def update(self):
@@ -329,6 +317,7 @@ class WorldUpdatePlugin(GiskardBehavior):
             callback = (lambda msg: self.object_js_cb(world_body.name, msg))
             self.object_js_subs[world_body.name] = \
                 rospy.Subscriber(world_body.joint_state_topic, JointState, callback, queue_size=1)
+            time.sleep(0.1)
 
     def detach_object(self, req):
         # assumes that parent has god map lock

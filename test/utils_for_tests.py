@@ -624,7 +624,7 @@ class GiskardTestWrapper(object):
             assert not self.get_world().has_object(name)
             assert name not in self.wrapper.get_object_names().object_names
 
-    def add_urdf(self, name, urdf, pose, js_topic, set_js_topic):
+    def add_urdf(self, name, urdf, pose, js_topic=u'', set_js_topic=None):
         r = self.wrapper.add_urdf(name, urdf, pose, js_topic, set_js_topic=set_js_topic)
         assert r.error_codes == UpdateWorldResponse.SUCCESS, \
             u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),

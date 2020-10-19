@@ -27,7 +27,6 @@ from giskardpy.urdf_object import URDFObject
 from rospy_message_converter.message_converter import convert_ros_message_to_dictionary
 
 import os
-import time
 
 class WorldUpdatePlugin(GiskardBehavior):
     # TODO reject changes if plugin not active or something
@@ -83,7 +82,7 @@ class WorldUpdatePlugin(GiskardBehavior):
                 f.write("map_odom_transform = Transform()\n" +
                         "map_odom_transform.rotation = map_odom_pose_stamped.pose.orientation\n" +
                         "map_odom_transform.translation = map_odom_pose_stamped.pose.position\n\n")
-                f.write("set_odom_map_transform = rospy.ServiceProxy('/update_map_odom_transform', SetMapOdomTransform)\n")
+                f.write("set_odom_map_transform = rospy.ServiceProxy('/odom_map_transform_publisher/update_map_odom_transform', SetMapOdomTransform)\n")
                 f.write("set_odom_map_transform(map_odom_transform)\n")
 
                 original_robot = URDFObject(robot.original_urdf)
@@ -317,7 +316,7 @@ class WorldUpdatePlugin(GiskardBehavior):
             callback = (lambda msg: self.object_js_cb(world_body.name, msg))
             self.object_js_subs[world_body.name] = \
                 rospy.Subscriber(world_body.joint_state_topic, JointState, callback, queue_size=1)
-            time.sleep(0.1)
+            rospy.sleep(0.1)
 
     def detach_object(self, req):
         # assumes that parent has god map lock

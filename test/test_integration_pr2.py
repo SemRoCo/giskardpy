@@ -24,7 +24,7 @@ from giskardpy.tfwrapper import init as tf_init
 from giskardpy.utils import to_joint_state_position_dict, publish_marker_vector
 from rospy_message_converter.message_converter import convert_dictionary_to_ros_message
 from utils_for_tests import PR2, compare_poses
-from iai_naive_kinematics_sim.srv import SetMapOdomTransform
+from iai_naive_kinematics_sim.srv import UpdateTransform
 
 
 # TODO roslaunch iai_pr2_sim ros_control_sim_with_base.launch

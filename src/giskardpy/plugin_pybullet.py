@@ -82,7 +82,7 @@ class WorldUpdatePlugin(GiskardBehavior):
                 f.write("map_odom_transform = Transform()\n" +
                         "map_odom_transform.rotation = map_odom_pose_stamped.pose.orientation\n" +
                         "map_odom_transform.translation = map_odom_pose_stamped.pose.position\n\n")
-                f.write("set_odom_map_transform = rospy.ServiceProxy('/odom_map_transform_publisher/update_map_odom_transform', SetMapOdomTransform)\n")
+                f.write("set_odom_map_transform = rospy.ServiceProxy('/map_odom_transform_publisher/update_map_odom_transform', UpdateTransform)\n")
                 f.write("set_odom_map_transform(map_odom_transform)\n")
 
                 original_robot = URDFObject(robot.original_urdf)

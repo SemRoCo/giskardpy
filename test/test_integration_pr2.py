@@ -5532,7 +5532,7 @@ class TestCollisionAvoidanceGoals(object):
         :type zero_pose: PR2
         """
         req = UpdateWorldRequest(42, WorldBody(), True, PoseStamped())
-        assert zero_pose.wrapper.update_world.call(req).error_codes == UpdateWorldResponse.INVALID_OPERATION
+        assert zero_pose.wrapper._update_world_srv.call(req).error_codes == UpdateWorldResponse.INVALID_OPERATION
 
     def test_missing_body_error(self, zero_pose):
         """
@@ -5546,7 +5546,7 @@ class TestCollisionAvoidanceGoals(object):
         """
         req = UpdateWorldRequest(UpdateWorldRequest.ADD, WorldBody(type=WorldBody.PRIMITIVE_BODY,
                                                                    shape=SolidPrimitive(type=42)), True, PoseStamped())
-        assert zero_pose.wrapper.update_world.call(req).error_codes == UpdateWorldResponse.CORRUPT_SHAPE_ERROR
+        assert zero_pose.wrapper._update_world_srv.call(req).error_codes == UpdateWorldResponse.CORRUPT_SHAPE_ERROR
 
     def test_unsupported_options(self, kitchen_setup):
         """
@@ -5561,7 +5561,7 @@ class TestCollisionAvoidanceGoals(object):
         wb.type = WorldBody.URDF_BODY
 
         req = UpdateWorldRequest(UpdateWorldRequest.ADD, wb, True, pose)
-        assert kitchen_setup.wrapper.update_world.call(req).error_codes == UpdateWorldResponse.UNSUPPORTED_OPTIONS
+        assert kitchen_setup.wrapper._update_world_srv.call(req).error_codes == UpdateWorldResponse.UNSUPPORTED_OPTIONS
 
     def test_infeasible(self, kitchen_setup):
         """

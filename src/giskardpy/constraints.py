@@ -1255,7 +1255,7 @@ class CartesianPose(Constraint):
         :param tip_link: str, name of the tip link of the kin chain
         :param goal: PoseStamped as json
         :param max_linear_velocity: float, m/s, default 0.1
-        :param translation_max_acceleration: float, rad/s, default 0.5
+        :param max_angular_velocity: float, rad/s, default 0.5
         :param weight: float, default WEIGHT_ABOVE_CA
         """
         super(CartesianPose, self).__init__(god_map)
@@ -1975,6 +1975,7 @@ class Pointing(Constraint):
     def __init__(self, god_map, tip_link, goal_point, root_link=None, pointing_axis=None, weight=WEIGHT_BELOW_CA,
                  goal_constraint=True):
         """
+        Uses the kinematic chain from root_link to tip_link to move the pointing axis, such that it points to the goal point.
         :param tip_link: str, name of the tip of the kin chain
         :param goal_point: PointStamped as json, where the pointing_axis will point towards
         :param root_link: str, name of the root of the kin chain

@@ -400,11 +400,11 @@ class GiskardTestWrapper(object):
         if not root_link:
             root_link = self.default_root
         if weight is not None:
-            self.wrapper.set_cart_goal(root_link, tip_link, goal_pose, weight=weight, trans_max_velocity=linear_velocity,
-                                       rot_max_velocity=angular_velocity)
+            self.wrapper.set_cart_goal(root_link, tip_link, goal_pose, weight=weight, max_linear_velocity=linear_velocity,
+                                       max_angular_velocity=angular_velocity)
         else:
-            self.wrapper.set_cart_goal(root_link, tip_link, goal_pose, trans_max_velocity=linear_velocity,
-                                       rot_max_velocity=angular_velocity)
+            self.wrapper.set_cart_goal(root_link, tip_link, goal_pose, max_linear_velocity=linear_velocity,
+                                       max_angular_velocity=angular_velocity)
 
     def set_and_check_cart_goal(self, goal_pose, tip_link, root_link=None, weight=None, linear_velocity=None, angular_velocity=None,
                                 expected_error_codes=None):
@@ -603,7 +603,7 @@ class GiskardTestWrapper(object):
         compare_poses(o_p, self.wrapper.get_object_info(name).pose.pose)
 
     def add_cylinder(self, name=u'cylinder', size=[1, 1], pose=None):
-        r = self.wrapper.add_cylinder(name=name, size=size, pose=pose)
+        r = self.wrapper.add_cylinder(name=name, height=size[0], radius=size[1], pose=pose)
         assert r.error_codes == UpdateWorldResponse.SUCCESS, \
             u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
                                             update_world_error_code(UpdateWorldResponse.SUCCESS))

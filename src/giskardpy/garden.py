@@ -145,7 +145,7 @@ def process_joint_specific_params(identifier_, default, override, god_map):
 
 
 def grow_tree():
-    action_server_name = u'giskardpy/command'
+    action_server_name = u'~command'
 
     god_map = initialize_god_map()
     # ----------------------------------------------

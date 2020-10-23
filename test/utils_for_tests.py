@@ -228,13 +228,13 @@ class GiskardTestWrapper(object):
         rospy.set_param('~enable_gui', False)
         rospy.set_param('~plugins/PlotTrajectory/enabled', True)
 
-        self.sub_result = rospy.Subscriber('/giskardpy/command/result', MoveActionResult, self.cb, queue_size=100)
-        self.cancel_goal = rospy.Publisher('/giskardpy/command/cancel', GoalID, queue_size=100)
+        self.sub_result = rospy.Subscriber('~command/result', MoveActionResult, self.cb, queue_size=100)
+        self.cancel_goal = rospy.Publisher('~command/cancel', GoalID, queue_size=100)
 
         self.tree = grow_tree()
         self.loop_once()
         # rospy.sleep(1)
-        self.wrapper = GiskardWrapper(ns=u'tests')
+        self.wrapper = GiskardWrapper(node_name=u'tests')
         self.results = Queue(100)
         self.default_root = self.get_robot().get_root()
         self.map = u'map'
@@ -441,7 +441,7 @@ class GiskardTestWrapper(object):
                                  goal_type=MoveGoal.PLAN_AND_CHECK_REACHABILITY)
 
     def get_as(self):
-        return Blackboard().get(u'giskardpy/command')
+        return Blackboard().get(u'~command')
 
     def send_goal(self, goal=None, goal_type=MoveGoal.PLAN_AND_EXECUTE, wait=True):
         """

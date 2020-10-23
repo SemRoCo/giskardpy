@@ -19,16 +19,17 @@ from rospy_message_converter.message_converter import convert_ros_message_to_dic
 
 
 class GiskardWrapper(object):
-    def __init__(self, giskard_topic=u'giskardpy/command', ns=u'giskardpy'):
+    def __init__(self, node_name=u'giskard'):
+        giskard_topic = u'{}/command'.format(node_name)
         if giskard_topic is not None:
             self._client = SimpleActionClient(giskard_topic, MoveAction)
-            self._update_world_srv = rospy.ServiceProxy(u'{}/update_world'.format(ns), UpdateWorld)
-            self._get_object_names_srv = rospy.ServiceProxy(u'{}/get_object_names'.format(ns), GetObjectNames)
-            self._get_object_info_srv = rospy.ServiceProxy(u'{}/get_object_info'.format(ns), GetObjectInfo)
-            self._update_rviz_markers_srv = rospy.ServiceProxy(u'{}/update_rviz_markers'.format(ns), UpdateRvizMarkers)
-            self._get_attached_objects_srv = rospy.ServiceProxy(u'{}/get_attached_objects'.format(ns), GetAttachedObjects)
+            self._update_world_srv = rospy.ServiceProxy(u'{}/update_world'.format(node_name), UpdateWorld)
+            self._get_object_names_srv = rospy.ServiceProxy(u'{}/get_object_names'.format(node_name), GetObjectNames)
+            self._get_object_info_srv = rospy.ServiceProxy(u'{}/get_object_info'.format(node_name), GetObjectInfo)
+            self._update_rviz_markers_srv = rospy.ServiceProxy(u'{}/update_rviz_markers'.format(node_name), UpdateRvizMarkers)
+            self._get_attached_objects_srv = rospy.ServiceProxy(u'{}/get_attached_objects'.format(node_name), GetAttachedObjects)
             self._marker_pub = rospy.Publisher(u'visualization_marker_array', MarkerArray, queue_size=10)
-            rospy.wait_for_service(u'{}/update_world'.format(ns))
+            rospy.wait_for_service(u'{}/update_world'.format(node_name))
             self._client.wait_for_server()
         self.robot_urdf = URDFObject(rospy.get_param(u'robot_description'))
         self.collisions = []
@@ -437,12 +438,7 @@ class GiskardWrapper(object):
         :return: result from giskard
         :rtype: MoveResult
         """
-        goal = self._get_goal()
-        if wait:
-            self._client.send_goal_and_wait(goal)
-            return self._client.get_result()
-        else:
-            self._client.send_goal(goal)
+        self.send_goal(MoveGoal.PLAN_AND_EXECUTE, wait)
 
     def check_reachability(self, wait=True):
         """
@@ -452,13 +448,7 @@ class GiskardWrapper(object):
         :return: result from giskard
         :rtype: MoveResult
         """
-        goal = self._get_goal()
-        goal.type = MoveGoal.CHECK_REACHABILITY
-        if wait:
-            self._client.send_goal_and_wait(goal)
-            return self._client.get_result()
-        else:
-            self._client.send_goal(goal)
+        self.send_goal(MoveGoal.CHECK_REACHABILITY, wait)
 
     def plan(self, wait=True):
         """
@@ -468,8 +458,11 @@ class GiskardWrapper(object):
         :return: result from giskard
         :rtype: MoveResult
         """
+        self.send_goal(MoveGoal.PLAN_ONLY, wait)
+
+    def send_goal(self, goal_type, wait=True):
         goal = self._get_goal()
-        goal.type = MoveGoal.PLAN_ONLY
+        goal.type = goal_type
         if wait:
             self._client.send_goal_and_wait(goal)
             return self._client.get_result()

@@ -1,24 +1,25 @@
+import shutil
 from collections import defaultdict
-from itertools import product, combinations_with_replacement
+from itertools import product
 
 import pybullet as p
-import shutil
-
 import pytest
-from geometry_msgs.msg import Pose, Point, Quaternion, PoseStamped
-from giskard_msgs.msg import CollisionEntry
+from geometry_msgs.msg import Pose, Point, Quaternion
 
+import giskardpy.pybullet_wrapper as pbw
+from giskardpy import logging
 from giskardpy.pybullet_world import PyBulletWorld
 from giskardpy.pybullet_world_object import PyBulletWorldObject
-import giskardpy.pybullet_wrapper as pbw
-from giskardpy.symengine_robot import Robot
+from giskardpy.robot import Robot
 from giskardpy.utils import make_world_body_box, make_world_body_sphere, make_world_body_cylinder
-from utils_for_tests import pr2_urdf, base_bot_urdf, donbot_urdf, boxy_urdf
 from giskardpy.world_object import WorldObject
-from giskardpy import logging
+from utils_for_tests import pr2_urdf, base_bot_urdf, donbot_urdf
+
+# this import has to come last
 import test_world
 
 folder_name = u'tmp_data/'
+
 
 @pytest.fixture(scope=u'module')
 def module_setup(request):
@@ -57,6 +58,7 @@ def test_folder(request, function_setup):
     """
     :rtype: World
     """
+
     def kill_pybullet():
         try:
             logging.loginfo(u'deleting tmp test folder')
@@ -66,6 +68,7 @@ def test_folder(request, function_setup):
 
     request.addfinalizer(kill_pybullet)
     return folder_name
+
 
 @pytest.fixture()
 def delete_test_folder(request):
@@ -78,6 +81,7 @@ def delete_test_folder(request):
     except:
         pass
     return folder_name
+
 
 def assert_num_pybullet_objects(num):
     assert p.getNumBodies() == num, pbw.print_body_names()
@@ -97,29 +101,34 @@ class TestPyBulletRobot(test_world.TestRobot):
 
     def test_from_world_body_box(self, function_setup):
         wb = make_world_body_box()
-        urdf_obj = self.cls.from_world_body(wb, calc_self_collision_matrix=False)
+        urdf_obj = self.cls.from_world_body(wb)
         assert len(urdf_obj.get_link_names()) == 1
         assert len(urdf_obj.get_joint_names()) == 0
 
     def test_from_world_body_sphere(self, function_setup):
         wb = make_world_body_sphere()
-        urdf_obj = self.cls.from_world_body(wb, calc_self_collision_matrix=False)
+        urdf_obj = self.cls.from_world_body(wb)
         assert len(urdf_obj.get_link_names()) == 1
         assert len(urdf_obj.get_joint_names()) == 0
 
     def test_from_world_body_cylinder(self, function_setup):
         wb = make_world_body_cylinder()
-        urdf_obj = self.cls.from_world_body(wb, calc_self_collision_matrix=False)
+        urdf_obj = self.cls.from_world_body(wb)
         assert len(urdf_obj.get_link_names()) == 1
         assert len(urdf_obj.get_joint_names()) == 0
 
     def test_safe_load_collision_matrix(self, test_folder, delete_test_folder):
-        r = self.cls(donbot_urdf(), path_to_data_folder=test_folder, calc_self_collision_matrix=True)
-        scm = r.get_self_collision_matrix()
-        assert len(scm) == 53
+        r = self.cls(donbot_urdf(), path_to_data_folder=test_folder)
+        r.init_self_collision_matrix()
+        expected = r.get_self_collision_matrix()
+        r.safe_self_collision_matrix(test_folder)
+        assert r.load_self_collision_matrix(test_folder)
+        actual = r.get_self_collision_matrix()
+        assert expected == actual
 
     def test_attach_urdf_object1_2(self, test_folder):
-        parsed_pr2 = self.cls(donbot_urdf(), path_to_data_folder=test_folder, calc_self_collision_matrix=True)
+        parsed_pr2 = self.cls(donbot_urdf(), path_to_data_folder=test_folder)
+        parsed_pr2.init_self_collision_matrix()
         scm = parsed_pr2.get_self_collision_matrix()
         num_of_links_before = len(parsed_pr2.get_link_names())
         num_of_joints_before = len(parsed_pr2.get_joint_names())
@@ -137,7 +146,8 @@ class TestPyBulletRobot(test_world.TestRobot):
         assert len(scm) < len(parsed_pr2.get_self_collision_matrix())
 
     def test_detach_object2(self, test_folder):
-        r = self.cls(donbot_urdf(), path_to_data_folder=test_folder, calc_self_collision_matrix=True)
+        r = self.cls(donbot_urdf(), path_to_data_folder=test_folder)
+        r.init_self_collision_matrix()
         scm = r.get_self_collision_matrix()
         box = WorldObject.from_world_body(make_world_body_box())
         p = Pose()
@@ -150,7 +160,7 @@ class TestPyBulletRobot(test_world.TestRobot):
 
     def test_reset_collision_matrix(self, test_folder):
         r = self.cls(donbot_urdf(), path_to_data_folder=test_folder)
-        r.update_self_collision_matrix()
+        r.init_self_collision_matrix()
         scm = r.get_self_collision_matrix()
 
         box = self.cls.from_world_body(make_world_body_box())
@@ -214,8 +224,122 @@ class TestPyBulletWorld(test_world.TestWorld):
 
     def test_collision_goals_to_collision_matrix1(self, test_folder):
         world_with_donbot = self.make_world_with_donbot(test_folder)
-        collision_matrix = world_with_donbot.collision_goals_to_collision_matrix([], 0.05)
-        assert len(collision_matrix) == 106
+        min_dist = defaultdict(lambda: {u'zero_weight_distance': 0.05})
+        collision_matrix = world_with_donbot.collision_goals_to_collision_matrix([], min_dist)
+
+        assert collision_matrix == {('base_link', 'iai_donbot', 'camera_holder_link'): 0.05,
+                                     ('base_link', 'iai_donbot', 'gripper_base_link'): 0.05,
+                                     ('base_link', 'iai_donbot', 'gripper_finger_left_link'): 0.05,
+                                     ('base_link', 'iai_donbot', 'gripper_finger_right_link'): 0.05,
+                                     ('base_link', 'iai_donbot', 'gripper_gripper_left_link'): 0.05,
+                                     ('base_link', 'iai_donbot', 'gripper_gripper_right_link'): 0.05,
+                                     ('base_link', 'iai_donbot', 'ur5_ee_link'): 0.05,
+                                     ('base_link', 'iai_donbot', 'ur5_wrist_1_link'): 0.05,
+                                     ('base_link', 'iai_donbot', 'ur5_wrist_2_link'): 0.05,
+                                     ('base_link', 'iai_donbot', 'ur5_wrist_3_link'): 0.05,
+                                     ('base_link', 'iai_donbot', 'wrist_collision'): 0.05,
+                                     ('camera_holder_link', 'iai_donbot', 'charger'): 0.05,
+                                     ('camera_holder_link', 'iai_donbot', 'plate'): 0.05,
+                                     ('camera_holder_link', 'iai_donbot', 'switches'): 0.05,
+                                     ('camera_holder_link', 'iai_donbot', 'ur5_base_link'): 0.05,
+                                     ('camera_holder_link', 'iai_donbot', 'ur5_forearm_link'): 0.05,
+                                     ('camera_holder_link', 'iai_donbot', 'ur5_shoulder_link'): 0.05,
+                                     ('camera_holder_link', 'iai_donbot', 'ur5_touchpad'): 0.05,
+                                     ('camera_holder_link', 'iai_donbot', 'ur5_upper_arm_link'): 0.05,
+                                     ('charger', 'iai_donbot', 'gripper_base_link'): 0.05,
+                                     ('charger', 'iai_donbot', 'gripper_finger_left_link'): 0.05,
+                                     ('charger', 'iai_donbot', 'gripper_finger_right_link'): 0.05,
+                                     ('charger', 'iai_donbot', 'gripper_gripper_left_link'): 0.05,
+                                     ('charger', 'iai_donbot', 'gripper_gripper_right_link'): 0.05,
+                                     ('charger', 'iai_donbot', 'ur5_forearm_link'): 0.05,
+                                     ('charger', 'iai_donbot', 'ur5_wrist_1_link'): 0.05,
+                                     ('charger', 'iai_donbot', 'ur5_wrist_2_link'): 0.05,
+                                     ('charger', 'iai_donbot', 'ur5_wrist_3_link'): 0.05,
+                                     ('charger', 'iai_donbot', 'wrist_collision'): 0.05,
+                                     ('e_stop', 'iai_donbot', 'ur5_forearm_link'): 0.05,
+                                     ('gripper_base_link', 'iai_donbot', 'plate'): 0.05,
+                                     ('gripper_base_link', 'iai_donbot', 'switches'): 0.05,
+                                     ('gripper_base_link', 'iai_donbot', 'ur5_base_link'): 0.05,
+                                     ('gripper_base_link', 'iai_donbot', 'ur5_forearm_link'): 0.05,
+                                     ('gripper_base_link', 'iai_donbot', 'ur5_shoulder_link'): 0.05,
+                                     ('gripper_base_link', 'iai_donbot', 'ur5_touchpad'): 0.05,
+                                     ('gripper_base_link', 'iai_donbot', 'ur5_upper_arm_link'): 0.05,
+                                     ('gripper_base_link', 'iai_donbot', 'wlan'): 0.05,
+                                     ('gripper_finger_left_link', 'iai_donbot', 'plate'): 0.05,
+                                     ('gripper_finger_left_link', 'iai_donbot', 'switches'): 0.05,
+                                     ('gripper_finger_left_link', 'iai_donbot', 'ur5_base_link'): 0.05,
+                                     ('gripper_finger_left_link', 'iai_donbot', 'ur5_forearm_link'): 0.05,
+                                     ('gripper_finger_left_link', 'iai_donbot', 'ur5_shoulder_link'): 0.05,
+                                     ('gripper_finger_left_link', 'iai_donbot', 'ur5_touchpad'): 0.05,
+                                     ('gripper_finger_left_link', 'iai_donbot', 'ur5_upper_arm_link'): 0.05,
+                                     ('gripper_finger_left_link', 'iai_donbot', 'wlan'): 0.05,
+                                     ('gripper_finger_right_link', 'iai_donbot', 'plate'): 0.05,
+                                     ('gripper_finger_right_link', 'iai_donbot', 'switches'): 0.05,
+                                     ('gripper_finger_right_link', 'iai_donbot', 'ur5_base_link'): 0.05,
+                                     ('gripper_finger_right_link', 'iai_donbot', 'ur5_forearm_link'): 0.05,
+                                     ('gripper_finger_right_link', 'iai_donbot', 'ur5_shoulder_link'): 0.05,
+                                     ('gripper_finger_right_link', 'iai_donbot', 'ur5_touchpad'): 0.05,
+                                     ('gripper_finger_right_link', 'iai_donbot', 'ur5_upper_arm_link'): 0.05,
+                                     ('gripper_finger_right_link', 'iai_donbot', 'wlan'): 0.05,
+                                     ('gripper_gripper_left_link', 'iai_donbot', 'plate'): 0.05,
+                                     ('gripper_gripper_left_link', 'iai_donbot', 'switches'): 0.05,
+                                     ('gripper_gripper_left_link', 'iai_donbot', 'ur5_base_link'): 0.05,
+                                     ('gripper_gripper_left_link', 'iai_donbot', 'ur5_forearm_link'): 0.05,
+                                     ('gripper_gripper_left_link', 'iai_donbot', 'ur5_shoulder_link'): 0.05,
+                                     ('gripper_gripper_left_link', 'iai_donbot', 'ur5_touchpad'): 0.05,
+                                     ('gripper_gripper_left_link', 'iai_donbot', 'ur5_upper_arm_link'): 0.05,
+                                     ('gripper_gripper_left_link', 'iai_donbot', 'wlan'): 0.05,
+                                     ('gripper_gripper_right_link', 'iai_donbot', 'plate'): 0.05,
+                                     ('gripper_gripper_right_link', 'iai_donbot', 'switches'): 0.05,
+                                     ('gripper_gripper_right_link', 'iai_donbot', 'ur5_base_link'): 0.05,
+                                     ('gripper_gripper_right_link', 'iai_donbot', 'ur5_forearm_link'): 0.05,
+                                     ('gripper_gripper_right_link', 'iai_donbot', 'ur5_shoulder_link'): 0.05,
+                                     ('gripper_gripper_right_link', 'iai_donbot', 'ur5_touchpad'): 0.05,
+                                     ('gripper_gripper_right_link', 'iai_donbot', 'ur5_upper_arm_link'): 0.05,
+                                     ('gripper_gripper_right_link', 'iai_donbot', 'wlan'): 0.05,
+                                     ('plate', 'iai_donbot', 'ur5_wrist_1_link'): 0.05,
+                                     ('plate', 'iai_donbot', 'ur5_wrist_2_link'): 0.05,
+                                     ('plate', 'iai_donbot', 'ur5_wrist_3_link'): 0.05,
+                                     ('plate', 'iai_donbot', 'wrist_collision'): 0.05,
+                                     ('switches', 'iai_donbot', 'ur5_forearm_link'): 0.05,
+                                     ('switches', 'iai_donbot', 'ur5_upper_arm_link'): 0.05,
+                                     ('switches', 'iai_donbot', 'ur5_wrist_1_link'): 0.05,
+                                     ('switches', 'iai_donbot', 'ur5_wrist_2_link'): 0.05,
+                                     ('switches', 'iai_donbot', 'ur5_wrist_3_link'): 0.05,
+                                     ('switches', 'iai_donbot', 'wrist_collision'): 0.05,
+                                     ('ur5_base_link', 'iai_donbot', 'ur5_ee_link'): 0.05,
+                                     ('ur5_base_link', 'iai_donbot', 'ur5_forearm_link'): 0.05,
+                                     ('ur5_base_link', 'iai_donbot', 'ur5_wrist_1_link'): 0.05,
+                                     ('ur5_base_link', 'iai_donbot', 'ur5_wrist_2_link'): 0.05,
+                                     ('ur5_base_link', 'iai_donbot', 'ur5_wrist_3_link'): 0.05,
+                                     ('ur5_base_link', 'iai_donbot', 'wrist_collision'): 0.05,
+                                     ('ur5_ee_link', 'iai_donbot', 'ur5_forearm_link'): 0.05,
+                                     ('ur5_ee_link', 'iai_donbot', 'ur5_shoulder_link'): 0.05,
+                                     ('ur5_ee_link', 'iai_donbot', 'ur5_upper_arm_link'): 0.05,
+                                     ('ur5_forearm_link', 'iai_donbot', 'ur5_shoulder_link'): 0.05,
+                                     ('ur5_forearm_link', 'iai_donbot', 'ur5_touchpad'): 0.05,
+                                     ('ur5_forearm_link', 'iai_donbot', 'ur5_wrist_3_link'): 0.05,
+                                     ('ur5_forearm_link', 'iai_donbot', 'wlan'): 0.05,
+                                     ('ur5_forearm_link', 'iai_donbot', 'wrist_collision'): 0.05,
+                                     ('ur5_shoulder_link', 'iai_donbot', 'ur5_wrist_1_link'): 0.05,
+                                     ('ur5_shoulder_link', 'iai_donbot', 'ur5_wrist_2_link'): 0.05,
+                                     ('ur5_shoulder_link', 'iai_donbot', 'ur5_wrist_3_link'): 0.05,
+                                     ('ur5_shoulder_link', 'iai_donbot', 'wrist_collision'): 0.05,
+                                     ('ur5_touchpad', 'iai_donbot', 'ur5_upper_arm_link'): 0.05,
+                                     ('ur5_touchpad', 'iai_donbot', 'ur5_wrist_1_link'): 0.05,
+                                     ('ur5_touchpad', 'iai_donbot', 'ur5_wrist_2_link'): 0.05,
+                                     ('ur5_touchpad', 'iai_donbot', 'ur5_wrist_3_link'): 0.05,
+                                     ('ur5_touchpad', 'iai_donbot', 'wrist_collision'): 0.05,
+                                     ('ur5_upper_arm_link', 'iai_donbot', 'ur5_wrist_1_link'): 0.05,
+                                     ('ur5_upper_arm_link', 'iai_donbot', 'ur5_wrist_2_link'): 0.05,
+                                     ('ur5_upper_arm_link', 'iai_donbot', 'ur5_wrist_3_link'): 0.05,
+                                     ('ur5_upper_arm_link', 'iai_donbot', 'wlan'): 0.05,
+                                     ('ur5_upper_arm_link', 'iai_donbot', 'wrist_collision'): 0.05,
+                                     ('ur5_wrist_1_link', 'iai_donbot', 'wlan'): 0.05,
+                                     ('ur5_wrist_2_link', 'iai_donbot', 'wlan'): 0.05,
+                                     ('ur5_wrist_3_link', 'iai_donbot', 'wlan'): 0.05,
+                                     ('wlan', 'iai_donbot', 'wrist_collision'): 0.05}
+
         return world_with_donbot
 
     def test_attach_detach_existing_obj_to_robot1(self, function_setup):
@@ -282,7 +406,7 @@ class TestPyBulletWorld(test_world.TestWorld):
         robot_links = pr22.get_link_names()
         cut_off_distances = {(link1, 'pr22', link2): 0.1 for link1, link2 in product(robot_links, repeat=2)}
 
-        assert len(w.check_collisions(cut_off_distances)) == 0
+        assert len(w.check_collisions(cut_off_distances).all_collisions) == 0
 
     def test_check_collisions2(self, test_folder):
         w = self.make_world_with_pr2()
@@ -302,11 +426,11 @@ class TestPyBulletWorld(test_world.TestWorld):
         base_pose.orientation.w = 1
         w.set_object_pose('pr23', base_pose)
 
-        min_dist = defaultdict(lambda : {u'zero_weight_distance': 0.1})
+        min_dist = defaultdict(lambda: {u'zero_weight_distance': 0.1})
         cut_off_distances = w.collision_goals_to_collision_matrix([], min_dist)
 
         for i in range(160):
-            assert len(w.check_collisions(cut_off_distances)) == 90
+            assert len(w.check_collisions(cut_off_distances).all_collisions) == 1328
 
     def test_check_collisions3(self, test_folder):
         w = self.make_world_with_pr2()
@@ -323,10 +447,8 @@ class TestPyBulletWorld(test_world.TestWorld):
         cut_off_distances.update({(link1, 'pr22', link2): 0.1 for link1, link2 in product(robot_links, repeat=2)})
 
         for i in range(160):
-            assert len(w.check_collisions(cut_off_distances)) == 36
-
+            assert len(w.check_collisions(cut_off_distances).all_collisions) == 60
 
     # TODO test that has collision entries of robot links without collision geometry
 
-
-
+    # TODO test that makes sure adding avoid specific self collisions works

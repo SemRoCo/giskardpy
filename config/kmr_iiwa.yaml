@@ -1,0 +1,74 @@
+general_options:
+  debug: False # prints the behavior tree state in the terminal
+  sample_period: 0.05 # time[s] between points of generated joint trajectory
+  map_frame: map
+  fill_velocity_values: True # due to a bug, the pr2 does not want the velocity values to be filled
+  joint_vel_limit: # giskard will use the min of this number and limits from the urdf
+    linear:
+      default: 1
+      odom_x_joint: 0.5
+      odom_y_joint: 0.5
+    angular:
+      default: 1
+      odom_z_joint: 0.6
+  joint_acceleration_limit: # multiply your desired acc limit with sample period; experimental, don't touch
+    linear:
+      default: 100
+    angular:
+      default: 100
+  joint_weights: # the planner prefers low weight joints to achieve solutions
+    default: 0.001
+    odom_x_joint: 0.001
+    odom_y_joint: 0.001
+    odom_z_joint: 0.001
+qp_solver:
+  nWSR: None # None results in a nWSR estimation thats fine most of the time
+plugins:
+  GoalReached:
+    joint_convergence_threshold: 0.02 # when the velocities fall below this value, the planning succeeds
+    window_size: 21 # in sample points, should be identical to WiggleCancel window_size
+  VisualizationBehavior: # planning visualization through markers, slows planning down a little bit
+    enabled: True
+  CPIMarker: # contact visualization, slows planning down a little bit
+    enabled: True
+  PlotTrajectory: # plots the joint trajectory at the end of planning
+    enabled: False
+    velocity_threshold: 0.0 # only joints that exceed this velocity threshold will be added to the plot. Use a negative number if you want to include every joint
+    scaling: 5.0 # determines how much the x axis is scaled with the length(time) of the trajectory
+    normalize_position: False # centers the joint positions around 0 on the y axis
+    tick_stride: 1.0 # the distance between ticks in the plot. if tick_stride <= 0 pyplot determines the ticks automatically 
+  WiggleCancel: # cancels planning if high frequencies are detected in the trajectory
+    amplitude_threshold: 0.15 # the amplitude of a frequency must exceed this threshold to be detected as wiggling
+    window_size: 21 # size of the moving window of sample points
+    frequency_range: 0.4 # must be in the range [0,1]. Only frequencies in the range [max_detectable_frequency * wiggle_frequency_range, max_detectable_frequency] are considered as wiggling. So a value of 0 means that every frequency with an amplitude above wiggle_detection_threshold is detected as wiggling and a value of 1 means that only the max_detectable_frequency can trigger a wiggle detection.      max_detectable_frequency = 1 / (2 * sample_period)
+reachability_check:
+  sample_period: 0.5
+  prismatic_velocity: 2.0
+  continuous_velocity: 0.5
+  revolute_velocity: 0.5
+  other_velocity: 0.5
+behavior_tree:
+  tree_tick_rate: 0.1 # how often the tree updates. lower numbers increase responsiveness, but waste cpu time while idle
+collision_avoidance:
+  distance_thresholds:
+    default:
+      max_weight_distance: 0.0
+      low_weight_distance: 0.01
+      zero_weight_distance: 0.05
+    high: &high
+      max_weight_distance: 0.01
+      low_weight_distance: 0.03
+      zero_weight_distance: 0.05
+    low: &low
+      max_weight_distance: 0.005
+      low_weight_distance: 0.01
+      zero_weight_distance: 0.02
+    base_link:
+      max_weight_distance: 0.04
+      low_weight_distance: 0.06
+      zero_weight_distance: 0.09
+  self_collision_avoidance:
+    ignore: []
+    add: []
+  external_collision_avoidance:
+    number_of_repeller: 5

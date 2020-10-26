@@ -1,17 +1,14 @@
-import PyKDL
 from geometry_msgs.msg import PoseStamped
 from giskard_msgs.msg import CollisionEntry
 
-from giskardpy.data_types import ClosestPointInfo
+from giskardpy import logging
 from giskardpy.exceptions import RobotExistsException, DuplicateNameException, PhysicsWorldException, \
     UnknownBodyException, UnsupportedOptionException
-from giskardpy.symengine_robot import Robot
-from giskardpy.tfwrapper import msg_to_kdl, kdl_to_pose, np_to_kdl, to_np
-from giskardpy.urdf_object import URDFObject, FIXED_JOINT
-from giskardpy.utils import KeyDefaultDict, np_point, np_vector
+from giskardpy.robot import Robot
+from giskardpy.tfwrapper import msg_to_kdl, kdl_to_pose
+from giskardpy.urdf_object import URDFObject
 from giskardpy.world_object import WorldObject
-from giskardpy import logging
-import numpy as np
+
 
 class World(object):
     def __init__(self, path_to_data_folder=u''):
@@ -22,7 +19,7 @@ class World(object):
         self._path_to_data_folder = path_to_data_folder
 
     # General ----------------------------------------------------------------------------------------------------------
-    
+
     def soft_reset(self):
         """
         keeps robot and other important objects like ground plane
@@ -38,7 +35,7 @@ class World(object):
         self.soft_reset()
         self.remove_robot()
 
-    def check_collisions(self, cut_off_distances):
+    def check_collisions(self, cut_off_distances, collision_list_size=20):
         pass
 
     # Objects ----------------------------------------------------------------------------------------------------------
@@ -64,7 +61,7 @@ class World(object):
 
     def get_object(self, name):
         """
-        :type name: str
+        :type name: Union[str, unicode]
         :rtype: WorldObject
         """
         return self._objects[name]
@@ -81,14 +78,14 @@ class World(object):
     def has_object(self, name):
         """
         Checks for objects with the same name.
-        :type name: str
+        :type name: Union[str, unicode]
         :rtype: bool
         """
         return name in self.get_objects()
 
     def set_object_joint_state(self, name, joint_state):
         """
-        :type name: str
+        :type name: Union[str, unicode]
         :param joint_state: joint name -> SingleJointState
         :type joint_state: dict
         """
@@ -97,20 +94,21 @@ class World(object):
     def remove_object(self, name):
         if self.has_object(name):
             self._objects[name].suicide()
-            logging.loginfo(u'<-- removed object {} to world'.format(name))
+            logging.loginfo(u'<-- removed object {} from world'.format(name))
             del (self._objects[name])
         else:
             raise UnknownBodyException(u'can\'t remove object \'{}\', because it doesn\' exist'.format(name))
 
     def remove_all_objects(self):
-        for object_ in self._objects.values():
-            object_.suicide()
+        for object_name in self._objects.keys():
+            # I'm not using remove object, because has object ignores hidden objects in pybullet world
+            self._objects[object_name].suicide()
+            logging.loginfo(u'<-- removed object {} from world'.format(object_name))
         self._objects = {}
 
     # Robot ------------------------------------------------------------------------------------------------------------
 
-    def add_robot(self, robot, base_pose, controlled_joints, joint_vel_limit, joint_acc_limit, joint_weights,
-                  calc_self_collision_matrix, ignored_pairs, added_pairs):
+    def add_robot(self, robot, base_pose, controlled_joints, ignored_pairs, added_pairs):
         """
         :type robot: giskardpy.world_object.WorldObject
         :type controlled_joints: list
@@ -127,12 +125,9 @@ class World(object):
                                              base_pose=base_pose,
                                              controlled_joints=controlled_joints,
                                              path_to_data_folder=self._path_to_data_folder,
-                                             joint_vel_limit=joint_vel_limit,
-                                             joint_acc_limit=joint_acc_limit,
-                                             calc_self_collision_matrix=calc_self_collision_matrix,
-                                             joint_weights=joint_weights,
                                              ignored_pairs=ignored_pairs,
                                              added_pairs=added_pairs)
+        logging.loginfo(u'--> added {} to world'.format(robot.get_name()))
 
     @property
     def robot(self):
@@ -166,6 +161,7 @@ class World(object):
         # TODO this should know the object pose and not require it as input
         self._robot.attach_urdf_object(self.get_object(name), link, pose)
         self.remove_object(name)
+        logging.loginfo(u'--> attached object {} on link {}'.format(name, link))
 
     def detach(self, joint_name, from_obj=None):
         if joint_name not in self.robot.get_joint_names():
@@ -175,7 +171,9 @@ class World(object):
             p = self.robot.get_fk_pose(self.robot.get_root(), joint_name)
             p_map = kdl_to_pose(self.robot.root_T_map.Inverse() * msg_to_kdl(p))
 
+            parent_link = self.robot.get_parent_link_of_joint(joint_name)
             cut_off_obj = self.robot.detach_sub_tree(joint_name)
+            logging.loginfo(u'<-- detached {} from link {}'.format(joint_name, parent_link))
         else:
             raise UnsupportedOptionException(u'only detach from robot supported')
         wo = WorldObject.from_urdf_object(cut_off_obj)  # type: WorldObject
@@ -188,10 +186,10 @@ class World(object):
         collision_matrix2 = {}
         for link1, link2 in collision_matrix:
             # FIXME should I use the minimum of both distances?
-            if link1 < link2:
-                collision_matrix2[link1, robot_name, link2] = min_dist[link1][u'zero_weight_distance']
+            if self.robot.link_order(link1, link2):
+                collision_matrix2[link1, robot_name, link2] = min_dist[link1]
             else:
-                collision_matrix2[link2, robot_name, link1] = min_dist[link1][u'zero_weight_distance']
+                collision_matrix2[link2, robot_name, link1] = min_dist[link1]
         return collision_matrix2
 
     def collision_goals_to_collision_matrix(self, collision_goals, min_dist):
@@ -201,7 +199,7 @@ class World(object):
         :return: dict mapping (robot_link, body_b, link_b) -> min allowed distance
         :rtype: dict
         """
-        collision_goals = self.verify_collision_entries(collision_goals, min_dist)
+        collision_goals = self.verify_collision_entries(collision_goals)
         min_allowed_distance = {}
         for collision_entry in collision_goals:  # type: CollisionEntry
             if self.is_avoid_all_self_collision(collision_entry):
@@ -219,12 +217,12 @@ class World(object):
                     del min_allowed_distance[key]
 
             elif self.is_avoid_collision(collision_entry):
-                min_allowed_distance[key] = min_dist[key[0]][u'zero_weight_distance']
+                min_allowed_distance[key] = min_dist[key[0]]
             else:
                 raise Exception('todo')
         return min_allowed_distance
 
-    def verify_collision_entries(self, collision_goals, min_dist):
+    def verify_collision_entries(self, collision_goals):
         for ce in collision_goals:  # type: CollisionEntry
             if ce.type in [CollisionEntry.ALLOW_ALL_COLLISIONS,
                            CollisionEntry.AVOID_ALL_COLLISIONS]:
@@ -293,13 +291,14 @@ class World(object):
             if collision_entry.body_b == robot_name:
                 for robot_link in collision_entry.link_bs:
                     if robot_link != CollisionEntry.ALL and robot_link not in robot_links:
-                        raise UnknownBodyException(u'link b \'{}\' of body \'{}\' unknown'.format(robot_link, collision_entry.body_b))
+                        raise UnknownBodyException(
+                            u'link b \'{}\' of body \'{}\' unknown'.format(robot_link, collision_entry.body_b))
             elif not self.all_body_bs(collision_entry) and not self.all_link_bs(collision_entry):
                 object_links = self.get_object(collision_entry.body_b).get_link_names()
                 for link_b in collision_entry.link_bs:
                     if link_b not in object_links:
-                        raise UnknownBodyException(u'link b \'{}\' of body \'{}\' unknown'.format(link_b, collision_entry.body_b))
-
+                        raise UnknownBodyException(
+                            u'link b \'{}\' of body \'{}\' unknown'.format(link_b, collision_entry.body_b))
 
     def split_link_bs(self, collision_goals):
         # FIXME remove the side effects of these three methods
@@ -427,16 +426,6 @@ class World(object):
     def is_allow_collision(self, collision_entry):
         return collision_entry.type in [CollisionEntry.ALLOW_COLLISION, CollisionEntry.ALLOW_ALL_COLLISIONS]
 
-    def is_avoid_all_collision(self, collision_entry):
-        """
-        :type collision_entry: CollisionEntry
-        :return: bool
-        """
-        return self.is_avoid_collision(collision_entry) \
-               and self.all_robot_links(collision_entry) \
-               and self.all_body_bs(collision_entry) \
-               and self.all_link_bs(collision_entry)
-
     def is_avoid_all_self_collision(self, collision_entry):
         """
         :type collision_entry: CollisionEntry
@@ -445,6 +434,26 @@ class World(object):
         return self.is_avoid_collision(collision_entry) \
                and self.all_robot_links(collision_entry) \
                and collision_entry.body_b == self.robot.get_name() \
+               and self.all_link_bs(collision_entry)
+
+    def is_allow_all_self_collision(self, collision_entry):
+        """
+        :type collision_entry: CollisionEntry
+        :return: bool
+        """
+        return self.is_allow_collision(collision_entry) \
+               and self.all_robot_links(collision_entry) \
+               and collision_entry.body_b == self.robot.get_name() \
+               and self.all_link_bs(collision_entry)
+
+    def is_avoid_all_collision(self, collision_entry):
+        """
+        :type collision_entry: CollisionEntry
+        :return: bool
+        """
+        return self.is_avoid_collision(collision_entry) \
+               and self.all_robot_links(collision_entry) \
+               and self.all_body_bs(collision_entry) \
                and self.all_link_bs(collision_entry)
 
     def is_allow_all_collision(self, collision_entry):
@@ -456,21 +465,3 @@ class World(object):
                and self.all_robot_links(collision_entry) \
                and self.all_body_bs(collision_entry) \
                and self.all_link_bs(collision_entry)
-
-    
-    def transform_contact_info(self, collisions):
-        root_T_map = to_np(self.robot.root_T_map)
-        robot_root = self.robot.get_root()
-        for contact_info in collisions.items():  # type: ClosestPointInfo
-            movable_joint = self.robot.get_controlled_parent_joint(contact_info.link_a)
-            f = self.robot.get_child_link_of_joint(movable_joint)
-            f_T_r = self.robot.get_fk_np(f, robot_root)
-            contact_info.frame = f
-
-            f_P_pa = np.dot(np.dot(f_T_r, root_T_map), np_point(*contact_info.position_on_a))
-            r_P_pb = np.dot(root_T_map, np_point(*contact_info.position_on_b))
-            r_V_n = np.dot(root_T_map, np_vector(*contact_info.contact_normal))
-            contact_info.position_on_a = f_P_pa[:-1]
-            contact_info.position_on_b = r_P_pb[:-1]
-            contact_info.contact_normal = r_V_n[:-1]
-        return collisions

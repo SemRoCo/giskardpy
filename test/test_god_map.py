@@ -1,16 +1,16 @@
 import numpy as np
 
 import giskardpy
-from giskardpy.utils import KeyDefaultDict
 
 giskardpy.WORLD_IMPLEMENTATION = None
 import unittest
 from collections import namedtuple
 
 from geometry_msgs.msg import PoseStamped
-from hypothesis import given
+from hypothesis import given, assume
 import hypothesis.strategies as st
-from giskardpy import w, identifier
+from giskardpy import identifier
+from giskardpy import cas_wrapper as w
 from giskardpy.god_map import GodMap
 from utils_for_tests import variable_name, keys_values, lists_of_same_length, pr2_urdf
 from giskardpy.world import World
@@ -21,20 +21,38 @@ PKG = u'giskardpy'
 
 class TestGodMap(unittest.TestCase):
     @given(variable_name(),
+           variable_name(),
+           st.integers(),
+           st.integers())
+    def test_god_map_key_error(self, key, wrong_key, number, default_value):
+        assume(key != wrong_key)
+        db = GodMap(default_value)
+        db.set_data([key], number)
+        self.assertEqual(db.get_data([wrong_key]), default_value, msg=u'key={}, number={}'.format(key, number))
+
+    @given(variable_name(),
            st.integers())
     def test_set_get_integer(self, key, number):
         db = GodMap()
-        db.safe_set_data([key], number)
-        self.assertEqual(db.safe_get_data([key]), number, msg=u'key={}, number={}'.format(key, number))
+        db.set_data([key], number)
+        self.assertEqual(db.get_data([key]), number, msg=u'key={}, number={}'.format(key, number))
+
+    @given(variable_name(),
+           st.integers())
+    def test_set_get_integer2(self, key, number):
+        db = GodMap()
+        db.set_data([key], number)
+        self.assertEqual(db.get_data([key]), number, msg=u'key={}, number={}'.format(key, number))
+        self.assertEqual(db.get_data([key]), number, msg=u'key={}, number={}'.format(key, number))
 
     @given(variable_name(),
            st.floats(allow_nan=False))
     def test_set_get_float(self, key, number):
         db = GodMap()
-        db.safe_set_data([key], number)
-        db.safe_set_data([key], number)
+        db.set_data([key], number)
+        db.set_data([key], number)
 
-        self.assertEqual(db.safe_get_data([key]), number)
+        self.assertEqual(db.get_data([key]), number)
 
     @given(variable_name(),
            variable_name(),
@@ -42,16 +60,16 @@ class TestGodMap(unittest.TestCase):
     def test_namedtuple(self, key, tuple_name, key_values):
         Frame = namedtuple(tuple_name, key_values[0])
         db = GodMap()
-        db.safe_set_data([key], Frame(*key_values[1]))
+        db.set_data([key], Frame(*key_values[1]))
         for k, v in zip(*key_values):
-            self.assertEqual(db.safe_get_data([key, k]), v)
+            self.assertEqual(db.get_data([key, k]), v)
 
     def test_namedtuple1(self):
         Frame = namedtuple(u'Frame', [u'pos'])
         db = GodMap()
-        db.safe_set_data([u'f12'], Frame(pos=2))
+        db.set_data([u'f12'], Frame(pos=2))
         with self.assertRaises(AttributeError):
-            db.safe_set_data([u'f12', u'pos'], 42)
+            db.set_data([u'f12', u'pos'], 42)
 
     @given(variable_name(),
            variable_name(),
@@ -62,45 +80,57 @@ class TestGodMap(unittest.TestCase):
             setattr(c, k, None)
 
         db = GodMap()
-        db.safe_set_data([key], c)
+        db.set_data([key], c)
 
         for k, v in zip(*key_values):
-            self.assertEqual(db.safe_get_data([key, k]), None)
+            self.assertEqual(db.get_data([key, k]), None)
         for k, v in zip(*key_values):
-            db.safe_set_data([key, k], v)
+            db.set_data([key, k], v)
         for k, v in zip(*key_values):
-            self.assertEqual(db.safe_get_data([key, k]), v)
+            self.assertEqual(db.get_data([key, k]), v)
 
     @given(st.lists(variable_name(), unique=True))
     def test_class3(self, class_names):
         db = GodMap()
         for i, name in enumerate(class_names):
             c = type(str(name), (object,), {})()
-            db.safe_set_data(class_names[:i + 1], c)
+            db.set_data(class_names[:i + 1], c)
 
         for i, name in enumerate(class_names):
-            c = db.safe_get_data(class_names[:i + 1])
+            c = db.get_data(class_names[:i + 1])
             self.assertEqual(type(c).__name__, name)
+
+    def test_attribute_error(self):
+        db = GodMap()
+        class C(object):
+            asdf = 1
+        db.unsafe_set_data(['c'], C())
+        self.assertEqual(db.get_data(['c', 'a']), db.default_value)
+
+    def test_index_error(self):
+        db = GodMap()
+        db.unsafe_set_data(['l'], [1, 2, 3])
+        self.assertEqual(db.get_data(['l', '5']), db.default_value)
 
     @given(variable_name(),
            keys_values())
     def test_dict1(self, key, key_values):
         d = {k: v for k, v in zip(*key_values)}
         db = GodMap()
-        db.safe_set_data([key], d)
+        db.set_data([key], d)
         for k, v in zip(*key_values):
-            self.assertEqual(db.safe_get_data([key, k]), v)
+            self.assertEqual(db.get_data([key, k]), v)
 
     @given(variable_name(),
            keys_values())
     def test_dict2(self, key, key_values):
         d = {}
         db = GodMap()
-        db.safe_set_data([key], d)
+        db.set_data([key], d)
         for k, v in zip(*key_values):
-            db.safe_set_data([key, k], v)
+            db.set_data([key, k], v)
         for k, v in zip(*key_values):
-            self.assertEqual(db.safe_get_data([key, k]), v)
+            self.assertEqual(db.get_data([key, k]), v)
 
     @given(variable_name(),
            st.lists(variable_name(), min_size=1),
@@ -109,71 +139,71 @@ class TestGodMap(unittest.TestCase):
         tuple_key = tuple(tuple_key)
         d = {tuple_key: value}
         db = GodMap()
-        db.safe_set_data([key], d)
-        self.assertEqual(db.safe_get_data([key, tuple_key]), value)
+        db.set_data([key], d)
+        self.assertEqual(db.get_data([key, tuple_key]), value)
 
     @given(variable_name(),
            st.lists(st.floats(allow_nan=False), min_size=1))
     def test_list1(self, key, value):
         db = GodMap()
-        db.safe_set_data([key], value)
+        db.set_data([key], value)
         for i, v in enumerate(value):
-            self.assertEqual(db.safe_get_data([key, i]), v)
+            self.assertEqual(db.get_data([key, i]), v)
 
     def test_list_double_index(self):
         key = 'asdf'
         value = np.array([[0, 1], [2, 3]])
         db = GodMap()
-        db.safe_set_data([key], value)
+        db.set_data([key], value)
         for i in range(value.shape[0]):
             for j in range(value.shape[1]):
-                self.assertEqual(db.safe_get_data([key, i, j]), value[i, j])
+                self.assertEqual(db.get_data([key, i, j]), value[i, j])
 
     @given(variable_name(),
            st.lists(st.floats(allow_nan=False), min_size=1))
     def test_tuple1(self, key, value):
         value = tuple(value)
         db = GodMap()
-        db.safe_set_data([key], value)
+        db.set_data([key], value)
         for i, v in enumerate(value):
-            self.assertEqual(db.safe_get_data([key, i]), v)
+            self.assertEqual(db.get_data([key, i]), v)
 
     @given(variable_name(),
            lists_of_same_length([st.floats(allow_nan=False), st.floats(allow_nan=False)]))
     def test_list_overwrite_entry(self, key, lists):
         first_values, second_values = lists
         db = GodMap()
-        db.safe_set_data([key], first_values)
+        db.set_data([key], first_values)
         for i, v in enumerate(first_values):
-            self.assertEqual(db.safe_get_data([key, i]), v)
-            db.safe_set_data([key, i], second_values[i])
+            self.assertEqual(db.get_data([key, i]), v)
+            db.set_data([key, i], second_values[i])
 
         for i, v in enumerate(second_values):
-            self.assertEqual(db.safe_get_data([key, i]), v)
+            self.assertEqual(db.get_data([key, i]), v)
 
     @given(variable_name(),
            st.lists(st.floats(allow_nan=False), min_size=1))
     def test_list_index_error(self, key, l):
         db = GodMap()
-        db.safe_set_data([key], l)
+        db.set_data([key], l)
         with self.assertRaises(IndexError):
-            db.safe_set_data([key, len(l) + 1], 0)
+            db.set_data([key, len(l) + 1], 0)
 
     @given(variable_name(),
            st.lists(st.floats(allow_nan=False), min_size=1))
     def test_list_negative_index(self, key, l):
         db = GodMap()
-        db.safe_set_data([key], l)
+        db.set_data([key], l)
         for i in range(len(l)):
-            self.assertEqual(db.safe_get_data([key, -i]), l[-i])
+            self.assertEqual(db.get_data([key, -i]), l[-i])
 
     @given(variable_name(),
            variable_name())
     def test_function_1param_lambda(self, key, key2):
         db = GodMap()
         f = lambda x: x
-        db.safe_set_data([key], f)
-        self.assertEqual(db.safe_get_data([key, [key2]]), key2)
+        db.set_data([key], f)
+        self.assertEqual(db.get_data([key, (key2,)]), key2)
 
     @given(variable_name(),
            variable_name(),
@@ -188,8 +218,8 @@ class TestGodMap(unittest.TestCase):
 
         a = MUH()
         d = {key2: a}
-        db.safe_set_data([key1], d)
-        self.assertEqual(db.safe_get_data([key1, key2, (key3, key4)]), key4)
+        db.set_data([key1], d)
+        self.assertEqual(db.get_data([key1, key2, (key3, key4)]), key4)
 
     @given(variable_name(),
            variable_name(),
@@ -205,9 +235,9 @@ class TestGodMap(unittest.TestCase):
 
         a = MUH()
         d = {key2: a}
-        db.safe_set_data([key1], d)
+        db.set_data([key1], d)
         try:
-            db.safe_get_data([key1, key2, (key3, key4), 0])
+            db.get_data([key1, key2, (key3, key4), 0])
             assert False
         except TypeError:
             assert True
@@ -226,8 +256,22 @@ class TestGodMap(unittest.TestCase):
 
         a = MUH()
         d = {key2: a}
-        db.safe_set_data([key1], d)
-        self.assertEqual(key5, db.safe_get_data([key1, key2, (key3, key4), 0]))
+        db.set_data([key1], d)
+        self.assertEqual(key5, db.get_data([key1, key2, (key3, key4), 0]))
+        self.assertEqual(key5, db.get_data([key1, key2, (key3, key4), 0]))
+        self.assertEqual(key5, db.get_data([key1, key2, (key3, key4), 0]))
+
+    def test_clear_cache(self):
+        db = GodMap()
+
+        d = {'b': 'c'}
+        db.set_data(['a'], d)
+        self.assertEqual('c', db.get_data(['a', 'b']))
+        db.clear_cache()
+        class C(object):
+            b = 'c'
+        db.set_data(['a'], C())
+        self.assertEqual('c', db.get_data(['a', 'b']))
 
     @given(variable_name(),
            variable_name(),
@@ -241,14 +285,14 @@ class TestGodMap(unittest.TestCase):
 
         a = MUH()
         d = {key2: a}
-        db.safe_set_data([key1], d)
-        self.assertEqual(key3, db.safe_get_data([key1, key2, [], 0]))
+        db.set_data([key1], d)
+        self.assertEqual(key3, db.get_data([key1, key2, tuple(), 0]))
 
     @given(variable_name(),
            st.integers())
     def test_to_symbol(self, key, value):
         gm = GodMap()
-        gm.safe_set_data([key], value)
+        gm.set_data([key], value)
         self.assertTrue(w.is_symbol(gm.to_symbol([key])))
         self.assertTrue(key in str(gm.to_symbol([key])))
 
@@ -257,7 +301,7 @@ class TestGodMap(unittest.TestCase):
         keys, values = keys_values
         gm = GodMap()
         for key, value in zip(keys, values):
-            gm.safe_set_data([key], value)
+            gm.set_data([key], value)
             gm.to_symbol([key])
         self.assertEqual(len(gm.get_values(keys)), len(keys))
 
@@ -268,16 +312,10 @@ class TestGodMap(unittest.TestCase):
         w.add_robot(robot=r,
                     base_pose=PoseStamped(),
                     controlled_joints=[],
-                    joint_vel_limit=KeyDefaultDict(lambda key: 0),
-                    joint_acc_limit=KeyDefaultDict(lambda key: 0),
-                    joint_weights=KeyDefaultDict(lambda key: 0),
-                    calc_self_collision_matrix=False,
                     ignored_pairs=set(),
-                    added_pairs=set(),
-                    symengine_backend='llvm',
-                    symengine_opt_level=0)
-        gm.safe_set_data([u'world'], w)
-        gm_robot = gm.safe_get_data(identifier.robot)
+                    added_pairs=set())
+        gm.set_data([u'world'], w)
+        gm_robot = gm.get_data(identifier.robot)
         assert 'pr2' == gm_robot.get_name()
 
 

@@ -9,7 +9,7 @@ sudo pip install pybullet
 sudo pip install scipy==1.2.2 # this is the last version for python 2.7
 sudo pip install casadi
 sudo pip install sortedcontainers
-sudo pip install hypothesis # only needed if you want to run tests
+sudo pip install hypothesis==4.34.0 # only needed if you want to run tests
 sudo pip install pandas
 sudo pip install numpy==1.16
 ```
@@ -29,23 +29,6 @@ rosdep install --ignore-src --from-paths .  # install dependencies available thr
 cd ..                                       # go to workspace directory
 catkin build                                # build packages
 source ~/giskardpy_ws/devel/setup.bash      # source new overlay
-```
-
-### (optional) symengine
-If you want to use the symengine backend, it can be install like this (does not have to be part of the ros workspace):
-```
-sudo apt-get install llvm-6.0-dev # or llvm-8-dev if you are using 18.04
-git clone https://github.com/symengine/symengine.git
-git clone https://github.com/symengine/symengine.py.git
-cd symengine
-git checkout `cat ../symengine.py/symengine_version.txt`
-mkdir build
-cd build
-cmake -DWITH_LLVM:BOOL=ON -DBUILD_TESTS:BOOL=OFF -DBUILD_BENCHMARKS:BOOL=OFF ..
-make
-sudo make install
-cd ../../symengine.py
-sudo python setup.py install
 ```
 
 ### Tutorials

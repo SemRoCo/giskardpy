@@ -5,13 +5,13 @@ import giskardpy
 
 giskardpy.WORLD_IMPLEMENTATION = None
 
-from giskardpy.symengine_robot import Robot
+from giskardpy.robot import Robot
 import pytest
 from geometry_msgs.msg import Pose, Point, Quaternion
 from giskard_msgs.msg import CollisionEntry
 import test_urdf_object
 from giskardpy.exceptions import DuplicateNameException, PhysicsWorldException, UnknownBodyException
-from utils_for_tests import pr2_urdf, donbot_urdf, compare_poses
+from utils_for_tests import pr2_urdf, donbot_urdf, compare_poses, pr2_without_base_urdf
 from giskardpy.utils import make_world_body_box
 from giskardpy.world import World
 from giskardpy.world_object import WorldObject
@@ -34,14 +34,17 @@ def function_setup(request, module_setup):
 @pytest.fixture()
 def test_folder(request):
     """
-    :rtype: World
+    :rtype: str
     """
     folder_name = u'tmp_data/'
 
-    def kill_pybullet():
-        shutil.rmtree(folder_name)
+    def delete_test_folder():
+        try:
+            shutil.rmtree(folder_name)
+        except OSError:
+            print(u'couldn\'t delete test folder')
 
-    request.addfinalizer(kill_pybullet)
+    request.addfinalizer(delete_test_folder)
     return folder_name
 
 
@@ -55,6 +58,15 @@ def delete_test_folder(request):
         shutil.rmtree(folder_name)
     except:
         pass
+
+    def delete_test_folder():
+        try:
+            shutil.rmtree(folder_name)
+        except OSError:
+            print(u'couldn\'t delete test folder')
+
+    request.addfinalizer(delete_test_folder)
+
     return folder_name
 
 
@@ -82,16 +94,16 @@ class TestWorldObj(test_urdf_object.TestUrdfObject):
     cls = WorldObject
 
     def test_safe_load_collision_matrix(self, test_folder, delete_test_folder):
-        r = self.cls(donbot_urdf(), path_to_data_folder=test_folder, calc_self_collision_matrix=True)
-        r.update_self_collision_matrix()
+        r = self.cls(donbot_urdf(), path_to_data_folder=test_folder)
+        r.init_self_collision_matrix()
         scm = r.get_self_collision_matrix()
         r.safe_self_collision_matrix(test_folder)
         r.load_self_collision_matrix(test_folder)
         assert scm == r.get_self_collision_matrix()
 
     def test_safe_load_collision_matrix2(self, test_folder, delete_test_folder):
-        r = self.cls(donbot_urdf(), path_to_data_folder=test_folder, calc_self_collision_matrix=True)
-        r.update_self_collision_matrix()
+        r = self.cls(donbot_urdf(), path_to_data_folder=test_folder)
+        r.init_self_collision_matrix()
         scm = r.get_self_collision_matrix()
 
         box = self.cls.from_world_body(make_world_body_box())
@@ -144,42 +156,143 @@ class TestWorldObj(test_urdf_object.TestUrdfObject):
 class TestRobot(TestWorldObj):
     cls = Robot
 
-    def test_safe_load_collision_matrix(self, test_folder):
-        r = self.cls(donbot_urdf(), path_to_data_folder=test_folder, calc_self_collision_matrix=True)
+    def test_safe_load_collision_matrix(self, test_folder, delete_test_folder):
+        r = self.cls(donbot_urdf(), path_to_data_folder=test_folder)
         scm = r.get_self_collision_matrix()
         assert len(scm) == 0
+
+    def test_get_controlled_leaf_joints(self, test_folder, delete_test_folder):
+        r = self.cls(pr2_urdf(), path_to_data_folder=test_folder)
+        r.controlled_joints = [u'torso_lift_joint',
+                               u'r_upper_arm_roll_joint',
+                               u'r_shoulder_pan_joint',
+                               u'r_shoulder_lift_joint',
+                               u'r_forearm_roll_joint',
+                               u'r_elbow_flex_joint',
+                               u'r_wrist_flex_joint',
+                               u'r_wrist_roll_joint',
+                               u'l_upper_arm_roll_joint',
+                               u'l_shoulder_pan_joint',
+                               u'l_shoulder_lift_joint',
+                               u'l_forearm_roll_joint',
+                               u'l_elbow_flex_joint',
+                               u'l_wrist_flex_joint',
+                               u'l_wrist_roll_joint',
+                               u'head_pan_joint',
+                               u'head_tilt_joint',
+                               u'odom_x_joint',
+                               u'odom_y_joint',
+                               u'odom_z_joint']
+
+        r = r.get_controlled_leaf_joints()
+        assert r == {
+            'l_wrist_roll_joint', 'r_wrist_roll_joint', 'odom_z_joint', 'l_forearm_roll_joint', 'torso_lift_joint',
+            'head_tilt_joint', 'r_forearm_roll_joint'
+        }
+
+    def test_get_controlled_leaf_joints2(self, test_folder, delete_test_folder):
+        r = self.cls(donbot_urdf(), path_to_data_folder=test_folder)
+        r.controlled_joints = [u'ur5_shoulder_pan_joint',
+                               u'ur5_shoulder_lift_joint',
+                               u'ur5_elbow_joint',
+                               u'ur5_wrist_1_joint',
+                               u'ur5_wrist_2_joint',
+                               u'ur5_wrist_3_joint',
+                               u'odom_x_joint',
+                               u'odom_y_joint',
+                               u'odom_z_joint']
+
+        r = r.get_controlled_leaf_joints()
+        assert r == {
+            'odom_z_joint', 'ur5_wrist_3_joint'
+        }
+
+    def test_get_directly_controllable_collision_links(self, test_folder, delete_test_folder):
+        r = self.cls(pr2_urdf(), path_to_data_folder=test_folder)
+        r.controlled_joints = [u'torso_lift_joint',
+                               u'r_upper_arm_roll_joint',
+                               u'r_shoulder_pan_joint',
+                               u'r_shoulder_lift_joint',
+                               u'r_forearm_roll_joint',
+                               u'r_elbow_flex_joint',
+                               u'r_wrist_flex_joint',
+                               u'r_wrist_roll_joint',
+                               u'l_upper_arm_roll_joint',
+                               u'l_shoulder_pan_joint',
+                               u'l_shoulder_lift_joint',
+                               u'l_forearm_roll_joint',
+                               u'l_elbow_flex_joint',
+                               u'l_wrist_flex_joint',
+                               u'l_wrist_roll_joint',
+                               u'head_pan_joint',
+                               u'head_tilt_joint',
+                               u'odom_x_joint',
+                               u'odom_y_joint',
+                               u'odom_z_joint']
+
+        result = r.get_directly_controllable_collision_links(u'odom_x_joint')
+        assert result == []
+        result = r.get_directly_controllable_collision_links(u'odom_y_joint')
+        assert result == []
+        result = r.get_directly_controllable_collision_links(u'odom_z_joint')
+        assert result == [u'base_link']
+        result = r.get_directly_controllable_collision_links(u'l_elbow_flex_joint')
+        assert result == [u'l_elbow_flex_link']
+        result = r.get_directly_controllable_collision_links(u'r_wrist_roll_joint')
+        assert result == [u'r_wrist_roll_link']
+        result = r.get_directly_controllable_collision_links(u'br_caster_l_wheel_joint')
+        assert result == []
+
+
 
 
 class TestWorld(object):
     cls = WorldObject
     world_cls = World
 
+    def make_world_with_robot(self, urdf, path_to_data_folder):
+        w = self.world_cls(path_to_data_folder=path_to_data_folder)
+        r = self.cls(urdf)
+        w.add_robot(robot=r,
+                    base_pose=None,
+                    controlled_joints=r.controlled_joints,
+                    ignored_pairs=[],
+                    added_pairs=[])
+        if path_to_data_folder is not None:
+            w.robot.init_self_collision_matrix()
+        return w
+
     def make_world_with_pr2(self, path_to_data_folder=None):
         """
         :rtype: World
         """
-        w = self.world_cls(path_to_data_folder=path_to_data_folder)
-        r = self.cls(pr2_urdf())
-        w.add_robot(r, None, r.controlled_joints, None, None, None, path_to_data_folder is not None, [], [], 'llvm', 0)
-        return w
+        return self.make_world_with_robot(pr2_urdf(), path_to_data_folder)
+
+    def make_world_with_pr2_without_base(self, path_to_data_folder=None):
+        """
+        :rtype: World
+        """
+        return self.make_world_with_robot(pr2_without_base_urdf(), path_to_data_folder)
 
     def make_world_with_donbot(self, path_to_data_folder=None):
         """
         :rtype: World
         """
-        w = self.world_cls(path_to_data_folder=path_to_data_folder)
-        r = self.cls(donbot_urdf())
-        w.add_robot(r, None, r.controlled_joints, None, None, None, path_to_data_folder is not None, [], [], 'llvm', 0)
-        return w
+        return self.make_world_with_robot(donbot_urdf(), path_to_data_folder)
 
     def test_add_robot(self, function_setup):
         empty_world = self.world_cls()
         assert len(empty_world.get_objects()) == 0
         assert not empty_world.has_robot()
-        pr2 = self.cls(pr2_urdf())
-        empty_world.add_robot(pr2, None, pr2.controlled_joints, None, None, None, False, [], [], 'llvm', 0)
+        # extracting the urdf turns integers into floats
+        pr2 = self.cls(self.cls(pr2_urdf()).get_urdf_str())
+        empty_world.add_robot(robot=pr2,
+                              base_pose=None,
+                              controlled_joints=pr2.controlled_joints,
+                              ignored_pairs=[],
+                              added_pairs=[])
         assert empty_world.has_robot()
-        assert pr2 == empty_world.robot
+        assert pr2.get_urdf_str() == empty_world.robot.get_urdf_str()
         return empty_world
 
     def test_add_object(self, function_setup):
@@ -701,15 +814,26 @@ class TestWorld(object):
             ce = new_ces[i + j]
             assert ce.type == CollisionEntry.ALLOW_COLLISION
 
-    def test_collision_goals_to_collision_matrix1(self, test_folder):
-        world_with_donbot = self.make_world_with_donbot(test_folder)
-        min_dist = defaultdict(lambda : {u'zero_weight_distance': 0.05})
+    def test_collision_goals_to_collision_matrix1(self, delete_test_folder):
+        """
+        test with no collision entries which is equal to avoid all collisions
+        collision matrix should be empty, because world has no collision checker
+        :param test_folder:
+        :return:
+        """
+        world_with_donbot = self.make_world_with_donbot(delete_test_folder)
+        min_dist = defaultdict(lambda: {u'zero_weight_distance': 0.05})
         collision_matrix = world_with_donbot.collision_goals_to_collision_matrix([], min_dist)
         assert len(collision_matrix) == 0
         return world_with_donbot
 
     def test_collision_goals_to_collision_matrix2(self, test_folder):
-        min_dist = defaultdict(lambda : {u'zero_weight_distance': 0.05})
+        """
+        avoid all with an added object should enlarge the collision matrix
+        :param test_folder:
+        :return:
+        """
+        min_dist = defaultdict(lambda: {u'zero_weight_distance': 0.05})
         world_with_donbot = self.make_world_with_donbot(test_folder)
         base_collision_matrix = world_with_donbot.collision_goals_to_collision_matrix([], min_dist)
         name = u'muh'
@@ -726,7 +850,12 @@ class TestWorld(object):
         return world_with_donbot
 
     def test_collision_goals_to_collision_matrix3(self, test_folder):
-        min_dist = defaultdict(lambda : {u'zero_weight_distance': 0.05})
+        """
+        empty list should have the same effect than avoid all entry
+        :param test_folder:
+        :return:
+        """
+        min_dist = defaultdict(lambda: {u'zero_weight_distance': 0.05})
         world_with_donbot = self.make_world_with_donbot(test_folder)
         base_collision_matrix = world_with_donbot.collision_goals_to_collision_matrix([], min_dist)
         name = u'muh'
@@ -745,6 +874,11 @@ class TestWorld(object):
         return world_with_donbot
 
     def test_collision_goals_to_collision_matrix4(self, test_folder):
+        """
+        allow all should lead to an empty collision matrix
+        :param test_folder:
+        :return:
+        """
         world_with_donbot = self.make_world_with_donbot(test_folder)
         name = u'muh'
 
@@ -761,6 +895,11 @@ class TestWorld(object):
         return world_with_donbot
 
     def test_collision_goals_to_collision_matrix5(self, test_folder):
+        """
+
+        :param test_folder:
+        :return:
+        """
         # FIXME min dist is kinda outdated so this test is hacked to succeed
         world_with_donbot = self.make_world_with_donbot(test_folder)
         name = u'muh'
@@ -789,10 +928,15 @@ class TestWorld(object):
         return world_with_donbot
 
     def test_collision_goals_to_collision_matrix6(self, test_folder):
+        """
+        allow collision with a specific object
+        :param test_folder:
+        :return:
+        """
         world_with_donbot = self.make_world_with_donbot(test_folder)
         name = u'muh'
         robot_link_names = list(world_with_donbot.robot.get_controlled_links())
-        min_dist = defaultdict(lambda : {u'zero_weight_distance': 0.1})
+        min_dist = defaultdict(lambda: {u'zero_weight_distance': 0.1})
 
         box = self.cls.from_world_body(make_world_body_box(name))
         world_with_donbot.add_object(box)
@@ -817,11 +961,16 @@ class TestWorld(object):
         return world_with_donbot
 
     def test_collision_goals_to_collision_matrix7(self, test_folder):
+        """
+        allow collision with specific object
+        :param test_folder:
+        :return:
+        """
         world_with_donbot = self.make_world_with_donbot(test_folder)
         name = u'muh'
         name2 = u'muh2'
         robot_link_names = list(world_with_donbot.robot.get_controlled_links())
-        min_dist = defaultdict(lambda : {u'zero_weight_distance': 0.05})
+        min_dist = defaultdict(lambda: {u'zero_weight_distance': 0.05})
 
         box = self.cls.from_world_body(make_world_body_box(name))
         box2 = self.cls.from_world_body(make_world_body_box(name2))
@@ -845,12 +994,17 @@ class TestWorld(object):
         return world_with_donbot
 
     def test_collision_goals_to_collision_matrix8(self, test_folder):
+        """
+        allow collision between specific object and link
+        :param test_folder:
+        :return:
+        """
         world_with_donbot = self.make_world_with_donbot(test_folder)
         name = u'muh'
         name2 = u'muh2'
         robot_link_names = list(world_with_donbot.robot.get_controlled_links())
         allowed_link = robot_link_names[0]
-        min_dist = defaultdict(lambda : {u'zero_weight_distance': 0.05})
+        min_dist = defaultdict(lambda: {u'zero_weight_distance': 0.05})
 
         box = self.cls.from_world_body(make_world_body_box(name))
         box2 = self.cls.from_world_body(make_world_body_box(name2))
@@ -877,8 +1031,13 @@ class TestWorld(object):
         return world_with_donbot
 
     def test_collision_goals_to_collision_matrix9(self, test_folder):
+        """
+        allow self collision
+        :param test_folder:
+        :return:
+        """
         world_with_pr2 = self.make_world_with_pr2(test_folder)
-        min_dist = defaultdict(lambda : {u'zero_weight_distance': 0.05})
+        min_dist = defaultdict(lambda: {u'zero_weight_distance': 0.05})
         ces = []
         collision_entry = CollisionEntry()
         collision_entry.type = CollisionEntry.ALLOW_COLLISION
@@ -903,4 +1062,26 @@ class TestWorld(object):
         #     assert robot_link in robot_link_names
         #     if body_b == name2:
         #         assert robot_link != robot_link_names[0]
+        return world_with_pr2
+
+    def test_collision_goals_to_collision_matrix10(self, test_folder):
+        """
+        avoid self collision with only specific links
+        :param test_folder:
+        :return:
+        """
+        world_with_pr2 = self.make_world_with_pr2_without_base(test_folder)
+        min_dist = defaultdict(lambda: {u'zero_weight_distance': 0.05})
+        ces = [allow_all_entry()]
+        collision_entry = CollisionEntry()
+        collision_entry.type = CollisionEntry.AVOID_COLLISION
+        collision_entry.robot_links = [u'base_link']
+        collision_entry.body_b = world_with_pr2.robot.get_name()
+        collision_entry.link_bs = [u'r_wrist_flex_link']
+        ces.append(collision_entry)
+
+        collision_matrix = world_with_pr2.collision_goals_to_collision_matrix(ces, min_dist)
+
+        assert collision_matrix == {(u'base_link', u'pr2', u'r_wrist_flex_link'): 0.05}
+
         return world_with_pr2

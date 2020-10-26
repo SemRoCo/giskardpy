@@ -1,35 +1,36 @@
 from __future__ import division
 
 import errno
-import pickle
-from functools import wraps
-
-import cPickle
-import numpy as np
+import json
 import os
-import pkg_resources
 import pydot
 import pylab as plt
 import re
 import rospkg
 import subprocess
 import sys
-from collections import defaultdict, OrderedDict
+from collections import defaultdict, OrderedDict, deque
 from contextlib import contextmanager
+from functools import wraps
 from itertools import product
-from numpy import pi
 
+import numpy as np
+import pkg_resources
+import rospy
 from geometry_msgs.msg import PointStamped, Point, Vector3Stamped, Vector3, Pose, PoseStamped, QuaternionStamped, \
     Quaternion
 from giskard_msgs.msg import WorldBody
+from numpy import pi
 from py_trees import common, Chooser, Selector, Sequence, Behaviour
 from py_trees.composites import Parallel
 from sensor_msgs.msg import JointState
 from shape_msgs.msg import SolidPrimitive
+from std_msgs.msg import ColorRGBA
 from tf.transformations import quaternion_multiply, quaternion_conjugate
+from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
+from visualization_msgs.msg import Marker
 
 from giskardpy import logging
-from giskardpy.data_types import ClosestPointInfo
 from giskardpy.data_types import SingleJointState
 from giskardpy.plugin import PluginBehavior
 from giskardpy.tfwrapper import kdl_to_pose, np_to_kdl
@@ -70,11 +71,6 @@ class NullContextManager(object):
     def __exit__(self, *args):
         pass
 
-def np_vector(x,y,z):
-    return np.array([x,y,z,0])
-
-def np_point(x,y,z):
-    return np.array([x,y,z,1])
 
 class KeyDefaultDict(defaultdict):
     """
@@ -154,20 +150,20 @@ def cylinder_surface(r, h):
     return 2 * pi * r * (h + r)
 
 
-def closest_point_constraint_violated(closest_point_infos, tolerance=0.9):
-    """
-    :param closest_point_infos: dict mapping a link name to a ClosestPointInfo
-    :type closest_point_infos: dict
-    :type tolerance: float
-    :return: whether of not the contact distance for any link has been violated
-    :rtype: bool
-    """
-    for link_name, cpi_info in closest_point_infos.items():  # type: (str, ClosestPointInfo)
-        if cpi_info.contact_distance < cpi_info.min_dist * tolerance:
-            logging.loginfo(u'collision constraints violated: {}'.format(cpi_info.link_a, cpi_info.link_b,
-                                                                         cpi_info.contact_distance))
-            return True
-    return False
+# def closest_point_constraint_violated(closest_point_infos, tolerance=0.9):
+#     """
+#     :param closest_point_infos: dict mapping a link name to a ClosestPointInfo
+#     :type closest_point_infos: dict
+#     :type tolerance: float
+#     :return: whether of not the contact distance for any link has been violated
+#     :rtype: bool
+#     """
+#     for link_name, cpi_info in closest_point_infos.items():  # type: (str, Collision)
+#         if cpi_info.contact_distance < cpi_info.min_dist * tolerance:
+#             logging.loginfo(u'collision constraints violated: {}'.format(cpi_info.link_a, cpi_info.link_b,
+#                                                                          cpi_info.contact_distance))
+#             return True
+#     return False
 
 
 def qv_mult(quaternion, vector):
@@ -214,21 +210,34 @@ def to_joint_state_dict(msg):
         mjs[joint_name] = sjs
     return mjs
 
-def to_joint_state_dict2(msg):
+
+def to_joint_state_position_dict(msg):
     """
     Converts a ROS message of type sensor_msgs/JointState into a dict that maps name to position
     :param msg: ROS message to convert.
     :type msg: JointState
     :return: Corresponding MultiJointState instance.
-    :rtype: OrderedDict[str, SingleJointState]
+    :rtype: OrderedDict[str, float]
     """
     js = OrderedDict()
     for i, joint_name in enumerate(msg.name):
         js[joint_name] = msg.position[i]
     return js
 
+def print_joint_state(joint_msg):
+    print_dict(to_joint_state_position_dict(joint_msg))
 
-def dict_to_joint_states(joint_state_dict):
+def print_dict(d):
+    print('{')
+    for key, value in d.items():
+        print("\'{}\': {},".format(key, value))
+    print('}')
+
+def write_dict(d, f):
+    json.dump(d,f, sort_keys=True, indent=4, separators=(',', ': '))
+    f.write('\n')
+
+def position_dict_to_joint_states(joint_state_dict):
     """
     :param joint_state_dict: maps joint_name to position
     :type joint_state_dict: dict
@@ -240,6 +249,22 @@ def dict_to_joint_states(joint_state_dict):
         js.name.append(k)
         js.position.append(v)
         js.velocity.append(0)
+        js.effort.append(0)
+    return js
+
+
+def dict_to_joint_states(joint_state_dict):
+    """
+    :param joint_state_dict: maps joint_name to position
+    :type joint_state_dict: dict
+    :return: velocity and effort are filled with 0
+    :rtype: JointState
+    """
+    js = JointState()
+    for k, v in sorted(joint_state_dict.items()):
+        js.name.append(k)
+        js.position.append(v.position)
+        js.velocity.append(v.velocity)
         js.effort.append(0)
     return js
 
@@ -329,52 +354,82 @@ def create_path(path):
                 raise
 
 
-def plot_trajectory(tj, controlled_joints, path_to_data_folder, sample_period):
+
+
+def plot_trajectory(tj, controlled_joints, path_to_data_folder, sample_period, order=3, velocity_threshold=0.0, scaling=0.2, normalize_position=False, tick_stride=1.0):
     """
     :type tj: Trajectory
     :param controlled_joints: only joints in this list will be added to the plot
     :type controlled_joints: list
+    :param velocity_threshold: only joints that exceed this velocity threshold will be added to the plot. Use a negative number if you want to include every joint
+    :param scaling: determines how much the x axis is scaled with the length(time) of the trajectory
+    :param normalize_position: centers the joint positions around 0 on the y axis
+    :param tick_stride: the distance between ticks in the plot. if tick_stride <= 0 pyplot determines the ticks automatically
     """
-    # return
+
+    def ceil(val, base=0.0, stride=1.0):
+        base = base % stride
+        return np.ceil((float)(val - base) / stride) * stride + base
+
+    def floor(val, base=0.0, stride=1.0):
+        base = base % stride
+        return np.floor((float)(val - base) / stride) * stride + base
+
+    order = max(order, 2)
     if len(tj._points) <= 0:
         return
     colors = [u'b', u'g', u'r', u'c', u'm', u'y', u'k']
     line_styles = [u'', u'--', u'-.', u':']
-    fmts = [u''.join(x) for x in product(line_styles, colors)]
-    positions = []
-    velocities = []
+    fmts = [u''.join(i) for i in product(line_styles, colors)]
+    data = [[] for i in range(order)]
     times = []
-    names = [x for x in tj._points[0.0].keys() if x in controlled_joints]
+    names = list(sorted([i for i in tj._points[0.0].keys() if i in controlled_joints]))
     for time, point in tj.items():
-        positions.append([point[joint_name].position for joint_name in names])
-        velocities.append([point[joint_name].velocity for joint_name in names])
+        for i in range(order):
+            if i == 0:
+                data[0].append([point[joint_name].position for joint_name in names])
+            elif i == 1:
+                data[1].append([point[joint_name].velocity for joint_name in names])
         times.append(time)
-    positions = np.array(positions)
-    velocities = np.array(velocities).T
+    data[0] = np.array(data[0])
+    data[1] = np.array(data[1])
+    if(normalize_position):
+        data[0] = data[0] - (data[0].max(0) + data[0].min(0)) / 2
+    for i in range(2, order):
+        data[i] = np.diff(data[i - 1], axis=0, prepend=0)
     times = np.array(times) * sample_period
 
-    f, (ax1, ax2) = plt.subplots(2, sharex=True)
-    ax1.set_title(u'position')
-    ax2.set_title(u'velocity')
-    # positions -= positions.mean(axis=0)
-    for i, position in enumerate(positions.T):
-        ax1.plot(times, position, fmts[i], label=names[i])
-        ax2.plot(times, velocities[i], fmts[i])
-    box = ax1.get_position()
-    diff = abs(positions.max() - positions.min()) * 0.1
-    ax1.set_ylim(positions.min() - diff, positions.max() + diff)
-    diff = abs(velocities.max() - velocities.min()) * 0.1
-    ax2.set_ylim(velocities.min() - diff, velocities.max() + diff)
-    ax1.set_position([box.x0, box.y0, box.width * 0.6, box.height])
-    box = ax2.get_position()
-    ax2.set_position([box.x0, box.y0, box.width * 0.6, box.height])
+    f, axs = plt.subplots(order, sharex=True, gridspec_kw={'hspace': 0.2})
+    f.set_size_inches(w=(times[-1] - times[0]) * scaling, h=order * 3.5)
 
-    # Put a legend to the right of the current axis
-    ax1.legend(loc=u'center', bbox_to_anchor=(1.45, 0), prop={'size': 10})
-    ax1.grid()
-    ax2.grid()
+    plt.xlim(times[0], times[-1])
 
-    plt.savefig(path_to_data_folder + u'trajectory.pdf')
+    if tick_stride > 0:
+        first = ceil(times[0], stride=tick_stride)
+        last = floor(times[-1], stride=tick_stride)
+        ticks = np.arange(first, last, tick_stride)
+        ticks = np.insert(ticks, 0, times[0])
+        ticks = np.append(ticks, last)
+        ticks = np.append(ticks, times[-1])
+        for i in range(order):
+            axs[i].set_title(r'$p' + '\'' * i + "$")
+            axs[i].xaxis.set_ticks(ticks)
+    else:
+        for i in range(order):
+            axs[i].set_title(r'$p' + '\'' * i + "$")
+    for i in range(len(controlled_joints)):
+        if any(abs(data[1][:, i]) > velocity_threshold):
+            for j in range(order):
+                axs[j].plot(times, data[j][:, i], fmts[i], label=names[i])
+
+
+    axs[0].legend(bbox_to_anchor=(1.01, 1), loc='upper left')
+
+    axs[-1].set_xlabel(u'time [s]')
+    for i in range(order):
+        axs[i].grid()
+
+    plt.savefig(path_to_data_folder + u'trajectory.pdf', bbox_inches="tight")
 
 
 def resolve_ros_iris_in_urdf(input_urdf):
@@ -755,6 +810,7 @@ def str_to_unique_number(s):
 
 def memoize(function):
     memo = function.memo = {}
+
     @wraps(function)
     def wrapper(*args, **kwargs):
         # key = cPickle.dumps((args, kwargs))
@@ -766,4 +822,133 @@ def memoize(function):
             rv = function(*args, **kwargs)
             memo[key] = rv
             return rv
+
     return wrapper
+
+def traj_to_msg(sample_period, trajectory, controlled_joints, fill_velocity_values):
+    """
+    :type traj: giskardpy.data_types.Trajectory
+    :return: JointTrajectory
+    """
+    trajectory_msg = JointTrajectory()
+    trajectory_msg.header.stamp = rospy.get_rostime() + rospy.Duration(0.5)
+    trajectory_msg.joint_names = controlled_joints
+    for time, traj_point in trajectory.items():
+        p = JointTrajectoryPoint()
+        p.time_from_start = rospy.Duration(time*sample_period)
+        for joint_name in controlled_joints:
+            if joint_name in traj_point:
+                p.positions.append(traj_point[joint_name].position)
+                if fill_velocity_values:
+                    p.velocities.append(traj_point[joint_name].velocity)
+            else:
+                raise NotImplementedError(u'generated traj does not contain all joints')
+        trajectory_msg.points.append(p)
+    return trajectory_msg
+
+def make_filter_b_mask(H):
+    return H.sum(axis=1) != 0
+
+def make_filter_masks(H, num_joint_constraints, num_hard_constraints):
+    b_mask = make_filter_b_mask(H)
+    s_mask = b_mask[num_joint_constraints:]
+    if num_hard_constraints == 0:
+        bA_mask = s_mask
+    else:
+        bA_mask = np.concatenate((np.array([True] * num_hard_constraints), s_mask))
+
+    return bA_mask, b_mask
+
+
+
+
+
+def trajectory_to_np(tj, joint_names):
+    """
+    :type tj: Trajectory
+    :return:
+    """
+    names = list(sorted([i for i in tj._points[0.0].keys() if i in joint_names]))
+    position = []
+    velocity = []
+    times = []
+    for time, point in tj.items():
+        position.append([point[joint_name].position for joint_name in names])
+        velocity.append([point[joint_name].velocity for joint_name in names])
+        times.append(time)
+    position = np.array(position)
+    velocity = np.array(velocity)
+    times = np.array(times)
+    return names, position, velocity, times
+
+def publish_marker_sphere(position, frame_id=u'map', radius=0.05, id_=0):
+    m = Marker()
+    m.action = m.ADD
+    m.ns = u'debug'
+    m.id = id_
+    m.type = m.SPHERE
+    m.header.frame_id = frame_id
+    m.pose.position.x = position[0]
+    m.pose.position.y = position[1]
+    m.pose.position.z = position[2]
+    m.color = ColorRGBA(1,0,0,1)
+    m.scale.x = radius
+    m.scale.y = radius
+    m.scale.z = radius
+
+    pub = rospy.Publisher('/visualization_marker', Marker, queue_size=1)
+    while pub.get_num_connections() < 1:
+        # wait for a connection to publisher
+        # you can do whatever you like here or simply do nothing
+        pass
+
+    pub.publish(m)
+
+def publish_marker_vector(start, end, diameter_shaft=0.01, diameter_head=0.02,  id_=0):
+    """
+    assumes points to be in frame map
+    :type start: Point
+    :type end: Point
+    :type diameter_shaft: float
+    :type diameter_head: float
+    :type id_: int
+    """
+    m = Marker()
+    m.action = m.ADD
+    m.ns = u'debug'
+    m.id = id_
+    m.type = m.ARROW
+    m.points.append(start)
+    m.points.append(end)
+    m.color = ColorRGBA(1,0,0,1)
+    m.scale.x = diameter_shaft
+    m.scale.y = diameter_head
+    m.scale.z = 0
+
+    pub = rospy.Publisher('/visualization_marker', Marker, queue_size=1)
+    while pub.get_num_connections() < 1:
+        # wait for a connection to publisher
+        # you can do whatever you like here or simply do nothing
+        pass
+    rospy.sleep(0.3)
+
+    pub.publish(m)
+
+class FIFOSet(set):
+    def __init__(self, data, max_length=None):
+        if len(data) > max_length:
+            raise ValueError('len(data) > max_length')
+        super(FIFOSet, self).__init__(data)
+        self.max_length = max_length
+        self._data_queue = deque(data)
+
+    def add(self, item):
+        if len(self._data_queue) == self.max_length:
+            to_delete = self._data_queue.popleft()
+            super(FIFOSet, self).remove(to_delete)
+            self._data_queue.append(item)
+        super(FIFOSet, self).add(item)
+
+    def remove(self, item):
+        self.remove(item)
+        self._data_queue.remove(item)

@@ -644,6 +644,7 @@ class TestConstraints(object):
                                     max_linear_velocity=0.1,
                                     max_angular_velocity=0.2
                                     )
+        kitchen_setup.set_joint_goal(gaya_pose)
         kitchen_setup.move_base(base_goal)
 
         current_x = Vector3Stamped()

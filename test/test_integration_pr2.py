@@ -7,8 +7,8 @@ import numpy as np
 import pytest
 import roslaunch
 import rospy
-from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped, PointStamped
-from giskard_msgs.msg import CollisionEntry, MoveActionGoal, MoveResult, WorldBody, MoveGoal
+from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped, PointStamped, Transform
+from giskard_msgs.msg import CollisionEntry, MoveActionGoal, MoveResult, WorldBody, MoveGoal, MoveCmd
 from giskard_msgs.srv import UpdateWorldResponse, UpdateWorldRequest
 from numpy import pi
 from sensor_msgs.msg import JointState
@@ -24,6 +24,8 @@ from giskardpy.tfwrapper import init as tf_init
 from giskardpy.utils import to_joint_state_position_dict, publish_marker_vector
 from rospy_message_converter.message_converter import convert_dictionary_to_ros_message
 from utils_for_tests import PR2, compare_poses
+from iai_naive_kinematics_sim.srv import UpdateTransform
+
 
 # TODO roslaunch iai_pr2_sim ros_control_sim_with_base.launch
 # TODO roslaunch iai_kitchen upload_kitchen_obj.launch
@@ -642,6 +644,7 @@ class TestConstraints(object):
                                     max_linear_velocity=0.1,
                                     max_angular_velocity=0.2
                                     )
+        kitchen_setup.set_joint_goal(gaya_pose)
         kitchen_setup.move_base(base_goal)
 
         current_x = Vector3Stamped()
@@ -5532,7 +5535,7 @@ class TestCollisionAvoidanceGoals(object):
         :type zero_pose: PR2
         """
         req = UpdateWorldRequest(42, WorldBody(), True, PoseStamped())
-        assert zero_pose.wrapper.update_world.call(req).error_codes == UpdateWorldResponse.INVALID_OPERATION
+        assert zero_pose.wrapper._update_world_srv.call(req).error_codes == UpdateWorldResponse.INVALID_OPERATION
 
     def test_missing_body_error(self, zero_pose):
         """
@@ -5546,7 +5549,7 @@ class TestCollisionAvoidanceGoals(object):
         """
         req = UpdateWorldRequest(UpdateWorldRequest.ADD, WorldBody(type=WorldBody.PRIMITIVE_BODY,
                                                                    shape=SolidPrimitive(type=42)), True, PoseStamped())
-        assert zero_pose.wrapper.update_world.call(req).error_codes == UpdateWorldResponse.CORRUPT_SHAPE_ERROR
+        assert zero_pose.wrapper._update_world_srv.call(req).error_codes == UpdateWorldResponse.CORRUPT_SHAPE_ERROR
 
     def test_unsupported_options(self, kitchen_setup):
         """
@@ -5561,7 +5564,7 @@ class TestCollisionAvoidanceGoals(object):
         wb.type = WorldBody.URDF_BODY
 
         req = UpdateWorldRequest(UpdateWorldRequest.ADD, wb, True, pose)
-        assert kitchen_setup.wrapper.update_world.call(req).error_codes == UpdateWorldResponse.UNSUPPORTED_OPTIONS
+        assert kitchen_setup.wrapper._update_world_srv.call(req).error_codes == UpdateWorldResponse.UNSUPPORTED_OPTIONS
 
     def test_infeasible(self, kitchen_setup):
         """

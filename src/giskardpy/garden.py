@@ -1,5 +1,5 @@
 import functools
-from itertools import combinations
+from collections import defaultdict
 
 import py_trees
 import py_trees_ros
@@ -7,7 +7,7 @@ import rospy
 from control_msgs.msg import JointTrajectoryControllerState
 from giskard_msgs.msg import MoveAction
 from py_trees import Sequence, Selector, BehaviourTree, Blackboard
-from py_trees.meta import failure_is_success, success_is_failure, failure_is_running, running_is_success
+from py_trees.meta import failure_is_success, success_is_failure, running_is_success
 from py_trees_ros.trees import BehaviourTree
 from rospy import ROSException
 
@@ -16,14 +16,14 @@ import giskardpy.pybullet_wrapper as pbw
 from giskardpy import logging
 from giskardpy.god_map import GodMap
 from giskardpy.input_system import JointStatesInput
-from giskardpy.plugin import PluginBehavior, SuccessPlugin
+from giskardpy.plugin import PluginBehavior
 from giskardpy.plugin_action_server import GoalReceived, SendResult, GoalCanceled
 from giskardpy.plugin_append_zero_velocity import AppendZeroVelocity
 from giskardpy.plugin_attached_tf_publicher import TFPlugin
 from giskardpy.plugin_cleanup import CleanUp
 from giskardpy.plugin_collision_checker import CollisionChecker
-from giskardpy.plugin_configuration import ConfigurationPlugin
 from giskardpy.plugin_collision_marker import CollisionMarker
+from giskardpy.plugin_configuration import ConfigurationPlugin
 from giskardpy.plugin_goal_reached import GoalReachedPlugin
 from giskardpy.plugin_if import IF
 from giskardpy.plugin_instantaneous_controller import ControllerPlugin
@@ -32,21 +32,17 @@ from giskardpy.plugin_kinematic_sim import KinSimPlugin
 from giskardpy.plugin_log_trajectory import LogTrajPlugin
 from giskardpy.plugin_loop_detector import LoopDetector
 from giskardpy.plugin_plot_trajectory import PlotTrajectory
-#from giskardpy.plugin_plot_trajectory_fft import PlotTrajectoryFFT
+from giskardpy.plugin_post_processing import PostProcessing
 from giskardpy.plugin_pybullet import WorldUpdatePlugin
 from giskardpy.plugin_send_trajectory import SendTrajectory
 from giskardpy.plugin_set_cmd import SetCmd
 from giskardpy.plugin_time import TimePlugin
 from giskardpy.plugin_update_constraints import GoalToConstraints
 from giskardpy.plugin_visualization import VisualizationBehavior
-from giskardpy.plugin_post_processing import PostProcessing
-# from giskardpy.pybullet_world import PyBulletWorld
 from giskardpy.pybullet_world import PyBulletWorld
-from giskardpy.utils import create_path, render_dot_tree, KeyDefaultDict
-from giskardpy.world import World
-from giskardpy.world_object import WorldObject
-from collections import defaultdict
 from giskardpy.tree_manager import TreeManager
+from giskardpy.utils import create_path, render_dot_tree, KeyDefaultDict
+from giskardpy.world_object import WorldObject
 
 
 def initialize_god_map():
@@ -95,7 +91,7 @@ def initialize_god_map():
                                   identifier.external_collision_avoidance_default_override,
                                   god_map)
 
-    #TODO add checks to test if joints listed as linear are actually linear
+    # TODO add checks to test if joints listed as linear are actually linear
     joint_velocity_linear_limit_symbols = process_joint_specific_params(identifier.joint_velocity_linear_limit,
                                                                         identifier.joint_velocity_linear_limit_default,
                                                                         identifier.joint_velocity_linear_limit_override,
@@ -109,10 +105,11 @@ def initialize_god_map():
                                                                             identifier.joint_acceleration_linear_limit_default,
                                                                             identifier.joint_acceleration_linear_limit_override,
                                                                             god_map)
-    joint_acceleration_angular_limit_symbols = process_joint_specific_params(identifier.joint_acceleration_angular_limit,
-                                                                             identifier.joint_acceleration_angular_limit_default,
-                                                                             identifier.joint_acceleration_angular_limit_override,
-                                                                             god_map)
+    joint_acceleration_angular_limit_symbols = process_joint_specific_params(
+        identifier.joint_acceleration_angular_limit,
+        identifier.joint_acceleration_angular_limit_default,
+        identifier.joint_acceleration_angular_limit_override,
+        god_map)
 
     world = PyBulletWorld(False, blackboard.god_map.get_data(identifier.data_folder))
     god_map.set_data(identifier.world, world)
@@ -136,6 +133,7 @@ def initialize_god_map():
     world.robot.init_self_collision_matrix()
     return god_map
 
+
 def process_joint_specific_params(identifier_, default, override, god_map):
     default_value = god_map.unsafe_get_data(default)
     d = defaultdict(lambda: default_value)
@@ -147,7 +145,7 @@ def process_joint_specific_params(identifier_, default, override, god_map):
 
 
 def grow_tree():
-    action_server_name = u'giskardpy/command'
+    action_server_name = u'~command'
 
     god_map = initialize_god_map()
     # ----------------------------------------------

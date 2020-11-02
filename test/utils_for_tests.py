@@ -228,13 +228,13 @@ class GiskardTestWrapper(object):
         rospy.set_param('~enable_gui', False)
         rospy.set_param('~plugins/PlotTrajectory/enabled', True)
 
-        self.sub_result = rospy.Subscriber('/giskardpy/command/result', MoveActionResult, self.cb, queue_size=100)
-        self.cancel_goal = rospy.Publisher('/giskardpy/command/cancel', GoalID, queue_size=100)
+        self.sub_result = rospy.Subscriber('~command/result', MoveActionResult, self.cb, queue_size=100)
+        self.cancel_goal = rospy.Publisher('~command/cancel', GoalID, queue_size=100)
 
         self.tree = grow_tree()
         self.loop_once()
         # rospy.sleep(1)
-        self.wrapper = GiskardWrapper(ns=u'tests')
+        self.wrapper = GiskardWrapper(node_name=u'tests')
         self.results = Queue(100)
         self.default_root = self.get_robot().get_root()
         self.map = u'map'
@@ -400,11 +400,11 @@ class GiskardTestWrapper(object):
         if not root_link:
             root_link = self.default_root
         if weight is not None:
-            self.wrapper.set_cart_goal(root_link, tip_link, goal_pose, weight=weight, trans_max_velocity=linear_velocity,
-                                       rot_max_velocity=angular_velocity)
+            self.wrapper.set_cart_goal(root_link, tip_link, goal_pose, weight=weight, max_linear_velocity=linear_velocity,
+                                       max_angular_velocity=angular_velocity)
         else:
-            self.wrapper.set_cart_goal(root_link, tip_link, goal_pose, trans_max_velocity=linear_velocity,
-                                       rot_max_velocity=angular_velocity)
+            self.wrapper.set_cart_goal(root_link, tip_link, goal_pose, max_linear_velocity=linear_velocity,
+                                       max_angular_velocity=angular_velocity)
 
     def set_and_check_cart_goal(self, goal_pose, tip_link, root_link=None, weight=None, linear_velocity=None, angular_velocity=None,
                                 expected_error_codes=None):
@@ -441,7 +441,7 @@ class GiskardTestWrapper(object):
                                  goal_type=MoveGoal.PLAN_AND_CHECK_REACHABILITY)
 
     def get_as(self):
-        return Blackboard().get(u'giskardpy/command')
+        return Blackboard().get(u'~command')
 
     def send_goal(self, goal=None, goal_type=MoveGoal.PLAN_AND_EXECUTE, wait=True):
         """
@@ -603,7 +603,7 @@ class GiskardTestWrapper(object):
         compare_poses(o_p, self.wrapper.get_object_info(name).pose.pose)
 
     def add_cylinder(self, name=u'cylinder', size=[1, 1], pose=None):
-        r = self.wrapper.add_cylinder(name=name, size=size, pose=pose)
+        r = self.wrapper.add_cylinder(name=name, height=size[0], radius=size[1], pose=pose)
         assert r.error_codes == UpdateWorldResponse.SUCCESS, \
             u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
                                             update_world_error_code(UpdateWorldResponse.SUCCESS))
@@ -624,7 +624,7 @@ class GiskardTestWrapper(object):
             assert not self.get_world().has_object(name)
             assert name not in self.wrapper.get_object_names().object_names
 
-    def add_urdf(self, name, urdf, pose, js_topic, set_js_topic):
+    def add_urdf(self, name, urdf, pose, js_topic=u'', set_js_topic=None):
         r = self.wrapper.add_urdf(name, urdf, pose, js_topic, set_js_topic=set_js_topic)
         assert r.error_codes == UpdateWorldResponse.SUCCESS, \
             u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),

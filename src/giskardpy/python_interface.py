@@ -165,10 +165,11 @@ class GiskardWrapper(object):
             if isinstance(goal_state, JointState):
                 goal_state = goal_state
             else:
-                goal_state = JointState()
+                goal_state2 = JointState()
                 for joint_name, joint_position in goal_state.items():
-                    goal_state.name.append(joint_name)
-                    goal_state.position.append(joint_position)
+                    goal_state2.name.append(joint_name)
+                    goal_state2.position.append(joint_position)
+                goal_state = goal_state2
             params = {}
             params[u'goal_state'] = convert_ros_message_to_dictionary(goal_state)
             if weight is not None:
@@ -438,7 +439,7 @@ class GiskardWrapper(object):
         :return: result from giskard
         :rtype: MoveResult
         """
-        self.send_goal(MoveGoal.PLAN_AND_EXECUTE, wait)
+        return self.send_goal(MoveGoal.PLAN_AND_EXECUTE, wait)
 
     def check_reachability(self, wait=True):
         """
@@ -448,7 +449,7 @@ class GiskardWrapper(object):
         :return: result from giskard
         :rtype: MoveResult
         """
-        self.send_goal(MoveGoal.CHECK_REACHABILITY, wait)
+        return self.send_goal(MoveGoal.CHECK_REACHABILITY, wait)
 
     def plan(self, wait=True):
         """
@@ -458,7 +459,7 @@ class GiskardWrapper(object):
         :return: result from giskard
         :rtype: MoveResult
         """
-        self.send_goal(MoveGoal.PLAN_ONLY, wait)
+        return self.send_goal(MoveGoal.PLAN_ONLY, wait)
 
     def send_goal(self, goal_type, wait=True):
         goal = self._get_goal()

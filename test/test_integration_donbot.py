@@ -395,7 +395,7 @@ class TestConstraints(object):
         zero_pose.set_and_check_cart_goal(box_pose, u'refills_tool_frame', u'base_footprint')
 
         zero_pose.add_box(box, [0.035, 0.12, 0.15], box_pose)
-        zero_pose.attach_existing(box, u'refills_finger')
+        zero_pose.attach_object(box, u'refills_finger')
 
         # go_up_pose = PoseStamped()
         # go_up_pose.header.frame_id = u'refills_finger'
@@ -411,7 +411,7 @@ class TestConstraints(object):
     def test_pointing(self, better_pose):
         tip = u'rs_camera_link'
         goal_point = tf.lookup_point(u'map', u'base_footprint')
-        better_pose.wrapper.pointing(tip, goal_point)
+        better_pose.pointing(tip, goal_point)
         better_pose.send_and_check_goal()
 
         current_x = Vector3Stamped()
@@ -423,7 +423,7 @@ class TestConstraints(object):
         np.testing.assert_almost_equal(expected_x.point.x, 0, 2)
 
         # goal_point = tf.lookup_point(u'map', tip)
-        # better_pose.wrapper.pointing(tip, goal_point, root=tip)
+        # better_pose.pointing(tip, goal_point, root=tip)
         #
         # r_goal = PoseStamped()
         # r_goal.header.frame_id = tip
@@ -543,7 +543,7 @@ class TestCollisionAvoidanceGoals(object):
         p.pose.orientation = Quaternion(0, 0, 0, 1)
 
         better_pose.add_box(pocky, [0.05, 0.2, 0.03], p)
-        better_pose.attach_existing(pocky, frame_id=u'refills_finger')
+        better_pose.attach_object(pocky, frame_id=u'refills_finger')
 
         tip_normal = Vector3Stamped()
         tip_normal.header.frame_id = pocky
@@ -561,7 +561,7 @@ class TestCollisionAvoidanceGoals(object):
         pocky_goal.pose.position.z = -.2
         pocky_goal.pose.orientation.w = 1
         better_pose.allow_self_collision()
-        better_pose.set_translation_goal(pocky_goal, pocky, u'base_footprint')
+        better_pose.set_translation_goal(u'base_footprint', pocky, pocky_goal)
         better_pose.send_and_check_goal()
 
     def test_avoid_collision2(self, better_pose):
@@ -682,14 +682,14 @@ class TestCollisionAvoidanceGoals(object):
         # shelf_setup.allow_all_collisions()
         shelf_setup.set_and_check_cart_goal(grasp_pose, u'refills_finger')
 
-        shelf_setup.attach_existing(box, u'refills_finger')
+        shelf_setup.attach_object(box, u'refills_finger')
 
         box_goal = PoseStamped()
         box_goal.header.frame_id = u'map'
         box_goal.pose.position.z = 1.12
         box_goal.pose.position.y = -.9
         grasp_pose.pose.orientation.w = 1
-        shelf_setup.set_translation_goal(box_goal, box)
+        shelf_setup.set_translation_goal(, box, box_goal
 
         tip_normal = Vector3Stamped()
         tip_normal.header.frame_id = box
@@ -706,7 +706,7 @@ class TestCollisionAvoidanceGoals(object):
         box_goal.pose.position.y = -0.2
         box_goal.pose.orientation.w = 1
         # shelf_setup.set_cart_goal(box_goal, box)
-        shelf_setup.set_translation_goal(box_goal, box)
+        shelf_setup.set_translation_goal(, box, box_goal
 
         tip_normal = Vector3Stamped()
         tip_normal.header.frame_id = box
@@ -750,7 +750,7 @@ class TestCollisionAvoidanceGoals(object):
         goal_js = {
             u'ur5_shoulder_lift_joint': .5,
         }
-        # zero_pose.wrapper.set_self_collision_distance(0.025)
+        # zero_pose.set_self_collision_distance(0.025)
         zero_pose.allow_self_collision()
         zero_pose.send_and_check_joint_goal(goal_js)
 
@@ -758,7 +758,7 @@ class TestCollisionAvoidanceGoals(object):
         arm_goal.header.frame_id = zero_pose.gripper_tip
         arm_goal.pose.position.y = -.1
         arm_goal.pose.orientation.w = 1
-        # zero_pose.wrapper.set_self_collision_distance(0.025)
+        # zero_pose.set_self_collision_distance(0.025)
         zero_pose.set_and_check_cart_goal(arm_goal, zero_pose.gripper_tip, zero_pose.default_root)
 
     def test_avoid_self_collision2(self, self_collision_pose):
@@ -775,6 +775,6 @@ class TestCollisionAvoidanceGoals(object):
         ce = CollisionEntry()
         ce.type = CollisionEntry.AVOID_COLLISION
         ce.body_b = u'asdf'
-        zero_pose.add_collision_entries([ce])
+        zero_pose.set_collision_entries([ce])
         zero_pose.send_and_check_goal(MoveResult.UNKNOWN_OBJECT)
         zero_pose.send_and_check_goal()

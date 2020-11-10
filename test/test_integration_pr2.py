@@ -7315,6 +7315,18 @@ class TestCollisionAvoidanceGoals(object):
 
     # TODO FIXME attaching and detach of urdf objects that listen to joint states
 
+    def test_iis(self, kitchen_setup):
+        base_pose = PoseStamped()
+        base_pose.header.frame_id = u'iai_kitchen/table_area_main'
+        base_pose.pose.position.y = -1
+        base_pose.pose.orientation = Quaternion(*quaternion_about_axis(np.pi/2, [0,0,1]))
+        kitchen_setup.teleport_base(base_pose)
+        pot_pose = PoseStamped()
+        pot_pose.header.frame_id = u'lid'
+        pot_pose.pose.position.z = -0.1
+        pot_pose.pose.orientation.w = 1
+        kitchen_setup.add_cylinder('pot', size=[0.2,0.2], pose=pot_pose)
+
     def test_ease_dishwasher(self, kitchen_setup):
         """
         :type kitchen_setup: PR2

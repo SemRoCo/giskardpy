@@ -234,7 +234,6 @@ class GiskardTestWrapper(GiskardWrapper):
         self.tree = grow_tree()
         self.loop_once()
         # rospy.sleep(1)
-        #self.wrapper = GiskardWrapper(node_name=u'tests')
         super(GiskardTestWrapper, self).__init__(node_name=u'tests')
         self.results = Queue(100)
         self.default_root = self.get_robot().get_root()
@@ -334,12 +333,6 @@ class GiskardTestWrapper(GiskardWrapper):
                 np.testing.assert_almost_equal(current, goal, decimal,
                                                err_msg='{} at {} insteand of {}'.format(joint_name, current, goal))
 
-    # def set_joint_goal(self, js, weight=None):
-    #    """
-    #    :rtype js: dict
-    #    """
-    #    self.wrapper.set_joint_goal(js, weight=weight)
-
     def check_current_joint_state(self, expected, decimal=2):
         current_joint_state = to_joint_state_position_dict(self.get_current_joint_state())
         self.compare_joint_state(current_joint_state, expected, decimal=decimal)
@@ -384,9 +377,6 @@ class GiskardTestWrapper(GiskardWrapper):
         goal.header.frame_id = tip
         goal.pose.orientation.w = 1
         self.set_rotation_goal(root, tip, goal)
-
-    #def align_planes(self, tip_link, tip_normal, root_link=None, root_normal=None, weight=None):
-    #    self.wrapper.align_planes(tip_link, tip_normal, root_link, root_normal, weight)
 
     def set_rotation_goal(self, goal_pose, tip_link, root_link=None, weight=None, max_velocity=None):
         if not root_link:
@@ -451,7 +441,6 @@ class GiskardTestWrapper(GiskardWrapper):
         """
         if goal is None:
             goal = MoveActionGoal()
-            #goal.goal = self.wrapper._get_goal()
             goal.goal = self._get_goal()
             goal.goal.type = goal_type
         i = 0
@@ -472,7 +461,6 @@ class GiskardTestWrapper(GiskardWrapper):
     def send_goal_and_dont_wait(self, goal=None, goal_type=MoveGoal.PLAN_AND_EXECUTE, stop_after=20):
         if goal is None:
             goal = MoveActionGoal()
-            #goal.goal = self.wrapper._get_goal()
             goal.goal = self._get_goal()
             goal.goal.type = goal_type
         i = 0
@@ -507,12 +495,6 @@ class GiskardTestWrapper(GiskardWrapper):
                                                                                     expected_error_code),
                                                                                 error_message)
         return r.trajectory
-
-    #def add_waypoint(self):
-    #    self.wrapper.add_cmd()
-
-    #def set_json_goal(self, constraint_type, **kwargs):
-    #    self.wrapper.set_json_goal(constraint_type, **kwargs)
 
     def get_result_trajectory_position(self):
         trajectory = self.get_god_map().unsafe_get_data(identifier.trajectory)
@@ -636,40 +618,9 @@ class GiskardTestWrapper(GiskardWrapper):
         assert self.get_world().has_object(name)
         assert name in self.get_object_names().object_names
 
-    #def allow_all_collisions(self):
-    #    super(GiskardTestWrapper, self).allow_all_collisions()
-
     def avoid_all_collisions(self, distance=0.5):
         super(GiskardTestWrapper, self).avoid_all_collisions(distance)
         self.loop_once()
-
-    #def allow_self_collision(self):
-    #    self.wrapper.allow_self_collision()
-
-    #def avoid_self_collision(self):
-    #    self.wrapper.avoid_self_collision()
-
-
-
-    #def set_collision_entries(self, collisions_entries):
-    #    self.wrapper.set_collision_entries(collisions_entries)
-
-    #def allow_collision(self, robot_links, body_b, link_bs):
-    #    ces = []
-    #    ces.append(CollisionEntry(type=CollisionEntry.ALLOW_COLLISION,
-    #                              robot_links=robot_links,
-    #                              body_b=body_b,
-    #                              link_bs=link_bs))
-    #    self.set_collision_entries(ces)
-
-    #def avoid_collision(self, robot_links, body_b, link_bs, min_dist):
-    #    ces = []
-    #    ces.append(CollisionEntry(type=CollisionEntry.AVOID_COLLISION,
-    #                              robot_links=robot_links,
-    #                              body_b=body_b,
-    #                              link_bs=link_bs,
-    #                              min_dist=min_dist))
-    #    self.set_collision_entries(ces)
 
     def attach_box(self, name=u'box', size=None, frame_id=None, position=None, orientation=None, pose=None,
                    expected_response=UpdateWorldResponse.SUCCESS):

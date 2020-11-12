@@ -376,7 +376,7 @@ class GiskardTestWrapper(GiskardWrapper):
         goal = PoseStamped()
         goal.header.frame_id = tip
         goal.pose.orientation.w = 1
-        self.set_rotation_goal(root, tip, goal)
+        self.set_rotation_goal(goal, tip, root)
 
     def set_rotation_goal(self, goal_pose, tip_link, root_link=None, weight=None, max_velocity=None):
         if not root_link:

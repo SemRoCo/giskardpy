@@ -174,7 +174,7 @@ class TestCollisionAvoidanceGoals(object):
                                                                           [1, 0, 0, 0],
                                                                           [0, 0, 0, 1]]))
         box_setup.set_and_check_cart_goal(grasp_pose, box_setup.tip)
-        box_setup.attach_existing(box_name, box_setup.tip)
+        box_setup.attach_object(box_name, box_setup.tip)
 
         base_goal = PoseStamped()
         base_goal.header.frame_id = box_setup.default_root

@@ -10,7 +10,7 @@ sudo pip install scipy==1.2.2 # this is the last version for python 2.7
 sudo pip install casadi
 sudo pip install sortedcontainers
 sudo pip install hypothesis==4.34.0 # only needed if you want to run tests
-sudo pip install pandas
+sudo pip install pandas==0.24.2
 sudo pip install numpy==1.16
 ```
 

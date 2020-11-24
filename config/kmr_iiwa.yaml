@@ -5,12 +5,12 @@ general_options:
   fill_velocity_values: True # due to a bug, the pr2 does not want the velocity values to be filled
   joint_vel_limit: # giskard will use the min of this number and limits from the urdf
     linear:
-      default: 0.1
-      odom_x_joint: 0.05
-      odom_y_joint: 0.05
+      default: 0.5
+      odom_x_joint: 0.5
+      odom_y_joint: 0.5
     angular:
-      default: 0.1
-      odom_z_joint: 0.2
+      default: 0.5
+      odom_z_joint: 0.5
   joint_acceleration_limit: # multiply your desired acc limit with sample period; experimental, don't touch
     linear:
       default: 100

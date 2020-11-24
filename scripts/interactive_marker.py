@@ -190,7 +190,9 @@ class IMServer(object):
                 p.header.frame_id = feedback.header.frame_id
                 p.pose = feedback.pose
 
-                self.giskard.set_cart_goal(self.root_link, self.tip_link, p)
+                self.giskard.set_cart_goal(root_link=self.root_link,
+                                           tip_link=self.tip_link,
+                                           goal_pose=p)
 
                 if not self.enable_self_collision:
                     self.giskard.allow_self_collision()

@@ -2,7 +2,8 @@ import numpy as np
 import pytest
 import roslaunch
 import rospy
-from geometry_msgs.msg import PoseStamped, Point, Quaternion
+from betterpybullet import Quaternion
+from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped
 from tf.transformations import quaternion_from_matrix, quaternion_about_axis
 
 from giskardpy import logging
@@ -246,5 +247,96 @@ class TestCartGoals(object):
         p.header.stamp = rospy.get_rostime()
         p.header.frame_id = zero_pose.gripper_tip
         p.pose.position = Point(0, 0, 0)
-        p.pose.orientation = Quaternion(*quaternion_about_axis(-np.pi/4, [0,1,0]))
+        p.pose.orientation = Quaternion(*quaternion_about_axis(-np.pi / 4, [0, 1, 0]))
         zero_pose.set_and_check_cart_goal(p, zero_pose.gripper_tip, 'odom')
+
+    def test_place_object(self, zero_pose):
+        """
+        :type zero_pose: Donbot
+        """
+        object_height = 0.145
+        camera_link = u'camera_link'
+        refills_finger = u'refills_finger'
+
+        # pre_grasp_left = {
+        #     'iiwa_joint_1': -0.05,
+        #     'iiwa_joint_2': -0.851187914658,
+        #     'iiwa_joint_3': 0.0399109025867,
+        #     'iiwa_joint_4': -2.02477636846,
+        #     'iiwa_joint_5': -1.74610553316,
+        #     'iiwa_joint_6': -1.49375643375,
+        #     'iiwa_joint_7': -0.395375673321,
+        # }
+        pre_grasp_left = {
+            'iiwa_joint_1': 0.8,
+            'iiwa_joint_2': -1.26293805785,
+            'iiwa_joint_3': -0.434284463224,
+            'iiwa_joint_4': 1.74242120759,
+            'iiwa_joint_5': 2.00150718678,
+            'iiwa_joint_6': -1.67087526211,
+            'iiwa_joint_7': -0.484213467998,
+        }
+
+        zero_pose.send_and_check_joint_goal(pre_grasp_left)
+
+        grasp_pose = PoseStamped()
+        grasp_pose.header.frame_id = camera_link
+        grasp_pose.pose.position.z = +0.2
+        grasp_pose.pose.orientation.w = 1
+        zero_pose.set_and_check_cart_goal(grasp_pose,
+                                          tip_link=camera_link,
+                                          root_link=u'base_link')
+
+        box_pose = PoseStamped()
+        box_pose.header.frame_id = refills_finger
+        box_pose.pose.orientation.w = 1
+        zero_pose.attach_box(name='box',
+                             size=[0.05, object_height, 0.115],
+                             frame_id=refills_finger,
+                             pose=box_pose)
+
+        grasp_pose = PoseStamped()
+        grasp_pose.header.frame_id = camera_link
+        grasp_pose.pose.position.z = -0.2
+        grasp_pose.pose.orientation.w = 1
+        zero_pose.set_and_check_cart_goal(grasp_pose,
+                                          tip_link=camera_link,
+                                          root_link=u'base_link')
+
+
+        tip_normal = Vector3Stamped()
+        tip_normal.header.frame_id = refills_finger
+        tip_normal.vector.y = 1
+        root_normal = Vector3Stamped()
+        root_normal.header.frame_id = u'map'
+        root_normal.vector.z = 1
+        zero_pose.align_planes(tip_link=refills_finger,
+                               tip_normal=tip_normal,
+                               root_link=u'base_link',
+                               root_normal=root_normal)
+        pre_place = {
+            u'iiwa_joint_1': 0,
+            u'iiwa_joint_2': -1.28,
+            u'iiwa_joint_3': 0,
+            u'iiwa_joint_4': 1.29,
+            u'iiwa_joint_5': 0,
+            u'iiwa_joint_6': -0.74,
+            u'iiwa_joint_7': -1.57,
+        }
+        zero_pose.send_and_check_joint_goal(pre_place)
+
+
+
+
+        box_goal = PoseStamped()
+        box_goal.header.frame_id = u'angle_adapter_base'
+        box_goal.pose.position.z = object_height / 2 + 0.01
+        box_goal.pose.position.y = 0.35
+        box_goal.pose.orientation = Quaternion(*quaternion_from_matrix([[1, 0, 0, 0],
+                                                                        [0, 0, -1, 0],
+                                                                        [0, 1, 0, 0],
+                                                                        [0, 0, 0, 1]]))
+
+        zero_pose.set_and_check_cart_goal(goal_pose=box_goal,
+                                          tip_link=u'refills_finger',
+                                          root_link=u'base_link')

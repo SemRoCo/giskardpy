@@ -23,7 +23,7 @@ class ConfigurationPlugin(GiskardBehavior):
         """
         super(ConfigurationPlugin, self).__init__(name)
         self.mjs = None
-        self.map_frame = self.get_god_map().safe_get_data(identifier.map_frame)
+        self.map_frame = self.get_god_map().get_data(identifier.map_frame)
         self.joint_state_topic = joint_state_topic
         self.lock = Queue(maxsize=1)
 
@@ -52,5 +52,5 @@ class ConfigurationPlugin(GiskardBehavior):
         base_pose = lookup_pose(self.map_frame, robot_frame)
         self.get_robot().base_pose = base_pose.pose
 
-        self.god_map.safe_set_data(identifier.joint_states, self.mjs)
+        self.god_map.set_data(identifier.joint_states, self.mjs)
         return Status.SUCCESS

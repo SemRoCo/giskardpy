@@ -2,8 +2,8 @@ import hashlib
 import warnings
 from collections import OrderedDict
 from itertools import chain
-from giskardpy.qp_problem_builder import QProblemBuilder, SoftConstraint
-from giskardpy.symengine_robot import Robot
+from giskardpy.qp_problem_builder import QProblemBuilder
+from giskardpy.robot import Robot
 
 
 class InstantaneousController(object):
@@ -30,17 +30,6 @@ class InstantaneousController(object):
         self.qp_problem_builder = None
 
 
-    def set_controlled_joints(self, joint_names):
-        """
-        :type joint_names: set
-        """
-        self.controlled_joints = joint_names
-        self.joint_to_symbols_str = OrderedDict((x, self.robot.get_joint_position_symbol(x)) for x in self.controlled_joints)
-        self.joint_constraints = OrderedDict(((self.robot.get_name(), k), self.robot._joint_constraints[k]) for k in
-                                             self.controlled_joints)
-        self.hard_constraints = OrderedDict(((self.robot.get_name(), k), self.robot._hard_constraints[k]) for k in
-                                            self.controlled_joints if k in self.robot._hard_constraints)
-
     def get_qpdata_key_map(self):
         b_keys = []
         weights_keys = []
@@ -63,23 +52,21 @@ class InstantaneousController(object):
             xdot_keys.append(key)
         return weights_keys, b_keys, bA_keys, xdot_keys
 
-    def update_soft_constraints(self, soft_constraints, free_symbols=None):
+    def update_constraints(self, joint_to_symbols_str, soft_constraints, joint_constraints, hard_constraints):
         """
         Triggers a recompile if the number of soft constraints has changed.
         :type soft_constraints: dict
         :type free_symbols: set
         """
-        if free_symbols is not None:
-            warnings.warn(u'use of free_symbols deprecated', DeprecationWarning)
         # TODO bug if soft constraints get replaced, actual amount does not change.
         last_number_of_constraints = len(self.soft_constraints)
-        if free_symbols is not None:
-            if self.free_symbols is None:
-                self.free_symbols = set()
-            self.free_symbols.update(free_symbols)
         self.soft_constraints.update(soft_constraints)
         if last_number_of_constraints != len(self.soft_constraints):
             self.qp_problem_builder = None
+
+        self.joint_to_symbols_str = joint_to_symbols_str
+        self.joint_constraints = joint_constraints
+        self.hard_constraints = hard_constraints
 
 
     def compile(self):
@@ -92,7 +79,6 @@ class InstantaneousController(object):
                                                   self.hard_constraints,
                                                   self.soft_constraints,
                                                   self.joint_to_symbols_str.values(),
-                                                  self.free_symbols,
                                                   path_to_functions)
 
     def get_cmd(self, substitutions, nWSR=None):

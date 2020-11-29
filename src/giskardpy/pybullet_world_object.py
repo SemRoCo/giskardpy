@@ -2,6 +2,7 @@ from collections import OrderedDict
 from multiprocessing import Lock
 
 import pybullet as p
+import giskardpy.pybullet_wrapper as pw
 from geometry_msgs.msg import Pose
 
 from giskardpy.pybullet_wrapper import load_urdf_string_into_bullet, JointInfo, pybullet_pose_to_msg, \
@@ -140,7 +141,7 @@ class PyBulletWorldObject(WorldObject):
         if self._pybullet_id is not None:
             p.removeBody(self._pybullet_id)
             self._pybullet_id = None
-            logging.loginfo(u'<-- removed {} from pybullet'.format(self.get_name()))
+            logging.logdebug(u'<-- removed {} from pybullet'.format(self.get_name()))
 
     def __del__(self):
         self.suicide()
@@ -166,4 +167,4 @@ class PyBulletWorldObject(WorldObject):
     def in_collision(self, link_a, link_b, distance):
         link_id_a = self.get_pybullet_link_id(link_a)
         link_id_b = self.get_pybullet_link_id(link_b)
-        return len(p.getClosestPoints(self._pybullet_id, self._pybullet_id, distance, link_id_a, link_id_b)) > 0
+        return len(pw.getClosestPoints(self._pybullet_id, self._pybullet_id, distance, link_id_a, link_id_b)) > 0

@@ -19,12 +19,12 @@ class KinSimPlugin(GiskardBehavior):
         super(KinSimPlugin, self).__init__(name)
 
     def initialise(self):
-        self.sample_period = self.get_god_map().safe_get_data(identifier.sample_period)
+        self.sample_period = self.get_god_map().get_data(identifier.sample_period)
         super(KinSimPlugin, self).initialise()
 
     def update(self):
-        motor_commands = self.get_god_map().safe_get_data(identifier.cmd)
-        current_js = self.get_god_map().safe_get_data(identifier.joint_states)
+        motor_commands = self.get_god_map().get_data(identifier.cmd)
+        current_js = self.get_god_map().get_data(identifier.joint_states)
         next_js = None
         if motor_commands:
             next_js = OrderedDict()
@@ -36,7 +36,8 @@ class KinSimPlugin(GiskardBehavior):
                 next_js[joint_name] = SingleJointState(sjs.name, sjs.position + cmd,
                                                             velocity=cmd/self.sample_period)
         if next_js is not None:
-            self.get_god_map().safe_set_data(identifier.joint_states, next_js)
+            self.get_god_map().set_data(identifier.joint_states, next_js)
         else:
-            self.get_god_map().safe_set_data(identifier.joint_states, current_js)
+            self.get_god_map().set_data(identifier.joint_states, current_js)
+        self.get_god_map().set_data(identifier.last_joint_states, current_js)
         return Status.RUNNING

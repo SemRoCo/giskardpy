@@ -2,13 +2,12 @@ import os
 import pickle
 
 import casadi as ca
+import errno
 import numpy as np
-from casadi import sign, cos, acos, sin, sqrt, atan2, qpsol
+from casadi import sign, cos, acos, sin, sqrt, atan2
 from numpy import pi
 
 from giskardpy import logging
-from giskardpy.exceptions import SymengineException
-from giskardpy.utils import create_path
 
 pathSeparator = '_'
 
@@ -16,83 +15,66 @@ pathSeparator = '_'
 VERY_SMALL_NUMBER = 1e-100
 SMALL_NUMBER = 1e-10
 
+
 def diag(*args):
     return ca.diag(Matrix(args))
+
 
 def Symbol(data):
     if isinstance(data, str) or isinstance(data, unicode):
         return ca.SX.sym(data)
     return ca.SX(data)
 
+
 def jacobian(expressions, symbols):
     return ca.jacobian(expressions, Matrix(symbols))
+
 
 def equivalent(expression1, expression2):
     return ca.is_equal(ca.simplify(expression1), ca.simplify(expression2), 1)
 
+
 def free_symbols(expression):
     return ca.symvar(expression)
+
 
 def is_matrix(expression):
     return hasattr(expression, 'shape') and expression.shape[0] * expression.shape[1] > 1
 
+
 def is_symbol(expression):
     return expression.shape[0] * expression.shape[1] == 1
 
+
 def compile_and_execute(f, params):
-    symbols = []
     input = []
-
-    # class next_symbol(object):
-    #     symbol_counter = 0
-    #
-    #     def __call__(self):
-    #         self.symbol_counter += 1
-    #         return ca.SX.sym('a{}'.format(self.symbol_counter))
-
-    # ns = next_symbol()
     symbol_params = []
+    symbol_params2 = []
+
     for i, param in enumerate(params):
         if isinstance(param, list):
             param = np.array(param)
         if isinstance(param, np.ndarray):
-            input.append(param)
-            symbol_params.append(ca.SX.sym('m', *param.shape))
-            # l2 = []
-            # for j in range(param.shape[0]):
-            #     l1 = []
-            #     if len(param.shape) == 2:
-            #         for k in range(param.shape[1]):
-            #             s = ns()
-            #             symbols.append(s)
-            #             input.append(param[j, k])
-            #             l1.append(s)
-            #         l2.append(l1)
-            #     else:
-            #         s = ns()
-            #         symbols.append(s)
-            #         input.append(param[j])
-            #         l2.append(s)
-            #
-            # p = Matrix(l2)
-            # symbol_params.append(p)
-        else:
-            # s = ns()
-            # symbols.append(s)
-            input.append(param)
-            symbol_params.append(ca.SX.sym('s'))
-    # try:
-    #     slow_f = Matrix([f(*symbol_params)])
-    # except TypeError:
-    #     slow_f = Matrix(f(*symbol_params))
+            symbol_param = ca.SX.sym('m', *param.shape)
+            if len(param.shape) == 2:
+                l = param.shape[0] * param.shape[1]
+            else:
+                l = param.shape[0]
 
-    fast_f = speed_up(f(*symbol_params), symbol_params)
-    # subs = {str(symbols[i]): input[i] for i in range(len(symbols))}
-    # slow_f.subs()
+            input.append(param.reshape((l, 1)))
+            symbol_params.append(symbol_param)
+            asdf = symbol_param.T.reshape((l, 1))
+            symbol_params2.extend(asdf[k] for k in range(l))
+        else:
+            input.append(np.array([param], ndmin=2))
+            symbol_param = ca.SX.sym('s')
+            symbol_params.append(symbol_param)
+            symbol_params2.append(symbol_param)
+    fast_f = speed_up(f(*symbol_params), symbol_params2)
+    input = np.concatenate(input).T[0]
     result = fast_f.call2(input)
     if result.shape[0] * result.shape[1] == 1:
         return result[0][0]
-    # if result.shape[0] > 1 and result.shape[1] > 1:
     elif result.shape[1] == 1:
         return result.T[0]
     elif result.shape[0] == 1:
@@ -131,173 +113,35 @@ def zeros(x, y):
 
 
 def Abs(x):
-    return ca.fabs(x)
-
-
-def diffable_abs(x):
     """
     :type x: Union[float, Symbol]
     :return: abs(x)
     :rtype: Union[float, Symbol]
     """
-    return Abs(x)
-
-
-def diffable_sign(x):
-    """
-    !Returns shit if x is very close to but not equal to zero!
-    if x > 0:
-        return 1
-    if x < 0:
-        return -1
-    if x == 0:
-        return 0
-
-    :type x: Union[float, Symbol]
-    :return: sign(x)
-    :rtype: Union[float, Symbol]
-    """
-    return ca.sign(x)
-
-
-# def diffable_heaviside(x):
-#     return ca.heaviside(x)
+    return ca.fabs(x)
 
 
 def Max(x, y):
     return ca.fmax(x, y)
 
 
-def diffable_max_fast(x, y):
+def Min(x, y):
     """
-    Can be compiled quickly.
     !gets very imprecise if inputs outside of [-1e7,1e7]!
     :type x: Union[float, Symbol]
     :type y: Union[float, Symbol]
-    :return: max(x, y)
+    :return: min(x, y)
     :rtype: Union[float, Symbol]
     """
-    return Max(x, y)
-
-
-def diffable_max(x, y):
-    """
-    !takes a long time to compile!
-    :type x: Union[float, Symbol]
-    :type y: Union[float, Symbol]
-    :return: max(x, y)
-    :rtype: Union[float, Symbol]
-    """
-    return Max(x, y)
-
-
-def Min(x, y):
     return ca.fmin(x, y)
 
 
-def diffable_min_fast(x, y):
-    """
-    Can be compiled quickly.
-    !gets very imprecise if inputs outside of [-1e7,1e7]!
-    :type x: Union[float, Symbol]
-    :type y: Union[float, Symbol]
-    :return: min(x, y)
-    :rtype: Union[float, Symbol]
-    """
-    return Min(x, y)
-
-
-def diffable_min(x, y):
-    """
-    !takes a long time to compile!
-    :type x: Union[float, Symbol]
-    :type y: Union[float, Symbol]
-    :return: min(x, y)
-    :rtype: Union[float, Symbol]
-    """
-    return Min(x, y)
-
-
-def diffable_if_greater_zero(condition, if_result, else_result):
-    """
-    !takes a long time to compile!
-    !Returns shit if condition is very close to but not equal to zero!
-    :type condition: Union[float, Symbol]
-    :type if_result: Union[float, Symbol]
-    :type else_result: Union[float, Symbol]
-    :return: if_result if condition > 0 else else_result
-    :rtype: Union[float, Symbol]
-    """
-    return if_greater_zero(condition, if_result, else_result)
-
-
-def diffable_if_greater(a, b, if_result, else_result):
-    """
-    !takes a long time to compile!
-    !Returns shit if condition is very close to but not equal to zero!
-    :type condition: Union[float, Symbol]
-    :type if_result: Union[float, Symbol]
-    :type else_result: Union[float, Symbol]
-    :return: if_result if a > b else else_result
-    :rtype: Union[float, Symbol]
-    """
-    return if_greater(a, b, if_result, else_result)
 
 def if_greater(a, b, if_result, else_result):
-    return ca.if_else(ca.gt(a,b), if_result, else_result)
+    return ca.if_else(ca.gt(a, b), if_result, else_result)
 
-def diffable_if_greater_eq_zero(condition, if_result, else_result):
-    """
-    !takes a long time to compile!
-    !Returns shit if condition is very close to but not equal to zero!
-    :type condition: Union[float, Symbol]
-    :type if_result: Union[float, Symbol]
-    :type else_result: Union[float, Symbol]
-    :return: if_result if condition >= 0 else else_result
-    :rtype: Union[float, Symbol]
-    """
-    return if_greater_eq_zero(condition, if_result, else_result)
-
-
-def diffable_if_greater_eq(a, b, if_result, else_result):
-    """
-    !takes a long time to compile!
-    !Returns shit if condition is very close to but not equal to zero!
-    :type condition: Union[float, Symbol]
-    :type if_result: Union[float, Symbol]
-    :type else_result: Union[float, Symbol]
-    :return: if_result if a >= b else else_result
-    :rtype: Union[float, Symbol]
-    """
-    return if_greater_eq(a, b, if_result, else_result)
-
-
-def diffable_if_eq_zero(condition, if_result, else_result):
-    """
-    A short expression which can be compiled quickly.
-    !Returns shit if condition is very close to but not equal to zero!
-    !Returns shit if if_result is outside of [-1e8,1e8]!
-    :type condition: Union[float, Symbol]
-    :type if_result: Union[float, Symbol]
-    :type else_result: Union[float, Symbol]
-    :return: if_result if condition == 0 else else_result
-    :rtype: Union[float, Symbol]
-    """
-    return if_eq_zero(condition, if_result, else_result)
-
-
-def diffable_if_eq(a, b, if_result, else_result):
-    """
-    A short expression which can be compiled quickly.
-    !Returns shit if condition is very close to but not equal to zero!
-    !Returns shit if if_result is outside of [-1e8,1e8]!
-    :type condition: Union[float, Symbol]
-    :type if_result: Union[float, Symbol]
-    :type else_result: Union[float, Symbol]
-    :return: if_result if a == b else else_result
-    :rtype: Union[float, Symbol]
-    """
-    return if_eq(a, b, if_result, else_result)
+def if_less(a, b, if_result, else_result):
+    return ca.if_else(ca.lt(a, b), if_result, else_result)
 
 
 def if_greater_zero(condition, if_result, else_result):
@@ -338,7 +182,7 @@ def if_greater_eq(a, b, if_result, else_result):
     :return: if_result if a >= b else else_result
     :rtype: Union[float, Symbol]
     """
-    return ca.if_else(ca.ge(a,b), if_result, else_result)
+    return ca.if_else(ca.ge(a, b), if_result, else_result)
 
 
 def if_less_eq(a, b, if_result, else_result):
@@ -352,7 +196,7 @@ def if_less_eq(a, b, if_result, else_result):
     :return: if_result if a <= b else else_result
     :rtype: Union[float, Symbol]
     """
-    return if_greater_eq(b, a, else_result, if_result)
+    return if_greater_eq(b, a, if_result, else_result)
 
 
 def if_eq_zero(condition, if_result, else_result):
@@ -368,11 +212,16 @@ def if_eq_zero(condition, if_result, else_result):
 
 
 def if_eq(a, b, if_result, else_result):
-    return ca.if_else(ca.eq(a,b), if_result, else_result)
+    return ca.if_else(ca.eq(a, b), if_result, else_result)
 
 
 def safe_compiled_function(f, file_name):
-    create_path(file_name)
+    if not os.path.exists(os.path.dirname(file_name)):
+        try:
+            os.makedirs(os.path.dirname(file_name))
+        except OSError as exc:  # Guard against race condition
+            if exc.errno != errno.EEXIST:
+                raise
     with open(file_name, 'w') as file:
         pickle.dump(f, file)
         logging.loginfo(u'saved {}'.format(file_name))
@@ -414,12 +263,16 @@ class CompiledFunction(object):
         self.f_eval()
         return self.out
 
+
 def speed_up(function, parameters, backend=u'clang'):
     str_params = [str(x) for x in parameters]
     try:
         f = ca.Function('f', [Matrix(parameters)], [ca.densify(function)])
     except:
+        # try:
         f = ca.Function('f', [Matrix(parameters)], ca.densify(function))
+        # except:
+        #     f = ca.Function('f', parameters, [ca.densify(function)])
     return CompiledFunction(str_params, f, 0, function.shape)
 
 
@@ -514,18 +367,18 @@ def rotation_matrix_from_rpy(roll, pitch, yaw):
     # TODO don't split this into 3 matrices
 
     rx = Matrix([[1, 0, 0, 0],
-                [0, ca.cos(roll), -ca.sin(roll), 0],
-                [0, ca.sin(roll), ca.cos(roll), 0],
-                [0, 0, 0, 1]])
+                 [0, ca.cos(roll), -ca.sin(roll), 0],
+                 [0, ca.sin(roll), ca.cos(roll), 0],
+                 [0, 0, 0, 1]])
     ry = Matrix([[ca.cos(pitch), 0, ca.sin(pitch), 0],
-                [0, 1, 0, 0],
-                [-ca.sin(pitch), 0, ca.cos(pitch), 0],
-                [0, 0, 0, 1]])
+                 [0, 1, 0, 0],
+                 [-ca.sin(pitch), 0, ca.cos(pitch), 0],
+                 [0, 0, 0, 1]])
     rz = Matrix([[ca.cos(yaw), -ca.sin(yaw), 0, 0],
-                [ca.sin(yaw), ca.cos(yaw), 0, 0],
-                [0, 0, 1, 0],
-                [0, 0, 0, 1]])
-    return dot(rz,ry,rx)
+                 [ca.sin(yaw), ca.cos(yaw), 0, 0],
+                 [0, 0, 1, 0],
+                 [0, 0, 0, 1]])
+    return dot(rz, ry, rx)
 
 
 def rotation_matrix_from_axis_angle(axis, angle):
@@ -551,9 +404,9 @@ def rotation_matrix_from_axis_angle(axis, angle):
     m_vt_0_2 = m_vt_0 * axis[2]
     m_vt_1_2 = m_vt_1 * axis[2]
     return Matrix([[ct + m_vt_0 * axis[0], -m_st_2 + m_vt_0_1, m_st_1 + m_vt_0_2, 0],
-                  [m_st_2 + m_vt_0_1, ct + m_vt_1 * axis[1], -m_st_0 + m_vt_1_2, 0],
-                  [-m_st_1 + m_vt_0_2, m_st_0 + m_vt_1_2, ct + m_vt_2 * axis[2], 0],
-                  [0, 0, 0, 1]])
+                   [m_st_2 + m_vt_0_1, ct + m_vt_1 * axis[1], -m_st_0 + m_vt_1_2, 0],
+                   [-m_st_1 + m_vt_0_2, m_st_0 + m_vt_1_2, ct + m_vt_2 * axis[2], 0],
+                   [0, 0, 0, 1]])
 
 
 def rotation_matrix_from_quaternion(x, y, z, w):
@@ -572,9 +425,9 @@ def rotation_matrix_from_quaternion(x, y, z, w):
     z2 = z * z
     w2 = w * w
     return Matrix([[w2 + x2 - y2 - z2, 2 * x * y - 2 * w * z, 2 * x * z + 2 * w * y, 0],
-                  [2 * x * y + 2 * w * z, w2 - x2 + y2 - z2, 2 * y * z - 2 * w * x, 0],
-                  [2 * x * z - 2 * w * y, 2 * y * z + 2 * w * x, w2 - x2 - y2 + z2, 0],
-                  [0, 0, 0, 1]])
+                   [2 * x * y + 2 * w * z, w2 - x2 + y2 - z2, 2 * y * z - 2 * w * x, 0],
+                   [2 * x * z - 2 * w * y, 2 * y * z + 2 * w * x, w2 - x2 - y2 + z2, 0],
+                   [0, 0, 0, 1]])
 
 
 def frame_axis_angle(x, y, z, axis, angle):
@@ -668,10 +521,11 @@ def rotation_of(frame):
     :return: 4x4 Matrix; sets the translation part of a frame to 0
     :rtype: Matrix
     """
-    frame[0,3] = 0
-    frame[1,3] = 0
-    frame[2,3] = 0
-    return frame
+    r = eye(4)
+    for i in range(3):
+        for j in range(3):
+            r[i, j] = frame[i, j]
+    return r
 
 
 def trace(matrix):
@@ -692,13 +546,26 @@ def rotation_distance(a_R_b, a_R_c):
     :rtype: Union[float, Symbol]
     """
     difference = dot(a_R_b.T, a_R_c)
+    # return axis_angle_from_matrix(difference)[1]
     angle = (trace(difference[:3, :3]) - 1) / 2
     angle = Min(angle, 1)
     angle = Max(angle, -1)
     return acos(angle)
 
+def asdf(a_R_b, a_R_c):
+    """
+    :param a_R_b: 4x4 or 3x3 Matrix
+    :type a_R_b: Matrix
+    :param a_R_c: 4x4 or 3x3 Matrix
+    :type a_R_c: Matrix
+    :return: angle of axis angle representation of b_R_c
+    :rtype: Union[float, Symbol]
+    """
+    difference = dot(a_R_b.T, a_R_c)
+    return axis_angle_from_matrix(difference)[0]
 
-def diffable_axis_angle_from_matrix(rotation_matrix):
+
+def axis_angle_from_matrix(rotation_matrix):
     """
     MAKE SURE MATRIX IS NORMALIZED
     :param rotation_matrix: 4x4 or 3x3 Matrix
@@ -706,68 +573,22 @@ def diffable_axis_angle_from_matrix(rotation_matrix):
     :return: 3x1 Matrix, angle
     :rtype: (Matrix, Union[float, Symbol])
     """
-    # TODO nan if angle 0
-    # TODO buggy when angle == pi
+    q = quaternion_from_matrix(rotation_matrix)
+    return axis_angle_from_quaternion(q[0], q[1], q[2], q[3])
     # TODO use 'if' to make angle always positive?
     rm = rotation_matrix
-    angle = (trace(rm[:3, :3]) - 1) / 2
-    angle = acos(angle)
+    cos_angle = (trace(rm[:3, :3]) - 1) / 2
+    cos_angle = Min(cos_angle, 1)
+    cos_angle = Max(cos_angle, -1)
+    angle = acos(cos_angle)
     x = (rm[2, 1] - rm[1, 2])
     y = (rm[0, 2] - rm[2, 0])
     z = (rm[1, 0] - rm[0, 1])
     n = sqrt(x * x + y * y + z * z)
 
-    axis = Matrix([x / n, y / n, z / n])
-    return axis, angle
-
-
-def diffable_axis_angle_from_matrix_stable(rotation_matrix):
-    """
-    :param rotation_matrix: 4x4 or 3x3 Matrix
-    :type rotation_matrix: Matrix
-    :return: 3x1 Matrix, angle
-    :rtype: (Matrix, Union[float, Symbol])
-    """
-    # TODO buggy when angle == pi
-    rm = rotation_matrix
-    angle = (trace(rm[:3, :3]) - 1) / 2
-    angle = diffable_min_fast(angle, 1)
-    angle = diffable_max_fast(angle, -1)
-    angle = acos(angle)
-    x = (rm[2, 1] - rm[1, 2])
-    y = (rm[0, 2] - rm[2, 0])
-    z = (rm[1, 0] - rm[0, 1])
-    n = sqrt(x * x + y * y + z * z)
-    m = diffable_if_eq_zero(n, 1, n)
-    axis = Matrix([diffable_if_eq_zero(n, 0, x / m),
-                   diffable_if_eq_zero(n, 0, y / m),
-                   diffable_if_eq_zero(n, 1, z / m)])
-    return axis, angle
-
-
-def axis_angle_from_matrix(rotation_matrix):
-    """
-    :param rotation_matrix: 4x4 or 3x3 Matrix
-    :type rotation_matrix: Matrix
-    :return: 3x1 Matrix, angle
-    :rtype: (Matrix, Union[float, Symbol])
-    """
-    rm = rotation_matrix
-    angle = (trace(rm[:3, :3]) - 1) / 2
-    angle = Min(angle, 1)
-    angle = Max(angle, -1)
-    angle = acos(angle)
-    x = (rm[2, 1] - rm[1, 2])
-    y = (rm[0, 2] - rm[2, 0])
-    z = (rm[1, 0] - rm[0, 1])
-    n = sqrt(x * x + y * y + z * z)
-    m = if_eq_zero(n, 1, n)
-    axis = Matrix([if_eq_zero(n, 0, x / m),
-                   if_eq_zero(n, 0, y / m),
-                   if_eq_zero(n, 1, z / m)])
-    sign = if_eq_zero(angle, 1, diffable_sign(angle))
-    axis *= sign
-    angle = sign * angle
+    axis = Matrix([if_eq(Abs(cos_angle), 1, 0, x / n),
+                   if_eq(Abs(cos_angle), 1, 0, y / n),
+                   if_eq(Abs(cos_angle), 1, 1, z / n)])
     return axis, angle
 
 
@@ -814,8 +635,8 @@ def axis_angle_from_rpy(roll, pitch, yaw):
     :return: 3x1 Matrix, angle
     :rtype: (Matrix, Union[float, Symbol])
     """
-    # TODO maybe go over quaternion instead of matrix
-    return diffable_axis_angle_from_matrix(rotation_matrix_from_rpy(roll, pitch, yaw))
+    q = quaternion_from_rpy(roll, pitch, yaw)
+    return axis_angle_from_quaternion(q[0], q[1], q[2], q[3])
 
 
 _EPS = np.finfo(float).eps * 4.0
@@ -835,13 +656,13 @@ def rpy_from_matrix(rotation_matrix):
 
     cy = sqrt(rotation_matrix[i, i] * rotation_matrix[i, i] + rotation_matrix[j, i] * rotation_matrix[j, i])
     if0 = cy - _EPS
-    ax = diffable_if_greater_zero(if0,
+    ax = if_greater_zero(if0,
                                   atan2(rotation_matrix[k, j], rotation_matrix[k, k]),
                                   atan2(-rotation_matrix[j, k], rotation_matrix[j, j]))
-    ay = diffable_if_greater_zero(if0,
+    ay = if_greater_zero(if0,
                                   atan2(-rotation_matrix[k, i], cy),
                                   atan2(-rotation_matrix[k, i], cy))
-    az = diffable_if_greater_zero(if0,
+    az = if_greater_zero(if0,
                                   atan2(rotation_matrix[j, i], rotation_matrix[i, i]),
                                   0)
     return ax, ay, az
@@ -887,8 +708,6 @@ def quaternion_from_matrix(matrix):
     :return: 4x1 Matrix
     :rtype: Matrix
     """
-    # return quaternion_from_axis_angle(*diffable_axis_angle_from_matrix_stable(matrix))
-    # return quaternion_from_rpy(*rpy_from_matrix(matrix))
     q = Matrix([0, 0, 0, 0])
     if isinstance(matrix, np.ndarray):
         M = Matrix(matrix.tolist())
@@ -900,43 +719,43 @@ def quaternion_from_matrix(matrix):
 
     if1 = M[1, 1] - M[0, 0]
 
-    m_i_i = diffable_if_greater_zero(if1, M[1, 1], M[0, 0])
-    m_i_j = diffable_if_greater_zero(if1, M[1, 2], M[0, 1])
-    m_i_k = diffable_if_greater_zero(if1, M[1, 0], M[0, 2])
+    m_i_i = if_greater_zero(if1, M[1, 1], M[0, 0])
+    m_i_j = if_greater_zero(if1, M[1, 2], M[0, 1])
+    m_i_k = if_greater_zero(if1, M[1, 0], M[0, 2])
 
-    m_j_i = diffable_if_greater_zero(if1, M[2, 1], M[1, 0])
-    m_j_j = diffable_if_greater_zero(if1, M[2, 2], M[1, 1])
-    m_j_k = diffable_if_greater_zero(if1, M[2, 0], M[1, 2])
+    m_j_i = if_greater_zero(if1, M[2, 1], M[1, 0])
+    m_j_j = if_greater_zero(if1, M[2, 2], M[1, 1])
+    m_j_k = if_greater_zero(if1, M[2, 0], M[1, 2])
 
-    m_k_i = diffable_if_greater_zero(if1, M[0, 1], M[2, 0])
-    m_k_j = diffable_if_greater_zero(if1, M[0, 2], M[2, 1])
-    m_k_k = diffable_if_greater_zero(if1, M[0, 0], M[2, 2])
+    m_k_i = if_greater_zero(if1, M[0, 1], M[2, 0])
+    m_k_j = if_greater_zero(if1, M[0, 2], M[2, 1])
+    m_k_k = if_greater_zero(if1, M[0, 0], M[2, 2])
 
     if2 = M[2, 2] - m_i_i
 
-    m_i_i = diffable_if_greater_zero(if2, M[2, 2], m_i_i)
-    m_i_j = diffable_if_greater_zero(if2, M[2, 0], m_i_j)
-    m_i_k = diffable_if_greater_zero(if2, M[2, 1], m_i_k)
+    m_i_i = if_greater_zero(if2, M[2, 2], m_i_i)
+    m_i_j = if_greater_zero(if2, M[2, 0], m_i_j)
+    m_i_k = if_greater_zero(if2, M[2, 1], m_i_k)
 
-    m_j_i = diffable_if_greater_zero(if2, M[0, 2], m_j_i)
-    m_j_j = diffable_if_greater_zero(if2, M[0, 0], m_j_j)
-    m_j_k = diffable_if_greater_zero(if2, M[0, 1], m_j_k)
+    m_j_i = if_greater_zero(if2, M[0, 2], m_j_i)
+    m_j_j = if_greater_zero(if2, M[0, 0], m_j_j)
+    m_j_k = if_greater_zero(if2, M[0, 1], m_j_k)
 
-    m_k_i = diffable_if_greater_zero(if2, M[1, 2], m_k_i)
-    m_k_j = diffable_if_greater_zero(if2, M[1, 0], m_k_j)
-    m_k_k = diffable_if_greater_zero(if2, M[1, 1], m_k_k)
+    m_k_i = if_greater_zero(if2, M[1, 2], m_k_i)
+    m_k_j = if_greater_zero(if2, M[1, 0], m_k_j)
+    m_k_k = if_greater_zero(if2, M[1, 1], m_k_k)
 
-    t = diffable_if_greater_zero(if0, t, m_i_i - (m_j_j + m_k_k) + M[3, 3])
-    q[0] = diffable_if_greater_zero(if0, M[2, 1] - M[1, 2],
-                                    diffable_if_greater_zero(if2, m_i_j + m_j_i,
-                                                             diffable_if_greater_zero(if1, m_k_i + m_i_k, t)))
-    q[1] = diffable_if_greater_zero(if0, M[0, 2] - M[2, 0],
-                                    diffable_if_greater_zero(if2, m_k_i + m_i_k,
-                                                             diffable_if_greater_zero(if1, t, m_i_j + m_j_i)))
-    q[2] = diffable_if_greater_zero(if0, M[1, 0] - M[0, 1],
-                                    diffable_if_greater_zero(if2, t, diffable_if_greater_zero(if1, m_i_j + m_j_i,
+    t = if_greater_zero(if0, t, m_i_i - (m_j_j + m_k_k) + M[3, 3])
+    q[0] = if_greater_zero(if0, M[2, 1] - M[1, 2],
+                                    if_greater_zero(if2, m_i_j + m_j_i,
+                                                             if_greater_zero(if1, m_k_i + m_i_k, t)))
+    q[1] = if_greater_zero(if0, M[0, 2] - M[2, 0],
+                                    if_greater_zero(if2, m_k_i + m_i_k,
+                                                             if_greater_zero(if1, t, m_i_j + m_j_i)))
+    q[2] = if_greater_zero(if0, M[1, 0] - M[0, 1],
+                                    if_greater_zero(if2, t, if_greater_zero(if1, m_i_j + m_j_i,
                                                                                               m_k_i + m_i_k)))
-    q[3] = diffable_if_greater_zero(if0, t, m_k_j - m_j_k)
+    q[3] = if_greater_zero(if0, t, m_k_j - m_j_k)
 
     q *= 0.5 / sqrt(t * M[3, 3])
     return q
@@ -989,13 +808,14 @@ def quaternion_diff(q0, q1):
 
 def cosine_distance(v0, v1):
     """
+    cosine distance ranging from 0 to 2
     :param v0: nx1 Matrix
     :type v0: Matrix
     :param v1: nx1 Matrix
     :type v1: Matrix
     :rtype: Union[float, Symbol]
     """
-    return 1 - (dot(v0.T, v1))[0]
+    return 1 - ((dot(v0.T, v1))[0] / (norm(v0)*norm(v1)))
 
 
 def euclidean_distance(v1, v2):
@@ -1032,7 +852,7 @@ def normalize_angle(angle):
     It takes and returns radians.
     """
     a = normalize_angle_positive(angle)
-    return diffable_if_greater(a, pi, a - 2.0 * pi, a)
+    return if_greater(a, pi, a - 2.0 * pi, a)
     # return Piecewise([, a > pi], [a, True])
 
 
@@ -1047,9 +867,9 @@ def shortest_angular_distance(from_angle, to_angle):
     return normalize_angle(to_angle - from_angle)
 
 
-def diffable_slerp(q1, q2, t):
+def quaternion_slerp(q1, q2, t):
     """
-    !takes a long time to compile!
+    spherical linear interpolation that takes into account that q == -q
     :param q1: 4x1 Matrix
     :type q1: Matrix
     :param q2: 4x1 Matrix
@@ -1062,72 +882,40 @@ def diffable_slerp(q1, q2, t):
     cos_half_theta = dot(q1.T, q2)
 
     if0 = -cos_half_theta
-    q2 = diffable_if_greater_zero(if0, -q2, q2)
-    cos_half_theta = diffable_if_greater_zero(if0, -cos_half_theta, cos_half_theta)
+    q2 = if_greater_zero(if0, -q2, q2)
+    cos_half_theta = if_greater_zero(if0, -cos_half_theta, cos_half_theta)
 
-    if1 = diffable_abs(cos_half_theta) - 1.0
+    if1 = Abs(cos_half_theta) - 1.0
 
     # enforce acos(x) with -1 < x < 1
-    cos_half_theta = diffable_min_fast(1, cos_half_theta)
-    cos_half_theta = diffable_max_fast(-1, cos_half_theta)
+    cos_half_theta = Min(1, cos_half_theta)
+    cos_half_theta = Max(-1, cos_half_theta)
 
     half_theta = acos(cos_half_theta)
 
     sin_half_theta = sqrt(1.0 - cos_half_theta * cos_half_theta)
-    if2 = 0.001 - diffable_abs(sin_half_theta)
+    if2 = 0.001 - Abs(sin_half_theta)
 
     ratio_a = save_division(sin((1.0 - t) * half_theta), sin_half_theta)
     ratio_b = save_division(sin(t * half_theta), sin_half_theta)
-    return diffable_if_greater_eq_zero(if1,
-                                       Matrix(q1),
-                                       diffable_if_greater_zero(if2,
-                                                                0.5 * q1 + 0.5 * q2,
-                                                                ratio_a * q1 + ratio_b * q2))
+    return if_greater_eq_zero(if1,
+                              Matrix(q1),
+                              if_greater_zero(if2,
+                                              0.5 * q1 + 0.5 * q2,
+                                              ratio_a * q1 + ratio_b * q2))
+
+def slerp(v1, v2, t):
+    """
+    spherical linear interpolation
+    :param v1: any vector
+    :param v2: vector of same length as v1
+    :param t: value between 0 and 1. 0 is v1 and 1 is v2
+    :return:
+    """
+    angle = acos(dot(v1.T, v2)[0])
+    return (sin((1-t)*angle)/sin(angle))*v1 + (sin(t*angle)/sin(angle))*v2
 
 
-# def piecewise_matrix(*piecewise_vector):
-#     # TODO testme
-#     # FIXME support non 2d matrices?
-#     dimensions = piecewise_vector[0][0].shape
-#     for m, condition in piecewise_vector:
-#         assert m.shape == dimensions
-#     matrix = zeros(*dimensions)
-#     for x in range(dimensions[0]):
-#         for y in range(dimensions[1]):
-#             piecewise_entry = []
-#             for m, condition in piecewise_vector:
-#                 piecewise_entry.append([m[x, y], condition])
-#             matrix[x, y] = Piecewise(*piecewise_entry)
-#     return matrix
-
-
-# def slerp(q1, q2, t):
-#     """
-#     !takes a long time to compile!
-#     :param q1: 4x1 Matrix
-#     :type q1: Matrix
-#     :param q2: 4x1 Matrix
-#     :type q2: Matrix
-#     :param t: float, 0-1
-#     :type t:  Union[float, Symbol]
-#     :return: 4x1 Matrix; Return spherical linear interpolation between two quaternions.
-#     :rtype: Matrix
-#     """
-#     #FIXME
-#     d = dot(q1, q2)
-#     d_abs = Abs(d)
-#     q1_2 = piecewise_matrix([-q1, d < 0.0], [q1, True])
-#     angle = acos(d_abs)
-#
-#     isin = 1.0 / sin(angle)
-#     q1_3 = q1_2 * sin((1.0 - t) * angle) * isin
-#     q2_2 = q2 * sin(t * angle) * isin
-#     q1_3 += q2_2
-#     return piecewise_matrix([q1, t == 0.0],
-#                             [q2, t == 1.0],
-#                             [q1, Abs(d_abs - 1.0) < _EPS],
-#                             [q1_2, Abs(angle) < _EPS],
-#                             [q1_3, True])
 
 def to_numpy(matrix):
     return np.array(matrix.tolist()).astype(float).reshape(matrix.shape)
@@ -1135,7 +923,7 @@ def to_numpy(matrix):
 
 def save_division(nominator, denominator, if_nan=0):
     save_denominator = if_eq_zero(denominator, 1, denominator)
-    return nominator * if_eq_zero(denominator, if_nan, 1 / save_denominator)
+    return nominator * if_eq_zero(denominator, if_nan, 1. / save_denominator)
 
 
 def entrywise_product(matrix1, matrix2):
@@ -1150,3 +938,52 @@ def entrywise_product(matrix1, matrix2):
         for j in range(matrix1.shape[1]):
             result[i, j] = matrix1[i, j] * matrix2[i, j]
     return result
+
+
+def floor(x):
+    return ca.floor(x)
+
+
+def ceil(x):
+    return ca.ceil(x)
+
+
+def Sum(matrix):
+    """
+    the equivalent to np.sum(matrix)
+    """
+    return ca.sum1(ca.sum2(matrix))
+
+
+def sum_row(matrix):
+    """
+    the equivalent to np.sum(matrix, axis=0)
+    """
+    return ca.sum1(matrix)
+
+
+def sum_column(matrix):
+    """
+    the equivalent to np.sum(matrix, axis=1)
+    """
+    return ca.sum2(matrix)
+
+
+def distance_point_to_line_segment(point, line_start, line_end):
+    line_vec = line_end - line_start
+    pnt_vec = point - line_start
+    line_len = norm(line_vec)
+    line_unitvec = line_vec / line_len
+    pnt_vec_scaled = pnt_vec / line_len
+    t = dot(line_unitvec.T, pnt_vec_scaled)[0]
+    t = Min(Max(t, 0.0), 1.0)
+    nearest = line_vec * t
+    dist = norm(nearest - pnt_vec)
+    nearest = nearest + line_start
+    return dist, nearest
+
+
+def angle_between_vector(v1, v2):
+    v1 = v1[:3]
+    v2 = v2[:3]
+    return acos(dot(v1.T, v2) / (norm(v1) * norm(v2)))

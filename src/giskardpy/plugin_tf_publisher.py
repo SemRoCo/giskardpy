@@ -18,7 +18,8 @@ class TFPlugin(GiskardBehavior):
     def __init__(self, name):
         super(TFPlugin, self).__init__(name)
         self.original_links = set(self.get_robot().get_link_names())
-        self.tf_pub = rospy.Publisher(u'/tf', TFMessage, queue_size=10)
+        tf_topic = self.get_god_map().get_data(identifier.tf_topic)
+        self.tf_pub = rospy.Publisher(tf_topic, TFMessage, queue_size=10)
 
     def make_transform(self, parent_frame, child_frame, pose):
         tf = TransformStamped()
@@ -36,7 +37,7 @@ class TFPlugin(GiskardBehavior):
         try:
             with self.get_god_map() as god_map:
                 tf_msg = TFMessage()
-                if god_map.unsafe_get_data(identifier.publish_attached):
+                if god_map.unsafe_get_data(identifier.publish_attached_objects):
                     robot_links = set(self.unsafe_get_robot().get_link_names())
                     attached_links = robot_links - self.original_links
                     if attached_links:
@@ -48,8 +49,9 @@ class TFPlugin(GiskardBehavior):
                             tf_msg.transforms.append(tf)
                 if god_map.unsafe_get_data(identifier.publish_world_objects):
                     world_objects = self.unsafe_get_world().get_objects()
+                    map_frame = god_map.unsafe_get_data(identifier.map_frame)
                     for object in world_objects.values():
-                        tf = self.make_transform(u'map', object.get_name(), object.base_pose)
+                        tf = self.make_transform(map_frame, object.get_name(), object.base_pose)
                         tf_msg.transforms.append(tf)
                 self.tf_pub.publish(tf_msg)
 

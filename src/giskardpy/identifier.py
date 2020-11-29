@@ -101,8 +101,9 @@ frequency_range = plugins + [u'WiggleCancel', u'frequency_range']
 joint_convergence_threshold = plugins + [u'GoalReached', u'joint_convergence_threshold']
 GoalReached_window_size = plugins + [u'GoalReached', u'window_size']
 
-publish_attached = plugins + [u'tf_publisher', u'publish_attached']
+publish_attached_objects = plugins + [u'tf_publisher', u'publish_attached_objects']
 publish_world_objects = plugins + [u'tf_publisher', u'publish_world_objects']
+tf_topic = plugins + [u'tf_publisher', u'tf_topic']
 
 # reachability check
 reachability_check = rosparam + [u'reachability_check']

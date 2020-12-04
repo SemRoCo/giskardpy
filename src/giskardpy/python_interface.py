@@ -11,6 +11,7 @@ from giskard_msgs.srv import UpdateWorld, UpdateWorldRequest, UpdateWorldRespons
 from sensor_msgs.msg import JointState
 from shape_msgs.msg import SolidPrimitive
 from visualization_msgs.msg import MarkerArray
+from tf.transformations import quaternion_multiply
 
 from giskardpy.constraints import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA
 from giskardpy.urdf_object import URDFObject
@@ -50,7 +51,17 @@ class GiskardWrapper(object):
         """
         return self.robot_urdf.get_root()
 
-    def set_cart_goal(self, goal_pose, tip_link, root_link, max_linear_velocity=None, max_angular_velocity=None, weight=None):
+    def multiply_rotation_quaternions(self, static_quaternions, grasp_offset):
+        """
+        Adds the rotation-quaternion offset to an existing quaternion
+        :param static_quaternions: The initial quaternion
+        :param grasp_offset: The offset depending on the grasp/place mode.
+        :return:
+        """
+        product = quaternion_multiply(static_quaternions, grasp_offset)
+        return Quaternion(product[0], product[1], product[2], product[3])
+
+    def set_cart_goal(self, root_link, tip_link, goal_pose, max_linear_velocity=None, max_angular_velocity=None, weight=None):
         """
         This goal will use the kinematic chain between root and tip link to move tip link into the goal pose
         :param root_link: name of the root link of the kin chain

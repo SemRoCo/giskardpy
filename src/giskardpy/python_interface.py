@@ -11,6 +11,7 @@ from giskard_msgs.srv import UpdateWorld, UpdateWorldRequest, UpdateWorldRespons
 from sensor_msgs.msg import JointState
 from shape_msgs.msg import SolidPrimitive
 from visualization_msgs.msg import MarkerArray
+from tf.transformations import quaternion_multiply
 
 from giskardpy.constraints import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA
 from giskardpy.urdf_object import URDFObject
@@ -49,6 +50,16 @@ class GiskardWrapper(object):
         :rtype: str
         """
         return self.robot_urdf.get_root()
+
+    def multiply_rotation_quaternions(self, static_quaternions, grasp_offset):
+        """
+        Adds the rotation-quaternion offset to an existing quaternion
+        :param static_quaternions: The initial quaternion
+        :param grasp_offset: The offset depending on the grasp/place mode.
+        :return:
+        """
+        product = quaternion_multiply(static_quaternions, grasp_offset)
+        return Quaternion(product[0], product[1], product[2], product[3])
 
     def set_cart_goal(self, root_link, tip_link, goal_pose, max_linear_velocity=None, max_angular_velocity=None, weight=None):
         """

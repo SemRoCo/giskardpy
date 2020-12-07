@@ -64,6 +64,9 @@ def initialize_god_map():
     god_map.set_data(identifier.nWSR, nWSR)
 
     pbw.start_pybullet(god_map.get_data(identifier.gui))
+
+    pbw.load_colldetPlugin()
+    
     while not rospy.is_shutdown():
         try:
             controlled_joints = rospy.wait_for_message(u'/whole_body_controller/state',

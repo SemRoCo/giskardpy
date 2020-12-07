@@ -10,6 +10,7 @@ from giskardpy.pybullet_wrapper import load_urdf_string_into_bullet, JointInfo, 
 from giskardpy.world_object import WorldObject
 from giskardpy import logging
 
+debugDistanceLength = 0
 
 class PyBulletWorldObject(WorldObject):
     """
@@ -119,6 +120,8 @@ class PyBulletWorldObject(WorldObject):
                 self.mimic_cb[self.get_mimiced_joint_name(joint_info.joint_name)] = joint_name, apply_mimic(offset, multiplier)
         self.link_name_to_id[self.get_root()] = -1
         self.link_id_to_name[-1] = self.get_root()
+        print("synchronizing colldet")
+        pw.sync_colldetPlugin()
 
     def reinitialize(self):
         with self.lock:
@@ -167,4 +170,11 @@ class PyBulletWorldObject(WorldObject):
     def in_collision(self, link_a, link_b, distance):
         link_id_a = self.get_pybullet_link_id(link_a)
         link_id_b = self.get_pybullet_link_id(link_b)
+        if debugDistanceLength == 1:
+                contactLengthCD = len(pw.getClosestPointsCD(self._pybullet_id, self._pybullet_id, distance, link_id_a, link_id_b))
+                print("contactLengthCD", contactLengthCD)
+                contactLength = len(pw.getClosestPoints(self._pybullet_id, self._pybullet_id, distance, link_id_a, link_id_b))
+                print("contactLength", contactLength)
+                print("=====")
+        #return len(pw.getClosestPointsCD(self._pybullet_id, self._pybullet_id, distance, link_id_a, link_id_b)) > 0
         return len(pw.getClosestPoints(self._pybullet_id, self._pybullet_id, distance, link_id_a, link_id_b)) > 0

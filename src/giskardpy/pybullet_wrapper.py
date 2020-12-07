@@ -13,6 +13,18 @@ from giskardpy.exceptions import DuplicateNameException
 from giskardpy.urdf_object import URDFObject
 from giskardpy.utils import write_to_tmp, NullContextManager, suppress_stdout, resolve_ros_iris_in_urdf
 
+# colldet stuffs -- start
+# workaround as pybullet plugin can't return values
+from ctypes import Structure, c_float, c_int, c_void_p
+import ctypes
+import time
+
+# Get a handle to the sytem C library
+try:
+    libc = ctypes.CDLL("./libpybullet_colldetPlugin_gmake_x64_release.so")
+except OSError:
+    print("Unable to load the system C library")
+
 JointInfo = namedtuple(u'JointInfo', [u'joint_index', u'joint_name', u'joint_type', u'q_index', u'u_index', u'flags',
                                       u'joint_damping', u'joint_friction', u'joint_lower_limit', u'joint_upper_limit',
                                       u'joint_max_force', u'joint_max_velocity', u'link_name', u'joint_axis',
@@ -25,6 +37,7 @@ ContactInfo = namedtuple(u'ContactInfo', [u'contact_flag', u'body_unique_id_a', 
                                           u'lateralFriction2', u'lateralFrictionDir2'])
 
 render = True
+colldetPlugin_id = 0
 
 def random_string(size=6):
     """
@@ -90,6 +103,50 @@ def start_pybullet(gui):
     p.setGravity(0, 0, -9.8)
     return server_id
 
+def load_colldetPlugin():
+    print("load colldet")
+    global colldetPlugin_id
+    colldetPlugin_id = p.loadPlugin("./libpybullet_colldetPlugin_gmake_x64_release.so","_colldetPlugin")
+
+def sync_colldetPlugin():
+    # synchronize objects with bullet
+    p.executePluginCommand(colldetPlugin_id,"",[1])
+
+def getClosestPointsCD(objectA, objectB, distance=-1, linkA=-1, linkB=-1):
+    # call check function
+    if linkA == -1:
+        if linkB == -1:
+            # all A vs all B
+            p.executePluginCommand(colldetPlugin_id,"", [2, objectA, objectB], [distance])
+
+        else:
+            # all A vs link B
+            p.executePluginCommand(colldetPlugin_id,"", [3, objectA, objectB, linkB], [distance])
+
+    else:
+        if linkB == -1:
+            # link A vs all B
+            p.executePluginCommand(colldetPlugin_id,"", [4, objectA, objectB, linkA], [distance])
+
+        else:
+            p.executePluginCommand(colldetPlugin_id,"", [5, objectA, objectB, linkA, linkB], [distance])
+
+    wrappedColData = []
+
+    libc.getColDataSize.restype = ctypes.c_int
+    colDataSize = libc.getColDataSize()
+
+    if colDataSize > 0:
+        libc.getColDataArr.restype = ctypes.POINTER(ctypes.c_float * (colDataSize * 9))
+        colData = libc.getColDataArr().contents
+
+        for i in range(0, colDataSize * 9, 9):
+            wrappedColData.append( ContactInfo(contact_flag=0, body_unique_id_a=objectA, body_unique_id_b=objectB, link_index_a=int(colData[i+7]), link_index_b=int(colData[i+8]),
+            position_on_a=(colData[i+1], colData[i+2], colData[i+3]), position_on_b=(colData[i+4], colData[i+5], colData[i+6]),
+            contact_normal_on_b=(0.0, 0.0, 0.0), contact_distance=colData[i], normal_force=0.0, lateralFriction1=0.0, lateralFrictionDir1=(0.0, 0.0, 0.0), lateralFriction2=0.0,
+            lateralFrictionDir2=(0.0, 0.0, 0.0)) ) 
+
+    return wrappedColData
 
 def pybullet_pose_to_msg(pose):
     """

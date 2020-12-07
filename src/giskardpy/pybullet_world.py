@@ -68,8 +68,8 @@ class PyBulletWorld(World):
 
             robot_link_id = self.robot.get_pybullet_link_id(robot_link)
             if body_b == robot_name or link_b != CollisionEntry.ALL:
-                #contacts = [ContactInfo(*x) for x in p.getClosestPoints(self.robot.get_pybullet_id(), object_id, distance * 1.1, robot_link_id, link_b_id)]                               
-                contacts = pbw.getClosestPointsCD(self.robot.get_pybullet_id(), object_id, distance=distance * 1.1, linkA=robot_link_id, linkB=link_b_id)
+                contacts = [ContactInfo(*x) for x in p.getClosestPoints(self.robot.get_pybullet_id(), object_id, distance * 1.1, robot_link_id, link_b_id)]                               
+                #contacts = pbw.getClosestPointsCD(self.robot.get_pybullet_id(), object_id, distance=distance * 1.1, linkA=robot_link_id, linkB=link_b_id)
 
                 if debugDistanceSingle == 1:
                     contactsNoDistance = [ContactInfo(*x) for x in p.getClosestPoints(self.robot.get_pybullet_id(), object_id, 1000, robot_link_id, link_b_id)]
@@ -99,7 +99,8 @@ class PyBulletWorld(World):
                 global counter
                 counter += 1
                 if counter == 50:
-                    sys.exit()                                                                       robot_link_id)]
+                    sys.exit()                                                                      
+
             if len(contacts) > 0:
                 try:
                     body_b_object = self.get_object(body_b)

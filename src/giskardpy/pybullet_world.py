@@ -11,7 +11,13 @@ from giskardpy.pybullet_wrapper import ContactInfo
 from giskardpy.utils import resolve_ros_iris
 from giskardpy.world import World
 from giskardpy.world_object import WorldObject
+import giskardpy.pybullet_wrapper as pbw
+import sys
+import datetime
 
+debugDistanceSingle = 1
+debugDistanceBulk = 0
+counter = 0
 
 class PyBulletWorld(World):
     """
@@ -62,13 +68,38 @@ class PyBulletWorld(World):
 
             robot_link_id = self.robot.get_pybullet_link_id(robot_link)
             if body_b == robot_name or link_b != CollisionEntry.ALL:
-                contacts = [ContactInfo(*x) for x in p.getClosestPoints(self.robot.get_pybullet_id(), object_id,
-                                                                        distance * 1.1,
-                                                                        robot_link_id, link_b_id)]
+                #contacts = [ContactInfo(*x) for x in p.getClosestPoints(self.robot.get_pybullet_id(), object_id, distance * 1.1, robot_link_id, link_b_id)]                               
+                contacts = pbw.getClosestPointsCD(self.robot.get_pybullet_id(), object_id, distance=distance * 1.1, linkA=robot_link_id, linkB=link_b_id)
+
+                if debugDistanceSingle == 1:
+                    contactsNoDistance = [ContactInfo(*x) for x in p.getClosestPoints(self.robot.get_pybullet_id(), object_id, 1000, robot_link_id, link_b_id)]
+                    print('distance BULLET = ', contactsNoDistance[0].contact_distance)
+                    print('position A = ', contactsNoDistance[0].position_on_a)
+                    print('position B = ', contactsNoDistance[0].position_on_b)
+
+                    contactsCDNoDistance = pbw.getClosestPointsCD(self.robot.get_pybullet_id(), object_id, 1000, linkA=robot_link_id, linkB=link_b_id) 
+                    if (len(contactsCDNoDistance) > 0):
+                        print('distance COLLDET = ', contactsCDNoDistance[0].contact_distance)
+                        print('position A = ', contactsCDNoDistance[0].position_on_a)
+                        print('position B = ', contactsCDNoDistance[0].position_on_b)
+                    print("=====")
+
             else:
-                contacts = [ContactInfo(*x) for x in p.getClosestPoints(self.robot.get_pybullet_id(), object_id,
-                                                                        distance * 1.1,
-                                                                        robot_link_id)]
+                contacts = [ContactInfo(*x) for x in p.getClosestPoints(self.robot.get_pybullet_id(), object_id, distance * 1.1, robot_link_id)]
+ 
+               #contacts = pbw.getClosestPointsCD(self.robot.get_pybullet_id(), object_id, distance=distance * 1.1, linkA=robot_link_id)
+                if debugDistanceBulk == 1:
+                    print("Bulk Bullet", contacts)
+                    contactsCD = pbw.getClosestPointsCD(self.robot.get_pybullet_id(), object_id, distance=distance * 1.1, linkA=robot_link_id)
+                    for i in contactsCD:
+                        print("Bulk Colldet - distance", i.contact_distance)
+                        print("position A", i.position_on_a)
+                        print("position B", i.position_on_b)
+
+                global counter
+                counter += 1
+                if counter == 50:
+                    sys.exit()                                                                       robot_link_id)]
             if len(contacts) > 0:
                 try:
                     body_b_object = self.get_object(body_b)

@@ -55,21 +55,30 @@ class GiskardWrapper(object):
         """
         Adds the rotation-quaternion offset to an existing quaternion
         :param static_quaternions: The initial quaternion
+        :type Quaternion
         :param grasp_offset: The offset depending on the grasp/place mode.
+        :type Quaternion
         :return:
         """
         product = quaternion_multiply(static_quaternions, grasp_offset)
         return Quaternion(product[0], product[1], product[2], product[3])
 
-    def set_cart_goal(self, root_link, tip_link, goal_pose, max_linear_velocity=None, max_angular_velocity=None, weight=None):
+    def set_cart_goal(self, root_link, tip_link, goal_pose, goal, current_quaternion, offset_dict=None, max_linear_velocity=None, max_angular_velocity=None, weight=None):
         """
-        This goal will use the kinematic chain between root and tip link to move tip link into the goal pose
+        This goal will use the kinematic chain between root and tip link to move tip link into the goal pose. Adds an offset
+        depending on the goal.
         :param root_link: name of the root link of the kin chain
         :type root_link: str
         :param tip_link: name of the tip link of the kin chain
         :type tip_link: str
-        :param goal: the goal pose
-        :type goal: PoseStamped
+        :param goal_pose: the goal pose
+        :type goal_pose: PoseStamped
+        :param goal: the goal
+        :type goal: Goal
+        :param current_quaternion: the current quaternion
+        :type current_quaternion: Quaternion
+        :param offset_dict: The offset depending on the grasp/place type
+        :type offset_dict: Dict{goal, Quaternion}
         :param max_linear_velocity: m/s, default 0.1
         :type max_linear_velocity: float
         :param max_angular_velocity: rad/s, default 0.5
@@ -77,6 +86,15 @@ class GiskardWrapper(object):
         :param weight: default WEIGHT_ABOVE_CA
         :type weight: float
         """
+        offset = None
+        if offset_dict:
+            if goal.grasp_mode & (goal.grasp_mode != goal.FREE):
+                offset = offset_dict[goal.grasp_mode]
+            elif goal.place_mode & (goal.place_mode != goal.FREE):
+                offset = offset_dict[goal.place_mode]
+
+            goal_pose.pose.orientation = quaternion_multiply(current_quaternion, offset)
+
         self.set_translation_goal(root_link, tip_link, goal_pose, max_velocity=max_linear_velocity, weight=weight)
         self.set_rotation_goal(root_link, tip_link, goal_pose, max_velocity=max_angular_velocity, weight=weight)
 
@@ -476,6 +494,7 @@ class GiskardWrapper(object):
         goal = self._get_goal()
         goal.type = goal_type
         if wait:
+            print("GOAL", goal)
             self._client.send_goal_and_wait(goal)
             return self._client.get_result()
         else:

@@ -55,7 +55,9 @@ class GiskardWrapper(object):
         """
         Adds the rotation-quaternion offset to an existing quaternion
         :param static_quaternions: The initial quaternion
+        :type Quaternion
         :param grasp_offset: The offset depending on the grasp/place mode.
+        :type Quaternion
         :return:
         """
         product = quaternion_multiply(static_quaternions, grasp_offset)
@@ -63,7 +65,8 @@ class GiskardWrapper(object):
 
     def set_cart_goal(self, root_link, tip_link, goal_pose, max_linear_velocity=None, max_angular_velocity=None, weight=None):
         """
-        This goal will use the kinematic chain between root and tip link to move tip link into the goal pose
+        This goal will use the kinematic chain between root and tip link to move tip link into the goal pose. Adds an offset
+        depending on the goal.
         :param root_link: name of the root link of the kin chain
         :type root_link: str
         :param tip_link: name of the tip link of the kin chain
@@ -532,6 +535,7 @@ class GiskardWrapper(object):
         goal = self._get_goal()
         goal.type = goal_type
         if wait:
+            print("GOAL", goal)
             self._client.send_goal_and_wait(goal)
             return self._client.get_result()
         else:

@@ -535,7 +535,6 @@ class GiskardWrapper(object):
         goal = self._get_goal()
         goal.type = goal_type
         if wait:
-            print("GOAL", goal)
             self._client.send_goal_and_wait(goal)
             return self._client.get_result()
         else:

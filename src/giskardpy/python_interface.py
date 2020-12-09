@@ -88,12 +88,16 @@ class GiskardWrapper(object):
         """
         offset = None
         if offset_dict:
-            if goal.grasp_mode & (goal.grasp_mode != goal.FREE):
+            if hasattr(goal, "grasp_mode") and (goal.grasp_mode != goal.FREE):
                 offset = offset_dict[goal.grasp_mode]
-            elif goal.place_mode & (goal.place_mode != goal.FREE):
+            elif hasattr(goal, "place_mode") and (goal.place_mode != goal.FREE):
                 offset = offset_dict[goal.place_mode]
 
-            goal_pose.pose.orientation = quaternion_multiply(current_quaternion, offset)
+            orientation_quaternion = quaternion_multiply(current_quaternion, offset)
+            goal_pose.pose.orientation.x = orientation_quaternion[0]
+            goal_pose.pose.orientation.y = orientation_quaternion[1]
+            goal_pose.pose.orientation.z = orientation_quaternion[2]
+            goal_pose.pose.orientation.w = orientation_quaternion[3]
 
         self.set_translation_goal(root_link, tip_link, goal_pose, max_velocity=max_linear_velocity, weight=weight)
         self.set_rotation_goal(root_link, tip_link, goal_pose, max_velocity=max_angular_velocity, weight=weight)
@@ -494,7 +498,6 @@ class GiskardWrapper(object):
         goal = self._get_goal()
         goal.type = goal_type
         if wait:
-            print("GOAL", goal)
             self._client.send_goal_and_wait(goal)
             return self._client.get_result()
         else:

@@ -191,15 +191,23 @@ class JointTrajectorySplitter:
             now = rospy.Time.now()
             timeout = timeout - (now - start)
             if not finished_before_timeout:
-                logging.logwarn("Client took to long to finish action")
+                logging.logwarn("Client took to long to finish action; stopping {}".format(self.client_topics[i]))
                 self.success = False
-                self._as.set_aborted()
                 break
+            else:
+                logging.loginfo('Client {} succeeded'.format(self.client_topics[i]))
 
 
         if self.success:
             self._as.set_succeeded()
+        else:
+            self.cancel_all_goals()
+            self._as.set_aborted()
 
+    def cancel_all_goals(self):
+        logging.logwarn('Canceling all goals of connected controllers')
+        for client in self.action_clients:
+            client.cancel_all_goals()
 
     def feedback_cb(self, feedback):
         self._as.publish_feedback(feedback)

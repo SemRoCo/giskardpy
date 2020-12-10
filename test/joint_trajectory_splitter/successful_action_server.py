@@ -22,7 +22,8 @@ class SuccessfulActionServer(object):
 
     def execute_cb(self, goal):
         rospy.sleep(goal.trajectory.points[-1].time_from_start)
-        self._as.set_succeeded()
+        if self._as.is_active():
+            self._as.set_succeeded()
 
 
 if __name__ == '__main__':

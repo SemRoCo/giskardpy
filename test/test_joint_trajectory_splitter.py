@@ -278,16 +278,19 @@ def launch_failing_goal_test_nodes(request, init_ros, ros_launch, launch_state_p
     launch = roslaunch.scriptapi.ROSLaunch()
     launch.start()
 
-    node = roslaunch.core.Node('giskardpy', 'successful_action_server.py', name='successful_action_server1')
+    node = roslaunch.core.Node('giskardpy', 'successful_action_server.py', name='successful_action_server1',
+                               output='screen')
     process1 = launch.launch(node)
 
-    node = roslaunch.core.Node('giskardpy', 'failing_action_server.py', name='failing_action_server1')
+    node = roslaunch.core.Node('giskardpy', 'failing_action_server.py', name='failing_action_server1',
+                               output='screen')
     process2 = launch.launch(node)
 
     rospy.set_param('/joint_trajectory_splitter/state_topics', ['/state_publisher1', '/state_publisher1'])
     rospy.set_param('/joint_trajectory_splitter/client_topics',
                     ['/successful_action_server1', '/failing_action_server1'])
-    node = roslaunch.core.Node('giskardpy', 'joint_trajectory_splitter.py', name='joint_trajectory_splitter')
+    node = roslaunch.core.Node('giskardpy', 'joint_trajectory_splitter.py', name='joint_trajectory_splitter',
+                               output='screen')
     process3 = launch.launch(node)
 
     def fin():
@@ -398,3 +401,5 @@ def test_failing_goal(launch_failing_goal_test_nodes):
     assert status == actionlib.GoalStatus.ABORTED
     assert result.error_code == control_msgs.msg.FollowJointTrajectoryResult.GOAL_TOLERANCE_VIOLATED
     assert end - start < rospy.Duration(20) and end - start >= rospy.Duration(10)
+    assert launch_failing_goal_test_nodes.get_other_state(0) == actionlib.GoalStatus.PREEMPTED
+    assert launch_failing_goal_test_nodes.get_other_state(1) == actionlib.GoalStatus.ABORTED

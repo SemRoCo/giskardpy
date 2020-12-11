@@ -41,8 +41,8 @@
   </node>
 
   <node pkg="giskardpy" type="joint_trajectory_splitter.py" name="joint_trajectory_splitter" output="screen">
-    <rosparam param="state_topics">["/hsrb/arm_trajectory_controller/state", "/hsrb/omni_base_controller/state"]</rosparam>
-    <rosparam param="client_topics">["/hsrb/arm_trajectory_controller/follow_joint_trajectory", "/base_trajectory_action/follow_joint_trajectory"]</rosparam>
+    <rosparam param="state_topics">["/hsrb/arm_trajectory_controller/state", "/hsrb/omni_base_controller/state" , "/hsrb/head_trajectory_controller/state"]</rosparam>
+    <rosparam param="client_topics">["/hsrb/arm_trajectory_controller/follow_joint_trajectory", "/base_trajectory_action/follow_joint_trajectory", "/hsrb/head_trajectory_controller/follow_joint_trajectory"]</rosparam>
   </node>
 
   <!--#######################################################################-->
@@ -55,7 +55,7 @@
 
   <!--launch node that combines base joint states and body joint states on the /joint_state topic-->
   <!--#######################################################################-->
-  <node pkg="joint_state_publisher" type="joint_state_publisher" name="joint_state_publisher" output="screen" >
+  <node pkg="joint_state_publisher" type="joint_state_publisher" name="giskard_joint_state_publisher" output="screen" >
     <rosparam param="source_list">
     - /hsrb/joint_states
     - /hsrb_base/joint_states

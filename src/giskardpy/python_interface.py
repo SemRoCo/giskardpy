@@ -15,7 +15,7 @@ from tf.transformations import quaternion_multiply
 
 from giskardpy.constraints import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA
 from giskardpy.urdf_object import URDFObject
-from giskardpy.utils import position_dict_to_joint_states, make_world_body_box, make_world_body_cylinder
+from giskardpy.utils import position_dict_to_joint_states, make_world_body_box, make_world_body_cylinder, to_joint_state_position_dict
 from rospy_message_converter.message_converter import convert_ros_message_to_dictionary
 
 
@@ -50,6 +50,21 @@ class GiskardWrapper(object):
         :rtype: str
         """
         return self.robot_urdf.get_root()
+
+    def get_joint_states(self, topic=u'joint_states', timeout=1):
+        """
+        Returns a dictionary of all joints (key) and their position (value)
+        :param topic: joint_state topic
+        :param timeout: duration to wait for JointState msg
+        :return: OrderedDict[str, float]
+        """
+        try:
+            msg = rospy.wait_for_message(topic, JointState, rospy.Duration(timeout))
+            return to_joint_state_position_dict(msg)
+        except rospy.ROSException:
+            rospy.logwarn("get_joint_states: wait_for_message timeout")
+            return None
+
 
     def multiply_rotation_quaternions(self, static_quaternions, grasp_offset):
         """

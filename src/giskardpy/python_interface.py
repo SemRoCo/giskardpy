@@ -16,7 +16,7 @@ from tf.transformations import quaternion_multiply
 from giskardpy.constraints import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA
 from giskardpy.urdf_object import URDFObject
 from giskardpy.utils import position_dict_to_joint_states, make_world_body_box, make_world_body_cylinder, \
-    quaternion_multiply, calculate_way_point2D
+    quaternion_multiply, calculate_way_point2D, to_joint_state_position_dict
 from rospy_message_converter.message_converter import convert_ros_message_to_dictionary
 
 
@@ -51,6 +51,33 @@ class GiskardWrapper(object):
         :rtype: str
         """
         return self.robot_urdf.get_root()
+
+     def get_joint_states(self, topic=u'joint_states', timeout=1):
+        """
+        Returns a dictionary of all joints (key) and their position (value)
+        :param topic: joint_state topic
+        :param timeout: duration to wait for JointState msg
+        :return: OrderedDict[str, float]
+        """
+        try:
+            msg = rospy.wait_for_message(topic, JointState, rospy.Duration(timeout))
+            return to_joint_state_position_dict(msg)
+        except rospy.ROSException:
+            rospy.logwarn("get_joint_states: wait_for_message timeout")
+            return None
+
+
+    def multiply_rotation_quaternions(self, static_quaternions, grasp_offset):
+        """
+        Adds the rotation-quaternion offset to an existing quaternion
+        :param static_quaternions: The initial quaternion
+        :type Quaternion
+        :param grasp_offset: The offset depending on the grasp/place mode.
+        :type Quaternion
+        :return:
+        """
+        product = quaternion_multiply(static_quaternions, grasp_offset)
+        return Quaternion(product[0], product[1], product[2], product[3])
 
     def set_cart_goal_wstep(self, root_link, tip_link, goal_pose, current_quaternion, root_tip_rotation=None,
                             max_linear_velocity=None, max_angular_velocity=None, weight=None, step=None, hsr_transform=None):

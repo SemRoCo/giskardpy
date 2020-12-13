@@ -66,19 +66,6 @@ class GiskardWrapper(object):
             rospy.logwarn("get_joint_states: wait_for_message timeout")
             return None
 
-
-    def multiply_rotation_quaternions(self, static_quaternions, grasp_offset):
-        """
-        Adds the rotation-quaternion offset to an existing quaternion
-        :param static_quaternions: The initial quaternion
-        :type Quaternion
-        :param grasp_offset: The offset depending on the grasp/place mode.
-        :type Quaternion
-        :return:
-        """
-        product = quaternion_multiply(static_quaternions, grasp_offset)
-        return Quaternion(product[0], product[1], product[2], product[3])
-
     def set_cart_goal_wstep(self, root_link, tip_link, goal_pose, current_quaternion, root_tip_rotation=None,
                             max_linear_velocity=None, max_angular_velocity=None, weight=None, step=None, hsr_transform=None):
         """

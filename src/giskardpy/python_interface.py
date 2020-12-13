@@ -15,7 +15,8 @@ from tf.transformations import quaternion_multiply
 
 from giskardpy.constraints import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA
 from giskardpy.urdf_object import URDFObject
-from giskardpy.utils import position_dict_to_joint_states, make_world_body_box, make_world_body_cylinder
+from giskardpy.utils import position_dict_to_joint_states, make_world_body_box, make_world_body_cylinder, \
+    quaternion_multiply, calculate_way_point2D
 from rospy_message_converter.message_converter import convert_ros_message_to_dictionary
 
 
@@ -51,19 +52,8 @@ class GiskardWrapper(object):
         """
         return self.robot_urdf.get_root()
 
-    def multiply_rotation_quaternions(self, static_quaternions, grasp_offset):
-        """
-        Adds the rotation-quaternion offset to an existing quaternion
-        :param static_quaternions: The initial quaternion
-        :type Quaternion
-        :param grasp_offset: The offset depending on the grasp/place mode.
-        :type Quaternion
-        :return:
-        """
-        product = quaternion_multiply(static_quaternions, grasp_offset)
-        return Quaternion(product[0], product[1], product[2], product[3])
-
-    def set_cart_goal(self, root_link, tip_link, goal_pose, goal, current_quaternion, offset_dict=None, max_linear_velocity=None, max_angular_velocity=None, weight=None):
+    def set_cart_goal_wstep(self, root_link, tip_link, goal_pose, current_quaternion, root_tip_rotation=None,
+                            max_linear_velocity=None, max_angular_velocity=None, weight=None, step=None, hsr_transform=None):
         """
         This goal will use the kinematic chain between root and tip link to move tip link into the goal pose. Adds an offset
         depending on the goal.
@@ -73,12 +63,53 @@ class GiskardWrapper(object):
         :type tip_link: str
         :param goal_pose: the goal pose
         :type goal_pose: PoseStamped
-        :param goal: the goal
-        :type goal: Goal
         :param current_quaternion: the current quaternion
         :type current_quaternion: Quaternion
-        :param offset_dict: The offset depending on the grasp/place type
-        :type offset_dict: Dict{goal, Quaternion}
+        :param root_tip_rotation: the rotation of the gripper
+        :type root_tip_rotation: Quaternion
+        :param max_linear_velocity: m/s, default 0.1
+        :type max_linear_velocity: float
+        :param max_angular_velocity: rad/s, default 0.5
+        :type max_angular_velocity: float
+        :param weight: default WEIGHT_ABOVE_CA
+        :type weight: float
+        :param step: Distance of a potential step in front of the object
+        :type step: float (meter)
+        :param hsr_transform: the current transform of the hsrb
+        :type hsr_transform: Transform
+        """
+        if step and hsr_transform:
+            step_pose = PoseStamped()
+            step_pose.header.frame_id = "map"
+            step_pose.header.stamp = rospy.Time.now()
+            step_pose.pose.position = calculate_way_point2D(goal_pose.pose.position, hsr_transform.transform.translation, step)
+            step_pose.pose.orientation = goal_pose.pose.orientation
+            # Move to the defined step
+            self.set_cart_goal(root_link, tip_link, step_pose, current_quaternion, root_tip_rotation, max_linear_velocity,
+                                max_angular_velocity, weight)
+            self.plan_and_execute(wait=True)
+
+        goal_pose.header.stamp = rospy.Time.now()
+        # Move to the target
+        self.set_cart_goal(root_link, tip_link, goal_pose, current_quaternion, root_tip_rotation, max_linear_velocity,
+                           max_angular_velocity, weight)
+        self.plan_and_execute(wait=True)
+
+    def set_cart_goal(self, root_link, tip_link, goal_pose, current_quaternion, root_tip_rotation=None,
+                      max_linear_velocity=None, max_angular_velocity=None, weight=None):
+        """
+        This goal will use the kinematic chain between root and tip link to move tip link into the goal pose. Adds an offset
+        depending on the goal.
+        :param root_link: name of the root link of the kin chain
+        :type root_link: str
+        :param tip_link: name of the tip link of the kin chain
+        :type tip_link: str
+        :param goal_pose: the goal pose
+        :type goal_pose: PoseStamped
+        :param current_quaternion: the current quaternion
+        :type current_quaternion: Quaternion
+        :param root_tip_rotation: the rotation of the gripper
+        :type root_tip_rotation: Quaternion
         :param max_linear_velocity: m/s, default 0.1
         :type max_linear_velocity: float
         :param max_angular_velocity: rad/s, default 0.5
@@ -86,14 +117,8 @@ class GiskardWrapper(object):
         :param weight: default WEIGHT_ABOVE_CA
         :type weight: float
         """
-        offset = None
-        if offset_dict:
-            if hasattr(goal, "grasp_mode") and (goal.grasp_mode != goal.FREE):
-                offset = offset_dict[goal.grasp_mode]
-            elif hasattr(goal, "place_mode") and (goal.place_mode != goal.FREE):
-                offset = offset_dict[goal.place_mode]
-
-            orientation_quaternion = quaternion_multiply(current_quaternion, offset)
+        if root_tip_rotation:
+            orientation_quaternion = quaternion_multiply(current_quaternion, root_tip_rotation)
             goal_pose.pose.orientation.x = orientation_quaternion[0]
             goal_pose.pose.orientation.y = orientation_quaternion[1]
             goal_pose.pose.orientation.z = orientation_quaternion[2]

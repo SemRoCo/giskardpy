@@ -9,6 +9,7 @@ import re
 import rospkg
 import subprocess
 import sys
+import math
 from collections import defaultdict, OrderedDict, deque
 from contextlib import contextmanager
 from functools import wraps
@@ -164,6 +165,23 @@ def cylinder_surface(r, h):
 #                                                                          cpi_info.contact_distance))
 #             return True
 #     return False
+
+def calculate_way_point2D(target, origin, distance):
+    """
+    Calculates a waypoint in front of the target.
+    :param target: The target position
+    :param origin: The origin position
+    :param distance: The distance of the new waypoint to the target
+    :return:
+    """
+    x = target.x - origin.x
+    y = target.y - origin.y
+
+    alpha = math.atan(y / x)
+    dx = math.cos(alpha) * distance
+    dy = math.sin(alpha) * distance
+
+    return Point(target.x - dx, target.y - dy, target.z)
 
 
 def qv_mult(quaternion, vector):

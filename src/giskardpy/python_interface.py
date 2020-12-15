@@ -16,7 +16,7 @@ from tf.transformations import quaternion_multiply
 from giskardpy.constraints import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA
 from giskardpy.urdf_object import URDFObject
 from giskardpy.utils import position_dict_to_joint_states, make_world_body_box, make_world_body_cylinder, \
-    quaternion_multiply, calculate_way_point2D, to_joint_state_position_dict
+    calculate_waypoint2D, to_joint_state_position_dict, to_tf_quaternion
 from rospy_message_converter.message_converter import convert_ros_message_to_dictionary
 
 
@@ -73,8 +73,8 @@ class GiskardWrapper(object):
         :type root_link: str
         :param tip_link: name of the tip link of the kin chain
         :type tip_link: str
-        :param goal: the goal pose
-        :type goal: PoseStamped
+        :param goal_pose: the goal pose
+        :type goal_pose: PoseStamped
         :param max_linear_velocity: m/s, default 0.1
         :type max_linear_velocity: float
         :param max_angular_velocity: rad/s, default 0.5
@@ -84,6 +84,7 @@ class GiskardWrapper(object):
         """
         self.set_translation_goal(goal_pose, tip_link, root_link, weight=weight, max_velocity=max_linear_velocity)
         self.set_rotation_goal(goal_pose, tip_link, root_link, weight=weight, max_velocity=max_angular_velocity)
+
 
     def set_straight_cart_goal(self, goal_pose, tip_link, root_link, trans_max_velocity=None, rot_max_velocity=None, weight=None):
         """

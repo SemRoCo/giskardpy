@@ -166,7 +166,7 @@ def cylinder_surface(r, h):
 #             return True
 #     return False
 
-def calculate_way_point2D(target, origin, distance):
+def calculate_waypoint2D(target, origin, distance):
     """
     Calculates a waypoint in front of the target.
     :param target: The target position
@@ -174,14 +174,23 @@ def calculate_way_point2D(target, origin, distance):
     :param distance: The distance of the new waypoint to the target
     :return:
     """
+    distance = abs(distance)
     x = target.x - origin.x
     y = target.y - origin.y
+
+    if x == 0.0:
+        return Point(target.x, target.y - distance, target.z)
+    if y == 0.0:
+        return Point(target.x - distance, target.y, target.z)
 
     alpha = math.atan(y / x)
     dx = math.cos(alpha) * distance
     dy = math.sin(alpha) * distance
 
-    return Point(target.x - dx, target.y - dy, target.z)
+    if x > 0.0:
+        return Point(target.x - dx, target.y - dy, target.z)
+    else:
+        return Point(target.x + dx, target.y + dy, target.z)
 
 
 def qv_mult(quaternion, vector):
@@ -206,8 +215,8 @@ def qv_mult(quaternion, vector):
 def to_tf_quaternion(msg):
     """
     converts a geometry_msgs/Quaternion to tf_quaternion[x, y, z, w]
-    :param msg:
-    :return:
+    :param msg: geometry_msgs/Quaternion
+    :return: [x, y, z, w]
     """
     return [msg.x, msg.y, msg.z, msg.w]
 

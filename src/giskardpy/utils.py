@@ -203,6 +203,13 @@ def qv_mult(quaternion, vector):
 # CONVERSION FUNCTIONS FOR ROS MESSAGES
 #
 
+def to_tf_quaternion(msg):
+    """
+    converts a geometry_msgs/Quaternion to tf_quaternion[x, y, z, w]
+    :param msg:
+    :return:
+    """
+    return [msg.x, msg.y, msg.z, msg.w]
 
 def to_joint_state_dict(msg):
     """
@@ -285,6 +292,7 @@ def dict_to_joint_states(joint_state_dict):
         js.velocity.append(v.velocity)
         js.effort.append(0)
     return js
+
 
 def normalize_quaternion_msg(quaternion):
     q = Quaternion()
@@ -370,8 +378,6 @@ def create_path(path):
         except OSError as exc:  # Guard against race condition
             if exc.errno != errno.EEXIST:
                 raise
-
-
 
 
 def plot_trajectory(tj, controlled_joints, path_to_data_folder, sample_period, order=3, velocity_threshold=0.0, scaling=0.2, normalize_position=False, tick_stride=1.0):

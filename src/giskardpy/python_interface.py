@@ -66,7 +66,7 @@ class GiskardWrapper(object):
             rospy.logwarn("get_joint_states: wait_for_message timeout")
             return None
 
-    def set_cart_goal_wstep(self, root_link, tip_link, goal_pose, current_quaternion, root_tip_rotation=None,
+    def set_cart_goal_wstep(self, root_link, tip_link, goal_pose, root_tip_rotation=None,
                             max_linear_velocity=None, max_angular_velocity=None, weight=None, step=None, hsr_transform=None):
         """
         This goal will use the kinematic chain between root and tip link to move tip link into the goal pose. Adds an offset
@@ -77,8 +77,6 @@ class GiskardWrapper(object):
         :type tip_link: str
         :param goal_pose: the goal pose
         :type goal_pose: PoseStamped
-        :param current_quaternion: the current quaternion
-        :type current_quaternion: Quaternion
         :param root_tip_rotation: the rotation of the gripper
         :type root_tip_rotation: Quaternion
         :param max_linear_velocity: m/s, default 0.1
@@ -92,6 +90,8 @@ class GiskardWrapper(object):
         :param hsr_transform: the current transform of the hsrb
         :type hsr_transform: Transform
         """
+        current_quaternion = [hsr_transform.transform.rotation.x, hsr_transform.transform.rotation.y, hsr_transform.transform.rotation.z,
+                              hsr_transform.transform.rotation.w]
         if step and hsr_transform:
             step_pose = PoseStamped()
             step_pose.header.frame_id = "map"

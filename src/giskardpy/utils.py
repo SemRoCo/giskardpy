@@ -179,9 +179,10 @@ def calculate_waypoint2D(target, origin, distance):
     y = target.y - origin.y
 
     if x == 0.0:
-        return Point(target.x, target.y - distance, target.z)
-    if y == 0.0:
-        return Point(target.x - distance, target.y, target.z)
+        if y < 0.0:
+            return Point(target.x, target.y + distance, target.z)
+        else:
+            return Point(target.x, target.y - distance, target.z)
 
     alpha = math.atan(y / x)
     dx = math.cos(alpha) * distance

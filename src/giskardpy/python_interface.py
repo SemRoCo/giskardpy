@@ -67,6 +67,7 @@ class GiskardWrapper(object):
             return {}
 
     def set_cart_goal(self, root_link, tip_link, goal_pose, max_linear_velocity=None, max_angular_velocity=None, weight=None):
+
         """
         This goal will use the kinematic chain between root and tip link to move tip link into the goal pose
         :param root_link: name of the root link of the kin chain
@@ -84,7 +85,6 @@ class GiskardWrapper(object):
         """
         self.set_translation_goal(goal_pose, tip_link, root_link, weight=weight, max_velocity=max_linear_velocity)
         self.set_rotation_goal(goal_pose, tip_link, root_link, weight=weight, max_velocity=max_angular_velocity)
-
 
     def set_straight_cart_goal(self, goal_pose, tip_link, root_link, trans_max_velocity=None, rot_max_velocity=None, weight=None):
         """

@@ -67,7 +67,7 @@ class GiskardWrapper(object):
             return {}
 
     def set_cart_goal_wstep(self, root_link, tip_link, goal_pose, base_tip_rotation=None,
-                            max_linear_velocity=None, max_angular_velocity=None, weight=None, step=None, base_transform=None):
+                            max_linear_velocity=None, max_angular_velocity=None, weight=None, step=None, base_pose=None):
         """
         This goal will use the kinematic chain between root and tip link to move tip link into the goal pose. Adds an offset
         depending on the goal. It will also execute the goal.
@@ -87,27 +87,28 @@ class GiskardWrapper(object):
         :type weight: float
         :param step: Distance of a potential step in front of the object
         :type step: float (meter)
-        :param base_transform: the current transform of the hsrb
-        :type base_transform: Transform
+        :param base_pose: the current pose of the robot
+        :type base_pose: PoseStamped
         """
         rotation = goal_pose.pose.orientation
-        if base_transform and base_tip_rotation:
-            hsr_rotation = to_tf_quaternion(base_transform.transform.rotation)
+        if base_pose and base_tip_rotation:
+            hsr_rotation = to_tf_quaternion(base_pose.pose.orientation)
             rotation = Quaternion(*quaternion_multiply(hsr_rotation, base_tip_rotation))
 
-        if base_transform and step:
+        if base_pose and step:
             step_pose = PoseStamped()
             step_pose.header.frame_id = goal_pose.header.frame_id
             step_pose.header.stamp = rospy.Time.now()
-            step_pose.pose.position = calculate_waypoint2D(goal_pose.pose.position, base_transform.transform.translation, step)
+            step_pose.pose.position = calculate_waypoint2D(goal_pose.pose.position, base_pose.pose.position, step)
             step_pose.pose.orientation = rotation
-            print(step_pose)
+            rospy.loginfo("step_pose: {}".format(step_pose))
             # Move to the defined step
             self.set_cart_goal(root_link, tip_link, step_pose, max_linear_velocity, max_angular_velocity, weight)
             self.plan_and_execute(wait=True)
 
         goal_pose.header.stamp = rospy.Time.now()
         goal_pose.pose.orientation = rotation
+        rospy.loginfo("goal_pose: {}".format(goal_pose))
         # Move to the target
         self.set_cart_goal(root_link, tip_link, goal_pose, max_linear_velocity, max_angular_velocity, weight)
         self.plan_and_execute(wait=True)

@@ -32,7 +32,7 @@ plugins:
   CPIMarker: # contact visualization, slows planning down a little bit
     enabled: True
   PlotTrajectory: # plots the joint trajectory at the end of planning
-    enabled: True
+    enabled: False
     velocity_threshold: 0.0 # only joints that exceed this velocity threshold will be added to the plot. Use a negative number if you want to include every joint
     scaling: 5.0 # determines how much the x axis is scaled with the length(time) of the trajectory
     normalize_position: False # centers the joint positions around 0 on the y axis

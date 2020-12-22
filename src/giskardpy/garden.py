@@ -19,7 +19,7 @@ from giskardpy.input_system import JointStatesInput
 from giskardpy.plugin import PluginBehavior
 from giskardpy.plugin_action_server import GoalReceived, SendResult, GoalCanceled
 from giskardpy.plugin_append_zero_velocity import AppendZeroVelocity
-from giskardpy.plugin_attached_tf_publicher import TFPlugin
+from giskardpy.plugin_tf_publisher import TFPlugin
 from giskardpy.plugin_cleanup import CleanUp
 from giskardpy.plugin_collision_checker import CollisionChecker
 from giskardpy.plugin_collision_marker import CollisionMarker

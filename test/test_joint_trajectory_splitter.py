@@ -342,6 +342,8 @@ def test_invalid_joints_error(launch_invalid_joints_test_nodes):
     status = action_client.get_state()
     assert status == actionlib.GoalStatus.ABORTED
     assert result.error_code == control_msgs.msg.FollowJointTrajectoryResult.INVALID_JOINTS
+    assert launch_invalid_joints_test_nodes.get_other_state(0) == actionlib.GoalStatus.PREEMPTED
+    assert launch_invalid_joints_test_nodes.get_other_state(1) == actionlib.GoalStatus.ABORTED
 
 
 def test_missing_joint_in_goal(launch_successful_test_nodes):
@@ -355,6 +357,16 @@ def test_missing_joint_in_goal(launch_successful_test_nodes):
     status = action_client.get_state()
     assert status == actionlib.GoalStatus.ABORTED
     assert result.error_code == control_msgs.msg.FollowJointTrajectoryResult.INVALID_GOAL
+    try:
+        launch_successful_test_nodes.get_other_state(0)
+        assert False
+    except:
+        pass
+    try:
+        launch_successful_test_nodes.get_other_state(1)
+        assert False
+    except:
+        pass
 
 
 def test_successful_goal(launch_successful_test_nodes):
@@ -368,6 +380,8 @@ def test_successful_goal(launch_successful_test_nodes):
     status = action_client.get_state()
     assert status == actionlib.GoalStatus.SUCCEEDED
     assert result.error_code == control_msgs.msg.FollowJointTrajectoryResult.SUCCESSFUL
+    assert launch_successful_test_nodes.get_other_state(0) == actionlib.GoalStatus.SUCCEEDED
+    assert launch_successful_test_nodes.get_other_state(1) == actionlib.GoalStatus.SUCCEEDED
 
 
 def test_cancel_goal(launch_successful_test_nodes):
@@ -378,6 +392,7 @@ def test_cancel_goal(launch_successful_test_nodes):
     action_client.send_goal(simple_trajectory_goal)
     rospy.sleep(0.2)
     action_client.cancel_goal()
+    rospy.sleep(0.2)
     action_client.wait_for_result()
     result = action_client.get_result()
     status = action_client.get_state()

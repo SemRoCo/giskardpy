@@ -6,10 +6,12 @@
         <rosparam param="state_topics">
             - /whole_body_controller/base/state 
             - /whole_body_controller/body/state
+            - /refills_finger/state
         </rosparam>
         <rosparam param="client_topics">
             - /whole_body_controller/base/follow_joint_trajectory
             - /whole_body_controller/body/follow_joint_trajectory
+            - /whole_body_controller/refills_finger/follow_joint_trajectory
         </rosparam>
     </node>
 
@@ -23,6 +25,7 @@
         <rosparam param="enable_self_collision">False</rosparam>
         <rosparam param="interactive_marker_chains">
             - [odom, gripper_tool_frame]
+            - [odom, base_link]
             - [iiwa_link_1, camera_link]
         </rosparam>
     </node>

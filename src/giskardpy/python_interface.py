@@ -50,7 +50,7 @@ class GiskardWrapper(object):
         """
         return self.robot_urdf.get_root()
 
-    def set_cart_goal(self, root_link, tip_link, goal_pose, max_linear_velocity=None, max_angular_velocity=None, weight=None):
+    def set_cart_goal(self, goal_pose, tip_link, root_link, max_linear_velocity=None, max_angular_velocity=None, weight=None):
         """
         This goal will use the kinematic chain between root and tip link to move tip link into the goal pose
         :param root_link: name of the root link of the kin chain
@@ -66,10 +66,10 @@ class GiskardWrapper(object):
         :param weight: default WEIGHT_ABOVE_CA
         :type weight: float
         """
-        self.set_translation_goal(root_link, tip_link, goal_pose, max_velocity=max_linear_velocity, weight=weight)
-        self.set_rotation_goal(root_link, tip_link, goal_pose, max_velocity=max_angular_velocity, weight=weight)
+        self.set_translation_goal(goal_pose, tip_link, root_link, weight=weight, max_velocity=max_linear_velocity)
+        self.set_rotation_goal(goal_pose, tip_link, root_link, weight=weight, max_velocity=max_angular_velocity)
 
-    def set_translation_goal(self, root_link, tip_link, goal_pose, weight=None, max_velocity=None):
+    def set_translation_goal(self, goal_pose, tip_link, root_link, weight=None, max_velocity=None):
         """
         This goal will use the kinematic chain between root and tip link to move tip link into the goal position
         :param root_link: name of the root link of the kin chain
@@ -104,7 +104,7 @@ class GiskardWrapper(object):
             constraint.parameter_value_pair = json.dumps(params)
             self.cmd_seq[-1].constraints.append(constraint)
 
-    def set_rotation_goal(self, root_link, tip_link, goal_pose, weight=None, max_velocity=None):
+    def set_rotation_goal(self, goal_pose, tip_link, root_link, weight=None, max_velocity=None):
         """
         This goal will use the kinematic chain between root and tip link to move tip link into the goal orientation
         :param root_link: name of the root link of the kin chain

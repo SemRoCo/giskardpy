@@ -119,6 +119,7 @@ class WorldObject(URDFObject):
         """
         # TODO computational expansive because of too many collision checks
         logging.loginfo(u'calculating self collision matrix')
+        joint_state_tmp = self.joint_state
         t = time()
         np.random.seed(1337)
         always = set()
@@ -149,6 +150,7 @@ class WorldObject(URDFObject):
                 sometimes = sometimes.union(sometimes2)
         sometimes = sometimes.union(self.added_pairs)
         logging.loginfo(u'calculated self collision matrix in {:.3f}s'.format(time() - t))
+        self.joint_state = joint_state_tmp
         return sometimes
 
     def get_possible_collisions(self, link):

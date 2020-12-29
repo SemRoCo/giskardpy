@@ -2,7 +2,7 @@ import rospy
 from inspect import currentframe, getframeinfo
 from giskardpy import identifier
 
-
+@profile
 def debug():
     try:
         if debug.param == None:
@@ -18,17 +18,15 @@ def debug():
 
 debug.param = None
 
-
+# @profile
 def generate_debug_msg(msg):
     node_name = rospy.get_name()
     frameinfo = getframeinfo(currentframe().f_back.f_back)
     file_info = frameinfo.filename.split('/')[-1] + ' line ' + str(frameinfo.lineno)
-    new_msg = ('\nnode: ' + node_name + '\n' +
-               'file: ' + file_info + '\n' +
-               'message: ' + msg + '\n')
+    new_msg = '\nnode: {}\n file: {}\n message: {}\n'.format(node_name, file_info, msg)
     return new_msg
 
-
+@profile
 def generate_msg(msg):
     if(debug()):
         return generate_debug_msg(msg)
@@ -37,11 +35,13 @@ def generate_msg(msg):
         new_msg = '[{}]: {}'.format(node_name, msg)
         return new_msg
 
-
+# @profile
 def logdebug(msg):
-    final_msg = generate_debug_msg(msg)
+    # generating debug msg in python3 is slow af
+    final_msg = generate_msg(msg)
     rospy.logdebug(final_msg)
 
+@profile
 def loginfo(msg):
     final_msg = generate_msg(msg)
     rospy.loginfo(final_msg)

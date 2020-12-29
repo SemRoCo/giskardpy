@@ -11,7 +11,7 @@ from giskard_msgs.msg import Constraint as Constraint_msg
 
 import giskardpy.identifier as identifier
 import giskardpy.tfwrapper as tf
-from giskardpy import cas_wrapper as w
+from giskardpy import casadi_wrapper as w
 from giskardpy.data_types import SoftConstraint
 from giskardpy.exceptions import GiskardException, ConstraintException
 from giskardpy.input_system import \

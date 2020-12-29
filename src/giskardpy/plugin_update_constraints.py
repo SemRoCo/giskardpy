@@ -77,7 +77,7 @@ class GoalToConstraints(GetGoal):
         controlled_joints = self.get_robot().controlled_joints
 
         if (self.get_god_map().get_data(identifier.check_reachability)):
-            from giskardpy import cas_wrapper as w
+            from giskardpy import casadi_wrapper as w
             joint_constraints = OrderedDict()
             for i, joint_name in enumerate(controlled_joints):
                 lower_limit, upper_limit = self.get_robot().get_joint_limits(joint_name)

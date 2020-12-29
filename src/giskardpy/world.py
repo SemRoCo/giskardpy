@@ -108,6 +108,7 @@ class World(object):
 
     # Robot ------------------------------------------------------------------------------------------------------------
 
+    @profile
     def add_robot(self, robot, base_pose, controlled_joints, ignored_pairs, added_pairs):
         """
         :type robot: giskardpy.world_object.WorldObject

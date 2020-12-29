@@ -1,4 +1,9 @@
-from Queue import Empty, Queue
+try:
+    # Python 2
+    from Queue import Empty, Queue
+except ImportError:
+    # Python 3
+    from queue import Queue, Empty
 
 import actionlib
 import rospy

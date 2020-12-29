@@ -6,7 +6,7 @@ from itertools import combinations
 from giskardpy import identifier
 from geometry_msgs.msg import PoseStamped
 
-from giskardpy import WORLD_IMPLEMENTATION, cas_wrapper as w
+from giskardpy import WORLD_IMPLEMENTATION, casadi_wrapper as w
 from giskardpy.data_types import SingleJointState, HardConstraint, JointConstraint
 from giskardpy.god_map import GodMap
 from giskardpy.pybullet_world_object import PyBulletWorldObject

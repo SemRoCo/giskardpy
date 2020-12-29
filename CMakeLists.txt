@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.8.3)
+cmake_minimum_required(VERSION 3.0.2)
 project(giskardpy)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
@@ -159,6 +159,27 @@ include_directories(
 #   scripts/my_python_script
 #   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 # )
+
+catkin_install_python(PROGRAMS 
+	scripts/giskard_trees.py 
+	scripts/interactive_marker.py
+	scripts/joint_trajectory_splitter.py
+	scripts/add_box.py
+	scripts/add_cylinder.py
+	scripts/add_sphere.py
+	scripts/add_urdf.py
+	scripts/attach_object.py
+	scripts/base_joint_state_publisher.py
+	scripts/clear_world.py
+	scripts/hsr_base_joint_state_publisher.py
+	scripts/joint_goal_publisher.py
+	scripts/move_base_simple_goal.py
+	scripts/print_joint_state.py
+	scripts/remove_object.py
+	scripts/tf_base_joint_state_publisher.py
+	scripts/traj_to_joint_states.py
+	scripts/urdf_merger.py
+  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
 ## Mark executables and/or libraries for installation
 # install(TARGETS ${PROJECT_NAME} ${PROJECT_NAME}_node

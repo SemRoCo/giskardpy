@@ -4,6 +4,8 @@ import string
 from collections import namedtuple
 
 import pybullet as p
+from pybullet import resetJointState, getNumJoints, resetBasePositionAndOrientation, getBasePositionAndOrientation, \
+    removeBody
 from pybullet import getClosestPoints
 from geometry_msgs.msg import Pose, PoseStamped, Point, Quaternion
 
@@ -26,6 +28,16 @@ ContactInfo = namedtuple(u'ContactInfo', [u'contact_flag', u'body_unique_id_a', 
 
 render = True
 
+def getJointInfo(pybullet_id, joint_index):
+    result = p.getJointInfo(pybullet_id, joint_index)
+    result2 = []
+    for r in result:
+        if isinstance(r, bytes):
+            result2.append(r.decode("utf-8"))
+        else:
+            result2.append(r)
+    return result2
+
 def random_string(size=6):
     """
     Creates and returns a random string.
@@ -37,6 +49,7 @@ def random_string(size=6):
     return u''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(size))
 
 
+@profile
 def load_urdf_string_into_bullet(urdf_string, pose=None):
     """
     Loads a URDF string into the bullet world.

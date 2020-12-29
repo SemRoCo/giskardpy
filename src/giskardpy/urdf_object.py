@@ -1,7 +1,7 @@
 import numpy as np
 from collections import namedtuple
 from itertools import chain
-
+import hashlib
 import urdf_parser_py.urdf as up
 from geometry_msgs.msg import Pose, Vector3, Quaternion
 from std_msgs.msg import ColorRGBA
@@ -43,6 +43,7 @@ LIMITED_JOINTS = [PRISMATIC_JOINT, REVOLUTE_JOINT]
 
 
 class URDFObject(object):
+    @profile
     def __init__(self, urdf, *args, **kwargs):
         """
         :param urdf:
@@ -163,12 +164,14 @@ class URDFObject(object):
         return cls(r.to_xml_string(), *args, **kwargs)
 
     @classmethod
+    @profile
     def from_urdf_object(cls, urdf_object, *args, **kwargs):
         """
         :type urdf_object: URDFObject
         :rtype: cls
         """
-        return cls(urdf_object.get_urdf_str(), *args, **kwargs)
+        s = urdf_object.get_urdf_str()
+        return cls(s, *args, **kwargs)
 
     @memoize
     def get_name(self):
@@ -416,7 +419,7 @@ class URDFObject(object):
         """
         :rtype: dict
         """
-        return self._urdf_robot.link_map.keys()
+        return list(self._urdf_robot.link_map.keys())
 
     @memoize
     def get_sub_tree_link_names_with_collision(self, root_joint):
@@ -500,6 +503,7 @@ class URDFObject(object):
                    isinstance(geo, up.Mesh)
         return False
 
+    @profile
     def get_urdf_str(self):
         return self._urdf_robot.to_xml_string()
 
@@ -632,6 +636,9 @@ class URDFObject(object):
 
     def __str__(self):
         return self.get_urdf_str()
+
+    def __hash__(self):
+        return hash(id(self))
 
     def reinitialize(self):
         self._urdf_robot = up.URDF.from_xml_string(self.get_urdf_str())

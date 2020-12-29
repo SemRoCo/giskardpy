@@ -40,6 +40,7 @@ class CollisionMarker(GiskardBehavior):
         m.id = 1337
         m.ns = self.name_space
         m.scale = Vector3(0.003, 0, 0)
+        m.pose.orientation.w = 1
         if len(collisions.items()) > 0:
             for collision in collisions.items():  # type: Collision
                 red_threshold = 0.05  # TODO don't hardcode this

@@ -6,8 +6,8 @@ from geometry_msgs.msg import Point, Quaternion
 from tf.transformations import quaternion_from_euler
 from visualization_msgs.msg import Marker, MarkerArray
 
+from giskardpy.plugin import GiskardBehavior
 from giskardpy.tfwrapper import pose_to_kdl, kdl_to_pose
-from plugin import GiskardBehavior
 
 class VisualizationBehavior(GiskardBehavior):
     def __init__(self, name, ensure_publish=False):
@@ -32,7 +32,7 @@ class VisualizationBehavior(GiskardBehavior):
 
             marker.header.frame_id = self.robot_base
             marker.action = Marker.ADD
-            marker.id = int(hashlib.md5(link_name).hexdigest()[:6],
+            marker.id = int(hashlib.md5(link_name.encode('utf-8')).hexdigest()[:6],
                             16)  # FIXME find a better way to give the same link the same id
             self.ids.add(marker.id)
             marker.ns = u'planning_visualization'

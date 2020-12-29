@@ -6,7 +6,6 @@ import giskardpy.identifier as identifier
 from giskardpy.plugin import GiskardBehavior
 from giskardpy.symengine_controller import InstantaneousController
 from collections import OrderedDict, namedtuple
-import utils
 
 
 class ControllerPlugin(GiskardBehavior):

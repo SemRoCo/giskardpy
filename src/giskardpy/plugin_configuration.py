@@ -1,5 +1,9 @@
-from Queue import Empty, Queue
-from time import time
+try:
+    # Python 2
+    from Queue import Empty, Queue
+except ImportError:
+    # Python 3
+    from queue import Queue, Empty
 
 import rospy
 from py_trees import Status

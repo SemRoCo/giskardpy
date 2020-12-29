@@ -153,6 +153,7 @@ class PyBulletWorld(World):
     def get_object_names(self):
         return [x for x in super(PyBulletWorld, self).get_object_names() if x not in self.hidden_objects]
 
+    @profile
     def add_object(self, object_):
         """
         :type object_: giskardpy.world_object.WorldObject

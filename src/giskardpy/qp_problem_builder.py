@@ -3,7 +3,7 @@ from time import time
 
 import numpy as np
 
-from giskardpy import logging, cas_wrapper as w
+from giskardpy import logging, casadi_wrapper as w
 from giskardpy.data_types import SoftConstraint
 from giskardpy.exceptions import QPSolverException, InfeasibleException, OutOfJointLimitsException, \
     HardConstraintsViolatedException

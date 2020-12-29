@@ -9,7 +9,7 @@ from giskardpy import logging, identifier
 
 
 if __name__ == u'__main__':
-    rospy.init_node(u'giskardpy')
+    rospy.init_node(u'giskard')
     check_dependencies()
     tree_tick_rate = 1. / rospy.get_param(rospy.get_name() +u'/' +u'/'.join(identifier.tree_tick_rate[1:]))
     tree = grow_tree()

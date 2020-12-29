@@ -70,15 +70,15 @@ class InstantaneousController(object):
 
 
     def compile(self):
-        a = ''.join(str(x) for x in sorted(chain(self.soft_constraints.keys(),
+        a = ''.join(str(x) for x in sorted(chain([(x,) for x in self.soft_constraints.keys()],
                                                  self.hard_constraints.keys(),
                                                  self.joint_constraints.keys())))
-        function_hash = hashlib.md5(a + self.robot.get_urdf_str()).hexdigest()
+        function_hash = hashlib.md5((a + self.robot.get_urdf_str()).encode('utf-8')).hexdigest()
         path_to_functions = self.path_to_functions + function_hash
         self.qp_problem_builder = QProblemBuilder(self.joint_constraints,
                                                   self.hard_constraints,
                                                   self.soft_constraints,
-                                                  self.joint_to_symbols_str.values(),
+                                                  list(self.joint_to_symbols_str.values()),
                                                   path_to_functions)
 
     def get_cmd(self, substitutions, nWSR=None):

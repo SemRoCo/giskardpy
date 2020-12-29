@@ -247,17 +247,20 @@ class WorldObject(URDFObject):
         """
         :rtype: bool
         """
-        urdf_hash = hashlib.md5(self.get_urdf_str()).hexdigest()
+        urdf_hash = hashlib.md5(self.get_urdf_str().encode('utf-8')).hexdigest()
         path = u'{}/{}/{}'.format(path, self.get_name(), urdf_hash)
         if os.path.isfile(path):
-            with open(path) as f:
-                self._self_collision_matrix = pickle.load(f)
-                logging.loginfo(u'loaded self collision matrix {}'.format(path))
-                return True
+            try:
+                with open(path, 'rb') as f:
+                    self._self_collision_matrix = pickle.load(f, encoding="latin1")
+                    logging.loginfo(u'loaded self collision matrix {}'.format(path))
+                    return True
+            except Exception:
+                logging.loginfo('failed to load collision matrix at {}'.format(path))
         return False
 
     def safe_self_collision_matrix(self, path):
-        urdf_hash = hashlib.md5(self.get_urdf_str()).hexdigest()
+        urdf_hash = hashlib.md5(self.get_urdf_str().encode('utf-8')).hexdigest()
         path = u'{}/{}/{}'.format(path, self.get_name(), urdf_hash)
         if not os.path.exists(os.path.dirname(path)):
             try:
@@ -267,7 +270,7 @@ class WorldObject(URDFObject):
             except OSError as exc:  # Guard against race condition
                 if exc.errno != errno.EEXIST:
                     raise
-        with open(path, u'w') as file:
+        with open(path, u'wb') as file:
             logging.loginfo(u'saved self collision matrix {}'.format(path))
             pickle.dump(self._self_collision_matrix, file)
 

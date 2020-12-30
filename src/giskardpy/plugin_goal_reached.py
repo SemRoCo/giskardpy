@@ -44,6 +44,7 @@ class GoalReachedPlugin(GiskardBehavior):
         self.thresholds = make_velocity_threshold(self.get_god_map())
         self.number_of_controlled_joints = len(self.thresholds)
 
+    @profile
     def update(self):
         # current_js = self.get_god_map().get_data(identifier.joint_states)
         planning_time = self.get_god_map().get_data(identifier.time)

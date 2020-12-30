@@ -25,6 +25,7 @@ class PostProcessing(GiskardBehavior):
     def initialise(self):
         super(PostProcessing, self).initialise()
 
+    @profile
     def update(self):
         if self.get_god_map().get_data(identifier.check_reachability):
             self.check_reachability_xdot()

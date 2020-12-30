@@ -6974,6 +6974,7 @@ class TestCollisionAvoidanceGoals(object):
     #     kitchen_setup.send_and_check_goal(execute=False)
 
     def test_bowl_and_cup(self, kitchen_setup):
+        # kernprof -lv py.test -s test/test_integration_pr2.py::TestCollisionAvoidanceGoals::test_bowl_and_cup
         bowl_name = u'bowl'
         cup_name = u'cup'
         percentage = 50

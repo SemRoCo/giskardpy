@@ -69,6 +69,7 @@ class ControllerPlugin(GiskardBehavior):
         self.qp_data[identifier.bA_keys[-1]], \
         self.qp_data[identifier.xdot_keys[-1]] = self.controller.get_qpdata_key_map()
 
+    @profile
     def update(self):
 
         expr = self.controller.get_expr()

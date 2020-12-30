@@ -50,6 +50,7 @@ class QProblemBuilder(object):
     def get_expr(self):
         return self.compiled_big_ass_M.str_params
 
+    @profile
     def construct_big_ass_M(self):
         # TODO cpu intensive
         weights = []
@@ -99,7 +100,7 @@ class QProblemBuilder(object):
         self.set_ub(w.Matrix(ub))
         self.set_linear_weights(w.Matrix(linear_weight))
 
-
+    @profile
     def compile_big_ass_M(self):
         t = time()
         self.free_symbols = w.free_symbols(self.big_ass_M)
@@ -257,6 +258,7 @@ class QProblemBuilder(object):
         H = H[b_mask][:, b_mask]
         return H, A, lb, ub, lbA, ubA, g
 
+    @profile
     def get_cmd(self, substitutions, nWSR=None):
         """
         Uses substitutions for each symbol to compute the next commands for each joint.

@@ -81,6 +81,7 @@ class InstantaneousController(object):
                                                   list(self.joint_to_symbols_str.values()),
                                                   path_to_functions)
 
+    @profile
     def get_cmd(self, substitutions, nWSR=None):
         """
         Computes joint commands that satisfy constrains given substitutions.

@@ -18,6 +18,7 @@ class LoopDetector(GiskardBehavior):
         super(LoopDetector, self).initialise()
         self.past_joint_states = set()
 
+    @profile
     def update(self):
         current_js = self.get_god_map().get_data(identifier.joint_states)
         planning_time = self.get_god_map().get_data(identifier.time)

@@ -22,6 +22,7 @@ class KinSimPlugin(GiskardBehavior):
         self.sample_period = self.get_god_map().get_data(identifier.sample_period)
         super(KinSimPlugin, self).initialise()
 
+    @profile
     def update(self):
         motor_commands = self.get_god_map().get_data(identifier.cmd)
         current_js = self.get_god_map().get_data(identifier.joint_states)

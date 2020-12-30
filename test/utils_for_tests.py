@@ -1,3 +1,4 @@
+from time import time
 import keyword
 import yaml
 from collections import defaultdict
@@ -10,6 +11,7 @@ import numpy as np
 import rospy
 from actionlib_msgs.msg import GoalID
 from angles import shortest_angular_distance
+from control_msgs.msg import FollowJointTrajectoryActionGoal, FollowJointTrajectoryActionResult
 from geometry_msgs.msg import PoseStamped, Pose, Point, Quaternion
 from giskard_msgs.msg import MoveActionResult, CollisionEntry, MoveActionGoal, MoveResult, MoveGoal
 from giskard_msgs.srv import UpdateWorldResponse
@@ -221,6 +223,8 @@ def pykdl_frame_to_numpy(pykdl_frame):
 
 class GiskardTestWrapper(GiskardWrapper):
     def __init__(self, config_file):
+        self.total_time_spend_giskarding = 0
+        self.total_time_spend_moving = 0
         with open(get_ros_pkg_path(u'giskardpy') + u'/config/' + config_file) as f:
             config = yaml.load(f)
         rospy.set_param('~', config)
@@ -230,6 +234,12 @@ class GiskardTestWrapper(GiskardWrapper):
 
         self.sub_result = rospy.Subscriber('~command/result', MoveActionResult, self.cb, queue_size=100)
         self.cancel_goal = rospy.Publisher('~command/cancel', GoalID, queue_size=100)
+        self.start_motion_sub = rospy.Subscriber('/whole_body_controller/follow_joint_trajectory/goal',
+                                                FollowJointTrajectoryActionGoal, self.start_motion_cb,
+                                                 queue_size=100)
+        self.stop_motion_sub = rospy.Subscriber('/whole_body_controller/follow_joint_trajectory/result',
+                                               FollowJointTrajectoryActionResult, self.stop_motion_cb,
+                                                queue_size=100)
 
         self.tree = grow_tree()
         self.loop_once()
@@ -250,6 +260,11 @@ class GiskardTestWrapper(GiskardWrapper):
         self.joint_state_publisher = KeyDefaultDict(create_publisher)
         # rospy.sleep(1)
 
+    def start_motion_cb(self, msg):
+        self.time = time()
+
+    def stop_motion_cb(self, msg):
+        self.total_time_spend_moving += time() - self.time
 
     def wait_for_synced(self):
         sleeper = rospy.Rate(self.tick_rate)
@@ -300,6 +315,8 @@ class GiskardTestWrapper(GiskardWrapper):
 
     def tear_down(self):
         rospy.sleep(1)
+        logging.loginfo(u'total time spend giskarding: {}'.format(self.total_time_spend_giskarding-self.total_time_spend_moving))
+        logging.loginfo(u'total time spend moving: {}'.format(self.total_time_spend_moving))
         logging.loginfo(u'stopping plugins')
 
     def set_object_joint_state(self, object_name, joint_state):
@@ -445,6 +462,7 @@ class GiskardTestWrapper(GiskardWrapper):
             goal.goal.type = goal_type
         i = 0
         self.loop_once()
+        t = time()
         t1 = Thread(target=self.get_as()._as.action_server.internal_goal_callback, args=(goal,))
         self.loop_once()
         t1.start()
@@ -454,6 +472,8 @@ class GiskardTestWrapper(GiskardWrapper):
             sleeper.sleep()
             i += 1
         t1.join()
+        t = time() - t
+        self.total_time_spend_giskarding += t
         self.loop_once()
         result = self.results.get()
         return result

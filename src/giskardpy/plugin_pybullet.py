@@ -152,6 +152,7 @@ class WorldUpdatePlugin(GiskardBehavior):
         res.message = 'saved dump to {}'.format(folder_path)
         return res
 
+    @profile
     def update(self):
         """
         updated urdfs in god map and updates pybullet object joint states

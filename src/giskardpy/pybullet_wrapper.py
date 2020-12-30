@@ -12,7 +12,7 @@ from geometry_msgs.msg import Pose, PoseStamped, Point, Quaternion
 import giskardpy
 from giskardpy import DEBUG, MAP, logging
 from giskardpy.exceptions import DuplicateNameException
-from giskardpy.urdf_object import URDFObject
+from giskardpy.urdf_object import URDFObject, robot_name_from_urdf_string
 from giskardpy.utils import write_to_tmp, NullContextManager, suppress_stdout, resolve_ros_iris_in_urdf
 
 JointInfo = namedtuple(u'JointInfo', [u'joint_index', u'joint_name', u'joint_type', u'q_index', u'u_index', u'flags',
@@ -65,7 +65,7 @@ def load_urdf_string_into_bullet(urdf_string, pose=None):
         pose.orientation.w = 1
     if isinstance(pose, PoseStamped):
         pose = pose.pose
-    object_name = URDFObject(urdf_string).get_name()
+    object_name = robot_name_from_urdf_string(urdf_string)
     if object_name in get_body_names():
         raise DuplicateNameException(u'an object with name \'{}\' already exists in pybullet'.format(object_name))
     resolved_urdf = resolve_ros_iris_in_urdf(urdf_string)

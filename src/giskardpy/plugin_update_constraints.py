@@ -42,6 +42,7 @@ class GoalToConstraints(GetGoal):
         self.get_god_map().set_data(identifier.collision_goal, None)
         self.clear_blackboard_exception()
 
+    @profile
     def update(self):
         # TODO make this interruptable
         # TODO try catch everything
@@ -172,11 +173,11 @@ class GoalToConstraints(GetGoal):
                 raise e
         loginfo(u'done parsing goal message')
 
-    def has_robot_changed(self):
-        new_urdf = self.get_robot().get_urdf_str()
-        result = self.last_urdf != new_urdf
-        self.last_urdf = new_urdf
-        return result
+    # def has_robot_changed(self):
+    #     new_urdf = self.get_robot().get_urdf_str()
+    #     result = self.last_urdf != new_urdf
+    #     self.last_urdf = new_urdf
+    #     return result
 
     def add_collision_avoidance_soft_constraints(self, collision_cmds):
         """

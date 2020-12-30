@@ -47,6 +47,7 @@ class PyBulletWorldObject(WorldObject):
 
 
     @WorldObject.joint_state.setter
+    @profile
     def joint_state(self, value):
         """
                 :param joint_state:

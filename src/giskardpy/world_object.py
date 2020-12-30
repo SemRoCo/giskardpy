@@ -252,7 +252,7 @@ class WorldObject(URDFObject):
         if os.path.isfile(path):
             try:
                 with open(path, 'rb') as f:
-                    self._self_collision_matrix = pickle.load(f, encoding="latin1")
+                    self._self_collision_matrix = pickle.load(f)
                     logging.loginfo(u'loaded self collision matrix {}'.format(path))
                     return True
             except Exception:

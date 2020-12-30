@@ -13,6 +13,9 @@ from giskardpy.utils import cube_volume, cube_surface, sphere_volume, cylinder_v
     suppress_stderr, msg_to_list, KeyDefaultDict, memoize
 
 
+def robot_name_from_urdf_string(urdf_string):
+    return urdf_string.split('robot name="')[1].split('"')[0]
+
 def hacky_urdf_parser_fix(urdf_str):
     # TODO this function is inefficient but the tested urdfs's aren't big enough for it to be a problem
     fixed_urdf = ''
@@ -503,6 +506,7 @@ class URDFObject(object):
                    isinstance(geo, up.Mesh)
         return False
 
+    @memoize
     @profile
     def get_urdf_str(self):
         return self._urdf_robot.to_xml_string()
@@ -640,9 +644,10 @@ class URDFObject(object):
     def __hash__(self):
         return hash(id(self))
 
+    @profile
     def reinitialize(self):
-        self._urdf_robot = up.URDF.from_xml_string(self.get_urdf_str())
         self.reset_cache()
+        self._urdf_robot = up.URDF.from_xml_string(self.get_urdf_str())
 
     def robot_name_to_root_joint(self, name):
         # TODO should this really be a class function?

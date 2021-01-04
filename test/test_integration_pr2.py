@@ -653,6 +653,7 @@ class TestConstraints(object):
         np.testing.assert_almost_equal(expected_x.point.y, 0, 1)
         np.testing.assert_almost_equal(expected_x.point.z, 0, 1)
 
+        rospy.loginfo("Starting looking")
         tip = u'head_mount_kinect_rgb_link'
         goal_point = tf.lookup_point(u'map', kitchen_setup.r_tip)
         pointing_axis = Vector3Stamped()
@@ -660,6 +661,7 @@ class TestConstraints(object):
         pointing_axis.vector.x = 1
         kitchen_setup.wrapper.pointing(tip, goal_point, pointing_axis=pointing_axis, root=kitchen_setup.r_tip)
 
+        rospy.loginfo("Starting pointing")
         r_goal = PoseStamped()
         r_goal.header.frame_id = kitchen_setup.r_tip
         r_goal.pose.position.x -= 0.3
@@ -674,6 +676,7 @@ class TestConstraints(object):
         kitchen_setup.set_and_check_cart_goal(r_goal, kitchen_setup.r_tip, u'base_footprint',
                                               weight=WEIGHT_BELOW_CA)
 
+        rospy.loginfo("Starting testing")
         current_x = Vector3Stamped()
         current_x.header.frame_id = tip
         current_x.vector.x = 1

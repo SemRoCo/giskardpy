@@ -61,14 +61,14 @@ class GiskardWrapper(object):
         """
         if not max_velocity and not weight:
             constraint = CartesianConstraint()
-            constraint.type = CartesianConstraint.STRAIGHT_TRANSLATION_3D
+            constraint.type = CartesianConstraint.TRANSLATION_3D # TODO: add STRAIGHT_TRANSLATION_3D here
             constraint.root_link = str(root)
             constraint.tip_link = str(tip)
             constraint.goal = pose_stamped
             self.cmd_seq[-1].cartesian_constraints.append(constraint)
         else:
             constraint = Constraint()
-            constraint.type = u'CartesianPositionStraight'
+            constraint.type = u'CartesianPosition' # TODO: add CartesianPositionStraight here
             params = {}
             params[u'root_link'] = root
             params[u'tip_link'] = tip

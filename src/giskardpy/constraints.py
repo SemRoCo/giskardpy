@@ -36,7 +36,11 @@ class Constraint(object):
 
     def save_params_on_god_map(self, params):
         constraints = self.get_god_map().get_data(identifier.constraints_identifier)
-        constraints[str(self)] = params
+        try:
+            constraints[str(self)].update(params)
+        except:
+            constraints[str(self)] = params
+
         self.get_god_map().set_data(identifier.constraints_identifier, constraints)
 
     def make_constraints(self):
@@ -348,13 +352,15 @@ class Constraint(object):
             self.add_debug_constraint(name + u'/{}'.format(x), vector_expr[x])
 
     def add_minimize_position_constraints(self, r_P_g, max_velocity, max_acceleration, root, tip, goal_constraint,
-                                          weight=WEIGHT_BELOW_CA):
+                                          weight=WEIGHT_BELOW_CA, prefix=u''):
         """
         :param r_P_g: position of goal relative to root frame
         :param max_velocity:
         :param max_acceleration:
         :param root:
         :param tip:
+        :param prefix: name prefix to distinguish different constraints
+        :type prefix: str
         :return:
         """
         r_P_c = w.position_of(self.get_fk(root, tip))
@@ -372,19 +378,19 @@ class Constraint(object):
         #                                     0.06, WEIGHTS[1])
         weight = self.normalize_weight(max_velocity, weight)
 
-        self.add_constraint(u'/x',
+        self.add_constraint(u'/{}/x'.format(prefix),
                             lower=r_P_intermediate_error[0],
                             upper=r_P_intermediate_error[0],
                             weight=weight,
                             expression=r_P_c[0],
                             goal_constraint=goal_constraint)
-        self.add_constraint(u'/y',
+        self.add_constraint(u'/{}/y'.format(prefix),
                             lower=r_P_intermediate_error[1],
                             upper=r_P_intermediate_error[1],
                             weight=weight,
                             expression=r_P_c[1],
                             goal_constraint=goal_constraint)
-        self.add_constraint(u'/z',
+        self.add_constraint(u'/{}/z'.format(prefix),
                             lower=r_P_intermediate_error[2],
                             upper=r_P_intermediate_error[2],
                             weight=weight,
@@ -392,7 +398,7 @@ class Constraint(object):
                             goal_constraint=goal_constraint)
 
     def add_minimize_vector_angle_constraints(self, max_velocity, root, tip, tip_V_tip_normal, root_V_goal_normal,
-                                              weight=WEIGHT_BELOW_CA, goal_constraint=False):
+                                              weight=WEIGHT_BELOW_CA, goal_constraint=False, prefix=u''):
         root_R_tip = w.rotation_of(self.get_fk(root, tip))
         root_V_tip_normal = w.dot(root_R_tip, tip_V_tip_normal)
 
@@ -403,19 +409,19 @@ class Constraint(object):
 
         weight = self.normalize_weight(max_velocity, weight)
 
-        self.add_constraint(u'/rot/x',
+        self.add_constraint(u'/{}/rot/x'.format(prefix),
                             lower=error[0],
                             upper=error[0],
                             weight=weight,
                             expression=root_V_tip_normal[0],
                             goal_constraint=goal_constraint)
-        self.add_constraint(u'/rot/y',
+        self.add_constraint(u'/{}/rot/y'.format(prefix),
                             lower=error[1],
                             upper=error[1],
                             weight=weight,
                             expression=root_V_tip_normal[1],
                             goal_constraint=goal_constraint)
-        self.add_constraint(u'/rot/z',
+        self.add_constraint(u'/{}/rot/z'.format(prefix),
                             lower=error[2],
                             upper=error[2],
                             weight=weight,
@@ -423,7 +429,7 @@ class Constraint(object):
                             goal_constraint=goal_constraint)
 
     def add_minimize_rotation_constraints(self, root_R_tipGoal, root, tip, max_velocity=np.pi / 4,
-                                          weight=WEIGHT_BELOW_CA, goal_constraint=True):
+                                          weight=WEIGHT_BELOW_CA, goal_constraint=True, prefix=u''):
         root_R_tipCurrent = w.rotation_of(self.get_fk(root, tip))
         root_R_tipCurrent_evaluated = w.rotation_of(self.get_fk_evaluated(root, tip))
 
@@ -452,19 +458,19 @@ class Constraint(object):
 
         weight = self.normalize_weight(max_velocity, weight)
 
-        self.add_constraint(u'/rot/0',
+        self.add_constraint(u'/{}/rot/0'.format(prefix),
                             lower=c_R_g_intermediate_aa[0],
                             upper=c_R_g_intermediate_aa[0],
                             weight=weight,
                             expression=current_angle_axis[0],
                             goal_constraint=goal_constraint)
-        self.add_constraint(u'/rot/1',
+        self.add_constraint(u'/{}/rot/1'.format(prefix),
                             lower=c_R_g_intermediate_aa[1],
                             upper=c_R_g_intermediate_aa[1],
                             weight=weight,
                             expression=current_angle_axis[1],
                             goal_constraint=goal_constraint)
-        self.add_constraint(u'/rot/2',
+        self.add_constraint(u'/{}/rot/2'.format(prefix),
                             lower=c_R_g_intermediate_aa[2],
                             upper=c_R_g_intermediate_aa[2],
                             weight=weight,
@@ -945,6 +951,91 @@ class CartesianPosition(BasicCartesianConstraint):
                                                self.goal_constraint, weight)
 
 
+class CartesianPositionStraight(BasicCartesianConstraint):
+    start = u'start'
+
+    def __init__(self, god_map, root_link, tip_link, goal,
+                 max_velocity=0.1,
+                 max_acceleration=0.1,
+                 weight=WEIGHT_ABOVE_CA,
+                 goal_constraint=True):
+        super(CartesianPositionStraight, self).__init__(god_map,
+                                                        root_link,
+                                                        tip_link,
+                                                        goal,
+                                                        max_velocity,
+                                                        max_acceleration,
+                                                        weight,
+                                                        goal_constraint)
+
+        start = tf.lookup_pose(self.root, self.tip)
+
+        params = {self.start: start}
+        self.save_params_on_god_map(params)
+
+    def get_tip_pose(self):
+        return self.get_input_PoseStamped(self.tip)
+
+    def make_constraints(self):
+        """
+        example:
+        name='CartesianPositionStraight'
+        parameter_value_pair='{
+            "root": "base_footprint", #required
+            "tip": "r_gripper_tool_frame", #required
+            "goal_position": {"header":
+                                {"stamp":
+                                    {"secs": 0,
+                                    "nsecs": 0},
+                                "frame_id": "",
+                                "seq": 0},
+                            "pose": {"position":
+                                        {"y": 0.0,
+                                        "x": 0.0,
+                                        "z": 0.0},
+                                    "orientation": {"y": 0.0,
+                                                    "x": 0.0,
+                                                    "z": 0.0,
+                                                    "w": 0.0}
+                                    }
+                            }', #required
+            "weight": 1, #optional
+            "max_velocity": 0.3 #optional -- rad/s or m/s depending on joint; can not go higher than urdf limit
+        }'
+        :return:
+        """
+        root_P_goal = w.position_of(self.get_goal_pose())
+        root_P_tip = w.position_of(self.get_fk(self.root, self.tip))
+        root_V_start = w.position_of(self.get_input_PoseStamped(self.start))
+        max_velocity = self.get_input_float(self.max_velocity)
+        max_acceleration = self.get_input_float(self.max_acceleration)
+        weight = self.get_input_float(self.weight)
+
+        # Constraint to go to goal pos
+        self.add_minimize_position_constraints(root_P_goal,
+                                               max_velocity,
+                                               max_acceleration,
+                                               self.root,
+                                               self.tip,
+                                               self.goal_constraint,
+                                               weight,
+                                               prefix=u'goal')
+
+        # self.add_debug_vector(u'start_point', root_P_goal)
+        dist, nearest = w.distance_point_to_line_segment(root_P_tip,
+                                                         root_V_start,
+                                                         root_P_goal)
+        # Constraint to stick to the line
+        self.add_minimize_position_constraints(r_P_g=nearest,
+                                               max_velocity=max_velocity,
+                                               max_acceleration=max_acceleration,
+                                               root=self.root,
+                                               tip=self.tip,
+                                               goal_constraint=self.goal_constraint,
+                                               prefix=u'line',
+                                               weight=WEIGHT_ABOVE_CA)
+
+
 class CartesianVelocityLimit(Constraint):
     goal = u'goal'
     weight_id = u'weight'
@@ -1272,6 +1363,34 @@ class CartesianPose(Constraint):
                                                           tip_link=tip_link,
                                                           goal=goal,
                                                           max_velocity=max_angular_velocity,
+                                                          weight=weight,
+                                                          goal_constraint=goal_constraint))
+
+    def make_constraints(self):
+        for constraint in self.constraints:
+            self.soft_constraints.update(constraint.get_constraints())
+
+
+class CartesianPoseStraight(Constraint):
+    def __init__(self, god_map, root_link, tip_link, goal, translation_max_velocity=0.1,
+                 translation_max_acceleration=0.1, rotation_max_velocity=0.5, rotation_max_acceleration=0.5,
+                 weight=WEIGHT_ABOVE_CA, goal_constraint=True):
+        super(CartesianPoseStraight, self).__init__(god_map)
+        self.constraints = []
+        self.constraints.append(CartesianPositionStraight(god_map=god_map,
+                                                          root_link=root_link,
+                                                          tip_link=tip_link,
+                                                          goal=goal,
+                                                          max_velocity=translation_max_velocity,
+                                                          max_acceleration=translation_max_acceleration,
+                                                          weight=weight,
+                                                          goal_constraint=goal_constraint))
+        self.constraints.append(CartesianOrientationSlerp(god_map=god_map,
+                                                          root_link=root_link,
+                                                          tip_link=tip_link,
+                                                          goal=goal,
+                                                          max_velocity=rotation_max_velocity,
+                                                          max_accleration=rotation_max_acceleration,
                                                           weight=weight,
                                                           goal_constraint=goal_constraint))
 
@@ -2296,7 +2415,7 @@ class OpenDrawer(Constraint):
             tf.kdl_to_pose_stamped(root_T_tip_goal, self.root))
 
         self.constraints.append(
-            CartesianPose(
+            CartesianPoseStraight(
                 god_map,
                 self.root,
                 self.tip,

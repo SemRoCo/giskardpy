@@ -69,6 +69,26 @@ class GiskardWrapper(object):
         self.set_translation_goal(goal_pose, tip_link, root_link, weight=weight, max_velocity=max_linear_velocity)
         self.set_rotation_goal(goal_pose, tip_link, root_link, weight=weight, max_velocity=max_angular_velocity)
 
+    def set_straight_cart_goal(self, goal_pose, root_link, tip_link, trans_max_velocity=None, rot_max_velocity=None, weight=None):
+        """
+        This goal will use the kinematic chain between root and tip link to move tip link on the straightest
+        line into the goal pose
+        :param root_link: name of the root link of the kin chain
+        :type root_link: str
+        :param tip_link: name of the tip link of the kin chain
+        :type tip_link: str
+        :param goal: the goal pose
+        :type goal: PoseStamped
+        :param max_linear_velocity: m/s, default 0.1
+        :type max_linear_velocity: float
+        :param max_angular_velocity: rad/s, default 0.5
+        :type max_angular_velocity: float
+        :param weight: default WEIGHT_ABOVE_CA
+        :type weight: float
+        """
+        self.set_straight_translation_goal(goal_pose, root_link, tip_link, max_velocity=trans_max_velocity, weight=weight)
+        self.set_rotation_goal(goal_pose, root_link, tip_link, max_velocity=rot_max_velocity, weight=weight)
+
     def set_translation_goal(self, goal_pose, tip_link, root_link, weight=None, max_velocity=None):
         """
         This goal will use the kinematic chain between root and tip link to move tip link into the goal position
@@ -93,6 +113,42 @@ class GiskardWrapper(object):
         else:
             constraint = Constraint()
             constraint.type = u'CartesianPosition'
+            params = {}
+            params[u'root_link'] = root_link
+            params[u'tip_link'] = tip_link
+            params[u'goal'] = convert_ros_message_to_dictionary(goal_pose)
+            if max_velocity:
+                params[u'max_velocity'] = max_velocity
+            if weight:
+                params[u'weight'] = weight
+            constraint.parameter_value_pair = json.dumps(params)
+            self.cmd_seq[-1].constraints.append(constraint)
+
+    def set_straight_translation_goal(self, goal_pose, root_link, tip_link, weight=None, max_velocity=None):
+        """
+        This goal will use the kinematic chain between root and tip link to move tip link on the straightest
+        line into the goal position
+        :param root_link: name of the root link of the kin chain
+        :type root_link: str
+        :param tip_link: name of the tip link of the kin chain
+        :type tip_link: str
+        :param goal_pose: the goal pose, orientation will be ignored
+        :type goal_pose: PoseStamped
+        :param max_velocity: m/s, default 0.1
+        :type max_velocity: float
+        :param weight: default WEIGHT_ABOVE_CA
+        :type weight: float
+        """
+        if not max_velocity and not weight:
+            constraint = CartesianConstraint()
+            constraint.type = CartesianConstraint.STRAIGHT_TRANSLATION_3D # TODO: add STRAIGHT_TRANSLATION_3D here
+            constraint.root_link = str(root_link)
+            constraint.tip_link = str(tip_link)
+            constraint.goal = goal_pose
+            self.cmd_seq[-1].cartesian_constraints.append(constraint)
+        else:
+            constraint = Constraint()
+            constraint.type = u'CartesianPositionStraight'
             params = {}
             params[u'root_link'] = root_link
             params[u'tip_link'] = tip_link

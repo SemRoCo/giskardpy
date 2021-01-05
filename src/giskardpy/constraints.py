@@ -919,7 +919,11 @@ class CartesianPosition(BasicCartesianConstraint):
 class CartesianPositionStraight(BasicCartesianConstraint):
     start = u'start'
 
-    def __init__(self, god_map, root_link, tip_link, goal, max_velocity, max_acceleration, weight, goal_constraint):
+    def __init__(self, god_map, root_link, tip_link, goal,
+                 max_velocity=0.1,
+                 max_acceleration=0.1,
+                 weight=WEIGHT_ABOVE_CA,
+                 goal_constraint=True):
         super(CartesianPositionStraight, self).__init__(god_map,
                                                         root_link,
                                                         tip_link,

@@ -392,7 +392,7 @@ class TestConstraints(object):
         zero_pose.add_sphere(u'sphere', 0.05, pose=object_pose)
 
         publish_marker_vector(start_pose.pose.position, map_T_goal_position.pose.position)
-        zero_pose.set_translation_goal(goal_position, zero_pose.l_tip)
+        zero_pose.set_straight_translation_goal(goal_position, zero_pose.l_tip)
         zero_pose.send_and_check_goal()
 
 

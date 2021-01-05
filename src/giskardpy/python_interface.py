@@ -52,6 +52,16 @@ class GiskardWrapper(object):
         self.set_translation_goal(root, tip, pose_stamped, max_velocity=trans_max_velocity, weight=weight)
         self.set_rotation_goal(root, tip, pose_stamped, max_velocity=rot_max_velocity, weight=weight)
 
+    def set_straight_cart_goal(self, root, tip, pose_stamped, trans_max_velocity=None, rot_max_velocity=None, weight=None):
+        """
+        :param tip:
+        :type tip: str
+        :param pose_stamped:
+        :type pose_stamped: PoseStamped
+        """
+        self.set_straight_translation_goal(root, tip, pose_stamped, max_velocity=trans_max_velocity, weight=weight)
+        self.set_rotation_goal(root, tip, pose_stamped, max_velocity=rot_max_velocity, weight=weight)
+
     def set_translation_goal(self, root, tip, pose_stamped, weight=None, max_velocity=None):
         """
         :param tip:
@@ -69,6 +79,34 @@ class GiskardWrapper(object):
         else:
             constraint = Constraint()
             constraint.type = u'CartesianPosition' # TODO: add CartesianPositionStraight here
+            params = {}
+            params[u'root_link'] = root
+            params[u'tip_link'] = tip
+            params[u'goal'] = convert_ros_message_to_dictionary(pose_stamped)
+            if max_velocity:
+                params[u'max_velocity'] = max_velocity
+            if weight:
+                params[u'weight'] = weight
+            constraint.parameter_value_pair = json.dumps(params)
+            self.cmd_seq[-1].constraints.append(constraint)
+
+    def set_straight_translation_goal(self, root, tip, pose_stamped, weight=None, max_velocity=None):
+        """
+        :param tip:
+        :type tip: str
+        :param pose_stamped:
+        :type pose_stamped: PoseStamped
+        """
+        if not max_velocity and not weight:
+            constraint = CartesianConstraint()
+            constraint.type = CartesianConstraint.STRAIGHT_TRANSLATION_3D # TODO: add STRAIGHT_TRANSLATION_3D here
+            constraint.root_link = str(root)
+            constraint.tip_link = str(tip)
+            constraint.goal = pose_stamped
+            self.cmd_seq[-1].cartesian_constraints.append(constraint)
+        else:
+            constraint = Constraint()
+            constraint.type = u'CartesianPositionStraight' # TODO: add CartesianPositionStraight here
             params = {}
             params[u'root_link'] = root
             params[u'tip_link'] = tip

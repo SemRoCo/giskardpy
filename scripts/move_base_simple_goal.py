@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import rospy
 from geometry_msgs.msg import PoseStamped
 from tf.transformations import rotation_from_matrix, quaternion_matrix

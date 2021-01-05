@@ -897,7 +897,8 @@ def publish_marker_sphere(position, frame_id=u'map', radius=0.05, id_=0):
     m.scale.z = radius
 
     pub = rospy.Publisher('/visualization_marker', Marker, queue_size=1)
-    while pub.get_num_connections() < 1:
+    start = rospy.get_rostime()
+    while pub.get_num_connections() < 1 and (rospy.get_rostime() - start).to_sec() < 2:
         # wait for a connection to publisher
         # you can do whatever you like here or simply do nothing
         pass
@@ -927,7 +928,8 @@ def publish_marker_vector(start, end, diameter_shaft=0.01, diameter_head=0.02,  
     m.header.frame_id = u'map'
 
     pub = rospy.Publisher('/visualization_marker', Marker, queue_size=1)
-    while pub.get_num_connections() < 1:
+    start = rospy.get_rostime()
+    while pub.get_num_connections() < 1 and (rospy.get_rostime() - start).to_sec() < 2:
         # wait for a connection to publisher
         # you can do whatever you like here or simply do nothing
         pass

@@ -1,7 +1,6 @@
 from collections import OrderedDict
 from multiprocessing import Lock
 
-import pybullet as p
 import giskardpy.pybullet_wrapper as pw
 from geometry_msgs.msg import Pose
 
@@ -17,6 +16,7 @@ class PyBulletWorldObject(WorldObject):
     """
     base_link_name = u'base'
 
+    @profile
     def __init__(self, urdf, base_pose=None, controlled_joints=None, path_to_data_folder=u'',
                  calc_self_collision_matrix=False, *args, **kwargs):
         """
@@ -47,6 +47,7 @@ class PyBulletWorldObject(WorldObject):
 
 
     @WorldObject.joint_state.setter
+    @profile
     def joint_state(self, value):
         """
                 :param joint_state:
@@ -58,12 +59,12 @@ class PyBulletWorldObject(WorldObject):
             for joint_name, singe_joint_state in value.items():
                 # FIXME hack because pybullet doesn't support mimic joints
                 if not self.is_joint_mimic(joint_name):
-                    p.resetJointState(self._pybullet_id, self.joint_name_to_info[joint_name].joint_index,
+                    pw.resetJointState(self._pybullet_id, self.joint_name_to_info[joint_name].joint_index,
                                       singe_joint_state.position)
                 if joint_name in self.mimic_cb:
                     mimic_joint, cb = self.mimic_cb[joint_name]
                     mimiced_position = cb(singe_joint_state.position)
-                    p.resetJointState(self._pybullet_id, self.joint_name_to_info[mimic_joint].joint_index,
+                    pw.resetJointState(self._pybullet_id, self.joint_name_to_info[mimic_joint].joint_index,
                                       mimiced_position)
                 else:
                     pass
@@ -76,7 +77,7 @@ class PyBulletWorldObject(WorldObject):
                 self._base_pose = value
                 WorldObject.base_pose.fset(self, value)
                 position, orientation = msg_to_pybullet_pose(value)
-                p.resetBasePositionAndOrientation(self._pybullet_id, position, orientation)
+                pw.resetBasePositionAndOrientation(self._pybullet_id, position, orientation)
 
     def get_pybullet_id(self):
         return self._pybullet_id
@@ -96,8 +97,8 @@ class PyBulletWorldObject(WorldObject):
                                                 [self.base_link_name] + [None] * 4))
         self.link_id_to_name[-1] = self.base_link_name
         self.link_name_to_id[self.base_link_name] = -1
-        for joint_index in range(p.getNumJoints(self._pybullet_id)):
-            joint_info = JointInfo(*p.getJointInfo(self._pybullet_id, joint_index))
+        for joint_index in range(pw.getNumJoints(self._pybullet_id)):
+            joint_info = JointInfo(*pw.getJointInfo(self._pybullet_id, joint_index))
             joint_name = joint_info.joint_name
             self.joint_name_to_info[joint_name] = joint_info
             self.joint_id_to_info[joint_info.joint_index] = joint_info
@@ -120,6 +121,7 @@ class PyBulletWorldObject(WorldObject):
         self.link_name_to_id[self.get_root()] = -1
         self.link_id_to_name[-1] = self.get_root()
 
+    @profile
     def reinitialize(self):
         with self.lock:
             super(PyBulletWorldObject, self).reinitialize()
@@ -130,7 +132,8 @@ class PyBulletWorldObject(WorldObject):
                 joint_state = self.joint_state
                 base_pose = self.base_pose
                 self.suicide()
-            self._pybullet_id = load_urdf_string_into_bullet(self.get_urdf_str(), base_pose)
+            s = self.get_urdf_str()
+            self._pybullet_id = load_urdf_string_into_bullet(s, base_pose)
             self.__sync_with_bullet()
         if joint_state is not None:
             joint_state = {k: v for k, v in joint_state.items() if k in self.get_joint_names()}
@@ -139,7 +142,7 @@ class PyBulletWorldObject(WorldObject):
 
     def suicide(self):
         if self._pybullet_id is not None:
-            p.removeBody(self._pybullet_id)
+            pw.removeBody(self._pybullet_id)
             self._pybullet_id = None
             logging.logdebug(u'<-- removed {} from pybullet'.format(self.get_name()))
 
@@ -152,7 +155,7 @@ class PyBulletWorldObject(WorldObject):
         :return: Base pose of the robot in the world.
         :rtype: Transform
         """
-        return pybullet_pose_to_msg(p.getBasePositionAndOrientation(self._pybullet_id))
+        return pybullet_pose_to_msg(pw.getBasePositionAndOrientation(self._pybullet_id))
 
     def get_pybullet_link_id(self, link_name):
         """

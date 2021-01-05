@@ -3,6 +3,7 @@ import numpy as np
 from py_trees import Status
 
 import giskardpy.identifier as identifier
+from giskardpy import logging
 from giskardpy.exceptions import ShakingException
 from giskardpy.plugin import GiskardBehavior
 # fast
@@ -15,6 +16,8 @@ class WiggleCancel(GiskardBehavior):
         self.amplitude_threshold = self.get_god_map().get_data(identifier.amplitude_threshold)
         self.num_samples_in_fft = self.get_god_map().get_data(identifier.num_samples_in_fft)
         self.frequency_range = self.get_god_map().get_data(identifier.frequency_range)
+        self.max_angular_velocity = 10.5
+        self.max_linear_velocity = 10.5
 
     def initialise(self):
         super(WiggleCancel, self).initialise()
@@ -27,7 +30,11 @@ class WiggleCancel(GiskardBehavior):
         self.velocity_limits = []
         for joint_name, threshold in zip(self.get_robot().controlled_joints,
                                          make_velocity_threshold(self.get_god_map())):
-            velocity_limit = self.get_robot().get_joint_velocity_limit(joint_name)
+            velocity_limit = self.get_robot().get_joint_velocity_limit_expr_evaluated(joint_name, self.god_map)
+            if self.get_robot().is_joint_prismatic(joint_name):
+                velocity_limit = min(self.max_linear_velocity, velocity_limit)
+            else:
+                velocity_limit = min(self.max_angular_velocity, velocity_limit)
             self.keys.append(joint_name)
             self.thresholds.append(threshold)
             self.velocity_limits.append(velocity_limit)
@@ -52,8 +59,21 @@ class WiggleCancel(GiskardBehavior):
 
         js_samples_array = np.array(self.js_samples)
         plot = False
-        self.detect_shaking(js_samples_array, self.sample_period, self.min_wiggle_frequency,
-                            self.amplitude_threshold, self.thresholds, self.velocity_limits, plot)
+        try:
+            self.detect_shaking(js_samples_array, self.sample_period, self.min_wiggle_frequency,
+                                self.amplitude_threshold, self.thresholds, self.velocity_limits, plot)
+        except ShakingException as e:
+            if self.get_god_map().get_data(identifier.cut_off_shaking):
+                trajectory = self.get_god_map().get_data(identifier.trajectory)
+                for i in range(self.num_samples_in_fft):
+                    trajectory.delete_last()
+                # time = self.get_god_map().get_data(identifier.time)
+                # self.get_god_map().set_data(identifier.time, len(trajectory.keys()))
+                if len(trajectory.keys()) >= self.num_samples_in_fft:
+                    logging.loginfo(str(e))
+                    logging.loginfo(u'cutting off last second')
+                    return Status.SUCCESS
+            raise e
 
         return Status.RUNNING
 
@@ -65,7 +85,8 @@ class WiggleCancel(GiskardBehavior):
         N = len(js_samples[0]) - 1
         # remove joints that arent moving
         mask = self.make_mask(js_samples, moving_thresholds)
-        amplitude_thresholds = velocity_limits[mask] * amplitude_threshold * N  # acceleration limit is basically vel*2
+        velocity_limits = velocity_limits[mask]
+        amplitude_thresholds = velocity_limits * amplitude_threshold * N  # acceleration limit is basically vel*2
         joints_filtered = js_samples[mask]
         joints_filtered = np.diff(joints_filtered)
         # joints_filtered = (joints_filtered.T - joints_filtered.mean(axis=1)).T
@@ -112,7 +133,7 @@ class WiggleCancel(GiskardBehavior):
                 if np.any(violations[:, i]):
                     joint = filtered_keys[i]
                     velocity_limit = velocity_limits[i]
-                    hertz_str = ','.join(u'{} hertz: {} > {}'.format(freq[freq_idx:][j],
+                    hertz_str = u', '.join(u'{} hertz: {} > {}'.format(freq[freq_idx:][j],
                                                                      fft[:, freq_idx:].T[:, i][j] / N / velocity_limit,
                                                                      amplitude_threshold) for j, x in
                                          enumerate(violations[:, i]) if x)

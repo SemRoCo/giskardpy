@@ -1,3 +1,4 @@
+from time import time
 import keyword
 import yaml
 from collections import defaultdict
@@ -10,6 +11,7 @@ import numpy as np
 import rospy
 from actionlib_msgs.msg import GoalID
 from angles import shortest_angular_distance
+from control_msgs.msg import FollowJointTrajectoryActionGoal, FollowJointTrajectoryActionResult
 from geometry_msgs.msg import PoseStamped, Pose, Point, Quaternion
 from giskard_msgs.msg import MoveActionResult, CollisionEntry, MoveActionGoal, MoveResult, MoveGoal
 from giskard_msgs.srv import UpdateWorldResponse
@@ -219,8 +221,10 @@ def pykdl_frame_to_numpy(pykdl_frame):
                      [0, 0, 0, 1]])
 
 
-class GiskardTestWrapper(object):
+class GiskardTestWrapper(GiskardWrapper):
     def __init__(self, config_file):
+        self.total_time_spend_giskarding = 0
+        self.total_time_spend_moving = 0
         with open(get_ros_pkg_path(u'giskardpy') + u'/config/' + config_file) as f:
             config = yaml.load(f)
         rospy.set_param('~', config)
@@ -228,13 +232,19 @@ class GiskardTestWrapper(object):
         rospy.set_param('~enable_gui', False)
         rospy.set_param('~plugins/PlotTrajectory/enabled', True)
 
-        self.sub_result = rospy.Subscriber('/giskardpy/command/result', MoveActionResult, self.cb, queue_size=100)
-        self.cancel_goal = rospy.Publisher('/giskardpy/command/cancel', GoalID, queue_size=100)
+        self.sub_result = rospy.Subscriber('~command/result', MoveActionResult, self.cb, queue_size=100)
+        self.cancel_goal = rospy.Publisher('~command/cancel', GoalID, queue_size=100)
+        self.start_motion_sub = rospy.Subscriber('/whole_body_controller/follow_joint_trajectory/goal',
+                                                FollowJointTrajectoryActionGoal, self.start_motion_cb,
+                                                 queue_size=100)
+        self.stop_motion_sub = rospy.Subscriber('/whole_body_controller/follow_joint_trajectory/result',
+                                               FollowJointTrajectoryActionResult, self.stop_motion_cb,
+                                                queue_size=100)
 
         self.tree = grow_tree()
         self.loop_once()
         # rospy.sleep(1)
-        self.wrapper = GiskardWrapper(ns=u'tests')
+        super(GiskardTestWrapper, self).__init__(node_name=u'tests')
         self.results = Queue(100)
         self.default_root = self.get_robot().get_root()
         self.map = u'map'
@@ -249,6 +259,12 @@ class GiskardTestWrapper(object):
 
         self.joint_state_publisher = KeyDefaultDict(create_publisher)
         # rospy.sleep(1)
+
+    def start_motion_cb(self, msg):
+        self.time = time()
+
+    def stop_motion_cb(self, msg):
+        self.total_time_spend_moving += time() - self.time
 
     def wait_for_synced(self):
         sleeper = rospy.Rate(self.tick_rate)
@@ -299,22 +315,20 @@ class GiskardTestWrapper(object):
 
     def tear_down(self):
         rospy.sleep(1)
+        logging.loginfo(u'total time spend giskarding: {}'.format(self.total_time_spend_giskarding-self.total_time_spend_moving))
+        logging.loginfo(u'total time spend moving: {}'.format(self.total_time_spend_moving))
         logging.loginfo(u'stopping plugins')
 
-    def set_object_joint_state(self, object_name, joint_state, topic=None):
-        if topic is None:
-            self.wrapper.set_object_joint_state(object_name, joint_state)
-        else:
-            self.joint_state_publisher[topic].publish(position_dict_to_joint_states(joint_state))
-            rospy.sleep(.5)
-
+    def set_object_joint_state(self, object_name, joint_state):
+        super(GiskardTestWrapper, self).set_object_joint_state(object_name, joint_state)
+        rospy.sleep(0.5)
         self.wait_for_synced()
         current_js = self.get_world().get_object(object_name).joint_state
         for joint_name, state in joint_state.items():
             np.testing.assert_almost_equal(current_js[joint_name].position, state, 2)
 
     def set_kitchen_js(self, joint_state, object_name=u'kitchen'):
-        self.set_object_joint_state(object_name, joint_state, topic=u'/kitchen/cram_joint_states')
+        self.set_object_joint_state(object_name, joint_state)
 
     #
     # JOINT GOAL STUFF #################################################################################################
@@ -336,13 +350,7 @@ class GiskardTestWrapper(object):
                 np.testing.assert_almost_equal(current, goal, decimal,
                                                err_msg='{} at {} insteand of {}'.format(joint_name, current, goal))
 
-    def set_joint_goal(self, js, weight=None):
-        """
-        :rtype js: dict
-        """
-        self.wrapper.set_joint_goal(js, weight=weight)
-
-    def check_joint_state(self, expected, decimal=2):
+    def check_current_joint_state(self, expected, decimal=2):
         current_joint_state = to_joint_state_position_dict(self.get_current_joint_state())
         self.compare_joint_state(current_joint_state, expected, decimal=decimal)
 
@@ -353,7 +361,7 @@ class GiskardTestWrapper(object):
         self.set_joint_goal(goal, weight=weight)
         self.send_and_check_goal(expected_error_codes=expected_error_codes)
         if expected_error_codes == [MoveResult.SUCCESS]:
-            self.check_joint_state(goal, decimal=decimal)
+            self.check_current_joint_state(goal, decimal=decimal)
 
     #
     # CART GOAL STUFF ##################################################################################################
@@ -387,33 +395,32 @@ class GiskardTestWrapper(object):
         goal.pose.orientation.w = 1
         self.set_rotation_goal(goal, tip, root)
 
-    def align_planes(self, tip, tip_normal, root=None, root_normal=None, weight=None):
-        self.wrapper.align_planes(tip, tip_normal, root, root_normal, weight)
+    def set_rotation_goal(self, goal_pose, tip_link, root_link=None, weight=None, max_velocity=None):
+        if not root_link:
+            root_link = self.default_root
+        super(GiskardTestWrapper, self).set_rotation_goal(goal_pose, tip_link, root_link, max_velocity=max_velocity)
 
-    def set_rotation_goal(self, goal_pose, tip, root=None, max_velocity=None):
-        if not root:
-            root = self.default_root
-        self.wrapper.set_rotation_goal(root, tip, goal_pose, max_velocity=max_velocity)
+    def set_translation_goal(self, goal_pose, tip_link, root_link=None, weight=None, max_velocity=None):
+        if not root_link:
+            root_link = self.default_root
+        super(GiskardTestWrapper, self).set_translation_goal(goal_pose, tip_link, root_link, max_velocity=max_velocity)
 
-    def set_translation_goal(self, goal_pose, tip, root=None, max_velocity=None):
-        if not root:
-            root = self.default_root
-        self.wrapper.set_translation_goal(root, tip, goal_pose, max_velocity=max_velocity)
 
     def set_straight_translation_goal(self, goal_pose, tip, root=None, max_velocity=None):
         if not root:
             root = self.default_root
         self.wrapper.set_straight_translation_goal(root, tip, goal_pose, max_velocity=max_velocity)
 
-    def set_cart_goal(self, goal_pose, tip, root=None, weight=None, linear_velocity=None, angular_velocity=None):
-        if not root:
-            root = self.default_root
+    def set_cart_goal(self, goal_pose, tip_link, root_link=None, weight=None, linear_velocity=None, angular_velocity=None):
+        if not root_link:
+            root_link = self.default_root
         if weight is not None:
-            self.wrapper.set_cart_goal(root, tip, goal_pose, weight=weight, trans_max_velocity=linear_velocity,
-                                       rot_max_velocity=angular_velocity)
+            super(GiskardTestWrapper, self).set_cart_goal(goal_pose, tip_link, root_link, weight=weight, max_linear_velocity=linear_velocity,
+                                       max_angular_velocity=angular_velocity)
         else:
-            self.wrapper.set_cart_goal(root, tip, goal_pose, trans_max_velocity=linear_velocity,
-                                       rot_max_velocity=angular_velocity)
+            super(GiskardTestWrapper, self).set_cart_goal(goal_pose, tip_link, root_link, max_linear_velocity=linear_velocity,
+                                       max_angular_velocity=angular_velocity)
+
 
     def set_straight_cart_goal(self, goal_pose, tip, root=None, weight=None, linear_velocity=None, angular_velocity=None):
         if not root:
@@ -425,15 +432,17 @@ class GiskardTestWrapper(object):
             self.wrapper.set_straight_cart_goal(root, tip, goal_pose, trans_max_velocity=linear_velocity,
                                        rot_max_velocity=angular_velocity)
 
-    def set_and_check_cart_goal(self, goal_pose, tip, root=None, weight=None, linear_velocity=None, angular_velocity=None,
+
+    def set_and_check_cart_goal(self, goal_pose, tip_link, root_link=None, weight=None, linear_velocity=None, angular_velocity=None,
                                 expected_error_codes=None):
         goal_pose_in_map = transform_pose(u'map', goal_pose)
-        self.set_cart_goal(goal_pose, tip, root, weight, linear_velocity=linear_velocity, angular_velocity=angular_velocity)
+        self.set_cart_goal(goal_pose, tip_link, root_link, weight, linear_velocity=linear_velocity, angular_velocity=angular_velocity)
         self.loop_once()
         self.send_and_check_goal(expected_error_codes)
         self.loop_once()
         if expected_error_codes is None:
-            self.check_cart_goal(tip, goal_pose_in_map)
+            self.check_cart_goal(tip_link, goal_pose_in_map)
+
 
     def set_and_check_straight_cart_goal(self, goal_pose, tip, root=None, weight=None, linear_velocity=None, angular_velocity=None,
                                 expected_error_codes=None):
@@ -445,9 +454,10 @@ class GiskardTestWrapper(object):
         if expected_error_codes is None:
             self.check_cart_goal(tip, goal_pose_in_map)
 
-    def check_cart_goal(self, tip, goal_pose):
+
+    def check_cart_goal(self, tip_link, goal_pose):
         goal_in_base = transform_pose(u'map', goal_pose)
-        current_pose = lookup_pose(u'map', tip)
+        current_pose = lookup_pose(u'map', tip_link)
         np.testing.assert_array_almost_equal(msg_to_list(goal_in_base.pose.position),
                                              msg_to_list(current_pose.pose.position), decimal=2)
 
@@ -470,7 +480,7 @@ class GiskardTestWrapper(object):
                                  goal_type=MoveGoal.PLAN_AND_CHECK_REACHABILITY)
 
     def get_as(self):
-        return Blackboard().get(u'giskardpy/command')
+        return Blackboard().get(u'~command')
 
     def send_goal(self, goal=None, goal_type=MoveGoal.PLAN_AND_EXECUTE, wait=True):
         """
@@ -478,10 +488,11 @@ class GiskardTestWrapper(object):
         """
         if goal is None:
             goal = MoveActionGoal()
-            goal.goal = self.wrapper._get_goal()
+            goal.goal = self._get_goal()
             goal.goal.type = goal_type
         i = 0
         self.loop_once()
+        t = time()
         t1 = Thread(target=self.get_as()._as.action_server.internal_goal_callback, args=(goal,))
         self.loop_once()
         t1.start()
@@ -491,6 +502,8 @@ class GiskardTestWrapper(object):
             sleeper.sleep()
             i += 1
         t1.join()
+        t = time() - t
+        self.total_time_spend_giskarding += t
         self.loop_once()
         result = self.results.get()
         return result
@@ -498,7 +511,7 @@ class GiskardTestWrapper(object):
     def send_goal_and_dont_wait(self, goal=None, goal_type=MoveGoal.PLAN_AND_EXECUTE, stop_after=20):
         if goal is None:
             goal = MoveActionGoal()
-            goal.goal = self.wrapper._get_goal()
+            goal.goal = self._get_goal()
             goal.goal.type = goal_type
         i = 0
         self.loop_once()
@@ -532,12 +545,6 @@ class GiskardTestWrapper(object):
                                                                                     expected_error_code),
                                                                                 error_message)
         return r.trajectory
-
-    def add_waypoint(self):
-        self.wrapper.add_cmd()
-
-    def add_json_goal(self, constraint_type, **kwargs):
-        self.wrapper.set_json_goal(constraint_type, **kwargs)
 
     def get_result_trajectory_position(self):
         trajectory = self.get_god_map().unsafe_get_data(identifier.trajectory)
@@ -580,37 +587,37 @@ class GiskardTestWrapper(object):
         return self.get_god_map().get_data(world)
 
     def clear_world(self):
-        assert self.wrapper.clear_world().error_codes == UpdateWorldResponse.SUCCESS
+        assert super(GiskardTestWrapper, self).clear_world().error_codes == UpdateWorldResponse.SUCCESS
         assert len(self.get_world().get_object_names()) == 0
-        assert len(self.wrapper.get_object_names().object_names) == 0
+        assert len(self.get_object_names().object_names) == 0
         # assert len(self.get_robot().get_attached_objects()) == 0
         # assert self.get_world().has_object(u'plane')
 
     def remove_object(self, name, expected_response=UpdateWorldResponse.SUCCESS):
-        r = self.wrapper.remove_object(name)
+        r = super(GiskardTestWrapper, self).remove_object(name)
         assert r.error_codes == expected_response, \
             u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
                                             update_world_error_code(expected_response))
         assert not self.get_world().has_object(name)
-        assert not name in self.wrapper.get_object_names().object_names
+        assert not name in self.get_object_names().object_names
 
     def detach_object(self, name, expected_response=UpdateWorldResponse.SUCCESS):
         if expected_response == UpdateWorldResponse.SUCCESS:
             p = self.get_robot().get_fk_pose(self.get_robot().get_root(), name)
             p = transform_pose(u'map', p)
-            assert name in self.wrapper.get_attached_objects().object_names, \
+            assert name in self.get_attached_objects().object_names, \
                 'there is no attached object named {}'.format(name)
-        r = self.wrapper.detach_object(name)
+        r = super(GiskardTestWrapper, self).detach_object(name)
         assert r.error_codes == expected_response, \
             u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
                                             update_world_error_code(expected_response))
         if expected_response == UpdateWorldResponse.SUCCESS:
             assert self.get_world().has_object(name)
-            assert not name in self.wrapper.get_attached_objects().object_names, 'the object was not detached'
+            assert not name in self.get_attached_objects().object_names, 'the object was not detached'
             compare_poses(self.get_world().get_object(name).base_pose, p.pose, decimal=2)
 
     def add_box(self, name=u'box', size=(1, 1, 1), pose=None, expected_response=UpdateWorldResponse.SUCCESS):
-        r = self.wrapper.add_box(name, size, pose=pose)
+        r = super(GiskardTestWrapper, self).add_box(name, size, pose=pose)
         assert r.error_codes == expected_response, \
             u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
                                             update_world_error_code(expected_response))
@@ -618,81 +625,52 @@ class GiskardTestWrapper(object):
         o_p = self.get_world().get_object(name).base_pose
         assert self.get_world().has_object(name)
         compare_poses(p.pose, o_p)
-        assert name in self.wrapper.get_object_names().object_names
-        compare_poses(o_p, self.wrapper.get_object_info(name).pose.pose)
+        assert name in self.get_object_names().object_names
+        compare_poses(o_p, self.get_object_info(name).pose.pose)
 
     def add_sphere(self, name=u'sphere', size=1, pose=None):
-        r = self.wrapper.add_sphere(name=name, size=size, pose=pose)
+        r = super(GiskardTestWrapper, self).add_sphere(name=name, size=size, pose=pose)
         assert r.error_codes == UpdateWorldResponse.SUCCESS, \
             u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
                                             update_world_error_code(UpdateWorldResponse.SUCCESS))
         assert self.get_world().has_object(name)
-        assert name in self.wrapper.get_object_names().object_names
+        assert name in self.get_object_names().object_names
         o_p = self.get_world().get_object(name).base_pose
-        compare_poses(o_p, self.wrapper.get_object_info(name).pose.pose)
+        compare_poses(o_p, self.get_object_info(name).pose.pose)
 
     def add_cylinder(self, name=u'cylinder', size=[1, 1], pose=None):
-        r = self.wrapper.add_cylinder(name=name, size=size, pose=pose)
+        r = super(GiskardTestWrapper, self).add_cylinder(name=name, height=size[0], radius=size[1], pose=pose)
         assert r.error_codes == UpdateWorldResponse.SUCCESS, \
             u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
                                             update_world_error_code(UpdateWorldResponse.SUCCESS))
         assert self.get_world().has_object(name)
-        assert name in self.wrapper.get_object_names().object_names
+        assert name in self.get_object_names().object_names
 
     def add_mesh(self, name=u'cylinder', path=u'', pose=None, expected_error=UpdateWorldResponse.SUCCESS):
-        r = self.wrapper.add_mesh(name=name, mesh=path, pose=pose)
+        r = super(GiskardTestWrapper, self).add_mesh(name=name, mesh=path, pose=pose)
         assert r.error_codes == expected_error, \
             u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
                                             update_world_error_code(expected_error))
         if expected_error == UpdateWorldResponse.SUCCESS:
             assert self.get_world().has_object(name)
-            assert name in self.wrapper.get_object_names().object_names
+            assert name in self.get_object_names().object_names
             o_p = self.get_world().get_object(name).base_pose
-            compare_poses(o_p, self.wrapper.get_object_info(name).pose.pose)
+            compare_poses(o_p, self.get_object_info(name).pose.pose)
         else:
             assert not self.get_world().has_object(name)
-            assert name not in self.wrapper.get_object_names().object_names
+            assert name not in self.get_object_names().object_names
 
-    def add_urdf(self, name, urdf, pose, js_topic):
-        r = self.wrapper.add_urdf(name, urdf, pose, js_topic)
+    def add_urdf(self, name, urdf, pose, js_topic=u'', set_js_topic=None):
+        r = super(GiskardTestWrapper, self).add_urdf(name, urdf, pose, js_topic, set_js_topic=set_js_topic)
         assert r.error_codes == UpdateWorldResponse.SUCCESS, \
             u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
                                             update_world_error_code(UpdateWorldResponse.SUCCESS))
         assert self.get_world().has_object(name)
-        assert name in self.wrapper.get_object_names().object_names
-
-    def allow_all_collisions(self):
-        self.wrapper.allow_all_collisions()
+        assert name in self.get_object_names().object_names
 
     def avoid_all_collisions(self, distance=0.5):
-        self.wrapper.avoid_all_collisions(distance)
+        super(GiskardTestWrapper, self).avoid_all_collisions(distance)
         self.loop_once()
-
-    def allow_self_collision(self):
-        self.wrapper.allow_self_collision()
-
-    def avoid_self_collision(self):
-        self.wrapper.avoid_self_collision()
-
-    def add_collision_entries(self, collisions_entries):
-        self.wrapper.set_collision_entries(collisions_entries)
-
-    def allow_collision(self, robot_links, body_b, link_bs):
-        ces = []
-        ces.append(CollisionEntry(type=CollisionEntry.ALLOW_COLLISION,
-                                  robot_links=robot_links,
-                                  body_b=body_b,
-                                  link_bs=link_bs))
-        self.add_collision_entries(ces)
-
-    def avoid_collision(self, robot_links, body_b, link_bs, min_dist):
-        ces = []
-        ces.append(CollisionEntry(type=CollisionEntry.AVOID_COLLISION,
-                                  robot_links=robot_links,
-                                  body_b=body_b,
-                                  link_bs=link_bs,
-                                  min_dist=min_dist))
-        self.add_collision_entries(ces)
 
     def attach_box(self, name=u'box', size=None, frame_id=None, position=None, orientation=None, pose=None,
                    expected_response=UpdateWorldResponse.SUCCESS):
@@ -707,7 +685,7 @@ class GiskardTestWrapper(object):
                 expected_pose.pose.orientation = Quaternion(0, 0, 0, 1)
         else:
             expected_pose = deepcopy(pose)
-        r = self.wrapper.attach_box(name, size, frame_id, position, orientation, pose)
+        r = super(GiskardTestWrapper, self).attach_box(name, size, frame_id, position, orientation, pose)
         assert r.error_codes == expected_response, \
             u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
                                             update_world_error_code(expected_response))
@@ -715,8 +693,8 @@ class GiskardTestWrapper(object):
             self.wait_for_synced()
             assert name in self.get_controllable_links()
             assert not self.get_world().has_object(name)
-            assert not name in self.wrapper.get_object_names().object_names
-            assert name in self.wrapper.get_attached_objects().object_names, 'object {} was not attached'
+            assert not name in self.get_object_names().object_names
+            assert name in self.get_attached_objects().object_names, 'object {} was not attached'
             assert scm.difference(self.get_robot().get_self_collision_matrix()) == set()
             assert len(scm) < len(self.get_robot().get_self_collision_matrix())
             compare_poses(expected_pose.pose, lookup_pose(frame_id, name).pose)
@@ -732,7 +710,7 @@ class GiskardTestWrapper(object):
             expected_pose.pose.orientation = Quaternion(*orientation)
         else:
             expected_pose.pose.orientation = Quaternion(0, 0, 0, 1)
-        r = self.wrapper.attach_cylinder(name, height, radius, frame_id, position, orientation)
+        r = super(GiskardTestWrapper, self).attach_cylinder(name, height, radius, frame_id, position, orientation)
         assert r.error_codes == expected_response, \
             u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
                                             update_world_error_code(expected_response))
@@ -740,24 +718,24 @@ class GiskardTestWrapper(object):
             self.wait_for_synced()
             assert name in self.get_controllable_links()
             assert not self.get_world().has_object(name)
-            assert not name in self.wrapper.get_object_names().object_names
-            assert name in self.wrapper.get_attached_objects().object_names
+            assert not name in self.get_object_names().object_names
+            assert name in self.get_attached_objects().object_names
             assert scm.difference(self.get_robot().get_self_collision_matrix()) == set()
             assert len(scm) < len(self.get_robot().get_self_collision_matrix())
             compare_poses(expected_pose.pose, lookup_pose(frame_id, name).pose)
         self.loop_once()
 
-    def attach_existing(self, name=u'box', frame_id=None, expected_response=UpdateWorldResponse.SUCCESS):
+    def attach_object(self, name=u'box', frame_id=None, expected_response=UpdateWorldResponse.SUCCESS):
         scm = self.get_robot().get_self_collision_matrix()
-        r = self.wrapper.attach_object(name, frame_id)
+        r = super(GiskardTestWrapper, self).attach_object(name, frame_id)
         assert r.error_codes == expected_response, \
             u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
                                             update_world_error_code(expected_response))
         self.wait_for_synced()
         assert name in self.get_controllable_links()
         assert not self.get_world().has_object(name)
-        assert not name in self.wrapper.get_object_names().object_names
-        assert name in self.wrapper.get_attached_objects().object_names
+        assert not name in self.get_object_names().object_names
+        assert name in self.get_attached_objects().object_names
         assert scm.difference(self.get_robot().get_self_collision_matrix()) == set()
         assert len(scm) < len(self.get_robot().get_self_collision_matrix())
         self.loop_once()

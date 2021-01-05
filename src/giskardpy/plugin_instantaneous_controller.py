@@ -6,7 +6,6 @@ import giskardpy.identifier as identifier
 from giskardpy.plugin import GiskardBehavior
 from giskardpy.symengine_controller import InstantaneousController
 from collections import OrderedDict, namedtuple
-import utils
 
 
 class ControllerPlugin(GiskardBehavior):
@@ -70,6 +69,7 @@ class ControllerPlugin(GiskardBehavior):
         self.qp_data[identifier.bA_keys[-1]], \
         self.qp_data[identifier.xdot_keys[-1]] = self.controller.get_qpdata_key_map()
 
+    @profile
     def update(self):
 
         expr = self.controller.get_expr()

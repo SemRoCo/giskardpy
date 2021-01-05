@@ -7,8 +7,8 @@ import numpy as np
 import pytest
 import roslaunch
 import rospy
-from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped, PointStamped
-from giskard_msgs.msg import CollisionEntry, MoveActionGoal, MoveResult, WorldBody, MoveGoal
+from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped, PointStamped, Transform
+from giskard_msgs.msg import CollisionEntry, MoveActionGoal, MoveResult, WorldBody, MoveGoal, MoveCmd
 from giskard_msgs.srv import UpdateWorldResponse, UpdateWorldRequest
 from numpy import pi
 from sensor_msgs.msg import JointState
@@ -24,6 +24,8 @@ from giskardpy.tfwrapper import init as tf_init
 from giskardpy.utils import to_joint_state_position_dict, publish_marker_vector
 from rospy_message_converter.message_converter import convert_dictionary_to_ros_message
 from utils_for_tests import PR2, compare_poses
+from iai_naive_kinematics_sim.srv import UpdateTransform
+
 
 # TODO roslaunch iai_pr2_sim ros_control_sim_with_base.launch
 # TODO roslaunch iai_kitchen upload_kitchen_obj.launch
@@ -232,7 +234,8 @@ def kitchen_setup(resetted_giskard):
     resetted_giskard.send_and_check_joint_goal(gaya_pose)
     object_name = u'kitchen'
     resetted_giskard.add_urdf(object_name, rospy.get_param(u'kitchen_description'),
-                              tf.lookup_pose(u'map', u'iai_kitchen/world'), u'/kitchen/joint_states')
+                              tf.lookup_pose(u'map', u'iai_kitchen/world'), u'/kitchen/joint_states',
+                              set_js_topic=u'/kitchen/cram_joint_states')
     js = {k: 0.0 for k in resetted_giskard.get_world().get_object(object_name).get_movable_joints()}
     resetted_giskard.set_kitchen_js(js)
     return resetted_giskard
@@ -330,7 +333,7 @@ class TestJointGoals(object):
         zero_pose.allow_self_collision()
         zero_pose.set_joint_goal(pocky_pose)
         zero_pose.send_and_check_goal(goal_type=MoveGoal.PLAN_ONLY)
-        zero_pose.check_joint_state(default_pose)
+        zero_pose.check_current_joint_state(default_pose)
 
     def test_prismatic_joint1(self, zero_pose):
         """
@@ -399,7 +402,7 @@ class TestConstraints(object):
     def test_CartesianVelocityLimit(self, zero_pose):
         linear_velocity = 1
         angular_velocity = 1
-        zero_pose.add_json_goal(u'CartesianVelocityLimit',
+        zero_pose.limit_cartesian_velocity(
                                 root_link=zero_pose.default_root,
                                 tip_link=u'base_footprint',
                                 max_linear_velocity=0.1,
@@ -412,7 +415,7 @@ class TestConstraints(object):
         goal_position.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 4, [0, 0, 1]))
 
         zero_pose.set_and_check_cart_goal(goal_pose=goal_position,
-                                          tip=u'r_gripper_tool_frame',
+                                          tip_link=u'r_gripper_tool_frame',
                                           linear_velocity=linear_velocity,
                                           angular_velocity=angular_velocity,
                                           weight=WEIGHT_BELOW_CA
@@ -425,7 +428,7 @@ class TestConstraints(object):
         """
         percentage = 10
         zero_pose.allow_self_collision()
-        zero_pose.add_json_goal(u'AvoidJointLimits', percentage=percentage)
+        zero_pose.avoid_joint_limits(percentage=percentage)
         zero_pose.send_and_check_goal()
 
         joint_non_continuous = [j for j in zero_pose.get_robot().controlled_joints if
@@ -453,13 +456,13 @@ class TestConstraints(object):
         del goal_state[u'odom_x_joint']
         del goal_state[u'odom_y_joint']
         zero_pose.allow_self_collision()
-        zero_pose.add_json_goal(u'AvoidJointLimits',
+        zero_pose.set_json_goal(u'AvoidJointLimits',
                                 percentage=percentage)
         zero_pose.set_joint_goal(goal_state)
         zero_pose.send_and_check_goal()
 
         zero_pose.allow_self_collision()
-        zero_pose.add_json_goal(u'AvoidJointLimits',
+        zero_pose.set_json_goal(u'AvoidJointLimits',
                                 percentage=percentage)
         zero_pose.send_and_check_goal()
 
@@ -502,7 +505,7 @@ class TestConstraints(object):
 
         old_pose = tf.lookup_pose(u'map', u'base_footprint')
 
-        pocky_pose_setup.wrapper.update_god_map(updates)
+        pocky_pose_setup.update_god_map(updates)
         pocky_pose_setup.set_and_check_cart_goal(r_goal, pocky_pose_setup.r_tip)
 
         new_pose = tf.lookup_pose(u'map', u'base_footprint')
@@ -525,7 +528,7 @@ class TestConstraints(object):
         }
         # old_pose = tf.lookup_pose(u'map', u'base_footprint')
         # old_pose.pose.position.x += 0.1
-        pocky_pose_setup.wrapper.update_god_map(updates)
+        pocky_pose_setup.update_god_map(updates)
         pocky_pose_setup.set_and_check_cart_goal(r_goal, pocky_pose_setup.r_tip)
 
         new_pose = tf.lookup_pose(u'map', u'base_footprint')
@@ -546,17 +549,17 @@ class TestConstraints(object):
         :param pocky_pose_setup: PR2
         """
         # FIXME idk
-        pocky_pose_setup.add_json_goal(u'BasePointingForward')
+        pocky_pose_setup.set_json_goal(u'BasePointingForward')
         r_goal = PoseStamped()
         r_goal.header.frame_id = pocky_pose_setup.r_tip
         r_goal.pose.position.y = -2
         r_goal.pose.orientation.w = 1
-        pocky_pose_setup.add_json_goal(u'CartesianVelocityLimit',
-                                root_link=pocky_pose_setup.default_root,
-                                tip_link=u'base_footprint',
-                                max_linear_velocity=0.1,
-                                max_angular_velocity=0.2
-                                )
+        pocky_pose_setup.set_json_goal(u'CartesianVelocityLimit',
+                                       root_link=pocky_pose_setup.default_root,
+                                       tip_link=u'base_footprint',
+                                       max_linear_velocity=0.1,
+                                       max_angular_velocity=0.2
+                                       )
         pocky_pose_setup.set_and_check_cart_goal(r_goal, pocky_pose_setup.r_tip, weight=WEIGHT_BELOW_CA)
 
     def test_UpdateGodMap2(self, pocky_pose_setup):
@@ -582,7 +585,7 @@ class TestConstraints(object):
                 }
             }
         }
-        pocky_pose_setup.wrapper.update_god_map(updates)
+        pocky_pose_setup.update_god_map(updates)
         pocky_pose_setup.set_cart_goal(r_goal, pocky_pose_setup.r_tip)
         pocky_pose_setup.send_and_check_goal(expected_error_codes=[MoveResult.ERROR])
         assert pocky_pose_setup.get_god_map().unsafe_get_data(
@@ -609,7 +612,7 @@ class TestConstraints(object):
                 }
             }
         }
-        pocky_pose_setup.wrapper.update_god_map(updates)
+        pocky_pose_setup.update_god_map(updates)
         pocky_pose_setup.set_cart_goal(r_goal, pocky_pose_setup.r_tip)
         pocky_pose_setup.send_and_check_goal(expected_error_codes=[MoveResult.ERROR])
         assert pocky_pose_setup.get_god_map().unsafe_get_data(
@@ -629,20 +632,21 @@ class TestConstraints(object):
         pointing_axis = Vector3Stamped()
         pointing_axis.header.frame_id = tip
         pointing_axis.vector.x = 1
-        kitchen_setup.wrapper.pointing(tip, goal_point, pointing_axis=pointing_axis)
+        kitchen_setup.pointing(tip, goal_point, pointing_axis=pointing_axis)
         kitchen_setup.send_and_check_goal()
 
         base_goal = PoseStamped()
         base_goal.header.frame_id = u'base_footprint'
         base_goal.pose.position.y = 2
         base_goal.pose.orientation = Quaternion(*quaternion_about_axis(1, [0, 0, 1]))
-        kitchen_setup.wrapper.pointing(tip, goal_point, pointing_axis=pointing_axis)
-        kitchen_setup.add_json_goal(u'CartesianVelocityLimit',
-                                root_link=kitchen_setup.default_root,
-                                tip_link=u'base_footprint',
-                                max_linear_velocity=0.1,
-                                max_angular_velocity=0.2
-                                )
+        kitchen_setup.pointing(tip, goal_point, pointing_axis=pointing_axis)
+        kitchen_setup.set_json_goal(u'CartesianVelocityLimit',
+                                    root_link=kitchen_setup.default_root,
+                                    tip_link=u'base_footprint',
+                                    max_linear_velocity=0.1,
+                                    max_angular_velocity=0.2
+                                    )
+        kitchen_setup.set_joint_goal(gaya_pose)
         kitchen_setup.move_base(base_goal)
 
         current_x = Vector3Stamped()
@@ -659,7 +663,7 @@ class TestConstraints(object):
         pointing_axis = Vector3Stamped()
         pointing_axis.header.frame_id = tip
         pointing_axis.vector.x = 1
-        kitchen_setup.wrapper.pointing(tip, goal_point, pointing_axis=pointing_axis, root=kitchen_setup.r_tip)
+        kitchen_setup.pointing(tip, goal_point, pointing_axis=pointing_axis, root_link=kitchen_setup.r_tip)
 
         rospy.loginfo("Starting pointing")
         r_goal = PoseStamped()
@@ -716,7 +720,7 @@ class TestConstraints(object):
         goal_state.name = [u'r_elbow_flex_joint']
         goal_state.position = [-1.0]
         kwargs = {u'goal_state': goal_state}
-        zero_pose.add_json_goal(u'jointpos', **kwargs)
+        zero_pose.set_json_goal(u'jointpos', **kwargs)
         zero_pose.send_and_check_goal(expected_error_codes=[MoveResult.UNKNOWN_CONSTRAINT])
 
     def test_python_code_in_constraint_type(self, zero_pose):
@@ -724,7 +728,7 @@ class TestConstraints(object):
         goal_state.name = [u'r_elbow_flex_joint']
         goal_state.position = [-1.0]
         kwargs = {u'goal_state': goal_state}
-        zero_pose.add_json_goal(u'print("asd")', **kwargs)
+        zero_pose.set_json_goal(u'print("asd")', **kwargs)
         zero_pose.send_and_check_goal(expected_error_codes=[MoveResult.UNKNOWN_CONSTRAINT])
 
     def test_wrong_params1(self, zero_pose):
@@ -732,7 +736,7 @@ class TestConstraints(object):
         goal_state.name = u'r_elbow_flex_joint'
         goal_state.position = [-1.0]
         kwargs = {u'goal_state': goal_state}
-        zero_pose.add_json_goal(u'JointPositionList', **kwargs)
+        zero_pose.set_json_goal(u'JointPositionList', **kwargs)
         zero_pose.send_and_check_goal(expected_error_codes=[MoveResult.CONSTRAINT_INITIALIZATION_ERROR])
 
     def test_wrong_params2(self, zero_pose):
@@ -740,7 +744,7 @@ class TestConstraints(object):
         goal_state.name = [5432]
         goal_state.position = u'test'
         kwargs = {u'goal_state': goal_state}
-        zero_pose.add_json_goal(u'JointPositionList', **kwargs)
+        zero_pose.set_json_goal(u'JointPositionList', **kwargs)
         zero_pose.send_and_check_goal(expected_error_codes=[MoveResult.CONSTRAINT_INITIALIZATION_ERROR])
 
     def test_align_planes2(self, zero_pose):
@@ -780,9 +784,9 @@ class TestConstraints(object):
         tip_grasp_axis.header.frame_id = kitchen_setup.r_tip
         tip_grasp_axis.vector.z = 1
 
-        kitchen_setup.add_json_goal(u'GraspBar',
-                                    root=kitchen_setup.default_root,
-                                    tip=kitchen_setup.r_tip,
+        kitchen_setup.set_json_goal(u'GraspBar',
+                                    root_link=kitchen_setup.default_root,
+                                    tip_link=kitchen_setup.r_tip,
                                     tip_grasp_axis=tip_grasp_axis,
                                     bar_center=bar_center,
                                     bar_axis=bar_axis,
@@ -817,9 +821,9 @@ class TestConstraints(object):
         tip_grasp_axis.header.frame_id = kitchen_setup.r_tip
         tip_grasp_axis.vector.z = 1
 
-        kitchen_setup.add_json_goal(u'GraspBar',
-                                    root=kitchen_setup.default_root,
-                                    tip=kitchen_setup.r_tip,
+        kitchen_setup.set_json_goal(u'GraspBar',
+                                    root_link=kitchen_setup.default_root,
+                                    tip_link=kitchen_setup.r_tip,
                                     tip_grasp_axis=tip_grasp_axis,
                                     bar_center=bar_center,
                                     bar_axis=bar_axis,
@@ -831,28 +835,30 @@ class TestConstraints(object):
         x_goal = Vector3Stamped()
         x_goal.header.frame_id = handle_frame_id
         x_goal.vector.x = -1
-        kitchen_setup.align_planes(kitchen_setup.r_tip, x_gripper, root_normal=x_goal, weight=WEIGHT_ABOVE_CA)
+        kitchen_setup.align_planes(kitchen_setup.r_tip, x_gripper, root_normal=x_goal, weight=WEIGHT_BELOW_CA)
         # kitchen_setup.allow_all_collisions()
-        kitchen_setup.add_json_goal(u'AvoidJointLimits', percentage=percentage)
+        kitchen_setup.set_json_goal(u'AvoidJointLimits', percentage=percentage)
+        kitchen_setup.limit_cartesian_velocity(u'odom_combined', u'base_footprint', max_linear_velocity=0.1,
+                                                       max_angular_velocity=0.2)
         kitchen_setup.send_and_check_goal()
 
-        kitchen_setup.add_json_goal(u'OpenDoor',
-                                    tip=kitchen_setup.r_tip,
+        kitchen_setup.set_json_goal(u'OpenDoor',
+                                    tip_link=kitchen_setup.r_tip,
                                     object_name=u'kitchen',
-                                    handle_link=handle_name,
+                                    object_link_name=handle_name,
                                     angle_goal=1.5)
         kitchen_setup.allow_all_collisions()
-        kitchen_setup.add_json_goal(u'AvoidJointLimits', percentage=percentage)
+        kitchen_setup.set_json_goal(u'AvoidJointLimits', percentage=percentage)
         kitchen_setup.send_and_check_goal()
         kitchen_setup.set_kitchen_js({u'iai_fridge_door_joint': 1.5})
 
-        kitchen_setup.add_json_goal(u'OpenDoor',
-                                    tip=kitchen_setup.r_tip,
+        kitchen_setup.set_json_goal(u'OpenDoor',
+                                    tip_link=kitchen_setup.r_tip,
                                     object_name=u'kitchen',
-                                    handle_link=handle_name,
+                                    object_link_name=handle_name,
                                     angle_goal=0)
         kitchen_setup.allow_all_collisions()
-        kitchen_setup.add_json_goal(u'AvoidJointLimits', percentage=percentage)
+        kitchen_setup.set_json_goal(u'AvoidJointLimits', percentage=percentage)
         kitchen_setup.send_and_check_goal()
         kitchen_setup.set_kitchen_js({u'iai_fridge_door_joint': 0})
 
@@ -877,9 +883,9 @@ class TestConstraints(object):
         tip_grasp_axis.header.frame_id = kitchen_setup.r_tip
         tip_grasp_axis.vector.z = 1
 
-        kitchen_setup.add_json_goal(u'GraspBar',
-                                    root=kitchen_setup.default_root,
-                                    tip=kitchen_setup.r_tip,
+        kitchen_setup.set_json_goal(u'GraspBar',
+                                    root_link=kitchen_setup.default_root,
+                                    tip_link=kitchen_setup.r_tip,
                                     tip_grasp_axis=tip_grasp_axis,
                                     bar_center=bar_center,
                                     bar_axis=bar_axis,
@@ -895,19 +901,19 @@ class TestConstraints(object):
         kitchen_setup.allow_all_collisions()
         kitchen_setup.send_and_check_goal()
 
-        kitchen_setup.add_json_goal(u'Open',
-                                    tip=kitchen_setup.r_tip,
+        kitchen_setup.set_json_goal(u'Open',
+                                    tip_link=kitchen_setup.r_tip,
                                     object_name=u'kitchen',
-                                    handle_link=handle_name)
+                                    object_link_name=handle_name)
         kitchen_setup.allow_all_collisions()
 
         kitchen_setup.send_and_check_goal()
         kitchen_setup.set_kitchen_js({u'iai_fridge_door_joint': np.pi / 2})
 
-        kitchen_setup.add_json_goal(u'Close',
-                                    tip=kitchen_setup.r_tip,
+        kitchen_setup.set_json_goal(u'Close',
+                                    tip_link=kitchen_setup.r_tip,
                                     object_name=u'kitchen',
-                                    handle_link=handle_name)
+                                    object_link_name=handle_name)
         kitchen_setup.allow_all_collisions()
         kitchen_setup.send_and_check_goal()
         kitchen_setup.set_kitchen_js({u'iai_fridge_door_joint': 0})
@@ -947,10 +953,10 @@ class TestConstraints(object):
         kitchen_setup.allow_all_collisions()
         kitchen_setup.send_and_check_goal()
 
-        kitchen_setup.add_json_goal(u'Close',
-                                    tip=elbow,
+        kitchen_setup.set_json_goal(u'Close',
+                                    tip_link=elbow,
                                     object_name=u'kitchen',
-                                    handle_link=handle_name)
+                                    object_link_name=handle_name)
         kitchen_setup.allow_all_collisions()
         kitchen_setup.send_and_check_goal()
         kitchen_setup.set_kitchen_js({u'iai_fridge_door_joint': 0})
@@ -973,9 +979,9 @@ class TestConstraints(object):
         tip_grasp_axis.header.frame_id = kitchen_setup.l_tip
         tip_grasp_axis.vector.z = 1
 
-        kitchen_setup.add_json_goal(u'GraspBar',
-                                    root=kitchen_setup.default_root,
-                                    tip=kitchen_setup.l_tip,
+        kitchen_setup.set_json_goal(u'GraspBar',
+                                    root_link=kitchen_setup.default_root,
+                                    tip_link=kitchen_setup.l_tip,
                                     tip_grasp_axis=tip_grasp_axis,
                                     bar_center=bar_center,
                                     bar_axis=bar_axis,
@@ -995,19 +1001,19 @@ class TestConstraints(object):
 
         kitchen_setup.send_and_check_goal()
 
-        kitchen_setup.add_json_goal(u'OpenDoor',
-                                    tip=kitchen_setup.l_tip,
+        kitchen_setup.set_json_goal(u'OpenDoor',
+                                    tip_link=kitchen_setup.l_tip,
                                     object_name=u'kitchen',
-                                    handle_link=handle_name,
+                                    object_link_name=handle_name,
                                     angle_goal=goal_angle)
         kitchen_setup.allow_all_collisions()
         kitchen_setup.send_and_check_goal()
         kitchen_setup.set_kitchen_js({u'oven_area_oven_door_joint': goal_angle})
 
-        kitchen_setup.add_json_goal(u'OpenDoor',
-                                    tip=kitchen_setup.l_tip,
+        kitchen_setup.set_json_goal(u'OpenDoor',
+                                    tip_link=kitchen_setup.l_tip,
                                     object_name=u'kitchen',
-                                    handle_link=handle_name,
+                                    object_link_name=handle_name,
                                     angle_goal=0)
         kitchen_setup.allow_all_collisions()
         kitchen_setup.send_and_check_goal()
@@ -1040,9 +1046,9 @@ class TestConstraints(object):
         tip_grasp_axis.header.frame_id = hand
         tip_grasp_axis.vector.z = 1
 
-        kitchen_setup.add_json_goal(u'GraspBar',
-                                    root=kitchen_setup.default_root,
-                                    tip=hand,
+        kitchen_setup.set_json_goal(u'GraspBar',
+                                    root_link=kitchen_setup.default_root,
+                                    tip_link=hand,
                                     tip_grasp_axis=tip_grasp_axis,
                                     bar_center=bar_center,
                                     bar_axis=bar_axis,
@@ -1062,10 +1068,10 @@ class TestConstraints(object):
 
         kitchen_setup.send_and_check_goal()
 
-        kitchen_setup.add_json_goal(u'Open',
-                                    tip=hand,
+        kitchen_setup.set_json_goal(u'Open',
+                                    tip_link=hand,
                                     object_name=u'kitchen',
-                                    handle_link=handle_name,
+                                    object_link_name=handle_name,
                                     goal_joint_state=goal_angle,
                                     # weight=100
                                     )
@@ -1073,10 +1079,10 @@ class TestConstraints(object):
         kitchen_setup.send_and_check_goal()
         kitchen_setup.set_kitchen_js({u'sink_area_dish_washer_door_joint': goal_angle})
 
-        kitchen_setup.add_json_goal(u'Close',
-                                    tip=hand,
+        kitchen_setup.set_json_goal(u'Close',
+                                    tip_link=hand,
                                     object_name=u'kitchen',
-                                    handle_link=handle_name)
+                                    object_link_name=handle_name)
         kitchen_setup.allow_all_collisions()
         kitchen_setup.send_and_check_goal()
         kitchen_setup.set_kitchen_js({u'sink_area_dish_washer_door_joint': 0})
@@ -1097,9 +1103,8 @@ class TestConstraints(object):
         tip_grasp_axis.header.frame_id = kitchen_setup.r_tip
         tip_grasp_axis.vector.z = 1
 
-        kitchen_setup.add_json_goal(u'GraspBar',
-                                    root=kitchen_setup.default_root,
-                                    tip=kitchen_setup.r_tip,
+        kitchen_setup.grasp_bar(root_link=kitchen_setup.default_root,
+                                    tip_link=kitchen_setup.r_tip,
                                     tip_grasp_axis=tip_grasp_axis,
                                     bar_center=bar_center,
                                     bar_axis=bar_axis,
@@ -1125,9 +1130,9 @@ class TestConstraints(object):
         tip_grasp_axis.header.frame_id = kitchen_setup.l_tip
         tip_grasp_axis.vector.z = 1
 
-        kitchen_setup.add_json_goal(u'GraspBar',
-                                    root=kitchen_setup.default_root,
-                                    tip=kitchen_setup.l_tip,
+        kitchen_setup.set_json_goal(u'GraspBar',
+                                    root_link=kitchen_setup.default_root,
+                                    tip_link=kitchen_setup.l_tip,
                                     tip_grasp_axis=tip_grasp_axis,
                                     bar_center=bar_center,
                                     bar_axis=bar_axis,
@@ -1146,30 +1151,30 @@ class TestConstraints(object):
         # kitchen_setup.allow_all_collisions()
         kitchen_setup.send_and_check_goal()
 
-        kitchen_setup.add_json_goal(u'Open',
-                                    tip=kitchen_setup.l_tip,
+        kitchen_setup.set_json_goal(u'Open',
+                                    tip_link=kitchen_setup.l_tip,
                                     object_name=u'kitchen',
-                                    handle_link=handle_name)
+                                    object_link_name=handle_name)
         kitchen_setup.allow_all_collisions()  # makes execution faster
         kitchen_setup.send_and_check_goal()  # send goal to Giskard
         # Update kitchen object
         kitchen_setup.set_kitchen_js({u'sink_area_left_middle_drawer_main_joint': 0.48})
 
         # Close drawer partially
-        kitchen_setup.add_json_goal(u'OpenDrawer',
-                                    tip=kitchen_setup.l_tip,
+        kitchen_setup.set_json_goal(u'OpenDrawer',
+                                    tip_link=kitchen_setup.l_tip,
                                     object_name=u'kitchen',
-                                    handle_link=handle_name,
+                                    object_link_name=handle_name,
                                     distance_goal=0.2)
         kitchen_setup.allow_all_collisions()  # makes execution faster
         kitchen_setup.send_and_check_goal()  # send goal to Giskard
         # Update kitchen object
         kitchen_setup.set_kitchen_js({u'sink_area_left_middle_drawer_main_joint': 0.2})
 
-        kitchen_setup.add_json_goal(u'Close',
-                                    tip=kitchen_setup.l_tip,
+        kitchen_setup.set_json_goal(u'Close',
+                                    tip_link=kitchen_setup.l_tip,
                                     object_name=u'kitchen',
-                                    handle_link=handle_name)
+                                    object_link_name=handle_name)
         kitchen_setup.allow_all_collisions()  # makes execution faster
         kitchen_setup.send_and_check_goal()  # send goal to Giskard
         # Update kitchen object
@@ -1476,7 +1481,7 @@ class TestCartGoals(object):
         kitchen_setup.set_cart_goal(r_goal, kitchen_setup.r_tip, weight=WEIGHT_BELOW_CA)
         # kitchen_setup.allow_collision([], tray_name, [])
         # kitchen_setup.allow_all_collisions()
-        kitchen_setup.add_json_goal(u'CartesianVelocityLimit',
+        kitchen_setup.set_json_goal(u'CartesianVelocityLimit',
                                     root_link=kitchen_setup.default_root,
                                     tip_link=u'base_footprint',
                                     max_linear_velocity=0.1,
@@ -1559,7 +1564,7 @@ class TestCartGoals(object):
         pocky_pose_setup.set_and_check_cart_goal(p, pocky_pose_setup.r_tip, pocky_pose_setup.default_root,
                                                  expected_error_codes=[MoveResult.SHAKING])
 
-        # box_setup.wrapper.avoid_collision()
+        # box_setup.avoid_collision()
 
         # collision_entry = CollisionEntry()
         # collision_entry.type = CollisionEntry.AVOID_COLLISION
@@ -1584,10 +1589,10 @@ class TestCartGoals(object):
         p.pose.position = Point(0, 0, 0)
         p.pose.orientation = Quaternion(0, 0, 0, 1)
         zero_pose.set_cart_goal(deepcopy(p), u'base_footprint')
-        zero_pose.add_waypoint()
+        zero_pose.add_cmd()
         p.pose.position.x += 1
         zero_pose.set_cart_goal(deepcopy(p), u'base_footprint')
-        zero_pose.add_waypoint()
+        zero_pose.add_cmd()
         p.pose.position.x += 1
         zero_pose.set_cart_goal(p, u'base_footprint')
         result = zero_pose.send_goal_and_dont_wait(stop_after=10)
@@ -1657,7 +1662,7 @@ class TestCartGoals(object):
         p.pose.orientation = Quaternion(0, 0, 0, 1)
         zero_pose.set_cart_goal(p, zero_pose.r_tip, zero_pose.default_root)
 
-        zero_pose.add_waypoint()
+        zero_pose.add_cmd()
         p = PoseStamped()
         p.header.frame_id = zero_pose.r_tip
         p.header.stamp = rospy.get_rostime()
@@ -1665,7 +1670,7 @@ class TestCartGoals(object):
         p.pose.orientation = Quaternion(0, 0, 0, 1)
         zero_pose.set_cart_goal(p, zero_pose.r_tip, zero_pose.default_root)
 
-        zero_pose.add_waypoint()
+        zero_pose.add_cmd()
         p = PoseStamped()
         p.header.frame_id = zero_pose.r_tip
         p.header.stamp = rospy.get_rostime()
@@ -1680,9 +1685,9 @@ class TestCartGoals(object):
         :type zero_pose: PR2
         """
         zero_pose.set_joint_goal(pocky_pose)
-        zero_pose.add_waypoint()
+        zero_pose.add_cmd()
         zero_pose.set_joint_goal(pick_up_pose)
-        zero_pose.add_waypoint()
+        zero_pose.add_cmd()
         zero_pose.set_joint_goal(gaya_pose)
 
         traj = zero_pose.send_and_check_goal()
@@ -1725,9 +1730,9 @@ class TestCartGoals(object):
         :type zero_pose: PR2
         """
         zero_pose.set_joint_goal(pocky_pose)
-        zero_pose.add_waypoint()
-        zero_pose.add_json_goal(u'muh')
-        zero_pose.add_waypoint()
+        zero_pose.add_cmd()
+        zero_pose.set_json_goal(u'muh')
+        zero_pose.add_cmd()
         zero_pose.set_joint_goal(gaya_pose)
 
         traj = zero_pose.send_and_check_goal(expected_error_codes=[MoveResult.SUCCESS,
@@ -1760,10 +1765,10 @@ class TestCartGoals(object):
         """
         :type zero_pose: PR2
         """
-        zero_pose.add_json_goal(u'muh')
-        zero_pose.add_waypoint()
+        zero_pose.set_json_goal(u'muh')
+        zero_pose.add_cmd()
         zero_pose.set_joint_goal(pocky_pose)
-        zero_pose.add_waypoint()
+        zero_pose.add_cmd()
         zero_pose.set_joint_goal(gaya_pose)
 
         traj = zero_pose.send_and_check_goal(expected_error_codes=[MoveResult.UNKNOWN_CONSTRAINT,
@@ -1797,10 +1802,10 @@ class TestCartGoals(object):
         :type zero_pose: PR2
         """
         zero_pose.set_joint_goal(pocky_pose)
-        zero_pose.add_waypoint()
+        zero_pose.add_cmd()
         zero_pose.set_joint_goal(gaya_pose)
-        zero_pose.add_waypoint()
-        zero_pose.add_json_goal(u'muh')
+        zero_pose.add_cmd()
+        zero_pose.set_json_goal(u'muh')
 
         traj = zero_pose.send_and_check_goal(expected_error_codes=[MoveResult.SUCCESS,
                                                                    MoveResult.SUCCESS,
@@ -1833,9 +1838,9 @@ class TestCartGoals(object):
         :type zero_pose: PR2
         """
         zero_pose.set_joint_goal(pocky_pose)
-        zero_pose.add_waypoint()
-        zero_pose.add_json_goal(u'muh')
-        zero_pose.add_waypoint()
+        zero_pose.add_cmd()
+        zero_pose.set_json_goal(u'muh')
+        zero_pose.add_cmd()
         zero_pose.set_joint_goal(gaya_pose)
 
         traj = zero_pose.send_and_check_goal(expected_error_codes=[MoveResult.SUCCESS,
@@ -1857,7 +1862,7 @@ class TestCartGoals(object):
         """
         :type zero_pose: PR2
         """
-        zero_pose.add_json_goal(u'muh')
+        zero_pose.set_json_goal(u'muh')
         zero_pose.send_and_check_goal(expected_error_codes=[MoveResult.UNKNOWN_CONSTRAINT, ],
                                       goal_type=MoveGoal.PLAN_AND_EXECUTE_AND_SKIP_FAILURES)
 
@@ -2150,7 +2155,7 @@ class TestCollisionAvoidanceGoals(object):
 
         map_T_cart_goal = tf.kdl_to_pose_stamped(map_T_odom * tf.pose_to_kdl(wrong_odom_T_goal.pose), u'map')
 
-        kitchen_setup.add_json_goal(u'AvoidJointLimits', percentage=40)
+        kitchen_setup.set_json_goal(u'AvoidJointLimits', percentage=40)
         kitchen_setup.set_and_check_cart_goal(map_T_cart_goal, kitchen_setup.r_tip)
 
     def test_bug2020_09_08_09_09_53_dump(self, kitchen_setup):
@@ -2298,7 +2303,7 @@ class TestCollisionAvoidanceGoals(object):
 
         map_T_cart_goal = tf.kdl_to_pose_stamped(map_T_odom * tf.pose_to_kdl(wrong_odom_T_goal.pose), u'map')
 
-        kitchen_setup.add_json_goal(u'AvoidJointLimits', percentage=40)
+        kitchen_setup.set_json_goal(u'AvoidJointLimits', percentage=40)
         kitchen_setup.avoid_all_collisions(0.1)
         kitchen_setup.allow_collision([
             "r_gripper_l_finger_tip_link",
@@ -2465,7 +2470,7 @@ class TestCollisionAvoidanceGoals(object):
 
         map_T_cart_goal = tf.kdl_to_pose_stamped(map_T_odom * tf.pose_to_kdl(wrong_odom_T_goal.pose), u'map')
 
-        kitchen_setup.add_json_goal(u'AvoidJointLimits', percentage=40)
+        kitchen_setup.set_json_goal(u'AvoidJointLimits', percentage=40)
         # kitchen_setup.avoid_all_collisions(0.05)
         kitchen_setup.allow_collision([
             "r_gripper_l_finger_tip_link",
@@ -2486,6 +2491,7 @@ class TestCollisionAvoidanceGoals(object):
         kitchen_setup.set_and_check_cart_goal(map_T_cart_goal, kitchen_setup.r_tip)
 
     def test_bug2020_09_15_11_23_35_dump_grasp_wiggle_drawer(self, kitchen_setup):
+        # fixme  AssertionError: in goal 0; got: SUCCESS, expected: SHAKING | error_massage: None
         map_T_odom = tf.pose_to_kdl(convert_dictionary_to_ros_message(u'geometry_msgs/PoseStamped',
                                                                       {
                                                                           "header": {
@@ -2631,9 +2637,9 @@ class TestCollisionAvoidanceGoals(object):
 
         map_T_cart_goal = tf.kdl_to_pose_stamped(map_T_odom * tf.pose_to_kdl(wrong_odom_T_goal.pose), u'map')
 
-        kitchen_setup.add_json_goal(u'AvoidJointLimits', percentage=40)
+        kitchen_setup.set_json_goal(u'AvoidJointLimits', percentage=40)
         kitchen_setup.avoid_all_collisions(0.1)
-        kitchen_setup.add_json_goal(u'CartesianVelocityLimit',
+        kitchen_setup.set_json_goal(u'CartesianVelocityLimit',
                                     root_link=u'odom_combined',
                                     tip_link=u'base_footprint',
                                     max_linear_velocity=0.1,
@@ -2760,9 +2766,9 @@ class TestCollisionAvoidanceGoals(object):
 
         map_T_cart_goal = tf.kdl_to_pose_stamped(map_T_odom * tf.pose_to_kdl(wrong_odom_T_goal.pose), u'map')
 
-        kitchen_setup.add_json_goal(u'AvoidJointLimits', percentage=40)
+        kitchen_setup.set_json_goal(u'AvoidJointLimits', percentage=40)
         # kitchen_setup.avoid_all_collisions(0.1)
-        kitchen_setup.add_json_goal(u'CartesianVelocityLimit',
+        kitchen_setup.set_json_goal(u'CartesianVelocityLimit',
                                     root_link=u'odom_combined',
                                     tip_link=u'base_footprint',
                                     max_linear_velocity=0.05,
@@ -2771,6 +2777,7 @@ class TestCollisionAvoidanceGoals(object):
         kitchen_setup.set_and_check_cart_goal(map_T_cart_goal, kitchen_setup.r_tip)
 
     def test_bug2020_09_22_10_18_17_dump_shaking_fridge(self, kitchen_setup):
+        # fixme shaking detected shaking of joint: 'l_wrist_roll_joint' at 10.0 hertz: 0.310023530937 > 0.23
         map_T_odom = tf.pose_to_kdl(convert_dictionary_to_ros_message(u'geometry_msgs/PoseStamped',
                                                                       {
                                                                           "header": {
@@ -2891,7 +2898,7 @@ class TestCollisionAvoidanceGoals(object):
                                  size=[0.0695257345835, 0.0704464276632, 0.199114735921],
                                  frame_id=tip, pose=box_pose)
 
-        kitchen_setup.add_json_goal(u'CartesianVelocityLimit',
+        kitchen_setup.set_json_goal(u'CartesianVelocityLimit',
                                     root_link=u'base_footprint',
                                     tip_link=tip,
                                     max_linear_velocity=0.05,
@@ -3023,7 +3030,7 @@ class TestCollisionAvoidanceGoals(object):
                                  size=[0.0695257345835, 0.0704464276632, 0.199114735921],
                                  frame_id=tip, pose=box_pose)
 
-        kitchen_setup.add_json_goal(u'CartesianVelocityLimit',
+        kitchen_setup.set_json_goal(u'CartesianVelocityLimit',
                                     root_link=u'base_footprint',
                                     tip_link='l_wrist_roll_link',
                                     max_linear_velocity=0.05,
@@ -3032,7 +3039,7 @@ class TestCollisionAvoidanceGoals(object):
                                     # weight=WEIGHT_BELOW_CA,
                                     )
 
-        kitchen_setup.add_json_goal(u'CartesianVelocityLimit',
+        kitchen_setup.set_json_goal(u'CartesianVelocityLimit',
                                     root_link=u'base_footprint',
                                     tip_link='r_wrist_roll_link',
                                     max_linear_velocity=0.05,
@@ -3041,22 +3048,897 @@ class TestCollisionAvoidanceGoals(object):
                                     # weight=WEIGHT_BELOW_CA,
                                     )
         kitchen_setup.send_and_check_joint_goal({
-            "l_shoulder_pan_joint":1.9652919379395388,
-            "l_shoulder_lift_joint":-0.26499816732737785,
-            "l_upper_arm_roll_joint":1.3837617139225473,
-            "l_elbow_flex_joint":-2.1224566064321584,
-            "l_forearm_roll_joint":16.99646118944817,
-            "l_wrist_flex_joint":-0.07350789589924167,
-            "l_wrist_roll_joint":0.0,
-            "r_shoulder_pan_joint":-1.712587449591307,
-            "r_shoulder_lift_joint":-0.2567290370386635,
-            "r_upper_arm_roll_joint":-1.4633501125737374,
-            "r_elbow_flex_joint":-2.1221670650093913,
-            "r_forearm_roll_joint":1.7663253481913623,
-            "r_wrist_flex_joint":-0.07942669250968948,
-            "r_wrist_roll_joint":0.05106258161229582
+            "l_shoulder_pan_joint": 1.9652919379395388,
+            "l_shoulder_lift_joint": -0.26499816732737785,
+            "l_upper_arm_roll_joint": 1.3837617139225473,
+            "l_elbow_flex_joint": -2.1224566064321584,
+            "l_forearm_roll_joint": 16.99646118944817,
+            "l_wrist_flex_joint": -0.07350789589924167,
+            "l_wrist_roll_joint": 0.0,
+            "r_shoulder_pan_joint": -1.712587449591307,
+            "r_shoulder_lift_joint": -0.2567290370386635,
+            "r_upper_arm_roll_joint": -1.4633501125737374,
+            "r_elbow_flex_joint": -2.1221670650093913,
+            "r_forearm_roll_joint": 1.7663253481913623,
+            "r_wrist_flex_joint": -0.07942669250968948,
+            "r_wrist_roll_joint": 0.05106258161229582
         })
 
+    def test_bug2020_09_22_16_31_19_dump_shaking_fridge(self, kitchen_setup):
+        # fixme shaking detected shaking of joint: 'l_shoulder_lift_joint' at 10.0 hertz: 0.245926307205 > 0.23
+        # shaking of joint: 'l_wrist_roll_joint' at 10.0 hertz: 0.261248685913 > 0.23
+        map_T_odom = tf.pose_to_kdl(convert_dictionary_to_ros_message(u'geometry_msgs/PoseStamped',
+                                                                      {
+                                                                          "header": {
+                                                                              "frame_id": "map",
+                                                                              "seq": 0,
+                                                                              "stamp": {
+                                                                                  "nsecs": 0,
+                                                                                  "secs": 0
+                                                                              }
+                                                                          },
+                                                                          "pose": {
+                                                                              "orientation": {
+                                                                                  "w": 0.9961110256200812,
+                                                                                  "x": 0.006263023182666383,
+                                                                                  "y": -0.005177686432095072,
+                                                                                  "z": -0.087731355523178
+                                                                              },
+                                                                              "position": {
+                                                                                  "x": -0.02804723533322183,
+                                                                                  "y": 1.521016808728904,
+                                                                                  "z": 0.024661551440549212
+                                                                              }
+                                                                          }
+                                                                      }
+                                                                      ).pose)
+
+        odom_T_base_footprint = PoseStamped()
+        odom_T_base_footprint.pose.position = Point(
+            0.749872459564353,
+            -2.3662978157179393,
+            0
+        )
+        odom_T_base_footprint.pose.orientation = Quaternion(*quaternion_about_axis(
+            -0.02447645526466663,
+            [0, 0, 1]))
+        odom_T_base_footprint = tf.pose_to_kdl(odom_T_base_footprint.pose)
+        map_T_base_footprint = tf.kdl_to_pose_stamped(map_T_odom * odom_T_base_footprint, u'map')
+
+        kitchen_setup.teleport_base(map_T_base_footprint)
+
+        js = {
+            "l_elbow_flex_joint": -1.1999776334963197,
+            "l_forearm_roll_joint": 125.80793083810454,
+            "l_shoulder_lift_joint": 0.3304654964048785,
+            "l_shoulder_pan_joint": 0.31122201505031577,
+            "l_upper_arm_roll_joint": 1.501462156478044,
+            "l_wrist_flex_joint": -0.4758783889802891,
+            "l_wrist_roll_joint": 17.44974655277518,
+            "r_elbow_flex_joint": -1.727087793643744,
+            "r_forearm_roll_joint": -67.3347966744268,
+            "r_shoulder_lift_joint": -0.023585428962786495,
+            "r_shoulder_pan_joint": -1.595440399265886,
+            "r_upper_arm_roll_joint": -1.4726506925031908,
+            "r_wrist_flex_joint": -0.4799775086785738,
+            "r_wrist_roll_joint": 37.75032336915375,
+            "torso_lift_joint": 0.2481805522141022,
+        }
+        kitchen_setup.allow_all_collisions()
+        kitchen_setup.send_and_check_joint_goal(js)
+
+        kitchen_setup.set_kitchen_js(
+            {
+                "fridge_area_lower_drawer_main_joint": 0.0,
+                "iai_fridge_door_joint": 1.5707,
+                "kitchen_island_left_lower_drawer_main_joint": 0.0,
+                "kitchen_island_left_upper_drawer_main_joint": 0.0,
+                "kitchen_island_middle_lower_drawer_main_joint": 0.0,
+                "kitchen_island_middle_upper_drawer_main_joint": 0.0,
+                "kitchen_island_right_lower_drawer_main_joint": 0.0,
+                "kitchen_island_right_upper_drawer_main_joint": 0.0,
+                "oven_area_area_left_drawer_main_joint": 0.0,
+                "oven_area_area_middle_lower_drawer_main_joint": 0.0,
+                "oven_area_area_middle_upper_drawer_main_joint": 0.0,
+                "oven_area_area_right_drawer_main_joint": 0.0,
+                "oven_area_oven_door_joint": 0.0,
+                "oven_area_oven_knob_oven_joint": 0.0,
+                "oven_area_oven_knob_stove_1_joint": 0.0,
+                "oven_area_oven_knob_stove_2_joint": 0.0,
+                "oven_area_oven_knob_stove_3_joint": 0.0,
+                "oven_area_oven_knob_stove_4_joint": 0.0,
+                "sink_area_dish_washer_door_joint": 0.0,
+                "sink_area_dish_washer_main_joint": 0.0,
+                "sink_area_dish_washer_tray_main": 0.0,
+                "sink_area_left_bottom_drawer_main_joint": 0.0,
+                "sink_area_left_middle_drawer_main_joint": 0.0,
+                "sink_area_left_upper_drawer_main_joint": 0.0,
+                "sink_area_trash_drawer_main_joint": 0.0
+            }
+        )
+
+        tip = "l_wrist_roll_link"
+        box_pose = convert_dictionary_to_ros_message(u'geometry_msgs/PoseStamped',
+                                                     {
+                                                         "header": {
+                                                             "frame_id": "l_wrist_roll_link",
+                                                             "seq": 0,
+                                                             "stamp": {
+                                                                 "nsecs": 0,
+                                                                 "secs": 0
+                                                             }
+                                                         },
+                                                         "pose": {
+                                                             "orientation": {
+                                                                 "w": 0.003999824012358274,
+                                                                 "x": 0.005999736017402663,
+                                                                 "y": -0.005999736017408128,
+                                                                 "z": 0.9999560029037843
+                                                             },
+                                                             "position": {
+                                                                 "x": 0.229,
+                                                                 "y": -0.006,
+                                                                 "z": -0.028
+                                                             }
+                                                         }
+                                                     }
+                                                     )
+        kitchen_setup.attach_box(u'bowl_1',
+                                 size=[0.0695257345835, 0.0704464276632, 0.199114735921],
+                                 frame_id=tip, pose=box_pose)
+
+        kitchen_setup.set_json_goal(u'CartesianVelocityLimit',
+                                    root_link=u'odom_combined',
+                                    # root_link=u'base_footprint',
+                                    tip_link='l_wrist_roll_link',
+                                    max_linear_velocity=0.05,
+                                    max_angular_velocity=0.25,
+                                    )
+
+        kitchen_setup.set_json_goal(u'CartesianVelocityLimit',
+                                    root_link=u'odom_combined',
+                                    # root_link=u'base_footprint',
+                                    tip_link='r_wrist_roll_link',
+                                    max_linear_velocity=0.05,
+                                    max_angular_velocity=0.25,
+                                    )
+
+        # kitchen_setup.add_json_goal(u'CartesianVelocityLimit',
+        #                             root_link=u'odom_combined',
+        #                             tip_link='base_footprint',
+        #                             max_linear_velocity=1,
+        #                             max_angular_velocity=1,
+        #                             )
+
+        # base_goal = PoseStamped()
+        # base_goal.header.frame_id = 'base_footprint'
+        # base_goal.pose.orientation.w = 1
+        # kitchen_setup.set_cart_goal(base_goal, 'base_footprint')
+
+        kitchen_setup.send_and_check_joint_goal({
+            "l_shoulder_pan_joint": 1.9652919379395388,
+            "l_shoulder_lift_joint": -0.26499816732737785,
+            "l_upper_arm_roll_joint": 1.3837617139225473,
+            "l_elbow_flex_joint": -2.1224566064321584,
+            "l_forearm_roll_joint": 16.99646118944817,
+            "l_wrist_flex_joint": -0.07350789589924167,
+            "l_wrist_roll_joint": 0.0,
+            "r_shoulder_pan_joint": -1.712587449591307,
+            "r_shoulder_lift_joint": -0.2567290370386635,
+            "r_upper_arm_roll_joint": -1.4633501125737374,
+            "r_elbow_flex_joint": -2.1221670650093913,
+            "r_forearm_roll_joint": 1.7663253481913623,
+            "r_wrist_flex_joint": -0.07942669250968948,
+            "r_wrist_roll_joint": 0.05106258161229582
+        })
+
+    def test_bug2020_09_23_14_41_39_dump_shaking_dishwasher_pregrasp(self, kitchen_setup):
+        map_T_odom = tf.pose_to_kdl(convert_dictionary_to_ros_message(u'geometry_msgs/PoseStamped',
+                                                                      {
+                                                                          "header": {
+                                                                              "frame_id": "map",
+                                                                              "seq": 0,
+                                                                              "stamp": {
+                                                                                  "nsecs": 0,
+                                                                                  "secs": 0
+                                                                              }
+                                                                          },
+                                                                          "pose": {
+                                                                              "orientation": {
+                                                                                  "w": 0.11408216549397629,
+                                                                                  "x": -0.002433897841084015,
+                                                                                  "y": -0.004554878786011255,
+                                                                                  "z": 0.9934578947981384
+                                                                              },
+                                                                              "position": {
+                                                                                  "x": -0.16320947833792052,
+                                                                                  "y": -0.21081622263243344,
+                                                                                  "z": -0.006415371063977849
+                                                                              }
+                                                                          }
+                                                                      }
+                                                                      ).pose)
+
+        odom_T_base_footprint = PoseStamped()
+        odom_T_base_footprint.pose.position = Point(
+            -0.28343443012929864,
+            -0.5648738290845918,
+            0
+        )
+        odom_T_base_footprint.pose.orientation = Quaternion(*quaternion_about_axis(
+            -2.967321533971128,
+            [0, 0, 1]))
+        odom_T_base_footprint = tf.pose_to_kdl(odom_T_base_footprint.pose)
+        map_T_base_footprint = tf.kdl_to_pose_stamped(map_T_odom * odom_T_base_footprint, u'map')
+
+        kitchen_setup.teleport_base(map_T_base_footprint)
+
+        js = {
+            "l_elbow_flex_joint": -2.121443211452474,
+            "l_forearm_roll_joint": 130.0879211074026,
+            "l_shoulder_lift_joint": -0.2985823517998466,
+            "l_shoulder_pan_joint": 1.9855211525746432,
+            "l_upper_arm_roll_joint": 1.3622741671889826,
+            "l_wrist_flex_joint": -0.10043991744088698,
+            "l_wrist_roll_joint": 25.13268219072186,
+            "r_elbow_flex_joint": -2.1211536700297065,
+            "r_forearm_roll_joint": -48.49943808080258,
+            "r_shoulder_lift_joint": -0.2567290370386635,
+            "r_shoulder_pan_joint": -1.715406274581445,
+            "r_upper_arm_roll_joint": -1.4633501125737374,
+            "r_wrist_flex_joint": -0.1007102521704093,
+            "r_wrist_roll_joint": 25.183946539228586,
+            "torso_lift_joint": 0.16467285637205487,
+        }
+        kitchen_setup.allow_all_collisions()
+        kitchen_setup.send_and_check_joint_goal(js)
+
+        kitchen_setup.set_kitchen_js(
+            {
+                "fridge_area_lower_drawer_main_joint": 0.0,
+                "iai_fridge_door_joint": 0.0,
+                "kitchen_island_left_lower_drawer_main_joint": 0.0,
+                "kitchen_island_left_upper_drawer_main_joint": 0.0,
+                "kitchen_island_middle_lower_drawer_main_joint": 0.0,
+                "kitchen_island_middle_upper_drawer_main_joint": 0.0,
+                "kitchen_island_right_lower_drawer_main_joint": 0.0,
+                "kitchen_island_right_upper_drawer_main_joint": 0.0,
+                "oven_area_area_left_drawer_main_joint": 0.0,
+                "oven_area_area_middle_lower_drawer_main_joint": 0.0,
+                "oven_area_area_middle_upper_drawer_main_joint": 0.0,
+                "oven_area_area_right_drawer_main_joint": 0.0,
+                "oven_area_oven_door_joint": 0.0,
+                "oven_area_oven_knob_oven_joint": 0.0,
+                "oven_area_oven_knob_stove_1_joint": 0.0,
+                "oven_area_oven_knob_stove_2_joint": 0.0,
+                "oven_area_oven_knob_stove_3_joint": 0.0,
+                "oven_area_oven_knob_stove_4_joint": 0.0,
+                "sink_area_dish_washer_door_joint": 0.95,
+                "sink_area_dish_washer_main_joint": 0.0,
+                "sink_area_dish_washer_tray_main": 0.0,
+                "sink_area_left_bottom_drawer_main_joint": 0.0,
+                "sink_area_left_middle_drawer_main_joint": 0.0,
+                "sink_area_left_upper_drawer_main_joint": 0.0,
+                "sink_area_trash_drawer_main_joint": 0.0
+            }
+        )
+
+        tip = "l_wrist_roll_link"
+        # box_pose = convert_dictionary_to_ros_message(u'geometry_msgs/PoseStamped',
+        #                                              {
+        #                                                  "header": {
+        #                                                      "frame_id": "l_wrist_roll_link",
+        #                                                      "seq": 0,
+        #                                                      "stamp": {
+        #                                                          "nsecs": 0,
+        #                                                          "secs": 0
+        #                                                      }
+        #                                                  },
+        #                                                  "pose": {
+        #                                                      "orientation": {
+        #                                                          "w": 0.22845752187233953,
+        #                                                          "x": 0.5246708312712841,
+        #                                                          "y": 0.09269007153360943,
+        #                                                          "z": 0.8148228213250679
+        #                                                      },
+        #                                                      "position": {
+        #                                                          "x": 1.24302126566569,
+        #                                                          "y": 0.34845867156982424,
+        #                                                          "z": 0.6850657145182292
+        #                                                      }
+        #                                                  }
+        #                                              }
+        #                                              )
+        # kitchen_setup.add_box(u'bowl_1',
+        #                       size=[0.10578233401, 0.171745332082, 0.171740325292],
+        #                       pose=box_pose)
+
+        wrong_odom_T_goal = convert_dictionary_to_ros_message(u'geometry_msgs/PoseStamped',
+                                                              {
+                                                                  "header": {
+                                                                      "frame_id": "odom_combined",
+                                                                      "seq": 0,
+                                                                      "stamp": {
+                                                                          "nsecs": 0,
+                                                                          "secs": 0
+                                                                      }
+                                                                  },
+                                                                  "pose": {
+                                                                      "orientation": {
+                                                                          "w": -0.24653031696884192,
+                                                                          "x": -0.39295171047859817,
+                                                                          "y": 0.5914696789782642,
+                                                                          "z": -0.6595266473901238
+                                                                      },
+                                                                      "position": {
+                                                                          "x": -0.7612966899290812,
+                                                                          "y": -0.6022479234367364,
+                                                                          "z": 0.3707253045365369
+                                                                      }
+                                                                  }
+                                                              }
+                                                              )
+
+        map_T_cart_goal = tf.kdl_to_pose_stamped(map_T_odom * tf.pose_to_kdl(wrong_odom_T_goal.pose), u'map')
+
+        # base_goal = PoseStamped()
+        # base_goal.header.frame_id = u'base_footprint'
+        # base_goal.pose.position.y += 0.3
+        # base_goal.pose.orientation.w = 1
+        # kitchen_setup.move_base(base_goal)
+
+        kitchen_setup.set_json_goal(u'AvoidJointLimits', percentage=40)
+
+        kitchen_setup.set_json_goal(u'CartesianVelocityLimit',
+                                    root_link=u'odom_combined',
+                                    tip_link='base_footprint',
+                                    max_linear_velocity=0.05,
+                                    max_angular_velocity=0.1,
+                                    )
+        avoidance_hint = Vector3Stamped()
+        avoidance_hint.header.frame_id = u'base_footprint'
+        avoidance_hint.vector.y = 1
+
+        kitchen_setup.set_json_goal(u'CollisionAvoidanceHint',
+                                    link_name=u'base_link',
+                                    max_threshold=0.05,
+                                    spring_threshold=0.1,
+                                    max_linear_velocity=1,
+                                    body_b=u'pr2',
+                                    link_b=u'r_wrist_flex_link',
+                                    weight=WEIGHT_COLLISION_AVOIDANCE,
+                                    avoidance_hint=avoidance_hint)
+        kitchen_setup.set_and_check_cart_goal(map_T_cart_goal, kitchen_setup.r_tip)
+
+    def test_bug2020_09_24_12_42_38_dump_cereal_shaking(self, kitchen_setup):
+        map_T_odom = tf.pose_to_kdl(convert_dictionary_to_ros_message(u'geometry_msgs/PoseStamped',
+                                                                      {
+                                                                          "header": {
+                                                                              "frame_id": "map",
+                                                                              "seq": 0,
+                                                                              "stamp": {
+                                                                                  "nsecs": 0,
+                                                                                  "secs": 0
+                                                                              }
+                                                                          },
+                                                                          "pose": {
+                                                                              "orientation": {
+                                                                                  "w": 0.9244367729204006,
+                                                                                  "x": 0.0030363552712611747,
+                                                                                  "y": -0.0011548192616205582,
+                                                                                  "z": 0.3813215176352568
+                                                                              },
+                                                                              "position": {
+                                                                                  "x": 0.33601843640452117,
+                                                                                  "y": 0.6726240499464146,
+                                                                                  "z": -0.002390805709227884
+                                                                              }
+                                                                          }
+                                                                      }
+                                                                      ).pose)
+
+        odom_T_base_footprint = PoseStamped()
+        odom_T_base_footprint.pose.position = Point(
+            0.250466603803726,
+            0.2679258445571168,
+            0
+        )
+        odom_T_base_footprint.pose.orientation = Quaternion(*quaternion_about_axis(
+            -0.18458974948173348,
+            [0, 0, 1]))
+        odom_T_base_footprint = tf.pose_to_kdl(odom_T_base_footprint.pose)
+        map_T_base_footprint = tf.kdl_to_pose_stamped(map_T_odom * odom_T_base_footprint, u'map')
+
+        kitchen_setup.teleport_base(map_T_base_footprint)
+
+        js = {
+            "head_pan_joint": 0.13790879609620701,
+            "head_tilt_joint": 0.29296063589059607,
+            "l_elbow_flex_joint": -2.121153670029707,
+            "l_forearm_roll_joint": 167.79311515847354,
+            "l_shoulder_lift_joint": -0.26152977548009537,
+            "l_shoulder_pan_joint": 1.9668671636693216,
+            "l_upper_arm_roll_joint": 1.384082423575287,
+            "l_wrist_flex_joint": -0.10096202448208258,
+            "l_wrist_roll_joint": 25.13233411936106,
+            "r_elbow_flex_joint": -2.121008899318323,
+            "r_forearm_roll_joint": -54.76560808054815,
+            "r_shoulder_lift_joint": -0.28557590581728254,
+            "r_shoulder_pan_joint": -1.7038822547688237,
+            "r_upper_arm_roll_joint": -1.4841962400018227,
+            "r_wrist_flex_joint": -0.1102822145923199,
+            "r_wrist_roll_joint": 0.0619830915629791,
+            "torso_lift_joint": 0.3249810356561252,
+        }
+        kitchen_setup.allow_all_collisions()
+        kitchen_setup.send_and_check_joint_goal(js)
+
+        kitchen_setup.set_kitchen_js(
+            {
+                "fridge_area_lower_drawer_main_joint": 0.0,
+                "iai_fridge_door_joint": 0.0,
+                "kitchen_island_left_lower_drawer_main_joint": 0.0,
+                "kitchen_island_left_upper_drawer_main_joint": 0.0,
+                "kitchen_island_middle_lower_drawer_main_joint": 0.0,
+                "kitchen_island_middle_upper_drawer_main_joint": 0.0,
+                "kitchen_island_right_lower_drawer_main_joint": 0.0,
+                "kitchen_island_right_upper_drawer_main_joint": 0.0,
+                "oven_area_area_left_drawer_main_joint": 0.0,
+                "oven_area_area_middle_lower_drawer_main_joint": 0.0,
+                "oven_area_area_middle_upper_drawer_main_joint": 0.0,
+                "oven_area_area_right_drawer_main_joint": 0.48,
+                "oven_area_oven_door_joint": 0.0,
+                "oven_area_oven_knob_oven_joint": 0.0,
+                "oven_area_oven_knob_stove_1_joint": 0.0,
+                "oven_area_oven_knob_stove_2_joint": 0.0,
+                "oven_area_oven_knob_stove_3_joint": 0.0,
+                "oven_area_oven_knob_stove_4_joint": 0.0,
+                "sink_area_dish_washer_door_joint": 0.0,
+                "sink_area_dish_washer_main_joint": 0.0,
+                "sink_area_dish_washer_tray_main": 0.0,
+                "sink_area_left_bottom_drawer_main_joint": 0.0,
+                "sink_area_left_middle_drawer_main_joint": 0.0,
+                "sink_area_left_upper_drawer_main_joint": 0.0,
+                "sink_area_trash_drawer_main_joint": 0.0
+            }
+        )
+
+        tip = "l_wrist_roll_link"
+        box_pose = convert_dictionary_to_ros_message(u'geometry_msgs/PoseStamped',
+                                                     {
+                                                         "header": {
+                                                             "frame_id": "r_wrist_roll_link",
+                                                             "seq": 0,
+                                                             "stamp": {
+                                                                 "nsecs": 0,
+                                                                 "secs": 0
+                                                             }
+                                                         },
+                                                         "pose": {
+                                                             "orientation": {
+                                                                 "w": -0.003999918000550195,
+                                                                 "x": -0.003999918002514649,
+                                                                 "y": 0.002999938501901191,
+                                                                 "z": 0.9999795006303613
+                                                             },
+                                                             "position": {
+                                                                 "x": 0.188,
+                                                                 "y": 0.016,
+                                                                 "z": -0.034
+                                                             }
+                                                         }
+                                                     }
+                                                     )
+        kitchen_setup.attach_box(u'bowl_1',
+                                 size=[0.152831586202, 0.06345692873, 0.228943316142],
+                                 frame_id=u'r_wrist_roll_link',
+                                 pose=box_pose)
+
+        wrong_odom_T_goal = convert_dictionary_to_ros_message(u'geometry_msgs/PoseStamped',
+                                                              {
+                                                                  "header": {
+                                                                      "frame_id": "odom_combined",
+                                                                      "seq": 0,
+                                                                      "stamp": {
+                                                                          "nsecs": 572013378,
+                                                                          "secs": 1600951355
+                                                                      }
+                                                                  },
+                                                                  "pose": {
+                                                                      "orientation": {
+                                                                          "w": 0.9233107716447588,
+                                                                          "x": -0.001343573090303712,
+                                                                          "y": 0.0028855260882010617,
+                                                                          "z": 0.3840404764022997
+                                                                      },
+                                                                      "position": {
+                                                                          "x": 1.0246044281713114,
+                                                                          "y": 0.14666530903909242,
+                                                                          "z": 1.4647596925502677
+                                                                      }
+                                                                  }
+                                                              }
+                                                              )
+
+        map_T_cart_goal = tf.kdl_to_pose_stamped(map_T_odom * tf.pose_to_kdl(wrong_odom_T_goal.pose), u'map')
+
+        # base_goal = PoseStamped()
+        # base_goal.header.frame_id = u'base_footprint'
+        # base_goal.pose.position.y += 0.3
+        # base_goal.pose.orientation.w = 1
+        # kitchen_setup.move_base(base_goal)
+
+        kitchen_setup.set_json_goal(u'AvoidJointLimits', percentage=40)
+
+        kitchen_setup.set_json_goal(u'CartesianVelocityLimit',
+                                    root_link=u'odom_combined',
+                                    tip_link='base_footprint',
+                                    max_linear_velocity=0.05,
+                                    max_angular_velocity=0.1,
+                                    )
+        # avoidance_hint = Vector3Stamped()
+        # avoidance_hint.header.frame_id = u'base_footprint'
+        # avoidance_hint.vector.y = 1
+        #
+        # kitchen_setup.add_json_goal(u'CollisionAvoidanceHint',
+        #                             link_name=u'base_link',
+        #                             max_threshold=0.05,
+        #                             spring_threshold=0.1,
+        #                             max_velocity=1,
+        #                             body_b=u'pr2',
+        #                             link_b=u'r_wrist_flex_link',
+        #                             weight=WEIGHT_COLLISION_AVOIDANCE,
+        #                             avoidance_hint=avoidance_hint)
+        kitchen_setup.set_cart_goal(map_T_cart_goal, kitchen_setup.r_tip)
+        kitchen_setup.send_and_check_goal(goal_type=MoveGoal.PLAN_AND_EXECUTE_AND_CUT_OFF_SHAKING)
+
+    def test_bug2020_09_24_23_37_34_dump_shaky_navigation(self, kitchen_setup):
+        map_T_odom = tf.pose_to_kdl(convert_dictionary_to_ros_message(u'geometry_msgs/PoseStamped',
+                                                                      {
+                                                                          "header": {
+                                                                              "frame_id": "map",
+                                                                              "seq": 0,
+                                                                              "stamp": {
+                                                                                  "nsecs": 0,
+                                                                                  "secs": 0
+                                                                              }
+                                                                          },
+                                                                          "pose": {
+                                                                              "orientation": {
+                                                                                  "w": 0.9998619603433222,
+                                                                                  "x": 0.0,
+                                                                                  "y": 0.0,
+                                                                                  "z": 0.01661506119184534
+                                                                              },
+                                                                              "position": {
+                                                                                  "x": -0.2916058355299374,
+                                                                                  "y": -0.12452888287703048,
+                                                                                  "z": 0.0
+                                                                              }
+                                                                          }
+                                                                      }
+                                                                      ).pose)
+
+        odom_T_base_footprint = PoseStamped()
+        odom_T_base_footprint.pose.position = Point(
+            0.26437903064558654,
+            1.9169635448789215,
+            0
+        )
+        odom_T_base_footprint.pose.orientation = Quaternion(*quaternion_about_axis(
+            -2.668025563175793,
+            [0, 0, 1]))
+        odom_T_base_footprint = tf.pose_to_kdl(odom_T_base_footprint.pose)
+        map_T_base_footprint = tf.kdl_to_pose_stamped(map_T_odom * odom_T_base_footprint, u'map')
+
+        kitchen_setup.teleport_base(map_T_base_footprint)
+
+        js = {
+            "head_pan_joint": -0.060430420100428574,
+            "head_tilt_joint": 1.1056797645197434,
+            "l_elbow_flex_joint": -1.9330965159425042,
+            "l_forearm_roll_joint": 76.74538681768225,
+            "l_shoulder_lift_joint": -0.1149267737400752,
+            "l_shoulder_pan_joint": 1.0535678668647663,
+            "l_upper_arm_roll_joint": 1.4567231599208457,
+            "l_wrist_flex_joint": -1.9148799812342445,
+            "l_wrist_roll_joint": -34.79822097912522,
+            "r_elbow_flex_joint": -2.121008899318323,
+            "r_forearm_roll_joint": -17.083321475909628,
+            "r_shoulder_lift_joint": -0.25664444211555915,
+            "r_shoulder_pan_joint": -1.712670356208664,
+            "r_upper_arm_roll_joint": -1.4633501125737376,
+            "r_wrist_flex_joint": -0.10001076260880781,
+            "r_wrist_roll_joint": -6.23214323691832,
+            "torso_lift_joint": 0.32500004902286184,
+        }
+        kitchen_setup.allow_all_collisions()
+        kitchen_setup.send_and_check_joint_goal(js)
+
+        kitchen_setup.set_kitchen_js(
+            {
+                "fridge_area_lower_drawer_main_joint": 0.0,
+                "iai_fridge_door_joint": 0.0,
+                "kitchen_island_left_lower_drawer_main_joint": 0.0,
+                "kitchen_island_left_upper_drawer_main_joint": 0.48,
+                "kitchen_island_middle_lower_drawer_main_joint": 0.0,
+                "kitchen_island_middle_upper_drawer_main_joint": 0.0,
+                "kitchen_island_right_lower_drawer_main_joint": 0.0,
+                "kitchen_island_right_upper_drawer_main_joint": 0.0,
+                "oven_area_area_left_drawer_main_joint": 0.0,
+                "oven_area_area_middle_lower_drawer_main_joint": 0.0,
+                "oven_area_area_middle_upper_drawer_main_joint": 0.0,
+                "oven_area_area_right_drawer_main_joint": 0.0,
+                "oven_area_oven_door_joint": 0.0,
+                "oven_area_oven_knob_oven_joint": 0.0,
+                "oven_area_oven_knob_stove_1_joint": 0.0,
+                "oven_area_oven_knob_stove_2_joint": 0.0,
+                "oven_area_oven_knob_stove_3_joint": 0.0,
+                "oven_area_oven_knob_stove_4_joint": 0.0,
+                "sink_area_dish_washer_door_joint": 0.0,
+                "sink_area_dish_washer_main_joint": 0.0,
+                "sink_area_dish_washer_tray_main": 0.0,
+                "sink_area_left_bottom_drawer_main_joint": 0.0,
+                "sink_area_left_middle_drawer_main_joint": 0.0,
+                "sink_area_left_upper_drawer_main_joint": 0.0,
+                "sink_area_trash_drawer_main_joint": 0.0
+            }
+        )
+
+        tip = "l_wrist_roll_link"
+        box_pose = convert_dictionary_to_ros_message(u'geometry_msgs/PoseStamped',
+                                                     {
+                                                         "header": {
+                                                             "frame_id": "l_wrist_roll_link",
+                                                             "seq": 0,
+                                                             "stamp": {
+                                                                 "nsecs": 0,
+                                                                 "secs": 0
+                                                             }
+                                                         },
+                                                         "pose": {
+                                                             "orientation": {
+                                                                 "w": -0.49697863037765766,
+                                                                 "x": 0.5049782864014414,
+                                                                 "y": 0.49397875937069785,
+                                                                 "z": -0.5039783293968079
+                                                             },
+                                                             "position": {
+                                                                 "x": 0.258,
+                                                                 "y": 0.067,
+                                                                 "z": -0.016
+                                                             }
+                                                         }
+                                                     }
+                                                     )
+        kitchen_setup.add_mesh(u'bowl_1',
+                               path=u'package://giskardpy/test/urdfs/meshes/cup_11.obj',
+                               pose=box_pose)
+        kitchen_setup.attach_object(u'bowl_1',
+                                    frame_id=tip)
+
+        map_T_cart_goal = convert_dictionary_to_ros_message(u'geometry_msgs/PoseStamped',
+                                                            {"header": {"stamp": {"secs": 1600990649,
+                                                                                  "nsecs": 781974.0772247314},
+                                                                        "frame_id": "map", "seq": 0}, "pose": {
+                                                                "position": {"x": -2.4800000190734863,
+                                                                             "y": 0.440000057220459, "z": 0.0},
+                                                                "orientation": {"x": 0.0, "y": 0.0,
+                                                                                "z": -0.971928447021743,
+                                                                                "w": 0.23527663264740736}}}
+                                                            )
+
+        goal_point = convert_dictionary_to_ros_message(u'geometry_msgs/PointStamped',
+                                                       {"header": {"stamp": {"secs": 0, "nsecs": 0.0},
+                                                                   "frame_id": "base_footprint",
+                                                                   "seq": 0},
+                                                        "point": {"x": 1.0, "y": 0.0, "z": 0.0}})
+        kitchen_setup.set_json_goal(u'Pointing',
+                                    root_link=u'base_footprint',
+                                    tip_link=u'narrow_stereo_optical_frame',
+                                    goal_point=goal_point)
+
+        # kitchen_setup.add_json_goal(u'AvoidJointLimits', percentage=40)
+
+        kitchen_setup.set_json_goal(u'CartesianVelocityLimit',
+                                    root_link=u'odom_combined',
+                                    tip_link='base_footprint',
+                                    max_linear_velocity=0.25,
+                                    max_angular_velocity=0.4,
+                                    )
+
+        avoidance_hint = Vector3Stamped()
+        avoidance_hint.header.frame_id = u'base_footprint'
+        avoidance_hint.vector.y = 1
+        kitchen_setup.set_json_goal(u'CollisionAvoidanceHint',
+                                    link_name=u'base_link',
+                                    max_threshold=0.05,
+                                    spring_threshold=0.1,
+                                    max_linear_velocity=1,
+                                    body_b=u'pr2',
+                                    link_b=u'r_wrist_flex_link',
+                                    weight=WEIGHT_COLLISION_AVOIDANCE,
+                                    avoidance_hint=avoidance_hint)
+        kitchen_setup.set_cart_goal(map_T_cart_goal, u'base_footprint', linear_velocity=0.25,
+                                    weight=WEIGHT_BELOW_CA)
+        kitchen_setup.set_joint_goal({
+            "l_shoulder_pan_joint": 1.0251308971113202,
+            "l_shoulder_lift_joint": -0.051142201719316396,
+            "l_upper_arm_roll_joint": 1.4663444495030389,
+            "l_elbow_flex_joint": -1.9328069745197372,
+            "l_forearm_roll_joint": 76.74521327642138,
+            "l_wrist_flex_joint": -1.8806384611158626,
+            "l_wrist_roll_joint": -34.788866561303806,
+            "r_shoulder_pan_joint": -1.712587449591307,
+            "r_shoulder_lift_joint": -0.25664444211555915,
+            "r_upper_arm_roll_joint": -1.4633501125737376,
+            "r_elbow_flex_joint": -2.121153670029707,
+            "r_forearm_roll_joint": -17.083263628822678,
+            "r_wrist_flex_joint": -0.10001076260880781,
+            "r_wrist_roll_joint": -6.23214323691832
+        })
+        kitchen_setup.avoid_all_collisions(0.2)
+        kitchen_setup.send_and_check_goal()
+
+    def test_bug2020_09_23_14_41_39_dump_shaking_dishwasher(self, kitchen_setup):
+        # fixme
+        map_T_odom = tf.pose_to_kdl(convert_dictionary_to_ros_message(u'geometry_msgs/PoseStamped',
+                                                                      {
+                                                                          "header": {
+                                                                              "frame_id": "map",
+                                                                              "seq": 0,
+                                                                              "stamp": {
+                                                                                  "nsecs": 0,
+                                                                                  "secs": 0
+                                                                              }
+                                                                          },
+                                                                          "pose": {
+                                                                              "orientation": {
+                                                                                  "w": 0.09031727466666487,
+                                                                                  "x": -0.0004497013398613231,
+                                                                                  "y": 0.0004948283836485173,
+                                                                                  "z": 0.9959128188804289
+                                                                              },
+                                                                              "position": {
+                                                                                  "x": -0.12686795283770538,
+                                                                                  "y": -0.2572401017912599,
+                                                                                  "z": 0.0006729246475819154
+                                                                              }
+                                                                          }
+                                                                      }
+                                                                      ).pose)
+
+        odom_T_base_footprint = PoseStamped()
+        odom_T_base_footprint.pose.position = Point(
+            -0.4493578039830778,
+            -1.2370549411982148,
+            0
+        )
+        odom_T_base_footprint.pose.orientation = Quaternion(*quaternion_about_axis(
+            2.6732432670398554,
+            [0, 0, 1]))
+        odom_T_base_footprint = tf.pose_to_kdl(odom_T_base_footprint.pose)
+        map_T_base_footprint = tf.kdl_to_pose_stamped(map_T_odom * odom_T_base_footprint, u'map')
+
+        kitchen_setup.teleport_base(map_T_base_footprint)
+
+        js = {
+            "l_elbow_flex_joint": -2.120719357895556,
+            "l_forearm_roll_joint": 130.09538338161923,
+            "l_shoulder_lift_joint": -0.28267850625620894,
+            "l_shoulder_pan_joint": 1.8997128036101634,
+            "l_upper_arm_roll_joint": 1.36580197336912,
+            "l_wrist_flex_joint": -0.10104904232228185,
+            "l_wrist_roll_joint": 25.131899030160067,
+            "r_elbow_flex_joint": -2.121008899318323,
+            "r_forearm_roll_joint": -48.49920669245478,
+            "r_shoulder_lift_joint": -0.2955581067436082,
+            "r_shoulder_pan_joint": -1.6014925823329464,
+            "r_upper_arm_roll_joint": -1.4224596318494167,
+            "r_wrist_flex_joint": -0.10388640333767984,
+            "r_wrist_roll_joint": 25.18512128007127,
+            "torso_lift_joint": 0.14616438794053993,
+        }
+        kitchen_setup.allow_all_collisions()
+        kitchen_setup.send_and_check_joint_goal(js)
+
+        kitchen_setup.set_kitchen_js(
+            {
+                "fridge_area_lower_drawer_main_joint": 0.0,
+                "iai_fridge_door_joint": 0.0,
+                "kitchen_island_left_lower_drawer_main_joint": 0.0,
+                "kitchen_island_left_upper_drawer_main_joint": 0.0,
+                "kitchen_island_middle_lower_drawer_main_joint": 0.0,
+                "kitchen_island_middle_upper_drawer_main_joint": 0.0,
+                "kitchen_island_right_lower_drawer_main_joint": 0.0,
+                "kitchen_island_right_upper_drawer_main_joint": 0.0,
+                "oven_area_area_left_drawer_main_joint": 0.0,
+                "oven_area_area_middle_lower_drawer_main_joint": 0.0,
+                "oven_area_area_middle_upper_drawer_main_joint": 0.0,
+                "oven_area_area_right_drawer_main_joint": 0.0,
+                "oven_area_oven_door_joint": 0.0,
+                "oven_area_oven_knob_oven_joint": 0.0,
+                "oven_area_oven_knob_stove_1_joint": 0.0,
+                "oven_area_oven_knob_stove_2_joint": 0.0,
+                "oven_area_oven_knob_stove_3_joint": 0.0,
+                "oven_area_oven_knob_stove_4_joint": 0.0,
+                "sink_area_dish_washer_door_joint": 0.95,
+                "sink_area_dish_washer_main_joint": 0.0,
+                "sink_area_dish_washer_tray_main": 0.0,
+                "sink_area_left_bottom_drawer_main_joint": 0.0,
+                "sink_area_left_middle_drawer_main_joint": 0.0,
+                "sink_area_left_upper_drawer_main_joint": 0.0,
+                "sink_area_trash_drawer_main_joint": 0.0
+            }
+        )
+
+        tip = "l_wrist_roll_link"
+        box_pose = convert_dictionary_to_ros_message(u'geometry_msgs/PoseStamped',
+                                                     {
+                                                         "header": {
+                                                             "frame_id": "l_wrist_roll_link",
+                                                             "seq": 0,
+                                                             "stamp": {
+                                                                 "nsecs": 0,
+                                                                 "secs": 0
+                                                             }
+                                                         },
+                                                         "pose": {
+                                                             "orientation": {
+                                                                 "w": 0.22845752187233953,
+                                                                 "x": 0.5246708312712841,
+                                                                 "y": 0.09269007153360943,
+                                                                 "z": 0.8148228213250679
+                                                             },
+                                                             "position": {
+                                                                 "x": 1.24302126566569,
+                                                                 "y": 0.34845867156982424,
+                                                                 "z": 0.6850657145182292
+                                                             }
+                                                         }
+                                                     }
+                                                     )
+        kitchen_setup.add_box(u'bowl_1',
+                              size=[0.10578233401, 0.171745332082, 0.171740325292],
+                              pose=box_pose)
+
+        wrong_odom_T_goal = convert_dictionary_to_ros_message(u'geometry_msgs/PoseStamped',
+                                                              {
+                                                                  "header": {
+                                                                      "frame_id": "odom_combined",
+                                                                      "seq": 0,
+                                                                      "stamp": {
+                                                                          "nsecs": 346399307,
+                                                                          "secs": 1600872096
+                                                                      }
+                                                                  },
+                                                                  "pose": {
+                                                                      "orientation": {
+                                                                          "w": -0.2651488857595898,
+                                                                          "x": -0.3784163478285344,
+                                                                          "y": 0.5968816112245744,
+                                                                          "z": -0.6559188227057068
+                                                                      },
+                                                                      "position": {
+                                                                          "x": -0.8011662710392221,
+                                                                          "y": -0.6108487047237943,
+                                                                          "z": 0.4534888328274996
+                                                                      }
+                                                                  }
+                                                              }
+                                                              )
+
+        map_T_cart_goal = tf.kdl_to_pose_stamped(map_T_odom * tf.pose_to_kdl(wrong_odom_T_goal.pose), u'map')
+
+        kitchen_setup.set_json_goal(u'AvoidJointLimits', percentage=40)
+        kitchen_setup.set_json_goal(u'CartesianVelocityLimit',
+                                    root_link=u'odom_combined',
+                                    tip_link='base_footprint',
+                                    max_linear_velocity=0.05,
+                                    max_angular_velocity=0.1,
+                                    )
+
+        kitchen_setup.set_and_check_cart_goal(map_T_cart_goal, kitchen_setup.r_tip)
 
     def test_bug2020_09_16_15_09_36_dump_grasp_wiggle_drawer(self, kitchen_setup):
         map_T_odom = tf.pose_to_kdl(convert_dictionary_to_ros_message(u'geometry_msgs/PoseStamped',
@@ -3204,9 +4086,9 @@ class TestCollisionAvoidanceGoals(object):
 
         map_T_cart_goal = tf.kdl_to_pose_stamped(map_T_odom * tf.pose_to_kdl(wrong_odom_T_goal.pose), u'map')
 
-        kitchen_setup.add_json_goal(u'AvoidJointLimits', percentage=40)
+        kitchen_setup.set_json_goal(u'AvoidJointLimits', percentage=40)
         # kitchen_setup.avoid_all_collisions(0.1)
-        kitchen_setup.add_json_goal(u'CartesianVelocityLimit',
+        kitchen_setup.set_json_goal(u'CartesianVelocityLimit',
                                     root_link=u'odom_combined',
                                     tip_link=u'base_footprint',
                                     max_linear_velocity=0.05,
@@ -3322,16 +4204,16 @@ class TestCollisionAvoidanceGoals(object):
         avoidance_hint = Vector3Stamped()
         avoidance_hint.header.frame_id = 'map'
         avoidance_hint.vector.y = -1
-        kitchen_setup.add_json_goal(u'CollisionAvoidanceHint',
+        kitchen_setup.set_json_goal(u'CollisionAvoidanceHint',
                                     link_name=u'base_link',
                                     max_threshold=0.3,
                                     # spring_threshold=0.5,
-                                    max_velocity=1,
+                                    max_linear_velocity=1,
                                     body_b=u'kitchen',
                                     link_b=u'kitchen_island',
                                     weight=WEIGHT_COLLISION_AVOIDANCE,
                                     avoidance_hint=avoidance_hint)
-        kitchen_setup.add_json_goal(u'CartesianVelocityLimit',
+        kitchen_setup.set_json_goal(u'CartesianVelocityLimit',
                                     root_link=u'odom_combined',
                                     tip_link=u'base_footprint',
                                     max_linear_velocity=0.5,
@@ -3449,16 +4331,16 @@ class TestCollisionAvoidanceGoals(object):
         avoidance_hint = Vector3Stamped()
         avoidance_hint.header.frame_id = 'map'
         avoidance_hint.vector.y = -1
-        kitchen_setup.add_json_goal(u'CollisionAvoidanceHint',
+        kitchen_setup.set_json_goal(u'CollisionAvoidanceHint',
                                     link_name=u'base_link',
                                     max_threshold=0.25,
                                     spring_threshold=0.3,
-                                    max_velocity=1,
+                                    max_linear_velocity=1,
                                     body_b=u'kitchen',
                                     link_b=u'kitchen_island',
                                     weight=WEIGHT_COLLISION_AVOIDANCE,
                                     avoidance_hint=avoidance_hint)
-        kitchen_setup.add_json_goal(u'CartesianVelocityLimit',
+        kitchen_setup.set_json_goal(u'CartesianVelocityLimit',
                                     root_link=u'odom_combined',
                                     tip_link=u'base_footprint',
                                     max_linear_velocity=0.5,
@@ -3526,7 +4408,6 @@ class TestCollisionAvoidanceGoals(object):
             "r_upper_arm_roll_joint": -1.4633501125737374,
             "r_wrist_flex_joint": -0.1001446362091114,
             "r_wrist_roll_joint": 25.18355495894769,
-            "torso_lift_joint": 0.18806347380458371,
         }
         kitchen_setup.send_and_check_joint_goal(js)
 
@@ -3574,16 +4455,16 @@ class TestCollisionAvoidanceGoals(object):
         avoidance_hint = Vector3Stamped()
         avoidance_hint.header.frame_id = 'map'
         avoidance_hint.vector.y = -1
-        kitchen_setup.add_json_goal(u'CollisionAvoidanceHint',
+        kitchen_setup.set_json_goal(u'CollisionAvoidanceHint',
                                     link_name=u'base_link',
                                     max_threshold=0.25,
                                     spring_threshold=0.3,
-                                    max_velocity=1,
+                                    max_linear_velocity=1,
                                     body_b=u'kitchen',
                                     link_b=u'kitchen_island',
                                     weight=WEIGHT_COLLISION_AVOIDANCE,
                                     avoidance_hint=avoidance_hint)
-        kitchen_setup.add_json_goal(u'CartesianVelocityLimit',
+        kitchen_setup.set_json_goal(u'CartesianVelocityLimit',
                                     root_link=u'odom_combined',
                                     tip_link=u'base_footprint',
                                     max_linear_velocity=0.5,
@@ -3611,6 +4492,148 @@ class TestCollisionAvoidanceGoals(object):
         kitchen_setup.avoid_all_collisions(0.2)
         kitchen_setup.set_and_check_cart_goal(map_T_cart_goal, 'base_footprint', linear_velocity=0.5,
                                               weight=WEIGHT_BELOW_CA, expected_error_codes=[MoveResult.SHAKING])
+
+    def test_bug2020_09_15_15_35_15_dump_shaky_nav_cut_off(self, kitchen_setup):
+        map_T_odom = tf.pose_to_kdl(convert_dictionary_to_ros_message(u'geometry_msgs/PoseStamped',
+                                                                      {
+                                                                          "header": {
+                                                                              "frame_id": "map",
+                                                                              "seq": 0,
+                                                                              "stamp": {
+                                                                                  "nsecs": 0,
+                                                                                  "secs": 0
+                                                                              }
+                                                                          },
+                                                                          "pose": {
+                                                                              "orientation": {
+                                                                                  "w": 0.9903702071222805,
+                                                                                  "x": -0.0034922295028117414,
+                                                                                  "y": -0.00012004497948064491,
+                                                                                  "z": -0.13840029901294992
+                                                                              },
+                                                                              "position": {
+                                                                                  "x": 0.022483169988823295,
+                                                                                  "y": -0.09823512894746209,
+                                                                                  "z": 0.0036762520107436565
+                                                                              }
+                                                                          }
+                                                                      }
+                                                                      ).pose)
+
+        odom_T_base_footprint = PoseStamped()
+        odom_T_base_footprint.pose.position = Point(
+            0.4355780076030453,
+            -0.10753565484855881,
+            0
+        )
+        odom_T_base_footprint.pose.orientation = Quaternion(*quaternion_about_axis(
+            -2.398246925955068,
+            [0, 0, 1]))
+        odom_T_base_footprint = tf.pose_to_kdl(odom_T_base_footprint.pose)
+        map_T_base_footprint = tf.kdl_to_pose_stamped(map_T_odom * odom_T_base_footprint, u'map')
+
+        kitchen_setup.teleport_base(map_T_base_footprint)
+
+        js = {
+            "l_elbow_flex_joint": -2.121008899318323,
+            "l_forearm_roll_joint": 48.41234640599331,
+            "l_shoulder_lift_joint": -0.2649981673273779,
+            "l_shoulder_pan_joint": 1.965457751174253,
+            "l_upper_arm_roll_joint": 1.3837617139225473,
+            "l_wrist_flex_joint": -0.09965675687909759,
+            "l_wrist_roll_joint": 6.283225718134377,
+            "r_elbow_flex_joint": -2.1211536700297065,
+            "r_forearm_roll_joint": -29.64961771544074,
+            "r_shoulder_lift_joint": -0.2566444421155591,
+            "r_shoulder_pan_joint": -1.7157379010508729,
+            "r_upper_arm_roll_joint": -1.4633501125737374,
+            "r_wrist_flex_joint": -0.1001446362091114,
+            "r_wrist_roll_joint": 25.18355495894769,
+        }
+        kitchen_setup.send_and_check_joint_goal(js)
+
+        kitchen_setup.set_kitchen_js(
+            {
+                "fridge_area_lower_drawer_main_joint": 0.0,
+                "iai_fridge_door_joint": 0.0,
+                "kitchen_island_left_lower_drawer_main_joint": 0.0,
+                "kitchen_island_left_upper_drawer_main_joint": 0.0,
+                "kitchen_island_middle_lower_drawer_main_joint": 0.0,
+                "kitchen_island_middle_upper_drawer_main_joint": 0.0,
+                "kitchen_island_right_lower_drawer_main_joint": 0.0,
+                "kitchen_island_right_upper_drawer_main_joint": 0.0,
+                "oven_area_area_left_drawer_main_joint": 0.0,
+                "oven_area_area_middle_lower_drawer_main_joint": 0.0,
+                "oven_area_area_middle_upper_drawer_main_joint": 0.0,
+                "oven_area_area_right_drawer_main_joint": 0.0,
+                "oven_area_oven_door_joint": 0.0,
+                "oven_area_oven_knob_oven_joint": 0.0,
+                "oven_area_oven_knob_stove_1_joint": 0.0,
+                "oven_area_oven_knob_stove_2_joint": 0.0,
+                "oven_area_oven_knob_stove_3_joint": 0.0,
+                "oven_area_oven_knob_stove_4_joint": 0.0,
+                "sink_area_dish_washer_door_joint": 0.0,
+                "sink_area_dish_washer_main_joint": 0.0,
+                "sink_area_dish_washer_tray_main": 0.0,
+                "sink_area_left_bottom_drawer_main_joint": 0.0,
+                "sink_area_left_middle_drawer_main_joint": 0.0,
+                "sink_area_left_upper_drawer_main_joint": 0.0,
+                "sink_area_trash_drawer_main_joint": 0.0
+            }
+        )
+
+        map_T_cart_goal = convert_dictionary_to_ros_message(u'geometry_msgs/PoseStamped',
+                                                            {"header": {"stamp": {"secs": 1600184101,
+                                                                                  "nsecs": 976460.9336853027},
+                                                                        "frame_id": "map", "seq": 0}, "pose": {
+                                                                "position": {"x": 0.48000001907348633,
+                                                                             "y": -0.5999999046325684, "z": 0.0},
+                                                                "orientation": {"x": 0.0, "y": 0.0,
+                                                                                "z": -0.3561185110796128,
+                                                                                "w": 0.9344407985883534}}}
+                                                            )
+
+        avoidance_hint = Vector3Stamped()
+        avoidance_hint.header.frame_id = 'map'
+        avoidance_hint.vector.y = -1
+        kitchen_setup.set_json_goal(u'CollisionAvoidanceHint',
+                                    link_name=u'base_link',
+                                    max_threshold=0.25,
+                                    spring_threshold=0.3,
+                                    max_linear_velocity=1,
+                                    body_b=u'kitchen',
+                                    link_b=u'kitchen_island',
+                                    weight=WEIGHT_COLLISION_AVOIDANCE,
+                                    avoidance_hint=avoidance_hint)
+        kitchen_setup.set_json_goal(u'CartesianVelocityLimit',
+                                    root_link=u'odom_combined',
+                                    tip_link=u'base_footprint',
+                                    max_linear_velocity=0.5,
+                                    max_angular_velocity=0.2,
+                                    )
+        kitchen_setup.set_joint_goal(
+            {
+                "l_shoulder_pan_joint": 1.965457751174253,
+                "l_shoulder_lift_joint": -0.26482897748116896,
+                "l_upper_arm_roll_joint": 1.3837617139225473,
+                "l_elbow_flex_joint": -2.121008899318323,
+                "l_forearm_roll_joint": 48.412635641428075,
+                "l_wrist_flex_joint": -0.09891710523740382,
+                "l_wrist_roll_joint": 6.283008173533879,
+                "r_shoulder_pan_joint": -1.7159037142855866,
+                "r_shoulder_lift_joint": -0.2564752522693502,
+                "r_upper_arm_roll_joint": -1.4633501125737374,
+                "r_elbow_flex_joint": -2.121443211452474,
+                "r_forearm_roll_joint": -29.649386327092937,
+                "r_wrist_flex_joint": -0.09992709160861413,
+                "r_wrist_roll_joint": 25.182815307305997,
+            }
+        )
+
+        kitchen_setup.avoid_all_collisions(0.2)
+        kitchen_setup.set_cart_goal(map_T_cart_goal, 'base_footprint', linear_velocity=0.5,
+                                    weight=WEIGHT_BELOW_CA)
+        kitchen_setup.send_and_check_goal(goal_type=MoveGoal.PLAN_AND_EXECUTE_AND_CUT_OFF_SHAKING)
 
     def test_bug2020_09_15_10_41_17_dump_wiggling(self, kitchen_setup):
         map_T_odom = tf.pose_to_kdl(convert_dictionary_to_ros_message(u'geometry_msgs/PoseStamped',
@@ -3747,16 +4770,16 @@ class TestCollisionAvoidanceGoals(object):
         avoidance_hint = Vector3Stamped()
         avoidance_hint.header.frame_id = 'map'
         avoidance_hint.vector.y = -1
-        kitchen_setup.add_json_goal(u'CollisionAvoidanceHint',
+        kitchen_setup.set_json_goal(u'CollisionAvoidanceHint',
                                     link_name=u'base_link',
                                     max_threshold=0.25,
                                     spring_threshold=0.3,
-                                    max_velocity=1,
+                                    max_linear_velocity=1,
                                     body_b=u'kitchen',
                                     link_b=u'kitchen_island',
                                     weight=WEIGHT_COLLISION_AVOIDANCE,
                                     avoidance_hint=avoidance_hint)
-        kitchen_setup.add_json_goal(u'CartesianVelocityLimit',
+        kitchen_setup.set_json_goal(u'CartesianVelocityLimit',
                                     root_link=u'odom_combined',
                                     tip_link=u'base_footprint',
                                     max_linear_velocity=0.5,
@@ -3954,16 +4977,16 @@ class TestCollisionAvoidanceGoals(object):
         avoidance_hint = Vector3Stamped()
         avoidance_hint.header.frame_id = 'map'
         avoidance_hint.vector.y = -1
-        kitchen_setup.add_json_goal(u'CollisionAvoidanceHint',
+        kitchen_setup.set_json_goal(u'CollisionAvoidanceHint',
                                     link_name=u'base_link',
                                     max_threshold=0.3,
                                     # spring_threshold=0.5,
-                                    max_velocity=1,
+                                    max_linear_velocity=1,
                                     body_b=u'kitchen',
                                     link_b=u'kitchen_island',
                                     weight=WEIGHT_COLLISION_AVOIDANCE,
                                     avoidance_hint=avoidance_hint)
-        kitchen_setup.add_json_goal(u'CartesianVelocityLimit',
+        kitchen_setup.set_json_goal(u'CartesianVelocityLimit',
                                     root_link=u'odom_combined',
                                     tip_link=u'base_footprint',
                                     max_linear_velocity=0.5,
@@ -4120,7 +5143,7 @@ class TestCollisionAvoidanceGoals(object):
                                                               }
                                                               )
         map_T_cart_goal = tf.kdl_to_pose_stamped(map_T_odom * tf.pose_to_kdl(wrong_odom_T_goal.pose), u'map')
-        kitchen_setup.add_json_goal(u'CartesianVelocityLimit',
+        kitchen_setup.set_json_goal(u'CartesianVelocityLimit',
                                     root_link=u'odom_combined',
                                     tip_link=u'base_footprint',
                                     max_linear_velocity=0.1,
@@ -4255,15 +5278,15 @@ class TestCollisionAvoidanceGoals(object):
         avoidance_hint = Vector3Stamped()
         avoidance_hint.header.frame_id = 'map'
         avoidance_hint.vector.y = -1
-        kitchen_setup.add_json_goal(u'CollisionAvoidanceHint',
+        kitchen_setup.set_json_goal(u'CollisionAvoidanceHint',
                                     link_name=u'base_footprint',
                                     max_threshold=0.3,
-                                    max_velocity=1,
+                                    max_linear_velocity=1,
                                     body_b=u'kitchen',
                                     link_b=u'kitchen_island',
                                     weight=WEIGHT_COLLISION_AVOIDANCE,
                                     avoidance_hint=avoidance_hint)
-        kitchen_setup.add_json_goal(u'CartesianVelocityLimit',
+        kitchen_setup.set_json_goal(u'CartesianVelocityLimit',
                                     root_link=u'odom_combined',
                                     tip_link=u'base_footprint',
                                     max_linear_velocity=0.5,
@@ -4301,8 +5324,8 @@ class TestCollisionAvoidanceGoals(object):
         r_goal.pose.orientation = Quaternion(*quaternion_about_axis(np.pi, [0, 0, 1]))
         # kitchen_setup.allow_all_collisions()
         kitchen_setup.set_cart_goal(r_goal,
-                                    tip=kitchen_setup.r_tip,
-                                    root=kitchen_setup.l_tip,
+                                    tip_link=kitchen_setup.r_tip,
+                                    root_link=kitchen_setup.l_tip,
                                     linear_velocity=0.2,
                                     angular_velocity=1
                                     )
@@ -4310,14 +5333,14 @@ class TestCollisionAvoidanceGoals(object):
         kitchen_setup.check_cart_goal(kitchen_setup.r_tip, r_goal)
 
         kitchen_setup.detach_object('box')
-        kitchen_setup.attach_existing('box', kitchen_setup.r_tip)
+        kitchen_setup.attach_object('box', kitchen_setup.r_tip)
 
         r_goal2 = PoseStamped()
         r_goal2.header.frame_id = 'box'
         r_goal2.pose.position.x -= -.1
         r_goal2.pose.orientation.w = 1
 
-        kitchen_setup.set_cart_goal(r_goal2, u'box', root=kitchen_setup.l_tip,
+        kitchen_setup.set_cart_goal(r_goal2, u'box', root_link=kitchen_setup.l_tip,
                                     )
         # kitchen_setup.allow_all_collisions()
         kitchen_setup.send_and_check_goal()
@@ -4475,7 +5498,7 @@ class TestCollisionAvoidanceGoals(object):
         p.pose.orientation.w = 1
         zero_pose.add_box(pocky, pose=p)
         for i in range(10):
-            zero_pose.attach_existing(pocky, zero_pose.r_tip)
+            zero_pose.attach_object(pocky, zero_pose.r_tip)
             zero_pose.detach_object(pocky)
         zero_pose.remove_object(pocky)
 
@@ -4497,7 +5520,7 @@ class TestCollisionAvoidanceGoals(object):
         p.pose.position = Point(0.05, 0, 0)
         p.pose.orientation = Quaternion(0., 0., 0.47942554, 0.87758256)
         zero_pose.add_box(pocky, [0.1, 0.02, 0.02], pose=p)
-        zero_pose.attach_existing(pocky, frame_id=zero_pose.r_tip)
+        zero_pose.attach_object(pocky, frame_id=zero_pose.r_tip)
         relative_pose = zero_pose.get_robot().get_fk_pose(zero_pose.r_tip, pocky).pose
         compare_poses(p.pose, relative_pose)
 
@@ -4511,11 +5534,11 @@ class TestCollisionAvoidanceGoals(object):
         p.pose.position = Point(1.2, 0, 1.6)
         p.pose.orientation = Quaternion(0.0, 0.0, 0.47942554, 0.87758256)
         zero_pose.add_box(object_name, pose=p)
-        zero_pose.attach_existing(object_name, frame_id=zero_pose.r_tip)
+        zero_pose.attach_object(object_name, frame_id=zero_pose.r_tip)
         zero_pose.detach_object(object_name)
         zero_pose.remove_object(object_name)
         zero_pose.add_box(object_name, pose=p)
-        assert zero_pose.wrapper.get_attached_objects().object_names == []
+        assert zero_pose.get_attached_objects().object_names == []
 
     def test_attach_existing_box2(self, zero_pose):
         """
@@ -4527,7 +5550,7 @@ class TestCollisionAvoidanceGoals(object):
         old_p.pose.position = Point(0.05, 0, 0)
         old_p.pose.orientation = Quaternion(0., 0., 0.47942554, 0.87758256)
         zero_pose.add_box(pocky, [0.1, 0.02, 0.02], pose=old_p)
-        zero_pose.attach_existing(pocky, frame_id=zero_pose.r_tip)
+        zero_pose.attach_object(pocky, frame_id=zero_pose.r_tip)
         relative_pose = zero_pose.get_robot().get_fk_pose(zero_pose.r_tip, pocky).pose
         compare_poses(old_p.pose, relative_pose)
 
@@ -4563,7 +5586,7 @@ class TestCollisionAvoidanceGoals(object):
         old_p.pose.position = Point(0.05, 0, 0)
         old_p.pose.orientation = Quaternion(0., 0., 0.47942554, 0.87758256)
         zero_pose.add_box(pocky, [0.1, 0.02, 0.02], pose=old_p)
-        zero_pose.attach_existing(pocky, frame_id=zero_pose.r_tip)
+        zero_pose.attach_object(pocky, frame_id=zero_pose.r_tip)
         relative_pose = zero_pose.get_robot().get_fk_pose(zero_pose.r_tip, pocky).pose
         compare_poses(old_p.pose, relative_pose)
 
@@ -4607,7 +5630,7 @@ class TestCollisionAvoidanceGoals(object):
         :type zero_pose: PR2
         """
         req = UpdateWorldRequest(42, WorldBody(), True, PoseStamped())
-        assert zero_pose.wrapper.update_world.call(req).error_codes == UpdateWorldResponse.INVALID_OPERATION
+        assert zero_pose._update_world_srv.call(req).error_codes == UpdateWorldResponse.INVALID_OPERATION
 
     def test_missing_body_error(self, zero_pose):
         """
@@ -4621,7 +5644,7 @@ class TestCollisionAvoidanceGoals(object):
         """
         req = UpdateWorldRequest(UpdateWorldRequest.ADD, WorldBody(type=WorldBody.PRIMITIVE_BODY,
                                                                    shape=SolidPrimitive(type=42)), True, PoseStamped())
-        assert zero_pose.wrapper.update_world.call(req).error_codes == UpdateWorldResponse.CORRUPT_SHAPE_ERROR
+        assert zero_pose._update_world_srv.call(req).error_codes == UpdateWorldResponse.CORRUPT_SHAPE_ERROR
 
     def test_unsupported_options(self, kitchen_setup):
         """
@@ -4636,7 +5659,7 @@ class TestCollisionAvoidanceGoals(object):
         wb.type = WorldBody.URDF_BODY
 
         req = UpdateWorldRequest(UpdateWorldRequest.ADD, wb, True, pose)
-        assert kitchen_setup.wrapper.update_world.call(req).error_codes == UpdateWorldResponse.UNSUPPORTED_OPTIONS
+        assert kitchen_setup._update_world_srv.call(req).error_codes == UpdateWorldResponse.UNSUPPORTED_OPTIONS
 
     def test_infeasible(self, kitchen_setup):
         """
@@ -4656,7 +5679,7 @@ class TestCollisionAvoidanceGoals(object):
         ce = CollisionEntry()
         ce.type = CollisionEntry.AVOID_COLLISION
         ce.link_bs = [u'asdf']
-        box_setup.add_collision_entries([ce])
+        box_setup.set_collision_entries([ce])
         box_setup.send_and_check_goal(expected_error_codes=[MoveResult.WORLD_ERROR])
 
     def test_unknown_robot_link(self, box_setup):
@@ -4666,7 +5689,7 @@ class TestCollisionAvoidanceGoals(object):
         ce = CollisionEntry()
         ce.type = CollisionEntry.AVOID_COLLISION
         ce.robot_links = [u'asdf']
-        box_setup.add_collision_entries([ce])
+        box_setup.set_collision_entries([ce])
         box_setup.send_and_check_goal([MoveResult.UNKNOWN_OBJECT])
 
     def test_unknown_body_b(self, box_setup):
@@ -4676,8 +5699,8 @@ class TestCollisionAvoidanceGoals(object):
         ce = CollisionEntry()
         ce.type = CollisionEntry.AVOID_COLLISION
         ce.body_b = u'asdf'
-        box_setup.add_collision_entries([ce])
-        box_setup.send_and_check_goal(MoveResult.UNKNOWN_OBJECT)
+        box_setup.set_collision_entries([ce])
+        box_setup.send_and_check_goal([MoveResult.UNKNOWN_OBJECT])
 
     def test_unknown_link_b(self, box_setup):
         """
@@ -4687,7 +5710,7 @@ class TestCollisionAvoidanceGoals(object):
         ce.type = CollisionEntry.AVOID_COLLISION
         ce.body_b = u'box'
         ce.link_bs = [u'asdf']
-        box_setup.add_collision_entries([ce])
+        box_setup.set_collision_entries([ce])
         box_setup.send_and_check_goal([MoveResult.UNKNOWN_OBJECT])
 
     def test_base_link_in_collision(self, zero_pose):
@@ -4718,7 +5741,7 @@ class TestCollisionAvoidanceGoals(object):
         collision_entry.type = CollisionEntry.AVOID_COLLISION
         collision_entry.min_dist = 0.05
         collision_entry.body_b = u'muh'
-        box_setup.add_collision_entries([collision_entry])
+        box_setup.set_collision_entries([collision_entry])
 
         box_setup.send_and_check_goal([MoveResult.UNKNOWN_OBJECT])
 
@@ -4784,7 +5807,7 @@ class TestCollisionAvoidanceGoals(object):
                                   robot_links=zero_pose.get_l_gripper_links(),
                                   body_b=u'pr2',
                                   link_bs=zero_pose.get_r_forearm_links()))
-        zero_pose.add_collision_entries(ces)
+        zero_pose.set_collision_entries(ces)
 
         zero_pose.set_and_check_cart_goal(p, zero_pose.l_tip, zero_pose.default_root)
         zero_pose.check_cpi_leq(zero_pose.get_l_gripper_links(), 0.01)
@@ -4876,7 +5899,7 @@ class TestCollisionAvoidanceGoals(object):
         ce.type = CollisionEntry.AVOID_COLLISION
         ce.body_b = u'box'
         # ce.min_dist = 0.05
-        box_setup.add_collision_entries([ce])
+        box_setup.set_collision_entries([ce])
         box_setup.send_and_check_goal([MoveResult.SUCCESS])
         box_setup.check_cpi_geq(box_setup.get_l_gripper_links(), 0.048)
         box_setup.check_cpi_geq(box_setup.get_r_gripper_links(), 0.048)
@@ -4928,7 +5951,7 @@ class TestCollisionAvoidanceGoals(object):
         collision_entry.type = CollisionEntry.ALLOW_COLLISION
         collision_entry.body_b = u'box'
         collision_entry.link_bs = [u'box']
-        box_setup.wrapper.set_collision_entries([collision_entry])
+        box_setup.set_collision_entries([collision_entry])
 
         box_setup.allow_self_collision()
         box_setup.set_and_check_cart_goal(p, box_setup.r_tip, box_setup.default_root)
@@ -5047,6 +6070,32 @@ class TestCollisionAvoidanceGoals(object):
 
         pocky_pose_setup.send_and_check_goal(expected_error_codes=[MoveResult.SHAKING])
 
+    def test_avoid_collision5_cut_off(self, pocky_pose_setup):
+        """
+        :type pocky_pose_setup: PR2
+        """
+        pocky_pose_setup.attach_box(size=[0.2, 0.05, 0.05],
+                                    frame_id=pocky_pose_setup.r_tip,
+                                    position=[0.08, 0, 0],
+                                    orientation=quaternion_about_axis(0.01, [1, 0, 0]).tolist())
+        p = PoseStamped()
+        p.header.frame_id = pocky_pose_setup.r_tip
+        p.pose.position.x = 0.12
+        p.pose.position.y = 0.04
+        p.pose.position.z = 0
+        p.pose.orientation.w = 1
+        pocky_pose_setup.add_cylinder('bl', [0.2, 0.01], p)
+        p = PoseStamped()
+        p.header.frame_id = pocky_pose_setup.r_tip
+        p.pose.position.x = 0.12
+        p.pose.position.y = -0.04
+        p.pose.position.z = 0
+        p.pose.orientation.w = 1
+        pocky_pose_setup.add_cylinder('br', [0.2, 0.01], p)
+
+        pocky_pose_setup.send_and_check_goal(goal_type=MoveGoal.PLAN_AND_EXECUTE_AND_CUT_OFF_SHAKING,
+                                             expected_error_codes=[MoveResult.SHAKING])
+
     def test_avoid_collision6(self, fake_table_setup):
         """
         :type fake_table_setup: PR2
@@ -5087,7 +6136,7 @@ class TestCollisionAvoidanceGoals(object):
         base_pose.pose.orientation = Quaternion(*quaternion_about_axis(-np.pi / 4, [0, 0, 1]))
         kitchen_setup.set_joint_goal(gaya_pose)
         kitchen_setup.set_and_check_cart_goal(base_pose, u'base_footprint')
-        kitchen_setup.check_joint_state(gaya_pose)
+        kitchen_setup.check_current_joint_state(gaya_pose)
 
     def test_avoid_collision9(self, kitchen_setup):
         """
@@ -5102,7 +6151,7 @@ class TestCollisionAvoidanceGoals(object):
         base_pose.pose.orientation = Quaternion(*quaternion_about_axis(np.pi, [0, 0, 1]))
         kitchen_setup.set_joint_goal(gaya_pose)
         kitchen_setup.set_and_check_cart_goal(base_pose, u'base_footprint', expected_error_codes=[MoveResult.SHAKING])
-        kitchen_setup.check_joint_state(gaya_pose)
+        kitchen_setup.check_current_joint_state(gaya_pose)
 
     def test_avoid_collision8(self, kitchen_setup):
         """
@@ -5121,7 +6170,7 @@ class TestCollisionAvoidanceGoals(object):
         base_pose.pose.orientation = Quaternion(*quaternion_about_axis(-np.pi / 4, [0, 0, 1]))
         kitchen_setup.set_joint_goal(gaya_pose)
         kitchen_setup.set_and_check_cart_goal(base_pose, 'base_footprint')
-        kitchen_setup.check_joint_state(gaya_pose)
+        kitchen_setup.check_current_joint_state(gaya_pose)
 
     def test_go_around_kitchen_island(self, kitchen_setup):
         """
@@ -5143,11 +6192,11 @@ class TestCollisionAvoidanceGoals(object):
         avoidance_hint.header.frame_id = u'map'
         avoidance_hint.vector.y = -1
         kitchen_setup.avoid_all_collisions(0.1)
-        kitchen_setup.add_json_goal(u'CollisionAvoidanceHint',
+        kitchen_setup.set_json_goal(u'CollisionAvoidanceHint',
                                     link_name=u'base_link',
                                     max_threshold=0.3,
                                     spring_threshold=0.35,
-                                    max_velocity=1,
+                                    max_linear_velocity=1,
                                     body_b=u'kitchen',
                                     link_b=u'kitchen_island',
                                     weight=WEIGHT_COLLISION_AVOIDANCE,
@@ -5177,11 +6226,11 @@ class TestCollisionAvoidanceGoals(object):
         avoidance_hint.header.frame_id = u'map'
         avoidance_hint.vector.y = -1
         kitchen_setup.avoid_all_collisions(0.1)
-        kitchen_setup.add_json_goal(u'CollisionAvoidanceHint',
+        kitchen_setup.set_json_goal(u'CollisionAvoidanceHint',
                                     link_name=u'base_footprint',
                                     max_threshold=0.25,
                                     spring_threshold=0.3,
-                                    max_velocity=1,
+                                    max_linear_velocity=1,
                                     body_b=u'kitchen',
                                     link_b=u'kitchen_island',
                                     avoidance_hint=avoidance_hint)
@@ -5212,7 +6261,7 @@ class TestCollisionAvoidanceGoals(object):
         collision_entry.type = CollisionEntry.AVOID_COLLISION
         collision_entry.min_dist = 0.05
         collision_entry.body_b = u'box'
-        pocky_pose_setup.add_collision_entries([collision_entry])
+        pocky_pose_setup.set_collision_entries([collision_entry])
 
         pocky_pose_setup.send_and_check_goal()
         pocky_pose_setup.check_cpi_geq(pocky_pose_setup.get_l_gripper_links(), 0.048)
@@ -5231,7 +6280,7 @@ class TestCollisionAvoidanceGoals(object):
         collision_entry = CollisionEntry()
         collision_entry.type = CollisionEntry.AVOID_ALL_COLLISIONS
         collision_entry.min_dist = 0.05
-        box_setup.add_collision_entries([collision_entry])
+        box_setup.set_collision_entries([collision_entry])
 
         box_setup.send_and_check_goal()
 
@@ -5251,14 +6300,14 @@ class TestCollisionAvoidanceGoals(object):
         collision_entry = CollisionEntry()
         collision_entry.type = CollisionEntry.ALLOW_ALL_COLLISIONS
         collision_entry.min_dist = 0.05
-        box_setup.add_collision_entries([collision_entry])
+        box_setup.set_collision_entries([collision_entry])
 
         box_setup.send_and_check_goal()
 
         collision_entry = CollisionEntry()
         collision_entry.type = CollisionEntry.AVOID_ALL_COLLISIONS
         collision_entry.min_dist = 0.05
-        box_setup.add_collision_entries([collision_entry])
+        box_setup.set_collision_entries([collision_entry])
 
         box_setup.send_and_check_goal()
 
@@ -5270,7 +6319,7 @@ class TestCollisionAvoidanceGoals(object):
         :type box_setup: PR2
         """
         ces = box_setup.get_allow_l_gripper(u'box')
-        box_setup.add_collision_entries(ces)
+        box_setup.set_collision_entries(ces)
         p = PoseStamped()
         p.header.frame_id = box_setup.l_tip
         p.header.stamp = rospy.get_rostime()
@@ -5458,7 +6507,7 @@ class TestCollisionAvoidanceGoals(object):
         p.pose.position.z = 0.25
         p.pose.orientation.w = 1
         zero_pose.set_and_check_cart_goal(p, zero_pose.l_tip, zero_pose.default_root)
-        zero_pose.check_joint_state(js_goal)
+        zero_pose.check_current_joint_state(js_goal)
 
         zero_pose.check_cpi_geq(zero_pose.get_l_gripper_links(), 0.048)
         zero_pose.check_cpi_geq([attached_link_name], 0.048)
@@ -5477,7 +6526,7 @@ class TestCollisionAvoidanceGoals(object):
         ce.robot_links = [pocky]
         ce.body_b = u'box'
         ces.append(ce)
-        box_setup.add_collision_entries(ces)
+        box_setup.set_collision_entries(ces)
 
         p = PoseStamped()
         p.header.frame_id = box_setup.r_tip
@@ -5494,7 +6543,7 @@ class TestCollisionAvoidanceGoals(object):
         """
         box_setup.allow_all_collisions()
         ces = box_setup.get_l_gripper_collision_entries(u'box', 0.05, CollisionEntry.AVOID_COLLISION)
-        box_setup.add_collision_entries(ces)
+        box_setup.set_collision_entries(ces)
         p = PoseStamped()
         p.header.frame_id = box_setup.l_tip
         p.header.stamp = rospy.get_rostime()
@@ -5651,7 +6700,7 @@ class TestCollisionAvoidanceGoals(object):
     #     p.header.frame_id = kitchen_setup.l_tip
     #     p.pose.position.x = 0.2
     #     p.pose.orientation.w = 1
-    #     kitchen_setup.wrapper.allow_collision(kitchen_setup.get_l_gripper_links(), u'kitchen',
+    #     kitchen_setup.allow_collision(kitchen_setup.get_l_gripper_links(), u'kitchen',
     #                                           [u'sink_area', u'sink_area_surface'])
     #     kitchen_setup.set_and_check_cart_goal(p, kitchen_setup.l_tip, kitchen_setup.default_root)
     #
@@ -5854,9 +6903,9 @@ class TestCollisionAvoidanceGoals(object):
         tip_grasp_axis.header.frame_id = kitchen_setup.l_tip
         tip_grasp_axis.vector.z = 1
 
-        kitchen_setup.add_json_goal(u'GraspBar',
-                                    root=kitchen_setup.default_root,
-                                    tip=kitchen_setup.l_tip,
+        kitchen_setup.set_json_goal(u'GraspBar',
+                                    root_link=kitchen_setup.default_root,
+                                    tip_link=kitchen_setup.l_tip,
                                     tip_grasp_axis=tip_grasp_axis,
                                     bar_center=bar_center,
                                     bar_axis=bar_axis,
@@ -5881,7 +6930,7 @@ class TestCollisionAvoidanceGoals(object):
         # kitchen_setup.allow_all_collisions()
         kitchen_setup.send_and_check_goal()
 
-        kitchen_setup.attach_existing(milk_name, kitchen_setup.l_tip)
+        kitchen_setup.attach_object(milk_name, kitchen_setup.l_tip)
         # kitchen_setup.keep_position(kitchen_setup.r_tip)
         kitchen_setup.close_l_gripper()
 
@@ -5932,7 +6981,7 @@ class TestCollisionAvoidanceGoals(object):
         # take milk out of fridge
         kitchen_setup.set_kitchen_js({u'oven_area_area_right_drawer_main_joint': 0.48})
 
-        kitchen_setup.add_json_goal(u'BasePointingForward')
+        kitchen_setup.set_json_goal(u'BasePointingForward')
 
         # spawn milk
 
@@ -5956,10 +7005,10 @@ class TestCollisionAvoidanceGoals(object):
 
         grasp_pose = tf.kdl_to_pose_stamped(drawer_T_box * box_T_r_goal_pre, drawer_frame_id)
 
-        kitchen_setup.add_json_goal(u'AvoidJointLimits', percentage=40)
-        kitchen_setup.set_and_check_cart_goal(grasp_pose, tip=kitchen_setup.r_tip)
+        kitchen_setup.set_json_goal(u'AvoidJointLimits', percentage=40)
+        kitchen_setup.set_and_check_cart_goal(grasp_pose, tip_link=kitchen_setup.r_tip)
 
-        kitchen_setup.attach_existing(cereal_name, kitchen_setup.l_tip)
+        kitchen_setup.attach_object(cereal_name, kitchen_setup.l_tip)
         # kitchen_setup.keep_position(kitchen_setup.r_tip)
         kitchen_setup.close_l_gripper()
 
@@ -6020,6 +7069,7 @@ class TestCollisionAvoidanceGoals(object):
     #     kitchen_setup.send_and_check_goal(execute=False)
 
     def test_bowl_and_cup(self, kitchen_setup):
+        # kernprof -lv py.test -s test/test_integration_pr2.py::TestCollisionAvoidanceGoals::test_bowl_and_cup
         bowl_name = u'bowl'
         cup_name = u'cup'
         percentage = 50
@@ -6060,7 +7110,7 @@ class TestCollisionAvoidanceGoals(object):
                                                                       [0, 0, -1, 0],
                                                                       [-1, 0, 0, 0],
                                                                       [0, 0, 0, 1]]))
-        kitchen_setup.add_json_goal(u'AvoidJointLimits', percentage=percentage)
+        kitchen_setup.set_json_goal(u'AvoidJointLimits', percentage=percentage)
         kitchen_setup.set_and_check_cart_goal(r_goal, kitchen_setup.r_tip, kitchen_setup.default_root)
 
         l_goal.pose.position.z -= .2
@@ -6069,11 +7119,11 @@ class TestCollisionAvoidanceGoals(object):
         kitchen_setup.allow_collision([CollisionEntry.ALL], cup_name, [CollisionEntry.ALL])
         kitchen_setup.set_cart_goal(l_goal, kitchen_setup.l_tip, kitchen_setup.default_root)
         kitchen_setup.set_cart_goal(r_goal, kitchen_setup.r_tip, kitchen_setup.default_root)
-        kitchen_setup.add_json_goal(u'AvoidJointLimits', percentage=percentage)
+        kitchen_setup.set_json_goal(u'AvoidJointLimits', percentage=percentage)
         kitchen_setup.send_and_check_goal()
 
-        kitchen_setup.attach_existing(bowl_name, kitchen_setup.l_tip)
-        kitchen_setup.attach_existing(cup_name, kitchen_setup.r_tip)
+        kitchen_setup.attach_object(bowl_name, kitchen_setup.l_tip)
+        kitchen_setup.attach_object(cup_name, kitchen_setup.r_tip)
 
         kitchen_setup.send_and_check_joint_goal(gaya_pose)
         base_goal = PoseStamped()
@@ -6095,7 +7145,7 @@ class TestCollisionAvoidanceGoals(object):
 
         kitchen_setup.set_cart_goal(bowl_goal, bowl_name, kitchen_setup.default_root)
         kitchen_setup.set_cart_goal(cup_goal, cup_name, kitchen_setup.default_root)
-        kitchen_setup.add_json_goal(u'AvoidJointLimits', percentage=percentage)
+        kitchen_setup.set_json_goal(u'AvoidJointLimits', percentage=percentage)
         kitchen_setup.send_and_check_goal()
 
         kitchen_setup.detach_object(bowl_name)
@@ -6142,8 +7192,8 @@ class TestCollisionAvoidanceGoals(object):
         r_goal.pose.position.x += 0.25
         r_goal.pose.orientation.w = 1
 
-        kitchen_setup.add_json_goal(u'AvoidJointLimits', percentage=percentage)
-        kitchen_setup.set_and_check_cart_goal(r_goal, tip=kitchen_setup.r_tip)
+        kitchen_setup.set_json_goal(u'AvoidJointLimits', percentage=percentage)
+        kitchen_setup.set_and_check_cart_goal(r_goal, tip_link=kitchen_setup.r_tip)
 
         # spawn cup
 
@@ -6196,26 +7246,26 @@ class TestCollisionAvoidanceGoals(object):
                                                                       [0, -1, 0, 0],
                                                                       [-1, 0, 0, 0],
                                                                       [0, 0, 0, 1]]))
-        kitchen_setup.add_json_goal(u'AvoidJointLimits', percentage=percentage)
+        kitchen_setup.set_json_goal(u'AvoidJointLimits', percentage=percentage)
         kitchen_setup.set_and_check_cart_goal(l_goal, kitchen_setup.l_tip, kitchen_setup.default_root)
 
         l_goal.pose.position.z -= .2
         # kitchen_setup.allow_collision([CollisionEntry.ALL], spoon_name, [CollisionEntry.ALL])
         kitchen_setup.set_cart_goal(l_goal, kitchen_setup.l_tip, kitchen_setup.default_root)
-        kitchen_setup.add_json_goal(u'AvoidJointLimits', percentage=percentage)
+        kitchen_setup.set_json_goal(u'AvoidJointLimits', percentage=percentage)
         kitchen_setup.send_and_check_goal()
-        kitchen_setup.attach_existing(spoon_name, kitchen_setup.l_tip)
+        kitchen_setup.attach_object(spoon_name, kitchen_setup.l_tip)
 
         l_goal.pose.position.z += .2
         # kitchen_setup.allow_collision([CollisionEntry.ALL], spoon_name, [CollisionEntry.ALL])
         kitchen_setup.set_cart_goal(l_goal, kitchen_setup.l_tip, kitchen_setup.default_root)
-        kitchen_setup.add_json_goal(u'AvoidJointLimits', percentage=percentage)
+        kitchen_setup.set_json_goal(u'AvoidJointLimits', percentage=percentage)
         kitchen_setup.send_and_check_goal()
 
         l_goal.pose.position.z -= .2
         # kitchen_setup.allow_collision([CollisionEntry.ALL], spoon_name, [CollisionEntry.ALL])
         kitchen_setup.set_cart_goal(l_goal, kitchen_setup.l_tip, kitchen_setup.default_root)
-        kitchen_setup.add_json_goal(u'AvoidJointLimits', percentage=percentage)
+        kitchen_setup.set_json_goal(u'AvoidJointLimits', percentage=percentage)
         kitchen_setup.send_and_check_goal()
 
         kitchen_setup.send_and_check_joint_goal(gaya_pose)
@@ -6262,7 +7312,7 @@ class TestCollisionAvoidanceGoals(object):
         l_goal.pose.position.x += 0.2
         # l_goal.pose.position.z -= 0.1
         l_goal.pose.orientation.w = 1
-        kitchen_setup.add_json_goal(u'AvoidJointLimits', percentage=percentage)
+        kitchen_setup.set_json_goal(u'AvoidJointLimits', percentage=percentage)
 
         js = {
             u'r_upper_arm_roll_joint': -1.4635104674,
@@ -6280,7 +7330,7 @@ class TestCollisionAvoidanceGoals(object):
         # base_pose.pose.orientation = Quaternion(0,0,0,1)
         # kitchen_setup.set_cart_goal(base_pose, u'base_footprint')
 
-        kitchen_setup.set_and_check_cart_goal(l_goal, tip=kitchen_setup.l_tip)
+        kitchen_setup.set_and_check_cart_goal(l_goal, tip_link=kitchen_setup.l_tip)
 
     def test_tray(self, kitchen_setup):
         # FIXME
@@ -6314,7 +7364,7 @@ class TestCollisionAvoidanceGoals(object):
         kitchen_setup.allow_collision([], tray_name, [])
         kitchen_setup.send_and_check_goal()
 
-        kitchen_setup.attach_existing(tray_name, kitchen_setup.r_tip)
+        kitchen_setup.attach_object(tray_name, kitchen_setup.r_tip)
 
         kitchen_setup.allow_collision(robot_links=[tray_name],
                                       body_b=kitchen_setup.get_robot().get_name(),
@@ -6361,6 +7411,36 @@ class TestCollisionAvoidanceGoals(object):
 
     # TODO FIXME attaching and detach of urdf objects that listen to joint states
 
+    def test_iis(self, kitchen_setup):
+        # kitchen_setup.set_joint_goal(pocky_pose)
+        # kitchen_setup.send_and_check_goal()
+        object_name = u'lid'
+        pot_pose = PoseStamped()
+        pot_pose.header.frame_id = u'lid'
+        pot_pose.pose.position.z = -0.22
+        pot_pose.pose.orientation = Quaternion(*quaternion_about_axis(np.pi/2, [0,0,1]))
+        kitchen_setup.add_mesh(object_name, path=u'package://cad_models/kitchen/cooking-vessels/cookingpot.dae',
+                           pose=pot_pose)
+
+        base_pose = PoseStamped()
+        base_pose.header.frame_id = u'iai_kitchen/table_area_main'
+        base_pose.pose.position.y = -1.1
+        base_pose.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 2, [0, 0, 1]))
+        kitchen_setup.teleport_base(base_pose)
+        # m = zero_pose.get_world().get_object(object_name).as_marker_msg()
+        # compare_poses(m.pose, p.pose)
+
+        hand_goal = PoseStamped()
+        hand_goal.header.frame_id = u'goal'
+        hand_goal.pose.orientation.w = 1
+        kitchen_setup.allow_all_collisions()
+        # kitchen_setup.avoid_collision([], 'kitchen', ['table_area_main'], 0.05)
+        kitchen_setup.set_cart_goal(hand_goal, u'r_gripper_tool_frame')
+        kitchen_setup.send_goal(goal_type=MoveGoal.PLAN_ONLY)
+
+
+        # kitchen_setup.add_cylinder('pot', size=[0.2,0.2], pose=pot_pose)
+
     def test_ease_dishwasher(self, kitchen_setup):
         """
         :type kitchen_setup: PR2
@@ -6389,9 +7469,9 @@ class TestCollisionAvoidanceGoals(object):
         tip_grasp_axis.header.frame_id = hand
         tip_grasp_axis.vector.z = 1
 
-        kitchen_setup.add_json_goal(u'GraspBar',
-                                    root=kitchen_setup.default_root,
-                                    tip=hand,
+        kitchen_setup.set_json_goal(u'GraspBar',
+                                    root_link=kitchen_setup.default_root,
+                                    tip_link=hand,
                                     tip_grasp_axis=tip_grasp_axis,
                                     bar_center=bar_center,
                                     bar_axis=bar_axis,
@@ -6411,10 +7491,10 @@ class TestCollisionAvoidanceGoals(object):
 
         kitchen_setup.send_and_check_goal()
 
-        kitchen_setup.add_json_goal(u'Open',
-                                    tip=hand,
+        kitchen_setup.set_json_goal(u'Open',
+                                    tip_link=hand,
                                     object_name=u'kitchen',
-                                    handle_link=handle_name,
+                                    object_link_name=handle_name,
                                     goal_joint_state=goal_angle,
                                     # weight=100
                                     )
@@ -6438,9 +7518,9 @@ class TestCollisionAvoidanceGoals(object):
         tip_grasp_axis.header.frame_id = hand
         tip_grasp_axis.vector.z = 1
 
-        kitchen_setup.add_json_goal(u'GraspBar',
-                                    root=kitchen_setup.default_root,
-                                    tip=hand,
+        kitchen_setup.set_json_goal(u'GraspBar',
+                                    root_link=kitchen_setup.default_root,
+                                    tip_link=hand,
                                     tip_grasp_axis=tip_grasp_axis,
                                     bar_center=bar_center,
                                     bar_axis=bar_axis,
@@ -6471,9 +7551,9 @@ class TestCollisionAvoidanceGoals(object):
 
         # ------------------------------------------------------------------------------------------
         # kitchen_setup.add_json_goal(u'Close',
-        #                             tip=hand,
+        #                             tip_link=hand,
         #                             object_name=u'kitchen',
-        #                             handle_link=handle_name)
+        #                             object_link_name=handle_name)
         # kitchen_setup.allow_all_collisions()
         # kitchen_setup.send_and_check_goal()
         # kitchen_setup.set_kitchen_js({u'sink_area_dish_washer_door_joint': 0})
@@ -6491,7 +7571,7 @@ class TestReachability():
         pose.header.frame_id = zero_pose.r_tip
         pose.pose.position.z = -2
         pose.pose.orientation.w = 1
-        zero_pose.set_cart_goal(root=zero_pose.default_root, tip=zero_pose.r_tip, goal_pose=pose)
+        zero_pose.set_cart_goal(root_link=zero_pose.default_root, tip_link=zero_pose.r_tip, goal_pose=pose)
         zero_pose.check_reachability(expected_error_codes=[MoveResult.UNREACHABLE])
 
     def test_unreachable_goal_2(self, zero_pose):
@@ -6499,7 +7579,7 @@ class TestReachability():
         pose.pose.position.z = 5
         pose.header.frame_id = 'map'
         pose.pose.orientation.w = 1
-        zero_pose.set_cart_goal(root='odom_combined', tip='r_gripper_tool_frame', goal_pose=pose)
+        zero_pose.set_cart_goal(root_link='odom_combined', tip_link='r_gripper_tool_frame', goal_pose=pose)
         zero_pose.check_reachability(expected_error_codes=[MoveResult.SHAKING])
 
     def test_unreachable_goal_3(self, zero_pose):
@@ -6507,7 +7587,7 @@ class TestReachability():
         pose.pose.position.z = 1.2
         pose.header.frame_id = 'map'
         pose.pose.orientation.w = 1
-        zero_pose.set_translation_goal(root='odom_combined', tip='r_gripper_tool_frame', goal_pose=pose)
+        zero_pose.set_translation_goal(goal_pose=pose, tip_link='r_gripper_tool_frame', root_link='odom_combined')
         js = {}
         js['r_shoulder_lift_joint'] = 1.0  # soft lower -0.3536 soft upper 1.2963
         js['r_elbow_flex_joint'] = -0.2  # soft lower -2.1213 soft upper -0.15
@@ -6521,13 +7601,13 @@ class TestReachability():
         pose.pose.position.z = 1
         pose.header.frame_id = 'map'
         pose.pose.orientation.w = 1
-        zero_pose.set_translation_goal(root='odom_combined', tip='r_gripper_tool_frame', goal_pose=pose)
+        zero_pose.set_translation_goal(goal_pose=pose, tip_link='r_gripper_tool_frame', root_link='odom_combined')
         pose2 = PoseStamped()
         pose2.pose.position.y = 2.0
         pose2.pose.position.z = 1
         pose2.header.frame_id = 'map'
         pose.pose.orientation.w = 1
-        zero_pose.set_translation_goal(root='odom_combined', tip='l_gripper_tool_frame', goal_pose=pose2)
+        zero_pose.set_translation_goal(goal_pose=pose2, tip_link='l_gripper_tool_frame', root_link='odom_combined')
         zero_pose.check_reachability(expected_error_codes=[MoveResult.UNREACHABLE])
 
     def test_unreachable_goal_5(self, zero_pose):
@@ -6535,7 +7615,7 @@ class TestReachability():
         pose.pose.position.x = 2
         pose.header.frame_id = 'map'
         pose.pose.orientation.w = 1
-        zero_pose.set_cart_goal(root='r_shoulder_lift_link', tip='r_gripper_tool_frame', goal_pose=pose)
+        zero_pose.set_cart_goal(root_link='r_shoulder_lift_link', tip_link='r_gripper_tool_frame', goal_pose=pose)
         zero_pose.check_reachability(expected_error_codes=[MoveResult.UNREACHABLE])
 
     def test_unreachable_goal_6(self, zero_pose):  # TODO torso lift joint xdot has a wrong value
@@ -6545,7 +7625,7 @@ class TestReachability():
         pose.pose.position.z = 0.0
         pose.header.frame_id = 'map'
         pose.pose.orientation.w = 1
-        zero_pose.set_translation_goal(root='odom_combined', tip='base_footprint', goal_pose=pose)
+        zero_pose.set_translation_goal(goal_pose=pose, tip_link='base_footprint', root_link='odom_combined')
         js = {}
         js['odom_x_joint'] = 0.01
         zero_pose.set_joint_goal(js)
@@ -6568,9 +7648,9 @@ class TestReachability():
         pose.pose.orientation.z = 0.0
         pose.pose.orientation.w = 0.707
         pose.header.frame_id = 'map'
-        zero_pose.set_cart_goal(root='odom_combined', tip='r_gripper_tool_frame', goal_pose=pose)
+        zero_pose.set_cart_goal(root_link='odom_combined', tip_link='r_gripper_tool_frame', goal_pose=pose)
         zero_pose.check_reachability()
-        zero_pose.set_cart_goal(root='odom_combined', tip='r_gripper_tool_frame', goal_pose=pose)
+        zero_pose.set_cart_goal(root_link='odom_combined', tip_link='r_gripper_tool_frame', goal_pose=pose)
         zero_pose.allow_all_collisions()
         zero_pose.send_and_check_goal(goal_type=MoveGoal.PLAN_ONLY)
 
@@ -6583,9 +7663,9 @@ class TestReachability():
         pose.pose.position.x = 3.0
         pose.pose.position.z = 1.0
         pose.header.frame_id = 'map'
-        zero_pose.set_cart_goal(root='odom_combined', tip='r_gripper_tool_frame', goal_pose=pose)
+        zero_pose.set_cart_goal(root_link='odom_combined', tip_link='r_gripper_tool_frame', goal_pose=pose)
         zero_pose.check_reachability()
-        zero_pose.set_cart_goal(root='odom_combined', tip='r_gripper_tool_frame', goal_pose=pose)
+        zero_pose.set_cart_goal(root_link='odom_combined', tip_link='r_gripper_tool_frame', goal_pose=pose)
         zero_pose.send_and_check_goal(goal_type=MoveGoal.PLAN_ONLY)
 
     def test_reachable_goal_2(self, zero_pose):
@@ -6593,9 +7673,9 @@ class TestReachability():
         pose.pose.position.x = -1.0
         pose.pose.position.z = 1.0
         pose.header.frame_id = 'map'
-        zero_pose.set_cart_goal(root='odom_combined', tip='r_gripper_tool_frame', goal_pose=pose)
+        zero_pose.set_cart_goal(root_link='odom_combined', tip_link='r_gripper_tool_frame', goal_pose=pose)
         zero_pose.check_reachability()
-        zero_pose.set_cart_goal(root='odom_combined', tip='r_gripper_tool_frame', goal_pose=pose)
+        zero_pose.set_cart_goal(root_link='odom_combined', tip_link='r_gripper_tool_frame', goal_pose=pose)
         zero_pose.send_and_check_goal(goal_type=MoveGoal.PLAN_ONLY)
 
     def test_reachable_goal_3(self, zero_pose):
@@ -6608,9 +7688,9 @@ class TestReachability():
         pose.pose.orientation.z = 0.322
         pose.pose.orientation.w = -0.317
         pose.header.frame_id = 'map'
-        zero_pose.set_cart_goal(root='odom_combined', tip='r_gripper_tool_frame', goal_pose=pose)
+        zero_pose.set_cart_goal(root_link='odom_combined', tip_link='r_gripper_tool_frame', goal_pose=pose)
         zero_pose.check_reachability()
-        zero_pose.set_cart_goal(root='odom_combined', tip='r_gripper_tool_frame', goal_pose=pose)
+        zero_pose.set_cart_goal(root_link='odom_combined', tip_link='r_gripper_tool_frame', goal_pose=pose)
         zero_pose.send_and_check_goal(goal_type=MoveGoal.PLAN_ONLY)
 
     def test_reachable_goal_4(self, zero_pose):
@@ -6623,7 +7703,7 @@ class TestReachability():
         pose.pose.orientation.z = 0.322
         pose.pose.orientation.w = -0.317
         pose.header.frame_id = 'map'
-        zero_pose.set_cart_goal(root='odom_combined', tip='r_gripper_tool_frame', goal_pose=pose)
+        zero_pose.set_cart_goal(root_link='odom_combined', tip_link='r_gripper_tool_frame', goal_pose=pose)
         js = {}
         js['r_elbow_flex_joint'] = -0.2
         js['torso_lift_joint'] = 0.15
@@ -6631,7 +7711,7 @@ class TestReachability():
         zero_pose.allow_all_collisions()
         zero_pose.check_reachability()
 
-        zero_pose.set_cart_goal(root='odom_combined', tip='r_gripper_tool_frame', goal_pose=pose)
+        zero_pose.set_cart_goal(root_link='odom_combined', tip_link='r_gripper_tool_frame', goal_pose=pose)
         zero_pose.set_joint_goal(js)
         zero_pose.allow_all_collisions()
         zero_pose.send_and_check_goal(goal_type=MoveGoal.PLAN_ONLY)

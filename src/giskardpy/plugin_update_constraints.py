@@ -42,6 +42,7 @@ class GoalToConstraints(GetGoal):
         self.get_god_map().set_data(identifier.collision_goal, None)
         self.clear_blackboard_exception()
 
+    @profile
     def update(self):
         # TODO make this interruptable
         # TODO try catch everything
@@ -51,6 +52,8 @@ class GoalToConstraints(GetGoal):
             return Status.FAILURE
 
         self.get_god_map().set_data(identifier.constraints_identifier, {})
+
+        self.get_robot()._create_constraints(self.get_god_map())
 
         self.soft_constraints = {}
         if not (self.get_god_map().get_data(identifier.check_reachability)):
@@ -75,7 +78,7 @@ class GoalToConstraints(GetGoal):
         controlled_joints = self.get_robot().controlled_joints
 
         if (self.get_god_map().get_data(identifier.check_reachability)):
-            from giskardpy import cas_wrapper as w
+            from giskardpy import casadi_wrapper as w
             joint_constraints = OrderedDict()
             for i, joint_name in enumerate(controlled_joints):
                 lower_limit, upper_limit = self.get_robot().get_joint_limits(joint_name)
@@ -130,7 +133,7 @@ class GoalToConstraints(GetGoal):
             except KeyError:
                 matches = ''
                 for s in self.allowed_constraint_types.keys():
-                    sm = difflib.SequenceMatcher(None, constraint.type.lower(), s.lower())
+                    sm = difflib.SequenceMatcher(None, str(constraint.type).lower(), s.lower())
                     ratio = sm.ratio()
                     if ratio >= 0.5:
                         matches = matches + s + '\n'
@@ -153,7 +156,7 @@ class GoalToConstraints(GetGoal):
                 c = C(self.god_map, **params)
             except Exception as e:
                 traceback.print_exc()
-                doc_string = C.make_constraints.__doc__
+                doc_string = C.__init__.__doc__
                 error_msg = u'Initialization of "{}" constraint failed: \n {} \n'.format(C.__name__, e)
                 if doc_string is not None:
                     error_msg = error_msg + doc_string
@@ -170,11 +173,11 @@ class GoalToConstraints(GetGoal):
                 raise e
         loginfo(u'done parsing goal message')
 
-    def has_robot_changed(self):
-        new_urdf = self.get_robot().get_urdf_str()
-        result = self.last_urdf != new_urdf
-        self.last_urdf = new_urdf
-        return result
+    # def has_robot_changed(self):
+    #     new_urdf = self.get_robot().get_urdf_str()
+    #     result = self.last_urdf != new_urdf
+    #     self.last_urdf = new_urdf
+    #     return result
 
     def add_collision_avoidance_soft_constraints(self, collision_cmds):
         """

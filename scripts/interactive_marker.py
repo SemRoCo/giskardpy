@@ -33,7 +33,7 @@ class IMServer(object):
     Spawns interactive Marker which send cart goals to action server.
     Does not interact with god map.
     """
-    def __init__(self, root_tips, suffix=u'', giskard_name=u'giskardpy/command'):
+    def __init__(self, root_tips, suffix=u''):
         """
         :param root_tips: list containing root->tip tuple for each interactive marker.
         :type root_tips: list
@@ -41,14 +41,13 @@ class IMServer(object):
         :type suffix: str
         """
         self.enable_self_collision = rospy.get_param(u'~enable_self_collision', True)
-        self.giskard = GiskardWrapper(giskard_name)
+        self.giskard = GiskardWrapper()
         if len(root_tips) > 0:
             self.roots, self.tips = zip(*root_tips)
         else:
             self.roots = []
             self.tips = []
         self.suffix = suffix
-        self.giskard_name = giskard_name
         self.markers = {}
 
         # marker server
@@ -191,7 +190,9 @@ class IMServer(object):
                 p.header.frame_id = feedback.header.frame_id
                 p.pose = feedback.pose
 
-                self.giskard.set_cart_goal(self.root_link, self.tip_link, p)
+                self.giskard.set_cart_goal(root_link=self.root_link,
+                                           tip_link=self.tip_link,
+                                           goal_pose=p)
 
                 if not self.enable_self_collision:
                     self.giskard.allow_self_collision()

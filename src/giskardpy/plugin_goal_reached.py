@@ -20,7 +20,7 @@ def make_velocity_threshold(god_map,
     sample_period = god_map.get_data(identifier.sample_period)
     thresholds = []
     for joint_name in robot.controlled_joints:
-        velocity_limit = robot.get_joint_velocity_limit(joint_name)
+        velocity_limit = robot.get_joint_velocity_limit_expr_evaluated(joint_name, god_map)
         if velocity_limit is None:
             velocity_limit = 1
         velocity_limit *= joint_convergence_threshold
@@ -44,6 +44,7 @@ class GoalReachedPlugin(GiskardBehavior):
         self.thresholds = make_velocity_threshold(self.get_god_map())
         self.number_of_controlled_joints = len(self.thresholds)
 
+    @profile
     def update(self):
         # current_js = self.get_god_map().get_data(identifier.joint_states)
         planning_time = self.get_god_map().get_data(identifier.time)

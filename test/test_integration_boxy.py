@@ -174,7 +174,8 @@ def kitchen_setup(better_pose):
     # better_pose.send_and_check_joint_goal(gaya_pose)
     object_name = u'kitchen'
     better_pose.add_urdf(object_name, rospy.get_param(u'kitchen_description'),
-                              tf.lookup_pose(u'map', u'iai_kitchen/world'), u'/kitchen/joint_states')
+                              tf.lookup_pose(u'map', u'iai_kitchen/world'), u'/kitchen/joint_states',
+                         set_js_topic=u'/kitchen/cram_joint_states')
     js = {k: 0.0 for k in better_pose.get_world().get_object(object_name).get_movable_joints()}
     better_pose.set_kitchen_js(js)
     return better_pose
@@ -194,7 +195,7 @@ class TestConstraints(object):
     def test_pointing(self, better_pose):
         tip = u'head_mount_kinect2_rgb_optical_frame'
         goal_point = lookup_point(u'map', better_pose.r_tip)
-        better_pose.wrapper.pointing(tip, goal_point)
+        better_pose.pointing(tip, goal_point)
         better_pose.send_and_check_goal()
 
         current_x = Vector3Stamped()
@@ -206,7 +207,7 @@ class TestConstraints(object):
         np.testing.assert_almost_equal(expected_x.point.x, 0, 2)
 
         goal_point = lookup_point(u'map', better_pose.r_tip)
-        better_pose.wrapper.pointing(tip, goal_point, root=better_pose.r_tip)
+        better_pose.pointing(tip, goal_point, root=better_pose.r_tip)
 
         r_goal = PoseStamped()
         r_goal.header.frame_id = better_pose.r_tip
@@ -246,7 +247,7 @@ class TestConstraints(object):
         tip_grasp_axis.header.frame_id = kitchen_setup.l_tip
         tip_grasp_axis.vector.y = 1
 
-        kitchen_setup.add_json_goal(u'GraspBar',
+        kitchen_setup.set_json_goal(u'GraspBar',
                                     root=kitchen_setup.default_root,
                                     tip=kitchen_setup.l_tip,
                                     tip_grasp_axis=tip_grasp_axis,
@@ -271,7 +272,7 @@ class TestConstraints(object):
         kitchen_setup.allow_all_collisions()  # makes execution faster
         kitchen_setup.send_and_check_goal()  # send goal to Giskard
 
-        kitchen_setup.add_json_goal(u'Open',
+        kitchen_setup.set_json_goal(u'Open',
                                     tip=kitchen_setup.l_tip,
                                     object_name=u'kitchen',
                                     handle_link=handle_name)
@@ -281,7 +282,7 @@ class TestConstraints(object):
         kitchen_setup.set_kitchen_js({u'sink_area_left_middle_drawer_main_joint': 0.48})
 
         # Close drawer partially
-        kitchen_setup.add_json_goal(u'OpenDrawer',
+        kitchen_setup.set_json_goal(u'OpenDrawer',
                                     tip=kitchen_setup.l_tip,
                                     object_name=u'kitchen',
                                     handle_link=handle_name,
@@ -291,7 +292,7 @@ class TestConstraints(object):
         # Update kitchen object
         kitchen_setup.set_kitchen_js({u'sink_area_left_middle_drawer_main_joint': 0.2})
 
-        kitchen_setup.add_json_goal(u'Close',
+        kitchen_setup.set_json_goal(u'Close',
                                     tip=kitchen_setup.l_tip,
                                     object_name=u'kitchen',
                                     handle_link=handle_name)

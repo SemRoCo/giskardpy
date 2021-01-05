@@ -38,9 +38,15 @@ class Trajectory(object):
         pass
 
     def set(self, time, point):
-        if len(self._points) > 0 and self._points.keys()[-1] > time:
+        if len(self._points) > 0 and list(self._points.keys())[-1] > time:
             raise KeyError(u'Cannot append a trajectory point that is before the current end time of the trajectory.')
         self._points[time] = point
+
+    def delete(self, time):
+        del self._points[time]
+
+    def delete_last(self):
+        self.delete(self._points.keys()[-1])
 
     def items(self):
         return self._points.items()

@@ -3,6 +3,7 @@ robot = world + [u'robot']
 fk_pose = robot + [u'get_fk_pose']
 fk_np = robot + [u'get_fk_np']
 joint_states = robot + [u'joint_state']
+last_joint_states = [u'last_joint_state']
 
 constraints_identifier = [u'constraints']
 trajectory = [u'traj']
@@ -19,6 +20,7 @@ hard_constraint_identifier = [u'hard_constraints']
 execute = [u'execute']
 skip_failures = [u'skip_failures']
 check_reachability = [u'check_reachability']
+cut_off_shaking = [u'cut_off_shaking']
 next_move_goal = [u'next_move_goal']
 cmd_id = [u'cmd_id']
 
@@ -98,6 +100,10 @@ frequency_range = plugins + [u'WiggleCancel', u'frequency_range']
 
 joint_convergence_threshold = plugins + [u'GoalReached', u'joint_convergence_threshold']
 GoalReached_window_size = plugins + [u'GoalReached', u'window_size']
+
+publish_attached_objects = plugins + [u'tf_publisher', u'publish_attached_objects']
+publish_world_objects = plugins + [u'tf_publisher', u'publish_world_objects']
+tf_topic = plugins + [u'tf_publisher', u'tf_topic']
 
 # reachability check
 reachability_check = rosparam + [u'reachability_check']

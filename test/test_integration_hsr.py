@@ -3,6 +3,7 @@ import numpy as np
 import pytest
 import rospy
 from geometry_msgs.msg import PoseStamped, Point, Quaternion
+from giskard_msgs.msg import MoveGoal, MoveResult
 from numpy import pi
 from tf.transformations import quaternion_from_matrix, quaternion_about_axis
 
@@ -149,7 +150,7 @@ class TestCollisionAvoidanceGoals(object):
 
         goal_pose = PoseStamped()
         goal_pose.header.frame_id = u'hand_palm_link'
-        goal_pose.pose.position.x = 0.9177
+        goal_pose.pose.position.x = 0.5
         goal_pose.pose.orientation.w = 1
         zero_pose.set_and_check_cart_goal(goal_pose, zero_pose.tip)
 
@@ -173,7 +174,7 @@ class TestCollisionAvoidanceGoals(object):
                                                                           [1, 0, 0, 0],
                                                                           [0, 0, 0, 1]]))
         box_setup.set_and_check_cart_goal(grasp_pose, box_setup.tip)
-        box_setup.attach_existing(box_name, box_setup.tip)
+        box_setup.attach_object(box_name, box_setup.tip)
 
         base_goal = PoseStamped()
         base_goal.header.frame_id = box_setup.default_root
@@ -197,5 +198,5 @@ class TestCollisionAvoidanceGoals(object):
         zero_pose.add_box(size=[1, 1, 0.01], pose=p)
 
         js = {u'arm_flex_joint': 0}
-        zero_pose.send_and_check_joint_goal(js)
+        zero_pose.send_and_check_joint_goal(js, expected_error_codes=[MoveResult.SHAKING])
 

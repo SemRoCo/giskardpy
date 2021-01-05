@@ -3,7 +3,7 @@ from time import time
 
 import numpy as np
 
-from giskardpy import logging, cas_wrapper as w
+from giskardpy import logging, casadi_wrapper as w
 from giskardpy.data_types import SoftConstraint
 from giskardpy.exceptions import QPSolverException, InfeasibleException, OutOfJointLimitsException, \
     HardConstraintsViolatedException
@@ -50,6 +50,7 @@ class QProblemBuilder(object):
     def get_expr(self):
         return self.compiled_big_ass_M.str_params
 
+    @profile
     def construct_big_ass_M(self):
         # TODO cpu intensive
         weights = []
@@ -99,7 +100,7 @@ class QProblemBuilder(object):
         self.set_ub(w.Matrix(ub))
         self.set_linear_weights(w.Matrix(linear_weight))
 
-
+    @profile
     def compile_big_ass_M(self):
         t = time()
         self.free_symbols = w.free_symbols(self.big_ass_M)
@@ -257,6 +258,7 @@ class QProblemBuilder(object):
         H = H[b_mask][:, b_mask]
         return H, A, lb, ub, lbA, ubA, g
 
+    @profile
     def get_cmd(self, substitutions, nWSR=None):
         """
         Uses substitutions for each symbol to compute the next commands for each joint.
@@ -280,6 +282,10 @@ class QProblemBuilder(object):
         except QPSolverException as e:
             p_weights, p_A, p_lbA, p_ubA, p_lb, p_ub = self.debug_print(np_H, A, lb, ub, lbA, ubA, g, actually_print=True)
             if isinstance(e, InfeasibleException):
+                if self.are_joint_limits_violated(p_lb, p_ub):
+                    raise OutOfJointLimitsException(e)
+                raise HardConstraintsViolatedException(e)
+            if isinstance(e, QPSolverException):
                 arrays = [(p_weights, u'H'),
                           (p_A, u'A'),
                           (p_lbA, u'lbA'),
@@ -291,9 +297,6 @@ class QProblemBuilder(object):
                     any_nan |= self.is_nan_in_array(name, a)
                 if any_nan:
                     raise e
-                if self.are_joint_limits_violated(p_lb, p_ub):
-                    raise OutOfJointLimitsException(e)
-                raise HardConstraintsViolatedException(e)
             raise e
         if xdot_full is None:
             return None

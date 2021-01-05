@@ -5,6 +5,7 @@ from py_trees import Status
 from giskardpy import identifier
 from giskardpy.data_types import Collision, Trajectory
 from giskardpy.plugin import GiskardBehavior
+from giskardpy.tree_manager import TreeManager
 from giskardpy.utils import KeyDefaultDict
 
 
@@ -26,6 +27,8 @@ class CleanUp(GiskardBehavior):
         # to reverse update godmap changes
         self.get_god_map().set_data(identifier.general_options, deepcopy(self.general_options))
         self.get_god_map().set_data(identifier.next_move_goal, None)
+        tree_manager = self.get_god_map().get_data(identifier.tree_manager) # type: TreeManager
+        tree_manager.get_node(u'visualization').clear_marker()
 
     def update(self):
         return Status.SUCCESS

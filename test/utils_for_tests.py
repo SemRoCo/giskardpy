@@ -409,7 +409,7 @@ class GiskardTestWrapper(GiskardWrapper):
     def set_straight_translation_goal(self, goal_pose, tip_link, root_link=None, weight=None, max_velocity=None):
         if not root_link:
             root_link = self.default_root
-        super(GiskardTestWrapper, self).set_straight_translation_goal(goal_pose, root_link, tip_link, max_velocity=max_velocity)
+        super(GiskardTestWrapper, self).set_straight_translation_goal(goal_pose, tip_link, root_link, max_velocity=max_velocity)
 
     def set_cart_goal(self, goal_pose, tip_link, root_link=None, weight=None, linear_velocity=None, angular_velocity=None):
         if not root_link:
@@ -426,10 +426,10 @@ class GiskardTestWrapper(GiskardWrapper):
         if not root_link:
             root_link = self.default_root
         if weight is not None:
-            super(GiskardTestWrapper, self).set_straight_cart_goal(goal_pose, root_link, tip_link, weight=weight, trans_max_velocity=linear_velocity,
+            super(GiskardTestWrapper, self).set_straight_cart_goal(goal_pose, tip_link, root_link, weight=weight, trans_max_velocity=linear_velocity,
                                        rot_max_velocity=angular_velocity)
         else:
-            super(GiskardTestWrapper, self).set_straight_cart_goal(goal_pose, root_link, tip_link, trans_max_velocity=linear_velocity,
+            super(GiskardTestWrapper, self).set_straight_cart_goal(goal_pose, tip_link, root_link, trans_max_velocity=linear_velocity,
                                        rot_max_velocity=angular_velocity)
 
 

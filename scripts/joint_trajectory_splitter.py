@@ -2,8 +2,11 @@
 
 import rospy
 import control_msgs.msg
-import pr2_controllers_msgs.msg
 import trajectory_msgs.msg
+try:
+    import pr2_controllers_msgs.msg
+except ImportError:
+    pass
 import actionlib
 from rospy import AnyMsg
 

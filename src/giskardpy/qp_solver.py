@@ -79,32 +79,32 @@ class QPSolver(object):
             if success == PyReturnValue.SUCCESSFUL_RETURN:
                 self.started = True
                 break
-            elif success == PyReturnValue.NAN_IN_LB:
-                # TODO nans get replaced with 0 document this somewhere
-                # TODO might still be buggy when nan occur when the qp problem is already initialized
-                lb[np.isnan(lb)] = 0
-                nWSR = None
-                self.started = False
-                number_of_retries += 1
-                continue
-            elif success == PyReturnValue.NAN_IN_UB:
-                ub[np.isnan(ub)] = 0
-                nWSR = None
-                self.started = False
-                number_of_retries += 1
-                continue
-            elif success == PyReturnValue.NAN_IN_LBA:
-                lbA[np.isnan(lbA)] = 0
-                nWSR = None
-                self.started = False
-                number_of_retries += 1
-                continue
-            elif success == PyReturnValue.NAN_IN_UBA:
-                ubA[np.isnan(ubA)] = 0
-                nWSR = None
-                self.started = False
-                number_of_retries += 1
-                continue
+#            elif success == PyReturnValue.NAN_IN_LB:
+#                # TODO nans get replaced with 0 document this somewhere
+#                # TODO might still be buggy when nan occur when the qp problem is already initialized
+#                lb[np.isnan(lb)] = 0
+#                nWSR = None
+#                self.started = False
+#                number_of_retries += 1
+#                continue
+#            elif success == PyReturnValue.NAN_IN_UB:
+#                ub[np.isnan(ub)] = 0
+#                nWSR = None
+#                self.started = False
+#                number_of_retries += 1
+#                continue
+#            elif success == PyReturnValue.NAN_IN_LBA:
+#                lbA[np.isnan(lbA)] = 0
+#                nWSR = None
+#                self.started = False
+#                number_of_retries += 1
+#                continue
+#            elif success == PyReturnValue.NAN_IN_UBA:
+#                ubA[np.isnan(ubA)] = 0
+#                nWSR = None
+#                self.started = False
+#                number_of_retries += 1
+#                continue
             else:
                 logging.loginfo(u'{}; retrying with A rounded to 5 decimal places'.format(self.RETURN_VALUE_DICT[success]))
                 r = 5

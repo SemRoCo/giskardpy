@@ -42,7 +42,7 @@
 
   <node pkg="giskardpy" type="joint_trajectory_splitter.py" name="joint_trajectory_splitter" output="screen">
     <rosparam param="state_topics">["/hsrb/arm_trajectory_controller/state", "/hsrb/omni_base_controller/state" , "/hsrb/head_trajectory_controller/state"]</rosparam>
-    <rosparam param="client_topics">["/hsrb/arm_trajectory_controller/follow_joint_trajectory", "/base_trajectory_action/follow_joint_trajectory", "/hsrb/head_trajectory_controller/follow_joint_trajectory"]</rosparam>
+    <rosparam param="client_topics">["/hsrb/arm_trajectory_controller/follow_joint_trajectory", "/hsrb/omni_base_controller/follow_joint_trajectory", "/hsrb/head_trajectory_controller/follow_joint_trajectory"]</rosparam>
   </node>
 
   <!--#######################################################################-->

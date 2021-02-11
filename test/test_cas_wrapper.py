@@ -5,45 +5,42 @@ import hypothesis.strategies as st
 import numpy as np
 from angles import shortest_angular_distance, normalize_angle_positive, normalize_angle
 from hypothesis import given, assume
-from scipy.spatial.distance import cosine
 from tf.transformations import quaternion_matrix, quaternion_about_axis, quaternion_from_euler, euler_matrix, \
     rotation_matrix, quaternion_multiply, quaternion_conjugate, quaternion_from_matrix, \
     quaternion_slerp, rotation_from_matrix, euler_from_matrix
 from transforms3d.quaternions import quat2mat, quat2axangle
 
-from giskardpy import cas_wrapper as w
-from utils_for_tests import float_no_nan_no_inf, SMALL_NUMBER, unit_vector, quaternion, vector, \
+from giskardpy import casadi_wrapper as w
+from utils_for_tests import float_no_nan_no_inf, unit_vector, quaternion, vector, \
     pykdl_frame_to_numpy, lists_of_same_length, angle, compare_axis_angle, angle_positive, sq_matrix
 
 
 class TestCASWrapper(unittest.TestCase):
 
-    #TODO test free symbols
+    # TODO test free symbols
 
     def test_is_matrix(self):
         self.assertFalse(w.is_matrix(w.Symbol('a')))
-        self.assertTrue(w.is_matrix(w.Matrix([[0,0]])))
+        self.assertTrue(w.is_matrix(w.Matrix([[0, 0]])))
 
     def test_jacobian(self):
         a = w.Symbol('a')
         b = w.Symbol('b')
-        m = w.Matrix([a+b, a**2, b**2])
-        jac = w.jacobian(m, [a,b])
-        expected = w.Matrix([[1,1],[2*a,0],[0,2*b]])
+        m = w.Matrix([a + b, a ** 2, b ** 2])
+        jac = w.jacobian(m, [a, b])
+        expected = w.Matrix([[1, 1], [2 * a, 0], [0, 2 * b]])
         for i in range(expected.shape[0]):
             for j in range(expected.shape[1]):
-
-                assert w.equivalent(jac[i,j], expected[i,j])
+                assert w.equivalent(jac[i, j], expected[i, j])
 
     @given(float_no_nan_no_inf())
     def test_abs(self, f1):
-        self.assertAlmostEqual(w.compile_and_execute(w.Abs, [f1]), abs(f1), places=7)
-
+        self.assertAlmostEqual(w.compile_and_execute(w.abs, [f1]), abs(f1), places=7)
 
     @given(float_no_nan_no_inf(),
            float_no_nan_no_inf())
     def test_max(self, f1, f2):
-        self.assertAlmostEqual(w.compile_and_execute(w.Max, [f1, f2]),
+        self.assertAlmostEqual(w.compile_and_execute(w.max, [f1, f2]),
                                max(f1, f2), places=7)
 
     @given(float_no_nan_no_inf(),
@@ -55,7 +52,7 @@ class TestCASWrapper(unittest.TestCase):
     @given(float_no_nan_no_inf(),
            float_no_nan_no_inf())
     def test_min(self, f1, f2):
-        self.assertAlmostEqual(w.compile_and_execute(w.Min, [f1, f2]),
+        self.assertAlmostEqual(w.compile_and_execute(w.min, [f1, f2]),
                                min(f1, f2), places=7)
 
     @given(st.integers(min_value=1, max_value=10))
@@ -63,15 +60,15 @@ class TestCASWrapper(unittest.TestCase):
         data = list(range(x_dim))
         m = w.Matrix(data)
         self.assertEqual(m[0], 0)
-        self.assertEqual(m[-1], x_dim -1)
+        self.assertEqual(m[-1], x_dim - 1)
 
     @given(st.integers(min_value=1, max_value=10),
            st.integers(min_value=1, max_value=10))
     def test_matrix2(self, x_dim, y_dim):
-        data = [[(i)+(j*x_dim) for j in range(y_dim)] for i in range(x_dim)]
+        data = [[(i) + (j * x_dim) for j in range(y_dim)] for i in range(x_dim)]
         m = w.Matrix(data)
-        self.assertEqual(float(m[0,0]), 0)
-        self.assertEqual(float(m[x_dim-1,y_dim-1]), (x_dim*y_dim)-1)
+        self.assertEqual(float(m[0, 0]), 0)
+        self.assertEqual(float(m[x_dim - 1, y_dim - 1]), (x_dim * y_dim) - 1)
 
     @given(float_no_nan_no_inf())
     def test_sign(self, f1):
@@ -190,7 +187,6 @@ class TestCASWrapper(unittest.TestCase):
         np.testing.assert_array_almost_equal(
             w.compile_and_execute(w.rotation_matrix_from_axis_angle, [axis, angle]),
             rotation_matrix(angle, axis))
-
 
     @given(vector(3),
            vector(3))
@@ -339,21 +335,22 @@ class TestCASWrapper(unittest.TestCase):
         r1 = w.position_of(w.frame_quaternion(x, y, z, q[0], q[1], q[2], q[3]))
         r2 = [x, y, z, 1]
         for i, e in enumerate(r2):
-            self.assertAlmostEqual(r1[i],e)
+            self.assertAlmostEqual(r1[i], e)
 
     @given(float_no_nan_no_inf(),
            float_no_nan_no_inf(),
            float_no_nan_no_inf(),
            unit_vector(4))
     def test_trans_of(self, x, y, z, q):
-        r1 = w.compile_and_execute(lambda *args: w.translation_of(w.frame_quaternion(*args)), [x, y, z, q[0], q[1], q[2], q[3]])
+        r1 = w.compile_and_execute(lambda *args: w.translation_of(w.frame_quaternion(*args)),
+                                   [x, y, z, q[0], q[1], q[2], q[3]])
         r2 = np.identity(4)
         r2[0, 3] = x
         r2[1, 3] = y
         r2[2, 3] = z
         for i in range(r2.shape[0]):
             for j in range(r2.shape[1]):
-                self.assertAlmostEqual(float(r1[i,j]), r2[i,j])
+                self.assertAlmostEqual(float(r1[i, j]), r2[i, j])
 
     @given(float_no_nan_no_inf(),
            float_no_nan_no_inf(),
@@ -369,17 +366,16 @@ class TestCASWrapper(unittest.TestCase):
         """
         Test to make sure the function doesn't alter the original
         """
-        f = w.translation3(1,2,3)
+        f = w.translation3(1, 2, 3)
         r = w.rotation_of(f)
-        self.assertTrue(f[0,3], 1)
-        self.assertTrue(f[0,3], 2)
-        self.assertTrue(f[0,3], 3)
+        self.assertTrue(f[0, 3], 1)
+        self.assertTrue(f[0, 3], 2)
+        self.assertTrue(f[0, 3], 3)
 
     @given(unit_vector(4))
     def test_trace(self, q):
         m = quaternion_matrix(q)
         np.testing.assert_array_almost_equal(w.compile_and_execute(w.trace, [m]), np.trace(m))
-
 
     @given(quaternion(),
            quaternion())
@@ -401,7 +397,6 @@ class TestCASWrapper(unittest.TestCase):
         actual_angle = w.compile_and_execute(lambda x: w.axis_angle_from_matrix(x)[1], [m])
         expected_angle, expected_axis, _ = rotation_from_matrix(m)
         compare_axis_angle(actual_angle, actual_axis, expected_angle, expected_axis)
-
 
     @given(unit_vector(length=3),
            angle_positive())
@@ -437,8 +432,8 @@ class TestCASWrapper(unittest.TestCase):
     @given(quaternion())
     def test_axis_angle_from_quaternion(self, q):
         axis2, angle2 = quat2axangle([q[-1], q[0], q[1], q[2]])
-        axis = w.compile_and_execute(lambda x,y,z,w_: w.axis_angle_from_quaternion(x,y,z,w_)[0], q)
-        angle = w.compile_and_execute(lambda x,y,z,w_: w.axis_angle_from_quaternion(x,y,z,w_)[1], q)
+        axis = w.compile_and_execute(lambda x, y, z, w_: w.axis_angle_from_quaternion(x, y, z, w_)[0], q)
+        angle = w.compile_and_execute(lambda x, y, z, w_: w.axis_angle_from_quaternion(x, y, z, w_)[1], q)
         compare_axis_angle(angle, axis, angle2, axis2, 2)
 
     def test_axis_angle_from_quaternion2(self):
@@ -576,6 +571,22 @@ class TestCASWrapper(unittest.TestCase):
         expected_sum = np.sum(m)
         self.assertTrue(np.isclose(actual_sum, expected_sum))
 
+    @given(st.integers(max_value=10000, min_value=1),
+           st.integers(max_value=5000, min_value=-5000),
+           st.integers(max_value=1000, min_value=1))
+    def test_r_gauss(self, acceleration, desired_result, step_size):
+        step_size /= 1000
+        acceleration /= 1000
+        desired_result /= 1000
+        # set current position to 0 such that the desired result is already the difference
+        velocity = w.compile_and_execute(w.velocity_limit_from_position_limit,
+                                         [acceleration, desired_result, 0, step_size])
+        position = 0
+        while (velocity * np.sign(desired_result) > 0):
+            position += velocity * step_size
+            velocity -= np.sign(desired_result) * acceleration * step_size
+        np.testing.assert_almost_equal(position, desired_result)
+
     @given(sq_matrix())
     def test_sum_row(self, m):
         actual_sum = w.compile_and_execute(w.sum_row, [m])
@@ -589,28 +600,28 @@ class TestCASWrapper(unittest.TestCase):
         self.assertTrue(np.all(np.isclose(actual_sum, expected_sum)))
 
     def test_distance_point_to_line_segment1(self):
-        p = np.array([0,0,0])
-        start = np.array([0,0,0])
-        end = np.array([0,0,1])
-        distance = w.compile_and_execute(lambda a, b, c: w.distance_point_to_line_segment(a,b,c)[0], [p, start, end])
-        nearest = w.compile_and_execute(lambda a, b, c: w.distance_point_to_line_segment(a,b,c)[1], [p, start, end])
+        p = np.array([0, 0, 0])
+        start = np.array([0, 0, 0])
+        end = np.array([0, 0, 1])
+        distance = w.compile_and_execute(lambda a, b, c: w.distance_point_to_line_segment(a, b, c)[0], [p, start, end])
+        nearest = w.compile_and_execute(lambda a, b, c: w.distance_point_to_line_segment(a, b, c)[1], [p, start, end])
         assert distance == 0
         assert nearest[0] == 0
         assert nearest[1] == 0
         assert nearest[2] == 0
 
     def test_distance_point_to_line_segment2(self):
-        p = np.array([0,1,0.5])
-        start = np.array([0,0,0])
-        end = np.array([0,0,1])
+        p = np.array([0, 1, 0.5])
+        start = np.array([0, 0, 0])
+        end = np.array([0, 0, 1])
         distance = w.compile_and_execute(lambda a, b, c: w.distance_point_to_line_segment(a, b, c)[0], [p, start, end])
         nearest = w.compile_and_execute(lambda a, b, c: w.distance_point_to_line_segment(a, b, c)[1], [p, start, end])
         assert distance == 1
 
     def test_distance_point_to_line_segment3(self):
-        p = np.array([0,1,2])
-        start = np.array([0,0,0])
-        end = np.array([0,0,1])
+        p = np.array([0, 1, 2])
+        start = np.array([0, 0, 0])
+        end = np.array([0, 0, 1])
         distance = w.compile_and_execute(lambda a, b, c: w.distance_point_to_line_segment(a, b, c)[0], [p, start, end])
         nearest = w.compile_and_execute(lambda a, b, c: w.distance_point_to_line_segment(a, b, c)[1], [p, start, end])
         assert distance == 1.4142135623730951

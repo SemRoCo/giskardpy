@@ -210,9 +210,9 @@ class Robot(Backend):
             last_joint_velocity = god_map.to_symbol(identifier.last_joint_states + [joint_name, u'velocity'])
 
             if not self.is_joint_continuous(joint_name):
-                self._joint_constraints[joint_name] = JointConstraint(lower=w.Max(-velocity_limit,
+                self._joint_constraints[joint_name] = JointConstraint(lower=w.max(-velocity_limit,
                                                                                   lower_limit - joint_symbol),
-                                                                      upper=w.Min(velocity_limit,
+                                                                      upper=w.min(velocity_limit,
                                                                                   upper_limit - joint_symbol),
                                                                       weight=weight,
                                                                       linear_weight=0)
@@ -289,7 +289,7 @@ class Robot(Backend):
         if limit is None or limit.velocity is None:
             return limit_symbol
         else:
-            return w.Min(limit.velocity, limit_symbol)
+            return w.min(limit.velocity, limit_symbol)
 
     def get_joint_velocity_limit_expr_evaluated(self, joint_name, god_map):
         """

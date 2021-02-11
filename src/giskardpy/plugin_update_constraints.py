@@ -99,8 +99,8 @@ class GoalToConstraints(GetGoal):
 
                 if not self.get_robot().is_joint_continuous(joint_name):
                     joint_constraints[(self.get_robot().get_name(), joint_name)] = JointConstraint(
-                        lower=w.Max(-velocity_limit, lower_limit - joint_symbol),
-                        upper=w.Min(velocity_limit, upper_limit - joint_symbol),
+                        lower=w.max(-velocity_limit, lower_limit - joint_symbol),
+                        upper=w.min(velocity_limit, upper_limit - joint_symbol),
                         weight=weight,
                         linear_weight=0)
                 else:

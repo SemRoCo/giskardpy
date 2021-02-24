@@ -261,7 +261,7 @@ class Constraint(object):
         last_velocity *= m
         max_velocity *= m
         sign = w.sign(error)
-        error = w.Abs(error)
+        error = w.abs(error)
         error_rounded = np.floor(error)
         cmd = w.if_greater(max_acceleration, error,
                            error,
@@ -269,13 +269,13 @@ class Constraint(object):
                                    max_acceleration ** 2 / 4)) - max_acceleration / 2)
         cmd *= sign
 
-        vel = w.Max(w.Min(cmd, w.Min(last_velocity + max_acceleration, max_velocity)),
-                    w.Max(last_velocity - max_acceleration, -max_velocity))
+        vel = w.max(w.min(cmd, w.min(last_velocity + max_acceleration, max_velocity)),
+                    w.max(last_velocity - max_acceleration, -max_velocity))
         return vel / m
 
     def add_max_force_constraint(self, name, expression):
         expr_jacobian = w.jacobian(expression, self.get_robot().get_joint_position_symbols())
-        total_derivative = w.Sum(w.Abs(expr_jacobian))
+        total_derivative = w.sum(w.abs(expr_jacobian))
         self.add_constraint(name,
                             lower=100,
                             upper=100,
@@ -291,7 +291,7 @@ class Constraint(object):
         """
         sample_period = self.get_input_sampling_period()
         max_velocity *= sample_period
-        return w.Max(w.Min(error, max_velocity), -max_velocity)
+        return w.max(w.min(error, max_velocity), -max_velocity)
 
     def normalize_weight(self, velocity_limit, weight):
         sample_period = self.get_input_sampling_period()
@@ -439,7 +439,7 @@ class Constraint(object):
         current_angle_axis = (current_axis * current_angle)
 
         error_angle = w.rotation_distance(root_R_tipCurrent, root_R_tipGoal)
-        error_angle = w.Abs(error_angle)
+        error_angle = w.abs(error_angle)
 
         _, angle = w.axis_angle_from_matrix(root_R_tipCurrent)
 
@@ -526,7 +526,7 @@ class JointPositionContinuous(Constraint):
         weight = self.get_input_float(self.weight)
 
         max_acceleration = self.get_input_float(self.max_acceleration)
-        max_velocity = w.Min(self.get_input_float(self.max_velocity),
+        max_velocity = w.min(self.get_input_float(self.max_velocity),
                              self.get_robot().get_joint_velocity_limit_expr(self.joint_name))
 
         error = w.shortest_angular_distance(current_joint, joint_goal)
@@ -600,7 +600,7 @@ class JointPositionPrismatic(Constraint):
         joint_goal = self.get_input_float(self.goal)
         weight = self.get_input_float(self.weight)
 
-        max_velocity = w.Min(self.get_input_float(self.max_velocity),
+        max_velocity = w.min(self.get_input_float(self.max_velocity),
                              self.get_robot().get_joint_velocity_limit_expr(self.joint_name))
         max_acceleration = self.get_input_float(self.max_acceleration)
 
@@ -673,7 +673,7 @@ class JointPositionRevolute(Constraint):
         joint_goal = self.get_input_float(self.goal)
         weight = self.get_input_float(self.weight)
 
-        max_velocity = w.Min(self.get_input_float(self.max_velocity),
+        max_velocity = w.min(self.get_input_float(self.max_velocity),
                              self.get_robot().get_joint_velocity_limit_expr(self.joint_name))
 
         max_acceleration = self.get_input_float(self.max_acceleration)
@@ -732,7 +732,7 @@ class AvoidJointLimitsRevolute(Constraint):
         joint_symbol = self.get_input_joint_position(self.joint_name)
         percentage = self.get_input_float(self.percentage) / 100.
         lower_limit, upper_limit = self.get_robot().get_joint_limits(self.joint_name)
-        max_velocity = w.Min(self.get_input_float(self.max_velocity),
+        max_velocity = w.min(self.get_input_float(self.max_velocity),
                              self.get_robot().get_joint_velocity_limit_expr(self.joint_name))
 
         joint_range = upper_limit - lower_limit
@@ -750,7 +750,7 @@ class AvoidJointLimitsRevolute(Constraint):
         upper_err_capped = self.limit_velocity(upper_err, max_velocity)
         lower_err_capped = self.limit_velocity(lower_err, max_velocity)
 
-        error = w.Max(w.Abs(w.Min(upper_err, 0)), w.Abs(w.Max(lower_err, 0)))
+        error = w.max(w.abs(w.min(upper_err, 0)), w.abs(w.max(lower_err, 0)))
         weight = weight * (error / max_error)
 
         weight_normalized = self.normalize_weight(max_velocity, weight)
@@ -797,7 +797,7 @@ class AvoidJointLimitsPrismatic(Constraint):
         joint_symbol = self.get_input_joint_position(self.joint_name)
         percentage = self.get_input_float(self.percentage) / 100.
         lower_limit, upper_limit = self.get_robot().get_joint_limits(self.joint_name)
-        max_velocity = w.Min(self.get_input_float(self.max_velocity),
+        max_velocity = w.min(self.get_input_float(self.max_velocity),
                              self.get_robot().get_joint_velocity_limit_expr(self.joint_name))
 
         joint_range = upper_limit - lower_limit
@@ -815,7 +815,7 @@ class AvoidJointLimitsPrismatic(Constraint):
         upper_err_capped = self.limit_velocity(upper_err, max_velocity)
         lower_err_capped = self.limit_velocity(lower_err, max_velocity)
 
-        error = w.Max(w.Abs(w.Min(upper_err, 0)), w.Abs(w.Max(lower_err, 0)))
+        error = w.max(w.abs(w.min(upper_err, 0)), w.abs(w.max(lower_err, 0)))
         weight = weight * (error / max_error)
 
         weight_normalized = self.normalize_weight(max_velocity, weight)
@@ -1490,7 +1490,7 @@ class ExternalCollisionAvoidance(Constraint):
 
         upper_slack = w.if_greater(actual_distance, 50,  # assuming that distance of unchecked closest points is 100
                                    1e9,
-                                   w.Max(0, lower_limit + actual_distance - hard_threshold)
+                                   w.max(0, lower_limit + actual_distance - hard_threshold)
                                    )
 
         weight = w.if_greater(actual_distance, 50, 0, WEIGHT_COLLISION_AVOIDANCE)
@@ -1506,7 +1506,7 @@ class ExternalCollisionAvoidance(Constraint):
 
         weight = self.normalize_weight(max_velocity, weight)
         weight = w.save_division(weight,  # divide by number of active repeller per link
-                                 w.Min(number_of_external_collisions, num_repeller))
+                                 w.min(number_of_external_collisions, num_repeller))
 
         # weight = self.normalize_weight(max_velocity, weight)
 
@@ -1625,12 +1625,12 @@ class CollisionAvoidanceHint(Constraint):
         spring_threshold = self.get_input_float(self.threshold2_id)
         body_b_hash = self.get_body_b()
         link_b_hash = self.get_link_b()
-        actual_distance_capped = w.Max(actual_distance, 0)
+        actual_distance_capped = w.max(actual_distance, 0)
 
         root_T_a = self.get_fk(self.root_link, self.link_name)
 
         spring_error = spring_threshold - actual_distance_capped
-        spring_error = w.Max(spring_error, 0)
+        spring_error = w.max(spring_error, 0)
 
         spring_weight = w.if_eq(spring_threshold, max_threshold, 0,
                                 weight * (spring_error / (spring_threshold - max_threshold)) ** 2)
@@ -1740,7 +1740,7 @@ class SelfCollisionAvoidance(Constraint):
         weight = w.if_greater(actual_distance, 50, 0, WEIGHT_COLLISION_AVOIDANCE)
         weight = self.normalize_weight(repel_velocity, weight)
         weight = w.save_division(weight,  # divide by number of active repeller per link
-                                 w.Min(number_of_self_collisions, num_repeller))
+                                 w.min(number_of_self_collisions, num_repeller))
 
         penetration_distance = soft_threshold - actual_distance
         lower_limit = self.limit_velocity(penetration_distance, repel_velocity)
@@ -1749,7 +1749,7 @@ class SelfCollisionAvoidance(Constraint):
 
         upper_slack = w.if_greater(actual_distance, 50,  # assuming that distance of unchecked closest points is 100
                                    1e9,
-                                   w.Max(0, lower_limit + actual_distance - hard_threshold)
+                                   w.max(0, lower_limit + actual_distance - hard_threshold)
                                    )
 
         self.add_constraint(u'/position',

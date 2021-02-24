@@ -4,7 +4,7 @@ import pickle
 import casadi as ca
 import errno
 import numpy as np
-from casadi import sign, cos, acos, sin, sqrt, atan2
+from casadi import sign, cos, acos, sin, sqrt, atan2, log, log10
 from numpy import pi
 
 from giskardpy import logging
@@ -18,7 +18,6 @@ SMALL_NUMBER = 1e-10
 
 def diag(*args):
     return ca.diag(Matrix(args))
-
 
 def Symbol(data):
     if isinstance(data, str) or isinstance(data, unicode):
@@ -121,7 +120,7 @@ def zeros(x, y):
     return ca.SX.zeros(x, y)
 
 
-def Abs(x):
+def abs(x):
     """
     :type x: Union[float, Symbol]
     :return: abs(x)
@@ -130,11 +129,11 @@ def Abs(x):
     return ca.fabs(x)
 
 
-def Max(x, y):
+def max(x, y):
     return ca.fmax(x, y)
 
 
-def Min(x, y):
+def min(x, y):
     """
     !gets very imprecise if inputs outside of [-1e7,1e7]!
     :type x: Union[float, Symbol]
@@ -144,6 +143,8 @@ def Min(x, y):
     """
     return ca.fmin(x, y)
 
+def limit(x, lower_limit, upper_limit):
+    return max(lower_limit, min(upper_limit, x))
 
 
 def if_greater(a, b, if_result, else_result):
@@ -162,9 +163,9 @@ def if_greater_zero(condition, if_result, else_result):
     :rtype: Union[float, Symbol]
     """
     _condition = sign(condition)  # 1 or -1
-    _if = Max(0, _condition) * if_result  # 0 or if_result
-    _else = -Min(0, _condition) * else_result  # 0 or else_result
-    return _if + _else + (1 - Abs(_condition)) * else_result  # if_result or else_result
+    _if = max(0, _condition) * if_result  # 0 or if_result
+    _else = -min(0, _condition) * else_result  # 0 or else_result
+    return _if + _else + (1 - abs(_condition)) * else_result  # if_result or else_result
 
 
 def if_greater_eq_zero(condition, if_result, else_result):
@@ -542,7 +543,10 @@ def trace(matrix):
     :type matrix: Matrix
     :rtype: Union[float, Symbol]
     """
-    return sum(matrix[i, i] for i in range(matrix.shape[0]))
+    s = 0
+    for i in range(matrix.shape[0]):
+        s += matrix[i, i]
+    return s
 
 
 def rotation_distance(a_R_b, a_R_c):
@@ -557,8 +561,8 @@ def rotation_distance(a_R_b, a_R_c):
     difference = dot(a_R_b.T, a_R_c)
     # return axis_angle_from_matrix(difference)[1]
     angle = (trace(difference[:3, :3]) - 1) / 2
-    angle = Min(angle, 1)
-    angle = Max(angle, -1)
+    angle = min(angle, 1)
+    angle = max(angle, -1)
     return acos(angle)
 
 def asdf(a_R_b, a_R_c):
@@ -587,17 +591,17 @@ def axis_angle_from_matrix(rotation_matrix):
     # TODO use 'if' to make angle always positive?
     rm = rotation_matrix
     cos_angle = (trace(rm[:3, :3]) - 1) / 2
-    cos_angle = Min(cos_angle, 1)
-    cos_angle = Max(cos_angle, -1)
+    cos_angle = min(cos_angle, 1)
+    cos_angle = max(cos_angle, -1)
     angle = acos(cos_angle)
     x = (rm[2, 1] - rm[1, 2])
     y = (rm[0, 2] - rm[2, 0])
     z = (rm[1, 0] - rm[0, 1])
     n = sqrt(x * x + y * y + z * z)
 
-    axis = Matrix([if_eq(Abs(cos_angle), 1, 0, x / n),
-                   if_eq(Abs(cos_angle), 1, 0, y / n),
-                   if_eq(Abs(cos_angle), 1, 1, z / n)])
+    axis = Matrix([if_eq(abs(cos_angle), 1, 0, x / n),
+                   if_eq(abs(cos_angle), 1, 0, y / n),
+                   if_eq(abs(cos_angle), 1, 1, z / n)])
     return axis, angle
 
 
@@ -613,7 +617,7 @@ def axis_angle_from_quaternion(x, y, z, w):
     l = norm(Matrix([x, y, z, w]))
     x, y, z, w = x / l, y / l, z / l, w / l
     w2 = sqrt(1 - w ** 2)
-    angle = (2 * acos(Min(Max(-1, w), 1)))
+    angle = (2 * acos(min(max(-1, w), 1)))
     m = if_eq_zero(w2, 1, w2)  # avoid /0
     x = if_eq_zero(w2, 0, x / m)
     y = if_eq_zero(w2, 0, y / m)
@@ -894,16 +898,16 @@ def quaternion_slerp(q1, q2, t):
     q2 = if_greater_zero(if0, -q2, q2)
     cos_half_theta = if_greater_zero(if0, -cos_half_theta, cos_half_theta)
 
-    if1 = Abs(cos_half_theta) - 1.0
+    if1 = abs(cos_half_theta) - 1.0
 
     # enforce acos(x) with -1 < x < 1
-    cos_half_theta = Min(1, cos_half_theta)
-    cos_half_theta = Max(-1, cos_half_theta)
+    cos_half_theta = min(1, cos_half_theta)
+    cos_half_theta = max(-1, cos_half_theta)
 
     half_theta = acos(cos_half_theta)
 
     sin_half_theta = sqrt(1.0 - cos_half_theta * cos_half_theta)
-    if2 = 0.001 - Abs(sin_half_theta)
+    if2 = 0.001 - abs(sin_half_theta)
 
     ratio_a = save_division(sin((1.0 - t) * half_theta), sin_half_theta)
     ratio_b = save_division(sin(t * half_theta), sin_half_theta)
@@ -957,7 +961,7 @@ def ceil(x):
     return ca.ceil(x)
 
 
-def Sum(matrix):
+def sum(matrix):
     """
     the equivalent to np.sum(matrix)
     """
@@ -994,7 +998,7 @@ def distance_point_to_line_segment(point, line_start, line_end):
     line_unitvec = line_vec / line_len
     pnt_vec_scaled = pnt_vec / line_len
     t = dot(line_unitvec.T, pnt_vec_scaled)[0]
-    t = Min(Max(t, 0.0), 1.0)
+    t = min(max(t, 0.0), 1.0)
     nearest = line_vec * t
     dist = norm(nearest - pnt_vec)
     nearest = nearest + line_start
@@ -1005,3 +1009,33 @@ def angle_between_vector(v1, v2):
     v1 = v1[:3]
     v2 = v2[:3]
     return acos(dot(v1.T, v2) / (norm(v1) * norm(v2)))
+
+
+def velocity_limit_from_position_limit(acceleration_limit, position_limit, current_position, step_size, eps=1e-5):
+    """
+    Computes the velocity limit given a distance to the position limits, an acceleration limit and a step size
+    :param acceleration_limit:
+    :param distance_to_position_limit: 
+    :param step_size: 
+    :param eps: 
+    :return: 
+    """
+    distance_to_position_limit = position_limit - current_position
+    acceleration_limit *= step_size
+    distance_to_position_limit /= step_size
+    m = 1 / acceleration_limit
+    acceleration_limit *= m
+    distance_to_position_limit *= m
+    sign_ = sign(distance_to_position_limit)
+    error = abs(distance_to_position_limit)
+    # reverse gausssche summenformel to compute n from sum
+    n = sqrt(2 * error + (1 / 4)) - 1 / 2
+    # round up if very close to the ceiling to avoid precision errors
+    n = if_less(1 - (n - floor(n)), eps, np.ceil(n), np.floor(n))
+    error_rounded = (n ** 2 + n) / 2
+    rest = error - error_rounded
+    rest = rest / (n + 1)
+    velocity_limit = n + rest
+    velocity_limit *= sign_
+    velocity_limit /= m
+    return velocity_limit

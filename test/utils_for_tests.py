@@ -18,7 +18,6 @@ from giskard_msgs.srv import UpdateWorldResponse
 from hypothesis import assume
 from hypothesis.strategies import composite
 from iai_naive_kinematics_sim.srv import SetJointState, SetJointStateRequest
-from iai_wsg_50_msgs.msg import PositionCmd
 from numpy import pi
 from py_trees import Blackboard
 from sensor_msgs.msg import JointState
@@ -174,7 +173,10 @@ def boxy_urdf():
 
 
 def float_no_nan_no_inf(outer_limit=None, min_dist_to_zero=None):
-    return st.floats(allow_nan=False, allow_infinity=False, max_value=outer_limit, min_value=outer_limit)
+    if outer_limit is not None:
+        return st.floats(allow_nan=False, allow_infinity=False, max_value=outer_limit, min_value=-outer_limit)
+    else:
+        return st.floats(allow_nan=False, allow_infinity=False)
     # f = st.floats(allow_nan=False, allow_infinity=False, max_value=outer_limit, min_value=-outer_limit)
     # # f = st.floats(allow_nan=False, allow_infinity=False)
     # if min_dist_to_zero is not None:

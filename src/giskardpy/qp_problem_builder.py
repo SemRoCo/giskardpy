@@ -167,8 +167,9 @@ class QProblemBuilder(object):
         bA_names = []
         for iJ, k in enumerate(self.joint_constraints_dict.keys()):
             key = 'j -- ' + str(k)
-            b_names.append(key)
-            b_names.append(key)
+            b_names.append(key+'/p')
+            b_names.append(key+'/v')
+            b_names.append(key+'/a')
 
         for iH, k in enumerate(self.hard_constraints_dict.keys()):
             key = 'h -- ' + str(k)
@@ -325,7 +326,7 @@ class QProblemBuilderAccelerationResolved(QProblemBuilder):
     def __init__(self, joint_constraints_dict, hard_constraints_dict, soft_constraints_dict, controlled_joint_symbols):
         super(QProblemBuilderAccelerationResolved, self).__init__(joint_constraints_dict, hard_constraints_dict, soft_constraints_dict, controlled_joint_symbols)
         self.shape1 = len(self.hard_constraints_dict) + len(self.soft_constraints_dict)
-        self.shape2 = len(self.joint_constraints_dict)*2 + len(self.soft_constraints_dict)
+        self.shape2 = len(self.joint_constraints_dict)*3 + len(self.soft_constraints_dict)
         self.order = 2
 
     def init_big_ass_M(self):
@@ -339,19 +340,19 @@ class QProblemBuilderAccelerationResolved(QProblemBuilder):
         # j+s| H                  | lb    | ub  | g |
         #    | -------------------------------------|
         """
-        self.big_ass_M = w.zeros(self.h + self.s * 2 + self.j*2,
-                                 self.j*2 + self.s + 3)
+        self.big_ass_M = w.zeros(self.h + self.s * 2 + self.j*3,
+                                 self.j*3 + self.s + 3)
 
     def construct_A_soft(self, soft_expressions):
-        A_soft = w.zeros(self.s, self.j*2 + self.s)
+        A_soft = w.zeros(self.s, self.j*3 + self.s)
         t = time()
         j = w.jacobian(w.Matrix(soft_expressions), self.controlled_joints, order=1)
         logging.loginfo(u'computed Jacobian in {:.5f}s'.format(time() - t))
         j_dot = w.jacobian(w.Matrix(soft_expressions), self.controlled_joints, order=2)
         logging.loginfo(u'computed Jacobian dot in {:.5f}s'.format(time() - t))
-        A_soft[:, :self.j] = j
         A_soft[:, self.j:self.j*2] = j_dot
-        A_soft[:, self.j*2:] = w.eye(self.s)
+        A_soft[:, self.j*2:self.j*3] = j
+        A_soft[:, self.j*3:] = w.eye(self.s)
         self.set_A_soft(A_soft)
 
     @profile
@@ -366,12 +367,16 @@ class QProblemBuilderAccelerationResolved(QProblemBuilder):
         soft_expressions = []
         hard_expressions = []
         for constraint_name, constraint in self.joint_constraints_dict.items(): #type: (str, JointConstraint)
-            weights.append(constraint.weight_a)
+            weights.append(constraint.weight_p)
             weights.append(constraint.weight_v)
-            lb.append(constraint.lower_a)
-            ub.append(constraint.upper_a)
+            weights.append(constraint.weight_a)
+            lb.append(constraint.lower_p)
             lb.append(constraint.lower_v)
+            lb.append(constraint.lower_a)
+            ub.append(constraint.upper_p)
             ub.append(constraint.upper_v)
+            ub.append(constraint.upper_a)
+            linear_weight.append(constraint.linear_weight)
             linear_weight.append(constraint.linear_weight)
             linear_weight.append(constraint.linear_weight)
         for constraint_name, constraint in self.hard_constraints_dict.items():
@@ -411,29 +416,82 @@ class QProblemBuilderAccelerationResolved(QProblemBuilder):
 
 
     def set_A_soft(self, A_soft):
-        self.big_ass_M[self.h:self.h + self.s, :self.j*2 + self.s] = A_soft
+        self.big_ass_M[self.h:self.h + self.s, :self.j*3 + self.s] = A_soft
 
     def set_weights(self, weights):
         self.big_ass_M[self.h + self.s:, :-3] = w.diag(*weights)
 
     def set_lb(self, lb):
-        self.big_ass_M[self.h + self.s:, self.j*2 + self.s] = lb
+        self.big_ass_M[self.h + self.s:, self.j*3 + self.s] = lb
 
     def set_ub(self, ub):
-        self.big_ass_M[self.h + self.s:, self.j*2 + self.s + 1] = ub
+        self.big_ass_M[self.h + self.s:, self.j*3 + self.s + 1] = ub
 
     def set_linear_weights(self, linear_weights):
-        self.big_ass_M[self.h + self.s:, self.j*2 + self.s + 2] = linear_weights
+        self.big_ass_M[self.h + self.s:, self.j*3 + self.s + 2] = linear_weights
 
     def set_lbA(self, lbA):
-        self.big_ass_M[:self.h + self.s, self.j*2 + self.s] = lbA
+        self.big_ass_M[:self.h + self.s, self.j*3 + self.s] = lbA
 
     def set_ubA(self, ubA):
-        self.big_ass_M[:self.h + self.s, self.j*2 + self.s + 1] = ubA
+        self.big_ass_M[:self.h + self.s, self.j*3 + self.s + 1] = ubA
 
     def set_A_hard(self, hard_expressions):
         for i, row in enumerate(hard_expressions):
-            self.big_ass_M[i, :self.j*2] = row
+            self.big_ass_M[i, :self.j*3] = row
 
     def filter_zero_weight_constraints(self, H, A, lb, ub, lbA, ubA, g):
         return H, A, lb, ub, lbA, ubA, g
+
+
+    @profile
+    def get_cmd(self, substitutions, nWSR=None):
+        """
+        Uses substitutions for each symbol to compute the next commands for each joint.
+        :param substitutions:
+        :type substitutions: list
+        :return: joint name -> joint command
+        :rtype: dict
+        """
+        np_big_ass_M = self.compiled_big_ass_M.call2(substitutions)
+        np_H = np_big_ass_M[self.shape1:, :-3].copy()
+        np_A = np_big_ass_M[:self.shape1, :self.shape2].copy()
+        np_lb = np_big_ass_M[self.shape1:, -3].copy()
+        np_ub = np_big_ass_M[self.shape1:, -2].copy()
+        np_g = np_big_ass_M[self.shape1:, -1].copy()
+        np_lbA = np_big_ass_M[:self.shape1, -3].copy()
+        np_ubA = np_big_ass_M[:self.shape1, -2].copy()
+        H, A, lb, ub, lbA, ubA, g = self.filter_zero_weight_constraints(np_H, np_A, np_lb, np_ub, np_lbA, np_ubA, np_g)
+        # self.debug_print(np_H, A, lb, ub, lbA, ubA, g)
+        try:
+            xdot_full = self.qp_solver.solve(H, g, A, lb, ub, lbA, ubA, nWSR)
+        except QPSolverException as e:
+            p_weights, p_A, p_lbA, p_ubA, p_lb, p_ub = self.debug_print(np_H, A, lb, ub, lbA, ubA, g, actually_print=True)
+            if isinstance(e, InfeasibleException):
+                if self.are_joint_limits_violated(p_lb, p_ub):
+                    raise OutOfJointLimitsException(e)
+                raise HardConstraintsViolatedException(e)
+            if isinstance(e, QPSolverException):
+                arrays = [(p_weights, u'H'),
+                          (p_A, u'A'),
+                          (p_lbA, u'lbA'),
+                          (p_ubA, u'ubA'),
+                          (p_lb, u'lb'),
+                          (p_ub, u'ub')]
+                any_nan = False
+                for a, name in arrays:
+                    any_nan |= self.is_nan_in_array(name, a)
+                if any_nan:
+                    raise e
+            raise e
+        if xdot_full is None:
+            return None
+        # TODO enable debug print in an elegant way, preferably without slowing anything down
+        self.debug_print(np_H, A, lb, ub, lbA, ubA, g, xdot_full)
+        position = OrderedDict((observable, xdot_full[i*2]) for i, observable in enumerate(self.controlled_joints)), \
+               np_H, np_A, np_lb, np_ub, np_lbA, np_ubA, xdot_full
+        velocity = OrderedDict((observable, xdot_full[i*2+1]) for i, observable in enumerate(self.controlled_joints)), \
+               np_H, np_A, np_lb, np_ub, np_lbA, np_ubA, xdot_full
+        acceleration = OrderedDict((observable, xdot_full[i*2+2]) for i, observable in enumerate(self.controlled_joints)), \
+               np_H, np_A, np_lb, np_ub, np_lbA, np_ubA, xdot_full
+        return position, velocity, acceleration

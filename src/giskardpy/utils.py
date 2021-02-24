@@ -849,9 +849,9 @@ def traj_to_msg(sample_period, trajectory, controlled_joints, fill_velocity_valu
 def make_filter_b_mask(H):
     return H.sum(axis=1) != 0
 
-def make_filter_masks(H, num_joint_constraints, num_hard_constraints):
+def make_filter_masks(H, num_joint_constraints, num_hard_constraints, order=1):
     b_mask = make_filter_b_mask(H)
-    s_mask = b_mask[num_joint_constraints:]
+    s_mask = b_mask[num_joint_constraints*order:]
     if num_hard_constraints == 0:
         bA_mask = s_mask
     else:

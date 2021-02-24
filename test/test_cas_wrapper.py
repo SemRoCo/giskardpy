@@ -35,6 +35,16 @@ class TestCASWrapper(unittest.TestCase):
 
                 assert w.equivalent(jac[i,j], expected[i,j])
 
+    def test_jacobian_order2(self):
+        a = w.Symbol('a')
+        b = w.Symbol('b')
+        m = w.Matrix([a + b, a ** 2 + b, a**3 + b ** 2])
+        jac = w.jacobian(m, [a, b], order=2)
+        expected = w.Matrix([[0, 0], [2, 0], [6*a, 2]])
+        for i in range(expected.shape[0]):
+            for j in range(expected.shape[1]):
+                assert w.equivalent(jac[i, j], expected[i, j])
+
     @given(float_no_nan_no_inf())
     def test_abs(self, f1):
         self.assertAlmostEqual(w.compile_and_execute(w.Abs, [f1]), abs(f1), places=7)

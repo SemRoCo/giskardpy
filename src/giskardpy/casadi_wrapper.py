@@ -26,8 +26,17 @@ def Symbol(data):
     return ca.SX(data)
 
 
-def jacobian(expressions, symbols):
-    return ca.jacobian(expressions, Matrix(symbols))
+def jacobian(expressions, symbols, order=1):
+    if order == 1:
+        return ca.jacobian(expressions, Matrix(symbols))
+    elif order == 2:
+        j = jacobian(expressions, symbols, order=1)
+        for i, symbol in enumerate(symbols):
+            j[:, i] = jacobian(j[:,i], symbol)
+        return j
+    else:
+        raise NotImplementedError('jacobian only supports order 1 and 2')
+
 
 
 def equivalent(expression1, expression2):

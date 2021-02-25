@@ -2,7 +2,7 @@ import hashlib
 import warnings
 from collections import OrderedDict
 from itertools import chain
-from giskardpy.qp_problem_builder import QProblemBuilder
+from giskardpy.qp_problem_builder import QProblemBuilder, QProblemBuilderAccelerationResolved
 from giskardpy.robot import Robot
 
 
@@ -75,7 +75,7 @@ class InstantaneousController(object):
                                                  self.joint_constraints.keys())))
         function_hash = hashlib.md5((a + self.robot.get_urdf_str()).encode('utf-8')).hexdigest()
         path_to_functions = self.path_to_functions + function_hash
-        self.qp_problem_builder = QProblemBuilder(self.joint_constraints,
+        self.qp_problem_builder = QProblemBuilderAccelerationResolved(self.joint_constraints,
                                                   self.hard_constraints,
                                                   self.soft_constraints,
                                                   list(self.joint_to_symbols_str.values()),

@@ -323,8 +323,10 @@ class Constraint(object):
         name = str(self) + name_suffix
         if name in self.soft_constraints:
             raise KeyError(u'a constraint with name \'{}\' already exists'.format(name))
-        self.soft_constraints[name] = SoftConstraint(lbA=lower,
-                                                     ubA=upper,
+        self.soft_constraints[name] = SoftConstraint(lbA_v=lower,
+                                                     ubA_v=upper,
+                                                     lbA_a=-999,
+                                                     ubA_a=999,
                                                      weight=weight,
                                                      expression=expression,
                                                      goal_constraint=goal_constraint,

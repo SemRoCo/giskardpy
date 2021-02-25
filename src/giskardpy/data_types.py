@@ -5,14 +5,14 @@ from sortedcontainers import SortedKeyList
 
 from giskardpy.tfwrapper import kdl_to_np, np_vector, np_point
 
-SoftConstraint = namedtuple(u'SoftConstraint', [u'lbA', u'ubA',
+SoftConstraint = namedtuple(u'SoftConstraint', [u'lbA_v', u'ubA_v',
+                                                u'lbA_a', u'ubA_a',
                                                 u'weight', u'expression', u'goal_constraint',
                                                 u'lower_slack_limit',
                                                 u'upper_slack_limit',
                                                 u'linear_weight'])
 HardConstraint = namedtuple(u'HardConstraint', [u'lower', u'upper', u'expression'])
-JointConstraint = namedtuple(u'JointConstraint', [u'lower_p', u'upper_p', u'weight_p',
-                                                  u'lower_v', u'upper_v', u'weight_v',
+JointConstraint = namedtuple(u'JointConstraint', [u'lower_v', u'upper_v', u'weight_v',
                                                   u'lower_a', u'upper_a', u'weight_a',
                                                   u'linear_weight'])
 

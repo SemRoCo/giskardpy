@@ -7,7 +7,7 @@ import rospy
 from control_msgs.msg import JointTrajectoryControllerState
 from giskard_msgs.msg import MoveAction
 from py_trees import Sequence, Selector, BehaviourTree, Blackboard
-from py_trees.meta import failure_is_success, success_is_failure, running_is_success
+from py_trees.meta import failure_is_success, success_is_failure, running_is_success, success_is_running
 from py_trees_ros.trees import BehaviourTree
 from rospy import ROSException
 
@@ -167,6 +167,7 @@ def grow_tree():
     planning_3.add_plugin(LoopDetector(u'loop detector'))
     planning_3.add_plugin(GoalReachedPlugin(u'goal reached'))
     planning_3.add_plugin(TimePlugin(u'time'))
+    planning_3.add_plugin(success_is_running(ConfigurationPlugin)(u'js3'))
     # planning_3.add_plugin(MaxTrajLength(u'traj length check'))
     # ----------------------------------------------
     publish_result = failure_is_success(Selector)(u'monitor execution')

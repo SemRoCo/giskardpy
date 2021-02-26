@@ -28,7 +28,7 @@ def make_velocity_threshold(god_map,
             velocity_limit = min(max(min_translation_cut_off, velocity_limit), max_translation_cut_off)
         elif robot.is_joint_rotational(joint_name):
             velocity_limit = min(max(min_rotation_cut_off, velocity_limit), max_rotation_cut_off)
-        velocity_limit *= sample_period
+        # velocity_limit *= sample_period
         thresholds.append(velocity_limit)
     return np.array(thresholds)
 

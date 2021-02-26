@@ -16,11 +16,11 @@ general_options:
         head_pan_joint: 0.5
         head_tilt_joint: 0.5
   joint_acceleration_limit: # multiply your desired acc limit with sample period; experimental, don't touch
-    linear:
-      default: 100
+    linear: # m/s**2
+      default: 20
       override: {}
-    angular:
-      default: 100
+    angular: # rad/s**2
+      default: 20
       override: {}
   joint_weights:
     # the planner prefers low weight joints to achieve solutions

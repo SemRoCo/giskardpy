@@ -217,6 +217,8 @@ class Robot(Backend):
                     lower_v=-velocity_limit,
                     upper_v=velocity_limit,
                     weight_v=0.0, # TODO is that right?
+                    # lower_a=-acceleration_limit2,
+                    # upper_a=acceleration_limit2,
                     lower_a=w.limit(w.velocity_limit_from_position_limit(acceleration_limit,
                                                                          lower_limit,
                                                                          joint_symbol,

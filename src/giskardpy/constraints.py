@@ -290,7 +290,7 @@ class Constraint(object):
         :return: expression that limits the velocity of error to max_velocity
         """
         sample_period = self.get_input_sampling_period()
-        max_velocity *= sample_period
+        # max_velocity *= sample_period
         return w.max(w.min(error, max_velocity), -max_velocity)
 
     def normalize_weight(self, velocity_limit, weight):
@@ -547,7 +547,7 @@ class JointPositionContinuous(Constraint):
                             lower=capped_err,
                             upper=capped_err,
                             weight=weight,
-                            expression=current_joint,
+                            expression=current_joint*self.get_input_sampling_period(),
                             goal_constraint=self.goal_constraint)
 
     def __str__(self):
@@ -621,7 +621,7 @@ class JointPositionPrismatic(Constraint):
                             lower=capped_err,
                             upper=capped_err,
                             weight=weight,
-                            expression=current_joint,
+                            expression=current_joint*self.get_input_sampling_period(),
                             goal_constraint=self.goal_constraint)
 
     def __str__(self):

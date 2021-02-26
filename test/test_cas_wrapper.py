@@ -583,18 +583,23 @@ class TestCASWrapper(unittest.TestCase):
 
     @given(st.integers(max_value=10000, min_value=1),
            st.integers(max_value=5000, min_value=-5000),
+           st.integers(max_value=5000, min_value=-5000),
            st.integers(max_value=1000, min_value=1))
-    def test_r_gauss(self, acceleration, desired_result, step_size):
+    def test_r_gauss(self, acceleration, desired_result, j, step_size):
         step_size /= 1000
         acceleration /= 1000
         desired_result /= 1000
+        j /= 1000
         # set current position to 0 such that the desired result is already the difference
         velocity = w.compile_and_execute(w.velocity_limit_from_position_limit,
-                                         [acceleration, desired_result, 0, step_size])
-        position = 0
-        while (velocity * np.sign(desired_result) > 0):
+                                         [acceleration, desired_result, j, step_size])
+        position = j
+        i = 0
+        start_sign = np.sign(velocity)
+        while (np.sign(velocity) == start_sign and i < 100000):
             position += velocity * step_size
-            velocity -= np.sign(desired_result) * acceleration * step_size
+            velocity -= np.sign(desired_result-j) * acceleration * step_size
+            i += 1
         np.testing.assert_almost_equal(position, desired_result)
 
     @given(sq_matrix())

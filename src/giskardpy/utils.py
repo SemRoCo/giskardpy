@@ -396,7 +396,7 @@ def plot_trajectory(tj, controlled_joints, path_to_data_folder, sample_period, o
     if(normalize_position):
         data[0] = data[0] - (data[0].max(0) + data[0].min(0)) / 2
     for i in range(2, order):
-        data[i] = np.diff(data[i - 1], axis=0, prepend=0)
+        data[i] = np.diff(data[i - 1], axis=0, prepend=0) / sample_period
     times = np.array(times) * sample_period
 
     f, axs = plt.subplots(order, sharex=True, gridspec_kw={'hspace': 0.2})

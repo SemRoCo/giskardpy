@@ -231,8 +231,6 @@ class Robot(Backend):
                                     acceleration_limit2),
                     weight_a=weight,
                     linear_weight=0)
-                self._hard_constraints[joint_name] = HardConstraint(velocity_limit,
-                                                                    velocity_limit)
             else:
                 self._joint_constraints[joint_name] = JointConstraint(
                     lower_v=-velocity_limit,

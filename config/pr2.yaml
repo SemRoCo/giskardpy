@@ -17,10 +17,10 @@ general_options:
         head_tilt_joint: 0.5
   joint_acceleration_limit: # multiply your desired acc limit with sample period; experimental, don't touch
     linear:
-      default: 1
+      default: 100
       override: {}
     angular:
-      default: 1
+      default: 100
       override: {}
   joint_weights:
     # the planner prefers low weight joints to achieve solutions
@@ -42,7 +42,7 @@ plugins:
   CPIMarker: # contact visualization, slows planning down a little bit
     enabled: True
   PlotTrajectory: # plots the joint trajectory at the end of planning, useful for debugging
-    enabled: False
+    enabled: True
     velocity_threshold: 0.0 # only joints that exceed this velocity threshold will be added to the plot. Use a negative number if you want to include every joint
     scaling: 2.5 # determines how much the x axis is scaled with the length(time) of the trajectory
     normalize_position: False # centers the joint positions around 0 on the y axis

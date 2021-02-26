@@ -356,13 +356,13 @@ class GiskardTestWrapper(GiskardWrapper):
         current_joint_state = to_joint_state_position_dict(self.get_current_joint_state())
         self.compare_joint_state(current_joint_state, expected, decimal=decimal)
 
-    def send_and_check_joint_goal(self, goal, weight=None, decimal=2, expected_error_codes=None):
+    def send_and_check_joint_goal(self, goal, weight=None, decimal=2, expected_error_codes=(MoveResult.SUCCESS,)):
         """
         :type goal: dict
         """
         self.set_joint_goal(goal, weight=weight)
         self.send_and_check_goal(expected_error_codes=expected_error_codes)
-        if expected_error_codes == [MoveResult.SUCCESS]:
+        if expected_error_codes is not None and expected_error_codes[0] == MoveResult.SUCCESS:
             self.check_current_joint_state(goal, decimal=decimal)
 
     #

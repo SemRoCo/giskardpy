@@ -530,15 +530,17 @@ class QProblemBuilderAccelerationResolved(QProblemBuilder):
         # TODO enable debug print in an elegant way, preferably without slowing anything down
         self.debug_print(np_H, A, lb, ub, lbA, ubA, g, xdot_full)
         velocity = OrderedDict(
-            (observable, xdot_full[i * 2 + 0]) for i, observable in enumerate(self.controlled_joints))
+            (observable, xdot_full[i]) for i, observable in enumerate(self.controlled_joints))
         acceleration = OrderedDict(
-            (observable, xdot_full[i * 2 + 1]) for i, observable in enumerate(self.controlled_joints))
+            (observable, xdot_full[i + len(self.controlled_joints)]) for i, observable in enumerate(self.controlled_joints))
         return velocity, acceleration, np_H, np_A, np_lb, np_ub, np_lbA, np_ubA, xdot_full
 
     def debug_print(self, unfiltered_H, A, lb, ub, lbA, ubA, g, xdot_full=None, actually_print=False):
         import pandas as pd
         # bA_mask, b_mask = make_filter_masks(unfiltered_H, self.num_joint_constraints, self.num_hard_constraints, self.order)
         b_names = []
+        b_v_names = []
+        b_a_names = []
         bA_names = []
         bA_names_v = []
         bA_names_a = []
@@ -549,10 +551,11 @@ class QProblemBuilderAccelerationResolved(QProblemBuilder):
 
         for iJ, k in enumerate(self.joint_constraints_dict.keys()):
             key = 'j -- ' + str(k)
-            b_names.append(key + '/v')
-            b_names.append(key + '/a')
+            b_v_names.append(key + '/v')
+            b_a_names.append(key + '/a')
             bA_names.append(key + '/vel_link')
-
+        b_names.extend(b_v_names)
+        b_names.extend(b_a_names)
         for iS, k in enumerate(self.soft_constraints_dict.keys()):
             key = 's -- ' + str(k)
             bA_names_v.append(key + '/v')

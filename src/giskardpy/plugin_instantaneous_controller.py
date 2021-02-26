@@ -55,7 +55,8 @@ class ControllerPlugin(GiskardBehavior):
 
         controlled_joints = self.get_robot().controlled_joints
         joint_to_symbols_str = OrderedDict(
-            (x, self.robot.get_joint_position_symbol(x)) for x in controlled_joints)
+            (x, (self.robot.get_joint_position_symbol(x),
+                 self.robot.get_joint_velocity_symbol(x))) for x in controlled_joints)
 
 
         self.controller.update_constraints(joint_to_symbols_str,
@@ -75,7 +76,7 @@ class ControllerPlugin(GiskardBehavior):
         expr = self.controller.get_expr()
         expr = self.god_map.get_values(expr)
 
-        next_cmd, \
+        next_velocity, \
         self.qp_data[identifier.H[-1]], \
         self.qp_data[identifier.A[-1]], \
         self.qp_data[identifier.lb[-1]], \
@@ -83,6 +84,6 @@ class ControllerPlugin(GiskardBehavior):
         self.qp_data[identifier.lbA[-1]], \
         self.qp_data[identifier.ubA[-1]], \
         self.qp_data[identifier.xdot_full[-1]] = self.controller.get_cmd(expr, self.nWSR)
-        self.get_god_map().set_data(identifier.cmd, next_cmd)
+        self.get_god_map().set_data(identifier.cmd, next_velocity)
 
         return Status.RUNNING

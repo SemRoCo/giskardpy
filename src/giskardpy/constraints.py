@@ -691,12 +691,13 @@ class JointPositionRevolute(Constraint):
         #                                     np.pi / 4, WEIGHTS[1])
         # weight = WEIGHTS[5]
         weight = self.normalize_weight(max_velocity, weight)
+        sample_period = self.get_input_sampling_period()
 
         self.add_constraint('',
                             lower=capped_err,
                             upper=capped_err,
                             weight=weight,
-                            expression=current_joint,
+                            expression=current_joint*sample_period,
                             goal_constraint=self.goal_constraint)
 
     def __str__(self):

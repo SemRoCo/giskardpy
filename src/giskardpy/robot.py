@@ -8,7 +8,7 @@ from geometry_msgs.msg import PoseStamped
 
 from giskardpy import WORLD_IMPLEMENTATION, casadi_wrapper as w
 from giskardpy import identifier
-from giskardpy.data_types import SingleJointState, JointConstraint, HardConstraint
+from giskardpy.data_types import SingleJointState, JointConstraint
 from giskardpy.god_map import GodMap
 from giskardpy.pybullet_world_object import PyBulletWorldObject
 from giskardpy.utils import KeyDefaultDict, \
@@ -203,6 +203,7 @@ class Robot(Backend):
         for i, joint_name in enumerate(self.get_joint_names_controllable()):
             lower_limit, upper_limit = self.get_joint_limits(joint_name)
             joint_symbol = self.get_joint_position_symbol(joint_name)
+            joint_velocity_symbol = self.get_joint_velocity_symbol(joint_name)
             sample_period = god_map.to_symbol(identifier.sample_period)
             velocity_limit = self.get_joint_velocity_limit_expr(joint_name)  # * sample_period
             acceleration_limit = self.get_joint_acceleration_limit_expr(joint_name)  # * sample_period
@@ -210,38 +211,42 @@ class Robot(Backend):
 
             weight = self._joint_weights[joint_name]
             weight = weight * (1. / (velocity_limit)) ** 2
-            last_joint_velocity = god_map.to_symbol(identifier.last_joint_states + [joint_name, u'velocity'])
+            # last_joint_velocity = god_map.to_symbol(identifier.last_joint_states + [joint_name, u'velocity'])
 
             if not self.is_joint_continuous(joint_name):
                 self._joint_constraints[joint_name] = JointConstraint(
                     lower_v=-velocity_limit,
                     upper_v=velocity_limit,
-                    weight_v=0.0, # TODO is that right?
+                    weight_v=weight,  # TODO is that right?
                     # lower_a=-acceleration_limit2,
                     # upper_a=acceleration_limit2,
                     lower_a=w.limit(w.velocity_limit_from_position_limit(acceleration_limit,
                                                                          lower_limit,
                                                                          joint_symbol,
-                                                                         sample_period) - last_joint_velocity,
+                                                                         sample_period) - joint_velocity_symbol,
                                     -acceleration_limit2,
                                     acceleration_limit2),
                     upper_a=w.limit(w.velocity_limit_from_position_limit(acceleration_limit,
                                                                          upper_limit,
                                                                          joint_symbol,
-                                                                         sample_period) - last_joint_velocity,
+                                                                         sample_period) - joint_velocity_symbol,
                                     -acceleration_limit2,
                                     acceleration_limit2),
-                    weight_a=weight,
-                    linear_weight=0)
+                    weight_a=0,
+                    linear_weight=0,
+                    joint_symbol=joint_symbol,
+                    joint_velocity_symbol=joint_velocity_symbol)
             else:
                 self._joint_constraints[joint_name] = JointConstraint(
                     lower_v=-velocity_limit,
                     upper_v=velocity_limit,
-                    weight_v=0.0, # TODO is that right?
+                    weight_v=weight,  # TODO is that right?
                     lower_a=-acceleration_limit2,
                     upper_a=acceleration_limit2,
-                    weight_a=weight,
-                    linear_weight=0)
+                    weight_a=0,
+                    linear_weight=0,
+                    joint_symbol=joint_symbol,
+                    joint_velocity_symbol=joint_velocity_symbol)
 
     def get_fk_expression(self, root_link, tip_link):
         """

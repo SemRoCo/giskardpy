@@ -56,7 +56,7 @@ class WorldVisualizationBehavior(GiskardBehavior):
             marker = Marker()
             marker.action = Marker.DELETE
             marker.id = i
-            marker.ns = u'planning_world_visualization'
+            marker.ns = self.marker_namespace
             msg.markers.append(marker)
         self.publisher.publish(msg)
         self.ids = set()

@@ -31,6 +31,30 @@ def init(tf_buffer_size=15):
     rospy.sleep(5.0)
 
 
+def get_full_frame_name(frame_name):
+    """
+    Gets the full tf frame name if the frame with the name frame_name
+    is in a separate namespace.
+
+    :rtype: str
+    """
+    global tfBuffer
+    tf_frames = tfBuffer._getFrameStrings()
+    j = -1
+    for i, tf_frame in enumerate(tf_frames):
+        try:
+            frame = tf_frame[tf_frame.index("/") + 1:]
+            if frame == frame_name:
+                j = i
+                break
+        except ValueError:
+            continue
+    if j == -1:
+        rospy.logwarn('Cannot find frame called {} in tf.'.format(frame_name))
+    else:
+        return tf_frames[j]
+
+
 def wait_for_transform(target_frame, source_frame, time, timeout):
     global tfBuller
     return tfBuffer.can_transform(target_frame, source_frame, time, timeout)
@@ -168,6 +192,7 @@ def pose_to_kdl(pose):
                                     pose.position.y,
                                     pose.position.z))
 
+
 def quaternion_to_kdl(pose):
     """Convert a geometry_msgs Transform message to a PyKDL Frame.
 
@@ -188,6 +213,7 @@ def point_to_kdl(point):
     :rtype: PyKDL.Vector
     """
     return PyKDL.Vector(point.x, point.y, point.z)
+
 
 def twist_to_kdl(twist):
     t = PyKDL.Twist()
@@ -226,6 +252,7 @@ def msg_to_kdl(msg):
     else:
         raise TypeError(u'can\'t convert {} to kdl'.format(type(msg)))
 
+
 def normalize(msg):
     if isinstance(msg, Quaternion):
         rotation = np.array([msg.x,
@@ -253,6 +280,7 @@ def kdl_to_pose(frame):
     p.position.z = frame.p[2]
     p.orientation = Quaternion(*frame.M.GetQuaternion())
     return p
+
 
 def kdl_to_pose_stamped(frame, frame_id):
     """
@@ -326,14 +354,14 @@ def kdl_to_np(kdl_thing):
                          kdl_thing[1],
                          kdl_thing[2]])
     if isinstance(kdl_thing, PyKDL.Frame):
-        return np.array([[kdl_thing.M[0,0], kdl_thing.M[0,1], kdl_thing.M[0,2], kdl_thing.p[0]],
-                         [kdl_thing.M[1,0], kdl_thing.M[1,1], kdl_thing.M[1,2], kdl_thing.p[1]],
-                         [kdl_thing.M[2,0], kdl_thing.M[2,1], kdl_thing.M[2,2], kdl_thing.p[2]],
+        return np.array([[kdl_thing.M[0, 0], kdl_thing.M[0, 1], kdl_thing.M[0, 2], kdl_thing.p[0]],
+                         [kdl_thing.M[1, 0], kdl_thing.M[1, 1], kdl_thing.M[1, 2], kdl_thing.p[1]],
+                         [kdl_thing.M[2, 0], kdl_thing.M[2, 1], kdl_thing.M[2, 2], kdl_thing.p[2]],
                          [0, 0, 0, 1]])
     if isinstance(kdl_thing, PyKDL.Rotation):
-        return np.array([[kdl_thing[0,0], kdl_thing[0,1], kdl_thing[0,2], 0],
-                         [kdl_thing[1,0], kdl_thing[1,1], kdl_thing[1,2], 0],
-                         [kdl_thing[2,0], kdl_thing[2,1], kdl_thing[2,2], 0],
+        return np.array([[kdl_thing[0, 0], kdl_thing[0, 1], kdl_thing[0, 2], 0],
+                         [kdl_thing[1, 0], kdl_thing[1, 1], kdl_thing[1, 2], 0],
+                         [kdl_thing[2, 0], kdl_thing[2, 1], kdl_thing[2, 2], 0],
                          [0, 0, 0, 1]])
 
 
@@ -434,6 +462,8 @@ def msg_to_homogeneous_matrix(msg):
     g = tr.quaternion_matrix(q)
     g[0:3, -1] = p
     return g
+
+
 # end of copied code
 
 def publish_frame_marker(pose_stamped, id_=1, length=0.1):
@@ -452,21 +482,21 @@ def publish_frame_marker(pose_stamped, id_=1, length=0.1):
     x.pose.position = copy(pose_stamped.pose.position)
     x.pose.orientation = pose_stamped.pose.orientation
 
-    v = PyKDL.Vector(length/2.,0,0)
+    v = PyKDL.Vector(length / 2., 0, 0)
     v = kdl_pose * v
     x.pose.position.x += v[0]
     x.pose.position.y += v[1]
     x.pose.position.z += v[2]
 
-    x.color = ColorRGBA(1,0,0,1)
+    x.color = ColorRGBA(1, 0, 0, 1)
     x.scale.x = length
-    x.scale.y = length/10.
-    x.scale.z = length/10.
+    x.scale.y = length / 10.
+    x.scale.z = length / 10.
     ma.markers.append(x)
     y = Marker()
     y.action = y.ADD
     y.ns = u'debug'
-    y.id = id_+1
+    y.id = id_ + 1
     y.type = y.CUBE
     y.header.frame_id = pose_stamped.header.frame_id
     y.pose.position = copy(pose_stamped.pose.position)
@@ -478,15 +508,15 @@ def publish_frame_marker(pose_stamped, id_=1, length=0.1):
     y.pose.position.y += v[1]
     y.pose.position.z += v[2]
 
-    y.color = ColorRGBA(0,1,0,1)
-    y.scale.x = length/10.
+    y.color = ColorRGBA(0, 1, 0, 1)
+    y.scale.x = length / 10.
     y.scale.y = length
-    y.scale.z = length/10.
+    y.scale.z = length / 10.
     ma.markers.append(y)
     z = Marker()
     z.action = z.ADD
     z.ns = u'debug'
-    z.id = id_+2
+    z.id = id_ + 2
     z.type = z.CUBE
     z.header.frame_id = pose_stamped.header.frame_id
     z.pose.position = copy(pose_stamped.pose.position)
@@ -498,9 +528,9 @@ def publish_frame_marker(pose_stamped, id_=1, length=0.1):
     z.pose.position.y += v[1]
     z.pose.position.z += v[2]
 
-    z.color = ColorRGBA(0,0,1,1)
-    z.scale.x = length/10.
-    z.scale.y = length/10.
+    z.color = ColorRGBA(0, 0, 1, 1)
+    z.scale.x = length / 10.
+    z.scale.y = length / 10.
     z.scale.z = length
     ma.markers.append(z)
 
@@ -512,10 +542,11 @@ def publish_frame_marker(pose_stamped, id_=1, length=0.1):
 
     pub.publish(ma)
 
+
 if __name__ == u'__main__':
     rospy.init_node('tf_wrapper_debug')
     p = PoseStamped()
     p.header.frame_id = u'map'
     p.pose.position.x = 1
-    p.pose.orientation = Quaternion(*quaternion_about_axis(np.pi/2, [0,1,0]))
+    p.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 2, [0, 1, 0]))
     publish_frame_marker(p)

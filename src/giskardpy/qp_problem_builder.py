@@ -225,7 +225,7 @@ class A(Parent):
         A_soft[:j, :j * 1] = w.eye(j)
         A_soft[:j, j * 1:j * 2] = -w.eye(j)
 
-        A_soft[j:j + s, :j * 1] = jac
+        A_soft[j:j + s, :j * 1] = jac * 0.05
         A_soft[j:j + s, j * 2:j * 2 + s] = w.eye(s)
 
         A_soft[j + s:j + s * 2, :j * 1] = jac_dot

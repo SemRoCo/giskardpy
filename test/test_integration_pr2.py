@@ -372,6 +372,28 @@ class TestJointGoals(object):
 
 class TestConstraints(object):
 
+    def test_CartesianPosition(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        tip = u'base_footprint'
+        p = PoseStamped()
+        p.header.stamp = rospy.get_rostime()
+        p.header.frame_id = tip
+        p.pose.position = Point(-0.1, 0, 0)
+        p.pose.orientation = Quaternion(0, 0, 0, 1)
+
+        expected = tf.transform_pose('map', p)
+
+        zero_pose.allow_self_collision()
+        zero_pose.set_json_goal(u'CartesianPosition',
+                                root_link=zero_pose.default_root,
+                                tip_link=tip,
+                                goal=p)
+        zero_pose.send_and_check_goal()
+        new_pose = tf.lookup_pose('map', tip)
+        compare_poses(expected.pose, new_pose.pose)
+
     def test_CartesianPoseStraight(self, zero_pose):
         zero_pose.close_l_gripper()
         goal_position = PoseStamped()

@@ -286,7 +286,7 @@ class Constraint(object):
         :return: expression that limits the velocity of error to max_velocity
         """
         sample_period = self.get_input_sampling_period()
-        # max_velocity *= sample_period
+        max_velocity *= sample_period
         return w.max(w.min(error, max_velocity), -max_velocity)
 
     def normalize_weight(self, velocity_limit, weight):
@@ -563,23 +563,19 @@ class JointPositionContinuous(Constraint):
                              self.get_robot().get_joint_velocity_limit_expr(self.joint_name))
 
         error = w.shortest_angular_distance(current_joint, joint_goal)
-        # capped_err = self.limit_acceleration(current_joint, error, max_acceleration, max_velocity)
-        capped_err = self.limit_velocity(error, max_velocity)
-
-        # weight = self.magic_weight_function(w.Abs(error),
-        #                                     0.0, WEIGHTS[5],
-        #                                     np.pi / 8, WEIGHTS[4],
-        #                                     np.pi / 6, WEIGHTS[3],
-        #                                     np.pi / 4, WEIGHTS[1])
 
         weight = self.normalize_weight(max_velocity, weight)
 
-        self.add_velocity_constraint('',
-                                     lower=capped_err,
-                                     upper=capped_err,
-                                     weight=weight,
-                                     expression=current_joint * self.get_input_sampling_period(),
-                                     goal_constraint=self.goal_constraint)
+        capped_err = self.limit_acceleration(current_joint, error, max_acceleration)
+
+        self.add_acceleration_constraint('',
+                                         lower=capped_err,
+                                         upper=capped_err,
+                                         lower_v=-999,
+                                         upper_v=999,
+                                         weight=weight,
+                                         expression=current_joint,
+                                         goal_constraint=self.goal_constraint)
 
     def __str__(self):
         s = super(JointPositionContinuous, self).__str__()
@@ -632,28 +628,24 @@ class JointPositionPrismatic(Constraint):
 
         joint_goal = self.get_input_float(self.goal)
         weight = self.get_input_float(self.weight)
-
         max_velocity = w.min(self.get_input_float(self.max_velocity),
                              self.get_robot().get_joint_velocity_limit_expr(self.joint_name))
+
         max_acceleration = self.get_input_float(self.max_acceleration)
 
         err = joint_goal - current_joint
-        # weight = self.magic_weight_function(w.Abs(err),
-        #                                     0.0, WEIGHTS[5],
-        #                                     0.01, WEIGHTS[4],
-        #                                     0.05, WEIGHTS[3],
-        #                                     0.06, WEIGHTS[1])
-        # capped_err = self.limit_acceleration(current_joint, err, max_acceleration, max_velocity)
-        capped_err = self.limit_velocity(err, max_velocity)
-
         weight = self.normalize_weight(max_velocity, weight)
 
-        self.add_velocity_constraint('',
-                                     lower=capped_err,
-                                     upper=capped_err,
-                                     weight=weight,
-                                     expression=current_joint * self.get_input_sampling_period(),
-                                     goal_constraint=self.goal_constraint)
+        capped_err = self.limit_acceleration(current_joint, err, max_acceleration)
+
+        self.add_acceleration_constraint('',
+                                         lower=capped_err,
+                                         upper=capped_err,
+                                         lower_v=-999,
+                                         upper_v=999,
+                                         weight=weight,
+                                         expression=current_joint,
+                                         goal_constraint=self.goal_constraint)
 
     def __str__(self):
         s = super(JointPositionPrismatic, self).__str__()
@@ -705,33 +697,13 @@ class JointPositionRevolute(Constraint):
 
         joint_goal = self.get_input_float(self.goal)
         weight = self.get_input_float(self.weight)
-        jv = self.get_input_joint_velocity(self.joint_name)
-
         max_velocity = w.min(self.get_input_float(self.max_velocity),
                              self.get_robot().get_joint_velocity_limit_expr(self.joint_name))
 
         max_acceleration = self.get_input_float(self.max_acceleration)
 
         err = joint_goal - current_joint
-        # capped_err = self.limit_acceleration(current_joint, err, max_acceleration, max_velocity)
-        # capped_err = self.limit_velocity(err, max_velocity)
-
-        # weight = self.magic_weight_function(w.Abs(err),
-        #                                     0.0, WEIGHTS[5],
-        #                                     np.pi / 8, WEIGHTS[4],
-        #                                     np.pi / 6, WEIGHTS[3],
-        #                                     np.pi / 4, WEIGHTS[1])
-        # weight = WEIGHTS[5]
         weight = self.normalize_weight(max_velocity, weight)
-        # sample_period = self.get_input_sampling_period()
-
-        # max_acceleration2 = max_acceleration * sample_period
-        # capped_err = w.limit(w.velocity_limit_from_position_limit(max_acceleration,
-        #                                                           joint_goal,
-        #                                                           current_joint,
-        #                                                           sample_period) - jv,
-        #                      -max_acceleration2,
-        #                      max_acceleration2)
 
         capped_err = self.limit_acceleration(current_joint, err, max_acceleration)
 
@@ -743,12 +715,6 @@ class JointPositionRevolute(Constraint):
                                          weight=weight,
                                          expression=current_joint,
                                          goal_constraint=self.goal_constraint)
-        # self.add_velocity_constraint('',
-        #                              lower=-max_velocity,
-        #                              upper=max_velocity,
-        #                              weight=weight,
-        #                              expression=current_joint * sample_period,
-        #                              goal_constraint=self.goal_constraint)
 
     def __str__(self):
         s = super(JointPositionRevolute, self).__str__()

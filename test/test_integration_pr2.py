@@ -386,7 +386,7 @@ class TestConstraints(object):
 
         expected = tf.transform_pose('map', p)
 
-        zero_pose.allow_self_collision()
+        zero_pose.allow_all_collisions()
         zero_pose.set_json_goal(u'CartesianPosition',
                                 root_link=zero_pose.default_root,
                                 tip_link=tip,

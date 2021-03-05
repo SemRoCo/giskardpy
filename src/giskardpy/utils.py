@@ -3,10 +3,7 @@ from __future__ import division
 import errno
 import json
 import os
-import pydot
-import pylab as plt
 import re
-import rospkg
 import subprocess
 import sys
 from collections import defaultdict, OrderedDict, deque
@@ -16,6 +13,9 @@ from itertools import product
 
 import numpy as np
 import pkg_resources
+import pydot
+import pylab as plt
+import rospkg
 import rospy
 from geometry_msgs.msg import PointStamped, Point, Vector3Stamped, Vector3, Pose, PoseStamped, QuaternionStamped, \
     Quaternion
@@ -224,8 +224,10 @@ def to_joint_state_position_dict(msg):
         js[joint_name] = msg.position[i]
     return js
 
+
 def print_joint_state(joint_msg):
     print_dict(to_joint_state_position_dict(joint_msg))
+
 
 def print_dict(d):
     print('{')
@@ -233,9 +235,11 @@ def print_dict(d):
         print("\'{}\': {},".format(key, value))
     print('}')
 
+
 def write_dict(d, f):
-    json.dump(d,f, sort_keys=True, indent=4, separators=(',', ': '))
+    json.dump(d, f, sort_keys=True, indent=4, separators=(',', ': '))
     f.write('\n')
+
 
 def position_dict_to_joint_states(joint_state_dict):
     """
@@ -267,6 +271,7 @@ def dict_to_joint_states(joint_state_dict):
         js.velocity.append(v.velocity)
         js.effort.append(0)
     return js
+
 
 def normalize_quaternion_msg(quaternion):
     q = Quaternion()
@@ -354,9 +359,8 @@ def create_path(path):
                 raise
 
 
-
-
-def plot_trajectory(tj, controlled_joints, path_to_data_folder, sample_period, order=3, velocity_threshold=0.0, scaling=0.2, normalize_position=False, tick_stride=1.0):
+def plot_trajectory(tj, controlled_joints, path_to_data_folder, sample_period, order=3, velocity_threshold=0.0,
+                    scaling=0.2, normalize_position=False, tick_stride=1.0, file_name=u'trajectory.pdf'):
     """
     :type tj: Trajectory
     :param controlled_joints: only joints in this list will be added to the plot
@@ -393,7 +397,7 @@ def plot_trajectory(tj, controlled_joints, path_to_data_folder, sample_period, o
         times.append(time)
     data[0] = np.array(data[0])
     data[1] = np.array(data[1])
-    if(normalize_position):
+    if (normalize_position):
         data[0] = data[0] - (data[0].max(0) + data[0].min(0)) / 2
     for i in range(2, order):
         data[i] = np.diff(data[i - 1], axis=0, prepend=0) / sample_period
@@ -420,8 +424,10 @@ def plot_trajectory(tj, controlled_joints, path_to_data_folder, sample_period, o
     for i in range(len(controlled_joints)):
         if any(abs(data[1][:, i]) > velocity_threshold):
             for j in range(order):
-                axs[j].plot(times, data[j][:, i], fmts[i], label=names[i])
-
+                try:
+                    axs[j].plot(times, data[j][:, i], fmts[i], label=names[i])
+                except:
+                    pass
 
     axs[0].legend(bbox_to_anchor=(1.01, 1), loc='upper left')
 
@@ -429,7 +435,7 @@ def plot_trajectory(tj, controlled_joints, path_to_data_folder, sample_period, o
     for i in range(order):
         axs[i].grid()
 
-    plt.savefig(path_to_data_folder + u'trajectory.pdf', bbox_inches="tight")
+    plt.savefig(path_to_data_folder + file_name, bbox_inches="tight")
 
 
 def resolve_ros_iris_in_urdf(input_urdf):
@@ -825,6 +831,7 @@ def memoize(function):
 
     return wrapper
 
+
 def traj_to_msg(sample_period, trajectory, controlled_joints, fill_velocity_values):
     """
     :type traj: giskardpy.data_types.Trajectory
@@ -835,7 +842,7 @@ def traj_to_msg(sample_period, trajectory, controlled_joints, fill_velocity_valu
     trajectory_msg.joint_names = controlled_joints
     for time, traj_point in trajectory.items():
         p = JointTrajectoryPoint()
-        p.time_from_start = rospy.Duration(time*sample_period)
+        p.time_from_start = rospy.Duration(time * sample_period)
         for joint_name in controlled_joints:
             if joint_name in traj_point:
                 p.positions.append(traj_point[joint_name].position)
@@ -846,21 +853,20 @@ def traj_to_msg(sample_period, trajectory, controlled_joints, fill_velocity_valu
         trajectory_msg.points.append(p)
     return trajectory_msg
 
+
 def make_filter_b_mask(H):
     return H.sum(axis=1) != 0
 
+
 def make_filter_masks(H, num_joint_constraints, num_hard_constraints, order=1):
     b_mask = make_filter_b_mask(H)
-    s_mask = b_mask[num_joint_constraints*order:]
+    s_mask = b_mask[num_joint_constraints * order:]
     if num_hard_constraints == 0:
         bA_mask = s_mask
     else:
         bA_mask = np.concatenate((np.array([True] * num_hard_constraints), s_mask))
 
     return bA_mask, b_mask
-
-
-
 
 
 def trajectory_to_np(tj, joint_names):
@@ -881,6 +887,7 @@ def trajectory_to_np(tj, joint_names):
     times = np.array(times)
     return names, position, velocity, times
 
+
 def publish_marker_sphere(position, frame_id=u'map', radius=0.05, id_=0):
     m = Marker()
     m.action = m.ADD
@@ -891,7 +898,7 @@ def publish_marker_sphere(position, frame_id=u'map', radius=0.05, id_=0):
     m.pose.position.x = position[0]
     m.pose.position.y = position[1]
     m.pose.position.z = position[2]
-    m.color = ColorRGBA(1,0,0,1)
+    m.color = ColorRGBA(1, 0, 0, 1)
     m.scale.x = radius
     m.scale.y = radius
     m.scale.z = radius
@@ -905,7 +912,8 @@ def publish_marker_sphere(position, frame_id=u'map', radius=0.05, id_=0):
 
     pub.publish(m)
 
-def publish_marker_vector(start, end, diameter_shaft=0.01, diameter_head=0.02,  id_=0):
+
+def publish_marker_vector(start, end, diameter_shaft=0.01, diameter_head=0.02, id_=0):
     """
     assumes points to be in frame map
     :type start: Point
@@ -921,7 +929,7 @@ def publish_marker_vector(start, end, diameter_shaft=0.01, diameter_head=0.02,  
     m.type = m.ARROW
     m.points.append(start)
     m.points.append(end)
-    m.color = ColorRGBA(1,0,0,1)
+    m.color = ColorRGBA(1, 0, 0, 1)
     m.scale.x = diameter_shaft
     m.scale.y = diameter_head
     m.scale.z = 0
@@ -936,6 +944,7 @@ def publish_marker_vector(start, end, diameter_shaft=0.01, diameter_head=0.02,  
     rospy.sleep(0.3)
 
     pub.publish(m)
+
 
 class FIFOSet(set):
     def __init__(self, data, max_length=None):

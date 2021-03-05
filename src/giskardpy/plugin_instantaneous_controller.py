@@ -65,10 +65,8 @@ class ControllerPlugin(GiskardBehavior):
                                            self.hard_constraints)
         self.controller.compile()
 
-        self.qp_data[identifier.weight_keys[-1]], \
         self.qp_data[identifier.b_keys[-1]], \
-        self.qp_data[identifier.bA_keys[-1]], \
-        self.qp_data[identifier.xdot_keys[-1]] = self.controller.get_qpdata_key_map()
+        self.qp_data[identifier.bA_keys[-1]] = self.controller.get_qpdata_key_map()
 
     @profile
     def update(self):

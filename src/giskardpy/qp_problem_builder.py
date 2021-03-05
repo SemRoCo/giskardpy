@@ -134,11 +134,6 @@ class B(Parent):
                             sv=self._s_ub_v,
                             sa=self._s_ub_a)[1]
 
-    def joint_names(self):
-        return self._sorter(jv=self._j_ub_v,
-                            ja=self._j_ub_a)[0]
-
-
 class BA(Parent):
     def __init__(self):
         self._lbA_v = {}
@@ -225,10 +220,10 @@ class A(Parent):
         A_soft[:j, :j * 1] = w.eye(j)
         A_soft[:j, j * 1:j * 2] = -w.eye(j)
 
-        A_soft[j:j + s, :j * 1] = jac * 0.05
+        A_soft[j:j + s, :j * 1] = jac * 0.05 # FIXME make parameter
         A_soft[j:j + s, j * 2:j * 2 + s] = w.eye(s)
 
-        A_soft[j + s:j + s * 2, :j * 1] = jac_dot
+        A_soft[j + s:j + s * 2, :j * 1] = jac_dot * 0.05
         A_soft[j + s:j + s * 2, j * 1:j * 2] = jac
         A_soft[j + s:j + s * 2, j * 2 + s:] = w.eye(s)
         return A_soft
@@ -482,12 +477,18 @@ class QProblemBuilder(object):
     def joint_names(self):
         return self.A.controlled_joint_symbols()
 
+    def b_names(self):
+        return self.b.names()
+
+    def bA_names(self):
+        return self.bA.names()
+
     def debug_print(self, unfiltered_H, A, lb, ub, lbA, ubA, g, xdot_full=None, actually_print=False):
         import pandas as pd
         # bA_mask, b_mask = make_filter_masks(unfiltered_H, self.num_joint_constraints, self.num_hard_constraints, self.order)
 
-        b_names = np.array(self.b.names())
-        bA_names = np.array(self.bA.names())
+        b_names = np.array(self.b_names())
+        bA_names = np.array(self.bA_names())
         filtered_b_names = b_names  # [b_mask]
         filtered_bA_names = bA_names  # [bA_mask]
         filtered_H = unfiltered_H  # [b_mask][:,b_mask]

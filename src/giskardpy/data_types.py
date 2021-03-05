@@ -32,16 +32,13 @@ class SingleJointState(object):
 
 class Trajectory(object):
     def __init__(self):
+        self.clear()
+
+    def clear(self):
         self._points = OrderedDict()
 
     def get_exact(self, time):
         return self._points[time]
-
-    def get_closest(self, time):
-        pass
-
-    def get_sub_trajectory(self, start_time, end_time):
-        pass
 
     def set(self, time, point):
         if len(self._points) > 0 and list(self._points.keys())[-1] > time:

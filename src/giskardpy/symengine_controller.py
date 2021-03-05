@@ -27,30 +27,11 @@ class InstantaneousController(object):
         self.joint_constraints = {}
         self.soft_constraints = {}
         self.free_symbols = None
-        self.qp_problem_builder = None
+        self.qp_problem_builder = None # type: QProblemBuilder
 
 
     def get_qpdata_key_map(self):
-        b_keys = []
-        weights_keys = []
-        xdot_keys = []
-        bA_keys = []
-        for iJ, k in enumerate(self.joint_constraints.keys()):
-            key = u'j -- ' + str(k)
-            b_keys.append(key)
-            weights_keys.append(key)
-            xdot_keys.append(key)
-
-        for iH, k in enumerate(self.hard_constraints.keys()):
-            key = u'h -- ' + str(k)
-            bA_keys.append(key)
-
-        for iS, k in enumerate(self.soft_constraints.keys()):
-            key = str(k)
-            bA_keys.append(key)
-            weights_keys.append(key)
-            xdot_keys.append(key)
-        return weights_keys, b_keys, bA_keys, xdot_keys
+        return self.qp_problem_builder.b_names(), self.qp_problem_builder.bA_names()
 
     def update_constraints(self, joint_to_symbols_str, soft_constraints, joint_constraints, hard_constraints):
         """

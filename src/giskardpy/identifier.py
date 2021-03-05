@@ -7,6 +7,7 @@ last_joint_states = [u'last_joint_state']
 
 constraints_identifier = [u'constraints']
 trajectory = [u'traj']
+lbA_trajectory = [u'lbA_traj']
 time = [u'time']
 cmd = [u'cmd']
 # last_cmd = [u'last_cmd']

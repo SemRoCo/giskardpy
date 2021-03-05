@@ -19,6 +19,8 @@ from giskardpy.input_system import JointStatesInput
 from giskardpy.plugin import PluginBehavior
 from giskardpy.plugin_action_server import GoalReceived, SendResult, GoalCanceled
 from giskardpy.plugin_append_zero_velocity import AppendZeroVelocity
+from giskardpy.plugin_log_lbA import LoglbAPlugin
+from giskardpy.plugin_plot_lbA import PlotlbA
 from giskardpy.plugin_tf_publisher import TFPlugin
 from giskardpy.plugin_cleanup import CleanUp
 from giskardpy.plugin_collision_checker import CollisionChecker
@@ -163,6 +165,7 @@ def grow_tree():
     planning_3.add_plugin(ControllerPlugin(u'controller'))
     planning_3.add_plugin(KinSimPlugin(u'kin sim'))
     planning_3.add_plugin(LogTrajPlugin(u'log'))
+    planning_3.add_plugin(LoglbAPlugin(u'log lba'))
     planning_3.add_plugin(WiggleCancel(u'wiggle'))
     planning_3.add_plugin(LoopDetector(u'loop detector'))
     planning_3.add_plugin(GoalReachedPlugin(u'goal reached'))
@@ -205,6 +208,7 @@ def grow_tree():
     # post_processing.add_child(WiggleCancel(u'final wiggle detection', final_detection=True))
     if god_map.get_data(identifier.enable_PlotTrajectory):
         post_processing.add_child(PlotTrajectory(u'plot trajectory', order=3))
+        post_processing.add_child(PlotlbA(u'plot lba', order=3))
     post_processing.add_child(PostProcessing(u'evaluate result'))
     # post_processing.add_child(PostProcessing(u'check reachability'))
     # ----------------------------------------------

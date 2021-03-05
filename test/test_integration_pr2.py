@@ -16,6 +16,7 @@ from shape_msgs.msg import SolidPrimitive
 from tf.transformations import quaternion_from_matrix, quaternion_about_axis
 
 import giskardpy.tfwrapper as tf
+from giskard_ws.src.giskardpy.test.utils_for_tests import compare_points
 from giskardpy import logging, identifier
 from giskardpy.constraints import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA, WEIGHT_COLLISION_AVOIDANCE
 from giskardpy.identifier import fk_pose
@@ -376,11 +377,11 @@ class TestConstraints(object):
         """
         :type zero_pose: PR2
         """
-        tip = u'base_footprint'
+        tip = zero_pose.r_tip
         p = PoseStamped()
         p.header.stamp = rospy.get_rostime()
         p.header.frame_id = tip
-        p.pose.position = Point(-0.1, 0, 0)
+        p.pose.position = Point(-0.2, -0.2, -0.3)
         p.pose.orientation = Quaternion(0, 0, 0, 1)
 
         expected = tf.transform_pose('map', p)
@@ -392,7 +393,7 @@ class TestConstraints(object):
                                 goal=p)
         zero_pose.send_and_check_goal()
         new_pose = tf.lookup_pose('map', tip)
-        compare_poses(expected.pose, new_pose.pose)
+        compare_points(expected.pose.position, new_pose.pose.position)
 
     def test_CartesianPoseStraight(self, zero_pose):
         zero_pose.close_l_gripper()

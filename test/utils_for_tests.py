@@ -92,19 +92,34 @@ def compare_poses(pose1, pose2, decimal=2):
     :type pose1: Pose
     :type pose2: Pose
     """
-    np.testing.assert_almost_equal(pose1.position.x, pose2.position.x, decimal=decimal)
-    np.testing.assert_almost_equal(pose1.position.y, pose2.position.y, decimal=decimal)
-    np.testing.assert_almost_equal(pose1.position.z, pose2.position.z, decimal=decimal)
+    compare_points(pose1.position, pose2.position, decimal)
+    compare_orientations(pose1.orientation, pose2.orientation, decimal)
+
+def compare_points(point1, point2, decimal=2):
+    """
+    :type pose1: Point
+    :type pose2: Point
+    """
+    np.testing.assert_almost_equal(point1.x, point2.x, decimal=decimal)
+    np.testing.assert_almost_equal(point1.y, point2.y, decimal=decimal)
+    np.testing.assert_almost_equal(point1.z, point2.z, decimal=decimal)
+
+
+def compare_orientations(orientation1, orientation2, decimal=2):
+    """
+    :type orientation1: Quaternion
+    :type orientation2: Quaternion
+    """
     try:
-        np.testing.assert_almost_equal(pose1.orientation.x, pose2.orientation.x, decimal=decimal)
-        np.testing.assert_almost_equal(pose1.orientation.y, pose2.orientation.y, decimal=decimal)
-        np.testing.assert_almost_equal(pose1.orientation.z, pose2.orientation.z, decimal=decimal)
-        np.testing.assert_almost_equal(pose1.orientation.w, pose2.orientation.w, decimal=decimal)
+        np.testing.assert_almost_equal(orientation1.x, orientation2.x, decimal=decimal)
+        np.testing.assert_almost_equal(orientation1.y, orientation2.y, decimal=decimal)
+        np.testing.assert_almost_equal(orientation1.z, orientation2.z, decimal=decimal)
+        np.testing.assert_almost_equal(orientation1.w, orientation2.w, decimal=decimal)
     except:
-        np.testing.assert_almost_equal(pose1.orientation.x, -pose2.orientation.x, decimal=decimal)
-        np.testing.assert_almost_equal(pose1.orientation.y, -pose2.orientation.y, decimal=decimal)
-        np.testing.assert_almost_equal(pose1.orientation.z, -pose2.orientation.z, decimal=decimal)
-        np.testing.assert_almost_equal(pose1.orientation.w, -pose2.orientation.w, decimal=decimal)
+        np.testing.assert_almost_equal(orientation1.x, -orientation2.x, decimal=decimal)
+        np.testing.assert_almost_equal(orientation1.y, -orientation2.y, decimal=decimal)
+        np.testing.assert_almost_equal(orientation1.z, -orientation2.z, decimal=decimal)
+        np.testing.assert_almost_equal(orientation1.w, -orientation2.w, decimal=decimal)
 
 
 @composite

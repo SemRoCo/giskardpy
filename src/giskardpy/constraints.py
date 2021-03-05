@@ -714,7 +714,7 @@ class JointPositionRevolute(Constraint):
 
         err = joint_goal - current_joint
         # capped_err = self.limit_acceleration(current_joint, err, max_acceleration, max_velocity)
-        capped_err = self.limit_velocity(err, max_velocity)
+        # capped_err = self.limit_velocity(err, max_velocity)
 
         # weight = self.magic_weight_function(w.Abs(err),
         #                                     0.0, WEIGHTS[5],
@@ -723,15 +723,17 @@ class JointPositionRevolute(Constraint):
         #                                     np.pi / 4, WEIGHTS[1])
         # weight = WEIGHTS[5]
         weight = self.normalize_weight(max_velocity, weight)
-        sample_period = self.get_input_sampling_period()
+        # sample_period = self.get_input_sampling_period()
 
-        max_acceleration2 = max_acceleration * sample_period
-        capped_err = w.limit(w.velocity_limit_from_position_limit(max_acceleration,
-                                                                  joint_goal,
-                                                                  current_joint,
-                                                                  sample_period) - jv,
-                             -max_acceleration2,
-                             max_acceleration2)
+        # max_acceleration2 = max_acceleration * sample_period
+        # capped_err = w.limit(w.velocity_limit_from_position_limit(max_acceleration,
+        #                                                           joint_goal,
+        #                                                           current_joint,
+        #                                                           sample_period) - jv,
+        #                      -max_acceleration2,
+        #                      max_acceleration2)
+
+        capped_err = self.limit_acceleration(current_joint, err, max_acceleration)
 
         self.add_acceleration_constraint('',
                                          lower=capped_err,

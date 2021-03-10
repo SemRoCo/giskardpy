@@ -19,7 +19,7 @@ def make_velocity_threshold(god_map,
     robot = god_map.get_data(identifier.robot)
     sample_period = god_map.get_data(identifier.sample_period)
     thresholds = []
-    for joint_name in robot.controlled_joints:
+    for joint_name in sorted(robot.controlled_joints):
         velocity_limit = robot.get_joint_velocity_limit_expr_evaluated(joint_name, god_map)
         if velocity_limit is None:
             velocity_limit = 1

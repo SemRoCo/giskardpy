@@ -1,10 +1,10 @@
+import errno
 import os
 import pickle
 
 import casadi as ca
-import errno
 import numpy as np
-from casadi import sign, cos, acos, sin, sqrt, atan2, log, log10
+from casadi import sign, cos, acos, sin, sqrt, atan2
 from numpy import pi
 
 from giskardpy import logging
@@ -19,6 +19,7 @@ SMALL_NUMBER = 1e-10
 def diag(*args):
     return ca.diag(Matrix(args))
 
+
 def Symbol(data):
     if isinstance(data, str) or isinstance(data, unicode):
         return ca.SX.sym(data)
@@ -31,11 +32,10 @@ def jacobian(expressions, symbols, order=1):
     elif order == 2:
         j = jacobian(expressions, symbols, order=1)
         for i, symbol in enumerate(symbols):
-            j[:, i] = jacobian(j[:,i], symbol)
+            j[:, i] = jacobian(j[:, i], symbol)
         return j
     else:
         raise NotImplementedError('jacobian only supports order 1 and 2')
-
 
 
 def equivalent(expression1, expression2):
@@ -52,6 +52,10 @@ def is_matrix(expression):
 
 def is_symbol(expression):
     return expression.shape[0] * expression.shape[1] == 1
+
+
+def create_symbols(names):
+    return [Symbol(x) for x in names]
 
 
 def compile_and_execute(f, params):
@@ -143,12 +147,14 @@ def min(x, y):
     """
     return ca.fmin(x, y)
 
+
 def limit(x, lower_limit, upper_limit):
     return max(lower_limit, min(upper_limit, x))
 
 
 def if_greater(a, b, if_result, else_result):
     return ca.if_else(ca.gt(a, b), if_result, else_result)
+
 
 def if_less(a, b, if_result, else_result):
     return ca.if_else(ca.lt(a, b), if_result, else_result)
@@ -565,6 +571,7 @@ def rotation_distance(a_R_b, a_R_c):
     angle = max(angle, -1)
     return acos(angle)
 
+
 def asdf(a_R_b, a_R_c):
     """
     :param a_R_b: 4x4 or 3x3 Matrix
@@ -617,12 +624,17 @@ def axis_angle_from_quaternion(x, y, z, w):
     l = norm(Matrix([x, y, z, w]))
     x, y, z, w = x / l, y / l, z / l, w / l
     w2 = sqrt(1 - w ** 2)
-    angle = (2 * acos(min(max(-1, w), 1)))
     m = if_eq_zero(w2, 1, w2)  # avoid /0
+    angle = if_eq_zero(w2, 0, (2 * acos(min(max(-1, w), 1))))
     x = if_eq_zero(w2, 0, x / m)
     y = if_eq_zero(w2, 0, y / m)
     z = if_eq_zero(w2, 1, z / m)
     return Matrix([x, y, z]), angle
+
+def normalize_axis_angle(axis, angle):
+    axis = if_less(angle, 0, -axis, axis)
+    angle = abs(angle)
+    return axis, angle
 
 
 def quaternion_from_axis_angle(axis, angle):
@@ -670,14 +682,14 @@ def rpy_from_matrix(rotation_matrix):
     cy = sqrt(rotation_matrix[i, i] * rotation_matrix[i, i] + rotation_matrix[j, i] * rotation_matrix[j, i])
     if0 = cy - _EPS
     ax = if_greater_zero(if0,
-                                  atan2(rotation_matrix[k, j], rotation_matrix[k, k]),
-                                  atan2(-rotation_matrix[j, k], rotation_matrix[j, j]))
+                         atan2(rotation_matrix[k, j], rotation_matrix[k, k]),
+                         atan2(-rotation_matrix[j, k], rotation_matrix[j, j]))
     ay = if_greater_zero(if0,
-                                  atan2(-rotation_matrix[k, i], cy),
-                                  atan2(-rotation_matrix[k, i], cy))
+                         atan2(-rotation_matrix[k, i], cy),
+                         atan2(-rotation_matrix[k, i], cy))
     az = if_greater_zero(if0,
-                                  atan2(rotation_matrix[j, i], rotation_matrix[i, i]),
-                                  0)
+                         atan2(rotation_matrix[j, i], rotation_matrix[i, i]),
+                         0)
     return ax, ay, az
 
 
@@ -760,14 +772,14 @@ def quaternion_from_matrix(matrix):
 
     t = if_greater_zero(if0, t, m_i_i - (m_j_j + m_k_k) + M[3, 3])
     q[0] = if_greater_zero(if0, M[2, 1] - M[1, 2],
-                                    if_greater_zero(if2, m_i_j + m_j_i,
-                                                             if_greater_zero(if1, m_k_i + m_i_k, t)))
+                           if_greater_zero(if2, m_i_j + m_j_i,
+                                           if_greater_zero(if1, m_k_i + m_i_k, t)))
     q[1] = if_greater_zero(if0, M[0, 2] - M[2, 0],
-                                    if_greater_zero(if2, m_k_i + m_i_k,
-                                                             if_greater_zero(if1, t, m_i_j + m_j_i)))
+                           if_greater_zero(if2, m_k_i + m_i_k,
+                                           if_greater_zero(if1, t, m_i_j + m_j_i)))
     q[2] = if_greater_zero(if0, M[1, 0] - M[0, 1],
-                                    if_greater_zero(if2, t, if_greater_zero(if1, m_i_j + m_j_i,
-                                                                                              m_k_i + m_i_k)))
+                           if_greater_zero(if2, t, if_greater_zero(if1, m_i_j + m_j_i,
+                                                                   m_k_i + m_i_k)))
     q[3] = if_greater_zero(if0, t, m_k_j - m_j_k)
 
     q *= 0.5 / sqrt(t * M[3, 3])
@@ -819,6 +831,12 @@ def quaternion_diff(q0, q1):
     return quaternion_multiply(quaternion_conjugate(q0), q1)
 
 
+def quaternion_sub(q0, q1):
+    cos_half_theta = dot(q0.T, q1)
+    q0 = if_greater_zero(-cos_half_theta, -q0, q0)
+    return q0 - q1
+
+
 def cosine_distance(v0, v1):
     """
     cosine distance ranging from 0 to 2
@@ -828,7 +846,7 @@ def cosine_distance(v0, v1):
     :type v1: Matrix
     :rtype: Union[float, Symbol]
     """
-    return 1 - ((dot(v0.T, v1))[0] / (norm(v0)*norm(v1)))
+    return 1 - ((dot(v0.T, v1))[0] / (norm(v0) * norm(v1)))
 
 
 def euclidean_distance(v1, v2):
@@ -917,6 +935,7 @@ def quaternion_slerp(q1, q2, t):
                                               0.5 * q1 + 0.5 * q2,
                                               ratio_a * q1 + ratio_b * q2))
 
+
 def slerp(v1, v2, t):
     """
     spherical linear interpolation
@@ -926,8 +945,7 @@ def slerp(v1, v2, t):
     :return:
     """
     angle = acos(dot(v1.T, v2)[0])
-    return (sin((1-t)*angle)/sin(angle))*v1 + (sin(t*angle)/sin(angle))*v2
-
+    return (sin((1 - t) * angle) / sin(angle)) * v1 + (sin(t * angle) / sin(angle)) * v2
 
 
 def to_numpy(matrix):
@@ -1039,3 +1057,19 @@ def velocity_limit_from_position_limit(acceleration_limit, position_limit, curre
     velocity_limit *= sign_
     velocity_limit /= m
     return velocity_limit
+
+
+def to_str(expression):
+    """
+    Turns expression into a more or less readable string.
+    """
+    s = str(expression)
+    parts = s.split(', ')
+    result = parts[-1]
+    for x in reversed(parts[:-1]):
+        index, sub = x.split('=')
+        if index not in result:
+            raise Exception('fuck')
+        result = result.replace(index, sub)
+    return result
+    pass

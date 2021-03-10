@@ -374,7 +374,7 @@ class QProblemBuilder(object):
             self.bA.add_soft_constraint(constraint_name, constraint)
             self.A.add_soft_constraint(constraint_name, constraint)
 
-        logging.loginfo(u'constructing new controller with {} soft constraints...'.format(len(soft_expressions)))
+        logging.loginfo(u'constructing new controller with {} soft constraints...'.format(len(self.bA_names())))
         # assert len(self.hard_constraints_dict) == 0, 'hard constraints are not supported anymore'
         self.h = len(self.hard_constraints_dict)
         self.s = len(self.soft_constraints_dict)

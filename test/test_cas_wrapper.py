@@ -640,3 +640,26 @@ class TestCASWrapper(unittest.TestCase):
         distance = w.compile_and_execute(lambda a, b, c: w.distance_point_to_line_segment(a, b, c)[0], [p, start, end])
         nearest = w.compile_and_execute(lambda a, b, c: w.distance_point_to_line_segment(a, b, c)[1], [p, start, end])
         assert distance == 1.4142135623730951
+
+    def test_to_str(self):
+        expr = w.norm(w.quaternion_from_axis_angle(w.Matrix(w.create_symbols(['v1', 'v2','v3'])),
+                                                                          w.Symbol('alpha')))
+        assert w.to_str(expr) == u'sqrt((((sq((v1*sin((alpha/2))))+sq((v2*sin((alpha/2)))))+sq((v3*sin((alpha/2)))))+sq(cos((alpha/2)))))'
+
+    def test_quaternion_sub(self):
+        data = [[[0,0,0,1], [0,0,0,-1], [0,0,0,0]],
+                [[0,0,0,1], [0.524, -0.495, 0.487, -0.494], [0,0,0,0]],
+                [[0,0,0,1], [0.524, -0.495, 0.487, -0.494], [0,0,0,0]]]
+        for q0, q1, expected in data:
+            actual = w.compile_and_execute(w.quaternion_sub, [q0, q1])
+            np.testing.assert_array_almost_equal(actual, expected)
+
+    @given(quaternion(),
+           quaternion())
+    def test_quaternion_sub2(self, q0, q1):
+        assume(np.dot(q0.T,q1) != 0)
+        actual1 = w.compile_and_execute(w.quaternion_sub, [q0, q1])
+        actual2 = w.compile_and_execute(w.quaternion_sub, [q0, -q1])
+        w.quaternion_sub(w.Matrix(q0),w.Matrix(q1))
+        w.quaternion_sub(w.Matrix(q0),w.Matrix(-q1))
+        np.testing.assert_array_almost_equal(actual1, actual2, decimal=4)

@@ -4,7 +4,7 @@ import py_trees
 import rospy
 from visualization_msgs.msg import Marker, MarkerArray
 
-from plugin import GiskardBehavior
+from giskardpy.plugin import GiskardBehavior
 import giskardpy.identifier as identifier
 from giskardpy.tfwrapper import lookup_pose, get_full_frame_name
 
@@ -15,32 +15,60 @@ class WorldVisualizationBehavior(GiskardBehavior):
         self.map_frame = self.get_god_map().get_data(identifier.map_frame)
         self.marker_namespace = u'planning_world_visualization'
         self.ensure_publish = ensure_publish
+        self.currently_publishing_object_names = set()
+        self.links_full_frame_name = {}
 
     def setup(self, timeout):
         self.publisher = rospy.Publisher(u'~visualization_marker_array', MarkerArray, queue_size=1)
         self.ids = set()
+        self.set_full_link_names_for_objects()
         return super(WorldVisualizationBehavior, self).setup(timeout)
+
+    def set_full_link_names_for_objects(self):
+        """
+        Resets the full link names (namespace name + link name) for every current
+        object in the world and saves the object names of these objects.
+        """
+        self.currently_publishing_object_names = set()
+        self.links_full_frame_name = {}
+        objects_dict = self.get_world().get_objects()
+        for object_name, object in objects_dict.items():
+            self.currently_publishing_object_names.add(object_name)
+            for link_name in object.get_link_names():
+                if object.has_link_visuals(link_name):
+                    self.links_full_frame_name[link_name] = get_full_frame_name(link_name)
+
+    def environment_changed(self):
+        "Checks if new objects in the world were added and if so it returns True."
+        objects_dict = self.get_world().get_objects()
+        for object_name, object in objects_dict.items():
+            if object_name not in self.currently_publishing_object_names:
+                return True
 
     def update(self):
         markers = []
-        objects = self.get_world().get_objects().values()
-        for object in objects:
+        time_stamp = rospy.Time()
+        objects_dict = self.get_world().get_objects()
+        if self.environment_changed():
+            self.set_full_link_names_for_objects()
+        for object_name, object in objects_dict.items():
             for link_name in object.get_link_names():
                 if object.has_link_visuals(link_name):
                     marker = object.link_as_marker(link_name)
                     if marker is None:
                         continue
                     marker.header.frame_id = self.map_frame
-                    marker.id = int(hashlib.md5(object.get_name() + link_name).hexdigest()[:6],
-                                    16)  # FIXME find a better way to give the same link the same id
+                    id_str = '{}{}'.format(object_name, link_name).encode('utf-8')
+                    marker.id = int(hashlib.md5(id_str).hexdigest()[:6], 16)  # FIXME find a better way to give the same link the same id
                     self.ids.add(marker.id)
                     marker.ns = self.marker_namespace
-                    marker.header.stamp = rospy.Time()
-                    if link_name == object.get_name():
+                    marker.header.stamp = time_stamp
+                    if link_name == object_name:
                         marker.pose = object.base_pose
                     else:
-                        full_link_name = get_full_frame_name(link_name)
-                        if not full_link_name:
+                        try:
+                            full_link_name = self.links_full_frame_name[link_name]
+                        except KeyError:
                             continue
                         marker.pose = lookup_pose(self.map_frame, full_link_name).pose
                     markers.append(marker)

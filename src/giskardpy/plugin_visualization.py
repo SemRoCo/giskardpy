@@ -22,6 +22,7 @@ class VisualizationBehavior(GiskardBehavior):
 
     def update(self):
         markers = []
+        time_stamp = rospy.Time()
         robot = self.get_robot()
         get_fk = robot.get_fk_pose
         links = [x for x in self.get_robot().get_link_names() if robot.has_link_visuals(x)]
@@ -36,7 +37,7 @@ class VisualizationBehavior(GiskardBehavior):
                             16)  # FIXME find a better way to give the same link the same id
             self.ids.add(marker.id)
             marker.ns = u'planning_visualization'
-            marker.header.stamp = rospy.Time()
+            marker.header.stamp = time_stamp
 
             origin = robot.get_urdf_link(link_name).visual.origin
             fk = get_fk(self.robot_base, link_name).pose

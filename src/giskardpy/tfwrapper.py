@@ -4,9 +4,10 @@ import PyKDL
 import rospy
 import numpy as np
 from geometry_msgs.msg import PoseStamped, Vector3Stamped, PointStamped, TransformStamped, Pose, Quaternion, Point, \
-    Vector3, Twist, TwistStamped, QuaternionStamped
+    Vector3, Twist, TwistStamped, QuaternionStamped, Transform
 from std_msgs.msg import ColorRGBA
-from tf.transformations import quaternion_from_matrix, quaternion_about_axis
+from tf.transformations import quaternion_from_matrix, quaternion_about_axis, translation_from_matrix, \
+    euler_matrix, quaternion_matrix, translation_matrix
 from tf2_geometry_msgs import do_transform_pose, do_transform_vector3, do_transform_point
 from tf2_kdl import transform_to_kdl
 from tf2_py._tf2 import ExtrapolationException
@@ -47,6 +48,7 @@ def get_full_frame_name(frame_name):
                 return tf_frame
         except ValueError:
             continue
+
 
 def wait_for_transform(target_frame, source_frame, time, timeout):
     global tfBuller
@@ -167,6 +169,104 @@ def lookup_point(target_frame, source_frame, time=None):
     p.point.y = t.transform.translation.y
     p.point.z = t.transform.translation.z
     return p
+
+
+def euler_to_quaternion(rpy):
+    """
+    :type rpy: List[double]
+    :rtype: Quaternion
+    """
+    q = quaternion_from_matrix(euler_matrix(rpy[0], rpy[1], rpy[2]))
+    return Quaternion(q[0], q[1], q[2], q[3])
+
+
+def tf_list_to_matrix(tf_list, tf_list_euler=False):
+    """
+    :type tf_list: List[List[double], List[double]]
+    :rtype: 4x4 Matrix
+    """
+    tf_trans_mat = translation_matrix([tf_list[0][0],
+                                       tf_list[0][1],
+                                       tf_list[0][2]])
+    if tf_list_euler:
+        tf_rot_mat = euler_matrix(tf_list[1][0],
+                                  tf_list[1][1],
+                                  tf_list[1][2])
+    else:
+        tf_rot_mat = quaternion_matrix(tf_list[1])
+    return np.dot(tf_trans_mat, tf_rot_mat)
+
+
+def multiply_transform_lists(tf_list, other_tf_list, tf_list_euler=False, other_tf_list_euler=False):
+    """
+    :type tf_list: List[List[double], List[double]]
+    :type other_tf_list: List[List[double], List[double]]
+    :rtype: List[List[double], List[double]]
+    """
+    tf_mat = tf_list_to_matrix(tf_list, tf_list_euler=tf_list_euler)
+    other_tf_mat = tf_list_to_matrix(other_tf_list, tf_list_euler=other_tf_list_euler)
+    new_tf = np.dot(tf_mat, other_tf_mat)
+    t = translation_from_matrix(new_tf)
+    q = quaternion_from_matrix(new_tf)
+    return [t, q]
+
+
+def transform_to_list(tf):
+    """
+    :type tf: Transform
+    :rtype: List[List[double], List[double]]
+    """
+    ctf = copy(tf)
+    return [[ctf.translation.x, ctf.translation.y, ctf.translation.z],
+            [ctf.rotation.x, ctf.rotation.y, ctf.rotation.z, ctf.rotation.w]]
+
+
+def list_to_transform(l, list_euler=False):
+    """
+    :type l: List[List[double], List[double]]
+    :rtype: Transform
+    """
+    cl = copy(l)
+    return Transform(Vector3(cl[0][0], cl[0][1], cl[0][2]),
+                     Quaternion(cl[1][0], cl[1][1], cl[1][2], cl[1][2])
+                     if not list_euler else euler_to_quaternion(cl[1]))
+
+
+def list_to_pose(l, list_euler=False):
+    """
+    :type l: List[List[double], List[double]]
+    :rtype: Pose
+    """
+    cl = copy(l)
+    return Pose(Point(cl[0][0], cl[0][1], cl[0][2]),
+                Quaternion(cl[1][0], cl[1][1], cl[1][2], cl[1][2])
+                if not list_euler else euler_to_quaternion(cl[1]))
+
+
+def multiply_transforms(tf, other_tf):
+    """
+    :type tf: Transform
+    :type other_tf: Transform
+    :rtype: Transform
+    """
+    [t, q] = multiply_transform_lists(transform_to_list(tf), transform_to_list(other_tf))
+    return Transform(Vector3(t[0], t[1], t[2]), Quaternion(q[0], q[1], q[2], q[3]))
+
+
+def pose_to_transform(pose):
+    """
+    :type pose: Pose
+    :rtype: Transform
+    """
+    return Transform(copy(pose.position), copy(pose.orientation))
+
+
+def transform_to_pose(tf):
+    """
+    :tpye tf: Transform
+    :rtype: Pose
+    """
+    return Pose(copy(tf.translation), copy(tf.rotation))
 
 
 def pose_to_kdl(pose):

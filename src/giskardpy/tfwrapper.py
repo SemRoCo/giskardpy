@@ -40,20 +40,13 @@ def get_full_frame_name(frame_name):
     """
     global tfBuffer
     tf_frames = tfBuffer._getFrameStrings()
-    j = -1
-    for i, tf_frame in enumerate(tf_frames):
+    for tf_frame in tf_frames:
         try:
             frame = tf_frame[tf_frame.index("/") + 1:]
             if frame == frame_name:
-                j = i
-                break
+                return tf_frame
         except ValueError:
             continue
-    if j == -1:
-        rospy.logwarn('Cannot find frame called {} in tf.'.format(frame_name))
-    else:
-        return tf_frames[j]
-
 
 def wait_for_transform(target_frame, source_frame, time, timeout):
     global tfBuller

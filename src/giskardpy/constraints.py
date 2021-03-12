@@ -536,7 +536,7 @@ class Constraint(object):
         error = w.quaternion_sub(r_Q_g, root_Q_tipCurrent)
         expr = root_Q_tipCurrent
 
-        self.add_debug_vector('c', expr)
+        self.add_debug_vector('error', error)
 
         self.add_velocity_constraint(u'{}/q/x'.format(prefix),
                                      lower=error[0],
@@ -560,6 +560,60 @@ class Constraint(object):
                                      lower=error[3],
                                      upper=error[3],
                                      weight=weight,
+                                     expression=expr[3],
+                                     goal_constraint=goal_constraint)
+
+    def add_minimize_rotation_constraints3(self, root_R_tipGoal, root, tip, max_velocity=np.pi / 4,
+                                          weight=WEIGHT_BELOW_CA, goal_constraint=True, prefix=u''):
+        root_Q_tipCurrent = w.quaternion_from_matrix(w.rotation_of(self.get_fk(root, tip)))
+        r_Q_g = w.quaternion_from_matrix(root_R_tipGoal)
+
+        weight = self.normalize_weight(max_velocity, weight)
+
+        error = w.quaternion_sub(r_Q_g, root_Q_tipCurrent)
+        expr = root_Q_tipCurrent
+
+
+        error[0] = self.limit_acceleration(expr[0], error[0], .05, 1)
+        error[1] = self.limit_acceleration(expr[1], error[1], .05, 1)
+        error[2] = self.limit_acceleration(expr[2], error[2], .05, 1)
+        error[3] = self.limit_acceleration(expr[3], error[3], .05, 1)
+
+        expr2 = w.if_less(expr[3], 0, -expr, expr)
+        self.add_debug_constraint('norm', w.norm(self.get_expr_velocity(expr2)))
+        self.add_debug_vector('v', self.get_expr_velocity(expr2))
+        # self.add_debug_vector('c', expr2)
+
+        self.add_acceleration_constraint(u'{}/q/x'.format(prefix),
+                                     lower=error[0],
+                                     upper=error[0],
+                                     lower_v=-999,
+                                     upper_v=999,
+                                     weight_a=weight,
+                                     expression=expr[0],
+                                     goal_constraint=goal_constraint)
+        self.add_acceleration_constraint(u'{}/q/y'.format(prefix),
+                                     lower=error[1],
+                                     upper=error[1],
+                                     lower_v=-999,
+                                     upper_v=999,
+                                     weight_a=weight,
+                                     expression=expr[1],
+                                     goal_constraint=goal_constraint)
+        self.add_acceleration_constraint(u'{}/q/z'.format(prefix),
+                                     lower=error[2],
+                                     upper=error[2],
+                                     lower_v=-999,
+                                     upper_v=999,
+                                     weight_a=weight,
+                                     expression=expr[2],
+                                     goal_constraint=goal_constraint)
+        self.add_acceleration_constraint(u'{}/q/w'.format(prefix),
+                                     lower=error[3],
+                                     upper=error[3],
+                                     lower_v=-999,
+                                     upper_v=999,
+                                     weight_a=weight,
                                      expression=expr[3],
                                      goal_constraint=goal_constraint)
 
@@ -1405,7 +1459,7 @@ class CartesianOrientationSlerp(BasicCartesianConstraint):
         max_velocity = self.get_input_float(self.max_velocity)
         max_acceleration = self.get_input_float(self.max_acceleration)
 
-        self.add_minimize_rotation_constraints2(r_R_g, self.root, self.tip, max_velocity, weight, self.goal_constraint)
+        self.add_minimize_rotation_constraints3(r_R_g, self.root, self.tip, max_velocity, weight, self.goal_constraint)
 
 
 class CartesianPose(Constraint):

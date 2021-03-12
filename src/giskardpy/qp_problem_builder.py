@@ -420,6 +420,14 @@ class QProblemBuilder(object):
             self.big_ass_M[i, :self.j * 2] = row
 
     def filter_zero_weight_constraints(self, H, A, lb, ub, lbA, ubA, g):
+        bA_mask, b_mask = make_filter_masks(H, self.num_joint_constraints, self.num_hard_constraints)
+        A = A[bA_mask][:, b_mask].copy()
+        lbA = lbA[bA_mask]
+        ubA = ubA[bA_mask]
+        lb = lb[b_mask]
+        ub = ub[b_mask]
+        g = g[b_mask]
+        H = H[b_mask][:, b_mask]
         return H, A, lb, ub, lbA, ubA, g
 
     @profile
@@ -485,13 +493,13 @@ class QProblemBuilder(object):
 
     def debug_print(self, unfiltered_H, A, lb, ub, lbA, ubA, g, xdot_full=None, actually_print=False):
         import pandas as pd
-        # bA_mask, b_mask = make_filter_masks(unfiltered_H, self.num_joint_constraints, self.num_hard_constraints, self.order)
+        bA_mask, b_mask = make_filter_masks(unfiltered_H, self.num_joint_constraints, self.num_hard_constraints)
 
         b_names = np.array(self.b_names())
         bA_names = np.array(self.bA_names())
-        filtered_b_names = b_names  # [b_mask]
-        filtered_bA_names = bA_names  # [bA_mask]
-        filtered_H = unfiltered_H  # [b_mask][:,b_mask]
+        filtered_b_names = b_names[b_mask]
+        filtered_bA_names = bA_names[bA_mask]
+        filtered_H = unfiltered_H[b_mask][:,b_mask]
 
         p_lb = pd.DataFrame(lb, filtered_b_names, [u'data'], dtype=float)
         p_ub = pd.DataFrame(ub, filtered_b_names, [u'data'], dtype=float)

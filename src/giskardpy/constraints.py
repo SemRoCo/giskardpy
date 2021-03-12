@@ -574,10 +574,10 @@ class Constraint(object):
         expr = root_Q_tipCurrent
 
 
-        error[0] = self.limit_acceleration(expr[0], error[0], .05, 1)
-        error[1] = self.limit_acceleration(expr[1], error[1], .05, 1)
-        error[2] = self.limit_acceleration(expr[2], error[2], .05, 1)
-        error[3] = self.limit_acceleration(expr[3], error[3], .05, 1)
+        error[0] = self.limit_acceleration(expr[0], error[0], 1, 1)
+        error[1] = self.limit_acceleration(expr[1], error[1], 1, 1)
+        error[2] = self.limit_acceleration(expr[2], error[2], 1, 1)
+        error[3] = self.limit_acceleration(expr[3], error[3], 1, 1)
 
         expr2 = w.if_less(expr[3], 0, -expr, expr)
         self.add_debug_constraint('norm', w.norm(self.get_expr_velocity(expr2)))

@@ -1,4 +1,5 @@
 import numpy as np
+from copy import deepcopy
 from collections import namedtuple
 from itertools import chain
 import hashlib
@@ -827,5 +828,10 @@ class URDFObject(object):
             marker.scale.x *= 0.99
             marker.scale.y *= 0.99
             marker.scale.z *= 0.99
+
+            marker.pose = Pose()
+            if self.has_non_identity_visual_offset(link_name):
+                marker.pose = self.get_visual_pose(link_name)
             self._link_to_marker[link_name] = marker
-        return self._link_to_marker[link_name]
+
+        return deepcopy(self._link_to_marker[link_name])

@@ -3,7 +3,7 @@ from collections import namedtuple
 from itertools import chain
 import hashlib
 import urdf_parser_py.urdf as up
-from geometry_msgs.msg import Pose, Vector3, Quaternion
+from geometry_msgs.msg import Pose, Vector3, Quaternion, Point
 from std_msgs.msg import ColorRGBA
 from tf.transformations import euler_from_quaternion, quaternion_from_euler, rotation_from_matrix, quaternion_matrix
 from visualization_msgs.msg import Marker
@@ -11,6 +11,7 @@ from visualization_msgs.msg import Marker
 from giskardpy.exceptions import DuplicateNameException, UnknownBodyException, CorruptShapeException
 from giskardpy.utils import cube_volume, cube_surface, sphere_volume, cylinder_volume, cylinder_surface, \
     suppress_stderr, msg_to_list, KeyDefaultDict, memoize
+from giskardpy.tfwrapper import normalize
 
 
 def robot_name_from_urdf_string(urdf_string):
@@ -757,6 +758,29 @@ class URDFObject(object):
             raise Exception(u'world body type {} can\'t be converted to marker'.format(geometry.__class__.__name__))
         m.color = ColorRGBA(0, 1, 0, 0.5)
         return m
+
+    def has_non_identity_visual_offset(self, link_name):
+        """
+        Returns true, if the link with the given link name has a visual origin/offset,
+        which equals not the identity pose. Otherwise, false.
+        """
+        if self.has_link_visuals(link_name) and self.get_urdf_link(link_name).visual.origin:
+            visual_offset = self.get_urdf_link(link_name).visual.origin
+            return visual_offset.rpy != [0, 0, 0] or visual_offset.xyz != [0, 0, 0]
+        return False
+
+    def get_visual_pose(self, link_name):
+        """
+        Returns the origin/offset of the visual in the link object with the given link name.
+        If no visual origin was found, None is returned.
+        """
+        if self.has_link_visuals(link_name) and self.get_urdf_link(link_name).visual.origin:
+            visual_offset = self.get_urdf_link(link_name).visual.origin
+            position = Point(*visual_offset.xyz)
+            orientation = normalize(Quaternion(*quaternion_from_euler(*visual_offset.rpy)))
+            return Pose(position, orientation)
+        else:
+            return None
 
     def link_as_marker(self, link_name):
         if link_name not in self._link_to_marker:

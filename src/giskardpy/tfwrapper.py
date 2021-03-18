@@ -48,6 +48,7 @@ def get_full_frame_name(frame_name):
                 return tf_frame
         except ValueError:
             continue
+    raise KeyError(u'Could not find frame {} in the buffer of the tf Listener.'.format(frame_name))
 
 
 def wait_for_transform(target_frame, source_frame, time, timeout):

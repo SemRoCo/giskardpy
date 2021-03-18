@@ -2,8 +2,6 @@ import hashlib
 
 import py_trees
 import rospy
-from geometry_msgs.msg import Point, Quaternion
-from tf.transformations import quaternion_from_euler
 from visualization_msgs.msg import Marker, MarkerArray
 
 from giskardpy.plugin import GiskardBehavior
@@ -39,12 +37,9 @@ class VisualizationBehavior(GiskardBehavior):
             marker.ns = u'planning_visualization'
             marker.header.stamp = time_stamp
 
-            origin = robot.get_urdf_link(link_name).visual.origin
             fk = get_fk(self.robot_base, link_name).pose
 
-            if origin is not None:
-                marker.pose.position = Point(*origin.xyz)
-                marker.pose.orientation = Quaternion(*quaternion_from_euler(*origin.rpy))
+            if robot.has_non_identity_visual_offset(link_name):
                 marker.pose = kdl_to_pose(pose_to_kdl(fk) * pose_to_kdl(marker.pose))
             else:
                 marker.pose = fk

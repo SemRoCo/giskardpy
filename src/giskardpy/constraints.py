@@ -701,6 +701,67 @@ class JointPositionRevolute(Constraint):
         s = super(JointPositionRevolute, self).__str__()
         return u'{}/{}'.format(s, self.joint_name)
 
+class Shaking(Constraint):
+    goal = u'goal'
+    weight = u'weight'
+    max_velocity = u'max_velocity'
+    max_acceleration = u'max_acceleration'
+
+    def __init__(self, god_map, joint_name, goal, weight=WEIGHT_ABOVE_CA, max_velocity=3451, max_acceleration=1,
+                 goal_constraint=True):
+        """
+        This goal will move a revolute joint to the goal position
+        :param joint_name: str
+        :param goal: float
+        :param weight: float, default WEIGHT_BELOW_CA
+        :param max_velocity: float, rad/s, default 3451, meaning the urdf/config limits are active
+        """
+        super(Shaking, self).__init__(god_map)
+        self.joint_name = joint_name
+        self.goal_constraint = goal_constraint
+
+        params = {self.goal: goal,
+                  self.weight: weight,
+                  self.max_velocity: max_velocity,
+                  self.max_acceleration: max_acceleration}
+        self.save_params_on_god_map(params)
+
+    def make_constraints(self):
+        """
+        example:
+        name='JointPosition'
+        parameter_value_pair='{
+            "joint_name": "torso_lift_joint", #required
+            "goal_position": 0, #required
+            "weight": 1, #optional
+            "gain": 10, #optional -- error is multiplied with this value
+            "max_speed": 1 #optional -- rad/s or m/s depending on joint; can not go higher than urdf limit
+        }'
+        :return:
+        """
+        current_joint = self.get_input_joint_position(self.joint_name)
+        joint_goal = self.get_input_float(self.goal)
+        weight = self.get_input_float(self.weight)
+        max_velocity = w.Min(self.get_input_float(self.max_velocity),
+                             self.get_robot().get_joint_velocity_limit_expr(self.joint_name))
+        time = self.get_god_map().to_symbol(identifier.time)
+
+        err = joint_goal - current_joint
+        shaky_err = w.if_eq(w.fmod(time, 2), 0, err, -err)
+
+        capped_err = self.limit_velocity(shaky_err, max_velocity)
+        weight = self.normalize_weight(max_velocity, weight)
+        self.add_constraint(u'',
+                            lower=capped_err,
+                            upper=capped_err,
+                            weight=weight,
+                            expression=current_joint,
+                            goal_constraint=self.goal_constraint)
+
+    def __str__(self):
+        s = super(Shaking, self).__str__()
+        return u'{}/{}'.format(s, self.joint_name)
+
 
 class AvoidJointLimitsRevolute(Constraint):
     goal = u'goal'

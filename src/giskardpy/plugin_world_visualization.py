@@ -36,7 +36,10 @@ class WorldVisualizationBehavior(GiskardBehavior):
             self.currently_publishing_objects[object_name] = object
             for link_name in object.get_link_names():
                 if object.has_link_visuals(link_name):
-                    self.links_full_frame_name[link_name] = get_full_frame_name(link_name)
+                    try:
+                        self.links_full_frame_name[link_name] = get_full_frame_name(link_name)
+                    except KeyError:
+                        continue
 
     def get_id_str(self, object_name, link_name):
         return '{}{}'.format(object_name, link_name).encode('utf-8')

@@ -288,12 +288,17 @@ class Constraint(object):
         :return: expression that limits the velocity of error to max_velocity
         """
         sample_period = self.get_input_sampling_period()
-        max_velocity *= sample_period
+        # max_velocity *= sample_period
         return w.max(w.min(error, max_velocity), -max_velocity)
 
     def normalize_weight(self, velocity_limit, weight):
         sample_period = self.get_input_sampling_period()
-        result = weight * (1. / (sample_period * velocity_limit)) ** 2
+        result = weight * (1. / (velocity_limit)) ** 2
+        return result
+
+    def normalize_weight2(self, acceleration_limit, weight):
+        sample_period = self.get_input_sampling_period()
+        result = weight * (1. / (sample_period * acceleration_limit)) ** 2
         return result
 
     def get_constraints(self):
@@ -404,21 +409,11 @@ class Constraint(object):
         r_P_c = w.position_of(self.get_fk(root, tip))
 
         r_P_error = r_P_g - r_P_c
-        max_velocity = 0.2
         direction = w.scale(r_P_error, 1) * max_velocity
         capped_error_x = self.limit_acceleration(r_P_c[0], r_P_error[0], max_acceleration, w.abs(direction[0]))
         capped_error_y = self.limit_acceleration(r_P_c[1], r_P_error[1], max_acceleration, w.abs(direction[1]))
         capped_error_z = self.limit_acceleration(r_P_c[2], r_P_error[2], max_acceleration, w.abs(direction[2]))
-        weight = self.normalize_weight(max_velocity, weight)
-
-        # self.add_debug_constraint('capped_error_x', capped_error_x)
-        # self.add_debug_constraint('vel_norm', w.norm(self.get_expr_velocity(r_P_c)))
-        # self.add_debug_constraint('vel_x', self.get_expr_velocity(r_P_c[0]))
-        # self.add_debug_constraint('vel_y', self.get_expr_velocity(r_P_c[1]))
-        # self.add_debug_constraint('vel_z', self.get_expr_velocity(r_P_c[2]))
-        # self.add_debug_constraint('pos/x', r_P_c[0])
-        # self.add_debug_constraint('pos/y', r_P_c[1])
-        # self.add_debug_constraint('pos/z', r_P_c[2])
+        weight = self.normalize_weight2(max_acceleration, weight)
 
         self.add_acceleration_constraint('/x',
                                          lower=capped_error_x,
@@ -536,7 +531,7 @@ class Constraint(object):
         error = w.quaternion_sub(r_Q_g, root_Q_tipCurrent)
         expr = root_Q_tipCurrent
 
-        self.add_debug_vector('error', error)
+        # self.add_debug_vector('error', error)
 
         self.add_velocity_constraint(u'{}/q/x'.format(prefix),
                                      lower=error[0],
@@ -568,7 +563,7 @@ class Constraint(object):
         root_Q_tipCurrent = w.quaternion_from_matrix(w.rotation_of(self.get_fk(root, tip)))
         r_Q_g = w.quaternion_from_matrix(root_R_tipGoal)
 
-        weight = self.normalize_weight(max_velocity, weight)
+        weight = self.normalize_weight2(1, weight)
 
         error = w.quaternion_sub(r_Q_g, root_Q_tipCurrent)
         expr = root_Q_tipCurrent
@@ -580,8 +575,8 @@ class Constraint(object):
         error[3] = self.limit_acceleration(expr[3], error[3], 1, 1)
 
         expr2 = w.if_less(expr[3], 0, -expr, expr)
-        self.add_debug_constraint('norm', w.norm(self.get_expr_velocity(expr2)))
-        self.add_debug_vector('v', self.get_expr_velocity(expr2))
+        # self.add_debug_constraint('norm', w.norm(self.get_expr_velocity(expr2)))
+        # self.add_debug_vector('v', self.get_expr_velocity(expr2))
         # self.add_debug_vector('c', expr2)
 
         self.add_acceleration_constraint(u'{}/q/x'.format(prefix),
@@ -2035,7 +2030,7 @@ class GraspBar(Constraint):
 
         self.add_minimize_position_constraints(r_P_g=nearest,
                                                max_velocity=translation_max_velocity,
-                                               max_acceleration=0.1,
+                                               max_acceleration=1,
                                                root=self.root,
                                                tip=self.tip,
                                                weight=weight,

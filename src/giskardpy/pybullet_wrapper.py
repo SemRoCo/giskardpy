@@ -94,13 +94,13 @@ def stop_pybullet():
     p.disconnect()
 
 
-def start_pybullet(gui):
+def start_pybullet(gui, gravity=-9.8):
     if gui:
         # TODO expose opengl2 option for gui?
         server_id = p.connect(p.GUI, options=u'--opengl2')  # or p.DIRECT for non-graphical version
     else:
         server_id = p.connect(p.DIRECT)  # or p.DIRECT for non-graphical version
-    p.setGravity(0, 0, -9.8)
+    p.setGravity(0, 0, gravity)
     return server_id
 
 

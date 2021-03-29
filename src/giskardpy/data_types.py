@@ -8,7 +8,7 @@ from giskardpy.tfwrapper import kdl_to_np, np_vector, np_point
 SoftConstraint = namedtuple(u'SoftConstraint', [u'lbA_v', u'ubA_v',
                                                 u'lbA_a', u'ubA_a',
                                                 u'weight_v', u'weight_a',
-                                                u'expression', u'goal_constraint',
+                                                u'expression', u'expression_dot', u'goal_constraint',
                                                 u'lower_slack_limit_v', u'lower_slack_limit_a',
                                                 u'upper_slack_limit_v', u'upper_slack_limit_a',
                                                 u'linear_weight'])

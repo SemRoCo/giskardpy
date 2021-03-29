@@ -134,6 +134,7 @@ class B(Parent):
                             sv=self._s_ub_v,
                             sa=self._s_ub_a)[1]
 
+
 class BA(Parent):
     def __init__(self):
         self._lbA_v = {}
@@ -151,15 +152,15 @@ class BA(Parent):
         self._j_lbA[name + '/link'] = constraint.joint_velocity_symbol
         self._j_ubA[name + '/link'] = constraint.joint_velocity_symbol
 
-    def add_soft_constraint(self, name, joint_constraint):
+    def add_soft_constraint(self, name, constraint):
         """
         :type name: str
-        :type joint_constraint: SoftConstraint
+        :type constraint: SoftConstraint
         """
-        self._lbA_v[name + '/v'] = joint_constraint.lbA_v
-        self._lbA_a[name + '/a'] = joint_constraint.lbA_a
-        self._ubA_v[name + '/v'] = joint_constraint.ubA_v
-        self._ubA_a[name + '/a'] = joint_constraint.ubA_a
+        self._lbA_v[name + '/v'] = constraint.lbA_v
+        self._lbA_a[name + '/a'] = constraint.lbA_a
+        self._ubA_v[name + '/v'] = constraint.ubA_v
+        self._ubA_a[name + '/a'] = constraint.ubA_a
 
     def lbA(self):
         return self._sorter(jv=self._j_lbA,
@@ -216,14 +217,16 @@ class A(Parent):
         jac_dot = w.jacobian(w.Matrix(soft_expressions), controlled_joints, order=2)
         logging.loginfo(u'computed Jacobian dot in {:.5f}s'.format(time() - t))
 
+        sample_period = 0.05
+
         # this assumes a jv ja sorting
         A_soft[:j, :j * 1] = w.eye(j)
         A_soft[:j, j * 1:j * 2] = -w.eye(j)
 
-        A_soft[j:j + s, :j * 1] = jac * 0.05 # FIXME make parameter
+        A_soft[j:j + s, :j * 1] = jac * sample_period # FIXME make parameter
         A_soft[j:j + s, j * 2:j * 2 + s] = w.eye(s)
 
-        A_soft[j + s:j + s * 2, :j * 1] = jac_dot * 0.05
+        A_soft[j + s:j + s * 2, :j * 1] = jac_dot * sample_period
         A_soft[j + s:j + s * 2, j * 1:j * 2] = jac
         A_soft[j + s:j + s * 2, j * 2 + s:] = w.eye(s)
         return A_soft
@@ -236,6 +239,7 @@ class QProblemBuilder(object):
     """
     Wraps around QPOases. Builds the required matrices from constraints.
     """
+
     def __init__(self, joint_constraints_dict, hard_constraints_dict, soft_constraints_dict, path_to_functions=''):
         """
         :type joint_constraints_dict: dict
@@ -270,7 +274,7 @@ class QProblemBuilder(object):
 
     def get_joint_symbols(self):
         joint_symbols = []
-        for constraint_name, constraint in self.joint_constraints_dict.items(): # type: (str, JointConstraint)
+        for constraint_name, constraint in self.joint_constraints_dict.items():  # type: (str, JointConstraint)
             joint_symbols.append(constraint.joint_symbol)
         return sorted(joint_symbols)
 

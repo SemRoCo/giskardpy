@@ -457,6 +457,11 @@ rospack = rospkg.RosPack()
 
 
 def resolve_ros_iris(path):
+    """
+    e.g. 'package://giskardpy/data'
+    :param path:
+    :return:
+    """
     if u'package://' in path:
         split = path.split(u'package://')
         prefix = split[0]
@@ -856,7 +861,7 @@ def traj_to_msg(sample_period, trajectory, controlled_joints, fill_velocity_valu
 
 def make_filter_b_mask(H, num_joint_constraints):
     filter = H.sum(axis=1) != 0
-    filter[:num_joint_constraints*2] = True # make sure joints are never kicked out
+    filter[:num_joint_constraints*2] = True  # make sure joints are never kicked out
     return filter
 
 

@@ -52,6 +52,13 @@ class GiskardWrapper(object):
         """
         return self.robot_urdf.get_root()
 
+    def get_robot_links(self):
+        """
+        Returns a list of the robots links
+        :rtype: dict
+        """
+        return self.robot_urdf.get_link_names()
+
     def get_joint_states(self, topic=u'joint_states', timeout=1):
         """
         Returns a dictionary of all joints (key) and their position (value)

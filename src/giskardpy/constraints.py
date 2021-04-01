@@ -701,19 +701,18 @@ class JointPositionRevolute(Constraint):
         s = super(JointPositionRevolute, self).__str__()
         return u'{}/{}'.format(s, self.joint_name)
 
+
 class Shaking(Constraint):
-    goal = u'goal'
     weight = u'weight'
     max_velocity = u'max_velocity'
     max_acceleration = u'max_acceleration'
     frequency = u'frequency'
 
-    def __init__(self, god_map, joint_name, goal, frequency, weight=WEIGHT_ABOVE_CA, max_velocity=3451, max_acceleration=1,
-                 goal_constraint=True):
+    def __init__(self, god_map, joint_name, frequency, weight=WEIGHT_ABOVE_CA, max_velocity=3451,
+                 max_acceleration=1, goal_constraint=True):
         """
-        This goal will move a revolute joint to the goal position
+        This constraint will shake a joint with the given frequency
         :param joint_name: str
-        :param goal: float
         :param frequency: float
         :param weight: float, default WEIGHT_BELOW_CA
         :param max_velocity: float, rad/s, default 3451, meaning the urdf/config limits are active
@@ -722,8 +721,7 @@ class Shaking(Constraint):
         self.joint_name = joint_name
         self.goal_constraint = goal_constraint
 
-        params = {self.goal: goal,
-                  self.frequency: frequency,
+        params = {self.frequency: frequency,
                   self.weight: weight,
                   self.max_velocity: max_velocity,
                   self.max_acceleration: max_acceleration}
@@ -732,18 +730,16 @@ class Shaking(Constraint):
     def make_constraints(self):
         """
         example:
-        name='JointPosition'
+        name=u'Shaking'
         parameter_value_pair='{
             "joint_name": "torso_lift_joint", #required
-            "goal_position": 0, #required
+            "frequency"=5, #required
             "weight": 1, #optional
-            "gain": 10, #optional -- error is multiplied with this value
-            "max_speed": 1 #optional -- rad/s or m/s depending on joint; can not go higher than urdf limit
+            "max_velocity": 1 #optional -- rad/s or m/s depending on joint; can not go higher than urdf limit
         }'
         :return:
         """
         current_joint = self.get_input_joint_position(self.joint_name)
-        joint_goal = self.get_input_float(self.goal)
         frequency = self.get_input_float(self.frequency)
         weight = self.get_input_float(self.weight)
         max_velocity = w.Min(self.get_input_float(self.max_velocity),
@@ -751,13 +747,10 @@ class Shaking(Constraint):
         time = self.get_god_map().to_symbol(identifier.time)
         time_in_secs = self.get_input_sampling_period() * time
 
-        correct_err = joint_goal - current_joint
         fun_params = frequency * 2.0 * w.pi * time_in_secs
-        shake_err = w.if_eq(w.fmod(frequency, 7.0), 0.0, w.sin(fun_params), w.cos(fun_params))
-        err = correct_err * shake_err
+        err = w.if_eq(w.fmod(frequency, 7.0), 0.0, w.sin(fun_params), w.cos(fun_params))
         capped_err = self.limit_velocity(err, max_velocity)
         weight = self.normalize_weight(max_velocity, weight)
-        self.add_debug_constraint("time", time_in_secs)
         self.add_constraint(u'',
                             lower=capped_err,
                             upper=capped_err,
@@ -994,7 +987,6 @@ class BasicCartesianConstraint(Constraint):
 
 
 class CartesianPosition(BasicCartesianConstraint):
-
 
     def __init__(self, god_map, root_link, tip_link, goal, max_velocity=0.1, max_acceleration=0.1,
                  weight=WEIGHT_ABOVE_CA, goal_constraint=False):
@@ -2276,7 +2268,8 @@ class OpenDoor(Constraint):
     hinge0_P_tipStart_norm_id = u'hinge0_P_tipStart_norm'
     weight_id = u'weight'
 
-    def __init__(self, god_map, tip_link, object_name, object_link_name, angle_goal, root_link=None, weight=WEIGHT_ABOVE_CA):
+    def __init__(self, god_map, tip_link, object_name, object_link_name, angle_goal, root_link=None,
+                 weight=WEIGHT_ABOVE_CA):
         super(OpenDoor, self).__init__(god_map)
 
         if root_link is None:
@@ -2402,7 +2395,8 @@ class OpenDrawer(Constraint):
     hinge_V_hinge_axis_msg_id = u'hinge_axis'  # axis vector of the hinge
     root_T_tip_goal_id = u'root_T_tipGoal'  # goal of the gripper tip (where to move)
 
-    def __init__(self, god_map, tip_link, object_name, object_link_name, distance_goal, root_link=None, weight=WEIGHT_ABOVE_CA):
+    def __init__(self, god_map, tip_link, object_name, object_link_name, distance_goal, root_link=None,
+                 weight=WEIGHT_ABOVE_CA):
         """
         :type tip_link: str
         :param tip_link: tip of manipulator (gripper) which is used

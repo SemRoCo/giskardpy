@@ -706,13 +706,15 @@ class Shaking(Constraint):
     weight = u'weight'
     max_velocity = u'max_velocity'
     max_acceleration = u'max_acceleration'
+    frequency = u'frequency'
 
-    def __init__(self, god_map, joint_name, goal, weight=WEIGHT_ABOVE_CA, max_velocity=3451, max_acceleration=1,
+    def __init__(self, god_map, joint_name, goal, frequency, weight=WEIGHT_ABOVE_CA, max_velocity=3451, max_acceleration=1,
                  goal_constraint=True):
         """
         This goal will move a revolute joint to the goal position
         :param joint_name: str
         :param goal: float
+        :param frequency: float
         :param weight: float, default WEIGHT_BELOW_CA
         :param max_velocity: float, rad/s, default 3451, meaning the urdf/config limits are active
         """
@@ -721,6 +723,7 @@ class Shaking(Constraint):
         self.goal_constraint = goal_constraint
 
         params = {self.goal: goal,
+                  self.frequency: frequency,
                   self.weight: weight,
                   self.max_velocity: max_velocity,
                   self.max_acceleration: max_acceleration}
@@ -741,16 +744,20 @@ class Shaking(Constraint):
         """
         current_joint = self.get_input_joint_position(self.joint_name)
         joint_goal = self.get_input_float(self.goal)
+        frequency = self.get_input_float(self.frequency)
         weight = self.get_input_float(self.weight)
         max_velocity = w.Min(self.get_input_float(self.max_velocity),
                              self.get_robot().get_joint_velocity_limit_expr(self.joint_name))
         time = self.get_god_map().to_symbol(identifier.time)
+        time_in_secs = self.get_input_sampling_period() * time
 
-        err = joint_goal - current_joint
-        shaky_err = w.if_eq(w.fmod(time, 2), 0, err, -err)
-
-        capped_err = self.limit_velocity(shaky_err, max_velocity)
+        correct_err = joint_goal - current_joint
+        sin_err = correct_err * w.sin(frequency * 2.0 * w.pi * time_in_secs)
+        cos_err = correct_err * w.cos(frequency * 2.0 * w.pi * time_in_secs)
+        err = w.if_eq(w.fmod(frequency, 7.0), 0.0, sin_err, cos_err)
+        capped_err = self.limit_velocity(err, max_velocity)
         weight = self.normalize_weight(max_velocity, weight)
+        self.add_debug_constraint("time", time_in_secs)
         self.add_constraint(u'',
                             lower=capped_err,
                             upper=capped_err,

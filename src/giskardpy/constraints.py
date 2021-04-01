@@ -752,9 +752,9 @@ class Shaking(Constraint):
         time_in_secs = self.get_input_sampling_period() * time
 
         correct_err = joint_goal - current_joint
-        sin_err = correct_err * w.sin(frequency * 2.0 * w.pi * time_in_secs)
-        cos_err = correct_err * w.cos(frequency * 2.0 * w.pi * time_in_secs)
-        err = w.if_eq(w.fmod(frequency, 7.0), 0.0, sin_err, cos_err)
+        fun_params = frequency * 2.0 * w.pi * time_in_secs
+        shake_err = w.if_eq(w.fmod(frequency, 7.0), 0.0, w.sin(fun_params), w.cos(fun_params))
+        err = correct_err * shake_err
         capped_err = self.limit_velocity(err, max_velocity)
         weight = self.normalize_weight(max_velocity, weight)
         self.add_debug_constraint("time", time_in_secs)

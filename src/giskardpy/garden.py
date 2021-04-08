@@ -39,6 +39,7 @@ from giskardpy.plugin_set_cmd import SetCmd
 from giskardpy.plugin_time import TimePlugin
 from giskardpy.plugin_update_constraints import GoalToConstraints
 from giskardpy.plugin_visualization import VisualizationBehavior
+from giskardpy.plugin_world_visualization import WorldVisualizationBehavior
 from giskardpy.pybullet_world import PyBulletWorld
 from giskardpy.tree_manager import TreeManager
 from giskardpy.utils import create_path, render_dot_tree, KeyDefaultDict
@@ -178,6 +179,8 @@ def grow_tree():
     planning_2.add_child(GoalCanceled(u'goal canceled', action_server_name))
     if god_map.get_data(identifier.enable_VisualizationBehavior):
         planning_2.add_child(success_is_failure(VisualizationBehavior)(u'visualization'))
+    if god_map.get_data(identifier.enable_WorldVisualizationBehavior):
+        planning_2.add_child(success_is_failure(WorldVisualizationBehavior)(u'world_visualization'))
     if god_map.get_data(identifier.enable_CPIMarker):
         planning_2.add_child(success_is_failure(CollisionMarker)(u'cpi marker'))
     planning_2.add_child(planning_3)
@@ -198,6 +201,8 @@ def grow_tree():
     # planning_1.add_child(running_is_success(LogTrajPlugin)(u'log zero velocity'))
     if god_map.get_data(identifier.enable_VisualizationBehavior):
         planning_1.add_child(VisualizationBehavior(u'visualization', ensure_publish=True))
+    if god_map.get_data(identifier.enable_WorldVisualizationBehavior):
+        planning_1.add_child(WorldVisualizationBehavior(u'world_visualization', ensure_publish=True))
     if god_map.get_data(identifier.enable_CPIMarker):
         planning_1.add_child(CollisionMarker(u'cpi marker'))
     # ----------------------------------------------

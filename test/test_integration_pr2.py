@@ -1461,10 +1461,10 @@ class TestCartGoals(object):
         min_wiggle_frequency = int(frequency_range * max_detectable_freq)
         distance_between_frequencies = 5 if sample_period < 0.05 else 1
 
-        for f in range(min_wiggle_frequency, max_detectable_freq+1, distance_between_frequencies):
+        for f in range(min_wiggle_frequency, max_detectable_freq + 1, distance_between_frequencies):
             target_freq = float(f)
             kitchen_setup.set_json_goal(u'Shaking',
-                                        joint_name=u'torso_lift_joint',
+                                        joint_name=u'odom_x_joint',
                                         frequency=target_freq
                                         )
             r = kitchen_setup.send_goal(goal=None, goal_type=MoveGoal.PLAN_AND_EXECUTE)
@@ -1472,8 +1472,8 @@ class TestCartGoals(object):
             error_code = r.error_codes[0]
             assert error_code == MoveResult.SHAKING
             error_message = r.error_messages[0]
-            freq_str = re.search("at [0-9]+\.[0-9]+ hertz", error_message).group(0)
-            assert float(freq_str[3:-6]) == target_freq
+            freqs_str = re.findall("[0-9]+\.[0-9]+ hertz", error_message)
+            assert any(map(lambda f_str: float(f_str[:-6]) == target_freq, freqs_str))
 
     def test_wiggle1(self, kitchen_setup):
         tray_pose = PoseStamped()

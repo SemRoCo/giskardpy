@@ -103,7 +103,7 @@ class WiggleCancel(GiskardBehavior):
             return False
 
         fft = np.fft.rfft(joints_filtered, axis=1)
-        fft = [np.abs(i.real) for i in fft]
+        fft = [np.sqrt(i.imag**2 + i.real**2) for i in fft]
 
         if plot:
             y = joints_filtered

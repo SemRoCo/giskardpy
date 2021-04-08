@@ -1454,6 +1454,93 @@ class TestCartGoals(object):
         zero_pose.check_cart_goal(zero_pose.r_tip, r_goal)
         zero_pose.check_cart_goal(zero_pose.l_tip, l_goal)
 
+    def test_wiggle_shaking_thresh(self, kitchen_setup):
+        sample_period = kitchen_setup.get_god_map().get_data(identifier.sample_period)
+        frequency_range = kitchen_setup.get_god_map().get_data(identifier.frequency_range)
+        max_detectable_freq = int(1 / (2 * sample_period))
+        min_wiggle_frequency = int(frequency_range * max_detectable_freq)
+        distance_between_frequencies = 5 if sample_period < 0.05 else 1
+        true_counter = 0
+        result = []
+        res = {}
+
+        for f in range(min_wiggle_frequency, max_detectable_freq, distance_between_frequencies):
+            for thresh in reversed(range(28, 70)):
+
+                updates = {
+                    u'rosparam': {
+                        u'plugins': {
+                            u'WiggleCancel': {
+                                u'amplitude_threshold': float(thresh / 100.0)
+                            }
+                        }
+                    }
+                }
+                kitchen_setup.update_god_map(updates)
+
+                target_freq = float(f)
+                kitchen_setup.set_json_goal(u'Shaking',
+                                            joint_name=u'odom_x_joint',
+                                            frequency=target_freq
+                                            )
+                r = kitchen_setup.send_goal(goal=None, goal_type=MoveGoal.PLAN_AND_EXECUTE)
+                if not len(r.error_codes) != 0:
+                    res[thresh] = u'no error'
+                    continue
+                error_code = r.error_codes[0]
+                if not error_code == MoveResult.SHAKING:
+                    res[thresh] = u'no shaking'
+                    continue
+                error_message = r.error_messages[0]
+                freqs_str = re.findall("[0-9]+\.[0-9]+ hertz", error_message)
+                res[thresh] = any(map(lambda f_str: float(f_str[:-6]) == target_freq, freqs_str))
+                if res[thresh] == True:
+                    true_counter += 1
+                    if true_counter == 4:
+                        break
+            result.append([f, res])
+            #assert any(map(lambda e: e == True, res))
+        rospy.logerr(result)
+
+    def test_wiggle_shaking_debug(self, kitchen_setup, thresh=0.6):
+        sample_period = kitchen_setup.get_god_map().get_data(identifier.sample_period)
+        frequency_range = kitchen_setup.get_god_map().get_data(identifier.frequency_range)
+        max_detectable_freq = int(1 / (2 * sample_period))
+        min_wiggle_frequency = int(frequency_range * max_detectable_freq)
+        distance_between_frequencies = 5 if sample_period < 0.05 else 1
+
+        updates = {
+            u'rosparam': {
+                u'plugins': {
+                    u'WiggleCancel': {
+                        u'amplitude_threshold': thresh
+                    }
+                }
+            }
+        }
+        kitchen_setup.update_god_map(updates)
+
+        res = {}
+
+        for f in range(min_wiggle_frequency, max_detectable_freq + 1, distance_between_frequencies):
+            target_freq = float(f)
+            kitchen_setup.set_json_goal(u'Shaking',
+                                        joint_name=u'odom_x_joint', #u'odom_x_joint',
+                                        frequency=target_freq
+                                        )
+            r = kitchen_setup.send_goal(goal=None, goal_type=MoveGoal.PLAN_AND_EXECUTE)
+            if not len(r.error_codes) != 0:
+                res[f] = u'no error'
+                continue
+            error_code = r.error_codes[0]
+            if not error_code == MoveResult.SHAKING:
+                res[f] = u'no shaking'
+            error_message = r.error_messages[0]
+            freqs_str = re.findall("[0-9]+\.[0-9]+ hertz", error_message)
+            res[f] = any(map(lambda f_str: float(f_str[:-6]) == target_freq, freqs_str))
+        rospy.logerr(res)
+        assert True
+
     def test_wiggle_shaking(self, kitchen_setup):
         sample_period = kitchen_setup.get_god_map().get_data(identifier.sample_period)
         frequency_range = kitchen_setup.get_god_map().get_data(identifier.frequency_range)

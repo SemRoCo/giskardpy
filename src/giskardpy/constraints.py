@@ -702,6 +702,67 @@ class JointPositionRevolute(Constraint):
         return u'{}/{}'.format(s, self.joint_name)
 
 
+class Shaking(Constraint):
+    weight = u'weight'
+    max_velocity = u'max_velocity'
+    max_acceleration = u'max_acceleration'
+    frequency = u'frequency'
+
+    def __init__(self, god_map, joint_name, frequency, weight=WEIGHT_ABOVE_CA, max_velocity=3451,
+                 max_acceleration=1, goal_constraint=True):
+        """
+        This constraint will shake a joint with the given frequency
+        :param joint_name: str
+        :param frequency: float
+        :param weight: float, default WEIGHT_BELOW_CA
+        :param max_velocity: float, rad/s, default 3451, meaning the urdf/config limits are active
+        """
+        super(Shaking, self).__init__(god_map)
+        self.joint_name = joint_name
+        self.goal_constraint = goal_constraint
+
+        params = {self.frequency: frequency,
+                  self.weight: weight,
+                  self.max_velocity: max_velocity,
+                  self.max_acceleration: max_acceleration}
+        self.save_params_on_god_map(params)
+
+    def make_constraints(self):
+        """
+        example:
+        name=u'Shaking'
+        parameter_value_pair='{
+            "joint_name": "torso_lift_joint", #required
+            "frequency"=5, #required
+            "weight": 1, #optional
+            "max_velocity": 1 #optional -- rad/s or m/s depending on joint; can not go higher than urdf limit
+        }'
+        :return:
+        """
+        current_joint = self.get_input_joint_position(self.joint_name)
+        frequency = self.get_input_float(self.frequency)
+        weight = self.get_input_float(self.weight)
+        max_velocity = w.Min(self.get_input_float(self.max_velocity),
+                             self.get_robot().get_joint_velocity_limit_expr(self.joint_name))
+        time = self.get_god_map().to_symbol(identifier.time)
+        time_in_secs = self.get_input_sampling_period() * time
+
+        fun_params = frequency * 2.0 * w.pi * time_in_secs
+        err = w.cos(fun_params)
+        capped_err = self.limit_velocity(err, max_velocity)
+        weight = self.normalize_weight(max_velocity, weight)
+        self.add_constraint(u'',
+                            lower=capped_err,
+                            upper=capped_err,
+                            weight=weight,
+                            expression=current_joint,
+                            goal_constraint=self.goal_constraint)
+
+    def __str__(self):
+        s = super(Shaking, self).__str__()
+        return u'{}/{}'.format(s, self.joint_name)
+
+
 class AvoidJointLimitsRevolute(Constraint):
     goal = u'goal'
     weight_id = u'weight'
@@ -926,7 +987,6 @@ class BasicCartesianConstraint(Constraint):
 
 
 class CartesianPosition(BasicCartesianConstraint):
-
 
     def __init__(self, god_map, root_link, tip_link, goal, max_velocity=0.1, max_acceleration=0.1,
                  weight=WEIGHT_ABOVE_CA, goal_constraint=False):
@@ -2208,7 +2268,8 @@ class OpenDoor(Constraint):
     hinge0_P_tipStart_norm_id = u'hinge0_P_tipStart_norm'
     weight_id = u'weight'
 
-    def __init__(self, god_map, tip_link, object_name, object_link_name, angle_goal, root_link=None, weight=WEIGHT_ABOVE_CA):
+    def __init__(self, god_map, tip_link, object_name, object_link_name, angle_goal, root_link=None,
+                 weight=WEIGHT_ABOVE_CA):
         super(OpenDoor, self).__init__(god_map)
 
         if root_link is None:
@@ -2334,7 +2395,8 @@ class OpenDrawer(Constraint):
     hinge_V_hinge_axis_msg_id = u'hinge_axis'  # axis vector of the hinge
     root_T_tip_goal_id = u'root_T_tipGoal'  # goal of the gripper tip (where to move)
 
-    def __init__(self, god_map, tip_link, object_name, object_link_name, distance_goal, root_link=None, weight=WEIGHT_ABOVE_CA):
+    def __init__(self, god_map, tip_link, object_name, object_link_name, distance_goal, root_link=None,
+                 weight=WEIGHT_ABOVE_CA):
         """
         :type tip_link: str
         :param tip_link: tip of manipulator (gripper) which is used

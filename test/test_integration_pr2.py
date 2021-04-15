@@ -1,5 +1,6 @@
 from __future__ import division
 
+import re
 import itertools
 from copy import deepcopy
 
@@ -25,7 +26,6 @@ from giskardpy.utils import to_joint_state_position_dict, publish_marker_vector
 from rospy_message_converter.message_converter import convert_dictionary_to_ros_message
 from utils_for_tests import PR2, compare_poses
 from iai_naive_kinematics_sim.srv import UpdateTransform
-
 
 # TODO roslaunch iai_pr2_sim ros_control_sim_with_base.launch
 # TODO roslaunch iai_kitchen upload_kitchen_obj.launch
@@ -399,16 +399,15 @@ class TestConstraints(object):
         zero_pose.set_straight_cart_goal(goal_position, zero_pose.l_tip)
         zero_pose.send_and_check_goal()
 
-
     def test_CartesianVelocityLimit(self, zero_pose):
         linear_velocity = 1
         angular_velocity = 1
         zero_pose.limit_cartesian_velocity(
-                                root_link=zero_pose.default_root,
-                                tip_link=u'base_footprint',
-                                max_linear_velocity=0.1,
-                                max_angular_velocity=0.2
-                                )
+            root_link=zero_pose.default_root,
+            tip_link=u'base_footprint',
+            max_linear_velocity=0.1,
+            max_angular_velocity=0.2
+        )
         goal_position = PoseStamped()
         goal_position.header.frame_id = u'r_gripper_tool_frame'
         goal_position.pose.position.x = 1
@@ -421,7 +420,6 @@ class TestConstraints(object):
                                           angular_velocity=angular_velocity,
                                           weight=WEIGHT_BELOW_CA
                                           )
-
 
     def test_AvoidJointLimits1(self, zero_pose):
         """
@@ -840,7 +838,7 @@ class TestConstraints(object):
         # kitchen_setup.allow_all_collisions()
         kitchen_setup.set_json_goal(u'AvoidJointLimits', percentage=percentage)
         kitchen_setup.limit_cartesian_velocity(u'odom_combined', u'base_footprint', max_linear_velocity=0.1,
-                                                       max_angular_velocity=0.2)
+                                               max_angular_velocity=0.2)
         kitchen_setup.send_and_check_goal()
 
         kitchen_setup.set_json_goal(u'OpenDoor',
@@ -1105,11 +1103,11 @@ class TestConstraints(object):
         tip_grasp_axis.vector.z = 1
 
         kitchen_setup.grasp_bar(root_link=kitchen_setup.default_root,
-                                    tip_link=kitchen_setup.r_tip,
-                                    tip_grasp_axis=tip_grasp_axis,
-                                    bar_center=bar_center,
-                                    bar_axis=bar_axis,
-                                    bar_length=.3)
+                                tip_link=kitchen_setup.r_tip,
+                                tip_grasp_axis=tip_grasp_axis,
+                                bar_center=bar_center,
+                                bar_axis=bar_axis,
+                                bar_length=.3)
         kitchen_setup.allow_collision([], u'kitchen', [u'sink_area_dish_washer_door_handle'])
         # kitchen_setup.allow_all_collisions()
         kitchen_setup.send_and_check_goal()
@@ -1455,6 +1453,114 @@ class TestCartGoals(object):
         zero_pose.send_and_check_goal()
         zero_pose.check_cart_goal(zero_pose.r_tip, r_goal)
         zero_pose.check_cart_goal(zero_pose.l_tip, l_goal)
+
+    def test_wiggle_shaking_thresh(self, kitchen_setup):
+        sample_period = kitchen_setup.get_god_map().get_data(identifier.sample_period)
+        frequency_range = kitchen_setup.get_god_map().get_data(identifier.frequency_range)
+        max_detectable_freq = int(1 / (2 * sample_period))
+        min_wiggle_frequency = int(frequency_range * max_detectable_freq)
+        distance_between_frequencies = 5 if sample_period < 0.05 else 1
+        true_counter = 0
+        result = []
+        res = {}
+
+        for f in range(min_wiggle_frequency, max_detectable_freq, distance_between_frequencies):
+            for thresh in reversed(range(28, 70)):
+
+                updates = {
+                    u'rosparam': {
+                        u'plugins': {
+                            u'WiggleCancel': {
+                                u'amplitude_threshold': float(thresh / 100.0)
+                            }
+                        }
+                    }
+                }
+                kitchen_setup.update_god_map(updates)
+
+                target_freq = float(f)
+                kitchen_setup.set_json_goal(u'Shaking',
+                                            joint_name=u'odom_x_joint',
+                                            frequency=target_freq
+                                            )
+                r = kitchen_setup.send_goal(goal=None, goal_type=MoveGoal.PLAN_AND_EXECUTE)
+                if not len(r.error_codes) != 0:
+                    res[thresh] = u'no error'
+                    continue
+                error_code = r.error_codes[0]
+                if not error_code == MoveResult.SHAKING:
+                    res[thresh] = u'no shaking'
+                    continue
+                error_message = r.error_messages[0]
+                freqs_str = re.findall("[0-9]+\.[0-9]+ hertz", error_message)
+                res[thresh] = any(map(lambda f_str: float(f_str[:-6]) == target_freq, freqs_str))
+                if res[thresh] == True:
+                    true_counter += 1
+                    if true_counter == 4:
+                        break
+            result.append([f, res])
+            #assert any(map(lambda e: e == True, res))
+        rospy.logerr(result)
+
+    def test_wiggle_shaking_debug(self, kitchen_setup, thresh=0.6):
+        sample_period = kitchen_setup.get_god_map().get_data(identifier.sample_period)
+        frequency_range = kitchen_setup.get_god_map().get_data(identifier.frequency_range)
+        max_detectable_freq = int(1 / (2 * sample_period))
+        min_wiggle_frequency = int(frequency_range * max_detectable_freq)
+        distance_between_frequencies = 5 if sample_period < 0.05 else 1
+
+        updates = {
+            u'rosparam': {
+                u'plugins': {
+                    u'WiggleCancel': {
+                        u'amplitude_threshold': thresh
+                    }
+                }
+            }
+        }
+        kitchen_setup.update_god_map(updates)
+
+        res = {}
+
+        for f in range(min_wiggle_frequency, max_detectable_freq + 1, distance_between_frequencies):
+            target_freq = float(f)
+            kitchen_setup.set_json_goal(u'Shaking',
+                                        joint_name=u'odom_x_joint', #u'odom_x_joint',
+                                        frequency=target_freq
+                                        )
+            r = kitchen_setup.send_goal(goal=None, goal_type=MoveGoal.PLAN_AND_EXECUTE)
+            if not len(r.error_codes) != 0:
+                res[f] = u'no error'
+                continue
+            error_code = r.error_codes[0]
+            if not error_code == MoveResult.SHAKING:
+                res[f] = u'no shaking'
+            error_message = r.error_messages[0]
+            freqs_str = re.findall("[0-9]+\.[0-9]+ hertz", error_message)
+            res[f] = any(map(lambda f_str: float(f_str[:-6]) == target_freq, freqs_str))
+        rospy.logerr(res)
+        assert True
+
+    def test_wiggle_shaking(self, kitchen_setup):
+        sample_period = kitchen_setup.get_god_map().get_data(identifier.sample_period)
+        frequency_range = kitchen_setup.get_god_map().get_data(identifier.frequency_range)
+        max_detectable_freq = int(1 / (2 * sample_period))
+        min_wiggle_frequency = int(frequency_range * max_detectable_freq)
+        distance_between_frequencies = 5 if sample_period < 0.05 else 1
+
+        for f in range(min_wiggle_frequency, max_detectable_freq + 1, distance_between_frequencies):
+            target_freq = float(f)
+            kitchen_setup.set_json_goal(u'Shaking',
+                                        joint_name=u'odom_x_joint',
+                                        frequency=target_freq
+                                        )
+            r = kitchen_setup.send_goal(goal=None, goal_type=MoveGoal.PLAN_AND_EXECUTE)
+            assert len(r.error_codes) != 0
+            error_code = r.error_codes[0]
+            assert error_code == MoveResult.SHAKING
+            error_message = r.error_messages[0]
+            freqs_str = re.findall("[0-9]+\.[0-9]+ hertz", error_message)
+            assert any(map(lambda f_str: float(f_str[:-6]) == target_freq, freqs_str))
 
     def test_wiggle1(self, kitchen_setup):
         tray_pose = PoseStamped()
@@ -7419,9 +7525,9 @@ class TestCollisionAvoidanceGoals(object):
         pot_pose = PoseStamped()
         pot_pose.header.frame_id = u'lid'
         pot_pose.pose.position.z = -0.22
-        pot_pose.pose.orientation = Quaternion(*quaternion_about_axis(np.pi/2, [0,0,1]))
+        pot_pose.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 2, [0, 0, 1]))
         kitchen_setup.add_mesh(object_name, path=u'package://cad_models/kitchen/cooking-vessels/cookingpot.dae',
-                           pose=pot_pose)
+                               pose=pot_pose)
 
         base_pose = PoseStamped()
         base_pose.header.frame_id = u'iai_kitchen/table_area_main'
@@ -7438,7 +7544,6 @@ class TestCollisionAvoidanceGoals(object):
         # kitchen_setup.avoid_collision([], 'kitchen', ['table_area_main'], 0.05)
         kitchen_setup.set_cart_goal(hand_goal, u'r_gripper_tool_frame')
         kitchen_setup.send_goal(goal_type=MoveGoal.PLAN_ONLY)
-
 
         # kitchen_setup.add_cylinder('pot', size=[0.2,0.2], pose=pot_pose)
 

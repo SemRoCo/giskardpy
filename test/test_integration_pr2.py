@@ -1541,26 +1541,130 @@ class TestCartGoals(object):
         rospy.logerr(res)
         assert True
 
-    def test_wiggle_shaking(self, kitchen_setup):
+    def test_wiggle_prismatic_joint_neglectable_shaking(self, kitchen_setup):
         sample_period = kitchen_setup.get_god_map().get_data(identifier.sample_period)
         frequency_range = kitchen_setup.get_god_map().get_data(identifier.frequency_range)
         max_detectable_freq = int(1 / (2 * sample_period))
         min_wiggle_frequency = int(frequency_range * max_detectable_freq)
         distance_between_frequencies = 5 if sample_period < 0.05 else 1
 
-        for f in range(min_wiggle_frequency, max_detectable_freq + 1, distance_between_frequencies):
-            target_freq = float(f)
-            kitchen_setup.set_json_goal(u'Shaking',
-                                        joint_name=u'odom_x_joint',
-                                        frequency=target_freq
-                                        )
-            r = kitchen_setup.send_goal(goal=None, goal_type=MoveGoal.PLAN_AND_EXECUTE)
-            assert len(r.error_codes) != 0
-            error_code = r.error_codes[0]
-            assert error_code == MoveResult.SHAKING
-            error_message = r.error_messages[0]
-            freqs_str = re.findall("[0-9]+\.[0-9]+ hertz", error_message)
-            assert any(map(lambda f_str: float(f_str[:-6]) == target_freq, freqs_str))
+        for joint, noise_amplitude, goal in [(u'torso_lift_joint', 0.01, 0.05), (u'odom_x_joint', 0.005, 0.5)]:# max vel: 0.015 and 0.5
+            for f in range(min_wiggle_frequency, max_detectable_freq + 1, distance_between_frequencies):
+                target_freq = float(f)
+                kitchen_setup.set_json_goal(u'JointPositionPrismatic',
+                                            joint_name=joint,
+                                            goal=0.0,
+                                            )
+                kitchen_setup.send_goal()
+                kitchen_setup.set_json_goal(u'ShakeyJointPositionRevoluteOrPrismatic',
+                                            joint_name=joint,
+                                            noise_amplitude=noise_amplitude,
+                                            goal=goal,
+                                            frequency=target_freq
+                                            )
+                kitchen_setup.send_and_check_goal()
+
+    def test_wiggle_revolute_joint_neglectable_shaking(self, kitchen_setup):
+        sample_period = kitchen_setup.get_god_map().get_data(identifier.sample_period)
+        frequency_range = kitchen_setup.get_god_map().get_data(identifier.frequency_range)
+        max_detectable_freq = int(1 / (2 * sample_period))
+        min_wiggle_frequency = int(frequency_range * max_detectable_freq)
+        distance_between_frequencies = 5 if sample_period < 0.05 else 1
+
+        for joint, noise_amplitude in [(u'r_wrist_flex_joint', 0.01), (u'head_pan_joint', 0.005)]:  # max vel: 1.0 and 0.5
+            for f in range(min_wiggle_frequency, max_detectable_freq + 1, distance_between_frequencies):
+                target_freq = float(f)
+                kitchen_setup.set_json_goal(u'JointPositionRevolute',
+                                            joint_name=joint,
+                                            goal=0.0,
+                                            )
+                kitchen_setup.send_goal()
+                kitchen_setup.set_json_goal(u'ShakeyJointPositionRevoluteOrPrismatic',
+                                            joint_name=joint,
+                                            noise_amplitude=noise_amplitude,
+                                            goal=1.0,
+                                            frequency=target_freq
+                                            )
+                kitchen_setup.send_and_check_goal()
+
+    def test_wiggle_revolute_joint_shaking(self, kitchen_setup):
+        sample_period = kitchen_setup.get_god_map().get_data(identifier.sample_period)
+        frequency_range = kitchen_setup.get_god_map().get_data(identifier.frequency_range)
+        max_detectable_freq = int(1 / (2 * sample_period))
+        min_wiggle_frequency = int(frequency_range * max_detectable_freq)
+        distance_between_frequencies = 5 if sample_period < 0.05 else 1
+
+        for joint in [u'r_wrist_flex_joint', u'head_pan_joint']: # max vel: 1.0 and 0.5
+            for f in range(min_wiggle_frequency, max_detectable_freq + 1, distance_between_frequencies):
+                kitchen_setup.set_json_goal(u'JointPositionRevolute',
+                                            joint_name=joint,
+                                            goal=0.0,
+                                            )
+                kitchen_setup.send_goal()
+                target_freq = float(f)
+                kitchen_setup.set_json_goal(u'ShakeyJointPositionRevoluteOrPrismatic',
+                                            joint_name=joint,
+                                            goal=1.0,
+                                            frequency=target_freq
+                                            )
+                r = kitchen_setup.send_goal(goal=None, goal_type=MoveGoal.PLAN_AND_EXECUTE)
+                assert len(r.error_codes) != 0
+                error_code = r.error_codes[0]
+                assert error_code == MoveResult.SHAKING
+                error_message = r.error_messages[0]
+                freqs_str = re.findall("[0-9]+\.[0-9]+ hertz", error_message)
+                assert any(map(lambda f_str: float(f_str[:-6]) == target_freq, freqs_str))
+
+    def test_wiggle_prismatic_joint_shaking(self, kitchen_setup):
+        sample_period = kitchen_setup.get_god_map().get_data(identifier.sample_period)
+        frequency_range = kitchen_setup.get_god_map().get_data(identifier.frequency_range)
+        max_detectable_freq = int(1 / (2 * sample_period))
+        min_wiggle_frequency = int(frequency_range * max_detectable_freq)
+        distance_between_frequencies = 5 if sample_period < 0.05 else 1
+
+        for joint in [u'torso_lift_joint', u'odom_x_joint']: # max vel: 0.015 and 0.5
+            for f in range(min_wiggle_frequency, max_detectable_freq + 1, distance_between_frequencies):
+                kitchen_setup.set_json_goal(u'JointPositionPrismatic',
+                                            joint_name=joint,
+                                            goal=0.0,
+                                            )
+                kitchen_setup.send_goal()
+                target_freq = float(f)
+                kitchen_setup.set_json_goal(u'ShakeyJointPositionRevoluteOrPrismatic',
+                                            joint_name=joint,
+                                            goal=1.0,
+                                            frequency=target_freq
+                                            )
+                r = kitchen_setup.send_goal(goal=None, goal_type=MoveGoal.PLAN_AND_EXECUTE)
+                assert len(r.error_codes) != 0
+                error_code = r.error_codes[0]
+                assert error_code == MoveResult.SHAKING
+                error_message = r.error_messages[0]
+                freqs_str = re.findall("[0-9]+\.[0-9]+ hertz", error_message)
+                assert any(map(lambda f_str: float(f_str[:-6]) == target_freq, freqs_str))
+
+    def test_wiggle_continuous_joint_shaking(self, kitchen_setup):
+        sample_period = kitchen_setup.get_god_map().get_data(identifier.sample_period)
+        frequency_range = kitchen_setup.get_god_map().get_data(identifier.frequency_range)
+        max_detectable_freq = int(1 / (2 * sample_period))
+        min_wiggle_frequency = int(frequency_range * max_detectable_freq)
+        distance_between_frequencies = 5 if sample_period < 0.05 else 1
+
+        for continuous_joint in [u'l_wrist_roll_joint', u'r_forearm_roll_joint']:#max vel. of 1.0 and 1.0
+            for f in range(min_wiggle_frequency, max_detectable_freq + 1, distance_between_frequencies):
+                target_freq = float(f)
+                kitchen_setup.set_json_goal(u'ShakeyJointPositionContinuous',
+                                            joint_name=continuous_joint,
+                                            goal=-5.0,
+                                            frequency=target_freq
+                                            )
+                r = kitchen_setup.send_goal(goal=None, goal_type=MoveGoal.PLAN_AND_EXECUTE)
+                assert len(r.error_codes) != 0
+                error_code = r.error_codes[0]
+                assert error_code == MoveResult.SHAKING
+                error_message = r.error_messages[0]
+                freqs_str = re.findall("[0-9]+\.[0-9]+ hertz", error_message)
+                assert any(map(lambda f_str: float(f_str[:-6]) == target_freq, freqs_str))
 
     def test_wiggle1(self, kitchen_setup):
         tray_pose = PoseStamped()

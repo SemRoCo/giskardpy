@@ -29,7 +29,7 @@ from giskardpy.plugin_configuration import ConfigurationPlugin
 from giskardpy.plugin_goal_reached import GoalReachedPlugin
 from giskardpy.plugin_if import IF
 from giskardpy.plugin_instantaneous_controller import ControllerPlugin
-from giskardpy.plugin_interrupts import WiggleCancel
+from giskardpy.plugin_interrupts import WiggleCancel, MaxTrajLength
 from giskardpy.plugin_kinematic_sim import KinSimPlugin
 from giskardpy.plugin_log_trajectory import LogTrajPlugin
 from giskardpy.plugin_loop_detector import LoopDetector
@@ -184,6 +184,13 @@ def grow_tree():
     if god_map.get_data(identifier.enable_CPIMarker):
         planning_2.add_child(success_is_failure(CollisionMarker)(u'cpi marker'))
     planning_2.add_child(planning_3)
+    planning_2.add_child(running_is_success(TimePlugin)(u'time for zero velocity'))
+    planning_2.add_child(AppendZeroVelocity(u'append zero velocity'))
+    planning_2.add_child(running_is_success(LogTrajPlugin)(u'log zero velocity'))
+    if god_map.get_data(identifier.enable_VisualizationBehavior):
+        planning_2.add_child(VisualizationBehavior(u'visualization', ensure_publish=True))
+    if god_map.get_data(identifier.enable_CPIMarker):
+        planning_2.add_child(CollisionMarker(u'cpi marker'))
     # ----------------------------------------------
     move_robot = failure_is_success(Sequence)(u'move robot')
     move_robot.add_child(IF(u'execute?', identifier.execute))
@@ -193,16 +200,6 @@ def grow_tree():
     planning_1 = Sequence(u'planning I')
     planning_1.add_child(GoalToConstraints(u'update constraints', action_server_name))
     planning_1.add_child(planning_2)
-    planning_1.add_child(running_is_success(TimePlugin)(u'time for zero velocity'))
-    planning_1.add_child(AppendZeroVelocity(u'append zero velocity'))
-    planning_1.add_child(running_is_success(LogTrajPlugin)(u'log zero velocity'))
-    # planning_1.add_child(running_is_success(TimePlugin)(u'time for zero velocity'))
-    # planning_1.add_child(AppendZeroVelocity(u'append zero velocity'))
-    # planning_1.add_child(running_is_success(LogTrajPlugin)(u'log zero velocity'))
-    if god_map.get_data(identifier.enable_VisualizationBehavior):
-        planning_1.add_child(VisualizationBehavior(u'visualization', ensure_publish=True))
-    if god_map.get_data(identifier.enable_CPIMarker):
-        planning_1.add_child(CollisionMarker(u'cpi marker'))
     # ----------------------------------------------
     post_processing = failure_is_success(Sequence)(u'post planning')
     # post_processing.add_child(WiggleCancel(u'final wiggle detection', final_detection=True))

@@ -4,7 +4,7 @@ from py_trees import Status
 
 import giskardpy.identifier as identifier
 from giskardpy import logging
-from giskardpy.exceptions import ShakingException
+from giskardpy.exceptions import ShakingException, PlanningException
 from giskardpy.plugin import GiskardBehavior
 # fast
 from giskardpy.plugin_goal_reached import make_velocity_threshold
@@ -141,12 +141,12 @@ class WiggleCancel(GiskardBehavior):
             raise ShakingException(u'endless wiggling detected' + violation_str)
 
 
-# class MaxTrajLength(GiskardBehavior):
-#     def update(self):
-#         t = self.get_god_map().get_data(identifier.time)
-#         sample_period = self.get_god_map().get_data(identifier.sample_period)
-#         t = t * sample_period
-#         if t > 30:
-#             raise InsolvableException(u'trajectory too long')
-#
-#         return Status.RUNNING
+class MaxTrajLength(GiskardBehavior):
+    def update(self):
+        t = self.get_god_map().get_data(identifier.time)
+        sample_period = self.get_god_map().get_data(identifier.sample_period)
+        t = t * sample_period
+        if t > 30:
+            raise PlanningException(u'trajectory too long')
+
+        return Status.RUNNING

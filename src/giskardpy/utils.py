@@ -422,7 +422,7 @@ def plot_trajectory(tj, controlled_joints, path_to_data_folder, sample_period, o
         for i in range(order):
             axs[i].set_title(r'$p' + '\'' * i + "$")
     for i in range(len(controlled_joints)):
-        if any(abs(data[1][:, i]) > velocity_threshold):
+        if velocity_threshold is None or any(abs(data[1][:, i]) > velocity_threshold):
             for j in range(order):
                 try:
                     axs[j].plot(times, data[j][:, i], fmts[i], label=names[i])

@@ -936,6 +936,15 @@ def quaternion_slerp(q1, q2, t):
                                               ratio_a * q1 + ratio_b * q2))
 
 
+def scale_quaternion(q, angle):
+    axis, _ = axis_angle_from_quaternion(q[0], q[1], q[2], q[3])
+    return quaternion_from_axis_angle(axis, angle)
+
+
+def quaternion_angle(q):
+    return axis_angle_from_quaternion(q[0], q[1], q[2], q[3])[1]
+
+
 def slerp(v1, v2, t):
     """
     spherical linear interpolation

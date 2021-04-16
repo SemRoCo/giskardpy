@@ -10,6 +10,7 @@ from tf.transformations import quaternion_matrix, quaternion_about_axis, quatern
     quaternion_slerp, rotation_from_matrix, euler_from_matrix
 from transforms3d.quaternions import quat2mat, quat2axangle
 
+from giskard_ws.src.giskardpy.test.utils_for_tests import compare_orientations
 from giskardpy import casadi_wrapper as w
 from utils_for_tests import float_no_nan_no_inf, unit_vector, quaternion, vector, \
     pykdl_frame_to_numpy, lists_of_same_length, angle, compare_axis_angle, angle_positive, sq_matrix
@@ -526,6 +527,50 @@ class TestCASWrapper(unittest.TestCase):
         self.assertTrue(np.isclose(r1, r2, atol=1e-3).all() or
                         np.isclose(r1, -r2, atol=1e-3).all(),
                         msg='q1={} q2={} t={}\n{} != {}'.format(q1, q2, t, r1, r2))
+
+    @given(quaternion(),
+           quaternion())
+    def test_slerp123(self, q1, q2):
+        step = 0.1
+        q_d = w.compile_and_execute(w.quaternion_diff, [q1,q2])
+        axis = w.compile_and_execute(lambda x, y, z, w_: w.axis_angle_from_quaternion(x, y, z, w_)[0], q_d)
+        angle = w.compile_and_execute(lambda x, y, z, w_: w.axis_angle_from_quaternion(x, y, z, w_)[1], q_d)
+        assume(angle != np.pi)
+        if np.abs(angle) > np.pi:
+            angle = angle - np.pi*2
+        elif np.abs(angle) < -np.pi:
+            angle = angle + np.pi*2
+        r1s = []
+        r2s = []
+        for t in np.arange(0, 1.001, step):
+            r1 = w.compile_and_execute(w.quaternion_slerp, [q1, q2, t])
+            r1 = w.compile_and_execute(w.quaternion_diff, [q1,r1])
+            axis2 = w.compile_and_execute(lambda x, y, z, w_: w.axis_angle_from_quaternion(x, y, z, w_)[0], r1)
+            angle2 = w.compile_and_execute(lambda x, y, z, w_: w.axis_angle_from_quaternion(x, y, z, w_)[1], r1)
+            r2 = w.compile_and_execute(w.quaternion_from_axis_angle, [axis,angle*t])
+            r1s.append(r1)
+            r2s.append(r2)
+        aa1 = []
+        aa2 = []
+        for r1, r2 in zip(r1s, r2s):
+            axisr1 = w.compile_and_execute(lambda x, y, z, w_: w.axis_angle_from_quaternion(x, y, z, w_)[0], r1)
+            angler1 = w.compile_and_execute(lambda x, y, z, w_: w.axis_angle_from_quaternion(x, y, z, w_)[1], r1)
+            aa1.append([axisr1, angler1])
+            axisr2 = w.compile_and_execute(lambda x, y, z, w_: w.axis_angle_from_quaternion(x, y, z, w_)[0], r2)
+            angler2 = w.compile_and_execute(lambda x, y, z, w_: w.axis_angle_from_quaternion(x, y, z, w_)[1], r2)
+            aa2.append([axisr2, angler2])
+        aa1 = np.array(aa1)
+        aa2 = np.array(aa2)
+        r1snp = np.array(r1s)
+        r2snp = np.array(r2s)
+        qds = []
+        for i in range(len(r1s)-1):
+            q1t = r1s[i]
+            q2t = r1s[i+1]
+            qds.append(w.compile_and_execute(w.quaternion_diff, [q1t,q2t]))
+        qds = np.array(qds)
+        for r1, r2 in zip(r1s, r2s):
+            compare_orientations(r1,r2)
 
     # fails if numbers too big or too small
     @given(unit_vector(3),

@@ -110,16 +110,30 @@ def compare_orientations(orientation1, orientation2, decimal=2):
     :type orientation1: Quaternion
     :type orientation2: Quaternion
     """
+    if isinstance(orientation1, Quaternion):
+        q1 = np.array([orientation1.x,
+                       orientation1.y,
+                       orientation1.z,
+                       orientation1.w])
+    else:
+        q1 = orientation1
+    if isinstance(orientation2, Quaternion):
+        q2 = np.array([orientation2.x,
+                       orientation2.y,
+                       orientation2.z,
+                       orientation2.w])
+    else:
+        q2 = orientation2
     try:
-        np.testing.assert_almost_equal(orientation1.x, orientation2.x, decimal=decimal)
-        np.testing.assert_almost_equal(orientation1.y, orientation2.y, decimal=decimal)
-        np.testing.assert_almost_equal(orientation1.z, orientation2.z, decimal=decimal)
-        np.testing.assert_almost_equal(orientation1.w, orientation2.w, decimal=decimal)
+        np.testing.assert_almost_equal(q1[0], q2[0], decimal=decimal)
+        np.testing.assert_almost_equal(q1[1], q2[1], decimal=decimal)
+        np.testing.assert_almost_equal(q1[2], q2[2], decimal=decimal)
+        np.testing.assert_almost_equal(q1[3], q2[3], decimal=decimal)
     except:
-        np.testing.assert_almost_equal(orientation1.x, -orientation2.x, decimal=decimal)
-        np.testing.assert_almost_equal(orientation1.y, -orientation2.y, decimal=decimal)
-        np.testing.assert_almost_equal(orientation1.z, -orientation2.z, decimal=decimal)
-        np.testing.assert_almost_equal(orientation1.w, -orientation2.w, decimal=decimal)
+        np.testing.assert_almost_equal(q1[0], -q2[0], decimal=decimal)
+        np.testing.assert_almost_equal(q1[1], -q2[1], decimal=decimal)
+        np.testing.assert_almost_equal(q1[2], -q2[2], decimal=decimal)
+        np.testing.assert_almost_equal(q1[3], -q2[3], decimal=decimal)
 
 
 @composite

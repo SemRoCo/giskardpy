@@ -331,7 +331,7 @@ class Constraint(object):
                                                      lbA_a=-999,
                                                      ubA_a=999,
                                                      weight_v=weight,
-                                                     weight_a=weight,
+                                                     weight_a=0,
                                                      expression=expression,
                                                      expression_dot=0,
                                                      goal_constraint=goal_constraint,

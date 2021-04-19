@@ -14,7 +14,7 @@ class InstantaneousController(object):
     # TODO should anybody who uses this class know about constraints?
 
 
-    def __init__(self, robot, path_to_functions):
+    def __init__(self, robot, sample_period, path_to_functions):
         """
         :type robot: Robot
         :param path_to_functions: location where compiled functions are stored
@@ -27,6 +27,7 @@ class InstantaneousController(object):
         self.joint_constraints = {}
         self.soft_constraints = {}
         self.free_symbols = None
+        self.sample_period = sample_period
         self.qp_problem_builder = None # type: QProblemBuilder
 
 
@@ -59,6 +60,7 @@ class InstantaneousController(object):
         self.qp_problem_builder = QProblemBuilder(self.joint_constraints,
                                                   self.hard_constraints,
                                                   self.soft_constraints,
+                                                  self.sample_period,
                                                   path_to_functions)
 
     @profile
@@ -74,8 +76,6 @@ class InstantaneousController(object):
         """
         next_velocity, next_acceleration, \
         H, A, lb, ub, lbA, ubA, xdot_full = self.qp_problem_builder.get_cmd(substitutions, nWSR)
-        if next_velocity is None:
-            pass
         return {name: next_velocity[symbol] for name, (symbol, _) in self.joint_to_symbols_str.items()}, \
                H, A, lb, ub, lbA, ubA, xdot_full
 

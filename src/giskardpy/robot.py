@@ -217,9 +217,7 @@ class Robot(Backend):
                 self._joint_constraints[joint_name] = JointConstraint(
                     lower_v=-velocity_limit,
                     upper_v=velocity_limit,
-                    weight_v=weight,  # TODO is that right?
-                    # lower_a=-acceleration_limit2,
-                    # upper_a=acceleration_limit2,
+                    weight_v=weight,
                     lower_a=w.limit(w.velocity_limit_from_position_limit(acceleration_limit,
                                                                          lower_limit,
                                                                          joint_symbol,
@@ -240,7 +238,7 @@ class Robot(Backend):
                 self._joint_constraints[joint_name] = JointConstraint(
                     lower_v=-velocity_limit,
                     upper_v=velocity_limit,
-                    weight_v=weight,  # TODO is that right?
+                    weight_v=weight,
                     lower_a=-acceleration_limit2,
                     upper_a=acceleration_limit2,
                     weight_a=0,

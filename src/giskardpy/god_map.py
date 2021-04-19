@@ -185,7 +185,6 @@ class GodMap(object):
     Data structure used by plugins to exchange information.
     """
 
-    # TODO give this fucker a lock
     def __init__(self, default_value=0.0):
         self._data = {}
         self.expr_separator = u'_'

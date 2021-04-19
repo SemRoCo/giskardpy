@@ -12,7 +12,7 @@ from giskardpy.utils import normalize_quaternion_msg
 
 class TFPlugin(GiskardBehavior):
     """
-    TODO
+    Published tf for attached and evironment objects.
     """
 
     def __init__(self, name):

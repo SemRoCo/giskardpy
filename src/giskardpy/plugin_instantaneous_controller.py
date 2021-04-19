@@ -50,6 +50,7 @@ class ControllerPlugin(GiskardBehavior):
 
         # if update:
         self.controller = InstantaneousController(self.get_robot(),
+                                                  self.get_god_map().unsafe_get_data(identifier.sample_period),
                                                   u'{}/{}/'.format(self.path_to_functions,
                                                                    self.get_robot().get_name()))
 

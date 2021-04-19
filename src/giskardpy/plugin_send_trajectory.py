@@ -24,9 +24,6 @@ class SendTrajectory(ActionClient, GiskardBehavior):
         self.fill_velocity_values = self.get_god_map().get_data(identifier.fill_velocity_values)
 
     def setup(self, timeout):
-        # TODO get this from god map
-        # self.controller_joints = rospy.wait_for_message(u'/whole_body_controller/state',
-        #                                                 JointTrajectoryControllerState).joint_names
         return super(SendTrajectory, self).setup(timeout)
 
     def initialise(self):

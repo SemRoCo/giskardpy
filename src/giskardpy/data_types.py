@@ -62,7 +62,6 @@ class Trajectory(object):
 
 
 class Collision(object):
-    # TODO why no named tuple?
     def __init__(self, link_a, body_b, link_b, position_on_a, position_on_b, contact_normal, contact_distance):
         self.__position_on_a = position_on_a
         self.__position_on_a_in_a = position_on_a

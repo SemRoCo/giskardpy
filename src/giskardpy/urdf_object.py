@@ -108,7 +108,6 @@ class URDFObject(object):
                 geometry = up.Mesh(world_body.mesh)
             else:
                 raise CorruptShapeException(u'primitive shape \'{}\' not supported'.format(world_body.shape.type))
-            # FIXME test if this works on 16.04
             try:
                 link = up.Link(world_body.name)
                 link.add_aggregate(u'visual', up.Visual(geometry,

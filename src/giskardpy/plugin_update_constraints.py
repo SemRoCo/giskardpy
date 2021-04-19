@@ -78,12 +78,13 @@ class GoalToConstraints(GetGoal):
         controlled_joints = self.get_robot().controlled_joints
 
         if (self.get_god_map().get_data(identifier.check_reachability)):
+            # FIXME reachability check is broken
             from giskardpy import casadi_wrapper as w
             joint_constraints = OrderedDict()
             for i, joint_name in enumerate(controlled_joints):
                 lower_limit, upper_limit = self.get_robot().get_joint_limits(joint_name)
                 joint_symbol = self.get_robot().get_joint_position_symbol(joint_name)
-                sample_period = w.Symbol(u'rosparam_general_options_sample_period')  # TODO this should be a parameter
+                sample_period = self.get_god_map().to_symbol(identifier.sample_period)
                 # velocity_limit = self.get_robot().get_joint_velocity_limit_expr(joint_name) * sample_period
                 if self.get_robot().is_joint_prismatic(joint_name):
                     velocity_limit = self.rc_prismatic_velocity * sample_period

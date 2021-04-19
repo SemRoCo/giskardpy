@@ -590,23 +590,23 @@ class TestConstraints(object):
         assert pocky_pose_setup.get_god_map().unsafe_get_data(
             identifier.joint_weight + [u'torso_lift_joint']) == old_torso_value
 
-    def test_base_pointing_forward(self, pocky_pose_setup):
-        """
-        :param pocky_pose_setup: PR2
-        """
-        # FIXME idk
-        pocky_pose_setup.set_json_goal(u'BasePointingForward')
-        r_goal = PoseStamped()
-        r_goal.header.frame_id = pocky_pose_setup.r_tip
-        r_goal.pose.position.y = -2
-        r_goal.pose.orientation.w = 1
-        pocky_pose_setup.set_json_goal(u'CartesianVelocityLimit',
-                                       root_link=pocky_pose_setup.default_root,
-                                       tip_link=u'base_footprint',
-                                       max_linear_velocity=0.1,
-                                       max_angular_velocity=0.2
-                                       )
-        pocky_pose_setup.set_and_check_cart_goal(r_goal, pocky_pose_setup.r_tip, weight=WEIGHT_BELOW_CA)
+    # def test_base_pointing_forward(self, pocky_pose_setup):
+    #     """
+    #     :param pocky_pose_setup: PR2
+    #     """
+    #     # FIXME idk
+    #     pocky_pose_setup.set_json_goal(u'BasePointingForward')
+    #     r_goal = PoseStamped()
+    #     r_goal.header.frame_id = pocky_pose_setup.r_tip
+    #     r_goal.pose.position.y = -2
+    #     r_goal.pose.orientation.w = 1
+    #     pocky_pose_setup.set_json_goal(u'CartesianVelocityLimit',
+    #                                    root_link=pocky_pose_setup.default_root,
+    #                                    tip_link=u'base_footprint',
+    #                                    max_linear_velocity=0.1,
+    #                                    max_angular_velocity=0.2
+    #                                    )
+    #     pocky_pose_setup.set_and_check_cart_goal(r_goal, pocky_pose_setup.r_tip, weight=WEIGHT_BELOW_CA)
 
     def test_UpdateGodMap2(self, pocky_pose_setup):
         """
@@ -636,7 +636,7 @@ class TestConstraints(object):
         pocky_pose_setup.send_and_check_goal(expected_error_codes=[MoveResult.ERROR])
         assert pocky_pose_setup.get_god_map().unsafe_get_data(
             identifier.joint_weight + [u'odom_x_joint']) == old_odom_x_value
-        assert pocky_pose_setup.get_god_map().unsafe_get_data(identifier.joint_weight + [u'odom_y_joint']) == 0.0001
+        assert pocky_pose_setup.get_god_map().unsafe_get_data(identifier.joint_weight + [u'odom_y_joint']) == old_odom_y_value
         assert pocky_pose_setup.get_god_map().get_data(
             identifier.joint_weight + [u'torso_lift_joint']) == old_torso_value
 
@@ -1230,7 +1230,7 @@ class TestConstraints(object):
 
     def test_open_all_drawers(self, kitchen_setup):
         """"
-        :type kitchen_setup: Boxy
+        :type kitchen_setup: PR2
         """
         handle_name = [u'oven_area_area_middle_upper_drawer_handle',
                        u'oven_area_area_middle_lower_drawer_handle',
@@ -1264,7 +1264,7 @@ class TestConstraints(object):
             tip_grasp_axis.header.frame_id = kitchen_setup.l_tip
             tip_grasp_axis.vector.z = 1
 
-            kitchen_setup.add_json_goal(u'GraspBar',
+            kitchen_setup.set_json_goal(u'GraspBar',
                                         root=kitchen_setup.default_root,
                                         tip=kitchen_setup.l_tip,
                                         tip_grasp_axis=tip_grasp_axis,
@@ -1286,7 +1286,7 @@ class TestConstraints(object):
             kitchen_setup.avoid_self_collision()
             kitchen_setup.send_and_check_goal()
 
-            kitchen_setup.add_json_goal(u'Open',
+            kitchen_setup.set_json_goal(u'Open',
                                         tip=kitchen_setup.l_tip,
                                         object_name=u'kitchen',
                                         handle_link=i_handle_name)
@@ -1297,7 +1297,7 @@ class TestConstraints(object):
             kitchen_setup.set_kitchen_js({i_joint_name: 0.48})  # TODO: get real value from URDF
 
             # Close drawer partially
-            kitchen_setup.add_json_goal(u'OpenDrawer',
+            kitchen_setup.set_json_goal(u'OpenDrawer',
                                         tip=kitchen_setup.l_tip,
                                         object_name=u'kitchen',
                                         handle_link=i_handle_name,
@@ -1308,7 +1308,7 @@ class TestConstraints(object):
             # Update kitchen object
             kitchen_setup.set_kitchen_js({i_joint_name: 0.2})
 
-            kitchen_setup.add_json_goal(u'Close',
+            kitchen_setup.set_json_goal(u'Close',
                                         tip=kitchen_setup.l_tip,
                                         object_name=u'kitchen',
                                         handle_link=i_handle_name)

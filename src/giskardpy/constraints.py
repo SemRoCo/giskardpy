@@ -293,7 +293,7 @@ class Constraint(object):
 
     def normalize_weight(self, velocity_limit, weight):
         sample_period = self.get_input_sampling_period()
-        result = weight * (1. / (velocity_limit)) ** 2
+        result = weight * (1. / (sample_period * velocity_limit)) ** 2
         return result
 
     def normalize_weight2(self, acceleration_limit, weight):

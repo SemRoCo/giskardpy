@@ -395,7 +395,7 @@ class TestConstraints(object):
         new_pose = tf.lookup_pose('map', tip)
         compare_points(expected.pose.position, new_pose.pose.position)
 
-    def test_CartesianOrientationSlerp(self, zero_pose):
+    def test_CartesianOrientation(self, zero_pose):
         """
         :type zero_pose: PR2
         """
@@ -409,7 +409,7 @@ class TestConstraints(object):
         expected = tf.transform_pose('map', p)
 
         zero_pose.allow_all_collisions()
-        zero_pose.set_json_goal(u'CartesianOrientationSlerp',
+        zero_pose.set_json_goal(u'CartesianOrientation',
                                 root_link=root,
                                 tip_link=tip,
                                 goal=p)
@@ -7191,7 +7191,7 @@ class TestCollisionAvoidanceGoals(object):
 
         kitchen_setup.set_cart_goal(bowl_goal, bowl_name, kitchen_setup.default_root)
         kitchen_setup.set_cart_goal(cup_goal, cup_name, kitchen_setup.default_root)
-        # kitchen_setup.set_json_goal(u'AvoidJointLimits', percentage=percentage)
+        kitchen_setup.set_json_goal(u'AvoidJointLimits', percentage=percentage)
         kitchen_setup.send_and_check_goal()
 
         kitchen_setup.detach_object(bowl_name)

@@ -183,7 +183,7 @@ class GiskardWrapper(object):
             self.cmd_seq[-1].cartesian_constraints.append(constraint)
         else:
             constraint = Constraint()
-            constraint.type = u'CartesianOrientationSlerp'
+            constraint.type = u'CartesianOrientation'
             params = {}
             params[u'root_link'] = root_link
             params[u'tip_link'] = tip_link

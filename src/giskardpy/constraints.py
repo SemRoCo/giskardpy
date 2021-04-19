@@ -523,32 +523,32 @@ class Constraint(object):
         tip_Q_tipCurrent = w.quaternion_from_matrix(w.dot(tip_R_rootCurrent_eval, root_R_tipCurrent))
         tip_R_goal = w.dot(tip_R_rootCurrent_eval, root_R_tipGoal)
 
-        weight = self.normalize_weight2(1, weight)
+        weight = self.normalize_weight(max_velocity, weight)
 
-        q_d = w.quaternion_from_matrix(tip_R_goal)
+        tip_Q_goal = w.quaternion_from_matrix(tip_R_goal)
 
-        q_d = w.if_greater_zero(-q_d[3], -q_d, q_d)  # flip to get shortest path
-        angle_error = w.quaternion_angle(q_d)
+        tip_Q_goal = w.if_greater_zero(-tip_Q_goal[3], -tip_Q_goal, tip_Q_goal)  # flip to get shortest path
+        angle_error = w.quaternion_angle(tip_Q_goal)
         scale = self.limit_velocity(angle_error, max_velocity)
-        q_d = w.scale_quaternion(q_d, scale)
+        tip_Q_goal = w.scale_quaternion(tip_Q_goal, scale)
 
         expr = tip_Q_tipCurrent
 
         self.add_velocity_constraint(u'{}/q/x'.format(prefix),
-                                     lower=q_d[0],
-                                     upper=q_d[0],
+                                     lower=tip_Q_goal[0],
+                                     upper=tip_Q_goal[0],
                                      weight=weight,
                                      expression=expr[0],
                                      goal_constraint=goal_constraint)
         self.add_velocity_constraint(u'{}/q/y'.format(prefix),
-                                     lower=q_d[1],
-                                     upper=q_d[1],
+                                     lower=tip_Q_goal[1],
+                                     upper=tip_Q_goal[1],
                                      weight=weight,
                                      expression=expr[1],
                                      goal_constraint=goal_constraint)
         self.add_velocity_constraint(u'{}/q/z'.format(prefix),
-                                     lower=q_d[2],
-                                     upper=q_d[2],
+                                     lower=tip_Q_goal[2],
+                                     upper=tip_Q_goal[2],
                                      weight=weight,
                                      expression=expr[2],
                                      goal_constraint=goal_constraint)
@@ -1310,91 +1310,6 @@ class CartesianVelocityLimit(Constraint):
 
 
 class CartesianOrientation(BasicCartesianConstraint):
-    def __init__(self, god_map, root_link, tip_link, goal, max_velocity=0.5, max_acceleration=0.5,
-                 weight=WEIGHT_ABOVE_CA, goal_constraint=True):
-        """
-        Don't use me
-        """
-        super(CartesianOrientation, self).__init__(god_map=god_map,
-                                                   root_link=root_link,
-                                                   tip_link=tip_link,
-                                                   goal=goal,
-                                                   max_velocity=max_velocity,
-                                                   max_acceleration=max_acceleration,
-                                                   weight=weight,
-                                                   goal_constraint=goal_constraint)
-
-    def make_constraints(self):
-        """
-        example:
-        name='CartesianPosition'
-        parameter_value_pair='{
-            "root": "base_footprint", #required
-            "tip": "r_gripper_tool_frame", #required
-            "goal_position": {"header":
-                                {"stamp":
-                                    {"secs": 0,
-                                    "nsecs": 0},
-                                "frame_id": "",
-                                "seq": 0},
-                            "pose": {"position":
-                                        {"y": 0.0,
-                                        "x": 0.0,
-                                        "z": 0.0},
-                                    "orientation": {"y": 0.0,
-                                                    "x": 0.0,
-                                                    "z": 0.0,
-                                                    "w": 0.0}
-                                    }
-                            }', #required
-            "weight": 1, #optional
-            "max_velocity": 0.3 #optional -- rad/s or m/s depending on joint; can not go higher than urdf limit
-        }'
-        :return:
-        """
-        goal_rotation = w.rotation_of(self.get_goal_pose())
-        max_velocity = self.get_input_float(self.max_velocity)
-        max_acceleration = self.get_input_float(self.max_acceleration)
-        weight = self.get_input_float(self.weight)
-
-        current_rotation = w.rotation_of(self.get_fk(self.root, self.tip))
-        current_evaluated_rotation = w.rotation_of(self.get_fk_evaluated(self.root, self.tip))
-
-        hack = w.rotation_matrix_from_axis_angle([0, 0, 1], 0.0001)
-
-        axis, current_angle = w.axis_angle_from_matrix(
-            w.dot(w.dot(current_evaluated_rotation.T, hack), current_rotation))
-        c_aa = (axis * current_angle)
-
-        axis, angle = w.axis_angle_from_matrix(w.dot(current_rotation.T, goal_rotation))
-
-        capped_angle = self.limit_acceleration(current_angle,
-                                               angle,
-                                               max_acceleration,
-                                               max_velocity)
-
-        r_rot_control = axis * capped_angle
-
-        weight = self.normalize_weight(max_velocity, weight)
-
-        self.add_velocity_constraint(u'/0', lower=r_rot_control[0],
-                                     upper=r_rot_control[0],
-                                     weight=weight,
-                                     expression=c_aa[0],
-                                     goal_constraint=self.goal_constraint)
-        self.add_velocity_constraint(u'/1', lower=r_rot_control[1],
-                                     upper=r_rot_control[1],
-                                     weight=weight,
-                                     expression=c_aa[1],
-                                     goal_constraint=self.goal_constraint)
-        self.add_velocity_constraint(u'/2', lower=r_rot_control[2],
-                                     upper=r_rot_control[2],
-                                     weight=weight,
-                                     expression=c_aa[2],
-                                     goal_constraint=self.goal_constraint)
-
-
-class CartesianOrientationSlerp(BasicCartesianConstraint):
     def __init__(self, god_map, root_link, tip_link, goal, max_velocity=0.5, max_accleration=0.5,
                  weight=WEIGHT_ABOVE_CA, goal_constraint=False):
         """
@@ -1405,14 +1320,14 @@ class CartesianOrientationSlerp(BasicCartesianConstraint):
         :param max_velocity: float, rad/s, default 0.5
         :param weight: float, default WEIGHT_ABOVE_CA
         """
-        super(CartesianOrientationSlerp, self).__init__(god_map=god_map,
-                                                        root_link=root_link,
-                                                        tip_link=tip_link,
-                                                        goal=goal,
-                                                        max_velocity=max_velocity,
-                                                        max_acceleration=max_accleration,
-                                                        weight=weight,
-                                                        goal_constraint=goal_constraint)
+        super(CartesianOrientation, self).__init__(god_map=god_map,
+                                                   root_link=root_link,
+                                                   tip_link=tip_link,
+                                                   goal=goal,
+                                                   max_velocity=max_velocity,
+                                                   max_acceleration=max_accleration,
+                                                   weight=weight,
+                                                   goal_constraint=goal_constraint)
 
     def make_constraints(self):
         """
@@ -1450,6 +1365,11 @@ class CartesianOrientationSlerp(BasicCartesianConstraint):
         self.add_minimize_rotation_constraints(r_R_g, self.root, self.tip, max_velocity, weight, self.goal_constraint)
 
 
+class CartesianOrientationSlerp(CartesianOrientation):
+    # TODO this is just here for backward compatibility
+    pass
+
+
 class CartesianPose(Constraint):
     def __init__(self, god_map, root_link, tip_link, goal, max_linear_velocity=0.1,
                  max_angular_velocity=0.5, weight=WEIGHT_ABOVE_CA, goal_constraint=False):
@@ -1471,13 +1391,13 @@ class CartesianPose(Constraint):
                                                   max_velocity=max_linear_velocity,
                                                   weight=weight,
                                                   goal_constraint=goal_constraint))
-        self.constraints.append(CartesianOrientationSlerp(god_map=god_map,
-                                                          root_link=root_link,
-                                                          tip_link=tip_link,
-                                                          goal=goal,
-                                                          max_velocity=max_angular_velocity,
-                                                          weight=weight,
-                                                          goal_constraint=goal_constraint))
+        self.constraints.append(CartesianOrientation(god_map=god_map,
+                                                     root_link=root_link,
+                                                     tip_link=tip_link,
+                                                     goal=goal,
+                                                     max_velocity=max_angular_velocity,
+                                                     weight=weight,
+                                                     goal_constraint=goal_constraint))
 
     def make_constraints(self):
         for constraint in self.constraints:
@@ -1498,14 +1418,14 @@ class CartesianPoseStraight(Constraint):
                                                           max_acceleration=translation_max_acceleration,
                                                           weight=weight,
                                                           goal_constraint=goal_constraint))
-        self.constraints.append(CartesianOrientationSlerp(god_map=god_map,
-                                                          root_link=root_link,
-                                                          tip_link=tip_link,
-                                                          goal=goal,
-                                                          max_velocity=rotation_max_velocity,
-                                                          max_accleration=rotation_max_acceleration,
-                                                          weight=weight,
-                                                          goal_constraint=goal_constraint))
+        self.constraints.append(CartesianOrientation(god_map=god_map,
+                                                     root_link=root_link,
+                                                     tip_link=tip_link,
+                                                     goal=goal,
+                                                     max_velocity=rotation_max_velocity,
+                                                     max_accleration=rotation_max_acceleration,
+                                                     weight=weight,
+                                                     goal_constraint=goal_constraint))
 
     def make_constraints(self):
         for constraint in self.constraints:

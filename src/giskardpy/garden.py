@@ -158,19 +158,31 @@ def grow_tree():
     wait_for_goal.add_child(GoalReceived(u'has goal', action_server_name, MoveAction))
     wait_for_goal.add_child(ConfigurationPlugin(u'js2'))
     # ----------------------------------------------
-    planning_3 = PluginBehavior(u'planning III', sleep=0)
-    planning_3.add_plugin(CollisionChecker(u'coll'))
+    planning_4 = PluginBehavior(u'planning IIII', sleep=0)
+    planning_4.add_plugin(CollisionChecker(u'coll'))
     # if god_map.safe_get_data(identifier.enable_collision_marker):
     #     planning_3.add_plugin(success_is_running(CPIMarker)(u'cpi marker'))
-    planning_3.add_plugin(ControllerPlugin(u'controller'))
-    planning_3.add_plugin(KinSimPlugin(u'kin sim'))
-    planning_3.add_plugin(LogTrajPlugin(u'log'))
-    planning_3.add_plugin(LoglbAPlugin(u'log lba'))
-    planning_3.add_plugin(WiggleCancel(u'wiggle'))
-    planning_3.add_plugin(LoopDetector(u'loop detector'))
-    planning_3.add_plugin(GoalReachedPlugin(u'goal reached'))
-    planning_3.add_plugin(TimePlugin(u'time'))
+    planning_4.add_plugin(ControllerPlugin(u'controller'))
+    planning_4.add_plugin(KinSimPlugin(u'kin sim'))
+    planning_4.add_plugin(LogTrajPlugin(u'log'))
+    planning_4.add_plugin(LoglbAPlugin(u'log lba'))
+    planning_4.add_plugin(WiggleCancel(u'wiggle'))
+    planning_4.add_plugin(LoopDetector(u'loop detector'))
+    planning_4.add_plugin(GoalReachedPlugin(u'goal reached'))
+    planning_4.add_plugin(TimePlugin(u'time'))
     # planning_3.add_plugin(MaxTrajLength(u'traj length check'))
+    # ----------------------------------------------
+    # ----------------------------------------------
+    planning_3 = Sequence(u'planning III', sleep=0)
+    planning_3.add_child(planning_4)
+    planning_3.add_child(running_is_success(TimePlugin)(u'time for zero velocity'))
+    planning_3.add_child(AppendZeroVelocity(u'append zero velocity'))
+    planning_3.add_child(running_is_success(LogTrajPlugin)(u'log zero velocity'))
+    if god_map.get_data(identifier.enable_VisualizationBehavior):
+        planning_3.add_child(VisualizationBehavior(u'visualization', ensure_publish=True))
+    if god_map.get_data(identifier.enable_CPIMarker):
+        planning_3.add_child(CollisionMarker(u'cpi marker'))
+    # ----------------------------------------------
     # ----------------------------------------------
     publish_result = failure_is_success(Selector)(u'monitor execution')
     publish_result.add_child(GoalCanceled(u'goal canceled', action_server_name))
@@ -184,13 +196,6 @@ def grow_tree():
     if god_map.get_data(identifier.enable_CPIMarker):
         planning_2.add_child(success_is_failure(CollisionMarker)(u'cpi marker'))
     planning_2.add_child(planning_3)
-    planning_2.add_child(running_is_success(TimePlugin)(u'time for zero velocity'))
-    planning_2.add_child(AppendZeroVelocity(u'append zero velocity'))
-    planning_2.add_child(running_is_success(LogTrajPlugin)(u'log zero velocity'))
-    if god_map.get_data(identifier.enable_VisualizationBehavior):
-        planning_2.add_child(VisualizationBehavior(u'visualization', ensure_publish=True))
-    if god_map.get_data(identifier.enable_CPIMarker):
-        planning_2.add_child(CollisionMarker(u'cpi marker'))
     # ----------------------------------------------
     move_robot = failure_is_success(Sequence)(u'move robot')
     move_robot.add_child(IF(u'execute?', identifier.execute))

@@ -411,6 +411,47 @@ class Constraint(object):
         r_P_c = w.position_of(self.get_fk(root, tip))
 
         r_P_error = r_P_g - r_P_c
+        trans_error = w.norm(r_P_error)
+
+        trans_scale = self.limit_velocity(trans_error, max_velocity)
+        r_P_intermediate_error = w.save_division(r_P_error, trans_error) * trans_scale
+
+        weight = self.normalize_weight(max_velocity, weight)
+
+        self.add_velocity_constraint(u'/{}/x'.format(prefix),
+                                     lower=r_P_intermediate_error[0],
+                                     upper=r_P_intermediate_error[0],
+                                     weight=weight,
+                                     expression=r_P_c[0],
+                                     goal_constraint=goal_constraint)
+        self.add_velocity_constraint(u'/{}/y'.format(prefix),
+                                     lower=r_P_intermediate_error[1],
+                                     upper=r_P_intermediate_error[1],
+                                     weight=weight,
+                                     expression=r_P_c[1],
+                                     goal_constraint=goal_constraint)
+        self.add_velocity_constraint(u'/{}/z'.format(prefix),
+                                     lower=r_P_intermediate_error[2],
+                                     upper=r_P_intermediate_error[2],
+                                     weight=weight,
+                                     expression=r_P_c[2],
+                                     goal_constraint=goal_constraint)
+
+    def add_minimize_position_constraints_acc(self, r_P_g, max_velocity, max_acceleration, root, tip, goal_constraint,
+                                              weight=WEIGHT_BELOW_CA, prefix=u''):
+        """
+        :param r_P_g: position of goal relative to root frame
+        :param max_velocity:
+        :param max_acceleration:
+        :param root:
+        :param tip:
+        :param prefix: name prefix to distinguish different constraints
+        :type prefix: str
+        :return:
+        """
+        r_P_c = w.position_of(self.get_fk(root, tip))
+
+        r_P_error = r_P_g - r_P_c
         direction = w.scale(r_P_error, max_velocity)
         capped_error_x = self.limit_acceleration(r_P_c[0], r_P_error[0], max_acceleration, w.abs(direction[0]))
         capped_error_y = self.limit_acceleration(r_P_c[1], r_P_error[1], max_acceleration, w.abs(direction[1]))
@@ -475,7 +516,6 @@ class Constraint(object):
                                      expression=root_V_tip_normal[2],
                                      goal_constraint=goal_constraint)
 
-
     def add_minimize_rotation_constraints(self, root_R_tipGoal, root, tip, max_velocity=np.pi / 4,
                                           weight=WEIGHT_BELOW_CA, goal_constraint=True, prefix=u''):
         root_R_tipCurrent = w.rotation_of(self.get_fk(root, tip))
@@ -487,7 +527,7 @@ class Constraint(object):
 
         q_d = w.quaternion_from_matrix(tip_R_goal)
 
-        q_d = w.if_greater_zero(-q_d[3], -q_d, q_d) # flip to get shortest path
+        q_d = w.if_greater_zero(-q_d[3], -q_d, q_d)  # flip to get shortest path
         angle_error = w.quaternion_angle(q_d)
         scale = self.limit_velocity(angle_error, max_velocity)
         q_d = w.scale_quaternion(q_d, scale)

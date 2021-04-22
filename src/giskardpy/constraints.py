@@ -702,7 +702,7 @@ class JointPositionRevolute(Constraint):
         return u'{}/{}'.format(s, self.joint_name)
 
 
-class ShakeyJointPositionRevoluteOrPrismatic(Constraint):
+class ShakyJointPositionRevoluteOrPrismatic(Constraint):
     goal = u'goal'
     weight = u'weight'
     max_velocity = u'max_velocity'
@@ -713,7 +713,7 @@ class ShakeyJointPositionRevoluteOrPrismatic(Constraint):
     def __init__(self, god_map, joint_name, goal, frequency, noise_amplitude=10, weight=WEIGHT_BELOW_CA,
                  max_velocity=3451, max_acceleration=1, goal_constraint=True):
         """
-        This goal will move a revolute joint to the goal position and shake the joint with the given frequency.
+        This goal will move a revolute or prismatic joint to the goal position and shake the joint with the given frequency.
         :param joint_name: str
         :param goal: float
         :param frequency: float
@@ -721,7 +721,7 @@ class ShakeyJointPositionRevoluteOrPrismatic(Constraint):
         :param weight: float, default WEIGHT_BELOW_CA
         :param max_velocity: float, rad/s, default 3451, meaning the urdf/config limits are active
         """
-        super(ShakeyJointPositionRevoluteOrPrismatic, self).__init__(god_map)
+        super(ShakyJointPositionRevoluteOrPrismatic, self).__init__(god_map)
         self.joint_name = joint_name
         self.goal_constraint = goal_constraint
         if not self.get_robot().is_joint_revolute(joint_name) and not self.get_robot().is_joint_prismatic(joint_name):
@@ -739,14 +739,13 @@ class ShakeyJointPositionRevoluteOrPrismatic(Constraint):
     def make_constraints(self):
         """
         example:
-        name='JointPosition'
+        name='ShakyJointPositionRevoluteOrPrismatic'
         parameter_value_pair='{
             "joint_name": "r_wrist_flex_joint", #required
-            "goal_position": 0, #required
-            "frequency": 0, #required
+            "goal_position": -1.0, #required
+            "frequency": 5.0, #required
             "weight": 1, #optional
-            "gain": 10, #optional -- error is multiplied with this value
-            "max_speed": 1 #optional -- rad/s or m/s depending on joint; can not go higher than urdf limit
+            "max_velocity": 1 #optional -- rad/s or m/s depending on joint; can not go higher than urdf limit
         }'
         :return:
         """
@@ -775,10 +774,10 @@ class ShakeyJointPositionRevoluteOrPrismatic(Constraint):
                             goal_constraint=self.goal_constraint)
 
     def __str__(self):
-        s = super(ShakeyJointPositionRevoluteOrPrismatic, self).__str__()
+        s = super(ShakyJointPositionRevoluteOrPrismatic, self).__str__()
         return u'{}/{}'.format(s, self.joint_name)
 
-class ShakeyJointPositionContinuous(Constraint):
+class ShakyJointPositionContinuous(Constraint):
     goal = u'goal'
     weight = u'weight'
     max_velocity = u'max_velocity'
@@ -790,7 +789,7 @@ class ShakeyJointPositionContinuous(Constraint):
     def __init__(self, god_map, joint_name, goal, frequency, noise_amplitude=10, weight=WEIGHT_BELOW_CA,
                  max_velocity=3451, max_acceleration=1, goal_constraint=True):
         """
-        This goal will move a revolute joint to the goal position and shake the joint with the given frequency.
+        This goal will move a continuous joint to the goal position and shake the joint with the given frequency.
         :param joint_name: str
         :param goal: float
         :param frequency: float
@@ -798,7 +797,7 @@ class ShakeyJointPositionContinuous(Constraint):
         :param weight: float, default WEIGHT_BELOW_CA
         :param max_velocity: float, rad/s, default 3451, meaning the urdf/config limits are active
         """
-        super(ShakeyJointPositionContinuous, self).__init__(god_map)
+        super(ShakyJointPositionContinuous, self).__init__(god_map)
         self.joint_name = joint_name
         self.goal_constraint = goal_constraint
         if not self.get_robot().is_joint_continuous(joint_name):
@@ -818,12 +817,11 @@ class ShakeyJointPositionContinuous(Constraint):
         example:
         name='JointPosition'
         parameter_value_pair='{
-            "joint_name": "r_wrist_flex_joint", #required
-            "goal_position": 0, #required
-            "frequency": 0, #required
+            "joint_name": "l_wrist_roll_joint", #required
+            "goal_position": -5.0, #required
+            "frequency": 5.0, #required
             "weight": 1, #optional
-            "gain": 10, #optional -- error is multiplied with this value
-            "max_speed": 1 #optional -- rad/s or m/s depending on joint; can not go higher than urdf limit
+            "max_velocity": 1 #optional -- rad/s or m/s depending on joint; can not go higher than urdf limit
         }'
         :return:
         """
@@ -852,7 +850,7 @@ class ShakeyJointPositionContinuous(Constraint):
                             goal_constraint=self.goal_constraint)
 
     def __str__(self):
-        s = super(ShakeyJointPositionContinuous, self).__str__()
+        s = super(ShakyJointPositionContinuous, self).__str__()
         return u'{}/{}'.format(s, self.joint_name)
 
 class AvoidJointLimitsRevolute(Constraint):

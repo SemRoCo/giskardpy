@@ -9,19 +9,14 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 ENV APT_KEY_DONT_WARN_ON_DANGEROUS_USAGE=TRUE
 
 RUN apt update
+RUN apt install -y python-pip
 
-# Python Rosdep Dependency (see https://github.com/ros-infrastructure/rosdep/issues/807 )
-RUN apt install -y python-pip && \
-    pip install rospkg==1.3.0 && \
-    pip install rosdep==0.20.0
-
-# Install build dependencies
-RUN apt install -y python-rosinstall python-rosinstall-generator python-wstool build-essential && \
+# Install build dependencies (see https://github.com/ros-infrastructure/rosdep/issues/807 )
+RUN apt install -y python-rospkg=1.3.0-100 python-rosdep=0.20.1-1 python-rosinstall python-rosinstall-generator python-wstool build-essential && \
     apt install -y python-catkin-tools
 
 # Init rosdep
-RUN rm /etc/ros/rosdep/sources.list.d/20-default.list && \
-    sudo -E rosdep init && \
+RUN sudo -E rosdep init && \
     rosdep update
     
 

@@ -10,7 +10,7 @@ ENV APT_KEY_DONT_WARN_ON_DANGEROUS_USAGE=TRUE
 
 RUN apt update
 
-# Python Rosdep Dependency
+# Python Rosdep Dependency (see https://github.com/ros-infrastructure/rosdep/issues/807 )
 RUN apt install -y python-pip && \
     pip install rospkg==1.3.0 && \
     pip install rosdep==0.20.0

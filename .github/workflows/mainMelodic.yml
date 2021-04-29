@@ -33,6 +33,7 @@ jobs:
           wget -q -O test.sh https://raw.githubusercontent.com/tlipps/giskardpy/devel/entrypoints/test.sh
           wget -q -O Dockerfile https://raw.githubusercontent.com/tlipps/giskardpy/devel/Dockerfiles/DockerfileMelodic
           docker build . --file Dockerfile --no-cache=True --tag my-image-name:$(date +%s)
+          docker exec my-image-name:$(date +%s) /test.sh
       
       # Runs a set of commands using the runners shell
       - name: Finished

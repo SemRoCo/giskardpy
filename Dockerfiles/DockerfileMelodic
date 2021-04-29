@@ -21,7 +21,7 @@ RUN apt install -y python-rosinstall python-rosinstall-generator python-wstool b
 
 # Init rosdep
 RUN rosdep fix-permissions && \
-    rosdep init && \
+    -E rosdep init && \
     rosdep update
     
 

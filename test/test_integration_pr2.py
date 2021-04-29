@@ -1614,6 +1614,39 @@ class TestCartGoals(object):
                 freqs_str = re.findall("[0-9]+\.[0-9]+ hertz", error_message)
                 assert any(map(lambda f_str: float(f_str[:-6]) == target_freq, freqs_str))
 
+    def test_only_revolute_joint_shaking(self, kitchen_setup):
+        sample_period = kitchen_setup.get_god_map().get_data(identifier.sample_period)
+        frequency_range = kitchen_setup.get_god_map().get_data(identifier.frequency_range)
+        amplitude_threshold = kitchen_setup.get_god_map().get_data(identifier.amplitude_threshold)
+        max_detectable_freq = int(1 / (2 * sample_period))
+        min_wiggle_frequency = int(frequency_range * max_detectable_freq)
+        distance_between_frequencies = 5 if sample_period < 0.05 else 1
+
+        for revolute_joint in [u'r_wrist_flex_joint', u'head_pan_joint']:#max vel. of 1.0 and 1.0
+            for f in range(min_wiggle_frequency, max_detectable_freq + 1, distance_between_frequencies):
+                target_freq = float(f)
+
+                if f == min_wiggle_frequency:
+                    kitchen_setup.set_json_goal(u'JointPositionRevolute',
+                                                joint_name=revolute_joint,
+                                                goal=0.0,
+                                                )
+                    kitchen_setup.send_goal()
+
+                kitchen_setup.set_json_goal(u'ShakyJointPositionRevoluteOrPrismatic',
+                                            joint_name=revolute_joint,
+                                            goal=0.0,
+                                            noise_amplitude=amplitude_threshold+0.01,
+                                            frequency=target_freq
+                                            )
+                r = kitchen_setup.send_goal(goal=None, goal_type=MoveGoal.PLAN_AND_EXECUTE)
+                assert len(r.error_codes) != 0
+                error_code = r.error_codes[0]
+                assert error_code == MoveResult.SHAKING
+                error_message = r.error_messages[0]
+                freqs_str = re.findall("[0-9]+\.[0-9]+ hertz", error_message)
+                assert any(map(lambda f_str: float(f_str[:-6]) == target_freq, freqs_str))
+
     def test_wiggle1(self, kitchen_setup):
         tray_pose = PoseStamped()
         tray_pose.header.frame_id = u'iai_kitchen/sink_area_surface'

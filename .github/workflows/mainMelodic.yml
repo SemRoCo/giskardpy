@@ -19,6 +19,8 @@ jobs:
   build:
     # The type of runner that the job will run on
     runs-on: ubuntu-18.04
+    env:
+      CURRENT_DATE: $(date +%s)
 
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
@@ -32,12 +34,12 @@ jobs:
           wget -q -O build.sh https://raw.githubusercontent.com/tlipps/giskardpy/devel/entrypoints/buildMelodic.sh
           wget -q -O test.sh https://raw.githubusercontent.com/tlipps/giskardpy/devel/entrypoints/test.sh
           wget -q -O Dockerfile https://raw.githubusercontent.com/tlipps/giskardpy/devel/Dockerfiles/DockerfileMelodic
-          docker build . --file Dockerfile --no-cache=True --tag giskard_docker:$(date +%s)
+          docker build . --file Dockerfile --no-cache=True --tag giskard_docker:$env.DAY_OF_WEEK
       
       - name: Testing Giskard in ROS Docker
         run: |
-          docker run --rm -i -t giskard_docker:$(date +%s) bash
-          docker exec giskard_docker:$(date +%s) /test.sh
+          docker run --rm -i -t giskard_docker:$env.DAY_OF_WEEK bash
+          docker exec giskard_docker:$env.DAY_OF_WEEK /test.sh
       
       # Runs a set of commands using the runners shell
       - name: Finished

@@ -16,8 +16,8 @@ RUN apt install -y python-rospkg=1.3.0-100 python-rosdep=0.20.1-1 python-rosinst
     apt install -y python-catkin-tools
 
 # Init rosdep
-RUN rosdep init && \
-    rosdep update
+RUN rosdep init || rm /etc/ros/rosdep/sources.list.d/20-default.list && rosdep init 
+RUN rosdep update
     
 
 # Install giskards python dependencies

@@ -37,4 +37,4 @@ COPY build.sh /build.sh
 COPY test.sh /test.sh
 
 # Code file to execute when the docker container starts up (`entrypoint.sh`)
-RUN /bin/bash -c "source build.sh && source test.sh"
+RUN /bin/bash -c "source build.sh"

@@ -16,7 +16,7 @@ RUN apt install -y python-rospkg=1.3.0-100 python-rosdep=0.20.1-1 python-rosinst
     apt install -y python-catkin-tools
 
 # Init rosdep
-RUN sudo -E rosdep init && \
+RUN rosdep init && \
     rosdep update
     
 

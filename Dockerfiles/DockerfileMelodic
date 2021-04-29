@@ -20,7 +20,8 @@ RUN apt install -y python-rosinstall python-rosinstall-generator python-wstool b
     apt install -y python-catkin-tools
 
 # Init rosdep
-RUN sudo -E rosdep init && \
+RUN rm /etc/ros/rosdep/sources.list.d/20-default.list && \
+    sudo -E rosdep init && \
     rosdep update
     
 

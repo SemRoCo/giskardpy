@@ -9,9 +9,9 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 ENV APT_KEY_DONT_WARN_ON_DANGEROUS_USAGE=TRUE
 
 # Install build dependencies
-RUN apt install -y python-rosdep python-rosinstall python-rosinstall-generator python-wstool build-essential python-pip
-    apt-get install -y python-catkin-tools
-    apt install -y python-rosdep
+RUN apt install -y python-rosdep python-rosinstall python-rosinstall-generator python-wstool build-essential python-pip && \
+    apt install -y python-catkin-tools && \
+    apt install -y python-rosdep && \
 
 # Init rosdep
 RUN rosdep init && \
@@ -19,12 +19,12 @@ RUN rosdep init && \
     rosdep fix-permissions
 
 # Install giskards python dependencies
-RUN pip install pybullet==3.0.8 # last known version to work with python 2.7
-    pip install scipy==1.2.2 # this is the last version for python 2.7
-    pip install casadi
-    pip install sortedcontainers
-    pip install hypothesis==4.34.0 # only needed if you want to run tests
-    pip install pandas==0.24.2
+RUN pip install pybullet==3.0.8 && \
+    pip install scipy==1.2.2 && \
+    pip install casadi && \
+    pip install sortedcontainers && \
+    pip install hypothesis==4.34.0 && \
+    pip install pandas==0.24.2 && \
     pip install numpy==1.16
 
 # Install run dependencies for giskardpy and the pr2 simulator

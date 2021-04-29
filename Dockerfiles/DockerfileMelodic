@@ -27,7 +27,8 @@ RUN pip install pybullet==3.0.8 && \
     pip install sortedcontainers && \
     pip install hypothesis==4.34.0 && \
     pip install pandas==0.24.2 && \
-    pip install numpy==1.16
+    pip install numpy==1.16 && \
+    pip install python-tk
 
 # Install run dependencies for giskardpy and the pr2 simulator
 RUN apt install -y ros-melodic-joint-state-publisher-gui

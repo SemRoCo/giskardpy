@@ -32,10 +32,12 @@ jobs:
           wget -q -O build.sh https://raw.githubusercontent.com/tlipps/giskardpy/devel/entrypoints/buildMelodic.sh
           wget -q -O test.sh https://raw.githubusercontent.com/tlipps/giskardpy/devel/entrypoints/test.sh
           wget -q -O Dockerfile https://raw.githubusercontent.com/tlipps/giskardpy/devel/Dockerfiles/DockerfileMelodic
-          docker build . --file Dockerfile --no-cache=True --tag my-image-name:$(date +%s)
+          docker build . --file Dockerfile --no-cache=True --tag giskard_docker:$(date +%s)
       
       - name: Testing Giskard in ROS Docker
-        run: docker exec my-image-name:$(date +%s) /test.sh
+        run: |
+          docker run --rm -i -t giskard_docker:$(date +%s) bash
+          docker exec giskard_docker:$(date +%s) /test.sh
       
       # Runs a set of commands using the runners shell
       - name: Finished

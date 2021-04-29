@@ -8,13 +8,16 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 # dont get warning from "danagerous usage of apt-key" only a problem when keys go outof date (they allways have to be fetch on demand)
 ENV APT_KEY_DONT_WARN_ON_DANGEROUS_USAGE=TRUE
 
-# Install build dependencies
-RUN apt update && \
-    apt install -y python-rosdep python-rosinstall python-rosinstall-generator python-wstool build-essential python-pip && \
-    apt install -y python-catkin-tools
+RUN apt update
 
 # Python Rosdep Dependency
-RUN pip install rospkg
+RUN python-pip && \
+    pip install rospkg==1.3.0 && \
+    pip install rosdep==0.20.0
+
+# Install build dependencies
+RUN apt install -y python-rosinstall python-rosinstall-generator python-wstool build-essential && \
+    apt install -y python-catkin-tools
 
 # Init rosdep
 RUN rosdep fix-permissions && \

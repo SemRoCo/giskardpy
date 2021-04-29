@@ -10,14 +10,14 @@ ENV APT_KEY_DONT_WARN_ON_DANGEROUS_USAGE=TRUE
 
 # Install build dependencies
 RUN apt update && \
-    apt install -y python-rospkg python-rosdep python-rosinstall python-rosinstall-generator python-wstool build-essential python-pip && \
-    apt install -y python-catkin-tools && \
-    apt install -y python-rosdep
-
+    apt install -y python-rosdep python-rosinstall python-rosinstall-generator python-wstool build-essential python-pip && \
+    apt install -y python-catkin-tools
+    
 # Init rosdep
-RUN rosdep init && \
-    rosdep update && \
-    rosdep fix-permissions
+RUN rosdep fix-permissions && \
+    rosdep init && \
+    rosdep update
+    
 
 # Install giskards python dependencies
 RUN pip install pybullet==3.0.8 && \

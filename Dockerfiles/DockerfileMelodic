@@ -1,0 +1,38 @@
+# We are running Ubuntu 18.04 for melodic
+FROM osrf/ros:melodic-desktop-full
+
+# Setup Timezone stuff
+ENV TZ=Europe/Berlin
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+
+# dont get warning from "danagerous usage of apt-key" only a problem when keys go outof date (they allways have to be fetch on demand)
+ENV APT_KEY_DONT_WARN_ON_DANGEROUS_USAGE=TRUE
+
+# Install build dependencies
+RUN apt install -y python-rosdep python-rosinstall python-rosinstall-generator python-wstool build-essential python-pip
+    apt-get install -y python-catkin-tools
+    apt install -y python-rosdep
+
+# Init rosdep
+RUN rosdep init && \
+    rosdep update && \
+    rosdep fix-permissions
+
+# Install giskards python dependencies
+RUN pip install pybullet==3.0.8 # last known version to work with python 2.7
+    pip install scipy==1.2.2 # this is the last version for python 2.7
+    pip install casadi
+    pip install sortedcontainers
+    pip install hypothesis==4.34.0 # only needed if you want to run tests
+    pip install pandas==0.24.2
+    pip install numpy==1.16
+
+# Install run dependencies for giskardpy and the pr2 simulator
+RUN apt install -y ros-melodic-joint-state-publisher-gui
+
+# Copies your code file from your action repository to the filesystem path `/` of the container
+COPY build.sh /build.sh
+COPY test.sh /test.sh
+
+# Code file to execute when the docker container starts up (`entrypoint.sh`)
+RUN /bin/bash -c "source build.sh && source test.sh"

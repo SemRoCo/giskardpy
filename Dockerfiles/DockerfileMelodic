@@ -12,7 +12,10 @@ ENV APT_KEY_DONT_WARN_ON_DANGEROUS_USAGE=TRUE
 RUN apt update && \
     apt install -y python-rosdep python-rosinstall python-rosinstall-generator python-wstool build-essential python-pip && \
     apt install -y python-catkin-tools
-    
+
+# Python Rosdep Dependency
+RUN pip install rospkg
+
 # Init rosdep
 RUN rosdep fix-permissions && \
     rosdep init && \

@@ -11,7 +11,7 @@ ENV APT_KEY_DONT_WARN_ON_DANGEROUS_USAGE=TRUE
 # Install build dependencies
 RUN apt install -y python-rosdep python-rosinstall python-rosinstall-generator python-wstool build-essential python-pip && \
     apt install -y python-catkin-tools && \
-    apt install -y python-rosdep && \
+    apt install -y python-rosdep
 
 # Init rosdep
 RUN rosdep init && \

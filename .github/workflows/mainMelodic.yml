@@ -38,8 +38,7 @@ jobs:
       
       - name: Testing Giskard in ROS Docker
         run: |
-          docker run giskard_docker:env.CURRENT_DATE
-          docker exec giskard_docker:env.CURRENT_DATE /test.sh
+          docker run giskard_docker:env.CURRENT_DATE --entrypoint /test.sh
       
       # Runs a set of commands using the runners shell
       - name: Finished

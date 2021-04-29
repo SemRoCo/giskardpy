@@ -37,8 +37,7 @@ jobs:
           docker build . --file Dockerfile --no-cache=True --tag giskard_docker:env.CURRENT_DATE
       
       - name: Testing Giskard in ROS Docker
-        run: |
-          docker run giskard_docker:env.CURRENT_DATE --entrypoint /test.sh
+        run: docker run giskard_docker:env.CURRENT_DATE --entrypoint /test.sh
       
       # Runs a set of commands using the runners shell
       - name: Finished

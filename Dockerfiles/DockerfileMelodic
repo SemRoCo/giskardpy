@@ -20,8 +20,7 @@ RUN apt install -y python-rosinstall python-rosinstall-generator python-wstool b
     apt install -y python-catkin-tools
 
 # Init rosdep
-RUN rosdep fix-permissions && \
-    sudo -E rosdep init && \
+RUN sudo -E rosdep init && \
     rosdep update
     
 

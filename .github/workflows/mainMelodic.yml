@@ -28,7 +28,7 @@ jobs:
       # Runs a single command using the runners shell
       - name: Building Docker & Giskard Workspace
         run: |
-          docker pull docker pull osrf/ros:melodic-desktop-full
+          docker pull osrf/ros:melodic-desktop-full
           wget -q -O build.sh https://raw.githubusercontent.com/tlipps/giskardpy/devel/entrypoints/buildMelodic.sh
           wget -q -O test.sh https://raw.githubusercontent.com/tlipps/giskardpy/devel/entrypoints/test.sh
           wget -q -O Dockerfile https://raw.githubusercontent.com/tlipps/giskardpy/devel/Dockerfiles/DockerfileMelodic

@@ -19,8 +19,6 @@ jobs:
   build:
     # The type of runner that the job will run on
     runs-on: ubuntu-18.04
-    env:
-      CURRENT_DATE: $(date +%s)
 
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
@@ -34,11 +32,12 @@ jobs:
           wget -q -O build.sh https://raw.githubusercontent.com/tlipps/giskardpy/devel/entrypoints/buildMelodic.sh
           wget -q -O test.sh https://raw.githubusercontent.com/tlipps/giskardpy/devel/entrypoints/test.sh
           wget -q -O Dockerfile https://raw.githubusercontent.com/tlipps/giskardpy/devel/Dockerfiles/DockerfileMelodic
-          docker build . --file Dockerfile --no-cache=True --tag giskard_docker:env.CURRENT_DATE
+          docker build . --file Dockerfile --no-cache=True --tag giskard_docker:latest
           
       - name: Testing Giskard in ROS Docker
         run: |
-          docker run -dit giskard_docker:env.CURRENT_DATE
+          docker run -dit giskard_docker:latest
+          echo "CONTAINER_ID=$(sudo docker ps)"
           echo "CONTAINER_ID=$(sudo docker ps -aqf "status=running")"
           echo "CONTAINER_ID=$(sudo docker ps -aqf "status=running")" >> $GITHUB_ENV
           docker exec -dit $CONTAINER_ID /bin/bash -c "source ~/ros_ws/devel/setup.bash; roslaunch iai_kitchen upload_kitchen_obj.launch;"

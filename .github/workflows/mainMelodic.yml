@@ -34,10 +34,10 @@ jobs:
           wget -q -O build.sh https://raw.githubusercontent.com/tlipps/giskardpy/devel/entrypoints/buildMelodic.sh
           wget -q -O test.sh https://raw.githubusercontent.com/tlipps/giskardpy/devel/entrypoints/test.sh
           wget -q -O Dockerfile https://raw.githubusercontent.com/tlipps/giskardpy/devel/Dockerfiles/DockerfileMelodic
-          docker build . --file Dockerfile --no-cache=True --tag giskard_docker:CURRENT_DATE
+          docker build . --file Dockerfile --no-cache=True --tag giskard_docker:env.CURRENT_DATE
           
       - name: Running ROS Docker
-        run: docker run -dit giskard_docker:CURRENT_DATE
+        run: docker run -dit giskard_docker:env.CURRENT_DATE
       
       - name: Testing Giskard in ROS Docker
         run: |

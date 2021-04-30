@@ -45,7 +45,7 @@ jobs:
           docker exec -dit $CONTAINER_ID /bin/bash -c "source ~/ros_ws/devel/setup.bash; roslaunch iai_pr2_sim ros_control_sim_with_base.launch;"
           docker exec -it $CONTAINER_ID /bin/bash -c "./test.sh;"
         env:
-          CONTAINER_ID: $(sudo docker ps -aqf "status=running")
+          CONTAINER_ID: $(echo $(sudo docker ps -aqf "status=running"))
       
       # Runs a set of commands using the runners shell
       - name: Finished

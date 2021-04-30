@@ -35,10 +35,12 @@ jobs:
           wget -q -O test.sh https://raw.githubusercontent.com/tlipps/giskardpy/devel/entrypoints/test.sh
           wget -q -O Dockerfile https://raw.githubusercontent.com/tlipps/giskardpy/devel/Dockerfiles/DockerfileMelodic
           docker build . --file Dockerfile --no-cache=True --tag giskard_docker
+          
+      - name: Running ROS Docker
+        run: docker run giskard_docker
       
       - name: Testing Giskard in ROS Docker
         run: |
-          docker run giskard_docker
           docker exec -it CONTAINER_ID /bin/bash -c "roslaunch iai_kitchen upload_kitchen_obj.launch;"
           docker exec -it CONTAINER_ID /bin/bash -c "roslaunch iai_pr2_sim ros_control_sim_with_base.launch;"
           docker exec -it CONTAINER_ID /bin/bash -c "./test.sh;"

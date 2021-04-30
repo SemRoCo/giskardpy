@@ -34,10 +34,10 @@ jobs:
           wget -q -O build.sh https://raw.githubusercontent.com/tlipps/giskardpy/devel/entrypoints/buildMelodic.sh
           wget -q -O test.sh https://raw.githubusercontent.com/tlipps/giskardpy/devel/entrypoints/test.sh
           wget -q -O Dockerfile https://raw.githubusercontent.com/tlipps/giskardpy/devel/Dockerfiles/DockerfileMelodic
-          docker build . --file Dockerfile --no-cache=True --tag giskard_docker
+          docker build . --file Dockerfile --no-cache=True --tag giskard_docker:CURRENT_DATE
           
       - name: Running ROS Docker
-        run: docker run giskard_docker
+        run: docker run giskard_docker:CURRENT_DATE
       
       - name: Testing Giskard in ROS Docker
         run: |
@@ -45,7 +45,7 @@ jobs:
           docker exec -it CONTAINER_ID /bin/bash -c "roslaunch iai_pr2_sim ros_control_sim_with_base.launch;"
           docker exec -it CONTAINER_ID /bin/bash -c "./test.sh;"
         env:
-          CONTAINER_ID: $(sudo docker ps -aqf "name=giskard_docker")  
+          CONTAINER_ID: $(sudo docker ps -aqf "name=giskard_docker:CURRENT_DATE")  
       
       # Runs a set of commands using the runners shell
       - name: Finished

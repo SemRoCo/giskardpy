@@ -40,9 +40,9 @@ jobs:
           echo "CONTAINER_ID=$(sudo docker ps)"
           echo "CONTAINER_ID=$(sudo docker ps -aqf "status=running")"
           echo "CONTAINER_ID=$(sudo docker ps -aqf "status=running")" >> $GITHUB_ENV
-          docker exec -dit $CONTAINER_ID bash -c "source ~/ros_ws/devel/setup.bash; roslaunch iai_kitchen upload_kitchen_obj.launch;"
-          docker exec -dit $CONTAINER_ID bash -c "source ~/ros_ws/devel/setup.bash; roslaunch iai_pr2_sim ros_control_sim_with_base.launch;"
-          docker exec -it $CONTAINER_ID bash -c "./test.sh;"
+          docker exec -dit $CONTAINER_ID "source ~/ros_ws/devel/setup.bash; roslaunch iai_kitchen upload_kitchen_obj.launch;"
+          docker exec -dit $CONTAINER_ID "source ~/ros_ws/devel/setup.bash; roslaunch iai_pr2_sim ros_control_sim_with_base.launch;"
+          docker exec -it $CONTAINER_ID "./test.sh;"
       
       # Runs a set of commands using the runners shell
       - name: Finished

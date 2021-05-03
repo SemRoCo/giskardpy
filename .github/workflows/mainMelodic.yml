@@ -40,7 +40,7 @@ jobs:
           docker exec -d $(sudo docker ps -aqf "status=running") bash -c "echo test;"
           docker exec -d $(sudo docker ps -aqf "status=running") bash -c "source ~/ros_ws/devel/setup.bash; roslaunch iai_kitchen upload_kitchen_obj.launch;"
           docker exec -d $(sudo docker ps -aqf "status=running") bash -c "source ~/ros_ws/devel/setup.bash; roslaunch iai_pr2_sim ros_control_sim_with_base.launch;"
-          docker exec $(sudo docker ps -aqf "status=running") "./test.sh;"
+          docker exec $(sudo docker ps -aqf "status=running") bash -c "./test.sh;"
       
       # Runs a set of commands using the runners shell
       - name: Finished

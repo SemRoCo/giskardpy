@@ -36,7 +36,7 @@ jobs:
           
       - name: Testing Giskard in ROS Docker
         run: |
-          docker run -dit giskard_docker:latest bash
+          docker run -dit giskard_docker:latest
           echo "CONTAINER_ID=$(sudo docker ps)"
           echo "CONTAINER_ID=$(sudo docker ps -aqf "status=running")"
           echo "CONTAINER_ID=$(sudo docker ps -aqf "status=running")" >> $GITHUB_ENV

@@ -37,12 +37,10 @@ jobs:
       - name: Testing Giskard in ROS Docker
         run: |
           docker run -dit giskard_docker:latest
-          echo "CONTAINER_ID=$(sudo docker ps)"
-          echo "CONTAINER_ID=$(sudo docker ps -aqf "status=running")"
-          echo "CONTAINER_ID=$(sudo docker ps -aqf "status=running")" >> $GITHUB_ENV
           docker exec -d $(sudo docker ps -aqf "status=running") bash -c "echo test;"
           docker exec -d $(sudo docker ps -aqf "status=running") bash -c "source ~/ros_ws/devel/setup.bash; roslaunch iai_kitchen upload_kitchen_obj.launch;"
           docker exec -d $(sudo docker ps -aqf "status=running") bash -c "source ~/ros_ws/devel/setup.bash; roslaunch iai_pr2_sim ros_control_sim_with_base.launch;"
+          docker exec $(sudo docker ps -aqf "status=running") bash -c "ls;"
           docker exec $(sudo docker ps -aqf "status=running") "./test.sh;"
       
       # Runs a set of commands using the runners shell

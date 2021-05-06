@@ -27,7 +27,7 @@ RUN pip install pybullet==3.0.8 && \
     pip install casadi && \
     pip install sortedcontainers && \
     pip install hypothesis==4.34.0 && \
-    pip install transforms3d && \
+    pip install "transforms3d" && \
     pip install pandas==0.24.2 && \
     pip install numpy==1.16
 

@@ -11,7 +11,7 @@ from tf.transformations import quaternion_matrix, quaternion_about_axis, quatern
     quaternion_slerp, rotation_from_matrix, euler_from_matrix
 from transforms3d.quaternions import quat2mat, quat2axangle
 
-from giskardpy import cas_wrapper as w
+from giskardpy import casadi_wrapper as w
 from utils_for_tests import float_no_nan_no_inf, SMALL_NUMBER, unit_vector, quaternion, vector, \
     pykdl_frame_to_numpy, lists_of_same_length, angle, compare_axis_angle, angle_positive, sq_matrix
 
@@ -572,7 +572,7 @@ class TestCASWrapper(unittest.TestCase):
 
     @given(sq_matrix())
     def test_sum(self, m):
-        actual_sum = w.compile_and_execute(w.sum, [m])
+        actual_sum = w.compile_and_execute(w.Sum, [m])
         expected_sum = np.sum(m)
         self.assertTrue(np.isclose(actual_sum, expected_sum))
 

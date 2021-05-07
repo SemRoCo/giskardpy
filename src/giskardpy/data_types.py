@@ -15,19 +15,22 @@ SoftConstraint = namedtuple(u'SoftConstraint', [u'lbA_v', u'ubA_v',
 HardConstraint = namedtuple(u'HardConstraint', [u'lower', u'upper', u'expression'])
 JointConstraint = namedtuple(u'JointConstraint', [u'lower_v', u'upper_v', u'weight_v',
                                                   u'lower_a', u'upper_a', u'weight_a',
+                                                  u'lower_j', u'upper_j', u'weight_j',
                                                   u'joint_symbol', u'joint_velocity_symbol',
+                                                  u'joint_acceleration_symbol',
                                                   u'linear_weight'])
 
 
 class SingleJointState(object):
-    def __init__(self, name='', position=0.0, velocity=0.0, effort=0.0):
+    def __init__(self, name='', position=0.0, velocity=0.0, acceleration=0.0, jerk=0.0):
         self.name = name
         self.position = position
         self.velocity = velocity
-        self.effort = effort
+        self.acceleration = acceleration
+        self.jerk = jerk
 
     def __str__(self):
-        return u'{}: {}, {}, {}'.format(self.name, self.position, self.velocity, self.effort)
+        return u'{}: {}, {}, {}, {}'.format(self.name, self.position, self.velocity, self.acceleration, self.jerk)
 
 
 class Trajectory(object):

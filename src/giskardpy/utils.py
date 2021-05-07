@@ -383,6 +383,7 @@ def plot_trajectory(tj, controlled_joints, path_to_data_folder, sample_period, o
     if len(tj._points) <= 0:
         return
     colors = [u'b', u'g', u'r', u'c', u'm', u'y', u'k']
+    titles = [u'position', u'velocity', u'acceleration', u'jerk', u'snap', u'crackle', u'pop']
     line_styles = [u'', u'--', u'-.', u':']
     fmts = [u''.join(i) for i in product(line_styles, colors)]
     data = [[] for i in range(order)]
@@ -416,11 +417,11 @@ def plot_trajectory(tj, controlled_joints, path_to_data_folder, sample_period, o
         ticks = np.append(ticks, last)
         ticks = np.append(ticks, times[-1])
         for i in range(order):
-            axs[i].set_title(r'$p' + '\'' * i + "$")
+            axs[i].set_title(titles[i])
             axs[i].xaxis.set_ticks(ticks)
     else:
         for i in range(order):
-            axs[i].set_title(r'$p' + '\'' * i + "$")
+            axs[i].set_title(titles[i])
     for i in range(len(controlled_joints)):
         if velocity_threshold is None or any(abs(data[1][:, i]) > velocity_threshold):
             for j in range(order):
@@ -861,7 +862,7 @@ def traj_to_msg(sample_period, trajectory, controlled_joints, fill_velocity_valu
 
 def make_filter_b_mask(H, num_joint_constraints):
     filter = H.sum(axis=1) != 0
-    filter[:num_joint_constraints*2] = True  # make sure joints are never kicked out
+    filter[:num_joint_constraints*3] = True  # make sure joints are never kicked out
     return filter
 
 

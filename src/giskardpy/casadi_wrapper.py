@@ -16,6 +16,17 @@ VERY_SMALL_NUMBER = 1e-100
 SMALL_NUMBER = 1e-10
 
 
+def var(variables_names):
+    """
+    :type variables_names: str
+    :return:
+    """
+    symbols = []
+    for v in variables_names.split(' '):
+        symbols.append(Symbol(v))
+    return symbols
+
+
 def diag(*args):
     return ca.diag(Matrix(args))
 
@@ -631,6 +642,7 @@ def axis_angle_from_quaternion(x, y, z, w):
     z = if_eq_zero(w2, 1, z / m)
     return Matrix([x, y, z]), angle
 
+
 def normalize_axis_angle(axis, angle):
     axis = if_less(angle, 0, -axis, axis)
     angle = abs(angle)
@@ -1066,6 +1078,87 @@ def velocity_limit_from_position_limit(acceleration_limit, position_limit, curre
     velocity_limit *= sign_
     velocity_limit /= m
     return velocity_limit
+
+
+def position_with_max_velocity(velocity_limit, jerk_limit):
+    t = np.sqrt(np.abs(velocity_limit / jerk_limit))
+    return -t * velocity_limit
+
+
+def t_til_pos2(position_error, jerk_limit):
+    return (position_error / (2 * jerk_limit)) ** (1 / 3)
+
+
+def position_till_b(jerk_limit, t):
+    return (1 / 6) * jerk_limit * t ** 3
+
+
+def position_till_a(jerk_limit, t, t_offset, velocity_limit):
+    return (
+                       1 / 6) * jerk_limit * t ** 3 - 0.5 * jerk_limit * t_offset * t ** 2 + 0.5 * jerk_limit * t_offset ** 2 * t + velocity_limit * t
+
+
+def velocity(velocity_limit, jerk_limit, t):
+    t_b = np.sqrt(np.abs(velocity_limit / jerk_limit))
+    t_a = t_b * 2
+    if t < t_b:
+        return velocity_limit + 0.5 * jerk_limit * t ** 2
+    if t < t_a:
+        t -= t_a
+        return -0.5 * jerk_limit * t ** 2
+    return velocity_limit
+
+
+def position(jerk_limit, t, velocity_limit):
+    t_b = np.sqrt(np.abs(velocity_limit / jerk_limit))
+    t_a = t_b * 2
+    if t < t_b:
+        return (1 / 6) * jerk_limit * t ** 3 + velocity_limit * t - velocity_limit * t_b
+    if t < t_a:
+        t -= t_a
+        return -(1 / 6) * jerk_limit * t ** 3
+    return velocity_limit * t
+
+
+def compute_t_from_position(jerk_limit, position_error, velocity_limit):
+    t_b = np.sqrt(np.abs(velocity_limit / jerk_limit))
+    a = position_with_max_velocity(velocity_limit, jerk_limit)
+    b = -(1 / 6) * jerk_limit * (-t_b) ** 3
+    t_a = t_b * 2
+    if position_error < b:
+        asdf = (-(6 * position_error) / jerk_limit)
+        return np.sign(asdf) * np.abs(asdf) ** (1 / 3) + t_a
+    if position_error < a:
+        return np.real(-1.44224957030741 * (-0.5 - 0.866025403784439j) * \
+                       (((-t_b * velocity_limit - position_error) ** 2 / jerk_limit ** 2 + (
+                                   8 / 9) * velocity_limit ** 3 / jerk_limit ** 3) ** (0.5 + 0j) + (1 / 6) *
+                        (-6.0 * t_b * velocity_limit - 6.0 * position_error) / jerk_limit) ** (1 / 3) \
+                       + 1.38672254870127 * velocity_limit * (-0.5 + 0.866025403784439j) / \
+                       (jerk_limit * (((-t_b * velocity_limit - position_error) ** 2 / jerk_limit ** 2 + (
+                                   8 / 9) * velocity_limit ** 3 / jerk_limit ** 3) ** (0.5 + 0j)
+                                      + (1 / 6) * (
+                                                  -6.0 * t_b * velocity_limit - 6.0 * position_error) / jerk_limit) ** (
+                                    1 / 3)))
+    return 0
+
+
+def jerk_limits_from_everything(position_limit, velocity_limit, jerk_limit, current_position, current_velocity,
+                                current_acceleration, t, step_size, eps=1e-5):
+    """
+    Computes the velocity limit given a distance to the position limits, an acceleration limit and a step size
+    :param acceleration_limit:
+    :param distance_to_position_limit:
+    :param step_size:
+    :param eps:
+    :return:
+    """
+    # p(t) describes slowdown with max vel/jerk down to 0
+    # 1. get t from p(t)=position_limit - current_position
+    # 2. plug t into v(t) to get vel limit
+
+    a = position_with_max_velocity(velocity_limit, jerk_limit)
+    t_b = t_til_pos2(a, jerk_limit)
+    t_a = t_b * 2
 
 
 def to_str(expression):

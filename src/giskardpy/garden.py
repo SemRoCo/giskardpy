@@ -128,6 +128,9 @@ def initialize_god_map():
     joint_vel_symbols = JointStatesInput(blackboard.god_map.to_symbol, world.robot.get_movable_joints(),
                                          identifier.joint_states,
                                          suffix=[u'velocity'])
+    joint_acc_symbols = JointStatesInput(blackboard.god_map.to_symbol, world.robot.get_movable_joints(),
+                                         identifier.joint_states,
+                                         suffix=[u'acceleration'])
     world.robot.update_joint_symbols(joint_position_symbols.joint_map, joint_vel_symbols.joint_map,
                                      joint_weight_symbols,
                                      joint_velocity_linear_limit_symbols, joint_velocity_angular_limit_symbols,
@@ -209,8 +212,8 @@ def grow_tree():
     post_processing = failure_is_success(Sequence)(u'post planning')
     # post_processing.add_child(WiggleCancel(u'final wiggle detection', final_detection=True))
     if god_map.get_data(identifier.enable_PlotTrajectory):
-        post_processing.add_child(PlotTrajectory(u'plot trajectory', order=3))
-        post_processing.add_child(PlotlbA(u'plot lba', order=3))
+        post_processing.add_child(PlotTrajectory(u'plot trajectory', order=4))
+        post_processing.add_child(PlotlbA(u'plot lba', order=2))
     post_processing.add_child(PostProcessing(u'evaluate result'))
     # post_processing.add_child(PostProcessing(u'check reachability'))
     # ----------------------------------------------

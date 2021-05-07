@@ -113,7 +113,7 @@ class QPSolver(object):
                 self.started = False
         else:  # if not break
             self.started = False
-            message = u''.format(self.RETURN_VALUE_DICT[success])
+            message = u'{}'.format(self.RETURN_VALUE_DICT[success])
             if success in [PyReturnValue.INIT_FAILED_INFEASIBILITY,
                            PyReturnValue.QP_INFEASIBLE,
                            PyReturnValue.HOTSTART_STOPPED_INFEASIBILITY,

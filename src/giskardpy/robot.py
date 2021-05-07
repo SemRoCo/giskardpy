@@ -204,6 +204,7 @@ class Robot(Backend):
             lower_limit, upper_limit = self.get_joint_limits(joint_name)
             joint_symbol = self.get_joint_position_symbol(joint_name)
             joint_velocity_symbol = self.get_joint_velocity_symbol(joint_name)
+            joint_velocity_symbol = self.get_joint_acvelocity_symbol(joint_name)
             sample_period = god_map.to_symbol(identifier.sample_period)
             velocity_limit = self.get_joint_velocity_limit_expr(joint_name)  # * sample_period
             acceleration_limit = self.get_joint_acceleration_limit_expr(joint_name)  # * sample_period
@@ -242,6 +243,9 @@ class Robot(Backend):
                     lower_a=-acceleration_limit2,
                     upper_a=acceleration_limit2,
                     weight_a=0,
+                    lower_j=-2,
+                    upper_j=2,
+                    weight_j=0,
                     linear_weight=0,
                     joint_symbol=joint_symbol,
                     joint_velocity_symbol=joint_velocity_symbol)

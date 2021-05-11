@@ -1,6 +1,6 @@
 from collections import OrderedDict
 from time import time
-
+import matplotlib.pyplot as plt
 import numpy as np
 
 from giskardpy import logging, casadi_wrapper as w
@@ -23,27 +23,19 @@ def print_pd_dfs(dfs, names):
             with open(path, 'w') as f:
                 f.write(df.to_csv())
 
-
 class Parent(object):
-    def _sorter(self, jv=None, ja=None, jj=None, sv=None, sa=None):
+    def _sorter(self, *args):
         """
-        :type jv: dict
-        :type ja: dict
-        :type sv: dict
-        :type sa: dict
+        Sorts every arg dict individually and then appends all of them.
+        :arg args: a bunch of dicts
         :return: list
         """
-        jv = jv if jv is not None else {}
-        ja = ja if ja is not None else {}
-        jj = jj if jj is not None else {}
-        sv = sv if sv is not None else {}
-        sa = sa if sa is not None else {}
-        return self.__helper(jv) + self.__helper(ja) + self.__helper(jj) + self.__helper(sv) + self.__helper(sa), \
-               self.__helper_names(jv) + \
-               self.__helper_names(ja) + \
-               self.__helper_names(jj) + \
-               self.__helper_names(sv) + \
-               self.__helper_names(sa)
+        result = []
+        result_names = []
+        for arg in args:
+            result.extend(self.__helper(arg))
+            result_names.extend(self.__helper_names(arg))
+        return result, result_names
 
     def __helper(self, param):
         return [x for _, x in sorted(param.items())]
@@ -53,12 +45,18 @@ class Parent(object):
 
 
 class H(Parent):
-    def __init__(self):
+    def __init__(self, prediction_horizon):
         self.__j_weights_v = {}
         self.__j_weights_a = {}
         self.__j_weights_j = {}
         self.__s_weights_v = {}
         self.__s_weights_a = {}
+        self.prediction_horizon = prediction_horizon
+        self.height = 0
+
+    @property
+    def width(self):
+        return self.height
 
     def add_joint_constraint(self, name, constraint):
         """
@@ -69,6 +67,7 @@ class H(Parent):
         self.__j_weights_v[name + '/v'] = constraint.weight_v
         self.__j_weights_a[name + '/a'] = constraint.weight_a
         self.__j_weights_j[name + '/j'] = constraint.weight_j
+        self.height += self.prediction_horizon*3
 
     def add_soft_constraint(self, name, constraint):
         """
@@ -78,17 +77,30 @@ class H(Parent):
         """
         self.__s_weights_v[name + '/v'] = constraint.weight_v
         self.__s_weights_a[name + '/a'] = constraint.weight_a
+        self.height += 1
 
     def weights(self):
-        return self._sorter(jv=self.__j_weights_v,
-                            ja=self.__j_weights_a,
-                            jj=self.__j_weights_j,
-                            sv=self.__s_weights_v,
-                            sa=self.__s_weights_a)[0]
+        vel_weights = {}
+        f = 0.1
+        for t in range(self.prediction_horizon):
+            for name, weight in self.__j_weights_v.items():
+                vel_weights['t{:03d}/{}'.format(t, name)] = weight + f*t
+        acc_weights = {}
+        for t in range(self.prediction_horizon):
+            for name, weight in self.__j_weights_a.items():
+                acc_weights['t{:03d}/{}'.format(t, name)] = weight + f*t
+        jerk_weights = {}
+        for t in range(self.prediction_horizon):
+            for name, weight in self.__j_weights_j.items():
+                jerk_weights['t{:03d}/{}'.format(t, name)] = weight + f*t
+        return self._sorter(vel_weights,
+                            acc_weights,
+                            jerk_weights,
+                            self.__s_weights_v)[0]
 
 
 class B(Parent):
-    def __init__(self):
+    def __init__(self, prediction_horizon):
         self._j_lb_v = {}
         self._j_ub_v = {}
         self._j_lb_a = {}
@@ -99,6 +111,7 @@ class B(Parent):
         self._s_ub_v = {}
         self._s_lb_a = {}
         self._s_ub_a = {}
+        self.prediction_horizon = prediction_horizon
 
     def add_joint_constraint(self, name, constraint):
         """
@@ -123,30 +136,37 @@ class B(Parent):
         self._s_ub_v[name + '/v'] = constraint.upper_slack_limit_v
         self._s_ub_a[name + '/a'] = constraint.upper_slack_limit_a
 
+    def blow_up(self, d):
+        result = {}
+        for t in range(self.prediction_horizon):
+            for name, value in d.items():
+                if t == self.prediction_horizon -1:
+                    result['t{:03d}/{}'.format(t, name)] = 0
+                else:
+                    result['t{:03d}/{}'.format(t, name)] = value
+        return result
+
     def lb(self):
-        return self._sorter(jv=self._j_lb_v,
-                            ja=self._j_lb_a,
-                            jj=self._j_lb_j,
-                            sv=self._s_lb_v,
-                            sa=self._s_lb_a)[0]
+        return self._sorter(self.blow_up(self._j_lb_v),
+                            self.blow_up(self._j_lb_a),
+                            self.blow_up(self._j_lb_j),
+                            self._s_lb_v)[0]
 
     def ub(self):
-        return self._sorter(jv=self._j_ub_v,
-                            ja=self._j_ub_a,
-                            jj=self._j_ub_j,
-                            sv=self._s_ub_v,
-                            sa=self._s_ub_a)[0]
+        return self._sorter(self.blow_up(self._j_ub_v),
+                            self.blow_up(self._j_ub_a),
+                            self.blow_up(self._j_ub_j),
+                            self._s_ub_v)[0]
 
     def names(self):
-        return self._sorter(jv=self._j_ub_v,
-                            ja=self._j_ub_a,
-                            jj=self._j_ub_j,
-                            sv=self._s_ub_v,
-                            sa=self._s_ub_a)[1]
+        return self._sorter(self.blow_up(self._j_ub_v),
+                            self.blow_up(self._j_ub_a),
+                            self.blow_up(self._j_ub_j),
+                            self._s_ub_v)[1]
 
 
 class BA(Parent):
-    def __init__(self):
+    def __init__(self, order, prediction_horizon):
         self._lbA_v = {}
         self._ubA_v = {}
         self._lbA_a = {}
@@ -155,16 +175,28 @@ class BA(Parent):
         self._j_ubA_a_link = {}
         self._j_lbA_j_link = {}
         self._j_ubA_j_link = {}
+        self._pos_limits_lba = {}
+        self._pos_limits_uba = {}
+        self._pos_limits_lba2 = {}
+        self._pos_limits_uba2 = {}
+        self._joint_names = []
+        self.prediction_horizon = prediction_horizon
+        self.order = order
 
     def add_joint_constraint(self, name, constraint):
         """
         :type name: str
         :type constraint: JointConstraint
         """
-        self._j_lbA_a_link[name + '/acc_link'] = constraint.joint_velocity_symbol
-        self._j_ubA_a_link[name + '/acc_link'] = constraint.joint_velocity_symbol
-        self._j_lbA_j_link[name + '/jerk_link'] = constraint.joint_acceleration_symbol
-        self._j_ubA_j_link[name + '/jerk_link'] = constraint.joint_acceleration_symbol
+        self._pos_limits_lba[name + '/pos_limit'] = 0#constraint.lower_p - constraint.joint_symbol
+        self._pos_limits_uba[name + '/pos_limit'] = 0#constraint.upper_p - constraint.joint_symbol
+        self._pos_limits_lba2[name + '/pos_limit'] = constraint.lower_p - constraint.joint_symbol
+        self._pos_limits_uba2[name + '/pos_limit'] = constraint.upper_p - constraint.joint_symbol
+        self._j_lbA_a_link[name + '/last_vel'] = constraint.joint_velocity_symbol
+        self._j_ubA_a_link[name + '/last_vel'] = constraint.joint_velocity_symbol
+        self._j_lbA_j_link[name + '/last_acc'] = constraint.joint_acceleration_symbol
+        self._j_ubA_j_link[name + '/last_acc'] = constraint.joint_acceleration_symbol
+        self._joint_names.append(name)
 
     def add_soft_constraint(self, name, constraint):
         """
@@ -177,30 +209,90 @@ class BA(Parent):
         self._ubA_a[name + '/a'] = constraint.ubA_a
 
     def lbA(self):
-        return self._sorter(ja=self._j_lbA_a_link,
-                            jj=self._j_lbA_j_link,
-                            sv=self._lbA_v,
-                            sa=self._lbA_a)[0]
+        # lba = [
+        #       j1 pos limit, j2 pos limit, j3 pos limit,
+        #       j1 pos limit, j2 pos limit, j3 pos limit,
+        #       joint1 last vel for t1, ..., jointn last vel for t1,
+        #       0 for each joint t2,
+        #       ...
+        #       0 for each joint tn,
+        #       joint1 last acc for t1, ..., jointn last acc for t1,
+        #       0 for each joint t2,
+        #       ...
+        #       0 for each joint tn,
+        #       soft constraints
+        #       ]
+        vel_link = {}
+        for joint in self._joint_names:
+            for t in range(self.prediction_horizon-1):
+                vel_link['t{:03d}/{}/vel_link/'.format(t+1, joint)] = 0
+        acc_link = {}
+        for joint in self._joint_names:
+            for t in range(self.prediction_horizon-1):
+                acc_link['t{:03d}/{}/acc_link/'.format(t+1, joint)] = 0
+        return self._sorter(self._pos_limits_lba,
+                            self._pos_limits_lba2,
+                            self._j_lbA_a_link,
+                            vel_link,
+                            self._j_lbA_j_link,
+                            acc_link,
+                            self._lbA_v)[0]
 
     def ubA(self):
-        return self._sorter(ja=self._j_ubA_a_link,
-                            jj=self._j_ubA_j_link,
-                            sv=self._ubA_v,
-                            sa=self._ubA_a)[0]
+        vel_link = {}
+        for joint in self._joint_names:
+            for t in range(self.prediction_horizon-1):
+                vel_link['t{:03d}/{}/vel_link/'.format(t+1, joint)] = 0
+        acc_link = {}
+        for joint in self._joint_names:
+            for t in range(self.prediction_horizon-1):
+                acc_link['t{:03d}/{}/acc_link/'.format(t+1, joint)] = 0
+        return self._sorter(self._pos_limits_uba,
+                            self._pos_limits_uba2,
+                            self._j_lbA_a_link,
+                            vel_link,
+                            self._j_lbA_j_link,
+                            acc_link,
+                            self._lbA_v)[0]
 
     def names(self):
-        return self._sorter(ja=self._j_ubA_a_link,
-                            jj=self._j_ubA_j_link,
-                            sv=self._ubA_v,
-                            sa=self._ubA_a)[1]
+        vel_link = {}
+        for joint in self._joint_names:
+            for t in range(self.prediction_horizon-1):
+                vel_link['t{:03d}/{}/vel_link/'.format(t + 1, joint)] = 0
+        acc_link = {}
+        for joint in self._joint_names:
+            for t in range(self.prediction_horizon-1):
+                acc_link['t{:03d}/{}/acc_link/'.format(t+1, joint)] = 0
+        return self._sorter(self._pos_limits_lba,
+                            self._pos_limits_lba,
+                            self._j_lbA_a_link,
+                            vel_link,
+                            self._j_lbA_j_link,
+                            acc_link,
+                            self._lbA_v)[1]
 
 
 class A(Parent):
-    def __init__(self, sample_period):
+    def __init__(self, sample_period, prediction_horizon, order=3):
         self._A_soft = {}
         self._A_hard = {}
         self._A_joint = {}
+        self.prediction_horizon = prediction_horizon
         self.sample_period = sample_period
+        self.order = order
+
+    @property
+    def number_of_joints(self):
+        return len(self.controlled_joint_symbols())
+
+    @property
+    def height(self):
+        return 2 * self.number_of_joints + self.number_of_joints * self.prediction_horizon * (self.order - 1) + len(self._A_soft)
+
+    @property
+    def width(self):
+        return self.number_of_joints * self.prediction_horizon * self.order + len(self._A_soft)
 
     def add_joint_constraint(self, name, constraint):
         """
@@ -221,52 +313,98 @@ class A(Parent):
         self._A_soft[name] = constraint.expression
 
     def controlled_joint_symbols(self):
-        return self._sorter(jv=self._A_joint)[0]
+        return self._sorter(self._A_joint)[0]
 
     def construct_A_soft(self):
-        j = len(self._A_joint)
-        s = len(self._A_soft)
-        A_soft = w.zeros(j * 2 + s * 2, j * 3 + s * 2)
-        soft_expressions = self._sorter(sv=self._A_soft)[0]
+        #         |   t1   |   tn   |   t1   |   tn   |   t1   |   tn   |
+        #         |v1 v2 vn|v1 v2 vn|a1 a2 an|a1 a2 an|j1 j2 jn|j1 j2 jn|
+        #         |-----------------------------------------------------|
+        #         |sp      |        |        |        |        |        |
+        #         |   sp   |        |        |        |        |        |
+        #         |      sp|        |        |        |        |        |
+        #         |-----------------------------------------------------|
+        #         |sp      |sp      |        |        |        |        |
+        #         |   sp   |   sp   |        |        |        |        |
+        #         |      sp|      sp|        |        |        |        |
+        #         |=====================================================|
+        #         | 1      |        |-sp     |        |        |        |
+        #         |    1   |        |   -sp  |        |        |        |
+        #         |       1|        |     -sp|        |        |        |
+        #         |-----------------------------------------------------|
+        #         |-1      | 1      |        |-sp     |        |        |
+        #         |   -1   |    1   |        |   -sp  |        |        |
+        #         |      -1|       1|        |     -sp|        |        |
+        #         |=====================================================|
+        #         |        |        | 1      |        |-sp     |        |
+        #         |        |        |    1   |        |   -sp  |        |
+        #         |        |        |       1|        |     -sp|        |
+        #         |-----------------------------------------------------|
+        #         |        |        |-1      | 1      |        |-sp     |
+        #         |        |        |   -1   |    1   |        |   -sp  |
+        #         |        |        |      -1|       1|        |     -sp|
+        #         |=====================================================|
+        #         |  J*sp  |  J*sp  |        |        |        |        |
+        #         |-----------------------------------------------------|
+
+        #         |   t1   |   t2   |   t3   |   t3   |
+        #         |v1 v2 vn|v1 v2 vn|v1 v2 vn|v1 v2 vn|
+        #         |-----------------------------------|
+        #         |sp      |        |        |        |
+        #         |   sp   |        |        |        |
+        #         |      sp|        |        |        |
+        #         |sp      |sp      |        |        |
+        #         |   sp   |   sp   |        |        |
+        #         |      sp|      sp|        |        |
+        #         |sp      |sp      |sp      |        |
+        #         |   sp   |   sp   |   sp   |        |
+        #         |      sp|      sp|      sp|        |
+        #         |sp      |sp      |sp      |sp      |
+        #         |   sp   |   sp   |   sp   |   sp   |
+        #         |      sp|      sp|      sp|      sp|
+        #         |===================================|
+
+        number_of_joints = self.number_of_joints
+        A_soft = w.zeros(self.height, self.width)
+        soft_expressions = self._sorter(self._A_soft)[0]
         controlled_joints = self.controlled_joint_symbols()
         t = time()
-        jac = w.jacobian(w.Matrix(soft_expressions), controlled_joints, order=1)
+        J = w.jacobian(w.Matrix(soft_expressions), controlled_joints, order=1)
         logging.loginfo(u'computed Jacobian in {:.5f}s'.format(time() - t))
-        jac_dot = w.jacobian(w.Matrix(soft_expressions), controlled_joints, order=2)
-        logging.loginfo(u'computed Jacobian dot in {:.5f}s'.format(time() - t))
+        # Jd = w.jacobian(w.Matrix(soft_expressions), controlled_joints, order=2)
+        # logging.loginfo(u'computed Jacobian dot in {:.5f}s'.format(time() - t))
 
-        #        j    j    j    s    s
-        # j   |  I | -I |    |    |    |
-        # j   |    |  I | -I |    |    |
-        # sv  | J  |    |    |  I |    |
-        # sa  | Jd | J  |    |    |  I |
-        #
+        # position limits
+        I = w.eye(number_of_joints) * self.sample_period
+        # A_soft[:number_of_joints, :number_of_joints] = I
+        for p in range(self.prediction_horizon):
+            A_soft[number_of_joints:2 * number_of_joints, p*number_of_joints:(p+1) * number_of_joints] = I
+        vertical_offset = 2 * number_of_joints
 
-        # this assumes a jv ja sorting
-        # row 1
-        v_start = 0
-        v_end = j
-        A_soft[v_start:v_end, :j * 1] = w.eye(j)
-        A_soft[v_start:v_end, j * 1:j * 2] = -w.eye(j) * self.sample_period
+        # derivative links
+        I = w.eye(number_of_joints * (self.order - 1) * self.prediction_horizon)
+        block_size = number_of_joints * (self.order - 1) * self.prediction_horizon
+        A_soft[vertical_offset:vertical_offset+block_size, :block_size] += I
+        h_offset = number_of_joints * self.prediction_horizon
+        A_soft[vertical_offset:vertical_offset+block_size, h_offset:h_offset + block_size] += -I * self.sample_period
 
-        # row 2
-        v_start += j
-        v_end += j
-        A_soft[v_start:v_end, j * 1:j * 2] = w.eye(j)
-        A_soft[v_start:v_end, j * 2:j * 3] = -w.eye(j)
+        I_height = number_of_joints * (self.prediction_horizon - 1)
+        I = -w.eye(I_height)
+        offset_v = vertical_offset
+        offset_h = 0
+        for o in range(self.order - 1):
+            offset_v += number_of_joints
+            A_soft[offset_v:offset_v + I_height,offset_h:offset_h+I_height] += I
+            offset_v += I_height
+            offset_h += self.prediction_horizon*number_of_joints
+        vertical_offset = vertical_offset + block_size
 
-        # row 3
-        v_start += j
-        v_end +=  s
-        A_soft[v_start:v_end, :j * 1] = jac * self.sample_period
-        A_soft[v_start:v_end, j * 3:j * 3 + s] = w.eye(s)
+        # soft constraints
+        A_soft[vertical_offset:, :number_of_joints] = J# * self.sample_period
 
-        # row 4
-        v_start += s
-        v_end += s
-        A_soft[v_start:v_end, :j * 1] = jac_dot * self.sample_period
-        A_soft[v_start:v_end, j * 1:j * 2] = jac
-        A_soft[v_start:v_end, j * 3 + s:] = w.eye(s)
+        number_of_soft_constraints = len(soft_expressions)
+        I = w.eye(number_of_soft_constraints)
+        A_soft[-number_of_soft_constraints:, -number_of_soft_constraints:] = I
+
         return A_soft
 
     def A(self):
@@ -288,10 +426,13 @@ class QProblemBuilder(object):
         :param path_to_functions: location where the compiled functions can be safed.
         :type path_to_functions: str
         """
-        self.b = B()
-        self.H = H()
-        self.bA = BA()
-        self.A = A(sample_period)
+        self.prediction_horizon = 20
+        self.sample_period = sample_period
+        self.order = 3
+        self.b = B(self.prediction_horizon)
+        self.H = H(self.prediction_horizon)
+        self.bA = BA(self.order, self.prediction_horizon)
+        self.A = A(sample_period, self.prediction_horizon, self.order)
         self.order = 2
         self.path_to_functions = path_to_functions
         self.joint_constraints_dict = joint_constraints_dict
@@ -358,94 +499,137 @@ class QProblemBuilder(object):
 
     def init_big_ass_M(self):
         """
-        #          vel  acc  jerk
-        #           j    j    j     s    s        1      1      1
-        #         |-----------------------------------------------|
-        # h       |    custom     |    0      | lbA_h | ubA_h | 0 | hard constraints
-        #         |-----------------------------------------------|
-        # j       | I  | -I |  0  |  0  |  0  | last v| last v| 0 | last velocity = current velocity - current acceleration
-        # j       | 0  |  I | -I  |  0  |  0  | last a| last a| 0 | last acceleration = current acceleration - current jerk
-        # s       | J  | 0  |  0  |  I  |  0  | sv lbA| sv ubA| 0 | vel soft constraints
-        # s       | Jd | J  |  0  |  0  |  I  | sa lbA| sa ubA| 0 | acc soft constraints
-        #         |-----------------------------------------------|
-        # j vel   | wv                        | jv lb | jv ub |   |
-        # j acc   |      wa                   | ja lb | ja ub | g |  weights
-        # j jerk  |           wj              | jj lb | jj ub |   |
-        # s       |                 wsv       | sv lb | sv ub |   |
-        # s       |                       wsa | sa lb | sa ub |   |
-        #         |-----------------------------------------------|
+        #         |   t1   |   t2   |   t3   |   t1   |   t2   |   t3   |   t1   |   t2   |   t3   |        |
+        #         |v1 v2 vn|v1 v2 vn|v1 v2 vn|a1 a2 an|a1 a2 an|a1 a2 an|j1 j2 jn|j1 j2 jn|j1 j2 jn|sv|sa|sj|
+        #         |--------------------------------------------------------------------------------|--------|-----------|
+        #         | 1      |        |        |        |        |        |        |        |        |        |lp-p0|up-p0|
+        #         | 1      | 1      | 1      |        |        |        |        |        |        |        |lp-p0|up-p0|
+        #         |--------------------------------------------------------------------------------|--------|
+        #         |    1   |        |        |        |        |        |        |        |        |        |
+        #         |    1   |    1   |    1   |        |        |        |        |        |        |        |
+        #         |--------------------------------------------------------------------------------|--------|
+        #         |       1|        |        |        |        |        |        |        |        |        |
+        #         |       1|       1|       1|        |        |        |        |        |        |        |
+        #         |================================================================================|========|===========|
+        #         | 1      |        |        |-1      |        |        |        |        |        |        |joint1 v0
+        #         |-1      | 1      |        |        |-1      |        |        |        |        |        |
+        #         |        |-1      | 1      |        |        |-1      |        |        |        |        |
+        #         |--------------------------------------------------------------------------------|        |
+        #         |    1   |        |        |   -1   |        |        |        |        |        |        |joint2 v0
+        #         |   -1   |    1   |        |        |   -1   |        |        |        |        |        |
+        #         |        |   -1   |    1   |        |        |   -1   |        |        |        |        |
+        #         |--------------------------------------------------------------------------------|        |
+        #         |       1|        |        |      -1|        |        |        |        |        |        |joint3 v0
+        #         |      -1|       1|        |        |      -1|        |        |        |        |        |
+        #         |        |      -1|       1|        |        |      -1|        |        |        |        |
+        #         |================================================================================|        |
+        #         |        |        |        | 1      |        |        |-1      |        |        |        |joint1 a0
+        #         |        |        |        |-1      | 1      |        |        |-1      |        |        |
+        #         |        |        |        |        |-1      | 1      |        |        |-1      |        |
+        #         |--------------------------------------------------------------------------------|        |
+        #         |        |        |        |    1   |        |        |   -1   |        |        |        |joint2 a0
+        #         |        |        |        |   -1   |    1   |        |        |   -1   |        |        |
+        #         |        |        |        |        |   -1   |    1   |        |        |   -1   |        |
+        #         |--------------------------------------------------------------------------------|        |
+        #         |        |        |        |       1|        |        |      -1|        |        |        |joint3 a0
+        #         |        |        |        |      -1|       1|        |        |      -1|        |        |
+        #         |        |        |        |        |      -1|       1|        |        |      -1|        |
+        #         |================================================================================|        |
+        #         |   J    |   J    |   J    |        |        |        |        |        |        | I|  |  |v lba|v uba|
+        #         |-----------------------------------------------------------------------------------------|
+        #         |   Jd   |   Jd   |   Jd   |   J    |   J    |   J    |        |        |        |  | I|  |a lba|a uba|
+        #         |-----------------------------------------------------------------------------------------------------|
+        #         |   Jdd  |   Jdd  |   Jdd  |   Jd   |   Jd   |   Jd   |   J    |   J    |   J    |  |  | I|j lba|j uba|
+        #         |=====================================================================================================|
+        #         |wv11    |        |        |        |        |        |        |        |        |        |joint1 vl  |
+        #         |  wv21  |        |        |        |        |        |        |        |        |        |joint2 vl  |
+        #         |    wv31|        |        |        |        |        |        |        |        |        |joint3 vl  |
+        #         |        |wv12    |        |        |        |        |        |        |        |        |joint1 vl  |
+        #         |        |  wv22  |        |        |        |        |        |        |        |        |           |
+        #         |        |    wv32|        |        |        |        |        |        |        |        |           |
+        #         |        |        |wv13    |        |        |        |        |        |        |        |           |
+        #         |        |        |  wv23  |        |        |        |        |        |        |        |           |
+        #         |        |        |    wv33|        |        |        |        |        |        |        |joint3 vl  |
+        #         |-----------------------------------------------------------------------------------------------------|
+        #         |        |        |        |wa11    |        |        |        |        |        |        |joint1 al  |
+        #         |        |        |        |  wa21  |        |        |        |        |        |        |joint2 al  |
+        #         |        |        |        |    wa31|        |        |        |        |        |        |joint3 al  |
+        #         |        |        |        |        |wa12    |        |        |        |        |        |           |
+        #         |        |        |        |        |  wa22  |        |        |        |        |        |           |
+        #         |        |        |        |        |    wa32|        |        |        |        |        |           |
+        #         |        |        |        |        |        |wa13    |        |        |        |        |           |
+        #         |        |        |        |        |        |  wa23  |        |        |        |        |           |
+        #         |        |        |        |        |        |    wa33|        |        |        |        |joint3 al  |
+        #         |-----------------------------------------------------------------------------------------------------|
+        #         |        |        |        |        |        |        |wj11    |        |        |        |joint1 jl  |
+        #         |        |        |        |        |        |        |  wj21  |        |        |        |joint2 jl  |
+        #         |        |        |        |        |        |        |    wj31|        |        |        |joint3 jl  |
+        #         |        |        |        |        |        |        |        |wj12    |        |        |           |
+        #         |        |        |        |        |        |        |        |  wj22  |        |        |           |
+        #         |        |        |        |        |        |        |        |    wj32|        |        |           |
+        #         |        |        |        |        |        |        |        |        |wj13    |        |           |
+        #         |        |        |        |        |        |        |        |        |  wj23  |        |           |
+        #         |        |        |        |        |        |        |        |        |    wj33|        |joint3 jl  |
+        #         |-----------------------------------------------------------------------------------------------------|
+        #         |        |        |        |        |        |        |        |        |        |wsv     |sv lb| ub  |
+        #         |        |        |        |        |        |        |        |        |        |  wsa   |sa lb| ub  |
+        #         |        |        |        |        |        |        |        |        |        |     wsj|sj lb| ub  |
+        #         |-----------------------------------------------------------------------------------------------------|
+        #
+
+        #         |---------------|
+        #         |  A  | lba| uba|
+        #         |---------------|
+        #         |  H  | lb | ub |
+        #         |---------------|
         """
-        self.big_ass_M = w.zeros(self.h + self.j * 2 + self.s * 2 + self.j * 3 + self.s * 2,
-                                 self.j * 3 + self.s * 2 + 3)
-        self.A_vertical_start = self.h
-        self.A_vertical_stop = self.A_vertical_start + self.j * 2 + self.s * 2
-        self.A_horizontal_start = 0
-        self.A_horizontal_stop = self.j * 3 + self.s * 2
-        self.H_vertical_start = self.A_vertical_stop
-        self.H_vertical_stop = None
-        self.H_horizontal_start = 0
-        self.H_horizontal_stop = self.A_horizontal_stop
-        self.A_height = self.A_vertical_stop - self.A_vertical_start
-        self.A_length = self.A_horizontal_stop - self.A_horizontal_start
+        self.big_ass_M = w.zeros(self.A.height+self.H.height,
+                                 self.A.width+2)
 
     def set_A_soft(self, A_soft):
-        self.big_ass_M[self.A_vertical_start:self.A_vertical_stop,
-        self.A_horizontal_start:self.A_horizontal_stop] = A_soft
+        self.big_ass_M[:self.A.height,:self.A.width] = A_soft
 
     def set_weights(self, weights):
-        self.big_ass_M[self.H_vertical_start:self.H_vertical_stop,
-        self.H_horizontal_start:self.H_horizontal_stop] = w.diag(*weights)
+        self.big_ass_M[self.A.height:,:self.H.width] = w.diag(*weights)
 
     def set_lb(self, lb):
-        self.big_ass_M[self.H_vertical_start:self.H_vertical_stop, self.H_horizontal_stop] = lb
+        self.big_ass_M[self.A.height:, -2] = lb
 
     def set_ub(self, ub):
-        self.big_ass_M[self.H_vertical_start:self.H_vertical_stop, self.H_horizontal_stop + 1] = ub
+        self.big_ass_M[self.A.height:, -1] = ub
 
-    def set_linear_weights(self, linear_weights):
-        self.big_ass_M[self.H_vertical_start:self.H_vertical_stop, self.H_horizontal_stop + 2] = linear_weights
+    # def set_linear_weights(self, linear_weights):
+    #     self.big_ass_M[self.H_vertical_start:self.H_vertical_stop, self.H_horizontal_stop + 2] = linear_weights
 
     def set_lbA(self, lbA):
-        self.big_ass_M[self.A_vertical_start:self.A_vertical_stop, self.H_horizontal_stop] = lbA
+        self.big_ass_M[:self.A.height, self.A.width] = lbA
 
     def set_ubA(self, ubA):
-        self.big_ass_M[self.A_vertical_start:self.A_vertical_stop, self.H_horizontal_stop + 1] = ubA
+        self.big_ass_M[:self.A.height, self.A.width+1] = ubA
 
-    def set_A_hard(self, hard_expressions):
-        for i, row in enumerate(hard_expressions):
-            self.big_ass_M[i, :self.j * 2] = row
+    # def set_A_hard(self, hard_expressions):
+    #     for i, row in enumerate(hard_expressions):
+    #         self.big_ass_M[i, :self.j * 2] = row
 
     def filter_zero_weight_constraints(self, H, A, lb, ub, lbA, ubA, g):
-        bA_mask, b_mask = make_filter_masks(H, self.num_joint_constraints, self.num_hard_constraints)
-        A = A[bA_mask][:, b_mask].copy()
-        lbA = lbA[bA_mask]
-        ubA = ubA[bA_mask]
-        lb = lb[b_mask]
-        ub = ub[b_mask]
-        g = g[b_mask]
-        H = H[b_mask][:, b_mask]
+        # bA_mask, b_mask = make_filter_masks(H, self.num_joint_constraints, self.num_hard_constraints)
+        # A = A[bA_mask][:, b_mask].copy()
+        # lbA = lbA[bA_mask]
+        # ubA = ubA[bA_mask]
+        # lb = lb[b_mask]
+        # ub = ub[b_mask]
+        # g = g[b_mask]
+        # H = H[b_mask][:, b_mask]
         return H, A, lb, ub, lbA, ubA, g
 
     @profile
     def construct_big_ass_M(self):
-        # TODO cpu intensive
-        soft_expressions = []
-        hard_expressions = []
         for i, ((_, constraint_name), constraint) in enumerate(
                 self.joint_constraints_dict.items()):  # type: (str, JointConstraint)
             self.H.add_joint_constraint(constraint_name, constraint)
             self.b.add_joint_constraint(constraint_name, constraint)
             self.bA.add_joint_constraint(constraint_name, constraint)
             self.A.add_joint_constraint(constraint_name, constraint)
-
-        # for constraint_name, constraint in self.hard_constraints_dict.items():  # type: (str, HardConstraint)
-        #     self.bA.add(name=constraint_name,
-        #                 lower_v=constraint.lower,
-        #                 upper_v=constraint.upper,
-        #                 lower_a=constraint.)
-        #     lbA.append(constraint.lower)
-        #     ubA.append(constraint.upper)
-        #     hard_expressions.append(constraint.expression)
 
         for constraint_name, constraint in self.soft_constraints_dict.items():  # type: (str, SoftConstraint)
             self.H.add_soft_constraint(constraint_name, constraint)
@@ -471,7 +655,8 @@ class QProblemBuilder(object):
         self.set_ubA(w.Matrix(self.bA.ubA()))
         self.set_lb(w.Matrix(self.b.lb()))
         self.set_ub(w.Matrix(self.b.ub()))
-        self.set_linear_weights(w.Matrix([0] * len(self.H.weights())))
+        self.np_g = np.zeros(self.H.width)
+        # self.set_linear_weights(w.Matrix([0] * len(self.H.weights())))
 
     @profile
     def get_cmd(self, substitutions, nWSR=None):
@@ -483,19 +668,20 @@ class QProblemBuilder(object):
         :rtype: dict
         """
         np_big_ass_M = self.compiled_big_ass_M.call2(substitutions)
-        np_H = np_big_ass_M[self.A_height:, :-3].copy()
-        np_A = np_big_ass_M[:self.A_height, :self.A_length].copy()
-        np_lb = np_big_ass_M[self.A_height:, -3].copy()
-        np_ub = np_big_ass_M[self.A_height:, -2].copy()
-        np_g = np_big_ass_M[self.A_height:, -1].copy()
-        np_lbA = np_big_ass_M[:self.A_height, -3].copy()
-        np_ubA = np_big_ass_M[:self.A_height, -2].copy()
-        H, A, lb, ub, lbA, ubA, g = self.filter_zero_weight_constraints(np_H, np_A, np_lb, np_ub, np_lbA, np_ubA, np_g)
+        np_H = np_big_ass_M[self.A.height:, :-2].copy()
+        np_A = np_big_ass_M[:self.A.height, :self.A.width].copy()
+        np_lb = np_big_ass_M[self.A.height:, -2].copy()
+        np_ub = np_big_ass_M[self.A.height:, -1].copy()
+        # np_g = np_big_ass_M[self.A.height:, -1].copy()
+        np_lbA = np_big_ass_M[:self.A.height, -2].copy()
+        np_ubA = np_big_ass_M[:self.A.height, -1].copy()
+        H, A, lb, ub, lbA, ubA, g = self.filter_zero_weight_constraints(np_H, np_A, np_lb, np_ub, np_lbA, np_ubA, self.np_g)
         # self.debug_print(np_H, A, lb, ub, lbA, ubA, g)
         try:
             xdot_full = self.qp_solver.solve(H, g, A, lb, ub, lbA, ubA, nWSR)
         except QPSolverException as e:
             p_weights, p_A, p_lbA, p_ubA, p_lb, p_ub = self.debug_print(np_H, A, lb, ub, lbA, ubA, g,
+                                                                        substitutions,
                                                                         actually_print=True)
             if isinstance(e, InfeasibleException):
                 if self.are_joint_limits_violated(p_lb, p_ub):
@@ -517,14 +703,14 @@ class QProblemBuilder(object):
         if xdot_full is None:
             return None
         # TODO enable debug print in an elegant way, preferably without slowing anything down
-        self.debug_print(np_H, A, lb, ub, lbA, ubA, g, xdot_full)
+        self.debug_print(np_H, A, lb, ub, lbA, ubA, g, substitutions, xdot_full)
         velocity = OrderedDict(
             (observable, xdot_full[i]) for i, observable in enumerate(self.joint_names()))
         acceleration = OrderedDict(
-            (observable, xdot_full[i + len(self.joint_names())]) for i, observable in
+            (observable, xdot_full[i + len(self.joint_names())*self.prediction_horizon]) for i, observable in
             enumerate(self.joint_names()))
         jerk = OrderedDict(
-            (observable, xdot_full[i + len(self.joint_names())*2]) for i, observable in
+            (observable, xdot_full[i + len(self.joint_names()) * self.prediction_horizon * 2]) for i, observable in
             enumerate(self.joint_names()))
         return velocity, acceleration, jerk, np_H, np_A, np_lb, np_ub, np_lbA, np_ubA, xdot_full
 
@@ -537,15 +723,41 @@ class QProblemBuilder(object):
     def bA_names(self):
         return self.bA.names()
 
-    def debug_print(self, unfiltered_H, A, lb, ub, lbA, ubA, g, xdot_full=None, actually_print=False):
-        import pandas as pd
-        bA_mask, b_mask = make_filter_masks(unfiltered_H, self.num_joint_constraints, self.num_hard_constraints)
+    def viz_mpc(self, x, joint_name, start_pos=0):
+        ts = np.array([(i+1) * self.sample_period for i in range(self.prediction_horizon)])
+        filtered_x = x.filter(like='/{}/'.format(joint_name), axis=0)
+        velocities = filtered_x[:self.prediction_horizon].values
+        accelerations = filtered_x[self.prediction_horizon:self.prediction_horizon * 2].values
+        jerks = filtered_x[self.prediction_horizon * 2:self.prediction_horizon * 3].values
+        positions = [start_pos]
+        for x_ in velocities:
+            positions.append(positions[-1] + x_ * self.sample_period)
+        positions = positions[1:]
 
+        f, axs = plt.subplots(4, sharex=True)
+        axs[0].set_title('position')
+        axs[0].plot(ts, positions, 'b')
+        axs[0].grid()
+        axs[1].set_title('velocity')
+        axs[1].plot(ts, velocities, 'b')
+        axs[1].grid()
+        axs[2].set_title('acceleration')
+        axs[2].plot(ts, accelerations, 'b')
+        axs[2].grid()
+        axs[3].set_title('jerk')
+        axs[3].plot(ts, jerks, 'b')
+        plt.grid()
+        plt.show()
+
+    def debug_print(self, unfiltered_H, A, lb, ub, lbA, ubA, g, substitutions, xdot_full=None, actually_print=False):
+        import pandas as pd
+        # bA_mask, b_mask = make_filter_masks(unfiltered_H, self.num_joint_constraints, self.num_hard_constraints)
+        state = {k:v for k,v in zip(self.compiled_big_ass_M.str_params, substitutions)}
         b_names = np.array(self.b_names())
         bA_names = np.array(self.bA_names())
-        filtered_b_names = b_names[b_mask]
-        filtered_bA_names = bA_names[bA_mask]
-        filtered_H = unfiltered_H[b_mask][:, b_mask]
+        filtered_b_names = b_names#[b_mask]
+        filtered_bA_names = bA_names#[bA_mask]
+        filtered_H = unfiltered_H#[b_mask][:, b_mask]
 
         p_lb = pd.DataFrame(lb, filtered_b_names, [u'data'], dtype=float)
         p_ub = pd.DataFrame(ub, filtered_b_names, [u'data'], dtype=float)
@@ -576,4 +788,5 @@ class QProblemBuilder(object):
         # self.lbAs.T[[c for c in self.lbAs.T.columns if 'dist' in c]].plot()
 
         # self.save_all(p_weights, p_A, p_lbA, p_ubA, p_lb, p_ub, p_xdot)
+        self.viz_mpc(p_xdot, 'j2', start_pos=state['j2'])
         return p_weights, p_A, p_lbA, p_ubA, p_lb, p_ub

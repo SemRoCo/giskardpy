@@ -134,6 +134,9 @@ def Matrix(data):
 def zeros(x, y):
     return ca.SX.zeros(x, y)
 
+def ones(x, y):
+    return ca.SX.ones(x, y)
+
 
 def abs(x):
     """

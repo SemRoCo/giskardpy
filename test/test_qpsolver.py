@@ -213,7 +213,7 @@ def test_mpc2():
     h = 100
     ch = 1
     sample_period = 0.05
-    goal = 0.5
+    goal = 5
     start_pose = -0.5
     upos_limit = 0.5
     lpos_limit = -0.5

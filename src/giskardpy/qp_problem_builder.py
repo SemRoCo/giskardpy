@@ -45,13 +45,14 @@ class Parent(object):
 
 
 class H(Parent):
-    def __init__(self, prediction_horizon):
+    def __init__(self, prediction_horizon, control_horizon):
         self.__j_weights_v = {}
         self.__j_weights_a = {}
         self.__j_weights_j = {}
         self.__s_weights_v = {}
         self.__s_weights_a = {}
         self.prediction_horizon = prediction_horizon
+        self.control_horizon = control_horizon
         self.height = 0
 
     @property
@@ -75,7 +76,8 @@ class H(Parent):
         :type constraint: SoftConstraint
         :return:
         """
-        self.__s_weights_v[name + '/v'] = constraint.weight_v
+        # self.__s_weights_v[name + '/v'] = constraint.weight_v * (self.prediction_horizon/self.control_horizon)**2
+        self.__s_weights_v[name + '/v'] = constraint.weight_v #* (self.control_horizon*0.05)**2
         self.__s_weights_a[name + '/a'] = constraint.weight_a
         self.height += 1
 
@@ -140,10 +142,10 @@ class B(Parent):
         result = {}
         for t in range(self.prediction_horizon):
             for name, value in d.items():
-                if t == self.prediction_horizon -1:
-                    result['t{:03d}/{}'.format(t, name)] = 0
-                else:
-                    result['t{:03d}/{}'.format(t, name)] = value
+                # if t == self.prediction_horizon -1:
+                #     result['t{:03d}/{}'.format(t, name)] = 0
+                # else:
+                result['t{:03d}/{}'.format(t, name)] = value
         return result
 
     def lb(self):
@@ -188,8 +190,8 @@ class BA(Parent):
         :type name: str
         :type constraint: JointConstraint
         """
-        self._pos_limits_lba[name + '/pos_limit'] = -999#constraint.lower_p - constraint.joint_symbol
-        self._pos_limits_uba[name + '/pos_limit'] = 999#constraint.upper_p - constraint.joint_symbol
+        self._pos_limits_lba[name + '/pos_limit'] = constraint.lower_p - constraint.joint_symbol
+        self._pos_limits_uba[name + '/pos_limit'] = constraint.upper_p - constraint.joint_symbol
         self._pos_limits_lba2[name + '/pos_limit'] = constraint.lower_p - constraint.joint_symbol
         self._pos_limits_uba2[name + '/pos_limit'] = constraint.upper_p - constraint.joint_symbol
         self._j_lbA_a_link[name + '/last_vel'] = constraint.joint_velocity_symbol
@@ -281,11 +283,12 @@ class BA(Parent):
 
 
 class A(Parent):
-    def __init__(self, sample_period, prediction_horizon, order=3):
+    def __init__(self, sample_period, prediction_horizon, control_horizon, order=3):
         self._A_soft = {}
         self._A_hard = {}
         self._A_joint = {}
         self.prediction_horizon = prediction_horizon
+        self.control_horizon = control_horizon
         self.sample_period = sample_period
         self.order = order
 
@@ -407,11 +410,12 @@ class A(Parent):
         vertical_offset = vertical_offset + block_size
 
         # soft constraints
-        A_soft[vertical_offset:, :number_of_joints] = J# * self.sample_period
+        for c in range(self.control_horizon):
+            A_soft[vertical_offset:, c*number_of_joints:(c+1)*number_of_joints] = J * self.sample_period
 
         number_of_soft_constraints = len(soft_expressions)
         I = w.eye(number_of_soft_constraints)
-        A_soft[-number_of_soft_constraints:, -number_of_soft_constraints:] = I
+        A_soft[-number_of_soft_constraints:, -number_of_soft_constraints:] = I * self.sample_period/self.control_horizon
 
         return A_soft
 
@@ -435,12 +439,13 @@ class QProblemBuilder(object):
         :type path_to_functions: str
         """
         self.prediction_horizon = 20
+        self.control_horizon = 20
         self.sample_period = sample_period
         self.order = 3
         self.b = B(self.prediction_horizon)
-        self.H = H(self.prediction_horizon)
+        self.H = H(self.prediction_horizon, self.control_horizon)
         self.bA = BA(self.order, self.prediction_horizon)
-        self.A = A(sample_period, self.prediction_horizon, self.order)
+        self.A = A(sample_period, self.prediction_horizon, self.control_horizon, self.order)
         self.order = 2
         self.path_to_functions = path_to_functions
         self.joint_constraints_dict = joint_constraints_dict

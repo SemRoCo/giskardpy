@@ -81,18 +81,18 @@ class H(Parent):
 
     def weights(self):
         vel_weights = {}
-        f = 0.1
+        f = lambda x: 0.001*x
         for t in range(self.prediction_horizon):
             for name, weight in self.__j_weights_v.items():
-                vel_weights['t{:03d}/{}'.format(t, name)] = weight + f*t
+                vel_weights['t{:03d}/{}'.format(t, name)] = weight + f(t)
         acc_weights = {}
         for t in range(self.prediction_horizon):
             for name, weight in self.__j_weights_a.items():
-                acc_weights['t{:03d}/{}'.format(t, name)] = weight + f*t
+                acc_weights['t{:03d}/{}'.format(t, name)] = weight + f(t)
         jerk_weights = {}
         for t in range(self.prediction_horizon):
             for name, weight in self.__j_weights_j.items():
-                jerk_weights['t{:03d}/{}'.format(t, name)] = weight + f*t
+                jerk_weights['t{:03d}/{}'.format(t, name)] = weight + f(t)
         return self._sorter(vel_weights,
                             acc_weights,
                             jerk_weights,
@@ -188,8 +188,8 @@ class BA(Parent):
         :type name: str
         :type constraint: JointConstraint
         """
-        self._pos_limits_lba[name + '/pos_limit'] = 0#constraint.lower_p - constraint.joint_symbol
-        self._pos_limits_uba[name + '/pos_limit'] = 0#constraint.upper_p - constraint.joint_symbol
+        self._pos_limits_lba[name + '/pos_limit'] = -999#constraint.lower_p - constraint.joint_symbol
+        self._pos_limits_uba[name + '/pos_limit'] = 999#constraint.upper_p - constraint.joint_symbol
         self._pos_limits_lba2[name + '/pos_limit'] = constraint.lower_p - constraint.joint_symbol
         self._pos_limits_uba2[name + '/pos_limit'] = constraint.upper_p - constraint.joint_symbol
         self._j_lbA_a_link[name + '/last_vel'] = constraint.joint_velocity_symbol
@@ -207,6 +207,13 @@ class BA(Parent):
         self._lbA_a[name + '/a'] = constraint.lbA_a
         self._ubA_v[name + '/v'] = constraint.ubA_v
         self._ubA_a[name + '/a'] = constraint.ubA_a
+
+    def blow_up(self, d):
+        result = {}
+        for t in range(self.prediction_horizon-1):
+            for name, value in d.items():
+                result['t{:03d}/{}'.format(t, name)] = value
+        return result
 
     def lbA(self):
         # lba = [
@@ -230,7 +237,7 @@ class BA(Parent):
         for joint in self._joint_names:
             for t in range(self.prediction_horizon-1):
                 acc_link['t{:03d}/{}/acc_link/'.format(t+1, joint)] = 0
-        return self._sorter(self._pos_limits_lba,
+        return self._sorter(self.blow_up(self._pos_limits_lba),
                             self._pos_limits_lba2,
                             self._j_lbA_a_link,
                             vel_link,
@@ -247,7 +254,7 @@ class BA(Parent):
         for joint in self._joint_names:
             for t in range(self.prediction_horizon-1):
                 acc_link['t{:03d}/{}/acc_link/'.format(t+1, joint)] = 0
-        return self._sorter(self._pos_limits_uba,
+        return self._sorter(self.blow_up(self._pos_limits_uba),
                             self._pos_limits_uba2,
                             self._j_lbA_a_link,
                             vel_link,
@@ -264,8 +271,8 @@ class BA(Parent):
         for joint in self._joint_names:
             for t in range(self.prediction_horizon-1):
                 acc_link['t{:03d}/{}/acc_link/'.format(t+1, joint)] = 0
-        return self._sorter(self._pos_limits_lba,
-                            self._pos_limits_lba,
+        return self._sorter(self.blow_up(self._pos_limits_lba),
+                            self._pos_limits_lba2,
                             self._j_lbA_a_link,
                             vel_link,
                             self._j_lbA_j_link,
@@ -288,7 +295,7 @@ class A(Parent):
 
     @property
     def height(self):
-        return 2 * self.number_of_joints + self.number_of_joints * self.prediction_horizon * (self.order - 1) + len(self._A_soft)
+        return self.prediction_horizon * self.number_of_joints + self.number_of_joints * self.prediction_horizon * (self.order - 1) + len(self._A_soft)
 
     @property
     def width(self):
@@ -374,11 +381,12 @@ class A(Parent):
         # logging.loginfo(u'computed Jacobian dot in {:.5f}s'.format(time() - t))
 
         # position limits
-        I = w.eye(number_of_joints) * self.sample_period
-        # A_soft[:number_of_joints, :number_of_joints] = I
-        for p in range(self.prediction_horizon):
-            A_soft[number_of_joints:2 * number_of_joints, p*number_of_joints:(p+1) * number_of_joints] = I
-        vertical_offset = 2 * number_of_joints
+        vertical_offset = number_of_joints * self.prediction_horizon
+        for p in range(1, self.prediction_horizon+1):
+            matrix_size = number_of_joints*p
+            I = w.eye(matrix_size) * self.sample_period
+            start = vertical_offset - matrix_size
+            A_soft[start:vertical_offset, :matrix_size] += I
 
         # derivative links
         I = w.eye(number_of_joints * (self.order - 1) * self.prediction_horizon)
@@ -788,5 +796,5 @@ class QProblemBuilder(object):
         # self.lbAs.T[[c for c in self.lbAs.T.columns if 'dist' in c]].plot()
 
         # self.save_all(p_weights, p_A, p_lbA, p_ubA, p_lb, p_ub, p_xdot)
-        self.viz_mpc(p_xdot, 'j2', start_pos=state['j2'])
+        # self.viz_mpc(p_xdot, 'j2', start_pos=state['j2'])
         return p_weights, p_A, p_lbA, p_ubA, p_lb, p_ub

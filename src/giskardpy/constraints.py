@@ -2314,7 +2314,7 @@ class OpenDoor(Constraint):
         projection = w.dot(hinge0_P_tipCurrent.T, hinge_V_hinge_axis)
         hinge0_P_tipCurrentProjected = hinge0_P_tipCurrent - hinge_V_hinge_axis * projection
 
-        current_tip_angle_projected = w.angle_between_vector(hinge0_P_tipStartProjected, hinge0_P_tipCurrentProjected)
+        current_tip_angle_projected = np.sign(self.angle_goal) * w.angle_between_vector(hinge0_P_tipStartProjected, hinge0_P_tipCurrentProjected)
 
         hinge0_T_hingeCurrent = w.rotation_matrix_from_axis_angle(hinge_V_hinge_axis, current_tip_angle_projected)
 

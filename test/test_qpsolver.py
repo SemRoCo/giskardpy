@@ -140,7 +140,7 @@ def test_mpc_osqp():
 
     g = np.zeros(h * 3)
     lba = np.zeros(2 + h * 3)
-    lba[:h - 1] = lpos_limt  # velocity integral
+    lba[:h - 1] = -lpos_limt  # velocity integral
     lba[h - 1] = goal  # velocity integral
     lba[h] = -v0  # acceleration integral
     lba[h + 1] = 0  # jerk integral
@@ -160,7 +160,7 @@ def test_mpc_osqp():
     uba = np.concatenate((ub, uba))
     Hs = sparse.csc_matrix(H)
     AIs = sparse.csc_matrix(A)
-    qp.setup(P=Hs, q=g, A=AIs, l=lba, u=uba,
+    qp.setup(P=Hs, q=g, A=AIs, l=lba, u=g,
              # rho=10
              adaptive_rho=False,
              polish=True,

@@ -132,6 +132,7 @@ def initialize_god_map():
                                          identifier.joint_states,
                                          suffix=[u'acceleration'])
     world.robot.update_joint_symbols(joint_position_symbols.joint_map, joint_vel_symbols.joint_map,
+                                     joint_acc_symbols.joint_map,
                                      joint_weight_symbols,
                                      joint_velocity_linear_limit_symbols, joint_velocity_angular_limit_symbols,
                                      joint_acceleration_linear_limit_symbols, joint_acceleration_angular_limit_symbols)

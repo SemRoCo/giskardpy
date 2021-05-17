@@ -74,9 +74,10 @@ class InstantaneousController(object):
         :return: maps joint names to command
         :rtype: dict
         """
-        next_velocity, next_acceleration, \
+        next_velocity, next_acceleration, next_jerk, \
         H, A, lb, ub, lbA, ubA, xdot_full = self.qp_problem_builder.get_cmd(substitutions, nWSR)
         return {name: next_velocity[symbol] for name, (symbol, _) in self.joint_to_symbols_str.items()}, \
+               {name: next_acceleration[symbol] for name, (symbol, _) in self.joint_to_symbols_str.items()}, \
                H, A, lb, ub, lbA, ubA, xdot_full
 
     def get_expr(self):

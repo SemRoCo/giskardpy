@@ -2,8 +2,8 @@ from collections import OrderedDict
 
 from py_trees import Status
 
-from giskardpy.data_types import SingleJointState
 import giskardpy.identifier as identifier
+from giskardpy.data_types import SingleJointState
 from giskardpy.plugin import GiskardBehavior
 
 
@@ -24,18 +24,22 @@ class KinSimPlugin(GiskardBehavior):
 
     @profile
     def update(self):
-        motor_commands = self.get_god_map().get_data(identifier.cmd)
+        vel_cmd, acc_cmds = self.get_god_map().get_data(identifier.cmd)
         current_js = self.get_god_map().get_data(identifier.joint_states)
         next_js = None
-        if motor_commands:
+        if vel_cmd:
             next_js = OrderedDict()
             for joint_name, sjs in current_js.items():
-                if joint_name in motor_commands:
-                    cmd = motor_commands[joint_name]
+                if joint_name in vel_cmd:
+                    cmd = vel_cmd[joint_name]
+                    acc_cmd = acc_cmds[joint_name]
                 else:
                     cmd = 0.0
-                next_js[joint_name] = SingleJointState(sjs.name, sjs.position + cmd*self.sample_period,
-                                                            velocity=cmd)
+                    acc_cmd = 0.0
+                next_js[joint_name] = SingleJointState(name=sjs.name,
+                                                       position=sjs.position + cmd * self.sample_period,
+                                                       velocity=cmd,
+                                                       acceleration=acc_cmd)
         if next_js is not None:
             self.get_god_map().set_data(identifier.joint_states, next_js)
         else:

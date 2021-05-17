@@ -76,6 +76,7 @@ class ControllerPlugin(GiskardBehavior):
         expr = self.god_map.get_values(expr)
 
         next_velocity, \
+        next_acceleration, \
         self.qp_data[identifier.H[-1]], \
         self.qp_data[identifier.A[-1]], \
         self.qp_data[identifier.lb[-1]], \
@@ -83,6 +84,6 @@ class ControllerPlugin(GiskardBehavior):
         self.qp_data[identifier.lbA[-1]], \
         self.qp_data[identifier.ubA[-1]], \
         self.qp_data[identifier.xdot_full[-1]] = self.controller.get_cmd(expr, self.nWSR)
-        self.get_god_map().set_data(identifier.cmd, next_velocity)
+        self.get_god_map().set_data(identifier.cmd, [next_velocity, next_acceleration])
 
         return Status.RUNNING

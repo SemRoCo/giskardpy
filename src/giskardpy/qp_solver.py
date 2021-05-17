@@ -30,6 +30,7 @@ class QPSolver(object):
 
         self.started = False
 
+    @profile
     def solve(self, H, g, A, lb, ub, lbA, ubA, nWSR=None):
         """
         x^T*H*x + x^T*g

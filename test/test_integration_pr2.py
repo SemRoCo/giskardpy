@@ -16,7 +16,6 @@ from shape_msgs.msg import SolidPrimitive
 from tf.transformations import quaternion_from_matrix, quaternion_about_axis
 
 import giskardpy.tfwrapper as tf
-from giskard_ws.src.giskardpy.test.utils_for_tests import compare_points, compare_orientations
 from giskardpy import logging, identifier
 from giskardpy.constraints import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA, WEIGHT_COLLISION_AVOIDANCE
 from giskardpy.identifier import fk_pose
@@ -24,7 +23,7 @@ from giskardpy.robot import Robot
 from giskardpy.tfwrapper import init as tf_init
 from giskardpy.utils import to_joint_state_position_dict, publish_marker_vector
 from rospy_message_converter.message_converter import convert_dictionary_to_ros_message
-from utils_for_tests import PR2, compare_poses
+from utils_for_tests import PR2, compare_poses, compare_points, compare_orientations
 from iai_naive_kinematics_sim.srv import UpdateTransform
 
 
@@ -1434,7 +1433,7 @@ class TestCartGoals(object):
         p.header.frame_id = u'base_footprint'
         p.pose.position = Point(0.599, -0.009, 0.983)
         p.pose.orientation = Quaternion(0.524, -0.495, 0.487, -0.494)
-        zero_pose.allow_self_collision()
+        zero_pose.allow_all_collisions()
         zero_pose.set_and_check_cart_goal(p, zero_pose.l_tip, u'base_footprint')
 
     def test_cart_goal_1eef3(self, zero_pose):

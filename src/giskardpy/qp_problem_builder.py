@@ -9,6 +9,7 @@ from giskardpy.data_types import SoftConstraint
 from giskardpy.exceptions import QPSolverException, InfeasibleException, OutOfJointLimitsException, \
     HardConstraintsViolatedException
 from giskardpy.qp_solver import QPSolver
+from giskardpy.qp_solver_osqp import QPSolverOSPQ
 from giskardpy.utils import make_filter_masks, create_path
 
 
@@ -83,7 +84,7 @@ class H(Parent):
 
     def weights(self):
         vel_weights = {}
-        f = lambda x: 0.001*x
+        f = lambda x: 0.0001*x
         for t in range(self.prediction_horizon):
             for name, weight in self.__j_weights_v.items():
                 vel_weights['t{:03d}/{}'.format(t, name)] = weight + f(t)
@@ -142,10 +143,10 @@ class B(Parent):
         result = {}
         for t in range(self.prediction_horizon):
             for name, value in d.items():
-                # if t == self.prediction_horizon -1:
-                #     result['t{:03d}/{}'.format(t, name)] = 0
-                # else:
-                result['t{:03d}/{}'.format(t, name)] = value
+                if t == self.prediction_horizon -1:
+                    result['t{:03d}/{}'.format(t, name)] = 0
+                else:
+                    result['t{:03d}/{}'.format(t, name)] = value
         return result
 
     def lb(self):
@@ -190,10 +191,11 @@ class BA(Parent):
         :type name: str
         :type constraint: JointConstraint
         """
-        self._pos_limits_lba[name + '/pos_limit'] = constraint.lower_p - constraint.joint_symbol
-        self._pos_limits_uba[name + '/pos_limit'] = constraint.upper_p - constraint.joint_symbol
-        self._pos_limits_lba2[name + '/pos_limit'] = constraint.lower_p - constraint.joint_symbol
-        self._pos_limits_uba2[name + '/pos_limit'] = constraint.upper_p - constraint.joint_symbol
+        if constraint.lower_p is not None:
+            self._pos_limits_lba[name + '/pos_limit'] = constraint.lower_p - constraint.joint_symbol
+            self._pos_limits_uba[name + '/pos_limit'] = constraint.upper_p - constraint.joint_symbol
+            self._pos_limits_lba2[name + '/pos_limit'] = constraint.lower_p - constraint.joint_symbol
+            self._pos_limits_uba2[name + '/pos_limit'] = constraint.upper_p - constraint.joint_symbol
         self._j_lbA_a_link[name + '/last_vel'] = constraint.joint_velocity_symbol
         self._j_ubA_a_link[name + '/last_vel'] = constraint.joint_velocity_symbol
         self._j_lbA_j_link[name + '/last_acc'] = constraint.joint_acceleration_symbol
@@ -291,6 +293,7 @@ class A(Parent):
         self.control_horizon = control_horizon
         self.sample_period = sample_period
         self.order = order
+        self.number_of_continuous = 0
 
     @property
     def number_of_joints(self):
@@ -298,7 +301,9 @@ class A(Parent):
 
     @property
     def height(self):
-        return self.prediction_horizon * self.number_of_joints + self.number_of_joints * self.prediction_horizon * (self.order - 1) + len(self._A_soft)
+        return self.prediction_horizon * (self.number_of_joints - self.number_of_continuous) + \
+               self.number_of_joints * self.prediction_horizon * (self.order - 1) + \
+               len(self._A_soft)
 
     @property
     def width(self):
@@ -311,6 +316,8 @@ class A(Parent):
         :return:
         """
         self._A_joint[name] = constraint.joint_symbol
+        # if constraint.lower_p is None:
+        #     self.number_of_continuous += 1
 
     def add_hard_constraint(self, name, constraint):
         self._A_hard[name] = constraint.expression
@@ -438,8 +445,8 @@ class QProblemBuilder(object):
         :param path_to_functions: location where the compiled functions can be safed.
         :type path_to_functions: str
         """
-        self.prediction_horizon = 20
-        self.control_horizon = 20
+        self.prediction_horizon = 8
+        self.control_horizon = 8
         self.sample_period = sample_period
         self.order = 3
         self.b = B(self.prediction_horizon)
@@ -459,6 +466,7 @@ class QProblemBuilder(object):
         self.num_soft_constraints = len(self.soft_constraints_dict)
 
         self.qp_solver = QPSolver()
+        # self.qp_solver = QPSolverOSPQ()
         self.lbAs = None  # for debugging purposes
 
     def get_joint_symbols(self):

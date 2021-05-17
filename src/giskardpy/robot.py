@@ -37,6 +37,7 @@ class Robot(Backend):
         self._joint_to_frame = {}
         self._joint_position_symbols = KeyDefaultDict(lambda x: w.Symbol(x))  # don't iterate over this map!!
         self._joint_velocity_symbols = KeyDefaultDict(lambda x: 0)  # don't iterate over this map!!
+        self._joint_acceleration_symbols = KeyDefaultDict(lambda x: 0)  # don't iterate over this map!!
         self._joint_velocity_linear_limit = KeyDefaultDict(lambda x: 10000)  # don't overwrite urdf limits by default
         self._joint_velocity_angular_limit = KeyDefaultDict(lambda x: 100000)
         self._joint_acc_linear_limit = defaultdict(lambda: 100)  # no acceleration limit per default
@@ -142,6 +143,9 @@ class Robot(Backend):
     def set_joint_velocity_symbols(self, symbols):
         self._joint_velocity_symbols = symbols
 
+    def set_joint_acceleration_symbols(self, symbols):
+        self._joint_acceleration_symbols = symbols
+
     def set_joint_acceleration_limit_symbols(self, linear, angular):
         self._joint_acc_linear_limit = linear
         self._joint_acc_angular_limit = angular
@@ -149,11 +153,12 @@ class Robot(Backend):
     def set_joint_weight_symbols(self, symbols):
         self._joint_weights = symbols
 
-    def update_joint_symbols(self, position, velocity, weights,
+    def update_joint_symbols(self, position, velocity, acceleration, weights,
                              linear_velocity_limit, angular_velocity_limit,
                              linear_acceleration_limit, angular_acceleration_limit):
         self.set_joint_position_symbols(position)
         self.set_joint_velocity_symbols(velocity)
+        self.set_joint_acceleration_symbols(acceleration)
         self.set_joint_weight_symbols(weights)
         self.set_joint_velocity_limit_symbols(linear_velocity_limit, angular_velocity_limit)
         self.set_joint_acceleration_limit_symbols(linear_acceleration_limit, angular_acceleration_limit)
@@ -204,51 +209,51 @@ class Robot(Backend):
             lower_limit, upper_limit = self.get_joint_limits(joint_name)
             joint_symbol = self.get_joint_position_symbol(joint_name)
             joint_velocity_symbol = self.get_joint_velocity_symbol(joint_name)
-            joint_velocity_symbol = self.get_joint_acvelocity_symbol(joint_name)
+            joint_acceleration_symbol = self.get_joint_acceleration_symbol(joint_name)
             sample_period = god_map.to_symbol(identifier.sample_period)
             velocity_limit = self.get_joint_velocity_limit_expr(joint_name)  # * sample_period
-            acceleration_limit = self.get_joint_acceleration_limit_expr(joint_name)  # * sample_period
-            acceleration_limit2 = acceleration_limit * sample_period
+            acceleration_limit = 9999
+            # acceleration_limit = self.get_joint_acceleration_limit_expr(joint_name)  # * sample_period
+            # acceleration_limit2 = acceleration_limit * sample_period
 
             weight = self._joint_weights[joint_name]
             weight = weight * (1. / (velocity_limit)) ** 2
             # last_joint_velocity = god_map.to_symbol(identifier.last_joint_states + [joint_name, u'velocity'])
-
+            jerk_limit = 15
             if not self.is_joint_continuous(joint_name):
                 self._joint_constraints[joint_name] = JointConstraint(
+                    lower_p=lower_limit,
+                    upper_p=upper_limit,
                     lower_v=-velocity_limit,
                     upper_v=velocity_limit,
                     weight_v=weight,
-                    lower_a=w.limit(w.velocity_limit_from_position_limit(acceleration_limit,
-                                                                         lower_limit,
-                                                                         joint_symbol,
-                                                                         sample_period) - joint_velocity_symbol,
-                                    -acceleration_limit2,
-                                    acceleration_limit2),
-                    upper_a=w.limit(w.velocity_limit_from_position_limit(acceleration_limit,
-                                                                         upper_limit,
-                                                                         joint_symbol,
-                                                                         sample_period) - joint_velocity_symbol,
-                                    -acceleration_limit2,
-                                    acceleration_limit2),
+                    lower_a=-acceleration_limit,
+                    upper_a=acceleration_limit,
                     weight_a=0,
-                    linear_weight=0,
-                    joint_symbol=joint_symbol,
-                    joint_velocity_symbol=joint_velocity_symbol)
-            else:
-                self._joint_constraints[joint_name] = JointConstraint(
-                    lower_v=-velocity_limit,
-                    upper_v=velocity_limit,
-                    weight_v=weight,
-                    lower_a=-acceleration_limit2,
-                    upper_a=acceleration_limit2,
-                    weight_a=0,
-                    lower_j=-2,
-                    upper_j=2,
+                    lower_j=-jerk_limit,
+                    upper_j=jerk_limit,
                     weight_j=0,
                     linear_weight=0,
                     joint_symbol=joint_symbol,
-                    joint_velocity_symbol=joint_velocity_symbol)
+                    joint_velocity_symbol=joint_velocity_symbol,
+                    joint_acceleration_symbol=joint_acceleration_symbol)
+            else:
+                self._joint_constraints[joint_name] = JointConstraint(
+                    lower_p=-9999,
+                    upper_p=9999,
+                    lower_v=-velocity_limit,
+                    upper_v=velocity_limit,
+                    weight_v=weight,
+                    lower_a=-acceleration_limit,
+                    upper_a=acceleration_limit,
+                    weight_a=0,
+                    lower_j=-jerk_limit,
+                    upper_j=jerk_limit,
+                    weight_j=0,
+                    linear_weight=0,
+                    joint_symbol=joint_symbol,
+                    joint_velocity_symbol=joint_velocity_symbol,
+                    joint_acceleration_symbol=joint_acceleration_symbol)
 
     def get_fk_expression(self, root_link, tip_link):
         """
@@ -374,6 +379,14 @@ class Robot(Backend):
         :rtype: spw.Symbol
         """
         return self._joint_velocity_symbols[joint_name]
+
+    def get_joint_acceleration_symbol(self, joint_name):
+        """
+        :param joint_name: name of the joint in the urdfs
+        :type joint_name: str
+        :rtype: spw.Symbol
+        """
+        return self._joint_acceleration_symbols[joint_name]
 
     def get_joint_velocity_symbols(self):
         return [self.get_joint_velocity_symbol(joint_name) for joint_name in self.controlled_joints]

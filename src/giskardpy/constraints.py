@@ -33,6 +33,7 @@ WEIGHT_MIN = Constraint_msg.WEIGHT_MIN
 class Constraint(object):
     def __init__(self, god_map, **kwargs):
         self.god_map = god_map
+        self.control_horizon = 8
 
     def save_params_on_god_map(self, params):
         constraints = self.get_god_map().get_data(identifier.constraints_identifier)
@@ -413,7 +414,7 @@ class Constraint(object):
         r_P_error = r_P_g - r_P_c
         trans_error = w.norm(r_P_error)
 
-        trans_scale = self.limit_velocity(trans_error, max_velocity)
+        trans_scale = self.limit_velocity(trans_error, max_velocity*self.control_horizon)
         r_P_intermediate_error = w.save_division(r_P_error, trans_error) * trans_scale
 
         weight = self.normalize_weight(max_velocity, weight)
@@ -529,7 +530,7 @@ class Constraint(object):
 
         tip_Q_goal = w.if_greater_zero(-tip_Q_goal[3], -tip_Q_goal, tip_Q_goal)  # flip to get shortest path
         angle_error = w.quaternion_angle(tip_Q_goal)
-        scale = self.limit_velocity(angle_error, max_velocity)
+        scale = self.limit_velocity(angle_error, max_velocity*self.control_horizon)
         tip_Q_goal = w.scale_quaternion(tip_Q_goal, scale)
 
         expr = tip_Q_tipCurrent
@@ -660,17 +661,16 @@ class JointPositionContinuous(Constraint):
         error = w.shortest_angular_distance(current_joint, joint_goal)
 
         weight = self.normalize_weight(max_velocity, weight)
+        error = self.limit_velocity(error, max_velocity*self.control_horizon)
 
         capped_err = self.limit_acceleration(current_joint, error, max_acceleration)
 
-        self.add_acceleration_constraint('',
-                                         lower=capped_err,
-                                         upper=capped_err,
-                                         lower_v=-999,
-                                         upper_v=999,
-                                         weight_a=weight,
-                                         expression=current_joint,
-                                         goal_constraint=self.goal_constraint)
+        self.add_velocity_constraint('',
+                                     lower=error,
+                                     upper=error,
+                                     weight=weight,
+                                     expression=current_joint,
+                                     goal_constraint=self.goal_constraint)
 
     def __str__(self):
         s = super(JointPositionContinuous, self).__str__()
@@ -731,16 +731,14 @@ class JointPositionPrismatic(Constraint):
         err = joint_goal - current_joint
         weight = self.normalize_weight(max_velocity, weight)
 
-        capped_err = self.limit_acceleration(current_joint, err, max_acceleration)
+        capped_err = self.limit_velocity(err, max_velocity*self.control_horizon)
 
-        self.add_acceleration_constraint('',
-                                         lower=capped_err,
-                                         upper=capped_err,
-                                         lower_v=-999,
-                                         upper_v=999,
-                                         weight_a=weight,
-                                         expression=current_joint,
-                                         goal_constraint=self.goal_constraint)
+        self.add_velocity_constraint('',
+                                     lower=capped_err,
+                                     upper=capped_err,
+                                     weight=weight,
+                                     expression=current_joint,
+                                     goal_constraint=self.goal_constraint)
 
     def __str__(self):
         s = super(JointPositionPrismatic, self).__str__()
@@ -800,16 +798,14 @@ class JointPositionRevolute(Constraint):
         err = joint_goal - current_joint
         weight = self.normalize_weight(max_velocity, weight)
 
-        capped_err = self.limit_acceleration(current_joint, err, max_acceleration)
+        capped_err = self.limit_velocity(err, max_velocity*self.control_horizon)
 
-        self.add_acceleration_constraint('',
-                                         lower=capped_err,
-                                         upper=capped_err,
-                                         lower_v=-999,
-                                         upper_v=999,
-                                         weight_a=weight,
-                                         expression=current_joint,
-                                         goal_constraint=self.goal_constraint)
+        self.add_velocity_constraint('',
+                                     lower=capped_err,
+                                     upper=capped_err,
+                                     weight=weight,
+                                     expression=current_joint,
+                                     goal_constraint=self.goal_constraint)
 
     def __str__(self):
         s = super(JointPositionRevolute, self).__str__()

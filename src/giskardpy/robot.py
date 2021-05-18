@@ -212,7 +212,7 @@ class Robot(Backend):
             joint_acceleration_symbol = self.get_joint_acceleration_symbol(joint_name)
             sample_period = god_map.to_symbol(identifier.sample_period)
             velocity_limit = self.get_joint_velocity_limit_expr(joint_name)  # * sample_period
-            acceleration_limit = 9999
+            acceleration_limit = 999
             # acceleration_limit = self.get_joint_acceleration_limit_expr(joint_name)  # * sample_period
             # acceleration_limit2 = acceleration_limit * sample_period
 

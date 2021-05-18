@@ -261,11 +261,11 @@ class BA(Parent):
                 acc_link['t{:03d}/{}/acc_link/'.format(t+1, joint)] = 0
         return self._sorter(self.blow_up(self._pos_limits_uba),
                             self._pos_limits_uba2,
-                            self._j_lbA_a_link,
+                            self._j_ubA_a_link,
                             vel_link,
-                            self._j_lbA_j_link,
+                            self._j_ubA_j_link,
                             acc_link,
-                            self._lbA_v)[0]
+                            self._ubA_v)[0]
 
     def names(self):
         vel_link = {}
@@ -466,8 +466,8 @@ class QProblemBuilder(object):
         self.num_joint_constraints = len(self.joint_constraints_dict)
         self.num_soft_constraints = len(self.soft_constraints_dict)
 
-        # self.qp_solver = QPSolver()
-        self.qp_solver = QPSolverGurubi()
+        self.qp_solver = QPSolver()
+        # self.qp_solver = QPSolverGurubi()
         # self.qp_solver = QPSolverOSPQ()
         self.lbAs = None  # for debugging purposes
 

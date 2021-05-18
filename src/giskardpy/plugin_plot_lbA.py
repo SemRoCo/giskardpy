@@ -22,7 +22,7 @@ class PlotlbA(GiskardBehavior):
         trajectory = self.get_god_map().get_data(identifier.lbA_trajectory)
         if trajectory and len(trajectory.items()) > 0:
             sample_period = self.get_god_map().get_data(identifier.sample_period)
-            controlled_joints = [x for x in trajectory.get_exact(0).keys() if 'debug' in x]
+            controlled_joints = list(trajectory.get_exact(0).keys())
             try:
                 plot_trajectory(trajectory, controlled_joints, self.path_to_data_folder, sample_period, self.order,
                                 None, self.scaling, False, self.tick_stride,

@@ -1,5 +1,5 @@
 from collections import OrderedDict
-
+import numpy as np
 from py_trees import Status
 
 from giskardpy import identifier
@@ -17,10 +17,11 @@ class LoglbAPlugin(GiskardBehavior):
         self.trajectory = self.get_god_map().get_data(identifier.lbA_trajectory)
 
     def update(self):
-        lbAs = self.get_god_map().get_data(identifier.lbA)
-        names = self.get_god_map().get_data(identifier.bA_keys)
-        lbAs = lbAs[self.number_of_joints:-int((len(names) - self.number_of_joints)/2)]
-        names = names[self.number_of_joints:-int((len(names) - self.number_of_joints)/2)]
+        lbAs = np.array(self.get_god_map().get_data(identifier.lbA))
+        names = np.array(self.get_god_map().get_data(identifier.bA_keys))
+        filter_ = np.array(['debug' in x for x in names])
+        lbAs = lbAs[filter_]
+        names = names[filter_]
         if len(names) > 0:
             time = self.get_god_map().get_data(identifier.time)
             last_mjs = None

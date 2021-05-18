@@ -419,6 +419,8 @@ class Constraint(object):
 
         weight = self.normalize_weight(max_velocity, weight)
 
+        self.add_debug_constraint('distance', trans_error)
+
         self.add_velocity_constraint(u'/{}/x'.format(prefix),
                                      lower=r_P_intermediate_error[0],
                                      upper=r_P_intermediate_error[0],

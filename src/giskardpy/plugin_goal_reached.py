@@ -12,9 +12,9 @@ from giskardpy.plugin import GiskardBehavior
 
 def make_velocity_threshold(god_map,
                             min_translation_cut_off=0.003,
-                            min_rotation_cut_off=0.02,
+                            min_rotation_cut_off=0.01,
                             max_translation_cut_off=0.01,
-                            max_rotation_cut_off=0.13):
+                            max_rotation_cut_off=0.06):
     joint_convergence_threshold = god_map.get_data(identifier.joint_convergence_threshold)
     robot = god_map.get_data(identifier.robot)
     sample_period = god_map.get_data(identifier.sample_period)

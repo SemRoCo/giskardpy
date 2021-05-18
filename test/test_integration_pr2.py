@@ -5945,6 +5945,7 @@ class TestCollisionAvoidanceGoals(object):
         ce.body_b = u'box'
         # ce.min_dist = 0.05
         box_setup.set_collision_entries([ce])
+        box_setup.allow_self_collision()
         box_setup.send_and_check_goal([MoveResult.SUCCESS])
         box_setup.check_cpi_geq(box_setup.get_l_gripper_links(), 0.048)
         box_setup.check_cpi_geq(box_setup.get_r_gripper_links(), 0.048)
@@ -6776,6 +6777,7 @@ class TestCollisionAvoidanceGoals(object):
                                                                                [0, 0, -1, 0],
                                                                                [0, -1, 0, 0],
                                                                                [0, 0, 0, 1]]))
+        # setup.allow_all_collisions()
         setup.set_and_check_cart_goal(tool_frame_goal, tool_frame, setup.default_root)
 
         tool_frame_goal = PoseStamped()

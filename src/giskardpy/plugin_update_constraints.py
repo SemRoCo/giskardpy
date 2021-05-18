@@ -154,7 +154,7 @@ class GoalToConstraints(GetGoal):
                     params = convert_ros_message_to_dictionary(constraint)
                     del params[u'type']
 
-                c = C(self.god_map, **params)
+                c = C(self.god_map, control_horizon=self.get_god_map().unsafe_get_data(identifier.control_horizon), **params)
             except Exception as e:
                 traceback.print_exc()
                 doc_string = C.__init__.__doc__

@@ -9,6 +9,7 @@ from giskardpy.data_types import SoftConstraint
 from giskardpy.exceptions import QPSolverException, InfeasibleException, OutOfJointLimitsException, \
     HardConstraintsViolatedException
 from giskardpy.qp_solver import QPSolver
+from giskardpy.qp_solver_gurubi import QPSolverGurubi
 from giskardpy.qp_solver_osqp import QPSolverOSPQ
 from giskardpy.utils import make_filter_masks, create_path
 
@@ -143,7 +144,7 @@ class B(Parent):
         result = {}
         for t in range(self.prediction_horizon):
             for name, value in d.items():
-                if t == self.prediction_horizon -1:
+                if t == self.prediction_horizon -1 and self.prediction_horizon >= 5:
                     result['t{:03d}/{}'.format(t, name)] = 0
                 else:
                     result['t{:03d}/{}'.format(t, name)] = value
@@ -436,7 +437,7 @@ class QProblemBuilder(object):
     """
 
     def __init__(self, joint_constraints_dict, hard_constraints_dict, soft_constraints_dict, sample_period,
-                 path_to_functions=''):
+                 prediciton_horizon, control_horizon, path_to_functions=''):
         """
         :type joint_constraints_dict: dict
         :type hard_constraints_dict: dict
@@ -445,8 +446,8 @@ class QProblemBuilder(object):
         :param path_to_functions: location where the compiled functions can be safed.
         :type path_to_functions: str
         """
-        self.prediction_horizon = 8
-        self.control_horizon = 8
+        self.prediction_horizon = prediciton_horizon
+        self.control_horizon = control_horizon
         self.sample_period = sample_period
         self.order = 3
         self.b = B(self.prediction_horizon)
@@ -465,7 +466,8 @@ class QProblemBuilder(object):
         self.num_joint_constraints = len(self.joint_constraints_dict)
         self.num_soft_constraints = len(self.soft_constraints_dict)
 
-        self.qp_solver = QPSolver()
+        # self.qp_solver = QPSolver()
+        self.qp_solver = QPSolverGurubi()
         # self.qp_solver = QPSolverOSPQ()
         self.lbAs = None  # for debugging purposes
 
@@ -700,7 +702,7 @@ class QProblemBuilder(object):
         # self.debug_print(np_H, A, lb, ub, lbA, ubA, g)
         try:
             xdot_full = self.qp_solver.solve(H, g, A, lb, ub, lbA, ubA, nWSR)
-        except QPSolverException as e:
+        except Exception as e:
             p_weights, p_A, p_lbA, p_ubA, p_lb, p_ub = self.debug_print(np_H, A, lb, ub, lbA, ubA, g,
                                                                         substitutions,
                                                                         actually_print=True)

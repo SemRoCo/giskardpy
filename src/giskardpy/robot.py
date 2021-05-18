@@ -219,7 +219,7 @@ class Robot(Backend):
             weight = self._joint_weights[joint_name]
             weight = weight * (1. / (velocity_limit)) ** 2
             # last_joint_velocity = god_map.to_symbol(identifier.last_joint_states + [joint_name, u'velocity'])
-            jerk_limit = 15
+            jerk_limit = 999
             if not self.is_joint_continuous(joint_name):
                 self._joint_constraints[joint_name] = JointConstraint(
                     lower_p=lower_limit,

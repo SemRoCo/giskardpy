@@ -75,8 +75,10 @@ class QPSolver(object):
             else:
                 success = self.qpProblem.hotstart(H, g, A, lb, ub, lbA, ubA, nWSR)
                 if success == PyReturnValue.MAX_NWSR_REACHED:
-                    self.started = False
-                    raise MAX_NWSR_REACHEDException(u'Failed to hot start QP-problem.')
+                    logging.logwarn('max nwsr or cpu time reached')
+                    success = PyReturnValue.SUCCESSFUL_RETURN
+                    # self.started = False
+                    # raise MAX_NWSR_REACHEDException(u'Failed to hot start QP-problem.')
             if success == PyReturnValue.SUCCESSFUL_RETURN:
                 self.started = True
                 break

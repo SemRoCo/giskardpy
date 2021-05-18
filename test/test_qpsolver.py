@@ -5,6 +5,7 @@ import numpy as np
 from scipy import sparse
 
 from giskardpy.qp_solver import QPSolver
+from giskardpy.qp_solver_gurubi import QPSolverGurubi
 
 
 def limit(l,v):
@@ -102,7 +103,7 @@ def test_mpc():
                          np.ones(h) * jerk_limit))
     lb = -ub
 
-    qp = QPSolver()
+    qp = QPSolverGurubi()
     t = time()
     asdf = 1
     for i in range(asdf):

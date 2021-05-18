@@ -84,6 +84,8 @@ joint_weight_override = joint_weight + [u'override']
 # qp solver
 qp_solver = rosparam + [u'qp_solver']
 nWSR = qp_solver + [u'nWSR']
+prediction_horizon = qp_solver + [u'prediction_horizon']
+control_horizon = qp_solver + [u'control_horizon']
 
 # plugins
 plugins = rosparam + [u'plugins']

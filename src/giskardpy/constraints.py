@@ -526,7 +526,7 @@ class Constraint(object):
         tip_Q_tipCurrent = w.quaternion_from_matrix(w.dot(tip_R_rootCurrent_eval, root_R_tipCurrent))
         tip_R_goal = w.dot(tip_R_rootCurrent_eval, root_R_tipGoal)
 
-        weight = self.normalize_weight(max_velocity, weight)
+        weight = self.normalize_weight(max_velocity/np.pi, weight)
 
         tip_Q_goal = w.quaternion_from_matrix(tip_R_goal)
 

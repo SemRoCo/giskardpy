@@ -17,6 +17,7 @@ collision_goal = [u'collision_goal']
 soft_constraint_identifier = [u'soft_constraints']
 joint_constraint_identifier = [u'joint_constraints']
 hard_constraint_identifier = [u'hard_constraints']
+debug_expressions = [u'debug_expressions']
 
 execute = [u'execute']
 skip_failures = [u'skip_failures']

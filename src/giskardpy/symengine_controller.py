@@ -28,6 +28,7 @@ class InstantaneousController(object):
         self.hard_constraints = {}
         self.joint_constraints = {}
         self.soft_constraints = {}
+        self.debug_expressions = {}
         self.free_symbols = None
         self.sample_period = sample_period
         self.qp_problem_builder = None # type: QProblemBuilder
@@ -36,7 +37,8 @@ class InstantaneousController(object):
     def get_qpdata_key_map(self):
         return self.qp_problem_builder.b_names(), self.qp_problem_builder.bA_names()
 
-    def update_constraints(self, joint_to_symbols_str, soft_constraints, joint_constraints, hard_constraints):
+    def update_constraints(self, joint_to_symbols_str, soft_constraints, joint_constraints, hard_constraints,
+                           debug_expressions):
         """
         Triggers a recompile if the number of soft constraints has changed.
         :type soft_constraints: dict
@@ -51,6 +53,7 @@ class InstantaneousController(object):
         self.joint_to_symbols_str = joint_to_symbols_str
         self.joint_constraints = joint_constraints
         self.hard_constraints = hard_constraints
+        self.debug_expressions = debug_expressions
 
 
     def compile(self):
@@ -65,6 +68,7 @@ class InstantaneousController(object):
                                                   self.sample_period,
                                                   self.prediciton_horizon,
                                                   self.control_horizon,
+                                                  self.debug_expressions,
                                                   path_to_functions)
 
     @profile

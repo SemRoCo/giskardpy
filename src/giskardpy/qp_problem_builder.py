@@ -438,7 +438,7 @@ class QProblemBuilder(object):
     """
 
     def __init__(self, joint_constraints_dict, hard_constraints_dict, soft_constraints_dict, sample_period,
-                 prediciton_horizon, control_horizon, path_to_functions=''):
+                 prediciton_horizon, control_horizon, debug_expressions, path_to_functions=''):
         """
         :type joint_constraints_dict: dict
         :type hard_constraints_dict: dict
@@ -460,6 +460,7 @@ class QProblemBuilder(object):
         self.joint_constraints_dict = joint_constraints_dict
         self.hard_constraints_dict = hard_constraints_dict
         self.soft_constraints_dict = soft_constraints_dict
+        self.debug_expressions = debug_expressions
         self.construct_big_ass_M()
         self.compile_big_ass_M()
 
@@ -487,6 +488,7 @@ class QProblemBuilder(object):
         self.free_symbols = w.free_symbols(self.big_ass_M)
         self.compiled_big_ass_M = w.speed_up(self.big_ass_M,
                                              self.free_symbols)
+        self.compiled_debug_v = w.speed_up(self.debug_v, self.free_symbols)
         logging.loginfo(u'compiled symbolic expressions in {:.5f}s'.format(time() - t))
 
     def are_joint_limits_violated(self, p_lb, p_ub):
@@ -523,84 +525,6 @@ class QProblemBuilder(object):
 
     def init_big_ass_M(self):
         """
-        #         |   t1   |   t2   |   t3   |   t1   |   t2   |   t3   |   t1   |   t2   |   t3   |        |
-        #         |v1 v2 vn|v1 v2 vn|v1 v2 vn|a1 a2 an|a1 a2 an|a1 a2 an|j1 j2 jn|j1 j2 jn|j1 j2 jn|sv|sa|sj|
-        #         |--------------------------------------------------------------------------------|--------|-----------|
-        #         | 1      |        |        |        |        |        |        |        |        |        |lp-p0|up-p0|
-        #         | 1      | 1      | 1      |        |        |        |        |        |        |        |lp-p0|up-p0|
-        #         |--------------------------------------------------------------------------------|--------|
-        #         |    1   |        |        |        |        |        |        |        |        |        |
-        #         |    1   |    1   |    1   |        |        |        |        |        |        |        |
-        #         |--------------------------------------------------------------------------------|--------|
-        #         |       1|        |        |        |        |        |        |        |        |        |
-        #         |       1|       1|       1|        |        |        |        |        |        |        |
-        #         |================================================================================|========|===========|
-        #         | 1      |        |        |-1      |        |        |        |        |        |        |joint1 v0
-        #         |-1      | 1      |        |        |-1      |        |        |        |        |        |
-        #         |        |-1      | 1      |        |        |-1      |        |        |        |        |
-        #         |--------------------------------------------------------------------------------|        |
-        #         |    1   |        |        |   -1   |        |        |        |        |        |        |joint2 v0
-        #         |   -1   |    1   |        |        |   -1   |        |        |        |        |        |
-        #         |        |   -1   |    1   |        |        |   -1   |        |        |        |        |
-        #         |--------------------------------------------------------------------------------|        |
-        #         |       1|        |        |      -1|        |        |        |        |        |        |joint3 v0
-        #         |      -1|       1|        |        |      -1|        |        |        |        |        |
-        #         |        |      -1|       1|        |        |      -1|        |        |        |        |
-        #         |================================================================================|        |
-        #         |        |        |        | 1      |        |        |-1      |        |        |        |joint1 a0
-        #         |        |        |        |-1      | 1      |        |        |-1      |        |        |
-        #         |        |        |        |        |-1      | 1      |        |        |-1      |        |
-        #         |--------------------------------------------------------------------------------|        |
-        #         |        |        |        |    1   |        |        |   -1   |        |        |        |joint2 a0
-        #         |        |        |        |   -1   |    1   |        |        |   -1   |        |        |
-        #         |        |        |        |        |   -1   |    1   |        |        |   -1   |        |
-        #         |--------------------------------------------------------------------------------|        |
-        #         |        |        |        |       1|        |        |      -1|        |        |        |joint3 a0
-        #         |        |        |        |      -1|       1|        |        |      -1|        |        |
-        #         |        |        |        |        |      -1|       1|        |        |      -1|        |
-        #         |================================================================================|        |
-        #         |   J    |   J    |   J    |        |        |        |        |        |        | I|  |  |v lba|v uba|
-        #         |-----------------------------------------------------------------------------------------|
-        #         |   Jd   |   Jd   |   Jd   |   J    |   J    |   J    |        |        |        |  | I|  |a lba|a uba|
-        #         |-----------------------------------------------------------------------------------------------------|
-        #         |   Jdd  |   Jdd  |   Jdd  |   Jd   |   Jd   |   Jd   |   J    |   J    |   J    |  |  | I|j lba|j uba|
-        #         |=====================================================================================================|
-        #         |wv11    |        |        |        |        |        |        |        |        |        |joint1 vl  |
-        #         |  wv21  |        |        |        |        |        |        |        |        |        |joint2 vl  |
-        #         |    wv31|        |        |        |        |        |        |        |        |        |joint3 vl  |
-        #         |        |wv12    |        |        |        |        |        |        |        |        |joint1 vl  |
-        #         |        |  wv22  |        |        |        |        |        |        |        |        |           |
-        #         |        |    wv32|        |        |        |        |        |        |        |        |           |
-        #         |        |        |wv13    |        |        |        |        |        |        |        |           |
-        #         |        |        |  wv23  |        |        |        |        |        |        |        |           |
-        #         |        |        |    wv33|        |        |        |        |        |        |        |joint3 vl  |
-        #         |-----------------------------------------------------------------------------------------------------|
-        #         |        |        |        |wa11    |        |        |        |        |        |        |joint1 al  |
-        #         |        |        |        |  wa21  |        |        |        |        |        |        |joint2 al  |
-        #         |        |        |        |    wa31|        |        |        |        |        |        |joint3 al  |
-        #         |        |        |        |        |wa12    |        |        |        |        |        |           |
-        #         |        |        |        |        |  wa22  |        |        |        |        |        |           |
-        #         |        |        |        |        |    wa32|        |        |        |        |        |           |
-        #         |        |        |        |        |        |wa13    |        |        |        |        |           |
-        #         |        |        |        |        |        |  wa23  |        |        |        |        |           |
-        #         |        |        |        |        |        |    wa33|        |        |        |        |joint3 al  |
-        #         |-----------------------------------------------------------------------------------------------------|
-        #         |        |        |        |        |        |        |wj11    |        |        |        |joint1 jl  |
-        #         |        |        |        |        |        |        |  wj21  |        |        |        |joint2 jl  |
-        #         |        |        |        |        |        |        |    wj31|        |        |        |joint3 jl  |
-        #         |        |        |        |        |        |        |        |wj12    |        |        |           |
-        #         |        |        |        |        |        |        |        |  wj22  |        |        |           |
-        #         |        |        |        |        |        |        |        |    wj32|        |        |           |
-        #         |        |        |        |        |        |        |        |        |wj13    |        |           |
-        #         |        |        |        |        |        |        |        |        |  wj23  |        |           |
-        #         |        |        |        |        |        |        |        |        |    wj33|        |joint3 jl  |
-        #         |-----------------------------------------------------------------------------------------------------|
-        #         |        |        |        |        |        |        |        |        |        |wsv     |sv lb| ub  |
-        #         |        |        |        |        |        |        |        |        |        |  wsa   |sa lb| ub  |
-        #         |        |        |        |        |        |        |        |        |        |     wsj|sj lb| ub  |
-        #         |-----------------------------------------------------------------------------------------------------|
-        #
-
         #         |---------------|
         #         |  A  | lba| uba|
         #         |---------------|
@@ -609,6 +533,7 @@ class QProblemBuilder(object):
         """
         self.big_ass_M = w.zeros(self.A.height+self.H.height,
                                  self.A.width+2)
+        self.debug_v = w.zeros(len(self.debug_expressions),1)
 
     def set_A_soft(self, A_soft):
         self.big_ass_M[:self.A.height,:self.A.width] = A_soft
@@ -680,7 +605,12 @@ class QProblemBuilder(object):
         self.set_lb(w.Matrix(self.b.lb()))
         self.set_ub(w.Matrix(self.b.ub()))
         self.np_g = np.zeros(self.H.width)
+        self.debug_names = list(self.debug_expressions.keys())
+        self.debug_v = w.Matrix(list(self.debug_expressions.values()))
         # self.set_linear_weights(w.Matrix([0] * len(self.H.weights())))
+
+    def eval_debug_exprs(self, subsitutions):
+        return self.compiled_debug_v.call2(subsitutions)
 
     @profile
     def get_cmd(self, substitutions, nWSR=None):
@@ -782,6 +712,9 @@ class QProblemBuilder(object):
         filtered_b_names = b_names#[b_mask]
         filtered_bA_names = bA_names#[bA_mask]
         filtered_H = unfiltered_H#[b_mask][:, b_mask]
+
+        debug_exprs = self.eval_debug_exprs(substitutions)
+        p_debug = pd.DataFrame(debug_exprs, self.debug_names, ['data'], dtype=float).sort_index()
 
         p_lb = pd.DataFrame(lb, filtered_b_names, [u'data'], dtype=float)
         p_ub = pd.DataFrame(ub, filtered_b_names, [u'data'], dtype=float)

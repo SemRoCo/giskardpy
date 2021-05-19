@@ -20,6 +20,7 @@ JointConstraint = namedtuple(u'JointConstraint', [u'lower_p', u'upper_p',
                                                   u'joint_symbol', u'joint_velocity_symbol',
                                                   u'joint_acceleration_symbol',
                                                   u'linear_weight'])
+DebugConstraint = namedtuple(u'debug', [u'expr'])
 
 
 class SingleJointState(object):

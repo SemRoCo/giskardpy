@@ -34,6 +34,7 @@ class ControllerPlugin(GiskardBehavior):
         new_soft_constraints = self.get_god_map().get_data(identifier.soft_constraint_identifier)
         new_joint_constraints = self.get_god_map().get_data(identifier.joint_constraint_identifier)
         new_hard_constraints = self.get_god_map().get_data(identifier.hard_constraint_identifier)
+        debug_expressions = self.get_god_map().get_data(identifier.debug_expressions)
 
         # update = False
         # if self.soft_constraints is None or set(self.soft_constraints.keys()) != set(new_soft_constraints.keys()):
@@ -65,7 +66,8 @@ class ControllerPlugin(GiskardBehavior):
         self.controller.update_constraints(joint_to_symbols_str,
                                            self.soft_constraints,
                                            self.joint_constraints,
-                                           self.hard_constraints)
+                                           self.hard_constraints,
+                                           debug_expressions)
         self.controller.compile()
 
         self.qp_data[identifier.b_keys[-1]], \

@@ -107,42 +107,6 @@ class Constraint(object):
     def get_input_sampling_period(self):
         return self.god_map.to_symbol(identifier.sample_period)
 
-    # def make_polynomial_function(self, x, p1x, p1y,
-    #                              p2x, p2y,
-    #                              min_x, min_y):
-    #     C = min_y
-    #     B = min_x
-    #
-    #     order = math.log(((p2y - min_y) / (p1y - min_y)), ((min_x - p2x) / (min_x - p1x)))
-    #     A = (p1y - C) / ((B - p1x) ** order)
-    #
-    #     return A * ((-x) + B) ** order + C
-    #
-    # def make_polynomial_function2(self, x, local_max_x, local_max_y,
-    #                               local_min_x, local_min_y,
-    #                               order):
-    #     """
-    #     function of form x**order - x**(order-1)
-    #     :return:
-    #     """
-    #     order_1 = order
-    #     order_2 = order - 1
-    #     A = (order_2 / order_1) * (1 / (local_min_x - local_max_x))
-    #     B = (order_1 ** order_1 / order_2 ** order_2) * (local_max_y - local_min_y)
-    #     C = -local_max_x
-    #     D = local_max_y
-    #     return B * ((x + C) * A) ** order_1 - B * ((x + C) * A) ** order_2 + D
-    #
-    # def magic_weight_function(self, x, p1x, p1y,
-    #                           p2x, p2y,
-    #                           saddlex, saddley,
-    #                           min_x, min_y):
-    #     f0 = p1y
-    #     f1 = self.make_polynomial_function(x, p1x, p1y, p2x, p2y, saddlex, saddley)
-    #     f2 = self.make_polynomial_function2(x, saddlex, saddley, min_x, min_y, 3)
-    #     f3 = min_y
-    #     return w.if_less_eq(x, p1x, f0, w.if_less_eq(x, saddlex, f1, w.if_less_eq(x, min_x, f2, f3)))
-
     def __str__(self):
         return self.__class__.__name__
 
@@ -307,6 +271,7 @@ class Constraint(object):
         :rtype: OrderedDict
         """
         self.soft_constraints = OrderedDict()
+        self.debug_expressions = OrderedDict()
         self.make_constraints()
         return self.soft_constraints
 
@@ -386,7 +351,8 @@ class Constraint(object):
         :type name: str
         :type expr: w.Symbol
         """
-        self.add_velocity_constraint(u'/' + name + u'/debug', expr, expr, 0, 0, False)
+        name = str(self) + '/' + name
+        self.debug_expressions[name] = expr
 
     def add_debug_matrix(self, name, matrix_expr):
         for x in range(matrix_expr.shape[0]):
@@ -418,8 +384,6 @@ class Constraint(object):
         r_P_intermediate_error = w.save_division(r_P_error, trans_error) * trans_scale
 
         weight = self.normalize_weight(max_velocity, weight)
-
-        self.add_debug_constraint('distance', trans_error)
 
         self.add_velocity_constraint(u'/{}/x'.format(prefix),
                                      lower=r_P_intermediate_error[0],
@@ -1520,14 +1484,13 @@ class ExternalCollisionAvoidance(Constraint):
 
         penetration_distance = soft_threshold - actual_distance
         # spring_penetration_distance = spring_threshold - actual_distance
-        self.add_debug_constraint('penetration_distance', penetration_distance)
         lower_limit = self.limit_velocity(penetration_distance, max_velocity)
         upper_limit = 1e2
 
         upper_slack = w.if_greater(actual_distance, 50,  # assuming that distance of unchecked closest points is 100
                                    1e4,
-                                   1e4,
-                                   # w.max(0, lower_limit + actual_distance - hard_threshold)/sample_period
+                                   # 1e4,
+                                   w.max(0, lower_limit + actual_distance - hard_threshold)/sample_period*self.control_horizon
                                    )
 
         weight = w.if_greater(actual_distance, 50, 0, WEIGHT_COLLISION_AVOIDANCE)
@@ -1787,7 +1750,7 @@ class SelfCollisionAvoidance(Constraint):
 
         upper_slack = w.if_greater(actual_distance, 50,  # assuming that distance of unchecked closest points is 100
                                    1e4,
-                                   w.max(0, lower_limit + actual_distance - hard_threshold)/sample_period
+                                   w.max(0, lower_limit + actual_distance - hard_threshold)/sample_period *self.control_horizon
                                    )
 
         self.add_velocity_constraint(u'/position',

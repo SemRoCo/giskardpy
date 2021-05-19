@@ -1455,7 +1455,7 @@ class TestCartGoals(object):
         zero_pose.allow_all_collisions()
         zero_pose.set_and_check_cart_goal(p, zero_pose.r_tip, zero_pose.default_root)
 
-    def test_cart_goal_2eef(self, zero_pose):
+    def test_cart_goal_orientation_singularity(self, zero_pose):
         """
         :type zero_pose: PR2
         """
@@ -1472,7 +1472,8 @@ class TestCartGoals(object):
         l_goal.pose.position = Point(-0.05, 0, 0)
         l_goal.pose.orientation = Quaternion(0, 0, 0, 1)
         zero_pose.set_cart_goal(l_goal, zero_pose.l_tip, root)
-        zero_pose.allow_all_collisions()
+        zero_pose.allow_self_collision()
+        # zero_pose.allow_all_collisions()
         zero_pose.send_and_check_goal()
         zero_pose.check_cart_goal(zero_pose.r_tip, r_goal)
         zero_pose.check_cart_goal(zero_pose.l_tip, l_goal)

@@ -523,6 +523,8 @@ class Constraint(object):
                                           weight=WEIGHT_BELOW_CA, goal_constraint=True, prefix=u''):
         root_R_tipCurrent = w.rotation_of(self.get_fk(root, tip))
         tip_R_rootCurrent_eval = w.rotation_of(self.get_fk_evaluated(tip, root))
+        hack = w.rotation_matrix_from_axis_angle([0,0,1], 0.0001)
+        root_R_tipCurrent = w.dot(root_R_tipCurrent, hack) # hack to avoid singularity
         tip_Q_tipCurrent = w.quaternion_from_matrix(w.dot(tip_R_rootCurrent_eval, root_R_tipCurrent))
         tip_R_goal = w.dot(tip_R_rootCurrent_eval, root_R_tipGoal)
 

@@ -386,7 +386,7 @@ class Constraint(object):
         :type name: str
         :type expr: w.Symbol
         """
-        self.add_velocity_constraint(u'/' + name + u'/debug', expr, expr, 1, 0, False)
+        self.add_velocity_constraint(u'/' + name + u'/debug', expr, expr, 0, 0, False)
 
     def add_debug_matrix(self, name, matrix_expr):
         for x in range(matrix_expr.shape[0]):
@@ -493,8 +493,8 @@ class Constraint(object):
         root_R_tip = w.rotation_of(self.get_fk(root, tip))
         root_V_tip_normal = w.dot(root_R_tip, tip_V_tip_normal)
 
-        angle = w.acos(w.dot(root_V_tip_normal.T, root_V_goal_normal)[0])
-        angle_limited = self.limit_velocity(angle, max_velocity) / angle
+        angle = w.save_acos(w.dot(root_V_tip_normal.T, root_V_goal_normal)[0])
+        angle_limited = w.save_division(self.limit_velocity(angle, max_velocity), angle)
         root_V_goal_normal_intermediate = w.slerp(root_V_tip_normal, root_V_goal_normal, angle_limited)
         error = root_V_goal_normal_intermediate - root_V_tip_normal
 
@@ -1505,7 +1505,7 @@ class ExternalCollisionAvoidance(Constraint):
         soft_threshold = self.get_input_float(self.soft_threshold_id)
         # spring_threshold = soft_threshold
         # soft_threshold = soft_threshold * 0.5
-        # sample_period = self.get_input_sampling_period()
+        sample_period = self.get_input_sampling_period()
         number_of_external_collisions = self.get_number_of_external_collisions()
         num_repeller = self.get_input_float(self.num_repeller_id)
 
@@ -1518,12 +1518,14 @@ class ExternalCollisionAvoidance(Constraint):
 
         penetration_distance = soft_threshold - actual_distance
         # spring_penetration_distance = spring_threshold - actual_distance
+        self.add_debug_constraint('penetration_distance', penetration_distance)
         lower_limit = self.limit_velocity(penetration_distance, max_velocity)
-        upper_limit = 1e4
+        upper_limit = 1e2
 
         upper_slack = w.if_greater(actual_distance, 50,  # assuming that distance of unchecked closest points is 100
                                    1e4,
-                                   w.max(0, lower_limit + actual_distance - hard_threshold)
+                                   1e4,
+                                   # w.max(0, lower_limit + actual_distance - hard_threshold)/sample_period
                                    )
 
         weight = w.if_greater(actual_distance, 50, 0, WEIGHT_COLLISION_AVOIDANCE)
@@ -1759,6 +1761,7 @@ class SelfCollisionAvoidance(Constraint):
         actual_distance = self.get_actual_distance()
         number_of_self_collisions = self.get_number_of_self_collisions()
         num_repeller = self.get_input_float(self.num_repeller_id)
+        sample_period = self.get_input_sampling_period()
 
         b_T_a = self.get_fk(self.link_b, self.link_a)
         pb_T_b = w.inverse_frame(self.get_b_T_pb())
@@ -1777,12 +1780,12 @@ class SelfCollisionAvoidance(Constraint):
 
         penetration_distance = soft_threshold - actual_distance
         lower_limit = self.limit_velocity(penetration_distance, repel_velocity)
-        upper_limit = 1e4
+        upper_limit = 1e2
         # slack_limit = self.limit_velocity(actual_distance, repel_velocity)
 
         upper_slack = w.if_greater(actual_distance, 50,  # assuming that distance of unchecked closest points is 100
                                    1e4,
-                                   w.max(0, lower_limit + actual_distance - hard_threshold)
+                                   w.max(0, lower_limit + actual_distance - hard_threshold)/sample_period
                                    )
 
         self.add_velocity_constraint(u'/position',

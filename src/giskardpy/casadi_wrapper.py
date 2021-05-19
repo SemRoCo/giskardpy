@@ -4,7 +4,7 @@ import pickle
 
 import casadi as ca
 import numpy as np
-from casadi import sign, cos, acos, sin, sqrt, atan2
+from casadi import sign, cos, sin, sqrt, atan2, acos
 from numpy import pi
 
 from giskardpy import logging
@@ -968,8 +968,11 @@ def slerp(v1, v2, t):
     :param t: value between 0 and 1. 0 is v1 and 1 is v2
     :return:
     """
-    angle = acos(dot(v1.T, v2)[0])
-    return (sin((1 - t) * angle) / sin(angle)) * v1 + (sin(t * angle) / sin(angle)) * v2
+    angle = save_acos(dot(v1.T, v2)[0])
+    angle2 = if_eq(angle, 0, 1, angle)
+    return if_eq(angle, 0,
+                 v1,
+                 (sin((1 - t) * angle2) / sin(angle2)) * v1 + (sin(t * angle2) / sin(angle2)) * v2)
 
 
 def to_numpy(matrix):
@@ -980,6 +983,10 @@ def save_division(nominator, denominator, if_nan=0):
     save_denominator = if_eq_zero(denominator, 1, denominator)
     return nominator * if_eq_zero(denominator, if_nan, 1. / save_denominator)
 
+
+def save_acos(angle):
+    angle = limit(angle, -1, 1)
+    return acos(angle)
 
 def entrywise_product(matrix1, matrix2):
     """

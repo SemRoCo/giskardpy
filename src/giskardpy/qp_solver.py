@@ -8,7 +8,7 @@ from giskardpy import logging
 
 
 class QPSolver(object):
-    RETURN_VALUE_DICT = {value: name for name, value in vars(PyReturnValue).items()}
+    STATUS_VALUE_DICT = {value: name for name, value in vars(PyReturnValue).items()}
 
     def __init__(self):
         """
@@ -109,14 +109,14 @@ class QPSolver(object):
                 number_of_retries += 1
                 continue
             else:
-                logging.loginfo(u'{}; retrying with A rounded to 5 decimal places'.format(self.RETURN_VALUE_DICT[success]))
+                logging.loginfo(u'{}; retrying with A rounded to 5 decimal places'.format(self.STATUS_VALUE_DICT[success]))
                 r = 5
                 A = np.round(A, r)
                 nWSR = None
                 self.started = False
         else:  # if not break
             self.started = False
-            message = u'{}'.format(self.RETURN_VALUE_DICT[success])
+            message = u'{}'.format(self.STATUS_VALUE_DICT[success])
             if success in [PyReturnValue.INIT_FAILED_INFEASIBILITY,
                            PyReturnValue.QP_INFEASIBLE,
                            PyReturnValue.HOTSTART_STOPPED_INFEASIBILITY,

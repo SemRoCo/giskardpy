@@ -1,4 +1,5 @@
 from collections import OrderedDict
+from copy import deepcopy
 from time import time
 import matplotlib.pyplot as plt
 import numpy as np
@@ -466,8 +467,8 @@ class QProblemBuilder(object):
         self.num_joint_constraints = len(self.joint_constraints_dict)
         self.num_soft_constraints = len(self.soft_constraints_dict)
 
-        self.qp_solver = QPSolver()
-        # self.qp_solver = QPSolverGurubi()
+        # self.qp_solver = QPSolver()
+        self.qp_solver = QPSolverGurubi()
         # self.qp_solver = QPSolverOSPQ()
         self.lbAs = None  # for debugging purposes
 
@@ -792,11 +793,15 @@ class QProblemBuilder(object):
         if xdot_full is not None:
             p_xdot = pd.DataFrame(xdot_full, filtered_b_names, [u'data'], dtype=float)
             Ax = np.dot(A, xdot_full)
-            p_Ax = pd.DataFrame(Ax, filtered_bA_names, [u'data'], dtype=float)
             xH = np.dot((xdot_full ** 2).T, filtered_H)
             p_xH = pd.DataFrame(xH, filtered_b_names, [u'data'], dtype=float)
             p_xg = p_g * p_xdot
             xHx = np.dot(np.dot(xdot_full.T, filtered_H), xdot_full)
+            num_non_slack = len(self.joint_names()) * self.prediction_horizon * 3
+            p_xdot2 = deepcopy(p_xdot)
+            p_xdot2[num_non_slack:] = 0
+            p_Ax = pd.DataFrame(Ax, filtered_bA_names, [u'data'], dtype=float)
+
             # x_soft = xdot_full[len(xdot_full) - num_slack:]
             # p_lbA_minus_x = pd.DataFrame(lbA - x_soft, filtered_bA_names, [u'data'], dtype=float).sort_index()
             # p_ubA_minus_x = pd.DataFrame(ubA - x_soft, filtered_bA_names, [u'data'], dtype=float).sort_index()
@@ -804,6 +809,8 @@ class QProblemBuilder(object):
             p_xdot = None
 
         p_A = pd.DataFrame(A, filtered_bA_names, filtered_b_names, dtype=float)
+        if xdot_full is not None:
+            p_Ax2 = pd.DataFrame(p_A.dot(p_xdot2), filtered_bA_names, [u'data'], dtype=float)
         # if self.lbAs is None:
         #     self.lbAs = p_lbA
         # else:

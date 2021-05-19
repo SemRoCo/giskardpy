@@ -239,8 +239,8 @@ class Robot(Backend):
                     joint_acceleration_symbol=joint_acceleration_symbol)
             else:
                 self._joint_constraints[joint_name] = JointConstraint(
-                    lower_p=-9999,
-                    upper_p=9999,
+                    lower_p=-1e3,
+                    upper_p=1e3,
                     lower_v=-velocity_limit,
                     upper_v=velocity_limit,
                     weight_v=weight,

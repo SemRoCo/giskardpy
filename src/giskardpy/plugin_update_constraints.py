@@ -207,6 +207,7 @@ class GoalToConstraints(GetGoal):
         # TODO add root joint?
         remaining_joints = [joint_name for joint_name in self.get_robot().controlled_joints
                             if joint_name not in eef_joints]
+        control_horizon = self.get_god_map().get_data(identifier.control_horizon)
         for joint_name in remaining_joints:
             child_links = self.get_robot().get_directly_controllable_collision_links(joint_name)
             if child_links:
@@ -221,6 +222,7 @@ class GoalToConstraints(GetGoal):
                                                                     [joint_name, u'soft_threshold'])
                     maximum_distance = max(maximum_distance, soft_threshold)
                     constraint = ExternalCollisionAvoidance(self.god_map, child_link,
+                                                            control_horizon=control_horizon,
                                                             hard_threshold=hard_threshold,
                                                             soft_threshold=soft_threshold,
                                                             idx=i,
@@ -239,6 +241,7 @@ class GoalToConstraints(GetGoal):
                                                                  [joint_name, u'soft_threshold'])
                 maximum_distance = max(maximum_distance, soft_threshold)
                 constraint = ExternalCollisionAvoidance(self.god_map, child_link,
+                                                        control_horizon=control_horizon,
                                                         hard_threshold=hard_threshold,
                                                         soft_threshold=soft_threshold,
                                                         idx=i,
@@ -252,6 +255,7 @@ class GoalToConstraints(GetGoal):
 
     def add_self_collision_avoidance_constraints(self):
         counter = defaultdict(int)
+        control_horizon = self.get_god_map().get_data(identifier.control_horizon)
         soft_constraints = {}
         number_of_repeller = self.get_god_map().get_data(identifier.self_collision_avoidance_repeller)
         maximum_distance = self.get_god_map().get_data(identifier.maximum_collision_threshold)
@@ -282,6 +286,7 @@ class GoalToConstraints(GetGoal):
                                          thresholds[link_b][u'soft_threshold'])
                 maximum_distance = max(maximum_distance, soft_threshold)
                 constraint = SelfCollisionAvoidance(self.god_map,
+                                                    control_horizon=control_horizon,
                                                     link_a=link_a,
                                                     link_b=link_b,
                                                     hard_threshold=hard_threshold,

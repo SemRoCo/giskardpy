@@ -124,7 +124,10 @@ def ros(request):
     except Exception:
         pass
 
-    logging.loginfo(u'init ros')
+    try:
+        logging.loginfo(u'init ros')
+    except Exception:
+        pass
     rospy.init_node('tests')
     tf_init(60)
     launch = roslaunch.scriptapi.ROSLaunch()
@@ -258,7 +261,6 @@ class TestInitialization(object):
         odom_z_ub = gm.unsafe_get_data(identifier.ub)[odom_z_index] / sample_period
         np.testing.assert_almost_equal(odom_z_lb, -0.6)
         np.testing.assert_almost_equal(odom_z_ub, 0.6)
-
 
 class TestFk(object):
     def test_fk1(self, zero_pose):
@@ -1430,6 +1432,45 @@ class TestCartGoals(object):
         zero_pose.send_and_check_goal()
         zero_pose.check_cart_goal(zero_pose.r_tip, r_goal)
         zero_pose.check_cart_goal(zero_pose.l_tip, l_goal)
+
+    def test_CartesianPoseChanging(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        root = u'base_link'
+        r_goal_a = PoseStamped()
+        r_goal_a.header.frame_id = zero_pose.r_tip
+        r_goal_a.header.stamp = rospy.get_rostime()
+        r_goal_a.pose.position = Point(0, 0, -0.1)
+        r_goal_a.pose.orientation = Quaternion(0, 0, 0, 1)
+        r_goal_b = PoseStamped()
+        r_goal_b.header.frame_id = zero_pose.r_tip
+        r_goal_b.header.stamp = rospy.get_rostime()
+        r_goal_b.pose.position = Point(0, 0, 0.1)
+        r_goal_b.pose.orientation = Quaternion(0, 0, 0, 1)
+        zero_pose.set_json_goal(u'CartesianPoseChanging',
+                                root_link=root,
+                                tip_link=zero_pose.r_tip,
+                                goal_a=r_goal_a,
+                                goal_b=r_goal_b
+                                )
+        #l_goal = PoseStamped()
+        #l_goal.header.frame_id = zero_pose.l_tip
+        #l_goal.header.stamp = rospy.get_rostime()
+        #l_goal.pose.position = Point(0, 0, -0.1)
+        #l_goal.pose.orientation = Quaternion(0, 0, 0, 1)
+        #zero_pose.set_json_goal(u'CartesianPoseChanging',
+        #                        root_link=root,
+        #                        tip_link=zero_pose.l_tip,
+        #                        goal=l_goal
+        #                        )
+        zero_pose.allow_self_collision()
+        zero_pose.send_and_check_goal()
+        #zero_pose.check_cart_goal(zero_pose.r_tip, r_goal)
+        #zero_pose.check_cart_goal(zero_pose.l_tip, l_goal)
+
+
+
 
     def test_cart_goal_2eef2(self, zero_pose):
         """

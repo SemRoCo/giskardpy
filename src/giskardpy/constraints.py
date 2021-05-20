@@ -6,6 +6,7 @@ from copy import deepcopy
 
 import PyKDL as kdl
 import numpy as np
+import rospy
 from geometry_msgs.msg import Vector3Stamped, Vector3
 from giskard_msgs.msg import Constraint as Constraint_msg
 
@@ -1457,6 +1458,89 @@ class CartesianPoseStraight(Constraint):
     def make_constraints(self):
         for constraint in self.constraints:
             self.soft_constraints.update(constraint.get_constraints())
+
+class CartesianPoseChanging(Constraint):
+
+    weight = u'weight'
+    max_linear_velocity = u'max_linear_velocity'
+    max_angular_velocity = u'max_angular_velocity'
+
+    def __init__(self, god_map, root_link, tip_link, goal_a, goal_b, max_linear_velocity=0.1,
+                 max_angular_velocity=0.5, weight=WEIGHT_ABOVE_CA, goal_constraint=False):
+        """
+        This goal will use the kinematic chain between root and tip link to move tip link into the goal pose
+        :param root_link: str, name of the root link of the kin chain
+        :param tip_link: str, name of the tip link of the kin chain
+        :param goal: PoseStamped as json
+        :param max_linear_velocity: float, m/s, default 0.1
+        :param max_angular_velocity: float, rad/s, default 0.5
+        :param weight: float, default WEIGHT_ABOVE_CA
+        """
+        super(CartesianPoseChanging, self).__init__(god_map)
+        self.constraints = []
+        self.root_link = root_link
+        self.tip_link = tip_link
+        self.goal_constraint = goal_constraint
+        self.goal_a = goal_a
+        self.goal_b = goal_b
+        params = {
+            self.weight: weight,
+            self.max_linear_velocity: max_linear_velocity,
+            self.max_angular_velocity: max_angular_velocity
+        }
+        self.save_params_on_god_map(params)
+
+
+    #def make_constraints(self):
+    #    for constraint in self.constraints:
+    #        self.soft_constraints.update(constraint.get_constraints())
+
+    def make_constraints(self):
+        goal_a = self.goal_a
+        goal_b = self.goal_b
+        max_linear_velocity = self.get_input_float(self.max_linear_velocity)
+        max_angular_velocity = self.get_input_float(self.max_angular_velocity)
+        weight = self.get_input_float(self.weight)
+        goal_constraint = self.get_input_float(self.goal_constraint)
+        time = self.get_god_map().to_symbol(identifier.time)
+        time_in_secs = self.get_input_sampling_period() * time
+        #weight_a = w.if_eq_zero(w.fmod(time_in_secs, 2),
+        #                        WEIGHT_ABOVE_CA,
+        #                        WEIGHT_BELOW_CA)
+        weight_a = w.if_greater_zero(w.sin(1 / 100 * 2 * w.pi * time_in_secs),
+                                     WEIGHT_ABOVE_CA,
+                                     WEIGHT_ABOVE_CA)
+        rospy.logerr(goal_a)
+        # weight_a = w.if_greater_zero(-1 * w.sin(1 / 100 * 2 * w.pi * time_in_secs),
+        #                              weight * -1 * w.sin(1 / 100 * 2 * w.pi * time_in_secs),
+        #                              weight)
+        #weight_b = w.if_greater_zero(w.sin(1 / 100 * 2 * w.pi * time_in_secs),
+        #                             weight * w.sin(1 / 100 * 2 * w.pi * time_in_secs),
+        #                             weight)
+        weight_normalized_a = weight_a
+        #weight_normalized_b = self.normalize_weight(max_linear_velocity, weight_b)
+        self.constraints.append(CartesianPose(god_map=self.get_god_map(),
+                                              root_link=self.root_link,
+                                              tip_link=self.tip_link,
+                                              goal=goal_a,
+                                              #max_linear_velocity=max_linear_velocity, throws qpsolveerror
+                                              #max_angular_velocity=max_angular_velocity, throws qpsolveerror
+                                              weight=WEIGHT_ABOVE_CA,
+                                              goal_constraint=goal_constraint))
+        #self.constraints.append(CartesianPose(god_map=self.get_god_map(),
+        #                                      root_link=self.root_link,
+        #                                      tip_link=self.tip_link,
+        #                                      goal=goal_b,
+        #                                      max_linear_velocity=max_linear_velocity,
+        #                                      max_angular_velocity=max_angular_velocity,
+        #                                      weight=weight_normalized_b,
+        #                                      goal_constraint=goal_constraint))
+        for c in self.constraints:
+            self.soft_constraints.update(c.get_constraints())
+
+    def __str__(self):
+        s = super(CartesianPoseChanging, self).__str__()
+        return u'{}'.format(s)
 
 
 class ExternalCollisionAvoidance(Constraint):

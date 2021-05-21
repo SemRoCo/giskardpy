@@ -33,7 +33,7 @@ class AppendZeroVelocity(GiskardBehavior):
         #         self.get_god_map().set_data(joint_velocity_identifier, 0)
         #         pass
 
-        motor_commands = self.get_god_map().get_data(identifier.cmd)
+        motor_commands = self.get_god_map().get_data(identifier.qp_solver_solution)
         current_js = self.get_god_map().get_data(identifier.joint_states)
         next_js = None
         if motor_commands:

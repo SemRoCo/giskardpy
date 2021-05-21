@@ -22,6 +22,13 @@ general_options:
     angular: # rad/s**2
       default: 40
       override: {}
+  joint_jerk_limit: # multiply your desired acc limit with sample period; experimental, don't touch
+    linear: # m/s**2
+      default: 15
+      override: {}
+    angular: # rad/s**2
+      default: 15
+      override: {}
   joint_weights:
     # the planner prefers low weight joints to achieve solutions
     # higher weights reduce wiggling, but lower the maximum joint velocity, which might make the planner stop too early

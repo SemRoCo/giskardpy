@@ -8,7 +8,7 @@ from geometry_msgs.msg import PoseStamped
 
 from giskardpy import WORLD_IMPLEMENTATION, casadi_wrapper as w
 from giskardpy import identifier
-from giskardpy.data_types import SingleJointState, JointConstraint
+from giskardpy.data_types import SingleJointState, FreeVariable
 from giskardpy.god_map import GodMap
 from giskardpy.pybullet_world_object import PyBulletWorldObject
 from giskardpy.utils import KeyDefaultDict, \
@@ -221,39 +221,39 @@ class Robot(Backend):
             # last_joint_velocity = god_map.to_symbol(identifier.last_joint_states + [joint_name, u'velocity'])
             jerk_limit = 999
             if not self.is_joint_continuous(joint_name):
-                self._joint_constraints[joint_name] = JointConstraint(
-                    lower_p=lower_limit,
-                    upper_p=upper_limit,
-                    lower_v=-velocity_limit,
-                    upper_v=velocity_limit,
-                    weight_v=weight,
-                    lower_a=-acceleration_limit,
-                    upper_a=acceleration_limit,
-                    weight_a=0,
-                    lower_j=-jerk_limit,
-                    upper_j=jerk_limit,
-                    weight_j=0,
-                    linear_weight=0,
-                    joint_symbol=joint_symbol,
-                    joint_velocity_symbol=joint_velocity_symbol,
-                    joint_acceleration_symbol=joint_acceleration_symbol)
+                self._joint_constraints[joint_name] = FreeVariable(
+                    position_symbol=joint_symbol,
+                    velocity_symbol=joint_velocity_symbol,
+                    acceleration_symbol=joint_acceleration_symbol,
+                    lower_position_limit=lower_limit,
+                    upper_position_limit=upper_limit,
+                    lower_velocity_limit=-velocity_limit,
+                    upper_velocity_limit=velocity_limit,
+                    lower_acceleration_limit=-acceleration_limit,
+                    upper_acceleration_limit=acceleration_limit,
+                    lower_jerk_limit=-jerk_limit,
+                    upper_jerk_limit=jerk_limit,
+                    quadratic_velocity_weight=weight,
+                    quadratic_acceleration_weight=0,
+                    quadratic_jerk_weight=0
+                )
             else:
-                self._joint_constraints[joint_name] = JointConstraint(
-                    lower_p=-1e3,
-                    upper_p=1e3,
-                    lower_v=-velocity_limit,
-                    upper_v=velocity_limit,
-                    weight_v=weight,
-                    lower_a=-acceleration_limit,
-                    upper_a=acceleration_limit,
-                    weight_a=0,
-                    lower_j=-jerk_limit,
-                    upper_j=jerk_limit,
-                    weight_j=0,
-                    linear_weight=0,
-                    joint_symbol=joint_symbol,
-                    joint_velocity_symbol=joint_velocity_symbol,
-                    joint_acceleration_symbol=joint_acceleration_symbol)
+                self._joint_constraints[joint_name] = FreeVariable(
+                    position_symbol=joint_symbol,
+                    velocity_symbol=joint_velocity_symbol,
+                    acceleration_symbol=joint_acceleration_symbol,
+                    lower_position_limit=None,
+                    upper_position_limit=None,
+                    lower_velocity_limit=-velocity_limit,
+                    upper_velocity_limit=velocity_limit,
+                    lower_acceleration_limit=-acceleration_limit,
+                    upper_acceleration_limit=acceleration_limit,
+                    lower_jerk_limit=-jerk_limit,
+                    upper_jerk_limit=jerk_limit,
+                    quadratic_velocity_weight=weight,
+                    quadratic_acceleration_weight=0,
+                    quadratic_jerk_weight=0
+                )
 
     def get_fk_expression(self, root_link, tip_link):
         """

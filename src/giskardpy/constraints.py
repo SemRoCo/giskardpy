@@ -15,7 +15,7 @@ from rospy_message_converter.message_converter import \
 import giskardpy.identifier as identifier
 import giskardpy.tfwrapper as tf
 from giskardpy import casadi_wrapper as w
-from giskardpy.data_types import SoftConstraint
+from giskardpy.data_types import VelocityConstraint
 from giskardpy.exceptions import GiskardException, ConstraintException
 from giskardpy.input_system import \
     PoseStampedInput, Point3Input, Vector3Input, \
@@ -30,25 +30,25 @@ WEIGHT_BELOW_CA = Constraint_msg.WEIGHT_BELOW_CA
 WEIGHT_MIN = Constraint_msg.WEIGHT_MIN
 
 
-class Constraint(object):
+class Goal(object):
     def __init__(self, god_map, control_horizon=1, **kwargs):
         self.god_map = god_map
         self.control_horizon = control_horizon
 
     def save_params_on_god_map(self, params):
-        constraints = self.get_god_map().get_data(identifier.constraints_identifier)
+        constraints = self.get_god_map().get_data(identifier.goal_params)
         try:
             constraints[str(self)].update(params)
         except:
             constraints[str(self)] = params
 
-        self.get_god_map().set_data(identifier.constraints_identifier, constraints)
+        self.get_god_map().set_data(identifier.goal_params, constraints)
 
     def make_constraints(self):
         pass
 
     def get_identifier(self):
-        return identifier.constraints_identifier + [str(self)]
+        return identifier.goal_params + [str(self)]
 
     def get_world_object_pose(self, object_name, link_name):
         pass
@@ -277,7 +277,7 @@ class Constraint(object):
 
     def add_velocity_constraint(self, name_suffix, lower, upper, weight, expression, goal_constraint=False,
                                 lower_slack_limit=-1e4,
-                                upper_slack_limit=1e4, linear_weight=0):
+                                upper_slack_limit=1e4):
         """
         :param name_suffix: name of the constraint, make use to avoid name conflicts!
         :type name_suffix: Union[str, unicode]
@@ -292,56 +292,13 @@ class Constraint(object):
         name = str(self) + name_suffix
         if name in self.soft_constraints:
             raise KeyError(u'a constraint with name \'{}\' already exists'.format(name))
-        self.soft_constraints[name] = SoftConstraint(lbA_v=lower,
-                                                     ubA_v=upper,
-                                                     lbA_a=-999,
-                                                     ubA_a=999,
-                                                     weight_v=weight,
-                                                     weight_a=0,
-                                                     expression=expression,
-                                                     expression_dot=0,
-                                                     goal_constraint=goal_constraint,
-                                                     lower_slack_limit_v=lower_slack_limit,
-                                                     upper_slack_limit_v=upper_slack_limit,
-                                                     lower_slack_limit_a=lower_slack_limit,
-                                                     upper_slack_limit_a=upper_slack_limit,
-                                                     linear_weight=linear_weight)
-
-    def add_acceleration_constraint(self, name_suffix, lower, upper, lower_v, upper_v,
-                                    weight_a, expression, goal_constraint=False,
-                                    lower_slack_limit_a=-1e9,
-                                    upper_slack_limit_a=1e9, linear_weight=0, weight_v=None,
-                                    lower_slack_limit_v=-1e9, upper_slack_limit_v=1e9):
-        """
-        :param name_suffix: name of the constraint, make use to avoid name conflicts!
-        :type name_suffix: Union[str, unicode]
-        :param lower: lower limit for the !derivative! of the expression
-        :type lower: float, or symbolic expression
-        :param upper: upper limit for the !derivative! of the expression
-        :type upper: float, or symbolic expression
-        :param weight_a: tells the solver how important this constraint is, if unsure, use HIGH_WEIGHT
-        :param expression: symbolic expression that describes a geometric property. make sure it as a depedency on the
-                            joint state. usually achieved through "get_fk"
-        """
-        if weight_v is None:
-            weight_v = weight_a
-        name = str(self) + name_suffix
-        if name in self.soft_constraints:
-            raise KeyError(u'a constraint with name \'{}\' already exists'.format(name))
-        self.soft_constraints[name] = SoftConstraint(lbA_v=lower_v,
-                                                     ubA_v=upper_v,
-                                                     lbA_a=lower,
-                                                     ubA_a=upper,
-                                                     weight_v=weight_v,
-                                                     weight_a=weight_a,
-                                                     expression=expression,
-                                                     expression_dot=0,
-                                                     goal_constraint=goal_constraint,
-                                                     lower_slack_limit_v=lower_slack_limit_v,
-                                                     upper_slack_limit_v=upper_slack_limit_v,
-                                                     lower_slack_limit_a=lower_slack_limit_a,
-                                                     upper_slack_limit_a=upper_slack_limit_a,
-                                                     linear_weight=linear_weight)
+        self.soft_constraints[name] = VelocityConstraint(name=name,
+                                                         expression=expression,
+                                                         lower_velocity_limit=lower,
+                                                         upper_velocity_limit=upper,
+                                                         quadratic_velocity_weight=weight,
+                                                         lower_slack_limit=lower_slack_limit,
+                                                         upper_slack_limit=upper_slack_limit)
 
     def add_debug_constraint(self, name, expr):
         """
@@ -575,7 +532,7 @@ class Constraint(object):
     #                                      goal_constraint=goal_constraint)
 
 
-class JointPositionContinuous(Constraint):
+class JointPositionContinuous(Goal):
     goal = u'goal'
     weight = u'weight'
     max_velocity = u'max_velocity'
@@ -645,7 +602,7 @@ class JointPositionContinuous(Constraint):
         return u'{}/{}'.format(s, self.joint_name)
 
 
-class JointPositionPrismatic(Constraint):
+class JointPositionPrismatic(Goal):
     goal = u'goal'
     weight = u'weight'
     max_velocity = u'max_velocity'
@@ -713,7 +670,7 @@ class JointPositionPrismatic(Constraint):
         return u'{}/{}'.format(s, self.joint_name)
 
 
-class JointPositionRevolute(Constraint):
+class JointPositionRevolute(Goal):
     goal = u'goal'
     weight = u'weight'
     max_velocity = u'max_velocity'
@@ -767,7 +724,9 @@ class JointPositionRevolute(Constraint):
         weight = self.normalize_weight(max_velocity, weight)
 
         capped_err = self.limit_velocity(err, max_velocity)
-
+        self.add_debug_constraint('weight', weight)
+        self.add_debug_constraint('max_velocity', max_velocity)
+        self.add_debug_constraint('basic', self.get_input_float(self.weight))
         self.add_velocity_constraint('',
                                      lower=capped_err,
                                      upper=capped_err,
@@ -780,7 +739,7 @@ class JointPositionRevolute(Constraint):
         return u'{}/{}'.format(s, self.joint_name)
 
 
-class AvoidJointLimitsRevolute(Constraint):
+class AvoidJointLimitsRevolute(Goal):
     goal = u'goal'
     weight_id = u'weight'
     max_velocity = u'max_velocity'
@@ -845,7 +804,7 @@ class AvoidJointLimitsRevolute(Constraint):
         return u'{}/{}'.format(s, self.joint_name)
 
 
-class AvoidJointLimitsPrismatic(Constraint):
+class AvoidJointLimitsPrismatic(Goal):
     goal = u'goal'
     weight_id = u'weight'
     max_velocity = u'max_velocity'
@@ -910,7 +869,7 @@ class AvoidJointLimitsPrismatic(Constraint):
         return u'{}/{}'.format(s, self.joint_name)
 
 
-class JointPositionList(Constraint):
+class JointPositionList(Goal):
     def __init__(self, god_map, goal_state, weight=None, max_velocity=None, goal_constraint=None, **kwargs):
         """
         This goal takes a joint state and adds the other JointPosition goals depending on their type
@@ -943,9 +902,10 @@ class JointPositionList(Constraint):
     def make_constraints(self):
         for constraint in self.constraints:
             self.soft_constraints.update(constraint.get_constraints())
+            self.debug_expressions.update(constraint.debug_expressions)
 
 
-class AvoidJointLimits(Constraint):
+class AvoidJointLimits(Goal):
     def __init__(self, god_map, percentage=15, weight=WEIGHT_BELOW_CA, **kwargs):
         """
         This goal will push joints away from their position limits
@@ -971,7 +931,7 @@ class AvoidJointLimits(Constraint):
             self.soft_constraints.update(constraint.get_constraints())
 
 
-class BasicCartesianConstraint(Constraint):
+class BasicCartesianGoal(Goal):
     goal = u'goal'
     weight = u'weight'
     max_velocity = u'max_velocity'
@@ -983,7 +943,7 @@ class BasicCartesianConstraint(Constraint):
         """
         dont use me
         """
-        super(BasicCartesianConstraint, self).__init__(god_map, **kwargs)
+        super(BasicCartesianGoal, self).__init__(god_map, **kwargs)
         self.root = root_link
         self.tip = tip_link
 
@@ -1000,11 +960,11 @@ class BasicCartesianConstraint(Constraint):
         return self.get_input_PoseStamped(self.goal)
 
     def __str__(self):
-        s = super(BasicCartesianConstraint, self).__str__()
+        s = super(BasicCartesianGoal, self).__str__()
         return u'{}/{}/{}'.format(s, self.root, self.tip)
 
 
-class CartesianPosition(BasicCartesianConstraint):
+class CartesianPosition(BasicCartesianGoal):
 
     def __init__(self, god_map, root_link, tip_link, goal, max_velocity=0.1, max_acceleration=1,
                  weight=WEIGHT_ABOVE_CA, goal_constraint=False, **kwargs):
@@ -1029,7 +989,7 @@ class CartesianPosition(BasicCartesianConstraint):
                                                self.goal_constraint, weight)
 
 
-class CartesianPositionStraight(BasicCartesianConstraint):
+class CartesianPositionStraight(BasicCartesianGoal):
     start = u'start'
 
     def __init__(self, god_map, root_link, tip_link, goal,
@@ -1114,7 +1074,7 @@ class CartesianPositionStraight(BasicCartesianConstraint):
                                                weight=WEIGHT_ABOVE_CA)
 
 
-class CartesianVelocityLimit(Constraint):
+class CartesianVelocityLimit(Goal):
     goal = u'goal'
     weight_id = u'weight'
     max_linear_velocity_id = u'max_linear_velocity'
@@ -1274,7 +1234,7 @@ class CartesianVelocityLimit(Constraint):
 #                             expression=current_position[1])
 
 
-class CartesianOrientation(BasicCartesianConstraint):
+class CartesianOrientation(BasicCartesianGoal):
     def __init__(self, god_map, root_link, tip_link, goal, max_velocity=0.5, max_accleration=0.5,
                  weight=WEIGHT_ABOVE_CA, goal_constraint=False, **kwargs):
         """
@@ -1336,7 +1296,7 @@ class CartesianOrientationSlerp(CartesianOrientation):
     pass
 
 
-class CartesianPose(Constraint):
+class CartesianPose(Goal):
     def __init__(self, god_map, root_link, tip_link, goal, max_linear_velocity=0.1,
                  max_angular_velocity=0.5, weight=WEIGHT_ABOVE_CA, goal_constraint=False, **kwargs):
         """
@@ -1370,7 +1330,7 @@ class CartesianPose(Constraint):
             self.soft_constraints.update(constraint.get_constraints())
 
 
-class CartesianPoseStraight(Constraint):
+class CartesianPoseStraight(Goal):
     def __init__(self, god_map, root_link, tip_link, goal, translation_max_velocity=0.1,
                  translation_max_acceleration=0.1, rotation_max_velocity=0.5, rotation_max_acceleration=0.5,
                  weight=WEIGHT_ABOVE_CA, goal_constraint=True, **kwargs):
@@ -1398,7 +1358,7 @@ class CartesianPoseStraight(Constraint):
             self.soft_constraints.update(constraint.get_constraints())
 
 
-class ExternalCollisionAvoidance(Constraint):
+class ExternalCollisionAvoidance(Goal):
     max_velocity_id = u'max_velocity'
     hard_threshold_id = u'hard_threshold'
     soft_threshold_id = u'soft_threshold'
@@ -1523,7 +1483,7 @@ class ExternalCollisionAvoidance(Constraint):
         return u'{}/{}/{}'.format(s, self.link_name, self.idx)
 
 
-class CollisionAvoidanceHint(Constraint):
+class CollisionAvoidanceHint(Goal):
     max_velocity_id = u'max_velocity'
     threshold_id = u'threshold'
     threshold2_id = u'threshold2'
@@ -1660,7 +1620,7 @@ class CollisionAvoidanceHint(Constraint):
         return u'{}/{}/{}/{}'.format(s, self.link_name, self.body_b, self.link_b)
 
 
-class SelfCollisionAvoidance(Constraint):
+class SelfCollisionAvoidance(Goal):
     max_velocity_id = u'max_velocity'
     hard_threshold_id = u'hard_threshold'
     soft_threshold_id = u'soft_threshold'
@@ -1767,7 +1727,7 @@ class SelfCollisionAvoidance(Constraint):
         return u'{}/{}/{}/{}'.format(s, self.link_a, self.link_b, self.idx)
 
 
-class AlignPlanes(Constraint):
+class AlignPlanes(Goal):
     root_normal_id = u'root_normal'
     tip_normal_id = u'tip_normal'
     max_velocity_id = u'max_velocity'
@@ -1827,7 +1787,7 @@ class AlignPlanes(Constraint):
                                                    goal_constraint=self.goal_constraint)
 
 
-class GraspBar(Constraint):
+class GraspBar(Goal):
     bar_axis_id = u'bar_axis'
     tip_grasp_axis_id = u'tip_grasp_axis'
     bar_center_id = u'bar_center'
@@ -1918,7 +1878,7 @@ class GraspBar(Constraint):
                                                goal_constraint=self.goal_constraint)
 
 
-class BasePointingForward(Constraint):
+class BasePointingForward(Goal):
     base_forward_axis_id = u'base_forward_axis'
     max_velocity = u'max_velocity'
     range_id = u'range'
@@ -2011,7 +1971,7 @@ class BasePointingForward(Constraint):
                                      goal_constraint=False)
 
 
-class GravityJoint(Constraint):
+class GravityJoint(Goal):
     weight = u'weight'
 
     # FIXME
@@ -2066,7 +2026,7 @@ class GravityJoint(Constraint):
         return u'{}/{}'.format(s, self.joint_name)
 
 
-class UpdateGodMap(Constraint):
+class UpdateGodMap(Goal):
 
     def __init__(self, god_map, updates, **kwargs):
         """
@@ -2087,7 +2047,7 @@ class UpdateGodMap(Constraint):
                 self.update_god_map(next_identifier, value)
 
 
-class Pointing(Constraint):
+class Pointing(Goal):
     goal_point = u'goal_point'
     pointing_axis = u'pointing_axis'
     weight_id = u'weight'
@@ -2199,7 +2159,7 @@ class Pointing(Constraint):
         return u'{}/{}/{}'.format(s, self.root, self.tip)
 
 
-class OpenDoor(Constraint):
+class OpenDoor(Goal):
     hinge_pose_id = u'hinge_frame'
     hinge_V_hinge_axis_msg_id = u'hinge_axis'
     hinge0_T_tipGoal_id = u'hinge0_T_tipGoal'
@@ -2331,7 +2291,7 @@ class OpenDoor(Constraint):
         return u'{}/{}/{}'.format(s, self.root, self.tip)
 
 
-class OpenDrawer(Constraint):
+class OpenDrawer(Goal):
     hinge_pose_id = u'hinge_frame'  # frame of the hinge TODO: is that necessary
     hinge_V_hinge_axis_msg_id = u'hinge_axis'  # axis vector of the hinge
     root_T_tip_goal_id = u'root_T_tipGoal'  # goal of the gripper tip (where to move)
@@ -2435,7 +2395,7 @@ class OpenDrawer(Constraint):
         return u'{}/{}/{}'.format(s, self.root, self.tip)
 
 
-class Open(Constraint):
+class Open(Goal):
     def __init__(self, god_map, tip_link, object_name, object_link_name, root_link=None, goal_joint_state=None,
                  weight=WEIGHT_ABOVE_CA, **kwargs):
         super(Open, self).__init__(god_map, **kwargs)
@@ -2475,7 +2435,7 @@ class Open(Constraint):
             self.soft_constraints.update(constraint.get_constraints())
 
 
-class Close(Constraint):
+class Close(Goal):
     def __init__(self, god_map, tip_link, object_name, object_link_name, root_link=None, goal_joint_state=None,
                  weight=WEIGHT_ABOVE_CA, **kwargs):
         super(Close, self).__init__(god_map)

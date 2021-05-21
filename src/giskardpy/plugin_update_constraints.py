@@ -14,7 +14,7 @@ from rospy_message_converter.message_converter import convert_ros_message_to_dic
 import giskardpy.constraints
 import giskardpy.identifier as identifier
 from giskardpy.constraints import SelfCollisionAvoidance, ExternalCollisionAvoidance
-from giskardpy.data_types import JointConstraint
+from giskardpy.data_types import FreeVariable
 from giskardpy.exceptions import ImplementationException, UnknownConstraintException, InvalidGoalException, \
     ConstraintInitalizationException, GiskardException
 from giskardpy.logging import loginfo
@@ -51,7 +51,7 @@ class GoalToConstraints(GetGoal):
         if not move_cmd:
             return Status.FAILURE
 
-        self.get_god_map().set_data(identifier.constraints_identifier, {})
+        self.get_god_map().set_data(identifier.goal_params, {})
 
         self.get_robot()._create_constraints(self.get_god_map())
 
@@ -73,7 +73,7 @@ class GoalToConstraints(GetGoal):
             return Status.SUCCESS
 
         self.get_god_map().set_data(identifier.collision_goal, move_cmd.collisions)
-        self.get_god_map().set_data(identifier.soft_constraint_identifier, self.soft_constraints)
+        self.get_god_map().set_data(identifier.constraints, self.soft_constraints)
         self.get_god_map().set_data(identifier.debug_expressions, self.debug_expr)
         self.get_blackboard().runtime = time()
 
@@ -81,45 +81,12 @@ class GoalToConstraints(GetGoal):
 
         if (self.get_god_map().get_data(identifier.check_reachability)):
             # FIXME reachability check is broken
-            from giskardpy import casadi_wrapper as w
-            joint_constraints = OrderedDict()
-            for i, joint_name in enumerate(controlled_joints):
-                lower_limit, upper_limit = self.get_robot().get_joint_limits(joint_name)
-                joint_symbol = self.get_robot().get_joint_position_symbol(joint_name)
-                sample_period = self.get_god_map().to_symbol(identifier.sample_period)
-                # velocity_limit = self.get_robot().get_joint_velocity_limit_expr(joint_name) * sample_period
-                if self.get_robot().is_joint_prismatic(joint_name):
-                    velocity_limit = self.rc_prismatic_velocity * sample_period
-                elif self.get_robot().is_joint_continuous(joint_name):
-                    velocity_limit = self.rc_continuous_velocity * sample_period
-                elif self.get_robot().is_joint_revolute(joint_name):
-                    velocity_limit = self.rc_revolute_velocity * sample_period
-                else:
-                    velocity_limit = self.rc_other_velocity * sample_period
-
-                weight = self.get_robot()._joint_weights[joint_name]
-                weight = weight * (1. / (self.rc_prismatic_velocity)) ** 2
-
-                if not self.get_robot().is_joint_continuous(joint_name):
-                    joint_constraints[(self.get_robot().get_name(), joint_name)] = JointConstraint(
-                        lower=w.max(-velocity_limit, lower_limit - joint_symbol),
-                        upper=w.min(velocity_limit, upper_limit - joint_symbol),
-                        weight=weight,
-                        linear_weight=0)
-                else:
-                    joint_constraints[(self.get_robot().get_name(), joint_name)] = JointConstraint(
-                        lower=-velocity_limit,
-                        upper=velocity_limit,
-                        weight=weight,
-                        linear_weight=0)
+            pass
         else:
             joint_constraints = OrderedDict(((self.robot.get_name(), k), self.robot._joint_constraints[k]) for k in
                                             controlled_joints)
-        hard_constraints = OrderedDict(((self.robot.get_name(), k), self.robot._hard_constraints[k]) for k in
-                                       controlled_joints if k in self.robot._hard_constraints)
 
-        self.get_god_map().set_data(identifier.joint_constraint_identifier, joint_constraints)
-        self.get_god_map().set_data(identifier.hard_constraint_identifier, hard_constraints)
+        self.get_god_map().set_data(identifier.free_variables, joint_constraints)
 
         return Status.SUCCESS
 

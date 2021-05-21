@@ -108,7 +108,7 @@ class PostProcessing(GiskardBehavior):
         b_mask = make_filter_b_mask(H)[num_joint_constraints:]
         xdot_keys = np.array(self.get_god_map().get_data(identifier.xdot_keys)[num_joint_constraints:])
         xdot_keys_filtered = xdot_keys[b_mask]
-        soft_constraints = self.get_god_map().get_data(identifier.soft_constraint_identifier)
+        soft_constraints = self.get_god_map().get_data(identifier.constraints)
         soft_constraints_filtered = [(i, soft_constraints[i]) for i in xdot_keys_filtered]
 
         xdotfull = self.get_god_map().get_data(identifier.xdot_full)

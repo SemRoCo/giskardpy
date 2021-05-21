@@ -77,7 +77,7 @@ joint_jerk_weight = general_options + [u'joint_weights', u'jerk', u'override']
 
 # qp solver
 qp_solver = rosparam + [u'qp_solver']
-nWSR = qp_solver + [u'nWSR']
+qp_solver_name = qp_solver + [u'name']
 prediction_horizon = qp_solver + [u'prediction_horizon']
 control_horizon = qp_solver + [u'control_horizon']
 

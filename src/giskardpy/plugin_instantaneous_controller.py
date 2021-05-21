@@ -1,5 +1,3 @@
-from collections import OrderedDict
-
 from py_trees import Status
 
 import giskardpy.identifier as identifier
@@ -11,7 +9,6 @@ class ControllerPlugin(GiskardBehavior):
     def __init__(self, name):
         super(ControllerPlugin, self).__init__(name)
         self.path_to_functions = self.get_god_map().get_data(identifier.data_folder)
-        self.nWSR = self.get_god_map().get_data(identifier.nWSR)
         self.qp_data = {}
         self.get_god_map().set_data(identifier.qp_data, self.qp_data)  # safe dict on godmap and work on ref
         self.rc_prismatic_velocity = self.get_god_map().get_data(identifier.rc_prismatic_velocity)
@@ -32,20 +29,15 @@ class ControllerPlugin(GiskardBehavior):
         free_variables = self.get_god_map().get_data(identifier.free_variables)
         debug_expressions = self.get_god_map().get_data(identifier.debug_expressions)
 
-
         self.controller = QPController(
             free_variables=list(free_variables.values()),
             constraints=list(constraints.values()),
             sample_period=self.get_god_map().unsafe_get_data(identifier.sample_period),
             prediciton_horizon=self.get_god_map().unsafe_get_data(identifier.prediction_horizon),
             control_horizon=self.get_god_map().unsafe_get_data(identifier.control_horizon),
-            debug_expressions=debug_expressions
+            debug_expressions=debug_expressions,
+            solver_name=self.get_god_map().unsafe_get_data(identifier.qp_solver_name)
         )
-
-        controlled_joints = self.get_robot().controlled_joints
-        joint_to_symbols_str = OrderedDict(
-            (x, (self.robot.get_joint_position_symbol(x),
-                 self.robot.get_joint_velocity_symbol(x))) for x in controlled_joints)
 
         self.controller.compile()
 

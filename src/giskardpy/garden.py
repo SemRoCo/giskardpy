@@ -59,12 +59,6 @@ def initialize_god_map():
         path_to_data_folder += u'/'
     god_map.set_data(identifier.data_folder, path_to_data_folder)
 
-    # fix nWSR
-    nWSR = god_map.get_data(identifier.nWSR)
-    if nWSR == u'None':
-        nWSR = None
-    god_map.set_data(identifier.nWSR, nWSR)
-
     pbw.start_pybullet(god_map.get_data(identifier.gui))
     while not rospy.is_shutdown():
         try:

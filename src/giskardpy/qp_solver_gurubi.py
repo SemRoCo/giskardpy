@@ -1,11 +1,7 @@
 import numpy as np
 import gurobipy
 
-import qpoases
-from qpoases import PyReturnValue
-from scipy import sparse
-
-from giskardpy.exceptions import MAX_NWSR_REACHEDException, QPSolverException, InfeasibleException
+from giskardpy.exceptions import QPSolverException, InfeasibleException
 from giskardpy import logging
 from giskardpy.qp_solver import QPSolver
 

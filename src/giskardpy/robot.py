@@ -218,8 +218,14 @@ class Robot(Backend):
             acceleration_limit = self.get_joint_acceleration_limit_expr(joint_name)
             jerk_limit = self.get_joint_jerk_limit_expr(joint_name)
 
-            weight = self._joint_velocity_weights[joint_name]
-            weight = weight * (1. / (velocity_limit)) ** 2
+            velocity_weight = self._joint_velocity_weights[joint_name]
+            velocity_weight = velocity_weight * (1. / (velocity_limit)) ** 2
+
+            acceleration_weight = self._joint_acceleration_weights[joint_name]
+            acceleration_weight = acceleration_weight * (1. / (acceleration_limit)) ** 2
+
+            jerk_weight = self._joint_jerk_weights[joint_name]
+            jerk_weight = jerk_weight * (1. / (jerk_limit)) ** 2
 
             if not self.is_joint_continuous(joint_name):
                 self._joint_constraints[joint_name] = FreeVariable(
@@ -234,9 +240,9 @@ class Robot(Backend):
                     upper_acceleration_limit=acceleration_limit,
                     lower_jerk_limit=-jerk_limit,
                     upper_jerk_limit=jerk_limit,
-                    quadratic_velocity_weight=weight,
-                    quadratic_acceleration_weight=0,
-                    quadratic_jerk_weight=0
+                    quadratic_velocity_weight=velocity_weight,
+                    quadratic_acceleration_weight=acceleration_weight,
+                    quadratic_jerk_weight=jerk_weight
                 )
             else:
                 self._joint_constraints[joint_name] = FreeVariable(
@@ -251,9 +257,9 @@ class Robot(Backend):
                     upper_acceleration_limit=acceleration_limit,
                     lower_jerk_limit=-jerk_limit,
                     upper_jerk_limit=jerk_limit,
-                    quadratic_velocity_weight=weight,
-                    quadratic_acceleration_weight=0,
-                    quadratic_jerk_weight=0
+                    quadratic_velocity_weight=velocity_weight,
+                    quadratic_acceleration_weight=acceleration_weight,
+                    quadratic_jerk_weight=jerk_weight
                 )
 
     def get_fk_expression(self, root_link, tip_link):

@@ -430,8 +430,8 @@ class QPController(object):
     Wraps around QPOases. Builds the required matrices from constraints.
     """
 
-    def __init__(self, free_variables, constraints, sample_period,
-                 prediciton_horizon, control_horizon, debug_expressions):
+    def __init__(self, free_variables, constraints, debug_expressions, sample_period,
+                 prediciton_horizon, control_horizon, solver_name):
         self.prediction_horizon = prediciton_horizon
         self.control_horizon = control_horizon
         self.sample_period = sample_period
@@ -445,8 +445,13 @@ class QPController(object):
         self.constraints = list(sorted(constraints, key=lambda x: x.name))
         self.debug_expressions = debug_expressions
 
-        # self.qp_solver = QPSolver()
-        self.qp_solver = QPSolverGurubi()
+        if solver_name == u'gurubi':
+            self.qp_solver = QPSolverGurubi()
+        elif solver_name == u'qpoases':
+            self.qp_solver = QPSolver()
+        else:
+            raise KeyError(u'Solver \'{}\' not supported'.format(solver_name))
+        logging.loginfo(u'Using QP Solver \'{}\''.format(solver_name))
         # self.qp_solver = QPSolverOSPQ()
 
     def compile(self):
@@ -546,7 +551,7 @@ class QPController(object):
             self.A.add_constraint(free_variable)
 
         logging.loginfo(u'constructing new controller with {} constraints and {} free variables...'.format(
-            len(self.bA_names()), len(self.free_variables)))
+            self.A.height, self.A.width))
 
         self._init_big_ass_M()
 

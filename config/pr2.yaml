@@ -47,7 +47,7 @@ general_options:
       default: 0
       override: {}
 qp_solver:
-  nWSR: None # None results in a nWSR estimation that's fine most of the time
+  name: gurubi # one of [qpoases, gurubi]
   prediction_horizon: 8
   control_horizon: 8
 plugins:

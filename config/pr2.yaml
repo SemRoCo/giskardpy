@@ -3,45 +3,53 @@ general_options:
   map_frame: map
   debug: False # enables debug prints and prints the behavior tree state in the terminal
   fill_velocity_values: True # due to a bug, the pr2 does not want the velocity values to be filled
-  joint_vel_limit: # giskard will use the min of this number and limits from the urdf
-    linear: # m/s
-      default: 1
-      override:
-        odom_x_joint: 0.5
-        odom_y_joint: 0.5
-    angular: # rad/s
-      default: 1
-      override:
-        odom_z_joint: 0.6
-        head_pan_joint: 0.5
-        head_tilt_joint: 0.5
-  joint_acceleration_limit: # multiply your desired acc limit with sample period; experimental, don't touch
-    linear: # m/s**2
-      default: 40
-      override: {}
-    angular: # rad/s**2
-      default: 40
-      override: {}
-  joint_jerk_limit: # multiply your desired acc limit with sample period; experimental, don't touch
-    linear: # m/s**2
-      default: 15
-      override: {}
-    angular: # rad/s**2
-      default: 15
-      override: {}
+  joint_limits: # giskard will use the min of this number and limits from the urdf
+    velocity:
+      linear: # m/s
+        default: 1
+        override:
+          odom_x_joint: 0.5
+          odom_y_joint: 0.5
+      angular: # rad/s
+        default: 1
+        override:
+          odom_z_joint: 0.6
+          head_pan_joint: 0.5
+          head_tilt_joint: 0.5
+    acceleration: # multiply your desired acc limit with sample period; experimental, don't touch
+      linear: # m/s**2
+        default: 1e3
+        override: {}
+      angular: # rad/s**2
+        default: 1e3
+        override: {}
+    jerk: # multiply your desired acc limit with sample period; experimental, don't touch
+      linear: # m/s**2
+        default: 15
+        override: {}
+      angular: # rad/s**2
+        default: 15
+        override: {}
   joint_weights:
     # the planner prefers low weight joints to achieve solutions
     # higher weights reduce wiggling, but lower the maximum joint velocity, which might make the planner stop too early
-    default: 0.01
-    override:
-      odom_x_joint: 0.05
-      odom_y_joint: 0.05
-      odom_z_joint: 0.05
-      torso_lift_joint: 0.05
+    velocity:
+      default: 0.01
+      override:
+        odom_x_joint: 0.05
+        odom_y_joint: 0.05
+        odom_z_joint: 0.05
+        torso_lift_joint: 0.05
+    acceleration:
+      default: 0
+      override: {}
+    jerk:
+      default: 0
+      override: {}
 qp_solver:
   nWSR: None # None results in a nWSR estimation that's fine most of the time
-  prediction_horizon: 1
-  control_horizon: 1
+  prediction_horizon: 8
+  control_horizon: 8
 plugins:
   GoalReached:
     joint_convergence_threshold: 0.01 # when the velocities fall below this value, the planning succeeds

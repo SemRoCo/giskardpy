@@ -42,7 +42,11 @@ class Robot(Backend):
         self._joint_velocity_angular_limit = KeyDefaultDict(lambda x: 100000)
         self._joint_acc_linear_limit = defaultdict(lambda: 100)  # no acceleration limit per default
         self._joint_acc_angular_limit = defaultdict(lambda: 100)  # no acceleration limit per default
-        self._joint_weights = defaultdict(lambda: 0)
+        self._joint_jerk_linear_limit = defaultdict(lambda: 100)  # no acceleration limit per default
+        self._joint_jerk_angular_limit = defaultdict(lambda: 100)  # no acceleration limit per default
+        self._joint_velocity_weights = defaultdict(lambda: 0)
+        self._joint_acceleration_weights = defaultdict(lambda: 0)
+        self._joint_jerk_weights = defaultdict(lambda: 0)
         super(Robot, self).__init__(urdf, base_pose, controlled_joints, path_to_data_folder, *args, **kwargs)
         self.reinitialize()
 
@@ -150,19 +154,18 @@ class Robot(Backend):
         self._joint_acc_linear_limit = linear
         self._joint_acc_angular_limit = angular
 
-    def set_joint_weight_symbols(self, symbols):
-        self._joint_weights = symbols
+    def set_joint_jerk_limit_symbols(self, linear, angular):
+        self._joint_jerk_linear_limit = linear
+        self._joint_jerk_angular_limit = angular
 
-    def update_joint_symbols(self, position, velocity, acceleration, weights,
-                             linear_velocity_limit, angular_velocity_limit,
-                             linear_acceleration_limit, angular_acceleration_limit):
-        self.set_joint_position_symbols(position)
-        self.set_joint_velocity_symbols(velocity)
-        self.set_joint_acceleration_symbols(acceleration)
-        self.set_joint_weight_symbols(weights)
-        self.set_joint_velocity_limit_symbols(linear_velocity_limit, angular_velocity_limit)
-        self.set_joint_acceleration_limit_symbols(linear_acceleration_limit, angular_acceleration_limit)
-        self.reinitialize()
+    def set_joint_velocity_weight_symbols(self, overrides):
+        self._joint_velocity_weights = overrides
+
+    def set_joint_acceleration_weight_symbols(self, overrides):
+        self._joint_acceleration_weights = overrides
+
+    def set_joint_jerk_weight_symbols(self, overrides):
+        self._joint_jerk_weights = overrides
 
     def update_self_collision_matrix(self, added_links=None, removed_links=None):
         super(Robot, self).update_self_collision_matrix(added_links, removed_links)
@@ -211,15 +214,13 @@ class Robot(Backend):
             joint_velocity_symbol = self.get_joint_velocity_symbol(joint_name)
             joint_acceleration_symbol = self.get_joint_acceleration_symbol(joint_name)
             sample_period = god_map.to_symbol(identifier.sample_period)
-            velocity_limit = self.get_joint_velocity_limit_expr(joint_name)  # * sample_period
-            acceleration_limit = 999
-            # acceleration_limit = self.get_joint_acceleration_limit_expr(joint_name)  # * sample_period
-            # acceleration_limit2 = acceleration_limit * sample_period
+            velocity_limit = self.get_joint_velocity_limit_expr(joint_name)
+            acceleration_limit = self.get_joint_acceleration_limit_expr(joint_name)
+            jerk_limit = self.get_joint_jerk_limit_expr(joint_name)
 
-            weight = self._joint_weights[joint_name]
+            weight = self._joint_velocity_weights[joint_name]
             weight = weight * (1. / (velocity_limit)) ** 2
-            # last_joint_velocity = god_map.to_symbol(identifier.last_joint_states + [joint_name, u'velocity'])
-            jerk_limit = 999
+
             if not self.is_joint_continuous(joint_name):
                 self._joint_constraints[joint_name] = FreeVariable(
                     position_symbol=joint_symbol,
@@ -331,15 +332,24 @@ class Robot(Backend):
         :return: minimum of default velocity limit and limit specified in urdfs
         :rtype: float
         """
-        limit = self._urdf_robot.joint_map[joint_name].limit
         if self.is_joint_prismatic(joint_name):
             limit_symbol = self._joint_acc_linear_limit[joint_name]
         else:
             limit_symbol = self._joint_acc_angular_limit[joint_name]
-        if limit is None or limit.effort is None:
-            return limit_symbol
+        return limit_symbol
+
+    def get_joint_jerk_limit_expr(self, joint_name):
+        """
+        :param joint_name: name of the joint in the urdfs
+        :type joint_name: str
+        :return: minimum of default velocity limit and limit specified in urdfs
+        :rtype: float
+        """
+        if self.is_joint_prismatic(joint_name):
+            limit_symbol = self._joint_jerk_linear_limit[joint_name]
         else:
-            return w.min(limit.effort, limit_symbol)
+            limit_symbol = self._joint_jerk_angular_limit[joint_name]
+        return limit_symbol
 
     def get_joint_velocity_limit_expr_evaluated(self, joint_name, god_map):
         """

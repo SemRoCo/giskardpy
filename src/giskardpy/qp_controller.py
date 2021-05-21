@@ -417,7 +417,7 @@ class A(Parent):
         indices_to_delete = []
         for o in range(self.prediction_horizon):
             for i in continuous_joint_indices:
-                indices_to_delete.append(i*(o+1))
+                indices_to_delete.append(i+len(self.free_variables())*(o))
         A_soft.remove(indices_to_delete, [])
         return A_soft
 
@@ -590,18 +590,19 @@ class QPController(object):
                 if self.__are_joint_limits_violated(p_lb, p_ub):
                     raise OutOfJointLimitsException(e)
                 raise HardConstraintsViolatedException(e)
-            if isinstance(e, QPSolverException):
-                arrays = [(p_weights, u'H'),
-                          (p_A, u'A'),
-                          (p_lbA, u'lbA'),
-                          (p_ubA, u'ubA'),
-                          (p_lb, u'lb'),
-                          (p_ub, u'ub')]
-                any_nan = False
-                for a, name in arrays:
-                    any_nan |= self.__is_nan_in_array(name, a)
-                if any_nan:
-                    raise e
+            # if isinstance(e, QPSolverException):
+            # FIXME
+            #     arrays = [(p_weights, u'H'),
+            #               (p_A, u'A'),
+            #               (p_lbA, u'lbA'),
+            #               (p_ubA, u'ubA'),
+            #               (p_lb, u'lb'),
+            #               (p_ub, u'ub')]
+            #     any_nan = False
+            #     for a, name in arrays:
+            #         any_nan |= self.__is_nan_in_array(name, a)
+            #     if any_nan:
+            #         raise e
             raise e
         if self.xdot_full is None:
             return None

@@ -62,25 +62,18 @@ map_frame = general_options + [u'map_frame']
 debug = general_options + [u'debug']
 fill_velocity_values = general_options + [u'fill_velocity_values']
 
-joint_velocity_linear_limit = general_options + [u'joint_vel_limit', u'linear']
-joint_velocity_linear_limit_default = joint_velocity_linear_limit + [u'default']
-joint_velocity_linear_limit_override = joint_velocity_linear_limit + [u'override']
+joint_velocity_linear_limit = general_options + [u'joint_limits', u'velocity', u'linear', u'override']
+joint_velocity_angular_limit = general_options + [u'joint_limits', u'velocity', u'angular', u'override']
 
-joint_velocity_angular_limit = general_options + [u'joint_vel_limit', u'angular']
-joint_velocity_angular_limit_default = joint_velocity_angular_limit + [u'default']
-joint_velocity_angular_limit_override = joint_velocity_angular_limit + [u'override']
+joint_acceleration_linear_limit = general_options + [u'joint_limits', u'acceleration', u'linear', u'override']
+joint_acceleration_angular_limit = general_options + [u'joint_limits', u'acceleration', u'angular', u'override']
 
-joint_acceleration_linear_limit = general_options + [u'joint_acceleration_limit', u'linear']
-joint_acceleration_linear_limit_default = joint_acceleration_linear_limit + [u'default']
-joint_acceleration_linear_limit_override = joint_acceleration_linear_limit + [u'override']
+joint_jerk_linear_limit = general_options + [u'joint_limits', u'jerk', u'linear', u'override']
+joint_jerk_angular_limit = general_options + [u'joint_limits', u'jerk', u'angular', u'override']
 
-joint_acceleration_angular_limit = general_options + [u'joint_acceleration_limit', u'angular']
-joint_acceleration_angular_limit_default = joint_acceleration_angular_limit + [u'default']
-joint_acceleration_angular_limit_override = joint_acceleration_angular_limit + [u'override']
-
-joint_weight = general_options + [u'joint_weights']
-joint_weight_default = joint_weight + [u'default']
-joint_weight_override = joint_weight + [u'override']
+joint_velocity_weight = general_options + [u'joint_weights', u'velocity', u'override']
+joint_acceleration_weight = general_options + [u'joint_weights', u'acceleration', u'override']
+joint_jerk_weight = general_options + [u'joint_weights', u'jerk', u'override']
 
 # qp solver
 qp_solver = rosparam + [u'qp_solver']

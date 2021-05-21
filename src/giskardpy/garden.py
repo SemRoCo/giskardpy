@@ -78,11 +78,6 @@ def initialize_god_map():
             break
         rospy.sleep(0.5)
 
-    joint_weight_symbols = process_joint_specific_params(identifier.joint_weight,
-                                                         identifier.joint_weight_default,
-                                                         identifier.joint_weight_override,
-                                                         god_map)
-
     process_joint_specific_params(identifier.self_collision_avoidance_distance,
                                   identifier.self_collision_avoidance_default_threshold,
                                   identifier.self_collision_avoidance_default_override,
@@ -93,26 +88,6 @@ def initialize_god_map():
                                   identifier.external_collision_avoidance_default_override,
                                   god_map)
 
-    # TODO add checks to test if joints listed as linear are actually linear
-    joint_velocity_linear_limit_symbols = process_joint_specific_params(identifier.joint_velocity_linear_limit,
-                                                                        identifier.joint_velocity_linear_limit_default,
-                                                                        identifier.joint_velocity_linear_limit_override,
-                                                                        god_map)
-    joint_velocity_angular_limit_symbols = process_joint_specific_params(identifier.joint_velocity_angular_limit,
-                                                                         identifier.joint_velocity_angular_limit_default,
-                                                                         identifier.joint_velocity_angular_limit_override,
-                                                                         god_map)
-
-    joint_acceleration_linear_limit_symbols = process_joint_specific_params(identifier.joint_acceleration_linear_limit,
-                                                                            identifier.joint_acceleration_linear_limit_default,
-                                                                            identifier.joint_acceleration_linear_limit_override,
-                                                                            god_map)
-    joint_acceleration_angular_limit_symbols = process_joint_specific_params(
-        identifier.joint_acceleration_angular_limit,
-        identifier.joint_acceleration_angular_limit_default,
-        identifier.joint_acceleration_angular_limit_override,
-        god_map)
-
     world = PyBulletWorld(False, blackboard.god_map.get_data(identifier.data_folder))
     god_map.set_data(identifier.world, world)
     robot = WorldObject(god_map.get_data(identifier.robot_description),
@@ -122,20 +97,41 @@ def initialize_god_map():
                     ignored_pairs=god_map.get_data(identifier.ignored_self_collisions),
                     added_pairs=god_map.get_data(identifier.added_self_collisions))
 
+    d = set_default_in_override_block(identifier.joint_velocity_weight, god_map)
+    world.robot.set_joint_velocity_weight_symbols(d)
+
+    d = set_default_in_override_block(identifier.joint_acceleration_weight, god_map)
+    world.robot.set_joint_acceleration_weight_symbols(d)
+
+    d = set_default_in_override_block(identifier.joint_jerk_weight, god_map)
+    world.robot.set_joint_jerk_weight_symbols(d)
+
+    d_linear = set_default_in_override_block(identifier.joint_velocity_linear_limit, god_map)
+    d_angular = set_default_in_override_block(identifier.joint_velocity_angular_limit, god_map)
+    world.robot.set_joint_velocity_limit_symbols(d_linear, d_angular)
+
+    d_linear = set_default_in_override_block(identifier.joint_acceleration_linear_limit, god_map)
+    d_angular = set_default_in_override_block(identifier.joint_acceleration_angular_limit, god_map)
+    world.robot.set_joint_acceleration_limit_symbols(d_linear, d_angular)
+
+    d_linear = set_default_in_override_block(identifier.joint_jerk_linear_limit, god_map)
+    d_angular = set_default_in_override_block(identifier.joint_jerk_angular_limit, god_map)
+    world.robot.set_joint_jerk_limit_symbols(d_linear, d_angular)
+
     joint_position_symbols = JointStatesInput(blackboard.god_map.to_symbol, world.robot.get_movable_joints(),
                                               identifier.joint_states,
                                               suffix=[u'position'])
+    world.robot.set_joint_position_symbols(joint_position_symbols.joint_map)
     joint_vel_symbols = JointStatesInput(blackboard.god_map.to_symbol, world.robot.get_movable_joints(),
                                          identifier.joint_states,
                                          suffix=[u'velocity'])
+    world.robot.set_joint_velocity_symbols(joint_vel_symbols.joint_map)
     joint_acc_symbols = JointStatesInput(blackboard.god_map.to_symbol, world.robot.get_movable_joints(),
                                          identifier.joint_states,
                                          suffix=[u'acceleration'])
-    world.robot.update_joint_symbols(joint_position_symbols.joint_map, joint_vel_symbols.joint_map,
-                                     joint_acc_symbols.joint_map,
-                                     joint_weight_symbols,
-                                     joint_velocity_linear_limit_symbols, joint_velocity_angular_limit_symbols,
-                                     joint_acceleration_linear_limit_symbols, joint_acceleration_angular_limit_symbols)
+    world.robot.set_joint_acceleration_symbols(joint_acc_symbols.joint_map)
+    world.robot.reinitialize()
+
     world.robot.init_self_collision_matrix()
     return god_map
 
@@ -149,6 +145,14 @@ def process_joint_specific_params(identifier_, default, override, god_map):
     god_map.set_data(identifier_, d)
     return KeyDefaultDict(lambda key: god_map.to_symbol(identifier_ + [key]))
 
+def set_default_in_override_block(block_identifier, god_map):
+    default_value = god_map.get_data(block_identifier[:-1] + [u'default'])
+    override = god_map.get_data(block_identifier)
+    d = defaultdict(lambda: default_value)
+    if isinstance(override, dict):
+        d.update(override)
+    god_map.set_data(block_identifier, d)
+    return KeyDefaultDict(lambda key: god_map.to_symbol(block_identifier + [key]))
 
 def grow_tree():
     action_server_name = u'~command'

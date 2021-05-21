@@ -84,6 +84,7 @@ control_horizon = qp_solver + [u'control_horizon']
 # plugins
 plugins = rosparam + [u'plugins']
 enable_VisualizationBehavior = plugins + [u'VisualizationBehavior', u'enabled']
+enable_WorldVisualizationBehavior = plugins + [u'WorldVisualizationBehavior', u'enabled']
 enable_CPIMarker = plugins + [u'CPIMarker', u'enabled']
 enable_PlotTrajectory = plugins + [u'PlotTrajectory', u'enabled']
 PlotTrajectory_velocity_threshold = plugins + [u'PlotTrajectory', u'velocity_threshold']

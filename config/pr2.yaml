@@ -56,6 +56,8 @@ plugins:
     window_size: 21 # in sample points, should be identical to WiggleCancel window_size
   VisualizationBehavior: # planning visualization through markers, slows planning down a little bit
     enabled: True
+  WorldVisualizationBehavior: # planning world visualization through markers, slows planning down a little bit
+    enabled: True
   CPIMarker: # contact visualization, slows planning down a little bit
     enabled: True
   PlotTrajectory: # plots the joint trajectory at the end of planning, useful for debugging

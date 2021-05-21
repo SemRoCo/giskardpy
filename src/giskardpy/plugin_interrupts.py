@@ -86,7 +86,7 @@ class WiggleCancel(GiskardBehavior):
         # remove joints that arent moving
         mask = self.make_mask(js_samples, moving_thresholds)
         velocity_limits = velocity_limits[mask]
-        amplitude_thresholds = velocity_limits * amplitude_threshold * N  # acceleration limit is basically vel*2
+        amplitude_thresholds = velocity_limits * amplitude_threshold  # acceleration limit is basically vel*2
         joints_filtered = js_samples[mask]
         joints_filtered = np.diff(joints_filtered)
         # joints_filtered = (joints_filtered.T - joints_filtered.mean(axis=1)).T
@@ -103,8 +103,7 @@ class WiggleCancel(GiskardBehavior):
             return False
 
         fft = np.fft.rfft(joints_filtered, axis=1)
-        fft = [np.sqrt(i.imag**2 + i.real**2) for i in fft]
-
+        fft = [np.abs(i/N) for i in fft]# amplitude of fft is only half as big ?!?!?
         if plot:
             y = joints_filtered
 
@@ -134,7 +133,7 @@ class WiggleCancel(GiskardBehavior):
                     joint = filtered_keys[i]
                     velocity_limit = velocity_limits[i]
                     hertz_str = u', '.join(u'{} hertz: {} > {}'.format(freq[freq_idx:][j],
-                                                                     fft[:, freq_idx:].T[:, i][j] / N / velocity_limit,
+                                                                     fft[:, freq_idx:].T[:, i][j] / velocity_limit,
                                                                      amplitude_threshold) for j, x in
                                          enumerate(violations[:, i]) if x)
                     violation_str += u'\nshaking of joint: \'{}\' at '.format(joint) + hertz_str

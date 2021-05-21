@@ -761,8 +761,8 @@ class ShakyJointPositionRevoluteOrPrismatic(Constraint):
                              self.get_robot().get_joint_velocity_limit_expr(self.joint_name))
 
         fun_params = frequency * 2.0 * w.pi * time_in_secs
-        err = (joint_goal - current_joint) + noise_amplitude * w.cos(fun_params)
-        capped_err = self.limit_velocity(err, max_velocity)
+        err = (joint_goal - current_joint) + w.cos(fun_params)
+        capped_err = self.limit_velocity(err, noise_amplitude * max_velocity)
 
         weight = self.normalize_weight(max_velocity, weight)
 

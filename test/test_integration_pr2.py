@@ -392,6 +392,20 @@ class TestConstraints(object):
         new_pose = tf.lookup_pose('map', tip)
         compare_points(expected.pose.position, new_pose.pose.position)
 
+    def test_JointPositionRevolute(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        joint = 'r_shoulder_lift_joint'
+        joint_goal = 1
+        zero_pose.allow_all_collisions()
+        zero_pose.set_json_goal(u'JointPositionRevolute',
+                                joint_name=joint,
+                                goal=joint_goal,
+                                max_velocity=0.5)
+        zero_pose.send_and_check_goal()
+        assert zero_pose.get_robot().joint_state[joint].position == joint_goal
+
     def test_CartesianOrientation(self, zero_pose):
         """
         :type zero_pose: PR2

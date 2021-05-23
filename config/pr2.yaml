@@ -25,10 +25,10 @@ general_options:
         override: {}
     jerk: # multiply your desired acc limit with sample period; experimental, don't touch
       linear: # m/s**2
-        default: 15
+        default: 50
         override: {}
       angular: # rad/s**2
-        default: 15
+        default: 50
         override: {}
   joint_weights:
     # the planner prefers low weight joints to achieve solutions
@@ -48,8 +48,8 @@ general_options:
       override: {}
 qp_solver:
   name: gurobi # one of [qpoases, gurobi]
-  prediction_horizon: 8
-  control_horizon: 8
+  prediction_horizon: 10
+  control_horizon: 10
 plugins:
   GoalReached:
     joint_convergence_threshold: 0.01 # when the velocities fall below this value, the planning succeeds

@@ -147,19 +147,19 @@ class B(Parent):
     def lb(self):
         return self._sorter(self.blow_up(self._j_lb_v, True),
                             self.blow_up(self._j_lb_a, True),
-                            self.blow_up(self._j_lb_j, True),
+                            self.blow_up(self._j_lb_j),
                             self._s_lb_v)[0]
 
     def ub(self):
         return self._sorter(self.blow_up(self._j_ub_v, True),
                             self.blow_up(self._j_ub_a, True),
-                            self.blow_up(self._j_ub_j, True),
+                            self.blow_up(self._j_ub_j),
                             self._s_ub_v)[0]
 
     def names(self):
         return self._sorter(self.blow_up(self._j_ub_v, True),
                             self.blow_up(self._j_ub_a, True),
-                            self.blow_up(self._j_ub_j, True),
+                            self.blow_up(self._j_ub_j),
                             self._s_ub_v)[1]
 
 

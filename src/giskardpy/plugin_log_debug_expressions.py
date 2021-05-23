@@ -19,17 +19,17 @@ class LogDebugExpressionsPlugin(GiskardBehavior):
     def update(self):
         debug_data = self.get_god_map().get_data(identifier.debug_expressions_evaluated)
         if len(debug_data) > 0:
-            time = self.get_god_map().get_data(identifier.time)
+            time = self.get_god_map().get_data(identifier.time) - 1
             last_mjs = None
-            if time == 1:
-                mjs = OrderedDict()
-                for name, value in debug_data.items():
-                    data_point = SingleJointState(name=name,
-                                                  position=0,
-                                                  velocity=0)
-                    mjs[name] = data_point
-                self.trajectory.set(0, mjs)
-            if time > 1:
+            # if time == 1:
+            #     mjs = OrderedDict()
+            #     for name, value in debug_data.items():
+            #         data_point = SingleJointState(name=name,
+            #                                       position=value,
+            #                                       velocity=0)
+            #         mjs[name] = data_point
+            #     self.trajectory.set(0, mjs)
+            if time >= 1:
                 last_mjs = self.trajectory.get_exact(time-1)
             mjs = OrderedDict()
             for name, value in debug_data.items():

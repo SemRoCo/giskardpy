@@ -341,7 +341,9 @@ class Goal(object):
         r_P_intermediate_error = w.save_division(r_P_error, trans_error) * trans_scale
 
         weight = self.normalize_weight(max_velocity, weight)
-        self.add_debug_vector('r_P_intermediate_error', r_P_intermediate_error)
+        self.add_debug_vector('vel', self.get_expr_velocity(trans_error))
+        self.add_debug_vector('error', trans_error)
+        self.add_debug_vector('trans_scale', trans_scale)
 
         self.add_velocity_constraint(u'/{}/x'.format(prefix),
                                      lower=r_P_intermediate_error[0],
@@ -677,7 +679,7 @@ class JointPositionRevolute(Goal):
     max_velocity = u'max_velocity'
     max_acceleration = u'max_acceleration'
 
-    def __init__(self, god_map, joint_name, goal, weight=WEIGHT_BELOW_CA, max_velocity=3451, max_acceleration=1,
+    def __init__(self, god_map, joint_name, goal, weight=WEIGHT_BELOW_CA, max_velocity=None, max_acceleration=1,
                  goal_constraint=True, **kwargs):
         """
         This goal will move a revolute joint to the goal position
@@ -689,6 +691,8 @@ class JointPositionRevolute(Goal):
         super(JointPositionRevolute, self).__init__(god_map, **kwargs)
         self.joint_name = joint_name
         self.goal_constraint = goal_constraint
+        if max_velocity is None:
+            max_velocity = 100
         if not self.get_robot().is_joint_revolute(joint_name):
             raise ConstraintException(u'{} called with non revolute joint {}'.format(self.__class__.__name__,
                                                                                      joint_name))
@@ -725,9 +729,8 @@ class JointPositionRevolute(Goal):
         weight = self.normalize_weight(max_velocity, weight)
 
         capped_err = self.limit_velocity(err, max_velocity)
-        self.add_debug_expr('weight', weight)
         self.add_debug_expr('max_velocity', max_velocity)
-        self.add_debug_expr('basic', self.get_input_float(self.weight))
+        self.add_debug_expr('capped_err', capped_err)
         self.add_velocity_constraint('',
                                      lower=capped_err,
                                      upper=capped_err,

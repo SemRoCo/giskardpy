@@ -356,16 +356,14 @@ class TestJointGoals(object):
                    u'torso_lift_joint': torso_lift_joint_limits[0] - 0.2,
                    u'head_pan_joint': head_pan_joint_limits[0] - 0.2}
         zero_pose.set_joint_goal(goal_js)
-        zero_pose.send_goal()
-        assert (not zero_pose.are_joint_limits_violated())
+        zero_pose.send_and_check_goal()
 
         goal_js = {u'r_elbow_flex_joint': r_elbow_flex_joint_limits[1] + 0.2,
                    u'torso_lift_joint': torso_lift_joint_limits[1] + 0.2,
                    u'head_pan_joint': head_pan_joint_limits[1] + 0.2}
 
         zero_pose.set_joint_goal(goal_js)
-        zero_pose.send_goal()
-        assert (not zero_pose.are_joint_limits_violated())
+        zero_pose.send_and_check_goal()
 
     # TODO test goal for unknown joint
 
@@ -6185,7 +6183,7 @@ class TestCollisionAvoidanceGoals(object):
         kitchen_setup.set_and_check_cart_goal(base_pose, u'base_footprint')
         kitchen_setup.check_current_joint_state(gaya_pose)
 
-    def test_avoid_collision9(self, kitchen_setup):
+    def test_avoid_collision_at_kitchen_corner(self, kitchen_setup):
         """
         :type kitchen_setup: PR2
         """

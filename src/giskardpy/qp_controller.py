@@ -134,32 +134,32 @@ class B(Parent):
         self._s_lb_v[name + '/v'] = constraint.lower_slack_limit
         self._s_ub_v[name + '/v'] = constraint.upper_slack_limit
 
-    def blow_up(self, d):
+    def blow_up(self, d, end_with_zero=False):
         result = {}
         for t in range(self.prediction_horizon):
             for name, value in d.items():
-                if t == self.prediction_horizon -1 and self.prediction_horizon >= 5:
+                if t == self.prediction_horizon -1 and self.prediction_horizon > 1 and end_with_zero:
                     result['t{:03d}/{}'.format(t, name)] = 0
                 else:
                     result['t{:03d}/{}'.format(t, name)] = value
         return result
 
     def lb(self):
-        return self._sorter(self.blow_up(self._j_lb_v),
-                            self.blow_up(self._j_lb_a),
-                            self.blow_up(self._j_lb_j),
+        return self._sorter(self.blow_up(self._j_lb_v, True),
+                            self.blow_up(self._j_lb_a, True),
+                            self.blow_up(self._j_lb_j, True),
                             self._s_lb_v)[0]
 
     def ub(self):
-        return self._sorter(self.blow_up(self._j_ub_v),
-                            self.blow_up(self._j_ub_a),
-                            self.blow_up(self._j_ub_j),
+        return self._sorter(self.blow_up(self._j_ub_v, True),
+                            self.blow_up(self._j_ub_a, True),
+                            self.blow_up(self._j_ub_j, True),
                             self._s_ub_v)[0]
 
     def names(self):
-        return self._sorter(self.blow_up(self._j_ub_v),
-                            self.blow_up(self._j_ub_a),
-                            self.blow_up(self._j_ub_j),
+        return self._sorter(self.blow_up(self._j_ub_v, True),
+                            self.blow_up(self._j_ub_a, True),
+                            self.blow_up(self._j_ub_j, True),
                             self._s_ub_v)[1]
 
 
@@ -184,15 +184,16 @@ class BA(Parent):
         :type free_variable: FreeVariable
         """
         name = free_variable.name
-        if free_variable.lower_position_limit is not None:
-            self._pos_limits_lba[name + '/pos_limit'] = free_variable.lower_position_limit - free_variable.position_symbol
-            self._pos_limits_uba[name + '/pos_limit'] = free_variable.upper_position_limit - free_variable.position_symbol
-            self._pos_limits_lba2[name + '/pos_limit'] = free_variable.lower_position_limit - free_variable.position_symbol
-            self._pos_limits_uba2[name + '/pos_limit'] = free_variable.upper_position_limit - free_variable.position_symbol
-        self._j_lbA_a_link[name + '/last_vel'] = free_variable.velocity_symbol
-        self._j_ubA_a_link[name + '/last_vel'] = free_variable.velocity_symbol
-        self._j_lbA_j_link[name + '/last_acc'] = free_variable.acceleration_symbol
-        self._j_ubA_j_link[name + '/last_acc'] = free_variable.acceleration_symbol
+        if free_variable.has_position_limits():
+            self._pos_limits_lba[name + '/pos_limit'] = w.round_up(free_variable.lower_position_limit - free_variable.position_symbol, 5)
+            self._pos_limits_lba2[name + '/pos_limit'] = w.round_up(free_variable.lower_position_limit - free_variable.position_symbol, 5)
+            self._pos_limits_uba[name + '/pos_limit'] = w.round_down(free_variable.upper_position_limit - free_variable.position_symbol, 5)
+            self._pos_limits_uba2[name + '/pos_limit'] = w.round_down(free_variable.upper_position_limit - free_variable.position_symbol, 5)
+        # this mean the last velocity only has to be matched to 5 decimal places
+        self._j_lbA_a_link[name + '/last_vel'] = w.round_down(free_variable.velocity_symbol, 5)
+        self._j_lbA_j_link[name + '/last_acc'] = w.round_down(free_variable.acceleration_symbol, 5)
+        self._j_ubA_a_link[name + '/last_vel'] = w.round_up(free_variable.velocity_symbol, 5)
+        self._j_ubA_j_link[name + '/last_acc'] = w.round_up(free_variable.acceleration_symbol, 5)
         self._joint_names.append(name)
 
     def add_constraint(self, constraint):
@@ -307,7 +308,7 @@ class A(Parent):
         :return:
         """
         name = free_variable.name
-        if free_variable.lower_position_limit is None:
+        if not free_variable.has_position_limits():
             self.num_of_continuous_joints += 1
         self.joints[name] = free_variable
         self._A_joint[name] = free_variable.position_symbol
@@ -321,6 +322,7 @@ class A(Parent):
     def free_variables(self):
         return self._sorter(self._A_joint)[0]
 
+    @profile
     def construct_A_soft(self):
         #         |   t1   |   tn   |   t1   |   tn   |   t1   |   tn   |
         #         |v1 v2 vn|v1 v2 vn|a1 a2 an|a1 a2 an|j1 j2 jn|j1 j2 jn|
@@ -374,7 +376,7 @@ class A(Parent):
         soft_expressions = self._sorter(self._A_soft)[0]
         controlled_joints = self.free_variables()
         t = time()
-        J = w.jacobian(w.Matrix(soft_expressions), controlled_joints, order=1)
+        J = w.jacobian(w.Matrix(soft_expressions), controlled_joints, order=1) * self.sample_period
         logging.loginfo(u'computed Jacobian in {:.5f}s'.format(time() - t))
         # Jd = w.jacobian(w.Matrix(soft_expressions), controlled_joints, order=2)
         # logging.loginfo(u'computed Jacobian dot in {:.5f}s'.format(time() - t))
@@ -406,14 +408,13 @@ class A(Parent):
         vertical_offset = vertical_offset + block_size
 
         # soft constraints
-        for c in range(self.control_horizon):
-            A_soft[vertical_offset:, c*number_of_joints:(c+1)*number_of_joints] = J * self.sample_period
+        A_soft[vertical_offset:, :(self.control_horizon)*number_of_joints] = w.hstack([J for _ in range(self.control_horizon)])
 
         number_of_soft_constraints = len(soft_expressions)
         I = w.eye(number_of_soft_constraints)
         A_soft[-number_of_soft_constraints:, -number_of_soft_constraints:] = I * self.sample_period/self.control_horizon
 
-        continuous_joint_indices = [i for i, x in enumerate(self.free_variables()) if self.joints[str(x)].lower_position_limit is None]
+        continuous_joint_indices = [i for i, x in enumerate(self.free_variables()) if not self.joints[str(x)].has_position_limits()]
         indices_to_delete = []
         for o in range(self.prediction_horizon):
             for i in continuous_joint_indices:
@@ -441,11 +442,19 @@ class QPController(object):
         self.bA = BA(self.order, self.prediction_horizon)
         self.A = A(sample_period, self.prediction_horizon, self.control_horizon, self.order)
         self.order = 2
+
+        l = [x.name for x in free_variables]
+        duplicates = set([x for x in l if l.count(x) > 1])
+        assert duplicates == set(), 'there are free variables with the same name: {}'.format(duplicates)
+        l = [x.name for x in constraints]
+        duplicates = set([x for x in l if l.count(x) > 1])
+        assert duplicates == set(), 'there are constraints with the same name: {}'.format(duplicates)
+
         self.free_variables = list(sorted(free_variables, key=lambda x: x.name))
         self.constraints = list(sorted(constraints, key=lambda x: x.name))
         self.debug_expressions = debug_expressions
 
-        if solver_name == u'gurubi':
+        if solver_name == u'gurobi':
             self.qp_solver = QPSolverGurubi()
         elif solver_name == u'qpoases':
             self.qp_solver = QPSolver()
@@ -590,7 +599,7 @@ class QPController(object):
             self.xdot_full = self.qp_solver.solve(self.np_H, self.np_g, self.np_A, self.np_lb, self.np_ub, self.np_lbA,
                                                   self.np_ubA)
         except Exception as e:
-            p_weights, p_A, p_lbA, p_ubA, p_lb, p_ub = self.__debug_print(substitutions, actually_print=True)
+            p_weights, p_A, p_lbA, p_ubA, p_lb, p_ub = self._debug_print(substitutions, actually_print=True)
             if isinstance(e, InfeasibleException):
                 if self.__are_joint_limits_violated(p_lb, p_ub):
                     raise OutOfJointLimitsException(e)
@@ -612,17 +621,8 @@ class QPController(object):
         if self.xdot_full is None:
             return None
         # TODO enable debug print in an elegant way, preferably without slowing anything down
-        self.__debug_print(substitutions, self.xdot_full)
+        self._debug_print(substitutions, self.xdot_full)
         return self.split_xdot(self.xdot_full), self._eval_debug_exprs(substitutions)
-        # velocity = OrderedDict(
-        #     (observable, self.xdot_full[i]) for i, observable in enumerate(self.joint_names()))
-        # acceleration = OrderedDict(
-        #     (observable, self.xdot_full[i + len(self.joint_names())*self.prediction_horizon]) for i, observable in
-        #     enumerate(self.joint_names()))
-        # jerk = OrderedDict(
-        #     (observable, self.xdot_full[i + len(self.joint_names()) * self.prediction_horizon * 2]) for i, observable in
-        #     enumerate(self.joint_names()))
-        # return velocity, acceleration, jerk
 
     def split_xdot(self, xdot):
         split = []
@@ -638,7 +638,8 @@ class QPController(object):
     def bA_names(self):
         return self.bA.names()
 
-    def __viz_mpc(self, x, joint_name, start_pos=0):
+    def _viz_mpc(self, x, joint_name, state):
+        start_pos = state[joint_name]
         ts = np.array([(i+1) * self.sample_period for i in range(self.prediction_horizon)])
         filtered_x = x.filter(like='/{}/'.format(joint_name), axis=0)
         velocities = filtered_x[:self.prediction_horizon].values
@@ -664,18 +665,18 @@ class QPController(object):
         plt.grid()
         plt.show()
 
-    def __debug_print(self, substitutions, xdot_full=None, actually_print=False):
+    @profile
+    def _debug_print(self, substitutions, xdot_full=None, actually_print=False):
         import pandas as pd
         # bA_mask, b_mask = make_filter_masks(unfiltered_H, self.num_joint_constraints, self.num_hard_constraints)
-        state = {k:v for k,v in zip(self.compiled_big_ass_M.str_params, substitutions)}
-        b_names = np.array(self.b_names())
-        bA_names = np.array(self.bA_names())
+        b_names = self.b_names()
+        bA_names = self.bA_names()
         filtered_b_names = b_names#[b_mask]
         filtered_bA_names = bA_names#[bA_mask]
         filtered_H = self.H#[b_mask][:, b_mask]
 
         debug_exprs = self._eval_debug_exprs(substitutions)
-        p_debug = pd.DataFrame(debug_exprs, self.debug_names, ['data'], dtype=float).sort_index()
+        p_debug = pd.DataFrame.from_dict(debug_exprs, orient='index', columns=['data']).sort_index()
 
         p_lb = pd.DataFrame(self.np_lb, filtered_b_names, [u'data'], dtype=float)
         p_ub = pd.DataFrame(self.np_ub, filtered_b_names, [u'data'], dtype=float)
@@ -689,7 +690,7 @@ class QPController(object):
             Ax = np.dot(self.np_A, xdot_full)
             xH = np.dot((xdot_full ** 2).T, self.np_H)
             p_xH = pd.DataFrame(xH, filtered_b_names, [u'data'], dtype=float)
-            p_xg = p_g * p_xdot
+            # p_xg = p_g * p_xdot
             xHx = np.dot(np.dot(xdot_full.T, self.np_H), xdot_full)
             num_non_slack = len(self.free_variables) * self.prediction_horizon * 3
             p_xdot2 = deepcopy(p_xdot)
@@ -712,5 +713,7 @@ class QPController(object):
         # self.lbAs.T[[c for c in self.lbAs.T.columns if 'dist' in c]].plot()
 
         # self.save_all(p_weights, p_A, p_lbA, p_ubA, p_lb, p_ub, p_xdot)
-        # self.viz_mpc(p_xdot, 'j2', start_pos=state['j2'])
+        state = {k: v for k, v in zip(self.compiled_big_ass_M.str_params, substitutions)}
+        # self._viz_mpc(p_xdot, 'world_robot_joint_state_head_pan_joint_position', state)
+        # p_lbA[p_lbA != 0].abs().sort_values(by='data')
         return p_weights, p_A, p_lbA, p_ubA, p_lb, p_ub

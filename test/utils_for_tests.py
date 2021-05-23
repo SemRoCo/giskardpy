@@ -576,38 +576,38 @@ class GiskardTestWrapper(GiskardWrapper):
                                                                                 move_result_error_code(
                                                                                     expected_error_code),
                                                                                 error_message)
+        self.are_joint_limits_violated()
         return r.trajectory
 
     def get_result_trajectory_position(self):
         trajectory = self.get_god_map().unsafe_get_data(identifier.trajectory)
-        trajectory2 = []
-        for t, p in trajectory._points.items():
-            trajectory2.append({joint_name: js.position for joint_name, js in p.items()})
+        trajectory2 = {}
+        for joint_name in trajectory.get_exact(0).keys():
+            trajectory2[joint_name] = np.array([p[joint_name].position for t, p in trajectory.items()])
         return trajectory2
 
     def get_result_trajectory_velocity(self):
         trajectory = self.get_god_map().get_data(identifier.trajectory)
-        trajectory2 = []
-        for t, p in trajectory._points.items():
-            trajectory2.append({joint_name: js.velocity for joint_name, js in p.items()})
+        trajectory2 = {}
+        for joint_name in trajectory.get_exact(0).keys():
+            trajectory2[joint_name] = np.array([p[joint_name].velocity for t, p in trajectory.items()])
         return trajectory2
 
     def are_joint_limits_violated(self):
-        controllable_joints = self.get_robot().get_movable_joints()
-        trajectory_pos = self.get_result_trajectory_position()
         trajectory_vel = self.get_result_trajectory_velocity()
+        trajectory_pos = self.get_result_trajectory_position()
 
-        for joint in controllable_joints:
-            joint_limits = self.get_robot().get_joint_limits(joint)
-            vel_limit = self.get_robot().get_joint_velocity_limit(joint)
-            trajectory_pos_joint = [p[joint] for p in trajectory_pos]
-            trajectory_vel_joint = [p[joint] for p in trajectory_vel]
-            if any(round(p, 7) < joint_limits[0] and round(p, 7) > joint_limits[1] for p in trajectory_pos_joint):
-                return True
-            if any(round(p, 7) < vel_limit and round(p, 7) > vel_limit for p in trajectory_vel_joint):
-                return True
-
-        return False
+        for joint in trajectory_vel.keys():
+            if not self.get_robot().is_joint_continuous(joint):
+                joint_limits = self.get_robot().get_joint_limits(joint)
+                error_msg = u'{} has violated joint position limit'.format(joint)
+                np.testing.assert_array_less(trajectory_pos[joint], joint_limits[1], error_msg)
+                np.testing.assert_array_less(-trajectory_pos[joint], -joint_limits[0], error_msg)
+            vel_limit = self.get_robot().get_joint_velocity_limit_expr(joint)
+            vel_limit = self.get_god_map().evaluate_expr(vel_limit)
+            error_msg = u'{} has violated joint velocity limit'.format(joint)
+            np.testing.assert_array_less(trajectory_vel[joint], vel_limit, error_msg)
+            np.testing.assert_array_less(-trajectory_vel[joint], vel_limit, error_msg)
 
     #
     # BULLET WORLD #####################################################################################################

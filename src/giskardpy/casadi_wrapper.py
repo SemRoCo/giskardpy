@@ -585,6 +585,11 @@ def rotation_distance(a_R_b, a_R_c):
     angle = max(angle, -1)
     return acos(angle)
 
+def vstack(list_of_matrices):
+    return ca.vertcat(*list_of_matrices)
+
+def hstack(list_of_matrices):
+    return ca.horzcat(*list_of_matrices)
 
 def asdf(a_R_b, a_R_c):
     """
@@ -1009,6 +1014,13 @@ def floor(x):
 def ceil(x):
     return ca.ceil(x)
 
+def round_up(x, decimal_places):
+    f = 10**(decimal_places)
+    return ceil(x*f)/f
+
+def round_down(x, decimal_places):
+    f = 10**(decimal_places)
+    return floor(x*f)/f
 
 def sum(matrix):
     """

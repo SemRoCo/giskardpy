@@ -223,7 +223,7 @@ class Goal(object):
         sample_period = self.get_input_sampling_period()
         last_velocity = self.get_expr_velocity(current_position)
         if debug_prefix is not None:
-            self.add_debug_constraint(debug_prefix + '/velocity', last_velocity)
+            self.add_debug_expr(debug_prefix + '/velocity', last_velocity)
 
         max_acceleration2 = max_acceleration * sample_period
         capped_err = w.limit(w.limit(w.velocity_limit_from_position_limit(max_acceleration,
@@ -294,13 +294,13 @@ class Goal(object):
             raise KeyError(u'a constraint with name \'{}\' already exists'.format(name))
         self.soft_constraints[name] = VelocityConstraint(name=name,
                                                          expression=expression,
-                                                         lower_velocity_limit=lower,
-                                                         upper_velocity_limit=upper,
+                                                         lower_velocity_limit=w.round_down(lower, 5),
+                                                         upper_velocity_limit=w.round_up(upper, 5),
                                                          quadratic_velocity_weight=weight,
                                                          lower_slack_limit=lower_slack_limit,
                                                          upper_slack_limit=upper_slack_limit)
 
-    def add_debug_constraint(self, name, expr):
+    def add_debug_expr(self, name, expr):
         """
         Adds a constraint with weight 0 to the qp problem.
         Used to inspect subexpressions for debugging.
@@ -314,11 +314,11 @@ class Goal(object):
     def add_debug_matrix(self, name, matrix_expr):
         for x in range(matrix_expr.shape[0]):
             for y in range(matrix_expr.shape[1]):
-                self.add_debug_constraint(name + u'/{},{}'.format(x, y), matrix_expr[x, y])
+                self.add_debug_expr(name + u'/{},{}'.format(x, y), matrix_expr[x, y])
 
     def add_debug_vector(self, name, vector_expr):
         for x in range(vector_expr.shape[0]):
-            self.add_debug_constraint(name + u'/{}'.format(x), vector_expr[x])
+            self.add_debug_expr(name + u'/{}'.format(x), vector_expr[x])
 
     def add_minimize_position_constraints(self, r_P_g, max_velocity, max_acceleration, root, tip, goal_constraint,
                                           weight=WEIGHT_BELOW_CA, prefix=u''):
@@ -341,6 +341,7 @@ class Goal(object):
         r_P_intermediate_error = w.save_division(r_P_error, trans_error) * trans_scale
 
         weight = self.normalize_weight(max_velocity, weight)
+        self.add_debug_vector('r_P_intermediate_error', r_P_intermediate_error)
 
         self.add_velocity_constraint(u'/{}/x'.format(prefix),
                                      lower=r_P_intermediate_error[0],
@@ -724,9 +725,9 @@ class JointPositionRevolute(Goal):
         weight = self.normalize_weight(max_velocity, weight)
 
         capped_err = self.limit_velocity(err, max_velocity)
-        self.add_debug_constraint('weight', weight)
-        self.add_debug_constraint('max_velocity', max_velocity)
-        self.add_debug_constraint('basic', self.get_input_float(self.weight))
+        self.add_debug_expr('weight', weight)
+        self.add_debug_expr('max_velocity', max_velocity)
+        self.add_debug_expr('basic', self.get_input_float(self.weight))
         self.add_velocity_constraint('',
                                      lower=capped_err,
                                      upper=capped_err,

@@ -7,39 +7,65 @@ from giskardpy.qp_solver import QPSolver
 
 gurobipy.setParam('LogToConsole', False)
 
+error_info = {
+    gurobipy.GRB.LOADED: "Model is loaded, but no solution information is available.",
+    gurobipy.GRB.OPTIMAL: "Model was solved to optimality (subject to tolerances), and an optimal solution is available.",
+    gurobipy.GRB.INFEASIBLE: "Model was proven to be infeasible.",
+    gurobipy.GRB.INF_OR_UNBD: "Model was proven to be either infeasible or unbounded. "
+                              "To obtain a more definitive conclusion, set the DualReductions parameter to 0 and reoptimize.",
+    gurobipy.GRB.UNBOUNDED: "Model was proven to be unbounded. "
+                            "Important note: an unbounded status indicates the presence of an unbounded ray that allows "
+                            "the objective to improve without limit. "
+                            "It says nothing about whether the model has a feasible solution. "
+                            "If you require information on feasibility, "
+                            "you should set the objective to zero and reoptimize.",
+    gurobipy.GRB.CUTOFF: "Optimal objective for model was proven to be worse than the value specified in the Cutoff parameter. "
+                         "No solution information is available.",
+    gurobipy.GRB.ITERATION_LIMIT: "Optimization terminated because the total number of simplex iterations performed "
+                                  "exceeded the value specified in the IterationLimit parameter, or because the total "
+                                  "number of barrier iterations exceeded the value specified in the BarIterLimit parameter.",
+    gurobipy.GRB.NODE_LIMIT: "Optimization terminated because the total number of branch-and-cut nodes explored exceeded "
+                             "the value specified in the NodeLimit parameter.",
+    gurobipy.GRB.TIME_LIMIT: "Optimization terminated because the time expended exceeded the value specified in the "
+                             "TimeLimit parameter.",
+    gurobipy.GRB.SOLUTION_LIMIT: "Optimization terminated because the number of solutions found reached the value "
+                                 "specified in the SolutionLimit parameter.",
+    gurobipy.GRB.INTERRUPTED: "Optimization was terminated by the user.",
+    gurobipy.GRB.NUMERIC: "Optimization was terminated due to unrecoverable numerical difficulties.",
+    gurobipy.GRB.SUBOPTIMAL: "Unable to satisfy optimality tolerances; a sub-optimal solution is available.",
+    gurobipy.GRB.INPROGRESS: "An asynchronous optimization call was made, but the associated optimization run is not "
+                             "yet complete.",
+    gurobipy.GRB.USER_OBJ_LIMIT: "User specified an objective limit (a bound on either the best objective or the best "
+                                 "bound), and that limit has been reached.",
+}
+
 class QPSolverGurubi(QPSolver):
     STATUS_VALUE_DICT = {getattr(gurobipy.GRB.status, name): name for name in dir(gurobipy.GRB.status) if '__' not in name}
 
-    def __init__(self):
-        """
-        :param dim_a: number of joint constraints + number of soft constraints
-        :type int
-        :param dim_b: number of hard constraints + number of soft constraints
-        :type int
-        """
-        self.started = False
-        self.shape = (0,0)
-
     @profile
     def init(self, H, g, A, lb, ub, lbA, ubA):
+        # TODO potential speed up by reusing model
         self.qpProblem = gurobipy.Model('qp')
         x = self.qpProblem.addMVar(lb.shape, lb=lb, ub=ub)
         self.qpProblem.addMConstr(A, x, gurobipy.GRB.LESS_EQUAL, ubA)
         self.qpProblem.addMConstr(A, x, gurobipy.GRB.GREATER_EQUAL, lbA)
         self.qpProblem.setMObjective(H, None, 0.0)
-        self.started = False
-        return True
 
     def print_debug(self):
+        # TODO use MinRHS etc to analyse solution
         gurobipy.setParam('LogToConsole', True)
+        logging.logwarn(error_info[self.qpProblem.status])
         self.qpProblem.reset()
         self.qpProblem.optimize()
         self.qpProblem.printStats()
         self.qpProblem.printQuality()
         gurobipy.setParam('LogToConsole', False)
 
+    def round(self, data, decimal_places):
+        return np.round(data, decimal_places)
+
     @profile
-    def solve(self, H, g, A, lb, ub, lbA, ubA, nWSR=None):
+    def solve(self, H, g, A, lb, ub, lbA, ubA, tries=1, decimal_places=4):
         """
         x^T*H*x + x^T*g
         s.t.: lbA < A*x < ubA
@@ -63,33 +89,32 @@ class QPSolverGurubi(QPSolver):
         :return: x according to the equations above, len = joint constraints + soft constraints
         :type np.array
         """
-        if A.shape != self.shape:
-            self.started = False
-            self.shape = A.shape
-
-        number_of_retries = 2
-        r = 4
-        while number_of_retries > 0:
-            number_of_retries -= 1
+        for i in range(tries):
             self.init(H, g, A, lb, ub, lbA, ubA)
             self.qpProblem.optimize()
             success = self.qpProblem.status
-            if success in [gurobipy.GRB.OPTIMAL, gurobipy.GRB.SUBOPTIMAL]:
-                self.xdot_full = np.array([x.x for x in self.qpProblem.getVars()])
-                self.started = True
+            if success in {gurobipy.GRB.OPTIMAL, gurobipy.GRB.SUBOPTIMAL}:
+                if success == gurobipy.GRB.SUBOPTIMAL:
+                    logging.logwarn('warning, suboptimal!')
+                self.xdot_full = np.array(self.qpProblem.X)
                 break
-            else:
-                logging.loginfo(u'optimization unsuccessful {}'.format(self.STATUS_VALUE_DICT[success]))
+            elif success in {gurobipy.GRB.NUMERIC} and i < tries-1:
                 self.print_debug()
-                logging.loginfo(u'retrying with A rounded to {} decimal places'.format(r))
-                # A = np.round(A, r)
-                # lbA = np.round(lbA, r)
-                # ubA = np.round(ubA, r)
-                r -= 1
-                self.started = False
-        else:  # if not break
-            self.started = False
+                logging.logwarn(u'Solver returned \'{}\', retrying with data rounded to \'{}\' decimal places'.format(
+                    self.STATUS_VALUE_DICT[success],
+                    decimal_places
+                ))
+                H = self.round(H,decimal_places)
+                A = self.round(A,decimal_places)
+                lb = self.round(lb,decimal_places)
+                ub = self.round(ub,decimal_places)
+                lbA = self.round(lbA,decimal_places)
+                ubA = self.round(ubA,decimal_places)
+        else:
             self.print_debug()
-            raise QPSolverException(u'{}'.format(self.STATUS_VALUE_DICT[success]))
+            error_message = u'{}'.format(self.STATUS_VALUE_DICT[success])
+            if success == gurobipy.GRB.INFEASIBLE:
+                raise InfeasibleException(error_message)
+            raise QPSolverException(error_message)
 
         return self.xdot_full

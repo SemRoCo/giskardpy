@@ -48,6 +48,11 @@ class TestCASWrapper(unittest.TestCase):
     def test_abs(self, f1):
         self.assertAlmostEqual(w.compile_and_execute(w.abs, [f1]), abs(f1), places=7)
 
+    @given(float_no_nan_no_inf(1e5, 1e-5),
+           st.integers(1, 5))
+    def test_round(self, f1, r):
+        self.assertAlmostEqual(w.compile_and_execute(w.round, [f1, r]), np.round(f1, r), places=7)
+
     @given(float_no_nan_no_inf(),
            float_no_nan_no_inf())
     def test_max(self, f1, f2):

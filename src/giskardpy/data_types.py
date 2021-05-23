@@ -135,6 +135,9 @@ class FreeVariable(object):
         self.quadratic_jerk_weight = quadratic_jerk_weight
         self.name = str(self.position_symbol)
 
+    def has_position_limits(self):
+        return self.lower_position_limit is not None and abs(self.upper_position_limit) < 100
+
     def __str__(self):
         return self.name
 

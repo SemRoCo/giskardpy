@@ -270,6 +270,16 @@ class GodMap(object):
             # return {expr: self.get_data(self.expr_to_key[expr]) for expr in exprs}
             return [self.unsafe_get_data(self.expr_to_key[expr]) for expr in symbols]
 
+    def evaluate_expr(self, expr):
+        fs = w.free_symbols(expr)
+        fss = [str(s) for s in fs]
+        f = w.speed_up(expr, fs)
+        result = f.call2(self.get_values(fss))
+        if len(result) == 1:
+            return result[0][0]
+        else:
+            return result
+
     def get_registered_symbols(self):
         """
         :rtype: list

@@ -506,6 +506,8 @@ def frame_quaternion(x, y, z, qx, qy, qz, qw):
 def eye(size):
     return ca.SX.eye(size)
 
+def kron(m1, m2):
+    return ca.kron(m1, m2)
 
 def inverse_frame(frame):
     """

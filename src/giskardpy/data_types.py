@@ -42,12 +42,13 @@ class Constraint(object):
                  lower_acceleration_limit, upper_acceleration_limit,
                  lower_jerk_limit, upper_jerk_limit,
                  lower_slack_limit, upper_slack_limit,
-                 quadratic_velocity_weight, linear_weight):
+                 quadratic_velocity_weight, linear_weight, control_horizon, horizon_function=None):
         self.name = name
         self.expression = expression
         self.quadratic_velocity_weight = quadratic_velocity_weight
         self.lower_position_limit = lower_position_limit
         self.upper_position_limit = upper_position_limit
+        self.control_horizon = control_horizon
         if lower_velocity_limit is not None:
             self.lower_velocity_limit = lower_velocity_limit
         if upper_velocity_limit is not None:
@@ -66,6 +67,9 @@ class Constraint(object):
             self.upper_slack_limit = upper_slack_limit
         if linear_weight is not None:
             self.linear_weight = linear_weight
+        def default_horizon_f(weight, t):
+            return weight
+        self.horizon_function = horizon_function or default_horizon_f
 
     def __str__(self):
         return self.name
@@ -73,7 +77,8 @@ class Constraint(object):
 
 class VelocityConstraint(Constraint):
     def __init__(self, name, expression, lower_velocity_limit, upper_velocity_limit, quadratic_velocity_weight,
-                 lower_slack_limit=None, upper_slack_limit=None, linear_weight=None):
+                 lower_slack_limit=None, upper_slack_limit=None, linear_weight=None, control_horizon=None,
+                 horizon_function=None):
         super(VelocityConstraint, self).__init__(name=name,
                                                  expression=expression,
                                                  lower_position_limit=None,
@@ -87,18 +92,22 @@ class VelocityConstraint(Constraint):
                                                  lower_slack_limit=lower_slack_limit,
                                                  upper_slack_limit=upper_slack_limit,
                                                  quadratic_velocity_weight=quadratic_velocity_weight,
-                                                 linear_weight=linear_weight)
+                                                 linear_weight=linear_weight,
+                                                 control_horizon=control_horizon,
+                                                 horizon_function=horizon_function)
 
 
 class PositionConstraint(Constraint):
-    def __init__(self, name, expression, lower_position_limit, upper_position_limit, quadratic_velocity_weight,
-                 lower_slack_limit=None, upper_slack_limit=None, linear_weight=None):
+    def __init__(self, name, expression, lower_position_limit, upper_position_limit,
+                 lower_velocity_limit, upper_velocity_limit,
+                 quadratic_velocity_weight, lower_slack_limit=None, upper_slack_limit=None, linear_weight=None,
+                 control_horizon=None, horizon_function=None):
         super(PositionConstraint, self).__init__(name=name,
                                                  expression=expression,
                                                  lower_position_limit=lower_position_limit,
                                                  upper_position_limit=upper_position_limit,
-                                                 lower_velocity_limit=None,
-                                                 upper_velocity_limit=None,
+                                                 lower_velocity_limit=lower_velocity_limit,
+                                                 upper_velocity_limit=upper_velocity_limit,
                                                  lower_acceleration_limit=None,
                                                  upper_acceleration_limit=None,
                                                  lower_jerk_limit=None,
@@ -106,7 +115,9 @@ class PositionConstraint(Constraint):
                                                  lower_slack_limit=lower_slack_limit,
                                                  upper_slack_limit=upper_slack_limit,
                                                  quadratic_velocity_weight=quadratic_velocity_weight,
-                                                 linear_weight=linear_weight)
+                                                 linear_weight=linear_weight,
+                                                 control_horizon=control_horizon,
+                                                 horizon_function=horizon_function)
 
 
 class FreeVariable(object):
@@ -116,9 +127,16 @@ class FreeVariable(object):
                  lower_acceleration_limit, upper_acceleration_limit,
                  lower_jerk_limit, upper_jerk_limit,
                  quadratic_velocity_weight, quadratic_acceleration_weight, quadratic_jerk_weight,
-                 velocity_symbol=None, acceleration_symbol=None, jerk_symbol=None, linear_weight=None):
+                 velocity_symbol=None, velocity_horizon_function=None,
+                 acceleration_symbol=None, acceleration_horizon_function=None,
+                 jerk_symbol=None, jerk_horizon_function=None, linear_weight=None):
         self.position_symbol = position_symbol
         self.velocity_symbol = velocity_symbol
+        def default_horizon_f(weight, t):
+            return weight
+        self.velocity_horizon_function = velocity_horizon_function or default_horizon_f
+        self.acceleration_horizon_function = acceleration_horizon_function or default_horizon_f
+        self.jerk_horizon_function = jerk_horizon_function or default_horizon_f
         self.acceleration_symbol = acceleration_symbol
         self.jerk_symbol = jerk_symbol
         self.lower_position_limit = lower_position_limit

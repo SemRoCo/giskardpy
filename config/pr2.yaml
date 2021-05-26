@@ -48,8 +48,8 @@ general_options:
       override: {}
 qp_solver:
   name: gurobi # one of [qpoases, gurobi]
-  prediction_horizon: 10
-  control_horizon: 10
+  prediction_horizon: 3
+  control_horizon: 3
 plugins:
   GoalReached:
     joint_convergence_threshold: 0.01 # when the velocities fall below this value, the planning succeeds

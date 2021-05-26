@@ -1441,7 +1441,7 @@ class TestCartGoals(object):
         r_goal_a = PoseStamped()
         r_goal_a.header.frame_id = zero_pose.r_tip
         r_goal_a.header.stamp = rospy.get_rostime()
-        r_goal_a.pose.position = Point(0, 0, -0.1)
+        r_goal_a.pose.position = Point(-0.1, 0, 0.6)
         r_goal_a.pose.orientation = Quaternion(0, 0, 0, 1)
         r_goal_b = PoseStamped()
         r_goal_b.header.frame_id = zero_pose.r_tip
@@ -1465,7 +1465,7 @@ class TestCartGoals(object):
         #                        goal=l_goal
         #                        )
         zero_pose.allow_self_collision()
-        zero_pose.send_and_check_goal()
+        zero_pose.send_goal()
         #zero_pose.check_cart_goal(zero_pose.r_tip, r_goal)
         #zero_pose.check_cart_goal(zero_pose.l_tip, l_goal)
 

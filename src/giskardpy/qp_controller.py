@@ -225,7 +225,12 @@ class BA(Parent):
         for t in range(self.prediction_horizon):
             for c in self.constraints:
                 if t < c.control_horizon:
-                    result['t{:03d}/{}'.format(t, c.name)] = c.lower_velocity_limit * self.sample_period
+                    if t == 0:
+                        result['t{:03d}/{}'.format(t, c.name)] = w.limit(c.lower_position_limit,
+                                                                         c.lower_velocity_limit * self.sample_period,
+                                                                         c.upper_velocity_limit * self.sample_period)
+                    else:
+                        result['t{:03d}/{}'.format(t, c.name)] = c.lower_velocity_limit * self.sample_period
         return result
 
     def get_upper_constraint_velocities(self):
@@ -233,7 +238,12 @@ class BA(Parent):
         for t in range(self.prediction_horizon):
             for c in self.constraints:
                 if t < c.control_horizon:
-                    result['t{:03d}/{}'.format(t, c.name)] = c.upper_velocity_limit * self.sample_period
+                    if t == 0:
+                        result['t{:03d}/{}'.format(t, c.name)] = w.limit(c.upper_position_limit,
+                                                                         c.lower_velocity_limit * self.sample_period,
+                                                                         c.upper_velocity_limit * self.sample_period)
+                    else:
+                        result['t{:03d}/{}'.format(t, c.name)] = c.upper_velocity_limit * self.sample_period
         return result
 
     @memoize
@@ -538,8 +548,7 @@ class QPController(object):
                                 u'Reducing control horizon of {} to prediction horizon of {}'.format(c.name,
                                                                                                      c.control_horizon,
                                                                                                      self.prediction_horizon))
-                c.control_horizon = self.prediction_horizon
-
+            c.control_horizon = max(min(c.control_horizon, self.prediction_horizon - 2), 1)
 
     def add_debug_expressions(self, debug_expressions):
         """

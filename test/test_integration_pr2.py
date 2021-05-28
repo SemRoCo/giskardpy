@@ -288,8 +288,7 @@ class TestJointGoals(object):
         """
         :type zero_pose: PR2
         """
-        zero_pose.allow_self_collision()
-        # zero_pose.send_and_check_goal()
+        zero_pose.allow_all_collisions()
         zero_pose.send_and_check_joint_goal(pocky_pose)
 
     def test_partial_joint_state_goal1(self, zero_pose):

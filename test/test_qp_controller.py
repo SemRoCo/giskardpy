@@ -90,12 +90,12 @@ def two_joint_setup(sample_period=0.05, prediction_horizon=10, j_start=0, j2_sta
         upper_acceleration_limit=acc_limit,
         lower_jerk_limit=-jerk_limit,
         upper_jerk_limit=jerk_limit,
-        quadratic_velocity_weight=.1,
+        quadratic_velocity_weight=.01,
         quadratic_acceleration_weight=0,
         quadratic_jerk_weight=0,
         velocity_symbol=j_v,
         acceleration_symbol=j_a,
-        velocity_horizon_function=lambda w, t: w + 0.1 * t,
+        velocity_horizon_function=lambda w, t: w + w*1 * t,
         # acceleration_horizon_function=lambda w, t: w + 0.00001 * t,
         # jerk_horizon_function=lambda w, t: w + 0.00001 * t
     )
@@ -110,17 +110,99 @@ def two_joint_setup(sample_period=0.05, prediction_horizon=10, j_start=0, j2_sta
         upper_acceleration_limit=acc_limit,
         lower_jerk_limit=-jerk_limit,
         upper_jerk_limit=jerk_limit,
-        quadratic_velocity_weight=.1,
+        quadratic_velocity_weight=.01,
         quadratic_acceleration_weight=0,
         quadratic_jerk_weight=0,
         velocity_symbol=j2_v,
         acceleration_symbol=j2_a,
-        velocity_horizon_function=lambda w, t: w + 0.0001 * t)
+        velocity_horizon_function=lambda w, t: w + w * 0.01 * t)
 
     qp = QPController(sample_period, prediction_horizon, 'gurobi', [jc, jc2])
     return qp, j, j2, state
 
 def test_joint_goal():
+    ph = 10
+    sample_period = 0.05
+    qp, j, j2, state = two_joint_setup(sample_period, ph)
+
+    goal_s, goal2_s = ca.var('goal goal2')
+    goal1 = -0.5
+    goal2 = 1.5
+    state['goal'] = goal1
+    state['goal2'] = goal2
+
+    error = goal_s - j
+    error2 = goal2_s - j2
+
+    constraints = [
+        PositionConstraint('j1 goal',
+                           expression=j,
+                           lower_position_limit=error,
+                           upper_position_limit=error,
+                           lower_velocity_limit=-0.3,
+                           upper_velocity_limit=0.3,
+                           quadratic_velocity_weight=1,
+                           control_horizon=10,
+                           horizon_function=lambda w,t: w),
+        PositionConstraint('j2 goal',
+                           expression=j2,
+                           lower_position_limit=error2,
+                           upper_position_limit=error2,
+                           lower_velocity_limit=-0.8,
+                           upper_velocity_limit=0.8,
+                           quadratic_velocity_weight=1,
+                           control_horizon=10,
+                           horizon_function=lambda w,t: w),
+    ]
+    qp.add_constraints(constraints)
+    qp.compile()
+
+    final_state, _ = simulate(state, qp, sample_period, True, time_limit=2.5)
+    np.testing.assert_almost_equal(final_state['j'], goal1, decimal=4)
+    np.testing.assert_almost_equal(final_state['j2'], goal2, decimal=4)
+
+def test_joint_goal_close_to_limits():
+    ph = 10
+    sample_period = 0.05
+    qp, j, j2, state = two_joint_setup(sample_period, ph)
+
+    goal_s, goal2_s = ca.var('goal goal2')
+    goal1 = -1.6
+    goal2 = 1.6
+    state['goal'] = goal1
+    state['goal2'] = goal2
+
+    error = goal_s - j
+    error2 = goal2_s - j2
+
+    constraints = [
+        PositionConstraint('j1 goal',
+                           expression=j,
+                           lower_position_limit=error,
+                           upper_position_limit=error,
+                           lower_velocity_limit=-0.9,
+                           upper_velocity_limit=0.9,
+                           quadratic_velocity_weight=1,
+                           control_horizon=10,
+                           horizon_function=lambda w,t: w),
+        PositionConstraint('j2 goal',
+                           expression=j2,
+                           lower_position_limit=error2,
+                           upper_position_limit=error2,
+                           lower_velocity_limit=-0.8,
+                           upper_velocity_limit=0.8,
+                           quadratic_velocity_weight=1,
+                           control_horizon=10,
+                           horizon_function=lambda w,t: w),
+    ]
+    qp.add_constraints(constraints)
+    qp.compile()
+
+    final_state, _ = simulate(state, qp, sample_period, True, time_limit=2.5)
+    np.testing.assert_almost_equal(final_state['j'], qp.get_free_variable('j2').lower_position_limit, decimal=4)
+    np.testing.assert_almost_equal(final_state['j2'], qp.get_free_variable('j2').upper_position_limit, decimal=4)
+
+def test_joint_goal_control_horizon_1():
     ph = 10
     sample_period = 0.05
     qp, j, j2, state = two_joint_setup(sample_period, ph)
@@ -141,21 +223,21 @@ def test_joint_goal():
                            upper_position_limit=error,
                            lower_velocity_limit=-0.3,
                            upper_velocity_limit=0.3,
-                           quadratic_velocity_weight=100,
-                           control_horizon=10),
+                           quadratic_velocity_weight=10,
+                           control_horizon=1),
         PositionConstraint('j2 goal',
                            expression=j2,
                            lower_position_limit=error2,
                            upper_position_limit=error2,
                            lower_velocity_limit=-0.8,
                            upper_velocity_limit=0.8,
-                           quadratic_velocity_weight=100,
+                           quadratic_velocity_weight=10,
                            control_horizon=1),
     ]
     qp.add_constraints(constraints)
     qp.compile()
 
-    final_state = simulate(state, qp, sample_period, True)
+    final_state = simulate(state, qp, sample_period, True, time_limit=2.5)
     np.testing.assert_almost_equal(final_state['j'], goal1, decimal=4)
     np.testing.assert_almost_equal(final_state['j2'], qp.get_free_variable('j2').upper_position_limit, decimal=3)
 

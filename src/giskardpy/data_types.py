@@ -42,10 +42,11 @@ class Constraint(object):
                  lower_acceleration_limit, upper_acceleration_limit,
                  lower_jerk_limit, upper_jerk_limit,
                  lower_slack_limit, upper_slack_limit,
-                 quadratic_velocity_weight, linear_weight, control_horizon, horizon_function=None):
+                 quadratic_velocity_weight, quadratic_error_weight, linear_weight, control_horizon, horizon_function=None):
         self.name = name
         self.expression = expression
         self.quadratic_velocity_weight = quadratic_velocity_weight
+        self.quadratic_error_weight = quadratic_error_weight
         self.lower_position_limit = lower_position_limit
         self.upper_position_limit = upper_position_limit
         self.control_horizon = control_horizon
@@ -100,7 +101,7 @@ class VelocityConstraint(Constraint):
 class PositionConstraint(Constraint):
     def __init__(self, name, expression, lower_position_limit, upper_position_limit,
                  lower_velocity_limit, upper_velocity_limit,
-                 quadratic_velocity_weight, lower_slack_limit=None, upper_slack_limit=None, linear_weight=None,
+                 quadratic_velocity_weight, quadratic_error_weight, lower_slack_limit=None, upper_slack_limit=None, linear_weight=None,
                  control_horizon=None, horizon_function=None):
         super(PositionConstraint, self).__init__(name=name,
                                                  expression=expression,
@@ -115,6 +116,7 @@ class PositionConstraint(Constraint):
                                                  lower_slack_limit=lower_slack_limit,
                                                  upper_slack_limit=upper_slack_limit,
                                                  quadratic_velocity_weight=quadratic_velocity_weight,
+                                                 quadratic_error_weight=quadratic_error_weight,
                                                  linear_weight=linear_weight,
                                                  control_horizon=control_horizon,
                                                  horizon_function=horizon_function)

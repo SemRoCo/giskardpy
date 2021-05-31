@@ -70,9 +70,13 @@ class H(Parent):
         self._compute_height()
 
     def _compute_height(self):
+        # joint weights
         self.height = len(self.free_variables) * 3 * self.prediction_horizon
+        # constraint vel weights
         for c in self.constraints:
             self.height += c.control_horizon
+        # constraint error
+        self.height += len(self.constraints)
 
     @property
     def width(self):
@@ -97,10 +101,12 @@ class H(Parent):
             for c in self.constraints:  # type: Constraint
                 if t < c.control_horizon:
                     slack_weights['t{}/{}'.format(t, c.name)] = c.horizon_function(c.quadratic_velocity_weight, t)
+        error_slack_weights = {'{}/error'.format(c.name): c.quadratic_error_weight for c in self.constraints}
         return self._sorter(vel_weights,
                             acc_weights,
                             jerk_weights,
-                            slack_weights)[0]
+                            slack_weights,
+                            error_slack_weights)[0]
 
 
 class B(Parent):
@@ -150,6 +156,14 @@ class B(Parent):
                     result['t{:03d}/{}'.format(t, c.name)] = c.lower_slack_limit
         return result
 
+    def get_lower_error_slack_limits(self):
+        # TODO separate slack limits for speed and error
+        return {'{}/error'.format(c.name):c.lower_slack_limit for c in self.constraints}
+
+    def get_upper_error_slack_limits(self):
+        # TODO separate slack limits for speed and error
+        return {'{}/error'.format(c.name):c.upper_slack_limit for c in self.constraints}
+
     def get_upper_slack_limits(self):
         result = {}
         for t in range(self.prediction_horizon):
@@ -162,19 +176,22 @@ class B(Parent):
         return self._sorter(self.get_lower_joint_velocity_limits(),
                             self.get_lower_joint_acceleration_limits(),
                             self.get_lower_joint_jerk_limits(),
-                            self.get_lower_slack_limits())[0]
+                            self.get_lower_slack_limits(),
+                            self.get_lower_error_slack_limits())[0]
 
     def ub(self):
         return self._sorter(self.get_upper_joint_velocity_limits(),
                             self.get_upper_joint_acceleration_limits(),
                             self.get_upper_joint_jerk_limits(),
-                            self.get_upper_slack_limits())[0]
+                            self.get_upper_slack_limits(),
+                            self.get_upper_error_slack_limits())[0]
 
     def names(self):
         return self._sorter(self.get_upper_joint_velocity_limits(),
                             self.get_upper_joint_acceleration_limits(),
                             self.get_upper_joint_jerk_limits(),
-                            self.get_upper_slack_limits())[1]
+                            self.get_upper_slack_limits(),
+                            self.get_upper_error_slack_limits())[1]
 
 
 class BA(Parent):
@@ -225,11 +242,11 @@ class BA(Parent):
         for t in range(self.prediction_horizon):
             for c in self.constraints:
                 if t < c.control_horizon:
-                    if t == 0:
-                        result['t{:03d}/{}'.format(t, c.name)] = w.limit(c.lower_position_limit,
-                                                                         c.lower_velocity_limit * self.sample_period,
-                                                                         c.upper_velocity_limit * self.sample_period)
-                    else:
+                    # if t == 0:
+                    #     result['t{:03d}/{}'.format(t, c.name)] = w.limit(c.lower_position_limit,
+                    #                                                      c.lower_velocity_limit * self.sample_period,
+                    #                                                      c.upper_velocity_limit * self.sample_period)
+                    # else:
                         result['t{:03d}/{}'.format(t, c.name)] = c.lower_velocity_limit * self.sample_period
         return result
 
@@ -238,11 +255,11 @@ class BA(Parent):
         for t in range(self.prediction_horizon):
             for c in self.constraints:
                 if t < c.control_horizon:
-                    if t == 0:
-                        result['t{:03d}/{}'.format(t, c.name)] = w.limit(c.upper_position_limit,
-                                                                         c.lower_velocity_limit * self.sample_period,
-                                                                         c.upper_velocity_limit * self.sample_period)
-                    else:
+                    # if t == 0:
+                    #     result['t{:03d}/{}'.format(t, c.name)] = w.limit(c.upper_position_limit,
+                    #                                                      c.lower_velocity_limit * self.sample_period,
+                    #                                                      c.upper_velocity_limit * self.sample_period)
+                    # else:
                         result['t{:03d}/{}'.format(t, c.name)] = c.upper_velocity_limit * self.sample_period
         return result
 
@@ -317,6 +334,8 @@ class A(Parent):
         # columns for constraints
         for i, c in enumerate(self.constraints):
             self.width += c.control_horizon
+        # slack variable for constraint error
+        self.width += len(self.constraints)
 
     @property
     def number_of_joints(self):
@@ -391,7 +410,7 @@ class A(Parent):
             number_of_joints * self.prediction_horizon * (self.order - 1) +
             len(self.constraints) * (self.prediction_horizon + 1),
             self.number_of_joints * self.prediction_horizon * self.order +
-            len(self.constraints) * self.prediction_horizon
+            len(self.constraints) * self.prediction_horizon + len(self.constraints)
         )
         t = time()
         J = w.jacobian(w.Matrix(self.get_soft_expressions()), self.get_free_variable_symbols(), order=1)
@@ -433,7 +452,7 @@ class A(Parent):
         next_vertical_offset = vertical_offset + J_vel_limit_block.shape[0]
         A_soft[vertical_offset:next_vertical_offset, :J_vel_limit_block.shape[1]] = J_vel_limit_block
         I = w.eye(J_vel_limit_block.shape[0]) * self.sample_period
-        A_soft[vertical_offset:next_vertical_offset, -I.shape[1]:] = I
+        A_soft[vertical_offset:next_vertical_offset, -I.shape[1]-J.shape[1]:-J.shape[1]] = I
         # delete rows if control horizon of constraint shorter than prediction horzion
         rows_to_delete = []
         for t in range(self.prediction_horizon):
@@ -442,31 +461,29 @@ class A(Parent):
                 if t + 1 > c.control_horizon:
                     rows_to_delete.append(index)
 
-        # sum of all for total error
-        # TODO use control horizon
+        # delete columns where control horizon is shorter than prediction horizon
+        columns_to_delete = []
+        horizontal_offset = A_soft.shape[1] - I.shape[1] - J.shape[1]
+        for t in range(self.prediction_horizon):
+            for i, c in enumerate(self.constraints):
+                index = horizontal_offset + (t * len(self.constraints)) + i
+                if t + 1 > c.control_horizon:
+                    columns_to_delete.append(index)
+
+        # separate slack variable for error
         J_hstack = w.hstack([J for _ in range(self.prediction_horizon)])
         vertical_offset = next_vertical_offset
         next_vertical_offset = vertical_offset + J_hstack.shape[0]
 
         A_soft[vertical_offset:next_vertical_offset, :J_hstack.shape[1]] = J_hstack
-        # TODO use control horizon
-        I = w.kron(w.Matrix([[1 for _ in range(self.prediction_horizon)]]),
-                   w.eye(J_hstack.shape[0])) * self.sample_period
+        # TODO multiply with control horizon instead?
+        I = w.eye(J_hstack.shape[0]) * self.sample_period / self.prediction_horizon
         A_soft[vertical_offset:next_vertical_offset, -I.shape[1]:] = I
 
         # set jacobian entry to 0 if control horizon shorter than prediction horizon
         for i, c in enumerate(self.constraints):
             offset = vertical_offset + i
             A_soft[offset, c.control_horizon * len(self.free_variables):J_hstack.shape[1]] = 0
-
-        # delete columns where control horizon is shorter than prediction horizon
-        columns_to_delete = []
-        horizontal_offset = A_soft.shape[1] - I.shape[1]
-        for t in range(self.prediction_horizon):
-            for i, c in enumerate(self.constraints):
-                index = horizontal_offset + (t * len(self.constraints)) + i
-                if t + 1 > c.control_horizon:
-                    columns_to_delete.append(index)
 
         # delete rows with position limits of continuous joints
         continuous_joint_indices = [i for i, v in enumerate(self.free_variables) if not v.has_position_limits()]

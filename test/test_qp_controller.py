@@ -115,7 +115,7 @@ def two_joint_setup(sample_period=0.05, prediction_horizon=10, j_start=0, j2_sta
         quadratic_jerk_weight=0,
         velocity_symbol=j2_v,
         acceleration_symbol=j2_a,
-        velocity_horizon_function=lambda w, t: w + w * 0.01 * t)
+        velocity_horizon_function=lambda w, t: w + w * 3 * t)
 
     qp = QPController(sample_period, prediction_horizon, 'gurobi', [jc, jc2])
     return qp, j, j2, state
@@ -139,20 +139,22 @@ def test_joint_goal():
                            expression=j,
                            lower_position_limit=error,
                            upper_position_limit=error,
-                           lower_velocity_limit=-0.3,
-                           upper_velocity_limit=0.3,
+                           lower_velocity_limit=-0.5,
+                           upper_velocity_limit=0.5,
                            quadratic_velocity_weight=1,
+                           quadratic_error_weight=1,
                            control_horizon=10,
-                           horizon_function=lambda w,t: w),
+                           horizon_function=lambda w,t: w + w*1*t),
         PositionConstraint('j2 goal',
                            expression=j2,
                            lower_position_limit=error2,
                            upper_position_limit=error2,
-                           lower_velocity_limit=-0.8,
-                           upper_velocity_limit=0.8,
+                           lower_velocity_limit=-0.5,
+                           upper_velocity_limit=0.5,
                            quadratic_velocity_weight=1,
+                           quadratic_error_weight=1,
                            control_horizon=10,
-                           horizon_function=lambda w,t: w),
+                           horizon_function=lambda w,t: w + w*1*t),
     ]
     qp.add_constraints(constraints)
     qp.compile()
@@ -323,3 +325,4 @@ def test_fk():
     assert max(abs(cart_x_vel)) <= c_max_vel + 0.04
     assert max(abs(cart_y_vel)) <= c_max_vel + 0.04
 
+# TODO test continuous joint

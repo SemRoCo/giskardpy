@@ -227,6 +227,9 @@ class Robot(Backend):
             jerk_weight = self._joint_jerk_weights[joint_name]
             jerk_weight = jerk_weight * (1. / (jerk_limit)) ** 2
 
+            def hf(w, t):
+                return w + w * 10 * t
+
             if not self.is_joint_continuous(joint_name):
                 self._joint_constraints[joint_name] = FreeVariable(
                     position_symbol=joint_symbol,
@@ -242,7 +245,8 @@ class Robot(Backend):
                     upper_jerk_limit=jerk_limit,
                     quadratic_velocity_weight=velocity_weight,
                     quadratic_acceleration_weight=acceleration_weight,
-                    quadratic_jerk_weight=jerk_weight
+                    quadratic_jerk_weight=jerk_weight,
+                    velocity_horizon_function=hf,
                 )
             else:
                 self._joint_constraints[joint_name] = FreeVariable(
@@ -259,7 +263,8 @@ class Robot(Backend):
                     upper_jerk_limit=jerk_limit,
                     quadratic_velocity_weight=velocity_weight,
                     quadratic_acceleration_weight=acceleration_weight,
-                    quadratic_jerk_weight=jerk_weight
+                    quadratic_jerk_weight=jerk_weight,
+                    velocity_horizon_function=hf,
                 )
 
     def get_fk_expression(self, root_link, tip_link):

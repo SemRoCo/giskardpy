@@ -153,7 +153,7 @@ class B(Parent):
         for t in range(self.prediction_horizon):
             for c in self.constraints:
                 if t < c.control_horizon:
-                    result['t{:03d}/{}'.format(t, c.name)] = c.lower_slack_limit
+                    result['t{:03d}/{}'.format(t, c.name)] = 0
         return result
 
     def get_lower_error_slack_limits(self):
@@ -169,7 +169,7 @@ class B(Parent):
         for t in range(self.prediction_horizon):
             for c in self.constraints:
                 if t < c.control_horizon:
-                    result['t{:03d}/{}'.format(t, c.name)] = c.upper_slack_limit
+                    result['t{:03d}/{}'.format(t, c.name)] = 0
         return result
 
     def lb(self):
@@ -234,8 +234,8 @@ class BA(Parent):
                     for v in self.free_variables}
 
     @memoize
-    def get_derivative_link(self):
-        return self.blow_up({'{}/link'.format(v.name): 0 for v in self.free_variables}, self.prediction_horizon - 1)
+    def get_derivative_link(self, infix):
+        return self.blow_up({'{}/{}/link'.format(infix, v.name): 0 for v in self.free_variables}, self.prediction_horizon - 1)
 
     def get_lower_constraint_velocities(self):
         result = {}
@@ -280,27 +280,27 @@ class BA(Parent):
     def lbA(self):
         return self._sorter(self.get_lower_position_limits(),
                             self.get_last_velocities(),
-                            self.get_derivative_link(),
+                            self.get_derivative_link('vel'),
                             self.get_last_accelerations(),
-                            self.get_derivative_link(),
+                            self.get_derivative_link('acc'),
                             self.get_lower_constraint_velocities(),
                             self.get_lower_constraint_error())[0]
 
     def ubA(self):
         return self._sorter(self.get_upper_position_limits(),
                             self.get_last_velocities(False),
-                            self.get_derivative_link(),
+                            self.get_derivative_link('vel'),
                             self.get_last_accelerations(False),
-                            self.get_derivative_link(),
+                            self.get_derivative_link('acc'),
                             self.get_upper_constraint_velocities(),
                             self.get_upper_constraint_error())[0]
 
     def names(self):
         return self._sorter(self.get_upper_position_limits(),
                             self.get_last_velocities(),
-                            self.get_derivative_link(),
+                            self.get_derivative_link('vel'),
                             self.get_last_accelerations(),
-                            self.get_derivative_link(),
+                            self.get_derivative_link('acc'),
                             self.get_upper_constraint_velocities(),
                             self.get_lower_constraint_error())[1]
 
@@ -452,7 +452,7 @@ class A(Parent):
         next_vertical_offset = vertical_offset + J_vel_limit_block.shape[0]
         A_soft[vertical_offset:next_vertical_offset, :J_vel_limit_block.shape[1]] = J_vel_limit_block
         I = w.eye(J_vel_limit_block.shape[0]) * self.sample_period
-        A_soft[vertical_offset:next_vertical_offset, -I.shape[1]-J.shape[1]:-J.shape[1]] = I
+        A_soft[vertical_offset:next_vertical_offset, -I.shape[1]-J.shape[0]:-J.shape[0]] = I
         # delete rows if control horizon of constraint shorter than prediction horzion
         rows_to_delete = []
         for t in range(self.prediction_horizon):
@@ -463,20 +463,25 @@ class A(Parent):
 
         # delete columns where control horizon is shorter than prediction horizon
         columns_to_delete = []
-        horizontal_offset = A_soft.shape[1] - I.shape[1] - J.shape[1]
+        horizontal_offset = A_soft.shape[1] - I.shape[1] - J.shape[0]
         for t in range(self.prediction_horizon):
             for i, c in enumerate(self.constraints):
                 index = horizontal_offset + (t * len(self.constraints)) + i
                 if t + 1 > c.control_horizon:
                     columns_to_delete.append(index)
 
-        # separate slack variable for error
+        # J stack for total error
         J_hstack = w.hstack([J for _ in range(self.prediction_horizon)])
         vertical_offset = next_vertical_offset
         next_vertical_offset = vertical_offset + J_hstack.shape[0]
-
         A_soft[vertical_offset:next_vertical_offset, :J_hstack.shape[1]] = J_hstack
+
+        # sum of vel slack for total error
+        I = w.kron(w.Matrix([[1 for _ in range(self.prediction_horizon)]]),
+                   w.eye(J_hstack.shape[0])) * self.sample_period
+        A_soft[vertical_offset:next_vertical_offset, -I.shape[1]-len(self.constraints):-len(self.constraints)] = I
         # TODO multiply with control horizon instead?
+        # extra slack variable for total error
         I = w.eye(J_hstack.shape[0]) * self.sample_period / self.prediction_horizon
         A_soft[vertical_offset:next_vertical_offset, -I.shape[1]:] = I
 
@@ -816,6 +821,6 @@ class QPController(object):
         # self.save_all(p_weights, p_A, p_lbA, p_ubA, p_lb, p_ub, p_xdot)
         state = {k: v for k, v in zip(self.compiled_big_ass_M.str_params, substitutions)}
         # self._viz_mpc(p_xdot, 'j', state)
-        # self._viz_mpc(p_xdot, 'world_robot_joint_state_head_pan_joint_position', state)
+        # self._viz_mpc(p_xdot, 'world_robot_joint_state_r_shoulder_lift_joint_position', state)
         # p_lbA[p_lbA != 0].abs().sort_values(by='data')
         return p_weights, p_A, p_lbA, p_ubA, p_lb, p_ub

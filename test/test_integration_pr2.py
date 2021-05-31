@@ -403,7 +403,8 @@ class TestConstraints(object):
                                 goal=joint_goal,
                                 max_velocity=0.5)
         zero_pose.send_and_check_goal()
-        assert zero_pose.get_robot().joint_state[joint].position == joint_goal
+        np.testing.assert_almost_equal(zero_pose.get_robot().joint_state[joint].position, joint_goal, decimal=4)
+
 
     def test_CartesianOrientation(self, zero_pose):
         """

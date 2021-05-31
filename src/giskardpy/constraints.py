@@ -293,13 +293,15 @@ class Goal(object):
             raise KeyError(u'a constraint with name \'{}\' already exists'.format(name))
         self.soft_constraints[name] = PositionConstraint(name=name,
                                                          expression=expression,
-                                                         lower_velocity_limit=lower_velocity_limit,
-                                                         upper_velocity_limit=upper_velocity_limit,
                                                          lower_position_limit=lower_error,
                                                          upper_position_limit=upper_error,
+                                                         lower_velocity_limit=lower_velocity_limit,
+                                                         upper_velocity_limit=upper_velocity_limit,
                                                          quadratic_velocity_weight=weight,
+                                                         quadratic_error_weight=weight,
                                                          lower_slack_limit=lower_slack_limit,
                                                          upper_slack_limit=upper_slack_limit,
+                                                         control_horizon=None,
                                                          horizon_function=lambda w,t: w+1*t)
 
     def add_debug_expr(self, name, expr):
@@ -348,23 +350,26 @@ class Goal(object):
         self.add_debug_vector('trans_scale', trans_scale)
 
         self.add_velocity_constraint(u'/{}/x'.format(prefix),
-                                     lower_velocity_limit=r_P_intermediate_error[0],
-                                     upper_velocity_limit=r_P_intermediate_error[0],
+                                     lower_velocity_limit=-max_velocity,
+                                     upper_velocity_limit=max_velocity,
+                                     lower_error=r_P_error[0],
+                                     upper_error=r_P_error[0],
                                      weight=weight,
-                                     expression=r_P_c[0],
-                                     goal_constraint=goal_constraint)
+                                     expression=r_P_c[0])
         self.add_velocity_constraint(u'/{}/y'.format(prefix),
-                                     lower_velocity_limit=r_P_intermediate_error[1],
-                                     upper_velocity_limit=r_P_intermediate_error[1],
+                                     lower_velocity_limit=-max_velocity,
+                                     upper_velocity_limit=max_velocity,
+                                     lower_error=r_P_error[1],
+                                     upper_error=r_P_error[1],
                                      weight=weight,
-                                     expression=r_P_c[1],
-                                     goal_constraint=goal_constraint)
+                                     expression=r_P_c[1])
         self.add_velocity_constraint(u'/{}/z'.format(prefix),
-                                     lower_velocity_limit=r_P_intermediate_error[2],
-                                     upper_velocity_limit=r_P_intermediate_error[2],
+                                     lower_velocity_limit=-max_velocity,
+                                     upper_velocity_limit=max_velocity,
+                                     lower_error=r_P_error[2],
+                                     upper_error=r_P_error[2],
                                      weight=weight,
-                                     expression=r_P_c[2],
-                                     goal_constraint=goal_constraint)
+                                     expression=r_P_c[2])
 
     def add_minimize_vector_angle_constraints(self, max_velocity, root, tip, tip_V_tip_normal, root_V_goal_normal,
                                               weight=WEIGHT_BELOW_CA, goal_constraint=False, prefix=u''):

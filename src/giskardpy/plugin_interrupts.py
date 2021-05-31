@@ -103,7 +103,7 @@ class WiggleCancel(GiskardBehavior):
             return False
 
         fft = np.fft.rfft(joints_filtered, axis=1)
-        fft = [np.abs(i/N) for i in fft]# amplitude of fft is only half as big ?!?!?
+        fft = [2.0 * np.abs(i)/N for i in fft]
         if plot:
             y = joints_filtered
 
@@ -123,7 +123,7 @@ class WiggleCancel(GiskardBehavior):
                 # plt.plot(xf, np.abs(yf.imag), label=u'img')
             plt.show()
 
-        fft = np.array(fft)
+        fft = (velocity_limits * np.array(fft).T).T
         violations = fft[:, freq_idx:].T > amplitude_thresholds
         if np.any(violations):
             filtered_keys = self.keys[mask]

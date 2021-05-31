@@ -710,7 +710,7 @@ class ShakyJointPositionRevoluteOrPrismatic(Constraint):
     frequency = u'frequency'
     noise_amplitude = u'noise_amplitude'
 
-    def __init__(self, god_map, joint_name, goal, frequency, noise_amplitude=10, weight=WEIGHT_BELOW_CA,
+    def __init__(self, god_map, joint_name, goal, frequency, noise_amplitude=1.0, weight=WEIGHT_BELOW_CA,
                  max_velocity=3451, max_acceleration=1, goal_constraint=True):
         """
         This goal will move a revolute or prismatic joint to the goal position and shake the joint with the given frequency.
@@ -761,7 +761,7 @@ class ShakyJointPositionRevoluteOrPrismatic(Constraint):
                              self.get_robot().get_joint_velocity_limit_expr(self.joint_name))
 
         fun_params = frequency * 2.0 * w.pi * time_in_secs
-        err = (joint_goal - current_joint) + w.cos(fun_params)
+        err = (joint_goal - current_joint) + noise_amplitude * max_velocity * w.sin(fun_params)
         capped_err = self.limit_velocity(err, noise_amplitude * max_velocity)
 
         weight = self.normalize_weight(max_velocity, weight)
@@ -837,8 +837,8 @@ class ShakyJointPositionContinuous(Constraint):
                              self.get_robot().get_joint_velocity_limit_expr(self.joint_name))
 
         fun_params = frequency * 2.0 * w.pi * time_in_secs
-        err = w.shortest_angular_distance(current_joint, joint_goal) + noise_amplitude * w.cos(fun_params)
-        capped_err = self.limit_velocity(err, max_velocity)
+        err = w.shortest_angular_distance(current_joint, joint_goal) + noise_amplitude * max_velocity * w.sin(fun_params)
+        capped_err = self.limit_velocity(err, noise_amplitude * max_velocity)
 
         weight = self.normalize_weight(max_velocity, weight)
 

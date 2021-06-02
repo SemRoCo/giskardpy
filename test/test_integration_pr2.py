@@ -423,7 +423,8 @@ class TestConstraints(object):
         zero_pose.set_json_goal(u'CartesianOrientation',
                                 root_link=root,
                                 tip_link=tip,
-                                goal=p)
+                                goal=p,
+                                max_velocity=0.1)
         zero_pose.send_and_check_goal()
         new_pose = tf.lookup_pose('map', tip)
         compare_orientations(expected.pose.orientation, new_pose.pose.orientation)
@@ -1484,8 +1485,8 @@ class TestCartGoals(object):
         l_goal.pose.position = Point(-0.05, 0, 0)
         l_goal.pose.orientation = Quaternion(0, 0, 0, 1)
         zero_pose.set_cart_goal(l_goal, zero_pose.l_tip, root)
-        zero_pose.allow_self_collision()
-        # zero_pose.allow_all_collisions()
+        # zero_pose.allow_self_collision()
+        zero_pose.allow_all_collisions()
         zero_pose.send_and_check_goal()
         zero_pose.check_cart_goal(zero_pose.r_tip, r_goal)
         zero_pose.check_cart_goal(zero_pose.l_tip, l_goal)
@@ -6047,6 +6048,8 @@ class TestCollisionAvoidanceGoals(object):
         p.pose.orientation = Quaternion(0, 0, 0, 1)
         pocky_pose_setup.set_cart_goal(p, pocky_pose_setup.r_tip, pocky_pose_setup.default_root)
 
+        pocky_pose_setup.allow_self_collision()
+
         pocky_pose_setup.send_and_check_goal()
         # TODO check traj length?
         pocky_pose_setup.check_cpi_geq(['box'], 0.048)
@@ -6104,7 +6107,7 @@ class TestCollisionAvoidanceGoals(object):
         # pocky_pose_setup.allow_all_collisions()
         pocky_pose_setup.send_and_check_goal()
 
-    def test_avoid_collision5(self, pocky_pose_setup):
+    def test_avoid_collision_two_sticks(self, pocky_pose_setup):
         """
         :type pocky_pose_setup: PR2
         """
@@ -6126,7 +6129,7 @@ class TestCollisionAvoidanceGoals(object):
         p.pose.position.z = 0
         p.pose.orientation.w = 1
         pocky_pose_setup.add_cylinder('br', [0.2, 0.01], p)
-
+        pocky_pose_setup.allow_self_collision()
         pocky_pose_setup.send_and_check_goal(expected_error_codes=[MoveResult.SHAKING])
 
     def test_avoid_collision5_cut_off(self, pocky_pose_setup):
@@ -6326,7 +6329,7 @@ class TestCollisionAvoidanceGoals(object):
         pocky_pose_setup.check_cpi_geq(pocky_pose_setup.get_l_gripper_links(), 0.048)
         pocky_pose_setup.check_cpi_geq(pocky_pose_setup.get_r_gripper_links(), 0.048)
 
-    def test_avoid_all_collision(self, box_setup):
+    def test_avoid_collision_touch(self, box_setup):
         """
         :type box_setup: PR2
         """
@@ -6345,6 +6348,7 @@ class TestCollisionAvoidanceGoals(object):
 
         box_setup.check_cpi_geq(box_setup.get_l_gripper_links(), 0.0)
         box_setup.check_cpi_geq(box_setup.get_r_gripper_links(), 0.0)
+        box_setup.check_cpi_leq(box_setup.get_r_gripper_links(), 0.04)
 
     def test_get_out_of_collision(self, box_setup):
         """
@@ -7785,3 +7789,6 @@ class TestReachability():
         zero_pose.check_reachability()
         zero_pose.set_joint_goal(js)
         zero_pose.send_and_check_goal(goal_type=MoveGoal.PLAN_ONLY)
+
+# import pytest
+# pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_avoid_collision5'])

@@ -606,8 +606,10 @@ class GiskardTestWrapper(GiskardWrapper):
             vel_limit = self.get_robot().get_joint_velocity_limit_expr(joint)
             vel_limit = self.get_god_map().evaluate_expr(vel_limit)
             error_msg = u'{} has violated joint velocity limit'.format(joint)
-            np.testing.assert_array_less(trajectory_vel[joint], vel_limit, error_msg)
-            np.testing.assert_array_less(-trajectory_vel[joint], vel_limit, error_msg)
+            assert np.all(np.less_equal(trajectory_vel[joint], vel_limit)), error_msg
+            assert np.all(np.greater_equal(trajectory_vel[joint], -vel_limit)), error_msg
+            # np.testing.assert_array_less(trajectory_vel[joint], vel_limit, error_msg)
+            # np.testing.assert_array_less(-trajectory_vel[joint], vel_limit, error_msg)
 
     #
     # BULLET WORLD #####################################################################################################

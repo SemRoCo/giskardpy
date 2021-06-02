@@ -4,6 +4,7 @@ from time import time
 
 import matplotlib.pyplot as plt
 import numpy as np
+# from line_profiler_pycharm import profile
 
 from giskardpy import logging, casadi_wrapper as w
 from giskardpy.data_types import FreeVariable, Constraint
@@ -153,6 +154,16 @@ class B(Parent):
         for t in range(self.prediction_horizon):
             for c in self.constraints:
                 if t < c.control_horizon:
+                    result['t{:03d}/{}'.format(t, c.name)] = -1e3
+                    # result['t{:03d}/{}'.format(t, c.name)] = 0
+        return result
+
+    def get_upper_slack_limits(self):
+        result = {}
+        for t in range(self.prediction_horizon):
+            for c in self.constraints:
+                if t < c.control_horizon:
+                    # result['t{:03d}/{}'.format(t, c.name)] = 1e3
                     result['t{:03d}/{}'.format(t, c.name)] = 0
         return result
 
@@ -164,13 +175,6 @@ class B(Parent):
         # TODO separate slack limits for speed and error
         return {'{}/error'.format(c.name):c.upper_slack_limit for c in self.constraints}
 
-    def get_upper_slack_limits(self):
-        result = {}
-        for t in range(self.prediction_horizon):
-            for c in self.constraints:
-                if t < c.control_horizon:
-                    result['t{:03d}/{}'.format(t, c.name)] = 0
-        return result
 
     def lb(self):
         return self._sorter(self.get_lower_joint_velocity_limits(),
@@ -403,7 +407,7 @@ class A(Parent):
         #         |   sp   |   sp   |   sp   |   sp   |
         #         |      sp|      sp|      sp|      sp|
         #         |===================================|
-
+        # TODO possible speed improvement by creating blocks and stiching them together
         number_of_joints = self.number_of_joints
         A_soft = w.zeros(
             self.prediction_horizon * number_of_joints +
@@ -474,6 +478,10 @@ class A(Parent):
         J_hstack = w.hstack([J for _ in range(self.prediction_horizon)])
         vertical_offset = next_vertical_offset
         next_vertical_offset = vertical_offset + J_hstack.shape[0]
+        # set jacobian entry to 0 if control horizon shorter than prediction horizon
+        for i, c in enumerate(self.constraints):
+            # offset = vertical_offset + i
+            J_hstack[i, c.control_horizon * len(self.free_variables):] = 0
         A_soft[vertical_offset:next_vertical_offset, :J_hstack.shape[1]] = J_hstack
 
         # sum of vel slack for total error
@@ -484,11 +492,6 @@ class A(Parent):
         # extra slack variable for total error
         I = w.eye(J_hstack.shape[0]) * self.sample_period / self.prediction_horizon
         A_soft[vertical_offset:next_vertical_offset, -I.shape[1]:] = I
-
-        # set jacobian entry to 0 if control horizon shorter than prediction horizon
-        for i, c in enumerate(self.constraints):
-            offset = vertical_offset + i
-            A_soft[offset, c.control_horizon * len(self.free_variables):J_hstack.shape[1]] = 0
 
         # delete rows with position limits of continuous joints
         continuous_joint_indices = [i for i, v in enumerate(self.free_variables) if not v.has_position_limits()]
@@ -570,7 +573,7 @@ class QPController(object):
                                 u'Reducing control horizon of {} to prediction horizon of {}'.format(c.name,
                                                                                                      c.control_horizon,
                                                                                                      self.prediction_horizon))
-            c.control_horizon = max(min(c.control_horizon, self.prediction_horizon - 2), 1)
+
 
     def add_debug_expressions(self, debug_expressions):
         """
@@ -593,6 +596,7 @@ class QPController(object):
         self.compiled_big_ass_M = w.speed_up(self.big_ass_M,
                                              free_symbols)
         logging.loginfo(u'Compiled symbolic controller in {:.5f}s'.format(time() - t))
+        # TODO should use separate symbols lists
         self.compiled_debug_v = w.speed_up(self.debug_v, free_symbols)
 
     def __are_joint_limits_violated(self, p_lb, p_ub):
@@ -791,9 +795,10 @@ class QPController(object):
         p_ubA = pd.DataFrame(self.np_ubA, filtered_bA_names, [u'data'], dtype=float)
         p_weights = pd.DataFrame(self.np_H.dot(np.ones(self.np_H.shape[0])), b_names, [u'data'],
                                  dtype=float)
+        p_A = pd.DataFrame(self.np_A, filtered_bA_names, filtered_b_names, dtype=float)
         if xdot_full is not None:
             p_xdot = pd.DataFrame(xdot_full, filtered_b_names, [u'data'], dtype=float)
-            Ax = np.dot(self.np_A, xdot_full)
+            # Ax = np.dot(self.np_A, xdot_full)
             xH = np.dot((xdot_full ** 2).T, self.np_H)
             p_xH = pd.DataFrame(xH, filtered_b_names, [u'data'], dtype=float)
             # p_xg = p_g * p_xdot
@@ -801,7 +806,8 @@ class QPController(object):
             num_non_slack = len(self.free_variables) * self.prediction_horizon * 3
             p_xdot2 = deepcopy(p_xdot)
             p_xdot2[num_non_slack:] = 0
-            p_Ax = pd.DataFrame(Ax, filtered_bA_names, [u'data'], dtype=float)
+            p_Ax = pd.DataFrame(p_A.dot(p_xdot), filtered_bA_names, [u'data'], dtype=float)
+            p_Ax2 = pd.DataFrame(p_A.dot(p_xdot2), filtered_bA_names, [u'data'], dtype=float)
 
             # x_soft = xdot_full[len(xdot_full) - num_slack:]
             # p_lbA_minus_x = pd.DataFrame(lbA - x_soft, filtered_bA_names, [u'data'], dtype=float).sort_index()
@@ -809,9 +815,7 @@ class QPController(object):
         else:
             p_xdot = None
 
-        p_A = pd.DataFrame(self.np_A, filtered_bA_names, filtered_b_names, dtype=float)
-        if xdot_full is not None:
-            p_Ax2 = pd.DataFrame(p_A.dot(p_xdot2), filtered_bA_names, [u'data'], dtype=float)
+
         # if self.lbAs is None:
         #     self.lbAs = p_lbA
         # else:
@@ -823,4 +827,6 @@ class QPController(object):
         # self._viz_mpc(p_xdot, 'j', state)
         # self._viz_mpc(p_xdot, 'world_robot_joint_state_r_shoulder_lift_joint_position', state)
         # p_lbA[p_lbA != 0].abs().sort_values(by='data')
+        # get non 0 A entries
+        # p_A.iloc[[1133]].T.loc[p_A.values[1133] != 0]
         return p_weights, p_A, p_lbA, p_ubA, p_lb, p_ub

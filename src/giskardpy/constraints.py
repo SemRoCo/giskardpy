@@ -33,7 +33,9 @@ WEIGHT_MIN = Constraint_msg.WEIGHT_MIN
 class Goal(object):
     def __init__(self, god_map, control_horizon=1, **kwargs):
         self.god_map = god_map
-        self.control_horizon = control_horizon
+        self.prediction_horizon = self.get_god_map().get_data(identifier.prediction_horizon)
+        # last 2 velocities are 0 anyway
+        self.control_horizon = max(min(control_horizon, self.prediction_horizon - 2), 1)
 
     def save_params_on_god_map(self, params):
         constraints = self.get_god_map().get_data(identifier.goal_params)
@@ -301,7 +303,7 @@ class Goal(object):
                                                          quadratic_error_weight=weight,
                                                          lower_slack_limit=lower_slack_limit,
                                                          upper_slack_limit=upper_slack_limit,
-                                                         control_horizon=None,
+                                                         control_horizon=self.control_horizon,
                                                          horizon_function=lambda w,t: w+1*t)
 
     def add_debug_expr(self, name, expr):
@@ -345,9 +347,8 @@ class Goal(object):
         r_P_intermediate_error = w.save_division(r_P_error, trans_error) * trans_scale
 
         weight = self.normalize_weight(max_velocity, weight)
-        self.add_debug_vector('vel', self.get_expr_velocity(trans_error))
-        self.add_debug_vector('error', trans_error)
-        self.add_debug_vector('trans_scale', trans_scale)
+        # self.add_debug_vector('vel', self.get_expr_velocity(trans_error))
+        self.add_debug_vector('r_P_error', r_P_error)
 
         self.add_velocity_constraint(u'/{}/x'.format(prefix),
                                      lower_velocity_limit=-max_velocity,
@@ -416,30 +417,35 @@ class Goal(object):
         tip_Q_goal = w.quaternion_from_matrix(tip_R_goal)
 
         tip_Q_goal = w.if_greater_zero(-tip_Q_goal[3], -tip_Q_goal, tip_Q_goal)  # flip to get shortest path
-        angle_error = w.quaternion_angle(tip_Q_goal)
-        scale = self.limit_velocity(angle_error, max_velocity)
-        tip_Q_goal = w.scale_quaternion(tip_Q_goal, scale)
+        # angle_error = w.quaternion_angle(tip_Q_goal)
+        # scale = self.limit_velocity(angle_error, max_velocity)
+        # tip_Q_goal = w.scale_quaternion(tip_Q_goal, scale)
 
         expr = tip_Q_tipCurrent
 
+        self.add_debug_vector('tip_Q_goal', tip_Q_goal)
+
         self.add_velocity_constraint(u'{}/q/x'.format(prefix),
-                                     lower_velocity_limit=tip_Q_goal[0],
-                                     upper_velocity_limit=tip_Q_goal[0],
+                                     lower_velocity_limit=-max_velocity,
+                                     upper_velocity_limit=max_velocity,
+                                     lower_error=tip_Q_goal[0],
+                                     upper_error=tip_Q_goal[0],
                                      weight=weight,
-                                     expression=expr[0],
-                                     goal_constraint=goal_constraint)
+                                     expression=expr[0])
         self.add_velocity_constraint(u'{}/q/y'.format(prefix),
-                                     lower_velocity_limit=tip_Q_goal[1],
-                                     upper_velocity_limit=tip_Q_goal[1],
+                                     lower_velocity_limit=-max_velocity,
+                                     upper_velocity_limit=max_velocity,
+                                     lower_error=tip_Q_goal[1],
+                                     upper_error=tip_Q_goal[1],
                                      weight=weight,
-                                     expression=expr[1],
-                                     goal_constraint=goal_constraint)
+                                     expression=expr[1])
         self.add_velocity_constraint(u'{}/q/z'.format(prefix),
-                                     lower_velocity_limit=tip_Q_goal[2],
-                                     upper_velocity_limit=tip_Q_goal[2],
+                                     lower_velocity_limit=-max_velocity,
+                                     upper_velocity_limit=max_velocity,
+                                     lower_error=tip_Q_goal[2],
+                                     upper_error=tip_Q_goal[2],
                                      weight=weight,
-                                     expression=expr[2],
-                                     goal_constraint=goal_constraint)
+                                     expression=expr[2])
         # w is not needed because its derivative is always 0 for identity quaternions
 
 
@@ -1349,35 +1355,33 @@ class ExternalCollisionAvoidance(Goal):
 
         penetration_distance = soft_threshold - actual_distance
         # spring_penetration_distance = spring_threshold - actual_distance
-        lower_limit = self.limit_velocity(penetration_distance, max_velocity)
+        # lower_limit = self.limit_velocity(penetration_distance, max_velocity)
+        lower_limit = penetration_distance
         upper_limit = 1e2
+
+        limit_of_lower_limit = max_velocity * sample_period * self.control_horizon
+        lower_limit_limited = w.limit(soft_threshold - hard_threshold, -limit_of_lower_limit, limit_of_lower_limit)
 
         upper_slack = w.if_greater(actual_distance, 50,  # assuming that distance of unchecked closest points is 100
                                    1e4,
                                    # 1e4,
-                                   w.max(0, lower_limit + actual_distance - hard_threshold)/sample_period*self.control_horizon
+                                   w.max(0, lower_limit_limited)/(sample_period/self.prediction_horizon)
                                    )
 
         weight = w.if_greater(actual_distance, 50, 0, WEIGHT_COLLISION_AVOIDANCE)
-
-        # spring_error = spring_threshold - actual_distance
-        # spring_error = w.Max(spring_error, 0)
-
-        # spring_weight = w.if_eq(spring_threshold, soft_threshold, 0,
-        #                         weight * (spring_error / (spring_threshold - soft_threshold))**2)
-
-        # weight = w.if_less_eq(actual_distance, soft_threshold, weight,
-        #                       spring_weight)
 
         weight = self.normalize_weight(max_velocity, weight)
         weight = w.save_division(weight,  # divide by number of active repeller per link
                                  w.min(number_of_external_collisions, num_repeller))
 
         # weight = self.normalize_weight(max_velocity, weight)
+        self.add_debug_expr('actual_distance', actual_distance)
 
         self.add_velocity_constraint(u'/position',
-                                     lower_velocity_limit=lower_limit,
-                                     upper_velocity_limit=upper_limit,
+                                     lower_velocity_limit=-max_velocity,
+                                     upper_velocity_limit=max_velocity,
+                                     lower_error=lower_limit,
+                                     upper_error=upper_limit,
                                      weight=weight,
                                      expression=dist,
                                      lower_slack_limit=-1e4,
@@ -1609,7 +1613,8 @@ class SelfCollisionAvoidance(Goal):
                                  w.min(number_of_self_collisions, num_repeller))
 
         penetration_distance = soft_threshold - actual_distance
-        lower_limit = self.limit_velocity(penetration_distance, repel_velocity)
+        # lower_limit = self.limit_velocity(penetration_distance, repel_velocity)
+        lower_limit = penetration_distance
         upper_limit = 1e2
         # slack_limit = self.limit_velocity(actual_distance, repel_velocity)
 
@@ -1619,11 +1624,12 @@ class SelfCollisionAvoidance(Goal):
                                    )
 
         self.add_velocity_constraint(u'/position',
-                                     lower_velocity_limit=lower_limit,
-                                     upper_velocity_limit=upper_limit,
+                                     lower_velocity_limit=-repel_velocity,
+                                     upper_velocity_limit=repel_velocity,
+                                     lower_error=lower_limit,
+                                     upper_error=upper_limit,
                                      weight=weight,
                                      expression=dist,
-                                     goal_constraint=False,
                                      lower_slack_limit=-1e4,
                                      upper_slack_limit=upper_slack)
 

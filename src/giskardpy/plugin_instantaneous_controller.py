@@ -32,7 +32,7 @@ class ControllerPlugin(GiskardBehavior):
         self.controller = QPController(
             free_variables=list(free_variables.values()),
             constraints=list(constraints.values()),
-            sample_period=self.get_god_map().unsafe_get_data(identifier.sample_period),
+            sample_period=self.get_god_map().to_symbol(identifier.sample_period),
             prediciton_horizon=self.get_god_map().unsafe_get_data(identifier.prediction_horizon),
             debug_expressions=debug_expressions,
             solver_name=self.get_god_map().unsafe_get_data(identifier.qp_solver_name)

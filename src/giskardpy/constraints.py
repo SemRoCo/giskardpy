@@ -1459,17 +1459,19 @@ class CartesianPoseStraight(Constraint):
         for constraint in self.constraints:
             self.soft_constraints.update(constraint.get_constraints())
 
-class CartesianPoseChanging(Constraint):
+class CartesianPath(Constraint):
 
     goal_a = u'goal_a'
     goal_b = u'goal_b'
+    goal_c = u'goal_c'
+    goal_d = u'goal_d'
     weight = u'weight'
     max_linear_velocity = u'max_linear_velocity'
     max_angular_velocity = u'max_angular_velocity'
     max_linear_acceleration = u'max_linear_acceleration'
     max_angular_acceleration = u'max_angular_acceleration'
 
-    def __init__(self, god_map, root_link, tip_link, goal_a, goal_b, max_linear_velocity=0.1,
+    def __init__(self, god_map, root_link, tip_link, goal_a, goal_b, goal_c, goal_d, max_linear_velocity=0.1,
                  max_angular_velocity=0.5, max_linear_acceleration=0.1, max_angular_acceleration=0.5,
                  weight=WEIGHT_ABOVE_CA, goal_constraint=False):
         """
@@ -1481,7 +1483,7 @@ class CartesianPoseChanging(Constraint):
         :param max_angular_velocity: float, rad/s, default 0.5
         :param weight: float, default WEIGHT_ABOVE_CA
         """
-        super(CartesianPoseChanging, self).__init__(god_map)
+        super(CartesianPath, self).__init__(god_map)
         self.constraints = []
         self.root_link = root_link
         self.tip_link = tip_link
@@ -1489,6 +1491,8 @@ class CartesianPoseChanging(Constraint):
         params = {
             self.goal_a: self.parse_and_transform_PoseStamped(goal_a, root_link),
             self.goal_b: self.parse_and_transform_PoseStamped(goal_b, root_link),
+            self.goal_c: self.parse_and_transform_PoseStamped(goal_c, root_link),
+            self.goal_d: self.parse_and_transform_PoseStamped(goal_d, root_link),
             self.weight: weight,
             self.max_linear_velocity: max_linear_velocity,
             self.max_angular_velocity: max_angular_velocity,
@@ -1506,22 +1510,52 @@ class CartesianPoseChanging(Constraint):
 
         time = self.get_god_map().to_symbol(identifier.time)
         time_in_secs = self.get_input_sampling_period() * time
-        
-        weight_a = w.if_greater_zero(w.sin((1. / 5.) * 2. * w.pi * time_in_secs),
-                                     WEIGHT_ABOVE_CA,
-                                     WEIGHT_BELOW_CA)
-        weight_b = w.if_greater_zero(w.sin((1. / 5.) * 2. * w.pi * time_in_secs),
-                                     WEIGHT_BELOW_CA,
-                                     WEIGHT_ABOVE_CA)
+        path = [self.goal_a, self.goal_b, self.goal_c, self.goal_d]
+
+        self.minimize_position(self.goal_a, self.get_weight(self.goal_a, path))
+        self.minimize_rotation(self.goal_a, self.get_weight(self.goal_a, path))
+        self.minimize_position(self.goal_b, self.get_weight(self.goal_b, path))
+        self.minimize_rotation(self.goal_b, self.get_weight(self.goal_b, path))
+        self.minimize_position(self.goal_c, self.get_weight(self.goal_c, path))
+        self.minimize_rotation(self.goal_c, self.get_weight(self.goal_c, path))
+        self.minimize_position(self.goal_d, self.get_weight(self.goal_d, path))
+        self.minimize_rotation(self.goal_d, self.get_weight(self.goal_d, path))
 
         self.add_debug_constraint("debugTime", time)
         self.add_debug_constraint("debugTimeInSecs", time_in_secs)
-        self.add_debug_constraint("debugWeight", weight_a)
+        self.add_debug_constraint("debugLocalCost", self.get_local_cost(self.goal_a))
 
-        self.minimize_position(self.goal_a, weight_a)
-        self.minimize_rotation(self.goal_a, weight_a)
-        self.minimize_position(self.goal_b, weight_b)
-        self.minimize_rotation(self.goal_b, weight_b)
+    def get_weight(self, p, path):
+        return w.if_less(self.get_local_cost(p), 1.0, self.get_global_cost(p, path), 10000)
+
+    def get_local_cost(self, p):
+        """
+        Calculates distance from point to the current pose of the tip link.
+
+        :type p: unicode string
+        :rtype: float
+        """
+        return w.norm(w.position_of(self.get_input_PoseStamped(p) - self.get_fk(self.root_link, self.tip_link)))
+
+    def get_global_cost(self, point, path):
+        """
+        Calculates the distance of the point towards environment objects and how far
+        the goal given the path.
+
+        :type point: unicode string
+        :type path: [unicode string]
+        :rtype: float
+        """
+        return self.distance_to_goal(point, path) #+ self.distance_to_environment(point)
+
+    def distance_to_goal(self, p, path):
+        return w.if_eq(w.ca.SX.sym(p), w.ca.SX.sym(path[0]), 3,
+                       w.if_eq(w.ca.SX.sym(p), w.ca.SX.sym(path[1]), 2,
+                               w.if_eq(w.ca.SX.sym(p), w.ca.SX.sym(path[2]), 1,
+                                       w.if_eq(w.ca.SX.sym(p), w.ca.SX.sym(path[3]), 0, 0))))
+
+    def distance_to_environment(self, point):
+        pass
 
     def minimize_position(self, goal, weight):
         r_P_g = w.position_of(self.get_input_PoseStamped(goal))
@@ -1540,7 +1574,7 @@ class CartesianPoseChanging(Constraint):
                                                self.goal_constraint, prefix=goal)
 
     def __str__(self):
-        s = super(CartesianPoseChanging, self).__str__()
+        s = super(CartesianPath, self).__str__()
         return u'{}'.format(s)
 
 class ExternalCollisionAvoidance(Constraint):

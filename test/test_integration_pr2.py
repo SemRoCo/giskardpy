@@ -1977,17 +1977,17 @@ class TestShaking(object):
             min_wiggle_frequency += 1
         distance_between_frequencies = 5
 
-        for joint in [u'r_wrist_flex_joint', u'head_pan_joint']:  # max vel: 1.0 and 0.5
-            for f in range(min_wiggle_frequency, max_detectable_freq + 1, distance_between_frequencies):
+        for joint in [ u'head_pan_joint', u'r_wrist_flex_joint']:  # max vel: 1.0 and 0.5
+            for f in range(min_wiggle_frequency, max_detectable_freq, distance_between_frequencies):
                 kitchen_setup.set_json_goal(u'JointPositionRevolute',
                                             joint_name=joint,
-                                            goal=0.0,
+                                            goal=0.5,
                                             )
                 kitchen_setup.send_goal()
                 target_freq = float(f)
                 kitchen_setup.set_json_goal(u'ShakyJointPositionRevoluteOrPrismatic',
                                             joint_name=joint,
-                                            goal=1.0,
+                                            goal=0.0,
                                             frequency=target_freq
                                             )
                 r = kitchen_setup.send_goal(goal=None, goal_type=MoveGoal.PLAN_AND_EXECUTE)
@@ -2007,17 +2007,17 @@ class TestShaking(object):
             min_wiggle_frequency += 1
         distance_between_frequencies = 5
 
-        for joint in [u'torso_lift_joint']: #, u'odom_x_joint']: # max vel: 0.015 and 0.5
+        for joint in [u'odom_x_joint']: #, u'torso_lift_joint']: # max vel: 0.015 and 0.5
             for f in range(min_wiggle_frequency, max_detectable_freq, distance_between_frequencies):
                 kitchen_setup.set_json_goal(u'JointPositionPrismatic',
                                             joint_name=joint,
-                                            goal=0.0,
+                                            goal=0.02,
                                             )
                 kitchen_setup.send_goal()
                 target_freq = float(f)
                 kitchen_setup.set_json_goal(u'ShakyJointPositionRevoluteOrPrismatic',
                                             joint_name=joint,
-                                            goal=2.0,
+                                            goal=0.0,
                                             frequency=target_freq
                                             )
                 r = kitchen_setup.send_goal(goal=None, goal_type=MoveGoal.PLAN_AND_EXECUTE)

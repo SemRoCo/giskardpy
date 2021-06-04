@@ -347,8 +347,6 @@ class Goal(object):
         r_P_intermediate_error = w.save_division(r_P_error, trans_error) * trans_scale
 
         weight = self.normalize_weight(max_velocity, weight)
-        # self.add_debug_vector('vel', self.get_expr_velocity(trans_error))
-        self.add_debug_vector('r_P_error', r_P_error)
 
         self.add_velocity_constraint(u'/{}/x'.format(prefix),
                                      lower_velocity_limit=-max_velocity,
@@ -422,8 +420,6 @@ class Goal(object):
         # tip_Q_goal = w.scale_quaternion(tip_Q_goal, scale)
 
         expr = tip_Q_tipCurrent
-
-        self.add_debug_vector('tip_Q_goal', tip_Q_goal)
 
         self.add_velocity_constraint(u'{}/q/x'.format(prefix),
                                      lower_velocity_limit=-max_velocity,
@@ -1276,7 +1272,7 @@ class ExternalCollisionAvoidance(Goal):
     max_acceleration_id = u'max_acceleration'
     num_repeller_id = u'num_repeller'
 
-    def __init__(self, god_map, link_name, max_velocity=0.1, hard_threshold=0.0, soft_threshold=0.05, idx=0,
+    def __init__(self, god_map, link_name, max_velocity=0.2, hard_threshold=0.0, soft_threshold=0.05, idx=0,
                  num_repeller=1, max_acceleration=0.005, **kwargs):
         """
         Don't use me
@@ -1287,7 +1283,7 @@ class ExternalCollisionAvoidance(Goal):
         self.robot_name = self.get_robot_unsafe().get_name()
         self.idx = idx
 
-        params = {self.max_velocity_id: max_velocity,
+        params = {self.max_velocity_id: 0.1,
                   self.hard_threshold_id: hard_threshold,
                   self.soft_threshold_id: soft_threshold,
                   self.max_acceleration_id: max_acceleration,
@@ -1375,7 +1371,8 @@ class ExternalCollisionAvoidance(Goal):
                                  w.min(number_of_external_collisions, num_repeller))
 
         # weight = self.normalize_weight(max_velocity, weight)
-        self.add_debug_expr('actual_distance', actual_distance)
+        if 'r_wrist_r' in str(self):
+            self.add_debug_expr('actual_distance', actual_distance)
 
         self.add_velocity_constraint(u'/position',
                                      lower_velocity_limit=-max_velocity,

@@ -55,6 +55,12 @@ class QPSolver(object):
         :return: x according to the equations above, len = joint constraints + soft constraints
         :type np.array
         """
+        H = H.copy()
+        A = A.copy()
+        lbA = lbA.copy()
+        ubA = ubA.copy()
+        lb = lb.copy()
+        ub = ub.copy()
         if A.shape != self.shape:
             self.started = False
             self.shape = A.shape

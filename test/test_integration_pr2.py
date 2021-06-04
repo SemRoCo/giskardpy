@@ -7791,4 +7791,4 @@ class TestReachability():
         zero_pose.send_and_check_goal(goal_type=MoveGoal.PLAN_ONLY)
 
 # import pytest
-# pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_avoid_collision5'])
+# pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_avoid_collision_at_kitchen_corner'])

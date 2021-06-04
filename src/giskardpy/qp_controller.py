@@ -163,8 +163,8 @@ class B(Parent):
         for t in range(self.prediction_horizon):
             for c in self.constraints:
                 if t < c.control_horizon:
-                    # result['t{:03d}/{}'.format(t, c.name)] = 1e3
-                    result['t{:03d}/{}'.format(t, c.name)] = 0
+                    result['t{:03d}/{}'.format(t, c.name)] = 1e3
+                    # result['t{:03d}/{}'.format(t, c.name)] = 0
         return result
 
     def get_lower_error_slack_limits(self):
@@ -356,7 +356,7 @@ class A(Parent):
         return self._sorter({v.name: v.position_symbol for v in self.free_variables})[0]
 
     @profile
-    def construct_A_soft(self):
+    def construct_A(self):
         #         |   t1   |   tn   |   t1   |   tn   |   t1   |   tn   |   t1   |   tn   |
         #         |v1 v2 vn|v1 v2 vn|a1 a2 an|a1 a2 an|j1 j2 jn|j1 j2 jn|s1 s2 sn|s1 s2 sn|
         #         |-----------------------------------------------------------------------|
@@ -457,7 +457,7 @@ class A(Parent):
         A_soft[vertical_offset:next_vertical_offset, :J_vel_limit_block.shape[1]] = J_vel_limit_block
         I = w.eye(J_vel_limit_block.shape[0]) * self.sample_period
         A_soft[vertical_offset:next_vertical_offset, -I.shape[1]-J.shape[0]:-J.shape[0]] = I
-        # delete rows if control horizon of constraint shorter than prediction horzion
+        # delete rows if control horizon of constraint shorter than prediction horizon
         rows_to_delete = []
         for t in range(self.prediction_horizon):
             for i, c in enumerate(self.constraints):
@@ -485,9 +485,9 @@ class A(Parent):
         A_soft[vertical_offset:next_vertical_offset, :J_hstack.shape[1]] = J_hstack
 
         # sum of vel slack for total error
-        I = w.kron(w.Matrix([[1 for _ in range(self.prediction_horizon)]]),
-                   w.eye(J_hstack.shape[0])) * self.sample_period
-        A_soft[vertical_offset:next_vertical_offset, -I.shape[1]-len(self.constraints):-len(self.constraints)] = I
+        # I = w.kron(w.Matrix([[1 for _ in range(self.prediction_horizon)]]),
+        #            w.eye(J_hstack.shape[0])) * self.sample_period
+        # A_soft[vertical_offset:next_vertical_offset, -I.shape[1]-len(self.constraints):-len(self.constraints)] = I
         # TODO multiply with control horizon instead?
         # extra slack variable for total error
         I = w.eye(J_hstack.shape[0]) * self.sample_period / self.prediction_horizon
@@ -504,7 +504,7 @@ class A(Parent):
         return A_soft
 
     def A(self):
-        return self.construct_A_soft()
+        return self.construct_A()
 
 
 class QPController(object):
@@ -521,7 +521,7 @@ class QPController(object):
         self.sample_period = sample_period
         self.order = 3  # TODO implement order
         if free_variables is not None:
-            self.add_free_varialbes(free_variables)
+            self.add_free_variables(free_variables)
         if constraints is not None:
             self.add_constraints(constraints)
         if debug_expressions is not None:
@@ -535,7 +535,7 @@ class QPController(object):
             raise KeyError(u'Solver \'{}\' not supported'.format(solver_name))
         logging.loginfo(u'Using QP Solver \'{}\''.format(solver_name))
 
-    def add_free_varialbes(self, free_variables):
+    def add_free_variables(self, free_variables):
         """
         :type free_variables: list
         """
@@ -595,6 +595,7 @@ class QPController(object):
         free_symbols = w.free_symbols(self.big_ass_M)
         self.compiled_big_ass_M = w.speed_up(self.big_ass_M,
                                              free_symbols)
+
         logging.loginfo(u'Compiled symbolic controller in {:.5f}s'.format(time() - t))
         # TODO should use separate symbols lists
         self.compiled_debug_v = w.speed_up(self.debug_v, free_symbols)
@@ -696,13 +697,12 @@ class QPController(object):
         :rtype: dict
         """
         np_big_ass_M = self.compiled_big_ass_M.call2(substitutions)
-        self.np_H = np_big_ass_M[self.A.height:, :-2].copy()
-        self.np_A = np_big_ass_M[:self.A.height, :self.A.width].copy()
-        self.np_lb = np_big_ass_M[self.A.height:, -2].copy()
-        self.np_ub = np_big_ass_M[self.A.height:, -1].copy()
-        # np_g = np_big_ass_M[self.A.height:, -1].copy()
-        self.np_lbA = np_big_ass_M[:self.A.height, -2].copy()
-        self.np_ubA = np_big_ass_M[:self.A.height, -1].copy()
+        self.np_H = np_big_ass_M[self.A.height:, :-2]
+        self.np_A = np_big_ass_M[:self.A.height, :self.A.width]
+        self.np_lb = np_big_ass_M[self.A.height:, -2]
+        self.np_ub = np_big_ass_M[self.A.height:, -1]
+        self.np_lbA = np_big_ass_M[:self.A.height, -2]
+        self.np_ubA = np_big_ass_M[:self.A.height, -1]
 
         try:
             self.xdot_full = self.qp_solver.solve(self.np_H, self.np_g, self.np_A, self.np_lb, self.np_ub, self.np_lbA,
@@ -730,7 +730,7 @@ class QPController(object):
         if self.xdot_full is None:
             return None
         # TODO enable debug print in an elegant way, preferably without slowing anything down
-        self._debug_print(substitutions, self.xdot_full)
+        # self._debug_print(substitutions, self.xdot_full)
         return self.split_xdot(self.xdot_full), self._eval_debug_exprs(substitutions)
 
     def split_xdot(self, xdot):

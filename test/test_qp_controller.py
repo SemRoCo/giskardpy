@@ -330,7 +330,7 @@ def test_fk():
                            upper_position_limit=ex,
                            lower_velocity_limit=-c_max_vel,
                            upper_velocity_limit=c_max_vel,
-                           quadratic_velocity_weight=1,
+                           quadratic_velocity_weight=1000,
                            quadratic_error_weight=error_weight,
                            control_horizon=ch,
                            horizon_function=lambda w, t: w),
@@ -340,7 +340,7 @@ def test_fk():
                            upper_position_limit=ey,
                            lower_velocity_limit=-c_max_vel,
                            upper_velocity_limit=c_max_vel,
-                           quadratic_velocity_weight=1,
+                           quadratic_velocity_weight=1000,
                            quadratic_error_weight=error_weight,
                            control_horizon=ch, horizon_function=lambda w, t: w),
     ]

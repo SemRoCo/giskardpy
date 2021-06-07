@@ -15,7 +15,7 @@ from rospy_message_converter.message_converter import \
 import giskardpy.identifier as identifier
 import giskardpy.tfwrapper as tf
 from giskardpy import casadi_wrapper as w
-from giskardpy.data_types import VelocityConstraint, PositionConstraint
+from giskardpy.data_types import PositionConstraint
 from giskardpy.exceptions import GiskardException, ConstraintException
 from giskardpy.input_system import \
     PoseStampedInput, Point3Input, Vector3Input, \
@@ -299,12 +299,12 @@ class Goal(object):
                                                          upper_position_limit=upper_error,
                                                          lower_velocity_limit=lower_velocity_limit,
                                                          upper_velocity_limit=upper_velocity_limit,
-                                                         quadratic_velocity_weight=weight,
+                                                         quadratic_velocity_weight=weight * 1000,
                                                          quadratic_error_weight=weight,
                                                          lower_slack_limit=lower_slack_limit,
                                                          upper_slack_limit=upper_slack_limit,
                                                          control_horizon=self.control_horizon,
-                                                         horizon_function=lambda w,t: w+1*t)
+                                                         horizon_function=lambda w, t: w + 1 * t)
 
     def add_debug_expr(self, name, expr):
         """
@@ -405,12 +405,12 @@ class Goal(object):
                                           weight=WEIGHT_BELOW_CA, goal_constraint=True, prefix=u''):
         root_R_tipCurrent = w.rotation_of(self.get_fk(root, tip))
         tip_R_rootCurrent_eval = w.rotation_of(self.get_fk_evaluated(tip, root))
-        hack = w.rotation_matrix_from_axis_angle([0,0,1], 0.0001)
-        root_R_tipCurrent = w.dot(root_R_tipCurrent, hack) # hack to avoid singularity
+        hack = w.rotation_matrix_from_axis_angle([0, 0, 1], 0.0001)
+        root_R_tipCurrent = w.dot(root_R_tipCurrent, hack)  # hack to avoid singularity
         tip_Q_tipCurrent = w.quaternion_from_matrix(w.dot(tip_R_rootCurrent_eval, root_R_tipCurrent))
         tip_R_goal = w.dot(tip_R_rootCurrent_eval, root_R_tipGoal)
 
-        weight = self.normalize_weight(max_velocity/np.pi, weight)
+        weight = self.normalize_weight(max_velocity / np.pi, weight)
 
         tip_Q_goal = w.quaternion_from_matrix(tip_R_goal)
 
@@ -443,7 +443,6 @@ class Goal(object):
                                      weight=weight,
                                      expression=expr[2])
         # w is not needed because its derivative is always 0 for identity quaternions
-
 
 
 class JointPositionContinuous(Goal):
@@ -1361,8 +1360,13 @@ class ExternalCollisionAvoidance(Goal):
         upper_slack = w.if_greater(actual_distance, 50,  # assuming that distance of unchecked closest points is 100
                                    1e4,
                                    # 1e4,
-                                   w.max(0, lower_limit_limited)/(sample_period/self.prediction_horizon)
+                                   w.max(0, lower_limit_limited) / (sample_period / self.prediction_horizon)
                                    )
+        hard_lower_limit = -w.limit(hard_threshold - actual_distance,
+                                   -limit_of_lower_limit,
+                                   limit_of_lower_limit)/ (sample_period / self.prediction_horizon)
+
+        upper_slack += hard_lower_limit
 
         weight = w.if_greater(actual_distance, 50, 0, WEIGHT_COLLISION_AVOIDANCE)
 
@@ -1370,9 +1374,6 @@ class ExternalCollisionAvoidance(Goal):
         weight = w.save_division(weight,  # divide by number of active repeller per link
                                  w.min(number_of_external_collisions, num_repeller))
 
-        # weight = self.normalize_weight(max_velocity, weight)
-        if 'r_wrist_r' in str(self):
-            self.add_debug_expr('actual_distance', actual_distance)
 
         self.add_velocity_constraint(u'/position',
                                      lower_velocity_limit=-max_velocity,
@@ -1586,7 +1587,7 @@ class SelfCollisionAvoidance(Goal):
                                                                   (self.link_a, self.link_b)])
 
     def make_constraints(self):
-        repel_velocity = self.get_input_float(self.max_velocity_id)
+        max_velocity = self.get_input_float(self.max_velocity_id)
         hard_threshold = self.get_input_float(self.hard_threshold_id)
         soft_threshold = self.get_input_float(self.soft_threshold_id)
         actual_distance = self.get_actual_distance()
@@ -1605,7 +1606,7 @@ class SelfCollisionAvoidance(Goal):
         dist = w.dot(pb_V_n.T, pb_P_pa)[0]
 
         weight = w.if_greater(actual_distance, 50, 0, WEIGHT_COLLISION_AVOIDANCE)
-        weight = self.normalize_weight(repel_velocity, weight)
+        weight = self.normalize_weight(max_velocity, weight)
         weight = w.save_division(weight,  # divide by number of active repeller per link
                                  w.min(number_of_self_collisions, num_repeller))
 
@@ -1615,14 +1616,23 @@ class SelfCollisionAvoidance(Goal):
         upper_limit = 1e2
         # slack_limit = self.limit_velocity(actual_distance, repel_velocity)
 
+        limit_of_lower_limit = max_velocity * sample_period * self.control_horizon
+        lower_limit_limited = w.limit(soft_threshold - hard_threshold, -limit_of_lower_limit, limit_of_lower_limit)
+
         upper_slack = w.if_greater(actual_distance, 50,  # assuming that distance of unchecked closest points is 100
                                    1e4,
-                                   w.max(0, lower_limit + actual_distance - hard_threshold)/sample_period *self.control_horizon
+                                   # 1e4,
+                                   w.max(0, lower_limit_limited) / (sample_period / self.prediction_horizon)
                                    )
+        hard_lower_limit = -w.limit(hard_threshold - actual_distance,
+                                    -limit_of_lower_limit,
+                                    limit_of_lower_limit) / (sample_period / self.prediction_horizon)
+
+        upper_slack += hard_lower_limit
 
         self.add_velocity_constraint(u'/position',
-                                     lower_velocity_limit=-repel_velocity,
-                                     upper_velocity_limit=repel_velocity,
+                                     lower_velocity_limit=-max_velocity,
+                                     upper_velocity_limit=max_velocity,
                                      lower_error=lower_limit,
                                      upper_error=upper_limit,
                                      weight=weight,
@@ -1794,7 +1804,8 @@ class BasePointingForward(Goal):
     weight_id = u'weight'
 
     def __init__(self, god_map, base_forward_axis=None, base_footprint=None, odom=None, velocity_tip=None,
-                 range=np.pi / 8, max_velocity=np.pi / 8, linear_velocity_threshold=0.02, weight=WEIGHT_BELOW_CA, **kwargs):
+                 range=np.pi / 8, max_velocity=np.pi / 8, linear_velocity_threshold=0.02, weight=WEIGHT_BELOW_CA,
+                 **kwargs):
         """
         dont use
         :param god_map: ignore

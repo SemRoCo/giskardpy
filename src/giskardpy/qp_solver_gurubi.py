@@ -42,14 +42,30 @@ error_info = {
 class QPSolverGurubi(QPSolver):
     STATUS_VALUE_DICT = {getattr(gurobipy.GRB.status, name): name for name in dir(gurobipy.GRB.status) if '__' not in name}
 
+    def __init__(self):
+        self.started = False
+
     @profile
     def init(self, H, g, A, lb, ub, lbA, ubA):
         # TODO potential speed up by reusing model
         self.qpProblem = gurobipy.Model('qp')
-        x = self.qpProblem.addMVar(lb.shape, lb=lb, ub=ub)
-        self.qpProblem.addMConstr(A, x, gurobipy.GRB.LESS_EQUAL, ubA)
-        self.qpProblem.addMConstr(A, x, gurobipy.GRB.GREATER_EQUAL, lbA)
+        self.x = self.qpProblem.addMVar(lb.shape, lb=lb, ub=ub)
+        self.qpProblem.addMConstr(A, self.x, gurobipy.GRB.LESS_EQUAL, ubA)
+        self.qpProblem.addMConstr(A, self.x, gurobipy.GRB.GREATER_EQUAL, lbA)
         self.qpProblem.setMObjective(H, None, 0.0)
+        self.started = True
+
+    @profile
+    def update(self, H, g, A, lb, ub, lbA, ubA):
+        # self.init(H, g, A, lb, ub, lbA, ubA)
+        # return
+        self.x.lb = lb
+        self.x.ub = ub
+        self.qpProblem.remove(self.qpProblem.getConstrs())
+        self.qpProblem.addMConstr(A, self.x, gurobipy.GRB.LESS_EQUAL, ubA)
+        self.qpProblem.addMConstr(A, self.x, gurobipy.GRB.GREATER_EQUAL, lbA)
+        self.qpProblem.setMObjective(H, None, 0.0)
+        pass
 
     def print_debug(self):
         # TODO use MinRHS etc to analyse solution
@@ -90,7 +106,10 @@ class QPSolverGurubi(QPSolver):
         :type np.array
         """
         for i in range(tries):
-            self.init(H, g, A, lb, ub, lbA, ubA)
+            if self.started:
+                self.update(H, g, A, lb, ub, lbA, ubA)
+            else:
+                self.init(H, g, A, lb, ub, lbA, ubA)
             self.qpProblem.optimize()
             success = self.qpProblem.status
             if success in {gurobipy.GRB.OPTIMAL, gurobipy.GRB.SUBOPTIMAL}:
@@ -112,6 +131,7 @@ class QPSolverGurubi(QPSolver):
                 ubA = self.round(ubA,decimal_places)
         else:
             self.print_debug()
+            self.started = False
             error_message = u'{}'.format(self.STATUS_VALUE_DICT[success])
             if success == gurobipy.GRB.INFEASIBLE:
                 raise InfeasibleException(error_message)

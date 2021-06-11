@@ -304,7 +304,7 @@ class Goal(object):
                                                          lower_slack_limit=lower_slack_limit,
                                                          upper_slack_limit=upper_slack_limit,
                                                          control_horizon=self.control_horizon,
-                                                         horizon_function=lambda w, t: w + 1 * t)
+                                                         horizon_function=lambda w, t: w )
 
     def add_debug_expr(self, name, expr):
         """

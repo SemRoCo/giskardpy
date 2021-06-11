@@ -53,7 +53,7 @@ class QPSolverGurubi(QPSolver):
         self.qpProblem.addMConstr(A, self.x, gurobipy.GRB.LESS_EQUAL, ubA)
         self.qpProblem.addMConstr(A, self.x, gurobipy.GRB.GREATER_EQUAL, lbA)
         self.qpProblem.setMObjective(H, None, 0.0)
-        self.started = True
+        self.started = False
 
     @profile
     def update(self, H, g, A, lb, ub, lbA, ubA):

@@ -5895,7 +5895,7 @@ class TestCollisionAvoidanceGoals(object):
         p.pose.position.x = 0.2
         p.pose.orientation.w = 1
         zero_pose.set_cart_goal(p, zero_pose.l_tip, 'base_footprint')
-        zero_pose.send_goal()
+        zero_pose.send_and_check_goal()
         zero_pose.check_cpi_geq(zero_pose.get_l_gripper_links(), 0.048)
 
     def test_avoid_self_collision2(self, zero_pose):

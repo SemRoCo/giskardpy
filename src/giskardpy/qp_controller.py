@@ -71,17 +71,25 @@ class H(Parent):
         self._compute_height()
 
     def _compute_height(self):
-        # joint weights
-        self.height = len(self.free_variables) * 3 * self.prediction_horizon
-        # constraint vel weights
-        for c in self.constraints:
-            self.height += c.control_horizon
-        # constraint error
-        self.height += len(self.constraints)
+        self.height = self.number_of_free_variables_with_horizon()
+        self.height += self.number_of_constraint_vel_variables()
+        self.height += self.number_of_contraint_error_variables()
 
     @property
     def width(self):
         return self.height
+
+    def number_of_free_variables_with_horizon(self):
+        return len(self.free_variables) * 3 * self.prediction_horizon
+
+    def number_of_constraint_vel_variables(self):
+        h = 0
+        for c in self.constraints:
+            h += c.control_horizon
+        return h
+
+    def number_of_contraint_error_variables(self):
+        return len(self.constraints)
 
     def weights(self):
         vel_weights = {}
@@ -687,6 +695,24 @@ class QPController(object):
     def _eval_debug_exprs(self, subsitutions):
         return {name: value[0] for name, value in zip(self.debug_names, self.compiled_debug_v.call2(subsitutions))}
 
+    def make_filters(self):
+        b_filter = self.np_H.sum(axis=0) != 0
+        b_filter[:self.H.number_of_free_variables_with_horizon()] = True
+        bA_filter = np.ones(self.A.height, dtype=bool)
+        ll = self.H.number_of_constraint_vel_variables()+self.H.number_of_contraint_error_variables()
+        bA_filter[-ll:] = b_filter[-ll:]
+        return b_filter, bA_filter
+
+    def filter_zero_weight_stuff(self, b_filter, bA_filter):
+        return self.np_H[b_filter, :][:,b_filter], \
+               self.np_g[b_filter], \
+               self.np_A[bA_filter, :][:,b_filter], \
+               self.np_lb[b_filter], \
+               self.np_ub[b_filter], \
+               self.np_lbA[bA_filter], \
+               self.np_ubA[bA_filter]
+
+
     @profile
     def get_cmd(self, substitutions):
         """
@@ -705,8 +731,7 @@ class QPController(object):
         self.np_ubA = np_big_ass_M[:self.A.height, -1]
 
         try:
-            self.xdot_full = self.qp_solver.solve(self.np_H, self.np_g, self.np_A, self.np_lb, self.np_ub, self.np_lbA,
-                                                  self.np_ubA)
+            self.xdot_full = self.qp_solver.solve(*self.filter_zero_weight_stuff(*self.make_filters()))
         except Exception as e:
             p_weights, p_A, p_lbA, p_ubA, p_lb, p_ub = self._debug_print(substitutions, actually_print=True)
             if isinstance(e, InfeasibleException):
@@ -730,7 +755,7 @@ class QPController(object):
         if self.xdot_full is None:
             return None
         # TODO enable debug print in an elegant way, preferably without slowing anything down
-        # self._debug_print(substitutions, self.xdot_full)
+        self._debug_print(substitutions, self.xdot_full)
         return self.split_xdot(self.xdot_full), self._eval_debug_exprs(substitutions)
 
     def split_xdot(self, xdot):
@@ -778,31 +803,38 @@ class QPController(object):
     @profile
     def _debug_print(self, substitutions, xdot_full=None, actually_print=False):
         import pandas as pd
-        # bA_mask, b_mask = make_filter_masks(unfiltered_H, self.num_joint_constraints, self.num_hard_constraints)
         b_names = self.b_names()
         bA_names = self.bA_names()
-        filtered_b_names = b_names  # [b_mask]
-        filtered_bA_names = bA_names  # [bA_mask]
-        filtered_H = self.H  # [b_mask][:, b_mask]
+        b_filter, bA_filter = self.make_filters()
+        filtered_b_names = np.array(b_names)[b_filter]
+        filtered_bA_names = np.array(bA_names)[bA_filter]
+        H, g, A, lb, ub, lbA, ubA = self.filter_zero_weight_stuff(b_filter, bA_filter)
+        # self.filter_zero_weight_stuff(*self.make_filters())
+        # filtered_H =  [b_mask][:, b_mask]
+        # lb = self.np_lb[b_mask]
+        # ub = self.np_ub[b_mask]
+        # lbA = self.np_lbA[bA_mask]
+        # ubA = self.np_ubA[bA_mask]
+        # A =
 
         debug_exprs = self._eval_debug_exprs(substitutions)
         p_debug = pd.DataFrame.from_dict(debug_exprs, orient='index', columns=['data']).sort_index()
 
-        p_lb = pd.DataFrame(self.np_lb, filtered_b_names, [u'data'], dtype=float)
-        p_ub = pd.DataFrame(self.np_ub, filtered_b_names, [u'data'], dtype=float)
-        p_g = pd.DataFrame(self.np_g, filtered_b_names, [u'data'], dtype=float)
-        p_lbA = pd.DataFrame(self.np_lbA, filtered_bA_names, [u'data'], dtype=float)
-        p_ubA = pd.DataFrame(self.np_ubA, filtered_bA_names, [u'data'], dtype=float)
+        p_lb = pd.DataFrame(lb, filtered_b_names, [u'data'], dtype=float)
+        p_ub = pd.DataFrame(ub, filtered_b_names, [u'data'], dtype=float)
+        p_g = pd.DataFrame(g, filtered_b_names, [u'data'], dtype=float)
+        p_lbA = pd.DataFrame(lbA, filtered_bA_names, [u'data'], dtype=float)
+        p_ubA = pd.DataFrame(ubA, filtered_bA_names, [u'data'], dtype=float)
         p_weights = pd.DataFrame(self.np_H.dot(np.ones(self.np_H.shape[0])), b_names, [u'data'],
                                  dtype=float)
-        p_A = pd.DataFrame(self.np_A, filtered_bA_names, filtered_b_names, dtype=float)
+        p_A = pd.DataFrame(A, filtered_bA_names, filtered_b_names, dtype=float)
         if xdot_full is not None:
             p_xdot = pd.DataFrame(xdot_full, filtered_b_names, [u'data'], dtype=float)
             # Ax = np.dot(self.np_A, xdot_full)
-            xH = np.dot((xdot_full ** 2).T, self.np_H)
+            xH = np.dot((xdot_full ** 2).T, H)
             p_xH = pd.DataFrame(xH, filtered_b_names, [u'data'], dtype=float)
             # p_xg = p_g * p_xdot
-            xHx = np.dot(np.dot(xdot_full.T, self.np_H), xdot_full)
+            xHx = np.dot(np.dot(xdot_full.T, H), xdot_full)
             num_non_slack = len(self.free_variables) * self.prediction_horizon * 3
             p_xdot2 = deepcopy(p_xdot)
             p_xdot2[num_non_slack:] = 0

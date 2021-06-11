@@ -26,7 +26,8 @@ general_options:
     jerk: # multiply your desired acc limit with sample period; experimental, don't touch
       linear: # m/s**2
         default: 30
-        override: {}
+        override:
+          torso_lift_joint: 5
       angular: # rad/s**2
         default: 30
         override: {}

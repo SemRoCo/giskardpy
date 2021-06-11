@@ -81,7 +81,7 @@ class QPSolverGurubi(QPSolver):
         return np.round(data, decimal_places)
 
     @profile
-    def solve(self, H, g, A, lb, ub, lbA, ubA, tries=1, decimal_places=4):
+    def solve(self, H, g, A, lb, ub, lbA, ubA, tries=2, decimal_places=4):
         """
         x^T*H*x + x^T*g
         s.t.: lbA < A*x < ubA

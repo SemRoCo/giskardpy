@@ -304,7 +304,7 @@ class Goal(object):
                                                          lower_slack_limit=lower_slack_limit,
                                                          upper_slack_limit=upper_slack_limit,
                                                          control_horizon=self.control_horizon,
-                                                         horizon_function=lambda w, t: w )
+                                                         horizon_function=lambda w, t: w)
 
     def add_debug_expr(self, name, expr):
         """
@@ -375,31 +375,34 @@ class Goal(object):
         root_R_tip = w.rotation_of(self.get_fk(root, tip))
         root_V_tip_normal = w.dot(root_R_tip, tip_V_tip_normal)
 
-        angle = w.save_acos(w.dot(root_V_tip_normal.T, root_V_goal_normal)[0])
-        angle_limited = w.save_division(self.limit_velocity(angle, max_velocity), angle)
-        root_V_goal_normal_intermediate = w.slerp(root_V_tip_normal, root_V_goal_normal, angle_limited)
-        error = root_V_goal_normal_intermediate - root_V_tip_normal
+        # angle = w.save_acos(w.dot(root_V_tip_normal.T, root_V_goal_normal)[0])
+        # angle_limited = w.save_division(self.limit_velocity(angle, max_velocity), angle)
+        # root_V_goal_normal_intermediate = w.slerp(root_V_tip_normal, root_V_goal_normal, angle_limited)
+        error = root_V_goal_normal - root_V_tip_normal
 
         weight = self.normalize_weight(max_velocity, weight)
 
         self.add_velocity_constraint(u'/{}/rot/x'.format(prefix),
-                                     lower_velocity_limit=error[0],
-                                     upper_velocity_limit=error[0],
+                                     lower_velocity_limit=-max_velocity,
+                                     upper_velocity_limit=max_velocity,
+                                     lower_error=error[0],
+                                     upper_error=error[0],
                                      weight=weight,
-                                     expression=root_V_tip_normal[0],
-                                     goal_constraint=goal_constraint)
+                                     expression=root_V_tip_normal[0])
         self.add_velocity_constraint(u'/{}/rot/y'.format(prefix),
-                                     lower_velocity_limit=error[1],
-                                     upper_velocity_limit=error[1],
+                                     lower_velocity_limit=-max_velocity,
+                                     upper_velocity_limit=max_velocity,
+                                     lower_error=error[1],
+                                     upper_error=error[1],
                                      weight=weight,
-                                     expression=root_V_tip_normal[1],
-                                     goal_constraint=goal_constraint)
+                                     expression=root_V_tip_normal[1])
         self.add_velocity_constraint(u'/{}/rot/z'.format(prefix),
-                                     lower_velocity_limit=error[2],
-                                     upper_velocity_limit=error[2],
+                                     lower_velocity_limit=-max_velocity,
+                                     upper_velocity_limit=max_velocity,
+                                     lower_error=error[2],
+                                     upper_error=error[2],
                                      weight=weight,
-                                     expression=root_V_tip_normal[2],
-                                     goal_constraint=goal_constraint)
+                                     expression=root_V_tip_normal[2])
 
     def add_minimize_rotation_constraints(self, root_R_tipGoal, root, tip, max_velocity=np.pi / 4,
                                           weight=WEIGHT_BELOW_CA, goal_constraint=True, prefix=u''):
@@ -690,8 +693,8 @@ class AvoidJointLimitsRevolute(Goal):
         upper_err = upper_goal - current_joint
         lower_err = lower_goal - current_joint
 
-        upper_err_capped = self.limit_velocity(upper_err, max_velocity)
-        lower_err_capped = self.limit_velocity(lower_err, max_velocity)
+        # upper_err_capped = self.limit_velocity(upper_err, max_velocity)
+        # lower_err_capped = self.limit_velocity(lower_err, max_velocity)
 
         error = w.max(w.abs(w.min(upper_err, 0)), w.abs(w.max(lower_err, 0)))
         weight = weight * (error / max_error)
@@ -699,11 +702,12 @@ class AvoidJointLimitsRevolute(Goal):
         weight_normalized = self.normalize_weight(max_velocity, weight)
 
         self.add_velocity_constraint(u'',
-                                     lower_velocity_limit=lower_err_capped,
-                                     upper_velocity_limit=upper_err_capped,
+                                     lower_velocity_limit=-max_velocity,
+                                     upper_velocity_limit=max_velocity,
+                                     lower_error=lower_err,
+                                     upper_error=upper_err,
                                      weight=weight_normalized,
-                                     expression=joint_symbol,
-                                     goal_constraint=False)
+                                     expression=joint_symbol)
 
     def __str__(self):
         s = super(AvoidJointLimitsRevolute, self).__str__()
@@ -755,8 +759,8 @@ class AvoidJointLimitsPrismatic(Goal):
         upper_err = upper_goal - current_joint
         lower_err = lower_goal - current_joint
 
-        upper_err_capped = self.limit_velocity(upper_err, max_velocity)
-        lower_err_capped = self.limit_velocity(lower_err, max_velocity)
+        # upper_err_capped = self.limit_velocity(upper_err, max_velocity)
+        # lower_err_capped = self.limit_velocity(lower_err, max_velocity)
 
         error = w.max(w.abs(w.min(upper_err, 0)), w.abs(w.max(lower_err, 0)))
         weight = weight * (error / max_error)
@@ -764,11 +768,12 @@ class AvoidJointLimitsPrismatic(Goal):
         weight_normalized = self.normalize_weight(max_velocity, weight)
 
         self.add_velocity_constraint(u'',
-                                     lower_velocity_limit=lower_err_capped,
-                                     upper_velocity_limit=upper_err_capped,
+                                     lower_velocity_limit=-max_velocity,
+                                     upper_velocity_limit=max_velocity,
+                                     lower_error=lower_err,
+                                     upper_error=upper_err,
                                      weight=weight_normalized,
-                                     expression=joint_symbol,
-                                     goal_constraint=False)
+                                     expression=joint_symbol)
 
     def __str__(self):
         s = super(AvoidJointLimitsPrismatic, self).__str__()

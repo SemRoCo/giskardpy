@@ -717,7 +717,7 @@ class QPController(object):
         map_ = self.H.make_error_id_to_vel_ids_map()
         for i in range(self.H.number_of_contraint_error_variables()):
             index = i+offset
-            if b_filter[index]:
+            if not b_filter[index]:
                 b_filter[map_[index]] = False
 
         bA_filter = np.ones(self.A.height, dtype=bool)

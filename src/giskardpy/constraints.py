@@ -343,10 +343,13 @@ class Goal(object):
         r_P_error = r_P_g - r_P_c
         trans_error = w.norm(r_P_error)
 
-        trans_scale = self.limit_velocity(trans_error, max_velocity)
-        r_P_intermediate_error = w.save_division(r_P_error, trans_error) * trans_scale
+        # trans_scale = self.limit_velocity(trans_error, max_velocity)
+        # r_P_intermediate_error = w.save_division(r_P_error, trans_error) * trans_scale
 
         weight = self.normalize_weight(max_velocity, weight)
+
+        self.add_debug_vector(u'r_P_error', r_P_error)
+        self.add_debug_vector(u'trans_error', trans_error)
 
         self.add_velocity_constraint(u'/{}/x'.format(prefix),
                                      lower_velocity_limit=-max_velocity,
@@ -877,7 +880,7 @@ class BasicCartesianGoal(Goal):
 
 class CartesianPosition(BasicCartesianGoal):
 
-    def __init__(self, god_map, root_link, tip_link, goal, max_velocity=0.1, max_acceleration=1,
+    def __init__(self, god_map, root_link, tip_link, goal, max_velocity=0.2, max_acceleration=1,
                  weight=WEIGHT_ABOVE_CA, goal_constraint=False, **kwargs):
         """
         This goal will use the kinematic chain between root and tip link to achieve a goal position for tip link
@@ -1146,7 +1149,7 @@ class CartesianVelocityLimit(Goal):
 
 
 class CartesianOrientation(BasicCartesianGoal):
-    def __init__(self, god_map, root_link, tip_link, goal, max_velocity=0.5, max_accleration=0.5,
+    def __init__(self, god_map, root_link, tip_link, goal, max_velocity=0.3, max_accleration=0.5,
                  weight=WEIGHT_ABOVE_CA, goal_constraint=False, **kwargs):
         """
         This goal will the kinematic chain from root_link to tip_link to achieve a rotation goal for the tip link
@@ -1197,7 +1200,6 @@ class CartesianOrientation(BasicCartesianGoal):
         r_R_g = w.rotation_of(self.get_goal_pose())
         weight = self.get_input_float(self.weight)
         max_velocity = self.get_input_float(self.max_velocity)
-        max_acceleration = self.get_input_float(self.max_acceleration)
 
         self.add_minimize_rotation_constraints(r_R_g, self.root, self.tip, max_velocity, weight, self.goal_constraint)
 

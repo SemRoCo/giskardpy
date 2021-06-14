@@ -835,6 +835,7 @@ class QPController(object):
 
     @profile
     def _create_debug_pandas(self, substitutions, xdot_full=None, actually_print=False):
+        self.np_H = np.diag(self.np_weights)
         b_names = self.b_names()
         bA_names = self.bA_names()
         b_filter, bA_filter = self.make_filters()

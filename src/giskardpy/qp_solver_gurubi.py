@@ -1,5 +1,6 @@
 import numpy as np
 import gurobipy
+from scipy import sparse
 
 from giskardpy.exceptions import QPSolverException, InfeasibleException
 from giskardpy import logging
@@ -50,6 +51,8 @@ class QPSolverGurubi(QPSolver):
         # TODO potential speed up by reusing model
         self.qpProblem = gurobipy.Model('qp')
         self.x = self.qpProblem.addMVar(lb.shape, lb=lb, ub=ub)
+        # H = sparse.csc_matrix(H)
+        A = sparse.csc_matrix(A)
         self.qpProblem.addMConstr(A, self.x, gurobipy.GRB.LESS_EQUAL, ubA)
         self.qpProblem.addMConstr(A, self.x, gurobipy.GRB.GREATER_EQUAL, lbA)
         self.qpProblem.setMObjective(H, None, 0.0)
@@ -81,7 +84,7 @@ class QPSolverGurubi(QPSolver):
         return np.round(data, decimal_places)
 
     @profile
-    def solve(self, H, g, A, lb, ub, lbA, ubA, tries=2, decimal_places=4):
+    def solve(self, H, g, A, lb, ub, lbA, ubA, tries=1, decimal_places=4):
         """
         x^T*H*x + x^T*g
         s.t.: lbA < A*x < ubA

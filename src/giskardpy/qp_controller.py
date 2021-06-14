@@ -655,13 +655,18 @@ class QPController(object):
 
     def _init_big_ass_M(self):
         """
+        #
         #         |---------------|
         #         |  A  | lba| uba|
         #         |---------------|
-        #         |  H  | lb | ub |
+        #         |  w  | 0  | 0  |
+        #         |---------------|
+        #         |  lb | 0  | 0  |
+        #         |---------------|
+        #         |  ub | 0  | 0  |
         #         |---------------|
         """
-        self.big_ass_M = w.zeros(self.A.height + self.H.height,
+        self.big_ass_M = w.zeros(self.A.height + 3,
                                  self.A.width + 2)
         self.debug_v = w.zeros(len(self.debug_expressions), 1)
 
@@ -669,13 +674,13 @@ class QPController(object):
         self.big_ass_M[:self.A.height, :self.A.width] = A_soft
 
     def _set_weights(self, weights):
-        self.big_ass_M[self.A.height:, :self.H.width] = w.diag(*weights)
+        self.big_ass_M[self.A.height, :-2] = weights
 
     def _set_lb(self, lb):
-        self.big_ass_M[self.A.height:, -2] = lb
+        self.big_ass_M[self.A.height+1, :-2] = lb
 
     def _set_ub(self, ub):
-        self.big_ass_M[self.A.height:, -1] = ub
+        self.big_ass_M[self.A.height+2, :-2] = ub
 
     def _set_lbA(self, lbA):
         self.big_ass_M[:self.A.height, self.A.width] = lbA
@@ -695,7 +700,7 @@ class QPController(object):
 
         self._init_big_ass_M()
 
-        self._set_weights(self.H.weights())
+        self._set_weights(w.Matrix(self.H.weights()))
         self._set_A_soft(self.A.A())
         self._set_lbA(w.Matrix(self.bA.lbA()))
         self._set_ubA(w.Matrix(self.bA.ubA()))
@@ -711,7 +716,7 @@ class QPController(object):
 
     @profile
     def make_filters(self):
-        b_filter = np.diagonal(self.np_H) != 0
+        b_filter = self.np_weights != 0
         b_filter[:self.H.number_of_free_variables_with_horizon()] = True
         offset = self.H.number_of_free_variables_with_horizon() + self.H.number_of_constraint_vel_variables()
         map_ = self.H.make_error_id_to_vel_ids_map()
@@ -727,8 +732,8 @@ class QPController(object):
 
     @profile
     def filter_zero_weight_stuff(self, b_filter, bA_filter):
-        return self.np_H[b_filter, :][:,b_filter], \
-               self.np_g[b_filter], \
+        return np.diag(self.np_weights[b_filter]), \
+               np.zeros(b_filter.shape[0]), \
                self.np_A[bA_filter, :][:,b_filter], \
                self.np_lb[b_filter], \
                self.np_ub[b_filter], \
@@ -746,10 +751,11 @@ class QPController(object):
         :rtype: dict
         """
         np_big_ass_M = self.compiled_big_ass_M.call2(substitutions)
-        self.np_H = np_big_ass_M[self.A.height:, :-2]
+        self.np_weights = np_big_ass_M[self.A.height, :-2]
+        # self.np_H = np.diag(self.np_weights)
         self.np_A = np_big_ass_M[:self.A.height, :self.A.width]
-        self.np_lb = np_big_ass_M[self.A.height:, -2]
-        self.np_ub = np_big_ass_M[self.A.height:, -1]
+        self.np_lb = np_big_ass_M[self.A.height+1, :-2]
+        self.np_ub = np_big_ass_M[self.A.height+2, :-2]
         self.np_lbA = np_big_ass_M[:self.A.height, -2]
         self.np_ubA = np_big_ass_M[:self.A.height, -1]
 

@@ -865,16 +865,13 @@ def make_filter_b_mask(H, num_joint_constraints):
     filter[:num_joint_constraints*3] = True  # make sure joints are never kicked out
     return filter
 
+def max_velocity_from_horizon_and_jerk(prediction_horizon, jerk_limit, sample_period):
+    def gauss(n):
+        return (n ** 2 + n) / 2
 
-def make_filter_masks(H, num_joint_constraints, num_hard_constraints):
-    b_mask = make_filter_b_mask(H, num_joint_constraints)
-    s_mask = b_mask[num_joint_constraints:]
-    if num_hard_constraints == 0:
-        bA_mask = s_mask
-    else:
-        bA_mask = np.concatenate((np.array([True] * num_hard_constraints), s_mask))
-
-    return bA_mask, b_mask
+    n2 = int((prediction_horizon) / 2)
+    (prediction_horizon**2+prediction_horizon)/2
+    return (gauss(n2) + gauss(n2 - 1)) * jerk_limit * sample_period ** 2
 
 
 def trajectory_to_np(tj, joint_names):

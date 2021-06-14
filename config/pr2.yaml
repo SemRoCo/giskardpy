@@ -37,7 +37,7 @@ general_options:
 #        override: {}
         default: 30
         override:
-          odom_z_joint: 5
+          odom_z_joint: 10
   joint_weights:
     # the planner prefers low weight joints to achieve solutions
     # higher weights reduce wiggling, but lower the maximum joint velocity, which might make the planner stop too early
@@ -56,8 +56,9 @@ general_options:
       override: {}
 qp_solver:
   name: gurobi # one of [qpoases, gurobi]
-  prediction_horizon: 7
-  control_horizon: 7
+  # you should always use uneven horizons. even horizons n create (almost) the same motions as n-1, but are slower.
+  prediction_horizon: 9
+  control_horizon: 9
 plugins:
   GoalReached:
     joint_convergence_threshold: 0.01 # when the velocities fall below this value, the planning succeeds

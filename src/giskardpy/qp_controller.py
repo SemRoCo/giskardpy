@@ -806,16 +806,30 @@ class QPController(object):
         return self.bA.names()
 
     def _viz_mpc(self, x, joint_name, state):
-        start_pos = state[joint_name]
-        ts = np.array([(i + 1) * self.sample_period for i in range(self.prediction_horizon)])
-        filtered_x = x.filter(like='/{}/'.format(joint_name), axis=0)
+        def pad(a, desired_length):
+            tmp = np.zeros(desired_length)
+            tmp[:len(a)] = a
+            return tmp
+
+        sample_period = state[str(self.sample_period)]
+        try:
+            start_pos = state[joint_name]
+        except KeyError:
+            logging.loginfo('start position not found in state')
+            start_pos = 0
+        ts = np.array([(i + 1) * sample_period for i in range(self.prediction_horizon)])
+        filtered_x = x.filter(like='/{}'.format(joint_name), axis=0)
         velocities = filtered_x[:self.prediction_horizon].values
-        accelerations = filtered_x[self.prediction_horizon:self.prediction_horizon * 2].values
-        jerks = filtered_x[self.prediction_horizon * 2:self.prediction_horizon * 3].values
+        if joint_name in state:
+            accelerations = filtered_x[self.prediction_horizon:self.prediction_horizon * 2].values
+            jerks = filtered_x[self.prediction_horizon * 2:self.prediction_horizon * 3].values
         positions = [start_pos]
         for x_ in velocities:
-            positions.append(positions[-1] + x_ * self.sample_period)
-        positions = positions[1:]
+            positions.append(positions[-1] + x_ * sample_period)
+
+        positions = np.array(positions[1:])
+        velocities = pad(velocities.T[0], len(ts))
+        positions = pad(positions.T[0], len(ts))
 
         f, axs = plt.subplots(4, sharex=True)
         axs[0].set_title('position')
@@ -824,12 +838,13 @@ class QPController(object):
         axs[1].set_title('velocity')
         axs[1].plot(ts, velocities, 'b')
         axs[1].grid()
-        axs[2].set_title('acceleration')
-        axs[2].plot(ts, accelerations, 'b')
-        axs[2].grid()
-        axs[3].set_title('jerk')
-        axs[3].plot(ts, jerks, 'b')
-        plt.grid()
+        if joint_name in state:
+            axs[2].set_title('acceleration')
+            axs[2].plot(ts, accelerations, 'b')
+            axs[2].grid()
+            axs[3].set_title('jerk')
+            axs[3].plot(ts, jerks, 'b')
+            axs[3].grid()
         plt.tight_layout()
         plt.show()
 
@@ -881,9 +896,13 @@ class QPController(object):
         # self.lbAs.T[[c for c in self.lbAs.T.columns if 'dist' in c]].plot()
 
         # self.save_all(p_weights, p_A, p_lbA, p_ubA, p_lb, p_ub, p_xdot)
-        state = {k: v for k, v in zip(self.compiled_big_ass_M.str_params, substitutions)}
+        self.state = {k: v for k, v in zip(self.compiled_big_ass_M.str_params, substitutions)}
+        sample_period = self.state[str(self.sample_period)]
+        self.p_Ax2 /= sample_period
         # self._viz_mpc(p_xdot, 'j', state)
-        # self._viz_mpc(p_xdot, 'world_robot_joint_state_r_shoulder_lift_joint_position', state)
+        # self._viz_mpc(self.p_xdot, 'world_robot_joint_state_r_shoulder_lift_joint_position', state)
+        # self._viz_mpc(self.p_Ax2, bA_names[-1][:-2], state)
         # p_lbA[p_lbA != 0].abs().sort_values(by='data')
         # get non 0 A entries
         # p_A.iloc[[1133]].T.loc[p_A.values[1133] != 0]
+        pass

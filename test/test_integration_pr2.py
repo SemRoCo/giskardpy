@@ -405,6 +405,20 @@ class TestConstraints(object):
         zero_pose.send_and_check_goal()
         np.testing.assert_almost_equal(zero_pose.get_robot().joint_state[joint].position, joint_goal, decimal=4)
 
+    def test_JointPositionContinuous(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        joint = 'odom_z_joint'
+        joint_goal = 4
+        zero_pose.allow_all_collisions()
+        zero_pose.set_json_goal(u'JointPositionContinuous',
+                                joint_name=joint,
+                                goal=joint_goal,
+                                max_velocity=1)
+        zero_pose.send_and_check_goal()
+        np.testing.assert_almost_equal(zero_pose.get_robot().joint_state[joint].position, -2.283, decimal=3)
+
 
     def test_CartesianOrientation(self, zero_pose):
         """
@@ -424,7 +438,8 @@ class TestConstraints(object):
                                 root_link=root,
                                 tip_link=tip,
                                 goal=p,
-                                max_velocity=0.1)
+                                max_velocity=0.15
+                                )
         zero_pose.send_and_check_goal()
         new_pose = tf.lookup_pose('map', tip)
         compare_orientations(expected.pose.orientation, new_pose.pose.orientation)
@@ -7790,5 +7805,5 @@ class TestReachability():
         zero_pose.set_joint_goal(js)
         zero_pose.send_and_check_goal(goal_type=MoveGoal.PLAN_ONLY)
 
-import pytest
-pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_avoid_collision_at_kitchen_corner'])
+# import pytest
+# pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_avoid_collision_at_kitchen_corner'])

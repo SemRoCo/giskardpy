@@ -7,7 +7,7 @@ import rospy
 from control_msgs.msg import JointTrajectoryControllerState
 from giskard_msgs.msg import MoveAction
 from py_trees import Sequence, Selector, BehaviourTree, Blackboard
-from py_trees.meta import failure_is_success, success_is_failure, running_is_success, success_is_running
+from py_trees.meta import failure_is_success, success_is_failure, running_is_success
 from py_trees_ros.trees import BehaviourTree
 from rospy import ROSException
 
@@ -19,9 +19,6 @@ from giskardpy.input_system import JointStatesInput
 from giskardpy.plugin import PluginBehavior
 from giskardpy.plugin_action_server import GoalReceived, SendResult, GoalCanceled
 from giskardpy.plugin_append_zero_velocity import AppendZeroVelocity
-from giskardpy.plugin_log_debug_expressions import LogDebugExpressionsPlugin
-from giskardpy.plugin_plot_debug_expressions import PlotDebugExpressions
-from giskardpy.plugin_tf_publisher import TFPlugin
 from giskardpy.plugin_cleanup import CleanUp
 from giskardpy.plugin_collision_checker import CollisionChecker
 from giskardpy.plugin_collision_marker import CollisionMarker
@@ -29,22 +26,25 @@ from giskardpy.plugin_configuration import ConfigurationPlugin
 from giskardpy.plugin_goal_reached import GoalReachedPlugin
 from giskardpy.plugin_if import IF
 from giskardpy.plugin_instantaneous_controller import ControllerPlugin
-from giskardpy.plugin_interrupts import WiggleCancel, MaxTrajLength
+from giskardpy.plugin_interrupts import WiggleCancel
 from giskardpy.plugin_kinematic_sim import KinSimPlugin
+from giskardpy.plugin_log_debug_expressions import LogDebugExpressionsPlugin
 from giskardpy.plugin_log_trajectory import LogTrajPlugin
 from giskardpy.plugin_loop_detector import LoopDetector
+from giskardpy.plugin_plot_debug_expressions import PlotDebugExpressions
 from giskardpy.plugin_plot_trajectory import PlotTrajectory
 from giskardpy.plugin_post_processing import PostProcessing
 from giskardpy.plugin_pybullet import WorldUpdatePlugin
 from giskardpy.plugin_send_trajectory import SendTrajectory
 from giskardpy.plugin_set_cmd import SetCmd
+from giskardpy.plugin_tf_publisher import TFPlugin
 from giskardpy.plugin_time import TimePlugin
 from giskardpy.plugin_update_constraints import GoalToConstraints
 from giskardpy.plugin_visualization import VisualizationBehavior
 from giskardpy.plugin_world_visualization import WorldVisualizationBehavior
 from giskardpy.pybullet_world import PyBulletWorld
 from giskardpy.tree_manager import TreeManager
-from giskardpy.utils import create_path, render_dot_tree, KeyDefaultDict
+from giskardpy.utils import create_path, render_dot_tree, KeyDefaultDict, max_velocity_from_horizon_and_jerk
 from giskardpy.world_object import WorldObject
 
 
@@ -128,7 +128,38 @@ def initialize_god_map():
     world.robot.reinitialize()
 
     world.robot.init_self_collision_matrix()
+    sanity_check(god_map)
     return god_map
+
+
+def sanity_check(god_map):
+    check_velocity_limits_reachable(god_map)
+
+
+def check_velocity_limits_reachable(god_map):
+    robot = god_map.get_data(identifier.robot)
+    sample_period = god_map.get_data(identifier.sample_period)
+    prediction_horizon = god_map.get_data(identifier.prediction_horizon)
+    print_help = False
+    for joint_name in robot.get_joint_names():
+        velocity_limit = robot.get_joint_velocity_limit_expr_evaluated(joint_name, god_map)
+        jerk_limit = robot.get_joint_jerk_limit_expr_evaluated(joint_name, god_map)
+        velocity_limit_horizon = max_velocity_from_horizon_and_jerk(prediction_horizon, jerk_limit, sample_period)
+        if velocity_limit_horizon < velocity_limit:
+            logging.logwarn(u'Joint \'{}\' '
+                            u'can reach at most \'{:.4}\' '
+                            u'with to prediction horizon of \'{}\' '
+                            u'and jerk limit of \'{}\', '
+                            u'but limit in urdf/config is \'{}\''.format(
+                joint_name,
+                velocity_limit_horizon,
+                prediction_horizon,
+                jerk_limit,
+                velocity_limit
+            ))
+            print_help = True
+    if print_help:
+        logging.logwarn(u'Check utils.py/max_velocity_from_horizon_and_jerk for help.')
 
 
 def process_joint_specific_params(identifier_, default, override, god_map):
@@ -140,6 +171,7 @@ def process_joint_specific_params(identifier_, default, override, god_map):
     god_map.set_data(identifier_, d)
     return KeyDefaultDict(lambda key: god_map.to_symbol(identifier_ + [key]))
 
+
 def set_default_in_override_block(block_identifier, god_map):
     default_value = god_map.get_data(block_identifier[:-1] + [u'default'])
     override = god_map.get_data(block_identifier)
@@ -148,6 +180,7 @@ def set_default_in_override_block(block_identifier, god_map):
         d.update(override)
     god_map.set_data(block_identifier, d)
     return KeyDefaultDict(lambda key: god_map.to_symbol(block_identifier + [key]))
+
 
 def grow_tree():
     action_server_name = u'~command'

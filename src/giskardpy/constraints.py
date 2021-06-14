@@ -348,7 +348,7 @@ class Goal(object):
 
         weight = self.normalize_weight(max_velocity, weight)
 
-        self.add_debug_vector(u'r_P_error', r_P_error)
+        # self.add_debug_vector(u'r_P_error', r_P_error)
         self.add_debug_vector(u'trans_error', trans_error)
 
         self.add_velocity_constraint(u'/{}/x'.format(prefix),
@@ -416,12 +416,14 @@ class Goal(object):
         tip_Q_tipCurrent = w.quaternion_from_matrix(w.dot(tip_R_rootCurrent_eval, root_R_tipCurrent))
         tip_R_goal = w.dot(tip_R_rootCurrent_eval, root_R_tipGoal)
 
-        weight = self.normalize_weight(max_velocity / np.pi, weight)
+        weight = self.normalize_weight(max_velocity, weight)
 
         tip_Q_goal = w.quaternion_from_matrix(tip_R_goal)
 
         tip_Q_goal = w.if_greater_zero(-tip_Q_goal[3], -tip_Q_goal, tip_Q_goal)  # flip to get shortest path
-        # angle_error = w.quaternion_angle(tip_Q_goal)
+        angle_error = w.quaternion_angle(tip_Q_goal)
+        self.add_debug_expr('angle_error', angle_error)
+        self.add_debug_vector('tip_Q_goal', tip_Q_goal)
         # scale = self.limit_velocity(angle_error, max_velocity)
         # tip_Q_goal = w.scale_quaternion(tip_Q_goal, scale)
 
@@ -1149,8 +1151,8 @@ class CartesianVelocityLimit(Goal):
 
 
 class CartesianOrientation(BasicCartesianGoal):
-    def __init__(self, god_map, root_link, tip_link, goal, max_velocity=0.3, max_accleration=0.5,
-                 weight=WEIGHT_ABOVE_CA, goal_constraint=False, **kwargs):
+    def __init__(self, god_map, root_link, tip_link, goal, max_velocity=10, max_accleration=0.5,
+                 weight=WEIGHT_ABOVE_CA*100, goal_constraint=False, **kwargs):
         """
         This goal will the kinematic chain from root_link to tip_link to achieve a rotation goal for the tip link
         :param root_link: str, root link of the kinematic chain

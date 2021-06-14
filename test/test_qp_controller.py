@@ -105,8 +105,8 @@ def two_joint_setup(sample_period=0.05, prediction_horizon=10, j_start=0, j2_sta
 
     jc2 = FreeVariable(
         position_symbol=j2,
-        lower_position_limit=lpos_limit,
-        upper_position_limit=upos_limit,
+        lower_position_limit=None,
+        upper_position_limit=None,
         lower_velocity_limit=-vel_limit,
         upper_velocity_limit=vel_limit,
         lower_acceleration_limit=-acc_limit,
@@ -161,7 +161,7 @@ def test_joint_goal():
                            quadratic_velocity_weight=1,
                            quadratic_error_weight=1,
                            control_horizon=10,
-                           horizon_function=lambda w, t: w + w * 1 * t),
+                           horizon_function=horizon_function),
     ]
     qp.add_constraints(constraints)
     qp.compile()

@@ -40,7 +40,7 @@ error_info = {
                                  "bound), and that limit has been reached.",
 }
 
-class QPSolverGurubi(QPSolver):
+class QPSolverGurobi(QPSolver):
     STATUS_VALUE_DICT = {getattr(gurobipy.GRB.status, name): name for name in dir(gurobipy.GRB.status) if '__' not in name}
 
     def __init__(self):

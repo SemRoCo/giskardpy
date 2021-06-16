@@ -10,7 +10,7 @@ from giskardpy.data_types import FreeVariable, Constraint
 from giskardpy.exceptions import InfeasibleException, OutOfJointLimitsException, \
     HardConstraintsViolatedException
 from giskardpy.qp_solver import QPSolver
-from giskardpy.qp_solver_gurubi import QPSolverGurubi
+from giskardpy.qp_solver_gurobi import QPSolverGurobi
 from giskardpy.utils import create_path, memoize
 
 
@@ -549,7 +549,7 @@ class QPController(object):
             self.add_debug_expressions(debug_expressions)
 
         if solver_name == u'gurobi':
-            self.qp_solver = QPSolverGurubi()
+            self.qp_solver = QPSolverGurobi()
         elif solver_name == u'qpoases':
             self.qp_solver = QPSolver()
         else:

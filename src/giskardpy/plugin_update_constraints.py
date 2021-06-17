@@ -150,7 +150,7 @@ class GoalToConstraints(GetGoal):
                 if hasattr(constraint, u'parameter_value_pair'):
                     params = json.loads(constraint.parameter_value_pair)
                 else:
-                    params = convert_ros_message_to_dictionary(constraint)
+                    params = convert_ros_message_to_dictionary(constraint) #FIXME: might break stuff too
                     del params[u'type']
 
                 c = C(self.god_map, **params)

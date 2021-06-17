@@ -1488,6 +1488,10 @@ class CartesianPath(Constraint):
         self.root_link = root_link
         self.tip_link = tip_link
         self.goal_constraint = goal_constraint
+        self.goal_a_time = 0.05
+        self.goal_b_time = -1.0
+        self.goal_c_time = -1.0
+        self.goal_d_time = -1.0
         params = {
             self.goal_a: self.parse_and_transform_PoseStamped(goal_a, root_link),
             self.goal_b: self.parse_and_transform_PoseStamped(goal_b, root_link),
@@ -1510,52 +1514,75 @@ class CartesianPath(Constraint):
 
         time = self.get_god_map().to_symbol(identifier.time)
         time_in_secs = self.get_input_sampling_period() * time
-        path = [self.goal_a, self.goal_b, self.goal_c, self.goal_d]
-
-        self.minimize_position(self.goal_a, self.get_weight(self.goal_a, path))
-        self.minimize_rotation(self.goal_a, self.get_weight(self.goal_a, path))
-        self.minimize_position(self.goal_b, self.get_weight(self.goal_b, path))
-        self.minimize_rotation(self.goal_b, self.get_weight(self.goal_b, path))
-        self.minimize_position(self.goal_c, self.get_weight(self.goal_c, path))
-        self.minimize_rotation(self.goal_c, self.get_weight(self.goal_c, path))
-        self.minimize_position(self.goal_d, self.get_weight(self.goal_d, path))
-        self.minimize_rotation(self.goal_d, self.get_weight(self.goal_d, path))
-
+        #path = [self.goal_a, self.goal_b, self.goal_c, self.goal_d]
+        #
+        # # weight in [0,..., WEIGHT_BELOW_CA=1, WEIGHT_C_A=10, WEIGHT_ABOVE_CA=100]
+        # # Bewegung muss Kosten verursachen. weight = 0 => ignorieren von motion controller zum ziel_xyz.
+        self.goal_b_time = w.if_eq(self.goal_b_time, -1,
+                                   w.if_eq(self.goal_reached(self.goal_a), 1, time_in_secs, -1),
+                                   self.goal_b_time)
+        self.goal_c_time = w.if_eq(self.goal_c_time, -1,
+                                   w.if_eq(self.goal_reached(self.goal_b), 1, time_in_secs, -1),
+                                   self.goal_c_time)
+        self.minimize_pose(self.goal_a, self.get_weight(self.goal_a, self.goal_a_time, self.goal_b_time))
+        self.minimize_pose(self.goal_b, self.get_weight(self.goal_b, self.goal_b_time, self.goal_c_time))
+        # self.minimize_position(self.goal_b, self.get_weight(self.goal_b, path))
+        # self.minimize_rotation(self.goal_b, self.get_weight(self.goal_b, path))
+        # self.minimize_position(self.goal_c, self.get_weight(self.goal_c, []))
+        # self.minimize_rotation(self.goal_c, self.get_weight(self.goal_c, []))
+        # self.minimize_position(self.goal_d, self.get_weight(self.goal_d, path))
+        # self.minimize_rotation(self.goal_d, self.get_weight(self.goal_d, path))
+        #
+        # self.add_debug_constraint("debugWeightA", self.get_weight(self.goal_a, path))
+        # self.add_debug_constraint("debugWeightB", self.get_weight(self.goal_b, path))
+        # self.add_debug_constraint("debugWeightC", self.get_weight(self.goal_c, path))
+        # self.add_debug_constraint("debugWeightD", self.get_weight(self.goal_d, path))
         self.add_debug_constraint("debugTime", time)
         self.add_debug_constraint("debugTimeInSecs", time_in_secs)
-        self.add_debug_constraint("debugLocalCost", self.get_local_cost(self.goal_a))
+        self.add_debug_constraint("debugweightATime", self.goal_a_time)
+        self.add_debug_constraint("debugweightBTime", self.goal_b_time)
+        self.add_debug_constraint("debugweightA", self.get_weight(self.goal_a, self.goal_a_time, self.goal_b_time))
+        #self.add_debug_constraint("debugActivationA", self.activation_for_p(self.goal_a, self.goal_a_time))
+        self.add_debug_constraint("debugActivation_funA", self.activation_fun(self.goal_a_time))
+        self.add_debug_constraint("debugDistanceToA", self.distance_to_goal(self.goal_a))
 
-    def get_weight(self, p, path):
-        return w.if_less(self.get_local_cost(p), 1.0, self.get_global_cost(p, path), 10000)
 
-    def get_local_cost(self, p):
-        """
-        Calculates distance from point to the current pose of the tip link.
+        self.add_debug_constraint("debugweightB", self.get_weight(self.goal_b, self.goal_b_time, self.goal_c_time))
+        #self.add_debug_constraint("debugActivationB", self.activation_for_p(self.goal_b, self.goal_b_time))
+        self.add_debug_constraint("debugActivation_funB", self.activation_fun(self.goal_b_time))
+        self.add_debug_constraint("debugDistanceToB", self.distance_to_goal(self.goal_b))
 
-        :type p: unicode string
-        :rtype: float
-        """
+    def activation_fun(self, start):
+        time = self.get_god_map().to_symbol(identifier.time)
+        time_in_secs = self.get_input_sampling_period() * time
+        return 1/(1+w.ca.exp(-(time_in_secs-start)))
+
+    def get_weight(self, p, p_time, p_next_time):
+        p_reached = w.if_greater(p_next_time, p_time, 1, 0)
+        invalid_p_time = w.if_eq(p_time, -1, 1, 0)
+        return w.if_greater_eq(p_reached + invalid_p_time, 1, 0, self.activation_fun(p_time))
+
+    def distance_to_goal(self, p):
         return w.norm(w.position_of(self.get_input_PoseStamped(p) - self.get_fk(self.root_link, self.tip_link)))
 
-    def get_global_cost(self, point, path):
-        """
-        Calculates the distance of the point towards environment objects and how far
-        the goal given the path.
+    def goal_reached(self, p):
+        return w.if_less(self.distance_to_goal(p), 0.1, 1, 0)
 
-        :type point: unicode string
-        :type path: [unicode string]
-        :rtype: float
-        """
-        return self.distance_to_goal(point, path) #+ self.distance_to_environment(point)
+    #def activation_for_p(self, p, p_time):
+    #    return w.if_eq(self.goal_reached(p), 1, 0, self.activation_fun(p_time)) #self.distance_to_last_goal(point, path) #+ self.distance_to_environment(point)
 
-    def distance_to_goal(self, p, path):
-        return w.if_eq(w.ca.SX.sym(p), w.ca.SX.sym(path[0]), 3,
-                       w.if_eq(w.ca.SX.sym(p), w.ca.SX.sym(path[1]), 2,
-                               w.if_eq(w.ca.SX.sym(p), w.ca.SX.sym(path[2]), 1,
-                                       w.if_eq(w.ca.SX.sym(p), w.ca.SX.sym(path[3]), 0, 0))))
+    def distance_to_last_goal(self, p, p_next):
+        return WEIGHT_BELOW_CA #w.if_eq(w.ca.SX.sym(p), w.ca.SX.sym(path[0]), 3, #w.ca.SX.sym(path[0]) breaks stuff, since god_map thinks it has it
+                       #w.if_eq(w.ca.SX.sym(p), w.ca.SX.sym(path[1]), 2,
+                               #w.if_eq(w.ca.SX.sym(p), w.ca.SX.sym(path[2]), 1,
+                                       #w.if_eq(w.ca.SX.sym(p), w.ca.SX.sym(path[3]), 0, 0))))
 
     def distance_to_environment(self, point):
         pass
+
+    def minimize_pose(self, goal, weight):
+        self.minimize_position(goal, weight)
+        self.minimize_rotation(goal, weight)
 
     def minimize_position(self, goal, weight):
         r_P_g = w.position_of(self.get_input_PoseStamped(goal))

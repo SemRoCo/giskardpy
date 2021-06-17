@@ -380,6 +380,7 @@ class GiskardWrapper(object):
         constraint = Constraint()
         constraint.type = constraint_type
         for k, v in kwargs.items():
+            # TODO: if type(v)==list
             if isinstance(v, Message):
                 kwargs[k] = convert_ros_message_to_dictionary(v)
         constraint.parameter_value_pair = json.dumps(kwargs)

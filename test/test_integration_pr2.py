@@ -233,7 +233,6 @@ def kitchen_setup(resetted_giskard):
     resetted_giskard.allow_all_collisions()
     resetted_giskard.send_and_check_joint_goal(gaya_pose)
     object_name = u'kitchen'
-    # TODO: wait for kitchen param from the ros param server
     resetted_giskard.add_urdf(object_name, rospy.get_param(u'kitchen_description'),
                               tf.lookup_pose(u'map', u'iai_kitchen/world'), u'/kitchen/joint_states',
                               set_js_topic=u'/kitchen/cram_joint_states')

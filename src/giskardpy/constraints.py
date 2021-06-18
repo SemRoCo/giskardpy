@@ -15,7 +15,7 @@ from rospy_message_converter.message_converter import \
 import giskardpy.identifier as identifier
 import giskardpy.tfwrapper as tf
 from giskardpy import casadi_wrapper as w
-from giskardpy.data_types import PositionConstraint
+from giskardpy.data_types import Constraint, VelocityConstraint
 from giskardpy.exceptions import GiskardException, ConstraintException
 from giskardpy.input_system import \
     PoseStampedInput, Point3Input, Vector3Input, \
@@ -238,16 +238,6 @@ class Goal(object):
                              max_acceleration2)
         return capped_err
 
-    def add_max_force_constraint(self, name, expression):
-        expr_jacobian = w.jacobian(expression, self.get_robot().get_joint_position_symbols())
-        total_derivative = w.sum(w.abs(expr_jacobian))
-        self.add_velocity_constraint(name,
-                                     lower_velocity_limit=100,
-                                     upper_velocity_limit=100,
-                                     weight=10,
-                                     expression=total_derivative,
-                                     goal_constraint=False)
-
     def limit_velocity(self, error, max_velocity):
         """
         :param error: expression that describes the error
@@ -272,39 +262,42 @@ class Goal(object):
         """
         :rtype: OrderedDict
         """
-        self.soft_constraints = OrderedDict()
+        self._constraints = OrderedDict()
+        self._velocity_constraints = OrderedDict()
         self.debug_expressions = OrderedDict()
         self.make_constraints()
-        return self.soft_constraints
+        return self._constraints, self._velocity_constraints
 
-    def add_velocity_constraint(self, name_suffix, lower_velocity_limit, upper_velocity_limit, lower_error,
-                                upper_error, weight, expression, lower_slack_limit=-1e4, upper_slack_limit=1e4):
-        """
-        :param name_suffix: name of the constraint, make use to avoid name conflicts!
-        :type name_suffix: Union[str, unicode]
-        :param lower_velocity_limit: lower limit for the !derivative! of the expression
-        :type lower_velocity_limit: float, or symbolic expression
-        :param upper_velocity_limit: upper limit for the !derivative! of the expression
-        :type upper_velocity_limit: float, or symbolic expression
-        :param weight: tells the solver how important this constraint is, if unsure, use HIGH_WEIGHT
-        :param expression: symbolic expression that describes a geometric property. make sure it as a depedency on the
-                            joint state. usually achieved through "get_fk"
-        """
+    def add_velocity_constraint(self, name_suffix, velocity_limit, weight, expression,
+                                lower_slack_limit=-1e4, upper_slack_limit=1e4):
+
         name = str(self) + name_suffix
-        if name in self.soft_constraints:
+        if name in self._velocity_constraints:
             raise KeyError(u'a constraint with name \'{}\' already exists'.format(name))
-        self.soft_constraints[name] = PositionConstraint(name=name,
-                                                         expression=expression,
-                                                         lower_position_limit=lower_error,
-                                                         upper_position_limit=upper_error,
-                                                         lower_velocity_limit=lower_velocity_limit,
-                                                         upper_velocity_limit=upper_velocity_limit,
-                                                         quadratic_velocity_weight=weight * 1000,
-                                                         quadratic_error_weight=weight,
-                                                         lower_slack_limit=lower_slack_limit,
-                                                         upper_slack_limit=upper_slack_limit,
-                                                         control_horizon=self.control_horizon,
-                                                         horizon_function=lambda w, t: w)
+        self._velocity_constraints[name] = VelocityConstraint(name=name,
+                                                              expression=expression,
+                                                              lower_velocity_limit=-velocity_limit,
+                                                              upper_velocity_limit=velocity_limit,
+                                                              quadratic_weight=weight,
+                                                              lower_slack_limit=lower_slack_limit,
+                                                              upper_slack_limit=upper_slack_limit,
+                                                              control_horizon=self.control_horizon)
+
+    def add_constraint(self, name_suffix, velocity_limit, lower_error,
+                       upper_error, weight, expression, lower_slack_limit=-1e4, upper_slack_limit=1e4):
+
+        name = str(self) + name_suffix
+        if name in self._constraints:
+            raise KeyError(u'a constraint with name \'{}\' already exists'.format(name))
+        self._constraints[name] = Constraint(name=name,
+                                             expression=expression,
+                                             lower_error=lower_error,
+                                             upper_error=upper_error,
+                                             velocity_limit=velocity_limit,
+                                             quadratic_weight=weight,
+                                             lower_slack_limit=lower_slack_limit,
+                                             upper_slack_limit=upper_slack_limit,
+                                             control_horizon=self.control_horizon)
 
     def add_debug_expr(self, name, expr):
         """
@@ -341,37 +334,61 @@ class Goal(object):
         r_P_c = w.position_of(self.get_fk(root, tip))
 
         r_P_error = r_P_g - r_P_c
-        trans_error = w.norm(r_P_error)
+        trans_error = w.norm(r_P_c)
 
-        # trans_scale = self.limit_velocity(trans_error, max_velocity)
+        # trans_scale = w.scale(r_P_error, max_velocity)
         # r_P_intermediate_error = w.save_division(r_P_error, trans_error) * trans_scale
 
         weight = self.normalize_weight(max_velocity, weight)
 
-        # self.add_debug_vector(u'r_P_error', r_P_error)
+        self.add_debug_vector(u'r_P_error', r_P_error)
+        # self.add_debug_vector(u'r_P_error/vel', self.get_expr_velocity(r_P_error))
         self.add_debug_vector(u'trans_error', trans_error)
+        # self.add_debug_vector(u'trans_error/v', w.norm(self.get_expr_velocity(r_P_error)))
+        # self.add_debug_vector(u'trans_error/vel', self.get_expr_velocity(trans_error))
 
-        self.add_velocity_constraint(u'/{}/x'.format(prefix),
-                                     lower_velocity_limit=-max_velocity,
-                                     upper_velocity_limit=max_velocity,
-                                     lower_error=r_P_error[0],
-                                     upper_error=r_P_error[0],
+        self.add_constraint(u'{}/x'.format(prefix),
+                            velocity_limit=max_velocity,
+                            lower_error=r_P_error[0],
+                            upper_error=r_P_error[0],
+                            weight=weight,
+                            expression=r_P_c[0])
+        self.add_constraint(u'{}/y'.format(prefix),
+                            velocity_limit=max_velocity,
+                            lower_error=r_P_error[1],
+                            upper_error=r_P_error[1],
+                            weight=weight,
+                            expression=r_P_c[1])
+        self.add_constraint(u'{}/z'.format(prefix),
+                            velocity_limit=max_velocity,
+                            lower_error=r_P_error[2],
+                            upper_error=r_P_error[2],
+                            weight=weight,
+                            expression=r_P_c[2])
+        self.add_velocity_constraint(u'{}/vel'.format(prefix),
+                                     velocity_limit=max_velocity,
                                      weight=weight,
-                                     expression=r_P_c[0])
-        self.add_velocity_constraint(u'/{}/y'.format(prefix),
-                                     lower_velocity_limit=-max_velocity,
-                                     upper_velocity_limit=max_velocity,
-                                     lower_error=r_P_error[1],
-                                     upper_error=r_P_error[1],
-                                     weight=weight,
-                                     expression=r_P_c[1])
-        self.add_velocity_constraint(u'/{}/z'.format(prefix),
-                                     lower_velocity_limit=-max_velocity,
-                                     upper_velocity_limit=max_velocity,
-                                     lower_error=r_P_error[2],
-                                     upper_error=r_P_error[2],
-                                     weight=weight,
-                                     expression=r_P_c[2])
+                                     expression=trans_error,
+                                     lower_slack_limit=0,
+                                     upper_slack_limit=0)
+        # self.add_velocity_constraint(u'{}/vel/x'.format(prefix),
+        #                              velocity_limit=max_velocity,
+        #                              weight=weight * 1000,
+        #                              expression=r_P_error[0],
+        #                              lower_slack_limit=-1,
+        #                              upper_slack_limit=1)
+        # self.add_velocity_constraint(u'{}/vel/y'.format(prefix),
+        #                              velocity_limit=max_velocity,
+        #                              weight=weight * 1000,
+        #                              expression=r_P_error[1],
+        #                              lower_slack_limit=-1,
+        #                              upper_slack_limit=1)
+        # self.add_velocity_constraint(u'{}/vel/z'.format(prefix),
+        #                              velocity_limit=max_velocity,
+        #                              weight=weight * 1000,
+        #                              expression=r_P_error[2],
+        #                              lower_slack_limit=-1,
+        #                              upper_slack_limit=1)
 
     def add_minimize_vector_angle_constraints(self, max_velocity, root, tip, tip_V_tip_normal, root_V_goal_normal,
                                               weight=WEIGHT_BELOW_CA, goal_constraint=False, prefix=u''):
@@ -385,35 +402,36 @@ class Goal(object):
 
         weight = self.normalize_weight(max_velocity, weight)
 
-        self.add_velocity_constraint(u'/{}/rot/x'.format(prefix),
-                                     lower_velocity_limit=-max_velocity,
-                                     upper_velocity_limit=max_velocity,
-                                     lower_error=error[0],
-                                     upper_error=error[0],
-                                     weight=weight,
-                                     expression=root_V_tip_normal[0])
-        self.add_velocity_constraint(u'/{}/rot/y'.format(prefix),
-                                     lower_velocity_limit=-max_velocity,
-                                     upper_velocity_limit=max_velocity,
-                                     lower_error=error[1],
-                                     upper_error=error[1],
-                                     weight=weight,
-                                     expression=root_V_tip_normal[1])
-        self.add_velocity_constraint(u'/{}/rot/z'.format(prefix),
-                                     lower_velocity_limit=-max_velocity,
-                                     upper_velocity_limit=max_velocity,
-                                     lower_error=error[2],
-                                     upper_error=error[2],
-                                     weight=weight,
-                                     expression=root_V_tip_normal[2])
+        self.add_constraint(u'/{}/rot/x'.format(prefix),
+                            lower_velocity_limit=-max_velocity,
+                            upper_velocity_limit=max_velocity,
+                            lower_error=error[0],
+                            upper_error=error[0],
+                            weight=weight,
+                            expression=root_V_tip_normal[0])
+        self.add_constraint(u'/{}/rot/y'.format(prefix),
+                            lower_velocity_limit=-max_velocity,
+                            upper_velocity_limit=max_velocity,
+                            lower_error=error[1],
+                            upper_error=error[1],
+                            weight=weight,
+                            expression=root_V_tip_normal[1])
+        self.add_constraint(u'/{}/rot/z'.format(prefix),
+                            lower_velocity_limit=-max_velocity,
+                            upper_velocity_limit=max_velocity,
+                            lower_error=error[2],
+                            upper_error=error[2],
+                            weight=weight,
+                            expression=root_V_tip_normal[2])
 
     def add_minimize_rotation_constraints(self, root_R_tipGoal, root, tip, max_velocity=np.pi / 4,
-                                          weight=WEIGHT_BELOW_CA, goal_constraint=True, prefix=u''):
+                                          weight=WEIGHT_BELOW_CA, prefix=u''):
         root_R_tipCurrent = w.rotation_of(self.get_fk(root, tip))
         tip_R_rootCurrent_eval = w.rotation_of(self.get_fk_evaluated(tip, root))
         hack = w.rotation_matrix_from_axis_angle([0, 0, 1], 0.0001)
         root_R_tipCurrent = w.dot(root_R_tipCurrent, hack)  # hack to avoid singularity
         tip_Q_tipCurrent = w.quaternion_from_matrix(w.dot(tip_R_rootCurrent_eval, root_R_tipCurrent))
+        root_Q_tipCurrent = w.quaternion_from_matrix(root_R_tipCurrent)
         tip_R_goal = w.dot(tip_R_rootCurrent_eval, root_R_tipGoal)
 
         weight = self.normalize_weight(max_velocity, weight)
@@ -421,35 +439,37 @@ class Goal(object):
         tip_Q_goal = w.quaternion_from_matrix(tip_R_goal)
 
         tip_Q_goal = w.if_greater_zero(-tip_Q_goal[3], -tip_Q_goal, tip_Q_goal)  # flip to get shortest path
-        angle_error = w.quaternion_angle(tip_Q_goal)
-        self.add_debug_expr('angle_error', angle_error)
-        self.add_debug_vector('tip_Q_goal', tip_Q_goal)
-        # scale = self.limit_velocity(angle_error, max_velocity)
-        # tip_Q_goal = w.scale_quaternion(tip_Q_goal, scale)
+        # angle_error = w.quaternion_angle(tip_Q_goal)
+        angle_error2 = w.quaternion_angle(root_Q_tipCurrent)
+        # self.add_debug_expr('angle_error', angle_error)
+        # self.add_debug_vector('tip_Q_goal', tip_Q_goal)
 
         expr = tip_Q_tipCurrent
 
-        self.add_velocity_constraint(u'{}/q/x'.format(prefix),
-                                     lower_velocity_limit=-max_velocity,
-                                     upper_velocity_limit=max_velocity,
-                                     lower_error=tip_Q_goal[0],
-                                     upper_error=tip_Q_goal[0],
-                                     weight=weight,
-                                     expression=expr[0])
-        self.add_velocity_constraint(u'{}/q/y'.format(prefix),
-                                     lower_velocity_limit=-max_velocity,
-                                     upper_velocity_limit=max_velocity,
-                                     lower_error=tip_Q_goal[1],
-                                     upper_error=tip_Q_goal[1],
-                                     weight=weight,
-                                     expression=expr[1])
-        self.add_velocity_constraint(u'{}/q/z'.format(prefix),
-                                     lower_velocity_limit=-max_velocity,
-                                     upper_velocity_limit=max_velocity,
-                                     lower_error=tip_Q_goal[2],
-                                     upper_error=tip_Q_goal[2],
-                                     weight=weight,
-                                     expression=expr[2])
+        self.add_constraint(u'{}/q/x'.format(prefix),
+                            velocity_limit=max_velocity,
+                            lower_error=tip_Q_goal[0],
+                            upper_error=tip_Q_goal[0],
+                            weight=weight,
+                            expression=expr[0])
+        self.add_constraint(u'{}/q/y'.format(prefix),
+                            velocity_limit=max_velocity,
+                            lower_error=tip_Q_goal[1],
+                            upper_error=tip_Q_goal[1],
+                            weight=weight,
+                            expression=expr[1])
+        self.add_constraint(u'{}/q/z'.format(prefix),
+                            velocity_limit=max_velocity,
+                            lower_error=tip_Q_goal[2],
+                            upper_error=tip_Q_goal[2],
+                            weight=weight,
+                            expression=expr[2])
+        self.add_velocity_constraint(u'{}/q/vel'.format(prefix),
+                                     velocity_limit=max_velocity,
+                                     weight=weight*1000,
+                                     expression=angle_error2,
+                                     lower_slack_limit=0,
+                                     upper_slack_limit=0)
         # w is not needed because its derivative is always 0 for identity quaternions
 
 
@@ -505,13 +525,12 @@ class JointPositionContinuous(Goal):
 
         weight = self.normalize_weight(max_velocity, weight)
 
-        self.add_velocity_constraint('',
-                                     lower_velocity_limit=-max_velocity,
-                                     upper_velocity_limit=max_velocity,
-                                     lower_error=error,
-                                     upper_error=error,
-                                     weight=weight,
-                                     expression=current_joint)
+        self.add_constraint('',
+                            velocity_limit=max_velocity,
+                            lower_error=error,
+                            upper_error=error,
+                            weight=weight,
+                            expression=current_joint)
 
     def __str__(self):
         s = super(JointPositionContinuous, self).__str__()
@@ -572,13 +591,12 @@ class JointPositionPrismatic(Goal):
 
         weight = self.normalize_weight(max_velocity, weight)
 
-        self.add_velocity_constraint('',
-                                     lower_velocity_limit=-max_velocity,
-                                     upper_velocity_limit=max_velocity,
-                                     lower_error=error,
-                                     upper_error=error,
-                                     weight=weight,
-                                     expression=current_joint)
+        self.add_constraint('',
+                            velocity_limit=max_velocity,
+                            lower_error=error,
+                            upper_error=error,
+                            weight=weight,
+                            expression=current_joint)
 
     def __str__(self):
         s = super(JointPositionPrismatic, self).__str__()
@@ -640,13 +658,12 @@ class JointPositionRevolute(Goal):
 
         weight = self.normalize_weight(max_velocity, weight)
 
-        self.add_velocity_constraint('',
-                                     lower_velocity_limit=-max_velocity,
-                                     upper_velocity_limit=max_velocity,
-                                     lower_error=error,
-                                     upper_error=error,
-                                     weight=weight,
-                                     expression=current_joint)
+        self.add_constraint('',
+                            velocity_limit=max_velocity,
+                            lower_error=error,
+                            upper_error=error,
+                            weight=weight,
+                            expression=current_joint)
 
     def __str__(self):
         s = super(JointPositionRevolute, self).__str__()
@@ -706,13 +723,13 @@ class AvoidJointLimitsRevolute(Goal):
 
         weight_normalized = self.normalize_weight(max_velocity, weight)
 
-        self.add_velocity_constraint(u'',
-                                     lower_velocity_limit=-max_velocity,
-                                     upper_velocity_limit=max_velocity,
-                                     lower_error=lower_err,
-                                     upper_error=upper_err,
-                                     weight=weight_normalized,
-                                     expression=joint_symbol)
+        self.add_constraint(u'',
+                            lower_velocity_limit=-max_velocity,
+                            upper_velocity_limit=max_velocity,
+                            lower_error=lower_err,
+                            upper_error=upper_err,
+                            weight=weight_normalized,
+                            expression=joint_symbol)
 
     def __str__(self):
         s = super(AvoidJointLimitsRevolute, self).__str__()
@@ -772,13 +789,13 @@ class AvoidJointLimitsPrismatic(Goal):
 
         weight_normalized = self.normalize_weight(max_velocity, weight)
 
-        self.add_velocity_constraint(u'',
-                                     lower_velocity_limit=-max_velocity,
-                                     upper_velocity_limit=max_velocity,
-                                     lower_error=lower_err,
-                                     upper_error=upper_err,
-                                     weight=weight_normalized,
-                                     expression=joint_symbol)
+        self.add_constraint(u'',
+                            lower_velocity_limit=-max_velocity,
+                            upper_velocity_limit=max_velocity,
+                            lower_error=lower_err,
+                            upper_error=upper_err,
+                            weight=weight_normalized,
+                            expression=joint_symbol)
 
     def __str__(self):
         s = super(AvoidJointLimitsPrismatic, self).__str__()
@@ -817,7 +834,9 @@ class JointPositionList(Goal):
 
     def make_constraints(self):
         for constraint in self.constraints:
-            self.soft_constraints.update(constraint.get_constraints())
+            c, vel_c = constraint.get_constraints()
+            self._constraints.update(c)
+            self._velocity_constraints.update(vel_c)
             self.debug_expressions.update(constraint.debug_expressions)
 
 
@@ -844,7 +863,7 @@ class AvoidJointLimits(Goal):
 
     def make_constraints(self):
         for constraint in self.constraints:
-            self.soft_constraints.update(constraint.get_constraints())
+            self.constraints.update(constraint.get_constraints())
 
 
 class BasicCartesianGoal(Goal):
@@ -882,7 +901,7 @@ class BasicCartesianGoal(Goal):
 
 class CartesianPosition(BasicCartesianGoal):
 
-    def __init__(self, god_map, root_link, tip_link, goal, max_velocity=0.2, max_acceleration=1,
+    def __init__(self, god_map, root_link, tip_link, goal, max_velocity=0.1, max_acceleration=1,
                  weight=WEIGHT_ABOVE_CA, goal_constraint=False, **kwargs):
         """
         This goal will use the kinematic chain between root and tip link to achieve a goal position for tip link
@@ -1037,32 +1056,32 @@ class CartesianVelocityLimit(Goal):
         else:
             slack_limit = 1e9
 
-        self.add_velocity_constraint(u'/linear/x',
-                                     lower_velocity_limit=-max_linear_velocity * sample_period,
-                                     upper_velocity_limit=max_linear_velocity * sample_period,
-                                     weight=linear_weight,
-                                     expression=root_P_tip[0],
-                                     goal_constraint=False,
-                                     lower_slack_limit=-slack_limit,
-                                     upper_slack_limit=slack_limit)
-        self.add_velocity_constraint(u'/linear/y',
-                                     lower_velocity_limit=-max_linear_velocity * sample_period,
-                                     upper_velocity_limit=max_linear_velocity * sample_period,
-                                     weight=linear_weight,
-                                     expression=root_P_tip[1],
-                                     goal_constraint=False,
-                                     lower_slack_limit=-slack_limit,
-                                     upper_slack_limit=slack_limit
-                                     )
-        self.add_velocity_constraint(u'/linear/z',
-                                     lower_velocity_limit=-max_linear_velocity * sample_period,
-                                     upper_velocity_limit=max_linear_velocity * sample_period,
-                                     weight=linear_weight,
-                                     expression=root_P_tip[2],
-                                     goal_constraint=False,
-                                     lower_slack_limit=-slack_limit,
-                                     upper_slack_limit=slack_limit
-                                     )
+        self.add_constraint(u'/linear/x',
+                            lower_velocity_limit=-max_linear_velocity * sample_period,
+                            upper_velocity_limit=max_linear_velocity * sample_period,
+                            weight=linear_weight,
+                            expression=root_P_tip[0],
+                            goal_constraint=False,
+                            lower_slack_limit=-slack_limit,
+                            upper_slack_limit=slack_limit)
+        self.add_constraint(u'/linear/y',
+                            lower_velocity_limit=-max_linear_velocity * sample_period,
+                            upper_velocity_limit=max_linear_velocity * sample_period,
+                            weight=linear_weight,
+                            expression=root_P_tip[1],
+                            goal_constraint=False,
+                            lower_slack_limit=-slack_limit,
+                            upper_slack_limit=slack_limit
+                            )
+        self.add_constraint(u'/linear/z',
+                            lower_velocity_limit=-max_linear_velocity * sample_period,
+                            upper_velocity_limit=max_linear_velocity * sample_period,
+                            weight=linear_weight,
+                            expression=root_P_tip[2],
+                            goal_constraint=False,
+                            lower_slack_limit=-slack_limit,
+                            upper_slack_limit=slack_limit
+                            )
 
         root_R_tip = w.rotation_of(root_T_tip)
         tip_evaluated_R_root = w.rotation_of(tip_evaluated_T_root)
@@ -1074,35 +1093,35 @@ class CartesianVelocityLimit(Goal):
 
         axis_angle = axis * angle
 
-        self.add_velocity_constraint(u'/angular/x',
-                                     lower_velocity_limit=-max_angular_velocity * sample_period,
-                                     upper_velocity_limit=max_angular_velocity * sample_period,
-                                     weight=angular_weight,
-                                     expression=axis_angle[0],
-                                     goal_constraint=False,
-                                     lower_slack_limit=-slack_limit,
-                                     upper_slack_limit=slack_limit
-                                     )
+        self.add_constraint(u'/angular/x',
+                            lower_velocity_limit=-max_angular_velocity * sample_period,
+                            upper_velocity_limit=max_angular_velocity * sample_period,
+                            weight=angular_weight,
+                            expression=axis_angle[0],
+                            goal_constraint=False,
+                            lower_slack_limit=-slack_limit,
+                            upper_slack_limit=slack_limit
+                            )
 
-        self.add_velocity_constraint(u'/angular/y',
-                                     lower_velocity_limit=-max_angular_velocity * sample_period,
-                                     upper_velocity_limit=max_angular_velocity * sample_period,
-                                     weight=angular_weight,
-                                     expression=axis_angle[1],
-                                     goal_constraint=False,
-                                     lower_slack_limit=-slack_limit,
-                                     upper_slack_limit=slack_limit
-                                     )
+        self.add_constraint(u'/angular/y',
+                            lower_velocity_limit=-max_angular_velocity * sample_period,
+                            upper_velocity_limit=max_angular_velocity * sample_period,
+                            weight=angular_weight,
+                            expression=axis_angle[1],
+                            goal_constraint=False,
+                            lower_slack_limit=-slack_limit,
+                            upper_slack_limit=slack_limit
+                            )
 
-        self.add_velocity_constraint(u'/angular/z',
-                                     lower_velocity_limit=-max_angular_velocity * sample_period,
-                                     upper_velocity_limit=max_angular_velocity * sample_period,
-                                     weight=angular_weight,
-                                     expression=axis_angle[2],
-                                     goal_constraint=False,
-                                     lower_slack_limit=-slack_limit,
-                                     upper_slack_limit=slack_limit
-                                     )
+        self.add_constraint(u'/angular/z',
+                            lower_velocity_limit=-max_angular_velocity * sample_period,
+                            upper_velocity_limit=max_angular_velocity * sample_period,
+                            weight=angular_weight,
+                            expression=axis_angle[2],
+                            goal_constraint=False,
+                            lower_slack_limit=-slack_limit,
+                            upper_slack_limit=slack_limit
+                            )
 
     def __str__(self):
         s = super(CartesianVelocityLimit, self).__str__()
@@ -1151,8 +1170,8 @@ class CartesianVelocityLimit(Goal):
 
 
 class CartesianOrientation(BasicCartesianGoal):
-    def __init__(self, god_map, root_link, tip_link, goal, max_velocity=10, max_accleration=0.5,
-                 weight=WEIGHT_ABOVE_CA*100, goal_constraint=False, **kwargs):
+    def __init__(self, god_map, root_link, tip_link, goal, max_velocity=0.2, max_accleration=0.5,
+                 weight=WEIGHT_ABOVE_CA * 100, goal_constraint=False, **kwargs):
         """
         This goal will the kinematic chain from root_link to tip_link to achieve a rotation goal for the tip link
         :param root_link: str, root link of the kinematic chain
@@ -1242,7 +1261,7 @@ class CartesianPose(Goal):
 
     def make_constraints(self):
         for constraint in self.constraints:
-            self.soft_constraints.update(constraint.get_constraints())
+            self.constraints.update(constraint.get_constraints())
 
 
 class CartesianPoseStraight(Goal):
@@ -1270,7 +1289,7 @@ class CartesianPoseStraight(Goal):
 
     def make_constraints(self):
         for constraint in self.constraints:
-            self.soft_constraints.update(constraint.get_constraints())
+            self.constraints.update(constraint.get_constraints())
 
 
 class ExternalCollisionAvoidance(Goal):
@@ -1372,8 +1391,8 @@ class ExternalCollisionAvoidance(Goal):
                                    w.max(0, lower_limit_limited) / (sample_period / self.prediction_horizon)
                                    )
         hard_lower_limit = -w.limit(hard_threshold - actual_distance,
-                                   -limit_of_lower_limit,
-                                   limit_of_lower_limit)/ (sample_period / self.prediction_horizon)
+                                    -limit_of_lower_limit,
+                                    limit_of_lower_limit) / (sample_period / self.prediction_horizon)
 
         upper_slack += hard_lower_limit
 
@@ -1383,16 +1402,14 @@ class ExternalCollisionAvoidance(Goal):
         weight = w.save_division(weight,  # divide by number of active repeller per link
                                  w.min(number_of_external_collisions, num_repeller))
 
-
-        self.add_velocity_constraint(u'/position',
-                                     lower_velocity_limit=-max_velocity,
-                                     upper_velocity_limit=max_velocity,
-                                     lower_error=lower_limit,
-                                     upper_error=upper_limit,
-                                     weight=weight,
-                                     expression=dist,
-                                     lower_slack_limit=-1e4,
-                                     upper_slack_limit=upper_slack)
+        self.add_constraint(u'/position',
+                            velocity_limit=max_velocity,
+                            lower_error=lower_limit,
+                            upper_error=upper_limit,
+                            weight=weight,
+                            expression=dist,
+                            lower_slack_limit=-1e4,
+                            upper_slack_limit=upper_slack)
 
     def __str__(self):
         s = super(ExternalCollisionAvoidance, self).__str__()
@@ -1525,11 +1542,11 @@ class CollisionAvoidanceHint(Goal):
         root_P_a = w.position_of(root_T_a)
         expr = w.dot(root_V_avoidance_hint[:3].T, root_P_a[:3])
 
-        self.add_velocity_constraint(u'/avoidance_hint',
-                                     lower_velocity_limit=error_capped,
-                                     upper_velocity_limit=error_capped,
-                                     weight=weight,
-                                     expression=expr)
+        self.add_constraint(u'/avoidance_hint',
+                            lower_velocity_limit=error_capped,
+                            upper_velocity_limit=error_capped,
+                            weight=weight,
+                            expression=expr)
 
     def __str__(self):
         s = super(CollisionAvoidanceHint, self).__str__()
@@ -1639,15 +1656,14 @@ class SelfCollisionAvoidance(Goal):
 
         upper_slack += hard_lower_limit
 
-        self.add_velocity_constraint(u'/position',
-                                     lower_velocity_limit=-max_velocity,
-                                     upper_velocity_limit=max_velocity,
-                                     lower_error=lower_limit,
-                                     upper_error=upper_limit,
-                                     weight=weight,
-                                     expression=dist,
-                                     lower_slack_limit=-1e4,
-                                     upper_slack_limit=upper_slack)
+        self.add_constraint(u'/position',
+                            velocity_limit=max_velocity,
+                            lower_error=lower_limit,
+                            upper_error=upper_limit,
+                            weight=weight,
+                            expression=dist,
+                            lower_slack_limit=-1e4,
+                            upper_slack_limit=upper_slack)
 
     def __str__(self):
         s = super(SelfCollisionAvoidance, self).__str__()
@@ -1891,12 +1907,12 @@ class BasePointingForward(Goal):
                                            self.limit_velocity(error + range, max_velocity))
         error_limited_ub = w.if_greater_eq(linear_velocity_threshold, linear_velocity, 0,
                                            self.limit_velocity(error - range, max_velocity))
-        self.add_velocity_constraint(u'/error',
-                                     lower_velocity_limit=-error_limited_lb,
-                                     upper_velocity_limit=-error_limited_ub,
-                                     weight=weight,
-                                     expression=error,
-                                     goal_constraint=False)
+        self.add_constraint(u'/error',
+                            lower_velocity_limit=-error_limited_lb,
+                            upper_velocity_limit=-error_limited_ub,
+                            weight=weight,
+                            expression=error,
+                            goal_constraint=False)
 
 
 class GravityJoint(Goal):
@@ -1942,12 +1958,12 @@ class GravityJoint(Goal):
         # TODO set a reasonable velocity limit
         weight = self.normalize_weight(0.1, weight)
 
-        self.add_velocity_constraint('',
-                                     lower_velocity_limit=goal_vel,  # sw.Min(goal_vel, 0),
-                                     upper_velocity_limit=goal_vel,  # sw.Max(goal_vel, 0),
-                                     weight=weight,
-                                     expression=current_joint,
-                                     goal_constraint=self.goal_constraint)
+        self.add_constraint('',
+                            lower_velocity_limit=goal_vel,  # sw.Min(goal_vel, 0),
+                            upper_velocity_limit=goal_vel,  # sw.Max(goal_vel, 0),
+                            weight=weight,
+                            expression=current_joint,
+                            goal_constraint=self.goal_constraint)
 
     def __str__(self):
         s = super(GravityJoint, self).__str__()
@@ -2053,7 +2069,7 @@ class Pointing(Goal):
         diff = goal_axis - current_axis
 
         # add constraints to the current problem, after execution, it gets cleared automatically
-        self.add_velocity_constraint(
+        self.add_constraint(
             # name of the constraint, make use to avoid name conflicts!
             u'x',
             # lower limit for the !derivative! of the expression
@@ -2068,18 +2084,18 @@ class Pointing(Goal):
             # describes if this constraint must be fulfilled at the end of the trajectory
             goal_constraint=self.goal_constraint)
 
-        self.add_velocity_constraint(u'y',
-                                     lower_velocity_limit=diff[1],
-                                     upper_velocity_limit=diff[1],
-                                     weight=weight,
-                                     expression=current_axis[1],
-                                     goal_constraint=self.goal_constraint)
-        self.add_velocity_constraint(u'z',
-                                     lower_velocity_limit=diff[2],
-                                     upper_velocity_limit=diff[2],
-                                     weight=weight,
-                                     expression=current_axis[2],
-                                     goal_constraint=self.goal_constraint)
+        self.add_constraint(u'y',
+                            lower_velocity_limit=diff[1],
+                            upper_velocity_limit=diff[1],
+                            weight=weight,
+                            expression=current_axis[1],
+                            goal_constraint=self.goal_constraint)
+        self.add_constraint(u'z',
+                            lower_velocity_limit=diff[2],
+                            upper_velocity_limit=diff[2],
+                            weight=weight,
+                            expression=current_axis[2],
+                            goal_constraint=self.goal_constraint)
 
     def __str__(self):
         # helps to make sure your constraint name is unique.
@@ -2190,12 +2206,12 @@ class OpenDoor(Goal):
 
         dist_expr = w.norm(hinge_P_tip)
         weight = self.normalize_weight(0.1, base_weight)
-        self.add_velocity_constraint(u'/dist',
-                                     dist_goal - dist_expr,
-                                     dist_goal - dist_expr,
-                                     weight,
-                                     dist_expr,
-                                     False)
+        self.add_constraint(u'/dist',
+                            dist_goal - dist_expr,
+                            dist_goal - dist_expr,
+                            weight,
+                            dist_expr,
+                            False)
 
         hinge0_T_tipCurrent = w.dot(w.inverse_frame(root_T_hinge0), root_T_tipCurrent)
         hinge0_P_tipStartProjected = w.position_of(hinge0_T_tipStartProjected)
@@ -2316,7 +2332,7 @@ class OpenDrawer(Goal):
     def make_constraints(self):
         # Execute constraints
         for constraint in self.constraints:
-            self.soft_constraints.update(constraint.get_constraints())
+            self.constraints.update(constraint.get_constraints())
 
     def __str__(self):
         s = super(OpenDrawer, self).__str__()
@@ -2360,7 +2376,7 @@ class Open(Goal):
 
     def make_constraints(self):
         for constraint in self.constraints:
-            self.soft_constraints.update(constraint.get_constraints())
+            self.constraints.update(constraint.get_constraints())
 
 
 class Close(Goal):
@@ -2400,4 +2416,4 @@ class Close(Goal):
 
     def make_constraints(self):
         for constraint in self.constraints:
-            self.soft_constraints.update(constraint.get_constraints())
+            self.constraints.update(constraint.get_constraints())

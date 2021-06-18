@@ -473,10 +473,7 @@ class URDFObject(object):
 
     @memoize
     def get_urdf_joint(self, joint_name):
-        try:
-            return self._urdf_robot.joint_map[joint_name]
-        except :
-            pass
+        return self._urdf_robot.joint_map[joint_name]
 
     @memoize
     def get_urdf_link(self, link_name):

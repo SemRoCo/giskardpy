@@ -377,7 +377,7 @@ class TestConstraints(object):
         p = PoseStamped()
         p.header.stamp = rospy.get_rostime()
         p.header.frame_id = tip
-        p.pose.position = Point(-0.2, -0.2, -0.3)
+        p.pose.position = Point(-0.4, -0.2, -0.3)
         p.pose.orientation = Quaternion(0, 0, 0, 1)
 
         expected = tf.transform_pose('map', p)

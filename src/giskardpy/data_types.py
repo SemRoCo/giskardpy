@@ -5,121 +5,69 @@ from sortedcontainers import SortedKeyList
 
 from giskardpy.tfwrapper import kdl_to_np, np_vector, np_point
 
-# SoftConstraint = namedtuple(u'SoftConstraint', [u'lbA_v', u'ubA_v',
-#                                                 u'lbA_a', u'ubA_a',
-#                                                 u'weight_v', u'weight_a',
-#                                                 u'expression', u'expression_dot', u'goal_constraint',
-#                                                 u'lower_slack_limit_v', u'lower_slack_limit_a',
-#                                                 u'upper_slack_limit_v', u'upper_slack_limit_a',
-#                                                 u'linear_weight'])
-# HardConstraint = namedtuple(u'HardConstraint', [u'lower', u'upper', u'expression'])
-# JointConstraint = namedtuple(u'JointConstraint', [u'lower_p', u'upper_p',
-#                                                   u'lower_v', u'upper_v', u'weight_v',
-#                                                   u'lower_a', u'upper_a', u'weight_a',
-#                                                   u'lower_j', u'upper_j', u'weight_j',
-#                                                   u'joint_symbol', u'joint_velocity_symbol',
-#                                                   u'joint_acceleration_symbol',
-#                                                   u'linear_weight'])
 DebugConstraint = namedtuple(u'debug', [u'expr'])
 
 
 class Constraint(object):
-    lower_position_limit = None
-    upper_position_limit = None
-    lower_velocity_limit = -1e4
-    upper_velocity_limit = 1e4
-    lower_acceleration_limit = -1e4
-    upper_acceleration_limit = 1e4
-    lower_jerk_limit = -1e4
-    upper_jerk_limit = 1e4
+    lower_error = -1e4
+    upper_error = 1e4
     lower_slack_limit = -1e4
     upper_slack_limit = 1e4
     linear_weight = 0
 
     def __init__(self, name, expression,
-                 lower_position_limit, upper_position_limit,
-                 lower_velocity_limit, upper_velocity_limit,
-                 lower_acceleration_limit, upper_acceleration_limit,
-                 lower_jerk_limit, upper_jerk_limit,
-                 lower_slack_limit, upper_slack_limit,
-                 quadratic_velocity_weight, quadratic_error_weight, linear_weight, control_horizon, horizon_function=None):
+                 lower_error, upper_error,
+                 velocity_limit,
+                 quadratic_weight, control_horizon, linear_weight=None,
+                 lower_slack_limit=None, upper_slack_limit=None,):
         self.name = name
         self.expression = expression
-        self.quadratic_velocity_weight = quadratic_velocity_weight
-        self.quadratic_error_weight = quadratic_error_weight
-        self.lower_position_limit = lower_position_limit
-        self.upper_position_limit = upper_position_limit
+        self.quadratic_weight = quadratic_weight
         self.control_horizon = control_horizon
-        if lower_velocity_limit is not None:
-            self.lower_velocity_limit = lower_velocity_limit
-        if upper_velocity_limit is not None:
-            self.upper_velocity_limit = upper_velocity_limit
-        if lower_acceleration_limit is not None:
-            self.lower_acceleration_limit = lower_acceleration_limit
-        if upper_acceleration_limit is not None:
-            self.upper_acceleration_limit = upper_acceleration_limit
-        if lower_jerk_limit is not None:
-            self.lower_jerk_limit = lower_jerk_limit
-        if upper_jerk_limit is not None:
-            self.upper_jerk_limit = upper_jerk_limit
+        self.velocity_limit = velocity_limit
+        self.lower_error = lower_error
+        self.upper_error = upper_error
         if lower_slack_limit is not None:
             self.lower_slack_limit = lower_slack_limit
         if upper_slack_limit is not None:
             self.upper_slack_limit = upper_slack_limit
         if linear_weight is not None:
             self.linear_weight = linear_weight
-        def default_horizon_f(weight, t):
-            return weight
-        self.horizon_function = horizon_function or default_horizon_f
 
     def __str__(self):
         return self.name
 
 
-class VelocityConstraint(Constraint):
-    def __init__(self, name, expression, lower_velocity_limit, upper_velocity_limit, quadratic_velocity_weight,
-                 lower_slack_limit=None, upper_slack_limit=None, linear_weight=None, control_horizon=None,
-                 horizon_function=None):
-        super(VelocityConstraint, self).__init__(name=name,
-                                                 expression=expression,
-                                                 lower_position_limit=None,
-                                                 upper_position_limit=None,
-                                                 lower_velocity_limit=lower_velocity_limit,
-                                                 upper_velocity_limit=upper_velocity_limit,
-                                                 lower_acceleration_limit=None,
-                                                 upper_acceleration_limit=None,
-                                                 lower_jerk_limit=None,
-                                                 upper_jerk_limit=None,
-                                                 lower_slack_limit=lower_slack_limit,
-                                                 upper_slack_limit=upper_slack_limit,
-                                                 quadratic_velocity_weight=quadratic_velocity_weight,
-                                                 linear_weight=linear_weight,
-                                                 control_horizon=control_horizon,
-                                                 horizon_function=horizon_function)
+class VelocityConstraint(object):
+    lower_acceleration_limit = -1e4
+    upper_acceleration_limit = 1e4
+    lower_slack_limit = -1e3
+    upper_slack_limit = 1e3
+    linear_weight = 0
 
-
-class PositionConstraint(Constraint):
-    def __init__(self, name, expression, lower_position_limit, upper_position_limit,
+    def __init__(self, name, expression,
                  lower_velocity_limit, upper_velocity_limit,
-                 quadratic_velocity_weight, quadratic_error_weight, lower_slack_limit=None, upper_slack_limit=None, linear_weight=None,
-                 control_horizon=None, horizon_function=None):
-        super(PositionConstraint, self).__init__(name=name,
-                                                 expression=expression,
-                                                 lower_position_limit=lower_position_limit,
-                                                 upper_position_limit=upper_position_limit,
-                                                 lower_velocity_limit=lower_velocity_limit,
-                                                 upper_velocity_limit=upper_velocity_limit,
-                                                 lower_acceleration_limit=None,
-                                                 upper_acceleration_limit=None,
-                                                 lower_jerk_limit=None,
-                                                 upper_jerk_limit=None,
-                                                 lower_slack_limit=lower_slack_limit,
-                                                 upper_slack_limit=upper_slack_limit,
-                                                 quadratic_velocity_weight=quadratic_velocity_weight,
-                                                 quadratic_error_weight=quadratic_error_weight,
-                                                 linear_weight=linear_weight,
-                                                 control_horizon=control_horizon,
-                                                 horizon_function=horizon_function)
+                 quadratic_weight,
+                 lower_slack_limit=None, upper_slack_limit=None,
+                 linear_weight=None, control_horizon=None,
+                 horizon_function=None):
+        self.name = name
+        self.expression = expression
+        self.quadratic_weight = quadratic_weight
+        self.control_horizon = control_horizon
+        self.lower_velocity_limit = lower_velocity_limit
+        self.upper_velocity_limit = upper_velocity_limit
+        if lower_slack_limit is not None:
+            self.lower_slack_limit = lower_slack_limit
+        if upper_slack_limit is not None:
+            self.upper_slack_limit = upper_slack_limit
+        if linear_weight is not None:
+            self.linear_weight = linear_weight
+        def default_horizon_function(weight, t):
+            return weight
+        self.horizon_function = default_horizon_function
+        if horizon_function is not None:
+            self.horizon_function = horizon_function
 
 
 class FreeVariable(object):

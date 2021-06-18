@@ -56,6 +56,7 @@ class GoalToConstraints(GetGoal):
         self.get_robot()._create_constraints(self.get_god_map())
 
         self.soft_constraints = {}
+        self.vel_constraints = {}
         self.debug_expr = {}
         if not (self.get_god_map().get_data(identifier.check_reachability)):
             self.get_god_map().set_data(identifier.maximum_collision_threshold, 0)
@@ -74,6 +75,7 @@ class GoalToConstraints(GetGoal):
 
         self.get_god_map().set_data(identifier.collision_goal, move_cmd.collisions)
         self.get_god_map().set_data(identifier.constraints, self.soft_constraints)
+        self.get_god_map().set_data(identifier.vel_constraints, self.vel_constraints)
         self.get_god_map().set_data(identifier.debug_expressions, self.debug_expr)
         self.get_blackboard().runtime = time()
 
@@ -134,8 +136,9 @@ class GoalToConstraints(GetGoal):
                     raise ConstraintInitalizationException(error_msg)
                 raise e
             try:
-                soft_constraints = c.get_constraints()
+                soft_constraints, vel_constraints = c.get_constraints()
                 self.soft_constraints.update(soft_constraints)
+                self.vel_constraints.update(vel_constraints)
                 self.debug_expr.update(c.debug_expressions)
             except Exception as e:
                 traceback.print_exc()
@@ -170,6 +173,7 @@ class GoalToConstraints(GetGoal):
 
     def add_external_collision_avoidance_constraints(self, soft_threshold_override=None):
         soft_constraints = {}
+        vel_constraints = {}
         debug_expr = {}
         number_of_repeller = self.get_god_map().get_data(identifier.external_collision_avoidance_repeller)
         number_of_repeller_eef = self.get_god_map().get_data(identifier.external_collision_avoidance_repeller_eef)
@@ -198,7 +202,9 @@ class GoalToConstraints(GetGoal):
                                                             soft_threshold=soft_threshold,
                                                             idx=i,
                                                             num_repeller=number_of_repeller)
-                    soft_constraints.update(constraint.get_constraints())
+                    c, c_vel = constraint.get_constraints()
+                    soft_constraints.update(c)
+                    vel_constraints.update(c_vel)
                     debug_expr.update(constraint.debug_expressions)
 
         for joint_name in eef_joints:
@@ -218,12 +224,15 @@ class GoalToConstraints(GetGoal):
                                                         soft_threshold=soft_threshold,
                                                         idx=i,
                                                         num_repeller=number_of_repeller_eef)
-                soft_constraints.update(constraint.get_constraints())
+                c, c_vel = constraint.get_constraints()
+                soft_constraints.update(c)
+                vel_constraints.update(c_vel)
                 debug_expr.update(constraint.debug_expressions)
 
         num_external = len(soft_constraints)
         loginfo('adding {} external collision avoidance constraints'.format(num_external))
         self.soft_constraints.update(soft_constraints)
+        self.vel_constraints.update(vel_constraints)
         self.debug_expr.update(debug_expr)
         self.get_god_map().set_data(identifier.maximum_collision_threshold, maximum_distance)
 
@@ -231,6 +240,7 @@ class GoalToConstraints(GetGoal):
         counter = defaultdict(int)
         control_horizon = self.get_god_map().get_data(identifier.control_horizon)
         soft_constraints = {}
+        vel_constraints = {}
         number_of_repeller = self.get_god_map().get_data(identifier.self_collision_avoidance_repeller)
         maximum_distance = self.get_god_map().get_data(identifier.maximum_collision_threshold)
         for link_a_o, link_b_o in self.get_robot().get_self_collision_matrix():
@@ -267,7 +277,9 @@ class GoalToConstraints(GetGoal):
                                                     soft_threshold=soft_threshold,
                                                     idx=i,
                                                     num_repeller=number_of_repeller)
-                soft_constraints.update(constraint.get_constraints())
+                c, c_vel = constraint.get_constraints()
+                soft_constraints.update(c)
         loginfo('adding {} self collision avoidance constraints'.format(len(soft_constraints)))
         self.soft_constraints.update(soft_constraints)
+        self.vel_constraints.update(vel_constraints)
         self.get_god_map().set_data(identifier.maximum_collision_threshold, maximum_distance)

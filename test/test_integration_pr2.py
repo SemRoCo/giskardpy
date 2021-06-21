@@ -2,6 +2,7 @@ from __future__ import division
 
 import re
 import itertools
+import time
 from copy import deepcopy
 
 import numpy as np
@@ -1491,22 +1492,22 @@ class TestCartGoals(object):
 
         base_pose = PoseStamped()
         base_pose.header.frame_id = tip_link
-        base_pose.pose.position.x = 0
-        base_pose.pose.position.y = 1.5
-        base_pose.pose.orientation = Quaternion(*quaternion_about_axis(0, [0, 0, 1]))
+        base_pose.pose.position.x = -1.75
+        base_pose.pose.position.y = -2.25
+        base_pose.pose.orientation = Quaternion(*quaternion_about_axis(np.pi, [0, 0, 1]))
         goal_b = base_pose
 
         base_pose = PoseStamped()
         base_pose.header.frame_id = tip_link
-        base_pose.pose.position.x = 2
+        base_pose.pose.position.x = -1.75
         base_pose.pose.position.y = 0
         base_pose.pose.orientation = Quaternion(*quaternion_about_axis(0, [0, 0, 1]))
         goal_c = base_pose
 
         base_pose = PoseStamped()
         base_pose.header.frame_id = tip_link
-        base_pose.pose.position.x = 0
-        base_pose.pose.position.y = -1.5
+        base_pose.pose.position.x = -2.5
+        base_pose.pose.position.y = 0
         base_pose.pose.orientation = Quaternion(*quaternion_about_axis(np.pi, [0, 0, 1]))
         goal_d = base_pose
 

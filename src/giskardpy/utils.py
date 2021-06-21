@@ -23,6 +23,8 @@ from giskard_msgs.msg import WorldBody
 from numpy import pi
 from py_trees import common, Chooser, Selector, Sequence, Behaviour
 from py_trees.composites import Parallel
+from rospy_message_converter.message_converter import convert_ros_message_to_dictionary as original_convert_ros_message_to_dictionary, \
+    convert_dictionary_to_ros_message as original_convert_dictionary_to_ros_message
 from sensor_msgs.msg import JointState
 from shape_msgs.msg import SolidPrimitive
 from std_msgs.msg import ColorRGBA
@@ -837,6 +839,19 @@ def memoize(function):
 
     return wrapper
 
+def convert_ros_message_to_dictionary(message):
+    # TODO there is probably a lib for that, but i'm to lazy to search
+    type_str_parts = str(type(message)).split(u'.')
+    part1 = type_str_parts[0].split(u'\'')[1]
+    part2 = type_str_parts[-1].split(u'\'')[0]
+    message_type = u'{}/{}'.format(part1, part2)
+    d = {u'message_type': message_type,
+         u'message': original_convert_ros_message_to_dictionary(message)}
+    return d
+
+def convert_dictionary_to_ros_message(json):
+    # maybe somehow search for message that fits to structure of json?
+    return original_convert_dictionary_to_ros_message(json[u'message_type'], json[u'message'])
 
 def traj_to_msg(sample_period, trajectory, controlled_joints, fill_velocity_values):
     """

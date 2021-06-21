@@ -368,6 +368,7 @@ class TestJointGoals(object):
 
 
 class TestConstraints(object):
+    # TODO write buggy constraints that test sanity checks
 
     def test_CartesianPosition(self, zero_pose):
         """
@@ -713,12 +714,12 @@ class TestConstraints(object):
         base_goal.pose.position.y = 2
         base_goal.pose.orientation = Quaternion(*quaternion_about_axis(1, [0, 0, 1]))
         kitchen_setup.pointing(tip, goal_point, pointing_axis=pointing_axis)
-        kitchen_setup.set_json_goal(u'CartesianVelocityLimit',
-                                    root_link=kitchen_setup.default_root,
-                                    tip_link=u'base_footprint',
-                                    max_linear_velocity=0.1,
-                                    max_angular_velocity=0.2
-                                    )
+        # kitchen_setup.set_json_goal(u'CartesianVelocityLimit',
+        #                             root_link=kitchen_setup.default_root,
+        #                             tip_link=u'base_footprint',
+        #                             max_linear_velocity=0.1,
+        #                             max_angular_velocity=0.2
+        #                             )
         kitchen_setup.set_joint_goal(gaya_pose)
         kitchen_setup.move_base(base_goal)
 
@@ -781,6 +782,7 @@ class TestConstraints(object):
         y_goal.vector.z = 1
         zero_pose.align_planes(zero_pose.r_tip, x_gripper, root_normal=x_goal)
         zero_pose.align_planes(zero_pose.r_tip, y_gripper, root_normal=y_goal)
+        zero_pose.allow_all_collisions()
         zero_pose.send_and_check_goal()
         map_T_gripper = tf.lookup_pose(u'map', u'r_gripper_tool_frame')
         np.testing.assert_almost_equal(map_T_gripper.pose.orientation.x, 0.7071, decimal=3)

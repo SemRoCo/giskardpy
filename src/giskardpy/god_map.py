@@ -167,16 +167,18 @@ def get_data(identifier, data, default_value=0.0):
         else:
             shortcut = GetMember(default_value)
             result = shortcut.init_call(identifier, data)
-    except AttributeError:
-        return default_value, None
-    except KeyError as e:
+    except AttributeError as e:
+        raise KeyError(e)
+        # return default_value, None
+    # except KeyError as e:
         # traceback.print_exc()
         # raise KeyError(identifier)
         # TODO is this really a good idea?
         # I do this because it automatically sets weights for unused goals to 0
-        return default_value, None
-    except IndexError:
-        return default_value, None
+        # return default_value, None
+    except IndexError as e:
+        raise KeyError(e)
+        # return default_value, None
     return result, shortcut
 
 

@@ -9,7 +9,6 @@ from time import time
 
 from giskard_msgs.msg import MoveCmd, CollisionEntry
 from py_trees import Status
-from rospy_message_converter.message_converter import convert_ros_message_to_dictionary
 
 import giskardpy.constraints
 import giskardpy.identifier as identifier
@@ -19,6 +18,7 @@ from giskardpy.exceptions import ImplementationException, UnknownConstraintExcep
     ConstraintInitalizationException, GiskardException
 from giskardpy.logging import loginfo
 from giskardpy.plugin_action_server import GetGoal
+from giskardpy.utils import convert_ros_message_to_dictionary, convert_dictionary_to_ros_message
 
 
 class GoalToConstraints(GetGoal):
@@ -51,7 +51,7 @@ class GoalToConstraints(GetGoal):
         if not move_cmd:
             return Status.FAILURE
 
-        self.get_god_map().set_data(identifier.goal_params, {})
+        self.get_god_map().set_data(identifier.goals, {})
 
         self.get_robot()._create_constraints(self.get_god_map())
 
@@ -120,10 +120,12 @@ class GoalToConstraints(GetGoal):
 
             try:
                 if hasattr(constraint, u'parameter_value_pair'):
-                    params = json.loads(constraint.parameter_value_pair)
+                    parsed_json = json.loads(constraint.parameter_value_pair)
+                    params = self.replace_jsons_with_ros_messages(parsed_json)
                 else:
-                    params = convert_ros_message_to_dictionary(constraint)
-                    del params[u'type']
+                    raise ConstraintInitalizationException(u'Only the json interface is supported at the moment. Create an issue if you want it.')
+                    # params = convert_ros_message_to_dictionary(constraint)
+                    # del params[u'type']
 
                 c = C(self.god_map, control_horizon=self.get_god_map().unsafe_get_data(identifier.control_horizon), **params)
             except Exception as e:
@@ -147,11 +149,13 @@ class GoalToConstraints(GetGoal):
                 raise e
         loginfo(u'done parsing goal message')
 
-    # def has_robot_changed(self):
-    #     new_urdf = self.get_robot().get_urdf_str()
-    #     result = self.last_urdf != new_urdf
-    #     self.last_urdf = new_urdf
-    #     return result
+    def replace_jsons_with_ros_messages(self, d):
+        # TODO find message type
+        for key, value in d.items():
+            if isinstance(value, dict):
+                d[key] = convert_dictionary_to_ros_message(value)
+        return d
+
 
     def add_collision_avoidance_soft_constraints(self, collision_cmds):
         """

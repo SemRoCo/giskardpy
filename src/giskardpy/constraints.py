@@ -1473,7 +1473,7 @@ class CartesianPath(Constraint):
     max_linear_acceleration = u'max_linear_acceleration'
     max_angular_acceleration = u'max_angular_acceleration'
 
-    def __init__(self, god_map, root_link, tip_link, goal_a, goal_b, goal_c, goal_d, max_linear_velocity=0.1,
+    def __init__(self, god_map, root_link, tip_link, goals, max_linear_velocity=0.1,
                  max_angular_velocity=0.5, max_linear_acceleration=0.1, max_angular_acceleration=0.5,
                  weight=WEIGHT_ABOVE_CA, goal_constraint=False):
         """
@@ -1494,18 +1494,18 @@ class CartesianPath(Constraint):
         self.goal_b_time = 0 # all times must be init with 0, except the first one
         self.goal_c_time = 0
         self.goal_d_time = 0
-        self.goal_a_r = self.parse_and_transform_PoseStamped(goal_a, root_link)
-        self.goal_b_r = self.parse_and_transform_PoseStamped(goal_b, root_link)
-        self.goal_c_r = self.parse_and_transform_PoseStamped(goal_c, root_link)
-        self.goal_d_r = self.parse_and_transform_PoseStamped(goal_d, root_link)
+        self.goal_a_r = self.parse_and_transform_PoseStamped(goals[0], root_link)
+        self.goal_b_r = self.parse_and_transform_PoseStamped(goals[1], root_link)
+        self.goal_c_r = self.parse_and_transform_PoseStamped(goals[2], root_link)
+        self.goal_d_r = self.parse_and_transform_PoseStamped(goals[3], root_link)
         self.robot = self.get_robot()
 
         params = {
             self.get_weight_py_f: self.get_weight_py,
-            self.goal_a: self.parse_and_transform_PoseStamped(goal_a, root_link),
-            self.goal_b: self.parse_and_transform_PoseStamped(goal_b, root_link),
-            self.goal_c: self.parse_and_transform_PoseStamped(goal_c, root_link),
-            self.goal_d: self.parse_and_transform_PoseStamped(goal_d, root_link),
+            self.goal_a: self.parse_and_transform_PoseStamped(goals[0], root_link),
+            self.goal_b: self.parse_and_transform_PoseStamped(goals[1], root_link),
+            self.goal_c: self.parse_and_transform_PoseStamped(goals[2], root_link),
+            self.goal_d: self.parse_and_transform_PoseStamped(goals[3], root_link),
             self.weight: weight,
             self.max_linear_velocity: max_linear_velocity,
             self.max_angular_velocity: max_angular_velocity,

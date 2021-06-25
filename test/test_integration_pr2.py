@@ -1514,10 +1514,7 @@ class TestCartGoals(object):
         kitchen_setup.set_json_goal(u'CartesianPath',
                                     tip_link=tip_link,
                                     root_link=kitchen_setup.get_root(),
-                                    goal_a=goal_a,
-                                    goal_b=goal_b,
-                                    goal_c=goal_c,
-                                    goal_d=goal_d
+                                    goals=[goal_a, goal_b, goal_c, goal_d]
                                     )
 
         kitchen_setup.send_goal()

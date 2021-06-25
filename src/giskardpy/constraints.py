@@ -1491,7 +1491,7 @@ class CartesianPath(Constraint):
         self.tip_link = tip_link
         self.goal_constraint = goal_constraint
         self.goal_a_time = 1.0
-        self.goal_b_time = 0
+        self.goal_b_time = 0 # all times must be init with 0, except the first one
         self.goal_c_time = 0
         self.goal_d_time = 0
         self.goal_a_r = self.parse_and_transform_PoseStamped(goal_a, root_link)
@@ -1499,7 +1499,6 @@ class CartesianPath(Constraint):
         self.goal_c_r = self.parse_and_transform_PoseStamped(goal_c, root_link)
         self.goal_d_r = self.parse_and_transform_PoseStamped(goal_d, root_link)
         self.robot = self.get_robot()
-        self.ui = 10
 
         params = {
             self.get_weight_py_f: self.get_weight_py,

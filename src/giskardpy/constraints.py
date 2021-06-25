@@ -1463,10 +1463,6 @@ class CartesianPoseStraight(Constraint):
 class CartesianPath(Constraint):
 
     get_weight_py_f = u'get_weight_py_f'
-    goal_a = u'goal_a'
-    goal_b = u'goal_b'
-    goal_c = u'goal_c'
-    goal_d = u'goal_d'
     weight = u'weight'
     max_linear_velocity = u'max_linear_velocity'
     max_angular_velocity = u'max_angular_velocity'
@@ -1490,28 +1486,22 @@ class CartesianPath(Constraint):
         self.root_link = root_link
         self.tip_link = tip_link
         self.goal_constraint = goal_constraint
-        self.goal_a_time = 1.0
-        self.goal_b_time = 0 # all times must be init with 0, except the first one
-        self.goal_c_time = 0
-        self.goal_d_time = 0
-        self.goal_a_r = self.parse_and_transform_PoseStamped(goals[0], root_link)
-        self.goal_b_r = self.parse_and_transform_PoseStamped(goals[1], root_link)
-        self.goal_c_r = self.parse_and_transform_PoseStamped(goals[2], root_link)
-        self.goal_d_r = self.parse_and_transform_PoseStamped(goals[3], root_link)
+        self.goals_times = np.zeros(len(goals))
+        self.goals_times[0] = 1.0
+        self.goals_rs = [self.parse_and_transform_PoseStamped(goal, root_link) for goal in goals]
         self.robot = self.get_robot()
 
         params = {
             self.get_weight_py_f: self.get_weight_py,
-            self.goal_a: self.parse_and_transform_PoseStamped(goals[0], root_link),
-            self.goal_b: self.parse_and_transform_PoseStamped(goals[1], root_link),
-            self.goal_c: self.parse_and_transform_PoseStamped(goals[2], root_link),
-            self.goal_d: self.parse_and_transform_PoseStamped(goals[3], root_link),
             self.weight: weight,
             self.max_linear_velocity: max_linear_velocity,
             self.max_angular_velocity: max_angular_velocity,
             self.max_linear_acceleration: max_linear_acceleration,
             self.max_angular_acceleration: max_angular_acceleration
         }
+        for i in range(0, len(goals)):
+            params['goal_' + str(i)] = self.parse_and_transform_PoseStamped(goals[i], root_link)
+
         self.save_params_on_god_map(params)
 
     #def make_constraints(self):
@@ -1521,23 +1511,15 @@ class CartesianPath(Constraint):
     def update_goal_times(self):
         time_in_secs = time.time()
 
-        if self.goal_b_time == 0:
-            if self.goal_reached_py(self.goal_a_r) == 1:
-                self.goal_b_time = time_in_secs
-            else:
-                self.goal_b_time = 0
+        for i, goal_time in enumerate(self.goals_times):
+            if i == 0:
+                continue
+            if goal_time == 0:
+                if self.goal_reached_py(self.goals_rs[i-1]) == 1:
+                    self.goals_times[i] = time_in_secs
+                else:
+                    self.goals_times[i] = 0
 
-        if self.goal_c_time == 0:
-            if self.goal_reached_py(self.goal_b_r) == 1:
-                self.goal_c_time = time_in_secs
-            else:
-                self.goal_c_time = 0
-
-        if self.goal_d_time == 0:
-            if self.goal_reached_py(self.goal_c_r) == 1:
-                self.goal_d_time = time_in_secs
-            else:
-                self.goal_d_time = 0
 
     def make_constraints(self):
 
@@ -1547,24 +1529,24 @@ class CartesianPath(Constraint):
         #
         # # weight in [0,..., WEIGHT_BELOW_CA=1, WEIGHT_C_A=10, WEIGHT_ABOVE_CA=100]
         # # Bewegung muss Kosten verursachen. weight = 0 => ignorieren von motion controller zum ziel_xyz.
-        self.minimize_pose(self.goal_a, self.get_god_map().to_symbol(self.get_identifier() + [self.get_weight_py_f, tuple(self.goal_a)]))
-        self.minimize_pose(self.goal_b, self.get_god_map().to_symbol(self.get_identifier() + [self.get_weight_py_f, tuple(self.goal_b)]))
-        self.minimize_pose(self.goal_c, self.get_god_map().to_symbol(self.get_identifier() + [self.get_weight_py_f, tuple(self.goal_c)]))
-        self.minimize_pose(self.goal_d, self.get_god_map().to_symbol(self.get_identifier() + [self.get_weight_py_f, tuple(self.goal_d)]))
+
+        # WILL ONLY BE EVALUATED ONCE, CUZ ITS WRITTEN IN PYTHON
+        for i in range(0, len(self.goals_rs)):
+            self.minimize_pose('goal_' + str(i), self.get_god_map().to_symbol(self.get_identifier() + [self.get_weight_py_f, tuple('goal_' + str(i))]))
 
         self.add_debug_constraint("debugTime", time)
         self.add_debug_constraint("debugTimeInSecs", time_in_secs)
 
-        self.add_debug_constraint("debugweightATime", self.goal_a_time)
-        self.add_debug_constraint("debugweightBTime", self.goal_b_time)
+        self.add_debug_constraint("debugweightATime", self.goals_times[0])
+        self.add_debug_constraint("debugweightBTime", self.goals_times[1])
 
-        self.add_debug_constraint("debugweightA", self.get_weight(self.goal_a, self.goal_a_time, self.goal_b_time))
-        self.add_debug_constraint("debugActivation_funA", self.activation_fun(self.goal_a_time))
-        self.add_debug_constraint("debugDistanceToA", self.distance_to_goal(self.goal_a))
+        #self.add_debug_constraint("debugweightA", self.get_weight(self.goal_a, self.goals_times[0], self.goals_times[1]))
+        #self.add_debug_constraint("debugActivation_funA", self.activation_fun(self.goals_times[0]))
+        self.add_debug_constraint("debugDistanceToA", self.distance_to_goal('goal_0'))
 
-        self.add_debug_constraint("debugweightB", self.get_weight(self.goal_b, self.goal_b_time, self.goal_c_time))
-        self.add_debug_constraint("debugActivation_funB", self.activation_fun(self.goal_b_time))
-        self.add_debug_constraint("debugDistanceToB", self.distance_to_goal(self.goal_b))
+        #self.add_debug_constraint("debugweightB", self.get_weight(self.goal_b, self.goals_times[1], self.goals_times[2]))
+        #self.add_debug_constraint("debugActivation_funB", self.activation_fun(self.goals_times[1]))
+        self.add_debug_constraint("debugDistanceToB", self.distance_to_goal('goal_1'))
 
     def activation_fun(self, x):
         #time = self.get_god_map().to_symbol(identifier.time)
@@ -1584,14 +1566,12 @@ class CartesianPath(Constraint):
     def get_weight_py(self, *p):
         self.update_goal_times()
         p_str = str(p).replace('\'', '').replace(',', '').replace('(', '').replace(')', '').replace(' ', '').replace('u', '')
-        if self.goal_a in p_str:
-            return self.activation_fun_py(self.goal_a_time - self.goal_b_time)
-        if self.goal_b in p_str:
-            return self.activation_fun_py(self.goal_b_time - self.goal_c_time)
-        if self.goal_c in p_str:
-            return self.activation_fun_py(self.goal_c_time - self.goal_d_time)
-        if self.goal_d in p_str:
-            return self.activation_fun_py(self.goal_d_time)
+        for i in range(0, len(self.goals_rs)):
+            if 'goal_' + str(i) in p_str:
+                if i == len(self.goals_rs)-1:
+                    return self.activation_fun_py(self.goals_times[i])
+                else:
+                    return self.activation_fun_py(self.goals_times[i] - self.goals_times[i+1])
         return 0
 
     def distance_to_goal(self, p):

@@ -374,13 +374,17 @@ class GiskardWrapper(object):
         Set a goal for any of the goals defined in Constraints.py
         :param constraint_type: Name of the Goal
         :type constraint_type: str
-        :param kwargs: maps constraint parameter names to values. Values should be float, str or ros messages.
+        :param kwargs: maps constraint parameter names to values. Values should be float, str or ros messages
+                       or a list containing values of the types mentioned.
         :type kwargs: dict
         """
         constraint = Constraint()
         constraint.type = constraint_type
         for k, v in kwargs.items():
-            # TODO: if type(v)==list
+            if isinstance(v, list):
+                kwargs[k] = []
+                for i in v:
+                    kwargs[k].append(convert_ros_message_to_dictionary(i))
             if isinstance(v, Message):
                 kwargs[k] = convert_ros_message_to_dictionary(v)
         constraint.parameter_value_pair = json.dumps(kwargs)

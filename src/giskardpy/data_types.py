@@ -1,6 +1,7 @@
 from collections import OrderedDict, defaultdict, namedtuple
 
 import numpy as np
+from sensor_msgs.msg import JointState
 from sortedcontainers import SortedKeyList
 from giskardpy.tfwrapper import kdl_to_np, np_vector, np_point
 
@@ -22,7 +23,6 @@ class SingleJointState(object):
 
     def __str__(self):
         return u'{}: {}, {}, {}'.format(self.name, self.position, self.velocity, self.effort)
-
 
 class Trajectory(object):
     def __init__(self):

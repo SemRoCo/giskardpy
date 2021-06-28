@@ -57,4 +57,4 @@ class ConfigurationPlugin(GiskardBehavior):
         self.get_robot().base_pose = base_pose.pose
 
         self.god_map.set_data(identifier.joint_states, self.mjs)
-        return Status.SUCCESS
+        return Status.RUNNING

@@ -152,10 +152,10 @@ def grow_tree():
     # ----------------------------------------------
     wait_for_goal = Sequence(u'wait for goal')
     wait_for_goal.add_child(TFPlugin(u'tf'))
-    wait_for_goal.add_child(ConfigurationPlugin(u'js1'))
+    wait_for_goal.add_child(running_is_success(ConfigurationPlugin)(u'js1'))
     wait_for_goal.add_child(WorldUpdatePlugin(u'pybullet updater'))
     wait_for_goal.add_child(GoalReceived(u'has goal', action_server_name, MoveAction))
-    wait_for_goal.add_child(ConfigurationPlugin(u'js2'))
+    wait_for_goal.add_child(running_is_success(ConfigurationPlugin)(u'js2'))
     # ----------------------------------------------
     planning_3 = PluginBehavior(u'planning III', sleep=0)
     planning_3.add_plugin(CollisionChecker(u'coll'))

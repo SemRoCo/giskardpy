@@ -1627,18 +1627,10 @@ class AlignPlanes(Goal):
 
 
 class GraspBar(Goal):
-    bar_axis_id = u'bar_axis'
-    tip_grasp_axis_id = u'tip_grasp_axis'
-    bar_center_id = u'bar_center'
-    bar_length_id = u'bar_length'
-    translation_max_velocity_id = u'translation_max_velocity'
-    rotation_max_velocity_id = u'rotation_max_velocity'
-    weight_id = u'weight'
-
     def __init__(self, god_map, root_link, tip_link, tip_grasp_axis, bar_center, bar_axis, bar_length,
-                 max_linear_velocity=0.1, max_angular_velocity=0.5, weight=WEIGHT_ABOVE_CA,
-                 goal_constraint=False, **kwargs):
+                 max_linear_velocity=0.1, max_angular_velocity=0.5, weight=WEIGHT_ABOVE_CA, **kwargs):
         """
+        TODO update description
         This goal can be used to grasp bars. It's like a cartesian goal with some freedom along one axis.
         :param root_link: str, root link of the kin chain
         :param tip_link: str, tip link of the kin chain
@@ -1650,45 +1642,45 @@ class GraspBar(Goal):
         :param max_angular_velocity: float, rad/s, default 0.5
         :param weight: float default WEIGHT_ABOVE_CA
         """
-        super(GraspBar, self).__init__(god_map, **kwargs)
         self.root = root_link
         self.tip = tip_link
-        self.goal_constraint = goal_constraint
+        super(GraspBar, self).__init__(god_map, **kwargs)
 
-        bar_center = self.parse_and_transform_PointStamped(bar_center, self.root)
+        bar_center = tf.transform_point(self.root, bar_center)
 
-        tip_grasp_axis = self.parse_and_transform_Vector3Stamped(tip_grasp_axis, self.tip, normalized=True)
+        tip_grasp_axis = tf.transform_vector(self.tip, tip_grasp_axis)
+        tip_grasp_axis.vector = tf.normalize(tip_grasp_axis.vector)
 
-        bar_axis = self.parse_and_transform_Vector3Stamped(bar_axis, self.root, normalized=True)
+        bar_axis = tf.transform_vector(self.root, bar_axis)
+        bar_axis.vector = tf.normalize(bar_axis.vector)
 
-        params = {self.bar_axis_id: bar_axis,
-                  self.tip_grasp_axis_id: tip_grasp_axis,
-                  self.bar_center_id: bar_center,
-                  self.bar_length_id: bar_length,
-                  self.translation_max_velocity_id: max_linear_velocity,
-                  self.rotation_max_velocity_id: max_angular_velocity,
-                  self.weight_id: weight}
-        self.save_params_on_god_map(params)
+        self.bar_axis = bar_axis
+        self.tip_grasp_axis = tip_grasp_axis
+        self.bar_center = bar_center
+        self.bar_length = bar_length
+        self.translation_max_velocity = max_linear_velocity
+        self.rotation_max_velocity = max_angular_velocity
+        self.weight = weight
 
     def __str__(self):
         s = super(GraspBar, self).__str__()
         return u'{}/{}/{}'.format(s, self.root, self.tip)
 
     def get_bar_axis_vector(self):
-        return self.get_input_Vector3Stamped(self.bar_axis_id)
+        return self.get_parameter_as_symbolic_expression(u'bar_axis')
 
     def get_tip_grasp_axis_vector(self):
-        return self.get_input_Vector3Stamped(self.tip_grasp_axis_id)
+        return self.get_parameter_as_symbolic_expression(u'tip_grasp_axis')
 
     def get_bar_center_point(self):
-        return self.get_input_PointStamped(self.bar_center_id)
+        return self.get_parameter_as_symbolic_expression(u'bar_center')
 
     def make_constraints(self):
-        translation_max_velocity = self.get_input_float(self.translation_max_velocity_id)
-        rotation_max_velocity = self.get_input_float(self.rotation_max_velocity_id)
-        weight = self.get_input_float(self.weight_id)
+        translation_max_velocity = self.get_parameter_as_symbolic_expression(u'translation_max_velocity')
+        rotation_max_velocity = self.get_parameter_as_symbolic_expression(u'rotation_max_velocity')
+        weight = self.get_parameter_as_symbolic_expression(u'weight')
 
-        bar_length = self.get_input_float(self.bar_length_id)
+        bar_length = self.get_parameter_as_symbolic_expression(u'bar_length')
         root_V_bar_axis = self.get_bar_axis_vector()
         tip_V_tip_grasp_axis = self.get_tip_grasp_axis_vector()
         root_P_bar_center = self.get_bar_center_point()
@@ -1698,8 +1690,7 @@ class GraspBar(Goal):
                                                    tip=self.tip,
                                                    tip_V_tip_normal=tip_V_tip_grasp_axis,
                                                    root_V_goal_normal=root_V_bar_axis,
-                                                   weight=weight,
-                                                   goal_constraint=self.goal_constraint)
+                                                   weight=weight)
 
         root_P_tip = w.position_of(self.get_fk(self.root, self.tip))
 
@@ -1710,11 +1701,9 @@ class GraspBar(Goal):
 
         self.add_minimize_position_constraints(r_P_g=nearest,
                                                max_velocity=translation_max_velocity,
-                                               max_acceleration=1,
                                                root=self.root,
                                                tip=self.tip,
-                                               weight=weight,
-                                               goal_constraint=self.goal_constraint)
+                                               weight=weight)
 
 
 class UpdateGodMap(Goal):

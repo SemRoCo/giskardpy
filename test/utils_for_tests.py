@@ -597,7 +597,7 @@ class GiskardTestWrapper(GiskardWrapper):
         trajectory_vel = self.get_result_trajectory_velocity()
         trajectory_pos = self.get_result_trajectory_position()
 
-        for joint in trajectory_vel.keys():
+        for joint in self.get_robot().controlled_joints:
             if not self.get_robot().is_joint_continuous(joint):
                 joint_limits = self.get_robot().get_joint_limits(joint)
                 error_msg = u'{} has violated joint position limit'.format(joint)

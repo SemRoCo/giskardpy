@@ -864,29 +864,19 @@ class CartesianPosition(BasicCartesianGoal):
 
 
 class CartesianPositionStraight(BasicCartesianGoal):
-    start = u'start'
-
     def __init__(self, god_map, root_link, tip_link, goal,
                  max_velocity=0.1,
-                 max_acceleration=0.1,
-                 weight=WEIGHT_ABOVE_CA,
-                 goal_constraint=True, **kwargs):
+                 weight=WEIGHT_ABOVE_CA, **kwargs):
         super(CartesianPositionStraight, self).__init__(god_map,
                                                         root_link,
                                                         tip_link,
                                                         goal,
                                                         max_velocity,
-                                                        max_acceleration,
-                                                        weight,
-                                                        goal_constraint, **kwargs)
+                                                        weight, **kwargs)
 
         start = tf.lookup_pose(self.root, self.tip)
 
-        params = {self.start: start}
-        self.save_params_on_god_map(params)
-
-    def get_tip_pose(self):
-        return self.get_input_PoseStamped(self.tip)
+        self.start = start
 
     def make_constraints(self):
         """
@@ -916,34 +906,28 @@ class CartesianPositionStraight(BasicCartesianGoal):
         }'
         :return:
         """
-        root_P_goal = w.position_of(self.get_goal_pose())
+        root_P_goal = w.position_of(self.get_parameter_as_symbolic_expression('goal'))
         root_P_tip = w.position_of(self.get_fk(self.root, self.tip))
-        root_V_start = w.position_of(self.get_input_PoseStamped(self.start))
-        max_velocity = self.get_input_float(self.max_velocity)
-        max_acceleration = self.get_input_float(self.max_acceleration)
-        weight = self.get_input_float(self.weight)
+        root_V_start = w.position_of(self.get_parameter_as_symbolic_expression('start'))
+        max_velocity = self.get_parameter_as_symbolic_expression('max_velocity')
+        weight = self.get_parameter_as_symbolic_expression('weight')
 
         # Constraint to go to goal pos
         self.add_minimize_position_constraints(root_P_goal,
                                                max_velocity,
-                                               max_acceleration,
                                                self.root,
                                                self.tip,
-                                               self.goal_constraint,
                                                weight,
                                                prefix=u'goal')
 
-        # self.add_debug_vector(u'start_point', root_P_goal)
         dist, nearest = w.distance_point_to_line_segment(root_P_tip,
                                                          root_V_start,
                                                          root_P_goal)
         # Constraint to stick to the line
         self.add_minimize_position_constraints(r_P_g=nearest,
                                                max_velocity=max_velocity,
-                                               max_acceleration=max_acceleration,
                                                root=self.root,
                                                tip=self.tip,
-                                               goal_constraint=self.goal_constraint,
                                                prefix=u'line',
                                                weight=WEIGHT_ABOVE_CA)
 
@@ -1228,7 +1212,10 @@ class CartesianPoseStraight(Goal):
 
     def make_constraints(self):
         for constraint in self.constraints:
-            self._constraints.update(constraint.get_constraints())
+            c, c_vel = constraint.get_constraints()
+            self._constraints.update(c)
+            self._velocity_constraints.update(c_vel)
+            self.debug_expressions.update(constraint.debug_expressions)
 
 
 class ExternalCollisionAvoidance(Goal):

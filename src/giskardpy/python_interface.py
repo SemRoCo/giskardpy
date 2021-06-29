@@ -131,26 +131,18 @@ class GiskardWrapper(object):
         :param weight: default WEIGHT_ABOVE_CA
         :type weight: float
         """
-        if not max_velocity and not weight:
-            constraint = CartesianConstraint()
-            constraint.type = CartesianConstraint.STRAIGHT_TRANSLATION_3D
-            constraint.root_link = str(root_link)
-            constraint.tip_link = str(tip_link)
-            constraint.goal = goal_pose
-            self.cmd_seq[-1].cartesian_constraints.append(constraint)
-        else:
-            constraint = Constraint()
-            constraint.type = u'CartesianPositionStraight'
-            params = {}
-            params[u'root_link'] = root_link
-            params[u'tip_link'] = tip_link
-            params[u'goal'] = convert_ros_message_to_dictionary(goal_pose)
-            if max_velocity:
-                params[u'max_velocity'] = max_velocity
-            if weight:
-                params[u'weight'] = weight
-            constraint.parameter_value_pair = json.dumps(params)
-            self.cmd_seq[-1].constraints.append(constraint)
+        constraint = Constraint()
+        constraint.type = u'CartesianPositionStraight'
+        params = {}
+        params[u'root_link'] = root_link
+        params[u'tip_link'] = tip_link
+        params[u'goal'] = convert_ros_message_to_dictionary(goal_pose)
+        if max_velocity:
+            params[u'max_velocity'] = max_velocity
+        if weight:
+            params[u'weight'] = weight
+        constraint.parameter_value_pair = json.dumps(params)
+        self.cmd_seq[-1].constraints.append(constraint)
 
     def set_rotation_goal(self, goal_pose, tip_link, root_link, weight=None, max_velocity=None):
         """

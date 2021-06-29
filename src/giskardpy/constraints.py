@@ -1709,7 +1709,7 @@ class UpdateGodMap(Goal):
 
     def __init__(self, god_map, updates, **kwargs):
         """
-        Modifies the core data structure of giskard, only used for hacks, and you know what you are doing :)
+        Modifies the core data structure of giskard, only use it if you know what you are doing
         """
         super(UpdateGodMap, self).__init__(god_map, **kwargs)
         self.update_god_map([], updates)

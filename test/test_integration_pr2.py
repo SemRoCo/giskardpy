@@ -558,8 +558,8 @@ class TestConstraints(object):
         """
         :type pocky_pose_setup: PR2
         """
-        old_torso_value = pocky_pose_setup.get_god_map().get_data(identifier.joint_weight + [u'torso_lift_joint'])
-        old_odom_x_value = pocky_pose_setup.get_god_map().get_data(identifier.joint_weight + [u'odom_x_joint'])
+        old_torso_value = pocky_pose_setup.get_god_map().get_data(identifier.joint_velocity_weight + [u'torso_lift_joint'])
+        old_odom_x_value = pocky_pose_setup.get_god_map().get_data(identifier.joint_velocity_weight + [u'odom_x_joint'])
 
         r_goal = PoseStamped()
         r_goal.header.frame_id = pocky_pose_setup.r_tip
@@ -569,9 +569,13 @@ class TestConstraints(object):
             u'rosparam': {
                 u'general_options': {
                     u'joint_weights': {
-                        u'odom_x_joint': 1000000,
-                        u'odom_y_joint': 1000000,
-                        u'odom_z_joint': 1000000
+                        u'velocity': {
+                            u'override': {
+                                u'odom_x_joint': 1000000,
+                                u'odom_y_joint': 1000000,
+                                u'odom_z_joint': 1000000
+                            }
+                        }
                     }
                 }
             }
@@ -583,19 +587,23 @@ class TestConstraints(object):
         pocky_pose_setup.set_and_check_cart_goal(r_goal, pocky_pose_setup.r_tip)
 
         new_pose = tf.lookup_pose(u'map', u'base_footprint')
-        compare_poses(old_pose.pose, new_pose.pose)
+        compare_poses(new_pose.pose, old_pose.pose)
 
-        assert pocky_pose_setup.get_god_map().unsafe_get_data(identifier.joint_weight + [u'odom_x_joint']) == 1000000
+        assert pocky_pose_setup.get_god_map().unsafe_get_data(identifier.joint_velocity_weight + [u'odom_x_joint']) == 1000000
         assert pocky_pose_setup.get_god_map().unsafe_get_data(
-            identifier.joint_weight + [u'torso_lift_joint']) == old_torso_value
+            identifier.joint_velocity_weight + [u'torso_lift_joint']) == old_torso_value
 
         updates = {
             u'rosparam': {
                 u'general_options': {
                     u'joint_weights': {
-                        u'odom_x_joint': 0.0001,
-                        u'odom_y_joint': 0.0001,
-                        u'odom_z_joint': 0.0001
+                        u'velocity': {
+                            u'override': {
+                                u'odom_x_joint': 0.0001,
+                                u'odom_y_joint': 0.0001,
+                                u'odom_z_joint': 0.0001
+                            }
+                        }
                     }
                 }
             }
@@ -608,15 +616,15 @@ class TestConstraints(object):
         new_pose = tf.lookup_pose(u'map', u'base_footprint')
 
         # compare_poses(old_pose.pose, new_pose.pose)
-        assert new_pose.pose.position.x >= 0.08
-        assert pocky_pose_setup.get_god_map().unsafe_get_data(identifier.joint_weight + [u'odom_x_joint']) == 0.0001
+        assert new_pose.pose.position.x >= 0.075
+        assert pocky_pose_setup.get_god_map().unsafe_get_data(identifier.joint_velocity_weight + [u'odom_x_joint']) == 0.0001
         assert pocky_pose_setup.get_god_map().unsafe_get_data(
-            identifier.joint_weight + [u'torso_lift_joint']) == old_torso_value
+            identifier.joint_velocity_weight + [u'torso_lift_joint']) == old_torso_value
         pocky_pose_setup.send_and_check_goal()
         assert pocky_pose_setup.get_god_map().unsafe_get_data(
-            identifier.joint_weight + [u'odom_x_joint']) == old_odom_x_value
+            identifier.joint_velocity_weight + [u'odom_x_joint']) == old_odom_x_value
         assert pocky_pose_setup.get_god_map().unsafe_get_data(
-            identifier.joint_weight + [u'torso_lift_joint']) == old_torso_value
+            identifier.joint_velocity_weight + [u'torso_lift_joint']) == old_torso_value
 
     # def test_base_pointing_forward(self, pocky_pose_setup):
     #     """
@@ -640,9 +648,9 @@ class TestConstraints(object):
         """
         :type pocky_pose_setup: PR2
         """
-        old_torso_value = pocky_pose_setup.get_god_map().get_data(identifier.joint_weight + [u'torso_lift_joint'])
-        old_odom_x_value = pocky_pose_setup.get_god_map().get_data(identifier.joint_weight + [u'odom_x_joint'])
-        old_odom_y_value = pocky_pose_setup.get_god_map().get_data(identifier.joint_weight + [u'odom_y_joint'])
+        old_torso_value = pocky_pose_setup.get_god_map().get_data(identifier.joint_velocity_weight + [u'torso_lift_joint'])
+        old_odom_x_value = pocky_pose_setup.get_god_map().get_data(identifier.joint_velocity_weight + [u'odom_x_joint'])
+        old_odom_y_value = pocky_pose_setup.get_god_map().get_data(identifier.joint_velocity_weight + [u'odom_y_joint'])
 
         r_goal = PoseStamped()
         r_goal.header.frame_id = pocky_pose_setup.r_tip
@@ -652,9 +660,13 @@ class TestConstraints(object):
             u'rosparam': {
                 u'general_options': {
                     u'joint_weights': {
-                        u'odom_x_joint': u'asdf',
-                        u'odom_y_joint': 0.0001,
-                        u'odom_z_joint': 0.0001
+                        u'velocity': {
+                            u'override': {
+                                u'odom_x_joint': u'asdf',
+                                u'odom_y_joint': 0.0001,
+                                u'odom_z_joint': 0.0001
+                            }
+                        }
                     }
                 }
             }
@@ -663,17 +675,17 @@ class TestConstraints(object):
         pocky_pose_setup.set_cart_goal(r_goal, pocky_pose_setup.r_tip)
         pocky_pose_setup.send_and_check_goal(expected_error_codes=[MoveResult.ERROR])
         assert pocky_pose_setup.get_god_map().unsafe_get_data(
-            identifier.joint_weight + [u'odom_x_joint']) == old_odom_x_value
-        assert pocky_pose_setup.get_god_map().unsafe_get_data(identifier.joint_weight + [u'odom_y_joint']) == old_odom_y_value
+            identifier.joint_velocity_weight + [u'odom_x_joint']) == old_odom_x_value
+        assert pocky_pose_setup.get_god_map().unsafe_get_data(identifier.joint_velocity_weight + [u'odom_y_joint']) == old_odom_y_value
         assert pocky_pose_setup.get_god_map().get_data(
-            identifier.joint_weight + [u'torso_lift_joint']) == old_torso_value
+            identifier.joint_velocity_weight + [u'torso_lift_joint']) == old_torso_value
 
     def test_UpdateGodMap3(self, pocky_pose_setup):
         """
         :type pocky_pose_setup: PR2
         """
-        old_torso_value = pocky_pose_setup.get_god_map().get_data(identifier.joint_weight + [u'torso_lift_joint'])
-        old_odom_x_value = pocky_pose_setup.get_god_map().get_data(identifier.joint_weight + [u'odom_x_joint'])
+        old_torso_value = pocky_pose_setup.get_god_map().get_data(identifier.joint_velocity_weight + [u'torso_lift_joint'])
+        old_odom_x_value = pocky_pose_setup.get_god_map().get_data(identifier.joint_velocity_weight + [u'odom_x_joint'])
 
         r_goal = PoseStamped()
         r_goal.header.frame_id = pocky_pose_setup.r_tip
@@ -690,9 +702,9 @@ class TestConstraints(object):
         pocky_pose_setup.set_cart_goal(r_goal, pocky_pose_setup.r_tip)
         pocky_pose_setup.send_and_check_goal(expected_error_codes=[MoveResult.ERROR])
         assert pocky_pose_setup.get_god_map().unsafe_get_data(
-            identifier.joint_weight + [u'odom_x_joint']) == old_odom_x_value
+            identifier.joint_velocity_weight + [u'odom_x_joint']) == old_odom_x_value
         assert pocky_pose_setup.get_god_map().unsafe_get_data(
-            identifier.joint_weight + [u'torso_lift_joint']) == old_torso_value
+            identifier.joint_velocity_weight + [u'torso_lift_joint']) == old_torso_value
 
     def test_pointing(self, kitchen_setup):
         base_goal = PoseStamped()

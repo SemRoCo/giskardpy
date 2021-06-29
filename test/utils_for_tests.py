@@ -95,14 +95,14 @@ def compare_poses(pose1, pose2, decimal=2):
     compare_points(pose1.position, pose2.position, decimal)
     compare_orientations(pose1.orientation, pose2.orientation, decimal)
 
-def compare_points(point1, point2, decimal=2):
+def compare_points(actual_point, desired_point, decimal=2):
     """
     :type pose1: Point
     :type pose2: Point
     """
-    np.testing.assert_almost_equal(point1.x, point2.x, decimal=decimal)
-    np.testing.assert_almost_equal(point1.y, point2.y, decimal=decimal)
-    np.testing.assert_almost_equal(point1.z, point2.z, decimal=decimal)
+    np.testing.assert_almost_equal(actual_point.x, desired_point.x, decimal=decimal)
+    np.testing.assert_almost_equal(actual_point.y, desired_point.y, decimal=decimal)
+    np.testing.assert_almost_equal(actual_point.z, desired_point.z, decimal=decimal)
 
 
 def compare_orientations(orientation1, orientation2, decimal=2):

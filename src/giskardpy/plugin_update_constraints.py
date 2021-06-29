@@ -152,7 +152,7 @@ class GoalToConstraints(GetGoal):
     def replace_jsons_with_ros_messages(self, d):
         # TODO find message type
         for key, value in d.items():
-            if isinstance(value, dict):
+            if isinstance(value, dict) and 'message_type' in value:
                 d[key] = convert_dictionary_to_ros_message(value)
         return d
 

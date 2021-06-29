@@ -6228,7 +6228,7 @@ class TestCollisionAvoidanceGoals(object):
         base_pose.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 2, [0, 0, 1]))
         kitchen_setup.teleport_base(base_pose)
         base_pose.pose.orientation = Quaternion(*quaternion_about_axis(np.pi, [0, 0, 1]))
-        kitchen_setup.set_joint_goal(gaya_pose)
+        kitchen_setup.set_joint_goal(gaya_pose, weight=WEIGHT_ABOVE_CA)
         kitchen_setup.set_and_check_cart_goal(base_pose, u'base_footprint', expected_error_codes=[MoveResult.SHAKING])
         kitchen_setup.check_current_joint_state(gaya_pose)
 

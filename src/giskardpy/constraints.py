@@ -398,6 +398,7 @@ class Goal(object):
         # angle_limited = w.save_division(self.limit_velocity(angle, max_velocity), angle)
         # root_V_goal_normal_intermediate = w.slerp(root_V_tip_normal, root_V_goal_normal, angle_limited)
         error = root_V_goal_normal - root_V_tip_normal
+        self.add_debug_vector('root_V_tip_normal', root_V_tip_normal)
 
         weight = self.normalize_weight(max_velocity, weight)
 
@@ -1118,7 +1119,7 @@ class CartesianVelocityLimit(Goal):
 
 class CartesianOrientation(BasicCartesianGoal):
     def __init__(self, god_map, root_link, tip_link, goal, max_velocity=0.3, max_accleration=0.5,
-                 weight=WEIGHT_ABOVE_CA * 100, goal_constraint=False, **kwargs):
+                 weight=WEIGHT_ABOVE_CA, goal_constraint=False, **kwargs):
         """
         This goal will the kinematic chain from root_link to tip_link to achieve a rotation goal for the tip link
         :param root_link: str, root link of the kinematic chain
@@ -1236,12 +1237,12 @@ class CartesianPoseStraight(Goal):
 
     def make_constraints(self):
         for constraint in self.constraints:
-            self.constraints.update(constraint.get_constraints())
+            self._constraints.update(constraint.get_constraints())
 
 
 class ExternalCollisionAvoidance(Goal):
 
-    def __init__(self, god_map, link_name, max_velocity=0.2, hard_threshold=0.0, soft_threshold=0.05, idx=0,
+    def __init__(self, god_map, link_name, max_velocity=0.1, hard_threshold=0.0, soft_threshold=0.05, idx=0,
                  num_repeller=1, **kwargs):
         """
         Don't use me
@@ -1634,8 +1635,8 @@ class AlignPlanes(Goal):
 
     def make_constraints(self):
         max_velocity = self.get_parameter_as_symbolic_expression(u'max_velocity')
-        tip_V_tip_normal = self.get_parameter_as_symbolic_expression(u'tip_normal')
-        root_V_root_normal = self.get_parameter_as_symbolic_expression(u'root_normal')
+        tip_V_tip_normal = self.get_parameter_as_symbolic_expression(u'tip_V_tip_normal')
+        root_V_root_normal = self.get_parameter_as_symbolic_expression(u'root_V_root_normal')
         weight = self.get_parameter_as_symbolic_expression(u'weight')
         self.add_minimize_vector_angle_constraints(max_velocity=max_velocity,
                                                    root=self.root,

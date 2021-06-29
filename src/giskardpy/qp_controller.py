@@ -869,18 +869,18 @@ class QPController(object):
         sample_period = self.state[str(self.sample_period)]
         b_names = self.b_names()
         bA_names = self.bA_names()
-        # b_filter, bA_filter = self.make_filters()
-        filtered_b_names = np.array(b_names)#[b_filter]
-        filtered_bA_names = np.array(bA_names)#[bA_filter]
-        # H, g, A, lb, ub, lbA, ubA = self.filter_zero_weight_stuff(b_filter, bA_filter)
-        H, g, A, lb, ub, lbA, ubA = self.np_H, self.np_g, self.np_A, self.np_lb, self.np_ub, self.np_lbA, self.np_ubA
+        b_filter, bA_filter = self.make_filters()
+        filtered_b_names = np.array(b_names)[b_filter]
+        filtered_bA_names = np.array(bA_names)[bA_filter]
+        H, g, A, lb, ub, lbA, ubA = self.filter_zero_weight_stuff(b_filter, bA_filter)
+        # H, g, A, lb, ub, lbA, ubA = self.np_H, self.np_g, self.np_A, self.np_lb, self.np_ub, self.np_lbA, self.np_ubA
 
         debug_exprs = self._eval_debug_exprs(substitutions)
         self.p_debug = pd.DataFrame.from_dict(debug_exprs, orient='index', columns=['data']).sort_index()
 
         self.p_lb = pd.DataFrame(lb, filtered_b_names, [u'data'], dtype=float)
         self.p_ub = pd.DataFrame(ub, filtered_b_names, [u'data'], dtype=float)
-        self.p_g = pd.DataFrame(g, filtered_b_names, [u'data'], dtype=float)
+        # self.p_g = pd.DataFrame(g, filtered_b_names, [u'data'], dtype=float)
         self.p_lbA = pd.DataFrame(lbA, filtered_bA_names, [u'data'], dtype=float)
         self.p_ubA = pd.DataFrame(ubA, filtered_bA_names, [u'data'], dtype=float)
         self.p_weights = pd.DataFrame(self.np_H.dot(np.ones(self.np_H.shape[0])), b_names, [u'data'],

@@ -399,10 +399,9 @@ class Goal(object):
         root_V_tip_normal = w.dot(root_R_tip, tip_V_tip_normal)
 
         angle = w.save_acos(w.dot(root_V_tip_normal.T, root_V_goal_normal)[0])
-        angle_limited = w.save_division(self.limit_velocity(angle, np.pi*0.8), angle) # avoid singularity by staying away from pi
+        angle_limited = w.save_division(self.limit_velocity(angle, np.pi*0.9), angle) # avoid singularity by staying away from pi
         root_V_goal_normal_intermediate = w.slerp(root_V_tip_normal, root_V_goal_normal, angle_limited)
         error = root_V_goal_normal_intermediate - root_V_tip_normal
-        self.add_debug_vector('root_V_tip_normal', root_V_tip_normal)
 
         weight = self.normalize_weight(max_velocity, weight)
 
@@ -1950,11 +1949,8 @@ class OpenDrawer(Goal):
         :type root_link: str
         :param root_link: default is root link of robot
         """
-
-        super(OpenDrawer, self).__init__(god_map, **kwargs)
-
         self.constraints = []  # init empty list
-
+        self.god_map = god_map
         # Process input parameters
         if root_link is None:
             self.root = self.get_robot().get_root()
@@ -1968,6 +1964,8 @@ class OpenDrawer(Goal):
         handle_frame_id = u'iai_kitchen/' + object_link_name
 
         self.object_name = object_name
+        super(OpenDrawer, self).__init__(god_map, **kwargs)
+
         environment_object = self.get_world().get_object(object_name)
         # Get movable joint
         self.hinge_joint = environment_object.get_movable_parent_joint(object_link_name)
@@ -2012,8 +2010,7 @@ class OpenDrawer(Goal):
         root_T_tip_goal.p += root_V_hinge_drawer
 
         # Convert goal pose to dict for Giskard
-        root_T_tip_goal_dict = convert_ros_message_to_dictionary(
-            tf.kdl_to_pose_stamped(root_T_tip_goal, self.root))
+        root_T_tip_goal_dict = tf.kdl_to_pose_stamped(root_T_tip_goal, self.root)
 
         self.constraints.append(
             CartesianPoseStraight(

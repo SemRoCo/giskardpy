@@ -1338,8 +1338,8 @@ class TestConstraints(object):
             tip_grasp_axis.vector.z = 1
 
             kitchen_setup.set_json_goal(u'GraspBar',
-                                        root=kitchen_setup.default_root,
-                                        tip=kitchen_setup.l_tip,
+                                        root_link=kitchen_setup.default_root,
+                                        tip_link=kitchen_setup.l_tip,
                                         tip_grasp_axis=tip_grasp_axis,
                                         bar_center=bar_center,
                                         bar_axis=bar_axis,
@@ -1360,9 +1360,9 @@ class TestConstraints(object):
             kitchen_setup.send_and_check_goal()
 
             kitchen_setup.set_json_goal(u'Open',
-                                        tip=kitchen_setup.l_tip,
+                                        tip_link=kitchen_setup.l_tip,
                                         object_name=u'kitchen',
-                                        handle_link=i_handle_name)
+                                        object_link_name=i_handle_name)
             kitchen_setup.allow_all_collisions()  # makes execution faster
             kitchen_setup.avoid_self_collision()
             kitchen_setup.send_and_check_goal()  # send goal to Giskard
@@ -1371,9 +1371,9 @@ class TestConstraints(object):
 
             # Close drawer partially
             kitchen_setup.set_json_goal(u'OpenDrawer',
-                                        tip=kitchen_setup.l_tip,
+                                        tip_link=kitchen_setup.l_tip,
                                         object_name=u'kitchen',
-                                        handle_link=i_handle_name,
+                                        object_link_name=i_handle_name,
                                         distance_goal=0.2)
             kitchen_setup.allow_all_collisions()  # makes execution faster
             kitchen_setup.avoid_self_collision()
@@ -1382,9 +1382,9 @@ class TestConstraints(object):
             kitchen_setup.set_kitchen_js({i_joint_name: 0.2})
 
             kitchen_setup.set_json_goal(u'Close',
-                                        tip=kitchen_setup.l_tip,
+                                        tip_link=kitchen_setup.l_tip,
                                         object_name=u'kitchen',
-                                        handle_link=i_handle_name)
+                                        object_link_name=i_handle_name)
             kitchen_setup.allow_all_collisions()  # makes execution faster
             kitchen_setup.avoid_self_collision()
             kitchen_setup.send_and_check_goal()  # send goal to Giskard

@@ -832,6 +832,7 @@ class TestConstraints(object):
 
         x_goal = Vector3Stamped()
         x_goal.header.frame_id = u'map'
+        # x_goal.vector.x = -0.001
         x_goal.vector.y = -1
         # x_goal.vector.z = 0.2
         x_goal.vector = tf.normalize(x_goal.vector)
@@ -842,6 +843,26 @@ class TestConstraints(object):
         np.testing.assert_almost_equal(map_T_gripper.vector.x, x_goal.vector.x, decimal=2)
         np.testing.assert_almost_equal(map_T_gripper.vector.y, x_goal.vector.y, decimal=2)
         np.testing.assert_almost_equal(map_T_gripper.vector.z, x_goal.vector.z, decimal=2)
+
+    def test_align_planes3(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        eef_vector = Vector3Stamped()
+        eef_vector.header.frame_id = 'base_footprint'
+        eef_vector.vector.y = 1
+
+        goal_vector = Vector3Stamped()
+        goal_vector.header.frame_id = u'map'
+        goal_vector.vector.y = -1
+        goal_vector.vector = tf.normalize(goal_vector.vector)
+        zero_pose.align_planes('base_footprint', eef_vector, root_normal=goal_vector)
+        zero_pose.send_and_check_goal()
+
+        map_T_gripper = tf.transform_vector(u'map', eef_vector)
+        np.testing.assert_almost_equal(map_T_gripper.vector.x, goal_vector.vector.x, decimal=2)
+        np.testing.assert_almost_equal(map_T_gripper.vector.y, goal_vector.vector.y, decimal=2)
+        np.testing.assert_almost_equal(map_T_gripper.vector.z, goal_vector.vector.z, decimal=2)
 
     def test_grasp_fridge_handle(self, kitchen_setup):
         """

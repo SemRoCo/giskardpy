@@ -394,10 +394,10 @@ class Goal(object):
         root_R_tip = w.rotation_of(self.get_fk(root, tip))
         root_V_tip_normal = w.dot(root_R_tip, tip_V_tip_normal)
 
-        # angle = w.save_acos(w.dot(root_V_tip_normal.T, root_V_goal_normal)[0])
-        # angle_limited = w.save_division(self.limit_velocity(angle, max_velocity), angle)
-        # root_V_goal_normal_intermediate = w.slerp(root_V_tip_normal, root_V_goal_normal, angle_limited)
-        error = root_V_goal_normal - root_V_tip_normal
+        angle = w.save_acos(w.dot(root_V_tip_normal.T, root_V_goal_normal)[0])
+        angle_limited = w.save_division(self.limit_velocity(angle, np.pi*0.9), angle) # avoid singularity by staying away from pi
+        root_V_goal_normal_intermediate = w.slerp(root_V_tip_normal, root_V_goal_normal, angle_limited)
+        error = root_V_goal_normal_intermediate - root_V_tip_normal
         self.add_debug_vector('root_V_tip_normal', root_V_tip_normal)
 
         weight = self.normalize_weight(max_velocity, weight)

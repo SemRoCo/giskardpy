@@ -158,8 +158,10 @@ class Goal(object):
             return self.get_input_PointStamped(name)
         elif isinstance(value, Vector3Stamped):
             return self.get_input_Vector3Stamped(name)
+        elif isinstance(value, np.ndarray):
+            return self.get_input_np_frame(name)
         else:
-            NotImplementedError(u'Symbol reference not implemented for this type.')
+            raise NotImplementedError(u'Symbol reference not implemented for this type.')
 
     def get_input_float(self, name):
         """
@@ -397,7 +399,7 @@ class Goal(object):
         root_V_tip_normal = w.dot(root_R_tip, tip_V_tip_normal)
 
         angle = w.save_acos(w.dot(root_V_tip_normal.T, root_V_goal_normal)[0])
-        angle_limited = w.save_division(self.limit_velocity(angle, np.pi*0.9), angle) # avoid singularity by staying away from pi
+        angle_limited = w.save_division(self.limit_velocity(angle, np.pi*0.8), angle) # avoid singularity by staying away from pi
         root_V_goal_normal_intermediate = w.slerp(root_V_tip_normal, root_V_goal_normal, angle_limited)
         error = root_V_goal_normal_intermediate - root_V_tip_normal
         self.add_debug_vector('root_V_tip_normal', root_V_tip_normal)
@@ -1822,23 +1824,9 @@ class Pointing(Goal):
 
 
 class OpenDoor(Goal):
-    hinge_pose_id = u'hinge_frame'
-    hinge_V_hinge_axis_msg_id = u'hinge_axis'
-    hinge0_T_tipGoal_id = u'hinge0_T_tipGoal'
-    hinge0_T_tipStartProjected_id = u'hinge0_T_tipStartProjected'
-    root_T_hinge0_id = u'root_T_hinge0'
-    root_T_tipGoal_id = u'root_T_tipGoal'
-    hinge0_P_tipStart_norm_id = u'hinge0_P_tipStart_norm'
-    weight_id = u'weight'
-
     def __init__(self, god_map, tip_link, object_name, object_link_name, angle_goal, root_link=None,
                  weight=WEIGHT_ABOVE_CA, **kwargs):
-        super(OpenDoor, self).__init__(god_map, **kwargs)
 
-        if root_link is None:
-            self.root = self.get_robot().get_root()
-        else:
-            self.root = root_link
         self.tip = tip_link
 
         self.angle_goal = angle_goal
@@ -1847,6 +1835,13 @@ class OpenDoor(Goal):
         handle_frame_id = u'iai_kitchen/' + object_link_name
 
         self.object_name = object_name
+        if root_link is None:
+            self.root = god_map.get_data(identifier.robot).get_root()
+        else:
+            self.root = root_link
+        super(OpenDoor, self).__init__(god_map, **kwargs)
+
+
         environment_object = self.get_world().get_object(object_name)
         self.hinge_joint = environment_object.get_movable_parent_joint(object_link_name)
         hinge_child = environment_object.get_child_link_of_joint(self.hinge_joint)
@@ -1886,38 +1881,35 @@ class OpenDoor(Goal):
 
         hinge0_P_tipStart_norm = np.linalg.norm(tf.kdl_to_np(hingeStart_P_tipStart))
 
-        params = {
-            self.hinge_pose_id: hinge_pose,
-            self.hinge_V_hinge_axis_msg_id: hinge_V_hinge_axis_msg,
-            self.hinge0_T_tipGoal_id: hinge0_T_tipGoal,
-            self.root_T_hinge0_id: tf.kdl_to_np(root_T_hinge0),
-            self.hinge0_T_tipStartProjected_id: hinge0_T_tipStartProjected,
-            self.root_T_tipGoal_id: root_T_tipGoal,
-            self.hinge0_P_tipStart_norm_id: hinge0_P_tipStart_norm,
-            self.weight_id: weight,
-        }
-        self.save_params_on_god_map(params)
+        self.hinge_pose = hinge_pose
+        self.hinge_V_hinge_axis_msg = hinge_V_hinge_axis_msg
+        self.hinge0_T_tipGoal = hinge0_T_tipGoal
+        self.root_T_hinge0 = tf.kdl_to_np(root_T_hinge0)
+        self.hinge0_T_tipStartProjected = hinge0_T_tipStartProjected
+        self.root_T_tipGoal = root_T_tipGoal
+        self.hinge0_P_tipStart_norm = hinge0_P_tipStart_norm
+        self.weight = weight
 
     def get_hinge_pose(self):
-        return self.get_input_PoseStamped(self.hinge_pose_id)
+        return self.get_parameter_as_symbolic_expression(u'hinge_pose')
 
     def get_hinge_axis(self):
-        return self.get_input_Vector3Stamped(self.hinge_V_hinge_axis_msg_id)
+        return self.get_parameter_as_symbolic_expression(u'hinge_V_hinge_axis_msg')
 
     def make_constraints(self):
-        base_weight = self.get_input_float(self.weight_id)
+        base_weight = self.get_parameter_as_symbolic_expression(u'weight')
         root_T_tip = self.get_fk(self.root, self.tip)
         root_T_hinge = self.get_hinge_pose()
         hinge_V_hinge_axis = self.get_hinge_axis()[:3]
         hinge_T_root = w.inverse_frame(root_T_hinge)
-        root_T_tipGoal = self.get_input_np_frame(self.root_T_tipGoal_id)
-        root_T_hinge0 = self.get_input_np_frame(self.root_T_hinge0_id)
+        root_T_tipGoal = self.get_parameter_as_symbolic_expression(u'root_T_tipGoal')
+        root_T_hinge0 = self.get_parameter_as_symbolic_expression(u'root_T_hinge0')
         root_T_tipCurrent = self.get_fk_evaluated(self.root, self.tip)
-        hinge0_R_tipGoal = w.rotation_of(self.get_input_np_frame(self.hinge0_T_tipGoal_id))
-        dist_goal = self.get_input_float(self.hinge0_P_tipStart_norm_id)
-        hinge0_T_tipStartProjected = self.get_input_np_frame(self.hinge0_T_tipStartProjected_id)
+        hinge0_R_tipGoal = w.rotation_of(self.get_parameter_as_symbolic_expression(u'hinge0_T_tipGoal'))
+        dist_goal = self.get_parameter_as_symbolic_expression(u'hinge0_P_tipStart_norm')
+        hinge0_T_tipStartProjected = self.get_parameter_as_symbolic_expression(u'hinge0_T_tipStartProjected')
 
-        self.add_minimize_position_constraints(w.position_of(root_T_tipGoal), 0.1, 0.1, self.root, self.tip, False,
+        self.add_minimize_position_constraints(w.position_of(root_T_tipGoal), 0.1, self.root, self.tip,
                                                weight=base_weight)
 
         hinge_P_tip = w.position_of(w.dot(hinge_T_root, root_T_tip))[:3]
@@ -1925,11 +1917,11 @@ class OpenDoor(Goal):
         dist_expr = w.norm(hinge_P_tip)
         weight = self.normalize_weight(0.1, base_weight)
         self.add_constraint(u'/dist',
-                            dist_goal - dist_expr,
-                            dist_goal - dist_expr,
-                            weight,
-                            dist_expr,
-                            False)
+                            reference_velocity=0.1,
+                            lower_error=dist_goal - dist_expr,
+                            upper_error=dist_goal - dist_expr,
+                            weight=weight,
+                            expression=dist_expr)
 
         hinge0_T_tipCurrent = w.dot(w.inverse_frame(root_T_hinge0), root_T_tipCurrent)
         hinge0_P_tipStartProjected = w.position_of(hinge0_T_tipStartProjected)
@@ -1954,10 +1946,6 @@ class OpenDoor(Goal):
 
 
 class OpenDrawer(Goal):
-    hinge_pose_id = u'hinge_frame'  # frame of the hinge TODO: is that necessary
-    hinge_V_hinge_axis_msg_id = u'hinge_axis'  # axis vector of the hinge
-    root_T_tip_goal_id = u'root_T_tipGoal'  # goal of the gripper tip (where to move)
-
     def __init__(self, god_map, tip_link, object_name, object_link_name, distance_goal, root_link=None,
                  weight=WEIGHT_ABOVE_CA, **kwargs):
         """
@@ -2000,8 +1988,7 @@ class OpenDrawer(Goal):
         hinge_frame_id = u'iai_kitchen/' + hinge_child
 
         # Get movable axis of drawer (= prismatic joint)
-        hinge_drawer_axis = kdl.Vector(
-            *environment_object.get_joint_axis(self.hinge_joint))
+        hinge_drawer_axis = kdl.Vector(*environment_object.get_joint_axis(self.hinge_joint))
         hinge_drawer_axis_msg = Vector3Stamped()
         hinge_drawer_axis_msg.header.frame_id = hinge_frame_id
         hinge_drawer_axis_msg.vector.x = hinge_drawer_axis[0]
@@ -2048,9 +2035,11 @@ class OpenDrawer(Goal):
                 weight=weight))
 
     def make_constraints(self):
-        # Execute constraints
         for constraint in self.constraints:
-            self.constraints.update(constraint.get_constraints())
+            c, c_vel = constraint.get_constraints()
+            self._constraints.update(c)
+            self._velocity_constraints.update(c_vel)
+            self.debug_expressions.update(constraint.debug_expressions)
 
     def __str__(self):
         s = super(OpenDrawer, self).__str__()
@@ -2094,7 +2083,10 @@ class Open(Goal):
 
     def make_constraints(self):
         for constraint in self.constraints:
-            self.constraints.update(constraint.get_constraints())
+            c, c_vel = constraint.get_constraints()
+            self._constraints.update(c)
+            self._velocity_constraints.update(c_vel)
+            self.debug_expressions.update(constraint.debug_expressions)
 
 
 class Close(Goal):
@@ -2134,4 +2126,7 @@ class Close(Goal):
 
     def make_constraints(self):
         for constraint in self.constraints:
-            self.constraints.update(constraint.get_constraints())
+            c, c_vel = constraint.get_constraints()
+            self._constraints.update(c)
+            self._velocity_constraints.update(c_vel)
+            self.debug_expressions.update(constraint.debug_expressions)

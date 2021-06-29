@@ -864,6 +864,28 @@ class TestConstraints(object):
         np.testing.assert_almost_equal(map_T_gripper.vector.y, goal_vector.vector.y, decimal=2)
         np.testing.assert_almost_equal(map_T_gripper.vector.z, goal_vector.vector.z, decimal=2)
 
+    def test_align_planes4(self, kitchen_setup):
+        """
+        :type zero_pose: PR2
+        """
+        elbow = u'r_elbow_flex_link'
+        handle_frame_id = u'iai_kitchen/iai_fridge_door_handle'
+
+        tip_axis = Vector3Stamped()
+        tip_axis.header.frame_id = elbow
+        tip_axis.vector.x = 1
+
+        env_axis = Vector3Stamped()
+        env_axis.header.frame_id = handle_frame_id
+        env_axis.vector.z = 1
+        kitchen_setup.align_planes(elbow, tip_axis, root_normal=env_axis, weight=WEIGHT_ABOVE_CA)
+        kitchen_setup.send_and_check_goal()
+
+        map_T_gripper = tf.transform_vector(handle_frame_id, tip_axis)
+        np.testing.assert_almost_equal(map_T_gripper.vector.x, env_axis.vector.x, decimal=2)
+        np.testing.assert_almost_equal(map_T_gripper.vector.y, env_axis.vector.y, decimal=2)
+        np.testing.assert_almost_equal(map_T_gripper.vector.z, env_axis.vector.z, decimal=2)
+
     def test_grasp_fridge_handle(self, kitchen_setup):
         """
         :type kitchen_setup: PR2
@@ -1032,13 +1054,14 @@ class TestConstraints(object):
         elbow = u'r_elbow_flex_link'
 
         tip_axis = Vector3Stamped()
-        tip_axis.header.frame_id = kitchen_setup.r_tip
+        tip_axis.header.frame_id = elbow
         tip_axis.vector.x = 1
 
         env_axis = Vector3Stamped()
         env_axis.header.frame_id = handle_frame_id
         env_axis.vector.z = 1
         kitchen_setup.align_planes(elbow, tip_axis, root_normal=env_axis, weight=WEIGHT_ABOVE_CA)
+        kitchen_setup.allow_all_collisions()
         kitchen_setup.send_and_check_goal()
         elbow_pose = PoseStamped()
         elbow_pose.header.frame_id = handle_frame_id

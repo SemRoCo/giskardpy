@@ -14,6 +14,7 @@ from rospy import ROSException
 import giskardpy.identifier as identifier
 import giskardpy.pybullet_wrapper as pbw
 from giskardpy import logging
+from giskardpy.global_planner import GlobalPlanner
 from giskardpy.god_map import GodMap
 from giskardpy.input_system import JointStatesInput
 from giskardpy.plugin import PluginBehavior
@@ -191,6 +192,7 @@ def grow_tree():
     # ----------------------------------------------
     # ----------------------------------------------
     planning_1 = Sequence(u'planning I')
+    planning_1.add_child(GlobalPlanner(u'global planner', action_server_name))
     planning_1.add_child(GoalToConstraints(u'update constraints', action_server_name))
     planning_1.add_child(planning_2)
     planning_1.add_child(running_is_success(TimePlugin)(u'time for zero velocity'))

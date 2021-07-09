@@ -48,7 +48,7 @@ plugins:
     normalize_position: False # centers the joint positions around 0 on the y axis
     tick_stride: 0.5 # the distance between ticks in the plot. if tick_stride <= 0 pyplot determines the ticks automatically
   WiggleCancel: # cancels planning if high frequencies are detected in the trajectory
-    amplitude_threshold: 0.15 # the amplitude of a frequency must exceed this threshold to be detected as wiggling
+    amplitude_threshold: 0.55 # the amplitude of a frequency must exceed this threshold to be detected as wiggling
     window_size: 21 # size of the moving window of sample points
     frequency_range: 0.4 # must be in the range [0,1]. Only frequencies in the range [max_detectable_frequency * wiggle_frequency_range, max_detectable_frequency] are considered as wiggling. So a value of 0 means that every frequency with an amplitude above wiggle_detection_threshold is detected as wiggling and a value of 1 means that only the max_detectable_frequency can trigger a wiggle detection.      max_detectable_frequency = 1 / (2 * sample_period)
   tf_publisher:

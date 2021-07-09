@@ -702,6 +702,157 @@ class JointPositionRevolute(Constraint):
         return u'{}/{}'.format(s, self.joint_name)
 
 
+class ShakyJointPositionRevoluteOrPrismatic(Constraint):
+    goal = u'goal'
+    weight = u'weight'
+    max_velocity = u'max_velocity'
+    max_acceleration = u'max_acceleration'
+    frequency = u'frequency'
+    noise_amplitude = u'noise_amplitude'
+
+    def __init__(self, god_map, joint_name, goal, frequency, noise_amplitude=1.0, weight=WEIGHT_BELOW_CA,
+                 max_velocity=3451, max_acceleration=1, goal_constraint=True):
+        """
+        This goal will move a revolute or prismatic joint to the goal position and shake the joint with the given frequency.
+        :param joint_name: str
+        :param goal: float
+        :param frequency: float
+        :param noise_amplitude: float
+        :param weight: float, default WEIGHT_BELOW_CA
+        :param max_velocity: float, rad/s, default 3451, meaning the urdf/config limits are active
+        """
+        super(ShakyJointPositionRevoluteOrPrismatic, self).__init__(god_map)
+        self.joint_name = joint_name
+        self.goal_constraint = goal_constraint
+        if not self.get_robot().is_joint_revolute(joint_name) and not self.get_robot().is_joint_prismatic(joint_name):
+            raise ConstraintException(u'{} called with non revolute/prismatic joint {}'.format(self.__class__.__name__,
+                                                                                               joint_name))
+
+        params = {self.goal: goal,
+                  self.frequency: frequency,
+                  self.noise_amplitude: noise_amplitude,
+                  self.weight: weight,
+                  self.max_velocity: max_velocity,
+                  self.max_acceleration: max_acceleration}
+        self.save_params_on_god_map(params)
+
+    def make_constraints(self):
+        """
+        example:
+        name='ShakyJointPositionRevoluteOrPrismatic'
+        parameter_value_pair='{
+            "joint_name": "r_wrist_flex_joint", #required
+            "goal_position": -1.0, #required
+            "frequency": 5.0, #required
+            "weight": 1, #optional
+            "max_velocity": 1 #optional -- rad/s or m/s depending on joint; can not go higher than urdf limit
+        }'
+        :return:
+        """
+        current_joint = self.get_input_joint_position(self.joint_name)
+        frequency = self.get_input_float(self.frequency)
+        noise_amplitude = self.get_input_float(self.noise_amplitude)
+        time = self.get_god_map().to_symbol(identifier.time)
+        time_in_secs = self.get_input_sampling_period() * time
+        joint_goal = self.get_input_float(self.goal)
+        weight = self.get_input_float(self.weight)
+
+        max_velocity = w.Min(self.get_input_float(self.max_velocity),
+                             self.get_robot().get_joint_velocity_limit_expr(self.joint_name))
+
+        fun_params = frequency * 2.0 * w.pi * time_in_secs
+        err = (joint_goal - current_joint) + noise_amplitude * max_velocity * w.sin(fun_params)
+        capped_err = self.limit_velocity(err, noise_amplitude * max_velocity)
+
+        weight = self.normalize_weight(max_velocity, weight)
+
+        self.add_constraint('',
+                            lower=capped_err,
+                            upper=capped_err,
+                            weight=weight,
+                            expression=current_joint,
+                            goal_constraint=self.goal_constraint)
+
+    def __str__(self):
+        s = super(ShakyJointPositionRevoluteOrPrismatic, self).__str__()
+        return u'{}/{}'.format(s, self.joint_name)
+
+class ShakyJointPositionContinuous(Constraint):
+    goal = u'goal'
+    weight = u'weight'
+    max_velocity = u'max_velocity'
+    max_acceleration = u'max_acceleration'
+    frequency = u'frequency'
+    noise_amplitude = u'noise_amplitude'
+
+
+    def __init__(self, god_map, joint_name, goal, frequency, noise_amplitude=10, weight=WEIGHT_BELOW_CA,
+                 max_velocity=3451, max_acceleration=1, goal_constraint=True):
+        """
+        This goal will move a continuous joint to the goal position and shake the joint with the given frequency.
+        :param joint_name: str
+        :param goal: float
+        :param frequency: float
+        :param noise_amplitude: float
+        :param weight: float, default WEIGHT_BELOW_CA
+        :param max_velocity: float, rad/s, default 3451, meaning the urdf/config limits are active
+        """
+        super(ShakyJointPositionContinuous, self).__init__(god_map)
+        self.joint_name = joint_name
+        self.goal_constraint = goal_constraint
+        if not self.get_robot().is_joint_continuous(joint_name):
+            raise ConstraintException(u'{} called with non continuous joint {}'.format(self.__class__.__name__,
+                                                                                     joint_name))
+
+        params = {self.goal: goal,
+                  self.frequency: frequency,
+                  self.noise_amplitude: noise_amplitude,
+                  self.weight: weight,
+                  self.max_velocity: max_velocity,
+                  self.max_acceleration: max_acceleration}
+        self.save_params_on_god_map(params)
+
+    def make_constraints(self):
+        """
+        example:
+        name='JointPosition'
+        parameter_value_pair='{
+            "joint_name": "l_wrist_roll_joint", #required
+            "goal_position": -5.0, #required
+            "frequency": 5.0, #required
+            "weight": 1, #optional
+            "max_velocity": 1 #optional -- rad/s or m/s depending on joint; can not go higher than urdf limit
+        }'
+        :return:
+        """
+        current_joint = self.get_input_joint_position(self.joint_name)
+        frequency = self.get_input_float(self.frequency)
+        noise_amplitude = self.get_input_float(self.noise_amplitude)
+        time = self.get_god_map().to_symbol(identifier.time)
+        time_in_secs = self.get_input_sampling_period() * time
+        joint_goal = self.get_input_float(self.goal)
+        weight = self.get_input_float(self.weight)
+
+        max_velocity = w.Min(self.get_input_float(self.max_velocity),
+                             self.get_robot().get_joint_velocity_limit_expr(self.joint_name))
+
+        fun_params = frequency * 2.0 * w.pi * time_in_secs
+        err = w.shortest_angular_distance(current_joint, joint_goal) + noise_amplitude * max_velocity * w.sin(fun_params)
+        capped_err = self.limit_velocity(err, noise_amplitude * max_velocity)
+
+        weight = self.normalize_weight(max_velocity, weight)
+
+        self.add_constraint('',
+                            lower=capped_err,
+                            upper=capped_err,
+                            weight=weight,
+                            expression=current_joint,
+                            goal_constraint=self.goal_constraint)
+
+    def __str__(self):
+        s = super(ShakyJointPositionContinuous, self).__str__()
+        return u'{}/{}'.format(s, self.joint_name)
+
 class AvoidJointLimitsRevolute(Constraint):
     goal = u'goal'
     weight_id = u'weight'
@@ -926,7 +1077,6 @@ class BasicCartesianConstraint(Constraint):
 
 
 class CartesianPosition(BasicCartesianConstraint):
-
 
     def __init__(self, god_map, root_link, tip_link, goal, max_velocity=0.1, max_acceleration=0.1,
                  weight=WEIGHT_ABOVE_CA, goal_constraint=False):
@@ -2208,7 +2358,8 @@ class OpenDoor(Constraint):
     hinge0_P_tipStart_norm_id = u'hinge0_P_tipStart_norm'
     weight_id = u'weight'
 
-    def __init__(self, god_map, tip_link, object_name, object_link_name, angle_goal, root_link=None, weight=WEIGHT_ABOVE_CA):
+    def __init__(self, god_map, tip_link, object_name, object_link_name, angle_goal, root_link=None,
+                 weight=WEIGHT_ABOVE_CA):
         super(OpenDoor, self).__init__(god_map)
 
         if root_link is None:
@@ -2334,7 +2485,8 @@ class OpenDrawer(Constraint):
     hinge_V_hinge_axis_msg_id = u'hinge_axis'  # axis vector of the hinge
     root_T_tip_goal_id = u'root_T_tipGoal'  # goal of the gripper tip (where to move)
 
-    def __init__(self, god_map, tip_link, object_name, object_link_name, distance_goal, root_link=None, weight=WEIGHT_ABOVE_CA):
+    def __init__(self, god_map, tip_link, object_name, object_link_name, distance_goal, root_link=None,
+                 weight=WEIGHT_ABOVE_CA):
         """
         :type tip_link: str
         :param tip_link: tip of manipulator (gripper) which is used

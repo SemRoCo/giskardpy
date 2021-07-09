@@ -26,7 +26,7 @@ from giskardpy.plugin_configuration import ConfigurationPlugin
 from giskardpy.plugin_goal_reached import GoalReachedPlugin
 from giskardpy.plugin_if import IF
 from giskardpy.plugin_instantaneous_controller import ControllerPlugin
-from giskardpy.plugin_interrupts import WiggleCancel
+from giskardpy.plugin_interrupts import WiggleCancel, MaxTrajLength
 from giskardpy.plugin_kinematic_sim import KinSimPlugin
 from giskardpy.plugin_log_debug_expressions import LogDebugExpressionsPlugin
 from giskardpy.plugin_log_trajectory import LogTrajPlugin
@@ -206,7 +206,7 @@ def grow_tree():
     planning_4.add_plugin(LoopDetector(u'loop detector'))
     planning_4.add_plugin(GoalReachedPlugin(u'goal reached'))
     planning_4.add_plugin(TimePlugin(u'time'))
-    # planning_3.add_plugin(MaxTrajLength(u'traj length check'))
+    planning_4.add_plugin(MaxTrajLength(u'traj length check', 15))
     # ----------------------------------------------
     # ----------------------------------------------
     planning_3 = Sequence(u'planning III', sleep=0)

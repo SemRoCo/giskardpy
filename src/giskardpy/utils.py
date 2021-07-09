@@ -421,9 +421,11 @@ def plot_trajectory(tj, controlled_joints, path_to_data_folder, sample_period, o
         for i in range(order):
             axs[i].set_title(titles[i])
             axs[i].xaxis.set_ticks(ticks)
+            axs[i].set_ylim([-0.5, 0.5])
     else:
         for i in range(order):
             axs[i].set_title(titles[i])
+            axs[i].set_ylim([-0.5, 0.5])
     for i in range(len(controlled_joints)):
         if velocity_threshold is None or any(abs(data[1][:, i]) > velocity_threshold):
             for j in range(order):

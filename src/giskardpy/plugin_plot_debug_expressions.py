@@ -9,11 +9,12 @@ from giskardpy.utils import plot_trajectory
 
 
 class PlotDebugExpressions(GiskardBehavior):
-    def __init__(self, name, order):
+    def __init__(self, name, enabled, history, scaling, tick_stride, order=2):
         super(PlotDebugExpressions, self).__init__(name)
         self.order = order
-        self.scaling = self.get_god_map().get_data(identifier.PlotTrajectory_scaling)
-        self.tick_stride = self.get_god_map().get_data(identifier.PlotTrajectory_tick_stride)
+        self.scaling = scaling
+        self.history = history
+        self.tick_stride = tick_stride
         self.path_to_data_folder = self.get_god_map().get_data(identifier.data_folder)
 
     def update(self):
@@ -24,7 +25,7 @@ class PlotDebugExpressions(GiskardBehavior):
             try:
                 plot_trajectory(trajectory, controlled_joints, self.path_to_data_folder, sample_period, self.order,
                                 None, self.scaling, False, self.tick_stride,
-                                file_name='debug.pdf')
+                                file_name='debug.pdf', history=self.history)
             except Exception:
                 traceback.print_exc()
                 logwarn(u'failed to save debug. pdf')

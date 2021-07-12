@@ -248,9 +248,12 @@ def grow_tree():
     # ----------------------------------------------
     post_processing = failure_is_success(Sequence)(u'post planning')
     # post_processing.add_child(WiggleCancel(u'final wiggle detection', final_detection=True))
-    if god_map.get_data(identifier.enable_PlotTrajectory):
-        post_processing.add_child(PlotTrajectory(u'plot trajectory', order=4))
-        post_processing.add_child(PlotDebugExpressions(u'plot lba', order=2))
+    if god_map.get_data(identifier.PlotTrajectory_enabled):
+        kwargs = god_map.get_data(identifier.PlotTrajectory)
+        post_processing.add_child(PlotTrajectory(u'plot trajectory', **kwargs))
+    if god_map.get_data(identifier.PlotDebugTrajectory_enabled):
+        kwargs = god_map.get_data(identifier.PlotDebugTrajectory)
+        post_processing.add_child(PlotDebugExpressions(u'plot debug expressions', **kwargs))
     post_processing.add_child(PostProcessing(u'evaluate result'))
     # post_processing.add_child(PostProcessing(u'check reachability'))
     # ----------------------------------------------

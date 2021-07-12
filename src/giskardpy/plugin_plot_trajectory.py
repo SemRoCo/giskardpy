@@ -7,13 +7,14 @@ from giskardpy.utils import plot_trajectory
 
 
 class PlotTrajectory(GiskardBehavior):
-    def __init__(self, name, order):
+    def __init__(self, name, enabled, history, velocity_threshold, scaling, normalize_position, tick_stride, order=4):
         super(PlotTrajectory, self).__init__(name)
         self.order = order
-        self.velocity_threshold = self.get_god_map().get_data(identifier.PlotTrajectory_velocity_threshold)
-        self.scaling = self.get_god_map().get_data(identifier.PlotTrajectory_scaling)
-        self.normalize_position = self.get_god_map().get_data(identifier.PlotTrajectory_normalize_position)
-        self.tick_stride = self.get_god_map().get_data(identifier.PlotTrajectory_tick_stride)
+        self.history = history
+        self.velocity_threshold = velocity_threshold
+        self.scaling = scaling
+        self.normalize_position = normalize_position
+        self.tick_stride = tick_stride
         self.path_to_data_folder = self.get_god_map().get_data(identifier.data_folder)
 
     def update(self):
@@ -23,7 +24,8 @@ class PlotTrajectory(GiskardBehavior):
             controlled_joints = self.get_robot().controlled_joints
             try:
                 plot_trajectory(trajectory, controlled_joints, self.path_to_data_folder, sample_period, self.order,
-                                self.velocity_threshold, self.scaling, self.normalize_position, self.tick_stride)
+                                self.velocity_threshold, self.scaling, self.normalize_position, self.tick_stride,
+                                history=self.history)
             except Exception:
                 logwarn(u'failed to save trajectory pdf')
         return Status.SUCCESS

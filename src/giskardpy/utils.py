@@ -362,7 +362,7 @@ def create_path(path):
 
 
 def plot_trajectory(tj, controlled_joints, path_to_data_folder, sample_period, order=3, velocity_threshold=0.0,
-                    scaling=0.2, normalize_position=False, tick_stride=1.0, file_name=u'trajectory.pdf'):
+                    scaling=0.2, normalize_position=False, tick_stride=1.0, file_name=u'trajectory.pdf', history=5):
     """
     :type tj: Trajectory
     :param controlled_joints: only joints in this list will be added to the plot
@@ -440,7 +440,23 @@ def plot_trajectory(tj, controlled_joints, path_to_data_folder, sample_period, o
     for i in range(order):
         axs[i].grid()
 
-    plt.savefig(path_to_data_folder + file_name, bbox_inches="tight")
+    file_name = path_to_data_folder + file_name
+    last_file_name = file_name.replace('.pdf', '{}.pdf'.format(history))
+
+    if os.path.isfile(file_name):
+        if os.path.isfile(last_file_name):
+            os.remove(last_file_name)
+        for i in np.arange(history, 0, -1):
+            if i == 1:
+                previous_file_name = file_name
+            else:
+                previous_file_name = file_name.replace('.pdf', '{}.pdf'.format(i-1))
+            current_file_name = file_name.replace('.pdf', '{}.pdf'.format(i))
+            try:
+                os.rename(previous_file_name, current_file_name)
+            except FileNotFoundError:
+                pass
+    plt.savefig(file_name, bbox_inches="tight")
 
 
 def resolve_ros_iris_in_urdf(input_urdf):

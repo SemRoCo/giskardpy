@@ -88,11 +88,13 @@ plugins = rosparam + [u'plugins']
 enable_VisualizationBehavior = plugins + [u'VisualizationBehavior', u'enabled']
 enable_WorldVisualizationBehavior = plugins + [u'WorldVisualizationBehavior', u'enabled']
 enable_CPIMarker = plugins + [u'CPIMarker', u'enabled']
-enable_PlotTrajectory = plugins + [u'PlotTrajectory', u'enabled']
-PlotTrajectory_velocity_threshold = plugins + [u'PlotTrajectory', u'velocity_threshold']
-PlotTrajectory_scaling = plugins + [u'PlotTrajectory', u'scaling']
-PlotTrajectory_normalize_position = plugins + [u'PlotTrajectory', u'normalize_position']
-PlotTrajectory_tick_stride = plugins + [u'PlotTrajectory', u'tick_stride']
+
+PlotTrajectory = plugins + [u'PlotTrajectory']
+PlotTrajectory_enabled = PlotTrajectory + [u'enabled']
+
+PlotDebugTrajectory = plugins + [u'PlotDebugTrajectory']
+PlotDebugTrajectory_enabled = PlotDebugTrajectory + [u'enabled']
+
 fft_duration = plugins + [u'WiggleCancel', u'fft_duration']
 amplitude_threshold = plugins + [u'WiggleCancel', u'amplitude_threshold']
 num_samples_in_fft = plugins + [u'WiggleCancel', u'window_size']

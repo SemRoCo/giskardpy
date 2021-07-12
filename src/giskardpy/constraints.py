@@ -952,7 +952,7 @@ class BasicCartesianGoal(Goal):
 
 
 class CartesianPosition(BasicCartesianGoal):
-    def __init__(self, god_map, root_link, tip_link, goal, reference_velocity=None, max_velocity=0.1,
+    def __init__(self, god_map, root_link, tip_link, goal, reference_velocity=None, max_velocity=0.2,
                  weight=WEIGHT_ABOVE_CA, **kwargs):
         """
         This goal will use the kinematic chain between root and tip link to achieve a goal position for tip link

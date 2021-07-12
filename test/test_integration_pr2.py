@@ -3110,14 +3110,18 @@ class TestCollisionAvoidanceGoals(object):
         :type kitchen_setup: PR2
         """
         base_pose = PoseStamped()
+        base_pose.header.stamp = rospy.get_rostime()
         base_pose.header.frame_id = u'map'
-        base_pose.pose.position.x = 0.8
+        base_pose.pose.position.x = 0.75
         base_pose.pose.position.y = 0.9
         base_pose.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 2, [0, 0, 1]))
         kitchen_setup.teleport_base(base_pose)
         base_pose.pose.orientation = Quaternion(*quaternion_about_axis(np.pi, [0, 0, 1]))
-        kitchen_setup.set_joint_goal(gaya_pose, weight=WEIGHT_ABOVE_CA)
-        kitchen_setup.set_and_check_cart_goal(base_pose, u'base_footprint', expected_error_codes=[MoveResult.SHAKING])
+        kitchen_setup.set_joint_goal(gaya_pose)#, weight=WEIGHT_ABOVE_CA)
+        kitchen_setup.set_rotation_goal(base_pose, u'base_footprint')
+        kitchen_setup.set_translation_goal(base_pose, u'base_footprint', weight=WEIGHT_BELOW_CA)
+        kitchen_setup.send_and_check_goal()
+        kitchen_setup.check_cart_goal(u'base_footprint', base_pose)
         kitchen_setup.check_current_joint_state(gaya_pose)
 
     def test_avoid_collision8(self, kitchen_setup):

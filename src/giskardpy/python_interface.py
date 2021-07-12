@@ -89,7 +89,7 @@ class GiskardWrapper(object):
         self.set_straight_translation_goal(goal_pose, tip_link, root_link, max_velocity=trans_max_velocity, weight=weight)
         self.set_rotation_goal(goal_pose, root_link, tip_link, max_velocity=rot_max_velocity, weight=weight)
 
-    def set_translation_goal(self, goal_pose, tip_link, root_link, weight=None, max_velocity=None):
+    def set_translation_goal(self, goal_pose, tip_link, root_link, weight=None, max_velocity=None, **kwargs):
         """
         This goal will use the kinematic chain between root and tip link to move tip link into the goal position
         :param root_link: name of the root link of the kin chain
@@ -113,6 +113,7 @@ class GiskardWrapper(object):
             params[u'max_velocity'] = max_velocity
         if weight:
             params[u'weight'] = weight
+        params.update(kwargs)
         constraint.parameter_value_pair = json.dumps(params)
         self.cmd_seq[-1].constraints.append(constraint)
 
@@ -144,7 +145,7 @@ class GiskardWrapper(object):
         constraint.parameter_value_pair = json.dumps(params)
         self.cmd_seq[-1].constraints.append(constraint)
 
-    def set_rotation_goal(self, goal_pose, tip_link, root_link, weight=None, max_velocity=None):
+    def set_rotation_goal(self, goal_pose, tip_link, root_link, weight=None, max_velocity=None, **kwargs):
         """
         This goal will use the kinematic chain between root and tip link to move tip link into the goal orientation
         :param root_link: name of the root link of the kin chain
@@ -168,6 +169,7 @@ class GiskardWrapper(object):
             params[u'max_velocity'] = max_velocity
         if weight:
             params[u'weight'] = weight
+        params.update(kwargs)
         constraint.parameter_value_pair = json.dumps(params)
         self.cmd_seq[-1].constraints.append(constraint)
 

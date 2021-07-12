@@ -42,12 +42,12 @@ general_options:
     # the planner prefers low weight joints to achieve solutions
     # higher weights reduce wiggling, but lower the maximum joint velocity, which might make the planner stop too early
     velocity:
-      default: 0.01
+      default: 0.001
       override:
-        odom_x_joint: 0.1
-        odom_y_joint: 0.1
-        odom_z_joint: 0.1
-        torso_lift_joint: 0.05
+        odom_x_joint: 0.01
+        odom_y_joint: 0.01
+        odom_z_joint: 0.01
+        torso_lift_joint: 0.005
     acceleration:
       default: 0
       override: {}

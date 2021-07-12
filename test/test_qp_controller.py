@@ -81,7 +81,7 @@ def two_joint_setup(sample_period=0.05, prediction_horizon=10, j_start=0, j2_sta
         'j2_j': 0,
         'sample_period': sample_period
     }
-    joint_weight = 1
+    joint_weight = 0.01
 
     def hf(w, t):
         return w + w * 10 * t
@@ -132,7 +132,7 @@ def test_joint_goal():
 
     goal_s, goal2_s = ca.var('goal goal2')
     goal1 = -0.5
-    goal2 = 1.5
+    goal2 = 1.2
     state['goal'] = goal1
     state['goal2'] = goal2
 
@@ -178,6 +178,7 @@ def test_joint_goal_vel_limit():
 
     error = goal_s - j
     error2 = goal2_s - j2
+    weight = 10
 
     constraints = [
         Constraint('j1 goal',
@@ -185,14 +186,14 @@ def test_joint_goal_vel_limit():
                    lower_error=error,
                    upper_error=error,
                    velocity_limit=j1_vel,
-                   quadratic_weight=1,
+                   quadratic_weight=weight,
                    control_horizon=ph - 2),
         Constraint('j2 goal',
                    expression=j2,
                    lower_error=error2,
                    upper_error=error2,
                    velocity_limit=j2_vel,
-                   quadratic_weight=1,
+                   quadratic_weight=weight,
                    control_horizon=ph - 2),
     ]
     vel_constraints = [
@@ -200,13 +201,13 @@ def test_joint_goal_vel_limit():
                            expression=j,
                            lower_velocity_limit=-j1_vel,
                            upper_velocity_limit=j1_vel,
-                           quadratic_weight=10000,
+                           quadratic_weight=100,
                            control_horizon=ph - 2),
         VelocityConstraint('j2 goal vel',
                            expression=j2,
                            lower_velocity_limit=-j2_vel,
                            upper_velocity_limit=j2_vel,
-                           quadratic_weight=1,
+                           quadratic_weight=100,
                            lower_slack_limit=0,
                            upper_slack_limit=0,
                            control_horizon=ph - 2),
@@ -452,13 +453,10 @@ def test_fk2():
     g = ca.Matrix([gx, gy])
 
     e = g - fk
-    em = ca.norm(e)
     state['gx'] = 2
     state['gy'] = 1
     c_max_vel = 0.5
     vel = 0.5
-    error_weight = 1
-    error_direction = ca.scale(e, c_max_vel)
     constraints = [
         Constraint('x',
                    expression=fk[0],
@@ -476,8 +474,16 @@ def test_fk2():
                    control_horizon=ch),
     ]
     vel_constraints = [
-        VelocityConstraint('trans vel',
-                           expression=em,
+        VelocityConstraint('trans vel x',
+                           expression=fk[0],
+                           lower_velocity_limit=-vel,
+                           upper_velocity_limit=vel,
+                           quadratic_weight=100000,
+                           control_horizon=ph - 2,
+                           lower_slack_limit=None,
+                           upper_slack_limit=None),
+        VelocityConstraint('trans vel y',
+                           expression=fk[1],
                            lower_velocity_limit=-vel,
                            upper_velocity_limit=vel,
                            quadratic_weight=100000,

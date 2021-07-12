@@ -427,15 +427,17 @@ class GiskardTestWrapper(GiskardWrapper):
         goal.pose.orientation.w = 1
         self.set_rotation_goal(goal, tip, root)
 
-    def set_rotation_goal(self, goal_pose, tip_link, root_link=None, weight=None, max_velocity=None):
+    def set_rotation_goal(self, goal_pose, tip_link, root_link=None, weight=None, max_velocity=None, **kwargs):
         if not root_link:
             root_link = self.default_root
-        super(GiskardTestWrapper, self).set_rotation_goal(goal_pose, tip_link, root_link, max_velocity=max_velocity)
+        super(GiskardTestWrapper, self).set_rotation_goal(goal_pose, tip_link, root_link, max_velocity=max_velocity,
+                                                          weight=weight, **kwargs)
 
-    def set_translation_goal(self, goal_pose, tip_link, root_link=None, weight=None, max_velocity=None):
+    def set_translation_goal(self, goal_pose, tip_link, root_link=None, weight=None, max_velocity=None, **kwargs):
         if not root_link:
             root_link = self.default_root
-        super(GiskardTestWrapper, self).set_translation_goal(goal_pose, tip_link, root_link, max_velocity=max_velocity)
+        super(GiskardTestWrapper, self).set_translation_goal(goal_pose, tip_link, root_link, max_velocity=max_velocity,
+                                                             weight=weight, **kwargs)
 
 
     def set_straight_translation_goal(self, goal_pose, tip_link, root_link=None, weight=None, max_velocity=None):

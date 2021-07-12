@@ -19,7 +19,7 @@ class Constraint(object):
                  lower_error, upper_error,
                  velocity_limit,
                  quadratic_weight, control_horizon, linear_weight=None,
-                 lower_slack_limit=None, upper_slack_limit=None,):
+                 lower_slack_limit=None, upper_slack_limit=None, ):
         self.name = name
         self.expression = expression
         self.quadratic_weight = quadratic_weight
@@ -36,6 +36,10 @@ class Constraint(object):
 
     def __str__(self):
         return self.name
+
+    def normalized_weight(self, prediction_horizon):
+        weight_normalized = self.quadratic_weight * (1 / (self.velocity_limit)) ** 2
+        return weight_normalized
 
 
 class VelocityConstraint(object):
@@ -63,11 +67,17 @@ class VelocityConstraint(object):
             self.upper_slack_limit = upper_slack_limit
         if linear_weight is not None:
             self.linear_weight = linear_weight
+
         def default_horizon_function(weight, t):
             return weight
+
         self.horizon_function = default_horizon_function
         if horizon_function is not None:
             self.horizon_function = horizon_function
+
+    def normalized_weight(self, t):
+        weight_normalized = self.quadratic_weight * (1 / self.upper_velocity_limit) ** 2
+        return self.horizon_function(weight_normalized, t)
 
 
 class FreeVariable(object):
@@ -82,8 +92,10 @@ class FreeVariable(object):
                  jerk_symbol=None, jerk_horizon_function=None, linear_weight=None):
         self.position_symbol = position_symbol
         self.velocity_symbol = velocity_symbol
+
         def default_horizon_f(weight, t):
             return weight
+
         self.velocity_horizon_function = velocity_horizon_function or default_horizon_f
         self.acceleration_horizon_function = acceleration_horizon_function or default_horizon_f
         self.jerk_horizon_function = jerk_horizon_function or default_horizon_f
@@ -105,6 +117,18 @@ class FreeVariable(object):
 
     def has_position_limits(self):
         return self.lower_position_limit is not None and abs(self.upper_position_limit) < 100
+
+    def normalized_velocity_weight(self, t):
+        weight_normalized = self.quadratic_velocity_weight * (1 / self.upper_velocity_limit) ** 2
+        return self.velocity_horizon_function(weight_normalized, t)
+
+    def normalized_acceleration_weight(self, t):
+        weight_normalized = self.quadratic_acceleration_weight * (1 / self.upper_acceleration_limit) ** 2
+        return self.acceleration_horizon_function(weight_normalized, t)
+
+    def normalized_jerk_weight(self, t):
+        weight_normalized = self.quadratic_jerk_weight * (1 / self.upper_jerk_limit) ** 2
+        return self.jerk_horizon_function(weight_normalized, t)
 
     def __str__(self):
         return self.name

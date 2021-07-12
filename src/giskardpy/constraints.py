@@ -251,13 +251,8 @@ class Goal(object):
 
     def normalize_weight(self, velocity_limit, weight):
         # sample_period = self.get_input_sampling_period()
-        result = weight * (1. / (velocity_limit)) ** 2
-        return result
-
-    def normalize_weight2(self, acceleration_limit, weight):
-        sample_period = self.get_input_sampling_period()
-        result = weight * (1. / (sample_period * acceleration_limit)) ** 2
-        return result
+        # result = weight * (1. / (velocity_limit)) ** 2
+        return weight
 
     def get_constraints(self):
         """
@@ -371,24 +366,6 @@ class Goal(object):
                                          velocity_limit=max_velocity,
                                          weight=weight,
                                          expression=trans_error)
-        # self.add_velocity_constraint(u'{}/vel/x'.format(prefix),
-        #                              velocity_limit=max_velocity,
-        #                              weight=weight * 1000,
-        #                              expression=r_P_error[0],
-        #                              lower_slack_limit=-1,
-        #                              upper_slack_limit=1)
-        # self.add_velocity_constraint(u'{}/vel/y'.format(prefix),
-        #                              velocity_limit=max_velocity,
-        #                              weight=weight * 1000,
-        #                              expression=r_P_error[1],
-        #                              lower_slack_limit=-1,
-        #                              upper_slack_limit=1)
-        # self.add_velocity_constraint(u'{}/vel/z'.format(prefix),
-        #                              velocity_limit=max_velocity,
-        #                              weight=weight * 1000,
-        #                              expression=r_P_error[2],
-        #                              lower_slack_limit=-1,
-        #                              upper_slack_limit=1)
 
     def add_minimize_vector_angle_constraints(self, max_velocity, root, tip, tip_V_tip_normal, root_V_goal_normal,
                                               weight=WEIGHT_BELOW_CA, goal_constraint=False, prefix=u''):
@@ -462,10 +439,11 @@ class Goal(object):
                             upper_error=tip_Q_goal[2],
                             weight=weight,
                             expression=expr[2])
-        self.add_velocity_constraint(u'{}/q/vel'.format(prefix),
-                                     velocity_limit=max_velocity,
-                                     weight=weight*1000,
-                                     expression=angle_error2)
+        if max_velocity is not None:
+            self.add_velocity_constraint(u'{}/q/vel'.format(prefix),
+                                         velocity_limit=max_velocity,
+                                         weight=weight*1000,
+                                         expression=angle_error2)
         # w is not needed because its derivative is always 0 for identity quaternions
 
 
@@ -1237,7 +1215,7 @@ class CartesianVelocityLimit(Goal):
 
 
 class CartesianOrientation(BasicCartesianGoal):
-    def __init__(self, god_map, root_link, tip_link, goal, reference_velocity=None, max_velocity=0.3, max_accleration=0.5,
+    def __init__(self, god_map, root_link, tip_link, goal, reference_velocity=None, max_velocity=0.5, max_accleration=0.5,
                  weight=WEIGHT_ABOVE_CA, goal_constraint=False, **kwargs):
         """
         This goal will the kinematic chain from root_link to tip_link to achieve a rotation goal for the tip link
@@ -1458,11 +1436,11 @@ class ExternalCollisionAvoidance(Goal):
         upper_slack = w.if_greater(actual_distance, 50,  # assuming that distance of unchecked closest points is 100
                                    1e4,
                                    # 1e4,
-                                   w.max(0, lower_limit_limited) / (sample_period / self.prediction_horizon)
+                                   w.max(0, lower_limit_limited) / (sample_period * self.prediction_horizon)
                                    )
         hard_lower_limit = -w.limit(hard_threshold - actual_distance,
                                     -limit_of_lower_limit,
-                                    limit_of_lower_limit) / (sample_period / self.prediction_horizon)
+                                    limit_of_lower_limit) / (sample_period * self.prediction_horizon)
 
         upper_slack += hard_lower_limit
 
@@ -1714,11 +1692,11 @@ class SelfCollisionAvoidance(Goal):
         upper_slack = w.if_greater(actual_distance, 50,  # assuming that distance of unchecked closest points is 100
                                    1e4,
                                    # 1e4,
-                                   w.max(0, lower_limit_limited) / (sample_period / self.prediction_horizon)
+                                   w.max(0, lower_limit_limited) / (sample_period * self.prediction_horizon)
                                    )
         hard_lower_limit = -w.limit(hard_threshold - actual_distance,
                                     -limit_of_lower_limit,
-                                    limit_of_lower_limit) / (sample_period / self.prediction_horizon)
+                                    limit_of_lower_limit) / (sample_period * self.prediction_horizon)
 
         upper_slack += hard_lower_limit
 

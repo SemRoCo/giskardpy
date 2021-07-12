@@ -96,27 +96,27 @@ class H(Parent):
         vel_weights = {}
         for t in range(self.prediction_horizon):
             for v in self.free_variables:  # type: FreeVariable
-                vel_weights['t{}/{}/v'.format(t, v.name)] = v.velocity_horizon_function(v.quadratic_velocity_weight, t)
+                vel_weights['t{}/{}/v'.format(t, v.name)] = v.normalized_velocity_weight(t)
         acc_weights = {}
         for t in range(self.prediction_horizon):
             for v in self.free_variables:  # type: FreeVariable
-                acc_weights['t{}/{}/a'.format(t, v.name)] = v.acceleration_horizon_function(
-                    v.quadratic_acceleration_weight, t)
+                acc_weights['t{}/{}/a'.format(t, v.name)] = v.normalized_acceleration_weight(t)
         jerk_weights = {}
         for t in range(self.prediction_horizon):
             for v in self.free_variables:  # type: FreeVariable
-                jerk_weights['t{}/{}/j'.format(t, v.name)] = v.jerk_horizon_function(v.quadratic_jerk_weight, t)
+                jerk_weights['t{}/{}/j'.format(t, v.name)] = v.normalized_jerk_weight(t)
         slack_weights = {}
         for t in range(self.prediction_horizon):
             for c in self.velocity_constraints:  # type: VelocityConstraint
                 if t < c.control_horizon:
-                    slack_weights['t{}/{}'.format(t, c.name)] = c.horizon_function(c.quadratic_weight, t)
-        error_slack_weights = {'{}/error'.format(c.name): c.quadratic_weight for c in self.constraints}
+                    slack_weights['t{}/{}'.format(t, c.name)] = c.normalized_weight(t)
+        error_slack_weights = {'{}/error'.format(c.name): c.normalized_weight(self.prediction_horizon) for c in self.constraints}
         return self._sorter(vel_weights,
                             acc_weights,
                             jerk_weights,
                             slack_weights,
                             error_slack_weights)[0]
+
     @profile
     @memoize
     def make_error_id_to_vel_ids_map(self):
@@ -399,11 +399,11 @@ class A(Parent):
         #         |        |        |   -1   |    1   |        |   -sp  |        |   -sp  |
         #         |        |        |      -1|       1|        |     -sp|        |     -sp|
         #         |=======================================================================|
-        #         |  J*sp  |        |        |        |        |        |   I    |        |
+        #         |  J*sp  |        |        |        |        |        |   sp   |        |
         #         |-----------------------------------------------------------------------|
-        #         |        |  J*sp  |        |        |        |        |        |   I    |
+        #         |        |  J*sp  |        |        |        |        |        |   sp   |
         #         |-----------------------------------------------------------------------|
-        #         |  J*sp  |  J*sp  |        |        |        |        |   I    |   I    |
+        #         |  J*sp  |  J*sp  |        |        |        |        | sp/ph  | sp/ph  |
         #         |-----------------------------------------------------------------------|
 
         #         |   t1   |   t2   |   t3   |   t3   |
@@ -508,7 +508,7 @@ class A(Parent):
         # A_soft[vertical_offset:next_vertical_offset, -I.shape[1]-len(self.constraints):-len(self.constraints)] = I
         # TODO multiply with control horizon instead?
         # extra slack variable for total error
-        I = w.eye(J_hstack.shape[0]) * self.sample_period / self.prediction_horizon
+        I = w.eye(J_hstack.shape[0]) * self.sample_period * self.prediction_horizon
         A_soft[vertical_offset:next_vertical_offset, -I.shape[1]:] = I
 
         # delete rows with position limits of continuous joints
@@ -864,6 +864,7 @@ class QPController(object):
 
     @profile
     def _create_debug_pandas(self, substitutions, xdot_full=None, actually_print=False):
+        xdot_full = deepcopy(xdot_full)
         self.np_H = np.diag(self.np_weights)
         self.state = {k: v for k, v in zip(self.compiled_big_ass_M.str_params, substitutions)}
         sample_period = self.state[str(self.sample_period)]
@@ -874,6 +875,8 @@ class QPController(object):
         filtered_bA_names = np.array(bA_names)[bA_filter]
         H, g, A, lb, ub, lbA, ubA = self.filter_zero_weight_stuff(b_filter, bA_filter)
         # H, g, A, lb, ub, lbA, ubA = self.np_H, self.np_g, self.np_A, self.np_lb, self.np_ub, self.np_lbA, self.np_ubA
+        num_non_slack = len(self.free_variables) * self.prediction_horizon * 3
+        num_of_slack = len(lb) - num_non_slack
 
         debug_exprs = self._eval_debug_exprs(substitutions)
         self.p_debug = pd.DataFrame.from_dict(debug_exprs, orient='index', columns=['data']).sort_index()
@@ -881,8 +884,13 @@ class QPController(object):
         self.p_lb = pd.DataFrame(lb, filtered_b_names, [u'data'], dtype=float)
         self.p_ub = pd.DataFrame(ub, filtered_b_names, [u'data'], dtype=float)
         # self.p_g = pd.DataFrame(g, filtered_b_names, [u'data'], dtype=float)
-        self.p_lbA = pd.DataFrame(lbA, filtered_bA_names, [u'data'], dtype=float)
-        self.p_ubA = pd.DataFrame(ubA, filtered_bA_names, [u'data'], dtype=float)
+        self.p_lbA_raw = pd.DataFrame(lbA, filtered_bA_names, [u'data'], dtype=float)
+        self.p_lbA = deepcopy(self.p_lbA_raw)
+        self.p_ubA_raw = pd.DataFrame(ubA, filtered_bA_names, [u'data'], dtype=float)
+        self.p_ubA = deepcopy(self.p_ubA_raw)
+        # remove sample period factor
+        self.p_lbA[-num_of_slack:] /= sample_period
+        self.p_ubA[-num_of_slack:] /= sample_period
         self.p_weights = pd.DataFrame(self.np_H.dot(np.ones(self.np_H.shape[0])), b_names, [u'data'],
                                  dtype=float)
         self.p_A = pd.DataFrame(A, filtered_bA_names, filtered_b_names, dtype=float)
@@ -893,16 +901,13 @@ class QPController(object):
             self.p_xH = pd.DataFrame(xH, filtered_b_names, [u'data'], dtype=float)
             # p_xg = p_g * p_xdot
             xHx = np.dot(np.dot(xdot_full.T, H), xdot_full)
-            num_non_slack = len(self.free_variables) * self.prediction_horizon * 3
-            self.p_xdot2 = deepcopy(self.p_xdot)
-            self.p_xdot2[num_non_slack:] = 0
-            self.p_Ax = pd.DataFrame(self.p_A.dot(self.p_xdot), filtered_bA_names, [u'data'], dtype=float)
-            self.p_Ax2 = pd.DataFrame(self.p_A.dot(self.p_xdot2), filtered_bA_names, [u'data'], dtype=float)
-            self.p_Ax2 /= sample_period
 
-            # x_soft = xdot_full[len(xdot_full) - num_slack:]
-            # p_lbA_minus_x = pd.DataFrame(lbA - x_soft, filtered_bA_names, [u'data'], dtype=float).sort_index()
-            # p_ubA_minus_x = pd.DataFrame(ubA - x_soft, filtered_bA_names, [u'data'], dtype=float).sort_index()
+            self.p_pure_xdot = deepcopy(self.p_xdot)
+            self.p_pure_xdot[num_non_slack:] = 0
+            self.p_Ax = pd.DataFrame(self.p_A.dot(self.p_xdot), filtered_bA_names, [u'data'], dtype=float)
+            self.p_Ax_without_slack = pd.DataFrame(self.p_A.dot(self.p_pure_xdot), filtered_bA_names, [u'data'], dtype=float)
+            self.p_Ax_without_slack[-num_of_slack:] /= sample_period
+
         else:
             self.p_xdot = None
 

@@ -219,13 +219,13 @@ class Robot(Backend):
             jerk_limit = self.get_joint_jerk_limit_expr(joint_name)
 
             velocity_weight = self._joint_velocity_weights[joint_name]
-            velocity_weight = velocity_weight * (1. / (velocity_limit)) ** 2
+            # velocity_weight = velocity_weight * (1. / (velocity_limit)) ** 2
 
             acceleration_weight = self._joint_acceleration_weights[joint_name]
-            acceleration_weight = acceleration_weight * (1. / (acceleration_limit)) ** 2
+            # acceleration_weight = acceleration_weight * (1. / (acceleration_limit)) ** 2
 
             jerk_weight = self._joint_jerk_weights[joint_name]
-            jerk_weight = jerk_weight * (1. / (jerk_limit)) ** 2
+            # jerk_weight = jerk_weight * (1. / (jerk_limit)) ** 2
 
             def hf(w, t):
                 return w + w * 10 * t

@@ -227,6 +227,22 @@ def fake_table_setup(pocky_pose_setup):
     pocky_pose_setup.add_box(pose=p)
     return pocky_pose_setup
 
+@pytest.fixture()
+def kitchen_setup_avoid_collisions(resetted_giskard):
+    """
+    :type resetted_giskard: GiskardTestWrapper
+    :return:
+    """
+    resetted_giskard.avoid_all_collisions(distance=0.05)
+    resetted_giskard.send_and_check_joint_goal(gaya_pose)
+    object_name = u'kitchen'
+    resetted_giskard.add_urdf(object_name, rospy.get_param(u'kitchen_description'),
+                              tf.lookup_pose(u'map', u'iai_kitchen/world'), u'/kitchen/joint_states',
+                              set_js_topic=u'/kitchen/cram_joint_states')
+    js = {k: 0.0 for k in resetted_giskard.get_world().get_object(object_name).get_movable_joints()}
+    resetted_giskard.set_kitchen_js(js)
+    return resetted_giskard
+
 
 @pytest.fixture()
 def kitchen_setup(resetted_giskard):
@@ -1521,7 +1537,35 @@ class TestCartGoals(object):
         kitchen_setup.check_cart_goal(tip_link, goal_a)
         #zero_pose.check_cart_goal(zero_pose.l_tip, l_goal)
 
+    def test_pathAroundKitchenIsland_with_global_planner(self, kitchen_setup_avoid_collisions):
+        """
+        :type kitchen_setup_avoid_collisions: PR2
+        """
+        tip_link = u'base_footprint'
 
+        base_pose = PoseStamped()
+        base_pose.header.frame_id = tip_link
+        base_pose.pose.position.x = 0
+        base_pose.pose.position.y = 2.0
+        base_pose.pose.orientation = Quaternion(*quaternion_about_axis(0, [0, 0, 1]))
+        kitchen_setup_avoid_collisions.teleport_base(base_pose)
+
+        base_pose = PoseStamped()
+        base_pose.header.frame_id = tip_link
+        base_pose.pose.position.x = -1.75
+        base_pose.pose.position.y = 0
+        base_pose.pose.orientation = Quaternion(*quaternion_about_axis(0, [0, 0, 1]))
+        goal_c = base_pose
+
+        kitchen_setup_avoid_collisions.set_json_goal(u'CartesianPose',
+                                                     tip_link=tip_link,
+                                                     root_link=kitchen_setup_avoid_collisions.get_root(),
+                                                     goal=goal_c
+                                                     )
+
+        kitchen_setup_avoid_collisions.send_goal()
+        kitchen_setup_avoid_collisions.check_cart_goal(tip_link, goal_c)
+        #zero_pose.check_cart_goal(zero_pose.l_tip, l_goal)
 
 
 

@@ -2,12 +2,18 @@
 
 
 # Author: Mark Moll
+import rospy
+import yaml
 from py_trees import Status
+import pybullet as p
+from giskardpy.data_types import SingleJointState
 from rospy_message_converter.message_converter import convert_dictionary_to_ros_message
+from collections import defaultdict
+from copy import deepcopy
 
 import giskardpy.identifier as identifier
 from giskardpy.plugin_action_server import GetGoal
-from giskardpy.tfwrapper import lookup_transform, get_full_frame_name
+from giskardpy.tfwrapper import transform_pose
 
 from mpl_toolkits.mplot3d import Axes3D
 import numpy
@@ -24,8 +30,22 @@ class GlobalPlanner(GetGoal):
         self.kitchen_space = self.create_kitchen_space()
         self.kitchen_floor_space = self.create_kitchen_floor_space()
 
-        self.translation_goal = None
-        #self.rotation_goal = None
+        self.pose_goal = None
+        self.goal_dict = None
+        self.pybullet_joints = []
+        self.pybullet_robot_id = 2
+        self.pybullet_kitchen_id = 3
+        for i in range(0, p.getNumJoints(self.get_robot().get_pybullet_id())):
+            j = p.getJointInfo(self.get_robot().get_pybullet_id(), i)
+            if j[2] != p.JOINT_FIXED:
+                self.pybullet_joints.append(j[1].decode('UTF-8'))
+                # self.rotation_goal = None
+
+    def get_cart_goal(self, cmd):
+        try:
+            return next(c for c in cmd.constraints if c.type == "CartesianPose")
+        except StopIteration:
+            return None
 
     def update(self):
 
@@ -33,31 +53,51 @@ class GlobalPlanner(GetGoal):
         if not move_cmd:
             return Status.FAILURE
 
-        cart_cmds = move_cmd.cmd_seq.CartesianConstraint
-        if not cart_cmds:
-            return Status.FAILURE
+        cart_c = self.get_cart_goal(move_cmd)
+        if not cart_c:
+            return Status.SUCCESS
 
-        try:
-            self.translation_goal = next(cart_c for cart_c in cart_cmds if u'CartesianPosition' in cart_c.type)
-            #self.rotation_goal = next(cart_c for cart_c in cart_cmds if u'CartesianOrientationSlerp' in cart_c.type)
-        except StopIteration:
-            return Status.FAILURE
+        self.goal_dict = yaml.load(cart_c.parameter_value_pair)
+        ros_pose = convert_dictionary_to_ros_message(u'geometry_msgs/PoseStamped', self.goal_dict[u'goal'])
+        self.pose_goal = transform_pose(self.get_god_map().get_data(identifier.map_frame), ros_pose)
 
-        if self.translation_goal.parameter_value_pair[u'root_link'] == self.get_robot().get_root():
+        if self.goal_dict[u'tip_link'] == u'base_footprint':
             trajectory = self.planNavigation()
+            print(trajectory)
             if not trajectory:
                 return Status.FAILURE
             pass
         else:
-            pass #return self.planMovement()
+            pass  # return self.planMovement()
 
         return Status.SUCCESS
 
-    def isStateValid(self, state):
-        # Some arbitrary condition on the state (note that thanks to
-        # dynamic type checking we can just call getX() and do not need
-        # to convert state to an SE2State.)
-        return True # state.getX() < .6
+    # def isStateValidForNavigation(self, state):
+    #    # Some arbitrary condition on the state (note that thanks to
+    #    # dynamic type checking we can just call getX() and do not need
+    #    # to convert state to an SE2State.)
+    #    print("a")
+    #    x = state().getX()
+    #    y = state().getY()
+    #    current_js = self.get_god_map().get_data(identifier.joint_states)
+    #    new_js = deepcopy(current_js)
+    #    #collision_matrix = self.get_god_map().get_data(identifier.collision_matrix)
+    #    #collision_list_size = self.get_god_map().get_data(identifier.collision_list_size)
+    #    robot = self.get_robot()
+    #    state_ik = p.calculateInverseKinematics(robot.get_pybullet_id(), robot.get_pybullet_link_id(u'base_footprint'),
+    #                                            [x, y, 0])
+    #    j_states = {j_name: SingleJointState(j_name, j_state) for j_name, j_state in zip(self.pybullet_joints, state_ik)}
+    #    for j_name, j_state in j_states.items():
+    #        new_js[j_name] = j_state
+    #    self.get_god_map().set_data(identifier.joint_states, new_js)
+    #    self.get_god_map().set_data(identifier.last_joint_states, current_js)
+    #    p.performCollisionDetection()
+    #    collisions = p.getContactPoints(self.pybullet_robot_id, self.pybullet_kitchen_id)
+    #    self.get_god_map().set_data(identifier.joint_states, current_js)
+    #    #collisions = self.get_world().check_collisions(collision_matrix, collision_list_size)
+    #    #return len(collisions.items) == 0
+    #    print("b")
+    #    return collisions is ()
 
     def create_kitchen_space(self):
         # create an SE3 state space
@@ -74,6 +114,7 @@ class GlobalPlanner(GetGoal):
     def create_kitchen_floor_space(self):
         # create an SE2 state space
         space = ob.SE2StateSpace()
+        #space.setLongestValidSegmentFraction(0.02)
 
         # set lower and upper bounds
         bounds = ob.RealVectorBounds(2)
@@ -83,53 +124,96 @@ class GlobalPlanner(GetGoal):
 
         return space
 
-    def get_robot_global_state(self):
-        state = ob.State(self.kitchen_floor_space)
-        tf = lookup_transform(self.get_robot().get_root(), identifier.map_frame)
-        state().setX(tf.transform.translation.x)
-        state().setY(tf.transform.translation.y)
+    def get_translation_start_state(self, space):
+        state = ob.State(space)
+        pose_root_linkTtip_link = self.get_robot().get_fk_pose(self.goal_dict[u'root_link'], self.goal_dict[u'tip_link'])
+        pose_mTtip_link = transform_pose(self.get_god_map().get_data(identifier.map_frame), pose_root_linkTtip_link)
+        state().setX(pose_mTtip_link.pose.position.x)
+        state().setY(pose_mTtip_link.pose.position.y)
+        if is_3D(space):
+            state().setZ(pose_mTtip_link.pose.position.Z)
         return state
 
     def get_translation_goal_state(self, space):
         state = ob.State(space)
-        goal_dict = self.translation_goal.parameter_value_pair[u'goal']
-        goal =  convert_dictionary_to_ros_message(u'geometry_msgs/PoseStamped', goal_dict)
-        state().setX(goal.pose.translation.x)
-        state().setY(goal.pose.translation.y)
+        state().setX(self.pose_goal.pose.position.x)
+        state().setY(self.pose_goal.pose.position.y)
         if is_3D(space):
-            state().setZ(goal.pose.translation.Z)
+            state().setZ(self.pose_goal.pose.position.Z)
         return state
+
+    def allocOBValidStateSampler(si):
+        return ob.GaussianValidStateSampler(si)
+
+    def getPlanner(self, si):
+        planner = og.RRTConnect(si)
+        planner.setRange(0.1)
+        # planner.setIntermediateStates(True)
+        # planner.setup()
+        return planner
 
     def planNavigation(self, plot=True):
 
         # create a simple setup object
         ss = og.SimpleSetup(self.kitchen_floor_space)
-        ss.setStateValidityChecker(ob.StateValidityCheckerFn(self.isStateValid))
+        ss.setStateValidityChecker(ob.StateValidityCheckerFn(isStateValidForNavigation_s))
 
-        start = self.get_robot_global_state()
+        start = self.get_translation_start_state(self.kitchen_floor_space)
         goal = self.get_translation_goal_state(self.kitchen_floor_space)
 
         ss.setStartAndGoalStates(start, goal)
 
+        si = ss.getSpaceInformation()
+        #si.setValidStateSamplerAllocator(ob.ValidStateSamplerAllocator(self.allocOBValidStateSampler))
+        #si.setMotionValidator(MyMotion(si))
+        #si.setStateValidityCheckingResolution(0.001)
+
         # this will automatically choose a default planner with
         # default parameters
-        solved = ss.solve(1.0)
+        planner = self.getPlanner(si)
+        ss.setPlanner(planner)
+
+        solved = ss.solve(100.0)
 
         if solved:
             # try to shorten the path
-            ss.simplifySolution()
+            # ss.simplifySolution() DONT! NO! DONT UNCOMMENT THAT! NO! STOP IT!
             # print the simplified path
-            data = states_matrix_str2array_floats(ss.getSolutionPath().printAsMatrix()) # [[x, y, theta]]
+            print(ss.getSolutionPath().printAsMatrix())
+            data = states_matrix_str2array_floats(ss.getSolutionPath().printAsMatrix())  # [[x, y, theta]]
             if plot:
-                fig = plt.figure()
-                ax = fig.gca(projection='2d')
-                ax.plot(data[:, 0], data[:, 1], '.-')
+                plt.close()
+                fig, ax = plt.subplots()
+                ax.plot(data[:, 1], data[:, 0])
+                ax.invert_xaxis()
+                ax.set(xlabel='y (m)', ylabel='x (m)',
+                       title='Navigation Path in map')
+                # ax = fig.gca(projection='2d')
+                # ax.plot(data[:, 0], data[:, 1], '.-')
                 plt.show()
             return data
         return None
 
+
+#class MyMotion(ob.MotionValidator):
+#
+#    def checkMotion(self, s1, s2):
+#        return isMotionValidForNavigation_s(s1, s2)
+
+
+def isStateValidForNavigation_s(state):
+    x = state.getX()
+    y = state.getY()
+    return not (-0.5 > x > -1.5 and 1 < y < 100)
+
+
+def isMotionValidForNavigation_s(state_a, state_b):
+    return isStateValidForNavigation_s(state_a) and isStateValidForNavigation_s(state_b)
+
+
 def is_3D(space):
     return type(space) == type(ob.SE3StateSpace())
+
 
 def states_matrix_str2array_floats(str: str, line_sep='\n', float_sep=' '):
     states_strings = str.split(line_sep)

@@ -4,12 +4,15 @@
 # Author: Mark Moll
 import rospy
 import yaml
+from geometry_msgs.msg import PoseStamped, Quaternion
+from nav_msgs.srv import GetMap
 from py_trees import Status
 import pybullet as p
 from giskardpy.data_types import SingleJointState
 from rospy_message_converter.message_converter import convert_dictionary_to_ros_message
 from collections import defaultdict
 from copy import deepcopy
+from tf.transformations import quaternion_about_axis
 
 import giskardpy.identifier as identifier
 from giskardpy.plugin_action_server import GetGoal
@@ -40,6 +43,29 @@ class GlobalPlanner(GetGoal):
             if j[2] != p.JOINT_FIXED:
                 self.pybullet_joints.append(j[1].decode('UTF-8'))
                 # self.rotation_goal = None
+        rospy.wait_for_service('static_map')
+        try:
+            get_map = rospy.ServiceProxy('static_map', GetMap)
+            map = get_map().map
+            info = map.info
+            tmp = numpy.zeros((info.height, info.width))
+            for x_i in range(0, info.height):
+                for y_i in range(0, info.width):
+                    tmp[x_i][y_i] = map.data[y_i + x_i * info.width]
+            self.occ_map = numpy.fliplr(deepcopy(tmp))
+            self.occ_map_res = info.resolution
+            self.occ_map_origin = info.origin.position
+            self.occ_map_height = info.height
+            self.occ_map_width = info.width
+        except rospy.ServiceException as e:
+            rospy.logerr("Failed to get static occupancy map.")
+        pass
+
+    def is_driveable(self, state):
+        x = numpy.sqrt((state.getX() - self.occ_map_origin.x) ** 2)
+        y = numpy.sqrt((state.getY() - self.occ_map_origin.y) ** 2)
+        return 0 <= self.occ_map[int(y / self.occ_map_res)][self.occ_map_width - int(x / self.occ_map_res)] < 1
+
 
     def get_cart_goal(self, cmd):
         try:
@@ -63,10 +89,17 @@ class GlobalPlanner(GetGoal):
 
         if self.goal_dict[u'tip_link'] == u'base_footprint':
             trajectory = self.planNavigation()
-            print(trajectory)
-            if not trajectory:
+            if not trajectory.any():
                 return Status.FAILURE
-            pass
+            poses = []
+            for point in trajectory:
+                base_pose = PoseStamped()
+                base_pose.header.frame_id = self.get_god_map().get_data(identifier.map_frame)
+                base_pose.pose.position.x = point[0]
+                base_pose.pose.position.y = point[1]
+                base_pose.pose.orientation = Quaternion(*quaternion_about_axis(0, [0, 0, 1]))
+                poses.append(base_pose)
+
         else:
             pass  # return self.planMovement()
 
@@ -156,7 +189,7 @@ class GlobalPlanner(GetGoal):
 
         # create a simple setup object
         ss = og.SimpleSetup(self.kitchen_floor_space)
-        ss.setStateValidityChecker(ob.StateValidityCheckerFn(isStateValidForNavigation_s))
+        ss.setStateValidityChecker(ob.StateValidityCheckerFn(self.is_driveable))
 
         start = self.get_translation_start_state(self.kitchen_floor_space)
         goal = self.get_translation_goal_state(self.kitchen_floor_space)
@@ -173,13 +206,12 @@ class GlobalPlanner(GetGoal):
         planner = self.getPlanner(si)
         ss.setPlanner(planner)
 
-        solved = ss.solve(100.0)
+        solved = ss.solve(10.0)
 
         if solved:
             # try to shorten the path
             # ss.simplifySolution() DONT! NO! DONT UNCOMMENT THAT! NO! STOP IT!
             # print the simplified path
-            print(ss.getSolutionPath().printAsMatrix())
             data = states_matrix_str2array_floats(ss.getSolutionPath().printAsMatrix())  # [[x, y, theta]]
             if plot:
                 plt.close()

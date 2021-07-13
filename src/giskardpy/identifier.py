@@ -140,5 +140,8 @@ external_collision_avoidance_default_override = external_collision_avoidance_dis
 external_collision_avoidance_repeller = external_collision_avoidance + [u'number_of_repeller', u'default']
 external_collision_avoidance_repeller_eef = external_collision_avoidance + [u'number_of_repeller', u'end_effector_joints']
 
+#collision_matrix = collision_avoidance + [u'collision_matrix']
+#collision_list_size = collision_avoidance + [u'collision_list_size']
+
 
 

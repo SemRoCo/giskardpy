@@ -81,6 +81,9 @@ class CollisionChecker(GiskardBehavior):
         self.collision_list_size = max(self.collision_list_size,
                                        self.get_god_map().get_data(identifier.self_collision_avoidance_repeller))
 
+        #self.get_god_map().set_data(identifier.collision_matrix, self.collision_matrix)
+        #self.get_god_map().set_data(identifier.collision_list_size, self.collision_list_size)
+
         super(CollisionChecker, self).initialise()
 
     def update(self):

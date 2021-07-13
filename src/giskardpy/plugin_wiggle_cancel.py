@@ -138,18 +138,3 @@ class WiggleCancel(GiskardBehavior):
                                          enumerate(violations[:, i]) if x)
                     violation_str += u'\nshaking of joint: \'{}\' at '.format(joint) + hertz_str
             raise ShakingException(u'endless wiggling detected' + violation_str)
-
-
-class MaxTrajLength(GiskardBehavior):
-    def __init__(self, name, length):
-        super(MaxTrajLength, self).__init__(name)
-        self.length = length
-
-    def update(self):
-        t = self.get_god_map().get_data(identifier.time)
-        sample_period = self.get_god_map().get_data(identifier.sample_period)
-        t = t * sample_period
-        if t > self.length:
-            raise PlanningException(u'trajectory too long')
-
-        return Status.RUNNING

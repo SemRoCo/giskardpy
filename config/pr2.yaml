@@ -71,7 +71,7 @@ plugins:
     enabled: True
   PlotTrajectory: # plots the joint trajectory at the end of planning, useful for debugging
     enabled: True
-    history: 5
+    history: 5 # will save the x last plots
     velocity_threshold: 0.0 # only joints that exceed this velocity threshold will be added to the plot. Use a negative number if you want to include every joint
     scaling: 2.5 # determines how much the x axis is scaled with the length(time) of the trajectory
     normalize_position: False # centers the joint positions around 0 on the y axis
@@ -85,10 +85,13 @@ plugins:
     amplitude_threshold: 0.55 # must be in the range [0,1]. The amplitude of a frequency must exceed this threshold to be detected as wiggling.
     window_size: 21 # size of the moving window of sample points
     frequency_range: 0.4 # must be in the range [0,1]. Only frequencies in the range [max_detectable_frequency * wiggle_frequency_range, max_detectable_frequency] are considered as wiggling. So a value of 0 means that every frequency with an amplitude above wiggle_detection_threshold is detected as wiggling and a value of 1 means that only the max_detectable_frequency can trigger a wiggle detection.      max_detectable_frequency = 1 / (2 * sample_period)
-  tf_publisher:
+  TFPublisher:
     publish_attached_objects: True
     publish_world_objects: False
     tf_topic: /tf
+  MaxTrajectoryLength:
+    enabled: False
+    length: 30 # will abort planning if the trajectory becomes longer than this many seconds
 reachability_check:
   sample_period: 0.5
   prismatic_velocity: 2.0

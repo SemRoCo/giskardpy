@@ -26,7 +26,8 @@ from giskardpy.plugin_configuration import ConfigurationPlugin
 from giskardpy.plugin_goal_reached import GoalReachedPlugin
 from giskardpy.plugin_if import IF
 from giskardpy.plugin_instantaneous_controller import ControllerPlugin
-from giskardpy.plugin_interrupts import WiggleCancel, MaxTrajLength
+from giskardpy.plugin_max_trajectory_length import MaxTrajectoryLength
+from giskardpy.plugin_wiggle_cancel import WiggleCancel
 from giskardpy.plugin_kinematic_sim import KinSimPlugin
 from giskardpy.plugin_log_debug_expressions import LogDebugExpressionsPlugin
 from giskardpy.plugin_log_trajectory import LogTrajPlugin
@@ -37,7 +38,7 @@ from giskardpy.plugin_post_processing import PostProcessing
 from giskardpy.plugin_pybullet import WorldUpdatePlugin
 from giskardpy.plugin_send_trajectory import SendTrajectory
 from giskardpy.plugin_set_cmd import SetCmd
-from giskardpy.plugin_tf_publisher import TFPlugin
+from giskardpy.plugin_tf_publisher import TFPublisher
 from giskardpy.plugin_time import TimePlugin
 from giskardpy.plugin_update_constraints import GoalToConstraints
 from giskardpy.plugin_visualization import VisualizationBehavior
@@ -188,7 +189,7 @@ def grow_tree():
     god_map = initialize_god_map()
     # ----------------------------------------------
     wait_for_goal = Sequence(u'wait for goal')
-    wait_for_goal.add_child(TFPlugin(u'tf'))
+    wait_for_goal.add_child(TFPublisher(u'tf', **god_map.get_data(identifier.TFPublisher)))
     wait_for_goal.add_child(ConfigurationPlugin(u'js1'))
     wait_for_goal.add_child(WorldUpdatePlugin(u'pybullet updater'))
     wait_for_goal.add_child(GoalReceived(u'has goal', action_server_name, MoveAction))
@@ -206,7 +207,9 @@ def grow_tree():
     planning_4.add_plugin(LoopDetector(u'loop detector'))
     planning_4.add_plugin(GoalReachedPlugin(u'goal reached'))
     planning_4.add_plugin(TimePlugin(u'time'))
-    planning_4.add_plugin(MaxTrajLength(u'traj length check', 15))
+    if god_map.get_data(identifier.MaxTrajectoryLength_enabled):
+        kwargs = god_map.get_data(identifier.MaxTrajectoryLength)
+        planning_4.add_plugin(MaxTrajectoryLength(u'traj length check', **kwargs))
     # ----------------------------------------------
     # ----------------------------------------------
     planning_3 = Sequence(u'planning III', sleep=0)
@@ -255,7 +258,6 @@ def grow_tree():
         kwargs = god_map.get_data(identifier.PlotDebugTrajectory)
         post_processing.add_child(PlotDebugExpressions(u'plot debug expressions', **kwargs))
     post_processing.add_child(PostProcessing(u'evaluate result'))
-    # post_processing.add_child(PostProcessing(u'check reachability'))
     # ----------------------------------------------
     planning = success_is_failure(Sequence)(u'planning')
     planning.add_child(IF(u'goal_set?', identifier.next_move_goal))
@@ -264,13 +266,7 @@ def grow_tree():
 
     process_move_goal = failure_is_success(Selector)(u'process move goal')
     process_move_goal.add_child(planning)
-    # process_move_goal.add_child(planning_1)
-    # process_move_goal.add_child(post_processing)
     process_move_goal.add_child(SetCmd(u'set move goal', action_server_name))
-    # ----------------------------------------------
-    #
-    # post_processing = failure_is_success(Sequence)(u'post processing')
-    # post_processing.add_child(PostProcessing(u'post_processing'))
 
     # ----------------------------------------------
     # ----------------------------------------------

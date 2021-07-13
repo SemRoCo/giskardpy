@@ -95,6 +95,9 @@ PlotTrajectory_enabled = PlotTrajectory + [u'enabled']
 PlotDebugTrajectory = plugins + [u'PlotDebugTrajectory']
 PlotDebugTrajectory_enabled = PlotDebugTrajectory + [u'enabled']
 
+MaxTrajectoryLength = plugins + [u'MaxTrajectoryLength']
+MaxTrajectoryLength_enabled = MaxTrajectoryLength + [u'enabled']
+
 fft_duration = plugins + [u'WiggleCancel', u'fft_duration']
 amplitude_threshold = plugins + [u'WiggleCancel', u'amplitude_threshold']
 num_samples_in_fft = plugins + [u'WiggleCancel', u'window_size']
@@ -103,9 +106,10 @@ frequency_range = plugins + [u'WiggleCancel', u'frequency_range']
 joint_convergence_threshold = plugins + [u'GoalReached', u'joint_convergence_threshold']
 GoalReached_window_size = plugins + [u'GoalReached', u'window_size']
 
-publish_attached_objects = plugins + [u'tf_publisher', u'publish_attached_objects']
-publish_world_objects = plugins + [u'tf_publisher', u'publish_world_objects']
-tf_topic = plugins + [u'tf_publisher', u'tf_topic']
+TFPublisher = plugins + [u'TFPublisher']
+# publish_attached_objects =  + [u'TFPublisher', u'publish_attached_objects']
+# publish_world_objects = plugins + [u'tf_publisher', u'publish_world_objects']
+# tf_topic = plugins + [u'tf_publisher', u'tf_topic']
 
 # reachability check
 reachability_check = rosparam + [u'reachability_check']

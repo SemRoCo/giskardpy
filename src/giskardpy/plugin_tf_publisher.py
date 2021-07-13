@@ -1,25 +1,24 @@
 import rospy
-import numpy as np
 from geometry_msgs.msg import TransformStamped
 from py_trees import Status
 from tf2_msgs.msg import TFMessage
 
 import giskardpy.identifier as identifier
-from giskardpy import logging
 from giskardpy.plugin import GiskardBehavior
 from giskardpy.utils import normalize_quaternion_msg
 
 
-class TFPlugin(GiskardBehavior):
+class TFPublisher(GiskardBehavior):
     """
     Published tf for attached and evironment objects.
     """
 
-    def __init__(self, name):
-        super(TFPlugin, self).__init__(name)
+    def __init__(self, name, publish_attached_objects, publish_world_objects, tf_topic):
+        super(TFPublisher, self).__init__(name)
         self.original_links = set(self.get_robot().get_link_names())
-        tf_topic = self.get_god_map().get_data(identifier.tf_topic)
         self.tf_pub = rospy.Publisher(tf_topic, TFMessage, queue_size=10)
+        self.publish_attached_objects = publish_attached_objects
+        self.publish_world_objects = publish_world_objects
 
     def make_transform(self, parent_frame, child_frame, pose):
         tf = TransformStamped()
@@ -32,12 +31,11 @@ class TFPlugin(GiskardBehavior):
         tf.transform.rotation = normalize_quaternion_msg(pose.orientation)
         return tf
 
-
     def update(self):
         try:
             with self.get_god_map() as god_map:
                 tf_msg = TFMessage()
-                if god_map.unsafe_get_data(identifier.publish_attached_objects):
+                if self.publish_attached_objects:
                     robot_links = set(self.unsafe_get_robot().get_link_names())
                     attached_links = robot_links - self.original_links
                     if attached_links:
@@ -47,7 +45,7 @@ class TFPlugin(GiskardBehavior):
                             fk = get_fk(parent_link_name, link_name)
                             tf = self.make_transform(fk.header.frame_id, link_name, fk.pose)
                             tf_msg.transforms.append(tf)
-                if god_map.unsafe_get_data(identifier.publish_world_objects):
+                if self.publish_world_objects:
                     world_objects = self.unsafe_get_world().get_objects()
                     map_frame = god_map.unsafe_get_data(identifier.map_frame)
                     for object in world_objects.values():

@@ -226,8 +226,9 @@ class GiskardTestWrapper(GiskardWrapper):
     def __init__(self, config_file):
         self.total_time_spend_giskarding = 0
         self.total_time_spend_moving = 0
-        config = load_robot_yaml(get_ros_pkg_path(u'giskardpy') + u'/config/' + config_file) #yaml.load(f)
+        config = load_robot_yaml(get_ros_pkg_path(u'giskardpy') + u'/config/' + config_file)
         rospy.set_param('~', config)
+        # TODO: throw 'test config stuff' on top on params in config, which may override stuff.
         rospy.set_param('~path_to_data_folder', u'tmp_data/')
         rospy.set_param('~enable_gui', False)
         rospy.set_param('~plugins/PlotTrajectory/enabled', True)

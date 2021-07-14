@@ -25,6 +25,7 @@ from sensor_msgs.msg import JointState
 from tf.transformations import rotation_from_matrix, quaternion_matrix
 
 from giskardpy import logging, identifier
+from giskardpy.config_loader import load_robot_yaml
 from giskardpy.garden import grow_tree
 from giskardpy.identifier import robot, world
 from giskardpy.pybullet_world import PyBulletWorld
@@ -225,8 +226,7 @@ class GiskardTestWrapper(GiskardWrapper):
     def __init__(self, config_file):
         self.total_time_spend_giskarding = 0
         self.total_time_spend_moving = 0
-        with open(get_ros_pkg_path(u'giskardpy') + u'/config/' + config_file) as f:
-            config = yaml.load(f)
+        config = load_robot_yaml(get_ros_pkg_path(u'giskardpy') + u'/config/' + config_file) #yaml.load(f)
         rospy.set_param('~', config)
         rospy.set_param('~path_to_data_folder', u'tmp_data/')
         rospy.set_param('~enable_gui', False)

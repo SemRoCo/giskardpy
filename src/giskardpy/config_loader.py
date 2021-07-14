@@ -1,7 +1,10 @@
 import os
 from copy import deepcopy
+
+import rospy
 import yaml
-import rospkg
+
+from giskardpy.utils import get_ros_pkg_path
 
 
 class Loader(yaml.SafeLoader):
@@ -10,14 +13,13 @@ class Loader(yaml.SafeLoader):
     def __init__(self, stream):
         """
         Initialise Loader by setting the root directory, specifying keywords for finding config files from other
-        ROS packages and creating a RosPack object.
+        ROS packages.
         """
 
         try:
             self.config_root = os.path.split(stream.name)[0]
             self.ros_package_keywords = [u'ros://', u'package://']
-            self.rospack = rospkg.RosPack()
-            self.giskardpy_root = self.rospack.get_path(u'giskardpy')
+            self.giskardpy_root = get_ros_pkg_path(u'giskardpy')
         except AttributeError:
             self.config_root = os.path.curdir
 
@@ -34,7 +36,7 @@ def get_filename(loader, node, root):
             raise SyntaxError(u'Invalid ros package path: please use ros:// or package:// as path prefix.')
         removed_key_word = file_or_ros_path_str.replace(loader.ros_package_keywords[indices[0]], '')
         path_split = removed_key_word.split('/')
-        package_path = loader.rospack.get_path(path_split[0])
+        package_path = get_ros_pkg_path(path_split[0])
         filename = package_path + removed_key_word.replace(path_split[0], '')
     else:
         filename = os.path.abspath(os.path.join(root, file_or_ros_path_str))
@@ -61,7 +63,7 @@ def construct_find(loader, node):
 
 def update_nested_dicts(d, u):
     """
-    Will update the values in the nested dict d from nested dict u and
+    Will update the values in the nested dict d from nested dict u and 
     add new key-value-pairs from nested dict u into nested dict d." \
 
     :type d: dict
@@ -116,22 +118,22 @@ def nested_update(dic, keys, value):
         dic.update(value)
 
 
-def update_parents(d):
+def update_parents(d, merge_key='parent'):
     """
-    Will merge the dict containing the key 'parent' with the value in d['parent'].
+    Will merge the dict containing the given key merge_key with the value in d[merge_key].
 
     :type d: dict
     :returns: dict
     """
     root_data = deepcopy(d)
-    gen = find_parent_of_key('parent', root_data, [])
+    gen = find_parent_of_key(merge_key, root_data, [])
     while True:
         try:
             data, keys = next(gen)
-        except StopIteration:
+        except (StopIteration, ValueError):
             break
-        parent_data = data['parent']
-        data.pop('parent')
+        parent_data = data[merge_key]
+        data.pop(merge_key)
         updated = update_nested_dicts(parent_data, data)
         nested_update(root_data, keys, updated)
     return root_data
@@ -141,6 +143,17 @@ def load_robot_yaml(path):
     with open(path, 'r') as f:
         data = yaml.load(f, Loader)
         return update_parents(data)
+
+
+def ros_load_robot_config(config_file, test=False):
+    config = load_robot_yaml(get_ros_pkg_path(u'giskardpy') + u'/config/' + config_file)
+    if test:
+        config = update_nested_dicts(deepcopy(config),
+                                     load_robot_yaml(get_ros_pkg_path(u'giskardpy') + u'/config/test.yaml'))
+    if config and not rospy.is_shutdown():
+        rospy.set_param('~', config)
+        return True
+    return False
 
 
 yaml.add_constructor('!include', construct_include, Loader)

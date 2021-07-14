@@ -25,7 +25,7 @@ from sensor_msgs.msg import JointState
 from tf.transformations import rotation_from_matrix, quaternion_matrix
 
 from giskardpy import logging, identifier
-from giskardpy.config_loader import load_robot_yaml
+from giskardpy.config_loader import ros_load_robot_config
 from giskardpy.garden import grow_tree
 from giskardpy.identifier import robot, world
 from giskardpy.pybullet_world import PyBulletWorld
@@ -226,12 +226,9 @@ class GiskardTestWrapper(GiskardWrapper):
     def __init__(self, config_file):
         self.total_time_spend_giskarding = 0
         self.total_time_spend_moving = 0
-        config = load_robot_yaml(get_ros_pkg_path(u'giskardpy') + u'/config/' + config_file)
-        rospy.set_param('~', config)
-        # TODO: throw 'test config stuff' on top on params in config, which may override stuff.
-        rospy.set_param('~path_to_data_folder', u'tmp_data/')
-        rospy.set_param('~enable_gui', False)
-        rospy.set_param('~plugins/PlotTrajectory/enabled', True)
+
+        if not ros_load_robot_config(config_file, test=True):
+            rospy.logerr('Could not set robot config as ROS parameter.')
 
         self.sub_result = rospy.Subscriber('~command/result', MoveActionResult, self.cb, queue_size=100)
         self.cancel_goal = rospy.Publisher('~command/cancel', GoalID, queue_size=100)

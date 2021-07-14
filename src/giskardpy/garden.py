@@ -45,9 +45,19 @@ from giskardpy.plugin_visualization import VisualizationBehavior
 from giskardpy.plugin_world_visualization import WorldVisualizationBehavior
 from giskardpy.pybullet_world import PyBulletWorld
 from giskardpy.tree_manager import TreeManager
-from giskardpy.utils import create_path, render_dot_tree, KeyDefaultDict, max_velocity_from_horizon_and_jerk
+from giskardpy.utils import create_path, render_dot_tree, KeyDefaultDict, max_velocity_from_horizon_and_jerk, BiDict
 from giskardpy.world_object import WorldObject
 
+# TODO hardcode this somewhere else
+order_map = BiDict({
+    0: u'position',
+    1: u'velocity',
+    2: u'acceleration',
+    3: u'jerk',
+    4: u'snap',
+    5: u'crackle',
+    6: u'pop'
+})
 
 def initialize_god_map():
     god_map = GodMap()
@@ -93,39 +103,33 @@ def initialize_god_map():
                     ignored_pairs=god_map.get_data(identifier.ignored_self_collisions),
                     added_pairs=god_map.get_data(identifier.added_self_collisions))
 
-    d = set_default_in_override_block(identifier.joint_velocity_weight, god_map)
-    world.robot.set_joint_velocity_weight_symbols(d)
+    sanity_check_derivatives(god_map)
 
-    d = set_default_in_override_block(identifier.joint_acceleration_weight, god_map)
-    world.robot.set_joint_acceleration_weight_symbols(d)
+    # weights
+    for i, key in enumerate(god_map.get_data(identifier.joint_weights), start=1):
+        d = set_default_in_override_block(identifier.joint_weights + [order_map[i], u'override'], god_map)
+        world.robot.set_joint_weight_symbols(d, i)
 
-    d = set_default_in_override_block(identifier.joint_jerk_weight, god_map)
-    world.robot.set_joint_jerk_weight_symbols(d)
 
-    d_linear = set_default_in_override_block(identifier.joint_velocity_linear_limit, god_map)
-    d_angular = set_default_in_override_block(identifier.joint_velocity_angular_limit, god_map)
-    world.robot.set_joint_velocity_limit_symbols(d_linear, d_angular)
+    # limits
+    for i, key in enumerate(god_map.get_data(identifier.joint_limits), start=1):
+        d_linear = set_default_in_override_block(identifier.joint_limits + [order_map[i], u'linear', u'override'],
+                                                 god_map)
+        d_angular = set_default_in_override_block(identifier.joint_limits + [order_map[i], u'angular', u'override'],
+                                                  god_map)
+        world.robot.set_joint_limit_symbols(d_linear, d_angular, i)
 
-    d_linear = set_default_in_override_block(identifier.joint_acceleration_linear_limit, god_map)
-    d_angular = set_default_in_override_block(identifier.joint_acceleration_angular_limit, god_map)
-    world.robot.set_joint_acceleration_limit_symbols(d_linear, d_angular)
+    order = len(god_map.get_data(identifier.joint_weights))+1
+    god_map.set_data(identifier.order, order)
 
-    d_linear = set_default_in_override_block(identifier.joint_jerk_linear_limit, god_map)
-    d_angular = set_default_in_override_block(identifier.joint_jerk_angular_limit, god_map)
-    world.robot.set_joint_jerk_limit_symbols(d_linear, d_angular)
+    # joint symbols
+    for o in range(order):
+        key = order_map[o]
+        joint_position_symbols = JointStatesInput(blackboard.god_map.to_symbol, world.robot.get_movable_joints(),
+                                                  identifier.joint_states,
+                                                  suffix=[key])
+        world.robot.set_joint_symbols(joint_position_symbols.joint_map, o)
 
-    joint_position_symbols = JointStatesInput(blackboard.god_map.to_symbol, world.robot.get_movable_joints(),
-                                              identifier.joint_states,
-                                              suffix=[u'position'])
-    world.robot.set_joint_position_symbols(joint_position_symbols.joint_map)
-    joint_vel_symbols = JointStatesInput(blackboard.god_map.to_symbol, world.robot.get_movable_joints(),
-                                         identifier.joint_states,
-                                         suffix=[u'velocity'])
-    world.robot.set_joint_velocity_symbols(joint_vel_symbols.joint_map)
-    joint_acc_symbols = JointStatesInput(blackboard.god_map.to_symbol, world.robot.get_movable_joints(),
-                                         identifier.joint_states,
-                                         suffix=[u'acceleration'])
-    world.robot.set_joint_acceleration_symbols(joint_acc_symbols.joint_map)
     world.robot.reinitialize()
 
     world.robot.init_self_collision_matrix()
@@ -136,15 +140,35 @@ def initialize_god_map():
 def sanity_check(god_map):
     check_velocity_limits_reachable(god_map)
 
+def sanity_check_derivatives(god_map):
+    weights = god_map.get_data(identifier.joint_weights)
+    limits = god_map.get_data(identifier.joint_limits)
+    check_derivatives(weights, u'Weights')
+    check_derivatives(limits, u'Limits')
+    if len(weights) != len(limits):
+        raise AttributeError(u'Weights and limits are not defined for the same number of derivatives')
+
+def check_derivatives(entries, name):
+    """
+    :type entries: dict
+    """
+    allowed_derivates = list(order_map.values())[1:]
+    for weight in entries:
+        if weight not in allowed_derivates:
+            raise AttributeError(u'{} set for unknown derivative: {} not in {}'.format(name, weight, list(allowed_derivates)))
+    weight_ids = [order_map.inverse[x] for x in entries]
+    if max(weight_ids) != len(weight_ids):
+        raise AttributeError(u'{} for {} set, but some of the previous derivatives are missing'.format(name, order_map[max(weight_ids)]))
 
 def check_velocity_limits_reachable(god_map):
+    # TODO a more general version of this
     robot = god_map.get_data(identifier.robot)
     sample_period = god_map.get_data(identifier.sample_period)
     prediction_horizon = god_map.get_data(identifier.prediction_horizon)
     print_help = False
     for joint_name in robot.get_joint_names():
-        velocity_limit = robot.get_joint_velocity_limit_expr_evaluated(joint_name, god_map)
-        jerk_limit = robot.get_joint_jerk_limit_expr_evaluated(joint_name, god_map)
+        velocity_limit = robot.get_joint_limit_expr_evaluated(joint_name, 1, god_map)
+        jerk_limit = robot.get_joint_limit_expr_evaluated(joint_name, 3, god_map)
         velocity_limit_horizon = max_velocity_from_horizon_and_jerk(prediction_horizon, jerk_limit, sample_period)
         if velocity_limit_horizon < velocity_limit:
             logging.logwarn(u'Joint \'{}\' '

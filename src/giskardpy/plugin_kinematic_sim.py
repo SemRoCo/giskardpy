@@ -25,26 +25,24 @@ class KinSimPlugin(GiskardBehavior):
 
     @profile
     def update(self):
-        vel_cmds, acc_cmds, jerk_cmds = self.get_god_map().get_data(identifier.qp_solver_solution)
+        next_cmds = self.get_god_map().get_data(identifier.qp_solver_solution)
         current_js = self.get_god_map().get_data(identifier.joint_states)
         next_js = None
-        if vel_cmds:
+        if next_cmds:
             next_js = OrderedDict()
             for key, sjs in current_js.items():
                 joint_name = str(self.get_robot().get_joint_position_symbol(key))
+                vel_cmds = next_cmds[0]
                 if joint_name in vel_cmds:
                     cmd = vel_cmds[joint_name]
-                    acc_cmd = acc_cmds[joint_name]
-                    jerk_cmd = jerk_cmds[joint_name]
+                    derivative_cmds = [x[joint_name] for x in next_cmds]
                 else:
                     cmd = 0.0
-                    acc_cmd = 0.0
-                    jerk_cmd = 0.0
-                next_js[key] = SingleJointState(name=sjs.name,
-                                                position=sjs.position + cmd * self.sample_period,
-                                                velocity=cmd,
-                                                acceleration=acc_cmd,
-                                                jerk=jerk_cmd)
+                    derivative_cmds = []
+                next_js[key] = SingleJointState(sjs.name,
+                                                sjs.position + cmd * self.sample_period,
+                                                cmd,
+                                                *derivative_cmds)
         if next_js is not None:
             self.get_god_map().set_data(identifier.joint_states, next_js)
         else:

@@ -47,8 +47,8 @@ class ControllerPlugin(GiskardBehavior):
         expr = self.controller.get_parameter_names()
         expr = self.god_map.get_values(expr)
 
-        (next_velocity, next_acceleration, next_jerk), debug_expressions = self.controller.get_cmd(expr)
-        self.get_god_map().set_data(identifier.qp_solver_solution, [next_velocity, next_acceleration, next_jerk])
+        (next_cmds), debug_expressions = self.controller.get_cmd(expr)
+        self.get_god_map().set_data(identifier.qp_solver_solution, next_cmds)
         self.get_god_map().set_data(identifier.debug_expressions_evaluated, debug_expressions)
 
         return Status.RUNNING

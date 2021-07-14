@@ -849,19 +849,19 @@ class TestUrdfObject(object):
 
     def test_get_joint_limits2(self, function_setup):
         parsed_pr2 = self.cls(pr2_urdf())
-        lower_limit, upper_limit = parsed_pr2.get_joint_limits(u'l_shoulder_pan_joint')
+        lower_limit, upper_limit = parsed_pr2.get_joint_position_limits(u'l_shoulder_pan_joint')
         assert lower_limit == -0.564601836603
         assert upper_limit == 2.1353981634
 
     def test_get_joint_limits3(self, function_setup):
         parsed_pr2 = self.cls(pr2_urdf())
-        lower_limit, upper_limit = parsed_pr2.get_joint_limits(u'l_wrist_roll_joint')
+        lower_limit, upper_limit = parsed_pr2.get_joint_position_limits(u'l_wrist_roll_joint')
         assert lower_limit == None
         assert upper_limit == None
 
     def test_get_joint_limits4(self, function_setup):
         parsed_base_bot = self.cls(base_bot_urdf())
-        lower_limit, upper_limit = parsed_base_bot.get_joint_limits(u'joint_x')
+        lower_limit, upper_limit = parsed_base_bot.get_joint_position_limits(u'joint_x')
         assert lower_limit == -3
         assert upper_limit == 3
 

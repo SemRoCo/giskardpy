@@ -225,12 +225,16 @@ class GodMap(object):
         :return: object that is saved at key
         """
         identifier = tuple(identifier)
-        if identifier not in self.shortcuts:
-            result, shortcut = get_data(identifier, self._data, self.default_value)
-            if shortcut:
-                self.shortcuts[identifier] = shortcut
-            return result
-        return self.shortcuts[identifier].c(self._data)
+        try:
+            if identifier not in self.shortcuts:
+                result, shortcut = get_data(identifier, self._data, self.default_value)
+                if shortcut:
+                    self.shortcuts[identifier] = shortcut
+                return result
+            return self.shortcuts[identifier].c(self._data)
+        except Exception as e:
+            e2 = type(e)(u'{}; path: {}'.format(e, identifier))
+            raise e2
 
     def get_data(self, identifier):
         with self.lock:

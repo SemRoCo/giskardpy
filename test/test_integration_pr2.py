@@ -347,9 +347,9 @@ class TestJointGoals(object):
         :type zero_pose: PR2
         """
         zero_pose.allow_self_collision()
-        r_elbow_flex_joint_limits = zero_pose.get_robot().get_joint_limits('r_elbow_flex_joint')
-        torso_lift_joint_limits = zero_pose.get_robot().get_joint_limits('torso_lift_joint')
-        head_pan_joint_limits = zero_pose.get_robot().get_joint_limits('head_pan_joint')
+        r_elbow_flex_joint_limits = zero_pose.get_robot().get_joint_position_limits('r_elbow_flex_joint')
+        torso_lift_joint_limits = zero_pose.get_robot().get_joint_position_limits('torso_lift_joint')
+        head_pan_joint_limits = zero_pose.get_robot().get_joint_position_limits('head_pan_joint')
 
         goal_js = {u'r_elbow_flex_joint': r_elbow_flex_joint_limits[0] - 0.2,
                    u'torso_lift_joint': torso_lift_joint_limits[0] - 0.2,
@@ -510,7 +510,7 @@ class TestConstraints(object):
         percentage *= 0.99  # if will not reach the exact percentager, because the weight is so low
         for joint in joint_non_continuous:
             position = current_joint_state[joint]
-            lower_limit, upper_limit = zero_pose.get_robot().get_joint_limits(joint)
+            lower_limit, upper_limit = zero_pose.get_robot().get_joint_position_limits(joint)
             joint_range = upper_limit - lower_limit
             center = (upper_limit + lower_limit) / 2.
             upper_limit2 = center + joint_range / 2. * (1 - percentage / 100.)
@@ -524,7 +524,7 @@ class TestConstraints(object):
         percentage = 10
         joints = [j for j in zero_pose.get_robot().controlled_joints if
                   not zero_pose.get_robot().is_joint_continuous(j)]
-        goal_state = {j: zero_pose.get_robot().get_joint_limits(j)[1] for j in joints}
+        goal_state = {j: zero_pose.get_robot().get_joint_position_limits(j)[1] for j in joints}
         del goal_state[u'odom_x_joint']
         del goal_state[u'odom_y_joint']
         zero_pose.allow_self_collision()
@@ -545,7 +545,7 @@ class TestConstraints(object):
         percentage *= 0.9  # if will not reach the exact percentage, because the weight is so low
         for joint in joint_non_continuous:
             position = current_joint_state[joint]
-            lower_limit, upper_limit = zero_pose.get_robot().get_joint_limits(joint)
+            lower_limit, upper_limit = zero_pose.get_robot().get_joint_position_limits(joint)
             joint_range = upper_limit - lower_limit
             center = (upper_limit + lower_limit) / 2.
             upper_limit2 = center + joint_range / 2. * (1 - percentage / 100.)

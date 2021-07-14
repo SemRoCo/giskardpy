@@ -7,7 +7,7 @@ from giskardpy.utils import plot_trajectory
 
 
 class PlotTrajectory(GiskardBehavior):
-    def __init__(self, name, enabled, history, velocity_threshold, scaling, normalize_position, tick_stride, order=4):
+    def __init__(self, name, enabled, history, velocity_threshold, scaling, normalize_position, tick_stride, order=5):
         super(PlotTrajectory, self).__init__(name)
         self.order = order
         self.history = history

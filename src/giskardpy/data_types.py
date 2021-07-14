@@ -81,69 +81,90 @@ class VelocityConstraint(object):
 
 
 class FreeVariable(object):
-    def __init__(self, position_symbol,
-                 lower_position_limit, upper_position_limit,
-                 lower_velocity_limit, upper_velocity_limit,
-                 lower_acceleration_limit, upper_acceleration_limit,
-                 lower_jerk_limit, upper_jerk_limit,
-                 quadratic_velocity_weight, quadratic_acceleration_weight, quadratic_jerk_weight,
-                 velocity_symbol=None, velocity_horizon_function=None,
-                 acceleration_symbol=None, acceleration_horizon_function=None,
-                 jerk_symbol=None, jerk_horizon_function=None, linear_weight=None):
-        self.position_symbol = position_symbol
-        self.velocity_symbol = velocity_symbol
+    def __init__(self, symbols, lower_limits, upper_limits, quadratic_weights, horizon_functions=None):
+        """
+        :type symbols:  dict
+        :type lower_limits: dict
+        :type upper_limits: dict
+        :type quadratic_weights: dict
+        :type horizon_functions: dict
+        """
+        self._symbols = symbols
+        self.name = str(self._symbols[0])
+        self._lower_limits = lower_limits
+        self._upper_limits = upper_limits
+        self._quadratic_weights = quadratic_weights
+        assert max(self._symbols.keys()) == len(self._symbols) - 1
+        assert len(self._symbols) == len(self._quadratic_weights) + 1
+        self.order = len(self._symbols)
 
         def default_horizon_f(weight, t):
             return weight
 
-        self.velocity_horizon_function = velocity_horizon_function or default_horizon_f
-        self.acceleration_horizon_function = acceleration_horizon_function or default_horizon_f
-        self.jerk_horizon_function = jerk_horizon_function or default_horizon_f
-        self.acceleration_symbol = acceleration_symbol
-        self.jerk_symbol = jerk_symbol
-        self.lower_position_limit = lower_position_limit
-        self.upper_position_limit = upper_position_limit
-        self.lower_velocity_limit = lower_velocity_limit
-        self.upper_velocity_limit = upper_velocity_limit
-        self.lower_acceleration_limit = lower_acceleration_limit
-        self.upper_acceleration_limit = upper_acceleration_limit
-        self.lower_jerk_limit = lower_jerk_limit
-        self.upper_jerk_limit = upper_jerk_limit
-        self.quadratic_velocity_weight = quadratic_velocity_weight
-        self.linear_weight = linear_weight
-        self.quadratic_acceleration_weight = quadratic_acceleration_weight
-        self.quadratic_jerk_weight = quadratic_jerk_weight
-        self.name = str(self.position_symbol)
+        self.horizon_functions = defaultdict(lambda: default_horizon_f)
+        self.horizon_functions.update(horizon_functions)
+
+    def get_symbol(self, order):
+        try:
+            return self._symbols[order]
+        except KeyError:
+            raise KeyError(u'Free variable {} doesn\'t have symbol for derivative of order {}'.format(self, order))
+
+    def get_lower_limit(self, order):
+        try:
+            return self._lower_limits[order]
+        except KeyError:
+            raise KeyError(u'Free variable {} doesn\'t have lower limit for derivative of order {}'.format(self, order))
+
+    def get_upper_limit(self, order):
+        try:
+            return self._upper_limits[order]
+        except KeyError:
+            raise KeyError(u'Free variable {} doesn\'t have upper limit for derivative of order {}'.format(self, order))
 
     def has_position_limits(self):
-        return self.lower_position_limit is not None and abs(self.upper_position_limit) < 100
+        try:
+            lower_limit = self.get_lower_limit(0)
+            upper_limit = self.get_upper_limit(0)
+            return lower_limit is not None and abs(lower_limit) < 100 \
+                   and upper_limit is not None and abs(upper_limit) < 100
+        except Exception:
+            return False
 
-    def normalized_velocity_weight(self, t):
-        weight_normalized = self.quadratic_velocity_weight * (1 / self.upper_velocity_limit) ** 2
-        return self.velocity_horizon_function(weight_normalized, t)
+    def get_quadratic_weights(self, order):
+        try:
+            return self._quadratic_weights[order]
+        except KeyError:
+            raise KeyError(u'Free variable {} doesn\'t have weight for derivative of order {}'.format(self, order))
 
-    def normalized_acceleration_weight(self, t):
-        weight_normalized = self.quadratic_acceleration_weight * (1 / self.upper_acceleration_limit) ** 2
-        return self.acceleration_horizon_function(weight_normalized, t)
-
-    def normalized_jerk_weight(self, t):
-        weight_normalized = self.quadratic_jerk_weight * (1 / self.upper_jerk_limit) ** 2
-        return self.jerk_horizon_function(weight_normalized, t)
+    def normalized_weight(self, t, order):
+        weight_normalized = self.get_quadratic_weights(order) * (1 / self.get_upper_limit(order)) ** 2
+        return self.horizon_functions[order](weight_normalized, t)
 
     def __str__(self):
         return self.name
 
 
 class SingleJointState(object):
-    def __init__(self, name='', position=0.0, velocity=0.0, acceleration=0.0, jerk=0.0):
+    def __init__(self, name='', position=0.0, velocity=0.0, acceleration=0.0, jerk=0.0, snap=0.0, crackle=0.0, pop=0.0):
         self.name = name
         self.position = position
         self.velocity = velocity
         self.acceleration = acceleration
         self.jerk = jerk
+        self.snap = snap
+        self.crackle = crackle
+        self.pop = pop
 
     def __str__(self):
-        return u'{}: {}, {}, {}, {}'.format(self.name, self.position, self.velocity, self.acceleration, self.jerk)
+        return u'{}: {}, {}, {}, {}, {}, {}, {}'.format(self.name,
+                                            self.position,
+                                            self.velocity,
+                                            self.acceleration,
+                                            self.jerk,
+                                            self.snap,
+                                            self.crackle,
+                                            self.pop)
 
 
 class Trajectory(object):

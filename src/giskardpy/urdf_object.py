@@ -272,11 +272,11 @@ class URDFObject(object):
         :return: dict mapping joint names to tuple containing lower and upper limits
         :rtype: dict
         """
-        return {joint_name: self.get_joint_limits(joint_name) for joint_name in self.get_joint_names()
+        return {joint_name: self.get_joint_position_limits(joint_name) for joint_name in self.get_joint_names()
                 if self.is_joint_movable(joint_name)}
 
     @memoize
-    def get_joint_limits(self, joint_name):
+    def get_joint_position_limits(self, joint_name):
         """
         Returns joint limits specified in the safety controller entry if given, else returns the normal limits.
         :param joint_name: name of the joint in the urdfs

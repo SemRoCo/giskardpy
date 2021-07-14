@@ -53,7 +53,7 @@ class GoalToConstraints(GetGoal):
 
         self.get_god_map().set_data(identifier.goals, {})
 
-        self.get_robot()._create_constraints(self.get_god_map())
+        self.get_robot().create_constraints(self.get_god_map())
 
         self.soft_constraints = {}
         self.vel_constraints = {}

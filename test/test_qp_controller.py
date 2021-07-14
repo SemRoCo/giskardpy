@@ -68,7 +68,8 @@ def simulate(start_state, qp_controller, sample_period, print_traj=False, time_l
 
 def two_joint_setup(sample_period=0.05, prediction_horizon=10, j_start=0, j2_start=0, upos_limit=1.5, lpos_limit=-1.5,
                     vel_limit=1, acc_limit=999, jerk_limit=30):
-    j, j_v, j_a, j2, j2_v, j2_a, sample_period_symbol = ca.var('j j_v j_a j2 j2_v j2_a sample_period')
+    j, j_v, j_a, j_j, j2, j2_v, j2_a, j2_j, sample_period_symbol = ca.var(
+        'j j_v j_a j_j j2 j2_v j2_a j2_j sample_period')
 
     state = {
         'j': j_start,
@@ -87,39 +88,62 @@ def two_joint_setup(sample_period=0.05, prediction_horizon=10, j_start=0, j2_sta
         return w + w * 10 * t
 
     jc = FreeVariable(
-        position_symbol=j,
-        lower_position_limit=lpos_limit,
-        upper_position_limit=upos_limit,
-        lower_velocity_limit=-vel_limit,
-        upper_velocity_limit=vel_limit,
-        lower_acceleration_limit=-acc_limit,
-        upper_acceleration_limit=acc_limit,
-        lower_jerk_limit=-jerk_limit,
-        upper_jerk_limit=jerk_limit,
-        quadratic_velocity_weight=joint_weight,
-        quadratic_acceleration_weight=0,
-        quadratic_jerk_weight=0,
-        velocity_symbol=j_v,
-        acceleration_symbol=j_a,
-        velocity_horizon_function=hf,
+        symbols={
+            0: j,
+            1: j_v,
+            2: j_a,
+            3: j_j,
+        },
+        lower_limits={
+            0: lpos_limit,
+            1: -vel_limit,
+            2: -acc_limit,
+            3: -jerk_limit
+        },
+        upper_limits={
+            0: upos_limit,
+            1: vel_limit,
+            2: acc_limit,
+            3: jerk_limit
+        },
+        quadratic_weights={
+            1: joint_weight,
+            2: 0,
+            3: 0,
+        },
+        horizon_functions={
+            1: hf
+        },
     )
 
     jc2 = FreeVariable(
-        position_symbol=j2,
-        lower_position_limit=lpos_limit,
-        upper_position_limit=upos_limit,
-        lower_velocity_limit=-vel_limit,
-        upper_velocity_limit=vel_limit,
-        lower_acceleration_limit=-acc_limit,
-        upper_acceleration_limit=acc_limit,
-        lower_jerk_limit=-jerk_limit,
-        upper_jerk_limit=jerk_limit,
-        quadratic_velocity_weight=joint_weight,
-        quadratic_acceleration_weight=0,
-        quadratic_jerk_weight=0,
-        velocity_symbol=j2_v,
-        acceleration_symbol=j2_a,
-        velocity_horizon_function=hf)
+        symbols={
+            0: j2,
+            1: j2_v,
+            2: j2_a,
+            3: j2_j,
+        },
+        lower_limits={
+            0: lpos_limit,
+            1: -vel_limit,
+            2: - acc_limit,
+            3: -jerk_limit
+        },
+        upper_limits={
+            0: upos_limit,
+            1: vel_limit,
+            2: acc_limit,
+            3: jerk_limit
+        },
+        quadratic_weights={
+            1: joint_weight,
+            2: 0,
+            3: 0,
+        },
+        horizon_functions={
+            1: hf
+        },
+    )
 
     qp = QPController(sample_period_symbol, prediction_horizon, 'gurobi', [jc, jc2])
     return qp, j, j2, state

@@ -7,6 +7,7 @@ last_joint_states = [u'last_joint_state']
 
 # goal_params = [u'goal_params']
 trajectory = [u'traj']
+order = [u'order']
 debug_trajectory = [u'lbA_traj']
 time = [u'time']
 qp_solver_solution = [u'qp_solver_solution']
@@ -64,8 +65,8 @@ map_frame = general_options + [u'map_frame']
 debug = general_options + [u'debug']
 fill_velocity_values = general_options + [u'fill_velocity_values']
 
-joint_velocity_linear_limit = general_options + [u'joint_limits', u'velocity', u'linear', u'override']
-joint_velocity_angular_limit = general_options + [u'joint_limits', u'velocity', u'angular', u'override']
+
+joint_limits = general_options + [u'joint_limits']
 
 joint_acceleration_linear_limit = general_options + [u'joint_limits', u'acceleration', u'linear', u'override']
 joint_acceleration_angular_limit = general_options + [u'joint_limits', u'acceleration', u'angular', u'override']
@@ -73,9 +74,7 @@ joint_acceleration_angular_limit = general_options + [u'joint_limits', u'acceler
 joint_jerk_linear_limit = general_options + [u'joint_limits', u'jerk', u'linear', u'override']
 joint_jerk_angular_limit = general_options + [u'joint_limits', u'jerk', u'angular', u'override']
 
-joint_velocity_weight = general_options + [u'joint_weights', u'velocity', u'override']
-joint_acceleration_weight = general_options + [u'joint_weights', u'acceleration', u'override']
-joint_jerk_weight = general_options + [u'joint_weights', u'jerk', u'override']
+joint_weights = general_options + [u'joint_weights']
 
 # qp solver
 qp_solver = rosparam + [u'qp_solver']

@@ -168,7 +168,7 @@ def rnd_joint_state2(draw, joint_limits):
 @composite
 def pr2_joint_state(draw):
     pr2 = Robot.from_urdf_file(pr2_urdf())
-    return draw(rnd_joint_state(*pr2.get_joint_limits()))
+    return draw(rnd_joint_state(*pr2.get_joint_position_limits()))
 
 
 def pr2_urdf():
@@ -603,7 +603,7 @@ class GiskardTestWrapper(GiskardWrapper):
 
         for joint in self.get_robot().controlled_joints:
             if not self.get_robot().is_joint_continuous(joint):
-                joint_limits = self.get_robot().get_joint_limits(joint)
+                joint_limits = self.get_robot().get_joint_position_limits(joint)
                 error_msg = u'{} has violated joint position limit'.format(joint)
                 np.testing.assert_array_less(trajectory_pos[joint], joint_limits[1], error_msg)
                 np.testing.assert_array_less(-trajectory_pos[joint], -joint_limits[0], error_msg)

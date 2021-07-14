@@ -179,7 +179,7 @@ class WorldObject(URDFObject):
 
     def get_max_joint_state(self):
         def f(joint_name):
-            _, upper_limit = self.get_joint_limits(joint_name)
+            _, upper_limit = self.get_joint_position_limits(joint_name)
             if upper_limit is None:
                 return np.pi * 2
             return upper_limit
@@ -188,7 +188,7 @@ class WorldObject(URDFObject):
 
     def get_min_joint_state(self):
         def f(joint_name):
-            lower_limit, _ = self.get_joint_limits(joint_name)
+            lower_limit, _ = self.get_joint_position_limits(joint_name)
             if lower_limit is None:
                 return -np.pi * 2
             return lower_limit
@@ -197,7 +197,7 @@ class WorldObject(URDFObject):
 
     def get_rnd_joint_state(self):
         def f(joint_name):
-            lower_limit, upper_limit = self.get_joint_limits(joint_name)
+            lower_limit, upper_limit = self.get_joint_position_limits(joint_name)
             if lower_limit is None:
                 return np.random.random() * np.pi * 2
             lower_limit = max(lower_limit, -10)

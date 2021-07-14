@@ -3,6 +3,25 @@ general_options:
   map_frame: map
   debug: False # enables debug prints and prints the behavior tree state in the terminal
   fill_velocity_values: True # due to a bug, the pr2 does not want the velocity values to be filled
+  joint_weights:
+    # the planner prefers low weight joints to achieve solutions
+    # higher weights reduce wiggling, but lower the maximum joint velocity, which might make the planner stop too early
+    velocity:
+      default: 0.01
+      override:
+        odom_x_joint: 0.1
+        odom_y_joint: 0.1
+        odom_z_joint: 0.1
+        torso_lift_joint: 0.05
+    acceleration:
+      default: 0
+      override: { }
+    jerk:
+      default: 0.01
+      override: { }
+#    snap:
+#      default: 0
+#      override: { }
   joint_limits: # giskard will use the min of this number and limits from the urdf
     velocity:
       linear: # m/s
@@ -16,44 +35,31 @@ general_options:
           odom_z_joint: 0.6
           head_pan_joint: 0.5
           head_tilt_joint: 0.5
-    acceleration: # multiply your desired acc limit with sample period; experimental, don't touch
+    acceleration:
       linear: # m/s**2
-        default: 1e3
-        override: {}
+        default: 1e2
+        override: { }
       angular: # rad/s**2
-        default: 1e3
-        override: {}
-    jerk: # multiply your desired acc limit with sample period; experimental, don't touch
-      linear: # m/s**2
-#        default: 999
-#        override: {}
+        default: 1e2
+        override: { }
+    jerk:
+      linear: # m/s**3
         default: 30
         override:
           torso_lift_joint: 5
           odom_x_joint: 5
           odom_y_joint: 5
-      angular: # rad/s**2
-#        default: 999
-#        override: {}
+      angular: # rad/s**3
         default: 30
         override:
           odom_z_joint: 10
-  joint_weights:
-    # the planner prefers low weight joints to achieve solutions
-    # higher weights reduce wiggling, but lower the maximum joint velocity, which might make the planner stop too early
-    velocity:
-      default: 0.01
-      override:
-        odom_x_joint: 0.1
-        odom_y_joint: 0.1
-        odom_z_joint: 0.1
-        torso_lift_joint: 0.05
-    acceleration:
-      default: 0
-      override: {}
-    jerk:
-      default: 0
-      override: {}
+#    snap:
+#      linear: # m/s**4
+#        default: 1e6
+#        override: { }
+#      angular: # rad/s**3
+#        default: 1e6
+#        override: { }
 qp_solver:
   name: gurobi # one of [qpoases, gurobi]
   # you should always use uneven horizons. even horizons n create (almost) the same motions as n-1, but are slower.
@@ -153,8 +159,8 @@ collision_avoidance:
         fr_caster_l_wheel_link: *zero
         fr_caster_r_wheel_link: *zero
         fr_caster_rotation_link: *zero
-    ignore: [] # list pairs of links that should be removed from the self collision avoidance
-#    ignore: #example
-#      - [base_link, l_upper_arm_link]
-    add: [] # list pairs of links that should be added to the self collision matrix
+    ignore: [ ] # list pairs of links that should be removed from the self collision avoidance
+    #    ignore: #example
+    #      - [base_link, l_upper_arm_link]
+    add: [ ] # list pairs of links that should be added to the self collision matrix
     number_of_repeller: 1 # each movable joint gets pushed away from the X objects closest to it

@@ -768,7 +768,7 @@ class AvoidJointLimitsRevolute(Goal):
         weight = self.get_parameter_as_symbolic_expression('weight')
         joint_symbol = self.get_joint_position_symbol(self.joint_name)
         percentage = self.get_parameter_as_symbolic_expression('percentage') / 100.
-        lower_limit, upper_limit = self.get_robot().get_joint_limits(self.joint_name)
+        lower_limit, upper_limit = self.get_robot().get_joint_position_limits(self.joint_name)
         max_velocity = self.get_parameter_as_symbolic_expression('max_velocity')
         max_velocity = w.min(max_velocity,
                              self.get_robot().get_joint_velocity_limit_expr(self.joint_name))
@@ -826,7 +826,7 @@ class AvoidJointLimitsPrismatic(Goal):
         weight = self.get_parameter_as_symbolic_expression('weight')
         joint_symbol = self.get_joint_position_symbol(self.joint_name)
         percentage = self.get_parameter_as_symbolic_expression('percentage') / 100.
-        lower_limit, upper_limit = self.get_robot().get_joint_limits(self.joint_name)
+        lower_limit, upper_limit = self.get_robot().get_joint_position_limits(self.joint_name)
         max_velocity = self.get_parameter_as_symbolic_expression('max_velocity')
         max_velocity = w.min(max_velocity,
                              self.get_robot().get_joint_velocity_limit_expr(self.joint_name))
@@ -2117,7 +2117,7 @@ class OpenDrawer(Goal):
         hinge_drawer_axis_msg.vector.z = hinge_drawer_axis[2]
 
         # Get joint limits TODO: check of desired goal is within limits
-        min_limit, max_limit = environment_object.get_joint_limits(
+        min_limit, max_limit = environment_object.get_joint_position_limits(
             self.hinge_joint)
         current_joint_pos = environment_object.joint_state[self.hinge_joint].position
 
@@ -2175,7 +2175,7 @@ class Open(Goal):
         joint_name = environment_object.get_movable_parent_joint(object_link_name)
 
         if environment_object.is_joint_revolute(joint_name) or environment_object.is_joint_prismatic(joint_name):
-            min_limit, max_limit = environment_object.get_joint_limits(joint_name)
+            min_limit, max_limit = environment_object.get_joint_position_limits(joint_name)
             if goal_joint_state:
                 goal_joint_state = min(max_limit, goal_joint_state)
             else:
@@ -2218,7 +2218,7 @@ class Close(Goal):
         joint_name = environment_object.get_movable_parent_joint(object_link_name)
 
         if environment_object.is_joint_revolute(joint_name) or environment_object.is_joint_prismatic(joint_name):
-            min_limit, max_limit = environment_object.get_joint_limits(joint_name)
+            min_limit, max_limit = environment_object.get_joint_position_limits(joint_name)
             if goal_joint_state:
                 goal_joint_state = max(min_limit, goal_joint_state)
             else:

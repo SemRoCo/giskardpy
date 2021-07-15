@@ -179,7 +179,7 @@ class B(Parent):
         for t in range(self.prediction_horizon):
             for v in self.free_variables:  # type: FreeVariable
                 for o in range(1, v.order):  # start with velocity
-                    if t == self.prediction_horizon - 1:
+                    if t == self.prediction_horizon - 1 and o < v.order-1:
                         lb[o]['t{:03d}/{}/{}'.format(t, v.name, o)] = 0
                         ub[o]['t{:03d}/{}/{}'.format(t, v.name, o)] = 0
                     else:

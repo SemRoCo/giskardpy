@@ -203,7 +203,7 @@ class Robot(Backend):
                 lower_limits=lower_limits,
                 upper_limits=upper_limits,
                 quadratic_weights={order: self._joint_weights[order][joint_name] for order in self._joint_weights},
-                horizon_functions={0: hf},
+                horizon_functions={1: hf},
             )
 
     def get_joint_limit_expr(self, joint_name, order):

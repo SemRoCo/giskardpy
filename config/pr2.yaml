@@ -55,10 +55,10 @@ general_options:
           odom_z_joint: 10
 #    snap:
 #      linear: # m/s**4
-#        default: 1e6
+#        default: 1e2
 #        override: { }
 #      angular: # rad/s**3
-#        default: 1e6
+#        default: 1e2
 #        override: { }
 qp_solver:
   name: gurobi # one of [qpoases, gurobi]

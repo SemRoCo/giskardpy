@@ -16,18 +16,6 @@ from giskardpy.qp_solver import QPSolver
 from giskardpy.qp_solver_gurobi import QPSolverGurobi
 from giskardpy.utils import memoize
 
-m_long = {
-    1: 'vel',
-    2: 'acc',
-    3: 'jerk'
-}
-
-m_short = {
-    1: 'v',
-    2: 'a',
-    3: 'j'
-}
-
 
 def save_pandas(dfs, names, path):
     file_name = u'{}/pandas_{}.csv'.format(path, datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
@@ -119,7 +107,7 @@ class H(Parent):
         for t in range(self.prediction_horizon):
             for v in self.free_variables:  # type: FreeVariable
                 for o in range(1, v.order):
-                    weights[o]['t{:03d}/{}/{}'.format(t, v.name, m_short[o])] = v.normalized_weight(t, o)
+                    weights[o]['t{:03d}/{}/{}'.format(t, v.name, o)] = v.normalized_weight(t, o)
 
         slack_weights = {}
         for t in range(self.prediction_horizon):
@@ -189,11 +177,11 @@ class B(Parent):
             for v in self.free_variables:  # type: FreeVariable
                 for o in range(1, v.order):  # start with velocity
                     if t == self.prediction_horizon - 1 and o < v.order - 1:
-                        lb[o]['t{:03d}/{}/{}'.format(t, v.name, m_short[o])] = 0
-                        ub[o]['t{:03d}/{}/{}'.format(t, v.name, m_short[o])] = 0
+                        lb[o]['t{:03d}/{}/{}'.format(t, v.name, o)] = 0
+                        ub[o]['t{:03d}/{}/{}'.format(t, v.name, o)] = 0
                     else:
-                        lb[o]['t{:03d}/{}/{}'.format(t, v.name, m_short[o])] = v.get_lower_limit(o)
-                        ub[o]['t{:03d}/{}/{}'.format(t, v.name, m_short[o])] = v.get_upper_limit(o)
+                        lb[o]['t{:03d}/{}/{}'.format(t, v.name, o)] = v.get_lower_limit(o)
+                        ub[o]['t{:03d}/{}/{}'.format(t, v.name, o)] = v.get_upper_limit(o)
         lb_params = []
         for o, x in sorted(lb.items()):
             lb_params.append(x)
@@ -266,14 +254,14 @@ class BA(Parent):
         u_last_stuff = defaultdict(dict)
         for v in self.free_variables:
             for o in range(1, v.order - 1):
-                l_last_stuff[o]['{}/last_{}'.format(v.name, m_short[o])] = w.round_down(v.get_symbol(o), self.round_to)
-                u_last_stuff[o]['{}/last_{}'.format(v.name, m_short[o])] = w.round_up(v.get_symbol(o), self.round_to)
+                l_last_stuff[o]['{}/last_{}'.format(v.name, o)] = w.round_down(v.get_symbol(o), self.round_to)
+                u_last_stuff[o]['{}/last_{}'.format(v.name, o)] = w.round_up(v.get_symbol(o), self.round_to)
 
         derivative_link = defaultdict(dict)
         for t in range(self.prediction_horizon - 1):
             for v in self.free_variables:
                 for o in range(1, v.order - 1):
-                    derivative_link[o]['t{:03d}/{}/{}/link'.format(t, m_long[o], v.name)] = 0
+                    derivative_link[o]['t{:03d}/{}/{}/link'.format(t, o, v.name)] = 0
 
         lb_params = [lb]
         ub_params = [ub]

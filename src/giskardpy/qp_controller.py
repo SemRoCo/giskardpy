@@ -1,3 +1,4 @@
+import datetime
 from collections import OrderedDict, defaultdict
 from copy import deepcopy
 from time import time
@@ -15,17 +16,32 @@ from giskardpy.qp_solver import QPSolver
 from giskardpy.qp_solver_gurobi import QPSolverGurobi
 from giskardpy.utils import create_path, memoize
 
+m_long = {
+    1: 'vel',
+    2: 'acc',
+    3: 'jerk'
+}
 
-def print_pd_dfs(dfs, names):
-    import pandas as pd
-    import datetime
-    folder_name = u'debug_matrices/{}'.format(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+m_short = {
+    1: 'v',
+    2: 'a',
+    3: 'j'
+}
+
+def save_pandas(dfs, names, path):
+    file_name = u'{}/pandas_{}.csv'.format(path, datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+    csv_string = u''
     for df, name in zip(dfs, names):
-        path = u'{}/{}.debug'.format(folder_name, name)
-        create_path(path)
+        csv_string += u'{}\n'.format(name)
         with pd.option_context('display.max_rows', None, 'display.max_columns', None):
-            with open(path, 'w') as f:
-                f.write(df.to_csv())
+            if df.shape[1] > 1:
+                for column_name, column in df.T.items():
+                    csv_string += column.add_prefix(column_name+u'||').to_csv()
+            else:
+                csv_string += df.to_csv()
+        csv_string += u'----------------------------------------------------------------------------'
+        with open(file_name, 'w') as f:
+            f.write(csv_string)
 
 
 class Parent(object):
@@ -102,7 +118,7 @@ class H(Parent):
         for t in range(self.prediction_horizon):
             for v in self.free_variables:  # type: FreeVariable
                 for o in range(1, v.order):
-                    weights[o]['t{:03d}/{}/{}'.format(t, v.name, o)] = v.normalized_weight(t, o)
+                    weights[o]['t{:03d}/{}/{}'.format(t, v.name, m_short[o])] = v.normalized_weight(t, o)
 
         slack_weights = {}
         for t in range(self.prediction_horizon):
@@ -180,11 +196,11 @@ class B(Parent):
             for v in self.free_variables:  # type: FreeVariable
                 for o in range(1, v.order):  # start with velocity
                     if t == self.prediction_horizon - 1 and o < v.order-1:
-                        lb[o]['t{:03d}/{}/{}'.format(t, v.name, o)] = 0
-                        ub[o]['t{:03d}/{}/{}'.format(t, v.name, o)] = 0
+                        lb[o]['t{:03d}/{}/{}'.format(t, v.name, m_short[o])] = 0
+                        ub[o]['t{:03d}/{}/{}'.format(t, v.name, m_short[o])] = 0
                     else:
-                        lb[o]['t{:03d}/{}/{}'.format(t, v.name, o)] = v.get_lower_limit(o)
-                        ub[o]['t{:03d}/{}/{}'.format(t, v.name, o)] = v.get_upper_limit(o)
+                        lb[o]['t{:03d}/{}/{}'.format(t, v.name, m_short[o])] = v.get_lower_limit(o)
+                        ub[o]['t{:03d}/{}/{}'.format(t, v.name, m_short[o])] = v.get_upper_limit(o)
         lb_params = []
         for o, x in sorted(lb.items()):
             lb_params.append(x)
@@ -292,15 +308,15 @@ class BA(Parent):
         u_last_stuff = defaultdict(dict)
         for v in self.free_variables:
             for o in range(1, v.order-1):
-                l_last_stuff[o]['/{}/last_{}'.format(v.name, o)] = w.round_down(v.get_symbol(o), self.round_to)
-                u_last_stuff[o]['/{}/last_{}'.format(v.name, o)] = w.round_up(v.get_symbol(o), self.round_to)
+                l_last_stuff[o]['{}/last_{}'.format(v.name, m_short[o])] = w.round_down(v.get_symbol(o), self.round_to)
+                u_last_stuff[o]['{}/last_{}'.format(v.name, m_short[o])] = w.round_up(v.get_symbol(o), self.round_to)
 
 
         derivative_link = defaultdict(dict)
         for t in range(self.prediction_horizon-1):
             for v in self.free_variables:
                 for o in range(1, v.order-1):
-                    derivative_link[o]['t{:03d}/{}/link_{}'.format(t, v.name, o)] = 0
+                    derivative_link[o]['t{:03d}/{}/{}/link'.format(t, m_long[o], v.name)] = 0
 
         lb_params = [lb]
         ub_params = [ub]
@@ -643,13 +659,15 @@ class QPController(object):
         logging.loginfo(u'All joints are within limits')
         return False
 
-    def __save_all(self, weights, A, lbA, ubA, lb, ub, xdot=None):
-        if xdot is not None:
-            print_pd_dfs([weights, A, lbA, ubA, lb, ub, xdot],
-                         ['weights', 'A', 'lbA', 'ubA', 'lb', 'ub', 'xdot'])
+    def save_all_pandas(self):
+        if self.p_xdot is not None:
+            save_pandas([self.p_weights, self.p_A, self.p_lbA, self.p_ubA, self.p_lb, self.p_ub, self.p_xdot],
+                        ['weights', 'A', 'lbA', 'ubA', 'lb', 'ub', 'xdot'],
+                        u'tmp_data')
         else:
-            print_pd_dfs([weights, A, lbA, ubA, lb, ub],
-                         ['weights', 'A', 'lbA', 'ubA', 'lb', 'ub'])
+            save_pandas([self.p_weights, self.p_A, self.p_lbA, self.p_ubA, self.p_lb, self.p_ub],
+                        ['weights', 'A', 'lbA', 'ubA', 'lb', 'ub'],
+                        u'tmp_data')
 
     def __is_nan_in_array(self, name, p_array):
         p_filtered = p_array.apply(lambda x: zip(x.index[x.isnull()].tolist(), x[x.isnull()]), 1)
@@ -929,4 +947,5 @@ class QPController(object):
         # p_lbA[p_lbA != 0].abs().sort_values(by='data')
         # get non 0 A entries
         # p_A.iloc[[1133]].T.loc[p_A.values[1133] != 0]
+        # self.save_all_pandas()
         pass

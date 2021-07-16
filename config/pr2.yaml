@@ -17,7 +17,7 @@ general_options:
       default: 0
       override: { }
     jerk:
-      default: 0.01
+      default: 0.0
       override: { }
 #    snap:
 #      default: 0
@@ -37,10 +37,10 @@ general_options:
           head_tilt_joint: 0.5
     acceleration:
       linear: # m/s**2
-        default: 1e2
+        default: 1e3
         override: { }
       angular: # rad/s**2
-        default: 1e2
+        default: 1e3
         override: { }
     jerk:
       linear: # m/s**3

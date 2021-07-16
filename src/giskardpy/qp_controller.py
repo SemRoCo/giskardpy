@@ -14,7 +14,7 @@ from giskardpy.exceptions import InfeasibleException, OutOfJointLimitsException,
     HardConstraintsViolatedException
 from giskardpy.qp_solver import QPSolver
 from giskardpy.qp_solver_gurobi import QPSolverGurobi
-from giskardpy.utils import create_path, memoize
+from giskardpy.utils import memoize
 
 m_long = {
     1: 'vel',
@@ -28,6 +28,7 @@ m_short = {
     3: 'j'
 }
 
+
 def save_pandas(dfs, names, path):
     file_name = u'{}/pandas_{}.csv'.format(path, datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
     csv_string = u''
@@ -36,7 +37,7 @@ def save_pandas(dfs, names, path):
         with pd.option_context('display.max_rows', None, 'display.max_columns', None):
             if df.shape[1] > 1:
                 for column_name, column in df.T.items():
-                    csv_string += column.add_prefix(column_name+u'||').to_csv()
+                    csv_string += column.add_prefix(column_name + u'||').to_csv()
             else:
                 csv_string += df.to_csv()
         csv_string += u'----------------------------------------------------------------------------'
@@ -159,14 +160,6 @@ class B(Parent):
         self.velocity_constraints = velocity_constraints  # type: list[VelocityConstraint]
         self.no_limits = 1e4
 
-    def blow_up(self, d, end_with_zero=False):
-        def f(value, t):
-            if t == self.prediction_horizon - 1 and self.prediction_horizon > 1 and end_with_zero:
-                return 0
-            return value
-
-        return super(B, self).blow_up(d, self.prediction_horizon, f)
-
     def get_lower_slack_limits(self):
         result = {}
         for t in range(self.prediction_horizon):
@@ -195,7 +188,7 @@ class B(Parent):
         for t in range(self.prediction_horizon):
             for v in self.free_variables:  # type: FreeVariable
                 for o in range(1, v.order):  # start with velocity
-                    if t == self.prediction_horizon - 1 and o < v.order-1:
+                    if t == self.prediction_horizon - 1 and o < v.order - 1:
                         lb[o]['t{:03d}/{}/{}'.format(t, v.name, m_short[o])] = 0
                         ub[o]['t{:03d}/{}/{}'.format(t, v.name, m_short[o])] = 0
                     else:
@@ -227,41 +220,6 @@ class BA(Parent):
         self.velocity_constraints = velocity_constraints
         self.round_to = 5
         self.round_to2 = 10
-
-    @memoize
-    def get_lower_position_limits(self):
-        d = {'{}/p_limit'.format(v.name): w.round_up(v.lower_position_limit - v.position_symbol, self.round_to2)
-             for v in self.free_variables if v.has_position_limits()}
-        return self.blow_up(d, self.prediction_horizon)
-
-    @memoize
-    def get_upper_position_limits(self):
-        d = {'{}/p_limit'.format(v.name): w.round_down(v.upper_position_limit - v.position_symbol, self.round_to2)
-             for v in self.free_variables if v.has_position_limits()}
-        return self.blow_up(d, self.prediction_horizon)
-
-    @memoize
-    def get_last_velocities(self, down=True):
-        if down:
-            return {'{}/last_v'.format(v.name): w.round_down(v.velocity_symbol, self.round_to)
-                    for v in self.free_variables}
-        else:
-            return {'{}/last_v'.format(v.name): w.round_up(v.velocity_symbol, self.round_to)
-                    for v in self.free_variables}
-
-    @memoize
-    def get_last_accelerations(self, down=True):
-        if down:
-            return {'{}/last_a'.format(v.name): w.round_down(v.acceleration_symbol, self.round_to)
-                    for v in self.free_variables}
-        else:
-            return {'{}/last_a'.format(v.name): w.round_up(v.acceleration_symbol, self.round_to)
-                    for v in self.free_variables}
-
-    @memoize
-    def get_derivative_link(self, infix):
-        return self.blow_up({'{}/{}/link'.format(infix, v.name): 0 for v in self.free_variables},
-                            self.prediction_horizon - 1)
 
     def get_lower_constraint_velocities(self):
         result = {}
@@ -302,25 +260,24 @@ class BA(Parent):
                     lb['t{:03d}/{}/p_limit'.format(t, v.name)] = w.round_up(v.get_lower_limit(0) - v.get_symbol(0),
                                                                             self.round_to2)
                     ub['t{:03d}/{}/p_limit'.format(t, v.name)] = w.round_down(v.get_upper_limit(0) - v.get_symbol(0),
-                                                                            self.round_to2)
+                                                                              self.round_to2)
 
         l_last_stuff = defaultdict(dict)
         u_last_stuff = defaultdict(dict)
         for v in self.free_variables:
-            for o in range(1, v.order-1):
+            for o in range(1, v.order - 1):
                 l_last_stuff[o]['{}/last_{}'.format(v.name, m_short[o])] = w.round_down(v.get_symbol(o), self.round_to)
                 u_last_stuff[o]['{}/last_{}'.format(v.name, m_short[o])] = w.round_up(v.get_symbol(o), self.round_to)
 
-
         derivative_link = defaultdict(dict)
-        for t in range(self.prediction_horizon-1):
+        for t in range(self.prediction_horizon - 1):
             for v in self.free_variables:
-                for o in range(1, v.order-1):
+                for o in range(1, v.order - 1):
                     derivative_link[o]['t{:03d}/{}/{}/link'.format(t, m_long[o], v.name)] = 0
 
         lb_params = [lb]
         ub_params = [ub]
-        for o in range(1, self.order-1):
+        for o in range(1, self.order - 1):
             lb_params.append(l_last_stuff[o])
             lb_params.append(derivative_link[o])
             ub_params.append(u_last_stuff[o])
@@ -829,7 +786,7 @@ class QPController(object):
     def split_xdot(self, xdot):
         split = []
         offset = len(self.free_variables)
-        for derivative in range(self.order-1):
+        for derivative in range(self.order - 1):
             split.append(OrderedDict((x.name, xdot[i + offset * self.prediction_horizon * derivative])
                                      for i, x in enumerate(self.free_variables)))
         return split

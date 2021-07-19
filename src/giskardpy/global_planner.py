@@ -2,6 +2,8 @@
 
 
 # Author: Mark Moll
+import threading
+
 import rospy
 import yaml
 from geometry_msgs.msg import PoseStamped, Quaternion
@@ -38,6 +40,7 @@ class GlobalPlanner(GetGoal):
         self.pybullet_joints = []
         self.pybullet_robot_id = 2
         self.pybullet_kitchen_id = 3
+        self.lock = threading.Lock()
         for i in range(0, p.getNumJoints(self.get_robot().get_pybullet_id())):
             j = p.getJointInfo(self.get_robot().get_pybullet_id(), i)
             if j[2] != p.JOINT_FIXED:
@@ -65,7 +68,6 @@ class GlobalPlanner(GetGoal):
         x = numpy.sqrt((state.getX() - self.occ_map_origin.x) ** 2)
         y = numpy.sqrt((state.getY() - self.occ_map_origin.y) ** 2)
         return 0 <= self.occ_map[int(y / self.occ_map_res)][self.occ_map_width - int(x / self.occ_map_res)] < 1
-
 
     def get_cart_goal(self, cmd):
         try:
@@ -105,32 +107,33 @@ class GlobalPlanner(GetGoal):
 
         return Status.SUCCESS
 
-    # def isStateValidForNavigation(self, state):
-    #    # Some arbitrary condition on the state (note that thanks to
-    #    # dynamic type checking we can just call getX() and do not need
-    #    # to convert state to an SE2State.)
-    #    print("a")
-    #    x = state().getX()
-    #    y = state().getY()
-    #    current_js = self.get_god_map().get_data(identifier.joint_states)
-    #    new_js = deepcopy(current_js)
-    #    #collision_matrix = self.get_god_map().get_data(identifier.collision_matrix)
-    #    #collision_list_size = self.get_god_map().get_data(identifier.collision_list_size)
-    #    robot = self.get_robot()
-    #    state_ik = p.calculateInverseKinematics(robot.get_pybullet_id(), robot.get_pybullet_link_id(u'base_footprint'),
-    #                                            [x, y, 0])
-    #    j_states = {j_name: SingleJointState(j_name, j_state) for j_name, j_state in zip(self.pybullet_joints, state_ik)}
-    #    for j_name, j_state in j_states.items():
-    #        new_js[j_name] = j_state
-    #    self.get_god_map().set_data(identifier.joint_states, new_js)
-    #    self.get_god_map().set_data(identifier.last_joint_states, current_js)
-    #    p.performCollisionDetection()
-    #    collisions = p.getContactPoints(self.pybullet_robot_id, self.pybullet_kitchen_id)
-    #    self.get_god_map().set_data(identifier.joint_states, current_js)
-    #    #collisions = self.get_world().check_collisions(collision_matrix, collision_list_size)
-    #    #return len(collisions.items) == 0
-    #    print("b")
-    #    return collisions is ()
+    def isStateValidForNavigation(self, state):
+        # Some arbitrary condition on the state (note that thanks to
+        # dynamic type checking we can just call getX() and do not need
+        # to convert state to an SE2State.)
+        with self.lock:
+            x = state.getX()
+            y = state.getY()
+            # Get current joint states from Bullet and copy them
+            current_js = self.get_god_map().get_data(identifier.joint_states)
+            new_js = deepcopy(current_js)
+            robot = self.get_robot()
+            # Calc IK for navigating to given state and ...
+            state_ik = p.calculateInverseKinematics(robot.get_pybullet_id(), robot.get_pybullet_link_id(u'base_footprint'),
+                                                    [x, y, 0])
+            # override on current joint states.
+            j_states = {j_name: SingleJointState(j_name, j_state) for j_name, j_state in zip(self.pybullet_joints, state_ik)}
+            for j_name, j_state in j_states.items():
+                new_js[j_name] = j_state
+            # Set new joint states in Bullet
+            self.get_god_map().set_data(identifier.joint_states, new_js)
+            self.get_god_map().set_data(identifier.last_joint_states, current_js)
+            # Check if kitchen is colliding with robot
+            p.performCollisionDetection()
+            collisions = p.getContactPoints(self.pybullet_robot_id, self.pybullet_kitchen_id)
+            # Reset joint state
+            self.get_god_map().set_data(identifier.joint_states, current_js)
+            return collisions is ()
 
     def create_kitchen_space(self):
         # create an SE3 state space
@@ -147,7 +150,7 @@ class GlobalPlanner(GetGoal):
     def create_kitchen_floor_space(self):
         # create an SE2 state space
         space = ob.SE2StateSpace()
-        #space.setLongestValidSegmentFraction(0.02)
+        # space.setLongestValidSegmentFraction(0.02)
 
         # set lower and upper bounds
         bounds = ob.RealVectorBounds(2)
@@ -159,7 +162,8 @@ class GlobalPlanner(GetGoal):
 
     def get_translation_start_state(self, space):
         state = ob.State(space)
-        pose_root_linkTtip_link = self.get_robot().get_fk_pose(self.goal_dict[u'root_link'], self.goal_dict[u'tip_link'])
+        pose_root_linkTtip_link = self.get_robot().get_fk_pose(self.goal_dict[u'root_link'],
+                                                               self.goal_dict[u'tip_link'])
         pose_mTtip_link = transform_pose(self.get_god_map().get_data(identifier.map_frame), pose_root_linkTtip_link)
         state().setX(pose_mTtip_link.pose.position.x)
         state().setY(pose_mTtip_link.pose.position.y)
@@ -189,7 +193,7 @@ class GlobalPlanner(GetGoal):
 
         # create a simple setup object
         ss = og.SimpleSetup(self.kitchen_floor_space)
-        ss.setStateValidityChecker(ob.StateValidityCheckerFn(self.is_driveable))
+        ss.setStateValidityChecker(ob.StateValidityCheckerFn(self.isStateValidForNavigation))
 
         start = self.get_translation_start_state(self.kitchen_floor_space)
         goal = self.get_translation_goal_state(self.kitchen_floor_space)
@@ -197,9 +201,9 @@ class GlobalPlanner(GetGoal):
         ss.setStartAndGoalStates(start, goal)
 
         si = ss.getSpaceInformation()
-        #si.setValidStateSamplerAllocator(ob.ValidStateSamplerAllocator(self.allocOBValidStateSampler))
-        #si.setMotionValidator(MyMotion(si))
-        #si.setStateValidityCheckingResolution(0.001)
+        # si.setValidStateSamplerAllocator(ob.ValidStateSamplerAllocator(self.allocOBValidStateSampler))
+        # si.setMotionValidator(MyMotion(si))
+        # si.setStateValidityCheckingResolution(0.001)
 
         # this will automatically choose a default planner with
         # default parameters
@@ -227,7 +231,7 @@ class GlobalPlanner(GetGoal):
         return None
 
 
-#class MyMotion(ob.MotionValidator):
+# class MyMotion(ob.MotionValidator):
 #
 #    def checkMotion(self, s1, s2):
 #        return isMotionValidForNavigation_s(s1, s2)

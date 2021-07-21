@@ -2,6 +2,7 @@
 
 
 # Author: Mark Moll
+import json
 import threading
 
 import rospy
@@ -11,7 +12,8 @@ from nav_msgs.srv import GetMap
 from py_trees import Status
 import pybullet as p
 from giskardpy.data_types import SingleJointState
-from rospy_message_converter.message_converter import convert_dictionary_to_ros_message
+from rospy_message_converter.message_converter import convert_dictionary_to_ros_message, convert_ros_message_to_dictionary
+
 from collections import defaultdict
 from copy import deepcopy
 from tf.transformations import quaternion_about_axis
@@ -101,11 +103,24 @@ class GlobalPlanner(GetGoal):
                 base_pose.pose.position.y = point[1]
                 base_pose.pose.orientation = Quaternion(*quaternion_about_axis(0, [0, 0, 1]))
                 poses.append(base_pose)
-
+            c = self.get_cartesian_path_constraint(poses)
+            move_cmd.constraints = []
+            move_cmd.constraints.append(c)
+            self.get_god_map().set_data(identifier.next_move_goal, move_cmd)
+            pass
         else:
             pass  # return self.planMovement()
 
         return Status.SUCCESS
+
+    def get_cartesian_path_constraint(self, poses):
+        d = {}
+        d[u'parameter_value_pair'] = deepcopy(self.goal_dict)
+        d[u'parameter_value_pair'].pop(u'goal')
+        d[u'type'] = u'CartesianPath'
+        d[u'parameter_value_pair'][u'goals'] = list(map(convert_ros_message_to_dictionary, poses))
+        d[u'parameter_value_pair'] = json.dumps(d[u'parameter_value_pair'])
+        return convert_dictionary_to_ros_message(u'giskard_msgs/Constraint', d)
 
     def isStateValidForNavigation(self, state):
         # Some arbitrary condition on the state (note that thanks to

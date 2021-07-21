@@ -44,4 +44,3 @@ collision_avoidance:
     number_of_repeller:
       default: 1
       end_effector_joints: 4
-

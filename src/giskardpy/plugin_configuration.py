@@ -21,7 +21,7 @@ class ConfigurationPlugin(GiskardBehavior):
     Gets replace with a kinematic sim plugin during a parallel universe.
     """
 
-    def __init__(self, name, joint_state_topic=u'/hsrb/joint_states'):
+    def __init__(self, name, joint_state_topic=u'/joint_states'):
         """
         :type js_identifier: str
         """

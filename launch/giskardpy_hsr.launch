@@ -9,7 +9,7 @@
   <arg name="on_hsr" default="false" />
 
   <group if="$(eval arg('sim') == false)">
-    <include file="$(find giskardpy)/launch/giskardpy_real_hsr_2.launch">
+    <include file="$(find giskardpy)/launch/giskardpy_real_hsr.launch">
       <arg name="on_hsr" value="$(arg on_hsr)"/>
     </include>
   </group>
@@ -31,6 +31,7 @@
     <rosparam param="enable_self_collision">False</rosparam>
     <rosparam param="interactive_marker_chains">
       - [odom, hand_palm_link]
+      - [odom, base_footprint]
     </rosparam>
   </node>
 

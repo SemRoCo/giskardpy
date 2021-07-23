@@ -12,6 +12,6 @@ def cb(data):
 if __name__ == '__main__':
     rospy.init_node('muh', anonymous=True)
 
-    rospy.Subscriber('joint_states', JointState, cb)
+    rospy.Subscriber('/hsrb/joint_states', JointState, cb)
 
     rospy.spin()

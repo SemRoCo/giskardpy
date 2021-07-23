@@ -32,11 +32,11 @@ plugins:
     joint_convergence_threshold: 0.02 # when the velocities fall below this value, the planning succeeds
     window_size: 21 # in sample points, should be identical to WiggleCancel window_size
   VisualizationBehavior: # planning visualization through markers, slows planning down a little bit
-    enabled: True
-  CPIMarker: # contact visualization, slows planning down a little bit
-    enabled: True
-  PlotTrajectory: # plots the joint trajectory at the end of planning, useful for debugging
     enabled: False
+  CPIMarker: # contact visualization, slows planning down a little bit
+    enabled: False
+  PlotTrajectory: # plots the joint trajectory at the end of planning, useful for debugging
+    enabled: True
     velocity_threshold: 0.0 # only joints that exceed this velocity threshold will be added to the plot. Use a negative number if you want to include every joint
     scaling: 2.5 # determines how much the x axis is scaled with the length(time) of the trajectory
     normalize_position: False # centers the joint positions around 0 on the y axis

@@ -53,7 +53,7 @@ def initialize_god_map():
     blackboard = Blackboard
     blackboard.god_map = god_map
     god_map.set_data(identifier.rosparam, rospy.get_param(rospy.get_name()))
-    god_map.set_data(identifier.robot_description, rospy.get_param(u'robot_description'))
+    god_map.set_data(identifier.robot_description, rospy.get_param(u'/giskard/robot_description'))
     path_to_data_folder = god_map.get_data(identifier.data_folder)
     # fix path to data folder
     if not path_to_data_folder.endswith(u'/'):
@@ -69,9 +69,10 @@ def initialize_god_map():
     pbw.start_pybullet(god_map.get_data(identifier.gui))
     while not rospy.is_shutdown():
         try:
-            controlled_joints = rospy.wait_for_message(u'/body/joint_states',
-                                                       JointState,
-                                                       timeout=5.0).name
+            #Todo: make states of controlled joints available
+            #List of controlled joints
+            controlled_joints = [u'head_tilt_joint', u'head_pan_joint', u'arm_lift_joint', u'arm_flex_joint',
+                                 u'arm_roll_joint', u'wrist_flex_joint', u'wrist_roll_joint']
         except ROSException as e:
             logging.logerr(u'state topic not available')
             logging.logerr(str(e))
@@ -168,7 +169,7 @@ def grow_tree():
     planning_3.add_plugin(SendJointStatePlugin(u'pub cmd'))
     # planning_3.add_plugin(KinSimPlugin(u'kin sim'))
     planning_3.add_plugin(LogTrajPlugin(u'log'))
-    planning_3.add_plugin(WiggleCancel(u'wiggle'))
+    #planning_3.add_plugin(WiggleCancel(u'wiggle'))
     # planning_3.add_plugin(LoopDetector(u'loop detector'))
     planning_3.add_plugin(GoalReachedPlugin(u'goal reached'))
     planning_3.add_plugin(TimePlugin(u'time'))

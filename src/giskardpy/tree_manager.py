@@ -2,8 +2,8 @@ from giskardpy.plugin import PluginBehavior
 from giskardpy import logging
 from sortedcontainers import SortedList
 
-class TreeManager(object):
 
+class TreeManager(object):
     class ManagerNode(object):
         def __init__(self, node, parent, position):
             """
@@ -100,7 +100,8 @@ class TreeManager(object):
                 elif manager_node in self.disabled_children:
                     self.disabled_children.remove(manager_node)
                 else:
-                    raise RuntimeError('could not remove node from parent. this probably means that the tree is inconsistent')
+                    raise RuntimeError(
+                        'could not remove node from parent. this probably means that the tree is inconsistent')
             else:
                 if manager_node in self.enabled_children:
                     self.enabled_children.remove(manager_node)
@@ -143,7 +144,6 @@ class TreeManager(object):
         for idx, child in enumerate(node.children):
             self.__init_map(child, manager_node, idx)
 
-
     def disable_node(self, node_name):
         """
         disables the node with the given name
@@ -157,7 +157,6 @@ class TreeManager(object):
             logging.logwarn('cannot disable root node')
             return False
 
-
     def enable_node(self, node_name):
         """
         enables the node with the given name
@@ -170,7 +169,6 @@ class TreeManager(object):
             t.parent.enable_child(t)
         else:
             logging.loginfo('root node')
-
 
     def insert_node(self, node, parent_name, position=-1):
         """
@@ -202,6 +200,16 @@ class TreeManager(object):
         del self.tree_nodes[node_name]
         parent.remove_child(node)
 
+    def has_node(self, node_name):
+        """
+        Returns true if the tree has the given node
+        :param node_name:
+        :type node_name: str
+        :return: True if tree has the node else false
+        :rtype boolean:
+        """
+        return self.tree_nodes.has_key(node_name)
+
     def get_node(self, node_name):
         """
         returns the behavior with the given name
@@ -211,4 +219,3 @@ class TreeManager(object):
         :rtype py_trees.behaviour.Behaviour:
         """
         return self.tree_nodes[node_name].node
-

@@ -3,11 +3,15 @@ from collections import OrderedDict
 import rospy
 from py_trees import Status
 from sensor_msgs.msg import JointState
+from std_msgs.msg import Float64
 
 from giskardpy.data_types import SingleJointState
 import giskardpy.identifier as identifier
 from giskardpy.plugin import GiskardBehavior
 
+#Todo: List of controllers, topics, msg_type
+#Todo: read corresponding position/velocity from calculated js (loop z.50)
+#Todo: publish corresponding msgs
 
 class SendJointStatePlugin(GiskardBehavior):
     def __init__(self, name):
@@ -21,7 +25,14 @@ class SendJointStatePlugin(GiskardBehavior):
         super(SendJointStatePlugin, self).__init__(name)
 
     def initialise(self):
-        self.pub = rospy.Publisher('body_commands', JointState, queue_size=10)
+        self.pub = {
+            u'head_tilt_joint': rospy.Publisher('/hsrb/head_tilt_controller/command', Float64, queue_size=10),
+            u'head_pan_joint': rospy.Publisher('/hsrb/head_pan_controller/command', Float64, queue_size=10),
+            u'arm_lift_joint': rospy.Publisher('/hsrb/arm_lift_controller/command', Float64, queue_size=10),
+            u'arm_flex_joint': rospy.Publisher('/hsrb/arm_flex_controller/command', Float64, queue_size=10),
+            u'arm_roll_joint': rospy.Publisher('/hsrb/arm_roll_controller/command', Float64, queue_size=10),
+            u'wrist_flex_joint': rospy.Publisher('/hsrb/wrist_flex_controller/command', Float64, queue_size=10),
+            u'wrist_roll_joint': rospy.Publisher('/hsrb/wrist_roll_controller/command', Float64, queue_size=10)}
         self.sample_period = self.get_god_map().get_data(identifier.sample_period)
         super(SendJointStatePlugin, self).initialise()
 
@@ -53,6 +64,8 @@ class SendJointStatePlugin(GiskardBehavior):
         #     self.get_god_map().set_data(identifier.joint_states, next_js)
         # else:
         #     self.get_god_map().set_data(identifier.joint_states, current_js)
-        self.pub.publish(self.js_to_msg(next_js))
+        for joint, pub in self.pub.iteritems():
+            pub.publish(Float64(data=next_js[joint].position))
+        #self.pub.publish(self.js_to_msg(next_js))
         self.get_god_map().set_data(identifier.last_joint_states, current_js)
         return Status.RUNNING

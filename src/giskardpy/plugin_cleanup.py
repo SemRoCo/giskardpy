@@ -28,7 +28,8 @@ class CleanUp(GiskardBehavior):
         self.get_god_map().set_data(identifier.general_options, deepcopy(self.general_options))
         self.get_god_map().set_data(identifier.next_move_goal, None)
         tree_manager = self.get_god_map().get_data(identifier.tree_manager) # type: TreeManager
-        tree_manager.get_node(u'visualization').clear_marker()
+        if tree_manager.has_node(u'visualization'):
+            tree_manager.get_node(u'visualization').clear_marker()
 
     def update(self):
         return Status.SUCCESS

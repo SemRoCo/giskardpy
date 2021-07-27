@@ -3,6 +3,7 @@ from collections import defaultdict
 from py_trees import Status
 
 import giskardpy.identifier as identifier
+from giskardpy import logging
 from giskardpy.exceptions import InvalidGoalException
 from giskardpy.plugin_action_server import GetGoal
 from giskard_msgs.msg import MoveGoal, CollisionEntry, MoveCmd, MoveResult
@@ -32,8 +33,10 @@ class SetCmd(GetGoal):
                     self.get_god_map().set_data(identifier.sample_period, self.sample_period_backup)
                     self.sample_period_backup = None
             else:
-                self.raise_to_blackboard(
-                    InvalidGoalException(u'invalid move action goal type: {}'.format(self.goal.type)))
+                error_message = u'Invalid move action goal type: {}'.format(self.goal.type)
+                logging.logwarn(error_message)
+                logging.logwarn(u'Goal rejected.')
+                self.raise_to_blackboard(InvalidGoalException(error_message))
             if self.is_check_reachability(self.goal.type):
                 self.sample_period_backup = self.get_god_map().get_data(identifier.sample_period)
                 self.get_god_map().set_data(identifier.sample_period, self.rc_sample_period)

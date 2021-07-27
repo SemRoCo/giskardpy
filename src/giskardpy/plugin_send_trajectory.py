@@ -7,6 +7,7 @@ from py_trees_ros.actions import ActionClient
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 
 import giskardpy.identifier as identifier
+from giskardpy import logging
 from giskardpy.logging import loginfo
 from giskardpy.plugin import GiskardBehavior
 from giskardpy.utils import traj_to_msg
@@ -51,6 +52,7 @@ class SendTrajectory(ActionClient, GiskardBehavior):
         # pity there is no 'is_connected' api like there is for c++
         if not self.sent_goal:
             self.action_client.send_goal(self.action_goal)
+            logging.loginfo(u'Sending trajectory to robot.')
             self.sent_goal = True
             self.feedback_message = "sent goal to the action server"
             return py_trees.Status.RUNNING
@@ -61,6 +63,7 @@ class SendTrajectory(ActionClient, GiskardBehavior):
         result = self.action_client.get_result()
         if result:
             self.feedback_message = "goal reached"
+            logging.loginfo(u'Robot successfully executed the trajectory.')
             return py_trees.Status.SUCCESS
         else:
             self.feedback_message = "moving"

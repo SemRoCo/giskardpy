@@ -1,3 +1,5 @@
+from giskardpy import logging
+
 try:
     # Python 2
     from Queue import Empty, Queue
@@ -105,6 +107,7 @@ class GoalReceived(ActionServerBehavior):
     def update(self):
         if self.get_as().has_goal():
             rospy.sleep(.5)
+            logging.loginfo(u'Received new goal.')
             return Status.SUCCESS
         return Status.FAILURE
 
@@ -151,8 +154,11 @@ class SendResult(ActionServerBehavior):
 
         else:
             if not self.all_goals_succeeded(result):
+                logging.logwarn(u'Failed to execute goal.')
                 self.get_as().send_aborted(result)
                 return Status.SUCCESS
+            else:
+                logging.loginfo(u'Successfully executed goal.')
         self.get_as().send_result(result)
         return Status.SUCCESS
 

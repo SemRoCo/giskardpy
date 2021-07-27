@@ -317,6 +317,7 @@ class TestJointGoals(object):
         goal.goal.type = MoveGoal.UNDEFINED
         result = zero_pose.send_goal(goal)
         assert result.error_codes[0] == MoveResult.INVALID_GOAL
+        zero_pose.send_and_check_goal()
 
     def test_empty_goal(self, zero_pose):
         """

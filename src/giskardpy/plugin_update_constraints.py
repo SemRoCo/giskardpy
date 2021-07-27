@@ -97,10 +97,10 @@ class GoalToConstraints(GetGoal):
         :type cmd: MoveCmd
         :rtype: dict
         """
-        loginfo(u'parsing goal message')
+        loginfo(u'Parsing goal message.')
         for constraint in itertools.chain(cmd.constraints, cmd.joint_constraints, cmd.cartesian_constraints):
             try:
-                loginfo(u'adding constraint of type: \'{}\''.format(constraint.type))
+                loginfo(u'Adding constraint of type: \'{}\''.format(constraint.type))
                 C = self.allowed_constraint_types[constraint.type]
             except KeyError:
                 matches = ''

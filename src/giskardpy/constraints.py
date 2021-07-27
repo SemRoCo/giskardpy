@@ -1406,8 +1406,6 @@ class ExternalCollisionAvoidance(Goal):
         dist = w.dot(r_V_n.T, r_V_pb_pa)[0]
 
         penetration_distance = soft_threshold - actual_distance
-        # spring_penetration_distance = spring_threshold - actual_distance
-        # lower_limit = self.limit_velocity(penetration_distance, max_velocity)
         lower_limit = penetration_distance
         upper_limit = 1e2
 
@@ -1671,24 +1669,31 @@ class SelfCollisionAvoidance(Goal):
                                  w.min(number_of_self_collisions, num_repeller))
 
         penetration_distance = soft_threshold - actual_distance
-        # lower_limit = self.limit_velocity(penetration_distance, repel_velocity)
         lower_limit = penetration_distance
         upper_limit = 1e2
-        # slack_limit = self.limit_velocity(actual_distance, repel_velocity)
 
-        limit_of_lower_limit = max_velocity * sample_period * self.control_horizon
-        lower_limit_limited = w.limit(soft_threshold - hard_threshold, -limit_of_lower_limit, limit_of_lower_limit)
+        # I have to consider, that the qp controller limits velocities
+        qp_limits_for_lba = max_velocity * sample_period * self.control_horizon
+
+        # this has to take into account the inner workings of the qp controller to compute an accurate slack limit
+        lower_limit_limited = w.limit(lower_limit,
+                                      -qp_limits_for_lba,
+                                      qp_limits_for_lba)
+        lower_limit_for_hard_threshold = w.limit(hard_threshold - actual_distance,
+                                                 -qp_limits_for_lba,
+                                                 qp_limits_for_lba)
+        upper_slack = w.if_greater(actual_distance, hard_threshold,
+                                   -lower_limit_for_hard_threshold + lower_limit_limited,
+                                   lower_limit_limited)
+
+        # undo factor in A
+        upper_slack /= (sample_period * self.prediction_horizon)
+
 
         upper_slack = w.if_greater(actual_distance, 50,  # assuming that distance of unchecked closest points is 100
                                    1e4,
                                    # 1e4,
-                                   w.max(0, lower_limit_limited) / (sample_period * self.prediction_horizon)
-                                   )
-        hard_lower_limit = -w.limit(hard_threshold - actual_distance,
-                                    -limit_of_lower_limit,
-                                    limit_of_lower_limit) / (sample_period * self.prediction_horizon)
-
-        upper_slack += hard_lower_limit
+                                   w.max(0, upper_slack))
 
         self.add_constraint(u'/position',
                             reference_velocity=max_velocity,

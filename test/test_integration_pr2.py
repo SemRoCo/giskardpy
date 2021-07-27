@@ -2849,7 +2849,7 @@ class TestCollisionAvoidanceGoals(object):
         p.header.stamp = rospy.get_rostime()
         p.pose.position.x = 0.15
         p.pose.orientation.w = 1
-        zero_pose.set_cart_goal(p, zero_pose.l_tip, zero_pose.default_root)
+        zero_pose.set_cart_goal(p, zero_pose.l_tip, u'base_footprint')
         zero_pose.allow_all_collisions()
         zero_pose.send_goal()
         zero_pose.send_goal()

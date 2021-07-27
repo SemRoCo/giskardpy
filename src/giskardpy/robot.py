@@ -194,8 +194,10 @@ class Robot(Backend):
                 lower_limits[i] = lower_limit
                 upper_limits[i] = upper_limit
 
-            def hf(w, t):
-                return w + w * 10 * t
+            # start_v = 0.005
+            # a_v = (v_i - start_v) / (ch)
+            # def hf(w, t):
+            #     return w + w * 1 * t
 
             self._joint_constraints[joint_name] = FreeVariable(
                 # FIXME there might not be an entry for a specific joint for an order
@@ -203,7 +205,7 @@ class Robot(Backend):
                 lower_limits=lower_limits,
                 upper_limits=upper_limits,
                 quadratic_weights={order: self._joint_weights[order][joint_name] for order in self._joint_weights},
-                horizon_functions={1: hf},
+                horizon_functions={1: 0.1},
             )
 
     def get_joint_limit_expr(self, joint_name, order):

@@ -10,7 +10,7 @@ from geometry_msgs.msg import PoseStamped
 from hypothesis import given, assume
 import hypothesis.strategies as st
 from giskardpy import identifier
-from giskardpy import cas_wrapper as w
+from giskardpy import casadi_wrapper as w
 from giskardpy.god_map import GodMap
 from utils_for_tests import variable_name, keys_values, lists_of_same_length, pr2_urdf
 from giskardpy.world import World
@@ -28,7 +28,11 @@ class TestGodMap(unittest.TestCase):
         assume(key != wrong_key)
         db = GodMap(default_value)
         db.set_data([key], number)
-        self.assertEqual(db.get_data([wrong_key]), default_value, msg=u'key={}, number={}'.format(key, number))
+        try:
+            db.get_data([wrong_key])
+            assert False
+        except KeyError as e:
+            assert True
 
     @given(variable_name(),
            st.integers())
@@ -105,12 +109,20 @@ class TestGodMap(unittest.TestCase):
         class C(object):
             asdf = 1
         db.unsafe_set_data(['c'], C())
-        self.assertEqual(db.get_data(['c', 'a']), db.default_value)
+        try:
+            db.get_data(['c', 'a'])
+            assert False
+        except KeyError as e:
+            assert True
 
     def test_index_error(self):
         db = GodMap()
         db.unsafe_set_data(['l'], [1, 2, 3])
-        self.assertEqual(db.get_data(['l', '5']), db.default_value)
+        try:
+            db.get_data(['l', '5'])
+            assert False
+        except KeyError as e:
+            assert True
 
     @given(variable_name(),
            keys_values())

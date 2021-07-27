@@ -98,10 +98,10 @@ class FreeVariable(object):
         assert len(self._symbols) == len(self._quadratic_weights) + 1
         self.order = len(self._symbols)
 
-        def default_horizon_f(weight, t):
-            return weight
+        # def default_horizon_f(weight, t):
+        #     return weight
 
-        self.horizon_functions = defaultdict(lambda: default_horizon_f)
+        self.horizon_functions = defaultdict(float)
         self.horizon_functions.update(horizon_functions)
 
     def get_symbol(self, order):
@@ -137,9 +137,13 @@ class FreeVariable(object):
         except KeyError:
             raise KeyError(u'Free variable {} doesn\'t have weight for derivative of order {}'.format(self, order))
 
-    def normalized_weight(self, t, order):
-        weight_normalized = self.get_quadratic_weights(order) * (1 / self.get_upper_limit(order)) ** 2
-        return self.horizon_functions[order](weight_normalized, t)
+    def normalized_weight(self, t, order, prediction_horizon):
+        weight = self.get_quadratic_weights(order)
+        start = weight * self.horizon_functions[order]
+        a = (weight - start) / (prediction_horizon)
+        weight = a*t + start
+        # weight = (self.get_quadratic_weights(order), t)
+        return weight * (1 / self.get_upper_limit(order)) ** 2
 
     def __str__(self):
         return self.name

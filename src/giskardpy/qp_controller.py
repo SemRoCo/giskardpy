@@ -2,7 +2,7 @@ import datetime
 from collections import OrderedDict, defaultdict
 from copy import deepcopy
 from time import time
-
+import os
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -107,7 +107,7 @@ class H(Parent):
         for t in range(self.prediction_horizon):
             for v in self.free_variables:  # type: FreeVariable
                 for o in range(1, v.order):
-                    weights[o]['t{:03d}/{}/{}'.format(t, v.name, o)] = v.normalized_weight(t, o)
+                    weights[o]['t{:03d}/{}/{}'.format(t, v.name, o)] = v.normalized_weight(t, o, self.prediction_horizon)
 
         slack_weights = {}
         for t in range(self.prediction_horizon):
@@ -176,7 +176,7 @@ class B(Parent):
         for t in range(self.prediction_horizon):
             for v in self.free_variables:  # type: FreeVariable
                 for o in range(1, v.order):  # start with velocity
-                    if t == self.prediction_horizon - 1 and o < v.order - 1:
+                    if t == self.prediction_horizon - 1 and o < v.order - 1:# and False:
                         lb[o]['t{:03d}/{}/{}'.format(t, v.name, o)] = 0
                         ub[o]['t{:03d}/{}/{}'.format(t, v.name, o)] = 0
                     else:
@@ -785,22 +785,22 @@ class QPController(object):
     def bA_names(self):
         return self.bA.names()
 
-    def _viz_mpc(self, x, joint_name, state):
+    def _viz_mpc(self, joint_name):
         def pad(a, desired_length):
             tmp = np.zeros(desired_length)
             tmp[:len(a)] = a
             return tmp
 
-        sample_period = state[str(self.sample_period)]
+        sample_period = self.state[str(self.sample_period)]
         try:
-            start_pos = state[joint_name]
+            start_pos = self.state[joint_name]
         except KeyError:
             logging.loginfo('start position not found in state')
             start_pos = 0
         ts = np.array([(i + 1) * sample_period for i in range(self.prediction_horizon)])
-        filtered_x = x.filter(like='/{}'.format(joint_name), axis=0)
+        filtered_x = self.p_xdot.filter(like='/{}/'.format(joint_name), axis=0)
         velocities = filtered_x[:self.prediction_horizon].values
-        if joint_name in state:
+        if joint_name in self.state:
             accelerations = filtered_x[self.prediction_horizon:self.prediction_horizon * 2].values
             jerks = filtered_x[self.prediction_horizon * 2:self.prediction_horizon * 3].values
         positions = [start_pos]
@@ -818,7 +818,7 @@ class QPController(object):
         axs[1].set_title('velocity')
         axs[1].plot(ts, velocities, 'b')
         axs[1].grid()
-        if joint_name in state:
+        if joint_name in self.state:
             axs[2].set_title('acceleration')
             axs[2].plot(ts, accelerations, 'b')
             axs[2].grid()
@@ -826,7 +826,9 @@ class QPController(object):
             axs[3].plot(ts, jerks, 'b')
             axs[3].grid()
         plt.tight_layout()
-        plt.show()
+        path, dirs, files = next(os.walk('tmp_data/mpc'))
+        file_count = len(files)
+        plt.savefig(u'tmp_data/mpc/mpc_{}_{}.png'.format(joint_name, file_count))
 
     @profile
     def _create_debug_pandas(self, substitutions, xdot_full=None, actually_print=False):
@@ -886,7 +888,7 @@ class QPController(object):
 
         # self.save_all(p_weights, p_A, p_lbA, p_ubA, p_lb, p_ub, p_xdot)
 
-        # self._viz_mpc(p_xdot, 'j', state)
+        # self._viz_mpc('j2')
         # self._viz_mpc(self.p_xdot, 'world_robot_joint_state_r_shoulder_lift_joint_position', state)
         # self._viz_mpc(self.p_Ax2, bA_names[-1][:-2], state)
         # p_lbA[p_lbA != 0].abs().sort_values(by='data')

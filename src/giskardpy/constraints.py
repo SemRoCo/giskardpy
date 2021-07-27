@@ -219,26 +219,6 @@ class Goal(object):
                        r_R_t_axis_angle[2]])
         return self.get_expr_velocity(fk)
 
-    def limit_acceleration(self, current_position, error, max_acceleration, max_velocity=1, debug_prefix=None):
-        """
-        experimental, don't use
-        """
-        sample_period = self.get_input_sampling_period()
-        last_velocity = self.get_expr_velocity(current_position)
-        if debug_prefix is not None:
-            self.add_debug_expr(debug_prefix + '/velocity', last_velocity)
-
-        max_acceleration2 = max_acceleration * sample_period
-        capped_err = w.limit(w.limit(w.velocity_limit_from_position_limit(max_acceleration,
-                                                                          error,
-                                                                          0,
-                                                                          sample_period),
-                                     -max_velocity,
-                                     max_velocity) - last_velocity,
-                             -max_acceleration2,
-                             max_acceleration2)
-        return capped_err
-
     def limit_velocity(self, error, max_velocity):
         """
         :param error: expression that describes the error
@@ -250,8 +230,6 @@ class Goal(object):
         return w.max(w.min(error, max_velocity), -max_velocity)
 
     def normalize_weight(self, velocity_limit, weight):
-        # sample_period = self.get_input_sampling_period()
-        # result = weight * (1. / (velocity_limit)) ** 2
         return weight
 
     def get_constraints(self):
@@ -442,7 +420,7 @@ class Goal(object):
         if max_velocity is not None:
             self.add_velocity_constraint(u'{}/q/vel'.format(prefix),
                                          velocity_limit=max_velocity,
-                                         weight=weight*1000,
+                                         weight=weight * 1000,
                                          expression=angle_error2)
         # w is not needed because its derivative is always 0 for identity quaternions
 
@@ -680,6 +658,7 @@ class ShakyJointPositionRevoluteOrPrismatic(Goal):
         s = super(ShakyJointPositionRevoluteOrPrismatic, self).__str__()
         return u'{}/{}'.format(s, self.joint_name)
 
+
 class ShakyJointPositionContinuous(Goal):
     def __init__(self, god_map, joint_name, goal, frequency, noise_amplitude=10, weight=WEIGHT_BELOW_CA,
                  max_velocity=1, **kwargs):
@@ -701,8 +680,7 @@ class ShakyJointPositionContinuous(Goal):
         super(ShakyJointPositionContinuous, self).__init__(god_map, **kwargs)
         if not self.get_robot().is_joint_continuous(joint_name):
             raise ConstraintException(u'{} called with non continuous joint {}'.format(self.__class__.__name__,
-                                                                                     joint_name))
-
+                                                                                       joint_name))
 
     def make_constraints(self):
         """
@@ -730,7 +708,8 @@ class ShakyJointPositionContinuous(Goal):
                              self.get_robot().get_joint_velocity_limit_expr(self.joint_name))
 
         fun_params = frequency * 2.0 * w.pi * time_in_secs
-        err = w.shortest_angular_distance(current_joint, joint_goal) + noise_amplitude * max_velocity * w.sin(fun_params)
+        err = w.shortest_angular_distance(current_joint, joint_goal) + noise_amplitude * max_velocity * w.sin(
+            fun_params)
         capped_err = self.limit_velocity(err, noise_amplitude * max_velocity)
 
         weight = self.normalize_weight(max_velocity, weight)
@@ -745,6 +724,7 @@ class ShakyJointPositionContinuous(Goal):
     def __str__(self):
         s = super(ShakyJointPositionContinuous, self).__str__()
         return u'{}/{}'.format(s, self.joint_name)
+
 
 class AvoidJointLimitsRevolute(Goal):
     def __init__(self, god_map, joint_name, weight=0.1, max_linear_velocity=100, percentage=5, **kwargs):
@@ -1215,7 +1195,8 @@ class CartesianVelocityLimit(Goal):
 
 
 class CartesianOrientation(BasicCartesianGoal):
-    def __init__(self, god_map, root_link, tip_link, goal, reference_velocity=None, max_velocity=0.5, max_accleration=0.5,
+    def __init__(self, god_map, root_link, tip_link, goal, reference_velocity=None, max_velocity=0.5,
+                 max_accleration=0.5,
                  weight=WEIGHT_ABOVE_CA, goal_constraint=False, **kwargs):
         """
         This goal will the kinematic chain from root_link to tip_link to achieve a rotation goal for the tip link
@@ -1351,7 +1332,7 @@ class CartesianPoseStraight(Goal):
 
 class ExternalCollisionAvoidance(Goal):
 
-    def __init__(self, god_map, link_name, max_velocity=0.1, hard_threshold=0.0, soft_threshold=0.05, idx=0,
+    def __init__(self, god_map, link_name, max_velocity=0.2, hard_threshold=0.0, soft_threshold=0.05, idx=0,
                  num_repeller=1, **kwargs):
         """
         Don't use me
@@ -1430,19 +1411,28 @@ class ExternalCollisionAvoidance(Goal):
         lower_limit = penetration_distance
         upper_limit = 1e2
 
-        limit_of_lower_limit = max_velocity * sample_period * self.control_horizon
-        lower_limit_limited = w.limit(soft_threshold - hard_threshold, -limit_of_lower_limit, limit_of_lower_limit)
+        # I have to consider, that the qp controller limits velocities
+        qp_limits_for_lba = max_velocity * sample_period * self.control_horizon
+
+        # this has to take into account the inner workings of the qp controller to compute an accurate slack limit
+        lower_limit_limited = w.limit(lower_limit,
+                                      -qp_limits_for_lba,
+                                      qp_limits_for_lba)
+        lower_limit_for_hard_threshold = w.limit(hard_threshold - actual_distance,
+                                                 -qp_limits_for_lba,
+                                                 qp_limits_for_lba)
+        upper_slack = w.if_greater(actual_distance, hard_threshold,
+                                   -lower_limit_for_hard_threshold + lower_limit_limited,
+                                   lower_limit_limited)
+
+        # undo factor in A
+        upper_slack /= (sample_period * self.prediction_horizon)
+
 
         upper_slack = w.if_greater(actual_distance, 50,  # assuming that distance of unchecked closest points is 100
                                    1e4,
                                    # 1e4,
-                                   w.max(0, lower_limit_limited) / (sample_period * self.prediction_horizon)
-                                   )
-        hard_lower_limit = -w.limit(hard_threshold - actual_distance,
-                                    -limit_of_lower_limit,
-                                    limit_of_lower_limit) / (sample_period * self.prediction_horizon)
-
-        upper_slack += hard_lower_limit
+                                   w.max(0, upper_slack))
 
         weight = w.if_greater(actual_distance, 50, 0, WEIGHT_COLLISION_AVOIDANCE)
 
@@ -1608,7 +1598,7 @@ class CollisionAvoidanceHint(Goal):
 
 class SelfCollisionAvoidance(Goal):
 
-    def __init__(self, god_map, link_a, link_b, max_velocity=0.1, hard_threshold=0.0, soft_threshold=0.05, idx=0,
+    def __init__(self, god_map, link_a, link_b, max_velocity=0.2, hard_threshold=0.0, soft_threshold=0.05, idx=0,
                  num_repeller=1, **kwargs):
         self.link_a = link_a
         self.link_b = link_b

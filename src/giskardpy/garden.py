@@ -59,6 +59,7 @@ order_map = BiDict({
     6: u'pop'
 })
 
+
 def initialize_god_map():
     god_map = GodMap()
     blackboard = Blackboard
@@ -133,7 +134,7 @@ def initialize_god_map():
     world.robot.reinitialize()
 
     world.robot.init_self_collision_matrix()
-    sanity_check(god_map)
+    # sanity_check(god_map)
     return god_map
 
 

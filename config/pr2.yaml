@@ -7,17 +7,17 @@ general_options:
     # the planner prefers low weight joints to achieve solutions
     # higher weights reduce wiggling, but lower the maximum joint velocity, which might make the planner stop too early
     velocity:
-      default: 0.01
-      override:
-        odom_x_joint: 0.1
-        odom_y_joint: 0.1
-        odom_z_joint: 0.1
-        torso_lift_joint: 0.05
+      default: 0.001
+      override: {}
+#        odom_x_joint: 0.0
+#        odom_y_joint: 0.0
+#        odom_z_joint: 0.0
+#        torso_lift_joint: 0.0
     acceleration:
       default: 0
       override: { }
     jerk:
-      default: 0.0
+      default: 0.001
       override: { }
 #    snap:
 #      default: 0
@@ -55,10 +55,10 @@ general_options:
           odom_z_joint: 10
 #    snap:
 #      linear: # m/s**4
-#        default: 1e2
+#        default: 250
 #        override: { }
 #      angular: # rad/s**3
-#        default: 1e2
+#        default: 250
 #        override: { }
 qp_solver:
   name: gurobi # one of [qpoases, gurobi]

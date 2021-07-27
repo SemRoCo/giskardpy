@@ -1,6 +1,6 @@
 import traceback
 from copy import deepcopy
-
+from mpl_toolkits import mplot3d
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -9,13 +9,15 @@ from giskardpy.data_types import FreeVariable, Constraint, VelocityConstraint
 from giskardpy.qp_controller import QPController
 
 
-def simulate(start_state, qp_controller, sample_period, print_traj=False, time_limit=4):
+def simulate(start_state, qp_controller, sample_period, print_traj=False, time_limit=6., name='',
+             save=False):
     num_free_variables = len(qp_controller.free_variables)
     state = deepcopy(start_state)
     traj = [[[] for __ in range(num_free_variables)] for _ in range(4)]
     time = []
     for t in range(int(1 / sample_period * time_limit)):
         try:
+            state['time'] = t
             subs = [state[x] for x in qp_controller.compiled_big_ass_M.str_params]
             [cmd_vel, cmd_acc, cmd_jerk], _ = qp_controller.get_cmd(subs)
             for i, (free_variable, cmd) in enumerate(cmd_vel.items()):
@@ -60,14 +62,18 @@ def simulate(start_state, qp_controller, sample_period, print_traj=False, time_l
                         ticks.append(max_ / 2)
                 axs[index].set_yticks(ticks)
                 axs[index].grid()
+        plt.title(name)
         plt.tight_layout()
-        f.show()
+        if save:
+            plt.savefig('tmp_data/results/l_{}_{}.png'.format(len(traj[0][0]), name))
+        else:
+            f.show()
 
     return state, traj
 
 
 def two_joint_setup(sample_period=0.05, prediction_horizon=10, j_start=0, j2_start=0, upos_limit=1.5, lpos_limit=-1.5,
-                    vel_limit=1, acc_limit=999, jerk_limit=30):
+                    vel_limit=1, acc_limit=4, jerk_limit=30, hf=None, joint_weight=None):
     j, j_v, j_a, j_j, j2, j2_v, j2_a, j2_j, sample_period_symbol = ca.var(
         'j j_v j_a j_j j2 j2_v j2_a j2_j sample_period')
 
@@ -82,10 +88,20 @@ def two_joint_setup(sample_period=0.05, prediction_horizon=10, j_start=0, j2_sta
         'j2_j': 0,
         'sample_period': sample_period
     }
-    joint_weight = 0.01
+    if joint_weight is None:
+        joint_weight = {
+            1: 0.01,
+            2: 0,
+            3: 0,
+        }
 
-    def hf(w, t):
-        return w + w * 10 * t
+    if hf is None:
+        def f(w, t):
+            return w + w * 1 * t
+
+        hf = {
+            1: f
+        }
 
     jc = FreeVariable(
         symbols={
@@ -106,14 +122,8 @@ def two_joint_setup(sample_period=0.05, prediction_horizon=10, j_start=0, j2_sta
             2: acc_limit,
             3: jerk_limit
         },
-        quadratic_weights={
-            1: joint_weight,
-            2: 0,
-            3: 0,
-        },
-        horizon_functions={
-            1: hf
-        },
+        quadratic_weights=joint_weight,
+        horizon_functions=hf,
     )
 
     jc2 = FreeVariable(
@@ -135,14 +145,8 @@ def two_joint_setup(sample_period=0.05, prediction_horizon=10, j_start=0, j2_sta
             2: acc_limit,
             3: jerk_limit
         },
-        quadratic_weights={
-            1: joint_weight,
-            2: 0,
-            3: 0,
-        },
-        horizon_functions={
-            1: hf
-        },
+        quadratic_weights=joint_weight,
+        horizon_functions=hf,
     )
 
     qp = QPController(sample_period_symbol, prediction_horizon, 'gurobi', [jc, jc2])
@@ -168,14 +172,14 @@ def test_joint_goal():
                    expression=j,
                    lower_error=error,
                    upper_error=error,
-                   velocity_limit=0.25,
+                   velocity_limit=1,
                    quadratic_weight=1,
                    control_horizon=ph - 2),
         Constraint('j2 goal',
                    expression=j2,
                    lower_error=error2,
                    upper_error=error2,
-                   velocity_limit=0.4,
+                   velocity_limit=1,
                    quadratic_weight=1,
                    control_horizon=ph - 2),
     ]
@@ -185,6 +189,132 @@ def test_joint_goal():
     final_state, _ = simulate(state, qp, sample_period, True, time_limit=2.5)
     np.testing.assert_almost_equal(final_state['j'], goal1, decimal=4)
     np.testing.assert_almost_equal(final_state['j2'], goal2, decimal=4)
+
+
+def test_joint_goal2():
+    j1_vel = 1
+    j2_vel = 1
+    # asdf = [0, 0.0001, 0.001, 0.01, 0.1, 1]
+    # asdf = [0, 0.0001, 0.0005, 0.001, 0.005, 0.01, 0.05, 0.1]
+    # asdf_v = [0.0001, 0.0005, 0.001, 0.005, 0.01]
+    resolution = 10
+    v_min = 0.0001
+    v_max = 0.02
+    # asdf_v = np.arange(v_min, v_max, (v_max - v_min) / resolution)
+    asdf_v = [1e-3]
+
+    resolution = 5
+    h_min = 0.1
+    h_max = 1.5
+    # asdf_h = np.arange(h_min, h_max, (h_max - h_min) / resolution)
+    asdf_h = [1e-1]
+
+    resolution = 10
+    j_min = 0.0001
+    j_max = 0.02
+    # asdf_j = np.arange(j_min, j_max, (j_max - j_min) / resolution)
+    asdf_j = [1e-3]
+
+    results = []
+    final = len(asdf_h) * len(asdf_v) * len(asdf_j)
+    counter = 0
+    for h_counter, h_i in enumerate(asdf_h):
+        for v_counter, v_i in enumerate(asdf_v):
+            for j_counter, j_i in enumerate(asdf_j):
+                counter += 1
+                print('{}/{}'.format(counter, final))
+                ph = 10
+                ch = ph - 2
+                if h_i == 0 and v_i == 0 and j_i == 0:
+                    continue
+                # hf = lambda w, t: w
+                # start_v = 0.005
+                # a_v = (v_i - start_v) / (ch)
+                # hf = lambda w, t: start_v + a_v * t
+
+                # start = j_i * h_i
+                # a = (j_i - start) / (ch)
+                # hfj = lambda w, t: start + a * t
+                # hfj = lambda w, t: w
+                sample_period = 0.05
+                qp, j, j2, state = two_joint_setup(sample_period, ph,
+                                                   hf={
+                                                       1: h_i,
+                                                       3: 1,
+                                                   },
+                                                   joint_weight={
+                                                       1: v_i,
+                                                       2: 0.0,
+                                                       3: j_i,
+                                                   })
+
+                goal_s, goal2_s = ca.var('goal goal2')
+                goal1 = -0.5
+                goal2 = 1.2
+                state['goal'] = goal1
+                state['goal2'] = goal2
+
+                error = goal_s - j
+                error2 = goal2_s - j2
+
+                constraints = [
+                    Constraint('j1 goal',
+                               expression=j,
+                               lower_error=error,
+                               upper_error=error,
+                               velocity_limit=1,
+                               quadratic_weight=1,
+                               control_horizon=ph - 2),
+                    Constraint('j2 goal',
+                               expression=j2,
+                               lower_error=error2,
+                               upper_error=error2,
+                               velocity_limit=1,
+                               quadratic_weight=1,
+                               control_horizon=ph - 2),
+                ]
+                vel_constraints = [
+                    VelocityConstraint('j1 goal vel',
+                                       expression=j,
+                                       lower_velocity_limit=-j1_vel,
+                                       upper_velocity_limit=j1_vel,
+                                       quadratic_weight=100,
+                                       control_horizon=ph - 2),
+                    VelocityConstraint('j2 goal vel',
+                                       expression=j2,
+                                       lower_velocity_limit=-j2_vel,
+                                       upper_velocity_limit=j2_vel,
+                                       quadratic_weight=100,
+                                       lower_slack_limit=0,
+                                       upper_slack_limit=0,
+                                       control_horizon=ph - 2),
+                ]
+                qp.add_constraints(constraints)
+                # qp.add_velocity_constraints(vel_constraints)
+                qp.compile()
+
+                final_state, traj = simulate(state, qp, sample_period,
+                                             time_limit=8,
+                                             name='h_{}-v_{}-j_{}'.format(h_i, v_i, j_i),
+                                             # print_traj=False,
+                                             print_traj=True,
+                                             save=False)
+                l = len(traj[0][0])
+                results.append([h_i, v_i, j_i, l])
+                pass
+                # np.testing.assert_almost_equal(final_state['j'], goal1, decimal=4)
+                # np.testing.assert_almost_equal(final_state['j2'], goal2, decimal=4)
+    fig = plt.figure(figsize=[16, 8])
+    ax = fig.add_subplot(1, 2, 1, projection='3d')
+    results = np.array(results)
+    ax.scatter(results[:, 0], results[:, 1], results[:, 2], c=results[:, 3], s=20)
+    minmax = np.array(list(sorted(results, key=lambda x: x[3])))
+    print(minmax)
+    ax.set_xlabel('h')
+    ax.set_ylabel('v')
+    ax.set_zlabel('j')
+    plt.show()
+    pass
 
 
 def test_joint_goal_vel_limit():

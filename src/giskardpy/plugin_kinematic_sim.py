@@ -10,13 +10,6 @@ from giskardpy.plugin import GiskardBehavior
 
 class KinSimPlugin(GiskardBehavior):
     def __init__(self, name):
-        """
-        :type js_identifier: str
-        :type next_cmd_identifier: str
-        :type time_identifier: str
-        :param sample_period: the time difference in s between each step.
-        :type sample_period: float
-        """
         super(KinSimPlugin, self).__init__(name)
 
     def initialise(self):

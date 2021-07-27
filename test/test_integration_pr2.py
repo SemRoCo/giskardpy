@@ -3301,7 +3301,35 @@ class TestCollisionAvoidanceGoals(object):
         box_setup.check_cpi_leq(box_setup.get_l_gripper_links(), 0.0)
         box_setup.check_cpi_geq(box_setup.get_r_gripper_links(), 0.048)
 
-    def test_attached_get_out_of_collision(self, box_setup):
+    def test_attached_get_below_soft_threshold(self, box_setup):
+        """
+        :type box_setup: PR2
+        """
+        attached_link_name = u'pocky'
+        box_setup.attach_box(attached_link_name, [0.2, 0.04, 0.04], box_setup.r_tip, [0.05, 0, 0])
+        box_setup.attach_box(attached_link_name, [0.2, 0.04, 0.04], box_setup.r_tip, [0.05, 0, 0],
+                             expected_response=UpdateWorldResponse.DUPLICATE_BODY_ERROR)
+        p = PoseStamped()
+        p.header.frame_id = box_setup.r_tip
+        p.header.stamp = rospy.get_rostime()
+        p.pose.position.x = -0.15
+        p.pose.orientation.w = 1
+        box_setup.set_and_check_cart_goal(p, box_setup.r_tip, box_setup.default_root)
+        box_setup.check_cpi_geq(box_setup.get_l_gripper_links(), 0.048)
+        box_setup.check_cpi_geq([attached_link_name], 0.048)
+
+        p = PoseStamped()
+        p.header.frame_id = box_setup.r_tip
+        p.header.stamp = rospy.get_rostime()
+        p.pose.position.x = 0.1
+        p.pose.orientation.w = 1
+        box_setup.set_cart_goal(p, box_setup.r_tip, box_setup.default_root)
+        box_setup.send_and_check_goal()
+        box_setup.check_cpi_geq([attached_link_name], -0.001)
+        box_setup.check_cpi_leq([attached_link_name], 0.01)
+        box_setup.detach_object(attached_link_name)
+
+    def test_attached_get_out_of_collision_below(self, box_setup):
         """
         :type box_setup: PR2
         """
@@ -3323,12 +3351,13 @@ class TestCollisionAvoidanceGoals(object):
         p.header.stamp = rospy.get_rostime()
         p.pose.position.x = 0.05
         p.pose.orientation.w = 1
-        box_setup.set_and_check_cart_goal(p, box_setup.r_tip, box_setup.default_root)
+        box_setup.set_cart_goal(p, box_setup.r_tip, box_setup.default_root, weight=WEIGHT_BELOW_CA)
+        box_setup.send_and_check_goal()
         box_setup.check_cpi_geq(box_setup.get_l_gripper_links(), 0.048)
         box_setup.check_cpi_geq([attached_link_name], 0.048)
         box_setup.detach_object(attached_link_name)
 
-    def test_attached_get_out_of_collision2(self, box_setup):
+    def test_attached_get_out_of_collision_and_stay_in_hard_threshold(self, box_setup):
         """
         :type box_setup: PR2
         """
@@ -3351,7 +3380,8 @@ class TestCollisionAvoidanceGoals(object):
         p.pose.orientation.w = 1
         box_setup.set_cart_goal(p, box_setup.r_tip, box_setup.default_root)
         box_setup.send_and_check_goal()
-        box_setup.check_cpi_geq([attached_link_name], 0.0)
+        box_setup.check_cpi_geq([attached_link_name], -0.001)
+        box_setup.check_cpi_leq([attached_link_name], 0.01)
         box_setup.detach_object(attached_link_name)
 
     def test_attached_get_out_of_collision_stay_in(self, box_setup):
@@ -3369,6 +3399,18 @@ class TestCollisionAvoidanceGoals(object):
         p.pose.orientation.w = 1
         box_setup.set_and_check_cart_goal(p, box_setup.r_tip, box_setup.default_root)
         box_setup.check_cpi_geq([attached_link_name], -0.0802)
+        box_setup.detach_object(attached_link_name)
+
+    def test_attached_get_out_of_collision_passive(self, box_setup):
+        """
+        :type box_setup: PR2
+        """
+        attached_link_name = u'pocky'
+        box_setup.attach_box(attached_link_name, [0.2, 0.04, 0.04], box_setup.r_tip, [0.05, 0, 0])
+        box_setup.attach_box(attached_link_name, [0.2, 0.04, 0.04], box_setup.r_tip, [0.05, 0, 0],
+                             expected_response=UpdateWorldResponse.DUPLICATE_BODY_ERROR)
+        box_setup.send_and_check_goal()
+        box_setup.check_cpi_geq([attached_link_name], 0.049)
         box_setup.detach_object(attached_link_name)
 
     def test_attached_collision2(self, box_setup):

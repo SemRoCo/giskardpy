@@ -95,13 +95,10 @@ def two_joint_setup(sample_period=0.05, prediction_horizon=10, j_start=0, j2_sta
             3: 0,
         }
 
-    if hf is None:
-        def f(w, t):
-            return w + w * 1 * t
 
-        hf = {
-            1: f
-        }
+    hf = {
+        1: 0.1
+    }
 
     jc = FreeVariable(
         symbols={
@@ -187,8 +184,45 @@ def test_joint_goal():
     qp.compile()
 
     final_state, _ = simulate(state, qp, sample_period, True, time_limit=2.5)
-    np.testing.assert_almost_equal(final_state['j'], goal1, decimal=4)
-    np.testing.assert_almost_equal(final_state['j2'], goal2, decimal=4)
+    np.testing.assert_almost_equal(final_state['j'], goal1, decimal=3)
+    np.testing.assert_almost_equal(final_state['j2'], goal2, decimal=3)
+
+def test_joint_goal_conflict():
+    ph = 10
+    sample_period = 0.05
+    qp, j, j2, state = two_joint_setup(sample_period, ph)
+
+    goal_s, goal2_s = ca.var('goal goal2')
+    goal1 = -1
+    goal2 = 1
+    state['goal'] = goal1
+    state['goal2'] = goal2
+
+    error = goal_s - j
+    error2 = goal2_s - j
+
+    constraints = [
+        Constraint('j1 goal',
+                   expression=j,
+                   lower_error=error,
+                   upper_error=error,
+                   velocity_limit=1,
+                   quadratic_weight=1,
+                   control_horizon=ph - 2),
+        Constraint('j1 goal2',
+                   expression=j,
+                   lower_error=error2,
+                   upper_error=error2,
+                   velocity_limit=1,
+                   quadratic_weight=50,
+                   control_horizon=ph - 2),
+    ]
+    qp.add_constraints(constraints)
+    qp.compile()
+
+    final_state, _ = simulate(state, qp, sample_period, True, time_limit=2.5)
+    # np.testing.assert_almost_equal(final_state['j'], goal1, decimal=3)
+    np.testing.assert_almost_equal(final_state['j'], goal2, decimal=3)
 
 
 def test_joint_goal2():

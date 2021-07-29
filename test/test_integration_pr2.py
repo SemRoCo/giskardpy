@@ -1538,6 +1538,7 @@ class TestCartGoals(object):
         #zero_pose.check_cart_goal(zero_pose.l_tip, l_goal)
 
     def test_pathAroundKitchenIsland_with_global_planner(self, kitchen_setup_avoid_collisions):
+        # kernprof -lv py.test -s test/test_integration_pr2.py::TestCartGoals::test_pathAroundKitchenIsland_with_global_planner
         """
         :type kitchen_setup_avoid_collisions: PR2
         """

@@ -117,7 +117,7 @@ class GlobalPlanner(GetGoal):
         d = {}
         d[u'parameter_value_pair'] = deepcopy(self.goal_dict)
         d[u'parameter_value_pair'].pop(u'goal')
-        d[u'type'] = u'CartesianPath'
+        d[u'type'] = u'CartesianPathCarrot'
         d[u'parameter_value_pair'][u'goals'] = list(map(convert_ros_message_to_dictionary, poses))
         d[u'parameter_value_pair'] = json.dumps(d[u'parameter_value_pair'])
         return convert_dictionary_to_ros_message(u'giskard_msgs/Constraint', d)

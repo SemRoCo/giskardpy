@@ -6,6 +6,7 @@ from collections import OrderedDict
 from copy import deepcopy
 
 import PyKDL as kdl
+import casadi
 import numpy as np
 from scipy import interpolate
 import rospy
@@ -1461,8 +1462,268 @@ class CartesianPoseStraight(Constraint):
         for constraint in self.constraints:
             self.soft_constraints.update(constraint.get_constraints())
 
-class CartesianPathSpline(Constraint):
 
+class CartesianPathCarrot(Constraint):
+    goals = u'goals'
+    weight = u'weight'
+    max_linear_velocity = u'max_linear_velocity'
+    max_angular_velocity = u'max_angular_velocity'
+    max_linear_acceleration = u'max_linear_acceleration'
+    max_angular_acceleration = u'max_angular_acceleration'
+
+    def __init__(self, god_map, root_link, tip_link, goals, max_linear_velocity=0.1,
+                 max_angular_velocity=0.5, max_linear_acceleration=0.1, max_angular_acceleration=0.5,
+                 weight=WEIGHT_ABOVE_CA, goal_constraint=False):
+        """
+        This goal will use the kinematic chain between root and tip link to move tip link into the goal pose
+        :param root_link: str, name of the root link of the kin chain
+        :param tip_link: str, name of the tip link of the kin chain
+        :param goal: PoseStamped as json
+        :param max_linear_velocity: float, m/s, default 0.1
+        :param max_angular_velocity: float, rad/s, default 0.5
+        :param weight: float, default WEIGHT_ABOVE_CA
+        """
+        super(CartesianPathCarrot, self).__init__(god_map)
+        self.constraints = []
+        self.root_link = root_link
+        self.tip_link = tip_link
+        self.goal_constraint = goal_constraint
+        self.trajectory_length = len(goals)
+
+        params = {
+            self.weight: weight,
+            self.max_linear_velocity: max_linear_velocity,
+            self.max_angular_velocity: max_angular_velocity,
+            self.max_linear_acceleration: max_linear_acceleration,
+            self.max_angular_acceleration: max_angular_acceleration
+        }
+
+        goal_str = []
+        next_goal_strings = []
+        for i in range(0, len(goals)):
+            params['goal_' + str(i)] = self.parse_and_transform_PoseStamped(goals[i], root_link)
+            goal_str.append(w.ca.SX.sym('goal_' + str(i)))
+            if i != 0:
+                next_goal_strings.append(w.ca.SX.sym('goal_' + str(i)))
+
+        next_goal_strings.append(w.ca.SX.sym('goal_' + str(len(goals) - 1)))
+        self.next_goal_strings = w.Matrix(next_goal_strings)
+        self.goal_strings = w.Matrix(goal_str)
+        self.save_params_on_god_map(params)
+
+    def get_robot_rTt(self):
+        return self.get_robot().get_fk_np(self.root_link, self.tip_link)
+
+    def predict(self):
+        v = 0.01 #self.get_fk_velocity(self.root_link, self.tip_link)[0:3]
+        p = w.position_of(self.get_robot_rTt())
+        s = 0.05 #self.get_input_sampling_period()
+        n_p = p[0:3] + v * s
+        return w.point3(n_p[0], n_p[1], n_p[2])
+
+    def get_normal(self, p, a, b):
+        ap = p - a
+        ab = b - a
+        ab = ab / w.norm(ab)
+        ab = ab * (w.dot(casadi.transpose(ap), ab))
+        normal = a + ab
+        normal = w.if_less(normal[0], w.Min(a[0], b[0]), b, normal)
+        normal = w.if_greater(normal[0], w.Max(a[0], b[0]), b, normal)
+        return normal
+
+    def get_normals(self):
+
+        trajectory_len = self.trajectory_length
+        goal_strings = self.goal_strings
+        next_goal_strings = self.next_goal_strings
+        next_pos = self.predict()
+
+        g = casadi.SX.sym('g', 1)
+        n_g = casadi.SX.sym('n_g', 1)
+        f = casadi.Function('f', [g, n_g], [self.get_normal(next_pos,
+                                                            w.position_of(self.get_input_PoseStamped(g)),
+                                                            w.position_of(self.get_input_PoseStamped(n_g)))])
+        f_map = f.map(trajectory_len)
+        return f_map(goal_strings, next_goal_strings) #FIXME: cannot be evaluated, since g and n_g are free vars?!?!??!
+
+    def get_target(self):
+        normals = self.get_normals()
+        invalid_normal = w.point3(-10e6, 10e6, 10e6)
+        trajectory_len = self.trajectory_length
+        next_pos = self.predict()
+
+        # calc distances to goals and the closest
+        n = casadi.SX.sym('n', 4)
+        f = casadi.Function('f', [n], [w.norm(n - next_pos)])
+        f_map = f.map(trajectory_len)
+        dist_normals = f_map(normals)
+        min_dist_normal = casadi.mmin(dist_normals)
+
+        # replace normals which are not the closest by replacing them with the invalid
+        d = casadi.SX.sym('d', 1)
+        nn = casadi.SX.sym('nn', 4)
+        g = casadi.Function('g', [d, nn], [w.if_eq(d, min_dist_normal, nn, invalid_normal)])  # FIXME: kinda retarded
+        g_map = g.map(trajectory_len)
+        min_normals_and_invalds = g_map(dist_normals, normals)
+
+        # replace invalid normals by zeros
+        nnn = casadi.SX.sym('nnn', 4)
+        h = casadi.Function('h', [nnn], [casadi.if_else(w.ca.is_equal(nnn, invalid_normal), w.point3(0.0, 0.0, 0.0), nnn)])  # FIXME: kinda retarded
+        h_map = h.map(trajectory_len)
+        min_normal_and_zeros = h_map(min_normals_and_invalds)
+
+        normal = w.sum_column(min_normal_and_zeros)
+        normal[3] = 1.0
+        return normal
+
+    def make_constraints(self):
+        goal_translation = self.get_target()
+        self.add_debug_constraint("debugGoalX", goal_translation[0])
+        self.add_debug_constraint("debugGoalY", goal_translation[1])
+        self.add_debug_constraint("debugGoalZ", goal_translation[2])
+        self.add_debug_constraint("debugGoal1", goal_translation[3])
+        self.minimize_position(goal_translation, WEIGHT_COLLISION_AVOIDANCE)
+
+    def minimize_pose(self, goal, weight):
+        self.minimize_position(w.position_of(goal), weight)
+        self.minimize_rotation(w.rotation_of(goal), weight)
+
+    def minimize_position(self, goal, weight):
+        max_velocity = self.get_input_float(self.max_linear_velocity)
+        max_acceleration = self.get_input_float(self.max_linear_acceleration)
+
+        self.add_minimize_position_constraints(goal, max_velocity, max_acceleration, self.root_link, self.tip_link,
+                                               self.goal_constraint, weight, prefix='goal')
+
+    def minimize_rotation(self, goal, weight):
+        max_velocity = self.get_input_float(self.max_angular_velocity)
+        max_acceleration = self.get_input_float(self.max_angular_acceleration)
+
+        self.add_minimize_rotation_constraints(goal, self.root_link, self.tip_link, max_velocity, weight,
+                                               self.goal_constraint, prefix='goal')
+
+
+
+
+class CartesianPathSplineCarrot(Constraint):
+    get_next_py_f = u'get_next_py_f'
+    goals = u'goals'
+    goal_time = u'goal_time'
+    weight = u'weight'
+    max_linear_velocity = u'max_linear_velocity'
+    max_angular_velocity = u'max_angular_velocity'
+    max_linear_acceleration = u'max_linear_acceleration'
+    max_angular_acceleration = u'max_angular_acceleration'
+
+    def __init__(self, god_map, root_link, tip_link, goals, max_linear_velocity=0.1,
+                 max_angular_velocity=0.5, max_linear_acceleration=0.1, max_angular_acceleration=0.5,
+                 weight=WEIGHT_ABOVE_CA, goal_constraint=False):
+        """
+        This goal will use the kinematic chain between root and tip link to move tip link into the goal pose
+        :param root_link: str, name of the root link of the kin chain
+        :param tip_link: str, name of the tip link of the kin chain
+        :param goal: PoseStamped as json
+        :param max_linear_velocity: float, m/s, default 0.1
+        :param max_angular_velocity: float, rad/s, default 0.5
+        :param weight: float, default WEIGHT_ABOVE_CA
+        """
+        super(CartesianPathSplineCarrot, self).__init__(god_map)
+        self.constraints = []
+        self.root_link = root_link
+        self.tip_link = tip_link
+        self.goal_constraint = goal_constraint
+        self.trajectory_length = len(goals)
+        self.calc_splines(goals)
+
+        params = {
+            self.goal_time: 0,
+            self.weight: weight,
+            self.max_linear_velocity: max_linear_velocity,
+            self.max_angular_velocity: max_angular_velocity,
+            self.max_linear_acceleration: max_linear_acceleration,
+            self.max_angular_acceleration: max_angular_acceleration
+        }
+
+        goal_str = []
+        for i in range(0, len(goals)):
+            params['goal_' + str(i)] = self.parse_and_transform_PoseStamped(goals[i], root_link)
+            goal_str.append(w.ca.SX.sym('goal_' + str(i)))
+
+        self.goal_strings = w.Matrix(goal_str)
+        self.save_params_on_god_map(params)
+
+    def calc_splines(self, goals):
+        goals_rs = [self.parse_and_transform_PoseStamped(goal, self.root_link) for goal in goals]
+        xs = [0 for i in range(0, len(goals_rs))]
+        ys = [0 for i in range(0, len(goals_rs))]
+        for i, goal in enumerate(goals_rs):
+            xs[i] = goal.pose.position.x
+            ys[i] = goal.pose.position.y
+        t = np.linspace(0, len(goals_rs) - 1, len(goals_rs)).astype(int).tolist()
+        LUT_x = casadi.interpolant("LUT_x", "bspline", [t], xs)
+        LUT_y = casadi.interpolant("LUT_y", "bspline", [t], ys)
+        self.LUT_x = LUT_x
+        self.LUT_y = LUT_y
+
+    def get_closest_index(self):
+        """
+        :rtype: int
+        """
+
+        trajectory_len = self.trajectory_length
+        goal_strings = self.goal_strings
+
+        x = casadi.SX.sym('x', 1)
+        f = casadi.Function('f', [x], [self.distance_to_goal(x)])
+        f_map = f.map(trajectory_len)
+        distances = f_map(goal_strings)
+        min_dis = casadi.mmin(distances)
+
+        d = casadi.SX.sym('d', 1)
+        i = casadi.SX.sym('i', 1)
+        g = casadi.Function('g', [d, i], [w.if_eq(d - min_dis, 0, i, trajectory_len + 1)])  # FIXME: kinda retarded
+        g_map = g.map(trajectory_len)
+        min_index = casadi.mmin(g_map(distances, casadi.linspace(0, trajectory_len - 1, trajectory_len)))
+
+        return min_index
+
+    def get_carrot(self):
+        closest_index = self.get_closest_index()
+        closest_time = closest_index
+        goal_time = w.if_greater_eq(closest_time + 0.5, self.trajectory_length,
+                                    self.trajectory_length, closest_time + 0.5)
+        x = self.LUT_x(goal_time) # FIXME goal_time needs to be MX symbol, but is SX symbol...
+        y = self.LUT_y(goal_time)
+        return w.point3(x, y, 0)
+
+    def make_constraints(self):
+        goal_translation = self.get_carrot()
+        self.add_debug_constraint("debugGoali", self.get_input_float(self.goal_time))
+        self.minimize_position(goal_translation, WEIGHT_COLLISION_AVOIDANCE)
+
+    def distance_to_goal(self, p):
+        return w.norm(w.position_of(self.get_input_PoseStamped(p) - self.get_fk(self.root_link, self.tip_link)))
+
+    def minimize_pose(self, goal, weight):
+        self.minimize_position(w.position_of(goal), weight)
+        self.minimize_rotation(w.rotation_of(goal), weight)
+
+    def minimize_position(self, goal, weight):
+        max_velocity = self.get_input_float(self.max_linear_velocity)
+        max_acceleration = self.get_input_float(self.max_linear_acceleration)
+
+        self.add_minimize_position_constraints(goal, max_velocity, max_acceleration, self.root_link, self.tip_link,
+                                               self.goal_constraint, weight, prefix='goal')
+
+    def minimize_rotation(self, goal, weight):
+        max_velocity = self.get_input_float(self.max_angular_velocity)
+        max_acceleration = self.get_input_float(self.max_angular_acceleration)
+
+        self.add_minimize_rotation_constraints(goal, self.root_link, self.tip_link, max_velocity, weight,
+                                               self.goal_constraint, prefix='goal')
+
+
+class CartesianPathError(Constraint):
     get_next_py_f = u'get_next_py_f'
     goal = u'goal'
     goal_time = u'goal_time'
@@ -1484,17 +1745,16 @@ class CartesianPathSpline(Constraint):
         :param max_angular_velocity: float, rad/s, default 0.5
         :param weight: float, default WEIGHT_ABOVE_CA
         """
-        super(CartesianPathSpline, self).__init__(god_map)
+        super(CartesianPathError, self).__init__(god_map)
         self.constraints = []
         self.root_link = root_link
         self.tip_link = tip_link
         self.goal_constraint = goal_constraint
-        self.goals_rs = [self.parse_and_transform_PoseStamped(goal, root_link) for goal in goals]
-        #self.robot = self.get_robot()
+        self.trajectory_length = len(goals)
 
         params = {
-            self.goal: self.goals_rs[0],
-            self.goal_time: 0,
+            #self.goal: self.goals_rs[0],
+            #self.goal_time: 0,
             self.weight: weight,
             self.max_linear_velocity: max_linear_velocity,
             self.max_angular_velocity: max_angular_velocity,
@@ -1502,48 +1762,134 @@ class CartesianPathSpline(Constraint):
             self.max_angular_acceleration: max_angular_acceleration
         }
 
+        goal_str = []
+        next_goal_strings = []
+        for i in range(0, len(goals)):
+            params['goal_' + str(i)] = self.parse_and_transform_PoseStamped(goals[i], root_link)
+            goal_str.append(w.ca.SX.sym('goal_' + str(i)))
+            if i != 0:
+                next_goal_strings.append(w.ca.SX.sym('goal_' + str(i)))
+
+        next_goal_strings.append(w.ca.SX.sym('goal_' + str(len(goals) - 1)))
+        self.next_goal_strings = w.Matrix(next_goal_strings)
+        self.goal_strings = w.Matrix(goal_str)
         self.save_params_on_god_map(params)
 
-    #def make_constraints(self):
+    # def make_constraints(self):
     #    self.get_god_map().to_symbol(self.get_identifier() + [self.get_next_py_f, tuple()])
     #    self.minimize_pose(self.goal, WEIGHT_COLLISION_AVOIDANCE)
 
-    def calc_splines(self):
-        xs = np.zeros(len(self.goals_rs))
-        ys = np.array(len(self.goals_rs))
-        for i, goal in enumerate(self.goals_rs):
-            xs[i] = goal.pose.position.x
-            ys[i] = goal.pose.position.y
-        tck, u = interpolate.splprep([xs, ys], s=0.0)
-        x_i, y_i = interpolate.splev(np.linspace(0, 1, 100), tck)
-        self.interpolated_path = np.array([x_i, y_i])
+    #def calc_splines(self):
+    #    xs = np.zeros(len(self.goals_rs))
+    #    ys = np.array(len(self.goals_rs))
+    #    for i, goal in enumerate(self.goals_rs):
+    #        xs[i] = goal.pose.position.x
+    #        ys[i] = goal.pose.position.y
+    #    self.LUT_x = casadi.interpolant("self.LUT_x", "bspline",
+    #                                    np.linspace(0, len(self.goals_rs), len(self.goals_rs) - 1), xs)
+    #    self.LUT_y = casadi.interpolant("self.LUT_y", "bspline",
+    #                                    np.linspace(0, len(self.goals_rs), len(self.goals_rs) - 1), ys)
+        # tck, u = interpolate.splprep([xs, ys], s=0.0)
+        # x_i, y_i = interpolate.splev(np.linspace(0, 1, 100), tck)
+        # self.interpolated_path = np.array([x_i, y_i])
 
-    def get_pose(self, time):
-        x = self.interpolated_path[0][int(time*100)]
-        y = self.interpolated_path[1][int(time*100)]
-        
+    #def get_error(self, p, v_time):
+    #    return casadi.sumsqr(w.position_of(p)[0] - self.LUT_x(v_time * time)) + \
+    #           casadi.sumsqr(w.position_of(p)[1] - self.LUT_y(v_time * time))
+
+    def get_error_to_goal(self, p):
+        #next_index = w.if_greater(index + 1, self.trajectory_length, self.trajectory_length, index + 1)
+        next_goal = w.position_of(self.get_input_PoseStamped(self.get_next_goal()))
+        return casadi.sumsqr(w.position_of(p)[0] - next_goal[0]) + \
+               casadi.sumsqr(w.position_of(p)[1] - next_goal[1])
+
+    def get_closest_index(self):
+        """
+        :rtype: int
+        """
+
+        trajectory_len = self.trajectory_length
+        goal_strings = self.goal_strings
+
+        x = casadi.SX.sym('x', 1)
+        f = casadi.Function('f', [x], [self.distance_to_goal(x)])
+        f_map = f.map(trajectory_len)
+        distances = f_map(goal_strings)
+        min_dis = casadi.mmin(distances)
+
+        d = casadi.SX.sym('d', 1)
+        i = casadi.SX.sym('i', 1)
+        g = casadi.Function('g', [d, i], [w.if_eq(d - min_dis, 0, i, trajectory_len + 1)])  # FIXME: kinda retarded
+        g_map = g.map(trajectory_len)
+        min_index = casadi.mmin(g_map(distances, casadi.linspace(0, trajectory_len - 1, trajectory_len)))
+
+        return min_index
+
+    def get_next_goal(self):
+        """
+        :rtype: int
+        """
+
+        trajectory_len = self.trajectory_length
+        goal_strings = self.goal_strings
+
+        x = casadi.SX.sym('x', 1)
+        f = casadi.Function('f', [x], [self.distance_to_goal(x)])
+        f_map = f.map(trajectory_len)
+        distances = f_map(goal_strings)
+        min_dis = casadi.mmin(distances)
+
+        d = casadi.SX.sym('d', 1)
+        i = casadi.SX.sym('i', 1)
+        g = casadi.Function('g', [d, i], [w.if_eq(d - min_dis, 0, i, trajectory_len + 1)])  # FIXME: kinda retarded
+        g_map = g.map(trajectory_len)
+        goal_str = casadi.mmin(g_map(distances, self.next_goal_strings))
+
+        return goal_str
+
+    def get_error(self):
+        closest_index = self.get_closest_index()
+        return self.get_error_to_goal(self.get_fk(self.root_link, self.tip_link), closest_index)
+
+    #def make_constraints(self):
+    #    max_velocity = self.get_input_float(self.max_linear_velocity) #w.Min(self.get_input_float(self.max_linear_velocity),
+    #                         #self.get_robot().get_joint_velocity_limit_expr(self.tip_link))
+    #    weight = self.get_input_float(self.weight)
+#
+    #    self.add_debug_constraint("debugGoali", self.get_input_float(self.goal_time))
+    #    err = self.get_error()
+    #    capped_err = self.limit_velocity(err, max_velocity)
+    #    weight = self.normalize_weight(max_velocity, weight)
+#
+    #    self.add_constraint('',
+    #                        lower=capped_err,
+    #                        upper=capped_err,
+    #                        weight=weight,
+    #                        expression=err,
+    #                        goal_constraint=self.goal_constraint)
 
     def make_constraints(self):
+        goal_str = self.get_next_goal()
         self.add_debug_constraint("debugGoali", self.get_input_float(self.goal_time))
-        self.minimize_pose(self.get_pose(self.get_next_goal()), WEIGHT_COLLISION_AVOIDANCE)
+        self.minimize_position(self.get_input_PoseStamped(goal_str), WEIGHT_COLLISION_AVOIDANCE)
 
-    #def get_closest_index_py(self):
+    # def get_closest_index_py(self):
     #    goal_dists = list(map(lambda ps: self.distance_to_goal_py(ps), self.goals_rs))
     #    return goal_dists.index(min(goal_dists))
 
-    def update_goal_time(self):
-        goal_time = self.get_input_float(self.goal_time)
-        next_goal_time = w.if_greater(goal_time + 0.05, 1.0, 1.0, goal_time + 0.05)
-        new_goal_time = w.if_less(self.distance_to_goal(self.get_pose(goal_time)),
-                                  self.distance_to_goal(self.get_pose(next_goal_time)),
-                                  goal_time, next_goal_time)
-        self.get_god_map().set_data(self.get_identifier() + [self.goal_time], new_goal_time)
+    #def update_goal_time(self):
+    #    goal_time = self.get_input_float(self.goal_time)
+    #    next_goal_time = w.if_greater(goal_time + 0.05, 1.0, 1.0, goal_time + 0.05)
+    #    new_goal_time = w.if_less(self.distance_to_goal(self.get_pose(goal_time)),
+    #                              self.distance_to_goal(self.get_pose(next_goal_time)),
+    #                              goal_time, next_goal_time)
+    #    self.get_god_map().set_data(self.get_identifier() + [self.goal_time], new_goal_time)
 
-    def get_next_goal(self):
-        self.update_goal_time()
-        goal_time = self.get_input_float(self.goal_time)
-        next_goal_time = w.if_greater(goal_time + 0.05, 1.0, 1.0, goal_time + 0.05)
-        return self.get_pose(next_goal_time)
+    #def get_next_goal(self):
+    #    self.update_goal_time()
+    #    goal_time = self.get_input_float(self.goal_time)
+    #    next_goal_time = w.if_greater(goal_time + 0.05, 1.0, 1.0, goal_time + 0.05)
+    #    return self.get_pose(next_goal_time)
 
     def distance_to_goal(self, p):
         return w.norm(w.position_of(self.get_input_PoseStamped(p) - self.get_fk(self.root_link, self.tip_link)))
@@ -1553,26 +1899,22 @@ class CartesianPathSpline(Constraint):
         self.minimize_rotation(goal, weight)
 
     def minimize_position(self, goal, weight):
-        r_P_g = w.position_of(self.get_input_PoseStamped(goal))
+        r_P_g = w.position_of(goal)
         max_velocity = self.get_input_float(self.max_linear_velocity)
         max_acceleration = self.get_input_float(self.max_linear_acceleration)
 
         self.add_minimize_position_constraints(r_P_g, max_velocity, max_acceleration, self.root_link, self.tip_link,
-                                               self.goal_constraint, weight, prefix=goal)
+                                               self.goal_constraint, weight, prefix='goal')
 
     def minimize_rotation(self, goal, weight):
-        r_R_g = w.rotation_of(self.get_input_PoseStamped(goal))
+        r_R_g = w.rotation_of(goal)
         max_velocity = self.get_input_float(self.max_angular_velocity)
         max_acceleration = self.get_input_float(self.max_angular_acceleration)
 
         self.add_minimize_rotation_constraints(r_R_g, self.root_link, self.tip_link, max_velocity, weight,
-                                               self.goal_constraint, prefix=goal)
+                                               self.goal_constraint, prefix='goal')
 
-class CartesianPath(Constraint):
-
-    get_next_py_f = u'get_next_py_f'
-    goal = u'goal'
-    goal_i = u'goal_i'
+class CartesianPathG(Constraint):
     weight = u'weight'
     max_linear_velocity = u'max_linear_velocity'
     max_angular_velocity = u'max_angular_velocity'
@@ -1591,17 +1933,14 @@ class CartesianPath(Constraint):
         :param max_angular_velocity: float, rad/s, default 0.5
         :param weight: float, default WEIGHT_ABOVE_CA
         """
-        super(CartesianPath, self).__init__(god_map)
+        super(CartesianPathG, self).__init__(god_map)
         self.constraints = []
         self.root_link = root_link
         self.tip_link = tip_link
         self.goal_constraint = goal_constraint
-        self.goals_rs = [self.parse_and_transform_PoseStamped(goal, root_link) for goal in goals]
-        #self.robot = self.get_robot()
+        self.trajectory_length = len(goals)
 
         params = {
-            self.goal: self.goals_rs[0],
-            self.goal_i: 0,
             self.weight: weight,
             self.max_linear_velocity: max_linear_velocity,
             self.max_angular_velocity: max_angular_velocity,
@@ -1609,81 +1948,85 @@ class CartesianPath(Constraint):
             self.max_angular_acceleration: max_angular_acceleration
         }
 
+        goal_str = []
+        next_goal_strings = []
+        debug_goals = []
         for i in range(0, len(goals)):
-            params['goal' + str(i)] = self.parse_and_transform_PoseStamped(goals[i], root_link)
+            params['goal_' + str(i)] = self.parse_and_transform_PoseStamped(goals[i], root_link)
+            goal_str.append(w.ca.SX.sym('goal_' + str(i)))
+            debug_goals.append(self.parse_and_transform_PoseStamped(goals[i], root_link))
+            if i != 0:
+                next_goal_strings.append(w.ca.SX.sym('goal_' + str(i)))
 
+        next_goal_strings.append(w.ca.SX.sym('goal_' + str(len(goals) - 1)))
+        self.next_goal_strings = w.Matrix(next_goal_strings)
+        self.goal_strings = w.Matrix(goal_str)
+        self.debug_goals = debug_goals
         self.save_params_on_god_map(params)
 
-    #def make_constraints(self):
-    #    self.get_god_map().to_symbol(self.get_identifier() + [self.get_next_py_f, tuple()])
-    #    self.minimize_pose(self.goal, WEIGHT_COLLISION_AVOIDANCE)
+    def get_min_distance(self):
+        trajectory_len = self.trajectory_length
+        goal_strings = self.goal_strings
 
-    def calc_splines(self):
-        xs = np.zeros(len(self.goals_rs))
-        ys = np.array(len(self.goals_rs))
-        for i, goal in enumerate(self.goals_rs):
-            xs[i] = goal.pose.position.x
-            ys[i] = goal.pose.position.y
-        tck, u = interpolate.splprep([xs, ys], s=0.0)
-        x_i, y_i = interpolate.splev(np.linspace(0, 1, 100), tck)
-        self.interpolated_path = np.array([x_i, y_i])
+        x = casadi.SX.sym('x', 1)
+        f = casadi.Function('f', [x], [self.distance_to_goal(x)])
+        f_map = f.map(trajectory_len)
+        distances = f_map(goal_strings)
+        return casadi.mmin(distances), distances
 
-    def get_pose(self, time):
-        return self.interpolated_path[0][int(time*100)], self.interpolated_path[1][int(time*100)]
+    def get_next_index(self):
+        """
+        :rtype: int
+        """
+
+        min_dis, distances = self.get_min_distance()
+        d = casadi.SX.sym('d', 1)
+        i = casadi.SX.sym('i', 1)
+        g = casadi.Function('g', [d, i], [w.if_eq(d - min_dis, 0, i, self.trajectory_length + 1)])  # FIXME: kinda retarded
+        g_map = g.map(self.trajectory_length)
+        min_index = casadi.mmin(g_map(distances, casadi.linspace(0, self.trajectory_length - 1, self.trajectory_length)))
+
+        return w.if_greater(min_index + 1, self.trajectory_length, self.trajectory_length, min_index + 1)
+
+    def get_next_goal(self):
+        """
+        :rtype: int
+        """
+        return self.next_goal_strings[casadi.evalf(self.get_next_index())]
 
     def make_constraints(self):
-        self.add_debug_constraint("debugGoali", self.get_input_float(self.goal_i))
-        self.set_goal_index()
-        self.minimize_pose(self.goal + str(self.get_god_map().get_data(self.get_identifier() + [self.goal_i])),
-                           WEIGHT_COLLISION_AVOIDANCE)
-
-    #def get_closest_index_py(self):
-    #    goal_dists = list(map(lambda ps: self.distance_to_goal_py(ps), self.goals_rs))
-    #    return goal_dists.index(min(goal_dists))
-
-    def set_goal_index(self):
-        goal_i = self.get_god_map().get_data(self.get_identifier() + [self.goal_i])
-        next_goal_i = goal_i + 1
-        self.get_god_map().set_data(self.get_identifier() + [self.goal_i],
-                                    w.if_less(self.distance_to_goal(self.goal + str(goal_i)),
-                                              self.distance_to_goal(self.goal + str(next_goal_i)),
-                                              goal_i, goal_i+1))
+        goal_str = self.get_next_goal()
+        d, _ = self.get_min_distance()
+        p = w.position_of(self.get_fk(self.root_link, self.tip_link))
+        self.add_debug_constraint("debugdist", d)
+        self.add_debug_constraint("debugCurrentX", p[0])
+        self.add_debug_constraint("debugCurrentY", p[1])
+        self.minimize_position(self.get_input_PoseStamped(goal_str), WEIGHT_COLLISION_AVOIDANCE)
 
     def distance_to_goal(self, p):
-        return w.norm(w.position_of(self.get_input_PoseStamped(p) - self.get_fk(self.root_link, self.tip_link)))
-
-    #def get_next_py(self):
-    #    p = self.goals_rs[self.get_closest_index_py()+1]
-    #    self.get_god_map().set_data(self.goal, p)
-
-    #def distance_to_goal_py(self, p):
-    #    cur = self.get_fk(self.root_link, self.tip_link).pose.position
-    #    x = p.pose.position.x - cur.x
-    #    y = p.pose.position.y - cur.y
-    #    z = p.pose.position.z - cur.z
-    #    return np.linalg.norm(np.array([x,y,z]))
+        return w.norm(w.position_of(self.get_input_PoseStamped(p) - self.get_fk_evaluated(self.root_link, self.tip_link)))
 
     def minimize_pose(self, goal, weight):
         self.minimize_position(goal, weight)
         self.minimize_rotation(goal, weight)
 
     def minimize_position(self, goal, weight):
-        r_P_g = w.position_of(self.get_input_PoseStamped(goal))
+        r_P_g = w.position_of(goal)
         max_velocity = self.get_input_float(self.max_linear_velocity)
         max_acceleration = self.get_input_float(self.max_linear_acceleration)
 
         self.add_minimize_position_constraints(r_P_g, max_velocity, max_acceleration, self.root_link, self.tip_link,
-                                               self.goal_constraint, weight, prefix=goal)
+                                               self.goal_constraint, weight, prefix='goal')
 
     def minimize_rotation(self, goal, weight):
-        r_R_g = w.rotation_of(self.get_input_PoseStamped(goal))
+        r_R_g = w.rotation_of(goal)
         max_velocity = self.get_input_float(self.max_angular_velocity)
         max_acceleration = self.get_input_float(self.max_angular_acceleration)
 
         self.add_minimize_rotation_constraints(r_R_g, self.root_link, self.tip_link, max_velocity, weight,
-                                               self.goal_constraint, prefix=goal)
-class CartesianPathPy(Constraint):
+                                               self.goal_constraint, prefix='goal')
 
+class CartesianPathPy(Constraint):
     get_weight_py_f = u'get_weight_py_f'
     weight = u'weight'
     max_linear_velocity = u'max_linear_velocity'
@@ -1703,7 +2046,7 @@ class CartesianPathPy(Constraint):
         :param max_angular_velocity: float, rad/s, default 0.5
         :param weight: float, default WEIGHT_ABOVE_CA
         """
-        super(CartesianPath, self).__init__(god_map)
+        super(CartesianPathPy, self).__init__(god_map)
         self.constraints = []
         self.root_link = root_link
         self.tip_link = tip_link
@@ -1726,10 +2069,11 @@ class CartesianPathPy(Constraint):
 
         self.save_params_on_god_map(params)
 
-    #def make_constraints(self):
+    # def make_constraints(self):
     #    for constraint in self.constraints:
     #        self.soft_constraints.update(constraint.get_constraints())
 
+    # @profile
     def update_goal_times(self):
         time_in_secs = time.time()
 
@@ -1737,24 +2081,24 @@ class CartesianPathPy(Constraint):
             if i == 0:
                 continue
             if goal_time == 0:
-                if self.goal_reached_py(self.goals_rs[i-1]) == 1:
+                if self.goal_reached_py(self.goals_rs[i - 1]) == 1:
                     self.goals_times[i] = time_in_secs
                 else:
                     self.goals_times[i] = 0
-
 
     def make_constraints(self):
 
         time = self.get_god_map().to_symbol(identifier.time)
         time_in_secs = self.get_input_sampling_period() * time
-        #path = [self.goal_a, self.goal_b, self.goal_c, self.goal_d]
+        # path = [self.goal_a, self.goal_b, self.goal_c, self.goal_d]
         #
         # # weight in [0,..., WEIGHT_BELOW_CA=1, WEIGHT_C_A=10, WEIGHT_ABOVE_CA=100]
         # # Bewegung muss Kosten verursachen. weight = 0 => ignorieren von motion controller zum ziel_xyz.
 
         # WILL ONLY BE EVALUATED ONCE, CUZ ITS WRITTEN IN PYTHON
         for i in range(0, len(self.goals_rs)):
-            self.minimize_pose('goal_' + str(i), self.get_god_map().to_symbol(self.get_identifier() + [self.get_weight_py_f, tuple('goal_' + str(i))]))
+            self.minimize_pose('goal_' + str(i), self.get_god_map().to_symbol(
+                self.get_identifier() + [self.get_weight_py_f, tuple('goal_' + str(i))]))
 
         self.add_debug_constraint("debugTime", time)
         self.add_debug_constraint("debugTimeInSecs", time_in_secs)
@@ -1762,38 +2106,40 @@ class CartesianPathPy(Constraint):
         self.add_debug_constraint("debugweightATime", self.goals_times[0])
         self.add_debug_constraint("debugweightBTime", self.goals_times[1])
 
-        #self.add_debug_constraint("debugweightA", self.get_weight(self.goal_a, self.goals_times[0], self.goals_times[1]))
-        #self.add_debug_constraint("debugActivation_funA", self.activation_fun(self.goals_times[0]))
+        # self.add_debug_constraint("debugweightA", self.get_weight(self.goal_a, self.goals_times[0], self.goals_times[1]))
+        # self.add_debug_constraint("debugActivation_funA", self.activation_fun(self.goals_times[0]))
         self.add_debug_constraint("debugDistanceToA", self.distance_to_goal('goal_0'))
 
-        #self.add_debug_constraint("debugweightB", self.get_weight(self.goal_b, self.goals_times[1], self.goals_times[2]))
-        #self.add_debug_constraint("debugActivation_funB", self.activation_fun(self.goals_times[1]))
+        # self.add_debug_constraint("debugweightB", self.get_weight(self.goal_b, self.goals_times[1], self.goals_times[2]))
+        # self.add_debug_constraint("debugActivation_funB", self.activation_fun(self.goals_times[1]))
         self.add_debug_constraint("debugDistanceToB", self.distance_to_goal('goal_1'))
 
     def activation_fun(self, x):
-        #time = self.get_god_map().to_symbol(identifier.time)
-        #time_in_secs = self.get_input_sampling_period() * time
-        ret = 2/(1+w.ca.exp(-x))-1
+        # time = self.get_god_map().to_symbol(identifier.time)
+        # time_in_secs = self.get_input_sampling_period() * time
+        ret = 2 / (1 + w.ca.exp(-x)) - 1
         return w.if_greater(ret, 0, ret, 0)
 
     def activation_fun_py(self, x):
-        ret = 2/(1+np.exp(-x))-1
+        ret = 2 / (1 + np.exp(-x)) - 1
         return ret if ret > 0 else 0
 
     def get_weight(self, p, p_time, p_next_time):
-        #p_reached = w.if_greater(p_next_time, p_time, 1, 0)
-        #invalid_p_time = w.if_eq(p_time, -1, 1, 0)
-        return self.activation_fun(p_time - p_next_time) #w.if_greater_eq(p_reached + invalid_p_time, 1, 0, self.activation_fun(p_time))
+        # p_reached = w.if_greater(p_next_time, p_time, 1, 0)
+        # invalid_p_time = w.if_eq(p_time, -1, 1, 0)
+        return self.activation_fun(
+            p_time - p_next_time)  # w.if_greater_eq(p_reached + invalid_p_time, 1, 0, self.activation_fun(p_time))
 
     def get_weight_py(self, *p):
         self.update_goal_times()
-        p_str = str(p).replace('\'', '').replace(',', '').replace('(', '').replace(')', '').replace(' ', '').replace('u', '')
+        p_str = str(p).replace('\'', '').replace(',', '').replace('(', '').replace(')', '').replace(' ', '').replace(
+            'u', '')
         for i in range(0, len(self.goals_rs)):
             if 'goal_' + str(i) in p_str:
-                if i == len(self.goals_rs)-1:
+                if i == len(self.goals_rs) - 1:
                     return self.activation_fun_py(self.goals_times[i])
                 else:
-                    return self.activation_fun_py(self.goals_times[i] - self.goals_times[i+1])
+                    return self.activation_fun_py(self.goals_times[i] - self.goals_times[i + 1])
         return 0
 
     def distance_to_goal(self, p):
@@ -1804,7 +2150,7 @@ class CartesianPathPy(Constraint):
         x = p.pose.position.x - cur.x
         y = p.pose.position.y - cur.y
         z = p.pose.position.z - cur.z
-        return np.linalg.norm(np.array([x,y,z]))
+        return np.linalg.norm(np.array([x, y, z]))
 
     def goal_reached(self, p):
         return w.if_less(self.distance_to_goal(p), 0.1, 1, 0)
@@ -1812,14 +2158,14 @@ class CartesianPathPy(Constraint):
     def goal_reached_py(self, p):
         return 1 if self.distance_to_goal_py(p) < 0.1 else 0
 
-    #def activation_for_p(self, p, p_time):
+    # def activation_for_p(self, p, p_time):
     #    return w.if_eq(self.goal_reached(p), 1, 0, self.activation_fun(p_time)) #self.distance_to_last_goal(point, path) #+ self.distance_to_environment(point)
 
     def distance_to_last_goal(self, p, p_next):
-        return WEIGHT_BELOW_CA #w.if_eq(w.ca.SX.sym(p), w.ca.SX.sym(path[0]), 3, #w.ca.SX.sym(path[0]) breaks stuff, since god_map thinks it has it
-                       #w.if_eq(w.ca.SX.sym(p), w.ca.SX.sym(path[1]), 2,
-                               #w.if_eq(w.ca.SX.sym(p), w.ca.SX.sym(path[2]), 1,
-                                       #w.if_eq(w.ca.SX.sym(p), w.ca.SX.sym(path[3]), 0, 0))))
+        return WEIGHT_BELOW_CA  # w.if_eq(w.ca.SX.sym(p), w.ca.SX.sym(path[0]), 3, #w.ca.SX.sym(path[0]) breaks stuff, since god_map thinks it has it
+        # w.if_eq(w.ca.SX.sym(p), w.ca.SX.sym(path[1]), 2,
+        # w.if_eq(w.ca.SX.sym(p), w.ca.SX.sym(path[2]), 1,
+        # w.if_eq(w.ca.SX.sym(p), w.ca.SX.sym(path[3]), 0, 0))))
 
     def distance_to_environment(self, point):
         pass
@@ -1845,8 +2191,9 @@ class CartesianPathPy(Constraint):
                                                self.goal_constraint, prefix=goal)
 
     def __str__(self):
-        s = super(CartesianPath, self).__str__()
+        s = super(CartesianPathPy, self).__str__()
         return u'{}'.format(s)
+
 
 class ExternalCollisionAvoidance(Constraint):
     max_velocity_id = u'max_velocity'

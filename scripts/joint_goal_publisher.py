@@ -160,8 +160,8 @@ class JointGoalPublisher(object):
         #self.pub_def_vels = get_param("publish_default_velocities", False)
         #self.pub_def_efforts = get_param("publish_default_efforts", False)
 
-        msg = rospy.wait_for_message(u'/whole_body_controller/state', JointTrajectoryControllerState)
-        self.giskard_joints = msg.joint_names
+        msg = rospy.wait_for_message(u'/hsrb/joint_states', JointState)
+        self.giskard_joints = msg.name
 
 
         robot = minidom.parseString(description)

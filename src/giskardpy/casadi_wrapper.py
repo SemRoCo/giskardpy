@@ -93,6 +93,8 @@ def Matrix(data):
             x = len(data)
             if isinstance(data[0], list) or isinstance(data[0], tuple):
                 y = len(data[0])
+            elif isinstance(data[0], ca.SX):
+                y = data[0].shape[0] if data[0].shape[0] > data[0].shape[1] else data[0].shape[1]
             else:
                 y = 1
             m = ca.SX(x, y)

@@ -1462,9 +1462,13 @@ class CartesianPoseStraight(Constraint):
         for constraint in self.constraints:
             self.soft_constraints.update(constraint.get_constraints())
 
+#
+#
+#
+#
+#
 
 class CartesianPathCarrot(Constraint):
-    goals = u'goals'
     weight = u'weight'
     max_linear_velocity = u'max_linear_velocity'
     max_angular_velocity = u'max_angular_velocity'
@@ -1498,90 +1502,109 @@ class CartesianPathCarrot(Constraint):
             self.max_angular_acceleration: max_angular_acceleration
         }
 
+        params = self.setup_goal_params(params, goals)
+        self.save_params_on_god_map(params)
+
+    def setup_goal_params(self, params, goals):
         goal_str = []
         next_goal_strings = []
         for i in range(0, len(goals)):
-            params['goal_' + str(i)] = self.parse_and_transform_PoseStamped(goals[i], root_link)
-            goal_str.append(w.ca.SX.sym('goal_' + str(i)))
+            params['goal_' + str(i)] = self.parse_and_transform_PoseStamped(goals[i], self.root_link)
+            goal_str.append('goal_' + str(i))#w.ca.SX.sym('goal_' + str(i)))
             if i != 0:
-                next_goal_strings.append(w.ca.SX.sym('goal_' + str(i)))
+                next_goal_strings.append('goal_' + str(i))#w.ca.SX.sym('goal_' + str(i)))
 
-        next_goal_strings.append(w.ca.SX.sym('goal_' + str(len(goals) - 1)))
-        self.next_goal_strings = w.Matrix(next_goal_strings)
-        self.goal_strings = w.Matrix(goal_str)
-        self.save_params_on_god_map(params)
+        next_goal_strings.append('goal_' + str(len(goals) - 1))#w.ca.SX.sym('goal_' + str(len(goals) - 1)))
+        self.next_goal_strings = next_goal_strings# w.Matrix(next_goal_strings)
+        self.goal_strings = goal_str #w.Matrix(goal_str)
+        return params
 
-    def get_robot_rTt(self):
-        return self.get_robot().get_fk_np(self.root_link, self.tip_link)
+    def get_goal_expr(self):
+        normals = self.get_normals(self.goal_strings, self.next_goal_strings)
+        normal_dists = self.get_normal_dists(normals)
+        zero_one_mapping = self.zero_one_mapping_if_equal(normal_dists, self.trajectory_length, w.ca.mmin(normal_dists))
+        #for i in range(0, self.trajectory_length):
+        #    self.add_debug_constraint("debugGoalsX" + str(i), w.position_of(self.get_input_PoseStamped(self.goal_strings[i]))[0])
+        #for i in range(0, self.trajectory_length):
+        #    self.add_debug_constraint("debugNormalDists" + str(i), normal_dists[i])
+        #for i in range(0, self.trajectory_length):
+        #    self.add_debug_constraint("debugMappings" + str(i), zero_one_mapping[i])
+        #self.add_debug_constraint("mmin_normal_dists", w.ca.mmin(normal_dists))
+        return self.get_target(normals, zero_one_mapping)
 
     def predict(self):
-        v = 0.01 #self.get_fk_velocity(self.root_link, self.tip_link)[0:3]
-        p = w.position_of(self.get_robot_rTt())
-        s = 0.05 #self.get_input_sampling_period()
+        v = self.get_fk_velocity(self.root_link, self.tip_link)[0:3]
+        v = w.save_division(v, w.norm(v), 0) * self.get_input_float(self.max_linear_velocity) * 10
+        p = w.position_of(self.get_fk(self.root_link, self.tip_link))#self.get_robot_rTt())
+        s = self.get_input_sampling_period()
         n_p = p[0:3] + v * s
         return w.point3(n_p[0], n_p[1], n_p[2])
 
     def get_normal(self, p, a, b):
+        """:rtype: w.point3"""
         ap = p - a
         ab = b - a
-        ab = ab / w.norm(ab)
+        ab = w.save_division(ab, w.norm(ab), 0)
         ab = ab * (w.dot(casadi.transpose(ap), ab))
         normal = a + ab
         normal = w.if_less(normal[0], w.Min(a[0], b[0]), b, normal)
         normal = w.if_greater(normal[0], w.Max(a[0], b[0]), b, normal)
         return normal
 
-    def get_normals(self):
+    def get_normals(self, goal_strings, next_goal_strings):
+
+        next_pos = self.predict()
+        trajectory_len = self.trajectory_length
+        normal_funs = []
+
+        for i in range(0, trajectory_len):
+            n = self.get_normal(next_pos,
+                                w.position_of(self.get_input_PoseStamped(goal_strings[i])),
+                                w.position_of(self.get_input_PoseStamped(next_goal_strings[i])))
+            normal_funs.append(n)
+
+        return w.Matrix(normal_funs)
+
+    def get_normal_dists(self, normals):
 
         trajectory_len = self.trajectory_length
-        goal_strings = self.goal_strings
-        next_goal_strings = self.next_goal_strings
         next_pos = self.predict()
+        normal_dist_funs = []
 
-        g = casadi.SX.sym('g', 1)
-        n_g = casadi.SX.sym('n_g', 1)
-        f = casadi.Function('f', [g, n_g], [self.get_normal(next_pos,
-                                                            w.position_of(self.get_input_PoseStamped(g)),
-                                                            w.position_of(self.get_input_PoseStamped(n_g)))])
-        f_map = f.map(trajectory_len)
-        return f_map(goal_strings, next_goal_strings) #FIXME: cannot be evaluated, since g and n_g are free vars?!?!??!
+        for i in range(0, trajectory_len):
+            normal_dist_funs.append(w.norm(w.ca.transpose(normals[i,:]) - next_pos))
 
-    def get_target(self):
-        normals = self.get_normals()
-        invalid_normal = w.point3(-10e6, 10e6, 10e6)
-        trajectory_len = self.trajectory_length
-        next_pos = self.predict()
+        return w.Matrix(normal_dist_funs)
 
-        # calc distances to goals and the closest
-        n = casadi.SX.sym('n', 4)
-        f = casadi.Function('f', [n], [w.norm(n - next_pos)])
-        f_map = f.map(trajectory_len)
-        dist_normals = f_map(normals)
-        min_dist_normal = casadi.mmin(dist_normals)
+    def zero_one_mapping_if_equal(self, l, l_len, elem):
 
-        # replace normals which are not the closest by replacing them with the invalid
-        d = casadi.SX.sym('d', 1)
-        nn = casadi.SX.sym('nn', 4)
-        g = casadi.Function('g', [d, nn], [w.if_eq(d, min_dist_normal, nn, invalid_normal)])  # FIXME: kinda retarded
-        g_map = g.map(trajectory_len)
-        min_normals_and_invalds = g_map(dist_normals, normals)
+        zeros_and_ones = []
 
-        # replace invalid normals by zeros
-        nnn = casadi.SX.sym('nnn', 4)
-        h = casadi.Function('h', [nnn], [casadi.if_else(w.ca.is_equal(nnn, invalid_normal), w.point3(0.0, 0.0, 0.0), nnn)])  # FIXME: kinda retarded
-        h_map = h.map(trajectory_len)
-        min_normal_and_zeros = h_map(min_normals_and_invalds)
+        for i in range(0, l_len):
+            zeros_and_ones.append(w.if_eq(l[i], elem, 1, 0))
 
-        normal = w.sum_column(min_normal_and_zeros)
-        normal[3] = 1.0
-        return normal
+        return w.Matrix(zeros_and_ones)
+
+    def get_target(self, normals, zero_one_mapping):
+
+        normal_and_zeros = normals * zero_one_mapping
+        normal = w.sum_row(normal_and_zeros)
+        return w.ca.transpose(normal)
 
     def make_constraints(self):
-        goal_translation = self.get_target()
+
+        goal_translation = self.get_goal_expr()
         self.add_debug_constraint("debugGoalX", goal_translation[0])
         self.add_debug_constraint("debugGoalY", goal_translation[1])
         self.add_debug_constraint("debugGoalZ", goal_translation[2])
-        self.add_debug_constraint("debugGoal1", goal_translation[3])
+        self.add_debug_constraint("debugGoalW", goal_translation[3])
+        self.add_debug_constraint("debugCurrentX", w.position_of(self.get_fk(self.root_link, self.tip_link))[0])
+        self.add_debug_constraint("debugCurrentY", w.position_of(self.get_fk(self.root_link, self.tip_link))[1])
+        self.add_debug_constraint("debugCurrentZ", w.position_of(self.get_fk(self.root_link, self.tip_link))[2])
+        self.add_debug_constraint("debugNextX", self.predict()[0])
+        self.add_debug_constraint("debugNextY", self.predict()[1])
+        self.add_debug_constraint("debugNextZ", self.predict()[2])
+
         self.minimize_position(goal_translation, WEIGHT_COLLISION_AVOIDANCE)
 
     def minimize_pose(self, goal, weight):
@@ -1601,8 +1624,6 @@ class CartesianPathCarrot(Constraint):
 
         self.add_minimize_rotation_constraints(goal, self.root_link, self.tip_link, max_velocity, weight,
                                                self.goal_constraint, prefix='goal')
-
-
 
 
 class CartesianPathSplineCarrot(Constraint):
@@ -1673,19 +1694,16 @@ class CartesianPathSplineCarrot(Constraint):
         trajectory_len = self.trajectory_length
         goal_strings = self.goal_strings
 
-        x = casadi.SX.sym('x', 1)
-        f = casadi.Function('f', [x], [self.distance_to_goal(x)])
-        f_map = f.map(trajectory_len)
-        distances = f_map(goal_strings)
+        distances = []
+        for i in range(0, trajectory_len):
+            distances.append(self.distance_to_goal(goal_strings[i]))
         min_dis = casadi.mmin(distances)
 
-        d = casadi.SX.sym('d', 1)
-        i = casadi.SX.sym('i', 1)
-        g = casadi.Function('g', [d, i], [w.if_eq(d - min_dis, 0, i, trajectory_len + 1)])  # FIXME: kinda retarded
-        g_map = g.map(trajectory_len)
-        min_index = casadi.mmin(g_map(distances, casadi.linspace(0, trajectory_len - 1, trajectory_len)))
+        min_inds = []
+        for i in range(0, trajectory_len):
+            min_inds.append(w.if_eq(distances[i] - min_dis, 0, i, trajectory_len + 1))
 
-        return min_index
+        return min_inds
 
     def get_carrot(self):
         closest_index = self.get_closest_index()

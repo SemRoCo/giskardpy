@@ -853,12 +853,6 @@ def quaternion_diff(q0, q1):
     return quaternion_multiply(quaternion_conjugate(q0), q1)
 
 
-def quaternion_sub(q0, q1):
-    cos_half_theta = dot(q0.T, q1)
-    q0 = if_greater_zero(-cos_half_theta, -q0, q0)
-    return q0 - q1
-
-
 def cosine_distance(v0, v1):
     """
     cosine distance ranging from 0 to 2

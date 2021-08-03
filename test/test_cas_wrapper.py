@@ -48,11 +48,6 @@ class TestCASWrapper(unittest.TestCase):
     def test_abs(self, f1):
         self.assertAlmostEqual(w.compile_and_execute(w.abs, [f1]), abs(f1), places=7)
 
-    @given(float_no_nan_no_inf(1e5, 1e-5),
-           st.integers(1, 5))
-    def test_round(self, f1, r):
-        self.assertAlmostEqual(w.compile_and_execute(w.round, [f1, r]), np.round(f1, r), places=7)
-
     @given(float_no_nan_no_inf(),
            float_no_nan_no_inf())
     def test_max(self, f1, f2):
@@ -629,7 +624,7 @@ class TestCASWrapper(unittest.TestCase):
     def test_sum(self, m):
         actual_sum = w.compile_and_execute(w.sum, [m])
         expected_sum = np.sum(m)
-        self.assertTrue(np.isclose(actual_sum, expected_sum))
+        self.assertTrue(np.isclose(actual_sum, expected_sum, rtol=1.e-4))
 
     @given(st.integers(max_value=10000, min_value=1),
            st.integers(max_value=5000, min_value=-5000),
@@ -696,20 +691,3 @@ class TestCASWrapper(unittest.TestCase):
                                                                           w.Symbol('alpha')))
         assert w.to_str(expr) == u'sqrt((((sq((v1*sin((alpha/2))))+sq((v2*sin((alpha/2)))))+sq((v3*sin((alpha/2)))))+sq(cos((alpha/2)))))'
 
-    def test_quaternion_sub(self):
-        data = [[[0,0,0,1], [0,0,0,-1], [0,0,0,0]],
-                [[0,0,0,1], [0.524, -0.495, 0.487, -0.494], [0,0,0,0]],
-                [[0,0,0,1], [0.524, -0.495, 0.487, -0.494], [0,0,0,0]]]
-        for q0, q1, expected in data:
-            actual = w.compile_and_execute(w.quaternion_sub, [q0, q1])
-            np.testing.assert_array_almost_equal(actual, expected)
-
-    @given(quaternion(),
-           quaternion())
-    def test_quaternion_sub2(self, q0, q1):
-        assume(np.dot(q0.T,q1) != 0)
-        actual1 = w.compile_and_execute(w.quaternion_sub, [q0, q1])
-        actual2 = w.compile_and_execute(w.quaternion_sub, [q0, -q1])
-        w.quaternion_sub(w.Matrix(q0),w.Matrix(q1))
-        w.quaternion_sub(w.Matrix(q0),w.Matrix(-q1))
-        np.testing.assert_array_almost_equal(actual1, actual2, decimal=4)

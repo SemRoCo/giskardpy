@@ -219,7 +219,7 @@ def float_no_nan_no_inf(outer_limit=None, min_dist_to_zero=None):
 def sq_matrix(draw):
     i = draw(st.integers(min_value=1, max_value=10))
     i_sq = i ** 2
-    l = draw(st.lists(float_no_nan_no_inf(), min_size=i_sq, max_size=i_sq))
+    l = draw(st.lists(float_no_nan_no_inf(outer_limit=1000), min_size=i_sq, max_size=i_sq))
     return np.array(l).reshape((i, i))
 
 

@@ -44,7 +44,10 @@ class PostProcessing(GiskardBehavior):
                 result.error_messages[cmd_id + i] = error_message
             logging.logwarn(u'Planning preempted: {}.'.format(error_message))
         else:
-            logging.loginfo(u'Planning succeeded.')
+            if error_code == MoveResult.SUCCESS:
+                logging.loginfo(u'Planning succeeded.')
+            else:
+                logging.logwarn(u'Planning failed: {}.'.format(error_message))
         self.get_god_map().set_data(identifier.result_message, result)
         return Status.SUCCESS
 

@@ -266,7 +266,7 @@ class GodMap(object):
     def get_values(self, symbols):
         """
         :return: a dict which maps all registered expressions to their values or 0 if there is no number entry
-        :rtype: dict
+        :rtype: list
         """
         # TODO potential speedup by only updating entries that have changed
         # its a trap, this function only looks slow with lineprofiler

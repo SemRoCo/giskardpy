@@ -21,9 +21,9 @@ from giskardpy.input_system import \
 from giskardpy.logging import logwarn
 
 WEIGHT_MAX = Constraint_msg.WEIGHT_MAX
-WEIGHT_ABOVE_CA = 250#Constraint_msg.WEIGHT_ABOVE_CA
-WEIGHT_COLLISION_AVOIDANCE = 50#Constraint_msg.WEIGHT_COLLISION_AVOIDANCE
-WEIGHT_BELOW_CA = 1#Constraint_msg.WEIGHT_BELOW_CA
+WEIGHT_ABOVE_CA = 2500  # Constraint_msg.WEIGHT_ABOVE_CA
+WEIGHT_COLLISION_AVOIDANCE = 50  # Constraint_msg.WEIGHT_COLLISION_AVOIDANCE
+WEIGHT_BELOW_CA = 1  # Constraint_msg.WEIGHT_BELOW_CA
 WEIGHT_MIN = Constraint_msg.WEIGHT_MIN
 
 
@@ -1419,14 +1419,19 @@ class ExternalCollisionAvoidance(Goal):
         lower_limit_for_hard_threshold = w.limit(hard_threshold - actual_distance,
                                                  -qp_limits_for_lba,
                                                  qp_limits_for_lba)
-        upper_slack = w.if_greater(actual_distance, hard_threshold,
-                                   -lower_limit_for_hard_threshold + lower_limit_limited,
-                                   lower_limit_limited)
+        upper_slack = w.limit(soft_threshold - hard_threshold,
+                              -qp_limits_for_lba * 2,
+                              qp_limits_for_lba * 2)
+        # upper_slack = w.if_greater(actual_distance, hard_threshold,
+        #                            # -lower_limit_for_hard_threshold + lower_limit_limited,
+        #                            w.limit(soft_threshold - hard_threshold,
+        #                                    -qp_limits_for_lba*2,
+        #                                    qp_limits_for_lba*2),
+        #                            lower_limit_limited)
 
         # undo factor in A
         upper_slack /= (sample_period * self.prediction_horizon)
-        upper_slack *= 1.01
-
+        # upper_slack *= 1.01
 
         upper_slack = w.if_greater(actual_distance, 50,  # assuming that distance of unchecked closest points is 100
                                    1e4,
@@ -1689,7 +1694,6 @@ class SelfCollisionAvoidance(Goal):
 
         # undo factor in A
         upper_slack /= (sample_period * self.prediction_horizon)
-
 
         upper_slack = w.if_greater(actual_distance, 50,  # assuming that distance of unchecked closest points is 100
                                    1e4,

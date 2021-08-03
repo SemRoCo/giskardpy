@@ -3144,6 +3144,24 @@ class TestCollisionAvoidanceGoals(object):
         kitchen_setup.set_and_check_cart_goal(base_pose, 'base_footprint')
         kitchen_setup.check_current_joint_state(gaya_pose)
 
+    def test_avoid_collision_drive_under_drawer(self, kitchen_setup):
+        """
+        :type kitchen_setup: PR2
+        """
+        kitchen_js = {u'sink_area_left_middle_drawer_main_joint': 0.45}
+        kitchen_setup.set_kitchen_js(kitchen_js)
+        base_pose = PoseStamped()
+        base_pose.header.frame_id = u'map'
+        base_pose.pose.position.x = 0.57
+        base_pose.pose.position.y = 0.5
+        base_pose.pose.orientation = Quaternion(*quaternion_about_axis(0, [0, 0, 1]))
+        kitchen_setup.teleport_base(base_pose)
+        base_pose = PoseStamped()
+        base_pose.header.frame_id = u'base_footprint'
+        base_pose.pose.position.y = 1
+        base_pose.pose.orientation = Quaternion(*quaternion_about_axis(0, [0, 0, 1]))
+        kitchen_setup.set_and_check_cart_goal(base_pose, tip_link=u'base_footprint')
+
     def test_go_around_kitchen_island(self, kitchen_setup):
         """
         :type kitchen_setup: PR2

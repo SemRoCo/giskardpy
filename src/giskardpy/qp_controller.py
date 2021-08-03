@@ -176,7 +176,7 @@ class B(Parent):
         for t in range(self.prediction_horizon):
             for v in self.free_variables:  # type: FreeVariable
                 for o in range(1, v.order):  # start with velocity
-                    if t == self.prediction_horizon - 1 and o < v.order - 1:# and False:
+                    if t == self.prediction_horizon - 1 and o < v.order - 1 and self.prediction_horizon > 2:# and False:
                         lb[o]['t{:03d}/{}/{}'.format(t, v.name, o)] = 0
                         ub[o]['t{:03d}/{}/{}'.format(t, v.name, o)] = 0
                     else:
@@ -596,11 +596,11 @@ class QPController(object):
         # TODO should use separate symbols lists
         self.compiled_debug_v = w.speed_up(self.debug_v, free_symbols)
 
-    def __are_joint_limits_violated(self):
+    def __are_joint_limits_violated(self, error_message):
         violations = (self.p_ub - self.p_lb)[self.p_lb.data > self.p_ub.data]
         if len(violations) > 0:
-            logging.logerr(u'The following joints are outside of their limits: \n {}'.format(violations))
-            return True
+            error_message += u'\nThe following joints are outside of their limits: \n {}'.format(violations)
+            raise OutOfJointLimitsException(error_message)
         logging.loginfo(u'All joints are within limits')
         return False
 
@@ -739,18 +739,16 @@ class QPController(object):
         self.np_lbA = np_big_ass_M[:self.A.height, -2]
         self.np_ubA = np_big_ass_M[:self.A.height, -1]
 
+        filters = self.make_filters()
+        filtered_stuff = self.filter_zero_weight_stuff(*filters)
         try:
-            filters = self.make_filters()
-            filtered_stuff = self.filter_zero_weight_stuff(*filters)
             self.xdot_full = self.qp_solver.solve(*filtered_stuff)
             # self.xdot_full = self.qp_solver.solve(self.np_H, self.np_g, self.np_A, self.np_lb, self.np_ub, self.np_lbA,
             #                                       self.np_ubA)
         except Exception as e:
-            self._create_debug_pandas(substitutions, actually_print=True)
-            if isinstance(e, InfeasibleException):
-                if self.__are_joint_limits_violated():
-                    raise OutOfJointLimitsException(e)
-                raise HardConstraintsViolatedException(e)
+            self._create_debug_pandas(substitutions)
+            self.__are_joint_limits_violated(str(e))
+            self._are_hard_limits_violated(substitutions, str(e), *filtered_stuff)
             # if isinstance(e, QPSolverException):
             # FIXME
             #     arrays = [(p_weights, u'H'),
@@ -770,6 +768,29 @@ class QPController(object):
         # for debugging to might want to execute this line to create named panda matrices
         # self._create_debug_pandas(substitutions, self.xdot_full)
         return self.split_xdot(self.xdot_full), self._eval_debug_exprs(substitutions)
+
+    def _are_hard_limits_violated(self, substitutions, error_message, H, g, A, lb, ub, lbA, ubA):
+        num_non_slack = len(self.free_variables) * self.prediction_horizon * 3
+        num_of_slack = len(lb) - num_non_slack
+        lb[-num_of_slack:] = -100
+        ub[-num_of_slack:] = 100
+        try:
+            self.xdot_full = self.qp_solver.solve(H, g, A, lb, ub, lbA, ubA)
+        except:
+            pass
+        else:
+            self._create_debug_pandas(substitutions, xdot_full=self.xdot_full)
+            upper_violations = self.p_xdot[self.p_ub.data < self.p_xdot.data]
+            lower_violations = self.p_xdot[self.p_lb.data > self.p_xdot.data]
+            if len(upper_violations) > 0 or len(lower_violations) > 0:
+                error_message += u'\n'
+                if len(upper_violations) > 0:
+                    error_message += u'upper slack bounds of following constraints might be too low: {}\n'.format(list(upper_violations.index))
+                if len(lower_violations) > 0:
+                    error_message += u'lower slack bounds of following constraints might be too high: {}'.format(list(lower_violations.index))
+                raise HardConstraintsViolatedException(error_message)
+        logging.loginfo(u'No slack limit violation detected.')
+        return False
 
     def split_xdot(self, xdot):
         split = []
@@ -831,7 +852,7 @@ class QPController(object):
         plt.savefig(u'tmp_data/mpc/mpc_{}_{}.png'.format(joint_name, file_count))
 
     @profile
-    def _create_debug_pandas(self, substitutions, xdot_full=None, actually_print=False):
+    def _create_debug_pandas(self, substitutions, xdot_full=None):
         xdot_full = deepcopy(xdot_full)
         self.np_H = np.diag(self.np_weights)
         self.state = {k: v for k, v in zip(self.compiled_big_ass_M.str_params, substitutions)}

@@ -48,13 +48,13 @@ result_message = [u'result_message']
 robot_description = [u'robot_description']
 
 rosparam = [u'rosparam']
-gui = rosparam + [u'enable_gui']
-data_folder = rosparam + [u'path_to_data_folder']
 
 
 # config file
 # general options
 general_options = rosparam + [u'general_options']
+gui = general_options + [u'enable_gui']
+data_folder = general_options + [u'path_to_data_folder']
 sample_period = general_options + [u'sample_period']
 map_frame = general_options + [u'map_frame']
 debug = general_options + [u'debug']

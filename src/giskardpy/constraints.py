@@ -1405,33 +1405,23 @@ class ExternalCollisionAvoidance(Goal):
 
         dist = w.dot(r_V_n.T, r_V_pb_pa)[0]
 
-        penetration_distance = soft_threshold - actual_distance
-        lower_limit = penetration_distance
-        upper_limit = 1e2
-
-        # I have to consider, that the qp controller limits velocities
         qp_limits_for_lba = max_velocity * sample_period * self.control_horizon
 
-        # this has to take into account the inner workings of the qp controller to compute an accurate slack limit
+        penetration_distance = soft_threshold - actual_distance
+        lower_limit = penetration_distance
+
         lower_limit_limited = w.limit(lower_limit,
                                       -qp_limits_for_lba,
                                       qp_limits_for_lba)
-        lower_limit_for_hard_threshold = w.limit(hard_threshold - actual_distance,
-                                                 -qp_limits_for_lba,
-                                                 qp_limits_for_lba)
-        upper_slack = w.limit(soft_threshold - hard_threshold,
-                              -qp_limits_for_lba * 2,
-                              qp_limits_for_lba * 2)
-        # upper_slack = w.if_greater(actual_distance, hard_threshold,
-        #                            # -lower_limit_for_hard_threshold + lower_limit_limited,
-        #                            w.limit(soft_threshold - hard_threshold,
-        #                                    -qp_limits_for_lba*2,
-        #                                    qp_limits_for_lba*2),
-        #                            lower_limit_limited)
+
+        upper_slack = w.if_greater(actual_distance, hard_threshold,
+                                   w.limit(soft_threshold - hard_threshold,
+                                           -qp_limits_for_lba,
+                                           qp_limits_for_lba),
+                                   lower_limit_limited)
 
         # undo factor in A
         upper_slack /= (sample_period * self.prediction_horizon)
-        # upper_slack *= 1.01
 
         upper_slack = w.if_greater(actual_distance, 50,  # assuming that distance of unchecked closest points is 100
                                    1e4,
@@ -1447,7 +1437,7 @@ class ExternalCollisionAvoidance(Goal):
         self.add_constraint(u'/position',
                             reference_velocity=max_velocity,
                             lower_error=lower_limit,
-                            upper_error=upper_limit,
+                            upper_error=100,
                             weight=weight,
                             expression=dist,
                             lower_slack_limit=-1e4,

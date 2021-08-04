@@ -6,7 +6,7 @@ from mpl_toolkits import mplot3d
 import matplotlib.pyplot as plt
 import numpy as np
 
-import giskardpy.casadi_wrapper as ca
+import giskardpy.casadi_wrapper as w
 from giskardpy.constraints import WEIGHT_COLLISION_AVOIDANCE, WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
 from giskardpy.data_types import FreeVariable, Constraint, VelocityConstraint
 from giskardpy.god_map import GodMap
@@ -218,23 +218,23 @@ def test_collision_avoidance(j_start, j_goal, above):
     penetration_distance = soft_threshold - actual_distance
     lower_limit = penetration_distance
 
-    lower_limit_limited = ca.limit(lower_limit,
-                                   -qp_limits_for_lba,
-                                   qp_limits_for_lba)
+    lower_limit_limited = w.limit(lower_limit,
+                                  -qp_limits_for_lba,
+                                  qp_limits_for_lba)
 
-    upper_slack = ca.if_greater(actual_distance, hard_threshold,
-                                ca.limit(soft_threshold - hard_threshold,
-                                         -qp_limits_for_lba,
-                                         qp_limits_for_lba),
-                                lower_limit_limited)
+    upper_slack = w.if_greater(actual_distance, hard_threshold,
+                               w.limit(soft_threshold - hard_threshold,
+                                       -qp_limits_for_lba,
+                                       qp_limits_for_lba),
+                               lower_limit_limited)
 
     # undo factor in A
     upper_slack /= (tjs.sample_period * tjs.prediction_horizon)
 
-    upper_slack = ca.if_greater(actual_distance, 50,  # assuming that distance of unchecked closest points is 100
-                                1e4,
-                                # 1e4,
-                                ca.max(0, upper_slack))
+    upper_slack = w.if_greater(actual_distance, 50,  # assuming that distance of unchecked closest points is 100
+                               1e4,
+                               # 1e4,
+                               w.max(0, upper_slack))
 
     error = goal_s - j
 
@@ -331,7 +331,7 @@ def test_joint_goal2():
                                                        3: j_i,
                                                    })
 
-                goal_s, goal2_s = ca.var('goal goal2')
+                goal_s, goal2_s = w.var('goal goal2')
                 goal1 = -0.5
                 goal2 = 1.2
                 state['goal'] = goal1
@@ -554,11 +554,11 @@ def test_fk():
     qp, j, j2, state = two_joint_setup(sample_period, ph, upos_limit=None, lpos_limit=None,
                                        j2_start=0.01, j_start=0.01, jerk_limit=50)
 
-    fk = ca.Matrix([
-        ca.sin(j) + ca.sin(j + j2),
-        ca.cos(j) + ca.cos(j + j2)
+    fk = w.Matrix([
+        w.sin(j) + w.sin(j + j2),
+        w.cos(j) + w.cos(j + j2)
     ])
-    gx, gy = ca.var('gx gy')
+    gx, gy = w.var('gx gy')
 
     ex = gx - fk[0]
     ey = gy - fk[1]
@@ -600,7 +600,7 @@ def test_fk():
     final_state, traj = simulate(state, qp, sample_period, True, time_limit=time_limit)
 
     def compute_fk(joint1, joint2):
-        final_state = ca.ca.substitute(ca.ca.substitute(fk, j, joint1), j2, joint2)
+        final_state = w.ca.substitute(w.ca.substitute(fk, j, joint1), j2, joint2)
         return float(final_state[0]), float(final_state[1])
 
     cart_x = np.array([compute_fk(j1, j2)[0] for [j1, j2] in zip(*traj[0])])
@@ -648,12 +648,12 @@ def test_fk2():
     qp, j, j2, state = two_joint_setup(sample_period, ph, upos_limit=None, lpos_limit=None,
                                        j2_start=0.01, j_start=0.01, jerk_limit=50)
 
-    fk = ca.Matrix([
+    fk = w.Matrix([
         j,
         j2
     ])
-    gx, gy = ca.var('gx gy')
-    g = ca.Matrix([gx, gy])
+    gx, gy = w.var('gx gy')
+    g = w.Matrix([gx, gy])
 
     e = g - fk
     state['gx'] = 2
@@ -701,7 +701,7 @@ def test_fk2():
     final_state, traj = simulate(state, qp, sample_period, True, time_limit=time_limit)
 
     def compute_fk(joint1, joint2):
-        final_state = ca.ca.substitute(ca.ca.substitute(fk, j, joint1), j2, joint2)
+        final_state = w.ca.substitute(w.ca.substitute(fk, j, joint1), j2, joint2)
         return float(final_state[0]), float(final_state[1])
 
     cart_x = np.array([compute_fk(j1, j2)[0] for [j1, j2] in zip(*traj[0])])

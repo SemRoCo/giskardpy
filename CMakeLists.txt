@@ -179,6 +179,7 @@ catkin_install_python(PROGRAMS
 	scripts/tf_base_joint_state_publisher.py
 	scripts/traj_to_joint_states.py
 	scripts/urdf_merger.py
+	scripts/giskard_robot_config.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
 ## Mark executables and/or libraries for installation

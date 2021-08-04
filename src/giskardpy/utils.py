@@ -3,6 +3,7 @@ from __future__ import division
 import errno
 import json
 import os
+from copy import deepcopy
 import re
 import subprocess
 import sys
@@ -1022,3 +1023,81 @@ class FIFOSet(set):
     def remove(self, item):
         self.remove(item)
         self._data_queue.remove(item)
+
+
+def update_nested_dicts(d, u):
+    """
+    Will update the values in the nested dict d from nested dict u and
+    add new key-value-pairs from nested dict u into nested dict d." \
+
+    :type d: dict
+    :type u: dict
+    :rtype: dict
+    :returns: updated nested dict
+    """
+    for k, v in u.items():
+        if type(v) == dict and d.get(k, {}) is not None:
+            d[k] = update_nested_dicts(d.get(k, {}), v)
+        else:
+            d[k] = v
+    return d
+
+
+def find_parent_of_key(key, value, keys):
+    """
+    Will return the values of the dict managing the given key and
+    returns the key-chain leading from the nested dict value to the
+    dict containing the given key.
+
+    :type key: str
+    :type value: dict
+    :type keys: list(str)
+    :rtype: tuple(dict, list(str))
+    :returns: tuple containing a dict and the key-chain in a list
+    """
+    if key in value:
+        yield value, keys
+    else:
+        for k, v in value.items():
+            if type(v) == dict:
+                keys.append(k)
+                yield find_parent_of_key(key, v, keys)
+
+
+def nested_update(dic, keys, value):
+    """
+    Will update the nested dict dic with the key-chain keys with the given value.
+
+    :type dic: dict
+    :type keys: list(str)
+    :type value: dict or str
+    :rtype: dict
+    :returns: updated dict
+    """
+    if keys:
+        for key in keys[:-1]:
+            dic = dic.setdefault(key, {})
+        dic[keys[-1]].update(value)
+    else:
+        dic.update(value)
+
+
+def update_parents(d, merge_key='parent'):
+    """
+    Will merge the dict containing the given key merge_key with the value in d[merge_key].
+
+    :type d: dict
+    :returns: dict
+    """
+    root_data = deepcopy(d)
+    gen = find_parent_of_key(merge_key, root_data, [])
+    while True:
+        try:
+            data, keys = next(gen)
+        except (StopIteration, ValueError):
+            break
+        parent_data = data[merge_key]
+        data.pop(merge_key)
+        updated = update_nested_dicts(parent_data, data)
+        nested_update(root_data, keys, updated)
+    return root_data

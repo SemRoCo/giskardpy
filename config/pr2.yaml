@@ -1,8 +1,5 @@
+parent: !include default.yaml
 general_options:
-  sample_period: 0.05 # time[s] between points of generated joint trajectory
-  map_frame: map
-  debug: False # enables debug prints and prints the behavior tree state in the terminal
-  fill_velocity_values: True # due to a bug, the pr2 does not want the velocity values to be filled
   joint_weights:
     # the planner prefers low weight joints to achieve solutions
     # higher weights reduce wiggling, but lower the maximum joint velocity, which might make the planner stop too early
@@ -60,52 +57,6 @@ general_options:
 #      angular: # rad/s**3
 #        default: 250
 #        override: { }
-qp_solver:
-  name: gurobi # one of [qpoases, gurobi]
-  # you should always use uneven horizons. even horizons n create (almost) the same motions as n-1, but are slower.
-  prediction_horizon: 9
-  control_horizon: 9
-plugins:
-  GoalReached:
-    joint_convergence_threshold: 0.01 # when the velocities fall below this value, the planning succeeds
-    window_size: 21 # in sample points, should be identical to WiggleCancel window_size
-  VisualizationBehavior: # planning visualization through markers, slows planning down a little bit
-    enabled: True
-  WorldVisualizationBehavior: # planning world visualization through markers, slows planning down a little bit
-    enabled: True
-  CPIMarker: # contact visualization, slows planning down a little bit
-    enabled: True
-  PlotTrajectory: # plots the joint trajectory at the end of planning, useful for debugging
-    enabled: True
-    history: 5 # will save the x last plots
-    velocity_threshold: 0.0 # only joints that exceed this velocity threshold will be added to the plot. Use a negative number if you want to include every joint
-    scaling: 2.5 # determines how much the x axis is scaled with the length(time) of the trajectory
-    normalize_position: False # centers the joint positions around 0 on the y axis
-    tick_stride: 0.5 # the distance between ticks in the plot. if tick_stride <= 0 pyplot determines the ticks automatically
-  PlotDebugTrajectory: # plots the joint trajectory at the end of planning, useful for debugging
-    enabled: True
-    history: 5
-    scaling: 2.5 # determines how much the x axis is scaled with the length(time) of the trajectory
-    tick_stride: 0.5 # the distance between ticks in the plot. if tick_stride <= 0 pyplot determines the ticks automatically
-  WiggleCancel: # cancels planning if high frequencies are detected in the trajectory
-    amplitude_threshold: 0.55 # must be in the range [0,1]. The amplitude of a frequency must exceed this threshold to be detected as wiggling.
-    window_size: 21 # size of the moving window of sample points
-    frequency_range: 0.4 # must be in the range [0,1]. Only frequencies in the range [max_detectable_frequency * wiggle_frequency_range, max_detectable_frequency] are considered as wiggling. So a value of 0 means that every frequency with an amplitude above wiggle_detection_threshold is detected as wiggling and a value of 1 means that only the max_detectable_frequency can trigger a wiggle detection.      max_detectable_frequency = 1 / (2 * sample_period)
-  TFPublisher:
-    publish_attached_objects: True
-    publish_world_objects: False
-    tf_topic: /tf
-  MaxTrajectoryLength:
-    enabled: False
-    length: 30 # will abort planning if the trajectory becomes longer than this many seconds
-reachability_check:
-  sample_period: 0.5
-  prismatic_velocity: 2.0
-  continuous_velocity: 1
-  revolute_velocity: 1
-  other_velocity: 1
-behavior_tree:
-  tree_tick_rate: 0.1 # how often the tree updates. lower numbers increase responsiveness, but waste cpu time while idle
 collision_avoidance:
   external_collision_avoidance:
     distance_thresholds: # external thresholds are per joint, they therefore count for all directly controlled links
@@ -164,3 +115,4 @@ collision_avoidance:
     #      - [base_link, l_upper_arm_link]
     add: [ ] # list pairs of links that should be added to the self collision matrix
     number_of_repeller: 1 # each movable joint gets pushed away from the X objects closest to it
+

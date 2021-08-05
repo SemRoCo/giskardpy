@@ -96,11 +96,14 @@ class GlobalPlanner(GetGoal):
             if not trajectory.any():
                 return Status.FAILURE
             poses = []
-            for point in trajectory:
+            for i, point in enumerate(trajectory):
+                if i == 0:
+                    continue # we do not to reach the first pose, since it is the start pose
                 base_pose = PoseStamped()
                 base_pose.header.frame_id = self.get_god_map().get_data(identifier.map_frame)
                 base_pose.pose.position.x = point[0]
                 base_pose.pose.position.y = point[1]
+                base_pose.pose.position.z = 0
                 base_pose.pose.orientation = Quaternion(*quaternion_about_axis(0, [0, 0, 1]))
                 poses.append(base_pose)
             c = self.get_cartesian_path_constraint(poses)
@@ -134,20 +137,25 @@ class GlobalPlanner(GetGoal):
             new_js = deepcopy(current_js)
             robot = self.get_robot()
             # Calc IK for navigating to given state and ...
-            state_ik = p.calculateInverseKinematics(robot.get_pybullet_id(), robot.get_pybullet_link_id(u'base_footprint'),
-                                                    [x, y, 0])
+            poses = [[x, y, 0], [x + 0.1, y, 0], [x - 0.1, y, 0], [x, y + 0.1, 0], [x, y - 0.1, 0]]
+            state_iks = list(map(lambda pose :
+                                 p.calculateInverseKinematics(robot.get_pybullet_id(),
+                                                              robot.get_pybullet_link_id(u'base_footprint'),
+                                                              pose), poses))
             # override on current joint states.
-            j_states = {j_name: SingleJointState(j_name, j_state) for j_name, j_state in zip(self.pybullet_joints, state_ik)}
-            for j_name, j_state in j_states.items():
-                new_js[j_name] = j_state
-            # Set new joint states in Bullet
-            self.get_god_map().set_data(identifier.joint_states, new_js)
-            self.get_god_map().set_data(identifier.last_joint_states, current_js)
-            # Check if kitchen is colliding with robot
-            p.performCollisionDetection()
-            collisions = p.getContactPoints(self.pybullet_robot_id, self.pybullet_kitchen_id)
-            # Reset joint state
-            self.get_god_map().set_data(identifier.joint_states, current_js)
+            collisions = ()
+            for state_ik in state_iks:
+                j_states = {j_name: SingleJointState(j_name, j_state) for j_name, j_state in zip(self.pybullet_joints, state_ik)}
+                for j_name, j_state in j_states.items():
+                    new_js[j_name] = j_state
+                # Set new joint states in Bullet
+                self.get_god_map().set_data(identifier.joint_states, new_js)
+                self.get_god_map().set_data(identifier.last_joint_states, current_js)
+                # Check if kitchen is colliding with robot
+                p.performCollisionDetection()
+                collisions += p.getContactPoints(self.pybullet_robot_id, self.pybullet_kitchen_id)
+                # Reset joint state
+                self.get_god_map().set_data(identifier.joint_states, current_js)
             return collisions is ()
 
     def create_kitchen_space(self):
@@ -198,6 +206,10 @@ class GlobalPlanner(GetGoal):
         return ob.GaussianValidStateSampler(si)
 
     def getPlanner(self, si):
+        # Navigation:
+        # RRTstar, RRTsharp: very sparse(= path length eq max range), high number of fp, slow relative to RRTConnect
+        # RRTConnect: many points, low number of fp
+        # PRMstar: no set_range function, finds no solutions
         planner = og.RRTConnect(si)
         planner.setRange(0.1)
         # planner.setIntermediateStates(True)
@@ -226,10 +238,11 @@ class GlobalPlanner(GetGoal):
         ss.setPlanner(planner)
 
         solved = ss.solve(10.0)
+        #og.PathSimplifier(si).smoothBSpline(ss.getSolutionPath()) # takes around 20-30 secs with RTTConnect(0.1)
 
         if solved:
             # try to shorten the path
-            # ss.simplifySolution() DONT! NO! DONT UNCOMMENT THAT! NO! STOP IT!
+            # ss.simplifySolution() DONT! NO! DONT UNCOMMENT THAT! NO! STOP IT! FIRST IMPLEMENT CHECKMOTION! THEN TRY AGAIN!
             # print the simplified path
             data = states_matrix_str2array_floats(ss.getSolutionPath().printAsMatrix())  # [[x, y, theta]]
             if plot:

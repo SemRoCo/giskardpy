@@ -1553,7 +1553,7 @@ class TestCartGoals(object):
 
         base_pose = PoseStamped()
         base_pose.header.frame_id = tip_link
-        base_pose.pose.position.x = -1.75
+        base_pose.pose.position.x = -1.86
         base_pose.pose.position.y = 0
         base_pose.pose.orientation = Quaternion(*quaternion_about_axis(0, [0, 0, 1]))
         goal_c = base_pose

@@ -1627,9 +1627,8 @@ class CartesianPathCarrot(Constraint):
 
 
 class CartesianPathSplineCarrot(Constraint):
-    get_next_py_f = u'get_next_py_f'
-    goals = u'goals'
-    goal_time = u'goal_time'
+    LUT_x_sym = u'LUT_x'
+    LUT_y_sym = u'LUT_y'
     weight = u'weight'
     max_linear_velocity = u'max_linear_velocity'
     max_angular_velocity = u'max_angular_velocity'
@@ -1657,7 +1656,8 @@ class CartesianPathSplineCarrot(Constraint):
         self.calc_splines(goals)
 
         params = {
-            self.goal_time: 0,
+            self.LUT_x_sym: self.LUT_x_f,
+            self.LUT_y_sym: self.LUT_y_f,
             self.weight: weight,
             self.max_linear_velocity: max_linear_velocity,
             self.max_angular_velocity: max_angular_velocity,
@@ -1668,10 +1668,19 @@ class CartesianPathSplineCarrot(Constraint):
         goal_str = []
         for i in range(0, len(goals)):
             params['goal_' + str(i)] = self.parse_and_transform_PoseStamped(goals[i], root_link)
-            goal_str.append(w.ca.SX.sym('goal_' + str(i)))
+            goal_str.append('goal_' + str(i))#w.ca.SX.sym('goal_' + str(i)))
 
-        self.goal_strings = w.Matrix(goal_str)
+        self.goal_strings = goal_str#w.Matrix(goal_str)
         self.save_params_on_god_map(params)
+
+    def LUT_x_f(self, t):
+        tmp = w.ca.SX.sym('tmp')
+        f = w.ca.Function('f', [tmp], [t])
+        vs = self.get_god_map().get_values(w.ca.Function.free_sx(f))
+        return self.LUT_x(w.compile_and_execute(f, [t]))
+
+    def LUT_y_f(self, t):
+        return self.LUT_y(w.compile_and_execute(w.ca.Function('f', [t], [float(t)]), [t]))
 
     def calc_splines(self, goals):
         goals_rs = [self.parse_and_transform_PoseStamped(goal, self.root_link) for goal in goals]
@@ -1697,26 +1706,29 @@ class CartesianPathSplineCarrot(Constraint):
         distances = []
         for i in range(0, trajectory_len):
             distances.append(self.distance_to_goal(goal_strings[i]))
-        min_dis = casadi.mmin(distances)
+        min_dis = w.ca.mmin(w.Matrix(distances))
 
         min_inds = []
         for i in range(0, trajectory_len):
             min_inds.append(w.if_eq(distances[i] - min_dis, 0, i, trajectory_len + 1))
 
-        return min_inds
+        return w.ca.mmin(w.Matrix(min_inds))
 
     def get_carrot(self):
         closest_index = self.get_closest_index()
         closest_time = closest_index
         goal_time = w.if_greater_eq(closest_time + 0.5, self.trajectory_length,
                                     self.trajectory_length, closest_time + 0.5)
-        x = self.LUT_x(goal_time) # FIXME goal_time needs to be MX symbol, but is SX symbol...
-        y = self.LUT_y(goal_time)
+        self.add_debug_constraint("goal_time", goal_time)
+        x = self.get_god_map().to_symbol(self.get_identifier() + [self.LUT_x_sym, (goal_time,)])
+        y = self.get_god_map().to_symbol(self.get_identifier() + [self.LUT_y_sym, (goal_time,)])
         return w.point3(x, y, 0)
 
     def make_constraints(self):
         goal_translation = self.get_carrot()
-        self.add_debug_constraint("debugGoali", self.get_input_float(self.goal_time))
+        self.add_debug_constraint("debugGoalX", goal_translation[0])
+        self.add_debug_constraint("debugGoalY", goal_translation[1])
+        self.add_debug_constraint("debugGoalZ", goal_translation[2])
         self.minimize_position(goal_translation, WEIGHT_COLLISION_AVOIDANCE)
 
     def distance_to_goal(self, p):

@@ -1,8 +1,9 @@
 import datetime
+import os
 from collections import OrderedDict, defaultdict
 from copy import deepcopy
 from time import time
-import os
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -10,7 +11,7 @@ import pandas as pd
 from giskardpy import logging, casadi_wrapper as w
 from giskardpy.data_types import FreeVariable, Constraint
 from giskardpy.data_types import VelocityConstraint
-from giskardpy.exceptions import InfeasibleException, OutOfJointLimitsException, \
+from giskardpy.exceptions import OutOfJointLimitsException, \
     HardConstraintsViolatedException
 from giskardpy.qp_solver import QPSolver
 from giskardpy.qp_solver_gurobi import QPSolverGurobi
@@ -107,7 +108,8 @@ class H(Parent):
         for t in range(self.prediction_horizon):
             for v in self.free_variables:  # type: FreeVariable
                 for o in range(1, v.order):
-                    weights[o]['t{:03d}/{}/{}'.format(t, v.name, o)] = v.normalized_weight(t, o, self.prediction_horizon)
+                    weights[o]['t{:03d}/{}/{}'.format(t, v.name, o)] = v.normalized_weight(t, o,
+                                                                                           self.prediction_horizon)
 
         slack_weights = {}
         for t in range(self.prediction_horizon):
@@ -176,7 +178,7 @@ class B(Parent):
         for t in range(self.prediction_horizon):
             for v in self.free_variables:  # type: FreeVariable
                 for o in range(1, v.order):  # start with velocity
-                    if t == self.prediction_horizon - 1 and o < v.order - 1 and self.prediction_horizon > 2:# and False:
+                    if t == self.prediction_horizon - 1 and o < v.order - 1 and self.prediction_horizon > 2:  # and False:
                         lb[o]['t{:03d}/{}/{}'.format(t, v.name, o)] = 0
                         ub[o]['t{:03d}/{}/{}'.format(t, v.name, o)] = 0
                     else:
@@ -242,6 +244,7 @@ class BA(Parent):
     def __call__(self):
         lb = {}
         ub = {}
+        # position limits
         for t in range(self.prediction_horizon):
             for v in self.free_variables:  # type: FreeVariable
                 if v.has_position_limits():
@@ -596,13 +599,36 @@ class QPController(object):
         # TODO should use separate symbols lists
         self.compiled_debug_v = w.speed_up(self.debug_v, free_symbols)
 
-    def __are_joint_limits_violated(self, error_message):
+    def _are_joint_limits_violated(self, error_message):
         violations = (self.p_ub - self.p_lb)[self.p_lb.data > self.p_ub.data]
         if len(violations) > 0:
             error_message += u'\nThe following joints are outside of their limits: \n {}'.format(violations)
             raise OutOfJointLimitsException(error_message)
         logging.loginfo(u'All joints are within limits')
         return False
+
+    def _is_close_to_joint_limits(self):
+        joint_with_position_limits = [x for x in self.free_variables if x.has_position_limits()]
+        num_joint_with_position_limits = len(joint_with_position_limits)
+        lbA = self.p_lbA_raw[:num_joint_with_position_limits]
+        ubA = self.p_ubA_raw[:num_joint_with_position_limits]
+        joint_range = ubA - lbA
+        percentage = 0.01
+        joint_range *= percentage
+        lbA_danger = lbA[lbA > -joint_range].dropna()
+        ubA_danger = ubA[ubA < joint_range].dropna()
+        result = False
+        if len(lbA_danger) > 0:
+            logging.logwarn(
+                u'The following joints ended up closer than {}% to their lower position limits {}'.format(percentage,
+                                                                                                          list(lbA_danger.index)))
+            result = True
+        if len(ubA_danger) > 0:
+            logging.logwarn(
+                u'The following joints ended up closer than {}% to their upper position limits {}'.format(percentage,
+                                                                                                          list(ubA_danger.index)))
+            result = True
+        return result
 
     def save_all_pandas(self):
         if self.p_xdot is not None:
@@ -747,7 +773,8 @@ class QPController(object):
             #                                       self.np_ubA)
         except Exception as e:
             self._create_debug_pandas(substitutions)
-            self.__are_joint_limits_violated(str(e))
+            self._are_joint_limits_violated(str(e))
+            self._is_close_to_joint_limits()
             self._are_hard_limits_violated(substitutions, str(e), *filtered_stuff)
             # if isinstance(e, QPSolverException):
             # FIXME
@@ -785,9 +812,11 @@ class QPController(object):
             if len(upper_violations) > 0 or len(lower_violations) > 0:
                 error_message += u'\n'
                 if len(upper_violations) > 0:
-                    error_message += u'upper slack bounds of following constraints might be too low: {}\n'.format(list(upper_violations.index))
+                    error_message += u'upper slack bounds of following constraints might be too low: {}\n'.format(
+                        list(upper_violations.index))
                 if len(lower_violations) > 0:
-                    error_message += u'lower slack bounds of following constraints might be too high: {}'.format(list(lower_violations.index))
+                    error_message += u'lower slack bounds of following constraints might be too high: {}'.format(
+                        list(lower_violations.index))
                 raise HardConstraintsViolatedException(error_message)
         logging.loginfo(u'No slack limit violation detected.')
         return False

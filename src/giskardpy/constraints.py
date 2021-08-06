@@ -28,10 +28,12 @@ WEIGHT_MIN = Constraint_msg.WEIGHT_MIN
 
 
 class Goal(object):
-    def __init__(self, god_map, control_horizon=1, **kwargs):
+    def __init__(self, god_map, control_horizon=None, **kwargs):
         self.god_map = god_map
         self.prediction_horizon = self.get_god_map().get_data(identifier.prediction_horizon)
         # last 2 velocities are 0 anyway
+        if control_horizon is None:
+            control_horizon = self.prediction_horizon
         self.control_horizon = max(min(control_horizon, self.prediction_horizon - 2), 1)
         self.save_self_on_god_map()
 

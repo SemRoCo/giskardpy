@@ -45,7 +45,6 @@ qp_solver:
   name: gurobi # one of [qpoases, gurobi]
   # you should always use uneven horizons. even horizons n create (almost) the same motions as n-1, but are slower.
   prediction_horizon: 9
-  control_horizon: 9
 plugins:
   GoalReached:
     joint_convergence_threshold: 0.01 # when the velocities fall below this value, the planning succeeds
@@ -89,25 +88,23 @@ behavior_tree:
   tree_tick_rate: 0.1 # how often the tree updates. lower numbers increase responsiveness, but waste cpu time while idle
 collision_avoidance:
   external_collision_avoidance:
-    distance_thresholds: # external thresholds are per joint, they therefore count for all directly controlled links
-      default:
-        hard_threshold: 0.0 # at this distance in [cm] that can not be surpassed
-        soft_threshold: 0.1 # robot links are pushed to that distance, but it can be overpowered with high weight constraints
-      override: {}
-    # each controlled joint gets pushed away from its X nearest objects
-    # to reduce the runtime, you can set different values for joints that control end effectors
-    number_of_repeller:
-      default: 1
-      end_effector_joints: 4
+    default:
+      number_of_repeller: 1
+      hard_threshold: 0.0
+      soft_threshold: 0.05
+      max_velocity: 0.2
+    override: {}
   self_collision_avoidance:
-    distance_thresholds: # thresholds for self collision avoidance are set for each link pair
-      default: &default # you can set variables and reuse them
-        hard_threshold: 0.0 # at this distance in [cm] that can not be surpassed
-        soft_threshold: 0.05 # robot links are pushed to that distance, but it can be overpowered with high weight constraints
-      override: {}
+    default:
+      number_of_repeller: 1
+      hard_threshold: 0.0
+      soft_threshold: 0.05
+      max_velocity: 0.2
+    override: {}
+#      - base_link # You can override all combinations with a specific link
+#      - base_link, r_upper_arm_link # You can override specific pairs
     ignore: [] # list pairs of links that should be removed from the self collision avoidance
 #    ignore: #example
 #      - [base_link, l_upper_arm_link]
     add: [] # list pairs of links that should be added to the self collision matrix
-    number_of_repeller: 1 # each movable joint gets pushed away from the X objects closest to it
 

@@ -1,13 +1,12 @@
 import errno
 import hashlib
-import numpy as np
 import os
 import pickle
 from itertools import product, combinations
 from time import time
 
+import numpy as np
 from geometry_msgs.msg import Pose, Quaternion
-from tf.transformations import euler_from_quaternion, rotation_from_matrix, quaternion_matrix
 
 from giskardpy import logging
 from giskardpy.data_types import SingleJointState
@@ -24,11 +23,12 @@ class WorldObject(URDFObject):
         if not ignored_pairs:
             self.ignored_pairs = set()
         else:
-            self.ignored_pairs = {tuple(x) for x in ignored_pairs}
+            # turn lists to tuple
+            self.ignored_pairs = {tuple(x) if isinstance(x, list) else x for x in ignored_pairs}
         if not added_pairs:
             self.added_pairs = set()
         else:
-            self.added_pairs = {tuple(x) for x in added_pairs}
+            self.added_pairs = {tuple(x) if isinstance(x, list) else x for x in added_pairs}
         self._calc_self_collision_matrix = calc_self_collision_matrix
         if base_pose is None:
             p = Pose()
@@ -126,9 +126,13 @@ class WorldObject(URDFObject):
 
         # find meaningless self-collisions
         for link_a, link_b in link_combinations:
-            if self.are_linked(link_a, link_b) or link_a == link_b:
+            if self.are_linked(link_a,link_b) or \
+                    link_a == link_b or \
+                    link_a in self.ignored_pairs or \
+                    link_b in self.ignored_pairs or \
+                    (link_a, link_b) in self.ignored_pairs or \
+                    (link_b, link_a) in self.ignored_pairs:
                 always.add((link_a, link_b))
-        always = always.union(self.ignored_pairs)
         rest = link_combinations.difference(always)
         self.joint_state = self.get_zero_joint_state()
         always = always.union(self.check_collisions(rest, d))

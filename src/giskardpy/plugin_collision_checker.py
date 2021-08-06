@@ -1,4 +1,3 @@
-import itertools
 from collections import defaultdict
 from copy import deepcopy
 from multiprocessing import Lock
@@ -41,13 +40,23 @@ class CollisionChecker(GiskardBehavior):
             pybullet_wrapper.deactivate_rendering()
         return SetBoolResponse()
 
+    def _cal_max_param(self, parameter_name):
+        external_distances = self.get_god_map().get_data(identifier.external_collision_avoidance)
+        self_distances = self.get_god_map().get_data(identifier.self_collision_avoidance)
+        default_distance = max(external_distances.default_factory()[parameter_name],
+                               self_distances.default_factory()[parameter_name])
+        for value in external_distances.values():
+            default_distance = max(default_distance, value[parameter_name])
+        for value in self_distances.values():
+            default_distance = max(default_distance, value[parameter_name])
+        return default_distance
+
     def initialise(self):
         collision_goals = self.get_god_map().get_data(identifier.collision_goal)
-        external_distances = self.get_god_map().get_data(identifier.external_collision_avoidance_distance)
-        self_distances = self.get_god_map().get_data(identifier.self_collision_avoidance_distance)
-        default_distance = max(external_distances.default_factory()[u'soft_threshold'],
-                               self_distances.default_factory()[u'soft_threshold'],
-                            self.get_god_map().get_data(identifier.maximum_collision_threshold))
+        external_distances = self.get_god_map().get_data(identifier.external_collision_avoidance)
+        self_distances = self.get_god_map().get_data(identifier.self_collision_avoidance)
+        # FIXME check all dict entries
+        default_distance = self._cal_max_param(u'soft_threshold')
 
         max_distances = defaultdict(lambda: default_distance)
 
@@ -71,15 +80,9 @@ class CollisionChecker(GiskardBehavior):
             else:
                 max_distances[link_name] = distance
 
-
-
-        self.collision_matrix = self.get_world().collision_goals_to_collision_matrix(deepcopy(collision_goals), max_distances)
-
-        self.collision_list_size = self.get_god_map().get_data(identifier.external_collision_avoidance_repeller)
-        self.collision_list_size = max(self.collision_list_size,
-                                       self.get_god_map().get_data(identifier.external_collision_avoidance_repeller_eef))
-        self.collision_list_size = max(self.collision_list_size,
-                                       self.get_god_map().get_data(identifier.self_collision_avoidance_repeller))
+        self.collision_matrix = self.get_world().collision_goals_to_collision_matrix(deepcopy(collision_goals),
+                                                                                     max_distances)
+        self.collision_list_size = self._cal_max_param(u'number_of_repeller')
 
         super(CollisionChecker, self).initialise()
 

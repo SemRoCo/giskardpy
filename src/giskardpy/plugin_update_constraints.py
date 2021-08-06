@@ -59,7 +59,6 @@ class GoalToConstraints(GetGoal):
         self.vel_constraints = {}
         self.debug_expr = {}
         if not (self.get_god_map().get_data(identifier.check_reachability)):
-            self.get_god_map().set_data(identifier.maximum_collision_threshold, 0)
             self.add_collision_avoidance_soft_constraints(move_cmd.collisions)
 
         try:
@@ -127,7 +126,7 @@ class GoalToConstraints(GetGoal):
                     # params = convert_ros_message_to_dictionary(constraint)
                     # del params[u'type']
 
-                c = C(self.god_map, control_horizon=self.get_god_map().unsafe_get_data(identifier.control_horizon), **params)
+                c = C(self.god_map, **params)
             except Exception as e:
                 traceback.print_exc()
                 doc_string = C.__init__.__doc__
@@ -179,29 +178,19 @@ class GoalToConstraints(GetGoal):
         soft_constraints = {}
         vel_constraints = {}
         debug_expr = {}
-        number_of_repeller = self.get_god_map().get_data(identifier.external_collision_avoidance_repeller)
-        number_of_repeller_eef = self.get_god_map().get_data(identifier.external_collision_avoidance_repeller_eef)
-        eef_joints = self.get_robot().get_controlled_leaf_joints()
-        maximum_distance = self.get_god_map().get_data(identifier.maximum_collision_threshold)
-        # TODO add root joint?
-        remaining_joints = [joint_name for joint_name in self.get_robot().controlled_joints
-                            if joint_name not in eef_joints]
-        control_horizon = self.get_god_map().get_data(identifier.control_horizon)
-        for joint_name in remaining_joints:
+        config = self.get_god_map().get_data(identifier.external_collision_avoidance)
+        for joint_name in self.get_robot().controlled_joints:
             child_links = self.get_robot().get_directly_controllable_collision_links(joint_name)
             if child_links:
+                number_of_repeller = config[joint_name][u'number_of_repeller']
                 for i in range(number_of_repeller):
                     child_link = self.get_robot().get_child_link_of_joint(joint_name)
-                    hard_threshold = self.get_god_map().get_data(identifier.external_collision_avoidance_distance +
-                                                                [joint_name, u'hard_threshold'])
+                    hard_threshold = config[joint_name][u'hard_threshold']
                     if soft_threshold_override is not None:
                         soft_threshold = soft_threshold_override
                     else:
-                        soft_threshold = self.get_god_map().get_data(identifier.external_collision_avoidance_distance +
-                                                                    [joint_name, u'soft_threshold'])
-                    maximum_distance = max(maximum_distance, soft_threshold)
+                        soft_threshold = config[joint_name][u'soft_threshold']
                     constraint = ExternalCollisionAvoidance(self.god_map, child_link,
-                                                            control_horizon=control_horizon,
                                                             hard_threshold=hard_threshold,
                                                             soft_threshold=soft_threshold,
                                                             idx=i,
@@ -211,42 +200,17 @@ class GoalToConstraints(GetGoal):
                     vel_constraints.update(c_vel)
                     debug_expr.update(constraint.debug_expressions)
 
-        for joint_name in eef_joints:
-            child_link = self.get_robot().get_child_link_of_joint(joint_name)
-            for i in range(number_of_repeller_eef):
-                hard_threshold = self.get_god_map().get_data(identifier.external_collision_avoidance_distance +
-                                                             [joint_name, u'hard_threshold'])
-                if soft_threshold_override is not None:
-                    soft_threshold = soft_threshold_override
-                else:
-                    soft_threshold = self.get_god_map().get_data(identifier.external_collision_avoidance_distance +
-                                                                 [joint_name, u'soft_threshold'])
-                maximum_distance = max(maximum_distance, soft_threshold)
-                constraint = ExternalCollisionAvoidance(self.god_map, child_link,
-                                                        control_horizon=control_horizon,
-                                                        hard_threshold=hard_threshold,
-                                                        soft_threshold=soft_threshold,
-                                                        idx=i,
-                                                        num_repeller=number_of_repeller_eef)
-                c, c_vel = constraint.get_constraints()
-                soft_constraints.update(c)
-                vel_constraints.update(c_vel)
-                debug_expr.update(constraint.debug_expressions)
-
         num_external = len(soft_constraints)
         loginfo('adding {} external collision avoidance constraints'.format(num_external))
         self.soft_constraints.update(soft_constraints)
         self.vel_constraints.update(vel_constraints)
         self.debug_expr.update(debug_expr)
-        self.get_god_map().set_data(identifier.maximum_collision_threshold, maximum_distance)
 
     def add_self_collision_avoidance_constraints(self):
         counter = defaultdict(int)
-        control_horizon = self.get_god_map().get_data(identifier.control_horizon)
         soft_constraints = {}
         vel_constraints = {}
-        number_of_repeller = self.get_god_map().get_data(identifier.self_collision_avoidance_repeller)
-        maximum_distance = self.get_god_map().get_data(identifier.maximum_collision_threshold)
+        config = self.get_god_map().get_data(identifier.self_collision_avoidance)
         for link_a_o, link_b_o in self.get_robot().get_self_collision_matrix():
             link_a, link_b = self.robot.get_chain_reduced_to_controlled_joints(link_a_o, link_b_o)
             if not self.get_robot().link_order(link_a, link_b):
@@ -256,25 +220,27 @@ class GoalToConstraints(GetGoal):
         for link_a, link_b in counter:
             num_of_constraints = min(1, counter[link_a, link_b])
             for i in range(num_of_constraints):
-                thresholds = self.get_god_map().get_data(identifier.self_collision_avoidance_distance)
                 key = u'{}, {}'.format(link_a, link_b)
                 key_r = u'{}, {}'.format(link_b, link_a)
-                if key in thresholds:
-                    hard_threshold = thresholds[key][u'hard_threshold']
-                    soft_threshold = thresholds[key][u'soft_threshold']
-                elif key_r in thresholds:
-                    hard_threshold = thresholds[key_r][u'hard_threshold']
-                    soft_threshold = thresholds[key_r][u'soft_threshold']
+                # FIXME there is probably a bug or unintuitive behavior, when a pair is affected by multiple entries
+                if key in config:
+                    hard_threshold = config[key][u'hard_threshold']
+                    soft_threshold = config[key][u'soft_threshold']
+                    number_of_repeller = config[key][u'number_of_repeller']
+                elif key_r in config:
+                    hard_threshold = config[key_r][u'hard_threshold']
+                    soft_threshold = config[key_r][u'soft_threshold']
+                    number_of_repeller = config[key_r][u'number_of_repeller']
                 else:
                     # TODO minimum is not the best if i reduce to the links next to the controlled chains
                     #   should probably add symbols that retrieve the values for the current pair
-                    hard_threshold = min(thresholds[link_a][u'hard_threshold'],
-                                         thresholds[link_b][u'hard_threshold'])
-                    soft_threshold = min(thresholds[link_a][u'soft_threshold'],
-                                         thresholds[link_b][u'soft_threshold'])
-                maximum_distance = max(maximum_distance, soft_threshold)
+                    hard_threshold = min(config[link_a][u'hard_threshold'],
+                                         config[link_b][u'hard_threshold'])
+                    soft_threshold = min(config[link_a][u'soft_threshold'],
+                                         config[link_b][u'soft_threshold'])
+                    number_of_repeller = min(config[link_a][u'number_of_repeller'],
+                                             config[link_b][u'number_of_repeller'])
                 constraint = SelfCollisionAvoidance(self.god_map,
-                                                    control_horizon=control_horizon,
                                                     link_a=link_a,
                                                     link_b=link_b,
                                                     hard_threshold=hard_threshold,
@@ -286,4 +252,3 @@ class GoalToConstraints(GetGoal):
         loginfo('adding {} self collision avoidance constraints'.format(len(soft_constraints)))
         self.soft_constraints.update(soft_constraints)
         self.vel_constraints.update(vel_constraints)
-        self.get_god_map().set_data(identifier.maximum_collision_threshold, maximum_distance)

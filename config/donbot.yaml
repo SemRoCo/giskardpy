@@ -1,39 +1,26 @@
 parent: !include default.yaml
 collision_avoidance:
   external_collision_avoidance:
-    distance_thresholds: # external thresholds are per joint, they therefore count for all directly controlled links
-      default:
-        hard_threshold: 0.0 # at this distance in [cm] that can not be surpassed
-        soft_threshold: 0.05 # robot links are pushed to that distance, but it can be overpowered with high weight constraints
-      override:
-        odom_z_joint: # this affects all links between this and the next controlled joint
-          hard_threshold: 0.05 # at this distance in [cm] that can not be surpassed
-          soft_threshold: 0.1 # robot links are pushed to that distance, but it can be overpowered with high weight constraints
-    # each controlled joint gets pushed away from its X nearest objects
-    # to reduce the runtime, you can set different values for joints that control end effectors
-    number_of_repeller:
-      default: 1
-      end_effector_joints: 4
+    override:
+      odom_z_joint: # this affects all links between this and the next controlled joint
+        hard_threshold: 0.05 # at this distance in [cm] that can not be surpassed
+        soft_threshold: 0.1 # robot links are pushed to that distance, but it can be overpowered with high weight constraints
   self_collision_avoidance:
-    distance_thresholds: # thresholds for self collision avoidance are set for each link pair
-      default: &default # you can set variables and reuse them
-        hard_threshold: 0.0 # at this distance in [cm] that can not be surpassed
-        soft_threshold: 0.05 # robot links are pushed to that distance, but it can be overpowered with high weight constraints
-      override:
-        low: &low
-          hard_threshold: 0.005
-          soft_threshold: 0.02
-        low2: &low2
-          hard_threshold: 0.0
-          soft_threshold: 0.00001
-        ur5_wrist_1_link: *low
-        ur5_wrist_2_link: *low
-        ur5_wrist_3_link: *low
-        ur5_forearm_link: *low
-        ur5_upper_arm_link: *low
-        gripper_gripper_left_link: *low2
-        gripper_gripper_right_link: *low2
-        refills_finger, refills_tool_frame: *low2
+    override:
+      low: &low
+        hard_threshold: 0.005
+        soft_threshold: 0.02
+      low2: &low2
+        hard_threshold: 0.0
+        soft_threshold: 0.00001
+      ur5_wrist_1_link: *low
+      ur5_wrist_2_link: *low
+      ur5_wrist_3_link: *low
+      ur5_forearm_link: *low
+      ur5_upper_arm_link: *low
+      gripper_gripper_left_link: *low2
+      gripper_gripper_right_link: *low2
+      refills_finger, refills_tool_frame: *low2
     ignore: # list pairs of links that should be removed from the self collision avoidance
 #    ignore: #example
 #      - [base_link, l_upper_arm_link]
@@ -41,20 +28,3 @@ collision_avoidance:
       - [ur5_base_link, ur5_upper_arm_link]
     add: # list pairs of links that should be added to the self collision matrix
       - [plate, ur5_upper_arm_link]
-    number_of_repeller: 1 # each movable joint gets pushed away from the X objects closest to it
-
-
-
-#    low: &low
-#      max_weight_distance: 0.005
-#      low_weight_distance: 0.01
-#      zero_weight_distance: 0.02
-#    base_link:
-#      max_weight_distance: 0.04
-#      low_weight_distance: 0.06
-#      zero_weight_distance: 0.09
-#    ur5_wrist_1_link: *low
-#    ur5_wrist_2_link: *low
-#    ur5_wrist_3_link: *low
-#    ur5_forearm_link: *low
-#    ur5_upper_arm_link: *low

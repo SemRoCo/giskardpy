@@ -1,5 +1,6 @@
 import functools
 from collections import defaultdict
+from copy import deepcopy
 
 import py_trees
 import py_trees_ros
@@ -85,15 +86,18 @@ def initialize_god_map():
             break
         rospy.sleep(0.5)
 
-    process_joint_specific_params(identifier.self_collision_avoidance_distance,
-                                  identifier.self_collision_avoidance_default_threshold,
-                                  identifier.self_collision_avoidance_default_override,
-                                  god_map)
+    # process_joint_specific_params(identifier.self_collision_avoidance_distance,
+    #                               identifier.self_collision_avoidance_default_threshold,
+    #                               identifier.self_collision_avoidance_default_override,
+    #                               god_map)
+    #
+    # process_joint_specific_params(identifier.external_collision_avoidance_distance,
+    #                               identifier.external_collision_avoidance_default_threshold,
+    #                               identifier.external_collision_avoidance_default_override,
+    #                               god_map)
 
-    process_joint_specific_params(identifier.external_collision_avoidance_distance,
-                                  identifier.external_collision_avoidance_default_threshold,
-                                  identifier.external_collision_avoidance_default_override,
-                                  god_map)
+    set_default_in_override_block(identifier.external_collision_avoidance, god_map)
+    set_default_in_override_block(identifier.self_collision_avoidance, god_map)
 
     world = PyBulletWorld(False, blackboard.god_map.get_data(identifier.data_folder))
     god_map.set_data(identifier.world, world)
@@ -203,6 +207,11 @@ def set_default_in_override_block(block_identifier, god_map):
     override = god_map.get_data(block_identifier)
     d = defaultdict(lambda: default_value)
     if isinstance(override, dict):
+        if isinstance(default_value, dict):
+            for key, value in override.items():
+                o = deepcopy(default_value)
+                o.update(value)
+                override[key] = o
         d.update(override)
     god_map.set_data(block_identifier, d)
     return KeyDefaultDict(lambda key: god_map.to_symbol(block_identifier + [key]))

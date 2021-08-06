@@ -80,7 +80,6 @@ joint_weights = general_options + [u'joint_weights']
 qp_solver = rosparam + [u'qp_solver']
 qp_solver_name = qp_solver + [u'name']
 prediction_horizon = qp_solver + [u'prediction_horizon']
-control_horizon = qp_solver + [u'control_horizon']
 
 # plugins
 plugins = rosparam + [u'plugins']
@@ -106,9 +105,6 @@ joint_convergence_threshold = plugins + [u'GoalReached', u'joint_convergence_thr
 GoalReached_window_size = plugins + [u'GoalReached', u'window_size']
 
 TFPublisher = plugins + [u'TFPublisher']
-# publish_attached_objects =  + [u'TFPublisher', u'publish_attached_objects']
-# publish_world_objects = plugins + [u'tf_publisher', u'publish_world_objects']
-# tf_topic = plugins + [u'tf_publisher', u'tf_topic']
 
 # reachability check
 reachability_check = rosparam + [u'reachability_check']
@@ -118,7 +114,6 @@ rc_continuous_velocity = reachability_check + [u'continuous_velocity']
 rc_revolute_velocity = reachability_check + [u'revolute_velocity']
 rc_other_velocity = reachability_check + [u'other_velocity']
 
-
 # behavior tree
 behavior_tree = rosparam + [u'behavior_tree']
 tree_tick_rate = behavior_tree + [u'tree_tick_rate']
@@ -126,23 +121,13 @@ tree_manager = behavior_tree + [u'tree_manager']
 
 # collision avoidance
 collision_avoidance = rosparam + [u'collision_avoidance']
-maximum_collision_threshold = collision_avoidance + [u'maximum_collision_threshold']
 added_collision_checks = collision_avoidance + [u'added_collision_checks']
 
-self_collision_avoidance = collision_avoidance + [u'self_collision_avoidance']
-self_collision_avoidance_distance = self_collision_avoidance + [u'distance_thresholds']
-self_collision_avoidance_default_threshold = self_collision_avoidance_distance + [u'default']
-self_collision_avoidance_default_override = self_collision_avoidance_distance + [u'override']
-ignored_self_collisions = self_collision_avoidance + [u'ignore']
-added_self_collisions = self_collision_avoidance + [u'add']
-self_collision_avoidance_repeller = self_collision_avoidance + [u'number_of_repeller']
+self_collision_avoidance = collision_avoidance + [u'self_collision_avoidance', u'override']
+ignored_self_collisions = self_collision_avoidance[:-1] + [u'ignore']
+added_self_collisions = self_collision_avoidance[:-1] + [u'add']
 
-external_collision_avoidance = collision_avoidance + [u'external_collision_avoidance']
-external_collision_avoidance_distance = external_collision_avoidance + [u'distance_thresholds']
-external_collision_avoidance_default_threshold = external_collision_avoidance_distance + [u'default']
-external_collision_avoidance_default_override = external_collision_avoidance_distance + [u'override']
-external_collision_avoidance_repeller = external_collision_avoidance + [u'number_of_repeller', u'default']
-external_collision_avoidance_repeller_eef = external_collision_avoidance + [u'number_of_repeller', u'end_effector_joints']
+external_collision_avoidance = collision_avoidance + [u'external_collision_avoidance', u'override']
 
 
 

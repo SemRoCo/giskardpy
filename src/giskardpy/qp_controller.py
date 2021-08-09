@@ -805,7 +805,7 @@ class QPController(object):
         return self.split_xdot(self.xdot_full), self._eval_debug_exprs(substitutions)
 
     def _are_hard_limits_violated(self, substitutions, error_message, weights, g, A, lb, ub, lbA, ubA):
-        num_non_slack = len(self.free_variables) * self.prediction_horizon * self.order
+        num_non_slack = len(self.free_variables) * self.prediction_horizon * (self.order-1)
         num_of_slack = len(lb) - num_non_slack
         lb[-num_of_slack:] = -100
         ub[-num_of_slack:] = 100
@@ -830,7 +830,7 @@ class QPController(object):
         return False
 
     def get_cmd_relaxed_hard_constraints(self, weights, g, A, lb, ub, lbA, ubA):
-        num_non_slack = len(self.free_variables) * self.prediction_horizon * self.order
+        num_non_slack = len(self.free_variables) * self.prediction_horizon * (self.order-1)
         num_of_slack = len(lb) - num_non_slack
         lb_relaxed = lb.copy()
         ub_relaxed = ub.copy()

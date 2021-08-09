@@ -85,7 +85,7 @@ retry_added_slack = qp_solver + [u'hard_constraint_handling', u'added_slack']
 retry_weight_factor = qp_solver + [u'hard_constraint_handling', u'weight_factor']
 
 # tree
-plugins = rosparam + [u'tree']
+plugins = rosparam + [u'plugins']
 enable_VisualizationBehavior = plugins + [u'VisualizationBehavior', u'enabled']
 enable_WorldVisualizationBehavior = plugins + [u'WorldVisualizationBehavior', u'enabled']
 enable_CPIMarker = plugins + [u'CPIMarker', u'enabled']

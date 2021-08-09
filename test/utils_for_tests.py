@@ -440,10 +440,12 @@ class GiskardTestWrapper(GiskardWrapper):
                                                              weight=weight, **kwargs)
 
 
-    def set_straight_translation_goal(self, goal_pose, tip_link, root_link=None, weight=None, max_velocity=None):
+    def set_straight_translation_goal(self, goal_pose, tip_link, root_link=None, weight=None, max_velocity=None, **kwargs):
         if not root_link:
             root_link = self.default_root
-        super(GiskardTestWrapper, self).set_straight_translation_goal(goal_pose, tip_link, root_link, max_velocity=max_velocity)
+        super(GiskardTestWrapper, self).set_straight_translation_goal(goal_pose, tip_link, root_link,
+                                                                      max_velocity=max_velocity, weight=weight,
+                                                                      **kwargs)
 
     def set_cart_goal(self, goal_pose, tip_link, root_link=None, weight=None, linear_velocity=None, angular_velocity=None):
         if not root_link:
@@ -460,11 +462,11 @@ class GiskardTestWrapper(GiskardWrapper):
         if not root_link:
             root_link = self.default_root
         if weight is not None:
-            super(GiskardTestWrapper, self).set_straight_cart_goal(goal_pose, tip_link, root_link, weight=weight, trans_max_velocity=linear_velocity,
-                                       rot_max_velocity=angular_velocity)
+            super(GiskardTestWrapper, self).set_straight_cart_goal(goal_pose, tip_link, root_link, weight=weight, max_linear_velocity=linear_velocity,
+                                                                   max_angular_velocity=angular_velocity)
         else:
-            super(GiskardTestWrapper, self).set_straight_cart_goal(goal_pose, tip_link, root_link, trans_max_velocity=linear_velocity,
-                                       rot_max_velocity=angular_velocity)
+            super(GiskardTestWrapper, self).set_straight_cart_goal(goal_pose, tip_link, root_link, max_linear_velocity=linear_velocity,
+                                                                   max_angular_velocity=angular_velocity)
 
 
     def set_and_check_cart_goal(self, goal_pose, tip_link, root_link=None, weight=None, linear_velocity=None, angular_velocity=None,
@@ -663,7 +665,7 @@ class GiskardTestWrapper(GiskardWrapper):
         assert name in self.get_object_names().object_names
         compare_poses(o_p, self.get_object_info(name).pose.pose)
 
-    def add_sphere(self, name=u'sphere', size=1, pose=None):
+    def add_sphere(self, name=u'sphere', size=1., pose=None):
         r = super(GiskardTestWrapper, self).add_sphere(name=name, size=size, pose=pose)
         assert r.error_codes == UpdateWorldResponse.SUCCESS, \
             u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),

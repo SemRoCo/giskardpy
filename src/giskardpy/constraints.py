@@ -964,15 +964,18 @@ class CartesianPosition(BasicCartesianGoal):
 
 
 class CartesianPositionStraight(BasicCartesianGoal):
-    def __init__(self, god_map, root_link, tip_link, goal,
-                 max_velocity=0.1,
+    def __init__(self, god_map, root_link, tip_link, goal, reference_velocity=None, max_velocity=0.2,
                  weight=WEIGHT_ABOVE_CA, **kwargs):
-        super(CartesianPositionStraight, self).__init__(god_map,
-                                                        root_link,
-                                                        tip_link,
-                                                        goal,
-                                                        max_velocity,
-                                                        weight, **kwargs)
+        if reference_velocity is None:
+            reference_velocity = max_velocity
+        super(CartesianPositionStraight, self).__init__(god_map=god_map,
+                                                        root_link=root_link,
+                                                        tip_link=tip_link,
+                                                        goal=goal,
+                                                        reference_velocity=reference_velocity,
+                                                        max_velocity=max_velocity,
+                                                        weight=weight,
+                                                        **kwargs)
 
         start = tf.lookup_pose(self.root, self.tip)
 
@@ -1006,18 +1009,20 @@ class CartesianPositionStraight(BasicCartesianGoal):
         }'
         :return:
         """
-        root_P_goal = w.position_of(self.get_parameter_as_symbolic_expression('goal'))
+        root_P_goal = w.position_of(self.get_goal_pose())
         root_P_tip = w.position_of(self.get_fk(self.root, self.tip))
         root_V_start = w.position_of(self.get_parameter_as_symbolic_expression('start'))
         max_velocity = self.get_parameter_as_symbolic_expression('max_velocity')
+        reference_velocity = self.get_parameter_as_symbolic_expression('reference_velocity')
         weight = self.get_parameter_as_symbolic_expression('weight')
 
         # Constraint to go to goal pos
-        self.add_minimize_position_constraints(root_P_goal,
-                                               max_velocity,
-                                               self.root,
-                                               self.tip,
-                                               weight,
+        self.add_minimize_position_constraints(r_P_g=root_P_goal,
+                                               reference_velocity=reference_velocity,
+                                               max_velocity=max_velocity,
+                                               root=self.root,
+                                               tip=self.tip,
+                                               weight=weight,
                                                prefix=u'goal')
 
         dist, nearest = w.distance_point_to_line_segment(root_P_tip,
@@ -1029,7 +1034,7 @@ class CartesianPositionStraight(BasicCartesianGoal):
                                                root=self.root,
                                                tip=self.tip,
                                                prefix=u'line',
-                                               weight=WEIGHT_ABOVE_CA)
+                                               weight=weight*2)
 
 
 class CartesianVelocityLimit(Goal):

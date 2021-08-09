@@ -108,6 +108,7 @@ class QPSolverGurobi(QPSolver):
         :return: x according to the equations above, len = joint constraints + soft constraints
         :type np.array
         """
+        H = np.diag(H)
         for i in range(tries):
             if self.started:
                 self.update(H, g, A, lb, ub, lbA, ubA)
@@ -133,7 +134,7 @@ class QPSolverGurobi(QPSolver):
                 lbA = self.round(lbA,decimal_places)
                 ubA = self.round(ubA,decimal_places)
         else:
-            self.print_debug()
+            # self.print_debug()
             self.started = False
             error_message = u'{}'.format(self.STATUS_VALUE_DICT[success])
             if success == gurobipy.GRB.INFEASIBLE:

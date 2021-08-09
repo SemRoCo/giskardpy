@@ -45,6 +45,10 @@ qp_solver:
   name: gurobi # one of [qpoases, gurobi]
   # you should always use uneven horizons. even horizons n create (almost) the same motions as n-1, but are slower.
   prediction_horizon: 9
+  hard_constraint_handling:
+    retry_with_relaxed_constraints: True
+    added_slack: 100
+    weight_factor: 100
 plugins:
   GoalReached:
     joint_convergence_threshold: 0.01 # when the velocities fall below this value, the planning succeeds

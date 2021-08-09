@@ -55,6 +55,7 @@ class QPSolver(object):
         :return: x according to the equations above, len = joint constraints + soft constraints
         :type np.array
         """
+        H = np.diag(H)
         H = H.copy()
         A = A.copy()
         lbA = lbA.copy()

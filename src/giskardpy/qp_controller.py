@@ -494,14 +494,18 @@ class QPController(object):
     Wraps around QP Solver. Builds the required matrices from constraints.
     """
 
-    def __init__(self, sample_period, prediciton_horizon, solver_name,
-                 free_variables=None, constraints=None, velocity_constraints=None, debug_expressions=None):
+    def __init__(self, sample_period, prediction_horizon, solver_name,
+                 free_variables=None, constraints=None, velocity_constraints=None, debug_expressions=None,
+                 retry_with_relaxed_constraints=True, retry_added_slack=100, retry_weight_factor=100):
         self.free_variables = []  # type: list[FreeVariable]
         self.constraints = []  # type: list[Constraint]
         self.velocity_constraints = []  # type: list[VelocityConstraint]
         self.debug_expressions = {}  # type: dict
-        self.prediction_horizon = prediciton_horizon
+        self.prediction_horizon = prediction_horizon
         self.sample_period = sample_period
+        self.retry_with_relaxed_constraints = retry_with_relaxed_constraints
+        self.retry_added_slack = retry_added_slack
+        self.retry_weight_factor = retry_weight_factor
         if free_variables is not None:
             self.add_free_variables(free_variables)
         if constraints is not None:
@@ -739,7 +743,7 @@ class QPController(object):
 
     @profile
     def filter_zero_weight_stuff(self, b_filter, bA_filter):
-        return np.diag(self.np_weights[b_filter]), \
+        return self.np_weights[b_filter], \
                np.zeros(b_filter.shape[0]), \
                self.np_A[bA_filter, :][:, b_filter], \
                self.np_lb[b_filter], \
@@ -758,7 +762,6 @@ class QPController(object):
         """
         np_big_ass_M = self.compiled_big_ass_M.call2(substitutions)
         self.np_weights = np_big_ass_M[self.A.height, :-2]
-        self.np_H = np.diag(self.np_weights)
         self.np_A = np_big_ass_M[:self.A.height, :self.A.width]
         self.np_lb = np_big_ass_M[self.A.height + 1, :-2]
         self.np_ub = np_big_ass_M[self.A.height + 2, :-2]
@@ -769,13 +772,18 @@ class QPController(object):
         filtered_stuff = self.filter_zero_weight_stuff(*filters)
         try:
             self.xdot_full = self.qp_solver.solve(*filtered_stuff)
-            # self.xdot_full = self.qp_solver.solve(self.np_H, self.np_g, self.np_A, self.np_lb, self.np_ub, self.np_lbA,
-            #                                       self.np_ubA)
-        except Exception as e:
+        except Exception as e_original:
+            if self.retry_with_relaxed_constraints:
+                try:
+                    logging.logwarn(u'Failed to solve QP, retrying with relaxed hard constraints.')
+                    self.get_cmd_relaxed_hard_constraints(*filtered_stuff)
+                    return self.split_xdot(self.xdot_full), self._eval_debug_exprs(substitutions)
+                except Exception as e_relaxed:
+                    logging.logerr(u'Relaxing hard constraints failed.')
             self._create_debug_pandas(substitutions)
-            self._are_joint_limits_violated(str(e))
+            self._are_joint_limits_violated(str(e_original))
             self._is_close_to_joint_limits()
-            self._are_hard_limits_violated(substitutions, str(e), *filtered_stuff)
+            self._are_hard_limits_violated(substitutions, str(e_original), *filtered_stuff)
             # if isinstance(e, QPSolverException):
             # FIXME
             #     arrays = [(p_weights, u'H'),
@@ -789,20 +797,20 @@ class QPController(object):
             #         any_nan |= self.__is_nan_in_array(name, a)
             #     if any_nan:
             #         raise e
-            raise e
+            raise
         if self.xdot_full is None:
             return None
         # for debugging to might want to execute this line to create named panda matrices
         # self._create_debug_pandas(substitutions, self.xdot_full)
         return self.split_xdot(self.xdot_full), self._eval_debug_exprs(substitutions)
 
-    def _are_hard_limits_violated(self, substitutions, error_message, H, g, A, lb, ub, lbA, ubA):
-        num_non_slack = len(self.free_variables) * self.prediction_horizon * 3
+    def _are_hard_limits_violated(self, substitutions, error_message, weights, g, A, lb, ub, lbA, ubA):
+        num_non_slack = len(self.free_variables) * self.prediction_horizon * self.order
         num_of_slack = len(lb) - num_non_slack
         lb[-num_of_slack:] = -100
         ub[-num_of_slack:] = 100
         try:
-            self.xdot_full = self.qp_solver.solve(H, g, A, lb, ub, lbA, ubA)
+            self.xdot_full = self.qp_solver.solve(weights, g, A, lb, ub, lbA, ubA)
         except:
             pass
         else:
@@ -819,6 +827,22 @@ class QPController(object):
                         list(lower_violations.index))
                 raise HardConstraintsViolatedException(error_message)
         logging.loginfo(u'No slack limit violation detected.')
+        return False
+
+    def get_cmd_relaxed_hard_constraints(self, weights, g, A, lb, ub, lbA, ubA):
+        num_non_slack = len(self.free_variables) * self.prediction_horizon * self.order
+        num_of_slack = len(lb) - num_non_slack
+        lb_relaxed = lb.copy()
+        ub_relaxed = ub.copy()
+        lb_relaxed[-num_of_slack:] = -self.retry_added_slack
+        ub_relaxed[-num_of_slack:] = self.retry_added_slack
+        self.xdot_full = self.qp_solver.solve(weights, g, A, lb_relaxed, ub_relaxed, lbA, ubA)
+        upper_violations = ub < self.xdot_full
+        lower_violations = lb > self.xdot_full
+        if np.any(upper_violations) or np.any(lower_violations):
+            weights[upper_violations | lower_violations][-num_of_slack:] *= self.retry_weight_factor
+            self.xdot_full = self.qp_solver.solve(weights, g, A, lb_relaxed, ub_relaxed, lbA, ubA)
+            return True
         return False
 
     def split_xdot(self, xdot):

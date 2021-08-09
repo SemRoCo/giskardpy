@@ -296,8 +296,8 @@ def test_collision_avoidance2():
 
     hard_threshold1 = 0.
     hard_threshold2 = 0.5
-    # hard_threshold = w.if_greater(t, 1, hard_threshold2, hard_threshold1)
-    hard_threshold = hard_threshold2
+    hard_threshold = w.if_greater(t, 1, hard_threshold2, hard_threshold1)
+    # hard_threshold = hard_threshold2
     soft_threshold = hard_threshold + 0.05
     qp_limits_for_lba = ca_vel_limit * tjs.sample_period * tjs.control_horizon
 
@@ -346,16 +346,15 @@ def test_collision_avoidance2():
     tjs.qp.add_debug_expressions(
         {
             'hard_threshold': hard_threshold,
-            'dist_dot': dist_dot,
          }
     )
 
     tjs.simulate(
-        things_to_plot=['j', 'j_v', 'hard_threshold', 'dist_dot'],
+        things_to_plot=['j', 'j_v', 'j_j', 'hard_threshold'],
         time_limit=5,
         hlines=[j_start, hard_threshold2]
     )
-    assert tjs.god_map.get_data(['j']) >= hard_threshold2
+    assert tjs.god_map.get_data(['j']) >= hard_threshold2/2
     if abs(j_goal - hard_threshold2) > 0.05 and j_goal > hard_threshold2:
         np.testing.assert_almost_equal(tjs.god_map.get_data(['j']),
                                        tjs.god_map.get_data(['goal']), decimal=2)

@@ -371,6 +371,40 @@ class TestJointGoals(object):
 class TestConstraints(object):
     # TODO write buggy constraints that test sanity checks
 
+    def test_CollisionAvoidanceHint(self, kitchen_setup):
+        """
+        :type kitchen_setup: PR2
+        """
+        # FIXME bouncy
+        tip = u'base_footprint'
+        base_pose = PoseStamped()
+        base_pose.header.frame_id = u'map'
+        base_pose.pose.position.x = 0
+        base_pose.pose.position.y = 1.5
+        base_pose.pose.orientation = Quaternion(*quaternion_about_axis(np.pi, [0, 0, 1]))
+        kitchen_setup.teleport_base(base_pose)
+        base_pose = PoseStamped()
+        base_pose.header.frame_id = tip
+        base_pose.pose.position.x = 2.3
+        base_pose.pose.orientation = Quaternion(*quaternion_about_axis(0, [0, 0, 1]))
+
+        avoidance_hint = Vector3Stamped()
+        avoidance_hint.header.frame_id = u'map'
+        avoidance_hint.vector.y = -1
+        kitchen_setup.avoid_all_collisions(0.1)
+        kitchen_setup.set_json_goal(u'CollisionAvoidanceHint',
+                                    tip_link=u'base_link',
+                                    max_threshold=0.4,
+                                    spring_threshold=0.5,
+                                    # max_linear_velocity=1,
+                                    object_name=u'kitchen',
+                                    object_link_name=u'kitchen_island',
+                                    weight=WEIGHT_COLLISION_AVOIDANCE,
+                                    avoidance_hint=avoidance_hint)
+        kitchen_setup.set_joint_goal(gaya_pose)
+
+        kitchen_setup.set_and_check_cart_goal(base_pose, tip, weight=WEIGHT_BELOW_CA, linear_velocity=0.5)
+
     def test_CartesianPosition(self, zero_pose):
         """
         :type zero_pose: PR2
@@ -3163,39 +3197,6 @@ class TestCollisionAvoidanceGoals(object):
         base_pose.pose.position.y = 1
         base_pose.pose.orientation = Quaternion(*quaternion_about_axis(0, [0, 0, 1]))
         kitchen_setup.set_and_check_cart_goal(base_pose, tip_link=u'base_footprint')
-
-    def test_go_around_kitchen_island(self, kitchen_setup):
-        """
-        :type kitchen_setup: PR2
-        """
-        tip = u'base_footprint'
-        base_pose = PoseStamped()
-        base_pose.header.frame_id = u'map'
-        base_pose.pose.position.x = 0
-        base_pose.pose.position.y = 1.5
-        base_pose.pose.orientation = Quaternion(*quaternion_about_axis(np.pi, [0, 0, 1]))
-        kitchen_setup.teleport_base(base_pose)
-        base_pose = PoseStamped()
-        base_pose.header.frame_id = tip
-        base_pose.pose.position.x = 2.3
-        base_pose.pose.orientation = Quaternion(*quaternion_about_axis(0, [0, 0, 1]))
-
-        avoidance_hint = Vector3Stamped()
-        avoidance_hint.header.frame_id = u'map'
-        avoidance_hint.vector.y = -1
-        kitchen_setup.avoid_all_collisions(0.1)
-        kitchen_setup.set_json_goal(u'CollisionAvoidanceHint',
-                                    link_name=u'base_link',
-                                    max_threshold=0.3,
-                                    spring_threshold=0.35,
-                                    max_linear_velocity=1,
-                                    body_b=u'kitchen',
-                                    link_b=u'kitchen_island',
-                                    weight=WEIGHT_COLLISION_AVOIDANCE,
-                                    avoidance_hint=avoidance_hint)
-        kitchen_setup.set_joint_goal(gaya_pose)
-
-        kitchen_setup.set_and_check_cart_goal(base_pose, tip, weight=WEIGHT_BELOW_CA, linear_velocity=0.5)
 
     def test_drive_into_wall_with_CollisionAvoidanceHint(self, kitchen_setup):
         """

@@ -313,9 +313,9 @@ class Goal(object):
 
         weight = self.normalize_weight(max_velocity, weight)
 
-        self.add_debug_vector(u'r_P_error', r_P_error)
+        # self.add_debug_vector(u'r_P_error', r_P_error)
         # self.add_debug_vector(u'r_P_error/vel', self.get_expr_velocity(r_P_error))
-        self.add_debug_vector(u'trans_error', trans_error)
+        # self.add_debug_vector(u'trans_error', trans_error)
         # self.add_debug_vector(u'trans_error/v', w.norm(self.get_expr_velocity(r_P_error)))
         # self.add_debug_vector(u'trans_error/vel', self.get_expr_velocity(trans_error))
 
@@ -1458,12 +1458,6 @@ class ExternalCollisionAvoidance(Goal):
 
 
 class CollisionAvoidanceHint(Goal):
-    max_velocity_id = u'max_velocity'
-    threshold_id = u'threshold'
-    threshold2_id = u'threshold2'
-    avoidance_hint_id = u'avoidance_hint'
-    weight_id = u'weight'
-
     def __init__(self, god_map, tip_link, avoidance_hint, object_name, object_link_name, max_linear_velocity=0.1,
                  root_link=None,
                  max_threshold=0.05, spring_threshold=None, weight=WEIGHT_ABOVE_CA, **kwargs):
@@ -1481,24 +1475,24 @@ class CollisionAvoidanceHint(Goal):
                                         sprint_threshold to max_threshold linearly, to smooth motions
         :param weight: float, default WEIGHT_ABOVE_CA
         """
-        super(CollisionAvoidanceHint, self).__init__(god_map, **kwargs)
         self.link_name = tip_link
-        if root_link is None:
-            self.root_link = self.get_robot().get_root()
-        else:
-            self.root_link = root_link
-        self.robot_name = self.get_robot_unsafe().get_name()
         self.key = (tip_link, object_name, object_link_name)
         self.body_b = object_name
         self.link_b = object_link_name
         self.body_b_hash = object_name.__hash__()
         self.link_b_hash = object_link_name.__hash__()
+        super(CollisionAvoidanceHint, self).__init__(god_map, **kwargs)
+        if root_link is None:
+            self.root_link = self.get_robot().get_root()
+        else:
+            self.root_link = root_link
 
         if spring_threshold is None:
             spring_threshold = max_threshold
         else:
             spring_threshold = max(spring_threshold, max_threshold)
 
+        # register collision checks TODO make function
         added_checks = self.get_god_map().get_data(identifier.added_collision_checks)
         if tip_link in added_checks:
             added_checks[tip_link] = max(added_checks[tip_link], spring_threshold)
@@ -1506,15 +1500,13 @@ class CollisionAvoidanceHint(Goal):
             added_checks[tip_link] = spring_threshold
         self.get_god_map().set_data(identifier.added_collision_checks, added_checks)
 
-        self.avoidance_hint = self.parse_and_transform_Vector3Stamped(avoidance_hint, self.root_link, normalized=True)
+        self.avoidance_hint = tf.transform_vector(self.root_link, avoidance_hint)
+        self.avoidance_hint.vector = tf.normalize(self.avoidance_hint.vector)
 
-        params = {self.max_velocity_id: max_linear_velocity,
-                  self.threshold_id: max_threshold,
-                  self.threshold2_id: spring_threshold,
-                  self.avoidance_hint_id: self.avoidance_hint,
-                  self.weight_id: weight,
-                  }
-        self.save_params_on_god_map(params)
+        self.max_velocity = max_linear_velocity
+        self.threshold = max_threshold
+        self.threshold2 = spring_threshold
+        self.weight = weight
 
     def get_contact_normal_on_b_in_root(self):
         return Vector3Input(self.god_map.to_symbol,
@@ -1552,11 +1544,11 @@ class CollisionAvoidanceHint(Goal):
                                                                   self.key, u'get_link_b_hash', tuple()])
 
     def make_constraints(self):
-        weight = self.get_input_float(self.weight_id)
+        weight = self.get_parameter_as_symbolic_expression(u'weight')
         actual_distance = self.get_actual_distance()
-        max_velocity = self.get_input_float(self.max_velocity_id)
-        max_threshold = self.get_input_float(self.threshold_id)
-        spring_threshold = self.get_input_float(self.threshold2_id)
+        max_velocity = self.get_parameter_as_symbolic_expression(u'max_velocity')
+        max_threshold = self.get_parameter_as_symbolic_expression(u'threshold')
+        spring_threshold = self.get_parameter_as_symbolic_expression(u'threshold2')
         body_b_hash = self.get_body_b()
         link_b_hash = self.get_link_b()
         actual_distance_capped = w.max(actual_distance, 0)
@@ -1575,7 +1567,7 @@ class CollisionAvoidanceHint(Goal):
         weight = w.if_eq(link_b_hash, self.link_b_hash, weight, 0)
         weight = self.normalize_weight(max_velocity, weight)
 
-        root_V_avoidance_hint = self.get_input_Vector3Stamped(self.avoidance_hint_id)
+        root_V_avoidance_hint = self.get_parameter_as_symbolic_expression(u'avoidance_hint')
 
         # penetration_distance = threshold - actual_distance_capped
         error_capped = self.limit_velocity(max_velocity, max_velocity)
@@ -1583,9 +1575,10 @@ class CollisionAvoidanceHint(Goal):
         root_P_a = w.position_of(root_T_a)
         expr = w.dot(root_V_avoidance_hint[:3].T, root_P_a[:3])
 
-        self.add_constraint(u'/avoidance_hint',
-                            lower_velocity_limit=error_capped,
-                            upper_velocity_limit=error_capped,
+        self.add_constraint(u'avoidance_hint',
+                            reference_velocity=max_velocity,
+                            lower_error=error_capped,
+                            upper_error=error_capped,
                             weight=weight,
                             expression=expr)
 

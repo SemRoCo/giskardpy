@@ -16,7 +16,7 @@ from giskardpy.constraints import SelfCollisionAvoidance, ExternalCollisionAvoid
 from giskardpy.exceptions import UnknownConstraintException, InvalidGoalException, \
     ConstraintInitalizationException, GiskardException
 from giskardpy.utils.logging import loginfo
-from giskardpy.plugins.plugin_action_server import GetGoal
+from giskardpy.tree.plugin_action_server import GetGoal
 from giskardpy.utils.utils import convert_dictionary_to_ros_message
 
 

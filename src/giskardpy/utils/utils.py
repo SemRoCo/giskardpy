@@ -35,7 +35,7 @@ from visualization_msgs.msg import Marker
 
 from giskardpy.utils import logging
 from giskardpy.data_types import SingleJointState
-from giskardpy.plugins.plugin import PluginBehavior
+from giskardpy.tree.plugin import PluginBehavior
 from giskardpy.utils.tfwrapper import kdl_to_pose, np_to_kdl
 
 r = rospkg.RosPack()

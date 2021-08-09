@@ -15,9 +15,9 @@ from visualization_msgs.msg import Marker, MarkerArray
 import giskardpy.identifier as identifier
 from giskardpy.exceptions import CorruptShapeException, UnknownBodyException, \
     UnsupportedOptionException, DuplicateNameException
-from giskardpy.plugins.plugin import GiskardBehavior
+from giskardpy.tree.plugin import GiskardBehavior
 from giskardpy.utils.tfwrapper import transform_pose
-from giskardpy.tree_manager import TreeManager
+from giskardpy.tree.tree_manager import TreeManager
 from giskardpy.utils.utils import to_joint_state_dict, to_joint_state_position_dict, dict_to_joint_states, write_dict, logging
 from giskardpy.model.world_object import WorldObject
 from giskardpy.model.urdf_object import URDFObject

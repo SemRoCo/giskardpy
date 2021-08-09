@@ -10,7 +10,7 @@ from py_trees import Status
 from sensor_msgs.msg import JointState
 
 import giskardpy.identifier as identifier
-from giskardpy.plugins.plugin import GiskardBehavior
+from giskardpy.tree.plugin import GiskardBehavior
 from giskardpy.utils.tfwrapper import lookup_pose
 from giskardpy.utils.utils import to_joint_state_dict
 

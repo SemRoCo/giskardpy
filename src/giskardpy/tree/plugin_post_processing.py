@@ -8,7 +8,7 @@ from giskardpy.exceptions import UnreachableException, MAX_NWSR_REACHEDException
     HardConstraintsViolatedException, PhysicsWorldException, ConstraintException, UnknownConstraintException, \
     ConstraintInitalizationException, PlanningException, ShakingException, ExecutionException, InvalidGoalException, \
     PreemptedException
-from giskardpy.plugins.plugin import GiskardBehavior
+from giskardpy.tree.plugin import GiskardBehavior
 from giskardpy.utils.utils import make_filter_b_mask, logging
 
 

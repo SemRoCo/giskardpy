@@ -4,8 +4,8 @@ from py_trees import Status
 
 from giskardpy import identifier
 from giskardpy.data_types import Trajectory
-from giskardpy.plugins.plugin import GiskardBehavior
-from giskardpy.tree_manager import TreeManager
+from giskardpy.tree.plugin import GiskardBehavior
+from giskardpy.tree.tree_manager import TreeManager
 
 
 class CleanUp(GiskardBehavior):

@@ -5,7 +5,7 @@ from py_trees_ros.actions import ActionClient
 
 import giskardpy.identifier as identifier
 from giskardpy.utils.logging import loginfo
-from giskardpy.plugins.plugin import GiskardBehavior
+from giskardpy.tree.plugin import GiskardBehavior
 from giskardpy.utils.utils import traj_to_msg, logging
 
 

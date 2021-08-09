@@ -8,7 +8,7 @@ from std_srvs.srv import SetBool, SetBoolResponse, SetBoolRequest
 
 import giskardpy.identifier as identifier
 from giskardpy.model import pybullet_wrapper
-from giskardpy.plugins.plugin import GiskardBehavior
+from giskardpy.tree.plugin import GiskardBehavior
 
 
 class CollisionChecker(GiskardBehavior):

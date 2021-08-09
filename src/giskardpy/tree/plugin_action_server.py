@@ -13,7 +13,7 @@ from py_trees import Blackboard, Status
 
 import giskardpy.identifier as identifier
 from giskardpy.exceptions import PreemptedException
-from giskardpy.plugins.plugin import GiskardBehavior
+from giskardpy.tree.plugin import GiskardBehavior
 from giskardpy.utils.utils import traj_to_msg, logging
 
 ERROR_CODE_TO_NAME = {getattr(MoveResult, x): x for x in dir(MoveResult) if x.isupper()}

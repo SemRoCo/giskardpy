@@ -5,9 +5,9 @@ from py_trees import Status
 import giskardpy.identifier as identifier
 from giskardpy.utils import logging
 from giskardpy.exceptions import ShakingException
-from giskardpy.plugins.plugin import GiskardBehavior
+from giskardpy.tree.plugin import GiskardBehavior
 # fast
-from giskardpy.plugins.plugin_goal_reached import make_velocity_threshold
+from giskardpy.tree.plugin_goal_reached import make_velocity_threshold
 
 
 class WiggleCancel(GiskardBehavior):

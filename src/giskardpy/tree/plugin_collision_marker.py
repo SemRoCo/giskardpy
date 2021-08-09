@@ -6,7 +6,7 @@ from visualization_msgs.msg import Marker, MarkerArray
 
 import giskardpy.identifier as identifier
 from giskardpy.data_types import Collision, Collisions
-from giskardpy.plugins.plugin import GiskardBehavior
+from giskardpy.tree.plugin import GiskardBehavior
 
 
 class CollisionMarker(GiskardBehavior):

@@ -1,7 +1,7 @@
 from py_trees import Status
 
 import giskardpy.identifier as identifier
-from giskardpy.plugins.plugin import GiskardBehavior
+from giskardpy.tree.plugin import GiskardBehavior
 from giskardpy.qp_controller import QPController
 
 

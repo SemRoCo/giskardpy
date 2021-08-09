@@ -1,4 +1,4 @@
-from giskardpy.plugins.plugin import PluginBehavior
+from giskardpy.tree.plugin import PluginBehavior
 from giskardpy.utils import logging
 from sortedcontainers import SortedList
 

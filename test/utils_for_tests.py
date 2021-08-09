@@ -259,8 +259,8 @@ class GiskardTestWrapper(GiskardWrapper):
 
         if not ros_load_robot_config(config_file, test=True):
             rospy.logerr('Could not set robot config as ROS parameter.')
-        rospy.set_param('~plugins/PlotDebugTrajectory/enabled', True)
-        rospy.set_param('~plugins/MaxTrajectoryLength/enabled', True)
+        rospy.set_param('~tree/PlotDebugTrajectory/enabled', True)
+        rospy.set_param('~tree/MaxTrajectoryLength/enabled', True)
 
         self.sub_result = rospy.Subscriber('~command/result', MoveActionResult, self.cb, queue_size=100)
         self.cancel_goal = rospy.Publisher('~command/cancel', GoalID, queue_size=100)
@@ -347,7 +347,7 @@ class GiskardTestWrapper(GiskardWrapper):
         rospy.sleep(1)
         logging.loginfo(u'total time spend giskarding: {}'.format(self.total_time_spend_giskarding - self.total_time_spend_moving))
         logging.loginfo(u'total time spend moving: {}'.format(self.total_time_spend_moving))
-        logging.loginfo(u'stopping plugins')
+        logging.loginfo(u'stopping tree')
 
     def set_object_joint_state(self, object_name, joint_state):
         super(GiskardTestWrapper, self).set_object_joint_state(object_name, joint_state)

@@ -4,7 +4,7 @@ from py_trees import Status
 from tf2_msgs.msg import TFMessage
 
 import giskardpy.identifier as identifier
-from giskardpy.plugins.plugin import GiskardBehavior
+from giskardpy.tree.plugin import GiskardBehavior
 from giskardpy.utils.utils import normalize_quaternion_msg
 
 

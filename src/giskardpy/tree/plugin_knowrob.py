@@ -8,7 +8,7 @@ from std_srvs.srv import Trigger, TriggerRequest
 
 from giskardpy import MAP
 from giskardpy.exceptions import CorruptShapeException
-from giskardpy.plugins.plugin import GiskardBehavior
+from giskardpy.tree.plugin import GiskardBehavior
 from giskardpy.utils.tfwrapper import transform_pose
 from giskardpy.model.world_object import WorldObject
 from giskardpy.utils import logging

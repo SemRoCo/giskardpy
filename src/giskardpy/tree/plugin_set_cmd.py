@@ -3,7 +3,7 @@ from py_trees import Status
 import giskardpy.identifier as identifier
 from giskardpy.utils import logging
 from giskardpy.exceptions import InvalidGoalException
-from giskardpy.plugins.plugin_action_server import GetGoal
+from giskardpy.tree.plugin_action_server import GetGoal
 from giskard_msgs.msg import MoveGoal, CollisionEntry, MoveCmd, MoveResult
 
 

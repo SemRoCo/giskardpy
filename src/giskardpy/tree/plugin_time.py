@@ -1,7 +1,7 @@
 from py_trees import Status
 
 from giskardpy import identifier
-from giskardpy.plugins.plugin import GiskardBehavior
+from giskardpy.tree.plugin import GiskardBehavior
 
 
 class TimePlugin(GiskardBehavior):

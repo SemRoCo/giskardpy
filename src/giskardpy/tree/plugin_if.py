@@ -1,6 +1,6 @@
 from py_trees import Status
 
-from giskardpy.plugins.plugin import GiskardBehavior
+from giskardpy.tree.plugin import GiskardBehavior
 
 
 class IF(GiskardBehavior):

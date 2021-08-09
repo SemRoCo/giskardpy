@@ -2,7 +2,7 @@ from py_trees import Status
 
 from giskardpy import identifier
 from giskardpy.utils.logging import logwarn
-from giskardpy.plugins.plugin import GiskardBehavior
+from giskardpy.tree.plugin import GiskardBehavior
 from giskardpy.utils.utils import plot_trajectory
 
 

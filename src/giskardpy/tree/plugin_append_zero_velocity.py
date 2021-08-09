@@ -4,7 +4,7 @@ from py_trees import Status
 
 from giskardpy.data_types import SingleJointState
 import giskardpy.identifier as identifier
-from giskardpy.plugins.plugin import GiskardBehavior
+from giskardpy.tree.plugin import GiskardBehavior
 
 
 class AppendZeroVelocity(GiskardBehavior):

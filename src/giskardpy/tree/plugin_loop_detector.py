@@ -2,7 +2,7 @@ from py_trees import Status
 from time import time
 import giskardpy.identifier as identifier
 from giskardpy.utils import logging
-from giskardpy.plugins.plugin import GiskardBehavior
+from giskardpy.tree.plugin import GiskardBehavior
 
 
 # fast

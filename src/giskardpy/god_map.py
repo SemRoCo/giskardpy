@@ -184,7 +184,7 @@ def get_data(identifier, data, default_value=0.0):
 
 class GodMap(object):
     """
-    Data structure used by plugins to exchange information.
+    Data structure used by tree to exchange information.
     """
 
     def __init__(self, default_value=0.0):

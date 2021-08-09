@@ -4,7 +4,7 @@ import py_trees
 import rospy
 from visualization_msgs.msg import Marker, MarkerArray
 
-from giskardpy.plugins.plugin import GiskardBehavior
+from giskardpy.tree.plugin import GiskardBehavior
 import giskardpy.identifier as identifier
 from giskardpy.utils.tfwrapper import lookup_pose, get_full_frame_name, pose_to_kdl, kdl_to_pose
 

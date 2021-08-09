@@ -4,7 +4,8 @@ import numpy as np
 
 import PyKDL as kdl
 from urdf_parser_py.urdf import Robot
-from giskardpy import logging
+from giskardpy.utils import logging
+
 
 def euler_to_quat(r, p, y):
     sr, sp, sy = np.sin(r/2.0), np.sin(p/2.0), np.sin(y/2.0)
@@ -102,8 +103,8 @@ def main():
             num_non_fixed_joints += 1
     logging.loginfo("URDF non-fixed joints: %d;" % num_non_fixed_joints)
     logging.loginfo("KDL joints: %d" % tree.getNrOfJoints())
-    logging.loginfo("URDF joints: %d; KDL segments: %d" %(len(robot.joint_map),
-                                                tree.getNrOfSegments()))
+    logging.loginfo("URDF joints: %d; KDL segments: %d" % (len(robot.joint_map),
+                                                           tree.getNrOfSegments()))
     import random
     base_link = robot.get_root()
     end_link = robot.link_map.keys()[random.randint(0, len(robot.link_map)-1)]

@@ -8,14 +8,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from giskardpy import logging, casadi_wrapper as w
+from giskardpy import casadi_wrapper as w
 from giskardpy.data_types import FreeVariable, Constraint
 from giskardpy.data_types import VelocityConstraint
 from giskardpy.exceptions import OutOfJointLimitsException, \
     HardConstraintsViolatedException
 from giskardpy.qp_solver import QPSolver
 from giskardpy.qp_solver_gurobi import QPSolverGurobi
-from giskardpy.utils import memoize
+from giskardpy.utils.utils import memoize, logging
 
 
 def save_pandas(dfs, names, path):

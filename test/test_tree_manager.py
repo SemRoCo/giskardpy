@@ -1,6 +1,6 @@
 import pytest
 from py_trees.composites import Sequence, Selector
-from giskardpy.plugin import PluginBehavior
+from giskardpy.plugins.plugin import PluginBehavior
 from py_trees.meta import failure_is_success, success_is_failure
 from py_trees import display, Blackboard
 from py_trees_ros.trees import BehaviourTree
@@ -8,15 +8,15 @@ from py_trees.behaviour import Behaviour
 from py_trees.common import Status
 from giskardpy.tree_manager import TreeManager
 from giskardpy.god_map import GodMap
-from giskardpy import logging
+from giskardpy.utils import logging
 from giskardpy import identifier
 
 import roslaunch
 import rospy
-from giskardpy.tfwrapper import init as tf_init
+from giskardpy.utils.tfwrapper import init as tf_init
 from utils_for_tests import PR2
-from giskardpy.pybullet_wrapper import stop_pybullet
-from giskardpy.plugin import GiskardBehavior
+from giskardpy.model.pybullet_wrapper import stop_pybullet
+from giskardpy.plugins.plugin import GiskardBehavior
 
 
 default_pose = {u'r_elbow_flex_joint': -0.15,

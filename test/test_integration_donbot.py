@@ -8,8 +8,8 @@ from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped, Po
 from giskard_msgs.msg import MoveActionGoal, MoveResult, MoveGoal, CollisionEntry, MoveCmd, JointConstraint, \
     Constraint as Constraint_msg
 from tf.transformations import quaternion_from_matrix, quaternion_about_axis
-from giskardpy import logging
-import giskardpy.tfwrapper as tf
+from giskardpy.utils import logging
+import giskardpy.utils.tfwrapper as tf
 from utils_for_tests import Donbot, compare_poses
 
 # TODO roslaunch iai_donbot_sim ros_control_sim.launch

@@ -7,7 +7,7 @@ import numpy as np
 from casadi import sign, cos, sin, sqrt, atan2, acos
 from numpy import pi
 
-from giskardpy import logging
+from giskardpy.utils import logging
 
 pathSeparator = '_'
 

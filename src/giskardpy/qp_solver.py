@@ -4,7 +4,7 @@ import qpoases
 from qpoases import PyReturnValue
 
 from giskardpy.exceptions import MAX_NWSR_REACHEDException, QPSolverException, InfeasibleException
-from giskardpy import logging
+from giskardpy.utils import logging
 
 
 class QPSolver(object):

@@ -10,7 +10,7 @@ except ImportError:
 import actionlib
 from rospy import AnyMsg
 
-from giskardpy import logging
+from giskardpy.utils import logging
 import copy
 import rostopic
 

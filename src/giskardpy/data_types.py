@@ -3,7 +3,7 @@ from collections import OrderedDict, defaultdict, namedtuple
 import numpy as np
 from sortedcontainers import SortedKeyList
 
-from giskardpy.tfwrapper import kdl_to_np, np_vector, np_point
+from giskardpy.utils.tfwrapper import kdl_to_np, np_vector, np_point
 
 DebugConstraint = namedtuple(u'debug', [u'expr'])
 

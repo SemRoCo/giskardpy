@@ -1,20 +1,19 @@
 
 import giskardpy
 from giskardpy.data_types import SingleJointState
-from giskardpy.tfwrapper import msg_to_kdl, kdl_to_pose
+from giskardpy.utils.tfwrapper import kdl_to_pose
 
 giskardpy.WORLD_IMPLEMENTATION = None
 
 import shutil
-from collections import OrderedDict
 
 import PyKDL
 import pytest
 from urdf_parser_py.urdf import URDF
 
-from giskardpy.robot import Robot
+from giskardpy.model.robot import Robot
 from utils_for_tests import rnd_joint_state, pr2_urdf, donbot_urdf, boxy_urdf, base_bot_urdf, compare_poses
-from giskardpy.urdf_object import hacky_urdf_parser_fix
+from giskardpy.model.urdf_object import hacky_urdf_parser_fix
 from kdl_parser import kdl_tree_from_urdf_model
 import numpy as np
 from hypothesis import given

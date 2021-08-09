@@ -2,8 +2,8 @@ import pytest
 from geometry_msgs.msg import Pose, Point, Quaternion
 
 from giskardpy.exceptions import DuplicateNameException, UnknownBodyException
-from giskardpy.urdf_object import URDFObject
-from giskardpy.utils import make_world_body_box, make_world_body_sphere, make_world_body_cylinder, make_urdf_world_body
+from giskardpy.model.urdf_object import URDFObject
+from giskardpy.utils.utils import make_world_body_box, make_world_body_sphere, make_world_body_cylinder, make_urdf_world_body
 from utils_for_tests import pr2_urdf, donbot_urdf, boxy_urdf, base_bot_urdf
 
 set_of_pr2_joints = {'r_gripper_motor_accelerometer_joint',

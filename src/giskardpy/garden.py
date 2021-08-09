@@ -13,41 +13,41 @@ from py_trees_ros.trees import BehaviourTree
 from rospy import ROSException
 
 import giskardpy.identifier as identifier
-import giskardpy.pybullet_wrapper as pbw
-from giskardpy import logging
+import giskardpy.model.pybullet_wrapper as pbw
 from giskardpy.god_map import GodMap
 from giskardpy.input_system import JointStatesInput
-from giskardpy.plugin import PluginBehavior
-from giskardpy.plugin_action_server import GoalReceived, SendResult, GoalCanceled
-from giskardpy.plugin_append_zero_velocity import AppendZeroVelocity
-from giskardpy.plugin_cleanup import CleanUp
-from giskardpy.plugin_collision_checker import CollisionChecker
-from giskardpy.plugin_collision_marker import CollisionMarker
-from giskardpy.plugin_configuration import ConfigurationPlugin
-from giskardpy.plugin_goal_reached import GoalReachedPlugin
-from giskardpy.plugin_if import IF
-from giskardpy.plugin_instantaneous_controller import ControllerPlugin
-from giskardpy.plugin_max_trajectory_length import MaxTrajectoryLength
-from giskardpy.plugin_wiggle_cancel import WiggleCancel
-from giskardpy.plugin_kinematic_sim import KinSimPlugin
-from giskardpy.plugin_log_debug_expressions import LogDebugExpressionsPlugin
-from giskardpy.plugin_log_trajectory import LogTrajPlugin
-from giskardpy.plugin_loop_detector import LoopDetector
-from giskardpy.plugin_plot_debug_expressions import PlotDebugExpressions
-from giskardpy.plugin_plot_trajectory import PlotTrajectory
-from giskardpy.plugin_post_processing import PostProcessing
-from giskardpy.plugin_pybullet import WorldUpdatePlugin
-from giskardpy.plugin_send_trajectory import SendTrajectory
-from giskardpy.plugin_set_cmd import SetCmd
-from giskardpy.plugin_tf_publisher import TFPublisher
-from giskardpy.plugin_time import TimePlugin
-from giskardpy.plugin_update_constraints import GoalToConstraints
-from giskardpy.plugin_visualization import VisualizationBehavior
-from giskardpy.plugin_world_visualization import WorldVisualizationBehavior
-from giskardpy.pybullet_world import PyBulletWorld
+from giskardpy.plugins.plugin import PluginBehavior
+from giskardpy.plugins.plugin_action_server import GoalReceived, SendResult, GoalCanceled
+from giskardpy.plugins.plugin_append_zero_velocity import AppendZeroVelocity
+from giskardpy.plugins.plugin_cleanup import CleanUp
+from giskardpy.plugins.plugin_collision_checker import CollisionChecker
+from giskardpy.plugins.plugin_collision_marker import CollisionMarker
+from giskardpy.plugins.plugin_configuration import ConfigurationPlugin
+from giskardpy.plugins.plugin_goal_reached import GoalReachedPlugin
+from giskardpy.plugins.plugin_if import IF
+from giskardpy.plugins.plugin_instantaneous_controller import ControllerPlugin
+from giskardpy.plugins.plugin_max_trajectory_length import MaxTrajectoryLength
+from giskardpy.plugins.plugin_wiggle_cancel import WiggleCancel
+from giskardpy.plugins.plugin_kinematic_sim import KinSimPlugin
+from giskardpy.plugins.plugin_log_debug_expressions import LogDebugExpressionsPlugin
+from giskardpy.plugins.plugin_log_trajectory import LogTrajPlugin
+from giskardpy.plugins.plugin_loop_detector import LoopDetector
+from giskardpy.plugins.plugin_plot_debug_expressions import PlotDebugExpressions
+from giskardpy.plugins.plugin_plot_trajectory import PlotTrajectory
+from giskardpy.plugins.plugin_post_processing import PostProcessing
+from giskardpy.plugins.plugin_pybullet import WorldUpdatePlugin
+from giskardpy.plugins.plugin_send_trajectory import SendTrajectory
+from giskardpy.plugins.plugin_set_cmd import SetCmd
+from giskardpy.plugins.plugin_tf_publisher import TFPublisher
+from giskardpy.plugins.plugin_time import TimePlugin
+from giskardpy.plugins.plugin_update_constraints import GoalToConstraints
+from giskardpy.plugins.plugin_visualization import VisualizationBehavior
+from giskardpy.plugins.plugin_world_visualization import WorldVisualizationBehavior
+from giskardpy.model.pybullet_world import PyBulletWorld
 from giskardpy.tree_manager import TreeManager
-from giskardpy.utils import create_path, render_dot_tree, KeyDefaultDict, max_velocity_from_horizon_and_jerk, BiDict
-from giskardpy.world_object import WorldObject
+from giskardpy.utils.utils import create_path, render_dot_tree, KeyDefaultDict, max_velocity_from_horizon_and_jerk, BiDict, \
+    logging
+from giskardpy.model.world_object import WorldObject
 
 # TODO hardcode this somewhere else
 order_map = BiDict({

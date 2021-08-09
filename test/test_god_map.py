@@ -13,8 +13,8 @@ from giskardpy import identifier
 from giskardpy import casadi_wrapper as w
 from giskardpy.god_map import GodMap
 from utils_for_tests import variable_name, keys_values, lists_of_same_length, pr2_urdf
-from giskardpy.world import World
-from giskardpy.world_object import WorldObject
+from giskardpy.model.world import World
+from giskardpy.model.world_object import WorldObject
 
 PKG = u'giskardpy'
 

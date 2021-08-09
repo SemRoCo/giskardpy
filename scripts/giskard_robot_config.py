@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 
 import rospy
-from giskardpy import logging
-from giskardpy.config_loader import load_robot_yaml
+from giskardpy.utils import logging
+from giskardpy.utils.config_loader import load_robot_yaml
 
 
 if __name__ == u'__main__':

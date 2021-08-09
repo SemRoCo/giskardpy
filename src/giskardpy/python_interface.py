@@ -5,7 +5,7 @@ from actionlib import SimpleActionClient
 from genpy import Message
 from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped, PointStamped
 from giskard_msgs.msg import MoveAction, MoveGoal, WorldBody, CollisionEntry, MoveResult, Constraint, \
-    MoveCmd, JointConstraint, CartesianConstraint
+    MoveCmd, JointConstraint
 from giskard_msgs.srv import UpdateWorld, UpdateWorldRequest, UpdateWorldResponse, GetObjectInfo, GetObjectNames, \
     UpdateRvizMarkers, GetAttachedObjects, GetAttachedObjectsResponse, GetObjectNamesResponse
 from sensor_msgs.msg import JointState
@@ -13,8 +13,8 @@ from shape_msgs.msg import SolidPrimitive
 from visualization_msgs.msg import MarkerArray
 
 from giskardpy.constraints import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA
-from giskardpy.urdf_object import URDFObject
-from giskardpy.utils import position_dict_to_joint_states, make_world_body_box, make_world_body_cylinder, \
+from giskardpy.model.urdf_object import URDFObject
+from giskardpy.utils.utils import position_dict_to_joint_states, make_world_body_box, make_world_body_cylinder, \
     convert_ros_message_to_dictionary
 
 

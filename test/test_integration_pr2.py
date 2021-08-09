@@ -8,24 +8,22 @@ import numpy as np
 import pytest
 import roslaunch
 import rospy
-from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped, PointStamped, Transform
-from giskard_msgs.msg import CollisionEntry, MoveActionGoal, MoveResult, WorldBody, MoveGoal, MoveCmd
+from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped, PointStamped
+from giskard_msgs.msg import CollisionEntry, MoveActionGoal, MoveResult, WorldBody, MoveGoal
 from giskard_msgs.srv import UpdateWorldResponse, UpdateWorldRequest
 from numpy import pi
 from sensor_msgs.msg import JointState
 from shape_msgs.msg import SolidPrimitive
 from tf.transformations import quaternion_from_matrix, quaternion_about_axis
 
-import giskardpy.tfwrapper as tf
-from giskardpy import logging, identifier
+import giskardpy.utils.tfwrapper as tf
+from giskardpy import identifier
 from giskardpy.constraints import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA, WEIGHT_COLLISION_AVOIDANCE
 from giskardpy.identifier import fk_pose
-from giskardpy.robot import Robot
-from giskardpy.tfwrapper import init as tf_init
-from giskardpy.utils import to_joint_state_position_dict, publish_marker_vector
-from rospy_message_converter.message_converter import convert_dictionary_to_ros_message
+from giskardpy.model.robot import Robot
+from giskardpy.utils.tfwrapper import init as tf_init
+from giskardpy.utils.utils import to_joint_state_position_dict, publish_marker_vector, logging
 from utils_for_tests import PR2, compare_poses, compare_points, compare_orientations
-from iai_naive_kinematics_sim.srv import UpdateTransform
 
 # TODO roslaunch iai_pr2_sim ros_control_sim_with_base.launch
 # TODO roslaunch iai_kitchen upload_kitchen_obj.launch

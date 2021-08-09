@@ -10,7 +10,7 @@ from geometry_msgs.msg import Vector3Stamped, PoseStamped, PointStamped
 from giskard_msgs.msg import Constraint as Constraint_msg
 
 import giskardpy.identifier as identifier
-import giskardpy.tfwrapper as tf
+import giskardpy.utils.tfwrapper as tf
 from giskardpy import casadi_wrapper as w
 from giskardpy.data_types import Constraint, VelocityConstraint
 from giskardpy.exceptions import GiskardException, ConstraintException
@@ -18,7 +18,7 @@ from giskardpy.input_system import \
     PoseStampedInput, Point3Input, Vector3Input, \
     Vector3StampedInput, FrameInput, \
     PointStampedInput, TranslationInput
-from giskardpy.logging import logwarn
+from giskardpy.utils.logging import logwarn
 
 WEIGHT_MAX = Constraint_msg.WEIGHT_MAX
 WEIGHT_ABOVE_CA = 2500  # Constraint_msg.WEIGHT_ABOVE_CA
@@ -1154,47 +1154,6 @@ class CartesianVelocityLimit(Goal):
     def __str__(self):
         s = super(CartesianVelocityLimit, self).__str__()
         return u'{}/{}/{}'.format(s, self.root_link, self.tip_link)
-
-
-# class CartesianPositionX(BasicCartesianConstraint):
-# FIXME
-#     def make_constraints(self):
-#         goal_position = w.position_of(self.get_goal_pose())
-#         weight = self.get_input_float(self.weight)
-#         max_velocity = self.get_input_float(self.max_velocity)
-#         t = self.get_input_sampling_period()
-#
-#         current_position = w.position_of(self.get_fk(self.root, self.tip))
-#
-#         trans_error_vector = goal_position - current_position
-#         trans_error = w.norm(trans_error_vector)
-#         trans_scale = w.Min(trans_error, max_velocity * t)
-#         trans_control = w.save_division(trans_error_vector, trans_error) * trans_scale
-#
-#         self.add_constraint(u'x', lower=trans_control[0],
-#                             upper=trans_control[0],
-#                             weight=weight,
-#                             expression=current_position[0])
-#
-#
-# class CartesianPositionY(BasicCartesianConstraint):
-#     def make_constraints(self):
-#         goal_position = w.position_of(self.get_goal_pose())
-#         weight = self.get_input_float(self.weight)
-#         max_velocity = self.get_input_float(self.max_velocity)
-#         t = self.get_input_sampling_period()
-#
-#         current_position = w.position_of(self.get_fk(self.root, self.tip))
-#
-#         trans_error_vector = goal_position - current_position
-#         trans_error = w.norm(trans_error_vector)
-#         trans_scale = w.Min(trans_error, max_velocity * t)
-#         trans_control = w.save_division(trans_error_vector, trans_error) * trans_scale
-#
-#         self.add_constraint(u'y', lower=trans_control[1],
-#                             upper=trans_control[1],
-#                             weight=weight,
-#                             expression=current_position[1])
 
 
 class CartesianOrientation(BasicCartesianGoal):

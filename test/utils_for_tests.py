@@ -1,6 +1,5 @@
 from time import time
 import keyword
-import yaml
 from collections import defaultdict
 from copy import deepcopy
 from multiprocessing import Queue
@@ -23,16 +22,16 @@ from py_trees import Blackboard
 from sensor_msgs.msg import JointState
 from tf.transformations import rotation_from_matrix, quaternion_matrix
 
-from giskardpy import logging, identifier
-from giskardpy.config_loader import ros_load_robot_config
+from giskardpy import identifier
+from giskardpy.utils.config_loader import ros_load_robot_config
 from giskardpy.garden import grow_tree
 from giskardpy.identifier import robot, world
-from giskardpy.pybullet_world import PyBulletWorld
+from giskardpy.model.pybullet_world import PyBulletWorld
 from giskardpy.python_interface import GiskardWrapper
-from giskardpy.robot import Robot
-from giskardpy.tfwrapper import transform_pose, lookup_pose
-from giskardpy.utils import msg_to_list, KeyDefaultDict, position_dict_to_joint_states, get_ros_pkg_path, \
-    to_joint_state_position_dict
+from giskardpy.model.robot import Robot
+from giskardpy.utils.tfwrapper import transform_pose, lookup_pose
+from giskardpy.utils.utils import msg_to_list, KeyDefaultDict, position_dict_to_joint_states, to_joint_state_position_dict, \
+    logging
 
 BIG_NUMBER = 1e100
 SMALL_NUMBER = 1e-100
@@ -346,7 +345,7 @@ class GiskardTestWrapper(GiskardWrapper):
 
     def tear_down(self):
         rospy.sleep(1)
-        logging.loginfo(u'total time spend giskarding: {}'.format(self.total_time_spend_giskarding-self.total_time_spend_moving))
+        logging.loginfo(u'total time spend giskarding: {}'.format(self.total_time_spend_giskarding - self.total_time_spend_moving))
         logging.loginfo(u'total time spend moving: {}'.format(self.total_time_spend_moving))
         logging.loginfo(u'stopping plugins')
 

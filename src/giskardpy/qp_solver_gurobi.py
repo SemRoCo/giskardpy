@@ -3,7 +3,7 @@ import gurobipy
 from scipy import sparse
 
 from giskardpy.exceptions import QPSolverException, InfeasibleException
-from giskardpy import logging
+from giskardpy.utils import logging
 from giskardpy.qp_solver import QPSolver
 
 gurobipy.setParam('LogToConsole', False)

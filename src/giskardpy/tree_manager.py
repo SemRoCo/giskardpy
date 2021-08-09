@@ -1,5 +1,5 @@
-from giskardpy.plugin import PluginBehavior
-from giskardpy import logging
+from giskardpy.plugins.plugin import PluginBehavior
+from giskardpy.utils import logging
 from sortedcontainers import SortedList
 
 class TreeManager(object):

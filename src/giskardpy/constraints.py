@@ -199,13 +199,9 @@ class Goal(object):
                           prefix=self.get_identifier() + [name]).get_frame()
 
     def get_expr_velocity(self, expr):
-        expr_jacobian = w.jacobian(expr, self.get_robot().get_joint_position_symbols())
-        last_velocities = w.Matrix(self.get_robot().get_joint_velocity_symbols())
-        velocity = w.dot(expr_jacobian, last_velocities)
-        if velocity.shape[0] * velocity.shape[0] == 1:
-            return velocity[0]
-        else:
-            return velocity
+        return w.total_derivative(expr,
+                                  self.get_robot().get_joint_position_symbols(),
+                                  self.get_robot().get_joint_velocity_symbols())
 
     def get_fk_velocity(self, root, tip):
         r_T_t = self.get_fk(root, tip)
@@ -1424,6 +1420,7 @@ class ExternalCollisionAvoidance(Goal):
 
         # undo factor in A
         upper_slack /= (sample_period * self.prediction_horizon)
+        # upper_slack *= 10
 
         upper_slack = w.if_greater(actual_distance, 50,  # assuming that distance of unchecked closest points is 100
                                    1e4,

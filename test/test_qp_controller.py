@@ -131,18 +131,19 @@ class TwoJointSetup(object):
         self.qp = QPController(self.god_map.to_symbol(['sample_period']), self.prediction_horizon, 'gurobi',
                                [self.jc, self.jc2])
 
-    def simulate(self, symbols_to_plot=None, time_limit=6., min_time=1., file_name='', save=False):
+    def simulate(self, things_to_plot=None, time_limit=6., min_time=1., file_name='', save=False,
+                 hlines=None):
         self.qp.compile()
         trajectories = {}
-        if symbols_to_plot is not None:
-            for s in symbols_to_plot:
+        if things_to_plot is not None:
+            for s in things_to_plot:
                 trajectories[s] = []
             trajectories['time'] = []
 
         for t in range(int(1 / self.sample_period * time_limit)):
             self.god_map.set_data(['time'], t)
             subs = self.god_map.get_values(self.qp.compiled_big_ass_M.str_params)
-            [cmd_vel, cmd_acc, cmd_jerk], _ = self.qp.get_cmd(subs)
+            [cmd_vel, cmd_acc, cmd_jerk], debug_expr = self.qp.get_cmd(subs)
             for i, (free_variable, cmd) in enumerate(cmd_vel.items()):
                 current = self.god_map.get_data([free_variable])
                 self.god_map.set_data([free_variable], current + cmd * self.god_map.get_data(['sample_period']))
@@ -158,17 +159,19 @@ class TwoJointSetup(object):
                 free_variable += '_j'
                 self.god_map.set_data([free_variable], cmd)
             for s in trajectories:
-                trajectories[s].append(self.god_map.get_data([s]))
+                try:
+                    trajectories[s].append(self.god_map.get_data([s]))
+                except KeyError:
+                    trajectories[s].append(debug_expr[s])
             if all_zero and t > min_time:
                 break
 
-        if symbols_to_plot:
-            f, axs = plt.subplots(len(symbols_to_plot), sharex=True)
+        if things_to_plot:
+            f, axs = plt.subplots(len(things_to_plot), sharex=True)
             f.set_size_inches(w=7, h=9)
             time = trajectories['time']
-            for i, (s, traj) in enumerate(trajectories.items()):
-                if s == 'time':
-                    continue
+            for i, (s) in enumerate(things_to_plot):
+                traj = trajectories[s]
                 axs[i].set_ylabel(s)
                 axs[i].plot(np.array(time) * self.sample_period, traj)
                 ticks = [0]
@@ -185,6 +188,9 @@ class TwoJointSetup(object):
                         ticks.append(max_ / 2)
                 axs[i].set_yticks(ticks)
                 axs[i].grid()
+            if hlines:
+                for h in hlines:
+                    axs[0].axhline(h)
             plt.title(file_name)
             plt.tight_layout()
             if save:
@@ -195,10 +201,10 @@ class TwoJointSetup(object):
         return trajectories
 
 
-@given(float_no_nan_no_inf(outer_limit=1.5),
-       float_no_nan_no_inf(outer_limit=1.5),
-       hypothesis.strategies.booleans())
-def test_collision_avoidance(j_start, j_goal, above):
+# @given(float_no_nan_no_inf(outer_limit=1.5),
+#        float_no_nan_no_inf(outer_limit=1.5),
+#        hypothesis.strategies.booleans())
+def test_collision_avoidance(j_start=1, j_goal=0, above=True):
     tjs = TwoJointSetup(j_start=j_start, j_vel_limit=0.7)
     if above:
         weight = WEIGHT_ABOVE_CA
@@ -258,8 +264,9 @@ def test_collision_avoidance(j_start, j_goal, above):
     tjs.qp.add_constraints(constraints)
 
     tjs.simulate(
-        # symbols_to_plot=['j', 'j_v'],
-        time_limit=5
+        things_to_plot=['j', 'j_v'],
+        hlines=[hard_threshold, soft_threshold],
+        time_limit=5,
     )
     if above:
         if j_goal < soft_threshold:
@@ -273,6 +280,85 @@ def test_collision_avoidance(j_start, j_goal, above):
                                                tjs.god_map.get_data(['goal']), decimal=2)
     else:
         assert tjs.god_map.get_data(['j']) > soft_threshold * 0.95
+
+def test_collision_avoidance2():
+    j_goal = 0
+    j_start = 1
+    tjs = TwoJointSetup(j_start=j_start, j_vel_limit=0.7)
+    weight = WEIGHT_ABOVE_CA
+    ca_vel_limit = 0.2
+
+    tjs.god_map.set_data(['goal'], j_goal)
+    goal_s = tjs.god_map.to_symbol(['goal'])
+    t = tjs.god_map.to_symbol(['time'])*0.05
+    j = tjs.god_map.to_symbol(['j'])
+    j_v = tjs.god_map.to_symbol(['j_v'])
+
+    hard_threshold1 = 0.
+    hard_threshold2 = 0.5
+    # hard_threshold = w.if_greater(t, 1, hard_threshold2, hard_threshold1)
+    hard_threshold = hard_threshold2
+    soft_threshold = hard_threshold + 0.05
+    qp_limits_for_lba = ca_vel_limit * tjs.sample_period * tjs.control_horizon
+
+    actual_distance = j
+    penetration_distance = soft_threshold - actual_distance
+    lower_limit = penetration_distance
+
+    lower_limit_limited = w.limit(lower_limit,
+                                  -qp_limits_for_lba,
+                                  qp_limits_for_lba)
+
+    upper_slack = w.if_greater(actual_distance, hard_threshold,
+                               w.limit(soft_threshold - hard_threshold,
+                                       -qp_limits_for_lba,
+                                       qp_limits_for_lba),
+                               lower_limit_limited)
+
+    # undo factor in A
+    upper_slack /= (tjs.sample_period * tjs.prediction_horizon)
+
+    upper_slack = w.if_greater(actual_distance, 50,  # assuming that distance of unchecked closest points is 100
+                               1e4,
+                               # 1e4,
+                               w.max(0, upper_slack))
+
+    error = goal_s - j
+
+    constraints = [
+        Constraint('j1 goal',
+                   expression=j,
+                   lower_error=error,
+                   upper_error=error,
+                   velocity_limit=tjs.j_vel_limit,
+                   quadratic_weight=weight,
+                   control_horizon=tjs.control_horizon),
+        Constraint('ca',
+                   expression=actual_distance,
+                   lower_error=lower_limit,
+                   upper_error=1e4,
+                   velocity_limit=ca_vel_limit,
+                   quadratic_weight=WEIGHT_COLLISION_AVOIDANCE,
+                   control_horizon=tjs.control_horizon,
+                   upper_slack_limit=upper_slack),
+    ]
+    tjs.qp.add_constraints(constraints)
+    tjs.qp.add_debug_expressions(
+        {
+            'hard_threshold': hard_threshold,
+            'dist_dot': dist_dot,
+         }
+    )
+
+    tjs.simulate(
+        things_to_plot=['j', 'j_v', 'hard_threshold', 'dist_dot'],
+        time_limit=5,
+        hlines=[j_start, hard_threshold2]
+    )
+    assert tjs.god_map.get_data(['j']) >= hard_threshold2
+    if abs(j_goal - hard_threshold2) > 0.05 and j_goal > hard_threshold2:
+        np.testing.assert_almost_equal(tjs.god_map.get_data(['j']),
+                                       tjs.god_map.get_data(['goal']), decimal=2)
 
 def test_joint_goal2():
     j1_vel = 1
@@ -435,7 +521,7 @@ def test_joint_goal_vel_limit():
     tjs.qp.add_velocity_constraints(vel_constraints)
 
     traj = tjs.simulate(
-        symbols_to_plot=['j', 'j_v', 'j_a', 'j_j'],
+        things_to_plot=['j', 'j_v', 'j_a', 'j_j'],
         time_limit=10
     )
     current = tjs.god_map.get_data(['j'])
@@ -544,6 +630,46 @@ def test_joint_goal_control_horizon(prediction_horizon):
     current = tjs.god_map.get_data(['j'])
     goal = tjs.god_map.get_data(['goal'])
     np.testing.assert_almost_equal(current, goal, decimal=3)
+
+def test_joint_goal_opposing():
+    tjs = TwoJointSetup(j_acc_limit=999,
+                        j_jerk_limit=999)
+
+    tjs.god_map.set_data(['goal'], 1)
+    goal_s = tjs.god_map.to_symbol(['goal'])
+    tjs.god_map.set_data(['goal2'], -1)
+    goal2_s = tjs.god_map.to_symbol(['goal2'])
+    j = tjs.god_map.to_symbol(['j'])
+
+    error = goal_s - j
+    error2 = goal2_s - j
+
+    constraints = [
+        Constraint('j1 goal',
+                   expression=j,
+                   lower_error=error,
+                   upper_error=error,
+                   velocity_limit=tjs.j_vel_limit,
+                   quadratic_weight=WEIGHT_BELOW_CA,
+                   control_horizon=tjs.control_horizon),
+        Constraint('j2 goal',
+                   expression=j,
+                   lower_error=error2,
+                   upper_error=error2,
+                   velocity_limit=tjs.j_vel_limit,
+                   quadratic_weight=WEIGHT_BELOW_CA,
+                   control_horizon=1),
+    ]
+    tjs.qp.add_constraints(constraints)
+
+    tjs.simulate(
+        things_to_plot=['j', 'j_v', 'j_a', 'j_j'],
+        time_limit=10
+    )
+    current = tjs.god_map.get_data(['j'])
+    goal = tjs.god_map.get_data(['goal'])
+    goal2 = tjs.god_map.get_data(['goal2'])
+    np.testing.assert_almost_equal(current, (goal+goal2)/2, decimal=3)
 
 
 def test_fk():

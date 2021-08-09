@@ -754,7 +754,7 @@ class QPController(object):
         :param substitutions:
         :type substitutions: list
         :return: joint name -> joint command
-        :rtype: dict
+        :rtype: [list, dict]
         """
         np_big_ass_M = self.compiled_big_ass_M.call2(substitutions)
         self.np_weights = np_big_ass_M[self.A.height, :-2]
@@ -848,7 +848,7 @@ class QPController(object):
             logging.loginfo('start position not found in state')
             start_pos = 0
         ts = np.array([(i + 1) * sample_period for i in range(self.prediction_horizon)])
-        filtered_x = self.p_xdot.filter(like='/{}/'.format(joint_name), axis=0)
+        filtered_x = self.p_xdot.filter(like='{}'.format(joint_name), axis=0)
         velocities = filtered_x[:self.prediction_horizon].values
         if joint_name in self.state:
             accelerations = filtered_x[self.prediction_horizon:self.prediction_horizon * 2].values
@@ -940,9 +940,10 @@ class QPController(object):
 
         # self._viz_mpc('j2')
         # self._viz_mpc(self.p_xdot, 'world_robot_joint_state_r_shoulder_lift_joint_position', state)
-        # self._viz_mpc(self.p_Ax2, bA_names[-1][:-2], state)
+        # self._viz_mpc(self.p_Ax_without_slack, bA_names[-91][:-2], state)
         # p_lbA[p_lbA != 0].abs().sort_values(by='data')
         # get non 0 A entries
         # p_A.iloc[[1133]].T.loc[p_A.values[1133] != 0]
         # self.save_all_pandas()
+        # self._viz_mpc(bA_names[-1])
         pass

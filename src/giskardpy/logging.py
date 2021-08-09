@@ -35,6 +35,8 @@ def generate_msg(msg):
     else:
         node_name = rospy.get_name()
         new_msg = '[{}]: {}'.format(node_name, msg)
+        if node_name == u'/unnamed':
+            print(new_msg)
         return new_msg
 
 @profile

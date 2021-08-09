@@ -840,7 +840,7 @@ class QPController(object):
         upper_violations = ub < self.xdot_full
         lower_violations = lb > self.xdot_full
         if np.any(upper_violations) or np.any(lower_violations):
-            weights[upper_violations | lower_violations][-num_of_slack:] *= self.retry_weight_factor
+            weights[upper_violations | lower_violations] *= self.retry_weight_factor
             self.xdot_full = self.qp_solver.solve(weights, g, A, lb_relaxed, ub_relaxed, lbA, ubA)
             return True
         return False

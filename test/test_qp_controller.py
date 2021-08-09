@@ -1,10 +1,9 @@
-import hypothesis.strategies as st
 # from mpl_toolkits import mplot3d
 import hypothesis.strategies
-from hypothesis import given, assume
-from mpl_toolkits import mplot3d
+import hypothesis.strategies as st
 import matplotlib.pyplot as plt
 import numpy as np
+from hypothesis import given, assume
 
 import giskardpy.casadi_wrapper as w
 from giskardpy.constraints import WEIGHT_COLLISION_AVOIDANCE, WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
@@ -201,10 +200,10 @@ class TwoJointSetup(object):
         return trajectories
 
 
-# @given(float_no_nan_no_inf(outer_limit=1.5),
-#        float_no_nan_no_inf(outer_limit=1.5),
-#        hypothesis.strategies.booleans())
-def test_collision_avoidance(j_start=1, j_goal=0, above=True):
+@given(float_no_nan_no_inf(outer_limit=1.5),
+       float_no_nan_no_inf(outer_limit=1.5),
+       hypothesis.strategies.booleans())
+def test_collision_avoidance(j_start, j_goal, above):
     tjs = TwoJointSetup(j_start=j_start, j_vel_limit=0.7)
     if above:
         weight = WEIGHT_ABOVE_CA
@@ -264,8 +263,8 @@ def test_collision_avoidance(j_start=1, j_goal=0, above=True):
     tjs.qp.add_constraints(constraints)
 
     tjs.simulate(
-        things_to_plot=['j', 'j_v'],
-        hlines=[hard_threshold, soft_threshold],
+        # things_to_plot=['j', 'j_v'],
+        # hlines=[hard_threshold, soft_threshold],
         time_limit=5,
     )
     if above:
@@ -281,6 +280,7 @@ def test_collision_avoidance(j_start=1, j_goal=0, above=True):
     else:
         assert tjs.god_map.get_data(['j']) > soft_threshold * 0.95
 
+
 def test_collision_avoidance2():
     j_goal = 0
     j_start = 1
@@ -290,7 +290,7 @@ def test_collision_avoidance2():
 
     tjs.god_map.set_data(['goal'], j_goal)
     goal_s = tjs.god_map.to_symbol(['goal'])
-    t = tjs.god_map.to_symbol(['time'])*0.05
+    t = tjs.god_map.to_symbol(['time']) * 0.05
     j = tjs.god_map.to_symbol(['j'])
     j_v = tjs.god_map.to_symbol(['j_v'])
 
@@ -346,143 +346,18 @@ def test_collision_avoidance2():
     tjs.qp.add_debug_expressions(
         {
             'hard_threshold': hard_threshold,
-         }
+        }
     )
 
     tjs.simulate(
-        things_to_plot=['j', 'j_v', 'j_j', 'hard_threshold'],
+        # things_to_plot=['j', 'j_v', 'j_j', 'hard_threshold'],
+        # hlines=[j_start, hard_threshold2],
         time_limit=5,
-        hlines=[j_start, hard_threshold2]
     )
-    assert tjs.god_map.get_data(['j']) >= hard_threshold2/2
+    assert tjs.god_map.get_data(['j']) >= hard_threshold2 / 2
     if abs(j_goal - hard_threshold2) > 0.05 and j_goal > hard_threshold2:
         np.testing.assert_almost_equal(tjs.god_map.get_data(['j']),
                                        tjs.god_map.get_data(['goal']), decimal=2)
-
-def test_joint_goal2():
-    j1_vel = 1
-    j2_vel = 1
-    # asdf = [0, 0.0001, 0.001, 0.01, 0.1, 1]
-    # asdf = [0, 0.0001, 0.0005, 0.001, 0.005, 0.01, 0.05, 0.1]
-    # asdf_v = [0.0001, 0.0005, 0.001, 0.005, 0.01]
-    resolution = 10
-    v_min = 0.0001
-    v_max = 0.02
-    # asdf_v = np.arange(v_min, v_max, (v_max - v_min) / resolution)
-    asdf_v = [1e-3]
-
-    resolution = 5
-    h_min = 0.1
-    h_max = 1.5
-    # asdf_h = np.arange(h_min, h_max, (h_max - h_min) / resolution)
-    asdf_h = [1e-1]
-
-    resolution = 10
-    j_min = 0.0001
-    j_max = 0.02
-    # asdf_j = np.arange(j_min, j_max, (j_max - j_min) / resolution)
-    asdf_j = [1e-3]
-
-    results = []
-    final = len(asdf_h) * len(asdf_v) * len(asdf_j)
-    counter = 0
-    for h_counter, h_i in enumerate(asdf_h):
-        for v_counter, v_i in enumerate(asdf_v):
-            for j_counter, j_i in enumerate(asdf_j):
-                counter += 1
-                print('{}/{}'.format(counter, final))
-                ph = 10
-                ch = ph - 2
-                if h_i == 0 and v_i == 0 and j_i == 0:
-                    continue
-                # hf = lambda w, t: w
-                # start_v = 0.005
-                # a_v = (v_i - start_v) / (ch)
-                # hf = lambda w, t: start_v + a_v * t
-
-                # start = j_i * h_i
-                # a = (j_i - start) / (ch)
-                # hfj = lambda w, t: start + a * t
-                # hfj = lambda w, t: w
-                sample_period = 0.05
-                qp, j, j2, state = two_joint_setup(sample_period, ph,
-                                                   hf={
-                                                       1: h_i,
-                                                       3: 1,
-                                                   },
-                                                   joint_weight={
-                                                       1: v_i,
-                                                       2: 0.0,
-                                                       3: j_i,
-                                                   })
-
-                goal_s, goal2_s = w.var('goal goal2')
-                goal1 = -0.5
-                goal2 = 1.2
-                state['goal'] = goal1
-                state['goal2'] = goal2
-
-                error = goal_s - j
-                error2 = goal2_s - j2
-
-                constraints = [
-                    Constraint('j1 goal',
-                               expression=j,
-                               lower_error=error,
-                               upper_error=error,
-                               velocity_limit=1,
-                               quadratic_weight=1,
-                               control_horizon=ph - 2),
-                    Constraint('j2 goal',
-                               expression=j2,
-                               lower_error=error2,
-                               upper_error=error2,
-                               velocity_limit=1,
-                               quadratic_weight=1,
-                               control_horizon=ph - 2),
-                ]
-                vel_constraints = [
-                    VelocityConstraint('j1 goal vel',
-                                       expression=j,
-                                       lower_velocity_limit=-j1_vel,
-                                       upper_velocity_limit=j1_vel,
-                                       quadratic_weight=100,
-                                       control_horizon=ph - 2),
-                    VelocityConstraint('j2 goal vel',
-                                       expression=j2,
-                                       lower_velocity_limit=-j2_vel,
-                                       upper_velocity_limit=j2_vel,
-                                       quadratic_weight=100,
-                                       lower_slack_limit=0,
-                                       upper_slack_limit=0,
-                                       control_horizon=ph - 2),
-                ]
-                qp.add_constraints(constraints)
-                # qp.add_velocity_constraints(vel_constraints)
-                qp.compile()
-
-                final_state, traj = simulate(state, qp, sample_period,
-                                             time_limit=8,
-                                             name='h_{}-v_{}-j_{}'.format(h_i, v_i, j_i),
-                                             # print_traj=False,
-                                             print_traj=True,
-                                             save=False)
-                l = len(traj[0][0])
-                results.append([h_i, v_i, j_i, l])
-                pass
-                # np.testing.assert_almost_equal(final_state['j'], goal1, decimal=4)
-                # np.testing.assert_almost_equal(final_state['j2'], goal2, decimal=4)
-    fig = plt.figure(figsize=[16, 8])
-    ax = fig.add_subplot(1, 2, 1, projection='3d')
-    results = np.array(results)
-    ax.scatter(results[:, 0], results[:, 1], results[:, 2], c=results[:, 3], s=20)
-    minmax = np.array(list(sorted(results, key=lambda x: x[3])))
-    print(minmax)
-    ax.set_xlabel('h')
-    ax.set_ylabel('v')
-    ax.set_zlabel('j')
-    plt.show()
-    pass
 
 
 def test_joint_goal_vel_limit():
@@ -569,6 +444,7 @@ def test_joint_goal(j_upos_limit, j_lpos_limit, goal):
     if goal < j_upos_limit and goal > j_lpos_limit:
         np.testing.assert_almost_equal(current, goal, decimal=3)
 
+
 def test_joint_goal_continuous():
     tjs = TwoJointSetup(j_upos_limit=None,
                         j_lpos_limit=None)
@@ -630,6 +506,7 @@ def test_joint_goal_control_horizon(prediction_horizon):
     goal = tjs.god_map.get_data(['goal'])
     np.testing.assert_almost_equal(current, goal, decimal=3)
 
+
 def test_joint_goal_opposing():
     tjs = TwoJointSetup(j_acc_limit=999,
                         j_jerk_limit=999)
@@ -662,91 +539,87 @@ def test_joint_goal_opposing():
     tjs.qp.add_constraints(constraints)
 
     tjs.simulate(
-        things_to_plot=['j', 'j_v', 'j_a', 'j_j'],
+        # things_to_plot=['j', 'j_v', 'j_a', 'j_j'],
         time_limit=10
     )
     current = tjs.god_map.get_data(['j'])
     goal = tjs.god_map.get_data(['goal'])
     goal2 = tjs.god_map.get_data(['goal2'])
-    np.testing.assert_almost_equal(current, (goal+goal2)/2, decimal=3)
+    np.testing.assert_almost_equal(current, (goal + goal2) / 2, decimal=3)
 
 
 def test_fk():
-    ph = 10
-    ch = 10
-    time_limit = 8
-    sample_period = 0.05
-    qp, j, j2, state = two_joint_setup(sample_period, ph, upos_limit=None, lpos_limit=None,
-                                       j2_start=0.01, j_start=0.01, jerk_limit=50)
+    tjs = TwoJointSetup(j_upos_limit=None,
+                        j_lpos_limit=None,
+                        j2_upos_limit=None,
+                        j2_lpos_limit=None)
+
+    tjs.god_map.set_data(['gx'], 1)
+    gx = tjs.god_map.to_symbol(['gx'])
+
+    tjs.god_map.set_data(['gy'], -1)
+    gy = tjs.god_map.to_symbol(['gy'])
+
+    j = tjs.god_map.to_symbol(['j'])
+    j2 = tjs.god_map.to_symbol(['j2'])
+    j_v = tjs.god_map.to_symbol(['j_v'])
+    j2_v = tjs.god_map.to_symbol(['j2_v'])
 
     fk = w.Matrix([
         w.sin(j) + w.sin(j + j2),
         w.cos(j) + w.cos(j + j2)
     ])
-    gx, gy = w.var('gx gy')
 
     ex = gx - fk[0]
     ey = gy - fk[1]
-    state['gx'] = 1.5
-    state['gy'] = -1
     c_max_vel = 0.5
     vel = 0.5
-    error_weight = 1
+    trans_vel = w.norm(fk)
     constraints = [
         Constraint('x',
                    expression=fk[0],
                    lower_error=ex,
                    upper_error=ex,
                    velocity_limit=c_max_vel,
-                   quadratic_weight=error_weight,
-                   control_horizon=ch),
+                   quadratic_weight=WEIGHT_BELOW_CA,
+                   control_horizon=tjs.control_horizon),
         Constraint('y',
                    expression=fk[1],
                    lower_error=ey,
                    upper_error=ey,
                    velocity_limit=c_max_vel,
-                   quadratic_weight=1000,
-                   control_horizon=ch),
+                   quadratic_weight=WEIGHT_BELOW_CA,
+                   control_horizon=tjs.control_horizon),
     ]
     vel_constraints = [
         VelocityConstraint('trans vel',
-                           expression=j,
+                           expression=trans_vel,
                            lower_velocity_limit=-vel,
                            upper_velocity_limit=vel,
                            quadratic_weight=1,
-                           control_horizon=ph - 2,
+                           control_horizon=tjs.control_horizon,
                            lower_slack_limit=0,
                            upper_slack_limit=0),
     ]
-    qp.add_constraints(constraints)
-    qp.add_velocity_constraints(vel_constraints)
-    qp.compile()
+    tjs.qp.add_constraints(constraints)
+    tjs.qp.add_velocity_constraints(vel_constraints)
+    tjs.qp.add_debug_expressions(
+        {
+            'fk/x': fk[0],
+            'fk/y': fk[1],
+            'fk/x/dot': w.total_derivative(fk[0], [j, j2], [j_v, j2_v]),
+            'fk/y/dot': w.total_derivative(fk[1], [j, j2], [j_v, j2_v]),
+            'cart_vel': w.total_derivative(trans_vel, [j, j2], [j_v, j2_v]),
+        }
+    )
 
-    final_state, traj = simulate(state, qp, sample_period, True, time_limit=time_limit)
+    traj = tjs.simulate(
+        things_to_plot=['j', 'j_v', 'j2', 'j2_v', 'fk/x', 'fk/x/dot', 'fk/y', 'fk/y/dot', 'cart_vel'],
+        time_limit=10
+    )
 
-    def compute_fk(joint1, joint2):
-        final_state = w.ca.substitute(w.ca.substitute(fk, j, joint1), j2, joint2)
-        return float(final_state[0]), float(final_state[1])
-
-    cart_x = np.array([compute_fk(j1, j2)[0] for [j1, j2] in zip(*traj[0])])
-    cart_x_vel = np.diff(cart_x) / sample_period
-    cart_y = np.array([compute_fk(j1, j2)[1] for [j1, j2] in zip(*traj[0])])
-    cart_y_vel = np.diff(cart_y) / sample_period
-    fig, ax = plt.subplots(4, 1, figsize=(5, 5), sharex=True)
-    ax[0].plot(cart_x)
-    ax[0].grid()
-    ax[1].plot(cart_x_vel)
-    ax[1].set_yticks([-c_max_vel, 0, c_max_vel])
-    ax[1].grid()
-    ax[2].plot(cart_y)
-    ax[2].grid()
-    ax[3].plot(cart_y_vel)
-    ax[3].set_yticks([-c_max_vel, 0, c_max_vel])
-    ax[3].grid()
-    plt.tight_layout()
-    plt.show()
-
-    fig, ax1 = plt.subplots(1, 1, figsize=(5, 5))
+    cart_x = traj['fk/x']
+    cart_y = traj['fk/y']
 
     plt.plot(cart_x, cart_y, 'C3', lw=3)
     # plt.scatter(cart_x, cart_y, s=120)
@@ -758,112 +631,12 @@ def test_fk():
     plt.tight_layout()
     plt.show()
 
-    x, y = compute_fk(final_state['j'], final_state['j2'])
-    np.testing.assert_almost_equal(x, final_state['gx'], decimal=2)
-    np.testing.assert_almost_equal(y, final_state['gy'], decimal=2)
-    assert max(abs(cart_x_vel)) <= c_max_vel + 0.04
-    assert max(abs(cart_y_vel)) <= c_max_vel + 0.04
+    x = traj['fk/x'][-1]
+    y = traj['fk/y'][-1]
+    gx = tjs.god_map.get_data(['gx'])
+    gy = tjs.god_map.get_data(['gy'])
+    np.testing.assert_almost_equal(x, gx, decimal=2)
+    np.testing.assert_almost_equal(y, gy, decimal=2)
+    assert np.max(np.abs(traj['cart_vel'])) <= c_max_vel * 1.04
 
-
-def test_fk2():
-    ph = 10
-    ch = ph - 2
-    time_limit = 8
-    sample_period = 0.05
-    qp, j, j2, state = two_joint_setup(sample_period, ph, upos_limit=None, lpos_limit=None,
-                                       j2_start=0.01, j_start=0.01, jerk_limit=50)
-
-    fk = w.Matrix([
-        j,
-        j2
-    ])
-    gx, gy = w.var('gx gy')
-    g = w.Matrix([gx, gy])
-
-    e = g - fk
-    state['gx'] = 2
-    state['gy'] = 1
-    c_max_vel = 0.5
-    vel = 0.5
-    constraints = [
-        Constraint('x',
-                   expression=fk[0],
-                   lower_error=e[0],
-                   upper_error=e[0],
-                   velocity_limit=vel,
-                   quadratic_weight=1,
-                   control_horizon=ch),
-        Constraint('y',
-                   expression=fk[1],
-                   lower_error=e[1],
-                   upper_error=e[1],
-                   velocity_limit=vel,
-                   quadratic_weight=1,
-                   control_horizon=ch),
-    ]
-    vel_constraints = [
-        VelocityConstraint('trans vel x',
-                           expression=fk[0],
-                           lower_velocity_limit=-vel,
-                           upper_velocity_limit=vel,
-                           quadratic_weight=100000,
-                           control_horizon=ph - 2,
-                           lower_slack_limit=None,
-                           upper_slack_limit=None),
-        VelocityConstraint('trans vel y',
-                           expression=fk[1],
-                           lower_velocity_limit=-vel,
-                           upper_velocity_limit=vel,
-                           quadratic_weight=100000,
-                           control_horizon=ph - 2,
-                           lower_slack_limit=None,
-                           upper_slack_limit=None),
-    ]
-    qp.add_constraints(constraints)
-    qp.add_velocity_constraints(vel_constraints)
-    qp.compile()
-
-    final_state, traj = simulate(state, qp, sample_period, True, time_limit=time_limit)
-
-    def compute_fk(joint1, joint2):
-        final_state = w.ca.substitute(w.ca.substitute(fk, j, joint1), j2, joint2)
-        return float(final_state[0]), float(final_state[1])
-
-    cart_x = np.array([compute_fk(j1, j2)[0] for [j1, j2] in zip(*traj[0])])
-    cart_x_vel = np.diff(cart_x) / sample_period
-    cart_y = np.array([compute_fk(j1, j2)[1] for [j1, j2] in zip(*traj[0])])
-    cart_y_vel = np.diff(cart_y) / sample_period
-    fig, ax = plt.subplots(4, 1, figsize=(5, 5), sharex=True)
-    ax[0].plot(cart_x)
-    ax[0].grid()
-    ax[1].plot(cart_x_vel)
-    ax[1].set_yticks([-c_max_vel, 0, c_max_vel])
-    ax[1].grid()
-    ax[2].plot(cart_y)
-    ax[2].grid()
-    ax[3].plot(cart_y_vel)
-    ax[3].set_yticks([-c_max_vel, 0, c_max_vel])
-    ax[3].grid()
-    plt.tight_layout()
-    plt.show()
-
-    fig, ax1 = plt.subplots(1, 1, figsize=(5, 5))
-
-    plt.plot(cart_x, cart_y, 'C3', lw=3)
-    # plt.scatter(cart_x, cart_y, s=120)
-    plt.title('cart space')
-    plt.grid()
-    plt.xlim(-2.1, 2.1)
-    plt.ylim(-2.1, 2.1)
-
-    plt.tight_layout()
-    plt.show()
-
-    x, y = compute_fk(final_state['j'], final_state['j2'])
-    np.testing.assert_almost_equal(x, final_state['gx'], decimal=2)
-    np.testing.assert_almost_equal(y, final_state['gy'], decimal=2)
-    assert max(abs(cart_x_vel)) <= c_max_vel + 0.04
-    assert max(abs(cart_y_vel)) <= c_max_vel + 0.04
-
-# TODO test continuous joint
 # TODO test with non square J

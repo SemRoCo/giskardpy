@@ -6,7 +6,7 @@ import numpy as np
 from hypothesis import given, assume
 
 import giskardpy.casadi_wrapper as w
-from giskardpy.constraints import WEIGHT_COLLISION_AVOIDANCE, WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
+from giskardpy.goals.open_close import WEIGHT_COLLISION_AVOIDANCE, WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
 from giskardpy.data_types import FreeVariable, Constraint, VelocityConstraint
 from giskardpy.god_map import GodMap
 from giskardpy.qp_controller import QPController

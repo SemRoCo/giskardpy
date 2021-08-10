@@ -6,18 +6,28 @@ import traceback
 from collections import OrderedDict
 from collections import defaultdict
 from time import time
-
 from giskard_msgs.msg import MoveCmd, CollisionEntry
 from py_trees import Status
-
-import giskardpy.constraints
+import giskardpy.goals
 import giskardpy.identifier as identifier
-from giskardpy.constraints import SelfCollisionAvoidance, ExternalCollisionAvoidance
+from giskardpy.goals.collision_avoidance import SelfCollisionAvoidance, ExternalCollisionAvoidance
 from giskardpy.exceptions import UnknownConstraintException, InvalidGoalException, \
     ConstraintInitalizationException, GiskardException
+from giskardpy.goals.goal import Goal
 from giskardpy.utils.logging import loginfo
 from giskardpy.tree.plugin_action_server import GetGoal
 from giskardpy.utils.utils import convert_dictionary_to_ros_message
+import pkgutil
+
+
+def get_all_classes_in_package(package):
+    classes = {}
+    for importer, modname, ispkg in pkgutil.iter_modules(package.__path__):
+        module = __import__('giskardpy.goals.{}'.format(modname), fromlist="dummy")
+        for name2, value2 in inspect.getmembers(module, inspect.isclass):
+            if issubclass(value2, Goal):
+                classes[name2] = value2
+    return classes
 
 
 class GoalToConstraints(GetGoal):
@@ -29,8 +39,7 @@ class GoalToConstraints(GetGoal):
         self.controlled_joints = set()
         self.controllable_links = set()
         self.last_urdf = None
-        self.allowed_constraint_types = {x[0]: x[1] for x in inspect.getmembers(giskardpy.constraints) if
-                                         inspect.isclass(x[1])}
+        self.allowed_constraint_types = get_all_classes_in_package(giskardpy.goals)
 
         self.rc_prismatic_velocity = self.get_god_map().get_data(identifier.rc_prismatic_velocity)
         self.rc_continuous_velocity = self.get_god_map().get_data(identifier.rc_continuous_velocity)

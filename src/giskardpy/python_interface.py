@@ -12,7 +12,7 @@ from sensor_msgs.msg import JointState
 from shape_msgs.msg import SolidPrimitive
 from visualization_msgs.msg import MarkerArray
 
-from giskardpy.constraints import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA
+from giskardpy.goals.goal import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA
 from giskardpy.model.urdf_object import URDFObject
 from giskardpy.utils.utils import position_dict_to_joint_states, make_world_body_box, make_world_body_cylinder, \
     convert_ros_message_to_dictionary

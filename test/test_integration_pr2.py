@@ -18,7 +18,7 @@ from tf.transformations import quaternion_from_matrix, quaternion_about_axis
 
 import giskardpy.utils.tfwrapper as tf
 from giskardpy import identifier
-from giskardpy.constraints import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA, WEIGHT_COLLISION_AVOIDANCE
+from giskardpy.goals.goal import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA, WEIGHT_COLLISION_AVOIDANCE
 from giskardpy.identifier import fk_pose
 from giskardpy.model.robot import Robot
 from giskardpy.utils.tfwrapper import init as tf_init
@@ -4817,5 +4817,5 @@ class TestReachability():
         zero_pose.set_joint_goal(js)
         zero_pose.send_and_check_goal(goal_type=MoveGoal.PLAN_ONLY)
 
-import pytest
-pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_bowl_and_cup'])
+# import pytest
+# pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_bowl_and_cup'])

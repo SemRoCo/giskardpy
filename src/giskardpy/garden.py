@@ -14,6 +14,7 @@ from rospy import ROSException
 
 import giskardpy.identifier as identifier
 import giskardpy.model.pybullet_wrapper as pbw
+from giskardpy.data_types import BiDict, KeyDefaultDict
 from giskardpy.god_map import GodMap
 from giskardpy.input_system import JointStatesInput
 from giskardpy.tree.plugin import PluginBehavior
@@ -45,8 +46,9 @@ from giskardpy.tree.plugin_visualization import VisualizationBehavior
 from giskardpy.tree.plugin_world_visualization import WorldVisualizationBehavior
 from giskardpy.model.pybullet_world import PyBulletWorld
 from giskardpy.tree.tree_manager import TreeManager
-from giskardpy.utils.utils import create_path, render_dot_tree, KeyDefaultDict, max_velocity_from_horizon_and_jerk, BiDict, \
-    logging
+from giskardpy.utils import logging
+from giskardpy.utils.math import max_velocity_from_horizon_and_jerk
+from giskardpy.utils.utils import create_path, render_dot_tree
 from giskardpy.model.world_object import WorldObject
 
 # TODO hardcode this somewhere else

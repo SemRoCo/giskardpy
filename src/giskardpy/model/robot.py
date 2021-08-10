@@ -7,11 +7,12 @@ from copy import deepcopy
 from geometry_msgs.msg import PoseStamped
 
 from giskardpy import WORLD_IMPLEMENTATION, casadi_wrapper as w
-from giskardpy.data_types import SingleJointState, FreeVariable
+from giskardpy.data_types import SingleJointState, KeyDefaultDict
 from giskardpy.god_map import GodMap
 from giskardpy.model.pybullet_world_object import PyBulletWorldObject
-from giskardpy.utils.utils import KeyDefaultDict, \
-    homo_matrix_to_pose, memoize
+from giskardpy.qp.free_variable import FreeVariable
+from giskardpy.utils.tfwrapper import homo_matrix_to_pose
+from giskardpy.utils.utils import memoize
 from giskardpy.model.world_object import WorldObject
 
 if WORLD_IMPLEMENTATION == u'pybullet':

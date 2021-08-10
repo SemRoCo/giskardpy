@@ -8,8 +8,8 @@ from tf.transformations import euler_from_quaternion, quaternion_from_euler
 from visualization_msgs.msg import Marker
 
 from giskardpy.exceptions import DuplicateNameException, UnknownBodyException, CorruptShapeException
-from giskardpy.utils.utils import cube_volume, cube_surface, sphere_volume, cylinder_volume, cylinder_surface, \
-    suppress_stderr, memoize
+from giskardpy.model.utils import cube_volume, cube_surface, sphere_volume, cylinder_volume, cylinder_surface
+from giskardpy.utils.utils import suppress_stderr, memoize
 from giskardpy.utils.tfwrapper import normalize
 
 

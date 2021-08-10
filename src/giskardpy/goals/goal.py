@@ -9,10 +9,10 @@ from giskard_msgs.msg import Constraint as Constraint_msg
 
 import giskardpy.identifier as identifier
 from giskardpy import casadi_wrapper as w
-from giskardpy.data_types import Constraint, VelocityConstraint
 from giskardpy.input_system import \
     PoseStampedInput, Vector3StampedInput, FrameInput, \
     PointStampedInput
+from giskardpy.qp.constraint import VelocityConstraint, Constraint
 
 WEIGHT_MAX = Constraint_msg.WEIGHT_MAX
 WEIGHT_ABOVE_CA = 2500  # Constraint_msg.WEIGHT_ABOVE_CA

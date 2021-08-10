@@ -1,5 +1,5 @@
 from giskardpy import casadi_wrapper as w
-from giskardpy.utils.utils import KeyDefaultDict
+from giskardpy.data_types import KeyDefaultDict
 
 
 class InputArray(object):

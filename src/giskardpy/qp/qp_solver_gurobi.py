@@ -4,7 +4,7 @@ from scipy import sparse
 
 from giskardpy.exceptions import QPSolverException, InfeasibleException
 from giskardpy.utils import logging
-from giskardpy.qp_solver import QPSolver
+from giskardpy.qp.qp_solver import QPSolver
 
 gurobipy.setParam('LogToConsole', False)
 

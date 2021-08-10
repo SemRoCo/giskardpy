@@ -14,8 +14,8 @@ from visualization_msgs.msg import MarkerArray
 
 from giskardpy.goals.goal import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA
 from giskardpy.model.urdf_object import URDFObject
-from giskardpy.utils.utils import position_dict_to_joint_states, make_world_body_box, make_world_body_cylinder, \
-    convert_ros_message_to_dictionary
+from giskardpy.model.utils import make_world_body_box, make_world_body_cylinder
+from giskardpy.utils.utils import position_dict_to_joint_states, convert_ros_message_to_dictionary
 
 
 class GiskardWrapper(object):

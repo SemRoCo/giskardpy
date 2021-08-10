@@ -9,7 +9,7 @@ from giskardpy.exceptions import UnreachableException, MAX_NWSR_REACHEDException
     ConstraintInitalizationException, PlanningException, ShakingException, ExecutionException, InvalidGoalException, \
     PreemptedException
 from giskardpy.tree.plugin import GiskardBehavior
-from giskardpy.utils.utils import make_filter_b_mask, logging
+from giskardpy.utils.utils import logging
 
 
 class PostProcessing(GiskardBehavior):
@@ -28,7 +28,7 @@ class PostProcessing(GiskardBehavior):
     @profile
     def update(self):
         if self.get_god_map().get_data(identifier.check_reachability):
-            self.check_reachability_xdot()
+            raise NotImplementedError()
         e = self.get_blackboard_exception()
 
         cmd_id = self.get_god_map().get_data(identifier.cmd_id)
@@ -106,34 +106,3 @@ class PostProcessing(GiskardBehavior):
         elif exception is not None:
             error_code = MoveResult.ERROR
         return error_code, error_message
-
-    def check_reachability_xdot(self):
-        num_joint_constraints = len(self.get_robot().controlled_joints)
-        H = self.get_god_map().get_data(identifier.H)
-        b_mask = make_filter_b_mask(H)[num_joint_constraints:]
-        xdot_keys = np.array(self.get_god_map().get_data(identifier.xdot_keys)[num_joint_constraints:])
-        xdot_keys_filtered = xdot_keys[b_mask]
-        soft_constraints = self.get_god_map().get_data(identifier.constraints)
-        soft_constraints_filtered = [(i, soft_constraints[i]) for i in xdot_keys_filtered]
-
-        xdotfull = self.get_god_map().get_data(identifier.xdot_full)
-
-        if isinstance(xdotfull, int):
-            return True
-        controllable_joints = self.get_robot().controlled_joints
-        xdot_soft_constraints = xdotfull[len(controllable_joints):]
-        if (len(soft_constraints_filtered) != len(xdot_soft_constraints)):
-            self.raise_to_blackboard(ImplementationException(u'this is a bug, please open an issue on github'))
-            return False
-        for i in range(len(soft_constraints_filtered)):
-            constraint_name = soft_constraints_filtered[i][0]
-            constraint = soft_constraints_filtered[i][1]
-            if constraint.goal_constraint and abs(xdot_soft_constraints[i]) > self.reachability_threshold:
-                self.raise_to_blackboard(
-                    UnreachableException(u'soft constraint "{}" is not satisfied; |{}| > {}'.format(
-                        constraint_name,
-                        xdot_soft_constraints[i],
-                        self.reachability_threshold
-                    )))
-                return False
-        return True

@@ -537,11 +537,20 @@ def publish_frame_marker(pose_stamped, id_=1, length=0.1):
 
     pub.publish(ma)
 
+def normalize_quaternion_msg(quaternion):
+    q = Quaternion()
+    rotation = np.array([quaternion.x,
+                         quaternion.y,
+                         quaternion.z,
+                         quaternion.w])
+    normalized_rotation = rotation / np.linalg.norm(rotation)
+    q.x = normalized_rotation[0]
+    q.y = normalized_rotation[1]
+    q.z = normalized_rotation[2]
+    q.w = normalized_rotation[3]
+    return q
 
-if __name__ == u'__main__':
-    rospy.init_node('tf_wrapper_debug')
-    p = PoseStamped()
-    p.header.frame_id = u'map'
-    p.pose.position.x = 1
-    p.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 2, [0, 1, 0]))
-    publish_frame_marker(p)
+
+
+def homo_matrix_to_pose(m):
+    return kdl_to_pose(np_to_kdl(m))

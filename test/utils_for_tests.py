@@ -17,12 +17,16 @@ from giskard_msgs.srv import UpdateWorldResponse
 from hypothesis import assume
 from hypothesis.strategies import composite
 from iai_naive_kinematics_sim.srv import SetJointState, SetJointStateRequest
+from iai_wsg_50_msgs.msg import PositionCmd
 from numpy import pi
 from py_trees import Blackboard
 from sensor_msgs.msg import JointState
+from std_msgs.msg import ColorRGBA
 from tf.transformations import rotation_from_matrix, quaternion_matrix
+from visualization_msgs.msg import Marker
 
 from giskardpy import identifier
+from giskardpy.data_types import KeyDefaultDict
 from giskardpy.utils.config_loader import ros_load_robot_config
 from giskardpy.garden import grow_tree
 from giskardpy.identifier import robot, world
@@ -30,7 +34,7 @@ from giskardpy.model.pybullet_world import PyBulletWorld
 from giskardpy.python_interface import GiskardWrapper
 from giskardpy.model.robot import Robot
 from giskardpy.utils.tfwrapper import transform_pose, lookup_pose
-from giskardpy.utils.utils import msg_to_list, KeyDefaultDict, position_dict_to_joint_states, to_joint_state_position_dict, \
+from giskardpy.utils.utils import msg_to_list, position_dict_to_joint_states, to_joint_state_position_dict, \
     logging
 
 BIG_NUMBER = 1e100
@@ -1023,3 +1027,61 @@ class HSR(GiskardTestWrapper):
     # def command_gripper(self, width):
     #     js = {u'hand_motor_joint': width}
     #     self.send_and_check_joint_goal(js)
+
+
+def publish_marker_sphere(position, frame_id=u'map', radius=0.05, id_=0):
+    m = Marker()
+    m.action = m.ADD
+    m.ns = u'debug'
+    m.id = id_
+    m.type = m.SPHERE
+    m.header.frame_id = frame_id
+    m.pose.position.x = position[0]
+    m.pose.position.y = position[1]
+    m.pose.position.z = position[2]
+    m.color = ColorRGBA(1, 0, 0, 1)
+    m.scale.x = radius
+    m.scale.y = radius
+    m.scale.z = radius
+
+    pub = rospy.Publisher('/visualization_marker', Marker, queue_size=1)
+    start = rospy.get_rostime()
+    while pub.get_num_connections() < 1 and (rospy.get_rostime() - start).to_sec() < 2:
+        # wait for a connection to publisher
+        # you can do whatever you like here or simply do nothing
+        pass
+
+    pub.publish(m)
+
+
+def publish_marker_vector(start, end, diameter_shaft=0.01, diameter_head=0.02, id_=0):
+    """
+    assumes points to be in frame map
+    :type start: Point
+    :type end: Point
+    :type diameter_shaft: float
+    :type diameter_head: float
+    :type id_: int
+    """
+    m = Marker()
+    m.action = m.ADD
+    m.ns = u'debug'
+    m.id = id_
+    m.type = m.ARROW
+    m.points.append(start)
+    m.points.append(end)
+    m.color = ColorRGBA(1, 0, 0, 1)
+    m.scale.x = diameter_shaft
+    m.scale.y = diameter_head
+    m.scale.z = 0
+    m.header.frame_id = u'map'
+
+    pub = rospy.Publisher('/visualization_marker', Marker, queue_size=1)
+    start = rospy.get_rostime()
+    while pub.get_num_connections() < 1 and (rospy.get_rostime() - start).to_sec() < 2:
+        # wait for a connection to publisher
+        # you can do whatever you like here or simply do nothing
+        pass
+    rospy.sleep(0.3)
+
+    pub.publish(m)

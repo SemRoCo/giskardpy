@@ -4,7 +4,7 @@ import errno
 import json
 import os
 from copy import deepcopy
-import re
+
 import subprocess
 import sys
 from collections import defaultdict, OrderedDict, deque
@@ -13,7 +13,6 @@ from functools import wraps
 from itertools import product
 
 import numpy as np
-import pkg_resources
 import pydot
 import pylab as plt
 import rospkg
@@ -37,8 +36,6 @@ from giskardpy.utils import logging
 from giskardpy.data_types import SingleJointState
 from giskardpy.tree.plugin import PluginBehavior
 from giskardpy.utils.tfwrapper import kdl_to_pose, np_to_kdl
-
-r = rospkg.RosPack()
 
 
 @contextmanager
@@ -75,133 +72,9 @@ class NullContextManager(object):
         pass
 
 
-class KeyDefaultDict(defaultdict):
-    """
-    A default dict where the key is passed as parameter to the factory function.
-    """
-
-    def __missing__(self, key):
-        if self.default_factory is None:
-            raise KeyError(key)
-        else:
-            ret = self[key] = self.default_factory(key)
-            return ret
 
 
-class BiDict(dict):
-    # TODO test me
-    def __init__(self, *args, **kwargs):
-        super(BiDict, self).__init__(*args, **kwargs)
-        self.inverse = {}
-        for key, value in self.items():
-            self.inverse[value] = key
 
-    def __setitem__(self, key, value):
-        if key in self:
-            self.inverse[self[key]].remove(key)
-        super(BiDict, self).__setitem__(key, value)
-        self.inverse[value] = key
-
-    def __delitem__(self, key):
-        self.inverse.setdefault(self[key],[]).remove(key)
-        if self[key] in self.inverse and not self.inverse[self[key]]:
-            del self.inverse[self[key]]
-        super(BiDict, self).__delitem__(key)
-
-def urdfs_equal(urdf1, urdf2):
-    """
-    Compairs two urdfs.
-    :type urdf1: str
-    :type urdf2: str
-    :rtype: bool
-    """
-    # return hashlib.md5(urdf1).hexdigest() == hashlib.md5(urdf2).hexdigest()
-    return urdf1 == urdf2
-
-
-def sphere_volume(radius):
-    """
-    :type radius: float
-    :rtype: float
-    """
-    return (4 / 3.) * pi * radius ** 3
-
-
-def sphere_surface(radius):
-    """
-    :type radius: float
-    :rtype: float
-    """
-    return 4 * pi * radius ** 2
-
-
-def cube_volume(length, width, height):
-    """
-    :type length: float
-    :type width: float
-    :type height: float
-    :rtype: float
-    """
-    return length * width * height
-
-
-def cube_surface(length, width, height):
-    """
-    :type length: float
-    :type width: float
-    :type height: float
-    :rtype: float
-    """
-    return 2 * (length * width + length * height + width * height)
-
-
-def cylinder_volume(r, h):
-    """
-    :type r: float
-    :type h: float
-    :rtype: float
-    """
-    return pi * r ** 2 * h
-
-
-def cylinder_surface(r, h):
-    """
-    :type r: float
-    :type h: float
-    :rtype: float
-    """
-    return 2 * pi * r * (h + r)
-
-
-# def closest_point_constraint_violated(closest_point_infos, tolerance=0.9):
-#     """
-#     :param closest_point_infos: dict mapping a link name to a ClosestPointInfo
-#     :type closest_point_infos: dict
-#     :type tolerance: float
-#     :return: whether of not the contact distance for any link has been violated
-#     :rtype: bool
-#     """
-#     for link_name, cpi_info in closest_point_infos.items():  # type: (str, Collision)
-#         if cpi_info.contact_distance < cpi_info.min_dist * tolerance:
-#             logging.loginfo(u'collision constraints violated: {}'.format(cpi_info.link_a, cpi_info.link_b,
-#                                                                          cpi_info.contact_distance))
-#             return True
-#     return False
-
-
-def qv_mult(quaternion, vector):
-    """
-    Transforms a vector by a quaternion
-    :param quaternion: Quaternion
-    :type quaternion: list
-    :param vector: vector
-    :type vector: list
-    :return: transformed vector
-    :type: list
-    """
-    q = quaternion
-    v = [vector[0], vector[1], vector[2], 0]
-    return quaternion_multiply(quaternion_multiply(q, v), quaternion_conjugate(q))[:-1]
 
 
 #
@@ -295,48 +168,6 @@ def dict_to_joint_states(joint_state_dict):
         js.effort.append(0)
     return js
 
-
-def normalize_quaternion_msg(quaternion):
-    q = Quaternion()
-    rotation = np.array([quaternion.x,
-                         quaternion.y,
-                         quaternion.z,
-                         quaternion.w])
-    normalized_rotation = rotation / np.linalg.norm(rotation)
-    q.x = normalized_rotation[0]
-    q.y = normalized_rotation[1]
-    q.z = normalized_rotation[2]
-    q.w = normalized_rotation[3]
-    return q
-
-
-def to_point_stamped(frame_id, point):
-    """
-    Creates a PointStamped from a frame id and a list of floats.
-    :type frame_id: str
-    :param point: list containing 3 floats
-    :type point: list
-    :rtype: geometry_msgs.msg._PointStamped.PointStamped
-    """
-    p = PointStamped()
-    p.header.frame_id = frame_id
-    p.point = Point(*point)
-    return p
-
-
-def to_vector3_stamped(frame_id, vector):
-    """
-    Creates a Vector3 msg from a frame id and list of floats.
-    :type frame_id: str
-    :type vector: list
-    :rtype: Vector3Stamped
-    """
-    v = Vector3Stamped()
-    v.header.frame_id = frame_id
-    v.vector = Vector3(*vector)
-    return v
-
-
 def msg_to_list(thing):
     """
     :param thing: ros msg
@@ -367,10 +198,6 @@ def msg_to_list(thing):
                 thing.orientation.y,
                 thing.orientation.z,
                 thing.orientation.w]
-
-
-def position_dist(position1, position2):
-    return np.linalg.norm(np.array(msg_to_list(position2)) - np.array(msg_to_list(position1)))
 
 
 def create_path(path):
@@ -517,22 +344,6 @@ def resolve_ros_iris(path):
         return path
 
 
-def convert_dae_to_obj(path):
-    path = path.replace(u'\'', u'')
-    file_name = path.split(u'/')[-1]
-    name, file_format = file_name.split(u'.')
-    if u'dae' in file_format:
-        input_path = resolve_ros_iris(path)
-        new_path = u'/tmp/giskardpy/{}.obj'.format(name)
-        create_path(new_path)
-        try:
-            subprocess.check_call([u'meshlabserver', u'-i', input_path, u'-o', new_path])
-        except Exception as e:
-            logging.logerr(u'meshlab not installed, can\'t convert dae to obj')
-        return new_path
-    return path
-
-
 def write_to_tmp(filename, urdf_string):
     """
     Writes a URDF string into a temporary file on disc. Used to deliver URDFs to PyBullet that only loads file.
@@ -669,198 +480,6 @@ def generate_pydot_graph(root, visibility_level):
     return graph
 
 
-def remove_outer_tag(xml):
-    """
-    :param xml:
-    :type xml: str
-    :return:
-    :rtype: str
-    """
-    return xml.split('>', 1)[1].rsplit('<', 1)[0]
-
-
-def make_world_body_box(name=u'box', x_length=1, y_length=1, z_length=1):
-    box = WorldBody()
-    box.type = WorldBody.PRIMITIVE_BODY
-    box.name = str(name)
-    box.shape.type = SolidPrimitive.BOX
-    box.shape.dimensions.append(x_length)
-    box.shape.dimensions.append(y_length)
-    box.shape.dimensions.append(z_length)
-    return box
-
-
-def make_world_body_sphere(name=u'sphere', radius=1):
-    sphere = WorldBody()
-    sphere.type = WorldBody.PRIMITIVE_BODY
-    sphere.name = str(name)
-    sphere.shape.type = SolidPrimitive.SPHERE
-    sphere.shape.dimensions.append(radius)
-    return sphere
-
-
-def make_world_body_cylinder(name=u'cylinder', height=1, radius=1):
-    cylinder = WorldBody()
-    cylinder.type = WorldBody.PRIMITIVE_BODY
-    cylinder.name = str(name)
-    cylinder.shape.type = SolidPrimitive.CYLINDER
-    cylinder.shape.dimensions = [0, 0]
-    cylinder.shape.dimensions[SolidPrimitive.CYLINDER_HEIGHT] = height
-    cylinder.shape.dimensions[SolidPrimitive.CYLINDER_RADIUS] = radius
-    return cylinder
-
-
-def make_urdf_world_body(name, urdf):
-    wb = WorldBody()
-    wb.name = name
-    wb.type = wb.URDF_BODY
-    wb.urdf = urdf
-    return wb
-
-
-def is_iterable(qwe):
-    try:
-        iter(qwe)
-    except TypeError:
-        return False
-    return True
-
-
-def homo_matrix_to_pose(m):
-    return kdl_to_pose(np_to_kdl(m))
-
-
-def compare_version(version1, operator, version2):
-    """
-    compares two version numbers by means of the given operator
-    :param version1: version number 1 e.g. 0.1.0
-    :type version1: str
-    :param operator: ==,<=,>=,<,>
-    :type operator: str
-    :param version2: version number 1 e.g. 3.2.0
-    :type version2: str
-    :return:
-    """
-    version1 = version1.split('.')
-    version2 = version2.split('.')
-    if operator == '==':
-        if (len(version1) != len(version2)):
-            return False
-        for i in range(len(version1)):
-            if version1[i] != version2[i]:
-                return False
-        return True
-    elif operator == '<=':
-        k = min(len(version1), len(version2))
-        for i in range(k):
-            if version1[i] > version2[i]:
-                return True
-            elif version1[i] < version2[i]:
-                return False
-        if len(version1) < len(version2):
-            return False
-        else:
-            return True
-    elif operator == '>=':
-        k = min(len(version1), len(version2))
-        for i in range(k):
-            if version1[i] < version2[i]:
-                return True
-            elif version1[i] > version2[i]:
-                return False
-        if len(version1) > len(version2):
-            return False
-        else:
-            return True
-    elif operator == '<':
-        k = min(len(version1), len(version2))
-        for i in range(k):
-            if version1[i] > version2[i]:
-                return True
-            elif version1[i] < version2[i]:
-                return False
-        if len(version1) < len(version2):
-            return False
-        else:
-            return True
-    elif operator == '>':
-        k = min(len(version1), len(version2))
-        for i in range(k):
-            if version1[i] < version2[i]:
-                return True
-            elif version1[i] > version2[i]:
-                return False
-        if len(version1) > len(version2):
-            return False
-        else:
-            return True
-    else:
-        return False
-
-
-def get_ros_pkg_path(ros_pkg):
-    return r.get_path(ros_pkg)
-
-
-def rospkg_exists(name):
-    """
-    checks whether a ros package with the given name and version exists
-    :param name: the name and version of the ros package in requirements format e.g. giskard_msgs<=0.1.0
-    :type name: str
-    :return: True if it exits else False
-    """
-    name = name.replace(' ', '')
-    version_list = name.split(',')
-    version_entry1 = re.split('(==|>=|<=|<|>)', version_list[0])
-    package_name = version_entry1[0]
-    try:
-        m = r.get_manifest(package_name)
-    except Exception as e:
-        logging.logwarn('package {name} not found'.format(name=name))
-        return False
-    if len(version_entry1) == 1:
-        return True
-    if not compare_version(version_entry1[2], version_entry1[1], m.version):
-        logging.logwarn('found ROS package {installed_name}=={installed_version} but {r} is required}'.format(
-            installed_name=package_name, installed_version=str(m.version), r=name))
-        return False
-    for entry in version_list[1:]:
-        operator_and_version = re.split('(==|>=|<=|<|>)', entry)
-        if not compare_version(operator_and_version[2], operator_and_version[1], m.version):
-            logging.logwarn('found ROS package {installed_name}=={installed_version} but {r} is required}'.format(
-                installed_name=package_name, installed_version=str(m.version), r=name))
-            return False
-
-    return True
-
-
-def check_dependencies():
-    """
-    Checks whether the dependencies specified in the dependency.txt in the root folder of giskardpy are installed. If a
-    dependecy is not installed a message is printed.
-    """
-
-    with open(get_ros_pkg_path('giskardpy') + '/dependencies.txt') as f:
-        dependencies = f.readlines()
-
-    dependencies = [x.split('#')[0] for x in dependencies]
-    dependencies = [x.strip() for x in dependencies]
-
-    for d in dependencies:
-        try:
-            pkg_resources.require(d)
-        except pkg_resources.DistributionNotFound as e:
-            rospkg_exists(d)
-        except pkg_resources.VersionConflict as e:
-            logging.logwarn('found {version_f} but version {version_r} is required'.format(version_r=str(e.req),
-                                                                                           version_f=str(e.dist)))
-
-
-def str_to_unique_number(s):
-    # FIXME not actually unique
-    return sum(ord(x) for x in s)
-
-
 def memoize(function):
     memo = function.memo = {}
 
@@ -914,20 +533,6 @@ def traj_to_msg(sample_period, trajectory, controlled_joints, fill_velocity_valu
     return trajectory_msg
 
 
-def make_filter_b_mask(H, num_joint_constraints):
-    filter = H.sum(axis=1) != 0
-    filter[:num_joint_constraints*3] = True  # make sure joints are never kicked out
-    return filter
-
-def max_velocity_from_horizon_and_jerk(prediction_horizon, jerk_limit, sample_period):
-    def gauss(n):
-        return (n ** 2 + n) / 2
-
-    n2 = int((prediction_horizon) / 2)
-    (prediction_horizon**2+prediction_horizon)/2
-    return (gauss(n2) + gauss(n2 - 1)) * jerk_limit * sample_period ** 2
-
-
 def trajectory_to_np(tj, joint_names):
     """
     :type tj: Trajectory
@@ -947,157 +552,4 @@ def trajectory_to_np(tj, joint_names):
     return names, position, velocity, times
 
 
-def publish_marker_sphere(position, frame_id=u'map', radius=0.05, id_=0):
-    m = Marker()
-    m.action = m.ADD
-    m.ns = u'debug'
-    m.id = id_
-    m.type = m.SPHERE
-    m.header.frame_id = frame_id
-    m.pose.position.x = position[0]
-    m.pose.position.y = position[1]
-    m.pose.position.z = position[2]
-    m.color = ColorRGBA(1, 0, 0, 1)
-    m.scale.x = radius
-    m.scale.y = radius
-    m.scale.z = radius
 
-    pub = rospy.Publisher('/visualization_marker', Marker, queue_size=1)
-    start = rospy.get_rostime()
-    while pub.get_num_connections() < 1 and (rospy.get_rostime() - start).to_sec() < 2:
-        # wait for a connection to publisher
-        # you can do whatever you like here or simply do nothing
-        pass
-
-    pub.publish(m)
-
-
-def publish_marker_vector(start, end, diameter_shaft=0.01, diameter_head=0.02, id_=0):
-    """
-    assumes points to be in frame map
-    :type start: Point
-    :type end: Point
-    :type diameter_shaft: float
-    :type diameter_head: float
-    :type id_: int
-    """
-    m = Marker()
-    m.action = m.ADD
-    m.ns = u'debug'
-    m.id = id_
-    m.type = m.ARROW
-    m.points.append(start)
-    m.points.append(end)
-    m.color = ColorRGBA(1, 0, 0, 1)
-    m.scale.x = diameter_shaft
-    m.scale.y = diameter_head
-    m.scale.z = 0
-    m.header.frame_id = u'map'
-
-    pub = rospy.Publisher('/visualization_marker', Marker, queue_size=1)
-    start = rospy.get_rostime()
-    while pub.get_num_connections() < 1 and (rospy.get_rostime() - start).to_sec() < 2:
-        # wait for a connection to publisher
-        # you can do whatever you like here or simply do nothing
-        pass
-    rospy.sleep(0.3)
-
-    pub.publish(m)
-
-
-class FIFOSet(set):
-    def __init__(self, data, max_length=None):
-        if len(data) > max_length:
-            raise ValueError('len(data) > max_length')
-        super(FIFOSet, self).__init__(data)
-        self.max_length = max_length
-        self._data_queue = deque(data)
-
-    def add(self, item):
-        if len(self._data_queue) == self.max_length:
-            to_delete = self._data_queue.popleft()
-            super(FIFOSet, self).remove(to_delete)
-            self._data_queue.append(item)
-        super(FIFOSet, self).add(item)
-
-    def remove(self, item):
-        self.remove(item)
-        self._data_queue.remove(item)
-
-
-def update_nested_dicts(d, u):
-    """
-    Will update the values in the nested dict d from nested dict u and
-    add new key-value-pairs from nested dict u into nested dict d." \
-
-    :type d: dict
-    :type u: dict
-    :rtype: dict
-    :returns: updated nested dict
-    """
-    for k, v in u.items():
-        if type(v) == dict and d.get(k, {}) is not None:
-            d[k] = update_nested_dicts(d.get(k, {}), v)
-        else:
-            d[k] = v
-    return d
-
-
-def find_parent_of_key(key, value, keys):
-    """
-    Will return the values of the dict managing the given key and
-    returns the key-chain leading from the nested dict value to the
-    dict containing the given key.
-
-    :type key: str
-    :type value: dict
-    :type keys: list(str)
-    :rtype: tuple(dict, list(str))
-    :returns: tuple containing a dict and the key-chain in a list
-    """
-    if key in value:
-        yield value, keys
-    else:
-        for k, v in value.items():
-            if type(v) == dict:
-                keys.append(k)
-                yield find_parent_of_key(key, v, keys)
-
-
-def nested_update(dic, keys, value):
-    """
-    Will update the nested dict dic with the key-chain keys with the given value.
-
-    :type dic: dict
-    :type keys: list(str)
-    :type value: dict or str
-    :rtype: dict
-    :returns: updated dict
-    """
-    if keys:
-        for key in keys[:-1]:
-            dic = dic.setdefault(key, {})
-        dic[keys[-1]].update(value)
-    else:
-        dic.update(value)
-
-
-def update_parents(d, merge_key='parent'):
-    """
-    Will merge the dict containing the given key merge_key with the value in d[merge_key].
-
-    :type d: dict
-    :returns: dict
-    """
-    root_data = deepcopy(d)
-    gen = find_parent_of_key(merge_key, root_data, [])
-    while True:
-        try:
-            data, keys = next(gen)
-        except (StopIteration, ValueError):
-            break
-        parent_data = data[merge_key]
-        data.pop(merge_key)
-        updated = update_nested_dicts(parent_data, data)
-        nested_update(root_data, keys, updated)
-    return root_data

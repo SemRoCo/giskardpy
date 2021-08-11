@@ -28,31 +28,14 @@ cut_off_shaking = [u'cut_off_shaking']
 next_move_goal = [u'next_move_goal']
 cmd_id = [u'cmd_id']
 
-qp_data = [u'qp_data']
-A = qp_data + [u'A']
-H = qp_data + [u'H']
-lbA = qp_data + [u'lbA']
-ubA = qp_data + [u'ubA']
-lb = qp_data + [u'lb']
-ub = qp_data + [u'ub']
-xdot_full = qp_data + [u'xdot_full']
-weight_keys = qp_data + [u'weight_keys']
-b_keys = qp_data + [u'b_keys']
-bA_keys = qp_data + [u'bA_keys']
-xdot_keys = qp_data + [u'xdot_keys']
-
 post_processing = [u'post_processing']
 soft_constraints = post_processing + [u'soft_constraints']
 result_message = [u'result_message']
 
-
-
-
-#stuff from rosparam
+# stuff from rosparam
 robot_description = [u'robot_description']
 
 rosparam = [u'rosparam']
-
 
 # config file
 # general options
@@ -63,7 +46,6 @@ sample_period = general_options + [u'sample_period']
 map_frame = general_options + [u'map_frame']
 debug = general_options + [u'debug']
 fill_velocity_values = general_options + [u'fill_velocity_values']
-
 
 joint_limits = general_options + [u'joint_limits']
 
@@ -130,6 +112,3 @@ ignored_self_collisions = self_collision_avoidance[:-1] + [u'ignore']
 added_self_collisions = self_collision_avoidance[:-1] + [u'add']
 
 external_collision_avoidance = collision_avoidance + [u'external_collision_avoidance', u'override']
-
-
-

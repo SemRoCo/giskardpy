@@ -10,7 +10,6 @@ class ControllerPlugin(GiskardBehavior):
         super(ControllerPlugin, self).__init__(name)
         self.path_to_functions = self.get_god_map().get_data(identifier.data_folder)
         self.qp_data = {}
-        self.get_god_map().set_data(identifier.qp_data, self.qp_data)  # safe dict on godmap and work on ref
         self.rc_prismatic_velocity = self.get_god_map().get_data(identifier.rc_prismatic_velocity)
         self.rc_continuous_velocity = self.get_god_map().get_data(identifier.rc_continuous_velocity)
         self.rc_revolute_velocity = self.get_god_map().get_data(identifier.rc_revolute_velocity)

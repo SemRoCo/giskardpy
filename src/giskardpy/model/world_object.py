@@ -9,7 +9,7 @@ import numpy as np
 from geometry_msgs.msg import Pose, Quaternion
 
 from giskardpy.utils import logging
-from giskardpy.data_types import SingleJointState
+from giskardpy.data_types import JointStates
 from giskardpy.utils.tfwrapper import msg_to_kdl
 from giskardpy.model.urdf_object import URDFObject
 
@@ -215,12 +215,9 @@ class WorldObject(URDFObject):
         :param f: lambda joint_info: float
         :return:
         """
-        js = {}
+        js = JointStates()
         for joint_name in sorted(self.get_movable_joints()):
-            sjs = SingleJointState()
-            sjs.name = joint_name
-            sjs.position = f(joint_name)
-            js[joint_name] = sjs
+            js[joint_name].position = f(joint_name)
         return js
 
     def add_self_collision_entries(self, object_name):

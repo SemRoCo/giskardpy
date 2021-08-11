@@ -3,7 +3,7 @@ from collections import OrderedDict
 from py_trees import Status
 
 import giskardpy.identifier as identifier
-from giskardpy.data_types import SingleJointState
+from giskardpy.data_types import JointStates
 from giskardpy.tree.plugin import GiskardBehavior
 
 
@@ -21,7 +21,7 @@ class KinSimPlugin(GiskardBehavior):
         current_js = self.get_god_map().get_data(identifier.joint_states)
         next_js = None
         if next_cmds:
-            next_js = OrderedDict()
+            next_js = JointStates()
             for key, sjs in current_js.items():
                 joint_name = str(self.get_robot().get_joint_position_symbol(key))
                 vel_cmds = next_cmds[0]
@@ -31,12 +31,11 @@ class KinSimPlugin(GiskardBehavior):
                 else:
                     cmd = 0.0
                     derivative_cmds = []
-                next_js[key] = SingleJointState(sjs.name,
-                                                sjs.position + cmd * self.sample_period,
-                                                *derivative_cmds)
+                next_js[key].position = sjs.position + cmd * self.sample_period
+                for i, derivative_cmd in enumerate(derivative_cmds):
+                    next_js[key].set_derivative(i+1, derivative_cmd)
         if next_js is not None:
             self.get_god_map().set_data(identifier.joint_states, next_js)
         else:
             self.get_god_map().set_data(identifier.joint_states, current_js)
-        self.get_god_map().set_data(identifier.last_joint_states, current_js)
         return Status.RUNNING

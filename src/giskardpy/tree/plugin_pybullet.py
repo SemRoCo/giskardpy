@@ -13,12 +13,13 @@ from std_srvs.srv import Trigger, TriggerResponse
 from visualization_msgs.msg import Marker, MarkerArray
 
 import giskardpy.identifier as identifier
+from giskardpy.data_types import JointStates
 from giskardpy.exceptions import CorruptShapeException, UnknownBodyException, \
     UnsupportedOptionException, DuplicateNameException
 from giskardpy.tree.plugin import GiskardBehavior
 from giskardpy.utils.tfwrapper import transform_pose
 from giskardpy.tree.tree_manager import TreeManager
-from giskardpy.utils.utils import to_joint_state_dict, to_joint_state_position_dict, dict_to_joint_states, write_dict, logging
+from giskardpy.utils.utils import to_joint_state_position_dict, dict_to_joint_states, write_dict, logging
 from giskardpy.model.world_object import WorldObject
 from giskardpy.model.urdf_object import URDFObject
 from rospy_message_converter.message_converter import convert_ros_message_to_dictionary
@@ -232,7 +233,7 @@ class WorldUpdatePlugin(GiskardBehavior):
         :param msg: Current state of the articulated object that shall be set in the world.
         :type msg: JointState
         """
-        self.object_joint_states[object_name] = to_joint_state_dict(msg)
+        self.object_joint_states[object_name] = JointStates.from_msg(msg)
 
     def update_world_cb(self, req):
         """

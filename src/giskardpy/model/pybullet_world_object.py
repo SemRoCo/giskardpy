@@ -4,6 +4,7 @@ from multiprocessing import Lock
 import giskardpy.model.pybullet_wrapper as pw
 from geometry_msgs.msg import Pose
 
+from giskardpy.data_types import JointStates
 from giskardpy.model.pybullet_wrapper import load_urdf_string_into_bullet, JointInfo, pybullet_pose_to_msg, \
     deactivate_rendering, activate_rendering, msg_to_pybullet_pose
 from giskardpy.model.world_object import WorldObject
@@ -50,10 +51,10 @@ class PyBulletWorldObject(WorldObject):
     @profile
     def joint_state(self, value):
         """
-                :param joint_state:
-                :type joint_state: dict
-                :return:
-                """
+        :param joint_state:
+        :type joint_state: JointStates
+        :return:
+        """
         with self.lock:
             WorldObject.joint_state.fset(self, value)
             for joint_name, singe_joint_state in value.items():

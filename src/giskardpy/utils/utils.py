@@ -33,7 +33,6 @@ from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 from visualization_msgs.msg import Marker
 
 from giskardpy.utils import logging
-from giskardpy.data_types import SingleJointState
 from giskardpy.tree.plugin import PluginBehavior
 from giskardpy.utils.tfwrapper import kdl_to_pose, np_to_kdl
 
@@ -80,32 +79,6 @@ class NullContextManager(object):
 #
 # CONVERSION FUNCTIONS FOR ROS MESSAGES
 #
-
-
-def to_joint_state_dict(msg):
-    """
-    Converts a ROS message of type sensor_msgs/JointState into an instance of MultiJointState.
-    :param msg: ROS message to convert.
-    :type msg: JointState
-    :return: Corresponding MultiJointState instance.
-    :rtype: OrderedDict[str, SingleJointState]
-    """
-    mjs = OrderedDict()
-    for i, joint_name in enumerate(msg.name):
-        sjs = SingleJointState()
-        sjs.name = joint_name
-        sjs.position = msg.position[i]
-        try:
-            sjs.velocity = msg.velocity[i]
-        except IndexError:
-            sjs.velocity = 0
-        try:
-            sjs.effort = msg.effort[i]
-        except IndexError:
-            sjs.effort = 0
-        mjs[joint_name] = sjs
-    return mjs
-
 
 def to_joint_state_position_dict(msg):
     """

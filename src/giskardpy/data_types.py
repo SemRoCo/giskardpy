@@ -1,6 +1,7 @@
 from collections import OrderedDict, defaultdict, deque
 
 import numpy as np
+from sensor_msgs.msg import JointState
 from sortedcontainers import SortedKeyList
 
 from giskardpy.utils.tfwrapper import kdl_to_np, np_vector, np_point
@@ -39,26 +40,56 @@ class FIFOSet(set):
         self._data_queue.remove(item)
 
 
-class SingleJointState(object):
-    def __init__(self, name='', position=0.0, velocity=0.0, acceleration=0.0, jerk=0.0, snap=0.0, crackle=0.0, pop=0.0):
-        self.name = name
-        self.position = position
-        self.velocity = velocity
-        self.acceleration = acceleration
-        self.jerk = jerk
-        self.snap = snap
-        self.crackle = crackle
-        self.pop = pop
+class JointStates(defaultdict):
+    class _JointState(object):
+        derivative_to_name = {
+            0: 'position',
+            1: 'velocity',
+            2: 'acceleration',
+            3: 'jerk',
+            4: 'snap',
+            5: 'crackle',
+            6: 'pop',
+        }
+        
+        def __init__(self, position=0, velocity=0, acceleration=0, jerk=0, snap=0, crackle=0, pop=0):
+            self.position = position
+            self.velocity = velocity
+            self.acceleration = acceleration
+            self.jerk = jerk
+            self.snap = snap
+            self.crackle = crackle
+            self.pop = pop
 
-    def __str__(self):
-        return u'{}: {}, {}, {}, {}, {}, {}, {}'.format(self.name,
-                                                        self.position,
-                                                        self.velocity,
-                                                        self.acceleration,
-                                                        self.jerk,
-                                                        self.snap,
-                                                        self.crackle,
-                                                        self.pop)
+        def set_derivative(self, d, item):
+            setattr(self, self.derivative_to_name[d], item)
+
+        def __str__(self):
+            return '{}'.format(self.position)
+
+        def __repr__(self):
+            return str(self)
+
+    def __init__(self):
+        super(JointStates, self).__init__(self._JointState)
+
+    @classmethod
+    def from_msg(cls, msg):
+        """
+        :type msg: JointState
+        :rtype: JointStates
+        """
+        self = cls()
+        for i, joint_name in enumerate(msg.name):
+            sjs = cls._JointState(position=msg.position[i],
+                                  velocity=msg.velocity[i] if msg.velocity else 0,
+                                  acceleration=0,
+                                  jerk=0,
+                                  snap=0,
+                                  crackle=0,
+                                  pop=0)
+            self[joint_name] = sjs
+        return self
 
 
 class Trajectory(object):

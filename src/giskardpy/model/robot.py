@@ -7,7 +7,7 @@ from copy import deepcopy
 from geometry_msgs.msg import PoseStamped
 
 from giskardpy import WORLD_IMPLEMENTATION, casadi_wrapper as w
-from giskardpy.data_types import SingleJointState, KeyDefaultDict
+from giskardpy.data_types import KeyDefaultDict, JointStates
 from giskardpy.god_map import GodMap
 from giskardpy.model.pybullet_world_object import PyBulletWorldObject
 from giskardpy.qp.free_variable import FreeVariable
@@ -36,14 +36,10 @@ class Robot(Backend):
         self._evaluated_fks = {}
         self._joint_to_frame = {}
         self._joint_symbols = {}
-        # self._joint_position_symbols = KeyDefaultDict(lambda x: w.Symbol(x))  # don't iterate over this map!!
-        # self._joint_velocity_symbols = KeyDefaultDict(lambda x: 0)  # don't iterate over this map!!
-        # self._joint_acceleration_symbols = KeyDefaultDict(lambda x: 0)  # don't iterate over this map!!
         self._joint_linear_limit = {} # KeyDefaultDict(lambda x: 10000)  # don't overwrite urdf limits by default
         self._joint_angular_limit = {} # KeyDefaultDict(lambda x: 100000)
         self._joint_weights = {} # defaultdict(lambda: defaultdict(lambda: 0))
         super(Robot, self).__init__(urdf, base_pose, controlled_joints, path_to_data_folder, *args, **kwargs)
-        # self.reinitialize()
 
     @property
     def hard_constraints(self):
@@ -128,7 +124,6 @@ class Robot(Backend):
         super(Robot, self).reinitialize()
         self._fk_expressions = {}
         self._create_frames_expressions()
-        # self._create_constraints()
         self.init_fast_fks()
 
     def set_joint_symbols(self, symbols, order):
@@ -345,12 +340,9 @@ class Robot(Backend):
         :param f: lambda joint_info: float
         :return:
         """
-        js = {}
+        js = JointStates()
         for joint_name in sorted(self.controlled_joints):
-            sjs = SingleJointState()
-            sjs.name = joint_name
-            sjs.position = f(joint_name)
-            js[joint_name] = sjs
+            js[joint_name].position = f(joint_name)
         return js
 
     def link_order(self, link_a, link_b):

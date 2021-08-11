@@ -1,3 +1,5 @@
+from giskardpy.data_types import JointStates
+
 try:
     # Python 2
     from Queue import Empty, Queue
@@ -12,7 +14,6 @@ from sensor_msgs.msg import JointState
 import giskardpy.identifier as identifier
 from giskardpy.tree.plugin import GiskardBehavior
 from giskardpy.utils.tfwrapper import lookup_pose
-from giskardpy.utils.utils import to_joint_state_dict
 
 
 class ConfigurationPlugin(GiskardBehavior):
@@ -48,7 +49,7 @@ class ConfigurationPlugin(GiskardBehavior):
                 js = self.lock.get()
             else:
                 js = self.lock.get_nowait()
-            self.mjs = to_joint_state_dict(js)
+            self.mjs = JointStates.from_msg(js)
         except Empty:
             pass
 

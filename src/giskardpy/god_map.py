@@ -27,29 +27,25 @@ def get_member(identifier, member):
     except RuntimeError:
         pass
 
-class GetMember(object):
-    def __init__(self, default_value):
-        self.member = None
-        self.default_value = default_value
-        self.child = None
 
+class GetMember(object):
+    def __init__(self):
+        self.member = None
+        self.child = None
 
     def init_call(self, identifier, data):
         self.member = identifier[0]
         sub_data = self.c(data)
         if len(identifier) == 2:
-            self.child = GetMemberLeaf(self.default_value)
+            self.child = GetMemberLeaf()
             return self.child.init_call(identifier[-1], sub_data)
         elif len(identifier) > 2:
-            self.child = GetMember(self.default_value)
+            self.child = GetMember()
             return self.child.init_call(identifier[1:], sub_data)
         return sub_data
 
-
-
     def __call__(self, a):
         return self.c(a)
-
 
     def c(self, a):
         try:
@@ -73,39 +69,32 @@ class GetMember(object):
             return r
         except RuntimeError:
             pass
-        return self.default_value
-
+        raise KeyError(a)
 
     def return_dict(self, a):
         return self.child.c(a[self.member])
 
-
     def return_list(self, a):
         return self.child.c(a[int(self.member)])
-
 
     def return_attribute(self, a):
         return self.child.c(getattr(a, self.member))
 
-
     def return_function_result(self, a):
         return self.child.c(a(*self.member))
 
+
 class GetMemberLeaf(object):
-    def __init__(self, default_value):
+    def __init__(self):
         self.member = None
-        self.default_value = default_value
         self.child = None
 
     def init_call(self, member, data):
         self.member = member
         return self.c(data)
 
-
-
     def __call__(self, a):
         return self.c(a)
-
 
     def c(self, a):
         try:
@@ -129,27 +118,22 @@ class GetMemberLeaf(object):
             return r
         except RuntimeError:
             pass
-        return self.default_value
-
+        raise KeyError(a)
 
     def return_dict(self, a):
         return a[self.member]
 
-
     def return_list(self, a):
         return a[int(self.member)]
 
-
     def return_attribute(self, a):
         return getattr(a, self.member)
-
 
     def return_function_result(self, a):
         return a(*self.member)
 
 
-
-def get_data(identifier, data, default_value=0.0):
+def get_data(identifier, data):
     """
     :param identifier: Identifier in the form of ['pose', 'position', 'x'],
                        to access class member: robot.joint_state = ['robot', 'joint_state']
@@ -162,23 +146,15 @@ def get_data(identifier, data, default_value=0.0):
     """
     try:
         if len(identifier) == 1:
-            shortcut = GetMemberLeaf(default_value)
+            shortcut = GetMemberLeaf()
             result = shortcut.init_call(identifier[0], data)
         else:
-            shortcut = GetMember(default_value)
+            shortcut = GetMember()
             result = shortcut.init_call(identifier, data)
     except AttributeError as e:
         raise KeyError(e)
-        # return default_value, None
-    # except KeyError as e:
-        # traceback.print_exc()
-        # raise KeyError(identifier)
-        # TODO is this really a good idea?
-        # I do this because it automatically sets weights for unused goals to 0
-        # return default_value, None
     except IndexError as e:
         raise KeyError(e)
-        # return default_value, None
     return result, shortcut
 
 
@@ -187,18 +163,17 @@ class GodMap(object):
     Data structure used by tree to exchange information.
     """
 
-    def __init__(self, default_value=0.0):
+    def __init__(self):
         self._data = {}
         self.expr_separator = u'_'
         self.key_to_expr = {}
         self.expr_to_key = {}
-        self.default_value = default_value
         self.last_expr_values = {}
         self.shortcuts = {}
         self.lock = Lock()
 
     def __copy__(self):
-        god_map_copy = GodMap(self.default_value)
+        god_map_copy = GodMap()
         god_map_copy._data = copy(self._data)
         god_map_copy.key_to_expr = copy(self.key_to_expr)
         god_map_copy.expr_to_key = copy(self.expr_to_key)
@@ -210,7 +185,6 @@ class GodMap(object):
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.lock.release()
-
 
     def unsafe_get_data(self, identifier):
         """
@@ -227,7 +201,7 @@ class GodMap(object):
         identifier = tuple(identifier)
         try:
             if identifier not in self.shortcuts:
-                result, shortcut = get_data(identifier, self._data, self.default_value)
+                result, shortcut = get_data(identifier, self._data)
                 if shortcut:
                     self.shortcuts[identifier] = shortcut
                 return result

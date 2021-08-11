@@ -60,4 +60,5 @@ class CollisionMarker(GiskardBehavior):
                     m.colors[-1] = ColorRGBA(1, 0, 0, 1)
         ma = MarkerArray()
         ma.markers.append(m)
-        self.pub_collision_marker.publish(ma)
+        if len(ma.markers[0].points) > 0:
+            self.pub_collision_marker.publish(ma)

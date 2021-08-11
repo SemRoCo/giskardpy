@@ -9,9 +9,6 @@ from giskard_msgs.msg import Constraint as Constraint_msg
 
 import giskardpy.identifier as identifier
 from giskardpy import casadi_wrapper as w
-from giskardpy.input_system import \
-    PoseStampedInput, Vector3StampedInput, FrameInput, \
-    PointStampedInput
 from giskardpy.qp.constraint import VelocityConstraint, Constraint
 
 WEIGHT_MAX = Constraint_msg.WEIGHT_MAX
@@ -123,9 +120,7 @@ class Goal(object):
         :type tip: str
         :return: root_T_tip
         """
-        return FrameInput(self.get_god_map().to_symbol,
-                          prefix=identifier.fk_np +
-                                 [(root, tip)]).get_frame()
+        return self.get_god_map().to_transformation_matrix(identifier.fk_np + [(root, tip)])
 
     def get_parameter_as_symbolic_expression(self, name):
         """
@@ -164,27 +159,16 @@ class Goal(object):
         :param name: name of the god map entry
         :return: a homogeneous transformation matrix, with symbols that refer to a pose stamped in the god map.
         """
-        return PoseStampedInput(self.get_god_map().to_symbol,
-                                translation_prefix=self.get_identifier() +
-                                                   [name,
-                                                    u'pose',
-                                                    u'position'],
-                                rotation_prefix=self.get_identifier() +
-                                                [name,
-                                                 u'pose',
-                                                 u'orientation']).get_frame()
+        return self.get_god_map().to_expr(self.get_identifier() + [name, u'pose'])
 
     def get_input_Vector3Stamped(self, name):
-        return Vector3StampedInput(self.god_map.to_symbol,
-                                   vector_prefix=self.get_identifier() + [name, u'vector']).get_expression()
+        return self.get_god_map().to_expr(self.get_identifier() + [name, u'vector'])
 
     def get_input_PointStamped(self, name):
-        return PointStampedInput(self.god_map.to_symbol,
-                                 prefix=self.get_identifier() + [name, u'point']).get_expression()
+        return self.get_god_map().to_expr(self.get_identifier() + [name, u'point'])
 
     def get_input_np_frame(self, name):
-        return FrameInput(self.get_god_map().to_symbol,
-                          prefix=self.get_identifier() + [name]).get_frame()
+        return self.get_god_map().to_transformation_matrix(self.get_identifier() + [name])
 
     def get_expr_velocity(self, expr):
         return w.total_derivative(expr,

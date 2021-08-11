@@ -16,7 +16,6 @@ import giskardpy.identifier as identifier
 import giskardpy.model.pybullet_wrapper as pbw
 from giskardpy.data_types import BiDict, KeyDefaultDict
 from giskardpy.god_map import GodMap
-from giskardpy.input_system import JointStatesInput
 from giskardpy.tree.plugin import PluginBehavior
 from giskardpy.tree.plugin_action_server import GoalReceived, SendResult, GoalCanceled
 from giskardpy.tree.plugin_append_zero_velocity import AppendZeroVelocity
@@ -64,6 +63,7 @@ order_map = BiDict({
 
 
 def initialize_god_map():
+    # FIXME i hate this function
     god_map = GodMap()
     blackboard = Blackboard
     blackboard.god_map = god_map
@@ -87,16 +87,6 @@ def initialize_god_map():
         else:
             break
         rospy.sleep(0.5)
-
-    # process_joint_specific_params(identifier.self_collision_avoidance_distance,
-    #                               identifier.self_collision_avoidance_default_threshold,
-    #                               identifier.self_collision_avoidance_default_override,
-    #                               god_map)
-    #
-    # process_joint_specific_params(identifier.external_collision_avoidance_distance,
-    #                               identifier.external_collision_avoidance_default_threshold,
-    #                               identifier.external_collision_avoidance_default_override,
-    #                               god_map)
 
     set_default_in_override_block(identifier.external_collision_avoidance, god_map)
     set_default_in_override_block(identifier.self_collision_avoidance, god_map)
@@ -132,10 +122,10 @@ def initialize_god_map():
     # joint symbols
     for o in range(order):
         key = order_map[o]
-        joint_position_symbols = JointStatesInput(blackboard.god_map.to_symbol, world.robot.get_movable_joints(),
-                                                  identifier.joint_states,
-                                                  suffix=[key])
-        world.robot.set_joint_symbols(joint_position_symbols.joint_map, o)
+        joint_position_symbols = {}
+        for joint_name in world.robot.get_movable_joints():
+            joint_position_symbols[joint_name] = god_map.to_symbol(identifier.joint_states + [joint_name, key])
+        world.robot.set_joint_symbols(joint_position_symbols, o)
 
     world.robot.reinitialize()
 

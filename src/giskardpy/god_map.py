@@ -2,6 +2,9 @@ import copy
 from copy import copy
 from multiprocessing import Lock
 
+import numpy as np
+from geometry_msgs.msg import Pose, Point, Vector3
+
 from giskardpy import casadi_wrapper as w
 
 
@@ -236,6 +239,89 @@ class GodMap(object):
             self.key_to_expr[identifier] = expr
             self.expr_to_key[str(expr)] = identifier_parts
         return self.key_to_expr[identifier]
+
+    def to_expr(self, identifier):
+        data = self.get_data(identifier)
+        if isinstance(data, Pose):
+            return self.pose_msg_to_matrix(identifier)
+        elif isinstance(data, Point):
+            return self.point_msg_to_matrix(identifier)
+        elif isinstance(data, Vector3):
+            return self.point_msg_to_matrix(identifier)
+        elif isinstance(data, list) or (isinstance(data, np.ndarray) and len(data.shape) == 1):
+            return self.list_to_symbol_matrix(identifier, len(data))
+
+    def list_to_symbol_matrix(self, identifier, length):
+        return w.Matrix([self.to_symbol(identifier + [i]) for i in range(length)])
+
+    def to_point3(self, identifier):
+        return w.point3(
+            x=self.to_symbol(identifier + [0]),
+            y=self.to_symbol(identifier + [1]),
+            z=self.to_symbol(identifier + [2]),
+        )
+
+    def to_vector3(self, identifier):
+        return w.vector3(
+            x=self.to_symbol(identifier + [0]),
+            y=self.to_symbol(identifier + [1]),
+            z=self.to_symbol(identifier + [2]),
+        )
+
+    def to_translation3(self, identifier):
+        return w.translation3(
+            x=self.to_symbol(identifier + [0]),
+            y=self.to_symbol(identifier + [1]),
+            z=self.to_symbol(identifier + [2]),
+        )
+
+    def to_transformation_matrix(self, identifier):
+        return w.Matrix(
+            [
+                [
+                    self.to_symbol(identifier + [0, 0]),
+                    self.to_symbol(identifier + [0, 1]),
+                    self.to_symbol(identifier + [0, 2]),
+                    self.to_symbol(identifier + [0, 3])
+                ],
+                [
+                    self.to_symbol(identifier + [1, 0]),
+                    self.to_symbol(identifier + [1, 1]),
+                    self.to_symbol(identifier + [1, 2]),
+                    self.to_symbol(identifier + [1, 3])
+                ],
+                [
+                    self.to_symbol(identifier + [2, 0]),
+                    self.to_symbol(identifier + [2, 1]),
+                    self.to_symbol(identifier + [2, 2]),
+                    self.to_symbol(identifier + [2, 3])
+                ],
+                [
+                    0, 0, 0, 1
+                ],
+            ]
+        )
+
+    def pose_msg_to_matrix(self, identifier):
+        return w.frame_quaternion(
+            x=self.to_symbol(identifier + ['position', 'x']),
+            y=self.to_symbol(identifier + ['position', 'y']),
+            z=self.to_symbol(identifier + ['position', 'z']),
+            qx=self.to_symbol(identifier + ['orientation', 'x']),
+            qy=self.to_symbol(identifier + ['orientation', 'y']),
+            qz=self.to_symbol(identifier + ['orientation', 'z']),
+            qw=self.to_symbol(identifier + ['orientation', 'w']),
+        )
+
+    def point_msg_to_matrix(self, identifier):
+        return w.point3(
+            x=self.to_symbol(identifier + ['x']),
+            y=self.to_symbol(identifier + ['y']),
+            z=self.to_symbol(identifier + ['z']),
+        )
+
+    def vector_msg_to_matrix(self, identifier):
+        return self.point_msg_to_matrix(identifier)
 
     def get_values(self, symbols):
         """

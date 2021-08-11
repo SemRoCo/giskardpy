@@ -22,11 +22,10 @@ PKG = u'giskardpy'
 class TestGodMap(unittest.TestCase):
     @given(variable_name(),
            variable_name(),
-           st.integers(),
            st.integers())
-    def test_god_map_key_error(self, key, wrong_key, number, default_value):
+    def test_god_map_key_error(self, key, wrong_key, number):
         assume(key != wrong_key)
-        db = GodMap(default_value)
+        db = GodMap()
         db.set_data([key], number)
         try:
             db.get_data([wrong_key])
@@ -307,6 +306,14 @@ class TestGodMap(unittest.TestCase):
         gm.set_data([key], value)
         self.assertTrue(w.is_symbol(gm.to_symbol([key])))
         self.assertTrue(key in str(gm.to_symbol([key])))
+
+    def test_to_symbol_pose_stamped(self):
+        gm = GodMap()
+        pose = PoseStamped()
+        gm.set_data(['muh'], pose)
+        result = gm.to_expr(['muh'])
+        self.assertEqual(result.shape[0], 4)
+        self.assertEqual(result.shape[1], 4)
 
     @given(lists_of_same_length([variable_name(), st.floats()], unique=True))
     def test_get_symbol_map(self, keys_values):

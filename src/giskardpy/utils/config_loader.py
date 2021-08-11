@@ -143,7 +143,20 @@ def construct_find(loader, node):
 def load_robot_yaml(path):
     with open(path, 'r') as f:
         data = yaml.load(f, Loader)
-        return update_parents(data)
+        result = update_parents(data)
+        replace_str_numbers(result)
+        return result
+
+
+def replace_str_numbers(data):
+    for key, value in data.items():
+        if isinstance(value, dict):
+            replace_str_numbers(value)
+        elif isinstance(value, str):
+            try:
+                data[key] = float(value)
+            except:
+                pass
 
 
 def ros_load_robot_config(config_file, test=False):

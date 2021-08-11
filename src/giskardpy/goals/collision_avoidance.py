@@ -1,7 +1,7 @@
+import giskardpy.utils.tfwrapper as tf
 from giskardpy import casadi_wrapper as w, identifier
 from giskardpy.goals.goal import Goal, WEIGHT_COLLISION_AVOIDANCE, WEIGHT_ABOVE_CA
-from giskardpy.input_system import Vector3Input, Point3Input, TranslationInput
-import giskardpy.utils.tfwrapper as tf
+
 
 class ExternalCollisionAvoidance(Goal):
 
@@ -21,28 +21,25 @@ class ExternalCollisionAvoidance(Goal):
         self.robot_name = self.get_robot_unsafe().get_name()
 
     def get_contact_normal_on_b_in_root(self):
-        return Vector3Input(self.god_map.to_symbol,
-                            prefix=identifier.closest_point + [u'get_external_collisions',
-                                                               (self.link_name,),
-                                                               self.idx,
-                                                               u'get_contact_normal_in_root',
-                                                               tuple()]).get_expression()
+        return self.get_god_map().to_vector3(identifier.closest_point + [u'get_external_collisions',
+                                                                         (self.link_name,),
+                                                                         self.idx,
+                                                                         u'get_contact_normal_in_root',
+                                                                         tuple()])
 
     def get_closest_point_on_a_in_a(self):
-        return Point3Input(self.god_map.to_symbol,
-                           prefix=identifier.closest_point + [u'get_external_collisions',
-                                                              (self.link_name,),
-                                                              self.idx,
-                                                              u'get_position_on_a_in_a',
-                                                              tuple()]).get_expression()
+        return self.get_god_map().to_point3(identifier.closest_point + [u'get_external_collisions',
+                                                                        (self.link_name,),
+                                                                        self.idx,
+                                                                        u'get_position_on_a_in_a',
+                                                                        tuple()])
 
     def get_closest_point_on_b_in_root(self):
-        return Point3Input(self.god_map.to_symbol,
-                           prefix=identifier.closest_point + [u'get_external_collisions',
-                                                              (self.link_name,),
-                                                              self.idx,
-                                                              u'get_position_on_b_in_root',
-                                                              tuple()]).get_expression()
+        return self.get_god_map().to_point3(identifier.closest_point + [u'get_external_collisions',
+                                                                        (self.link_name,),
+                                                                        self.idx,
+                                                                        u'get_position_on_b_in_root',
+                                                                        tuple()])
 
     def get_actual_distance(self):
         return self.god_map.to_symbol(identifier.closest_point + [u'get_external_collisions',
@@ -74,9 +71,8 @@ class ExternalCollisionAvoidance(Goal):
         root_T_a = self.get_fk(self.robot_root, self.link_name)
 
         r_P_pa = w.dot(root_T_a, a_P_pa)
-        r_V_pb_pa = r_P_pa  # - r_P_pb
 
-        dist = w.dot(r_V_n.T, r_V_pb_pa)[0]
+        dist = w.dot(r_V_n.T, r_P_pa)[0]
 
         qp_limits_for_lba = max_velocity * sample_period * self.control_horizon
 
@@ -127,7 +123,6 @@ class ExternalCollisionAvoidance(Goal):
         return u'{}/{}/{}'.format(s, self.link_name, self.idx)
 
 
-
 class SelfCollisionAvoidance(Goal):
 
     def __init__(self, god_map, link_a, link_b, max_velocity=0.2, hard_threshold=0.0, soft_threshold=0.05, idx=0,
@@ -144,28 +139,25 @@ class SelfCollisionAvoidance(Goal):
         self.robot_name = self.get_robot_unsafe().get_name()
 
     def get_contact_normal_in_b(self):
-        return Vector3Input(self.god_map.to_symbol,
-                            prefix=identifier.closest_point + [u'get_self_collisions',
-                                                               (self.link_a, self.link_b),
-                                                               self.idx,
-                                                               u'get_contact_normal_in_b',
-                                                               tuple()]).get_expression()
+        return self.get_god_map().to_vector3(identifier.closest_point + [u'get_self_collisions',
+                                                                         (self.link_a, self.link_b),
+                                                                         self.idx,
+                                                                         u'get_contact_normal_in_b',
+                                                                         tuple()])
 
     def get_position_on_a_in_a(self):
-        return Point3Input(self.god_map.to_symbol,
-                           prefix=identifier.closest_point + [u'get_self_collisions',
-                                                              (self.link_a, self.link_b),
-                                                              self.idx,
-                                                              u'get_position_on_a_in_a',
-                                                              tuple()]).get_expression()
+        return self.get_god_map().to_point3(identifier.closest_point + [u'get_self_collisions',
+                                                                        (self.link_a, self.link_b),
+                                                                        self.idx,
+                                                                        u'get_position_on_a_in_a',
+                                                                        tuple()])
 
     def get_b_T_pb(self):
-        return TranslationInput(self.god_map.to_symbol,
-                                prefix=identifier.closest_point + [u'get_self_collisions',
-                                                                   (self.link_a, self.link_b),
-                                                                   self.idx,
-                                                                   u'get_position_on_b_in_b',
-                                                                   tuple()]).get_frame()
+        return self.get_god_map().to_translation3(identifier.closest_point + [u'get_self_collisions',
+                                                                              (self.link_a, self.link_b),
+                                                                              self.idx,
+                                                                              u'get_position_on_b_in_b',
+                                                                              tuple()])
 
     def get_actual_distance(self):
         return self.god_map.to_symbol(identifier.closest_point + [u'get_self_collisions',
@@ -293,25 +285,22 @@ class CollisionAvoidanceHint(Goal):
         self.weight = weight
 
     def get_contact_normal_on_b_in_root(self):
-        return Vector3Input(self.god_map.to_symbol,
-                            prefix=identifier.closest_point + [u'get_external_collisions_long_key',
-                                                               self.key,
-                                                               u'get_contact_normal_in_root',
-                                                               tuple()]).get_expression()
+        return self.get_god_map().to_vector3(identifier.closest_point + [u'get_external_collisions_long_key',
+                                                                         self.key,
+                                                                         u'get_contact_normal_in_root',
+                                                                         tuple()])
 
     def get_closest_point_on_a_in_a(self):
-        return Point3Input(self.god_map.to_symbol,
-                           prefix=identifier.closest_point + [u'get_external_collisions_long_key',
-                                                              self.key,
-                                                              u'get_position_on_a_in_a',
-                                                              tuple()]).get_expression()
+        return self.get_god_map().to_point3(identifier.closest_point + [u'get_external_collisions_long_key',
+                                                                        self.key,
+                                                                        u'get_position_on_a_in_a',
+                                                                        tuple()])
 
     def get_closest_point_on_b_in_root(self):
-        return Point3Input(self.god_map.to_symbol,
-                           prefix=identifier.closest_point + [u'get_external_collisions_long_key',
-                                                              self.key,
-                                                              u'get_position_on_b_in_root',
-                                                              tuple()]).get_expression()
+        return self.get_god_map().to_point3(identifier.closest_point + [u'get_external_collisions_long_key',
+                                                                        self.key,
+                                                                        u'get_position_on_b_in_root',
+                                                                        tuple()])
 
     def get_actual_distance(self):
         return self.god_map.to_symbol(identifier.closest_point + [u'get_external_collisions_long_key',
@@ -369,4 +358,3 @@ class CollisionAvoidanceHint(Goal):
     def __str__(self):
         s = super(CollisionAvoidanceHint, self).__str__()
         return u'{}/{}/{}/{}'.format(s, self.link_name, self.body_b, self.link_b)
-

@@ -179,7 +179,7 @@ class Robot(Backend):
         """
         self._hard_constraints = OrderedDict()
         self._joint_constraints = OrderedDict()
-        for i, joint_name in enumerate(self.get_joint_names_controllable()):
+        for i, joint_name in enumerate(self.controlled_joints):
             lower_limits = {}
             upper_limits = {}
             order = max(list(self._joint_symbols.keys()) + list(self._joint_weights.keys()))
@@ -188,11 +188,6 @@ class Robot(Backend):
                 # These can be None
                 lower_limits[i] = lower_limit
                 upper_limits[i] = upper_limit
-
-            # start_v = 0.005
-            # a_v = (v_i - start_v) / (ch)
-            # def hf(w, t):
-            #     return w + w * 1 * t
 
             self._joint_constraints[joint_name] = FreeVariable(
                 # FIXME there might not be an entry for a specific joint for an order

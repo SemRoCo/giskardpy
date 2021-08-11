@@ -46,8 +46,6 @@ class JointPositionContinuous(Goal):
 
         error = w.shortest_angular_distance(current_joint, joint_goal)
 
-        weight = self.normalize_weight(max_velocity, weight)
-
         self.add_constraint('',
                             reference_velocity=max_velocity,
                             lower_error=error,
@@ -100,8 +98,6 @@ class JointPositionPrismatic(Goal):
                              self.get_robot().get_joint_velocity_limit_expr(self.joint_name))
 
         error = joint_goal - current_joint
-
-        weight = self.normalize_weight(max_velocity, weight)
 
         self.add_constraint('',
                             reference_velocity=max_velocity,
@@ -156,8 +152,6 @@ class JointPositionRevolute(Goal):
                              self.get_robot().get_joint_velocity_limit_expr(self.joint_name))
 
         error = joint_goal - current_joint
-
-        weight = self.normalize_weight(max_velocity, weight)
 
         self.add_constraint('',
                             reference_velocity=max_velocity,
@@ -224,8 +218,6 @@ class ShakyJointPositionRevoluteOrPrismatic(Goal):
         err = (joint_goal - current_joint) + noise_amplitude * max_velocity * w.sin(fun_params)
         capped_err = self.limit_velocity(err, noise_amplitude * max_velocity)
 
-        weight = self.normalize_weight(max_velocity, weight)
-
         self.add_constraint('',
                             lower_error=capped_err,
                             upper_error=capped_err,
@@ -291,8 +283,6 @@ class ShakyJointPositionContinuous(Goal):
             fun_params)
         capped_err = self.limit_velocity(err, noise_amplitude * max_velocity)
 
-        weight = self.normalize_weight(max_velocity, weight)
-
         self.add_constraint('',
                             lower_error=capped_err,
                             upper_error=capped_err,
@@ -349,13 +339,11 @@ class AvoidJointLimitsRevolute(Goal):
         error = w.max(w.abs(w.min(upper_err, 0)), w.abs(w.max(lower_err, 0)))
         weight = weight * (error / max_error)
 
-        weight_normalized = self.normalize_weight(max_velocity, weight)
-
         self.add_constraint(u'',
                             reference_velocity=max_velocity,
                             lower_error=lower_err,
                             upper_error=upper_err,
-                            weight=weight_normalized,
+                            weight=weight,
                             expression=joint_symbol)
 
     def __str__(self):
@@ -407,13 +395,11 @@ class AvoidJointLimitsPrismatic(Goal):
         error = w.max(w.abs(w.min(upper_err, 0)), w.abs(w.max(lower_err, 0)))
         weight = weight * (error / max_error)
 
-        weight_normalized = self.normalize_weight(max_velocity, weight)
-
         self.add_constraint(u'',
                             reference_velocity=max_velocity,
                             lower_error=lower_err,
                             upper_error=upper_err,
-                            weight=weight_normalized,
+                            weight=weight,
                             expression=joint_symbol)
 
     def __str__(self):

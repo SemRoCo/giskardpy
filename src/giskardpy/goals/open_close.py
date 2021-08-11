@@ -105,12 +105,11 @@ class OpenDoor(Goal):
         hinge_P_tip = w.position_of(w.dot(hinge_T_root, root_T_tip))[:3]
 
         dist_expr = w.norm(hinge_P_tip)
-        weight = self.normalize_weight(0.1, base_weight)
         self.add_constraint(u'/dist',
                             reference_velocity=0.1,
                             lower_error=dist_goal - dist_expr,
                             upper_error=dist_goal - dist_expr,
-                            weight=weight,
+                            weight=base_weight,
                             expression=dist_expr)
 
         hinge0_T_tipCurrent = w.dot(w.inverse_frame(root_T_hinge0), root_T_tipCurrent)

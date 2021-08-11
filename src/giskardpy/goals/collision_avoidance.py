@@ -98,7 +98,6 @@ class ExternalCollisionAvoidance(Goal):
 
         weight = w.if_greater(actual_distance, 50, 0, WEIGHT_COLLISION_AVOIDANCE)
 
-        weight = self.normalize_weight(max_velocity, weight)
         weight = w.save_division(weight,  # divide by number of active repeller per link
                                  w.min(number_of_external_collisions, num_repeller))
 
@@ -188,7 +187,6 @@ class SelfCollisionAvoidance(Goal):
         dist = w.dot(pb_V_n.T, pb_P_pa)[0]
 
         weight = w.if_greater(actual_distance, 50, 0, WEIGHT_COLLISION_AVOIDANCE)
-        weight = self.normalize_weight(max_velocity, weight)
         weight = w.save_division(weight,  # divide by number of active repeller per link
                                  w.min(number_of_self_collisions, num_repeller))
 
@@ -336,20 +334,19 @@ class CollisionAvoidanceHint(Goal):
                               spring_weight)
         weight = w.if_eq(body_b_hash, self.body_b_hash, weight, 0)
         weight = w.if_eq(link_b_hash, self.link_b_hash, weight, 0)
-        weight = self.normalize_weight(max_velocity, weight)
 
         root_V_avoidance_hint = self.get_parameter_as_symbolic_expression(u'avoidance_hint')
 
         # penetration_distance = threshold - actual_distance_capped
-        error_capped = self.limit_velocity(max_velocity, max_velocity)
 
         root_P_a = w.position_of(root_T_a)
         expr = w.dot(root_V_avoidance_hint[:3].T, root_P_a[:3])
 
+        # FIXME really?
         self.add_constraint(u'avoidance_hint',
                             reference_velocity=max_velocity,
-                            lower_error=error_capped,
-                            upper_error=error_capped,
+                            lower_error=max_velocity,
+                            upper_error=max_velocity,
                             weight=weight,
                             expression=expr)
 

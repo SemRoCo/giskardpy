@@ -42,7 +42,6 @@ class Pointing(Goal):
         # get_input functions generally return symbols referring to god map entries
         max_velocity = self.get_parameter_as_symbolic_expression(u'max_velocity')
         weight = self.get_parameter_as_symbolic_expression(u'weight')
-        weight = self.normalize_weight(max_velocity, weight)
 
         root_T_tip = self.get_fk(self.root, self.tip)
         goal_point = self.get_parameter_as_symbolic_expression(u'goal_point')

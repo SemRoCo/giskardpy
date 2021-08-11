@@ -24,15 +24,15 @@ class Goal(object):
         if control_horizon is None:
             control_horizon = self.prediction_horizon
         self.control_horizon = max(min(control_horizon, self.prediction_horizon - 2), 1)
-        self.save_self_on_god_map()
+        self._save_self_on_god_map()
 
-    def save_self_on_god_map(self):
-        self.get_god_map().set_data(self.get_identifier(), self)
+    def _save_self_on_god_map(self):
+        self.get_god_map().set_data(self._get_identifier(), self)
 
     def make_constraints(self):
         pass
 
-    def get_identifier(self):
+    def _get_identifier(self):
         try:
             return identifier.goals + [str(self)]
         except AttributeError as e:
@@ -129,7 +129,7 @@ class Goal(object):
         """
         if not hasattr(self, name):
             raise AttributeError(u'{} doesn\'t have attribute {}'.format(self.__class__.__name__, name))
-        return self.get_god_map().to_expr(self.get_identifier() + [name])
+        return self.get_god_map().to_expr(self._get_identifier() + [name])
 
     def get_expr_velocity(self, expr):
         return w.total_derivative(expr,
@@ -159,9 +159,6 @@ class Goal(object):
         sample_period = self.get_sampling_period_symbol()
         max_velocity *= sample_period * self.control_horizon
         return w.max(w.min(error, max_velocity), -max_velocity)
-
-    def normalize_weight(self, velocity_limit, weight):
-        return weight
 
     def get_constraints(self):
         """
@@ -237,20 +234,7 @@ class Goal(object):
         :return:
         """
         r_P_c = w.position_of(self.get_fk(root, tip))
-
         r_P_error = r_P_g - r_P_c
-        trans_error = w.norm(r_P_c)
-
-        # trans_scale = w.scale(r_P_error, max_velocity)
-        # r_P_intermediate_error = w.save_division(r_P_error, trans_error) * trans_scale
-
-        weight = self.normalize_weight(max_velocity, weight)
-
-        # self.add_debug_vector(u'r_P_error', r_P_error)
-        # self.add_debug_vector(u'r_P_error/vel', self.get_expr_velocity(r_P_error))
-        # self.add_debug_vector(u'trans_error', trans_error)
-        # self.add_debug_vector(u'trans_error/v', w.norm(self.get_expr_velocity(r_P_error)))
-        # self.add_debug_vector(u'trans_error/vel', self.get_expr_velocity(trans_error))
 
         self.add_constraint(u'{}/x'.format(prefix),
                             reference_velocity=reference_velocity,
@@ -271,6 +255,7 @@ class Goal(object):
                             weight=weight,
                             expression=r_P_c[2])
         if max_velocity is not None:
+            trans_error = w.norm(r_P_c)
             self.add_velocity_constraint(u'{}/vel'.format(prefix),
                                          velocity_limit=max_velocity,
                                          weight=weight,
@@ -286,8 +271,6 @@ class Goal(object):
                                         angle)  # avoid singularity by staying away from pi
         root_V_goal_normal_intermediate = w.slerp(root_V_tip_normal, root_V_goal_normal, angle_limited)
         error = root_V_goal_normal_intermediate - root_V_tip_normal
-
-        weight = self.normalize_weight(max_velocity, weight)
 
         self.add_constraint(u'/{}/rot/x'.format(prefix),
                             reference_velocity=max_velocity,
@@ -317,8 +300,6 @@ class Goal(object):
         tip_Q_tipCurrent = w.quaternion_from_matrix(w.dot(tip_R_rootCurrent_eval, root_R_tipCurrent))
         root_Q_tipCurrent = w.quaternion_from_matrix(root_R_tipCurrent)
         tip_R_goal = w.dot(tip_R_rootCurrent_eval, root_R_tipGoal)
-
-        weight = self.normalize_weight(reference_velocity, weight)
 
         tip_Q_goal = w.quaternion_from_matrix(tip_R_goal)
 

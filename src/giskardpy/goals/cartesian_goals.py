@@ -312,8 +312,6 @@ class CartesianVelocityLimit(Goal):
         tip_evaluated_T_root = self.get_fk_evaluated(self.tip_link, self.root_link)
         root_P_tip = w.position_of(root_T_tip)
 
-        linear_weight = self.normalize_weight(max_linear_velocity, weight)
-
         if self.hard:
             slack_limit = 0
         else:
@@ -322,7 +320,7 @@ class CartesianVelocityLimit(Goal):
         self.add_constraint(u'/linear/x',
                             lower_velocity_limit=-max_linear_velocity * sample_period,
                             upper_velocity_limit=max_linear_velocity * sample_period,
-                            weight=linear_weight,
+                            weight=weight,
                             expression=root_P_tip[0],
                             goal_constraint=False,
                             lower_slack_limit=-slack_limit,
@@ -330,7 +328,7 @@ class CartesianVelocityLimit(Goal):
         self.add_constraint(u'/linear/y',
                             lower_velocity_limit=-max_linear_velocity * sample_period,
                             upper_velocity_limit=max_linear_velocity * sample_period,
-                            weight=linear_weight,
+                            weight=weight,
                             expression=root_P_tip[1],
                             goal_constraint=False,
                             lower_slack_limit=-slack_limit,
@@ -339,7 +337,7 @@ class CartesianVelocityLimit(Goal):
         self.add_constraint(u'/linear/z',
                             lower_velocity_limit=-max_linear_velocity * sample_period,
                             upper_velocity_limit=max_linear_velocity * sample_period,
-                            weight=linear_weight,
+                            weight=weight,
                             expression=root_P_tip[2],
                             goal_constraint=False,
                             lower_slack_limit=-slack_limit,
@@ -352,14 +350,13 @@ class CartesianVelocityLimit(Goal):
         hack = w.rotation_matrix_from_axis_angle([0, 0, 1], 0.0001)
 
         axis, angle = w.axis_angle_from_matrix(w.dot(w.dot(tip_evaluated_R_root, hack), root_R_tip))
-        angular_weight = self.normalize_weight(max_angular_velocity, weight)
 
         axis_angle = axis * angle
 
         self.add_constraint(u'/angular/x',
                             lower_velocity_limit=-max_angular_velocity * sample_period,
                             upper_velocity_limit=max_angular_velocity * sample_period,
-                            weight=angular_weight,
+                            weight=weight,
                             expression=axis_angle[0],
                             goal_constraint=False,
                             lower_slack_limit=-slack_limit,
@@ -369,7 +366,7 @@ class CartesianVelocityLimit(Goal):
         self.add_constraint(u'/angular/y',
                             lower_velocity_limit=-max_angular_velocity * sample_period,
                             upper_velocity_limit=max_angular_velocity * sample_period,
-                            weight=angular_weight,
+                            weight=weight,
                             expression=axis_angle[1],
                             goal_constraint=False,
                             lower_slack_limit=-slack_limit,
@@ -379,7 +376,7 @@ class CartesianVelocityLimit(Goal):
         self.add_constraint(u'/angular/z',
                             lower_velocity_limit=-max_angular_velocity * sample_period,
                             upper_velocity_limit=max_angular_velocity * sample_period,
-                            weight=angular_weight,
+                            weight=weight,
                             expression=axis_angle[2],
                             goal_constraint=False,
                             lower_slack_limit=-slack_limit,

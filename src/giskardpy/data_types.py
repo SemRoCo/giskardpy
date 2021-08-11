@@ -51,7 +51,7 @@ class JointStates(defaultdict):
             5: 'crackle',
             6: 'pop',
         }
-        
+
         def __init__(self, position=0, velocity=0, acceleration=0, jerk=0, snap=0, crackle=0, pop=0):
             self.position = position
             self.velocity = velocity

@@ -238,7 +238,8 @@ def grow_tree():
     planning_4.add_plugin(ControllerPlugin(u'controller'))
     planning_4.add_plugin(KinSimPlugin(u'kin sim'))
     planning_4.add_plugin(LogTrajPlugin(u'log'))
-    # planning_4.add_plugin(LogDebugExpressionsPlugin(u'log lba'))
+    if god_map.get_data(identifier.PlotDebugTrajectory_enabled):
+        planning_4.add_plugin(LogDebugExpressionsPlugin(u'log lba'))
     planning_4.add_plugin(WiggleCancel(u'wiggle'))
     planning_4.add_plugin(LoopDetector(u'loop detector'))
     planning_4.add_plugin(GoalReachedPlugin(u'goal reached'))
@@ -290,9 +291,9 @@ def grow_tree():
     if god_map.get_data(identifier.PlotTrajectory_enabled):
         kwargs = god_map.get_data(identifier.PlotTrajectory)
         post_processing.add_child(PlotTrajectory(u'plot trajectory', **kwargs))
-    # if god_map.get_data(identifier.PlotDebugTrajectory_enabled):
-    #     kwargs = god_map.get_data(identifier.PlotDebugTrajectory)
-    #     post_processing.add_child(PlotDebugExpressions(u'plot debug expressions', **kwargs))
+    if god_map.get_data(identifier.PlotDebugTrajectory_enabled):
+        kwargs = god_map.get_data(identifier.PlotDebugTrajectory)
+        post_processing.add_child(PlotDebugExpressions(u'plot debug expressions', **kwargs))
     post_processing.add_child(PostProcessing(u'evaluate result'))
     # ----------------------------------------------
     planning = success_is_failure(Sequence)(u'planning')

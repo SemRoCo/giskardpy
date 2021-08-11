@@ -2,6 +2,7 @@ from collections import OrderedDict
 from py_trees import Status
 
 from giskardpy import identifier
+from giskardpy.data_types import JointStates
 from giskardpy.tree.plugin import GiskardBehavior
 
 
@@ -21,15 +22,13 @@ class LogDebugExpressionsPlugin(GiskardBehavior):
             last_mjs = None
             if time >= 1:
                 last_mjs = self.trajectory.get_exact(time-1)
-            mjs = OrderedDict()
+            js = JointStates()
             for name, value in debug_data.items():
                 if last_mjs is not None:
                     velocity = value - last_mjs[name].position
                 else:
                     velocity = 0
-                data_point = SingleJointState(name=name,
-                                              position=value,
-                                              velocity=velocity/self.sample_period)
-                mjs[name] = data_point
-            self.trajectory.set(time, mjs)
+                js[name].position = value
+                js[name].velocity = velocity/self.sample_period
+            self.trajectory.set(time, js)
         return Status.RUNNING

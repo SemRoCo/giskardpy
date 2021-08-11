@@ -1,10 +1,8 @@
 from __future__ import division
 
-import numbers
 from collections import OrderedDict
 
 import numpy as np
-from geometry_msgs.msg import Vector3Stamped, PoseStamped, PointStamped
 from giskard_msgs.msg import Constraint as Constraint_msg
 
 import giskardpy.identifier as identifier
@@ -83,21 +81,22 @@ class Goal(object):
         key = identifier.joint_states + [joint_name, u'position']
         return self.god_map.to_symbol(key)
 
-    def get_input_joint_velocity(self, joint_name):
+    def get_joint_velocity_symbols(self, joint_name):
         """
         returns a symbol that referes to the given joint
         """
         key = identifier.joint_states + [joint_name, u'velocity']
         return self.god_map.to_symbol(key)
 
-    def get_input_object_joint_position(self, object_name, joint_name):
+    def get_object_joint_position_symbol(self, object_name, joint_name):
         """
         returns a symbol that referes to the given joint
         """
+        # TODO test me
         key = identifier.world + [u'get_object', (object_name,), u'joint_state', joint_name, u'position']
         return self.god_map.to_symbol(key)
 
-    def get_input_sampling_period(self):
+    def get_sampling_period_symbol(self):
         return self.god_map.to_symbol(identifier.sample_period)
 
     def __str__(self):
@@ -120,7 +119,7 @@ class Goal(object):
         :type tip: str
         :return: root_T_tip
         """
-        return self.get_god_map().to_transformation_matrix(identifier.fk_np + [(root, tip)])
+        return self.get_god_map().list_to_frame(identifier.fk_np + [(root, tip)])
 
     def get_parameter_as_symbolic_expression(self, name):
         """
@@ -130,45 +129,7 @@ class Goal(object):
         """
         if not hasattr(self, name):
             raise AttributeError(u'{} doesn\'t have attribute {}'.format(self.__class__.__name__, name))
-        key = self.get_identifier() + [name]
-        value = self.get_god_map().get_data(key)
-        if isinstance(value, numbers.Number):
-            return self.get_input_float(name)
-        elif isinstance(value, PoseStamped):
-            return self.get_input_PoseStamped(name)
-        elif isinstance(value, PointStamped):
-            return self.get_input_PointStamped(name)
-        elif isinstance(value, Vector3Stamped):
-            return self.get_input_Vector3Stamped(name)
-        elif isinstance(value, np.ndarray):
-            return self.get_input_np_frame(name)
-        else:
-            raise NotImplementedError(u'Symbol reference not implemented for this type.')
-
-    def get_input_float(self, name):
-        """
-        Returns a symbol that refers to the value of "name" on god map
-        :type name: Union[str, unicode]
-        :return: symbol
-        """
-        key = self.get_identifier() + [name]
-        return self.god_map.to_symbol(key)
-
-    def get_input_PoseStamped(self, name):
-        """
-        :param name: name of the god map entry
-        :return: a homogeneous transformation matrix, with symbols that refer to a pose stamped in the god map.
-        """
-        return self.get_god_map().to_expr(self.get_identifier() + [name, u'pose'])
-
-    def get_input_Vector3Stamped(self, name):
-        return self.get_god_map().to_expr(self.get_identifier() + [name, u'vector'])
-
-    def get_input_PointStamped(self, name):
-        return self.get_god_map().to_expr(self.get_identifier() + [name, u'point'])
-
-    def get_input_np_frame(self, name):
-        return self.get_god_map().to_transformation_matrix(self.get_identifier() + [name])
+        return self.get_god_map().to_expr(self.get_identifier() + [name])
 
     def get_expr_velocity(self, expr):
         return w.total_derivative(expr,
@@ -195,7 +156,7 @@ class Goal(object):
         :param max_velocity: float or expression representing the max velocity
         :return: expression that limits the velocity of error to max_velocity
         """
-        sample_period = self.get_input_sampling_period()
+        sample_period = self.get_sampling_period_symbol()
         max_velocity *= sample_period * self.control_horizon
         return w.max(w.min(error, max_velocity), -max_velocity)
 

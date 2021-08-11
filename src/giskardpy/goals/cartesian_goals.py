@@ -20,7 +20,7 @@ class BasicCartesianGoal(Goal):
         super(BasicCartesianGoal, self).__init__(god_map, **kwargs)
 
     def get_goal_pose(self):
-        return self.get_input_PoseStamped(u'goal')
+        return self.get_parameter_as_symbolic_expression(u'goal')
 
     def __str__(self):
         s = super(BasicCartesianGoal, self).__str__()
@@ -50,9 +50,9 @@ class CartesianPosition(BasicCartesianGoal):
 
     def make_constraints(self):
         r_P_g = w.position_of(self.get_goal_pose())
-        max_velocity = self.get_input_float(u'max_velocity')
-        reference_velocity = self.get_input_float(u'reference_velocity')
-        weight = self.get_input_float(u'weight')
+        max_velocity = self.get_parameter_as_symbolic_expression(u'max_velocity')
+        reference_velocity = self.get_parameter_as_symbolic_expression(u'reference_velocity')
+        weight = self.get_parameter_as_symbolic_expression(u'weight')
         self.add_minimize_position_constraints(r_P_g=r_P_g,
                                                reference_velocity=reference_velocity,
                                                max_velocity=max_velocity,
@@ -190,9 +190,9 @@ class CartesianOrientation(BasicCartesianGoal):
         :return:
         """
         r_R_g = w.rotation_of(self.get_goal_pose())
-        weight = self.get_input_float(u'weight')
-        max_velocity = self.get_input_float(u'max_velocity')
-        reference_velocity = self.get_input_float(u'reference_velocity')
+        weight = self.get_parameter_as_symbolic_expression(u'weight')
+        max_velocity = self.get_parameter_as_symbolic_expression(u'max_velocity')
+        reference_velocity = self.get_parameter_as_symbolic_expression(u'reference_velocity')
 
         self.add_minimize_rotation_constraints(root_R_tipGoal=r_R_g,
                                                root=self.root,
@@ -306,7 +306,7 @@ class CartesianVelocityLimit(Goal):
         weight = self.get_input_float(self.weight_id)
         max_linear_velocity = self.get_input_float(self.max_linear_velocity_id)
         max_angular_velocity = self.get_input_float(self.max_angular_velocity_id)
-        sample_period = self.get_input_sampling_period()
+        sample_period = self.get_sampling_period_symbol()
 
         root_T_tip = self.get_fk(self.root_link, self.tip_link)
         tip_evaluated_T_root = self.get_fk_evaluated(self.tip_link, self.root_link)

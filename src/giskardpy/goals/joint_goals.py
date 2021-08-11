@@ -215,7 +215,7 @@ class ShakyJointPositionRevoluteOrPrismatic(Goal):
         weight = self.get_parameter_as_symbolic_expression(u'weight')
 
         time = self.get_god_map().to_symbol(identifier.time)
-        time_in_secs = self.get_input_sampling_period() * time
+        time_in_secs = self.get_sampling_period_symbol() * time
 
         max_velocity = w.min(self.get_parameter_as_symbolic_expression(u'max_velocity'),
                              self.get_robot().get_joint_velocity_limit_expr(self.joint_name))
@@ -281,7 +281,7 @@ class ShakyJointPositionContinuous(Goal):
         weight = self.get_parameter_as_symbolic_expression(u'weight')
 
         time = self.get_god_map().to_symbol(identifier.time)
-        time_in_secs = self.get_input_sampling_period() * time
+        time_in_secs = self.get_sampling_period_symbol() * time
 
         max_velocity = w.min(self.get_parameter_as_symbolic_expression(u'max_velocity'),
                              self.get_robot().get_joint_velocity_limit_expr(self.joint_name))

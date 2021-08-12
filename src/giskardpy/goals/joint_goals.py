@@ -1,7 +1,8 @@
 from __future__ import division
-from giskardpy.exceptions import ConstraintException
-from giskardpy.goals.goal import Goal, WEIGHT_BELOW_CA
+
 from giskardpy import casadi_wrapper as w, identifier
+from giskardpy.exceptions import ConstraintException, ConstraintInitalizationException
+from giskardpy.goals.goal import Goal, WEIGHT_BELOW_CA
 
 
 class JointPositionContinuous(Goal):
@@ -46,8 +47,7 @@ class JointPositionContinuous(Goal):
 
         error = w.shortest_angular_distance(current_joint, joint_goal)
 
-        self.add_constraint('',
-                            reference_velocity=max_velocity,
+        self.add_constraint(reference_velocity=max_velocity,
                             lower_error=error,
                             upper_error=error,
                             weight=weight,
@@ -100,8 +100,7 @@ class JointPositionPrismatic(Goal):
 
         error = joint_goal - current_joint
 
-        self.add_constraint('',
-                            reference_velocity=max_velocity,
+        self.add_constraint(reference_velocity=max_velocity,
                             lower_error=error,
                             upper_error=error,
                             weight=weight,
@@ -154,8 +153,7 @@ class JointPositionRevolute(Goal):
 
         error = joint_goal - current_joint
 
-        self.add_constraint('',
-                            reference_velocity=max_velocity,
+        self.add_constraint(reference_velocity=max_velocity,
                             lower_error=error,
                             upper_error=error,
                             weight=weight,
@@ -219,8 +217,7 @@ class ShakyJointPositionRevoluteOrPrismatic(Goal):
         err = (joint_goal - current_joint) + noise_amplitude * max_velocity * w.sin(fun_params)
         capped_err = self.limit_velocity(err, noise_amplitude * max_velocity)
 
-        self.add_constraint('',
-                            lower_error=capped_err,
+        self.add_constraint(lower_error=capped_err,
                             upper_error=capped_err,
                             reference_velocity=max_velocity,
                             weight=weight,
@@ -284,8 +281,7 @@ class ShakyJointPositionContinuous(Goal):
             fun_params)
         capped_err = self.limit_velocity(err, noise_amplitude * max_velocity)
 
-        self.add_constraint('',
-                            lower_error=capped_err,
+        self.add_constraint(lower_error=capped_err,
                             upper_error=capped_err,
                             reference_velocity=max_velocity,
                             weight=weight,
@@ -340,8 +336,7 @@ class AvoidJointLimitsRevolute(Goal):
         error = w.max(w.abs(w.min(upper_err, 0)), w.abs(w.max(lower_err, 0)))
         weight = weight * (error / max_error)
 
-        self.add_constraint(u'',
-                            reference_velocity=max_velocity,
+        self.add_constraint(reference_velocity=max_velocity,
                             lower_error=lower_err,
                             upper_error=upper_err,
                             weight=weight,
@@ -396,8 +391,7 @@ class AvoidJointLimitsPrismatic(Goal):
         error = w.max(w.abs(w.min(upper_err, 0)), w.abs(w.max(lower_err, 0)))
         weight = weight * (error / max_error)
 
-        self.add_constraint(u'',
-                            reference_velocity=max_velocity,
+        self.add_constraint(reference_velocity=max_velocity,
                             lower_error=lower_err,
                             upper_error=upper_err,
                             weight=weight,
@@ -471,7 +465,31 @@ class AvoidJointLimits(Goal):
             self.debug_expressions.update(constraint.debug_expressions)
 
 
-# class JointPositionLimit(Goal):
-#
-#     def __init__(self, god_map, **kwargs):
-#         super().__init__(god_map, control_horizon, **kwargs)
+class JointPositionLimit(Goal):
+
+    def __init__(self, joint_name, upper_limit, lower_limit, **kwargs):
+        self.joint_name = joint_name
+        self.upper_limit = upper_limit
+        self.lower_limit = lower_limit
+        super(JointPositionLimit, self).__init__(**kwargs)
+        current_position = self.get_robot().joint_state[self.joint_name].position
+        if current_position > self.upper_limit + 2e-3 or current_position < self.lower_limit - 2e-3:
+            raise ConstraintInitalizationException(u'{} out of set limits. '
+                                                   u'{} <= {} <= {} is not true.'.format(self.joint_name,
+                                                                                         self.lower_limit,
+                                                                                         current_position,
+                                                                                         self.upper_limit))
+
+    def make_constraints(self):
+        joint_position = self.get_joint_position_symbol(self.joint_name)
+        self.add_constraint(reference_velocity=self.get_robot().get_joint_velocity_limit_expr(self.joint_name),
+                            lower_error=self.lower_limit - joint_position,
+                            upper_error=self.upper_limit - joint_position,
+                            weight=WEIGHT_BELOW_CA,
+                            expression=joint_position,
+                            lower_slack_limit=0,
+                            upper_slack_limit=0)
+
+    def __str__(self):
+        s = super(JointPositionLimit, self).__str__()
+        return u'{}/{}'.format(s, self.joint_name)

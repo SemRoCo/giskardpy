@@ -942,13 +942,14 @@ class QPController(object):
             xH = np.dot((xdot_full ** 2).T, H)
             self.p_xH = pd.DataFrame(xH, filtered_b_names, [u'data'], dtype=float)
             # p_xg = p_g * p_xdot
-            xHx = np.dot(np.dot(xdot_full.T, H), xdot_full)
+            # xHx = np.dot(np.dot(xdot_full.T, H), xdot_full)
 
             self.p_pure_xdot = deepcopy(self.p_xdot)
             self.p_pure_xdot[num_non_slack:] = 0
             self.p_Ax = pd.DataFrame(self.p_A.dot(self.p_xdot), filtered_bA_names, [u'data'], dtype=float)
-            self.p_Ax_without_slack = pd.DataFrame(self.p_A.dot(self.p_pure_xdot), filtered_bA_names, [u'data'],
+            self.p_Ax_without_slack_raw = pd.DataFrame(self.p_A.dot(self.p_pure_xdot), filtered_bA_names, [u'data'],
                                                    dtype=float)
+            self.p_Ax_without_slack = deepcopy(self.p_Ax_without_slack_raw)
             self.p_Ax_without_slack[-num_of_slack:] /= sample_period
 
         else:

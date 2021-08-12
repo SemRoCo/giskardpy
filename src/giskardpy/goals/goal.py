@@ -7,6 +7,7 @@ from giskard_msgs.msg import Constraint as Constraint_msg
 
 import giskardpy.identifier as identifier
 from giskardpy import casadi_wrapper as w
+from giskardpy.model.robot import Robot
 from giskardpy.qp.constraint import VelocityConstraint, Constraint
 
 WEIGHT_MAX = Constraint_msg.WEIGHT_MAX
@@ -56,7 +57,7 @@ class Goal(object):
 
     def get_robot(self):
         """
-        :rtype: giskardpy.robot.Robot
+        :rtype: Robot
         """
         return self.get_god_map().get_data(identifier.robot)
 
@@ -185,8 +186,8 @@ class Goal(object):
                                                               upper_slack_limit=upper_slack_limit,
                                                               control_horizon=self.control_horizon)
 
-    def add_constraint(self, name_suffix, reference_velocity, lower_error,
-                       upper_error, weight, expression, lower_slack_limit=-1e4, upper_slack_limit=1e4):
+    def add_constraint(self, reference_velocity, lower_error, upper_error, weight, expression, name_suffix=u'',
+                       lower_slack_limit=-1e4, upper_slack_limit=1e4):
 
         name = str(self) + name_suffix
         if name in self._constraints:
@@ -262,7 +263,7 @@ class Goal(object):
                                          expression=trans_error)
 
     def add_minimize_vector_angle_constraints(self, max_velocity, root, tip, tip_V_tip_normal, root_V_goal_normal,
-                                              weight=WEIGHT_BELOW_CA, goal_constraint=False, prefix=u''):
+                                              weight=WEIGHT_BELOW_CA, prefix=u''):
         root_R_tip = w.rotation_of(self.get_fk(root, tip))
         root_V_tip_normal = w.dot(root_R_tip, tip_V_tip_normal)
 
@@ -306,7 +307,7 @@ class Goal(object):
         tip_Q_goal = w.if_greater_zero(-tip_Q_goal[3], -tip_Q_goal, tip_Q_goal)  # flip to get shortest path
         # angle_error = w.quaternion_angle(tip_Q_goal)
         angle_error2 = w.quaternion_angle(root_Q_tipCurrent)
-        self.add_debug_expr('angle_error', angle_error2)
+        # self.add_debug_expr('angle_error', angle_error2)
         # self.add_debug_vector('tip_Q_goal', tip_Q_goal)
 
         expr = tip_Q_tipCurrent

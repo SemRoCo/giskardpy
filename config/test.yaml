@@ -4,4 +4,7 @@ general_options:
 plugins:
     PlotTrajectory: # plots the joint trajectory at the end of planning, useful for debugging
       enabled: True
+    MaxTrajectoryLength:
+      enabled: False
+      length: 10 # will abort planning if the trajectory becomes longer than this many seconds
 

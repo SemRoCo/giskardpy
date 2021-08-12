@@ -254,9 +254,9 @@ class GodMap(object):
         elif isinstance(data, PointStamped):
             return self.point_msg_to_point3(identifier + ['point'])
         elif isinstance(data, Vector3):
-            return self.point_msg_to_point3(identifier)
+            return self.vector_msg_to_vector3(identifier)
         elif isinstance(data, Vector3Stamped):
-            return self.point_msg_to_point3(identifier + ['vector'])
+            return self.vector_msg_to_vector3(identifier + ['vector'])
         elif isinstance(data, list) or (isinstance(data, np.ndarray) and len(data.shape) == 1):
             return self.list_to_symbol_matrix(identifier, len(data))
         else:
@@ -332,7 +332,11 @@ class GodMap(object):
         )
 
     def vector_msg_to_vector3(self, identifier):
-        return self.point_msg_to_point3(identifier)
+        return w.vector3(
+            x=self.to_symbol(identifier + ['x']),
+            y=self.to_symbol(identifier + ['y']),
+            z=self.to_symbol(identifier + ['z']),
+        )
 
     def get_values(self, symbols):
         """

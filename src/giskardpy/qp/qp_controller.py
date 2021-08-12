@@ -496,14 +496,14 @@ class QPController(object):
 
     def __init__(self, sample_period, prediction_horizon, solver_name,
                  free_variables=None, constraints=None, velocity_constraints=None, debug_expressions=None,
-                 retry_with_relaxed_constraints=True, retry_added_slack=100, retry_weight_factor=100):
+                 retries_with_relaxed_constraints=0, retry_added_slack=100, retry_weight_factor=100):
         self.free_variables = []  # type: list[FreeVariable]
         self.constraints = []  # type: list[Constraint]
         self.velocity_constraints = []  # type: list[VelocityConstraint]
         self.debug_expressions = {}  # type: dict
         self.prediction_horizon = prediction_horizon
         self.sample_period = sample_period
-        self.retry_with_relaxed_constraints = retry_with_relaxed_constraints
+        self.retries_with_relaxed_constraints = retries_with_relaxed_constraints
         self.retry_added_slack = retry_added_slack
         self.retry_weight_factor = retry_weight_factor
         if free_variables is not None:
@@ -773,13 +773,16 @@ class QPController(object):
         try:
             self.xdot_full = self.qp_solver.solve(*filtered_stuff)
         except Exception as e_original:
-            if self.retry_with_relaxed_constraints:
+            if self.retries_with_relaxed_constraints:
                 try:
                     logging.logwarn(u'Failed to solve QP, retrying with relaxed hard constraints.')
                     self.get_cmd_relaxed_hard_constraints(*filtered_stuff)
+                    self.retries_with_relaxed_constraints -= 1
                     return self.split_xdot(self.xdot_full), self._eval_debug_exprs(substitutions)
                 except Exception as e_relaxed:
                     logging.logerr(u'Relaxing hard constraints failed.')
+            else:
+                logging.logwarn(u'Ran out of allowed retries with relaxed hard constraints.')
             self._create_debug_pandas(substitutions)
             self._are_joint_limits_violated(str(e_original))
             self._is_close_to_joint_limits()

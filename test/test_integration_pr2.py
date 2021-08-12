@@ -369,14 +369,14 @@ class TestJointGoals(object):
 class TestConstraints(object):
     # TODO write buggy constraints that test sanity checks
 
-    def test_JointPositionLimit(self, zero_pose):
+    def test_JointPositionRange(self, zero_pose):
         """
         :type zero_pose: PR2
         """
         joint_name = u'r_wrist_roll_joint'
         upper_limit = 1
         lower_limit = -1
-        zero_pose.set_json_goal(u'JointPositionLimit',
+        zero_pose.set_json_goal(u'JointPositionRange',
                                 joint_name=joint_name,
                                 upper_limit=upper_limit,
                                 lower_limit=lower_limit)
@@ -388,7 +388,7 @@ class TestConstraints(object):
         assert zero_pose.get_robot().joint_state[joint_name].position <= upper_limit + 2e-3
         assert zero_pose.get_robot().joint_state[joint_name].position >= lower_limit - 2e-3
 
-        zero_pose.set_json_goal(u'JointPositionLimit',
+        zero_pose.set_json_goal(u'JointPositionRange',
                                 joint_name=joint_name,
                                 upper_limit=upper_limit,
                                 lower_limit=lower_limit)
@@ -400,7 +400,7 @@ class TestConstraints(object):
         assert zero_pose.get_robot().joint_state[joint_name].position <= upper_limit
         assert zero_pose.get_robot().joint_state[joint_name].position >= lower_limit
 
-        zero_pose.set_json_goal(u'JointPositionLimit',
+        zero_pose.set_json_goal(u'JointPositionRange',
                                 joint_name=joint_name,
                                 upper_limit=10,
                                 lower_limit=9)
@@ -922,6 +922,7 @@ class TestConstraints(object):
         # x_goal.vector.z = 0.2
         x_goal.vector = tf.normalize(x_goal.vector)
         zero_pose.align_planes(zero_pose.r_tip, x_gripper, root_normal=x_goal)
+        zero_pose.allow_all_collisions()
         zero_pose.send_and_check_goal()
 
         map_T_gripper = tf.transform_vector(u'map', x_gripper)
@@ -942,6 +943,7 @@ class TestConstraints(object):
         goal_vector.vector.y = -1
         goal_vector.vector = tf.normalize(goal_vector.vector)
         zero_pose.align_planes('base_footprint', eef_vector, root_normal=goal_vector)
+        zero_pose.allow_all_collisions()
         zero_pose.send_and_check_goal()
 
         map_T_gripper = tf.transform_vector(u'map', eef_vector)
@@ -951,7 +953,7 @@ class TestConstraints(object):
 
     def test_align_planes4(self, kitchen_setup):
         """
-        :type zero_pose: PR2
+        :type kitchen_setup: PR2
         """
         elbow = u'r_elbow_flex_link'
         handle_frame_id = u'iai_kitchen/iai_fridge_door_handle'
@@ -964,6 +966,7 @@ class TestConstraints(object):
         env_axis.header.frame_id = handle_frame_id
         env_axis.vector.z = 1
         kitchen_setup.align_planes(elbow, tip_axis, root_normal=env_axis, weight=WEIGHT_ABOVE_CA)
+        kitchen_setup.allow_all_collisions()
         kitchen_setup.send_and_check_goal()
 
         map_T_gripper = tf.transform_vector(handle_frame_id, tip_axis)

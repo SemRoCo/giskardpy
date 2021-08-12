@@ -36,14 +36,12 @@ class AlignPlanes(Goal):
                                                  self.tip_V_tip_normal.vector.z)
 
     def make_constraints(self):
-        max_velocity = self.get_parameter_as_symbolic_expression(u'max_velocity')
         tip_V_tip_normal = self.get_parameter_as_symbolic_expression(u'tip_V_tip_normal')
+        root_R_current = w.rotation_of(self.get_fk(self.root, self.tip))
+        root_V_current = w.dot(root_R_current, tip_V_tip_normal)
         root_V_root_normal = self.get_parameter_as_symbolic_expression(u'root_V_root_normal')
-        weight = self.get_parameter_as_symbolic_expression(u'weight')
-        self.add_minimize_vector_angle_constraints(max_velocity=max_velocity,
-                                                   root=self.root,
-                                                   tip=self.tip,
-                                                   tip_V_tip_normal=tip_V_tip_normal,
-                                                   root_V_goal_normal=root_V_root_normal,
-                                                   weight=weight)
+        self.add_vector_goal_constraints(frame_V_current=root_V_current,
+                                         frame_V_goal=root_V_root_normal,
+                                         reference_velocity=self.max_velocity,
+                                         weight=self.weight)
 

@@ -465,13 +465,13 @@ class AvoidJointLimits(Goal):
             self.debug_expressions.update(constraint.debug_expressions)
 
 
-class JointPositionLimit(Goal):
+class JointPositionRange(Goal):
 
     def __init__(self, joint_name, upper_limit, lower_limit, **kwargs):
         self.joint_name = joint_name
         self.upper_limit = upper_limit
         self.lower_limit = lower_limit
-        super(JointPositionLimit, self).__init__(**kwargs)
+        super(JointPositionRange, self).__init__(**kwargs)
         current_position = self.get_robot().joint_state[self.joint_name].position
         if current_position > self.upper_limit + 2e-3 or current_position < self.lower_limit - 2e-3:
             raise ConstraintInitalizationException(u'{} out of set limits. '
@@ -491,5 +491,5 @@ class JointPositionLimit(Goal):
                             upper_slack_limit=0)
 
     def __str__(self):
-        s = super(JointPositionLimit, self).__str__()
+        s = super(JointPositionRange, self).__str__()
         return u'{}/{}'.format(s, self.joint_name)

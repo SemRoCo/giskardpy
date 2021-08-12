@@ -64,12 +64,12 @@ class GraspBar(Goal):
         tip_V_tip_grasp_axis = self.get_tip_grasp_axis_vector()
         root_P_bar_center = self.get_bar_center_point()
 
-        self.add_minimize_vector_angle_constraints(max_velocity=rotation_max_velocity,
-                                                   root=self.root,
-                                                   tip=self.tip,
-                                                   tip_V_tip_normal=tip_V_tip_grasp_axis,
-                                                   root_V_goal_normal=root_V_bar_axis,
-                                                   weight=weight)
+        self.add_vector_goal_constraints(max_velocity=rotation_max_velocity,
+                                         root=self.root,
+                                         tip=self.tip,
+                                         tip_V_tip_normal=tip_V_tip_grasp_axis,
+                                         root_V_goal_normal=root_V_bar_axis,
+                                         weight=weight)
 
         root_P_tip = w.position_of(self.get_fk(self.root, self.tip))
 
@@ -80,6 +80,6 @@ class GraspBar(Goal):
 
         self.add_minimize_position_constraints(r_P_g=nearest,
                                                max_velocity=translation_max_velocity,
-                                               root=self.root,
-                                               tip=self.tip,
+                                               root_frame=self.root,
+                                               tip_frame=self.tip,
                                                weight=weight)

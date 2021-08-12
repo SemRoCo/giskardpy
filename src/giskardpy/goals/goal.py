@@ -7,6 +7,7 @@ from giskard_msgs.msg import Constraint as Constraint_msg
 
 import giskardpy.identifier as identifier
 from giskardpy import casadi_wrapper as w
+from giskardpy.exceptions import ConstraintInitalizationException
 from giskardpy.model.robot import Robot
 from giskardpy.qp.constraint import VelocityConstraint, Constraint
 
@@ -186,12 +187,15 @@ class Goal(object):
                                                               upper_slack_limit=upper_slack_limit,
                                                               control_horizon=self.control_horizon)
 
-    def add_constraint(self, reference_velocity, lower_error, upper_error, weight, expression, name_suffix=u'',
-                       lower_slack_limit=-1e4, upper_slack_limit=1e4):
+    def add_constraint(self, reference_velocity, lower_error, upper_error, weight, expression, name_suffix=None,
+                       lower_slack_limit=None, upper_slack_limit=None):
 
+        name_suffix = name_suffix if name_suffix else u''
         name = str(self) + name_suffix
         if name in self._constraints:
             raise KeyError(u'a constraint with name \'{}\' already exists'.format(name))
+        lower_slack_limit = lower_slack_limit if lower_slack_limit else -1e4
+        upper_slack_limit = upper_slack_limit if upper_slack_limit else 1e4
         self._constraints[name] = Constraint(name=name,
                                              expression=expression,
                                              lower_error=lower_error,
@@ -201,6 +205,38 @@ class Goal(object):
                                              lower_slack_limit=lower_slack_limit,
                                              upper_slack_limit=upper_slack_limit,
                                              control_horizon=self.control_horizon)
+
+    def add_constraint_vector(self, reference_velocities, lower_errors, upper_errors, weights, expressions,
+                              name_suffixes=None, lower_slack_limits=None, upper_slack_limits=None):
+        reference_velocities = w.matrix_to_list(reference_velocities)
+        lower_errors = w.matrix_to_list(lower_errors)
+        upper_errors = w.matrix_to_list(upper_errors)
+        weights = w.matrix_to_list(weights)
+        expressions = w.matrix_to_list(expressions)
+        if lower_slack_limits is not None:
+            lower_slack_limits = w.matrix_to_list(lower_slack_limits)
+        if upper_slack_limits is not None:
+            upper_slack_limits = w.matrix_to_list(upper_slack_limits)
+        if len(lower_errors) != len(upper_errors) \
+                or len(lower_errors) != len(expressions) \
+                or len(lower_errors) != len(reference_velocities) \
+                or len(lower_errors) != len(weights) \
+                or (name_suffixes is not None and len(lower_errors) != len(name_suffixes)) \
+                or (lower_slack_limits is not None and len(lower_errors) != len(lower_slack_limits)) \
+                or (upper_slack_limits is not None and len(lower_errors) != len(upper_slack_limits)):
+            raise ConstraintInitalizationException('All parameters must have the same length.')
+        for i in range(len(lower_errors)):
+            name_suffix = name_suffixes[i] if name_suffixes else None
+            lower_slack_limit = lower_slack_limits[i] if lower_slack_limits else None
+            upper_slack_limit = upper_slack_limits[i] if upper_slack_limits else None
+            self.add_constraint(reference_velocity=reference_velocities[i],
+                                lower_error=lower_errors[i],
+                                upper_error=upper_errors[i],
+                                weight=weights[i],
+                                expression=expressions[i],
+                                name_suffix=name_suffix,
+                                lower_slack_limit=lower_slack_limit,
+                                upper_slack_limit=upper_slack_limit)
 
     def add_debug_expr(self, name, expr):
         """
@@ -222,117 +258,86 @@ class Goal(object):
         for x in range(vector_expr.shape[0]):
             self.add_debug_expr(name + u'/{}'.format(x), vector_expr[x])
 
-    def add_minimize_position_constraints(self, r_P_g, reference_velocity, root, tip, max_velocity=None,
-                                          weight=WEIGHT_BELOW_CA, prefix=u''):
-        """
-        :param r_P_g: position of goal relative to root frame
-        :param max_velocity:
-        :param max_acceleration:
-        :param root:
-        :param tip:
-        :param prefix: name prefix to distinguish different constraints
-        :type prefix: str
-        :return:
-        """
-        r_P_c = w.position_of(self.get_fk(root, tip))
-        r_P_error = r_P_g - r_P_c
+    def add_position_constraint(self, expr_current, expr_goal, reference_velocity, weight=WEIGHT_BELOW_CA,
+                                name_suffix=u''):
 
-        self.add_constraint(u'{}/x'.format(prefix),
-                            reference_velocity=reference_velocity,
-                            lower_error=r_P_error[0],
-                            upper_error=r_P_error[0],
+        error = expr_goal - expr_current
+        self.add_constraint(reference_velocity=reference_velocity,
+                            lower_error=error,
+                            upper_error=error,
                             weight=weight,
-                            expression=r_P_c[0])
-        self.add_constraint(u'{}/y'.format(prefix),
-                            reference_velocity=reference_velocity,
-                            lower_error=r_P_error[1],
-                            upper_error=r_P_error[1],
-                            weight=weight,
-                            expression=r_P_c[1])
-        self.add_constraint(u'{}/z'.format(prefix),
-                            reference_velocity=reference_velocity,
-                            lower_error=r_P_error[2],
-                            upper_error=r_P_error[2],
-                            weight=weight,
-                            expression=r_P_c[2])
-        if max_velocity is not None:
-            trans_error = w.norm(r_P_c)
-            self.add_velocity_constraint(u'{}/vel'.format(prefix),
-                                         velocity_limit=max_velocity,
-                                         weight=weight,
-                                         expression=trans_error)
+                            expression=expr_current,
+                            name_suffix=name_suffix)
 
-    def add_minimize_vector_angle_constraints(self, max_velocity, root, tip, tip_V_tip_normal, root_V_goal_normal,
-                                              weight=WEIGHT_BELOW_CA, prefix=u''):
-        root_R_tip = w.rotation_of(self.get_fk(root, tip))
-        root_V_tip_normal = w.dot(root_R_tip, tip_V_tip_normal)
+    def add_point_goal_constraints(self, frame_P_current, frame_P_goal, reference_velocity, weight, name_suffix=u''):
+        error = frame_P_goal - frame_P_current
+        self.add_constraint_vector(reference_velocities=[reference_velocity] * 3,
+                                   lower_errors=error[:3],
+                                   upper_errors=error[:3],
+                                   weights=[weight] * 3,
+                                   expressions=frame_P_current[:3],
+                                   name_suffixes=['{}/x'.format(name_suffix),
+                                                  '{}/y'.format(name_suffix),
+                                                  '{}/z'.format(name_suffix)])
 
-        angle = w.save_acos(w.dot(root_V_tip_normal.T, root_V_goal_normal)[0])
+    def add_translational_velocity_limit(self, frame_P_current, max_velocity, weight, max_violation=1e4, name_suffix=u''):
+        trans_error = w.norm(frame_P_current)
+        self.add_velocity_constraint(velocity_limit=max_velocity,
+                                     weight=weight,
+                                     expression=trans_error,
+                                     lower_slack_limit=-max_violation,
+                                     upper_slack_limit=max_violation,
+                                     name_suffix=u'{}/vel'.format(name_suffix))
+
+    def add_vector_goal_constraints(self, frame_V_current, frame_V_goal, reference_velocity,
+                                    weight=WEIGHT_BELOW_CA, name_suffix=u''):
+
+        angle = w.save_acos(w.dot(frame_V_current.T, frame_V_goal)[0])
         angle_limited = w.save_division(self.limit_velocity(angle, np.pi * 0.9),
                                         angle)  # avoid singularity by staying away from pi
-        root_V_goal_normal_intermediate = w.slerp(root_V_tip_normal, root_V_goal_normal, angle_limited)
-        error = root_V_goal_normal_intermediate - root_V_tip_normal
+        root_V_goal_normal_intermediate = w.slerp(frame_V_current, frame_V_goal, angle_limited)
+        error = root_V_goal_normal_intermediate - frame_V_current
+        self.add_debug_vector(u'frame_V_current', frame_V_current)
+        self.add_debug_vector(u'frame_V_goal', frame_V_goal)
+        self.add_debug_vector(u'error', error)
 
-        self.add_constraint(u'/{}/rot/x'.format(prefix),
-                            reference_velocity=max_velocity,
-                            lower_error=error[0],
-                            upper_error=error[0],
-                            weight=weight,
-                            expression=root_V_tip_normal[0])
-        self.add_constraint(u'/{}/rot/y'.format(prefix),
-                            reference_velocity=max_velocity,
-                            lower_error=error[1],
-                            upper_error=error[1],
-                            weight=weight,
-                            expression=root_V_tip_normal[1])
-        self.add_constraint(u'/{}/rot/z'.format(prefix),
-                            reference_velocity=max_velocity,
-                            lower_error=error[2],
-                            upper_error=error[2],
-                            weight=weight,
-                            expression=root_V_tip_normal[2])
+        self.add_constraint_vector(reference_velocities=[reference_velocity]*3,
+                                   lower_errors=error[:3],
+                                   upper_errors=error[:3],
+                                   weights=[weight]*3,
+                                   expressions=frame_V_current[:3],
+                                   name_suffixes=[u'{}/x'.format(name_suffix),
+                                                  u'{}/y'.format(name_suffix),
+                                                  u'{}/z'.format(name_suffix)])
 
-    def add_minimize_rotation_constraints(self, root_R_tipGoal, root, tip, reference_velocity, max_velocity,
-                                          weight=WEIGHT_BELOW_CA, prefix=u''):
-        root_R_tipCurrent = w.rotation_of(self.get_fk(root, tip))
-        tip_R_rootCurrent_eval = w.rotation_of(self.get_fk_evaluated(tip, root))
+    def add_rotation_goal_constraints(self, frame_R_current, frame_R_goal, current_R_frame_eval, reference_velocity,
+                                      weight, name_suffix=u''):
         hack = w.rotation_matrix_from_axis_angle([0, 0, 1], 0.0001)
-        root_R_tipCurrent = w.dot(root_R_tipCurrent, hack)  # hack to avoid singularity
-        tip_Q_tipCurrent = w.quaternion_from_matrix(w.dot(tip_R_rootCurrent_eval, root_R_tipCurrent))
-        root_Q_tipCurrent = w.quaternion_from_matrix(root_R_tipCurrent)
-        tip_R_goal = w.dot(tip_R_rootCurrent_eval, root_R_tipGoal)
+        frame_R_current = w.dot(frame_R_current, hack)  # hack to avoid singularity
+        tip_Q_tipCurrent = w.quaternion_from_matrix(w.dot(current_R_frame_eval, frame_R_current))
+        tip_R_goal = w.dot(current_R_frame_eval, frame_R_goal)
 
         tip_Q_goal = w.quaternion_from_matrix(tip_R_goal)
 
         tip_Q_goal = w.if_greater_zero(-tip_Q_goal[3], -tip_Q_goal, tip_Q_goal)  # flip to get shortest path
-        # angle_error = w.quaternion_angle(tip_Q_goal)
-        angle_error2 = w.quaternion_angle(root_Q_tipCurrent)
-        # self.add_debug_expr('angle_error', angle_error2)
-        # self.add_debug_vector('tip_Q_goal', tip_Q_goal)
 
         expr = tip_Q_tipCurrent
-
-        self.add_constraint(u'{}/q/x'.format(prefix),
-                            reference_velocity=reference_velocity,
-                            lower_error=tip_Q_goal[0],
-                            upper_error=tip_Q_goal[0],
-                            weight=weight,
-                            expression=expr[0])
-        self.add_constraint(u'{}/q/y'.format(prefix),
-                            reference_velocity=reference_velocity,
-                            lower_error=tip_Q_goal[1],
-                            upper_error=tip_Q_goal[1],
-                            weight=weight,
-                            expression=expr[1])
-        self.add_constraint(u'{}/q/z'.format(prefix),
-                            reference_velocity=reference_velocity,
-                            lower_error=tip_Q_goal[2],
-                            upper_error=tip_Q_goal[2],
-                            weight=weight,
-                            expression=expr[2])
-        if max_velocity is not None:
-            self.add_velocity_constraint(u'{}/q/vel'.format(prefix),
-                                         velocity_limit=max_velocity,
-                                         weight=weight * 1000,
-                                         expression=angle_error2)
         # w is not needed because its derivative is always 0 for identity quaternions
+        self.add_constraint_vector(reference_velocities=[reference_velocity] * 3,
+                                   lower_errors=tip_Q_goal[:3],
+                                   upper_errors=tip_Q_goal[:3],
+                                   weights=[weight] * 3,
+                                   expressions=expr[:3],
+                                   name_suffixes=['{}/x'.format(name_suffix),
+                                                  '{}/y'.format(name_suffix),
+                                                  '{}/z'.format(name_suffix)])
+
+    def add_rotational_velocity_limit(self, frame_R_current, max_velocity, weight, max_violation=1e4, name_suffix=u''):
+        root_Q_tipCurrent = w.quaternion_from_matrix(frame_R_current)
+        angle_error = w.quaternion_angle(root_Q_tipCurrent)
+        self.add_velocity_constraint(velocity_limit=max_velocity,
+                                     weight=weight,
+                                     expression=angle_error,
+                                     lower_slack_limit=-max_violation,
+                                     upper_slack_limit=max_violation,
+                                     name_suffix=u'{}/q/vel'.format(name_suffix))

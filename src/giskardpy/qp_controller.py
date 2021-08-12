@@ -13,6 +13,7 @@ from giskardpy.data_types import VelocityConstraint
 from giskardpy.exceptions import InfeasibleException, OutOfJointLimitsException, \
     HardConstraintsViolatedException
 from giskardpy.qp_solver import QPSolver
+from giskardpy.qp_solver_cplex import QPSolverCplex
 from giskardpy.qp_solver_gurobi import QPSolverGurobi
 from giskardpy.utils import memoize
 
@@ -512,6 +513,8 @@ class QPController(object):
             self.qp_solver = QPSolverGurobi()
         elif solver_name == u'qpoases':
             self.qp_solver = QPSolver()
+        elif solver_name == u'cplex':
+            self.qp_solver = QPSolverCplex()
         else:
             raise KeyError(u'Solver \'{}\' not supported'.format(solver_name))
         logging.loginfo(u'Using QP Solver \'{}\''.format(solver_name))

@@ -2,9 +2,9 @@
 import rospy
 from control_msgs.msg import FollowJointTrajectoryActionGoal
 from sensor_msgs.msg import JointState
-import giskardpy.tfwrapper as tf
-from giskardpy import logging
-from giskardpy.tfwrapper import msg_to_kdl
+import giskardpy.utils.tfwrapper as tf
+from giskardpy.utils import logging
+from giskardpy.utils.tfwrapper import msg_to_kdl
 import PyKDL as kdl
 
 class TrajToJS(object):

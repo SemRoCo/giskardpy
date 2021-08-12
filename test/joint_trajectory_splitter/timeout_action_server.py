@@ -3,7 +3,6 @@
 import rospy
 import actionlib
 import control_msgs.msg
-from giskardpy import  logging
 
 
 class TimeoutActionServer(object):

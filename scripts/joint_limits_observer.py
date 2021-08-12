@@ -2,7 +2,7 @@
 
 import rospy
 import sys
-from giskardpy import urdf_object
+from giskardpy.model import urdf_object
 from sensor_msgs.msg import JointState
 import math
 import curses

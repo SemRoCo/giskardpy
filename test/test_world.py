@@ -5,16 +5,16 @@ import giskardpy
 
 giskardpy.WORLD_IMPLEMENTATION = None
 
-from giskardpy.robot import Robot
+from giskardpy.model.robot import Robot
 import pytest
 from geometry_msgs.msg import Pose, Point, Quaternion
 from giskard_msgs.msg import CollisionEntry
 import test_urdf_object
 from giskardpy.exceptions import DuplicateNameException, PhysicsWorldException, UnknownBodyException
 from utils_for_tests import pr2_urdf, donbot_urdf, compare_poses, pr2_without_base_urdf
-from giskardpy.utils import make_world_body_box
-from giskardpy.world import World
-from giskardpy.world_object import WorldObject
+from giskardpy.utils.utils import make_world_body_box
+from giskardpy.model.world import World
+from giskardpy.model.world_object import WorldObject
 import numpy as np
 
 

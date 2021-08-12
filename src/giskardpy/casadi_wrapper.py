@@ -7,7 +7,7 @@ import numpy as np
 from casadi import sign, cos, sin, sqrt, atan2, acos
 from numpy import pi
 
-from giskardpy import logging
+from giskardpy.utils import logging
 
 pathSeparator = '_'
 
@@ -131,8 +131,12 @@ def Matrix(data):
         return m
 
 
+
+
+
 def zeros(x, y):
     return ca.SX.zeros(x, y)
+
 
 def ones(x, y):
     return ca.SX.ones(x, y)
@@ -506,8 +510,10 @@ def frame_quaternion(x, y, z, qx, qy, qz, qw):
 def eye(size):
     return ca.SX.eye(size)
 
+
 def kron(m1, m2):
     return ca.kron(m1, m2)
+
 
 def inverse_frame(frame):
     """
@@ -587,11 +593,14 @@ def rotation_distance(a_R_b, a_R_c):
     angle = max(angle, -1)
     return acos(angle)
 
+
 def vstack(list_of_matrices):
     return ca.vertcat(*list_of_matrices)
 
+
 def hstack(list_of_matrices):
     return ca.horzcat(*list_of_matrices)
+
 
 def asdf(a_R_b, a_R_c):
     """
@@ -853,12 +862,6 @@ def quaternion_diff(q0, q1):
     return quaternion_multiply(quaternion_conjugate(q0), q1)
 
 
-def quaternion_sub(q0, q1):
-    cos_half_theta = dot(q0.T, q1)
-    q0 = if_greater_zero(-cos_half_theta, -q0, q0)
-    return q0 - q1
-
-
 def cosine_distance(v0, v1):
     """
     cosine distance ranging from 0 to 2
@@ -995,6 +998,7 @@ def save_acos(angle):
     angle = limit(angle, -1, 1)
     return acos(angle)
 
+
 def entrywise_product(matrix1, matrix2):
     """
     :type matrix1: se.Matrix
@@ -1016,13 +1020,16 @@ def floor(x):
 def ceil(x):
     return ca.ceil(x)
 
+
 def round_up(x, decimal_places):
-    f = 10**(decimal_places)
-    return ceil(x*f)/f
+    f = 10 ** (decimal_places)
+    return ceil(x * f) / f
+
 
 def round_down(x, decimal_places):
-    f = 10**(decimal_places)
-    return floor(x*f)/f
+    f = 10 ** (decimal_places)
+    return floor(x * f) / f
+
 
 def sum(matrix):
     """
@@ -1119,7 +1126,7 @@ def position_till_b(jerk_limit, t):
 
 def position_till_a(jerk_limit, t, t_offset, velocity_limit):
     return (
-                       1 / 6) * jerk_limit * t ** 3 - 0.5 * jerk_limit * t_offset * t ** 2 + 0.5 * jerk_limit * t_offset ** 2 * t + velocity_limit * t
+                   1 / 6) * jerk_limit * t ** 3 - 0.5 * jerk_limit * t_offset * t ** 2 + 0.5 * jerk_limit * t_offset ** 2 * t + velocity_limit * t
 
 
 def velocity(velocity_limit, jerk_limit, t):
@@ -1155,14 +1162,14 @@ def compute_t_from_position(jerk_limit, position_error, velocity_limit):
     if position_error < a:
         return np.real(-1.44224957030741 * (-0.5 - 0.866025403784439j) * \
                        (((-t_b * velocity_limit - position_error) ** 2 / jerk_limit ** 2 + (
-                                   8 / 9) * velocity_limit ** 3 / jerk_limit ** 3) ** (0.5 + 0j) + (1 / 6) *
+                               8 / 9) * velocity_limit ** 3 / jerk_limit ** 3) ** (0.5 + 0j) + (1 / 6) *
                         (-6.0 * t_b * velocity_limit - 6.0 * position_error) / jerk_limit) ** (1 / 3) \
                        + 1.38672254870127 * velocity_limit * (-0.5 + 0.866025403784439j) / \
                        (jerk_limit * (((-t_b * velocity_limit - position_error) ** 2 / jerk_limit ** 2 + (
-                                   8 / 9) * velocity_limit ** 3 / jerk_limit ** 3) ** (0.5 + 0j)
+                               8 / 9) * velocity_limit ** 3 / jerk_limit ** 3) ** (0.5 + 0j)
                                       + (1 / 6) * (
-                                                  -6.0 * t_b * velocity_limit - 6.0 * position_error) / jerk_limit) ** (
-                                    1 / 3)))
+                                              -6.0 * t_b * velocity_limit - 6.0 * position_error) / jerk_limit) ** (
+                                1 / 3)))
     return 0
 
 
@@ -1199,3 +1206,13 @@ def to_str(expression):
         result = result.replace(index, sub)
     return result
     pass
+
+
+def total_derivative(expr, symbols, symbols_dot):
+    expr_jacobian = jacobian(expr, symbols)
+    last_velocities = Matrix(symbols_dot)
+    velocity = dot(expr_jacobian, last_velocities)
+    if velocity.shape[0] * velocity.shape[0] == 1:
+        return velocity[0]
+    else:
+        return velocity

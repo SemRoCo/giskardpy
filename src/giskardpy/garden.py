@@ -1,5 +1,6 @@
 import functools
 from collections import defaultdict
+from copy import deepcopy
 
 import py_trees
 import py_trees_ros
@@ -12,41 +13,42 @@ from py_trees_ros.trees import BehaviourTree
 from rospy import ROSException
 
 import giskardpy.identifier as identifier
-import giskardpy.pybullet_wrapper as pbw
-from giskardpy import logging
+import giskardpy.model.pybullet_wrapper as pbw
+from giskardpy.data_types import BiDict, KeyDefaultDict
 from giskardpy.god_map import GodMap
-from giskardpy.input_system import JointStatesInput
-from giskardpy.plugin import PluginBehavior
-from giskardpy.plugin_action_server import GoalReceived, SendResult, GoalCanceled
-from giskardpy.plugin_append_zero_velocity import AppendZeroVelocity
-from giskardpy.plugin_cleanup import CleanUp
-from giskardpy.plugin_collision_checker import CollisionChecker
-from giskardpy.plugin_collision_marker import CollisionMarker
-from giskardpy.plugin_configuration import ConfigurationPlugin
-from giskardpy.plugin_goal_reached import GoalReachedPlugin
-from giskardpy.plugin_if import IF
-from giskardpy.plugin_instantaneous_controller import ControllerPlugin
-from giskardpy.plugin_max_trajectory_length import MaxTrajectoryLength
-from giskardpy.plugin_wiggle_cancel import WiggleCancel
-from giskardpy.plugin_kinematic_sim import KinSimPlugin
-from giskardpy.plugin_log_debug_expressions import LogDebugExpressionsPlugin
-from giskardpy.plugin_log_trajectory import LogTrajPlugin
-from giskardpy.plugin_loop_detector import LoopDetector
-from giskardpy.plugin_plot_debug_expressions import PlotDebugExpressions
-from giskardpy.plugin_plot_trajectory import PlotTrajectory
-from giskardpy.plugin_post_processing import PostProcessing
-from giskardpy.plugin_pybullet import WorldUpdatePlugin
-from giskardpy.plugin_send_trajectory import SendTrajectory
-from giskardpy.plugin_set_cmd import SetCmd
-from giskardpy.plugin_tf_publisher import TFPublisher
-from giskardpy.plugin_time import TimePlugin
-from giskardpy.plugin_update_constraints import GoalToConstraints
-from giskardpy.plugin_visualization import VisualizationBehavior
-from giskardpy.plugin_world_visualization import WorldVisualizationBehavior
-from giskardpy.pybullet_world import PyBulletWorld
-from giskardpy.tree_manager import TreeManager
-from giskardpy.utils import create_path, render_dot_tree, KeyDefaultDict, max_velocity_from_horizon_and_jerk, BiDict
-from giskardpy.world_object import WorldObject
+from giskardpy.tree.plugin import PluginBehavior
+from giskardpy.tree.plugin_action_server import GoalReceived, SendResult, GoalCanceled
+from giskardpy.tree.plugin_append_zero_velocity import AppendZeroVelocity
+from giskardpy.tree.plugin_cleanup import CleanUp
+from giskardpy.tree.plugin_collision_checker import CollisionChecker
+from giskardpy.tree.plugin_collision_marker import CollisionMarker
+from giskardpy.tree.plugin_configuration import ConfigurationPlugin
+from giskardpy.tree.plugin_goal_reached import GoalReachedPlugin
+from giskardpy.tree.plugin_if import IF
+from giskardpy.tree.plugin_instantaneous_controller import ControllerPlugin
+from giskardpy.tree.plugin_max_trajectory_length import MaxTrajectoryLength
+from giskardpy.tree.plugin_wiggle_cancel import WiggleCancel
+from giskardpy.tree.plugin_kinematic_sim import KinSimPlugin
+from giskardpy.tree.plugin_log_debug_expressions import LogDebugExpressionsPlugin
+from giskardpy.tree.plugin_log_trajectory import LogTrajPlugin
+from giskardpy.tree.plugin_loop_detector import LoopDetector
+from giskardpy.tree.plugin_plot_debug_expressions import PlotDebugExpressions
+from giskardpy.tree.plugin_plot_trajectory import PlotTrajectory
+from giskardpy.tree.plugin_post_processing import PostProcessing
+from giskardpy.tree.plugin_pybullet import WorldUpdatePlugin
+from giskardpy.tree.plugin_send_trajectory import SendTrajectory
+from giskardpy.tree.plugin_set_cmd import SetCmd
+from giskardpy.tree.plugin_tf_publisher import TFPublisher
+from giskardpy.tree.plugin_time import TimePlugin
+from giskardpy.tree.plugin_update_constraints import GoalToConstraints
+from giskardpy.tree.plugin_visualization import VisualizationBehavior
+from giskardpy.tree.plugin_world_visualization import WorldVisualizationBehavior
+from giskardpy.model.pybullet_world import PyBulletWorld
+from giskardpy.tree.tree_manager import TreeManager
+from giskardpy.utils import logging
+from giskardpy.utils.math import max_velocity_from_horizon_and_jerk
+from giskardpy.utils.utils import create_path, render_dot_tree
+from giskardpy.model.world_object import WorldObject
 
 # TODO hardcode this somewhere else
 order_map = BiDict({
@@ -61,6 +63,7 @@ order_map = BiDict({
 
 
 def initialize_god_map():
+    # FIXME i hate this function
     god_map = GodMap()
     blackboard = Blackboard
     blackboard.god_map = god_map
@@ -85,15 +88,8 @@ def initialize_god_map():
             break
         rospy.sleep(0.5)
 
-    process_joint_specific_params(identifier.self_collision_avoidance_distance,
-                                  identifier.self_collision_avoidance_default_threshold,
-                                  identifier.self_collision_avoidance_default_override,
-                                  god_map)
-
-    process_joint_specific_params(identifier.external_collision_avoidance_distance,
-                                  identifier.external_collision_avoidance_default_threshold,
-                                  identifier.external_collision_avoidance_default_override,
-                                  god_map)
+    set_default_in_override_block(identifier.external_collision_avoidance, god_map)
+    set_default_in_override_block(identifier.self_collision_avoidance, god_map)
 
     world = PyBulletWorld(False, blackboard.god_map.get_data(identifier.data_folder))
     god_map.set_data(identifier.world, world)
@@ -126,10 +122,10 @@ def initialize_god_map():
     # joint symbols
     for o in range(order):
         key = order_map[o]
-        joint_position_symbols = JointStatesInput(blackboard.god_map.to_symbol, world.robot.get_movable_joints(),
-                                                  identifier.joint_states,
-                                                  suffix=[key])
-        world.robot.set_joint_symbols(joint_position_symbols.joint_map, o)
+        joint_position_symbols = {}
+        for joint_name in world.robot.get_movable_joints():
+            joint_position_symbols[joint_name] = god_map.to_symbol(identifier.joint_states + [joint_name, key])
+        world.robot.set_joint_symbols(joint_position_symbols, o)
 
     world.robot.reinitialize()
 
@@ -203,6 +199,11 @@ def set_default_in_override_block(block_identifier, god_map):
     override = god_map.get_data(block_identifier)
     d = defaultdict(lambda: default_value)
     if isinstance(override, dict):
+        if isinstance(default_value, dict):
+            for key, value in override.items():
+                o = deepcopy(default_value)
+                o.update(value)
+                override[key] = o
         d.update(override)
     god_map.set_data(block_identifier, d)
     return KeyDefaultDict(lambda key: god_map.to_symbol(block_identifier + [key]))
@@ -227,7 +228,8 @@ def grow_tree():
     planning_4.add_plugin(ControllerPlugin(u'controller'))
     planning_4.add_plugin(KinSimPlugin(u'kin sim'))
     planning_4.add_plugin(LogTrajPlugin(u'log'))
-    planning_4.add_plugin(LogDebugExpressionsPlugin(u'log lba'))
+    if god_map.get_data(identifier.PlotDebugTrajectory_enabled):
+        planning_4.add_plugin(LogDebugExpressionsPlugin(u'log lba'))
     planning_4.add_plugin(WiggleCancel(u'wiggle'))
     planning_4.add_plugin(LoopDetector(u'loop detector'))
     planning_4.add_plugin(GoalReachedPlugin(u'goal reached'))

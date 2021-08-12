@@ -4,8 +4,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy import sparse
 
-from giskardpy.qp_solver import QPSolver
-from giskardpy.qp_solver_gurobi import QPSolverGurobi
+from giskardpy.qp.qp_solver import QPSolver
+from giskardpy.qp.qp_solver_gurobi import QPSolverGurobi
 
 
 def limit(l,v):

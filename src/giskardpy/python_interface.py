@@ -5,17 +5,17 @@ from actionlib import SimpleActionClient
 from genpy import Message
 from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped, PointStamped
 from giskard_msgs.msg import MoveAction, MoveGoal, WorldBody, CollisionEntry, MoveResult, Constraint, \
-    MoveCmd, JointConstraint, CartesianConstraint
+    MoveCmd, JointConstraint
 from giskard_msgs.srv import UpdateWorld, UpdateWorldRequest, UpdateWorldResponse, GetObjectInfo, GetObjectNames, \
     UpdateRvizMarkers, GetAttachedObjects, GetAttachedObjectsResponse, GetObjectNamesResponse
 from sensor_msgs.msg import JointState
 from shape_msgs.msg import SolidPrimitive
 from visualization_msgs.msg import MarkerArray
 
-from giskardpy.constraints import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA
-from giskardpy.urdf_object import URDFObject
-from giskardpy.utils import position_dict_to_joint_states, make_world_body_box, make_world_body_cylinder, \
-    convert_ros_message_to_dictionary
+from giskardpy.goals.goal import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA
+from giskardpy.model.urdf_object import URDFObject
+from giskardpy.model.utils import make_world_body_box, make_world_body_cylinder
+from giskardpy.utils.utils import position_dict_to_joint_states, convert_ros_message_to_dictionary
 
 
 class GiskardWrapper(object):
@@ -69,7 +69,7 @@ class GiskardWrapper(object):
         self.set_translation_goal(goal_pose, tip_link, root_link, weight=weight, max_velocity=max_linear_velocity)
         self.set_rotation_goal(goal_pose, tip_link, root_link, weight=weight, max_velocity=max_angular_velocity)
 
-    def set_straight_cart_goal(self, goal_pose, tip_link, root_link, trans_max_velocity=None, rot_max_velocity=None, weight=None):
+    def set_straight_cart_goal(self, goal_pose, tip_link, root_link, max_linear_velocity=None, max_angular_velocity=None, weight=None):
         """
         This goal will use the kinematic chain between root and tip link to move tip link on the straightest
         line into the goal pose
@@ -79,15 +79,15 @@ class GiskardWrapper(object):
         :type tip_link: str
         :param goal_pose: the goal pose
         :type goal_pose: PoseStamped
-        :param trans_max_velocity: m/s, default 0.1
-        :type trans_max_velocity: float
-        :param rot_max_velocity: rad/s, default 0.5
-        :type rot_max_velocity: float
+        :param max_linear_velocity: m/s, default 0.1
+        :type max_linear_velocity: float
+        :param max_angular_velocity: rad/s, default 0.5
+        :type max_angular_velocity: float
         :param weight: default WEIGHT_ABOVE_CA
         :type weight: float
         """
-        self.set_straight_translation_goal(goal_pose, tip_link, root_link, max_velocity=trans_max_velocity, weight=weight)
-        self.set_rotation_goal(goal_pose, root_link, tip_link, max_velocity=rot_max_velocity, weight=weight)
+        self.set_straight_translation_goal(goal_pose, tip_link, root_link, max_velocity=max_linear_velocity, weight=weight)
+        self.set_rotation_goal(goal_pose, tip_link, root_link, max_velocity=max_angular_velocity, weight=weight)
 
     def set_translation_goal(self, goal_pose, tip_link, root_link, weight=None, max_velocity=None, **kwargs):
         """
@@ -117,7 +117,7 @@ class GiskardWrapper(object):
         constraint.parameter_value_pair = json.dumps(params)
         self.cmd_seq[-1].constraints.append(constraint)
 
-    def set_straight_translation_goal(self, goal_pose, tip_link, root_link, weight=None, max_velocity=None):
+    def set_straight_translation_goal(self, goal_pose, tip_link, root_link, weight=None, max_velocity=None, **kwargs):
         """
         This goal will use the kinematic chain between root and tip link to move tip link on the straightest
         line into the goal position
@@ -142,6 +142,7 @@ class GiskardWrapper(object):
             params[u'max_velocity'] = max_velocity
         if weight:
             params[u'weight'] = weight
+        params.update(kwargs)
         constraint.parameter_value_pair = json.dumps(params)
         self.cmd_seq[-1].constraints.append(constraint)
 

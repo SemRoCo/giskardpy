@@ -1,8 +1,7 @@
 #!/usr/bin/env python
 import rospy
-import sys
 from giskardpy.python_interface import GiskardWrapper
-from giskardpy import logging
+from giskardpy.utils import logging
 
 if __name__ == '__main__':
     rospy.init_node('add_cylinder')

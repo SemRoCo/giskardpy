@@ -1,10 +1,9 @@
 #!/usr/bin/env python
 import rospy
-import sys
 from sensor_msgs.msg import JointState
 from tf.transformations import rotation_from_matrix, quaternion_matrix
 
-from giskardpy.tfwrapper import lookup_pose, init
+from giskardpy.utils.tfwrapper import lookup_pose, init
 
 
 def cb(dt):

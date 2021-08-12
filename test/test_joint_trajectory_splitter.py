@@ -10,7 +10,7 @@ import rospy
 import trajectory_msgs.msg
 from actionlib_msgs.msg import GoalStatusArray
 
-from giskardpy import logging
+from giskardpy.utils import logging
 
 
 class Clients(object):

@@ -1,0 +1,7 @@
+general_options:
+  path_to_data_folder: !find tmp_data # or 'find ros://giskardpy/data'
+  enable_gui: False
+plugins:
+    PlotTrajectory: # plots the joint trajectory at the end of planning, useful for debugging
+      enabled: True
+

@@ -12,7 +12,7 @@ from giskardpy.python_interface import GiskardWrapper
 from sensor_msgs.msg import JointState
 from math import pi
 from control_msgs.msg import JointTrajectoryControllerState
-from giskardpy import logging
+from giskardpy.utils import logging
 
 
 def get_param(name, value=None):

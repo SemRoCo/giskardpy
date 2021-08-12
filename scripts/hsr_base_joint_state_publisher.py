@@ -1,11 +1,9 @@
 #!/usr/bin/env python
 import rospy
-from geometry_msgs.msg import PoseWithCovarianceStamped
 from nav_msgs.msg import Odometry
 from sensor_msgs.msg import JointState
 from tf.transformations import quaternion_matrix, rotation_from_matrix
 
-from giskardpy.tfwrapper import lookup_pose
 
 def odom_cb(data):
     """

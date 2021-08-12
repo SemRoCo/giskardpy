@@ -1,174 +1,95 @@
-from collections import OrderedDict, defaultdict, namedtuple
+from collections import OrderedDict, defaultdict, deque
 
 import numpy as np
+from sensor_msgs.msg import JointState
 from sortedcontainers import SortedKeyList
 
-from giskardpy.tfwrapper import kdl_to_np, np_vector, np_point
-
-DebugConstraint = namedtuple(u'debug', [u'expr'])
+from giskardpy.utils.tfwrapper import kdl_to_np, np_vector, np_point
 
 
-class Constraint(object):
-    lower_error = -1e4
-    upper_error = 1e4
-    lower_slack_limit = -1e4
-    upper_slack_limit = 1e4
-    linear_weight = 0
+class KeyDefaultDict(defaultdict):
+    """
+    A default dict where the key is passed as parameter to the factory function.
+    """
 
-    def __init__(self, name, expression,
-                 lower_error, upper_error,
-                 velocity_limit,
-                 quadratic_weight, control_horizon, linear_weight=None,
-                 lower_slack_limit=None, upper_slack_limit=None, ):
-        self.name = name
-        self.expression = expression
-        self.quadratic_weight = quadratic_weight
-        self.control_horizon = control_horizon
-        self.velocity_limit = velocity_limit
-        self.lower_error = lower_error
-        self.upper_error = upper_error
-        if lower_slack_limit is not None:
-            self.lower_slack_limit = lower_slack_limit
-        if upper_slack_limit is not None:
-            self.upper_slack_limit = upper_slack_limit
-        if linear_weight is not None:
-            self.linear_weight = linear_weight
-
-    def __str__(self):
-        return self.name
-
-    def normalized_weight(self, prediction_horizon):
-        weight_normalized = self.quadratic_weight * (1 / (self.velocity_limit)) ** 2
-        return weight_normalized
+    def __missing__(self, key):
+        if self.default_factory is None:
+            raise KeyError(key)
+        else:
+            ret = self[key] = self.default_factory(key)
+            return ret
 
 
-class VelocityConstraint(object):
-    lower_acceleration_limit = -1e4
-    upper_acceleration_limit = 1e4
-    lower_slack_limit = -1e3
-    upper_slack_limit = 1e3
-    linear_weight = 0
+class FIFOSet(set):
+    def __init__(self, data, max_length=None):
+        if len(data) > max_length:
+            raise ValueError('len(data) > max_length')
+        super(FIFOSet, self).__init__(data)
+        self.max_length = max_length
+        self._data_queue = deque(data)
 
-    def __init__(self, name, expression,
-                 lower_velocity_limit, upper_velocity_limit,
-                 quadratic_weight,
-                 lower_slack_limit=None, upper_slack_limit=None,
-                 linear_weight=None, control_horizon=None,
-                 horizon_function=None):
-        self.name = name
-        self.expression = expression
-        self.quadratic_weight = quadratic_weight
-        self.control_horizon = control_horizon
-        self.lower_velocity_limit = lower_velocity_limit
-        self.upper_velocity_limit = upper_velocity_limit
-        if lower_slack_limit is not None:
-            self.lower_slack_limit = lower_slack_limit
-        if upper_slack_limit is not None:
-            self.upper_slack_limit = upper_slack_limit
-        if linear_weight is not None:
-            self.linear_weight = linear_weight
+    def add(self, item):
+        if len(self._data_queue) == self.max_length:
+            to_delete = self._data_queue.popleft()
+            super(FIFOSet, self).remove(to_delete)
+            self._data_queue.append(item)
+        super(FIFOSet, self).add(item)
 
-        def default_horizon_function(weight, t):
-            return weight
-
-        self.horizon_function = default_horizon_function
-        if horizon_function is not None:
-            self.horizon_function = horizon_function
-
-    def normalized_weight(self, t):
-        weight_normalized = self.quadratic_weight * (1 / self.upper_velocity_limit) ** 2
-        return self.horizon_function(weight_normalized, t)
+    def remove(self, item):
+        self.remove(item)
+        self._data_queue.remove(item)
 
 
-class FreeVariable(object):
-    def __init__(self, symbols, lower_limits, upper_limits, quadratic_weights, horizon_functions=None):
+class JointStates(defaultdict):
+    class _JointState(object):
+        derivative_to_name = {
+            0: 'position',
+            1: 'velocity',
+            2: 'acceleration',
+            3: 'jerk',
+            4: 'snap',
+            5: 'crackle',
+            6: 'pop',
+        }
+
+        def __init__(self, position=0, velocity=0, acceleration=0, jerk=0, snap=0, crackle=0, pop=0):
+            self.position = position
+            self.velocity = velocity
+            self.acceleration = acceleration
+            self.jerk = jerk
+            self.snap = snap
+            self.crackle = crackle
+            self.pop = pop
+
+        def set_derivative(self, d, item):
+            setattr(self, self.derivative_to_name[d], item)
+
+        def __str__(self):
+            return '{}'.format(self.position)
+
+        def __repr__(self):
+            return str(self)
+
+    def __init__(self):
+        super(JointStates, self).__init__(self._JointState)
+
+    @classmethod
+    def from_msg(cls, msg):
         """
-        :type symbols:  dict
-        :type lower_limits: dict
-        :type upper_limits: dict
-        :type quadratic_weights: dict
-        :type horizon_functions: dict
+        :type msg: JointState
+        :rtype: JointStates
         """
-        self._symbols = symbols
-        self.name = str(self._symbols[0])
-        self._lower_limits = lower_limits
-        self._upper_limits = upper_limits
-        self._quadratic_weights = quadratic_weights
-        assert max(self._symbols.keys()) == len(self._symbols) - 1
-        assert len(self._symbols) == len(self._quadratic_weights) + 1
-        self.order = len(self._symbols)
-
-        # def default_horizon_f(weight, t):
-        #     return weight
-
-        self.horizon_functions = defaultdict(float)
-        self.horizon_functions.update(horizon_functions)
-
-    def get_symbol(self, order):
-        try:
-            return self._symbols[order]
-        except KeyError:
-            raise KeyError(u'Free variable {} doesn\'t have symbol for derivative of order {}'.format(self, order))
-
-    def get_lower_limit(self, order):
-        try:
-            return self._lower_limits[order]
-        except KeyError:
-            raise KeyError(u'Free variable {} doesn\'t have lower limit for derivative of order {}'.format(self, order))
-
-    def get_upper_limit(self, order):
-        try:
-            return self._upper_limits[order]
-        except KeyError:
-            raise KeyError(u'Free variable {} doesn\'t have upper limit for derivative of order {}'.format(self, order))
-
-    def has_position_limits(self):
-        try:
-            lower_limit = self.get_lower_limit(0)
-            upper_limit = self.get_upper_limit(0)
-            return lower_limit is not None and abs(lower_limit) < 100 \
-                   and upper_limit is not None and abs(upper_limit) < 100
-        except Exception:
-            return False
-
-    def get_quadratic_weights(self, order):
-        try:
-            return self._quadratic_weights[order]
-        except KeyError:
-            raise KeyError(u'Free variable {} doesn\'t have weight for derivative of order {}'.format(self, order))
-
-    def normalized_weight(self, t, order, prediction_horizon):
-        weight = self.get_quadratic_weights(order)
-        start = weight * self.horizon_functions[order]
-        a = (weight - start) / (prediction_horizon)
-        weight = a*t + start
-        # weight = (self.get_quadratic_weights(order), t)
-        return weight * (1 / self.get_upper_limit(order)) ** 2
-
-    def __str__(self):
-        return self.name
-
-
-class SingleJointState(object):
-    def __init__(self, name='', position=0.0, velocity=0.0, acceleration=0.0, jerk=0.0, snap=0.0, crackle=0.0, pop=0.0):
-        self.name = name
-        self.position = position
-        self.velocity = velocity
-        self.acceleration = acceleration
-        self.jerk = jerk
-        self.snap = snap
-        self.crackle = crackle
-        self.pop = pop
-
-    def __str__(self):
-        return u'{}: {}, {}, {}, {}, {}, {}, {}'.format(self.name,
-                                            self.position,
-                                            self.velocity,
-                                            self.acceleration,
-                                            self.jerk,
-                                            self.snap,
-                                            self.crackle,
-                                            self.pop)
+        self = cls()
+        for i, joint_name in enumerate(msg.name):
+            sjs = cls._JointState(position=msg.position[i],
+                                  velocity=msg.velocity[i] if msg.velocity else 0,
+                                  acceleration=0,
+                                  jerk=0,
+                                  snap=0,
+                                  crackle=0,
+                                  pop=0)
+            self[joint_name] = sjs
+        return self
 
 
 class Trajectory(object):
@@ -461,3 +382,24 @@ class Collisions(object):
 
     def items(self):
         return self.all_collisions
+
+
+class BiDict(dict):
+    # TODO test me
+    def __init__(self, *args, **kwargs):
+        super(BiDict, self).__init__(*args, **kwargs)
+        self.inverse = {}
+        for key, value in self.items():
+            self.inverse[value] = key
+
+    def __setitem__(self, key, value):
+        if key in self:
+            self.inverse[self[key]].remove(key)
+        super(BiDict, self).__setitem__(key, value)
+        self.inverse[value] = key
+
+    def __delitem__(self, key):
+        self.inverse.setdefault(self[key], []).remove(key)
+        if self[key] in self.inverse and not self.inverse[self[key]]:
+            del self.inverse[self[key]]
+        super(BiDict, self).__delitem__(key)

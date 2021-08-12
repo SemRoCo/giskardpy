@@ -8,24 +8,22 @@ import numpy as np
 import pytest
 import roslaunch
 import rospy
-from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped, PointStamped, Transform
-from giskard_msgs.msg import CollisionEntry, MoveActionGoal, MoveResult, WorldBody, MoveGoal, MoveCmd
+from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped, PointStamped
+from giskard_msgs.msg import CollisionEntry, MoveActionGoal, MoveResult, WorldBody, MoveGoal
 from giskard_msgs.srv import UpdateWorldResponse, UpdateWorldRequest
 from numpy import pi
 from sensor_msgs.msg import JointState
 from shape_msgs.msg import SolidPrimitive
 from tf.transformations import quaternion_from_matrix, quaternion_about_axis
 
-import giskardpy.tfwrapper as tf
-from giskardpy import logging, identifier
-from giskardpy.constraints import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA, WEIGHT_COLLISION_AVOIDANCE
+import giskardpy.utils.tfwrapper as tf
+from giskardpy import identifier
+from giskardpy.goals.goal import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA, WEIGHT_COLLISION_AVOIDANCE
 from giskardpy.identifier import fk_pose
-from giskardpy.robot import Robot
-from giskardpy.tfwrapper import init as tf_init
-from giskardpy.utils import to_joint_state_position_dict, publish_marker_vector
-from rospy_message_converter.message_converter import convert_dictionary_to_ros_message
-from utils_for_tests import PR2, compare_poses, compare_points, compare_orientations
-from iai_naive_kinematics_sim.srv import UpdateTransform
+from giskardpy.model.robot import Robot
+from giskardpy.utils.tfwrapper import init as tf_init
+from giskardpy.utils.utils import to_joint_state_position_dict, logging
+from utils_for_tests import PR2, compare_poses, compare_points, compare_orientations, publish_marker_vector
 
 # TODO roslaunch iai_pr2_sim ros_control_sim_with_base.launch
 # TODO roslaunch iai_kitchen upload_kitchen_obj.launch
@@ -371,6 +369,40 @@ class TestJointGoals(object):
 class TestConstraints(object):
     # TODO write buggy constraints that test sanity checks
 
+    def test_CollisionAvoidanceHint(self, kitchen_setup):
+        """
+        :type kitchen_setup: PR2
+        """
+        # FIXME bouncy
+        tip = u'base_footprint'
+        base_pose = PoseStamped()
+        base_pose.header.frame_id = u'map'
+        base_pose.pose.position.x = 0
+        base_pose.pose.position.y = 1.5
+        base_pose.pose.orientation = Quaternion(*quaternion_about_axis(np.pi, [0, 0, 1]))
+        kitchen_setup.teleport_base(base_pose)
+        base_pose = PoseStamped()
+        base_pose.header.frame_id = tip
+        base_pose.pose.position.x = 2.3
+        base_pose.pose.orientation = Quaternion(*quaternion_about_axis(0, [0, 0, 1]))
+
+        avoidance_hint = Vector3Stamped()
+        avoidance_hint.header.frame_id = u'map'
+        avoidance_hint.vector.y = -1
+        kitchen_setup.avoid_all_collisions(0.1)
+        kitchen_setup.set_json_goal(u'CollisionAvoidanceHint',
+                                    tip_link=u'base_link',
+                                    max_threshold=0.4,
+                                    spring_threshold=0.5,
+                                    # max_linear_velocity=1,
+                                    object_name=u'kitchen',
+                                    object_link_name=u'kitchen_island',
+                                    weight=WEIGHT_COLLISION_AVOIDANCE,
+                                    avoidance_hint=avoidance_hint)
+        kitchen_setup.set_joint_goal(gaya_pose)
+
+        kitchen_setup.set_and_check_cart_goal(base_pose, tip, weight=WEIGHT_BELOW_CA, linear_velocity=0.5)
+
     def test_CartesianPosition(self, zero_pose):
         """
         :type zero_pose: PR2
@@ -447,6 +479,9 @@ class TestConstraints(object):
         compare_orientations(expected.pose.orientation, new_pose.pose.orientation)
 
     def test_CartesianPoseStraight(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
         zero_pose.close_l_gripper()
         goal_position = PoseStamped()
         goal_position.header.frame_id = u'base_link'
@@ -469,9 +504,7 @@ class TestConstraints(object):
         zero_pose.add_sphere(u'sphere', 0.05, pose=object_pose)
 
         publish_marker_vector(start_pose.pose.position, map_T_goal_position.pose.position)
-        zero_pose.set_straight_translation_goal(goal_position, zero_pose.l_tip)  # FIXME: starts wiggling
-        zero_pose.set_straight_cart_goal(goal_position, zero_pose.l_tip)
-        zero_pose.send_and_check_goal()
+        zero_pose.set_and_check_straight_cart_goal(goal_position, zero_pose.l_tip)
 
     def test_CartesianVelocityLimit(self, zero_pose):
         linear_velocity = 1
@@ -1676,35 +1709,6 @@ class TestCartGoals(object):
         zero_pose.set_cart_goal(p, zero_pose.r_tip, zero_pose.default_root)
         zero_pose.send_and_check_goal()
 
-    def test_wiggle4(self, pocky_pose_setup):
-        """
-        :type pocky_pose_setup: PR2
-        """
-        p = PoseStamped()
-        p.header.frame_id = u'map'
-        p.pose.position.x = 1.1
-        p.pose.position.y = 0
-        p.pose.position.z = 0.6
-        p.pose.orientation.w = 1
-        pocky_pose_setup.add_box(size=[1, 1, 0.01], pose=p)
-
-        p = PoseStamped()
-        p.header.frame_id = pocky_pose_setup.r_tip
-        p.pose.position = Point(0.1, 0, 0)
-        p.pose.orientation = Quaternion(0, 0, 0, 1)
-        pocky_pose_setup.set_and_check_cart_goal(p, pocky_pose_setup.r_tip, pocky_pose_setup.default_root,
-                                                 expected_error_codes=[MoveResult.SHAKING])
-
-        # box_setup.avoid_collision()
-
-        # collision_entry = CollisionEntry()
-        # collision_entry.type = CollisionEntry.AVOID_COLLISION
-        # collision_entry.min_dist = 0.05
-        # collision_entry.body_b = u'box'
-        # pocky_pose_setup.add_collision_entries([collision_entry])
-        #
-        # pocky_pose_setup.send_and_check_goal(expected_error_code=MoveResult.INSOLVABLE)
-
     def test_interrupt1(self, zero_pose):
         p = PoseStamped()
         p.header.frame_id = u'base_footprint'
@@ -2261,6 +2265,36 @@ class TestShaking(object):
 
 
 class TestCollisionAvoidanceGoals(object):
+
+    def test_wiggle4(self, pocky_pose_setup):
+        """
+        :type pocky_pose_setup: PR2
+        """
+        p = PoseStamped()
+        p.header.frame_id = u'map'
+        p.pose.position.x = 1.1
+        p.pose.position.y = 0
+        p.pose.position.z = 0.6
+        p.pose.orientation.w = 1
+        pocky_pose_setup.add_box(size=[1, 1, 0.01], pose=p)
+
+        p = PoseStamped()
+        p.header.frame_id = pocky_pose_setup.r_tip
+        p.pose.position = Point(0.1, 0, 0)
+        p.pose.orientation = Quaternion(0, 0, 0, 1)
+        pocky_pose_setup.set_and_check_cart_goal(p, pocky_pose_setup.r_tip, pocky_pose_setup.default_root,
+                                                 expected_error_codes=[MoveResult.SHAKING])
+
+        # box_setup.avoid_collision()
+
+        # collision_entry = CollisionEntry()
+        # collision_entry.type = CollisionEntry.AVOID_COLLISION
+        # collision_entry.min_dist = 0.05
+        # collision_entry.body_b = u'box'
+        # pocky_pose_setup.add_collision_entries([collision_entry])
+        #
+        # pocky_pose_setup.send_and_check_goal(expected_error_code=MoveResult.INSOLVABLE)
+
     def test_open_drawer(self, kitchen_setup):
         self.open_drawer(kitchen_setup, kitchen_setup.l_tip, u'iai_kitchen/sink_area_left_middle_drawer_handle',
                          u'sink_area_left_middle_drawer_main_joint')
@@ -3144,38 +3178,23 @@ class TestCollisionAvoidanceGoals(object):
         kitchen_setup.set_and_check_cart_goal(base_pose, 'base_footprint')
         kitchen_setup.check_current_joint_state(gaya_pose)
 
-    def test_go_around_kitchen_island(self, kitchen_setup):
+    def test_avoid_collision_drive_under_drawer(self, kitchen_setup):
         """
         :type kitchen_setup: PR2
         """
-        tip = u'base_footprint'
+        kitchen_js = {u'sink_area_left_middle_drawer_main_joint': 0.45}
+        kitchen_setup.set_kitchen_js(kitchen_js)
         base_pose = PoseStamped()
         base_pose.header.frame_id = u'map'
-        base_pose.pose.position.x = 0
-        base_pose.pose.position.y = 1.5
-        base_pose.pose.orientation = Quaternion(*quaternion_about_axis(np.pi, [0, 0, 1]))
+        base_pose.pose.position.x = 0.57
+        base_pose.pose.position.y = 0.5
+        base_pose.pose.orientation = Quaternion(*quaternion_about_axis(0, [0, 0, 1]))
         kitchen_setup.teleport_base(base_pose)
         base_pose = PoseStamped()
-        base_pose.header.frame_id = tip
-        base_pose.pose.position.x = 2.3
+        base_pose.header.frame_id = u'base_footprint'
+        base_pose.pose.position.y = 1
         base_pose.pose.orientation = Quaternion(*quaternion_about_axis(0, [0, 0, 1]))
-
-        avoidance_hint = Vector3Stamped()
-        avoidance_hint.header.frame_id = u'map'
-        avoidance_hint.vector.y = -1
-        kitchen_setup.avoid_all_collisions(0.1)
-        kitchen_setup.set_json_goal(u'CollisionAvoidanceHint',
-                                    link_name=u'base_link',
-                                    max_threshold=0.3,
-                                    spring_threshold=0.35,
-                                    max_linear_velocity=1,
-                                    body_b=u'kitchen',
-                                    link_b=u'kitchen_island',
-                                    weight=WEIGHT_COLLISION_AVOIDANCE,
-                                    avoidance_hint=avoidance_hint)
-        kitchen_setup.set_joint_goal(gaya_pose)
-
-        kitchen_setup.set_and_check_cart_goal(base_pose, tip, weight=WEIGHT_BELOW_CA, linear_velocity=0.5)
+        kitchen_setup.set_and_check_cart_goal(base_pose, tip_link=u'base_footprint')
 
     def test_drive_into_wall_with_CollisionAvoidanceHint(self, kitchen_setup):
         """
@@ -4137,6 +4156,10 @@ class TestCollisionAvoidanceGoals(object):
     #     kitchen_setup.send_and_check_goal(execute=False)
 
     def test_bowl_and_cup(self, kitchen_setup):
+        """
+        :type kitchen_setup: PR2
+        :return:
+        """
         # kernprof -lv py.test -s test/test_integration_pr2.py::TestCollisionAvoidanceGoals::test_bowl_and_cup
         bowl_name = u'bowl'
         cup_name = u'cup'
@@ -4795,4 +4818,4 @@ class TestReachability():
         zero_pose.send_and_check_goal(goal_type=MoveGoal.PLAN_ONLY)
 
 # import pytest
-# pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_avoid_collision_at_kitchen_corner'])
+# pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_bowl_and_cup'])

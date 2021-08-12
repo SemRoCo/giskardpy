@@ -1,6 +1,10 @@
 import copy
+import numbers
 from copy import copy
 from multiprocessing import Lock
+
+import numpy as np
+from geometry_msgs.msg import Pose, Point, Vector3, PoseStamped, PointStamped, Vector3Stamped
 
 from giskardpy import casadi_wrapper as w
 
@@ -27,29 +31,25 @@ def get_member(identifier, member):
     except RuntimeError:
         pass
 
-class GetMember(object):
-    def __init__(self, default_value):
-        self.member = None
-        self.default_value = default_value
-        self.child = None
 
+class GetMember(object):
+    def __init__(self):
+        self.member = None
+        self.child = None
 
     def init_call(self, identifier, data):
         self.member = identifier[0]
         sub_data = self.c(data)
         if len(identifier) == 2:
-            self.child = GetMemberLeaf(self.default_value)
+            self.child = GetMemberLeaf()
             return self.child.init_call(identifier[-1], sub_data)
         elif len(identifier) > 2:
-            self.child = GetMember(self.default_value)
+            self.child = GetMember()
             return self.child.init_call(identifier[1:], sub_data)
         return sub_data
 
-
-
     def __call__(self, a):
         return self.c(a)
-
 
     def c(self, a):
         try:
@@ -73,39 +73,32 @@ class GetMember(object):
             return r
         except RuntimeError:
             pass
-        return self.default_value
-
+        raise KeyError(a)
 
     def return_dict(self, a):
         return self.child.c(a[self.member])
 
-
     def return_list(self, a):
         return self.child.c(a[int(self.member)])
-
 
     def return_attribute(self, a):
         return self.child.c(getattr(a, self.member))
 
-
     def return_function_result(self, a):
         return self.child.c(a(*self.member))
 
+
 class GetMemberLeaf(object):
-    def __init__(self, default_value):
+    def __init__(self):
         self.member = None
-        self.default_value = default_value
         self.child = None
 
     def init_call(self, member, data):
         self.member = member
         return self.c(data)
 
-
-
     def __call__(self, a):
         return self.c(a)
-
 
     def c(self, a):
         try:
@@ -129,27 +122,22 @@ class GetMemberLeaf(object):
             return r
         except RuntimeError:
             pass
-        return self.default_value
-
+        raise KeyError(a)
 
     def return_dict(self, a):
         return a[self.member]
 
-
     def return_list(self, a):
         return a[int(self.member)]
 
-
     def return_attribute(self, a):
         return getattr(a, self.member)
-
 
     def return_function_result(self, a):
         return a(*self.member)
 
 
-
-def get_data(identifier, data, default_value=0.0):
+def get_data(identifier, data):
     """
     :param identifier: Identifier in the form of ['pose', 'position', 'x'],
                        to access class member: robot.joint_state = ['robot', 'joint_state']
@@ -162,43 +150,34 @@ def get_data(identifier, data, default_value=0.0):
     """
     try:
         if len(identifier) == 1:
-            shortcut = GetMemberLeaf(default_value)
+            shortcut = GetMemberLeaf()
             result = shortcut.init_call(identifier[0], data)
         else:
-            shortcut = GetMember(default_value)
+            shortcut = GetMember()
             result = shortcut.init_call(identifier, data)
     except AttributeError as e:
         raise KeyError(e)
-        # return default_value, None
-    # except KeyError as e:
-        # traceback.print_exc()
-        # raise KeyError(identifier)
-        # TODO is this really a good idea?
-        # I do this because it automatically sets weights for unused goals to 0
-        # return default_value, None
     except IndexError as e:
         raise KeyError(e)
-        # return default_value, None
     return result, shortcut
 
 
 class GodMap(object):
     """
-    Data structure used by plugins to exchange information.
+    Data structure used by tree to exchange information.
     """
 
-    def __init__(self, default_value=0.0):
+    def __init__(self):
         self._data = {}
         self.expr_separator = u'_'
         self.key_to_expr = {}
         self.expr_to_key = {}
-        self.default_value = default_value
         self.last_expr_values = {}
         self.shortcuts = {}
         self.lock = Lock()
 
     def __copy__(self):
-        god_map_copy = GodMap(self.default_value)
+        god_map_copy = GodMap()
         god_map_copy._data = copy(self._data)
         god_map_copy.key_to_expr = copy(self.key_to_expr)
         god_map_copy.expr_to_key = copy(self.expr_to_key)
@@ -210,7 +189,6 @@ class GodMap(object):
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.lock.release()
-
 
     def unsafe_get_data(self, identifier):
         """
@@ -227,7 +205,7 @@ class GodMap(object):
         identifier = tuple(identifier)
         try:
             if identifier not in self.shortcuts:
-                result, shortcut = get_data(identifier, self._data, self.default_value)
+                result, shortcut = get_data(identifier, self._data)
                 if shortcut:
                     self.shortcuts[identifier] = shortcut
                 return result
@@ -263,17 +241,107 @@ class GodMap(object):
             self.expr_to_key[str(expr)] = identifier_parts
         return self.key_to_expr[identifier]
 
+    def to_expr(self, identifier):
+        data = self.get_data(identifier)
+        if isinstance(data, numbers.Number):
+            return self.to_symbol(identifier)
+        if isinstance(data, Pose):
+            return self.pose_msg_to_frame(identifier)
+        elif isinstance(data, PoseStamped):
+            return self.pose_msg_to_frame(identifier + ['pose'])
+        elif isinstance(data, Point):
+            return self.point_msg_to_point3(identifier)
+        elif isinstance(data, PointStamped):
+            return self.point_msg_to_point3(identifier + ['point'])
+        elif isinstance(data, Vector3):
+            return self.point_msg_to_point3(identifier)
+        elif isinstance(data, Vector3Stamped):
+            return self.point_msg_to_point3(identifier + ['vector'])
+        elif isinstance(data, list) or (isinstance(data, np.ndarray) and len(data.shape) == 1):
+            return self.list_to_symbol_matrix(identifier, len(data))
+        else:
+            raise NotImplementedError(u'to_expr not implemented for type {}.'.format(type(data)))
+
+    def list_to_symbol_matrix(self, identifier, length):
+        return w.Matrix([self.to_symbol(identifier + [i]) for i in range(length)])
+
+    def list_to_point3(self, identifier):
+        return w.point3(
+            x=self.to_symbol(identifier + [0]),
+            y=self.to_symbol(identifier + [1]),
+            z=self.to_symbol(identifier + [2]),
+        )
+
+    def list_to_vector3(self, identifier):
+        return w.vector3(
+            x=self.to_symbol(identifier + [0]),
+            y=self.to_symbol(identifier + [1]),
+            z=self.to_symbol(identifier + [2]),
+        )
+
+    def list_to_translation3(self, identifier):
+        return w.translation3(
+            x=self.to_symbol(identifier + [0]),
+            y=self.to_symbol(identifier + [1]),
+            z=self.to_symbol(identifier + [2]),
+        )
+
+    def list_to_frame(self, identifier):
+        return w.Matrix(
+            [
+                [
+                    self.to_symbol(identifier + [0, 0]),
+                    self.to_symbol(identifier + [0, 1]),
+                    self.to_symbol(identifier + [0, 2]),
+                    self.to_symbol(identifier + [0, 3])
+                ],
+                [
+                    self.to_symbol(identifier + [1, 0]),
+                    self.to_symbol(identifier + [1, 1]),
+                    self.to_symbol(identifier + [1, 2]),
+                    self.to_symbol(identifier + [1, 3])
+                ],
+                [
+                    self.to_symbol(identifier + [2, 0]),
+                    self.to_symbol(identifier + [2, 1]),
+                    self.to_symbol(identifier + [2, 2]),
+                    self.to_symbol(identifier + [2, 3])
+                ],
+                [
+                    0, 0, 0, 1
+                ],
+            ]
+        )
+
+    def pose_msg_to_frame(self, identifier):
+        return w.frame_quaternion(
+            x=self.to_symbol(identifier + ['position', 'x']),
+            y=self.to_symbol(identifier + ['position', 'y']),
+            z=self.to_symbol(identifier + ['position', 'z']),
+            qx=self.to_symbol(identifier + ['orientation', 'x']),
+            qy=self.to_symbol(identifier + ['orientation', 'y']),
+            qz=self.to_symbol(identifier + ['orientation', 'z']),
+            qw=self.to_symbol(identifier + ['orientation', 'w']),
+        )
+
+    def point_msg_to_point3(self, identifier):
+        return w.point3(
+            x=self.to_symbol(identifier + ['x']),
+            y=self.to_symbol(identifier + ['y']),
+            z=self.to_symbol(identifier + ['z']),
+        )
+
+    def vector_msg_to_vector3(self, identifier):
+        return self.point_msg_to_point3(identifier)
+
     def get_values(self, symbols):
         """
         :return: a dict which maps all registered expressions to their values or 0 if there is no number entry
-        :rtype: dict
+        :rtype: list
         """
         # TODO potential speedup by only updating entries that have changed
         # its a trap, this function only looks slow with lineprofiler
         with self.lock:
-            # if exprs is None:
-            #     exprs = self.expr_to_key.keys()
-            # return {expr: self.get_data(self.expr_to_key[expr]) for expr in exprs}
             return [self.unsafe_get_data(self.expr_to_key[expr]) for expr in symbols]
 
     def evaluate_expr(self, expr):

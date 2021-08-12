@@ -1,6 +1,5 @@
 from time import time
 import keyword
-import yaml
 from collections import defaultdict
 from copy import deepcopy
 from multiprocessing import Queue
@@ -18,20 +17,25 @@ from giskard_msgs.srv import UpdateWorldResponse
 from hypothesis import assume
 from hypothesis.strategies import composite
 from iai_naive_kinematics_sim.srv import SetJointState, SetJointStateRequest
+from iai_wsg_50_msgs.msg import PositionCmd
 from numpy import pi
 from py_trees import Blackboard
 from sensor_msgs.msg import JointState
+from std_msgs.msg import ColorRGBA
 from tf.transformations import rotation_from_matrix, quaternion_matrix
+from visualization_msgs.msg import Marker
 
-from giskardpy import logging, identifier
+from giskardpy import identifier
+from giskardpy.data_types import KeyDefaultDict
+from giskardpy.utils.config_loader import ros_load_robot_config
 from giskardpy.garden import grow_tree
 from giskardpy.identifier import robot, world
-from giskardpy.pybullet_world import PyBulletWorld
+from giskardpy.model.pybullet_world import PyBulletWorld
 from giskardpy.python_interface import GiskardWrapper
-from giskardpy.robot import Robot
-from giskardpy.tfwrapper import transform_pose, lookup_pose
-from giskardpy.utils import msg_to_list, KeyDefaultDict, position_dict_to_joint_states, get_ros_pkg_path, \
-    to_joint_state_position_dict
+from giskardpy.model.robot import Robot
+from giskardpy.utils.tfwrapper import transform_pose, lookup_pose
+from giskardpy.utils.utils import msg_to_list, position_dict_to_joint_states, to_joint_state_position_dict, \
+    logging
 
 BIG_NUMBER = 1e100
 SMALL_NUMBER = 1e-100
@@ -219,7 +223,7 @@ def float_no_nan_no_inf(outer_limit=None, min_dist_to_zero=None):
 def sq_matrix(draw):
     i = draw(st.integers(min_value=1, max_value=10))
     i_sq = i ** 2
-    l = draw(st.lists(float_no_nan_no_inf(), min_size=i_sq, max_size=i_sq))
+    l = draw(st.lists(float_no_nan_no_inf(outer_limit=1000), min_size=i_sq, max_size=i_sq))
     return np.array(l).reshape((i, i))
 
 
@@ -256,14 +260,11 @@ class GiskardTestWrapper(GiskardWrapper):
     def __init__(self, config_file):
         self.total_time_spend_giskarding = 0
         self.total_time_spend_moving = 0
-        with open(get_ros_pkg_path(u'giskardpy') + u'/config/' + config_file) as f:
-            config = yaml.load(f)
-        rospy.set_param('~', config)
-        rospy.set_param('~path_to_data_folder', u'tmp_data/')
-        rospy.set_param('~enable_gui', False)
-        rospy.set_param('~plugins/PlotTrajectory/enabled', True)
-        rospy.set_param('~plugins/PlotDebugTrajectory/enabled', True)
-        rospy.set_param('~plugins/MaxTrajectoryLength/enabled', True)
+
+        if not ros_load_robot_config(config_file, test=True):
+            rospy.logerr('Could not set robot config as ROS parameter.')
+        rospy.set_param('~tree/PlotDebugTrajectory/enabled', True)
+        rospy.set_param('~tree/MaxTrajectoryLength/enabled', True)
 
         self.sub_result = rospy.Subscriber('~command/result', MoveActionResult, self.cb, queue_size=100)
         self.cancel_goal = rospy.Publisher('~command/cancel', GoalID, queue_size=100)
@@ -348,9 +349,9 @@ class GiskardTestWrapper(GiskardWrapper):
 
     def tear_down(self):
         rospy.sleep(1)
-        logging.loginfo(u'total time spend giskarding: {}'.format(self.total_time_spend_giskarding-self.total_time_spend_moving))
+        logging.loginfo(u'total time spend giskarding: {}'.format(self.total_time_spend_giskarding - self.total_time_spend_moving))
         logging.loginfo(u'total time spend moving: {}'.format(self.total_time_spend_moving))
-        logging.loginfo(u'stopping plugins')
+        logging.loginfo(u'stopping tree')
 
     def set_object_joint_state(self, object_name, joint_state):
         super(GiskardTestWrapper, self).set_object_joint_state(object_name, joint_state)
@@ -442,10 +443,12 @@ class GiskardTestWrapper(GiskardWrapper):
                                                              weight=weight, **kwargs)
 
 
-    def set_straight_translation_goal(self, goal_pose, tip_link, root_link=None, weight=None, max_velocity=None):
+    def set_straight_translation_goal(self, goal_pose, tip_link, root_link=None, weight=None, max_velocity=None, **kwargs):
         if not root_link:
             root_link = self.default_root
-        super(GiskardTestWrapper, self).set_straight_translation_goal(goal_pose, tip_link, root_link, max_velocity=max_velocity)
+        super(GiskardTestWrapper, self).set_straight_translation_goal(goal_pose, tip_link, root_link,
+                                                                      max_velocity=max_velocity, weight=weight,
+                                                                      **kwargs)
 
     def set_cart_goal(self, goal_pose, tip_link, root_link=None, weight=None, linear_velocity=None, angular_velocity=None):
         if not root_link:
@@ -462,11 +465,11 @@ class GiskardTestWrapper(GiskardWrapper):
         if not root_link:
             root_link = self.default_root
         if weight is not None:
-            super(GiskardTestWrapper, self).set_straight_cart_goal(goal_pose, tip_link, root_link, weight=weight, trans_max_velocity=linear_velocity,
-                                       rot_max_velocity=angular_velocity)
+            super(GiskardTestWrapper, self).set_straight_cart_goal(goal_pose, tip_link, root_link, weight=weight, max_linear_velocity=linear_velocity,
+                                                                   max_angular_velocity=angular_velocity)
         else:
-            super(GiskardTestWrapper, self).set_straight_cart_goal(goal_pose, tip_link, root_link, trans_max_velocity=linear_velocity,
-                                       rot_max_velocity=angular_velocity)
+            super(GiskardTestWrapper, self).set_straight_cart_goal(goal_pose, tip_link, root_link, max_linear_velocity=linear_velocity,
+                                                                   max_angular_velocity=angular_velocity)
 
 
     def set_and_check_cart_goal(self, goal_pose, tip_link, root_link=None, weight=None, linear_velocity=None, angular_velocity=None,
@@ -665,7 +668,7 @@ class GiskardTestWrapper(GiskardWrapper):
         assert name in self.get_object_names().object_names
         compare_poses(o_p, self.get_object_info(name).pose.pose)
 
-    def add_sphere(self, name=u'sphere', size=1, pose=None):
+    def add_sphere(self, name=u'sphere', size=1., pose=None):
         r = super(GiskardTestWrapper, self).add_sphere(name=name, size=size, pose=pose)
         assert r.error_codes == UpdateWorldResponse.SUCCESS, \
             u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
@@ -1024,3 +1027,61 @@ class HSR(GiskardTestWrapper):
     # def command_gripper(self, width):
     #     js = {u'hand_motor_joint': width}
     #     self.send_and_check_joint_goal(js)
+
+
+def publish_marker_sphere(position, frame_id=u'map', radius=0.05, id_=0):
+    m = Marker()
+    m.action = m.ADD
+    m.ns = u'debug'
+    m.id = id_
+    m.type = m.SPHERE
+    m.header.frame_id = frame_id
+    m.pose.position.x = position[0]
+    m.pose.position.y = position[1]
+    m.pose.position.z = position[2]
+    m.color = ColorRGBA(1, 0, 0, 1)
+    m.scale.x = radius
+    m.scale.y = radius
+    m.scale.z = radius
+
+    pub = rospy.Publisher('/visualization_marker', Marker, queue_size=1)
+    start = rospy.get_rostime()
+    while pub.get_num_connections() < 1 and (rospy.get_rostime() - start).to_sec() < 2:
+        # wait for a connection to publisher
+        # you can do whatever you like here or simply do nothing
+        pass
+
+    pub.publish(m)
+
+
+def publish_marker_vector(start, end, diameter_shaft=0.01, diameter_head=0.02, id_=0):
+    """
+    assumes points to be in frame map
+    :type start: Point
+    :type end: Point
+    :type diameter_shaft: float
+    :type diameter_head: float
+    :type id_: int
+    """
+    m = Marker()
+    m.action = m.ADD
+    m.ns = u'debug'
+    m.id = id_
+    m.type = m.ARROW
+    m.points.append(start)
+    m.points.append(end)
+    m.color = ColorRGBA(1, 0, 0, 1)
+    m.scale.x = diameter_shaft
+    m.scale.y = diameter_head
+    m.scale.z = 0
+    m.header.frame_id = u'map'
+
+    pub = rospy.Publisher('/visualization_marker', Marker, queue_size=1)
+    start = rospy.get_rostime()
+    while pub.get_num_connections() < 1 and (rospy.get_rostime() - start).to_sec() < 2:
+        # wait for a connection to publisher
+        # you can do whatever you like here or simply do nothing
+        pass
+    rospy.sleep(0.3)
+
+    pub.publish(m)

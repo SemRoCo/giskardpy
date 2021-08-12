@@ -5,7 +5,7 @@ import giskardpy.utils.tfwrapper as tf
 
 class BasicCartesianGoal(Goal):
 
-    def __init__(self, god_map, root_link, tip_link, goal, reference_velocity=0.1, max_velocity=0.1,
+    def __init__(self, root_link, tip_link, goal, reference_velocity=0.1, max_velocity=0.1,
                  weight=WEIGHT_ABOVE_CA, **kwargs):
         """
         dont use me
@@ -17,7 +17,7 @@ class BasicCartesianGoal(Goal):
 
         self.max_velocity = max_velocity
         self.weight = weight
-        super(BasicCartesianGoal, self).__init__(god_map, **kwargs)
+        super(BasicCartesianGoal, self).__init__(**kwargs)
 
     def get_goal_pose(self):
         return self.get_parameter_as_symbolic_expression(u'goal')
@@ -28,7 +28,7 @@ class BasicCartesianGoal(Goal):
 
 
 class CartesianPosition(BasicCartesianGoal):
-    def __init__(self, god_map, root_link, tip_link, goal, reference_velocity=None, max_velocity=0.2,
+    def __init__(self, root_link, tip_link, goal, reference_velocity=None, max_velocity=0.2,
                  weight=WEIGHT_ABOVE_CA, **kwargs):
         """
         This goal will use the kinematic chain between root and tip link to achieve a goal position for tip link
@@ -40,8 +40,7 @@ class CartesianPosition(BasicCartesianGoal):
         """
         if reference_velocity is None:
             reference_velocity = max_velocity
-        super(CartesianPosition, self).__init__(god_map,
-                                                root_link=root_link,
+        super(CartesianPosition, self).__init__(root_link=root_link,
                                                 tip_link=tip_link,
                                                 goal=goal,
                                                 reference_velocity=reference_velocity,
@@ -62,12 +61,11 @@ class CartesianPosition(BasicCartesianGoal):
 
 
 class CartesianPositionStraight(BasicCartesianGoal):
-    def __init__(self, god_map, root_link, tip_link, goal, reference_velocity=None, max_velocity=0.2,
+    def __init__(self, root_link, tip_link, goal, reference_velocity=None, max_velocity=0.2,
                  weight=WEIGHT_ABOVE_CA, **kwargs):
         if reference_velocity is None:
             reference_velocity = max_velocity
-        super(CartesianPositionStraight, self).__init__(god_map=god_map,
-                                                        root_link=root_link,
+        super(CartesianPositionStraight, self).__init__(root_link=root_link,
                                                         tip_link=tip_link,
                                                         goal=goal,
                                                         reference_velocity=reference_velocity,
@@ -137,7 +135,7 @@ class CartesianPositionStraight(BasicCartesianGoal):
 
 
 class CartesianOrientation(BasicCartesianGoal):
-    def __init__(self, god_map, root_link, tip_link, goal, reference_velocity=None, max_velocity=0.5,
+    def __init__(self, root_link, tip_link, goal, reference_velocity=None, max_velocity=0.5,
                  max_accleration=0.5,
                  weight=WEIGHT_ABOVE_CA, goal_constraint=False, **kwargs):
         """
@@ -150,8 +148,7 @@ class CartesianOrientation(BasicCartesianGoal):
         """
         if reference_velocity is None:
             reference_velocity = max_velocity
-        super(CartesianOrientation, self).__init__(god_map=god_map,
-                                                   root_link=root_link,
+        super(CartesianOrientation, self).__init__(root_link=root_link,
                                                    tip_link=tip_link,
                                                    goal=goal,
                                                    reference_velocity=reference_velocity,
@@ -208,7 +205,7 @@ class CartesianOrientationSlerp(CartesianOrientation):
 
 
 class CartesianPose(Goal):
-    def __init__(self, god_map, root_link, tip_link, goal, max_linear_velocity=0.1,
+    def __init__(self, root_link, tip_link, goal, max_linear_velocity=0.1,
                  max_angular_velocity=0.5, weight=WEIGHT_ABOVE_CA, **kwargs):
         """
         This goal will use the kinematic chain between root and tip link to move tip link into the goal pose
@@ -219,17 +216,15 @@ class CartesianPose(Goal):
         :param max_angular_velocity: float, rad/s, default 0.5
         :param weight: float, default WEIGHT_ABOVE_CA
         """
-        super(CartesianPose, self).__init__(god_map)
+        super(CartesianPose, self).__init__(**kwargs)
         self.constraints = []
-        self.constraints.append(CartesianPosition(god_map=god_map,
-                                                  root_link=root_link,
+        self.constraints.append(CartesianPosition(root_link=root_link,
                                                   tip_link=tip_link,
                                                   goal=goal,
                                                   max_velocity=max_linear_velocity,
                                                   weight=weight,
                                                   **kwargs))
-        self.constraints.append(CartesianOrientation(god_map=god_map,
-                                                     root_link=root_link,
+        self.constraints.append(CartesianOrientation(root_link=root_link,
                                                      tip_link=tip_link,
                                                      goal=goal,
                                                      max_velocity=max_angular_velocity,
@@ -242,21 +237,19 @@ class CartesianPose(Goal):
 
 
 class CartesianPoseStraight(Goal):
-    def __init__(self, god_map, root_link, tip_link, goal, translation_max_velocity=0.1,
+    def __init__(self, root_link, tip_link, goal, translation_max_velocity=0.1,
                  translation_max_acceleration=0.1, rotation_max_velocity=0.5, rotation_max_acceleration=0.5,
                  weight=WEIGHT_ABOVE_CA, goal_constraint=True, **kwargs):
-        super(CartesianPoseStraight, self).__init__(god_map)
+        super(CartesianPoseStraight, self).__init__(**kwargs)
         self.constraints = []
-        self.constraints.append(CartesianPositionStraight(god_map=god_map,
-                                                          root_link=root_link,
+        self.constraints.append(CartesianPositionStraight(root_link=root_link,
                                                           tip_link=tip_link,
                                                           goal=goal,
                                                           max_velocity=translation_max_velocity,
                                                           max_acceleration=translation_max_acceleration,
                                                           weight=weight,
                                                           goal_constraint=goal_constraint, **kwargs))
-        self.constraints.append(CartesianOrientation(god_map=god_map,
-                                                     root_link=root_link,
+        self.constraints.append(CartesianOrientation(root_link=root_link,
                                                      tip_link=tip_link,
                                                      goal=goal,
                                                      max_velocity=rotation_max_velocity,
@@ -271,15 +264,8 @@ class CartesianPoseStraight(Goal):
             self._velocity_constraints.update(c_vel)
             self.debug_expressions.update(constraint.debug_expressions)
 
-
-class CartesianVelocityLimit(Goal):
-    goal = u'goal'
-    weight_id = u'weight'
-    max_linear_velocity_id = u'max_linear_velocity'
-    max_angular_velocity_id = u'max_angular_velocity'
-    percentage = u'percentage'
-
-    def __init__(self, god_map, root_link, tip_link, weight=WEIGHT_ABOVE_CA, max_linear_velocity=0.1,
+class TranslationVelocityLimit(Goal):
+    def __init__(self, root_link, tip_link, weight=WEIGHT_ABOVE_CA, max_linear_velocity=0.1,
                  max_angular_velocity=0.5, hard=True, **kwargs):
         """
         This goal will limit the cartesian velocity of the tip link relative to root link
@@ -291,21 +277,19 @@ class CartesianVelocityLimit(Goal):
         :param hard: bool, default True, will turn this into a hard constraint, that will always be satisfied, can could
                                 make some goal combination infeasible
         """
-        super(CartesianVelocityLimit, self).__init__(god_map, **kwargs)
         self.root_link = root_link
         self.tip_link = tip_link
         self.hard = hard
 
-        params = {self.weight_id: weight,
-                  self.max_linear_velocity_id: max_linear_velocity,
-                  self.max_angular_velocity_id: max_angular_velocity
-                  }
-        self.save_params_on_god_map(params)
+        self.weight = weight
+        self.max_linear_velocity = max_linear_velocity
+        self.max_angular_velocity = max_angular_velocity
+        super(TranslationVelocityLimit, self).__init__(**kwargs)
 
     def make_constraints(self):
-        weight = self.get_input_float(self.weight_id)
-        max_linear_velocity = self.get_input_float(self.max_linear_velocity_id)
-        max_angular_velocity = self.get_input_float(self.max_angular_velocity_id)
+        weight = self.get_parameter_as_symbolic_expression(u'weight')
+        max_linear_velocity = self.get_parameter_as_symbolic_expression(u'max_linear_velocity')
+        max_angular_velocity = self.get_parameter_as_symbolic_expression(u'max_angular_velocity')
         sample_period = self.get_sampling_period_symbol()
 
         root_T_tip = self.get_fk(self.root_link, self.tip_link)
@@ -384,6 +368,114 @@ class CartesianVelocityLimit(Goal):
                             )
 
     def __str__(self):
-        s = super(CartesianVelocityLimit, self).__str__()
+        s = super(TranslationVelocityLimit, self).__str__()
+        return u'{}/{}/{}'.format(s, self.root_link, self.tip_link)
+
+
+class RotationVelocityLimit(Goal):
+    def __init__(self, root_link, tip_link, weight=WEIGHT_ABOVE_CA, max_linear_velocity=0.1,
+                 max_angular_velocity=0.5, hard=True, **kwargs):
+        """
+        This goal will limit the cartesian velocity of the tip link relative to root link
+        :param root_link: str, root link of the kin chain
+        :param tip_link: str, tip link of the kin chain
+        :param weight: float, default WEIGHT_ABOVE_CA
+        :param max_linear_velocity: float, m/s, default 0.1
+        :param max_angular_velocity: float, rad/s, default 0.5
+        :param hard: bool, default True, will turn this into a hard constraint, that will always be satisfied, can could
+                                make some goal combination infeasible
+        """
+        self.root_link = root_link
+        self.tip_link = tip_link
+        self.hard = hard
+
+        self.weight = weight
+        self.max_linear_velocity = max_linear_velocity
+        self.max_angular_velocity = max_angular_velocity
+        super(RotationVelocityLimit, self).__init__(**kwargs)
+
+    def make_constraints(self):
+        weight = self.get_parameter_as_symbolic_expression(u'weight')
+        max_linear_velocity = self.get_parameter_as_symbolic_expression(u'max_linear_velocity')
+        max_angular_velocity = self.get_parameter_as_symbolic_expression(u'max_angular_velocity')
+        sample_period = self.get_sampling_period_symbol()
+
+        root_T_tip = self.get_fk(self.root_link, self.tip_link)
+        tip_evaluated_T_root = self.get_fk_evaluated(self.tip_link, self.root_link)
+        root_P_tip = w.position_of(root_T_tip)
+
+        if self.hard:
+            slack_limit = 0
+        else:
+            slack_limit = 1e9
+
+        self.add_constraint(u'/linear/x',
+                            lower_velocity_limit=-max_linear_velocity * sample_period,
+                            upper_velocity_limit=max_linear_velocity * sample_period,
+                            weight=weight,
+                            expression=root_P_tip[0],
+                            goal_constraint=False,
+                            lower_slack_limit=-slack_limit,
+                            upper_slack_limit=slack_limit)
+        self.add_constraint(u'/linear/y',
+                            lower_velocity_limit=-max_linear_velocity * sample_period,
+                            upper_velocity_limit=max_linear_velocity * sample_period,
+                            weight=weight,
+                            expression=root_P_tip[1],
+                            goal_constraint=False,
+                            lower_slack_limit=-slack_limit,
+                            upper_slack_limit=slack_limit
+                            )
+        self.add_constraint(u'/linear/z',
+                            lower_velocity_limit=-max_linear_velocity * sample_period,
+                            upper_velocity_limit=max_linear_velocity * sample_period,
+                            weight=weight,
+                            expression=root_P_tip[2],
+                            goal_constraint=False,
+                            lower_slack_limit=-slack_limit,
+                            upper_slack_limit=slack_limit
+                            )
+
+        root_R_tip = w.rotation_of(root_T_tip)
+        tip_evaluated_R_root = w.rotation_of(tip_evaluated_T_root)
+
+        hack = w.rotation_matrix_from_axis_angle([0, 0, 1], 0.0001)
+
+        axis, angle = w.axis_angle_from_matrix(w.dot(w.dot(tip_evaluated_R_root, hack), root_R_tip))
+
+        axis_angle = axis * angle
+
+        self.add_constraint(u'/angular/x',
+                            lower_velocity_limit=-max_angular_velocity * sample_period,
+                            upper_velocity_limit=max_angular_velocity * sample_period,
+                            weight=weight,
+                            expression=axis_angle[0],
+                            goal_constraint=False,
+                            lower_slack_limit=-slack_limit,
+                            upper_slack_limit=slack_limit
+                            )
+
+        self.add_constraint(u'/angular/y',
+                            lower_velocity_limit=-max_angular_velocity * sample_period,
+                            upper_velocity_limit=max_angular_velocity * sample_period,
+                            weight=weight,
+                            expression=axis_angle[1],
+                            goal_constraint=False,
+                            lower_slack_limit=-slack_limit,
+                            upper_slack_limit=slack_limit
+                            )
+
+        self.add_constraint(u'/angular/z',
+                            lower_velocity_limit=-max_angular_velocity * sample_period,
+                            upper_velocity_limit=max_angular_velocity * sample_period,
+                            weight=weight,
+                            expression=axis_angle[2],
+                            goal_constraint=False,
+                            lower_slack_limit=-slack_limit,
+                            upper_slack_limit=slack_limit
+                            )
+
+    def __str__(self):
+        s = super(RotationVelocityLimit, self).__str__()
         return u'{}/{}/{}'.format(s, self.root_link, self.tip_link)
 

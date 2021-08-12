@@ -3,7 +3,7 @@ from giskardpy import casadi_wrapper as w
 import giskardpy.utils.tfwrapper as tf
 
 class AlignPlanes(Goal):
-    def __init__(self, god_map, root_link, tip_link, root_normal, tip_normal,
+    def __init__(self, root_link, tip_link, root_normal, tip_normal,
                  max_angular_velocity=0.5, weight=WEIGHT_ABOVE_CA, **kwargs):
         """
         This Goal will use the kinematic chain between tip and root normal to align both
@@ -26,7 +26,7 @@ class AlignPlanes(Goal):
         self.root_V_root_normal = tf.transform_vector(self.root, root_normal)
         self.root_V_root_normal.vector = tf.normalize(self.root_V_root_normal.vector)
 
-        super(AlignPlanes, self).__init__(god_map, **kwargs)
+        super(AlignPlanes, self).__init__(**kwargs)
 
     def __str__(self):
         s = super(AlignPlanes, self).__str__()

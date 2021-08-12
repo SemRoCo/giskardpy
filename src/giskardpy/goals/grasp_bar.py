@@ -6,7 +6,7 @@ from giskardpy.goals.goal import Goal, WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA
 import giskardpy.utils.tfwrapper as tf
 
 class GraspBar(Goal):
-    def __init__(self, god_map, root_link, tip_link, tip_grasp_axis, bar_center, bar_axis, bar_length,
+    def __init__(self, root_link, tip_link, tip_grasp_axis, bar_center, bar_axis, bar_length,
                  max_linear_velocity=0.1, max_angular_velocity=0.5, weight=WEIGHT_ABOVE_CA, **kwargs):
         """
         TODO update description
@@ -23,7 +23,7 @@ class GraspBar(Goal):
         """
         self.root = root_link
         self.tip = tip_link
-        super(GraspBar, self).__init__(god_map, **kwargs)
+        super(GraspBar, self).__init__(**kwargs)
 
         bar_center = tf.transform_point(self.root, bar_center)
 

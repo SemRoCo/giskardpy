@@ -9,7 +9,7 @@ import giskardpy.utils.tfwrapper as tf
 
 class Pointing(Goal):
 
-    def __init__(self, god_map, tip_link, goal_point, root_link, pointing_axis=None, max_velocity=0.3,
+    def __init__(self, tip_link, goal_point, root_link, pointing_axis=None, max_velocity=0.3,
                  weight=WEIGHT_BELOW_CA, **kwargs):
         """
         Uses the kinematic chain from root_link to tip_link to move the pointing axis, such that it points to the goal point.
@@ -33,7 +33,7 @@ class Pointing(Goal):
             pointing_axis.header.frame_id = self.tip
             pointing_axis.vector.z = 1
 
-        super(Pointing, self).__init__(god_map, **kwargs)
+        super(Pointing, self).__init__(**kwargs)
 
     def make_constraints(self):
         # TODO fix comments

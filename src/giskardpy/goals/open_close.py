@@ -15,7 +15,7 @@ from giskardpy.utils.logging import logwarn
 
 
 class OpenDoor(Goal):
-    def __init__(self, god_map, tip_link, object_name, object_link_name, angle_goal, root_link=None,
+    def __init__(self, tip_link, object_name, object_link_name, angle_goal, root_link=None,
                  weight=WEIGHT_ABOVE_CA, **kwargs):
 
         self.tip = tip_link
@@ -27,10 +27,10 @@ class OpenDoor(Goal):
 
         self.object_name = object_name
         if root_link is None:
-            self.root = god_map.get_data(identifier.robot).get_root()
+            self.root = self.get_god_map().get_data(identifier.robot).get_root()
         else:
             self.root = root_link
-        super(OpenDoor, self).__init__(god_map, **kwargs)
+        super(OpenDoor, self).__init__(**kwargs)
 
         environment_object = self.get_world().get_object(object_name)
         self.hinge_joint = environment_object.get_movable_parent_joint(object_link_name)
@@ -135,7 +135,7 @@ class OpenDoor(Goal):
 
 
 class OpenDrawer(Goal):
-    def __init__(self, god_map, tip_link, object_name, object_link_name, distance_goal, root_link=None,
+    def __init__(self, tip_link, object_name, object_link_name, distance_goal, root_link=None,
                  weight=WEIGHT_ABOVE_CA, **kwargs):
         """
         :type tip_link: str
@@ -151,7 +151,6 @@ class OpenDrawer(Goal):
         :param root_link: default is root link of robot
         """
         self.constraints = []  # init empty list
-        self.god_map = god_map
         # Process input parameters
         if root_link is None:
             self.root = self.get_robot().get_root()
@@ -165,7 +164,7 @@ class OpenDrawer(Goal):
         handle_frame_id = u'iai_kitchen/' + object_link_name
 
         self.object_name = object_name
-        super(OpenDrawer, self).__init__(god_map, **kwargs)
+        super(OpenDrawer, self).__init__(**kwargs)
 
         environment_object = self.get_world().get_object(object_name)
         # Get movable joint
@@ -183,7 +182,7 @@ class OpenDrawer(Goal):
         hinge_drawer_axis_msg.vector.y = hinge_drawer_axis[1]
         hinge_drawer_axis_msg.vector.z = hinge_drawer_axis[2]
 
-        # Get joint limits TODO: check of desired goal is within limits
+        # Get joint limits TODO: check if desired goal is within limits
         min_limit, max_limit = environment_object.get_joint_position_limits(
             self.hinge_joint)
         current_joint_pos = environment_object.joint_state[self.hinge_joint].position
@@ -215,7 +214,6 @@ class OpenDrawer(Goal):
 
         self.constraints.append(
             CartesianPoseStraight(
-                god_map,
                 self.root,
                 self.tip,
                 root_T_tip_goal_dict,
@@ -234,7 +232,7 @@ class OpenDrawer(Goal):
 
 
 class Open(Goal):
-    def __init__(self, god_map, tip_link, object_name, object_link_name, root_link=None, goal_joint_state=None,
+    def __init__(self, tip_link, object_name, object_link_name, root_link=None, goal_joint_state=None,
                  weight=WEIGHT_ABOVE_CA, **kwargs):
         super(Open, self).__init__(god_map, **kwargs)
         self.constraints = []
@@ -249,16 +247,14 @@ class Open(Goal):
                 goal_joint_state = max_limit
 
         if environment_object.is_joint_revolute(joint_name):
-            self.constraints.append(OpenDoor(god_map=god_map,
-                                             tip_link=tip_link,
+            self.constraints.append(OpenDoor(tip_link=tip_link,
                                              object_name=object_name,
                                              object_link_name=object_link_name,
                                              angle_goal=goal_joint_state,
                                              root_link=root_link,
                                              weight=weight, **kwargs))
         elif environment_object.is_joint_prismatic(joint_name):
-            self.constraints.append(OpenDrawer(god_map,
-                                               tip_link=tip_link,
+            self.constraints.append(OpenDrawer(tip_link=tip_link,
                                                object_name=object_name,
                                                object_link_name=object_link_name,
                                                distance_goal=goal_joint_state,
@@ -277,9 +273,9 @@ class Open(Goal):
 
 
 class Close(Goal):
-    def __init__(self, god_map, tip_link, object_name, object_link_name, root_link=None, goal_joint_state=None,
+    def __init__(self, tip_link, object_name, object_link_name, root_link=None, goal_joint_state=None,
                  weight=WEIGHT_ABOVE_CA, **kwargs):
-        super(Close, self).__init__(god_map)
+        super(Close, self).__init__(**kwargs)
         self.constraints = []
         environment_object = self.get_world().get_object(object_name)
         joint_name = environment_object.get_movable_parent_joint(object_link_name)
@@ -292,16 +288,14 @@ class Close(Goal):
                 goal_joint_state = min_limit
 
         if environment_object.is_joint_revolute(joint_name):
-            self.constraints.append(OpenDoor(god_map=god_map,
-                                             tip_link=tip_link,
+            self.constraints.append(OpenDoor(tip_link=tip_link,
                                              object_name=object_name,
                                              object_link_name=object_link_name,
                                              angle_goal=goal_joint_state,
                                              root_link=root_link,
                                              weight=weight, **kwargs))
         elif environment_object.is_joint_prismatic(joint_name):
-            self.constraints.append(OpenDrawer(god_map,
-                                               tip_link=tip_link,
+            self.constraints.append(OpenDrawer(tip_link=tip_link,
                                                object_name=object_name,
                                                object_link_name=object_link_name,
                                                distance_goal=goal_joint_state,

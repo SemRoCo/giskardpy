@@ -5,7 +5,7 @@ from giskardpy.goals.goal import Goal, WEIGHT_COLLISION_AVOIDANCE, WEIGHT_ABOVE_
 
 class ExternalCollisionAvoidance(Goal):
 
-    def __init__(self, god_map, link_name, max_velocity=0.2, hard_threshold=0.0, soft_threshold=0.05, idx=0,
+    def __init__(self, link_name, max_velocity=0.2, hard_threshold=0.0, soft_threshold=0.05, idx=0,
                  num_repeller=1, **kwargs):
         """
         Don't use me
@@ -16,7 +16,7 @@ class ExternalCollisionAvoidance(Goal):
         self.num_repeller = num_repeller
         self.link_name = link_name
         self.idx = idx
-        super(ExternalCollisionAvoidance, self).__init__(god_map, **kwargs)
+        super(ExternalCollisionAvoidance, self).__init__(**kwargs)
         self.robot_root = self.get_robot().get_root()
         self.robot_name = self.get_robot_unsafe().get_name()
 
@@ -122,7 +122,7 @@ class ExternalCollisionAvoidance(Goal):
 
 class SelfCollisionAvoidance(Goal):
 
-    def __init__(self, god_map, link_a, link_b, max_velocity=0.2, hard_threshold=0.0, soft_threshold=0.05, idx=0,
+    def __init__(self, link_a, link_b, max_velocity=0.2, hard_threshold=0.0, soft_threshold=0.05, idx=0,
                  num_repeller=1, **kwargs):
         self.link_a = link_a
         self.link_b = link_b
@@ -131,7 +131,7 @@ class SelfCollisionAvoidance(Goal):
         self.soft_threshold = soft_threshold
         self.num_repeller = num_repeller
         self.idx = idx
-        super(SelfCollisionAvoidance, self).__init__(god_map, **kwargs)
+        super(SelfCollisionAvoidance, self).__init__(**kwargs)
         self.robot_root = self.get_robot().get_root()
         self.robot_name = self.get_robot_unsafe().get_name()
 
@@ -230,7 +230,7 @@ class SelfCollisionAvoidance(Goal):
 
 
 class CollisionAvoidanceHint(Goal):
-    def __init__(self, god_map, tip_link, avoidance_hint, object_name, object_link_name, max_linear_velocity=0.1,
+    def __init__(self, tip_link, avoidance_hint, object_name, object_link_name, max_linear_velocity=0.1,
                  root_link=None,
                  max_threshold=0.05, spring_threshold=None, weight=WEIGHT_ABOVE_CA, **kwargs):
         """
@@ -253,7 +253,7 @@ class CollisionAvoidanceHint(Goal):
         self.link_b = object_link_name
         self.body_b_hash = object_name.__hash__()
         self.link_b_hash = object_link_name.__hash__()
-        super(CollisionAvoidanceHint, self).__init__(god_map, **kwargs)
+        super(CollisionAvoidanceHint, self).__init__(**kwargs)
         if root_link is None:
             self.root_link = self.get_robot().get_root()
         else:

@@ -134,7 +134,7 @@ class GoalToConstraints(GetGoal):
                     # params = convert_ros_message_to_dictionary(constraint)
                     # del params[u'type']
 
-                c = C(self.god_map, **params)
+                c = C(god_map=self.god_map, **params)
             except Exception as e:
                 traceback.print_exc()
                 doc_string = C.__init__.__doc__
@@ -198,7 +198,8 @@ class GoalToConstraints(GetGoal):
                         soft_threshold = soft_threshold_override
                     else:
                         soft_threshold = config[joint_name][u'soft_threshold']
-                    constraint = ExternalCollisionAvoidance(self.god_map, child_link,
+                    constraint = ExternalCollisionAvoidance(god_map=self.god_map,
+                                                            link_name=child_link,
                                                             hard_threshold=hard_threshold,
                                                             soft_threshold=soft_threshold,
                                                             idx=i,
@@ -248,7 +249,7 @@ class GoalToConstraints(GetGoal):
                                          config[link_b][u'soft_threshold'])
                     number_of_repeller = min(config[link_a][u'number_of_repeller'],
                                              config[link_b][u'number_of_repeller'])
-                constraint = SelfCollisionAvoidance(self.god_map,
+                constraint = SelfCollisionAvoidance(god_map=self.god_map,
                                                     link_a=link_a,
                                                     link_b=link_b,
                                                     hard_threshold=hard_threshold,

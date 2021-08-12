@@ -19,6 +19,7 @@ from copy import deepcopy
 from tf.transformations import quaternion_about_axis
 
 import giskardpy.identifier as identifier
+from giskardpy.plugin import GiskardBehavior
 from giskardpy.plugin_action_server import GetGoal
 from giskardpy.tfwrapper import transform_pose
 
@@ -29,25 +30,53 @@ from ompl import base as ob
 from ompl import geometric as og
 
 
-class GlobalPlanner(GetGoal):
+class TwoDimRayMotionValidator(ob.MotionValidator):
 
-    def __init__(self, name, as_name):
-        GetGoal.__init__(self, name, as_name)
+    def __init__(self, si):
+        ob.MotionValidator.__init__(self, si)
+        self.lock = threading.Lock()
+        self.state_validator = TwoDimStateValidator(si)
 
-        self.kitchen_space = self.create_kitchen_space()
-        self.kitchen_floor_space = self.create_kitchen_floor_space()
+    def checkMotion(self, s1, s2):
+        with self.lock:
+            x_b = s1.getX()
+            y_b = s1.getY()
+            x_e = s2.getX()
+            y_e = s2.getY()
+            # Shoot ray from start to end pose and check if it intersects with the kitchen,
+            # if so return false, else true.
+            d, u = ((-0.33712110805511475, -0.33709930224943446, 0),
+                    (0.33712110805511475, 0.33714291386079503, 0))#p.getAABB(self.pybullet_robot_id, 3)
+            d_l = (d[0], u[1], 0)
+            u_r = (u[0], d[1], 0)
+            aabbs = (d_l, d, u, u_r)
+            query_b = [[x_b+aabb[0], y_b+aabb[1], 0] for aabb in aabbs]
+            query_e = [[x_e+aabb[0], y_e+aabb[1], 0] for aabb in aabbs]
+            query_res = p.rayTestBatch(query_b, query_e)
+            return all([obj != self.state_validator.pybullet_kitchen_id for obj, _, _, _, _ in query_res]) and \
+                   self.state_validator.isValid(s1) and self.state_validator.isValid(s2)
 
-        self.pose_goal = None
-        self.goal_dict = None
+
+class TwoDimStateValidator(ob.StateValidityChecker, GiskardBehavior):
+
+    def __init__(self, si):
+        ob.StateValidityChecker.__init__(self, si)
+        GiskardBehavior.__init__(self, str(self))
+        self.lock = threading.Lock()
+        self.init_map()
+        self.init_pybullet_ids_and_joints()
+
+    def init_pybullet_ids_and_joints(self):
         self.pybullet_joints = []
         self.pybullet_robot_id = 2
         self.pybullet_kitchen_id = 3
-        self.lock = threading.Lock()
         for i in range(0, p.getNumJoints(self.get_robot().get_pybullet_id())):
             j = p.getJointInfo(self.get_robot().get_pybullet_id(), i)
             if j[2] != p.JOINT_FIXED:
                 self.pybullet_joints.append(j[1].decode('UTF-8'))
                 # self.rotation_goal = None
+
+    def init_map(self):
         rospy.wait_for_service('static_map')
         try:
             get_map = rospy.ServiceProxy('static_map', GetMap)
@@ -64,68 +93,16 @@ class GlobalPlanner(GetGoal):
             self.occ_map_width = info.width
         except rospy.ServiceException as e:
             rospy.logerr("Failed to get static occupancy map.")
-        pass
 
     def is_driveable(self, state):
         x = numpy.sqrt((state.getX() - self.occ_map_origin.x) ** 2)
         y = numpy.sqrt((state.getY() - self.occ_map_origin.y) ** 2)
+        if int(y / self.occ_map_res) >= self.occ_map.shape[0] or \
+                self.occ_map_width - int(x / self.occ_map_res) >= self.occ_map.shape[1]:
+            return False
         return 0 <= self.occ_map[int(y / self.occ_map_res)][self.occ_map_width - int(x / self.occ_map_res)] < 1
 
-    def get_cart_goal(self, cmd):
-        try:
-            return next(c for c in cmd.constraints if c.type == "CartesianPose")
-        except StopIteration:
-            return None
-
-    def update(self):
-
-        move_cmd = self.get_god_map().get_data(identifier.next_move_goal)  # type: MoveCmd
-        if not move_cmd:
-            return Status.FAILURE
-
-        cart_c = self.get_cart_goal(move_cmd)
-        if not cart_c:
-            return Status.SUCCESS
-
-        self.goal_dict = yaml.load(cart_c.parameter_value_pair)
-        ros_pose = convert_dictionary_to_ros_message(u'geometry_msgs/PoseStamped', self.goal_dict[u'goal'])
-        self.pose_goal = transform_pose(self.get_god_map().get_data(identifier.map_frame), ros_pose)
-
-        if self.goal_dict[u'tip_link'] == u'base_footprint':
-            trajectory = self.planNavigation()
-            if not trajectory.any():
-                return Status.FAILURE
-            poses = []
-            for i, point in enumerate(trajectory):
-                if i == 0:
-                    continue # we do not to reach the first pose, since it is the start pose
-                base_pose = PoseStamped()
-                base_pose.header.frame_id = self.get_god_map().get_data(identifier.map_frame)
-                base_pose.pose.position.x = point[0]
-                base_pose.pose.position.y = point[1]
-                base_pose.pose.position.z = 0
-                base_pose.pose.orientation = Quaternion(*quaternion_about_axis(0, [0, 0, 1]))
-                poses.append(base_pose)
-            c = self.get_cartesian_path_constraint(poses)
-            move_cmd.constraints = []
-            move_cmd.constraints.append(c)
-            self.get_god_map().set_data(identifier.next_move_goal, move_cmd)
-            pass
-        else:
-            pass  # return self.planMovement()
-
-        return Status.SUCCESS
-
-    def get_cartesian_path_constraint(self, poses):
-        d = {}
-        d[u'parameter_value_pair'] = deepcopy(self.goal_dict)
-        d[u'parameter_value_pair'].pop(u'goal')
-        d[u'type'] = u'CartesianPathCarrot'
-        d[u'parameter_value_pair'][u'goals'] = list(map(convert_ros_message_to_dictionary, poses))
-        d[u'parameter_value_pair'] = json.dumps(d[u'parameter_value_pair'])
-        return convert_dictionary_to_ros_message(u'giskard_msgs/Constraint', d)
-
-    def isStateValidForNavigation(self, state):
+    def isValid(self, state):
         # Some arbitrary condition on the state (note that thanks to
         # dynamic type checking we can just call getX() and do not need
         # to convert state to an SE2State.)
@@ -156,7 +133,75 @@ class GlobalPlanner(GetGoal):
                 collisions += p.getContactPoints(self.pybullet_robot_id, self.pybullet_kitchen_id)
                 # Reset joint state
                 self.get_god_map().set_data(identifier.joint_states, current_js)
-            return collisions is ()
+            return collisions is () and self.is_driveable(state)
+
+    def __str__(self):
+        return u'TwoDimStateValidator'
+
+class GlobalPlanner(GetGoal):
+
+    def __init__(self, name, as_name):
+        GetGoal.__init__(self, name, as_name)
+
+        self.kitchen_space = self.create_kitchen_space()
+        self.kitchen_floor_space = self.create_kitchen_floor_space()
+
+        self.pose_goal = None
+        self.goal_dict = None
+
+    def get_cart_goal(self, cmd):
+        try:
+            return next(c for c in cmd.constraints if c.type == "CartesianPose")
+        except StopIteration:
+            return None
+
+    def update(self):
+
+        move_cmd = self.get_god_map().get_data(identifier.next_move_goal)  # type: MoveCmd
+        if not move_cmd:
+            return Status.FAILURE
+
+        cart_c = self.get_cart_goal(move_cmd)
+        if not cart_c:
+            return Status.SUCCESS
+
+        self.goal_dict = yaml.load(cart_c.parameter_value_pair)
+        ros_pose = convert_dictionary_to_ros_message(u'geometry_msgs/PoseStamped', self.goal_dict[u'goal'])
+        self.pose_goal = transform_pose(self.get_god_map().get_data(identifier.map_frame), ros_pose)
+
+        if self.goal_dict[u'tip_link'] == u'base_footprint':
+            trajectory = self.planNavigation()
+            if trajectory is None or not trajectory.any():
+                return Status.FAILURE
+            poses = []
+            for i, point in enumerate(trajectory):
+                if i == 0:
+                    continue # we do not to reach the first pose, since it is the start pose
+                base_pose = PoseStamped()
+                base_pose.header.frame_id = self.get_god_map().get_data(identifier.map_frame)
+                base_pose.pose.position.x = point[0]
+                base_pose.pose.position.y = point[1]
+                base_pose.pose.position.z = 0
+                base_pose.pose.orientation = Quaternion(*quaternion_about_axis(0, [0, 0, 1]))
+                poses.append(base_pose)
+            c = self.get_cartesian_path_constraint(poses)
+            move_cmd.constraints = []
+            move_cmd.constraints.append(c)
+            self.get_god_map().set_data(identifier.next_move_goal, move_cmd)
+            pass
+        else:
+            pass  # return self.planMovement()
+
+        return Status.SUCCESS
+
+    def get_cartesian_path_constraint(self, poses):
+        d = {}
+        d[u'parameter_value_pair'] = deepcopy(self.goal_dict)
+        d[u'parameter_value_pair'].pop(u'goal')
+        d[u'type'] = u'CartesianPathCarrot'
+        d[u'parameter_value_pair'][u'goals'] = list(map(convert_ros_message_to_dictionary, poses))
+        d[u'parameter_value_pair'] = json.dumps(d[u'parameter_value_pair'])
+        return convert_dictionary_to_ros_message(u'giskard_msgs/Constraint', d)
 
     def create_kitchen_space(self):
         # create an SE3 state space
@@ -210,8 +255,9 @@ class GlobalPlanner(GetGoal):
         # RRTstar, RRTsharp: very sparse(= path length eq max range), high number of fp, slow relative to RRTConnect
         # RRTConnect: many points, low number of fp
         # PRMstar: no set_range function, finds no solutions
-        planner = og.RRTConnect(si)
-        planner.setRange(0.1)
+        # ABITstar: slow, sparse, but good
+        planner = og.ABITstar(si)
+        # planner.setRange(0.1)
         # planner.setIntermediateStates(True)
         # planner.setup()
         return planner
@@ -220,7 +266,6 @@ class GlobalPlanner(GetGoal):
 
         # create a simple setup object
         ss = og.SimpleSetup(self.kitchen_floor_space)
-        ss.setStateValidityChecker(ob.StateValidityCheckerFn(self.isStateValidForNavigation))
 
         start = self.get_translation_start_state(self.kitchen_floor_space)
         goal = self.get_translation_goal_state(self.kitchen_floor_space)
@@ -228,8 +273,11 @@ class GlobalPlanner(GetGoal):
         ss.setStartAndGoalStates(start, goal)
 
         si = ss.getSpaceInformation()
+        si.setMotionValidator(TwoDimRayMotionValidator(si))
+        si.setStateValidityChecker(TwoDimStateValidator(si))
+        si.setup()
+
         # si.setValidStateSamplerAllocator(ob.ValidStateSamplerAllocator(self.allocOBValidStateSampler))
-        # si.setMotionValidator(MyMotion(si))
         # si.setStateValidityCheckingResolution(0.001)
 
         # this will automatically choose a default planner with
@@ -237,8 +285,10 @@ class GlobalPlanner(GetGoal):
         planner = self.getPlanner(si)
         ss.setPlanner(planner)
 
-        solved = ss.solve(10.0)
-        #og.PathSimplifier(si).smoothBSpline(ss.getSolutionPath()) # takes around 20-30 secs with RTTConnect(0.1)
+        solved = ss.solve(15.0)
+        og.PathSimplifier(si).smoothBSpline(ss.getSolutionPath()) # takes around 20-30 secs with RTTConnect(0.1)
+        #og.PathSimplifier(si).reduceVertices(ss.getSolutionPath())
+        ss.getSolutionPath().interpolate(20)
 
         if solved:
             # try to shorten the path

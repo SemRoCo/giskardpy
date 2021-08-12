@@ -27,11 +27,11 @@ from rospy_message_converter.message_converter import \
     convert_dictionary_to_ros_message, \
     convert_ros_message_to_dictionary
 
-WEIGHT_MAX = Constraint_msg.WEIGHT_MAX
-WEIGHT_ABOVE_CA = Constraint_msg.WEIGHT_ABOVE_CA
-WEIGHT_COLLISION_AVOIDANCE = Constraint_msg.WEIGHT_COLLISION_AVOIDANCE
-WEIGHT_BELOW_CA = Constraint_msg.WEIGHT_BELOW_CA
-WEIGHT_MIN = Constraint_msg.WEIGHT_MIN
+WEIGHT_MAX = Constraint_msg.WEIGHT_MAX # 1000
+WEIGHT_ABOVE_CA = Constraint_msg.WEIGHT_ABOVE_CA #100
+WEIGHT_COLLISION_AVOIDANCE = Constraint_msg.WEIGHT_COLLISION_AVOIDANCE #10
+WEIGHT_BELOW_CA = Constraint_msg.WEIGHT_BELOW_CA # 1
+WEIGHT_MIN = Constraint_msg.WEIGHT_MIN # 0
 
 
 class Constraint(object):
@@ -1403,7 +1403,7 @@ class CartesianOrientationSlerp(BasicCartesianConstraint):
 
 class CartesianPose(Constraint):
     def __init__(self, god_map, root_link, tip_link, goal, max_linear_velocity=0.1,
-                 max_angular_velocity=0.5, weight=WEIGHT_ABOVE_CA, goal_constraint=False):
+                 max_angular_velocity=0.5, weight=.0, goal_constraint=False):
         """
         This goal will use the kinematic chain between root and tip link to move tip link into the goal pose
         :param root_link: str, name of the root link of the kin chain
@@ -1469,7 +1469,9 @@ class CartesianPoseStraight(Constraint):
 #
 
 class CartesianPathCarrot(Constraint):
+    # TODO: Include time
     weight = u'weight'
+    terminal_goal = u'terminal_goal'
     max_linear_velocity = u'max_linear_velocity'
     max_angular_velocity = u'max_angular_velocity'
     max_linear_acceleration = u'max_linear_acceleration'
@@ -1495,6 +1497,7 @@ class CartesianPathCarrot(Constraint):
         self.trajectory_length = len(goals)
 
         params = {
+            self.terminal_goal: self.parse_and_transform_PoseStamped(goals[-1], self.root_link),
             self.weight: weight,
             self.max_linear_velocity: max_linear_velocity,
             self.max_angular_velocity: max_angular_velocity,
@@ -1515,7 +1518,7 @@ class CartesianPathCarrot(Constraint):
                 next_goal_strings.append('goal_' + str(i))#w.ca.SX.sym('goal_' + str(i)))
 
         next_goal_strings.append('goal_' + str(len(goals) - 1))#w.ca.SX.sym('goal_' + str(len(goals) - 1)))
-        self.next_goal_strings = next_goal_strings# w.Matrix(next_goal_strings)
+        self.next_goal_strings = next_goal_strings # w.Matrix(next_goal_strings)
         self.goal_strings = goal_str #w.Matrix(goal_str)
         return params
 
@@ -1530,14 +1533,14 @@ class CartesianPathCarrot(Constraint):
         #for i in range(0, self.trajectory_length):
         #    self.add_debug_constraint("debugMappings" + str(i), zero_one_mapping[i])
         #self.add_debug_constraint("mmin_normal_dists", w.ca.mmin(normal_dists))
-        return self.get_target(normals, zero_one_mapping)
+        return self.select(normals, zero_one_mapping)
 
     def predict(self):
         v = self.get_fk_velocity(self.root_link, self.tip_link)[0:3]
-        v = w.save_division(v, w.norm(v), 0) * self.get_input_float(self.max_linear_velocity) * 10
+        v_p = w.save_division(v, w.norm(v), 0) * self.get_input_float(self.max_linear_velocity) * 10 #todo: make parameter for num
         p = w.position_of(self.get_fk(self.root_link, self.tip_link))#self.get_robot_rTt())
         s = self.get_input_sampling_period()
-        n_p = p[0:3] + v * s
+        n_p = p[0:3] + v_p * s
         return w.point3(n_p[0], n_p[1], n_p[2])
 
     def get_normal(self, p, a, b):
@@ -1585,11 +1588,11 @@ class CartesianPathCarrot(Constraint):
 
         return w.Matrix(zeros_and_ones)
 
-    def get_target(self, normals, zero_one_mapping):
+    def select(self, arr, zero_one_mapping):
 
-        normal_and_zeros = normals * zero_one_mapping
-        normal = w.sum_row(normal_and_zeros)
-        return w.ca.transpose(normal)
+        arr_and_zeros = arr * zero_one_mapping
+        selected = w.sum_row(arr_and_zeros)
+        return w.ca.transpose(selected)
 
     def make_constraints(self):
 
@@ -1605,7 +1608,54 @@ class CartesianPathCarrot(Constraint):
         self.add_debug_constraint("debugNextY", self.predict()[1])
         self.add_debug_constraint("debugNextZ", self.predict()[2])
 
-        self.minimize_position(goal_translation, WEIGHT_COLLISION_AVOIDANCE)
+        self.minimize_position(goal_translation, self.get_weight())
+
+    def get_closest_traj_point(self):
+
+        current_pose = self.get_fk(self.root_link, self.tip_link)
+        trajectory_len = self.trajectory_length
+        dists_l = []
+        inds_l = []
+
+        for i in range(0, trajectory_len):
+            n = w.norm(w.position_of(current_pose - self.get_input_PoseStamped(self.goal_strings[i])))
+            dists_l.append(n)
+            inds_l.append(i)
+
+        dists = w.Matrix(dists_l)
+        inds = w.Matrix(inds_l)
+        dist_min = w.ca.mmin(dists)
+        mapping = self.zero_one_mapping_if_equal(dists, trajectory_len, dist_min)
+        return w.sum_row(inds * mapping)
+
+    def get_weight(self):
+        weight = self.get_input_float(self.weight)
+        dyn_weight = weight - weight * self.get_traversed_trajectory_mult()
+        return dyn_weight
+
+    def get_traversed_trajectory_mult(self):
+        """
+        0 means the traversed trajectory is empty
+        1 means we traversed the whole trajectory
+        """
+        traj_point = self.get_closest_traj_point() + 1
+        return traj_point/self.trajectory_length
+
+    def get_terminal_goal_weight_mult(self):
+        """
+        behaves pretty shitty
+
+        0 means the goal is far away, 1 means the goal is close
+        :rtype: float
+        :returns: float in range(0,1)
+        """
+        terminal_goal = self.get_input_PoseStamped(self.terminal_goal)
+        dis_to_goal = w.norm(w.position_of(self.get_fk(self.root_link, self.tip_link) - terminal_goal))
+        distance_thresh = 1.0
+        return w.if_less(dis_to_goal, distance_thresh,
+                         0.5 * (distance_thresh - dis_to_goal) + 0.5, # add 0.5 as starting point from below:
+                         distance_thresh / (2 * dis_to_goal)) # if dis_to_goal == distance_thresh, then
+                                                              # distance_thresh / 2 * dis_to_goal == 0.5.
 
     def minimize_pose(self, goal, weight):
         self.minimize_position(w.position_of(goal), weight)
@@ -1629,6 +1679,7 @@ class CartesianPathCarrot(Constraint):
 class CartesianPathSplineCarrot(Constraint):
     LUT_x_sym = u'LUT_x'
     LUT_y_sym = u'LUT_y'
+    terminal_goal=u'terminal_goal'
     weight = u'weight'
     max_linear_velocity = u'max_linear_velocity'
     max_angular_velocity = u'max_angular_velocity'
@@ -1658,6 +1709,7 @@ class CartesianPathSplineCarrot(Constraint):
         params = {
             self.LUT_x_sym: self.LUT_x_f,
             self.LUT_y_sym: self.LUT_y_f,
+            self.terminal_goal: self.parse_and_transform_PoseStamped(goals[-1], root_link),
             self.weight: weight,
             self.max_linear_velocity: max_linear_velocity,
             self.max_angular_velocity: max_angular_velocity,
@@ -1673,14 +1725,13 @@ class CartesianPathSplineCarrot(Constraint):
         self.goal_strings = goal_str#w.Matrix(goal_str)
         self.save_params_on_god_map(params)
 
-    def LUT_x_f(self, t):
-        tmp = w.ca.SX.sym('tmp')
-        f = w.ca.Function('f', [tmp], [t])
-        vs = self.get_god_map().get_values(w.ca.Function.free_sx(f))
-        return self.LUT_x(w.compile_and_execute(f, [t]))
+    def LUT_x_f(self, ts):
+        t = self.get_god_map().unsafe_get_data(identifier.time)#fixme:evtl berechnen?
+        return self.LUT_x(t*ts)
 
-    def LUT_y_f(self, t):
-        return self.LUT_y(w.compile_and_execute(w.ca.Function('f', [t], [float(t)]), [t]))
+    def LUT_y_f(self, ts):
+        t = self.get_god_map().unsafe_get_data(identifier.time)
+        return self.LUT_y(t*ts)
 
     def calc_splines(self, goals):
         goals_rs = [self.parse_and_transform_PoseStamped(goal, self.root_link) for goal in goals]
@@ -1714,22 +1765,62 @@ class CartesianPathSplineCarrot(Constraint):
 
         return w.ca.mmin(w.Matrix(min_inds))
 
+    def zero_one_mapping_if_equal(self, l, l_len, elem):
+
+        zeros_and_ones = []
+
+        for i in range(0, l_len):
+            zeros_and_ones.append(w.if_eq(l[i], elem, 1, 0))
+
+        return w.Matrix(zeros_and_ones)
+
+    def select(self, arr, zero_one_mapping):
+
+        arr_and_zeros = arr * zero_one_mapping
+        selected = w.sum_row(arr_and_zeros)
+        return w.ca.transpose(selected)
+
+    def get_closer_carrot_cart(self, max_dist):
+        carrots_l = []
+        carrots_dist_l = []
+        fake_sampling_times = [0.081, 0.071, 0.061, 0.051, 0.041, 0.031, 0.021, 0.011]
+        for st in fake_sampling_times:
+            p = w.point3(self.get_god_map().to_symbol(self.get_identifier() + [self.LUT_x_sym, (st,)]),
+                         self.get_god_map().to_symbol(self.get_identifier() + [self.LUT_y_sym, (st,)]),
+                         0)
+            p_dist = w.norm(p - w.position_of(self.get_fk(self.root_link, self.tip_link)))
+            close_to_max_dist = w.if_greater_zero(p_dist - max_dist, -max_dist, p_dist - max_dist)
+            carrots_l.append(p)
+            carrots_dist_l.append(close_to_max_dist)
+        carrots = w.Matrix(carrots_l)
+        carrots_dist = w.Matrix(carrots_dist_l)
+        max_close_to_max_dist = w.ca.mmax(carrots_dist)
+        mapping = self.zero_one_mapping_if_equal(carrots_dist, 8, max_close_to_max_dist)
+        return self.select(carrots, mapping)
+
     def get_carrot(self):
         closest_index = self.get_closest_index()
         closest_time = closest_index
-        goal_time = w.if_greater_eq(closest_time + 0.5, self.trajectory_length,
-                                    self.trajectory_length, closest_time + 0.5)
-        self.add_debug_constraint("goal_time", goal_time)
-        x = self.get_god_map().to_symbol(self.get_identifier() + [self.LUT_x_sym, (goal_time,)])
-        y = self.get_god_map().to_symbol(self.get_identifier() + [self.LUT_y_sym, (goal_time,)])
-        return w.point3(x, y, 0)
+        #goal_time = w.if_greater_eq(closest_time + 0.5, self.trajectory_length,
+        #                            self.trajectory_length, closest_time + 0.5)
+        x = self.get_god_map().to_symbol(self.get_identifier() + [self.LUT_x_sym, (0.101,)])
+        y = self.get_god_map().to_symbol(self.get_identifier() + [self.LUT_y_sym, (0.101,)])
+        p = w.point3(x, y, 0)
+        self.add_debug_constraint("dist_carrot", w.norm(p - w.position_of(self.get_fk(self.root_link, self.tip_link))))
+        return p#self.get_closer_carrot_cart(0.5)
 
     def make_constraints(self):
         goal_translation = self.get_carrot()
+        time = self.get_god_map().get_data(identifier.time)
+        weight = self.get_input_float(self.weight)
+        trajectory_len = self.get_input_float(self.trajectory_length)
+        #dis_to_goal = self.distance_to_goal(self.terminal_goal)
+        dyn_weight = weight - weight * w.if_greater(time/trajectory_len, 1, 1, time/trajectory_len)
+                                        #0.3*w.if_less(dis_to_goal, 0.2, 1, w.if_less(dis_to_goal, 1, 1/30, 1/dis_to_goal)))
         self.add_debug_constraint("debugGoalX", goal_translation[0])
         self.add_debug_constraint("debugGoalY", goal_translation[1])
         self.add_debug_constraint("debugGoalZ", goal_translation[2])
-        self.minimize_position(goal_translation, WEIGHT_COLLISION_AVOIDANCE)
+        self.minimize_position(goal_translation, WEIGHT_ABOVE_CA)
 
     def distance_to_goal(self, p):
         return w.norm(w.position_of(self.get_input_PoseStamped(p) - self.get_fk(self.root_link, self.tip_link)))

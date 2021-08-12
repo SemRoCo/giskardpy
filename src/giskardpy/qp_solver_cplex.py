@@ -4,8 +4,8 @@ import numpy as np
 import cplex
 
 from giskardpy.exceptions import QPSolverException, InfeasibleException
-from giskardpy import logging
-from giskardpy.qp_solver import QPSolver
+from giskardpy.utils import logging
+from giskardpy.qp.qp_solver import QPSolver
 
 error_info = {
     # https://www.ibm.com/docs/en/icos/20.1.0?topic=manual-cplexexceptionserror-codes
@@ -38,7 +38,7 @@ class QPSolverCplex(QPSolver):
                                      names=x_names)
         # Set quadratic objective term
         H_doubled = H * 2.0
-        self.qpProblem.objective.set_quadratic(H_doubled.diagonal().tolist())
+        self.qpProblem.objective.set_quadratic(H_doubled.tolist())
         # Add linear constraints
         Gs = ''.join(["G"] * len(lbA))
         Ls = ''.join(["L"] * len(lbA))

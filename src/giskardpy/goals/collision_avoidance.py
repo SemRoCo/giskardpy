@@ -318,7 +318,7 @@ class CollisionAvoidanceHint(Goal):
         expr = w.dot(root_V_avoidance_hint[:3].T, root_P_a[:3])
 
         # FIXME really?
-        self.add_constraint(u'avoidance_hint',
+        self.add_constraint(name_suffix=u'avoidance_hint',
                             reference_velocity=max_velocity,
                             lower_error=max_velocity,
                             upper_error=max_velocity,

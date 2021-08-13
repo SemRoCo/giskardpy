@@ -162,14 +162,16 @@ class CartesianPoseStraight(Goal):
                                                                max_velocity=translation_max_velocity,
                                                                max_acceleration=translation_max_acceleration,
                                                                weight=weight,
-                                                               goal_constraint=goal_constraint, **kwargs))
+                                                               goal_constraint=goal_constraint,
+                                                               **kwargs))
         self.add_constraints_of_goal(CartesianOrientation(root_link=root_link,
                                                           tip_link=tip_link,
                                                           goal=goal,
                                                           max_velocity=rotation_max_velocity,
                                                           max_accleration=rotation_max_acceleration,
                                                           weight=weight,
-                                                          goal_constraint=goal_constraint, **kwargs))
+                                                          goal_constraint=goal_constraint,
+                                                          **kwargs))
 
 
 class TranslationVelocityLimit(Goal):

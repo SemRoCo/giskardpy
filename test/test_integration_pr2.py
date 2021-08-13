@@ -500,7 +500,7 @@ class TestConstraints(object):
                                 goal=joint_goal,
                                 max_velocity=0.5)
         zero_pose.send_and_check_goal()
-        np.testing.assert_almost_equal(zero_pose.get_robot().joint_state[joint].position, joint_goal, decimal=4)
+        np.testing.assert_almost_equal(zero_pose.get_robot().joint_state[joint].position, joint_goal, decimal=3)
 
     def test_JointPositionContinuous(self, zero_pose):
         """
@@ -841,13 +841,10 @@ class TestConstraints(object):
         base_goal.pose.position.y = 2
         base_goal.pose.orientation = Quaternion(*quaternion_about_axis(1, [0, 0, 1]))
         kitchen_setup.pointing(tip, goal_point, pointing_axis=pointing_axis)
-        # kitchen_setup.set_json_goal(u'CartesianVelocityLimit',
-        #                             root_link=kitchen_setup.default_root,
-        #                             tip_link=u'base_footprint',
-        #                             max_linear_velocity=0.1,
-        #                             max_angular_velocity=0.2
-        #                             )
-        kitchen_setup.set_joint_goal(gaya_pose)
+        gaya_pose2 = deepcopy(gaya_pose)
+        del gaya_pose2['head_pan_joint']
+        del gaya_pose2['head_tilt_joint']
+        kitchen_setup.set_joint_goal(gaya_pose2)
         kitchen_setup.move_base(base_goal)
 
         current_x = Vector3Stamped()

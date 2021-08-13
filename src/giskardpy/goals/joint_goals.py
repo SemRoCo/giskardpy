@@ -16,7 +16,7 @@ class JointPositionContinuous(Goal):
         :param max_velocity: float, rad/s, default 1423, meaning the urdf/config limits are active
         """
         self.joint_name = joint_name
-        self.goal = goal
+        self.joint_goal = goal
         self.weight = weight
         self.max_velocity = max_velocity
         super(JointPositionContinuous, self).__init__(**kwargs)
@@ -38,20 +38,18 @@ class JointPositionContinuous(Goal):
         :return:
         """
         current_joint = self.get_joint_position_symbol(self.joint_name)
-
-        joint_goal = self.get_parameter_as_symbolic_expression(u'goal')
-        weight = self.get_parameter_as_symbolic_expression(u'weight')
-
         max_velocity = w.min(self.get_parameter_as_symbolic_expression(u'max_velocity'),
                              self.get_robot().get_joint_velocity_limit_expr(self.joint_name))
 
-        error = w.shortest_angular_distance(current_joint, joint_goal)
+        error = w.shortest_angular_distance(current_joint, self.joint_goal)
 
         self.add_constraint(reference_velocity=max_velocity,
                             lower_error=error,
                             upper_error=error,
-                            weight=weight,
+                            weight=self.weight,
                             expression=current_joint)
+        if self.joint_name == 'odom_z_joint':
+            self.add_debug_expr('error', error)
 
     def __str__(self):
         s = super(JointPositionContinuous, self).__str__()

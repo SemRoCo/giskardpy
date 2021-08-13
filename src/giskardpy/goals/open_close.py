@@ -133,20 +133,8 @@ class OpenDoor(Goal):
 class OpenDrawer(Goal):
     def __init__(self, tip_link, object_name, object_link_name, distance_goal, root_link=None,
                  weight=WEIGHT_ABOVE_CA, **kwargs):
-        """
-        :type tip_link: str
-        :param tip_link: tip of manipulator (gripper) which is used
-        :type object_name str
-        :param object_name
-        :type object_link_name str
-        :param object_link_name handle to grasp
-        :type distance_goal float
-        :param distance_goal
-               relative opening distance 0 = close, 1 = fully open
-        :type root_link: str
-        :param root_link: default is root link of robot
-        """
         # Process input parameters
+        super(OpenDrawer, self).__init__(**kwargs)
         if root_link is None:
             self.root = self.get_robot().get_root()
         else:
@@ -154,12 +142,6 @@ class OpenDrawer(Goal):
         self.tip = tip_link
 
         self.distance_goal = distance_goal
-
-        self.handle_link = object_link_name
-        handle_frame_id = u'iai_kitchen/' + object_link_name
-
-        self.object_name = object_name
-        super(OpenDrawer, self).__init__(**kwargs)
 
         environment_object = self.get_world().get_object(object_name)
         # Get movable joint
@@ -205,12 +187,13 @@ class OpenDrawer(Goal):
         root_T_tip_goal.p += root_V_hinge_drawer
 
         # Convert goal pose to dict for Giskard
-        root_T_tip_goal_dict = tf.kdl_to_pose_stamped(root_T_tip_goal, self.root)
+        root_T_tip_goal_msg = tf.kdl_to_pose_stamped(root_T_tip_goal, self.root)
 
-        self.add_constraints_of_goal(CartesianPoseStraight(self.root,
-                                                           self.tip,
-                                                           root_T_tip_goal_dict,
-                                                           weight=weight))
+        self.add_constraints_of_goal(CartesianPoseStraight(root_link=self.root,
+                                                           tip_link=self.tip,
+                                                           goal=root_T_tip_goal_msg,
+                                                           weight=weight,
+                                                           **kwargs))
 
     def __str__(self):
         s = super(OpenDrawer, self).__str__()

@@ -722,6 +722,7 @@ class QPController(object):
         self.debug_v = w.Matrix([self.debug_expressions[name] for name in self.debug_names])
         self.H.make_error_id_to_vel_ids_map()
 
+    @profile
     def _eval_debug_exprs(self, subsitutions):
         return {name: value[0] for name, value in zip(self.debug_names, self.compiled_debug_v.call2(subsitutions))}
 

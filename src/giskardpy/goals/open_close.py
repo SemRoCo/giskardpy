@@ -17,20 +17,17 @@ from giskardpy.utils.logging import logwarn
 class OpenDoor(Goal):
     def __init__(self, tip_link, object_name, object_link_name, angle_goal, root_link=None,
                  weight=WEIGHT_ABOVE_CA, **kwargs):
+        super(OpenDoor, self).__init__(**kwargs)
 
         self.tip = tip_link
-
         self.angle_goal = angle_goal
-
         self.handle_link = object_link_name
         handle_frame_id = u'iai_kitchen/' + object_link_name
-
         self.object_name = object_name
         if root_link is None:
             self.root = self.get_god_map().get_data(identifier.robot).get_root()
         else:
             self.root = root_link
-        super(OpenDoor, self).__init__(**kwargs)
 
         environment_object = self.get_world().get_object(object_name)
         self.hinge_joint = environment_object.get_movable_parent_joint(object_link_name)
@@ -80,17 +77,10 @@ class OpenDoor(Goal):
         self.hinge0_P_tipStart_norm = hinge0_P_tipStart_norm
         self.weight = weight
 
-    def get_hinge_pose(self):
-        return self.get_parameter_as_symbolic_expression(u'hinge_pose')
-
-    def get_hinge_axis(self):
-        return self.get_parameter_as_symbolic_expression(u'hinge_V_hinge_axis_msg')
-
     def make_constraints(self):
-        base_weight = self.get_parameter_as_symbolic_expression(u'weight')
         root_T_tip = self.get_fk(self.root, self.tip)
-        root_T_hinge = self.get_hinge_pose()
-        hinge_V_hinge_axis = self.get_hinge_axis()[:3]
+        root_T_hinge = self.get_parameter_as_symbolic_expression(u'hinge_pose')
+        hinge_V_hinge_axis = self.get_parameter_as_symbolic_expression(u'hinge_V_hinge_axis_msg')[:3]
         hinge_T_root = w.inverse_frame(root_T_hinge)
         root_T_tipGoal = self.get_parameter_as_symbolic_expression(u'root_T_tipGoal')
         root_T_hinge0 = self.get_parameter_as_symbolic_expression(u'root_T_hinge0')
@@ -99,17 +89,19 @@ class OpenDoor(Goal):
         dist_goal = self.get_parameter_as_symbolic_expression(u'hinge0_P_tipStart_norm')
         hinge0_T_tipStartProjected = self.get_parameter_as_symbolic_expression(u'hinge0_T_tipStartProjected')
 
-        self.add_minimize_position_constraints(w.position_of(root_T_tipGoal), 0.1, self.root, self.tip,
-                                               weight=base_weight)
+        self.add_point_goal_constraints(frame_P_current=w.position_of(root_T_tip),
+                                        frame_P_goal=w.position_of(root_T_tipGoal),
+                                        reference_velocity=0.1,
+                                        weight=self.weight)
 
         hinge_P_tip = w.position_of(w.dot(hinge_T_root, root_T_tip))[:3]
 
         dist_expr = w.norm(hinge_P_tip)
-        self.add_constraint(u'/dist',
+        self.add_constraint(name_suffix=u'/dist',
                             reference_velocity=0.1,
                             lower_error=dist_goal - dist_expr,
                             upper_error=dist_goal - dist_expr,
-                            weight=base_weight,
+                            weight=self.weight,
                             expression=dist_expr)
 
         hinge0_T_tipCurrent = w.dot(w.inverse_frame(root_T_hinge0), root_T_tipCurrent)
@@ -127,11 +119,15 @@ class OpenDoor(Goal):
 
         root_R_tipGoal = w.dot(root_T_hingeCurrent, hinge0_R_tipGoal)
 
-        self.add_minimize_rotation_constraints(root_R_tipGoal, self.root, self.tip, weight=base_weight)
+        self.add_rotation_goal_constraints(frame_R_current=w.rotation_of(self.get_fk(self.root, self.tip)),
+                                           frame_R_goal=root_R_tipGoal,
+                                           current_R_frame_eval=w.rotation_of(self.get_fk_evaluated(self.tip, self.root)),
+                                           reference_velocity=0.5,
+                                           weight=self.weight)
 
     def __str__(self):
         s = super(OpenDoor, self).__str__()
-        return u'{}/{}/{}'.format(s, self.root, self.tip)
+        return u'{}/{}'.format(s, self.handle_link)
 
 
 class OpenDrawer(Goal):

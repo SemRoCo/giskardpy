@@ -46,10 +46,10 @@ class ControllerPlugin(GiskardBehavior):
 
     @profile
     def update(self):
-        expr = self.controller.get_parameter_names()
-        expr = self.god_map.get_values(expr)
+        parameters = self.controller.get_parameter_names()
+        substitutions = self.god_map.get_values(parameters)
 
-        (next_cmds), debug_expressions = self.controller.get_cmd(expr)
+        next_cmds, debug_expressions = self.controller.get_cmd(substitutions)
         self.get_god_map().set_data(identifier.qp_solver_solution, next_cmds)
         self.get_god_map().set_data(identifier.debug_expressions_evaluated, debug_expressions)
 

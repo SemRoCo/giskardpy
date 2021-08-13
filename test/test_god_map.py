@@ -337,6 +337,22 @@ class TestGodMap(unittest.TestCase):
         gm_robot = gm.get_data(identifier.robot)
         assert 'pr2' == gm_robot.get_name()
 
+    def test_to_expr_ndarray(self):
+        gm = GodMap()
+        data = np.zeros((5,5))
+        gm.set_data(['muh'], data)
+        expr = gm.to_expr(['muh'])
+        assert expr.shape == data.shape
+
+    def test_to_expr_list(self):
+        gm = GodMap()
+        data = [1,2,3]
+        gm.set_data(['muh'], data)
+        expr = gm.to_expr(['muh'])
+        data[0]
+        data[1]
+        data[2]
+
 
 if __name__ == '__main__':
     import rosunit

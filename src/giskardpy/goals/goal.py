@@ -20,15 +20,14 @@ WEIGHT_MIN = Constraint_msg.WEIGHT_MIN
 
 class Goal(object):
     def __init__(self, god_map, control_horizon=None, **kwargs):
-        self.god_map = god_map
+        self._god_map = god_map
         self.prediction_horizon = self.get_god_map().get_data(identifier.prediction_horizon)
-        self.test_mode = self.get_god_map().get_data(identifier.test_mode)
+        self._test_mode = self.get_god_map().get_data(identifier.test_mode)
         # last 2 velocities are 0 anyway
         if control_horizon is None:
             control_horizon = self.prediction_horizon
         self.control_horizon = max(min(control_horizon, self.prediction_horizon - 2), 1)
         self._sub_goals = []
-        self._save_self_on_god_map()
 
     def _save_self_on_god_map(self):
         self.get_god_map().set_data(self._get_identifier(), self)
@@ -50,7 +49,7 @@ class Goal(object):
         """
         :rtype: giskardpy.god_map.GodMap
         """
-        return self.god_map
+        return self._god_map
 
     def get_world(self):
         """
@@ -83,14 +82,14 @@ class Goal(object):
         if not self.get_robot().has_joint(joint_name):
             raise KeyError('Robot doesn\'t have joint named: {}'.format(joint_name))
         key = identifier.joint_states + [joint_name, u'position']
-        return self.god_map.to_symbol(key)
+        return self._god_map.to_symbol(key)
 
     def get_joint_velocity_symbols(self, joint_name):
         """
         returns a symbol that referes to the given joint
         """
         key = identifier.joint_states + [joint_name, u'velocity']
-        return self.god_map.to_symbol(key)
+        return self._god_map.to_symbol(key)
 
     def get_object_joint_position_symbol(self, object_name, joint_name):
         """
@@ -98,10 +97,10 @@ class Goal(object):
         """
         # TODO test me
         key = identifier.world + [u'get_object', (object_name,), u'joint_state', joint_name, u'position']
-        return self.god_map.to_symbol(key)
+        return self._god_map.to_symbol(key)
 
     def get_sampling_period_symbol(self):
-        return self.god_map.to_symbol(identifier.sample_period)
+        return self._god_map.to_symbol(identifier.sample_period)
 
     def __str__(self):
         return self.__class__.__name__
@@ -158,6 +157,7 @@ class Goal(object):
         """
         :rtype: OrderedDict
         """
+        self._save_self_on_god_map()
         self._constraints = OrderedDict()
         self._velocity_constraints = OrderedDict()
         self._debug_expressions = OrderedDict()
@@ -270,7 +270,7 @@ class Goal(object):
                             name_suffix=name_suffix)
 
     def add_point_goal_constraints(self, frame_P_current, frame_P_goal, reference_velocity, weight, name_suffix=u''):
-        error = frame_P_goal - frame_P_current
+        error = frame_P_goal[:3] - frame_P_current[:3]
         self.add_constraint_vector(reference_velocities=[reference_velocity] * 3,
                                    lower_errors=error[:3],
                                    upper_errors=error[:3],
@@ -279,7 +279,7 @@ class Goal(object):
                                    name_suffixes=['{}/x'.format(name_suffix),
                                                   '{}/y'.format(name_suffix),
                                                   '{}/z'.format(name_suffix)])
-        if self.test_mode:
+        if self._test_mode:
             self.add_debug_expr('{}/error'.format(name_suffix), w.norm(error))
 
     def add_translational_velocity_limit(self, frame_P_current, max_velocity, weight, max_violation=1e4, name_suffix=u''):
@@ -290,7 +290,7 @@ class Goal(object):
                                      lower_slack_limit=-max_violation,
                                      upper_slack_limit=max_violation,
                                      name_suffix=u'{}/vel'.format(name_suffix))
-        if self.test_mode:
+        if self._test_mode:
             self.add_debug_expr('trans_error', self.get_expr_velocity(trans_error))
 
     def add_vector_goal_constraints(self, frame_V_current, frame_V_goal, reference_velocity,
@@ -309,9 +309,9 @@ class Goal(object):
                                    upper_errors=error[:3],
                                    weights=[weight]*3,
                                    expressions=frame_V_current[:3],
-                                   name_suffixes=[u'{}/x'.format(name_suffix),
-                                                  u'{}/y'.format(name_suffix),
-                                                  u'{}/z'.format(name_suffix)])
+                                   name_suffixes=[u'{}/trans/x'.format(name_suffix),
+                                                  u'{}/trans/y'.format(name_suffix),
+                                                  u'{}/trans/z'.format(name_suffix)])
 
     def add_rotation_goal_constraints(self, frame_R_current, frame_R_goal, current_R_frame_eval, reference_velocity,
                                       weight, name_suffix=u''):
@@ -331,9 +331,9 @@ class Goal(object):
                                    upper_errors=tip_Q_goal[:3],
                                    weights=[weight] * 3,
                                    expressions=expr[:3],
-                                   name_suffixes=['{}/x'.format(name_suffix),
-                                                  '{}/y'.format(name_suffix),
-                                                  '{}/z'.format(name_suffix)])
+                                   name_suffixes=['{}/rot/x'.format(name_suffix),
+                                                  '{}/rot/y'.format(name_suffix),
+                                                  '{}/rot/z'.format(name_suffix)])
 
     def add_rotational_velocity_limit(self, frame_R_current, max_velocity, weight, max_violation=1e4, name_suffix=u''):
         root_Q_tipCurrent = w.quaternion_from_matrix(frame_R_current)

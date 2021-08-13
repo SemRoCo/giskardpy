@@ -42,15 +42,15 @@ class ExternalCollisionAvoidance(Goal):
                                                                              tuple()])
 
     def get_actual_distance(self):
-        return self.god_map.to_symbol(identifier.closest_point + [u'get_external_collisions',
-                                                                  (self.link_name,),
-                                                                  self.idx,
+        return self._god_map.to_symbol(identifier.closest_point + [u'get_external_collisions',
+                                                                   (self.link_name,),
+                                                                   self.idx,
                                                                   u'get_contact_distance',
-                                                                  tuple()])
+                                                                   tuple()])
 
     def get_number_of_external_collisions(self):
-        return self.god_map.to_symbol(identifier.closest_point + [u'get_number_of_external_collisions',
-                                                                  (self.link_name,)])
+        return self._god_map.to_symbol(identifier.closest_point + [u'get_number_of_external_collisions',
+                                                                   (self.link_name,)])
 
     def make_constraints(self):
         a_P_pa = self.get_closest_point_on_a_in_a()
@@ -141,15 +141,15 @@ class SelfCollisionAvoidance(Goal):
                                                                                    tuple()])
 
     def get_actual_distance(self):
-        return self.god_map.to_symbol(identifier.closest_point + [u'get_self_collisions',
-                                                                  (self.link_a, self.link_b),
-                                                                  self.idx,
+        return self._god_map.to_symbol(identifier.closest_point + [u'get_self_collisions',
+                                                                   (self.link_a, self.link_b),
+                                                                   self.idx,
                                                                   u'get_contact_distance',
-                                                                  tuple()])
+                                                                   tuple()])
 
     def get_number_of_self_collisions(self):
-        return self.god_map.to_symbol(identifier.closest_point + [u'get_number_of_self_collisions',
-                                                                  (self.link_a, self.link_b)])
+        return self._god_map.to_symbol(identifier.closest_point + [u'get_number_of_self_collisions',
+                                                                   (self.link_a, self.link_b)])
 
     def make_constraints(self):
         actual_distance = self.get_actual_distance()
@@ -274,18 +274,18 @@ class CollisionAvoidanceHint(Goal):
                                                                              tuple()])
 
     def get_actual_distance(self):
-        return self.god_map.to_symbol(identifier.closest_point + [u'get_external_collisions_long_key',
-                                                                  self.key,
+        return self._god_map.to_symbol(identifier.closest_point + [u'get_external_collisions_long_key',
+                                                                   self.key,
                                                                   u'get_contact_distance',
-                                                                  tuple()])
+                                                                   tuple()])
 
     def get_body_b(self):
-        return self.god_map.to_symbol(identifier.closest_point + [u'get_external_collisions_long_key',
-                                                                  self.key, u'get_body_b_hash', tuple()])
+        return self._god_map.to_symbol(identifier.closest_point + [u'get_external_collisions_long_key',
+                                                                   self.key, u'get_body_b_hash', tuple()])
 
     def get_link_b(self):
-        return self.god_map.to_symbol(identifier.closest_point + [u'get_external_collisions_long_key',
-                                                                  self.key, u'get_link_b_hash', tuple()])
+        return self._god_map.to_symbol(identifier.closest_point + [u'get_external_collisions_long_key',
+                                                                   self.key, u'get_link_b_hash', tuple()])
 
     def make_constraints(self):
         weight = self.get_parameter_as_symbolic_expression(u'weight')

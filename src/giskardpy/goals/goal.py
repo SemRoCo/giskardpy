@@ -194,8 +194,8 @@ class Goal(object):
         name = str(self) + name_suffix
         if name in self._constraints:
             raise KeyError(u'a constraint with name \'{}\' already exists'.format(name))
-        lower_slack_limit = lower_slack_limit if lower_slack_limit else -1e4
-        upper_slack_limit = upper_slack_limit if upper_slack_limit else 1e4
+        lower_slack_limit = lower_slack_limit if lower_slack_limit is not None else -1e4
+        upper_slack_limit = upper_slack_limit if upper_slack_limit is not None else 1e4
         self._constraints[name] = Constraint(name=name,
                                              expression=expression,
                                              lower_error=lower_error,
@@ -279,6 +279,8 @@ class Goal(object):
                                    name_suffixes=['{}/x'.format(name_suffix),
                                                   '{}/y'.format(name_suffix),
                                                   '{}/z'.format(name_suffix)])
+        if self.test_mode:
+            self.add_debug_expr('{}/error'.format(name_suffix), w.norm(error))
 
     def add_translational_velocity_limit(self, frame_P_current, max_velocity, weight, max_violation=1e4, name_suffix=u''):
         trans_error = w.norm(frame_P_current)

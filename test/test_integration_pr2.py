@@ -566,6 +566,7 @@ class TestConstraints(object):
         zero_pose.add_sphere(u'sphere', 0.05, pose=object_pose)
 
         publish_marker_vector(start_pose.pose.position, map_T_goal_position.pose.position)
+        zero_pose.allow_self_collision()
         zero_pose.set_and_check_straight_cart_goal(goal_position, zero_pose.l_tip)
 
     def test_CartesianVelocityLimit(self, zero_pose):
@@ -609,7 +610,7 @@ class TestConstraints(object):
         :type zero_pose: PR2
         """
         percentage = 10
-        zero_pose.allow_self_collision()
+        zero_pose.allow_all_collisions()
         zero_pose.avoid_joint_limits(percentage=percentage)
         zero_pose.send_and_check_goal()
 

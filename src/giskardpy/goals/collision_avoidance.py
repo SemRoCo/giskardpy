@@ -56,15 +56,8 @@ class ExternalCollisionAvoidance(Goal):
         a_P_pa = self.get_closest_point_on_a_in_a()
         r_V_n = self.get_contact_normal_on_b_in_root()
         actual_distance = self.get_actual_distance()
-        max_velocity = self.get_parameter_as_symbolic_expression(u'max_velocity')
-        # zero_weight_distance = self.get_input_float(self.zero_weight_distance)
-        hard_threshold = self.get_parameter_as_symbolic_expression(u'hard_threshold')
-        soft_threshold = self.get_parameter_as_symbolic_expression(u'soft_threshold')
-        # spring_threshold = soft_threshold
-        # soft_threshold = soft_threshold * 0.5
         sample_period = self.get_sampling_period_symbol()
         number_of_external_collisions = self.get_number_of_external_collisions()
-        num_repeller = self.get_parameter_as_symbolic_expression(u'num_repeller')
 
         root_T_a = self.get_fk(self.robot_root, self.link_name)
 
@@ -72,48 +65,39 @@ class ExternalCollisionAvoidance(Goal):
 
         dist = w.dot(r_V_n.T, r_P_pa)[0]
 
-        qp_limits_for_lba = max_velocity * sample_period * self.control_horizon
+        qp_limits_for_lba = self.max_velocity * sample_period * self.control_horizon
 
-        penetration_distance = soft_threshold - actual_distance
-        lower_limit = penetration_distance
+        lower_limit = self.soft_threshold - actual_distance
 
         lower_limit_limited = w.limit(lower_limit,
                                       -qp_limits_for_lba,
                                       qp_limits_for_lba)
 
-        upper_slack = w.if_greater(actual_distance, hard_threshold,
-                                   w.limit(soft_threshold - hard_threshold,
+        upper_slack = w.if_greater(actual_distance, self.hard_threshold,
+                                   w.limit(self.soft_threshold - self.hard_threshold,
                                            -qp_limits_for_lba,
                                            qp_limits_for_lba),
                                    lower_limit_limited)
 
         # undo factor in A
         upper_slack /= (sample_period * self.prediction_horizon)
-        # upper_slack *= 10
 
         upper_slack = w.if_greater(actual_distance, 50,  # assuming that distance of unchecked closest points is 100
                                    1e4,
-                                   # 1e4,
                                    w.max(0, upper_slack))
 
         weight = w.if_greater(actual_distance, 50, 0, WEIGHT_COLLISION_AVOIDANCE)
 
         weight = w.save_division(weight,  # divide by number of active repeller per link
-                                 w.min(number_of_external_collisions, num_repeller))
+                                 w.min(number_of_external_collisions, self.num_repeller))
 
-        self.add_constraint(u'/position',
-                            reference_velocity=max_velocity,
+        self.add_constraint(reference_velocity=self.max_velocity,
                             lower_error=lower_limit,
                             upper_error=100,
                             weight=weight,
                             expression=dist,
                             lower_slack_limit=-1e4,
                             upper_slack_limit=upper_slack)
-
-        # self.add_velocity_constraint(u'/position/vel',
-        #                              velocity_limit=max_velocity,
-        #                              weight=weight,
-        #                              expression=dist)
 
     def __str__(self):
         s = super(ExternalCollisionAvoidance, self).__str__()
@@ -168,12 +152,8 @@ class SelfCollisionAvoidance(Goal):
                                                                   (self.link_a, self.link_b)])
 
     def make_constraints(self):
-        max_velocity = self.get_parameter_as_symbolic_expression(u'max_velocity')
-        hard_threshold = self.get_parameter_as_symbolic_expression(u'hard_threshold')
-        soft_threshold = self.get_parameter_as_symbolic_expression(u'soft_threshold')
         actual_distance = self.get_actual_distance()
         number_of_self_collisions = self.get_number_of_self_collisions()
-        num_repeller = self.get_parameter_as_symbolic_expression(u'num_repeller')
         sample_period = self.get_sampling_period_symbol()
 
         b_T_a = self.get_fk(self.link_b, self.link_a)
@@ -188,35 +168,30 @@ class SelfCollisionAvoidance(Goal):
 
         weight = w.if_greater(actual_distance, 50, 0, WEIGHT_COLLISION_AVOIDANCE)
         weight = w.save_division(weight,  # divide by number of active repeller per link
-                                 w.min(number_of_self_collisions, num_repeller))
+                                 w.min(number_of_self_collisions, self.num_repeller))
 
-        penetration_distance = soft_threshold - actual_distance
-        qp_limits_for_lba = max_velocity * sample_period * self.control_horizon
+        qp_limits_for_lba = self.max_velocity * sample_period * self.control_horizon
 
-        penetration_distance = soft_threshold - actual_distance
-        lower_limit = penetration_distance
+        lower_limit = self.soft_threshold - actual_distance
 
         lower_limit_limited = w.limit(lower_limit,
                                       -qp_limits_for_lba,
                                       qp_limits_for_lba)
 
-        upper_slack = w.if_greater(actual_distance, hard_threshold,
-                                   w.limit(soft_threshold - hard_threshold,
+        upper_slack = w.if_greater(actual_distance, self.hard_threshold,
+                                   w.limit(self.soft_threshold - self.hard_threshold,
                                            -qp_limits_for_lba,
                                            qp_limits_for_lba),
                                    lower_limit_limited)
 
         # undo factor in A
         upper_slack /= (sample_period * self.prediction_horizon)
-        # upper_slack *= 10
 
         upper_slack = w.if_greater(actual_distance, 50,  # assuming that distance of unchecked closest points is 100
                                    1e4,
-                                   # 1e4,
                                    w.max(0, upper_slack))
 
-        self.add_constraint(u'/position',
-                            reference_velocity=max_velocity,
+        self.add_constraint(reference_velocity=self.max_velocity,
                             lower_error=lower_limit,
                             upper_error=100,
                             weight=weight,

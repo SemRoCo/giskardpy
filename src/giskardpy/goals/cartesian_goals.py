@@ -86,72 +86,42 @@ class CartesianPositionStraight(Goal):
                  weight=WEIGHT_ABOVE_CA, **kwargs):
         if reference_velocity is None:
             reference_velocity = max_velocity
-        super(CartesianPositionStraight, self).__init__(root_link=root_link,
-                                                        tip_link=tip_link,
-                                                        goal=goal,
-                                                        reference_velocity=reference_velocity,
-                                                        max_velocity=max_velocity,
-                                                        weight=weight,
-                                                        **kwargs)
+        self.reference_velocity = reference_velocity
+        self.max_velocity = max_velocity
+        self.weight = weight
+        self.root_link = root_link
+        self.tip_link = tip_link
+        self.goal = tf.transform_pose(self.root_link, goal)
+        super(CartesianPositionStraight, self).__init__(**kwargs)
 
-        start = tf.lookup_pose(self.root, self.tip)
-
-        self.start = start
+        self.start = self.get_robot().get_fk_pose(self.root_link, self.tip_link)
 
     def make_constraints(self):
-        """
-        example:
-        name='CartesianPositionStraight'
-        parameter_value_pair='{
-            "root": "base_footprint", #required
-            "tip": "r_gripper_tool_frame", #required
-            "goal_position": {"header":
-                                {"stamp":
-                                    {"secs": 0,
-                                    "nsecs": 0},
-                                "frame_id": "",
-                                "seq": 0},
-                            "pose": {"position":
-                                        {"y": 0.0,
-                                        "x": 0.0,
-                                        "z": 0.0},
-                                    "orientation": {"y": 0.0,
-                                                    "x": 0.0,
-                                                    "z": 0.0,
-                                                    "w": 0.0}
-                                    }
-                            }', #required
-            "weight": 1, #optional
-            "max_velocity": 0.3 #optional -- rad/s or m/s depending on joint; can not go higher than urdf limit
-        }'
-        :return:
-        """
-        root_P_goal = w.position_of(self.get_goal_pose())
-        root_P_tip = w.position_of(self.get_fk(self.root, self.tip))
+        root_P_goal = w.position_of(self.get_parameter_as_symbolic_expression('goal'))
+        root_P_tip = w.position_of(self.get_fk(self.root_link, self.tip_link))
         root_V_start = w.position_of(self.get_parameter_as_symbolic_expression('start'))
-        max_velocity = self.get_parameter_as_symbolic_expression('max_velocity')
-        reference_velocity = self.get_parameter_as_symbolic_expression('reference_velocity')
-        weight = self.get_parameter_as_symbolic_expression('weight')
 
         # Constraint to go to goal pos
-        self.add_minimize_position_constraints(r_P_g=root_P_goal,
-                                               reference_velocity=reference_velocity,
-                                               max_velocity=max_velocity,
-                                               root_frame=self.root,
-                                               tip_frame=self.tip,
-                                               weight=weight,
-                                               name_suffix=u'goal')
+        self.add_point_goal_constraints(frame_P_current=root_P_tip,
+                                        frame_P_goal=root_P_goal,
+                                        reference_velocity=self.reference_velocity,
+                                        weight=self.weight,
+                                        name_suffix=u'goal')
 
         dist, nearest = w.distance_point_to_line_segment(root_P_tip,
                                                          root_V_start,
                                                          root_P_goal)
         # Constraint to stick to the line
-        self.add_minimize_position_constraints(r_P_g=nearest,
-                                               reference_velocity=max_velocity,
-                                               root_frame=self.root,
-                                               tip_frame=self.tip,
-                                               name_suffix=u'line',
-                                               weight=weight * 2)
+        self.add_point_goal_constraints(frame_P_goal=nearest,
+                                        frame_P_current=root_P_tip,
+                                        reference_velocity=self.reference_velocity,
+                                        name_suffix=u'line',
+                                        weight=self.weight * 2)
+
+        if self.max_velocity is not None:
+            self.add_translational_velocity_limit(frame_P_current=root_P_tip,
+                                                  max_velocity=self.max_velocity,
+                                                  weight=self.weight)
 
 
 class CartesianPose(Goal):
@@ -186,7 +156,6 @@ class CartesianPoseStraight(Goal):
                  translation_max_acceleration=0.1, rotation_max_velocity=0.5, rotation_max_acceleration=0.5,
                  weight=WEIGHT_ABOVE_CA, goal_constraint=True, **kwargs):
         super(CartesianPoseStraight, self).__init__(**kwargs)
-        self.constraints = []
         self.add_constraints_of_goal(CartesianPositionStraight(root_link=root_link,
                                                                tip_link=tip_link,
                                                                goal=goal,

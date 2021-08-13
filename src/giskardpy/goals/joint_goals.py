@@ -215,7 +215,7 @@ class ShakyJointPositionRevoluteOrPrismatic(Goal):
 
         fun_params = frequency * 2.0 * w.pi * time_in_secs
         err = (joint_goal - current_joint) + noise_amplitude * max_velocity * w.sin(fun_params)
-        capped_err = self.limit_velocity(err, noise_amplitude * max_velocity)
+        capped_err = w.limit(err, -noise_amplitude * max_velocity, noise_amplitude * max_velocity)
 
         self.add_constraint(lower_error=capped_err,
                             upper_error=capped_err,
@@ -279,7 +279,8 @@ class ShakyJointPositionContinuous(Goal):
         fun_params = frequency * 2.0 * w.pi * time_in_secs
         err = w.shortest_angular_distance(current_joint, joint_goal) + noise_amplitude * max_velocity * w.sin(
             fun_params)
-        capped_err = self.limit_velocity(err, noise_amplitude * max_velocity)
+
+        capped_err = w.limit(err, -noise_amplitude * max_velocity, noise_amplitude * max_velocity)
 
         self.add_constraint(lower_error=capped_err,
                             upper_error=capped_err,

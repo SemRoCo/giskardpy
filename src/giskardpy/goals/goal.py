@@ -152,16 +152,6 @@ class Goal(object):
                        r_R_t_axis_angle[2]])
         return self.get_expr_velocity(fk)
 
-    def limit_velocity(self, error, max_velocity):
-        """
-        :param error: expression that describes the error
-        :param max_velocity: float or expression representing the max velocity
-        :return: expression that limits the velocity of error to max_velocity
-        """
-        sample_period = self.get_sampling_period_symbol()
-        max_velocity *= sample_period * self.control_horizon
-        return w.max(w.min(error, max_velocity), -max_velocity)
-
     def get_constraints(self):
         """
         :rtype: OrderedDict
@@ -293,13 +283,12 @@ class Goal(object):
                                     weight=WEIGHT_BELOW_CA, name_suffix=u''):
 
         angle = w.save_acos(w.dot(frame_V_current.T, frame_V_goal)[0])
-        angle_limited = w.save_division(self.limit_velocity(angle, np.pi * 0.9),
-                                        angle)  # avoid singularity by staying away from pi
+        # avoid singularity by staying away from pi
+        angle_limited = w.min(w.max(angle, -np.pi*0.9), np.pi*0.9)
+        angle_limited = w.save_division(angle_limited, angle)
         root_V_goal_normal_intermediate = w.slerp(frame_V_current, frame_V_goal, angle_limited)
+
         error = root_V_goal_normal_intermediate - frame_V_current
-        self.add_debug_vector(u'frame_V_current', frame_V_current)
-        self.add_debug_vector(u'frame_V_goal', frame_V_goal)
-        self.add_debug_vector(u'error', error)
 
         self.add_constraint_vector(reference_velocities=[reference_velocity]*3,
                                    lower_errors=error[:3],

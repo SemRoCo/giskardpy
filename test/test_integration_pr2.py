@@ -2795,7 +2795,7 @@ class TestCollisionAvoidanceGoals(object):
         p.pose.position.z = -0.2
         p.pose.orientation.w = 1
         zero_pose.add_box(pose=p)
-        zero_pose.send_and_check_joint_goal(pocky_pose, expected_error_codes=[MoveResult.HARD_CONSTRAINTS_VIOLATED])
+        zero_pose.send_and_check_joint_goal(pocky_pose)
 
     def test_unknown_object1(self, box_setup):
         """

@@ -289,9 +289,9 @@ class WorldUpdatePlugin(GiskardBehavior):
                     return UpdateWorldResponse(UpdateWorldResponse.UNSUPPORTED_OPTIONS, str(e))
                 except Exception as e:
                     traceback.print_exc()
-                return UpdateWorldResponse(UpdateWorldResponse.UNSUPPORTED_OPTIONS,
-                                           u'{}: {}'.format(e.__class__.__name__,
-                                                            str(e)))
+                    return UpdateWorldResponse(UpdateWorldResponse.UNSUPPORTED_OPTIONS,
+                                               u'{}: {}'.format(e.__class__.__name__,
+                                                                str(e)))
 
     def add_object(self, req):
         """

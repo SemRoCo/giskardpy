@@ -164,6 +164,7 @@ class Goal(object):
         self.make_constraints()
         for sub_goal in self._sub_goals:
             c, c_vel, debug_expressions = sub_goal.get_constraints()
+            # TODO check for duplicates
             self._constraints.update(_prepend_prefix(self.__class__.__name__, c))
             self._velocity_constraints.update(_prepend_prefix(self.__class__.__name__, c_vel))
             self._debug_expressions.update(_prepend_prefix(self.__class__.__name__, debug_expressions))

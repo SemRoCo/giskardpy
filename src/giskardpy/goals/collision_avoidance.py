@@ -206,8 +206,7 @@ class SelfCollisionAvoidance(Goal):
 
 class CollisionAvoidanceHint(Goal):
     def __init__(self, tip_link, avoidance_hint, object_name, object_link_name, max_linear_velocity=0.1,
-                 root_link=None,
-                 max_threshold=0.05, spring_threshold=None, weight=WEIGHT_ABOVE_CA, **kwargs):
+                 root_link=None, max_threshold=0.05, spring_threshold=None, weight=WEIGHT_ABOVE_CA, **kwargs):
         """
         This goal pushes the link_name in the direction of avoidance_hint, if it is closer than spring_threshold
         to body_b/link_b.

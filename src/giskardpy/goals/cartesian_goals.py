@@ -80,6 +80,10 @@ class CartesianOrientation(Goal):
                                                max_velocity=self.max_velocity,
                                                weight=self.weight)
 
+    def __str__(self):
+        s = super(CartesianOrientation, self).__str__()
+        return u'{}/{}/{}'.format(s, self.root_link, self.tip_link)
+
 
 class CartesianPositionStraight(Goal):
     def __init__(self, root_link, tip_link, goal, reference_velocity=None, max_velocity=0.2,

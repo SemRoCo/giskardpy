@@ -22,10 +22,12 @@ class Goal(object):
     def __init__(self, god_map, control_horizon=None, **kwargs):
         self.god_map = god_map
         self.prediction_horizon = self.get_god_map().get_data(identifier.prediction_horizon)
+        self.test_mode = self.get_god_map().get_data(identifier.test_mode)
         # last 2 velocities are 0 anyway
         if control_horizon is None:
             control_horizon = self.prediction_horizon
         self.control_horizon = max(min(control_horizon, self.prediction_horizon - 2), 1)
+        self._sub_goals = []
         self._save_self_on_god_map()
 
     def _save_self_on_god_map(self):
@@ -158,9 +160,17 @@ class Goal(object):
         """
         self._constraints = OrderedDict()
         self._velocity_constraints = OrderedDict()
-        self.debug_expressions = OrderedDict()
+        self._debug_expressions = OrderedDict()
         self.make_constraints()
-        return self._constraints, self._velocity_constraints
+        for sub_goal in self._sub_goals:
+            c, c_vel, debug_expressions = sub_goal.get_constraints()
+            self._constraints.update(_prepend_prefix(self.__class__.__name__, c))
+            self._velocity_constraints.update(_prepend_prefix(self.__class__.__name__, c_vel))
+            self._debug_expressions.update(_prepend_prefix(self.__class__.__name__, debug_expressions))
+        return self._constraints, self._velocity_constraints, self._debug_expressions
+
+    def add_constraints_of_goal(self, goal):
+        self._sub_goals.append(goal)
 
     def add_velocity_constraint(self, name_suffix, velocity_limit, weight, expression,
                                 lower_slack_limit=-1e4, upper_slack_limit=1e4):
@@ -237,7 +247,7 @@ class Goal(object):
         :type expr: w.Symbol
         """
         name = str(self) + '/' + name
-        self.debug_expressions[name] = expr
+        self._debug_expressions[name] = expr
 
     def add_debug_matrix(self, name, matrix_expr):
         for x in range(matrix_expr.shape[0]):
@@ -278,13 +288,15 @@ class Goal(object):
                                      lower_slack_limit=-max_violation,
                                      upper_slack_limit=max_violation,
                                      name_suffix=u'{}/vel'.format(name_suffix))
+        if self.test_mode:
+            self.add_debug_expr('trans_error', self.get_expr_velocity(trans_error))
 
     def add_vector_goal_constraints(self, frame_V_current, frame_V_goal, reference_velocity,
                                     weight=WEIGHT_BELOW_CA, name_suffix=u''):
 
         angle = w.save_acos(w.dot(frame_V_current.T, frame_V_goal)[0])
         # avoid singularity by staying away from pi
-        angle_limited = w.min(w.max(angle, -np.pi*0.9), np.pi*0.9)
+        angle_limited = w.min(w.max(angle, -reference_velocity), reference_velocity)
         angle_limited = w.save_division(angle_limited, angle)
         root_V_goal_normal_intermediate = w.slerp(frame_V_current, frame_V_goal, angle_limited)
 
@@ -330,3 +342,11 @@ class Goal(object):
                                      lower_slack_limit=-max_violation,
                                      upper_slack_limit=max_violation,
                                      name_suffix=u'{}/q/vel'.format(name_suffix))
+
+def _prepend_prefix(prefix, d):
+    new_dict = OrderedDict()
+    for key, value in d.items():
+        new_key = u'{}/{}'.format(prefix, key)
+        value.name = u'{}/{}'.format(prefix, value.name)
+        new_dict[new_key] = value
+    return new_dict

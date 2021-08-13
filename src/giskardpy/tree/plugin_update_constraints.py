@@ -145,10 +145,10 @@ class GoalToConstraints(GetGoal):
                     raise ConstraintInitalizationException(error_msg)
                 raise e
             try:
-                soft_constraints, vel_constraints = c.get_constraints()
+                soft_constraints, vel_constraints, debug_expressions = c.get_constraints()
                 self.soft_constraints.update(soft_constraints)
                 self.vel_constraints.update(vel_constraints)
-                self.debug_expr.update(c.debug_expressions)
+                self.debug_expr.update(debug_expressions)
             except Exception as e:
                 traceback.print_exc()
                 if not isinstance(e, GiskardException):
@@ -204,10 +204,10 @@ class GoalToConstraints(GetGoal):
                                                             soft_threshold=soft_threshold,
                                                             idx=i,
                                                             num_repeller=number_of_repeller)
-                    c, c_vel = constraint.get_constraints()
+                    c, c_vel, debug_expressions = constraint.get_constraints()
                     soft_constraints.update(c)
                     vel_constraints.update(c_vel)
-                    debug_expr.update(constraint.debug_expressions)
+                    debug_expr.update(debug_expressions)
 
         num_external = len(soft_constraints)
         loginfo('adding {} external collision avoidance constraints'.format(num_external))
@@ -219,6 +219,7 @@ class GoalToConstraints(GetGoal):
         counter = defaultdict(int)
         soft_constraints = {}
         vel_constraints = {}
+        debug_expr = {}
         config = self.get_god_map().get_data(identifier.self_collision_avoidance)
         for link_a_o, link_b_o in self.get_robot().get_self_collision_matrix():
             link_a, link_b = self.robot.get_chain_reduced_to_controlled_joints(link_a_o, link_b_o)
@@ -256,8 +257,11 @@ class GoalToConstraints(GetGoal):
                                                     soft_threshold=soft_threshold,
                                                     idx=i,
                                                     num_repeller=number_of_repeller)
-                c, c_vel = constraint.get_constraints()
+                c, c_vel, debug_expressions = constraint.get_constraints()
                 soft_constraints.update(c)
+                vel_constraints.update(c_vel)
+                debug_expr.update(debug_expressions)
         loginfo('adding {} self collision avoidance constraints'.format(len(soft_constraints)))
         self.soft_constraints.update(soft_constraints)
         self.vel_constraints.update(vel_constraints)
+        self.debug_expr.update(debug_expr)

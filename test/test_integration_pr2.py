@@ -1,7 +1,7 @@
 from __future__ import division
 
-import re
 import itertools
+import re
 from copy import deepcopy
 
 import numpy as np
@@ -466,6 +466,28 @@ class TestConstraints(object):
         new_pose = tf.lookup_pose('map', tip)
         compare_points(expected.pose.position, new_pose.pose.position)
 
+    def test_CartesianPose(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        tip = zero_pose.r_tip
+        p = PoseStamped()
+        p.header.stamp = rospy.get_rostime()
+        p.header.frame_id = tip
+        p.pose.position = Point(-0.4, -0.2, -0.3)
+        p.pose.orientation = Quaternion(0, 0, 1, 0)
+
+        expected = tf.transform_pose('map', p)
+
+        zero_pose.allow_all_collisions()
+        zero_pose.set_json_goal(u'CartesianPose',
+                                root_link=zero_pose.default_root,
+                                tip_link=tip,
+                                goal=p)
+        zero_pose.send_and_check_goal()
+        new_pose = tf.lookup_pose('map', tip)
+        compare_points(expected.pose.position, new_pose.pose.position)
+
     def test_JointPositionRevolute(self, zero_pose):
         """
         :type zero_pose: PR2
@@ -494,7 +516,6 @@ class TestConstraints(object):
         zero_pose.send_and_check_goal()
         np.testing.assert_almost_equal(zero_pose.get_robot().joint_state[joint].position, -2.283, decimal=3)
 
-
     def test_CartesianOrientation(self, zero_pose):
         """
         :type zero_pose: PR2
@@ -504,7 +525,7 @@ class TestConstraints(object):
         p = PoseStamped()
         p.header.stamp = rospy.get_rostime()
         p.header.frame_id = tip
-        p.pose.orientation = Quaternion(*quaternion_about_axis(4, [0,0,1]))
+        p.pose.orientation = Quaternion(*quaternion_about_axis(4, [0, 0, 1]))
 
         expected = tf.transform_pose('map', p)
 
@@ -548,26 +569,40 @@ class TestConstraints(object):
         zero_pose.set_and_check_straight_cart_goal(goal_position, zero_pose.l_tip)
 
     def test_CartesianVelocityLimit(self, zero_pose):
-        linear_velocity = 1
-        angular_velocity = 1
+        """
+        :type zero_pose: PR2
+        """
+        base_linear_velocity = 0.1
+        base_angular_velocity = 0.2
         zero_pose.limit_cartesian_velocity(
             root_link=zero_pose.default_root,
             tip_link=u'base_footprint',
-            max_linear_velocity=0.1,
-            max_angular_velocity=0.2
+            max_linear_velocity=base_linear_velocity,
+            max_angular_velocity=base_angular_velocity,
+            hard=True,
         )
+        eef_linear_velocity = 1
+        eef_angular_velocity = 1
         goal_position = PoseStamped()
         goal_position.header.frame_id = u'r_gripper_tool_frame'
         goal_position.pose.position.x = 1
         goal_position.pose.position.y = 0
         goal_position.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 4, [0, 0, 1]))
-
+        zero_pose.allow_all_collisions()
         zero_pose.set_and_check_cart_goal(goal_pose=goal_position,
                                           tip_link=u'r_gripper_tool_frame',
-                                          linear_velocity=linear_velocity,
-                                          angular_velocity=angular_velocity,
-                                          weight=WEIGHT_BELOW_CA
-                                          )
+                                          linear_velocity=eef_linear_velocity,
+                                          angular_velocity=eef_angular_velocity,
+                                          weight=WEIGHT_BELOW_CA)
+
+        for time, state in zero_pose.get_god_map().get_data(identifier.debug_trajectory).items():
+            key = '{}/{}/{}/{}/trans_error'.format('CartesianVelocityLimit',
+                                                   'TranslationVelocityLimit',
+                                                   zero_pose.default_root,
+                                                   u'base_footprint')
+            assert key in state
+            assert state[key].position <= base_linear_velocity + 2e3
+            assert state[key].position >= -base_linear_velocity - 2e3
 
     def test_AvoidJointLimits1(self, zero_pose):
         """
@@ -631,7 +666,8 @@ class TestConstraints(object):
         """
         :type pocky_pose_setup: PR2
         """
-        old_torso_value = pocky_pose_setup.get_god_map().get_data(identifier.joint_velocity_weight + [u'torso_lift_joint'])
+        old_torso_value = pocky_pose_setup.get_god_map().get_data(
+            identifier.joint_velocity_weight + [u'torso_lift_joint'])
         old_odom_x_value = pocky_pose_setup.get_god_map().get_data(identifier.joint_velocity_weight + [u'odom_x_joint'])
 
         r_goal = PoseStamped()
@@ -662,7 +698,8 @@ class TestConstraints(object):
         new_pose = tf.lookup_pose(u'map', u'base_footprint')
         compare_poses(new_pose.pose, old_pose.pose)
 
-        assert pocky_pose_setup.get_god_map().unsafe_get_data(identifier.joint_velocity_weight + [u'odom_x_joint']) == 1000000
+        assert pocky_pose_setup.get_god_map().unsafe_get_data(
+            identifier.joint_velocity_weight + [u'odom_x_joint']) == 1000000
         assert pocky_pose_setup.get_god_map().unsafe_get_data(
             identifier.joint_velocity_weight + [u'torso_lift_joint']) == old_torso_value
 
@@ -690,7 +727,8 @@ class TestConstraints(object):
 
         # compare_poses(old_pose.pose, new_pose.pose)
         assert new_pose.pose.position.x >= 0.075
-        assert pocky_pose_setup.get_god_map().unsafe_get_data(identifier.joint_velocity_weight + [u'odom_x_joint']) == 0.0001
+        assert pocky_pose_setup.get_god_map().unsafe_get_data(
+            identifier.joint_velocity_weight + [u'odom_x_joint']) == 0.0001
         assert pocky_pose_setup.get_god_map().unsafe_get_data(
             identifier.joint_velocity_weight + [u'torso_lift_joint']) == old_torso_value
         pocky_pose_setup.send_and_check_goal()
@@ -721,7 +759,8 @@ class TestConstraints(object):
         """
         :type pocky_pose_setup: PR2
         """
-        old_torso_value = pocky_pose_setup.get_god_map().get_data(identifier.joint_velocity_weight + [u'torso_lift_joint'])
+        old_torso_value = pocky_pose_setup.get_god_map().get_data(
+            identifier.joint_velocity_weight + [u'torso_lift_joint'])
         old_odom_x_value = pocky_pose_setup.get_god_map().get_data(identifier.joint_velocity_weight + [u'odom_x_joint'])
         old_odom_y_value = pocky_pose_setup.get_god_map().get_data(identifier.joint_velocity_weight + [u'odom_y_joint'])
 
@@ -749,7 +788,8 @@ class TestConstraints(object):
         pocky_pose_setup.send_and_check_goal(expected_error_codes=[MoveResult.ERROR])
         assert pocky_pose_setup.get_god_map().unsafe_get_data(
             identifier.joint_velocity_weight + [u'odom_x_joint']) == old_odom_x_value
-        assert pocky_pose_setup.get_god_map().unsafe_get_data(identifier.joint_velocity_weight + [u'odom_y_joint']) == old_odom_y_value
+        assert pocky_pose_setup.get_god_map().unsafe_get_data(
+            identifier.joint_velocity_weight + [u'odom_y_joint']) == old_odom_y_value
         assert pocky_pose_setup.get_god_map().get_data(
             identifier.joint_velocity_weight + [u'torso_lift_joint']) == old_torso_value
 
@@ -757,7 +797,8 @@ class TestConstraints(object):
         """
         :type pocky_pose_setup: PR2
         """
-        old_torso_value = pocky_pose_setup.get_god_map().get_data(identifier.joint_velocity_weight + [u'torso_lift_joint'])
+        old_torso_value = pocky_pose_setup.get_god_map().get_data(
+            identifier.joint_velocity_weight + [u'torso_lift_joint'])
         old_odom_x_value = pocky_pose_setup.get_god_map().get_data(identifier.joint_velocity_weight + [u'odom_x_joint'])
 
         r_goal = PoseStamped()
@@ -2156,7 +2197,7 @@ class TestShaking(object):
             min_wiggle_frequency += 1
         distance_between_frequencies = 5
 
-        for joint in [ u'head_pan_joint', u'r_wrist_flex_joint']:  # max vel: 1.0 and 0.5
+        for joint in [u'head_pan_joint', u'r_wrist_flex_joint']:  # max vel: 1.0 and 0.5
             for f in range(min_wiggle_frequency, max_detectable_freq, distance_between_frequencies):
                 kitchen_setup.set_json_goal(u'JointPositionRevolute',
                                             joint_name=joint,
@@ -2186,7 +2227,7 @@ class TestShaking(object):
             min_wiggle_frequency += 1
         distance_between_frequencies = 5
 
-        for joint in [u'odom_x_joint']: #, u'torso_lift_joint']: # max vel: 0.015 and 0.5
+        for joint in [u'odom_x_joint']:  # , u'torso_lift_joint']: # max vel: 0.015 and 0.5
             for f in range(min_wiggle_frequency, max_detectable_freq, distance_between_frequencies):
                 kitchen_setup.set_json_goal(u'JointPositionPrismatic',
                                             joint_name=joint,
@@ -2282,7 +2323,7 @@ class TestShaking(object):
             min_wiggle_frequency += 1
         distance_between_frequencies = 5
 
-        for revolute_joint in [ u'r_wrist_flex_joint', u'head_pan_joint']:  # max vel. of 1.0 and 0.5
+        for revolute_joint in [u'r_wrist_flex_joint', u'head_pan_joint']:  # max vel. of 1.0 and 0.5
             for f in range(min_wiggle_frequency, max_detectable_freq, distance_between_frequencies):
                 target_freq = float(f)
 
@@ -3196,7 +3237,7 @@ class TestCollisionAvoidanceGoals(object):
         base_pose.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 2, [0, 0, 1]))
         kitchen_setup.teleport_base(base_pose)
         base_pose.pose.orientation = Quaternion(*quaternion_about_axis(np.pi, [0, 0, 1]))
-        kitchen_setup.set_joint_goal(gaya_pose)#, weight=WEIGHT_ABOVE_CA)
+        kitchen_setup.set_joint_goal(gaya_pose)  # , weight=WEIGHT_ABOVE_CA)
         kitchen_setup.set_rotation_goal(base_pose, u'base_footprint')
         kitchen_setup.set_translation_goal(base_pose, u'base_footprint', weight=WEIGHT_BELOW_CA)
         kitchen_setup.send_and_check_goal()

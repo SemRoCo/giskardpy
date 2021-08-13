@@ -150,7 +150,6 @@ class OpenDrawer(Goal):
         :type root_link: str
         :param root_link: default is root link of robot
         """
-        self.constraints = []  # init empty list
         # Process input parameters
         if root_link is None:
             self.root = self.get_robot().get_root()
@@ -212,19 +211,10 @@ class OpenDrawer(Goal):
         # Convert goal pose to dict for Giskard
         root_T_tip_goal_dict = tf.kdl_to_pose_stamped(root_T_tip_goal, self.root)
 
-        self.constraints.append(
-            CartesianPoseStraight(
-                self.root,
-                self.tip,
-                root_T_tip_goal_dict,
-                weight=weight))
-
-    def make_constraints(self):
-        for constraint in self.constraints:
-            c, c_vel = constraint.get_constraints()
-            self._constraints.update(c)
-            self._velocity_constraints.update(c_vel)
-            self.debug_expressions.update(constraint.debug_expressions)
+        self.add_constraints_of_goal(CartesianPoseStraight(self.root,
+                                                           self.tip,
+                                                           root_T_tip_goal_dict,
+                                                           weight=weight))
 
     def __str__(self):
         s = super(OpenDrawer, self).__str__()
@@ -234,8 +224,7 @@ class OpenDrawer(Goal):
 class Open(Goal):
     def __init__(self, tip_link, object_name, object_link_name, root_link=None, goal_joint_state=None,
                  weight=WEIGHT_ABOVE_CA, **kwargs):
-        super(Open, self).__init__(god_map, **kwargs)
-        self.constraints = []
+        super(Open, self).__init__(**kwargs)
         environment_object = self.get_world().get_object(object_name)
         joint_name = environment_object.get_movable_parent_joint(object_link_name)
 
@@ -247,36 +236,28 @@ class Open(Goal):
                 goal_joint_state = max_limit
 
         if environment_object.is_joint_revolute(joint_name):
-            self.constraints.append(OpenDoor(tip_link=tip_link,
-                                             object_name=object_name,
-                                             object_link_name=object_link_name,
-                                             angle_goal=goal_joint_state,
-                                             root_link=root_link,
-                                             weight=weight, **kwargs))
+            self.add_constraints_of_goal(OpenDoor(tip_link=tip_link,
+                                                  object_name=object_name,
+                                                  object_link_name=object_link_name,
+                                                  angle_goal=goal_joint_state,
+                                                  root_link=root_link,
+                                                  weight=weight, **kwargs))
         elif environment_object.is_joint_prismatic(joint_name):
-            self.constraints.append(OpenDrawer(tip_link=tip_link,
-                                               object_name=object_name,
-                                               object_link_name=object_link_name,
-                                               distance_goal=goal_joint_state,
-                                               root_link=root_link,
-                                               weight=weight, **kwargs))
+            self.add_constraints_of_goal(OpenDrawer(tip_link=tip_link,
+                                                    object_name=object_name,
+                                                    object_link_name=object_link_name,
+                                                    distance_goal=goal_joint_state,
+                                                    root_link=root_link,
+                                                    weight=weight, **kwargs))
         else:
             logwarn(u'Opening containers with joint of type "{}" not supported'.format(
                 environment_object.get_joint_type(joint_name)))
-
-    def make_constraints(self):
-        for constraint in self.constraints:
-            c, c_vel = constraint.get_constraints()
-            self._constraints.update(c)
-            self._velocity_constraints.update(c_vel)
-            self.debug_expressions.update(constraint.debug_expressions)
 
 
 class Close(Goal):
     def __init__(self, tip_link, object_name, object_link_name, root_link=None, goal_joint_state=None,
                  weight=WEIGHT_ABOVE_CA, **kwargs):
         super(Close, self).__init__(**kwargs)
-        self.constraints = []
         environment_object = self.get_world().get_object(object_name)
         joint_name = environment_object.get_movable_parent_joint(object_link_name)
 
@@ -288,26 +269,19 @@ class Close(Goal):
                 goal_joint_state = min_limit
 
         if environment_object.is_joint_revolute(joint_name):
-            self.constraints.append(OpenDoor(tip_link=tip_link,
-                                             object_name=object_name,
-                                             object_link_name=object_link_name,
-                                             angle_goal=goal_joint_state,
-                                             root_link=root_link,
-                                             weight=weight, **kwargs))
+            self.add_constraints_of_goal(OpenDoor(tip_link=tip_link,
+                                                  object_name=object_name,
+                                                  object_link_name=object_link_name,
+                                                  angle_goal=goal_joint_state,
+                                                  root_link=root_link,
+                                                  weight=weight, **kwargs))
         elif environment_object.is_joint_prismatic(joint_name):
-            self.constraints.append(OpenDrawer(tip_link=tip_link,
-                                               object_name=object_name,
-                                               object_link_name=object_link_name,
-                                               distance_goal=goal_joint_state,
-                                               root_link=root_link,
-                                               weight=weight, **kwargs))
+            self.add_constraints_of_goal(OpenDrawer(tip_link=tip_link,
+                                                    object_name=object_name,
+                                                    object_link_name=object_link_name,
+                                                    distance_goal=goal_joint_state,
+                                                    root_link=root_link,
+                                                    weight=weight, **kwargs))
         else:
             logwarn(u'Opening containers with joint of type "{}" not supported'.format(
                 environment_object.get_joint_type(joint_name)))
-
-    def make_constraints(self):
-        for constraint in self.constraints:
-            c, c_vel = constraint.get_constraints()
-            self._constraints.update(c)
-            self._velocity_constraints.update(c_vel)
-            self.debug_expressions.update(constraint.debug_expressions)

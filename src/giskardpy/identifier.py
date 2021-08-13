@@ -46,6 +46,7 @@ sample_period = general_options + [u'sample_period']
 map_frame = general_options + [u'map_frame']
 debug = general_options + [u'debug']
 fill_velocity_values = general_options + [u'fill_velocity_values']
+test_mode = general_options + [u'test_mode']
 
 joint_limits = general_options + [u'joint_limits']
 

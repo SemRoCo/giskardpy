@@ -3,6 +3,7 @@ general_options:
   enable_gui: False
   sample_period: 0.05 # time[s] between points of generated joint trajectory
   map_frame: map
+  test_mode: False
   debug: False # enables debug prints and prints the behavior tree state in the terminal
   fill_velocity_values: True # due to a bug, the pr2 does not want the velocity values to be filled
   joint_weights:

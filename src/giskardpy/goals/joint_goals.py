@@ -412,7 +412,6 @@ class JointPositionList(Goal):
         :param max_velocity: float, default is the default of the added joint goals
         """
         super(JointPositionList, self).__init__(**kwargs)
-        self.constraints = []
         for i, joint_name in enumerate(goal_state.name):
             if not self.get_robot().has_joint(joint_name):
                 raise KeyError(u'unknown joint "{}"'.format(joint_name))
@@ -425,18 +424,11 @@ class JointPositionList(Goal):
             if max_velocity is not None:
                 params[u'max_velocity'] = max_velocity
             if self.get_robot().is_joint_continuous(joint_name):
-                self.constraints.append(JointPositionContinuous(**params))
+                self.add_constraints_of_goal(JointPositionContinuous(**params))
             elif self.get_robot().is_joint_revolute(joint_name):
-                self.constraints.append(JointPositionRevolute(**params))
+                self.add_constraints_of_goal(JointPositionRevolute(**params))
             elif self.get_robot().is_joint_prismatic(joint_name):
-                self.constraints.append(JointPositionPrismatic(**params))
-
-    def make_constraints(self):
-        for constraint in self.constraints:
-            c, vel_c = constraint.get_constraints()
-            self._constraints.update(c)
-            self._velocity_constraints.update(vel_c)
-            self.debug_expressions.update(constraint.debug_expressions)
+                self.add_constraints_of_goal(JointPositionPrismatic(**params))
 
 
 class AvoidJointLimits(Goal):
@@ -447,23 +439,15 @@ class AvoidJointLimits(Goal):
         :param weight: float, default WEIGHT_BELOW_CA
         """
         super(AvoidJointLimits, self).__init__(**kwargs)
-        self.constraints = []
         for joint_name in self.get_robot().controlled_joints:
             if self.get_robot().is_joint_revolute(joint_name):
-                self.constraints.append(AvoidJointLimitsRevolute(joint_name=joint_name,
-                                                                 percentage=percentage,
-                                                                 weight=weight, **kwargs))
+                self.add_constraints_of_goal(AvoidJointLimitsRevolute(joint_name=joint_name,
+                                                                      percentage=percentage,
+                                                                      weight=weight, **kwargs))
             elif self.get_robot().is_joint_prismatic(joint_name):
-                self.constraints.append(AvoidJointLimitsPrismatic(joint_name=joint_name,
-                                                                  percentage=percentage,
-                                                                  weight=weight, **kwargs))
-
-    def make_constraints(self):
-        for constraint in self.constraints:
-            c, c_vel = constraint.get_constraints()
-            self._constraints.update(c)
-            self._velocity_constraints.update(c_vel)
-            self.debug_expressions.update(constraint.debug_expressions)
+                self.add_constraints_of_goal(AvoidJointLimitsPrismatic(joint_name=joint_name,
+                                                                       percentage=percentage,
+                                                                       weight=weight, **kwargs))
 
 
 class JointPositionRange(Goal):

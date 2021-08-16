@@ -38,11 +38,6 @@ class PyBulletWorldObject(WorldObject):
                                                   path_to_data_folder=path_to_data_folder,
                                                   calc_self_collision_matrix=calc_self_collision_matrix,
                                                   *args, **kwargs)
-        self.reinitialize()
-        if base_pose is None:
-            p = Pose()
-            p.orientation.w = 1
-            self.base_pose = p
         self.self_collision_matrix = set()
         self.render = False
 
@@ -74,9 +69,10 @@ class PyBulletWorldObject(WorldObject):
     @WorldObject.base_pose.setter
     def base_pose(self, value):
         with self.lock:
+            # super(PyBulletWorldObject, self).base_pose = value
+            WorldObject.base_pose.fset(self, value)
             if self._pybullet_id is not None:
                 self._base_pose = value
-                WorldObject.base_pose.fset(self, value)
                 position, orientation = msg_to_pybullet_pose(value)
                 pw.resetBasePositionAndOrientation(self._pybullet_id, position, orientation)
 
@@ -128,10 +124,9 @@ class PyBulletWorldObject(WorldObject):
             super(PyBulletWorldObject, self).reinitialize()
             deactivate_rendering()
             joint_state = None
-            base_pose = None
+            base_pose = self.base_pose
             if self._pybullet_id is not None:
                 joint_state = self.joint_state
-                base_pose = self.base_pose
                 self.suicide()
             s = self.get_urdf_str()
             self._pybullet_id = load_urdf_string_into_bullet(s, base_pose)

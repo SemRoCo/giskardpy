@@ -34,6 +34,8 @@ class WorldObject(URDFObject):
             p = Pose()
             p.orientation.w = 1
             self.base_pose = p
+        else:
+            self.base_pose = base_pose
         # using .joint_state creates a chicken egg problem in pybulletworldobject
         self._js = self.get_zero_joint_state()
         self._controlled_links = None

@@ -121,6 +121,8 @@ class World(object):
         if self.has_object(robot.get_name()):
             raise DuplicateNameException(
                 u'can\'t add robot; object with name "{}" already exists'.format(robot.get_name()))
+        if base_pose is None:
+            base_pose = robot.base_pose
         self._robot = Robot.from_urdf_object(urdf_object=robot,
                                              base_pose=base_pose,
                                              controlled_joints=controlled_joints,

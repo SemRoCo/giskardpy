@@ -1,6 +1,7 @@
 from __future__ import division
 
 import numbers
+import random
 import time
 from collections import OrderedDict
 from copy import deepcopy
@@ -1523,17 +1524,20 @@ class CartesianPathCarrot(Constraint):
         return params
 
     def get_goal_expr(self):
-        normals = self.get_normals(self.goal_strings, self.next_goal_strings)
-        normal_dists = self.get_normal_dists(normals)
-        zero_one_mapping = self.zero_one_mapping_if_equal(normal_dists, self.trajectory_length, w.ca.mmin(normal_dists))
-        #for i in range(0, self.trajectory_length):
-        #    self.add_debug_constraint("debugGoalsX" + str(i), w.position_of(self.get_input_PoseStamped(self.goal_strings[i]))[0])
-        #for i in range(0, self.trajectory_length):
-        #    self.add_debug_constraint("debugNormalDists" + str(i), normal_dists[i])
-        #for i in range(0, self.trajectory_length):
-        #    self.add_debug_constraint("debugMappings" + str(i), zero_one_mapping[i])
-        #self.add_debug_constraint("mmin_normal_dists", w.ca.mmin(normal_dists))
-        return self.select(normals, zero_one_mapping)
+        """Will return the next normal with a higher normal time as the normal time calculated from the current position."""
+        # todo: clean the mess below
+        curr_normals, curr_normal_times = self.get_normals(self.goal_strings, self.next_goal_strings,
+                                                           w.position_of(self.get_fk(self.root_link, self.tip_link)))
+        curr_normal_dists = self.get_normal_dists(curr_normals)
+        zero_one_mapping = self.zero_one_mapping_if_equal(curr_normal_dists, self.trajectory_length, w.ca.mmin(curr_normal_dists))
+        curr_normal_time = self.select(curr_normal_times, zero_one_mapping)
+        next_normals, next_normal_times = self.get_normals(self.goal_strings, self.next_goal_strings, self.predict())
+        zero_one_mapping_n = self.zero_one_mapping_if_greater(next_normal_times, self.trajectory_length, curr_normal_time)
+        next_normals_closer_to_goal = next_normals * zero_one_mapping_n
+        next_normal_dists = self.get_normal_dists(next_normals_closer_to_goal)
+        zero_one_mapping_one = self.zero_one_mapping_if_equal(next_normal_dists, self.trajectory_length,
+                                                              w.ca.mmin(next_normal_dists))
+        return self.select(next_normals_closer_to_goal, zero_one_mapping_one)
 
     def predict(self):
         v = self.get_fk_velocity(self.root_link, self.tip_link)[0:3]
@@ -1542,6 +1546,23 @@ class CartesianPathCarrot(Constraint):
         s = self.get_input_sampling_period()
         n_p = p[0:3] + v_p * s
         return w.point3(n_p[0], n_p[1], n_p[2])
+
+    def get_normal_time(self, n, a, b):
+        """
+        Will return the normal time for a given normal point n between the start point a and b.
+        First the normal time depends on the place in the trajectory. If a (the start point of the given
+        trajectory part) is at the end of the trajectory the time is higher. The normal time can therefore
+        be in [0, len(self.trajectory_length)]. If n is not a or b, the normalized distance from a to n will
+        be added on the normal time. This results in the following formulation:
+        normal_time = trajectory[a].index() + norm(n-a)/norm(b-a)
+        """
+        ps = []
+        for i in range(0, self.trajectory_length):
+            ps.append(w.position_of(self.get_input_PoseStamped(self.goal_strings[i])))
+        m = self.zero_one_mapping_if_equal(w.Matrix(ps), self.trajectory_length, w.ca.transpose(a))
+        g_i = self.select(w.Matrix([i for i in range(0, self.trajectory_length)]), m)
+        n_t = w.save_division(w.norm(n - a), w.norm(b - a))
+        return g_i + n_t
 
     def get_normal(self, p, a, b):
         """:rtype: w.point3"""
@@ -1554,19 +1575,21 @@ class CartesianPathCarrot(Constraint):
         normal = w.if_greater(normal[0], w.Max(a[0], b[0]), b, normal)
         return normal
 
-    def get_normals(self, goal_strings, next_goal_strings):
+    def get_normals(self, goal_strings, next_goal_strings, pos):
 
-        next_pos = self.predict()
         trajectory_len = self.trajectory_length
-        normal_funs = []
+        normals = []
+        normal_times = []
 
         for i in range(0, trajectory_len):
-            n = self.get_normal(next_pos,
-                                w.position_of(self.get_input_PoseStamped(goal_strings[i])),
-                                w.position_of(self.get_input_PoseStamped(next_goal_strings[i])))
-            normal_funs.append(n)
+            a = w.position_of(self.get_input_PoseStamped(goal_strings[i]))
+            b = w.position_of(self.get_input_PoseStamped(next_goal_strings[i]))
+            n = self.get_normal(pos, a, b)
+            n_t = self.get_normal_time(n, a, b)
+            normals.append(n)
+            normal_times.append(n_t)
 
-        return w.Matrix(normal_funs)
+        return w.Matrix(normals), w.Matrix(normal_times)
 
     def get_normal_dists(self, normals):
 
@@ -1580,11 +1603,30 @@ class CartesianPathCarrot(Constraint):
         return w.Matrix(normal_dist_funs)
 
     def zero_one_mapping_if_equal(self, l, l_len, elem):
+        """
+        Will take 2d array l and will compare elementwise each 1d entry of l with the given array elem.
+        The compare function is here equal(). Because of the elementwise comparison, each positive
+        comparison will be summed with 1/l.shape[1]. If the sum is 1 all elements were equal.
+        """
 
         zeros_and_ones = []
 
         for i in range(0, l_len):
-            zeros_and_ones.append(w.if_eq(l[i], elem, 1, 0))
+            zeros_and_ones.append(w.if_eq(1, w.Sum(w.if_eq(l[i,:], elem, 1/l.shape[1], 0)), 1, 0))
+
+        return w.Matrix(zeros_and_ones)
+
+    def zero_one_mapping_if_greater(self, l, l_len, elem):
+        """
+        Will take 2d array l and will compare elementwise each 1d entry of l with the given array elem.
+        The compare function is here greater(). Because of the elementwise comparison, each positive
+        comparison will be summed with the 1/l.shape[1]. If the sum is 1 all entries in l were greater.
+        """
+
+        zeros_and_ones = []
+
+        for i in range(0, l_len):
+            zeros_and_ones.append(w.if_eq(1, w.Sum(w.if_greater(l[i,:], elem, 1/l.shape[1], 0)), 1, 0))
 
         return w.Matrix(zeros_and_ones)
 

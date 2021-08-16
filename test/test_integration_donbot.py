@@ -482,6 +482,47 @@ class TestCartGoals(object):
         zero_pose.allow_self_collision()
         zero_pose.set_and_check_cart_goal(goal_pose, zero_pose.gripper_tip, zero_pose.default_root)
 
+    def test_elbow_singularity(self, better_pose):
+        """
+        :type better_pose: Donbot
+        """
+        hand_goal = PoseStamped()
+        hand_goal.header.frame_id = better_pose.gripper_tip
+        hand_goal.pose.position.z = 1
+        hand_goal.pose.orientation.w = 1
+        better_pose.set_cart_goal(hand_goal, better_pose.gripper_tip, u'base_footprint')
+        better_pose.send_and_check_goal()
+        hand_goal = PoseStamped()
+        hand_goal.header.frame_id = better_pose.gripper_tip
+        hand_goal.pose.position.z = -0.2
+        hand_goal.pose.orientation.w = 1
+        better_pose.set_cart_goal(hand_goal, better_pose.gripper_tip, u'base_footprint')
+        better_pose.send_and_check_goal()
+        pass
+
+    def test_shoulder_singularity(self, better_pose):
+        """
+        :type better_pose: Donbot
+        """
+        hand_goal = PoseStamped()
+        hand_goal.header.frame_id = 'ur5_base_link'
+        hand_goal.pose.position.x = 0.05
+        hand_goal.pose.position.y = -0.2
+        hand_goal.pose.position.z = 0.4
+        hand_goal.pose.orientation = Quaternion(*quaternion_from_matrix(
+            [
+                [0,-1,0,0],
+                [-1,0,0,0],
+                [0,0,-1,0],
+                [0,0,0,1],
+            ]
+        ))
+        better_pose.allow_all_collisions()
+        better_pose.set_and_check_cart_goal(hand_goal, u'ur5_wrist_2_link', u'base_footprint', weight=WEIGHT_BELOW_CA)
+        hand_goal.pose.position.y = 0.05
+        better_pose.allow_all_collisions()
+        better_pose.set_and_check_cart_goal(hand_goal, u'ur5_wrist_2_link', u'base_footprint', weight=WEIGHT_BELOW_CA)
+        pass
 
 class TestCollisionAvoidanceGoals(object):
     # kernprof -lv py.test -s test/test_integration_donbot.py::TestCollisionAvoidanceGoals::test_place_in_shelf

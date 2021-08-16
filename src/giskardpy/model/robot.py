@@ -58,7 +58,7 @@ class Robot(Backend):
         """
         Backend.joint_state.fset(self, value)
         self.__joint_state_positions = {str(self.get_joint_position_symbol(k)): v.position for k, v in
-                                        self.joint_state.items()}
+                                        self.joint_state.items() if not self.is_joint_mimic(k)}
         self.get_fk_np.memo.clear()
 
     @memoize

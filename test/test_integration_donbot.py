@@ -8,6 +8,8 @@ from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped, Po
 from giskard_msgs.msg import MoveActionGoal, MoveResult, MoveGoal, CollisionEntry, MoveCmd, JointConstraint, \
     Constraint as Constraint_msg
 from tf.transformations import quaternion_from_matrix, quaternion_about_axis
+
+from giskardpy.goals.goal import WEIGHT_BELOW_CA
 from giskardpy.utils import logging
 import giskardpy.utils.tfwrapper as tf
 from utils_for_tests import Donbot, compare_poses
@@ -251,35 +253,6 @@ class TestJointGoals(object):
         })
         zero_pose.send_and_check_joint_goal({})
 
-    def test_empty_joint_goal2(self, zero_pose):
-        """
-        :type zero_pose: Donbot
-        """
-        # zero_pose.allow_self_collision()
-        goal = MoveActionGoal()
-        move_cmd = MoveCmd()
-        joint_goal1 = JointConstraint()
-        joint_goal1.type = JointConstraint.JOINT
-        joint_goal1.goal_state.name = [u'ur5_shoulder_pan_joint',
-                                       u'ur5_shoulder_lift_joint',
-                                       u'ur5_elbow_joint',
-                                       u'ur5_wrist_1_joint',
-                                       u'ur5_wrist_2_joint',
-                                       u'ur5_wrist_3_joint']
-        joint_goal1.goal_state.position = [-0.15841275850404912,
-                                           -2.2956998983966272,
-                                           2.240689277648926,
-                                           -2.608211342488424,
-                                           -2.7356796900378626,
-                                           -2.5249870459186]
-        joint_goal2 = JointConstraint()
-        joint_goal2.type = JointConstraint.JOINT
-        move_cmd.joint_constraints.append(joint_goal1)
-        move_cmd.joint_constraints.append(joint_goal2)
-        goal.goal.cmd_seq.append(move_cmd)
-        goal.goal.type = goal.goal.PLAN_AND_EXECUTE
-        zero_pose.send_and_check_goal(goal=goal)
-
     def test_joint_movement2(self, zero_pose):
         """
         :type zero_pose: Donbot
@@ -329,7 +302,7 @@ class TestJointGoals(object):
         :type zero_pose: Donbot
         """
         zero_pose.allow_self_collision()
-        js = dict(floor_detection_js.items()[:3])
+        js = dict(list(floor_detection_js.items())[:3])
         zero_pose.send_and_check_joint_goal(js)
 
     def test_undefined_type(self, zero_pose):
@@ -340,7 +313,7 @@ class TestJointGoals(object):
         goal = MoveActionGoal()
         goal.goal.type = MoveGoal.UNDEFINED
         result = zero_pose.send_goal(goal)
-        assert result.error_code == MoveResult.INSOLVABLE
+        assert result.error_codes[0] == MoveResult.INVALID_GOAL
 
     def test_empty_goal(self, zero_pose):
         """
@@ -350,7 +323,7 @@ class TestJointGoals(object):
         goal = MoveActionGoal()
         goal.goal.type = MoveGoal.PLAN_AND_EXECUTE
         result = zero_pose.send_goal(goal)
-        assert result.error_code == MoveResult.INSOLVABLE
+        assert result.error_codes[0] == MoveResult.INVALID_GOAL
 
 
 class TestConstraints(object):
@@ -395,7 +368,7 @@ class TestConstraints(object):
         zero_pose.set_and_check_cart_goal(box_pose, u'refills_tool_frame', u'base_footprint')
 
         zero_pose.add_box(box, [0.035, 0.12, 0.15], box_pose)
-        zero_pose.attach_existing(box, u'refills_finger')
+        zero_pose.attach_object(box, u'refills_finger')
 
         # go_up_pose = PoseStamped()
         # go_up_pose.header.frame_id = u'refills_finger'
@@ -409,9 +382,12 @@ class TestConstraints(object):
         zero_pose.send_and_check_goal()
 
     def test_pointing(self, better_pose):
+        """
+        :type better_pose: Donbot
+        """
         tip = u'rs_camera_link'
         goal_point = tf.lookup_point(u'map', u'base_footprint')
-        better_pose.wrapper.pointing(tip, goal_point)
+        better_pose.pointing(tip, goal_point)
         better_pose.send_and_check_goal()
 
         current_x = Vector3Stamped()
@@ -533,7 +509,7 @@ class TestCollisionAvoidanceGoals(object):
 
     def test_attach_existing_box_non_fixed(self, better_pose):
         """
-        :type zero_pose: Donbot
+        :type better_pose: Donbot
         """
         pocky = u'box'
 
@@ -543,7 +519,7 @@ class TestCollisionAvoidanceGoals(object):
         p.pose.orientation = Quaternion(0, 0, 0, 1)
 
         better_pose.add_box(pocky, [0.05, 0.2, 0.03], p)
-        better_pose.attach_existing(pocky, frame_id=u'refills_finger')
+        better_pose.attach_object(pocky, frame_id=u'refills_finger')
 
         tip_normal = Vector3Stamped()
         tip_normal.header.frame_id = pocky
@@ -568,6 +544,7 @@ class TestCollisionAvoidanceGoals(object):
         """
         :type box_setup: PR2
         """
+        # FIXME check if out of collision at the
         better_pose.attach_box(size=[0.05, 0.05, 0.2],
                                frame_id=better_pose.gripper_tip,
                                position=[0, 0, 0.08],
@@ -619,7 +596,7 @@ class TestCollisionAvoidanceGoals(object):
 
     def test_avoid_collision4(self, better_pose):
         """
-        :type box_setup: PR2
+        :type better_pose: Donbot
         """
         better_pose.attach_cylinder(height=0.3,
                                     radius=0.025,
@@ -655,8 +632,11 @@ class TestCollisionAvoidanceGoals(object):
         p.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 2, [0, 1, 0]))
         better_pose.add_cylinder('bup', [0.2, 0.01], p)
 
-        better_pose.send_and_check_goal()
-        # TODO check traj length?
+        eef_goal = PoseStamped()
+        eef_goal.header.frame_id = u'cylinder'
+        eef_goal.pose.position.z -= 0.2
+        eef_goal.pose.orientation.w = 1
+        better_pose.set_and_check_cart_goal(eef_goal, 'cylinder', weight=WEIGHT_BELOW_CA)
 
     def test_place_in_shelf(self, shelf_setup):
         """
@@ -682,7 +662,7 @@ class TestCollisionAvoidanceGoals(object):
         # shelf_setup.allow_all_collisions()
         shelf_setup.set_and_check_cart_goal(grasp_pose, u'refills_finger')
 
-        shelf_setup.attach_existing(box, u'refills_finger')
+        shelf_setup.attach_object(box, u'refills_finger')
 
         box_goal = PoseStamped()
         box_goal.header.frame_id = u'map'
@@ -770,11 +750,11 @@ class TestCollisionAvoidanceGoals(object):
 
     def test_unknown_body_b(self, zero_pose):
         """
-        :type box_setup: PR2
+        :type zero_pose: Donbot
         """
         ce = CollisionEntry()
         ce.type = CollisionEntry.AVOID_COLLISION
         ce.body_b = u'asdf'
-        zero_pose.add_collision_entries([ce])
-        zero_pose.send_and_check_goal(MoveResult.UNKNOWN_OBJECT)
+        zero_pose.set_collision_entries([ce])
+        zero_pose.send_and_check_goal(expected_error_codes=[MoveResult.UNKNOWN_OBJECT])
         zero_pose.send_and_check_goal()

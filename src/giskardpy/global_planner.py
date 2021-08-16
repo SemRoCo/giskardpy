@@ -262,7 +262,7 @@ class GlobalPlanner(GetGoal):
         # planner.setup()
         return planner
 
-    def planNavigation(self, plot=True):
+    def planNavigation(self, num_of_tries=3, plot=True):
 
         # create a simple setup object
         ss = og.SimpleSetup(self.kitchen_floor_space)
@@ -285,11 +285,14 @@ class GlobalPlanner(GetGoal):
         planner = self.getPlanner(si)
         ss.setPlanner(planner)
 
-        solved = ss.solve(15.0)
-        og.PathSimplifier(si).smoothBSpline(ss.getSolutionPath()) # takes around 20-30 secs with RTTConnect(0.1)
+        solved = ob.PlannerStatus.UNKNOWN
+        i = 0
+        while i < num_of_tries and solved not in [ob.PlannerStatus.APPROXIMATE_SOLUTION, ob.PlannerStatus.EXACT_SOLUTION]:
+            solved = ss.solve(20.0)
+            i += 1
+        #og.PathSimplifier(si).smoothBSpline(ss.getSolutionPath()) # takes around 20-30 secs with RTTConnect(0.1)
         #og.PathSimplifier(si).reduceVertices(ss.getSolutionPath())
         ss.getSolutionPath().interpolate(20)
-
         if solved:
             # try to shorten the path
             # ss.simplifySolution() DONT! NO! DONT UNCOMMENT THAT! NO! STOP IT! FIRST IMPLEMENT CHECKMOTION! THEN TRY AGAIN!

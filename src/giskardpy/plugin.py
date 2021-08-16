@@ -147,6 +147,7 @@ class PluginBehavior(GiskardBehavior):
     def set_status(self, new_state):
         self.my_status = new_state
 
+    #Try to set at 20hz
     def loop_over_plugins(self):
         try:
             # self.init_plugins()

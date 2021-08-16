@@ -42,6 +42,7 @@ from giskardpy.plugin_time import TimePlugin
 from giskardpy.plugin_update_constraints import GoalToConstraints
 from giskardpy.plugin_visualization import VisualizationBehavior
 from giskardpy.plugin_world_visualization import WorldVisualizationBehavior
+from giskardpy.plugin_visual_servoing import VisualServoingPlugin
 from giskardpy.pybullet_world import PyBulletWorld
 from giskardpy.tree_manager import TreeManager
 from giskardpy.utils import create_path, render_dot_tree, KeyDefaultDict
@@ -72,7 +73,7 @@ def initialize_god_map():
             #Todo: make states of controlled joints available
             #List of controlled joints
             controlled_joints = [u'head_tilt_joint', u'head_pan_joint', u'arm_lift_joint', u'arm_flex_joint',
-                                 u'arm_roll_joint', u'wrist_flex_joint', u'wrist_roll_joint']
+                                 u'arm_roll_joint', u'wrist_flex_joint', u'wrist_roll_joint', u'odom_x', u'odom_y', u'odom_t']
         except ROSException as e:
             logging.logerr(u'state topic not available')
             logging.logerr(str(e))
@@ -161,6 +162,7 @@ def grow_tree():
     wait_for_goal.add_child(running_is_success(ConfigurationPlugin)(u'js2'))
     # ----------------------------------------------
     planning_3 = PluginBehavior(u'planning III', sleep=0)
+    planning_3.add_plugin(VisualServoingPlugin(u'vs_goal_ipdate'))
     planning_3.add_plugin(ConfigurationPlugin(u'js3'))
     # planning_3.add_plugin(CollisionChecker(u'coll'))
     # if god_map.safe_get_data(identifier.enable_collision_marker):
@@ -170,7 +172,7 @@ def grow_tree():
     # planning_3.add_plugin(KinSimPlugin(u'kin sim'))
     planning_3.add_plugin(LogTrajPlugin(u'log'))
     #planning_3.add_plugin(WiggleCancel(u'wiggle'))
-    # planning_3.add_plugin(LoopDetector(u'loop detector'))
+    #planning_3.add_plugin(LoopDetector(u'loop detector'))
     planning_3.add_plugin(GoalReachedPlugin(u'goal reached'))
     planning_3.add_plugin(TimePlugin(u'time'))
     # planning_3.add_plugin(MaxTrajLength(u'traj length check'))

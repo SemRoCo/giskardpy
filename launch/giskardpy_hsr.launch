@@ -14,18 +14,12 @@
     </include>
   </group>
 
-  <!--node pkg="giskardpy" type="giskard_trees2.py" name="giskard" output="screen">
+  <node pkg="giskardpy" type="giskard_trees2.py" name="giskard" output="screen">
     <param name="path_to_data_folder" value="$(find giskardpy)/data" />
     <param name="enable_gui" value="$(arg gui)"/>
     <remap if="$(eval arg('sim') == false)" from="/robot_description" to="/giskard/robot_description" />
     <rosparam command="load" file="$(find giskardpy)/config/hsr.yaml"/>
-  </node-->
-  <group ns="giskard">
-    <param name="path_to_data_folder" value="$(find giskardpy)/data" />
-    <param name="enable_gui" value="$(arg gui)"/>
-    <remap if="$(eval arg('sim') == false)" from="/robot_description" to="/giskard/robot_description" />
-    <rosparam command="load" file="$(find giskardpy)/config/hsr.yaml"/>
-  </group>
+  </node>
 
   <node pkg="giskardpy" type="interactive_marker.py" name="giskard_interactive_marker" output="screen">
     <rosparam param="enable_self_collision">False</rosparam>

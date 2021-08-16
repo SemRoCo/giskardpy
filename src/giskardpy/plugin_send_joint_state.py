@@ -4,6 +4,7 @@ import rospy
 from py_trees import Status
 from sensor_msgs.msg import JointState
 from std_msgs.msg import Float64
+from geometry_msgs.msg import Twist
 
 from giskardpy.data_types import SingleJointState
 import giskardpy.identifier as identifier
@@ -25,6 +26,10 @@ class SendJointStatePlugin(GiskardBehavior):
         super(SendJointStatePlugin, self).__init__(name)
 
     def initialise(self):
+
+        self.min_pos_diff = 0.02
+        self.min_vel = 0.01
+
         self.position_publisher = {
             u'head_tilt_joint': rospy.Publisher('/hsrb/head_tilt_joint_position_controller/command', Float64, queue_size=10),
             u'head_pan_joint': rospy.Publisher('/hsrb/head_pan_joint_position_controller/command', Float64, queue_size=10),
@@ -32,12 +37,9 @@ class SendJointStatePlugin(GiskardBehavior):
             u'arm_flex_joint': rospy.Publisher('/hsrb/arm_flex_joint_position_controller/command', Float64, queue_size=10),
             u'arm_roll_joint': rospy.Publisher('/hsrb/arm_roll_joint_position_controller/command', Float64, queue_size=10),
             u'wrist_flex_joint': rospy.Publisher('/hsrb/wrist_flex_joint_position_controller/command', Float64, queue_size=10),
-            u'wrist_roll_joint': rospy.Publisher('/hsrb/wrist_roll_joint_position_controller/command', Float64, queue_size=10),
-            u'base_roll_joint': rospy.Publisher('/hsrb/base_roll_joint_position_controller/command', Float64, queue_size=10)}
+            u'wrist_roll_joint': rospy.Publisher('/hsrb/wrist_roll_joint_position_controller/command', Float64, queue_size=10)}
 
-        self.velocity_publisher = {
-            u'base_l_drive_wheel_joint': rospy.Publisher('/hsrb/base_l_drive_wheel_joint_velocity_controller/command', Float64, queue_size=10),
-            u'base_r_drive_wheel_joint': rospy.Publisher('/hsrb/base_r_drive_wheel_joint_velocity_controller/command', Float64, queue_size=10)}
+        self.base_publisher = rospy.Publisher('/hsrb/command_velocity', Twist, queue_size=10)
 
         self.sample_period = self.get_god_map().get_data(identifier.sample_period)
         super(SendJointStatePlugin, self).initialise()
@@ -72,8 +74,13 @@ class SendJointStatePlugin(GiskardBehavior):
         #     self.get_god_map().set_data(identifier.joint_states, current_js)
         for joint, pub in self.position_publisher.iteritems():
             pub.publish(Float64(data=next_js[joint].position))
-        for joint, pub in self.velocity_publisher.iteritems():
-            pub.publish(Float64(data=next_js[joint].velocity))
+
+        vel = Twist()
+        vel.linear.x = next_js[u'odom_x'].velocity
+        vel.linear.y = next_js[u'odom_y'].velocity
+        vel.angular.z = next_js[u'odom_t'].velocity
+        self.base_publisher.publish(vel)
+
         #self.pub.publish(self.js_to_msg(next_js))
         self.get_god_map().set_data(identifier.last_joint_states, current_js)
         return Status.RUNNING

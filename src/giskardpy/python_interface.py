@@ -28,8 +28,10 @@ class GiskardWrapper(object):
             self._update_world_srv = rospy.ServiceProxy(u'{}/update_world'.format(node_name), UpdateWorld)
             self._get_object_names_srv = rospy.ServiceProxy(u'{}/get_object_names'.format(node_name), GetObjectNames)
             self._get_object_info_srv = rospy.ServiceProxy(u'{}/get_object_info'.format(node_name), GetObjectInfo)
-            self._update_rviz_markers_srv = rospy.ServiceProxy(u'{}/update_rviz_markers'.format(node_name), UpdateRvizMarkers)
-            self._get_attached_objects_srv = rospy.ServiceProxy(u'{}/get_attached_objects'.format(node_name), GetAttachedObjects)
+            self._update_rviz_markers_srv = rospy.ServiceProxy(u'{}/update_rviz_markers'.format(node_name),
+                                                               UpdateRvizMarkers)
+            self._get_attached_objects_srv = rospy.ServiceProxy(u'{}/get_attached_objects'.format(node_name),
+                                                                GetAttachedObjects)
             self._marker_pub = rospy.Publisher(u'visualization_marker_array', MarkerArray, queue_size=10)
             rospy.wait_for_service(u'{}/update_world'.format(node_name))
             self._client.wait_for_server()
@@ -73,7 +75,38 @@ class GiskardWrapper(object):
             rospy.logwarn("get_joint_states: wait_for_message timeout")
             return {}
 
-    def set_cart_goal(self, root_link, tip_link, goal_pose, max_linear_velocity=None, max_angular_velocity=None, weight=None):
+    def set_visual_servoing_goal(self, root_link, tip_link, goal_pose, max_linear_velocity=0.1,
+                                 max_angular_velocity=0.5, weight=WEIGHT_BELOW_CA):
+
+        """
+        This goal will use the kinematic chain between root and tip link to move tip link into the goal pose
+        :param root_link: name of the root link of the kin chain
+        :type root_link: str
+        :param tip_link: name of the tip link of the kin chain
+        :type tip_link: str
+        :param goal_pose: the goal pose
+        :type goal_pose: PoseStamped
+        :param max_linear_velocity: m/s, default 0.1
+        :type max_linear_velocity: float
+        :param max_angular_velocity: rad/s, default 0.5
+        :type max_angular_velocity: float
+        :param weight: default WEIGHT_ABOVE_CA
+        :type weight: float
+        """
+        constraint = Constraint()
+        constraint.type = u'VisualServoing'
+        params = {}
+        params[u'root_link'] = root_link
+        params[u'tip_link'] = tip_link
+        params[u'goal_pose'] = convert_ros_message_to_dictionary(goal_pose)
+        params[u'max_linear_velocity'] = max_linear_velocity
+        params[u'max_angular_velocity'] = max_angular_velocity
+        params[u'weight'] = weight
+        constraint.parameter_value_pair = json.dumps(params)
+        self.cmd_seq[-1].constraints.append(constraint)
+
+    def set_cart_goal(self, root_link, tip_link, goal_pose, max_linear_velocity=None, max_angular_velocity=None,
+                      weight=None):
 
         """
         This goal will use the kinematic chain between root and tip link to move tip link into the goal pose
@@ -93,7 +126,8 @@ class GiskardWrapper(object):
         self.set_translation_goal(goal_pose, tip_link, root_link, weight=weight, max_velocity=max_linear_velocity)
         self.set_rotation_goal(goal_pose, tip_link, root_link, weight=weight, max_velocity=max_angular_velocity)
 
-    def set_straight_cart_goal(self, goal_pose, tip_link, root_link, trans_max_velocity=None, rot_max_velocity=None, weight=None):
+    def set_straight_cart_goal(self, goal_pose, tip_link, root_link, trans_max_velocity=None, rot_max_velocity=None,
+                               weight=None):
         """
         This goal will use the kinematic chain between root and tip link to move tip link on the straightest
         line into the goal pose
@@ -110,7 +144,8 @@ class GiskardWrapper(object):
         :param weight: default WEIGHT_ABOVE_CA
         :type weight: float
         """
-        self.set_straight_translation_goal(goal_pose, tip_link, root_link, max_velocity=trans_max_velocity, weight=weight)
+        self.set_straight_translation_goal(goal_pose, tip_link, root_link, max_velocity=trans_max_velocity,
+                                           weight=weight)
         self.set_rotation_goal(goal_pose, tip_link, root_link, max_velocity=rot_max_velocity, weight=weight)
 
     def set_translation_goal(self, goal_pose, tip_link, root_link, weight=None, max_velocity=None):
@@ -363,7 +398,7 @@ class GiskardWrapper(object):
                            weight=weight)
 
     def set_open_goal(self, tip_link, object_name, object_link_name, root_link=None, goal_joint_state=None,
-             weight=WEIGHT_ABOVE_CA):
+                      weight=WEIGHT_ABOVE_CA):
         """
         :type tip_link: str
         :param tip_link: tip of manipulator (gripper) which is used
@@ -698,7 +733,8 @@ class GiskardWrapper(object):
         req = UpdateWorldRequest(UpdateWorldRequest.ADD, object, False, pose)
         return self._update_world_srv.call(req)
 
-    def add_cylinder(self, name=u'cylinder', height=1, radius=1, frame_id=u'map', position=(0, 0, 0), orientation=(0, 0, 0, 1),
+    def add_cylinder(self, name=u'cylinder', height=1, radius=1, frame_id=u'map', position=(0, 0, 0),
+                     orientation=(0, 0, 0, 1),
                      pose=None):
         """
         If pose is used, frame_id, position and orientation are ignored.
@@ -723,7 +759,7 @@ class GiskardWrapper(object):
             pose.pose.position = Point(*position)
             pose.pose.orientation = Quaternion(*orientation)
         object.shape.type = SolidPrimitive.CYLINDER
-        object.shape.dimensions = [0,0]
+        object.shape.dimensions = [0, 0]
         object.shape.dimensions[SolidPrimitive.CYLINDER_HEIGHT] = height
         object.shape.dimensions[SolidPrimitive.CYLINDER_RADIUS] = radius
         req = UpdateWorldRequest(UpdateWorldRequest.ADD, object, False, pose)

@@ -42,6 +42,8 @@ soft_constraints = post_processing + [u'soft_constraints']
 result_message = [u'result_message']
 
 
+#visual servoing
+vs_goal = [u'visual_servoing_goal_pose']
 
 
 #stuff from rosparam

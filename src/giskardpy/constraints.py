@@ -927,7 +927,6 @@ class BasicCartesianConstraint(Constraint):
 
 class CartesianPosition(BasicCartesianConstraint):
 
-
     def __init__(self, god_map, root_link, tip_link, goal, max_velocity=0.1, max_acceleration=0.1,
                  weight=WEIGHT_ABOVE_CA, goal_constraint=False):
         """
@@ -1337,6 +1336,7 @@ class CartesianOrientationSlerp(BasicCartesianConstraint):
         self.add_minimize_rotation_constraints(r_R_g, self.root, self.tip, max_velocity, weight, self.goal_constraint)
 
 
+# goal_contraint: outdated
 class CartesianPose(Constraint):
     def __init__(self, god_map, root_link, tip_link, goal, max_linear_velocity=0.1,
                  max_angular_velocity=0.5, weight=WEIGHT_ABOVE_CA, goal_constraint=False):
@@ -2208,7 +2208,8 @@ class OpenDoor(Constraint):
     hinge0_P_tipStart_norm_id = u'hinge0_P_tipStart_norm'
     weight_id = u'weight'
 
-    def __init__(self, god_map, tip_link, object_name, object_link_name, angle_goal, root_link=None, weight=WEIGHT_ABOVE_CA):
+    def __init__(self, god_map, tip_link, object_name, object_link_name, angle_goal, root_link=None,
+                 weight=WEIGHT_ABOVE_CA):
         super(OpenDoor, self).__init__(god_map)
 
         if root_link is None:
@@ -2314,7 +2315,8 @@ class OpenDoor(Constraint):
         projection = w.dot(hinge0_P_tipCurrent.T, hinge_V_hinge_axis)
         hinge0_P_tipCurrentProjected = hinge0_P_tipCurrent - hinge_V_hinge_axis * projection
 
-        current_tip_angle_projected = np.sign(self.angle_goal) * w.angle_between_vector(hinge0_P_tipStartProjected, hinge0_P_tipCurrentProjected)
+        current_tip_angle_projected = np.sign(self.angle_goal) * w.angle_between_vector(hinge0_P_tipStartProjected,
+                                                                                        hinge0_P_tipCurrentProjected)
 
         hinge0_T_hingeCurrent = w.rotation_matrix_from_axis_angle(hinge_V_hinge_axis, current_tip_angle_projected)
 
@@ -2334,7 +2336,8 @@ class OpenDrawer(Constraint):
     hinge_V_hinge_axis_msg_id = u'hinge_axis'  # axis vector of the hinge
     root_T_tip_goal_id = u'root_T_tipGoal'  # goal of the gripper tip (where to move)
 
-    def __init__(self, god_map, tip_link, object_name, object_link_name, distance_goal, root_link=None, weight=WEIGHT_ABOVE_CA):
+    def __init__(self, god_map, tip_link, object_name, object_link_name, distance_goal, root_link=None,
+                 weight=WEIGHT_ABOVE_CA):
         """
         :type tip_link: str
         :param tip_link: tip of manipulator (gripper) which is used
@@ -2510,3 +2513,57 @@ class Close(Constraint):
     def make_constraints(self):
         for constraint in self.constraints:
             self.soft_constraints.update(constraint.get_constraints())
+
+
+class VisualServoing(Constraint):
+    weight_id = u'weight'
+    max_linear_velocity_id = u'max_linear_velocity'
+    max_angular_velocity_id = u'max_angular_velocity'
+
+    def __init__(self, god_map, tip_link, root_link, goal_pose, max_linear_velocity=0.1, max_angular_velocity=0.5,
+                 weight=WEIGHT_ABOVE_CA):
+        super(VisualServoing, self).__init__(god_map)
+        if root_link is None:
+            self.root = self.get_robot().get_root()
+        else:
+            self.root = root_link
+        self.tip = tip_link
+
+        goal_pose = self.parse_and_transform_PoseStamped(goal_pose, self.root)
+
+        params = {
+            self.weight_id: weight,
+            self.max_linear_velocity_id: max_linear_velocity,
+            self.max_angular_velocity_id: max_angular_velocity
+        }
+        self.save_params_on_god_map(params)
+        self.get_god_map().set_data(identifier.vs_goal, goal_pose)
+
+    def get_goal_pose(self):
+        return PoseStampedInput(self.get_god_map().to_symbol,
+                                translation_prefix=identifier.vs_goal +
+                                                   [u'pose',
+                                                    u'position'],
+                                rotation_prefix=identifier.vs_goal +
+                                                [u'pose',
+                                                 u'orientation']).get_frame()
+
+    def make_constraints(self):
+        r_R_g = w.rotation_of(self.get_goal_pose())
+        weight = self.get_input_float(self.weight_id)
+        max_velocity = self.get_input_float(self.max_linear_velocity_id)
+        max_acceleration = self.get_input_float(self.max_angular_velocity_id)
+
+        self.add_minimize_rotation_constraints(r_R_g, self.root, self.tip, max_velocity, weight)
+
+        r_P_g = w.position_of(self.get_goal_pose())
+        max_velocity = self.get_input_float(self.max_linear_velocity_id)
+        max_acceleration = self.get_input_float(self.max_angular_velocity_id)
+        weight = self.get_input_float(self.weight_id)
+
+        self.add_minimize_position_constraints(r_P_g, max_velocity, max_acceleration, self.root, self.tip, False)
+
+    def __str__(self):
+        # helps to make sure your constraint name is unique.
+        s = super(VisualServoing, self).__str__()
+        return u'{}/{}/{}'.format(s, self.root, self.tip)

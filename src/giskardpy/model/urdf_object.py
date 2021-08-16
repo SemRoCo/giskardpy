@@ -196,7 +196,7 @@ class URDFObject(object):
         """
         :rtype: list
         """
-        return self._urdf_robot.joint_map.keys()
+        return list(self._urdf_robot.joint_map.keys())
 
     @memoize
     def get_split_chain(self, root, tip, joints=True, links=True, fixed=True):
@@ -230,7 +230,10 @@ class URDFObject(object):
         :rtype: list
         """
         if root == tip:
-            return [root]
+            if links:
+                return [root]
+            else:
+                return []
         root_chain, connection, tip_chain = self.get_split_chain(root, tip, joints, links, fixed)
         return root_chain + connection + tip_chain
 

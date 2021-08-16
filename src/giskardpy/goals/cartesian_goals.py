@@ -56,6 +56,7 @@ class CartesianPosition(Goal):
 class CartesianOrientation(Goal):
     def __init__(self, root_link, tip_link, goal, reference_velocity=None, max_velocity=0.5, weight=WEIGHT_ABOVE_CA,
                  **kwargs):
+        super(CartesianOrientation, self).__init__(**kwargs)
         if reference_velocity is None:
             reference_velocity = max_velocity
         self.root_link = root_link
@@ -64,7 +65,13 @@ class CartesianOrientation(Goal):
         self.reference_velocity = reference_velocity
         self.max_velocity = max_velocity
         self.weight = weight
-        super(CartesianOrientation, self).__init__(**kwargs)
+        if self.max_velocity is not None:
+            self.add_constraints_of_goal(RotationVelocityLimit(root_link=root_link,
+                                                               tip_link=tip_link,
+                                                               weight=weight,
+                                                               max_velocity=max_velocity,
+                                                               hard=False,
+                                                               **kwargs))
 
     def make_constraints(self):
         r_R_g = w.rotation_of(self.get_parameter_as_symbolic_expression('goal_pose'))
@@ -75,10 +82,6 @@ class CartesianOrientation(Goal):
                                            current_R_frame_eval=c_R_r_eval,
                                            reference_velocity=self.reference_velocity,
                                            weight=self.weight)
-        if self.max_velocity is not None:
-            self.add_rotational_velocity_limit(frame_R_current=r_R_c,
-                                               max_velocity=self.max_velocity,
-                                               weight=self.weight)
 
     def __str__(self):
         s = super(CartesianOrientation, self).__str__()

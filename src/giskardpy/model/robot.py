@@ -1,7 +1,7 @@
 from __future__ import division
 
 import traceback
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 from copy import deepcopy
 
 from geometry_msgs.msg import PoseStamped
@@ -128,6 +128,15 @@ class Robot(Backend):
 
     def set_joint_symbols(self, symbols, order):
         self._joint_symbols[order] = symbols
+
+    def set_dummy_joint_symbols(self):
+        def default(o):
+            return KeyDefaultDict(lambda x: w.Symbol('{}/{}'.format(o,x)))
+
+        self._joint_symbols = KeyDefaultDict(default)
+        for o in range(2):
+            for joint_name in self.get_movable_joints():
+                self._joint_symbols[o][joint_name]
 
     def set_joint_limit_symbols(self, linear, angular, order):
         # TODO check for None if order == 1

@@ -6,7 +6,7 @@ giskardpy.WORLD_IMPLEMENTATION = None
 import unittest
 from collections import namedtuple
 
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import PoseStamped, Pose
 from hypothesis import given, assume
 import hypothesis.strategies as st
 from giskardpy import identifier
@@ -329,7 +329,7 @@ class TestGodMap(unittest.TestCase):
         w = World()
         r = WorldObject(pr2_urdf())
         w.add_robot(robot=r,
-                    base_pose=PoseStamped(),
+                    base_pose=Pose(),
                     controlled_joints=[],
                     ignored_pairs=set(),
                     added_pairs=set())

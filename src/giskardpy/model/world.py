@@ -112,7 +112,7 @@ class World(object):
         """
         :type robot: giskardpy.world_object.WorldObject
         :type controlled_joints: list
-        :type base_pose: PoseStamped
+        :type base_pose: Pose
         """
         if not isinstance(robot, WorldObject):
             raise TypeError(u'only WorldObject can be added to world')

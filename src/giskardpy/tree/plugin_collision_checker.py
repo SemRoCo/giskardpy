@@ -59,7 +59,7 @@ class CollisionChecker(GiskardBehavior):
         default_distance = self._cal_max_param(u'soft_threshold')
 
         max_distances = defaultdict(lambda: default_distance)
-
+        # override max distances based on external distances dict
         for link_name in self.get_robot().get_links_with_collision():
             controlled_parent_joint = self.get_robot().get_controlled_parent_joint(link_name)
             distance = external_distances[controlled_parent_joint][u'soft_threshold']

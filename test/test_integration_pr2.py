@@ -2991,7 +2991,7 @@ class TestCollisionAvoidanceGoals(object):
         r_goal.header.frame_id = u'map'
         r_goal.pose.position.x = 0.8
         r_goal.pose.position.y = -0.38
-        r_goal.pose.position.z = 0.82
+        r_goal.pose.position.z = 0.84
         r_goal.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 2, [0, 1, 0]))
         fake_table_setup.avoid_all_collisions(0.1)
         fake_table_setup.set_and_check_cart_goal(r_goal, fake_table_setup.r_tip)
@@ -4456,6 +4456,7 @@ class TestCollisionAvoidanceGoals(object):
         """
         :type kitchen_setup: PR2
         """
+        #FIXME
         tray_name = u'tray'
         percentage = 50
 
@@ -4486,14 +4487,11 @@ class TestCollisionAvoidanceGoals(object):
         kitchen_setup.set_cart_goal(r_goal, kitchen_setup.r_tip)
         kitchen_setup.allow_collision([], tray_name, [])
         kitchen_setup.avoid_joint_limits(percentage=percentage)
+        # grasp tray
         kitchen_setup.send_and_check_goal()
 
         kitchen_setup.attach_object(tray_name, kitchen_setup.r_tip)
 
-        # kitchen_setup.allow_collision(robot_links=[tray_name],
-        #                               body_b=kitchen_setup.get_robot().get_name(),
-        #                               link_bs=kitchen_setup.get_l_gripper_links())
-        kitchen_setup.allow_collision([tray_name], '', [])
         r_goal = PoseStamped()
         r_goal.header.frame_id = kitchen_setup.l_tip
         r_goal.pose.orientation.w = 1
@@ -4516,11 +4514,9 @@ class TestCollisionAvoidanceGoals(object):
         kitchen_setup.allow_collision(robot_links=[tray_name],
                                       body_b=kitchen_setup.get_robot().get_name(),
                                       link_bs=kitchen_setup.get_l_gripper_links())
+        # kitchen_setup.allow_self_collision()
+        # drive back
         kitchen_setup.move_base(base_goal)
-
-        kitchen_setup.allow_collision(robot_links=[tray_name],
-                                      body_b=kitchen_setup.get_robot().get_name(),
-                                      link_bs=kitchen_setup.get_l_gripper_links())
 
         r_goal = PoseStamped()
         r_goal.header.frame_id = kitchen_setup.l_tip
@@ -4536,39 +4532,44 @@ class TestCollisionAvoidanceGoals(object):
         tray_goal.pose.position.x = .1
         tray_goal.pose.orientation = Quaternion(*quaternion_about_axis(-1, [0, 1, 0]))
         kitchen_setup.avoid_joint_limits(percentage=percentage)
+        kitchen_setup.allow_collision(robot_links=[tray_name],
+                                      body_b=kitchen_setup.get_robot().get_name(),
+                                      link_bs=kitchen_setup.get_l_gripper_links())
         kitchen_setup.set_and_check_cart_goal(tray_goal, tray_name, u'base_footprint')
+        # kitchen_setup.allow_self_collision()
+        # twist tray
         kitchen_setup.check_cart_goal(kitchen_setup.l_tip, expected_pose)
 
     # TODO FIXME attaching and detach of urdf objects that listen to joint states
 
-    def test_iis(self, kitchen_setup):
-        # kitchen_setup.set_joint_goal(pocky_pose)
-        # kitchen_setup.send_and_check_goal()
-        object_name = u'lid'
-        pot_pose = PoseStamped()
-        pot_pose.header.frame_id = u'lid'
-        pot_pose.pose.position.z = -0.22
-        pot_pose.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 2, [0, 0, 1]))
-        kitchen_setup.add_mesh(object_name, path=u'package://cad_models/kitchen/cooking-vessels/cookingpot.dae',
-                               pose=pot_pose)
-
-        base_pose = PoseStamped()
-        base_pose.header.frame_id = u'iai_kitchen/table_area_main'
-        base_pose.pose.position.y = -1.1
-        base_pose.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 2, [0, 0, 1]))
-        kitchen_setup.teleport_base(base_pose)
-        # m = zero_pose.get_world().get_object(object_name).as_marker_msg()
-        # compare_poses(m.pose, p.pose)
-
-        hand_goal = PoseStamped()
-        hand_goal.header.frame_id = u'goal'
-        hand_goal.pose.orientation.w = 1
-        kitchen_setup.allow_all_collisions()
-        # kitchen_setup.avoid_collision([], 'kitchen', ['table_area_main'], 0.05)
-        kitchen_setup.set_cart_goal(hand_goal, u'r_gripper_tool_frame')
-        kitchen_setup.send_goal(goal_type=MoveGoal.PLAN_ONLY)
-
-        # kitchen_setup.add_cylinder('pot', size=[0.2,0.2], pose=pot_pose)
+    # def test_iis(self, kitchen_setup):
+    #     # kitchen_setup.set_joint_goal(pocky_pose)
+    #     # kitchen_setup.send_and_check_goal()
+    #     object_name = u'lid'
+    #     pot_pose = PoseStamped()
+    #     pot_pose.header.frame_id = u'lid'
+    #     pot_pose.pose.position.z = -0.22
+    #     pot_pose.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 2, [0, 0, 1]))
+    #     kitchen_setup.add_mesh(object_name, path=u'package://cad_models/kitchen/cooking-vessels/cookingpot.dae',
+    #                            pose=pot_pose)
+    #
+    #     base_pose = PoseStamped()
+    #     base_pose.header.frame_id = u'iai_kitchen/table_area_main'
+    #     base_pose.pose.position.y = -1.1
+    #     base_pose.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 2, [0, 0, 1]))
+    #     kitchen_setup.teleport_base(base_pose)
+    #     # m = zero_pose.get_world().get_object(object_name).as_marker_msg()
+    #     # compare_poses(m.pose, p.pose)
+    #
+    #     hand_goal = PoseStamped()
+    #     hand_goal.header.frame_id = u'goal'
+    #     hand_goal.pose.orientation.w = 1
+    #     kitchen_setup.allow_all_collisions()
+    #     # kitchen_setup.avoid_collision([], 'kitchen', ['table_area_main'], 0.05)
+    #     kitchen_setup.set_cart_goal(hand_goal, u'r_gripper_tool_frame')
+    #     kitchen_setup.send_goal(goal_type=MoveGoal.PLAN_ONLY)
+    #
+    #     # kitchen_setup.add_cylinder('pot', size=[0.2,0.2], pose=pot_pose)
 
     def test_ease_dishwasher(self, kitchen_setup):
         """

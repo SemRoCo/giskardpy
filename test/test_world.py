@@ -905,7 +905,6 @@ class TestWorld(object):
         :param test_folder:
         :return:
         """
-        # FIXME min dist is kinda outdated so this test is hacked to succeed
         world_with_donbot = self.make_world_with_donbot(test_folder)
         name = u'muh'
         robot_link_names = list(world_with_donbot.robot.get_controlled_links())

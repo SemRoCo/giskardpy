@@ -1,19 +1,14 @@
 #!/usr/bin/env python
 import numpy as np
-from collections import defaultdict
 from copy import deepcopy
 
 import rospy
 from actionlib.simple_action_client import SimpleActionClient
 from geometry_msgs.msg import Pose, PoseStamped
 from geometry_msgs.msg._Quaternion import Quaternion
-from giskard_msgs.msg._Controller import Controller
-from giskard_msgs.msg._MoveAction import MoveAction
-from giskard_msgs.msg._MoveCmd import MoveCmd
-from giskard_msgs.msg._MoveGoal import MoveGoal
 from interactive_markers.interactive_marker_server import InteractiveMarkerServer
 from interactive_markers.menu_handler import MenuHandler
-from tf.transformations import quaternion_multiply, quaternion_about_axis, quaternion_conjugate
+from tf.transformations import quaternion_multiply, quaternion_about_axis
 from visualization_msgs.msg import MarkerArray
 from visualization_msgs.msg._InteractiveMarker import InteractiveMarker
 from visualization_msgs.msg._InteractiveMarkerControl import InteractiveMarkerControl
@@ -21,8 +16,7 @@ from visualization_msgs.msg._InteractiveMarkerFeedback import InteractiveMarkerF
 from visualization_msgs.msg._Marker import Marker
 
 from giskardpy.python_interface import GiskardWrapper
-from giskardpy.utils import qv_mult
-from giskardpy import logging
+from giskardpy.utils.utils import qv_mult, logging
 
 MARKER_SCALE = 0.15
 

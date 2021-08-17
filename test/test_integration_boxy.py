@@ -4,9 +4,9 @@ import roslaunch
 import rospy
 from geometry_msgs.msg import PoseStamped, Quaternion, Vector3Stamped, PointStamped
 from tf.transformations import quaternion_from_matrix
-import giskardpy.tfwrapper as tf
-from giskardpy import logging
-from giskardpy.tfwrapper import lookup_transform, init as tf_init, lookup_point, transform_point, \
+import giskardpy.utils.tfwrapper as tf
+from giskardpy.utils import logging
+from giskardpy.utils.tfwrapper import init as tf_init, lookup_point, transform_point, \
     transform_pose
 from utils_for_tests import Donbot, Boxy
 

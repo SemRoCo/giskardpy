@@ -179,6 +179,12 @@ catkin_install_python(PROGRAMS
 	scripts/tf_base_joint_state_publisher.py
 	scripts/traj_to_joint_states.py
 	scripts/urdf_merger.py
+	scripts/giskard_robot_config.py
+	test/joint_trajectory_splitter/failing_action_server.py
+	test/joint_trajectory_splitter/invalid_joints_action_server.py
+	test/joint_trajectory_splitter/state_publisher.py
+	test/joint_trajectory_splitter/successful_action_server.py
+	test/joint_trajectory_splitter/timeout_action_server.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
 ## Mark executables and/or libraries for installation

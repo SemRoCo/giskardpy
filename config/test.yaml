@@ -1,0 +1,11 @@
+general_options:
+  path_to_data_folder: !find tmp_data # or 'find ros://giskardpy/data'
+  enable_gui: False
+  test_mode: True
+plugins:
+    PlotTrajectory: # plots the joint trajectory at the end of planning, useful for debugging
+      enabled: True
+    MaxTrajectoryLength:
+      enabled: True
+      length: 30 # will abort planning if the trajectory becomes longer than this many seconds
+

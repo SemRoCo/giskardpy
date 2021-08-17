@@ -8,26 +8,28 @@ import threading
 import rospy
 import yaml
 from geometry_msgs.msg import PoseStamped, Quaternion
+from giskard_msgs.msg import Constraint
 from nav_msgs.srv import GetMap
 from py_trees import Status
 import pybullet as p
-from giskardpy.data_types import SingleJointState
-from rospy_message_converter.message_converter import convert_dictionary_to_ros_message, convert_ros_message_to_dictionary
 
-from collections import defaultdict
 from copy import deepcopy
 from tf.transformations import quaternion_about_axis
 
 import giskardpy.identifier as identifier
-from giskardpy.plugin import GiskardBehavior
-from giskardpy.plugin_action_server import GetGoal
-from giskardpy.tfwrapper import transform_pose
+from giskardpy.tree.plugin import GiskardBehavior
+from giskardpy.tree.plugin_action_server import GetGoal
+from giskardpy.utils.tfwrapper import transform_pose
 
 from mpl_toolkits.mplot3d import Axes3D
 import numpy
 import matplotlib.pyplot as plt
 from ompl import base as ob
 from ompl import geometric as og
+
+from giskardpy.data_types import JointStates
+from giskardpy.utils.utils import convert_dictionary_to_ros_message, convert_ros_message_to_dictionary, \
+    replace_jsons_with_ros_messages
 
 
 class TwoDimRayMotionValidator(ob.MotionValidator):
@@ -122,12 +124,11 @@ class TwoDimStateValidator(ob.StateValidityChecker, GiskardBehavior):
             # override on current joint states.
             collisions = ()
             for state_ik in state_iks:
-                j_states = {j_name: SingleJointState(j_name, j_state) for j_name, j_state in zip(self.pybullet_joints, state_ik)}
-                for j_name, j_state in j_states.items():
-                    new_js[j_name] = j_state
+                new_js = JointStates()
+                for j_name, j_state in zip(self.pybullet_joints, state_ik):
+                    new_js[j_name].position = j_state
                 # Set new joint states in Bullet
                 self.get_god_map().set_data(identifier.joint_states, new_js)
-                self.get_god_map().set_data(identifier.last_joint_states, current_js)
                 # Check if kitchen is colliding with robot
                 p.performCollisionDetection()
                 collisions += p.getContactPoints(self.pybullet_robot_id, self.pybullet_kitchen_id)
@@ -166,7 +167,7 @@ class GlobalPlanner(GetGoal):
             return Status.SUCCESS
 
         self.goal_dict = yaml.load(cart_c.parameter_value_pair)
-        ros_pose = convert_dictionary_to_ros_message(u'geometry_msgs/PoseStamped', self.goal_dict[u'goal'])
+        ros_pose = convert_dictionary_to_ros_message(self.goal_dict[u'goal'])
         self.pose_goal = transform_pose(self.get_god_map().get_data(identifier.map_frame), ros_pose)
 
         if self.goal_dict[u'tip_link'] == u'base_footprint':
@@ -198,10 +199,13 @@ class GlobalPlanner(GetGoal):
         d = {}
         d[u'parameter_value_pair'] = deepcopy(self.goal_dict)
         d[u'parameter_value_pair'].pop(u'goal')
-        d[u'type'] = u'CartesianPathCarrot'
         d[u'parameter_value_pair'][u'goals'] = list(map(convert_ros_message_to_dictionary, poses))
-        d[u'parameter_value_pair'] = json.dumps(d[u'parameter_value_pair'])
-        return convert_dictionary_to_ros_message(u'giskard_msgs/Constraint', d)
+        # d[u'parameter_value_pair'] = json.dumps(d[u'parameter_value_pair'])
+        # d[u'parameter_value_pair'] = json.loads(d[u'parameter_value_pair'])
+        c = Constraint()
+        c.type = u'CartesianPathCarrot'
+        c.parameter_value_pair = json.dumps(d[u'parameter_value_pair'])
+        return c
 
     def create_kitchen_space(self):
         # create an SE3 state space
@@ -256,8 +260,8 @@ class GlobalPlanner(GetGoal):
         # RRTConnect: many points, low number of fp
         # PRMstar: no set_range function, finds no solutions
         # ABITstar: slow, sparse, but good
-        planner = og.ABITstar(si)
-        # planner.setRange(0.1)
+        planner = og.RRTConnect(si)
+        planner.setRange(0.1)
         # planner.setIntermediateStates(True)
         # planner.setup()
         return planner

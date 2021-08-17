@@ -1,23 +1,13 @@
-import itertools
 import shutil
-from copy import deepcopy
 
-import numpy as np
 import pytest
 import roslaunch
 import rospy
-from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped
-from giskard_msgs.msg import CollisionEntry, MoveActionGoal, MoveResult, WorldBody, MoveGoal
-from giskard_msgs.srv import UpdateWorldResponse, UpdateWorldRequest
-from numpy import pi
-from shape_msgs.msg import SolidPrimitive
-from tf.transformations import quaternion_from_matrix, quaternion_about_axis
+from geometry_msgs.msg import PoseStamped
 
-from giskardpy import logging, identifier
-from giskardpy.identifier import fk_pose
-from giskardpy.robot import Robot
-from giskardpy.tfwrapper import init as tf_init, lookup_pose, transform_pose, lookup_point, transform_point
-from utils_for_tests import PR2, compare_poses
+from giskardpy.utils import logging
+from giskardpy.utils.tfwrapper import init as tf_init, lookup_pose
+from utils_for_tests import PR2
 
 # TODO roslaunch iai_pr2_sim ros_control_sim_with_base.launch
 # TODO roslaunch iai_kitchen upload_kitchen_obj.launch

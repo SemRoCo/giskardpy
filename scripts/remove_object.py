@@ -2,7 +2,7 @@
 import rospy
 import sys
 from giskardpy.python_interface import GiskardWrapper
-from giskardpy import logging
+from giskardpy.utils import logging
 
 if __name__ == '__main__':
     rospy.init_node('remove_object')

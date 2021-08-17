@@ -1,6 +1,5 @@
 from time import time
 import keyword
-import yaml
 from collections import defaultdict
 from copy import deepcopy
 from multiprocessing import Queue
@@ -22,17 +21,21 @@ from iai_wsg_50_msgs.msg import PositionCmd
 from numpy import pi
 from py_trees import Blackboard
 from sensor_msgs.msg import JointState
+from std_msgs.msg import ColorRGBA
 from tf.transformations import rotation_from_matrix, quaternion_matrix
+from visualization_msgs.msg import Marker
 
-from giskardpy import logging, identifier
+from giskardpy import identifier
+from giskardpy.data_types import KeyDefaultDict
+from giskardpy.utils.config_loader import ros_load_robot_config
 from giskardpy.garden import grow_tree
 from giskardpy.identifier import robot, world
-from giskardpy.pybullet_world import PyBulletWorld
+from giskardpy.model.pybullet_world import PyBulletWorld
 from giskardpy.python_interface import GiskardWrapper
-from giskardpy.robot import Robot
-from giskardpy.tfwrapper import transform_pose, lookup_pose
-from giskardpy.utils import msg_to_list, KeyDefaultDict, position_dict_to_joint_states, get_ros_pkg_path, \
-    to_joint_state_position_dict
+from giskardpy.model.robot import Robot
+from giskardpy.utils.tfwrapper import transform_pose, lookup_pose
+from giskardpy.utils.utils import msg_to_list, position_dict_to_joint_states, to_joint_state_position_dict, \
+    logging
 
 BIG_NUMBER = 1e100
 SMALL_NUMBER = 1e-100
@@ -93,19 +96,48 @@ def compare_poses(pose1, pose2, decimal=2):
     :type pose1: Pose
     :type pose2: Pose
     """
-    np.testing.assert_almost_equal(pose1.position.x, pose2.position.x, decimal=decimal)
-    np.testing.assert_almost_equal(pose1.position.y, pose2.position.y, decimal=decimal)
-    np.testing.assert_almost_equal(pose1.position.z, pose2.position.z, decimal=decimal)
+    compare_points(pose1.position, pose2.position, decimal)
+    compare_orientations(pose1.orientation, pose2.orientation, decimal)
+
+def compare_points(actual_point, desired_point, decimal=2):
+    """
+    :type pose1: Point
+    :type pose2: Point
+    """
+    np.testing.assert_almost_equal(actual_point.x, desired_point.x, decimal=decimal)
+    np.testing.assert_almost_equal(actual_point.y, desired_point.y, decimal=decimal)
+    np.testing.assert_almost_equal(actual_point.z, desired_point.z, decimal=decimal)
+
+
+def compare_orientations(orientation1, orientation2, decimal=2):
+    """
+    :type orientation1: Quaternion
+    :type orientation2: Quaternion
+    """
+    if isinstance(orientation1, Quaternion):
+        q1 = np.array([orientation1.x,
+                       orientation1.y,
+                       orientation1.z,
+                       orientation1.w])
+    else:
+        q1 = orientation1
+    if isinstance(orientation2, Quaternion):
+        q2 = np.array([orientation2.x,
+                       orientation2.y,
+                       orientation2.z,
+                       orientation2.w])
+    else:
+        q2 = orientation2
     try:
-        np.testing.assert_almost_equal(pose1.orientation.x, pose2.orientation.x, decimal=decimal)
-        np.testing.assert_almost_equal(pose1.orientation.y, pose2.orientation.y, decimal=decimal)
-        np.testing.assert_almost_equal(pose1.orientation.z, pose2.orientation.z, decimal=decimal)
-        np.testing.assert_almost_equal(pose1.orientation.w, pose2.orientation.w, decimal=decimal)
+        np.testing.assert_almost_equal(q1[0], q2[0], decimal=decimal)
+        np.testing.assert_almost_equal(q1[1], q2[1], decimal=decimal)
+        np.testing.assert_almost_equal(q1[2], q2[2], decimal=decimal)
+        np.testing.assert_almost_equal(q1[3], q2[3], decimal=decimal)
     except:
-        np.testing.assert_almost_equal(pose1.orientation.x, -pose2.orientation.x, decimal=decimal)
-        np.testing.assert_almost_equal(pose1.orientation.y, -pose2.orientation.y, decimal=decimal)
-        np.testing.assert_almost_equal(pose1.orientation.z, -pose2.orientation.z, decimal=decimal)
-        np.testing.assert_almost_equal(pose1.orientation.w, -pose2.orientation.w, decimal=decimal)
+        np.testing.assert_almost_equal(q1[0], -q2[0], decimal=decimal)
+        np.testing.assert_almost_equal(q1[1], -q2[1], decimal=decimal)
+        np.testing.assert_almost_equal(q1[2], -q2[2], decimal=decimal)
+        np.testing.assert_almost_equal(q1[3], -q2[3], decimal=decimal)
 
 
 @composite
@@ -140,7 +172,7 @@ def rnd_joint_state2(draw, joint_limits):
 @composite
 def pr2_joint_state(draw):
     pr2 = Robot.from_urdf_file(pr2_urdf())
-    return draw(rnd_joint_state(*pr2.get_joint_limits()))
+    return draw(rnd_joint_state(*pr2.get_joint_position_limits()))
 
 
 def pr2_urdf():
@@ -174,7 +206,10 @@ def boxy_urdf():
 
 
 def float_no_nan_no_inf(outer_limit=None, min_dist_to_zero=None):
-    return st.floats(allow_nan=False, allow_infinity=False, max_value=outer_limit, min_value=outer_limit)
+    if outer_limit is not None:
+        return st.floats(allow_nan=False, allow_infinity=False, max_value=outer_limit, min_value=-outer_limit)
+    else:
+        return st.floats(allow_nan=False, allow_infinity=False)
     # f = st.floats(allow_nan=False, allow_infinity=False, max_value=outer_limit, min_value=-outer_limit)
     # # f = st.floats(allow_nan=False, allow_infinity=False)
     # if min_dist_to_zero is not None:
@@ -188,7 +223,7 @@ def float_no_nan_no_inf(outer_limit=None, min_dist_to_zero=None):
 def sq_matrix(draw):
     i = draw(st.integers(min_value=1, max_value=10))
     i_sq = i ** 2
-    l = draw(st.lists(float_no_nan_no_inf(), min_size=i_sq, max_size=i_sq))
+    l = draw(st.lists(float_no_nan_no_inf(outer_limit=1000), min_size=i_sq, max_size=i_sq))
     return np.array(l).reshape((i, i))
 
 
@@ -225,12 +260,11 @@ class GiskardTestWrapper(GiskardWrapper):
     def __init__(self, config_file):
         self.total_time_spend_giskarding = 0
         self.total_time_spend_moving = 0
-        with open(get_ros_pkg_path(u'giskardpy') + u'/config/' + config_file) as f:
-            config = yaml.load(f)
-        rospy.set_param('~', config)
-        rospy.set_param('~path_to_data_folder', u'tmp_data/')
-        rospy.set_param('~enable_gui', False)
-        rospy.set_param('~plugins/PlotTrajectory/enabled', True)
+
+        if not ros_load_robot_config(config_file, test=True):
+            rospy.logerr('Could not set robot config as ROS parameter.')
+        rospy.set_param('~tree/PlotDebugTrajectory/enabled', True)
+        rospy.set_param('~tree/MaxTrajectoryLength/enabled', True)
 
         self.sub_result = rospy.Subscriber('~command/result', MoveActionResult, self.cb, queue_size=100)
         self.cancel_goal = rospy.Publisher('~command/cancel', GoalID, queue_size=100)
@@ -315,9 +349,9 @@ class GiskardTestWrapper(GiskardWrapper):
 
     def tear_down(self):
         rospy.sleep(1)
-        logging.loginfo(u'total time spend giskarding: {}'.format(self.total_time_spend_giskarding-self.total_time_spend_moving))
+        logging.loginfo(u'total time spend giskarding: {}'.format(self.total_time_spend_giskarding - self.total_time_spend_moving))
         logging.loginfo(u'total time spend moving: {}'.format(self.total_time_spend_moving))
-        logging.loginfo(u'stopping plugins')
+        logging.loginfo(u'stopping tree')
 
     def set_object_joint_state(self, object_name, joint_state):
         super(GiskardTestWrapper, self).set_object_joint_state(object_name, joint_state)
@@ -345,22 +379,23 @@ class GiskardTestWrapper(GiskardWrapper):
             goal = goal_js[joint_name]
             current = current_js[joint_name]
             if self.get_robot().is_joint_continuous(joint_name):
-                np.testing.assert_almost_equal(shortest_angular_distance(goal, current), 0, decimal=decimal)
+                np.testing.assert_almost_equal(shortest_angular_distance(goal, current), 0, decimal=decimal,
+                                               err_msg=u'{}: actual: {} desired: {}'.format(joint_name, current, goal))
             else:
                 np.testing.assert_almost_equal(current, goal, decimal,
-                                               err_msg='{} at {} insteand of {}'.format(joint_name, current, goal))
+                                               err_msg=u'{}: actual: {} desired: {}'.format(joint_name, current, goal))
 
     def check_current_joint_state(self, expected, decimal=2):
         current_joint_state = to_joint_state_position_dict(self.get_current_joint_state())
         self.compare_joint_state(current_joint_state, expected, decimal=decimal)
 
-    def send_and_check_joint_goal(self, goal, weight=None, decimal=2, expected_error_codes=None):
+    def send_and_check_joint_goal(self, goal, weight=None, decimal=2, expected_error_codes=(MoveResult.SUCCESS,)):
         """
         :type goal: dict
         """
         self.set_joint_goal(goal, weight=weight)
         self.send_and_check_goal(expected_error_codes=expected_error_codes)
-        if expected_error_codes == [MoveResult.SUCCESS]:
+        if expected_error_codes is not None and expected_error_codes[0] == MoveResult.SUCCESS:
             self.check_current_joint_state(goal, decimal=decimal)
 
     #
@@ -395,42 +430,52 @@ class GiskardTestWrapper(GiskardWrapper):
         goal.pose.orientation.w = 1
         self.set_rotation_goal(goal, tip, root)
 
-    def set_rotation_goal(self, goal_pose, tip_link, root_link=None, weight=None, max_velocity=None):
+    def set_rotation_goal(self, goal_pose, tip_link, root_link=None, weight=None, max_velocity=None, **kwargs):
         if not root_link:
             root_link = self.default_root
-        super(GiskardTestWrapper, self).set_rotation_goal(goal_pose, tip_link, root_link, max_velocity=max_velocity)
+        super(GiskardTestWrapper, self).set_rotation_goal(goal_pose, tip_link, root_link, max_velocity=max_velocity,
+                                                          weight=weight, **kwargs)
 
-    def set_translation_goal(self, goal_pose, tip_link, root_link=None, weight=None, max_velocity=None):
+    def set_translation_goal(self, goal_pose, tip_link, root_link=None, weight=None, max_velocity=None, **kwargs):
         if not root_link:
             root_link = self.default_root
-        super(GiskardTestWrapper, self).set_translation_goal(goal_pose, tip_link, root_link, max_velocity=max_velocity)
+        super(GiskardTestWrapper, self).set_translation_goal(goal_pose, tip_link, root_link, max_velocity=max_velocity,
+                                                             weight=weight, **kwargs)
 
 
-    def set_straight_translation_goal(self, goal_pose, tip_link, root_link=None, weight=None, max_velocity=None):
+    def set_straight_translation_goal(self, goal_pose, tip_link, root_link=None, weight=None, max_velocity=None, **kwargs):
         if not root_link:
             root_link = self.default_root
-        super(GiskardTestWrapper, self).set_straight_translation_goal(goal_pose, tip_link, root_link, max_velocity=max_velocity)
+        super(GiskardTestWrapper, self).set_straight_translation_goal(goal_pose, tip_link, root_link,
+                                                                      max_velocity=max_velocity, weight=weight,
+                                                                      **kwargs)
 
     def set_cart_goal(self, goal_pose, tip_link, root_link=None, weight=None, linear_velocity=None, angular_velocity=None):
         if not root_link:
             root_link = self.default_root
         if weight is not None:
-            super(GiskardTestWrapper, self).set_cart_goal(goal_pose, tip_link, root_link, weight=weight, max_linear_velocity=linear_velocity,
-                                       max_angular_velocity=angular_velocity)
+            super(GiskardTestWrapper, self).set_cart_goal(goal_pose,
+                                                          tip_link,
+                                                          root_link,
+                                                          weight=weight,
+                                                          max_linear_velocity=linear_velocity,
+                                                          max_angular_velocity=angular_velocity)
         else:
-            super(GiskardTestWrapper, self).set_cart_goal(goal_pose, tip_link, root_link, max_linear_velocity=linear_velocity,
-                                       max_angular_velocity=angular_velocity)
-
+            super(GiskardTestWrapper, self).set_cart_goal(goal_pose,
+                                                          tip_link,
+                                                          root_link,
+                                                          max_linear_velocity=linear_velocity,
+                                                          max_angular_velocity=angular_velocity)
 
     def set_straight_cart_goal(self, goal_pose, tip_link, root_link=None, weight=None, linear_velocity=None, angular_velocity=None):
         if not root_link:
             root_link = self.default_root
         if weight is not None:
-            super(GiskardTestWrapper, self).set_straight_cart_goal(goal_pose, tip_link, root_link, weight=weight, trans_max_velocity=linear_velocity,
-                                       rot_max_velocity=angular_velocity)
+            super(GiskardTestWrapper, self).set_straight_cart_goal(goal_pose, tip_link, root_link, weight=weight, max_linear_velocity=linear_velocity,
+                                                                   max_angular_velocity=angular_velocity)
         else:
-            super(GiskardTestWrapper, self).set_straight_cart_goal(goal_pose, tip_link, root_link, trans_max_velocity=linear_velocity,
-                                       rot_max_velocity=angular_velocity)
+            super(GiskardTestWrapper, self).set_straight_cart_goal(goal_pose, tip_link, root_link, max_linear_velocity=linear_velocity,
+                                                                   max_angular_velocity=angular_velocity)
 
 
     def set_and_check_cart_goal(self, goal_pose, tip_link, root_link=None, weight=None, linear_velocity=None, angular_velocity=None,
@@ -544,38 +589,39 @@ class GiskardTestWrapper(GiskardWrapper):
                                                                                 move_result_error_code(
                                                                                     expected_error_code),
                                                                                 error_message)
+        self.are_joint_limits_violated()
         return r.trajectory
 
     def get_result_trajectory_position(self):
         trajectory = self.get_god_map().unsafe_get_data(identifier.trajectory)
-        trajectory2 = []
-        for t, p in trajectory._points.items():
-            trajectory2.append({joint_name: js.position for joint_name, js in p.items()})
+        trajectory2 = {}
+        for joint_name in trajectory.get_exact(0).keys():
+            trajectory2[joint_name] = np.array([p[joint_name].position for t, p in trajectory.items()])
         return trajectory2
 
     def get_result_trajectory_velocity(self):
         trajectory = self.get_god_map().get_data(identifier.trajectory)
-        trajectory2 = []
-        for t, p in trajectory._points.items():
-            trajectory2.append({joint_name: js.velocity for joint_name, js in p.items()})
+        trajectory2 = {}
+        for joint_name in trajectory.get_exact(0).keys():
+            trajectory2[joint_name] = np.array([p[joint_name].velocity for t, p in trajectory.items()])
         return trajectory2
 
     def are_joint_limits_violated(self):
-        controllable_joints = self.get_robot().get_movable_joints()
-        trajectory_pos = self.get_result_trajectory_position()
         trajectory_vel = self.get_result_trajectory_velocity()
+        trajectory_pos = self.get_result_trajectory_position()
 
-        for joint in controllable_joints:
-            joint_limits = self.get_robot().get_joint_limits(joint)
-            vel_limit = self.get_robot().get_joint_velocity_limit(joint)
-            trajectory_pos_joint = [p[joint] for p in trajectory_pos]
-            trajectory_vel_joint = [p[joint] for p in trajectory_vel]
-            if any(round(p, 7) < joint_limits[0] and round(p, 7) > joint_limits[1] for p in trajectory_pos_joint):
-                return True
-            if any(round(p, 7) < vel_limit and round(p, 7) > vel_limit for p in trajectory_vel_joint):
-                return True
-
-        return False
+        for joint in self.get_robot().controlled_joints:
+            if not self.get_robot().is_joint_continuous(joint):
+                joint_limits = self.get_robot().get_joint_position_limits(joint)
+                error_msg = u'{} has violated joint position limit'.format(joint)
+                np.testing.assert_array_less(trajectory_pos[joint], joint_limits[1], error_msg)
+                np.testing.assert_array_less(-trajectory_pos[joint], -joint_limits[0], error_msg)
+            vel_limit = self.get_robot().get_joint_velocity_limit_expr(joint)
+            vel_limit = self.get_god_map().evaluate_expr(vel_limit) * 1.001
+            vel = trajectory_vel[joint]
+            error_msg = u'{} has violated joint velocity limit {} > {}'.format(joint, vel, vel_limit)
+            assert np.all(np.less_equal(vel, vel_limit)), error_msg
+            assert np.all(np.greater_equal(vel, -vel_limit)), error_msg
 
     #
     # BULLET WORLD #####################################################################################################
@@ -628,7 +674,7 @@ class GiskardTestWrapper(GiskardWrapper):
         assert name in self.get_object_names().object_names
         compare_poses(o_p, self.get_object_info(name).pose.pose)
 
-    def add_sphere(self, name=u'sphere', size=1, pose=None):
+    def add_sphere(self, name=u'sphere', size=1., pose=None):
         r = super(GiskardTestWrapper, self).add_sphere(name=name, size=size, pose=pose)
         assert r.error_codes == UpdateWorldResponse.SUCCESS, \
             u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
@@ -987,3 +1033,61 @@ class HSR(GiskardTestWrapper):
     # def command_gripper(self, width):
     #     js = {u'hand_motor_joint': width}
     #     self.send_and_check_joint_goal(js)
+
+
+def publish_marker_sphere(position, frame_id=u'map', radius=0.05, id_=0):
+    m = Marker()
+    m.action = m.ADD
+    m.ns = u'debug'
+    m.id = id_
+    m.type = m.SPHERE
+    m.header.frame_id = frame_id
+    m.pose.position.x = position[0]
+    m.pose.position.y = position[1]
+    m.pose.position.z = position[2]
+    m.color = ColorRGBA(1, 0, 0, 1)
+    m.scale.x = radius
+    m.scale.y = radius
+    m.scale.z = radius
+
+    pub = rospy.Publisher('/visualization_marker', Marker, queue_size=1)
+    start = rospy.get_rostime()
+    while pub.get_num_connections() < 1 and (rospy.get_rostime() - start).to_sec() < 2:
+        # wait for a connection to publisher
+        # you can do whatever you like here or simply do nothing
+        pass
+
+    pub.publish(m)
+
+
+def publish_marker_vector(start, end, diameter_shaft=0.01, diameter_head=0.02, id_=0):
+    """
+    assumes points to be in frame map
+    :type start: Point
+    :type end: Point
+    :type diameter_shaft: float
+    :type diameter_head: float
+    :type id_: int
+    """
+    m = Marker()
+    m.action = m.ADD
+    m.ns = u'debug'
+    m.id = id_
+    m.type = m.ARROW
+    m.points.append(start)
+    m.points.append(end)
+    m.color = ColorRGBA(1, 0, 0, 1)
+    m.scale.x = diameter_shaft
+    m.scale.y = diameter_head
+    m.scale.z = 0
+    m.header.frame_id = u'map'
+
+    pub = rospy.Publisher('/visualization_marker', Marker, queue_size=1)
+    start = rospy.get_rostime()
+    while pub.get_num_connections() < 1 and (rospy.get_rostime() - start).to_sec() < 2:
+        # wait for a connection to publisher
+        # you can do whatever you like here or simply do nothing
+        pass
+    rospy.sleep(0.3)
+
+    pub.publish(m)

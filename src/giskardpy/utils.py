@@ -1035,3 +1035,30 @@ def update_parents(d, merge_key='parent'):
         updated = update_nested_dicts(parent_data, data)
         nested_update(root_data, keys, updated)
     return root_data
+
+
+def cast_values_in_nested_dict(d, constructor):
+    """
+    Will try to cast the values in the given nested dict d with the given constructor.
+    :type d: dict
+    :type constructor: type
+    :rtype: dict
+    """
+    for k, v in d.items():
+        if isinstance(v, dict) and d.get(k, {}) is not None:
+            cast_values_in_nested_dict(d.get(k, {}), constructor)
+        elif isinstance(v, list):
+            v_new = []
+            for w in v:
+                if isinstance(w, str) or isinstance(w, list):
+                    tmp = {None: w}
+                    cast_values_in_nested_dict(tmp, constructor)
+                    v_new.append(tmp[None])
+            d.update({k: v_new})
+        else:
+            if isinstance(d[k], str):
+                try:
+                    d.update({k: constructor(d[k])})
+                except ValueError:
+                    pass
+    return d

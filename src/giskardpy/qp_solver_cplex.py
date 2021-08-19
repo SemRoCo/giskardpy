@@ -11,6 +11,26 @@ error_info = {
     # https://www.ibm.com/docs/en/icos/20.1.0?topic=manual-cplexexceptionserror-codes
 }
 
+feasible = [cplex.SolutionInterface.status.feasible, cplex.SolutionInterface.status.feasible_relaxed_sum,
+            cplex.SolutionInterface.status.optimal_relaxed_sum, cplex.SolutionInterface.status.feasible_relaxed_inf,
+            cplex.SolutionInterface.status.optimal_relaxed_inf, cplex.SolutionInterface.status.feasible_relaxed_quad,
+            cplex.SolutionInterface.status.optimal_relaxed_quad, cplex.SolutionInterface.status.first_order,
+            cplex.SolutionInterface.status.optimal_tolerance, cplex.SolutionInterface.status.node_limit_feasible,
+            cplex.SolutionInterface.status.MIP_feasible_relaxed_sum, cplex.SolutionInterface.status.MIP_optimal_relaxed_sum,
+            cplex.SolutionInterface.status.MIP_feasible_relaxed_inf, cplex.SolutionInterface.status.MIP_optimal_relaxed_inf,
+            cplex.SolutionInterface.status.MIP_feasible_relaxed_quad, cplex.SolutionInterface.status.MIP_optimal_relaxed_quad,
+            cplex.SolutionInterface.status.MIP_feasible, cplex.SolutionInterface.status.multiobj_non_optimal]
+
+optimal = [cplex.SolutionInterface.status.optimal, cplex.SolutionInterface.status.MIP_optimal,
+           cplex.SolutionInterface.status.multiobj_optimal]
+
+infeasible = [cplex.SolutionInterface.status.infeasible,  cplex.SolutionInterface.status.infeasible_or_unbounded,
+              cplex.SolutionInterface.status.fail_infeasible,  cplex.SolutionInterface.status.fail_infeasible_no_tree,
+              cplex.SolutionInterface.status.multiobj_infeasible, cplex.SolutionInterface.status.MIP_optimal_infeasible,
+              cplex.SolutionInterface.status.MIP_infeasible_or_unbounded, cplex.SolutionInterface.status.multiobj_infeasible]
+
+limit_infeasible = [cplex.SolutionInterface.status.mem_limit_infeasible, cplex.SolutionInterface.status.node_limit_infeasible]
+
 
 class QPSolverCplex(QPSolver):
 
@@ -18,38 +38,27 @@ class QPSolverCplex(QPSolver):
     def init(self, H, g, A, lb, ub, lbA, ubA):
         # TODO potential speed up by reusing model
         self.qpProblem = cplex.Cplex()
-        # self.qpProblem.set_problem_type(self.qpProblem.problem_type.QP)
-        # self.qpProblem.parameters.barrier.qcpconvergetol.set(1e-10)
         self.qpProblem.objective.set_sense(self.qpProblem.objective.sense.minimize)
         self.set_qp(H, g, A, lb, ub, lbA, ubA)
-        # H = sparse.csc_matrix(H)
-        # A = sparse.csc_matrix(A)
         self.started = False
         self.qpProblem.set_log_stream(None)
         self.qpProblem.set_results_stream(None)
 
     def set_qp(self, H, g, A, lb, ub, lbA, ubA):
-        x_names = ['x' + str(int(i)) for i in range(0, len(lb))]
-        c_names = ['c' + str(int(i)) for i in range(0, len(lbA))]
         # Add vars with limits and linear objective if valid
-        self.qpProblem.variables.add(obj=g.tolist() if len(g) == len(lb) else None,
-                                     lb=lb.tolist(), ub=ub.tolist(),
-                                     types=[self.qpProblem.variables.type.continuous] * len(lb),
-                                     names=x_names)
+        self.qpProblem.variables.add(obj=g if len(g) == len(lb) else None,
+                                     lb=lb, ub=ub,
+                                     types=[self.qpProblem.variables.type.continuous] * len(lb))
         # Set quadratic objective term
         H_doubled = H * 2.0
-        self.qpProblem.objective.set_quadratic(H_doubled.tolist())
+        self.qpProblem.objective.set_quadratic(H_doubled)
         # Add linear constraints
         Gs = ''.join(["G"] * len(lbA))
         Ls = ''.join(["L"] * len(lbA))
-        A_with_x_names = np.zeros((A.shape[0], 2, A.shape[1])).tolist()
-        for c_i in range(0, A.shape[0]):
-            A_with_x_names[c_i][0] = x_names[:]
-            A_with_x_names[c_i][1] = A[c_i][:].tolist()
-        self.qpProblem.linear_constraints.add(lin_expr=A_with_x_names[:], senses=Gs, rhs=lbA.tolist(),
-                                              range_values=np.zeros(len(lbA)).tolist(), names=c_names)
-        self.qpProblem.linear_constraints.add(lin_expr=A_with_x_names[:], senses=Ls, rhs=ubA.tolist(),
-                                              range_values=np.zeros(len(ubA)).tolist(), names=c_names)
+        x_inds = list(range(0, len(lb)))
+        A_with_x_inds = list(zip([x_inds]*A.shape[0], A))
+        self.qpProblem.linear_constraints.add(lin_expr=A_with_x_inds, senses=Gs, rhs=lbA)
+        self.qpProblem.linear_constraints.add(lin_expr=A_with_x_inds, senses=Ls, rhs=ubA)
 
     @profile
     def update(self, H, g, A, lb, ub, lbA, ubA):
@@ -58,21 +67,30 @@ class QPSolverCplex(QPSolver):
         self.set_qp(H, g, A, lb, ub, lbA, ubA)
 
     def print_debug(self):
-        # TODO use MinRHS etc to analyse solution
-        # self.qpProblem.set_log_stream(sys.stdout)
-        # self.qpProblem.set_results_stream(sys.stdout)
-        logging.logwarn(self.qpProblem.solution.get_status_string())
+        # Print QP problem stats
+        logging.logwarn(u'Problem Definition:')
+        logging.logwarn(u'Problem Type: {}'.format(self.qpProblem.problem_type[self.qpProblem.get_problem_type()]))
         logging.logwarn(str(self.qpProblem.get_stats()))
-        #self.qpProblem.write("log.lp")
+        # Print solution type and stats if solution exists
+        logging.logwarn(u'Solving method: {}'.format(self.qpProblem.solution.method[self.qpProblem.solution.get_method()]))
+        logging.logwarn(u'Solution status: {}'.format(self.qpProblem.solution.get_status_string()))
+        if self.qpProblem.solution.get_status() in infeasible:
+            m = self.qpProblem.solution.quality_metric
+            arr = self.qpProblem.solution.get_float_quality([m.max_x, m.max_dual_infeasibility])
+            if len(arr) == 0:
+                arr = self.qpProblem.solution.get_integer_quality([m.max_x, m.max_dual_infeasibility])
+            logging.logwarn(u'Solution quality [max, max_dual_infeasibility]: {}'.format(str(arr)))
+            logging.logwarn(u'Solution objective value'.format(str(self.qpProblem.solution.get_objective_value())))
+        logging.logwarn(u'')
+        # Write QP problem in prob.lp and solution in solution.lp
+        #self.qpProblem.write("prob.lp")
         #self.qpProblem.solution.write("solution.lp")
-        # self.qpProblem.set_log_stream(None)
-        # self.qpProblem.set_results_stream(None)
 
     def round(self, data, decimal_places):
         return np.round(data, decimal_places)
 
     @profile
-    def solve(self, H, g, A, lb, ub, lbA, ubA, tries=5, decimal_places=4):
+    def solve(self, H, g, A, lb, ub, lbA, ubA, tries=1, decimal_places=4):
         """
         x^T*H*x + x^T*g
         s.t.: lbA < A*x < ubA
@@ -103,9 +121,9 @@ class QPSolverCplex(QPSolver):
                 self.init(H, g, A, lb, ub, lbA, ubA)
             self.qpProblem.solve()
             success = self.qpProblem.solution.get_status()
-            if 'optimal' in self.qpProblem.solution.get_status_string():
-                # if success == gurobipy.GRB.SUBOPTIMAL:
-                #    logging.logwarn('warning, suboptimal!')
+            if success in optimal or success in feasible:
+                if success in feasible:
+                    logging.logwarn(u'Solution may be suboptimal!')
                 self.xdot_full = np.array(self.qpProblem.solution.get_values())
                 break
             elif i < tries - 1:
@@ -123,9 +141,14 @@ class QPSolverCplex(QPSolver):
         else:
             self.print_debug()
             self.started = False
-            error_message = u'{}'.format(self.qpProblem.solution.get_status_string())
-            if success == self.qpProblem.solution.status.infeasible:
+            if success == cplex.SolutionInterface.status.optimal_infeasible:
+                error_message = u'{}: problem is optimally infeasible'.format(self.qpProblem.solution.get_status_string())
                 raise InfeasibleException(error_message)
-            raise QPSolverException(error_message)
-
+            elif success in infeasible:
+                error_message = u'{}: problem is infeasible'.format(self.qpProblem.solution.get_status_string())
+                raise InfeasibleException(error_message)
+            elif success in limit_infeasible:
+                error_message = u'{}: problem is due to limits infeasible'.format(self.qpProblem.solution.get_status_string())
+                raise InfeasibleException(error_message)
+            raise QPSolverException(u'{}'.format(self.qpProblem.solution.get_status_string()))
         return self.xdot_full

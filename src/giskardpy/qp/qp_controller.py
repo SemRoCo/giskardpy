@@ -14,7 +14,7 @@ from giskardpy.exceptions import OutOfJointLimitsException, \
 from giskardpy.qp.constraint import VelocityConstraint, Constraint
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.qp.qp_solver import QPSolver
-from giskardpy.qp_solver_cplex import QPSolverCplex
+from giskardpy.qp.qp_solver_cplex import QPSolverCplex
 from giskardpy.qp.qp_solver_gurobi import QPSolverGurobi
 from giskardpy.utils.utils import memoize, logging
 

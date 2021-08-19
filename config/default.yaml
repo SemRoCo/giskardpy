@@ -12,6 +12,12 @@ general_options:
     velocity:
       default: 0.001
       override: {}
+    acceleration:
+      default: 0
+      override: {}
+    jerk:
+      default: 0.001
+      override: {}
   joint_limits: # giskard will use the min of this number and limits from the urdf
     velocity:
       linear: # m/s
@@ -22,10 +28,24 @@ general_options:
       angular: # rad/s
         default: 1
         override: {}
+    acceleration:
+      linear: # m/s**2
+        default: 1e3
+        override: {}
+      angular: # rad/s**2
+        default: 1e3
+        override: {}
+    jerk:
+      linear: # m/s**3
+        default: 30
+        override: {}
+      angular: # rad/s**3
+        default: 30
+        override: {}
 qp_solver:
   name: cplex # one of [qpoases, gurobi]
   # you should always use uneven horizons. even horizons n create (almost) the same motions as n-1, but are slower.
-  prediction_horizon: 1
+  prediction_horizon: 5
   hard_constraint_handling:
     retries_with_relaxed_constraints: 5 # per goal
     added_slack: 100

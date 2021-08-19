@@ -81,7 +81,6 @@ class QPSolverCplex(QPSolver):
                 arr = self.qpProblem.solution.get_integer_quality([m.max_x, m.max_dual_infeasibility])
             logging.logwarn(u'Solution quality [max, max_dual_infeasibility]: {}'.format(str(arr)))
             logging.logwarn(u'Solution objective value'.format(str(self.qpProblem.solution.get_objective_value())))
-        logging.logwarn(u'')
         # Write QP problem in prob.lp and solution in solution.lp
         #self.qpProblem.write("prob.lp")
         #self.qpProblem.solution.write("solution.lp")

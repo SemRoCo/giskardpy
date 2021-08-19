@@ -74,7 +74,7 @@ class QPSolverCplex(QPSolver):
         # Print solution type and stats if solution exists
         logging.logwarn(u'Solving method: {}'.format(self.qpProblem.solution.method[self.qpProblem.solution.get_method()]))
         logging.logwarn(u'Solution status: {}'.format(self.qpProblem.solution.get_status_string()))
-        if self.qpProblem.solution.get_status() in infeasible:
+        if self.qpProblem.solution.get_status() not in infeasible:
             m = self.qpProblem.solution.quality_metric
             arr = self.qpProblem.solution.get_float_quality([m.max_x, m.max_dual_infeasibility])
             if len(arr) == 0:

@@ -1,12 +1,13 @@
 from __future__ import division
-from giskardpy.exceptions import ConstraintException
-from giskardpy.goals.goal import Goal, WEIGHT_BELOW_CA
+
 from giskardpy import casadi_wrapper as w, identifier
+from giskardpy.exceptions import ConstraintException, ConstraintInitalizationException
+from giskardpy.goals.goal import Goal, WEIGHT_BELOW_CA
 
 
 class JointPositionContinuous(Goal):
 
-    def __init__(self, god_map, joint_name, goal, weight=WEIGHT_BELOW_CA, max_velocity=100, **kwargs):
+    def __init__(self, joint_name, goal, weight=WEIGHT_BELOW_CA, max_velocity=100, **kwargs):
         """
         This goal will move a continuous joint to the goal position
         :param joint_name: str
@@ -15,10 +16,10 @@ class JointPositionContinuous(Goal):
         :param max_velocity: float, rad/s, default 1423, meaning the urdf/config limits are active
         """
         self.joint_name = joint_name
-        self.goal = goal
+        self.joint_goal = goal
         self.weight = weight
         self.max_velocity = max_velocity
-        super(JointPositionContinuous, self).__init__(god_map, **kwargs)
+        super(JointPositionContinuous, self).__init__(**kwargs)
 
         if not self.get_robot().is_joint_continuous(joint_name):
             raise ConstraintException(u'{} called with non continuous joint {}'.format(self.__class__.__name__,
@@ -37,21 +38,18 @@ class JointPositionContinuous(Goal):
         :return:
         """
         current_joint = self.get_joint_position_symbol(self.joint_name)
-
-        joint_goal = self.get_parameter_as_symbolic_expression(u'goal')
-        weight = self.get_parameter_as_symbolic_expression(u'weight')
-
         max_velocity = w.min(self.get_parameter_as_symbolic_expression(u'max_velocity'),
                              self.get_robot().get_joint_velocity_limit_expr(self.joint_name))
 
-        error = w.shortest_angular_distance(current_joint, joint_goal)
+        error = w.shortest_angular_distance(current_joint, self.joint_goal)
 
-        self.add_constraint('',
-                            reference_velocity=max_velocity,
+        self.add_constraint(reference_velocity=max_velocity,
                             lower_error=error,
                             upper_error=error,
-                            weight=weight,
+                            weight=self.weight,
                             expression=current_joint)
+        if self.joint_name == 'odom_z_joint':
+            self.add_debug_expr('error', error)
 
     def __str__(self):
         s = super(JointPositionContinuous, self).__str__()
@@ -59,7 +57,8 @@ class JointPositionContinuous(Goal):
 
 
 class JointPositionPrismatic(Goal):
-    def __init__(self, god_map, joint_name, goal, weight=WEIGHT_BELOW_CA, max_velocity=100, **kwargs):
+
+    def __init__(self, joint_name, goal, weight=WEIGHT_BELOW_CA, max_velocity=100, **kwargs):
         """
         This goal will move a prismatic joint to the goal position
         :param joint_name: str
@@ -71,7 +70,7 @@ class JointPositionPrismatic(Goal):
         self.goal = goal
         self.weight = weight
         self.max_velocity = max_velocity
-        super(JointPositionPrismatic, self).__init__(god_map, **kwargs)
+        super(JointPositionPrismatic, self).__init__(**kwargs)
         if not self.get_robot().is_joint_prismatic(joint_name):
             raise ConstraintException(u'{} called with non prismatic joint {}'.format(self.__class__.__name__,
                                                                                       joint_name))
@@ -99,8 +98,7 @@ class JointPositionPrismatic(Goal):
 
         error = joint_goal - current_joint
 
-        self.add_constraint('',
-                            reference_velocity=max_velocity,
+        self.add_constraint(reference_velocity=max_velocity,
                             lower_error=error,
                             upper_error=error,
                             weight=weight,
@@ -113,7 +111,7 @@ class JointPositionPrismatic(Goal):
 
 class JointPositionRevolute(Goal):
 
-    def __init__(self, god_map, joint_name, goal, weight=WEIGHT_BELOW_CA, max_velocity=100, **kwargs):
+    def __init__(self, joint_name, goal, weight=WEIGHT_BELOW_CA, max_velocity=100, **kwargs):
         """
         This goal will move a revolute joint to the goal position
         :param joint_name: str
@@ -125,7 +123,7 @@ class JointPositionRevolute(Goal):
         self.goal = goal
         self.weight = weight
         self.max_velocity = max_velocity
-        super(JointPositionRevolute, self).__init__(god_map, **kwargs)
+        super(JointPositionRevolute, self).__init__(**kwargs)
         if not self.get_robot().is_joint_revolute(joint_name):
             raise ConstraintException(u'{} called with non revolute joint {}'.format(self.__class__.__name__,
                                                                                      joint_name))
@@ -153,8 +151,7 @@ class JointPositionRevolute(Goal):
 
         error = joint_goal - current_joint
 
-        self.add_constraint('',
-                            reference_velocity=max_velocity,
+        self.add_constraint(reference_velocity=max_velocity,
                             lower_error=error,
                             upper_error=error,
                             weight=weight,
@@ -166,7 +163,7 @@ class JointPositionRevolute(Goal):
 
 
 class ShakyJointPositionRevoluteOrPrismatic(Goal):
-    def __init__(self, god_map, joint_name, goal, frequency, noise_amplitude=1.0, weight=WEIGHT_BELOW_CA,
+    def __init__(self, joint_name, goal, frequency, noise_amplitude=1.0, weight=WEIGHT_BELOW_CA,
                  max_velocity=1, **kwargs):
         """
         This goal will move a revolute or prismatic joint to the goal position and shake the joint with the given frequency.
@@ -178,7 +175,7 @@ class ShakyJointPositionRevoluteOrPrismatic(Goal):
         :param max_velocity: float, rad/s, default 3451, meaning the urdf/config limits are active
         """
         self.joint_name = joint_name
-        super(ShakyJointPositionRevoluteOrPrismatic, self).__init__(god_map, **kwargs)
+        super(ShakyJointPositionRevoluteOrPrismatic, self).__init__(**kwargs)
         if not self.get_robot().is_joint_revolute(joint_name) and not self.get_robot().is_joint_prismatic(joint_name):
             raise ConstraintException(u'{} called with non revolute/prismatic joint {}'.format(self.__class__.__name__,
                                                                                                joint_name))
@@ -216,10 +213,9 @@ class ShakyJointPositionRevoluteOrPrismatic(Goal):
 
         fun_params = frequency * 2.0 * w.pi * time_in_secs
         err = (joint_goal - current_joint) + noise_amplitude * max_velocity * w.sin(fun_params)
-        capped_err = self.limit_velocity(err, noise_amplitude * max_velocity)
+        capped_err = w.limit(err, -noise_amplitude * max_velocity, noise_amplitude * max_velocity)
 
-        self.add_constraint('',
-                            lower_error=capped_err,
+        self.add_constraint(lower_error=capped_err,
                             upper_error=capped_err,
                             reference_velocity=max_velocity,
                             weight=weight,
@@ -231,7 +227,7 @@ class ShakyJointPositionRevoluteOrPrismatic(Goal):
 
 
 class ShakyJointPositionContinuous(Goal):
-    def __init__(self, god_map, joint_name, goal, frequency, noise_amplitude=10, weight=WEIGHT_BELOW_CA,
+    def __init__(self, joint_name, goal, frequency, noise_amplitude=10, weight=WEIGHT_BELOW_CA,
                  max_velocity=1, **kwargs):
         """
         This goal will move a continuous joint to the goal position and shake the joint with the given frequency.
@@ -248,7 +244,7 @@ class ShakyJointPositionContinuous(Goal):
         self.noise_amplitude = noise_amplitude
         self.weight = weight
         self.max_velocity = max_velocity
-        super(ShakyJointPositionContinuous, self).__init__(god_map, **kwargs)
+        super(ShakyJointPositionContinuous, self).__init__(**kwargs)
         if not self.get_robot().is_joint_continuous(joint_name):
             raise ConstraintException(u'{} called with non continuous joint {}'.format(self.__class__.__name__,
                                                                                        joint_name))
@@ -281,10 +277,10 @@ class ShakyJointPositionContinuous(Goal):
         fun_params = frequency * 2.0 * w.pi * time_in_secs
         err = w.shortest_angular_distance(current_joint, joint_goal) + noise_amplitude * max_velocity * w.sin(
             fun_params)
-        capped_err = self.limit_velocity(err, noise_amplitude * max_velocity)
 
-        self.add_constraint('',
-                            lower_error=capped_err,
+        capped_err = w.limit(err, -noise_amplitude * max_velocity, noise_amplitude * max_velocity)
+
+        self.add_constraint(lower_error=capped_err,
                             upper_error=capped_err,
                             reference_velocity=max_velocity,
                             weight=weight,
@@ -296,7 +292,7 @@ class ShakyJointPositionContinuous(Goal):
 
 
 class AvoidJointLimitsRevolute(Goal):
-    def __init__(self, god_map, joint_name, weight=0.1, max_linear_velocity=100, percentage=5, **kwargs):
+    def __init__(self, joint_name, weight=0.1, max_linear_velocity=100, percentage=5, **kwargs):
         """
         This goal will push revolute joints away from their position limits
         :param joint_name: str
@@ -308,7 +304,7 @@ class AvoidJointLimitsRevolute(Goal):
         self.weight = weight
         self.max_velocity = max_linear_velocity
         self.percentage = percentage
-        super(AvoidJointLimitsRevolute, self).__init__(god_map, **kwargs)
+        super(AvoidJointLimitsRevolute, self).__init__(**kwargs)
         if not self.get_robot().is_joint_revolute(joint_name):
             raise ConstraintException(u'{} called with non prismatic joint {}'.format(self.__class__.__name__,
                                                                                       joint_name))
@@ -339,8 +335,7 @@ class AvoidJointLimitsRevolute(Goal):
         error = w.max(w.abs(w.min(upper_err, 0)), w.abs(w.max(lower_err, 0)))
         weight = weight * (error / max_error)
 
-        self.add_constraint(u'',
-                            reference_velocity=max_velocity,
+        self.add_constraint(reference_velocity=max_velocity,
                             lower_error=lower_err,
                             upper_error=upper_err,
                             weight=weight,
@@ -352,7 +347,7 @@ class AvoidJointLimitsRevolute(Goal):
 
 
 class AvoidJointLimitsPrismatic(Goal):
-    def __init__(self, god_map, joint_name, weight=0.1, max_angular_velocity=100, percentage=5, **kwargs):
+    def __init__(self, joint_name, weight=0.1, max_angular_velocity=100, percentage=5, **kwargs):
         """
         This goal will push prismatic joints away from their position limits
         :param joint_name: str
@@ -364,7 +359,7 @@ class AvoidJointLimitsPrismatic(Goal):
         self.weight = weight
         self.max_velocity = max_angular_velocity
         self.percentage = percentage
-        super(AvoidJointLimitsPrismatic, self).__init__(god_map, **kwargs)
+        super(AvoidJointLimitsPrismatic, self).__init__(**kwargs)
         if not self.get_robot().is_joint_prismatic(joint_name):
             raise ConstraintException(u'{} called with non prismatic joint {}'.format(self.__class__.__name__,
                                                                                       joint_name))
@@ -395,8 +390,7 @@ class AvoidJointLimitsPrismatic(Goal):
         error = w.max(w.abs(w.min(upper_err, 0)), w.abs(w.max(lower_err, 0)))
         weight = weight * (error / max_error)
 
-        self.add_constraint(u'',
-                            reference_velocity=max_velocity,
+        self.add_constraint(reference_velocity=max_velocity,
                             lower_error=lower_err,
                             upper_error=upper_err,
                             weight=weight,
@@ -408,15 +402,14 @@ class AvoidJointLimitsPrismatic(Goal):
 
 
 class JointPositionList(Goal):
-    def __init__(self, god_map, goal_state, weight=None, max_velocity=None, **kwargs):
+    def __init__(self, goal_state, weight=None, max_velocity=None, **kwargs):
         """
         This goal takes a joint state and adds the other JointPosition goals depending on their type
         :param goal_state: JointState as json
         :param weight: float, default is the default of the added joint goals
         :param max_velocity: float, default is the default of the added joint goals
         """
-        super(JointPositionList, self).__init__(god_map, **kwargs)
-        self.constraints = []
+        super(JointPositionList, self).__init__(**kwargs)
         for i, joint_name in enumerate(goal_state.name):
             if not self.get_robot().has_joint(joint_name):
                 raise KeyError(u'unknown joint "{}"'.format(joint_name))
@@ -429,44 +422,57 @@ class JointPositionList(Goal):
             if max_velocity is not None:
                 params[u'max_velocity'] = max_velocity
             if self.get_robot().is_joint_continuous(joint_name):
-                self.constraints.append(JointPositionContinuous(god_map, **params))
+                self.add_constraints_of_goal(JointPositionContinuous(**params))
             elif self.get_robot().is_joint_revolute(joint_name):
-                self.constraints.append(JointPositionRevolute(god_map, **params))
+                self.add_constraints_of_goal(JointPositionRevolute(**params))
             elif self.get_robot().is_joint_prismatic(joint_name):
-                self.constraints.append(JointPositionPrismatic(god_map, **params))
-
-    def make_constraints(self):
-        for constraint in self.constraints:
-            c, vel_c = constraint.get_constraints()
-            self._constraints.update(c)
-            self._velocity_constraints.update(vel_c)
-            self.debug_expressions.update(constraint.debug_expressions)
+                self.add_constraints_of_goal(JointPositionPrismatic(**params))
 
 
 class AvoidJointLimits(Goal):
-    def __init__(self, god_map, percentage=15, weight=WEIGHT_BELOW_CA, **kwargs):
+    def __init__(self, percentage=15, weight=WEIGHT_BELOW_CA, **kwargs):
         """
         This goal will push joints away from their position limits
         :param percentage: float, default 15, if limits are 0-100, the constraint will push into the 15-85 range
         :param weight: float, default WEIGHT_BELOW_CA
         """
-        super(AvoidJointLimits, self).__init__(god_map, **kwargs)
-        self.constraints = []
+        super(AvoidJointLimits, self).__init__(**kwargs)
         for joint_name in self.get_robot().controlled_joints:
             if self.get_robot().is_joint_revolute(joint_name):
-                self.constraints.append(AvoidJointLimitsRevolute(god_map,
-                                                                 joint_name=joint_name,
-                                                                 percentage=percentage,
-                                                                 weight=weight, **kwargs))
+                self.add_constraints_of_goal(AvoidJointLimitsRevolute(joint_name=joint_name,
+                                                                      percentage=percentage,
+                                                                      weight=weight, **kwargs))
             elif self.get_robot().is_joint_prismatic(joint_name):
-                self.constraints.append(AvoidJointLimitsPrismatic(god_map,
-                                                                  joint_name=joint_name,
-                                                                  percentage=percentage,
-                                                                  weight=weight, **kwargs))
+                self.add_constraints_of_goal(AvoidJointLimitsPrismatic(joint_name=joint_name,
+                                                                       percentage=percentage,
+                                                                       weight=weight, **kwargs))
+
+
+class JointPositionRange(Goal):
+
+    def __init__(self, joint_name, upper_limit, lower_limit, **kwargs):
+        self.joint_name = joint_name
+        self.upper_limit = upper_limit
+        self.lower_limit = lower_limit
+        super(JointPositionRange, self).__init__(**kwargs)
+        current_position = self.get_robot().joint_state[self.joint_name].position
+        if current_position > self.upper_limit + 2e-3 or current_position < self.lower_limit - 2e-3:
+            raise ConstraintInitalizationException(u'{} out of set limits. '
+                                                   u'{} <= {} <= {} is not true.'.format(self.joint_name,
+                                                                                         self.lower_limit,
+                                                                                         current_position,
+                                                                                         self.upper_limit))
 
     def make_constraints(self):
-        for constraint in self.constraints:
-            c, c_vel = constraint.get_constraints()
-            self._constraints.update(c)
-            self._velocity_constraints.update(c_vel)
-            self.debug_expressions.update(constraint.debug_expressions)
+        joint_position = self.get_joint_position_symbol(self.joint_name)
+        self.add_constraint(reference_velocity=self.get_robot().get_joint_velocity_limit_expr(self.joint_name),
+                            lower_error=self.lower_limit - joint_position,
+                            upper_error=self.upper_limit - joint_position,
+                            weight=WEIGHT_BELOW_CA,
+                            expression=joint_position,
+                            lower_slack_limit=0,
+                            upper_slack_limit=0)
+
+    def __str__(self):
+        s = super(JointPositionRange, self).__str__()
+        return u'{}/{}'.format(s, self.joint_name)

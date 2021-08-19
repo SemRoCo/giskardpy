@@ -243,6 +243,8 @@ class GodMap(object):
 
     def to_expr(self, identifier):
         data = self.get_data(identifier)
+        if isinstance(data, np.ndarray):
+            data = data.tolist()
         if isinstance(data, numbers.Number):
             return self.to_symbol(identifier)
         if isinstance(data, Pose):
@@ -254,16 +256,29 @@ class GodMap(object):
         elif isinstance(data, PointStamped):
             return self.point_msg_to_point3(identifier + ['point'])
         elif isinstance(data, Vector3):
-            return self.point_msg_to_point3(identifier)
+            return self.vector_msg_to_vector3(identifier)
         elif isinstance(data, Vector3Stamped):
-            return self.point_msg_to_point3(identifier + ['vector'])
-        elif isinstance(data, list) or (isinstance(data, np.ndarray) and len(data.shape) == 1):
-            return self.list_to_symbol_matrix(identifier, len(data))
+            return self.vector_msg_to_vector3(identifier + ['vector'])
+        elif isinstance(data, list):
+            return self.list_to_symbol_matrix(identifier, data)
+        elif isinstance(data, np.ndarray):
+            return self.list_to_symbol_matrix(identifier, data)
         else:
             raise NotImplementedError(u'to_expr not implemented for type {}.'.format(type(data)))
 
-    def list_to_symbol_matrix(self, identifier, length):
-        return w.Matrix([self.to_symbol(identifier + [i]) for i in range(length)])
+    def list_to_symbol_matrix(self, identifier, data):
+        def replace_nested_list(l, f, start_index=None):
+            if start_index is None:
+                start_index = []
+            result = []
+            for i, entry in enumerate(l):
+                index = start_index + [i]
+                if isinstance(entry, list):
+                    result.append(replace_nested_list(entry, f, index))
+                else:
+                    result.append(f(index))
+            return result
+        return w.Matrix(replace_nested_list(data, lambda index: self.to_symbol(identifier + index)))
 
     def list_to_point3(self, identifier):
         return w.point3(
@@ -332,7 +347,11 @@ class GodMap(object):
         )
 
     def vector_msg_to_vector3(self, identifier):
-        return self.point_msg_to_point3(identifier)
+        return w.vector3(
+            x=self.to_symbol(identifier + ['x']),
+            y=self.to_symbol(identifier + ['y']),
+            z=self.to_symbol(identifier + ['z']),
+        )
 
     def get_values(self, symbols):
         """

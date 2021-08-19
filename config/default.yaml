@@ -3,6 +3,7 @@ general_options:
   enable_gui: False
   sample_period: 0.05 # time[s] between points of generated joint trajectory
   map_frame: map
+  test_mode: False
   debug: False # enables debug prints and prints the behavior tree state in the terminal
   fill_velocity_values: True # due to a bug, the pr2 does not want the velocity values to be filled
   joint_weights:
@@ -46,7 +47,7 @@ qp_solver:
   # you should always use uneven horizons. even horizons n create (almost) the same motions as n-1, but are slower.
   prediction_horizon: 9
   hard_constraint_handling:
-    retry_with_relaxed_constraints: True
+    retries_with_relaxed_constraints: 5 # per goal
     added_slack: 100
     weight_factor: 100
 plugins:

@@ -5,13 +5,14 @@ import numbers
 from giskardpy.exceptions import GiskardException
 from giskardpy.goals.goal import Goal
 
+
 class UpdateGodMap(Goal):
 
-    def __init__(self, god_map, updates, **kwargs):
+    def __init__(self, updates, **kwargs):
         """
         Modifies the core data structure of giskard, only use it if you know what you are doing
         """
-        super(UpdateGodMap, self).__init__(god_map, **kwargs)
+        super(UpdateGodMap, self).__init__(**kwargs)
         self.update_god_map([], updates)
 
     def update_god_map(self, identifier, updates):

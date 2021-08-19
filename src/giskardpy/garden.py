@@ -306,14 +306,14 @@ def grow_tree():
 
     tree = BehaviourTree(root)
 
-    if god_map.get_data(identifier.debug):
-        def post_tick(snapshot_visitor, behaviour_tree):
-            logging.logdebug(u'\n' + py_trees.display.ascii_tree(behaviour_tree.root,
-                                                                 snapshot_information=snapshot_visitor))
-
-        snapshot_visitor = py_trees_ros.visitors.SnapshotVisitor()
-        tree.add_post_tick_handler(functools.partial(post_tick, snapshot_visitor))
-        tree.visitors.append(snapshot_visitor)
+    # if god_map.get_data(identifier.debug):
+    #     def post_tick(snapshot_visitor, behaviour_tree):
+    #         logging.logdebug(u'\n' + py_trees.display.ascii_tree(behaviour_tree.root,
+    #                                                              snapshot_information=snapshot_visitor))
+    #
+    #     snapshot_visitor = py_trees_ros.visitors.SnapshotVisitor()
+    #     tree.add_post_tick_handler(functools.partial(post_tick, snapshot_visitor))
+    #     tree.visitors.append(snapshot_visitor)
     path = god_map.get_data(identifier.data_folder) + u'tree'
     create_path(path)
     render_dot_tree(root, name=path)

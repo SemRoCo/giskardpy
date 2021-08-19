@@ -6,7 +6,7 @@ from giskardpy.goals.goal import Goal, WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA
 import giskardpy.utils.tfwrapper as tf
 
 class GraspBar(Goal):
-    def __init__(self, god_map, root_link, tip_link, tip_grasp_axis, bar_center, bar_axis, bar_length,
+    def __init__(self, root_link, tip_link, tip_grasp_axis, bar_center, bar_axis, bar_length,
                  max_linear_velocity=0.1, max_angular_velocity=0.5, weight=WEIGHT_ABOVE_CA, **kwargs):
         """
         TODO update description
@@ -21,9 +21,9 @@ class GraspBar(Goal):
         :param max_angular_velocity: float, rad/s, default 0.5
         :param weight: float default WEIGHT_ABOVE_CA
         """
+        super(GraspBar, self).__init__(**kwargs)
         self.root = root_link
         self.tip = tip_link
-        super(GraspBar, self).__init__(god_map, **kwargs)
 
         bar_center = tf.transform_point(self.root, bar_center)
 
@@ -45,41 +45,27 @@ class GraspBar(Goal):
         s = super(GraspBar, self).__str__()
         return u'{}/{}/{}'.format(s, self.root, self.tip)
 
-    def get_bar_axis_vector(self):
-        return self.get_parameter_as_symbolic_expression(u'bar_axis')
-
-    def get_tip_grasp_axis_vector(self):
-        return self.get_parameter_as_symbolic_expression(u'tip_grasp_axis')
-
-    def get_bar_center_point(self):
-        return self.get_parameter_as_symbolic_expression(u'bar_center')
-
     def make_constraints(self):
-        translation_max_velocity = self.get_parameter_as_symbolic_expression(u'translation_max_velocity')
-        rotation_max_velocity = self.get_parameter_as_symbolic_expression(u'rotation_max_velocity')
-        weight = self.get_parameter_as_symbolic_expression(u'weight')
+        root_V_bar_axis = self.get_parameter_as_symbolic_expression(u'bar_axis')
+        tip_V_tip_grasp_axis = self.get_parameter_as_symbolic_expression(u'tip_grasp_axis')
+        root_P_bar_center = self.get_parameter_as_symbolic_expression(u'bar_center')
 
-        bar_length = self.get_parameter_as_symbolic_expression(u'bar_length')
-        root_V_bar_axis = self.get_bar_axis_vector()
-        tip_V_tip_grasp_axis = self.get_tip_grasp_axis_vector()
-        root_P_bar_center = self.get_bar_center_point()
+        root_T_tip = self.get_fk(self.root, self.tip)
+        root_V_tip_normal = w.dot(root_T_tip, tip_V_tip_grasp_axis)
 
-        self.add_minimize_vector_angle_constraints(max_velocity=rotation_max_velocity,
-                                                   root=self.root,
-                                                   tip=self.tip,
-                                                   tip_V_tip_normal=tip_V_tip_grasp_axis,
-                                                   root_V_goal_normal=root_V_bar_axis,
-                                                   weight=weight)
+        self.add_vector_goal_constraints(frame_V_current=root_V_tip_normal,
+                                         frame_V_goal=root_V_bar_axis,
+                                         reference_velocity=self.rotation_max_velocity,
+                                         weight=self.weight)
 
         root_P_tip = w.position_of(self.get_fk(self.root, self.tip))
 
-        root_P_line_start = root_P_bar_center + root_V_bar_axis * bar_length / 2
-        root_P_line_end = root_P_bar_center - root_V_bar_axis * bar_length / 2
+        root_P_line_start = root_P_bar_center + root_V_bar_axis * self.bar_length / 2
+        root_P_line_end = root_P_bar_center - root_V_bar_axis * self.bar_length / 2
 
         dist, nearest = w.distance_point_to_line_segment(root_P_tip, root_P_line_start, root_P_line_end)
 
-        self.add_minimize_position_constraints(r_P_g=nearest,
-                                               max_velocity=translation_max_velocity,
-                                               root=self.root,
-                                               tip=self.tip,
-                                               weight=weight)
+        self.add_point_goal_constraints(frame_P_current=w.position_of(root_T_tip),
+                                        frame_P_goal=nearest,
+                                        reference_velocity=self.translation_max_velocity,
+                                        weight=self.weight)

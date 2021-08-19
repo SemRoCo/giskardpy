@@ -3,7 +3,8 @@ from geometry_msgs.msg import Pose, Point, Quaternion
 
 from giskardpy.exceptions import DuplicateNameException, UnknownBodyException
 from giskardpy.model.urdf_object import URDFObject
-from giskardpy.utils.utils import make_world_body_box, make_world_body_sphere, make_world_body_cylinder, make_urdf_world_body
+from giskardpy.model.utils import make_world_body_box, make_world_body_sphere, make_world_body_cylinder, \
+    make_urdf_world_body
 from utils_for_tests import pr2_urdf, donbot_urdf, boxy_urdf, base_bot_urdf
 
 set_of_pr2_joints = {'r_gripper_motor_accelerometer_joint',
@@ -773,12 +774,10 @@ class TestUrdfObject(object):
         p.orientation = Quaternion(0.0, 0.0, 0.0, 1.0)
         original_links = parsed_pr2.get_link_names()
         original_joints = parsed_pr2.get_joint_names()
-        # original_urdf = parsed_pr2.get_urdf_str()
         parsed_pr2.attach_urdf_object(box, u'l_gripper_tool_frame', p)
         parsed_pr2.detach_sub_tree(u'box')
         assert set(original_links) == set(parsed_pr2.get_link_names())
-        assert set(original_joints) == set(parsed_pr2.get_joint_names())
-        # assert original_urdf == parsed_pr2.get_urdf_str()
+        assert set(original_joints) == set(parsed_pr2.get_joint_names()), u'diff {}'.format(set(original_joints).difference(set(parsed_pr2.get_joint_names())))
 
     def test_detach_non_existing_object(self, function_setup):
         parsed_pr2 = self.cls(pr2_urdf())

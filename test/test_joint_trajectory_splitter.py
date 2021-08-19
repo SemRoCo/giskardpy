@@ -1,5 +1,3 @@
-#! /usr/bin/env python
-
 import copy
 
 import actionlib
@@ -36,6 +34,7 @@ class Clients(object):
                                                       queue_size=10))
 
     def get_other_state(self, i):
+        rospy.sleep(1)
         return self.statuses[i].status_list[0].status
 
 

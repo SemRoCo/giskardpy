@@ -10,7 +10,8 @@ import giskardpy.model.pybullet_wrapper as pbw
 from giskardpy.model.pybullet_world import PyBulletWorld
 from giskardpy.model.pybullet_world_object import PyBulletWorldObject
 from giskardpy.model.robot import Robot
-from giskardpy.utils.utils import make_world_body_box, make_world_body_sphere, make_world_body_cylinder, logging
+from giskardpy.model.utils import make_world_body_box, make_world_body_sphere, make_world_body_cylinder
+from giskardpy.utils.utils import logging
 from giskardpy.model.world_object import WorldObject
 from utils_for_tests import pr2_urdf, base_bot_urdf, donbot_urdf
 
@@ -96,7 +97,10 @@ class TestPyBulletWorldObject(test_world.TestWorldObj):
 
 
 class TestPyBulletRobot(test_world.TestRobot):
-    cls = Robot
+    class cls(Robot):
+        def __init__(self, urdf, base_pose=None, controlled_joints=None, path_to_data_folder=u'', *args, **kwargs):
+            super().__init__(urdf, base_pose, controlled_joints, path_to_data_folder, *args, **kwargs)
+            self.set_dummy_joint_symbols()
 
     def test_from_world_body_box(self, function_setup):
         wb = make_world_body_box()
@@ -223,122 +227,9 @@ class TestPyBulletWorld(test_world.TestWorld):
 
     def test_collision_goals_to_collision_matrix1(self, test_folder):
         world_with_donbot = self.make_world_with_donbot(test_folder)
-        min_dist = defaultdict(lambda: {u'zero_weight_distance': 0.05})
+        min_dist = defaultdict(lambda: 0.05)
         collision_matrix = world_with_donbot.collision_goals_to_collision_matrix([], min_dist)
-
-        assert collision_matrix == {('base_link', 'iai_donbot', 'camera_holder_link'): 0.05,
-                                     ('base_link', 'iai_donbot', 'gripper_base_link'): 0.05,
-                                     ('base_link', 'iai_donbot', 'gripper_finger_left_link'): 0.05,
-                                     ('base_link', 'iai_donbot', 'gripper_finger_right_link'): 0.05,
-                                     ('base_link', 'iai_donbot', 'gripper_gripper_left_link'): 0.05,
-                                     ('base_link', 'iai_donbot', 'gripper_gripper_right_link'): 0.05,
-                                     ('base_link', 'iai_donbot', 'ur5_ee_link'): 0.05,
-                                     ('base_link', 'iai_donbot', 'ur5_wrist_1_link'): 0.05,
-                                     ('base_link', 'iai_donbot', 'ur5_wrist_2_link'): 0.05,
-                                     ('base_link', 'iai_donbot', 'ur5_wrist_3_link'): 0.05,
-                                     ('base_link', 'iai_donbot', 'wrist_collision'): 0.05,
-                                     ('camera_holder_link', 'iai_donbot', 'charger'): 0.05,
-                                     ('camera_holder_link', 'iai_donbot', 'plate'): 0.05,
-                                     ('camera_holder_link', 'iai_donbot', 'switches'): 0.05,
-                                     ('camera_holder_link', 'iai_donbot', 'ur5_base_link'): 0.05,
-                                     ('camera_holder_link', 'iai_donbot', 'ur5_forearm_link'): 0.05,
-                                     ('camera_holder_link', 'iai_donbot', 'ur5_shoulder_link'): 0.05,
-                                     ('camera_holder_link', 'iai_donbot', 'ur5_touchpad'): 0.05,
-                                     ('camera_holder_link', 'iai_donbot', 'ur5_upper_arm_link'): 0.05,
-                                     ('charger', 'iai_donbot', 'gripper_base_link'): 0.05,
-                                     ('charger', 'iai_donbot', 'gripper_finger_left_link'): 0.05,
-                                     ('charger', 'iai_donbot', 'gripper_finger_right_link'): 0.05,
-                                     ('charger', 'iai_donbot', 'gripper_gripper_left_link'): 0.05,
-                                     ('charger', 'iai_donbot', 'gripper_gripper_right_link'): 0.05,
-                                     ('charger', 'iai_donbot', 'ur5_forearm_link'): 0.05,
-                                     ('charger', 'iai_donbot', 'ur5_wrist_1_link'): 0.05,
-                                     ('charger', 'iai_donbot', 'ur5_wrist_2_link'): 0.05,
-                                     ('charger', 'iai_donbot', 'ur5_wrist_3_link'): 0.05,
-                                     ('charger', 'iai_donbot', 'wrist_collision'): 0.05,
-                                     ('e_stop', 'iai_donbot', 'ur5_forearm_link'): 0.05,
-                                     ('gripper_base_link', 'iai_donbot', 'plate'): 0.05,
-                                     ('gripper_base_link', 'iai_donbot', 'switches'): 0.05,
-                                     ('gripper_base_link', 'iai_donbot', 'ur5_base_link'): 0.05,
-                                     ('gripper_base_link', 'iai_donbot', 'ur5_forearm_link'): 0.05,
-                                     ('gripper_base_link', 'iai_donbot', 'ur5_shoulder_link'): 0.05,
-                                     ('gripper_base_link', 'iai_donbot', 'ur5_touchpad'): 0.05,
-                                     ('gripper_base_link', 'iai_donbot', 'ur5_upper_arm_link'): 0.05,
-                                     ('gripper_base_link', 'iai_donbot', 'wlan'): 0.05,
-                                     ('gripper_finger_left_link', 'iai_donbot', 'plate'): 0.05,
-                                     ('gripper_finger_left_link', 'iai_donbot', 'switches'): 0.05,
-                                     ('gripper_finger_left_link', 'iai_donbot', 'ur5_base_link'): 0.05,
-                                     ('gripper_finger_left_link', 'iai_donbot', 'ur5_forearm_link'): 0.05,
-                                     ('gripper_finger_left_link', 'iai_donbot', 'ur5_shoulder_link'): 0.05,
-                                     ('gripper_finger_left_link', 'iai_donbot', 'ur5_touchpad'): 0.05,
-                                     ('gripper_finger_left_link', 'iai_donbot', 'ur5_upper_arm_link'): 0.05,
-                                     ('gripper_finger_left_link', 'iai_donbot', 'wlan'): 0.05,
-                                     ('gripper_finger_right_link', 'iai_donbot', 'plate'): 0.05,
-                                     ('gripper_finger_right_link', 'iai_donbot', 'switches'): 0.05,
-                                     ('gripper_finger_right_link', 'iai_donbot', 'ur5_base_link'): 0.05,
-                                     ('gripper_finger_right_link', 'iai_donbot', 'ur5_forearm_link'): 0.05,
-                                     ('gripper_finger_right_link', 'iai_donbot', 'ur5_shoulder_link'): 0.05,
-                                     ('gripper_finger_right_link', 'iai_donbot', 'ur5_touchpad'): 0.05,
-                                     ('gripper_finger_right_link', 'iai_donbot', 'ur5_upper_arm_link'): 0.05,
-                                     ('gripper_finger_right_link', 'iai_donbot', 'wlan'): 0.05,
-                                     ('gripper_gripper_left_link', 'iai_donbot', 'plate'): 0.05,
-                                     ('gripper_gripper_left_link', 'iai_donbot', 'switches'): 0.05,
-                                     ('gripper_gripper_left_link', 'iai_donbot', 'ur5_base_link'): 0.05,
-                                     ('gripper_gripper_left_link', 'iai_donbot', 'ur5_forearm_link'): 0.05,
-                                     ('gripper_gripper_left_link', 'iai_donbot', 'ur5_shoulder_link'): 0.05,
-                                     ('gripper_gripper_left_link', 'iai_donbot', 'ur5_touchpad'): 0.05,
-                                     ('gripper_gripper_left_link', 'iai_donbot', 'ur5_upper_arm_link'): 0.05,
-                                     ('gripper_gripper_left_link', 'iai_donbot', 'wlan'): 0.05,
-                                     ('gripper_gripper_right_link', 'iai_donbot', 'plate'): 0.05,
-                                     ('gripper_gripper_right_link', 'iai_donbot', 'switches'): 0.05,
-                                     ('gripper_gripper_right_link', 'iai_donbot', 'ur5_base_link'): 0.05,
-                                     ('gripper_gripper_right_link', 'iai_donbot', 'ur5_forearm_link'): 0.05,
-                                     ('gripper_gripper_right_link', 'iai_donbot', 'ur5_shoulder_link'): 0.05,
-                                     ('gripper_gripper_right_link', 'iai_donbot', 'ur5_touchpad'): 0.05,
-                                     ('gripper_gripper_right_link', 'iai_donbot', 'ur5_upper_arm_link'): 0.05,
-                                     ('gripper_gripper_right_link', 'iai_donbot', 'wlan'): 0.05,
-                                     ('plate', 'iai_donbot', 'ur5_wrist_1_link'): 0.05,
-                                     ('plate', 'iai_donbot', 'ur5_wrist_2_link'): 0.05,
-                                     ('plate', 'iai_donbot', 'ur5_wrist_3_link'): 0.05,
-                                     ('plate', 'iai_donbot', 'wrist_collision'): 0.05,
-                                     ('switches', 'iai_donbot', 'ur5_forearm_link'): 0.05,
-                                     ('switches', 'iai_donbot', 'ur5_upper_arm_link'): 0.05,
-                                     ('switches', 'iai_donbot', 'ur5_wrist_1_link'): 0.05,
-                                     ('switches', 'iai_donbot', 'ur5_wrist_2_link'): 0.05,
-                                     ('switches', 'iai_donbot', 'ur5_wrist_3_link'): 0.05,
-                                     ('switches', 'iai_donbot', 'wrist_collision'): 0.05,
-                                     ('ur5_base_link', 'iai_donbot', 'ur5_ee_link'): 0.05,
-                                     ('ur5_base_link', 'iai_donbot', 'ur5_forearm_link'): 0.05,
-                                     ('ur5_base_link', 'iai_donbot', 'ur5_wrist_1_link'): 0.05,
-                                     ('ur5_base_link', 'iai_donbot', 'ur5_wrist_2_link'): 0.05,
-                                     ('ur5_base_link', 'iai_donbot', 'ur5_wrist_3_link'): 0.05,
-                                     ('ur5_base_link', 'iai_donbot', 'wrist_collision'): 0.05,
-                                     ('ur5_ee_link', 'iai_donbot', 'ur5_forearm_link'): 0.05,
-                                     ('ur5_ee_link', 'iai_donbot', 'ur5_shoulder_link'): 0.05,
-                                     ('ur5_ee_link', 'iai_donbot', 'ur5_upper_arm_link'): 0.05,
-                                     ('ur5_forearm_link', 'iai_donbot', 'ur5_shoulder_link'): 0.05,
-                                     ('ur5_forearm_link', 'iai_donbot', 'ur5_touchpad'): 0.05,
-                                     ('ur5_forearm_link', 'iai_donbot', 'ur5_wrist_3_link'): 0.05,
-                                     ('ur5_forearm_link', 'iai_donbot', 'wlan'): 0.05,
-                                     ('ur5_forearm_link', 'iai_donbot', 'wrist_collision'): 0.05,
-                                     ('ur5_shoulder_link', 'iai_donbot', 'ur5_wrist_1_link'): 0.05,
-                                     ('ur5_shoulder_link', 'iai_donbot', 'ur5_wrist_2_link'): 0.05,
-                                     ('ur5_shoulder_link', 'iai_donbot', 'ur5_wrist_3_link'): 0.05,
-                                     ('ur5_shoulder_link', 'iai_donbot', 'wrist_collision'): 0.05,
-                                     ('ur5_touchpad', 'iai_donbot', 'ur5_upper_arm_link'): 0.05,
-                                     ('ur5_touchpad', 'iai_donbot', 'ur5_wrist_1_link'): 0.05,
-                                     ('ur5_touchpad', 'iai_donbot', 'ur5_wrist_2_link'): 0.05,
-                                     ('ur5_touchpad', 'iai_donbot', 'ur5_wrist_3_link'): 0.05,
-                                     ('ur5_touchpad', 'iai_donbot', 'wrist_collision'): 0.05,
-                                     ('ur5_upper_arm_link', 'iai_donbot', 'ur5_wrist_1_link'): 0.05,
-                                     ('ur5_upper_arm_link', 'iai_donbot', 'ur5_wrist_2_link'): 0.05,
-                                     ('ur5_upper_arm_link', 'iai_donbot', 'ur5_wrist_3_link'): 0.05,
-                                     ('ur5_upper_arm_link', 'iai_donbot', 'wlan'): 0.05,
-                                     ('ur5_upper_arm_link', 'iai_donbot', 'wrist_collision'): 0.05,
-                                     ('ur5_wrist_1_link', 'iai_donbot', 'wlan'): 0.05,
-                                     ('ur5_wrist_2_link', 'iai_donbot', 'wlan'): 0.05,
-                                     ('ur5_wrist_3_link', 'iai_donbot', 'wlan'): 0.05,
-                                     ('wlan', 'iai_donbot', 'wrist_collision'): 0.05}
-
+        assert len(collision_matrix) == 116
         return world_with_donbot
 
     def test_attach_detach_existing_obj_to_robot1(self, function_setup):
@@ -425,11 +316,11 @@ class TestPyBulletWorld(test_world.TestWorld):
         base_pose.orientation.w = 1
         w.set_object_pose('pr23', base_pose)
 
-        min_dist = defaultdict(lambda: {u'zero_weight_distance': 0.1})
+        min_dist = defaultdict(lambda: 0.1)
         cut_off_distances = w.collision_goals_to_collision_matrix([], min_dist)
 
         for i in range(160):
-            assert len(w.check_collisions(cut_off_distances).all_collisions) == 1328
+            assert len(w.check_collisions(cut_off_distances).all_collisions) == 614
 
     def test_check_collisions3(self, test_folder):
         w = self.make_world_with_pr2()
@@ -440,13 +331,13 @@ class TestPyBulletWorld(test_world.TestWorld):
         base_pose.position.x = 1.5
         base_pose.orientation.w = 1
         w.set_object_pose('pr22', base_pose)
-        min_dist = defaultdict(lambda: {u'zero_weight_distance': 0.1})
+        min_dist = defaultdict(lambda: 0.1)
         cut_off_distances = w.collision_goals_to_collision_matrix([], min_dist)
         robot_links = pr22.get_link_names()
-        cut_off_distances.update({(link1, 'pr22', link2): 0.1 for link1, link2 in product(robot_links, repeat=2)})
+        cut_off_distances.update({(link1, 'pr22', link2): 0.1 for link1, link2 in product(robot_links, repeat=2) if w.robot.has_link_collision(link1)})
 
         for i in range(160):
-            assert len(w.check_collisions(cut_off_distances).all_collisions) == 60
+            assert len(w.check_collisions(cut_off_distances).all_collisions) == 0
 
     # TODO test that has collision entries of robot links without collision geometry
 

@@ -23,6 +23,8 @@ class KinSimPlugin(GiskardBehavior):
         if next_cmds:
             next_js = JointStates()
             for key, sjs in current_js.items():
+                if self.get_robot().is_joint_mimic(key):
+                    continue
                 joint_name = str(self.get_robot().get_joint_position_symbol(key))
                 vel_cmds = next_cmds[0]
                 if joint_name in vel_cmds:

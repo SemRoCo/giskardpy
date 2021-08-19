@@ -5,7 +5,7 @@ from giskardpy.goals.goal import Goal, WEIGHT_COLLISION_AVOIDANCE, WEIGHT_ABOVE_
 
 class ExternalCollisionAvoidance(Goal):
 
-    def __init__(self, god_map, link_name, max_velocity=0.2, hard_threshold=0.0, soft_threshold=0.05, idx=0,
+    def __init__(self, link_name, max_velocity=0.2, hard_threshold=0.0, soft_threshold=0.05, idx=0,
                  num_repeller=1, **kwargs):
         """
         Don't use me
@@ -16,7 +16,7 @@ class ExternalCollisionAvoidance(Goal):
         self.num_repeller = num_repeller
         self.link_name = link_name
         self.idx = idx
-        super(ExternalCollisionAvoidance, self).__init__(god_map, **kwargs)
+        super(ExternalCollisionAvoidance, self).__init__(**kwargs)
         self.robot_root = self.get_robot().get_root()
         self.robot_name = self.get_robot_unsafe().get_name()
 
@@ -42,29 +42,22 @@ class ExternalCollisionAvoidance(Goal):
                                                                              tuple()])
 
     def get_actual_distance(self):
-        return self.god_map.to_symbol(identifier.closest_point + [u'get_external_collisions',
-                                                                  (self.link_name,),
-                                                                  self.idx,
+        return self._god_map.to_symbol(identifier.closest_point + [u'get_external_collisions',
+                                                                   (self.link_name,),
+                                                                   self.idx,
                                                                   u'get_contact_distance',
-                                                                  tuple()])
+                                                                   tuple()])
 
     def get_number_of_external_collisions(self):
-        return self.god_map.to_symbol(identifier.closest_point + [u'get_number_of_external_collisions',
-                                                                  (self.link_name,)])
+        return self._god_map.to_symbol(identifier.closest_point + [u'get_number_of_external_collisions',
+                                                                   (self.link_name,)])
 
     def make_constraints(self):
         a_P_pa = self.get_closest_point_on_a_in_a()
         r_V_n = self.get_contact_normal_on_b_in_root()
         actual_distance = self.get_actual_distance()
-        max_velocity = self.get_parameter_as_symbolic_expression(u'max_velocity')
-        # zero_weight_distance = self.get_input_float(self.zero_weight_distance)
-        hard_threshold = self.get_parameter_as_symbolic_expression(u'hard_threshold')
-        soft_threshold = self.get_parameter_as_symbolic_expression(u'soft_threshold')
-        # spring_threshold = soft_threshold
-        # soft_threshold = soft_threshold * 0.5
         sample_period = self.get_sampling_period_symbol()
         number_of_external_collisions = self.get_number_of_external_collisions()
-        num_repeller = self.get_parameter_as_symbolic_expression(u'num_repeller')
 
         root_T_a = self.get_fk(self.robot_root, self.link_name)
 
@@ -72,48 +65,39 @@ class ExternalCollisionAvoidance(Goal):
 
         dist = w.dot(r_V_n.T, r_P_pa)[0]
 
-        qp_limits_for_lba = max_velocity * sample_period * self.control_horizon
+        qp_limits_for_lba = self.max_velocity * sample_period * self.control_horizon
 
-        penetration_distance = soft_threshold - actual_distance
-        lower_limit = penetration_distance
+        lower_limit = self.soft_threshold - actual_distance
 
         lower_limit_limited = w.limit(lower_limit,
                                       -qp_limits_for_lba,
                                       qp_limits_for_lba)
 
-        upper_slack = w.if_greater(actual_distance, hard_threshold,
-                                   w.limit(soft_threshold - hard_threshold,
+        upper_slack = w.if_greater(actual_distance, self.hard_threshold,
+                                   w.limit(self.soft_threshold - self.hard_threshold,
                                            -qp_limits_for_lba,
                                            qp_limits_for_lba),
                                    lower_limit_limited)
 
         # undo factor in A
         upper_slack /= (sample_period * self.prediction_horizon)
-        # upper_slack *= 10
 
         upper_slack = w.if_greater(actual_distance, 50,  # assuming that distance of unchecked closest points is 100
                                    1e4,
-                                   # 1e4,
                                    w.max(0, upper_slack))
 
         weight = w.if_greater(actual_distance, 50, 0, WEIGHT_COLLISION_AVOIDANCE)
 
         weight = w.save_division(weight,  # divide by number of active repeller per link
-                                 w.min(number_of_external_collisions, num_repeller))
+                                 w.min(number_of_external_collisions, self.num_repeller))
 
-        self.add_constraint(u'/position',
-                            reference_velocity=max_velocity,
+        self.add_constraint(reference_velocity=self.max_velocity,
                             lower_error=lower_limit,
                             upper_error=100,
                             weight=weight,
                             expression=dist,
                             lower_slack_limit=-1e4,
                             upper_slack_limit=upper_slack)
-
-        # self.add_velocity_constraint(u'/position/vel',
-        #                              velocity_limit=max_velocity,
-        #                              weight=weight,
-        #                              expression=dist)
 
     def __str__(self):
         s = super(ExternalCollisionAvoidance, self).__str__()
@@ -122,7 +106,7 @@ class ExternalCollisionAvoidance(Goal):
 
 class SelfCollisionAvoidance(Goal):
 
-    def __init__(self, god_map, link_a, link_b, max_velocity=0.2, hard_threshold=0.0, soft_threshold=0.05, idx=0,
+    def __init__(self, link_a, link_b, max_velocity=0.2, hard_threshold=0.0, soft_threshold=0.05, idx=0,
                  num_repeller=1, **kwargs):
         self.link_a = link_a
         self.link_b = link_b
@@ -131,7 +115,7 @@ class SelfCollisionAvoidance(Goal):
         self.soft_threshold = soft_threshold
         self.num_repeller = num_repeller
         self.idx = idx
-        super(SelfCollisionAvoidance, self).__init__(god_map, **kwargs)
+        super(SelfCollisionAvoidance, self).__init__(**kwargs)
         self.robot_root = self.get_robot().get_root()
         self.robot_name = self.get_robot_unsafe().get_name()
 
@@ -157,23 +141,19 @@ class SelfCollisionAvoidance(Goal):
                                                                                    tuple()])
 
     def get_actual_distance(self):
-        return self.god_map.to_symbol(identifier.closest_point + [u'get_self_collisions',
-                                                                  (self.link_a, self.link_b),
-                                                                  self.idx,
+        return self._god_map.to_symbol(identifier.closest_point + [u'get_self_collisions',
+                                                                   (self.link_a, self.link_b),
+                                                                   self.idx,
                                                                   u'get_contact_distance',
-                                                                  tuple()])
+                                                                   tuple()])
 
     def get_number_of_self_collisions(self):
-        return self.god_map.to_symbol(identifier.closest_point + [u'get_number_of_self_collisions',
-                                                                  (self.link_a, self.link_b)])
+        return self._god_map.to_symbol(identifier.closest_point + [u'get_number_of_self_collisions',
+                                                                   (self.link_a, self.link_b)])
 
     def make_constraints(self):
-        max_velocity = self.get_parameter_as_symbolic_expression(u'max_velocity')
-        hard_threshold = self.get_parameter_as_symbolic_expression(u'hard_threshold')
-        soft_threshold = self.get_parameter_as_symbolic_expression(u'soft_threshold')
         actual_distance = self.get_actual_distance()
         number_of_self_collisions = self.get_number_of_self_collisions()
-        num_repeller = self.get_parameter_as_symbolic_expression(u'num_repeller')
         sample_period = self.get_sampling_period_symbol()
 
         b_T_a = self.get_fk(self.link_b, self.link_a)
@@ -188,35 +168,30 @@ class SelfCollisionAvoidance(Goal):
 
         weight = w.if_greater(actual_distance, 50, 0, WEIGHT_COLLISION_AVOIDANCE)
         weight = w.save_division(weight,  # divide by number of active repeller per link
-                                 w.min(number_of_self_collisions, num_repeller))
+                                 w.min(number_of_self_collisions, self.num_repeller))
 
-        penetration_distance = soft_threshold - actual_distance
-        qp_limits_for_lba = max_velocity * sample_period * self.control_horizon
+        qp_limits_for_lba = self.max_velocity * sample_period * self.control_horizon
 
-        penetration_distance = soft_threshold - actual_distance
-        lower_limit = penetration_distance
+        lower_limit = self.soft_threshold - actual_distance
 
         lower_limit_limited = w.limit(lower_limit,
                                       -qp_limits_for_lba,
                                       qp_limits_for_lba)
 
-        upper_slack = w.if_greater(actual_distance, hard_threshold,
-                                   w.limit(soft_threshold - hard_threshold,
+        upper_slack = w.if_greater(actual_distance, self.hard_threshold,
+                                   w.limit(self.soft_threshold - self.hard_threshold,
                                            -qp_limits_for_lba,
                                            qp_limits_for_lba),
                                    lower_limit_limited)
 
         # undo factor in A
         upper_slack /= (sample_period * self.prediction_horizon)
-        # upper_slack *= 10
 
         upper_slack = w.if_greater(actual_distance, 50,  # assuming that distance of unchecked closest points is 100
                                    1e4,
-                                   # 1e4,
                                    w.max(0, upper_slack))
 
-        self.add_constraint(u'/position',
-                            reference_velocity=max_velocity,
+        self.add_constraint(reference_velocity=self.max_velocity,
                             lower_error=lower_limit,
                             upper_error=100,
                             weight=weight,
@@ -230,9 +205,8 @@ class SelfCollisionAvoidance(Goal):
 
 
 class CollisionAvoidanceHint(Goal):
-    def __init__(self, god_map, tip_link, avoidance_hint, object_name, object_link_name, max_linear_velocity=0.1,
-                 root_link=None,
-                 max_threshold=0.05, spring_threshold=None, weight=WEIGHT_ABOVE_CA, **kwargs):
+    def __init__(self, tip_link, avoidance_hint, object_name, object_link_name, max_linear_velocity=0.1,
+                 root_link=None, max_threshold=0.05, spring_threshold=None, weight=WEIGHT_ABOVE_CA, **kwargs):
         """
         This goal pushes the link_name in the direction of avoidance_hint, if it is closer than spring_threshold
         to body_b/link_b.
@@ -253,7 +227,7 @@ class CollisionAvoidanceHint(Goal):
         self.link_b = object_link_name
         self.body_b_hash = object_name.__hash__()
         self.link_b_hash = object_link_name.__hash__()
-        super(CollisionAvoidanceHint, self).__init__(god_map, **kwargs)
+        super(CollisionAvoidanceHint, self).__init__(**kwargs)
         if root_link is None:
             self.root_link = self.get_robot().get_root()
         else:
@@ -299,18 +273,18 @@ class CollisionAvoidanceHint(Goal):
                                                                              tuple()])
 
     def get_actual_distance(self):
-        return self.god_map.to_symbol(identifier.closest_point + [u'get_external_collisions_long_key',
-                                                                  self.key,
+        return self._god_map.to_symbol(identifier.closest_point + [u'get_external_collisions_long_key',
+                                                                   self.key,
                                                                   u'get_contact_distance',
-                                                                  tuple()])
+                                                                   tuple()])
 
     def get_body_b(self):
-        return self.god_map.to_symbol(identifier.closest_point + [u'get_external_collisions_long_key',
-                                                                  self.key, u'get_body_b_hash', tuple()])
+        return self._god_map.to_symbol(identifier.closest_point + [u'get_external_collisions_long_key',
+                                                                   self.key, u'get_body_b_hash', tuple()])
 
     def get_link_b(self):
-        return self.god_map.to_symbol(identifier.closest_point + [u'get_external_collisions_long_key',
-                                                                  self.key, u'get_link_b_hash', tuple()])
+        return self._god_map.to_symbol(identifier.closest_point + [u'get_external_collisions_long_key',
+                                                                   self.key, u'get_link_b_hash', tuple()])
 
     def make_constraints(self):
         weight = self.get_parameter_as_symbolic_expression(u'weight')
@@ -343,7 +317,7 @@ class CollisionAvoidanceHint(Goal):
         expr = w.dot(root_V_avoidance_hint[:3].T, root_P_a[:3])
 
         # FIXME really?
-        self.add_constraint(u'avoidance_hint',
+        self.add_constraint(name_suffix=u'avoidance_hint',
                             reference_velocity=max_velocity,
                             lower_error=max_velocity,
                             upper_error=max_velocity,

@@ -1,6 +1,5 @@
 
 import giskardpy
-from giskardpy.data_types import SingleJointState
 from giskardpy.utils.tfwrapper import kdl_to_pose
 
 giskardpy.WORLD_IMPLEMENTATION = None
@@ -14,7 +13,6 @@ from urdf_parser_py.urdf import URDF
 from giskardpy.model.robot import Robot
 from utils_for_tests import rnd_joint_state, pr2_urdf, donbot_urdf, boxy_urdf, base_bot_urdf, compare_poses
 from giskardpy.model.urdf_object import hacky_urdf_parser_fix
-from kdl_parser import kdl_tree_from_urdf_model
 import numpy as np
 from hypothesis import given
 
@@ -251,11 +249,3 @@ class TestSymengineController(object):
                     u'left_gripper_base_gripper_left_joint', u'right_arm_6_joint'}
 
         assert set(parsed_boxy.get_joint_names_controllable()).difference(expected) == set()
-
-
-if __name__ == '__main__':
-    import rosunit
-
-    rosunit.unitrun(package=PKG,
-                    test_name='TestSymengineController',
-                    test=TestSymengineController)

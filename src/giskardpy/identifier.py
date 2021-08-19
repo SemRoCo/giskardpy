@@ -46,6 +46,7 @@ sample_period = general_options + [u'sample_period']
 map_frame = general_options + [u'map_frame']
 debug = general_options + [u'debug']
 fill_velocity_values = general_options + [u'fill_velocity_values']
+test_mode = general_options + [u'test_mode']
 
 joint_limits = general_options + [u'joint_limits']
 
@@ -61,7 +62,7 @@ joint_weights = general_options + [u'joint_weights']
 qp_solver = rosparam + [u'qp_solver']
 qp_solver_name = qp_solver + [u'name']
 prediction_horizon = qp_solver + [u'prediction_horizon']
-retry_with_relaxed_constraints = qp_solver + [u'hard_constraint_handling', u'retry_with_relaxed_constraints']
+retries_with_relaxed_constraints = qp_solver + [u'hard_constraint_handling', u'retries_with_relaxed_constraints']
 retry_added_slack = qp_solver + [u'hard_constraint_handling', u'added_slack']
 retry_weight_factor = qp_solver + [u'hard_constraint_handling', u'weight_factor']
 

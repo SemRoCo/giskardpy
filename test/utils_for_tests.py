@@ -454,12 +454,18 @@ class GiskardTestWrapper(GiskardWrapper):
         if not root_link:
             root_link = self.default_root
         if weight is not None:
-            super(GiskardTestWrapper, self).set_cart_goal(goal_pose, tip_link, root_link, weight=weight, max_linear_velocity=linear_velocity,
-                                       max_angular_velocity=angular_velocity)
+            super(GiskardTestWrapper, self).set_cart_goal(goal_pose,
+                                                          tip_link,
+                                                          root_link,
+                                                          weight=weight,
+                                                          max_linear_velocity=linear_velocity,
+                                                          max_angular_velocity=angular_velocity)
         else:
-            super(GiskardTestWrapper, self).set_cart_goal(goal_pose, tip_link, root_link, max_linear_velocity=linear_velocity,
-                                       max_angular_velocity=angular_velocity)
-
+            super(GiskardTestWrapper, self).set_cart_goal(goal_pose,
+                                                          tip_link,
+                                                          root_link,
+                                                          max_linear_velocity=linear_velocity,
+                                                          max_angular_velocity=angular_velocity)
 
     def set_straight_cart_goal(self, goal_pose, tip_link, root_link=None, weight=None, linear_velocity=None, angular_velocity=None):
         if not root_link:

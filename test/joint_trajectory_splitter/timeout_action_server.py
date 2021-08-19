@@ -20,7 +20,7 @@ class TimeoutActionServer(object):
         self._as.set_preempted()
 
     def execute_cb(self, goal):
-        rospy.sleep(goal.trajectory.points[2].time_from_start + rospy.Duration(5))
+        rospy.sleep(10)
         if self._as.is_active():
             self._as.set_succeeded()
 

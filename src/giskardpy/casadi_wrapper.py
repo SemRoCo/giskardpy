@@ -131,6 +131,12 @@ def Matrix(data):
         return m
 
 
+def matrix_to_list(m):
+    try:
+        len(m)
+        return m
+    except:
+        return [m[i] for i in range(m.shape[0])]
 
 
 

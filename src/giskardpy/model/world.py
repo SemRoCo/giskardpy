@@ -112,7 +112,7 @@ class World(object):
         """
         :type robot: giskardpy.world_object.WorldObject
         :type controlled_joints: list
-        :type base_pose: PoseStamped
+        :type base_pose: Pose
         """
         if not isinstance(robot, WorldObject):
             raise TypeError(u'only WorldObject can be added to world')
@@ -121,6 +121,8 @@ class World(object):
         if self.has_object(robot.get_name()):
             raise DuplicateNameException(
                 u'can\'t add robot; object with name "{}" already exists'.format(robot.get_name()))
+        if base_pose is None:
+            base_pose = robot.base_pose
         self._robot = Robot.from_urdf_object(urdf_object=robot,
                                              base_pose=base_pose,
                                              controlled_joints=controlled_joints,
@@ -208,6 +210,7 @@ class World(object):
             assert len(collision_entry.robot_links) == 1
             assert len(collision_entry.link_bs) == 1
             key = (collision_entry.robot_links[0], collision_entry.body_b, collision_entry.link_bs[0])
+            r_key = (collision_entry.link_bs[0], collision_entry.body_b, collision_entry.robot_links[0])
             if self.is_allow_collision(collision_entry):
                 if self.all_link_bs(collision_entry):
                     for key2 in list(min_allowed_distance.keys()):
@@ -215,6 +218,8 @@ class World(object):
                             del min_allowed_distance[key2]
                 elif key in min_allowed_distance:
                     del min_allowed_distance[key]
+                elif r_key in min_allowed_distance:
+                    del min_allowed_distance[r_key]
 
             elif self.is_avoid_collision(collision_entry):
                 min_allowed_distance[key] = min_dist[key[0]]

@@ -138,7 +138,8 @@ def clear_pybullet():
 
 
 def get_body_names():
-    return [p.getBodyInfo(p.getBodyUniqueId(i))[1] for i in range(p.getNumBodies())]
+    # return [p.getBodyInfo(p.getBodyUniqueId(i))[1] for i in range(p.getNumBodies())]
+    return [p.getBodyInfo(p.getBodyUniqueId(i))[1].decode("utf-8")  for i in range(p.getNumBodies())]
 
 
 def print_body_names():

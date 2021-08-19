@@ -3,7 +3,7 @@ from giskardpy import casadi_wrapper as w
 import giskardpy.utils.tfwrapper as tf
 
 class AlignPlanes(Goal):
-    def __init__(self, god_map, root_link, tip_link, root_normal, tip_normal,
+    def __init__(self, root_link, tip_link, root_normal, tip_normal,
                  max_angular_velocity=0.5, weight=WEIGHT_ABOVE_CA, **kwargs):
         """
         This Goal will use the kinematic chain between tip and root normal to align both
@@ -26,7 +26,7 @@ class AlignPlanes(Goal):
         self.root_V_root_normal = tf.transform_vector(self.root, root_normal)
         self.root_V_root_normal.vector = tf.normalize(self.root_V_root_normal.vector)
 
-        super(AlignPlanes, self).__init__(god_map, **kwargs)
+        super(AlignPlanes, self).__init__(**kwargs)
 
     def __str__(self):
         s = super(AlignPlanes, self).__str__()
@@ -36,14 +36,12 @@ class AlignPlanes(Goal):
                                                  self.tip_V_tip_normal.vector.z)
 
     def make_constraints(self):
-        max_velocity = self.get_parameter_as_symbolic_expression(u'max_velocity')
         tip_V_tip_normal = self.get_parameter_as_symbolic_expression(u'tip_V_tip_normal')
+        root_R_tip = w.rotation_of(self.get_fk(self.root, self.tip))
+        root_V_tip_normal = w.dot(root_R_tip, tip_V_tip_normal)
         root_V_root_normal = self.get_parameter_as_symbolic_expression(u'root_V_root_normal')
-        weight = self.get_parameter_as_symbolic_expression(u'weight')
-        self.add_minimize_vector_angle_constraints(max_velocity=max_velocity,
-                                                   root=self.root,
-                                                   tip=self.tip,
-                                                   tip_V_tip_normal=tip_V_tip_normal,
-                                                   root_V_goal_normal=root_V_root_normal,
-                                                   weight=weight)
+        self.add_vector_goal_constraints(frame_V_current=root_V_tip_normal,
+                                         frame_V_goal=root_V_root_normal,
+                                         reference_velocity=self.max_velocity,
+                                         weight=self.weight)
 

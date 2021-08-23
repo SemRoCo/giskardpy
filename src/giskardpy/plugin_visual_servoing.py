@@ -4,6 +4,7 @@ from giskardpy.plugin import GiskardBehavior
 from giskardpy.identifier import vs_goal
 from py_trees import Status
 import rospy
+from giskardpy import tfwrapper
 
 from geometry_msgs.msg import PoseStamped
 
@@ -20,10 +21,13 @@ class VisualServoingPlugin(GiskardBehavior):
 
     def cb(self, msg):
         self.lock.acquire()
+        new_goal_pose = msg
+        if not new_goal_pose.header.frame_id == "map":
+            new_goal_pose = tfwrapper.transform_pose("map", new_goal_pose)
         rospy.loginfo("Updating goal pose")
         rospy.loginfo("From: {}".format(self.get_god_map().get_data(vs_goal)))
-        rospy.loginfo("To: {}".format(msg))
-        self.goal_pose = msg
+        rospy.loginfo("To: {}".format(new_goal_pose))
+        self.goal_pose = new_goal_pose
         self.lock.release()
 
     @profile

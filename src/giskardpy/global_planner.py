@@ -32,12 +32,28 @@ from giskardpy.data_types import JointStates
 from giskardpy.utils.utils import convert_dictionary_to_ros_message, convert_ros_message_to_dictionary
 
 
+class PathLengthAndGoalOptimizationObjective(ob.PathLengthOptimizationObjective):
+
+    def __init__(self, si, goal):
+        ob.PathLengthOptimizationObjective.__init__(self, si)
+        self.goal = goal()
+
+    def stateCost(self, state):
+        return ob.Cost(self.getSpaceInformation().distance(state, self.goal))
+
+    def motionCost(self, s1, s2):
+        return self.motionCostHeuristic(s1, s2)
+
+    def motionCostHeuristic(self, s1, s2):
+        return ob.Cost(self.getSpaceInformation().distance(s1, s2))
+
+
 class TwoDimRayMotionValidator(ob.MotionValidator):
 
-    def __init__(self, si):
+    def __init__(self, si, state_validator):
         ob.MotionValidator.__init__(self, si)
         self.lock = threading.Lock()
-        self.state_validator = TwoDimStateValidator(si)
+        self.state_validator = state_validator
         if 'pybullet' not in sys.modules:
             raise Exception('For two dimensional motion validation the python module pybullet is needed.')
 
@@ -58,19 +74,20 @@ class TwoDimRayMotionValidator(ob.MotionValidator):
             query_b = [[x_b + aabb[0], y_b + aabb[1], 0] for aabb in aabbs]
             query_e = [[x_e + aabb[0], y_e + aabb[1], 0] for aabb in aabbs]
             query_res = p.rayTestBatch(query_b, query_e)
-            # todo: check if actually works, stepSimulation?
+            # todo: check if actually works, stepSimulation or p.performCollisionDetection()?
             return all([obj != self.state_validator.pybullet_kitchen_id for obj, _, _, _, _ in query_res]) and \
                    self.state_validator.isValid(s1) and self.state_validator.isValid(s2)
 
 
 class TwoDimStateValidator(ob.StateValidityChecker, GiskardBehavior):
 
-    def __init__(self, si):
+    def __init__(self, si, collision_checker):
         ob.StateValidityChecker.__init__(self, si)
         GiskardBehavior.__init__(self, str(self))
         self.lock = threading.Lock()
         self.init_map()
         self.init_pybullet_ids_and_joints()
+        self.collision_checker = collision_checker
         if not self.pybullet_initialized and not self.map_initialized:
             raise Exception(
                 'At least one of the following service must be activated for two dimensional state validation:'
@@ -79,8 +96,9 @@ class TwoDimStateValidator(ob.StateValidityChecker, GiskardBehavior):
     def init_pybullet_ids_and_joints(self):
         if 'pybullet' in sys.modules:
             self.pybullet_initialized = True
-            self.pybullet_joints = []
-            self.pybullet_robot_id = 2
+            self.pybullet_joints = [] # todo: remove and use instead self.get_robot().joint_name_to_info[joint_name].joint_index
+            self.pybullet_floor_id = 1
+            self.pybullet_robot_id = 2 # todo: self.get_robot.get_pybullet_id()
             self.pybullet_kitchen_id = 3
             for i in range(0, p.getNumJoints(self.get_robot().get_pybullet_id())):
                 j = p.getJointInfo(self.get_robot().get_pybullet_id(), i)
@@ -90,7 +108,7 @@ class TwoDimStateValidator(ob.StateValidityChecker, GiskardBehavior):
         else:
             self.pybullet_initialized = False
 
-    def init_map(self, timeout=10.0):
+    def init_map(self, timeout=3.0):
         try:
             rospy.wait_for_service('static_map', timeout=timeout)
             self.map_initialized = True
@@ -131,7 +149,7 @@ class TwoDimStateValidator(ob.StateValidityChecker, GiskardBehavior):
             x = state.getX()
             y = state.getY()
             # Get current joint states from Bullet and copy them
-            current_js = self.get_god_map().get_data(identifier.joint_states)
+            old_js = self.get_robot().joint_state
             robot = self.get_robot()
             # Calc IK for navigating to given state and ...
             poses = [[x, y, 0], [x + 0.1, y, 0], [x - 0.1, y, 0], [x, y + 0.1, 0], [x, y - 0.1, 0]]
@@ -140,19 +158,21 @@ class TwoDimStateValidator(ob.StateValidityChecker, GiskardBehavior):
                                                               robot.get_pybullet_link_id(u'base_footprint'),
                                                               pose), poses))
             # override on current joint states.
-            collisions = ()
+            results = []
             for state_ik in state_iks:
+                # Transform floats into a JointStates object
                 new_js = JointStates()
                 for j_name, j_state in zip(self.pybullet_joints, state_ik):
                     new_js[j_name].position = j_state
                 # Set new joint states in Bullet
-                self.get_god_map().set_data(identifier.joint_states, new_js)
+                self.get_robot().joint_state = {k: v for k, v in new_js.items()}
+                #for joint_name, joint_state in new_js.items():
+                #    self.get_robot().joint_state[joint_name] = joint_state
                 # Check if kitchen is colliding with robot
-                p.performCollisionDetection()
-                collisions += p.getContactPoints(self.pybullet_robot_id, self.pybullet_kitchen_id)
+                results.append(self.collision_checker())
                 # Reset joint state
-                self.get_god_map().set_data(identifier.joint_states, current_js)
-            return collisions == tuple()
+                self.get_robot().joint_state = old_js
+            return all(results)
         else:
             return True
 
@@ -188,6 +208,21 @@ class GlobalPlanner(GetGoal):
         except StopIteration:
             return None
 
+    def update_collisions_environment(self):
+        self.get_god_map().get_data(identifier.tree_manager).get_node(u'coll').initialise()
+
+    def update_collision_checker(self):
+        self.get_god_map().get_data(identifier.tree_manager).get_node(u'coll').update()
+
+    def is_external_collision_free(self):
+        self.update_collision_checker()
+        closest_points = self.god_map.get_data(identifier.closest_point)
+        collisions = []
+        for joint_name in self.get_robot().get_link_names():
+            if joint_name in closest_points.external_collision:
+                collisions.append(closest_points.get_external_collisions(joint_name))
+        return len(collisions) == 0
+
     def update(self):
 
         move_cmd = self.get_god_map().get_data(identifier.next_move_goal)  # type: MoveCmd
@@ -198,6 +233,7 @@ class GlobalPlanner(GetGoal):
         if not cart_c:
             return Status.SUCCESS
 
+        self.update_collisions_environment()
         self.goal_dict = yaml.load(cart_c.parameter_value_pair)
         ros_pose = convert_dictionary_to_ros_message(self.goal_dict[u'goal'])
         self.pose_goal = transform_pose(self.get_god_map().get_data(identifier.map_frame), ros_pose)
@@ -308,8 +344,8 @@ class GlobalPlanner(GetGoal):
 
         # Set two dimensional motion and state validator
         si = self.navigation_setup.getSpaceInformation()
-        si.setMotionValidator(TwoDimRayMotionValidator(si))
-        si.setStateValidityChecker(TwoDimStateValidator(si))
+        si.setMotionValidator(TwoDimRayMotionValidator(si, state_validator=TwoDimStateValidator(si, collision_checker=self.is_external_collision_free)))
+        si.setStateValidityChecker(TwoDimStateValidator(si, collision_checker=self.is_external_collision_free))
         si.setup()
 
         # si.setValidStateSamplerAllocator(ob.ValidStateSamplerAllocator(self.allocOBValidStateSampler))
@@ -319,27 +355,46 @@ class GlobalPlanner(GetGoal):
         planner = self.get_navigation_planner(si)
         self.navigation_setup.setPlanner(planner)
 
-    def planNavigation(self, num_of_tries=3, plot=True):
+    def planNavigation(self, initial_solve_time=15, refine_solve_time=5,
+                       max_num_of_tries=3, max_refine_iterations=5, min_refine_thresh=0.1,
+                       plot=True):
 
         start = self.get_translation_start_state(self.kitchen_floor_space)
         goal = self.get_translation_goal_state(self.kitchen_floor_space)
         self.navigation_setup.setStartAndGoalStates(start, goal)
 
-        solved = ob.PlannerStatus.UNKNOWN
-        i = 0
-        while i < num_of_tries and solved not in [ob.PlannerStatus.APPROXIMATE_SOLUTION,
-                                                  ob.PlannerStatus.EXACT_SOLUTION]:
-            solved = self.navigation_setup.solve(20.0)
-            i += 1
+        optimization_objective = PathLengthAndGoalOptimizationObjective(self.navigation_setup.getSpaceInformation(), goal)
+        self.navigation_setup.setOptimizationObjective(optimization_objective)
+
+        planner_status = ob.PlannerStatus(ob.PlannerStatus.UNKNOWN)
+        num_try = 0
+        solve_time = initial_solve_time
+        # Find solution
+        while num_try < max_num_of_tries and planner_status.getStatus() not in [ob.PlannerStatus.APPROXIMATE_SOLUTION,
+                                                                                ob.PlannerStatus.EXACT_SOLUTION]:
+            planner_status = self.navigation_setup.solve(solve_time)
+            num_try += 1
+        # Refine solution
+        refine_iteration = 0
+        v_min = 1e6
+        while v_min > min_refine_thresh and refine_iteration < max_refine_iterations:
+            if not self.fast_navigation:
+                v_before = self.navigation_setup.getPlanner().bestCost().value()
+            self.navigation_setup.solve(refine_solve_time)
+            if not self.fast_navigation:
+                v_after = self.navigation_setup.getPlanner().bestCost().value()
+                v_min = v_before - v_after
+            refine_iteration += 1
+
         # og.PathSimplifier(si).smoothBSpline(ss.getSolutionPath()) # takes around 20-30 secs with RTTConnect(0.1)
         # og.PathSimplifier(si).reduceVertices(ss.getSolutionPath())
+        # Make sure enough subpaths are available for Path Following
         self.navigation_setup.getSolutionPath().interpolate(20)
-        if solved:
+        if planner_status:
             # try to shorten the path
             # ss.simplifySolution() DONT! NO! DONT UNCOMMENT THAT! NO! STOP IT! FIRST IMPLEMENT CHECKMOTION! THEN TRY AGAIN!
             # print the simplified path
-            data = states_matrix_str2array_floats(
-                self.navigation_setup.getSolutionPath().printAsMatrix())  # [[x, y, theta]]
+            data = states_matrix_str2array_floats(self.navigation_setup.getSolutionPath().printAsMatrix())  # [[x, y, theta]]
             if plot:
                 plt.close()
                 fig, ax = plt.subplots()

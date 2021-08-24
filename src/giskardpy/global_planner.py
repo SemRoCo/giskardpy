@@ -1,7 +1,5 @@
 #!/usr/bin/env python
 
-
-# Author: Mark Moll
 import json
 import sys
 import threading
@@ -28,7 +26,6 @@ import matplotlib.pyplot as plt
 from ompl import base as ob
 from ompl import geometric as og
 
-from giskardpy.data_types import JointStates
 from giskardpy.utils.utils import convert_dictionary_to_ros_message, convert_ros_message_to_dictionary
 
 
@@ -48,14 +45,29 @@ class PathLengthAndGoalOptimizationObjective(ob.PathLengthOptimizationObjective)
         return ob.Cost(self.getSpaceInformation().distance(s1, s2))
 
 
-class TwoDimRayMotionValidator(ob.MotionValidator):
+class TwoDimRayMotionValidator(ob.MotionValidator, GiskardBehavior):
 
-    def __init__(self, si, state_validator):
+    def __init__(self, si, object_in_motion):
         ob.MotionValidator.__init__(self, si)
-        self.lock = threading.Lock()
-        self.state_validator = state_validator
+        GiskardBehavior.__init__(self, str(self))
         if 'pybullet' not in sys.modules:
             raise Exception('For two dimensional motion validation the python module pybullet is needed.')
+        self.lock = threading.Lock()
+        self.object_in_motion = object_in_motion
+        self.init_ignore_objects()
+
+    def init_ignore_objects(self, ignore_objects=None):
+        if ignore_objects is None:
+            ignore_objects = self.get_world().hidden_objects
+        else:
+            ignore_objects.extend(self.get_world().hidden_objects)
+        self.ignore_object_ids = [self.object_in_motion.get_pybullet_id()]
+        for ignore_object in ignore_objects:
+            if ignore_object in self.get_world()._objects:
+                obj = self.get_world()._objects[ignore_object]
+                self.ignore_object_ids.append(obj.get_pybullet_id())
+            else:
+                raise KeyError('Cannot find object of name {} in the PyBulletWorld.'.format(ignore_object))
 
     def checkMotion(self, s1, s2):
         # checkMotion calls checkMotion with Map anc checkMotion with Bullet
@@ -75,8 +87,7 @@ class TwoDimRayMotionValidator(ob.MotionValidator):
             query_e = [[x_e + aabb[0], y_e + aabb[1], 0] for aabb in aabbs]
             query_res = p.rayTestBatch(query_b, query_e)
             # todo: check if actually works, stepSimulation or p.performCollisionDetection()?
-            return all([obj != self.state_validator.pybullet_kitchen_id for obj, _, _, _, _ in query_res]) and \
-                   self.state_validator.isValid(s1) and self.state_validator.isValid(s2)
+            return all([obj == -1 or obj in self.ignore_object_ids for obj, _, _, _, _ in query_res])
 
 
 class TwoDimStateValidator(ob.StateValidityChecker, GiskardBehavior):
@@ -96,10 +107,7 @@ class TwoDimStateValidator(ob.StateValidityChecker, GiskardBehavior):
     def init_pybullet_ids_and_joints(self):
         if 'pybullet' in sys.modules:
             self.pybullet_initialized = True
-            self.pybullet_joints = [] # todo: remove and use instead self.get_robot().joint_name_to_info[joint_name].joint_index
-            self.pybullet_floor_id = 1
-            self.pybullet_robot_id = 2 # todo: self.get_robot.get_pybullet_id()
-            self.pybullet_kitchen_id = 3
+            self.pybullet_joints = []  # todo: remove and use instead self.get_robot().joint_name_to_info[joint_name].joint_index
             for i in range(0, p.getNumJoints(self.get_robot().get_pybullet_id())):
                 j = p.getJointInfo(self.get_robot().get_pybullet_id(), i)
                 if j[2] != p.JOINT_FIXED:
@@ -149,7 +157,7 @@ class TwoDimStateValidator(ob.StateValidityChecker, GiskardBehavior):
             x = state.getX()
             y = state.getY()
             # Get current joint states from Bullet and copy them
-            old_js = self.get_robot().joint_state
+            old_js = deepcopy(self.get_robot().joint_state)
             robot = self.get_robot()
             # Calc IK for navigating to given state and ...
             poses = [[x, y, 0], [x + 0.1, y, 0], [x - 0.1, y, 0], [x, y + 0.1, 0], [x, y - 0.1, 0]]
@@ -160,11 +168,11 @@ class TwoDimStateValidator(ob.StateValidityChecker, GiskardBehavior):
             # override on current joint states.
             results = []
             for state_ik in state_iks:
+                current_js = deepcopy(old_js)
                 # Set new joint states in Bullet
                 for joint_name, joint_state in zip(self.pybullet_joints, state_ik):
-                    self.get_robot().joint_state[joint_name].position = joint_state
-                #for joint_name, joint_state in new_js.items():
-                #    self.get_robot().joint_state[joint_name] = joint_state
+                    current_js[joint_name].position = joint_state
+                self.get_robot().joint_state = current_js
                 # Check if kitchen is colliding with robot
                 results.append(self.collision_checker())
                 # Reset joint state
@@ -211,7 +219,7 @@ class GlobalPlanner(GetGoal):
     def update_collision_checker(self):
         self.get_god_map().get_data(identifier.tree_manager).get_node(u'coll').update()
 
-    def is_external_collision_free(self):
+    def is_robot_external_collision_free(self):
         self.update_collision_checker()
         closest_points = self.god_map.get_data(identifier.closest_point)
         collisions = []
@@ -341,8 +349,8 @@ class GlobalPlanner(GetGoal):
 
         # Set two dimensional motion and state validator
         si = self.navigation_setup.getSpaceInformation()
-        si.setMotionValidator(TwoDimRayMotionValidator(si, state_validator=TwoDimStateValidator(si, collision_checker=self.is_external_collision_free)))
-        si.setStateValidityChecker(TwoDimStateValidator(si, collision_checker=self.is_external_collision_free))
+        si.setMotionValidator(TwoDimRayMotionValidator(si, self.get_robot()))
+        si.setStateValidityChecker(TwoDimStateValidator(si, self.is_robot_external_collision_free))
         si.setup()
 
         # si.setValidStateSamplerAllocator(ob.ValidStateSamplerAllocator(self.allocOBValidStateSampler))
@@ -352,8 +360,8 @@ class GlobalPlanner(GetGoal):
         planner = self.get_navigation_planner(si)
         self.navigation_setup.setPlanner(planner)
 
-    def planNavigation(self, initial_solve_time=15, refine_solve_time=5,
-                       max_num_of_tries=3, max_refine_iterations=5, min_refine_thresh=0.1,
+    def planNavigation(self, initial_solve_time=60, refine_solve_time=5,
+                       max_num_of_tries=3, max_refine_iterations=0, min_refine_thresh=0.1,
                        plot=True):
 
         start = self.get_translation_start_state(self.kitchen_floor_space)

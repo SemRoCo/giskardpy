@@ -2196,7 +2196,7 @@ class TestCartesianPath(object):
 
         base_pose = PoseStamped()
         base_pose.header.frame_id = tip_link
-        base_pose.pose.position.x = -1.86
+        base_pose.pose.position.x = -2
         base_pose.pose.position.y = 0
         base_pose.pose.orientation = Quaternion(*quaternion_about_axis(0, [0, 0, 1]))
         goal_c = base_pose
@@ -2224,7 +2224,7 @@ class TestCartesianPath(object):
         box_pose.pose.position.y = 0
         box_pose.pose.position.z = 0
         box_pose.pose.orientation = Quaternion(*quaternion_about_axis(0, [0, 0, 1]))
-        kitchen_setup_avoid_collisions.add_box(pose=box_pose, size=(1, 1, 1))
+        kitchen_setup_avoid_collisions.add_box(pose=box_pose, size=(0.5, 0.5, 1))
 
         base_pose = PoseStamped()
         base_pose.header.frame_id = tip_link
@@ -2235,7 +2235,7 @@ class TestCartesianPath(object):
 
         base_pose = PoseStamped()
         base_pose.header.frame_id = tip_link
-        base_pose.pose.position.x = -1.86
+        base_pose.pose.position.x = -2
         base_pose.pose.position.y = 0
         base_pose.pose.orientation = Quaternion(*quaternion_about_axis(0, [0, 0, 1]))
         goal_c = base_pose

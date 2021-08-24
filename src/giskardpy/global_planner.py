@@ -160,12 +160,9 @@ class TwoDimStateValidator(ob.StateValidityChecker, GiskardBehavior):
             # override on current joint states.
             results = []
             for state_ik in state_iks:
-                # Transform floats into a JointStates object
-                new_js = JointStates()
-                for j_name, j_state in zip(self.pybullet_joints, state_ik):
-                    new_js[j_name].position = j_state
                 # Set new joint states in Bullet
-                self.get_robot().joint_state = {k: v for k, v in new_js.items()}
+                for joint_name, joint_state in zip(self.pybullet_joints, state_ik):
+                    self.get_robot().joint_state[joint_name].position = joint_state
                 #for joint_name, joint_state in new_js.items():
                 #    self.get_robot().joint_state[joint_name] = joint_state
                 # Check if kitchen is colliding with robot

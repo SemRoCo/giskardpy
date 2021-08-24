@@ -188,6 +188,26 @@ class GlobalPlanner(GetGoal):
         except StopIteration:
             return None
 
+    def is_global_path_needed(self, root_link, tip_link):
+        curr_pos = self.get_robot().get_fk_pose(root_link, tip_link).pose.position
+        curr_arr = numpy.array([curr_pos.x, curr_pos.y, curr_pos.z])
+        goal_pos = self.pose_goal.pose.position
+        goal_arr = numpy.array([goal_pos.x, goal_pos.y, goal_pos.z])
+        obj_id, _, _, _, normal = p.rayTest(curr_arr, goal_arr)[0]
+        if obj_id != -1:
+            diff = curr_arr - goal_arr
+            v = numpy.array(list(normal)) * diff
+            new_goal_arr = goal_arr + v
+            obj_id, _, _, _, _ = p.rayTest(curr_arr, new_goal_arr)[0]
+            return obj_id != -1
+        else:
+            return False
+
+    def is_global_navigation_needed(self):
+        return self.goal_dict[u'tip_link'] == u'base_footprint' and \
+               self.goal_dict[u'root_link'] == self.get_robot().get_root() and \
+               self.is_global_path_needed(self.goal_dict[u'root_link'], self.goal_dict[u'tip_link'])
+
     def update(self):
 
         move_cmd = self.get_god_map().get_data(identifier.next_move_goal)  # type: MoveCmd
@@ -202,7 +222,7 @@ class GlobalPlanner(GetGoal):
         ros_pose = convert_dictionary_to_ros_message(self.goal_dict[u'goal'])
         self.pose_goal = transform_pose(self.get_god_map().get_data(identifier.map_frame), ros_pose)
 
-        if self.goal_dict[u'tip_link'] == u'base_footprint':
+        if self.is_global_navigation_needed():
             trajectory = self.planNavigation()
             if trajectory is None or not trajectory.any():
                 return Status.FAILURE

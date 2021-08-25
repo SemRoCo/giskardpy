@@ -2180,6 +2180,37 @@ class TestCartGoals(object):
 
 class TestCartesianPath(object):
 
+    def test_pathAroundKitchenIsland_without_global_planner(self, kitchen_setup_avoid_collisions):
+        # kernprof -lv py.test -s test/test_integration_pr2.py::TestCartGoals::test_pathAroundKitchenIsland_with_global_planner
+        """
+        :type kitchen_setup_avoid_collisions: PR2
+        """
+        tip_link = u'base_footprint'
+
+        base_pose = PoseStamped()
+        base_pose.header.frame_id = tip_link
+        base_pose.pose.position.x = 0
+        base_pose.pose.position.y = 2.0
+        base_pose.pose.orientation = Quaternion(*quaternion_about_axis(0, [0, 0, 1]))
+        kitchen_setup_avoid_collisions.teleport_base(base_pose)
+
+        base_pose = PoseStamped()
+        base_pose.header.frame_id = tip_link
+        base_pose.pose.position.x = -1.2
+        base_pose.pose.position.y = -2.0
+        base_pose.pose.orientation = Quaternion(*quaternion_about_axis(0, [0, 0, 1]))
+        goal_c = base_pose
+
+        kitchen_setup_avoid_collisions.set_json_goal(u'CartesianPose',
+                                                     tip_link=tip_link,
+                                                     root_link=kitchen_setup_avoid_collisions.get_root(),
+                                                     goal=goal_c
+                                                     )
+
+        kitchen_setup_avoid_collisions.send_goal()
+        kitchen_setup_avoid_collisions.check_cart_goal(tip_link, goal_c)
+        #zero_pose.check_cart_goal(zero_pose.l_tip, l_goal)
+
     def test_pathAroundKitchenIsland_with_global_planner(self, kitchen_setup_avoid_collisions):
         # kernprof -lv py.test -s test/test_integration_pr2.py::TestCartGoals::test_pathAroundKitchenIsland_with_global_planner
         """

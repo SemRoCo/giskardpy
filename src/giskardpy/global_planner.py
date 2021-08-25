@@ -89,6 +89,9 @@ class TwoDimRayMotionValidator(ob.MotionValidator, GiskardBehavior):
             # todo: check if actually works, stepSimulation or p.performCollisionDetection()?
             return all([obj == -1 or obj in self.ignore_object_ids for obj, _, _, _, _ in query_res])
 
+    def __str__(self):
+        return u'TwoDimRayMotionValidator'
+
 
 class TwoDimStateValidator(ob.StateValidityChecker, GiskardBehavior):
 
@@ -229,7 +232,36 @@ class GlobalPlanner(GetGoal):
         return len(collisions) == 0
 
     def is_global_path_needed(self, root_link, tip_link):
-        curr_pos = self.get_robot().get_fk_pose(root_link, tip_link).pose.position
+        """
+        (disclaimer: for correct format please see the source code)
+
+        Returns whether a global path is needed by checking if the shortest path to the goal
+        is free of collisions.
+
+        start        new_start (calculated with vector v)
+        XXXXXXXXXXXX   ^
+        XXcollXobjXX   |  v
+        XXXXXXXXXXXX   |
+                     goal
+
+        The vector from start to goal in 2D collides with collision object, but the vector
+        from new_start to goal does not collide with the environment, but...
+
+        start        new_start
+        XXXXXXXXXXXXXXXXXXXXXX
+        XXcollisionXobjectXXXX
+        XXXXXXXXXXXXXXXXXXXXXX
+                     goal
+
+        ... here the shortest path to goal is in collision. Therefore, a global path
+        is needed.
+
+        :type root_link: str
+        :type tip_link: str
+        :rtype: boolean
+        """
+        curr_R_pose = self.get_robot().get_fk_pose(root_link, tip_link)
+        curr_pos = transform_pose(self.get_god_map().get_data(identifier.map_frame), curr_R_pose).pose.position
         curr_arr = numpy.array([curr_pos.x, curr_pos.y, curr_pos.z])
         goal_pos = self.pose_goal.pose.position
         goal_arr = numpy.array([goal_pos.x, goal_pos.y, goal_pos.z])
@@ -237,8 +269,8 @@ class GlobalPlanner(GetGoal):
         if obj_id != -1:
             diff = curr_arr - goal_arr
             v = numpy.array(list(normal)) * diff
-            new_goal_arr = goal_arr + v
-            obj_id, _, _, _, _ = p.rayTest(curr_arr, new_goal_arr)[0]
+            new_curr_arr = goal_arr + v
+            obj_id, _, _, _, _ = p.rayTest(new_curr_arr, goal_arr)[0]
             return obj_id != -1
         else:
             return False
@@ -250,20 +282,23 @@ class GlobalPlanner(GetGoal):
 
     def update(self):
 
+        # Check if move_cmd exists
         move_cmd = self.get_god_map().get_data(identifier.next_move_goal)  # type: MoveCmd
         if not move_cmd:
-            return Status.FAILURE
+            return Status.SUCCESS
 
+        # Check if move_cmd contains a Cartesian Goal
         cart_c = self.get_cart_goal(move_cmd)
         if not cart_c:
             return Status.SUCCESS
 
-        self.update_collisions_environment()
+        # Parse the Cartesian Goal Constraint
         self.goal_dict = yaml.load(cart_c.parameter_value_pair)
         ros_pose = convert_dictionary_to_ros_message(self.goal_dict[u'goal'])
         self.pose_goal = transform_pose(self.get_god_map().get_data(identifier.map_frame), ros_pose)
 
         if self.is_global_navigation_needed():
+            self.update_collisions_environment()
             trajectory = self.planNavigation()
             if trajectory is None or not trajectory.any():
                 return Status.FAILURE
@@ -293,8 +328,6 @@ class GlobalPlanner(GetGoal):
         d[u'parameter_value_pair'] = deepcopy(self.goal_dict)
         d[u'parameter_value_pair'].pop(u'goal')
         d[u'parameter_value_pair'][u'goals'] = list(map(convert_ros_message_to_dictionary, poses))
-        # d[u'parameter_value_pair'] = json.dumps(d[u'parameter_value_pair'])
-        # d[u'parameter_value_pair'] = json.loads(d[u'parameter_value_pair'])
         c = Constraint()
         c.type = u'CartesianPathCarrot'
         c.parameter_value_pair = json.dumps(d[u'parameter_value_pair'])

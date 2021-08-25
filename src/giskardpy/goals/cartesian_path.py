@@ -54,14 +54,19 @@ class CartesianPathCarrot(Goal):
     def get_goal_expr(self):
         """Will return the next normal with a higher normal time as the normal time calculated from the current position."""
         # todo: clean the mess below
+        # Calculate the normals and normal times with the current robot position and ...
         curr_normals, curr_normal_times = self.get_normals(self.goal_strings, self.next_goal_strings,
                                                            w.position_of(self.get_fk(self.root_link, self.tip_link)))
         curr_normal_dists = self.get_normal_dists(curr_normals)
+        # ... choose the closest normal with its estimated normal time.
         zero_one_mapping = self.zero_one_mapping_if_equal(curr_normal_dists, self.trajectory_length, w.ca.mmin(curr_normal_dists))
         curr_normal_time = self.select(curr_normal_times, zero_one_mapping)
+        # Calculate the normals and normal times with the predicted robot position and ...
         next_normals, next_normal_times = self.get_normals(self.goal_strings, self.next_goal_strings, self.predict())
+        # ... filter the normals out which have a smaller normal time than curr_normal_time.
         zero_one_mapping_n = self.zero_one_mapping_if_greater(next_normal_times, self.trajectory_length, curr_normal_time)
         next_normals_closer_to_goal = next_normals * zero_one_mapping_n
+        # After that get the closest normal point relative to the predicted robot position.
         next_normal_dists = self.get_normal_dists(next_normals_closer_to_goal)
         zero_one_mapping_one = self.zero_one_mapping_if_equal(next_normal_dists, self.trajectory_length,
                                                               w.ca.mmin(next_normal_dists))
@@ -70,7 +75,7 @@ class CartesianPathCarrot(Goal):
     def predict(self):
         v = self.get_fk_velocity(self.root_link, self.tip_link)[0:3]
         v_p = w.save_division(v, w.norm(v), 0) * self.max_linear_velocity * 10 #todo: make parameter for num
-        p = w.position_of(self.get_fk(self.root_link, self.tip_link))#self.get_robot_rTt())
+        p = w.position_of(self.get_fk(self.root_link, self.tip_link))
         s = self.get_sampling_period_symbol()
         n_p = p[0:3] + v_p * s
         return w.point3(n_p[0], n_p[1], n_p[2])
@@ -171,7 +176,7 @@ class CartesianPathCarrot(Goal):
         self.add_debug_vector("debugCurrentX", w.position_of(self.get_fk(self.root_link, self.tip_link)))
         self.add_debug_vector("debugNext", self.predict())
 
-        self.minimize_position(goal_translation, self.get_weight())
+        self.minimize_position(goal_translation, self.get_dyn_weight())
 
     def get_closest_traj_point(self):
 
@@ -191,7 +196,7 @@ class CartesianPathCarrot(Goal):
         mapping = self.zero_one_mapping_if_equal(dists, trajectory_len, dist_min)
         return w.sum_row(inds * mapping)
 
-    def get_weight(self):
+    def get_dyn_weight(self):
         weight = self.get_parameter_as_symbolic_expression(u'weight')
         dyn_weight = weight - weight * self.get_traversed_trajectory_mult()
         return dyn_weight
@@ -220,24 +225,14 @@ class CartesianPathCarrot(Goal):
                          distance_thresh / (2 * dis_to_goal)) # if dis_to_goal == distance_thresh, then
                                                               # distance_thresh / 2 * dis_to_goal == 0.5.
 
-    def minimize_pose(self, goal, weight):
-        self.minimize_position(w.position_of(goal), weight)
-        self.minimize_rotation(w.rotation_of(goal), weight)
-
     def minimize_position(self, goal, weight):
         max_velocity = self.max_linear_velocity
 
         self.add_point_goal_constraints(frame_P_current=w.position_of(self.get_fk(self.root_link, self.tip_link)),
                                         frame_P_goal=goal,
                                         reference_velocity=max_velocity,
-                                        weight=weight, name_suffix=u'goal')
+                                        weight=weight, name_suffix=u'goal_pos')
 
-    def minimize_rotation(self, goal, weight):
-        max_velocity = self.max_angular_velocity
-
-        self.add_rotation_goal_constraints(w.rotation_of(self.get_fk(self.root_link, self.tip_link)), goal,
-                                           w.rotation_of(self.get_fk_evaluated(self.root_link, self.tip_link)),
-                                           max_velocity, weight, name_suffix='goal')
 
 class CartesianPathSplineCarrot(Goal):
     LUT_x_sym = u'LUT_x'

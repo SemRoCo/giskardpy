@@ -54,7 +54,7 @@ def initialize_god_map():
     blackboard = Blackboard
     blackboard.god_map = god_map
     god_map.set_data(identifier.rosparam, rospy.get_param(rospy.get_name()))
-    god_map.set_data(identifier.robot_description, rospy.get_param(u'/giskard/robot_description'))
+    god_map.set_data(identifier.robot_description, rospy.get_param(u'/robot_description'))
     path_to_data_folder = god_map.get_data(identifier.data_folder)
     # fix path to data folder
     if not path_to_data_folder.endswith(u'/'):

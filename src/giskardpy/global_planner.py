@@ -3,6 +3,7 @@
 import json
 import sys
 import threading
+from collections import namedtuple
 
 import rospy
 import yaml
@@ -25,6 +26,9 @@ import numpy
 import matplotlib.pyplot as plt
 from ompl import base as ob
 from ompl import geometric as og
+
+SolveParameters = namedtuple('SolveParameters', 'initial_solve_time refine_solve_time max_initial_iterations '
+                             'max_refine_iterations min_refine_thresh')
 
 from giskardpy.utils.utils import convert_dictionary_to_ros_message, convert_ros_message_to_dictionary
 
@@ -206,7 +210,8 @@ class GlobalPlanner(GetGoal):
         self.pose_goal = None
         self.goal_dict = None
 
-        self.fast_navigation = False
+        self._planner_solve_params = {} # todo: load values from rosparam
+        self.navigation_config = 'slow_without_refine' # todo: load value from rosparam
 
         self.setupNavigation()
 
@@ -267,7 +272,7 @@ class GlobalPlanner(GetGoal):
         goal_arr = numpy.array([goal_pos.x, goal_pos.y, goal_pos.z])
         obj_id, _, _, _, normal = p.rayTest(curr_arr, goal_arr)[0]
         if obj_id != -1:
-            diff = curr_arr - goal_arr
+            diff = numpy.sqrt(numpy.sum((curr_arr - goal_arr)**2))
             v = numpy.array(list(normal)) * diff
             new_curr_arr = goal_arr + v
             obj_id, _, _, _, _ = p.rayTest(new_curr_arr, goal_arr)[0]
@@ -300,12 +305,13 @@ class GlobalPlanner(GetGoal):
         if self.is_global_navigation_needed():
             self.update_collisions_environment()
             trajectory = self.planNavigation()
-            if trajectory is None or not trajectory.any():
+            if len(trajectory) == 0:
                 return Status.FAILURE
             poses = []
             for i, point in enumerate(trajectory):
                 if i == 0:
-                    continue  # we do not to reach the first pose, since it is the start pose
+                    continue  # important assumption for constraint:
+                              # we do not to reach the first pose, since it is the start pose
                 base_pose = PoseStamped()
                 base_pose.header.frame_id = self.get_god_map().get_data(identifier.map_frame)
                 base_pose.pose.position.x = point[0]
@@ -313,9 +319,8 @@ class GlobalPlanner(GetGoal):
                 base_pose.pose.position.z = 0
                 base_pose.pose.orientation = Quaternion(*quaternion_about_axis(0, [0, 0, 1]))
                 poses.append(base_pose)
-            c = self.get_cartesian_path_constraint(poses)
-            move_cmd.constraints = []
-            move_cmd.constraints.append(c)
+            poses[-1].pose.orientation = self.pose_goal.pose.orientation
+            move_cmd.constraints = self.get_cartesian_path_constraints(poses)
             self.get_god_map().set_data(identifier.next_move_goal, move_cmd)
             pass
         else:
@@ -323,15 +328,25 @@ class GlobalPlanner(GetGoal):
 
         return Status.SUCCESS
 
-    def get_cartesian_path_constraint(self, poses):
-        d = {}
+    def get_cartesian_path_constraints(self, poses):
+
+        d = dict()
         d[u'parameter_value_pair'] = deepcopy(self.goal_dict)
         d[u'parameter_value_pair'].pop(u'goal')
-        d[u'parameter_value_pair'][u'goals'] = list(map(convert_ros_message_to_dictionary, poses))
+
+        oc_d = deepcopy(d)
+        oc_d[u'parameter_value_pair'][u'goal'] = convert_ros_message_to_dictionary(poses[-1])
+        oc = Constraint()
+        oc.type = u'CartesianOrientation'
+        oc.parameter_value_pair = json.dumps(oc_d[u'parameter_value_pair'])
+
+        c_d = deepcopy(d)
+        c_d[u'parameter_value_pair'][u'goals'] = list(map(convert_ros_message_to_dictionary, poses))
         c = Constraint()
         c.type = u'CartesianPathCarrot'
-        c.parameter_value_pair = json.dumps(d[u'parameter_value_pair'])
-        return c
+        c.parameter_value_pair = json.dumps(c_d[u'parameter_value_pair'])
+
+        return [c, oc]
 
     def create_kitchen_space(self):
         # create an SE3 state space
@@ -358,23 +373,23 @@ class GlobalPlanner(GetGoal):
 
         return space
 
-    def get_translation_start_state(self, space):
+    def get_translation_start_state(self, space, round_decimal_place=3):
         state = ob.State(space)
         pose_root_linkTtip_link = self.get_robot().get_fk_pose(self.goal_dict[u'root_link'],
                                                                self.goal_dict[u'tip_link'])
         pose_mTtip_link = transform_pose(self.get_god_map().get_data(identifier.map_frame), pose_root_linkTtip_link)
-        state().setX(pose_mTtip_link.pose.position.x)
-        state().setY(pose_mTtip_link.pose.position.y)
+        state().setX(round(pose_mTtip_link.pose.position.x, round_decimal_place))
+        state().setY(round(pose_mTtip_link.pose.position.y, round_decimal_place))
         if is_3D(space):
-            state().setZ(pose_mTtip_link.pose.position.Z)
+            state().setZ(round(pose_mTtip_link.pose.position.Z, round_decimal_place))
         return state
 
-    def get_translation_goal_state(self, space):
+    def get_translation_goal_state(self, space, round_decimal_place=3):
         state = ob.State(space)
-        state().setX(self.pose_goal.pose.position.x)
-        state().setY(self.pose_goal.pose.position.y)
+        state().setX(round(self.pose_goal.pose.position.x, round_decimal_place))
+        state().setY(round(self.pose_goal.pose.position.y, round_decimal_place))
         if is_3D(space):
-            state().setZ(self.pose_goal.pose.position.Z)
+            state().setZ(round(self.pose_goal.pose.position.Z, round_decimal_place))
         return state
 
     def allocOBValidStateSampler(si):
@@ -386,11 +401,21 @@ class GlobalPlanner(GetGoal):
         # RRTConnect: many points, low number of fp
         # PRMstar: no set_range function, finds no solutions
         # ABITstar: slow, sparse, but good
-        if self.fast_navigation:
-            planner = og.RRTConnect(si)
-            planner.setRange(0.1)
-        else:
-            planner = og.ABITstar(si)
+        #if self.fast_navigation:
+        #    planner = og.RRTConnect(si)
+        #    planner.setRange(0.1)
+        #else:
+        planner = og.ABITstar(si)
+        self._planner_solve_params[planner.getName()] = {
+            'slow_without_refine': SolveParameters(initial_solve_time=60, refine_solve_time=5, max_initial_iterations=3,
+                                                   max_refine_iterations=0, min_refine_thresh=0.5),
+            'slow_with_refine': SolveParameters(initial_solve_time=60, refine_solve_time=5, max_initial_iterations=3,
+                                                max_refine_iterations=5, min_refine_thresh=0.5),
+            'fast_without_refine': SolveParameters(initial_solve_time=15, refine_solve_time=5, max_initial_iterations=3,
+                                                   max_refine_iterations=0, min_refine_thresh=0.5),
+            'fast_with_refine': SolveParameters(initial_solve_time=15, refine_solve_time=5, max_initial_iterations=3,
+                                                max_refine_iterations=5, min_refine_thresh=0.5)
+        }
         # planner.setIntermediateStates(True)
         # planner.setup()
         return planner
@@ -413,9 +438,7 @@ class GlobalPlanner(GetGoal):
         planner = self.get_navigation_planner(si)
         self.navigation_setup.setPlanner(planner)
 
-    def planNavigation(self, initial_solve_time=60, refine_solve_time=5,
-                       max_num_of_tries=3, max_refine_iterations=0, min_refine_thresh=0.1,
-                       plot=True):
+    def planNavigation(self, plot=True):
 
         start = self.get_translation_start_state(self.kitchen_floor_space)
         goal = self.get_translation_goal_state(self.kitchen_floor_space)
@@ -424,35 +447,17 @@ class GlobalPlanner(GetGoal):
         optimization_objective = PathLengthAndGoalOptimizationObjective(self.navigation_setup.getSpaceInformation(), goal)
         self.navigation_setup.setOptimizationObjective(optimization_objective)
 
-        planner_status = ob.PlannerStatus(ob.PlannerStatus.UNKNOWN)
-        num_try = 0
-        solve_time = initial_solve_time
-        # Find solution
-        while num_try < max_num_of_tries and planner_status.getStatus() not in [ob.PlannerStatus.APPROXIMATE_SOLUTION,
-                                                                                ob.PlannerStatus.EXACT_SOLUTION]:
-            planner_status = self.navigation_setup.solve(solve_time)
-            num_try += 1
-        # Refine solution
-        refine_iteration = 0
-        v_min = 1e6
-        while v_min > min_refine_thresh and refine_iteration < max_refine_iterations:
-            if not self.fast_navigation:
-                v_before = self.navigation_setup.getPlanner().bestCost().value()
-            self.navigation_setup.solve(refine_solve_time)
-            if not self.fast_navigation:
-                v_after = self.navigation_setup.getPlanner().bestCost().value()
-                v_min = v_before - v_after
-            refine_iteration += 1
-
+        planner_status = self.solve(self.navigation_setup, self.navigation_config)
         # og.PathSimplifier(si).smoothBSpline(ss.getSolutionPath()) # takes around 20-30 secs with RTTConnect(0.1)
         # og.PathSimplifier(si).reduceVertices(ss.getSolutionPath())
-        # Make sure enough subpaths are available for Path Following
-        self.navigation_setup.getSolutionPath().interpolate(20)
-        if planner_status:
+        data = numpy.array([])
+        if planner_status in [ob.PlannerStatus.APPROXIMATE_SOLUTION, ob.PlannerStatus.EXACT_SOLUTION]:
             # try to shorten the path
             # ss.simplifySolution() DONT! NO! DONT UNCOMMENT THAT! NO! STOP IT! FIRST IMPLEMENT CHECKMOTION! THEN TRY AGAIN!
-            # print the simplified path
+            # Make sure enough subpaths are available for Path Following
+            self.navigation_setup.getSolutionPath().interpolate(20)
             data = states_matrix_str2array_floats(self.navigation_setup.getSolutionPath().printAsMatrix())  # [[x, y, theta]]
+            # print the simplified path
             if plot:
                 plt.close()
                 fig, ax = plt.subplots()
@@ -463,8 +468,46 @@ class GlobalPlanner(GetGoal):
                 # ax = fig.gca(projection='2d')
                 # ax.plot(data[:, 0], data[:, 1], '.-')
                 plt.show()
-            return data
-        return None
+        return data
+
+    def solve(self, setup, config):
+
+        # Get solve parameters
+        solve_params = self._planner_solve_params[setup.getPlanner().getName()][config]
+        initial_solve_time = solve_params.initial_solve_time
+        refine_solve_time = solve_params.refine_solve_time
+        max_initial_iterations = solve_params.max_initial_iterations
+        max_refine_iterations = solve_params.max_refine_iterations
+        min_refine_thresh = solve_params.min_refine_thresh
+        max_initial_solve_time = initial_solve_time * max_initial_iterations
+        max_refine_solve_time = refine_solve_time * max_refine_iterations
+
+        planner_status = ob.PlannerStatus(ob.PlannerStatus.UNKNOWN)
+        num_try = 0
+        time_solving_intial = 0
+        # Find solution
+        while num_try < max_initial_iterations and time_solving_intial < max_initial_solve_time and \
+                planner_status.getStatus() not in [ob.PlannerStatus.APPROXIMATE_SOLUTION,
+                                                   ob.PlannerStatus.EXACT_SOLUTION]:
+            planner_status = setup.solve(initial_solve_time)
+            time_solving_intial += setup.getLastPlanComputationTime()
+            num_try += 1
+        # Refine solution
+        refine_iteration = 0
+        v_min = 1e6
+        time_solving_refine = 0
+        if planner_status.getStatus() in [ob.PlannerStatus.APPROXIMATE_SOLUTION, ob.PlannerStatus.EXACT_SOLUTION]:
+            while v_min > min_refine_thresh and refine_iteration < max_refine_iterations and \
+                    time_solving_refine < max_refine_solve_time:
+                if min_refine_thresh is not None:
+                    v_before = setup.getPlanner().bestCost().value()
+                setup.solve(refine_solve_time)
+                time_solving_refine += setup.getLastPlanComputationTime()
+                if min_refine_thresh is not None:
+                    v_after = setup.getPlanner().bestCost().value()
+                    v_min = v_before - v_after
+                refine_iteration += 1
+        return planner_status.getStatus()
 
 
 def is_3D(space):

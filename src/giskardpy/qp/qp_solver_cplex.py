@@ -38,7 +38,6 @@ class QPSolverCplex(QPSolver):
         self.qpProblem = cplex.Cplex()
         self.qpProblem.objective.set_sense(self.qpProblem.objective.sense.minimize)
         self.set_qp(H, g, A, lb, ub, lbA, ubA)
-        self.started = False
         self.qpProblem.set_log_stream(None)
         self.qpProblem.set_results_stream(None)
 
@@ -57,12 +56,6 @@ class QPSolverCplex(QPSolver):
         A_with_x_inds = list(zip([x_inds]*A.shape[0], A))
         self.qpProblem.linear_constraints.add(lin_expr=A_with_x_inds, senses=Gs, rhs=lbA)
         self.qpProblem.linear_constraints.add(lin_expr=A_with_x_inds, senses=Ls, rhs=ubA)
-
-    @profile
-    def update(self, H, g, A, lb, ub, lbA, ubA):
-        self.qpProblem.linear_constraints.delete()
-        self.qpProblem.variables.delete()
-        self.set_qp(H, g, A, lb, ub, lbA, ubA)
 
     def print_debug(self):
         # Print QP problem stats
@@ -112,10 +105,7 @@ class QPSolverCplex(QPSolver):
         :type np.array
         """
         for i in range(tries):
-            if self.started:
-                self.update(H, g, A, lb, ub, lbA, ubA)
-            else:
-                self.init(H, g, A, lb, ub, lbA, ubA)
+            self.init(H, g, A, lb, ub, lbA, ubA)
             self.qpProblem.solve()
             success = self.qpProblem.solution.get_status()
             if success in optimal or success in feasible:
@@ -137,7 +127,6 @@ class QPSolverCplex(QPSolver):
                 ubA = self.round(ubA, decimal_places)
         else:
             self.print_debug()
-            self.started = False
             if success == cplex.SolutionInterface.status.optimal_infeasible:
                 error_message = u'{}: problem is optimally infeasible'.format(self.qpProblem.solution.get_status_string())
                 raise InfeasibleException(error_message)

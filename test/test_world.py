@@ -343,6 +343,7 @@ class TestWorld(object):
         p = Pose()
         p.orientation.w = 1
         world_with_pr2.attach_existing_obj_to_robot(u'box', u'l_gripper_tool_frame', p)
+        world_with_pr2.remove_object(u'box')
         assert u'box' not in world_with_pr2.get_object_names()
         assert set(world_with_pr2.robot.get_link_names()).difference(links_before) == {u'box'}
         assert set(world_with_pr2.robot.get_joint_names()).difference(joints_before) == {u'box'}
@@ -371,6 +372,7 @@ class TestWorld(object):
         p = Pose()
         p.orientation.w = 1
         world_with_pr2.attach_existing_obj_to_robot(obj_name, u'l_gripper_tool_frame', p)
+        world_with_pr2.remove_object(obj_name)
         assert obj_name not in world_with_pr2.get_object_names()
         assert set(world_with_pr2.robot.get_link_names()).difference(links_before) == {obj_name}
         assert set(world_with_pr2.robot.get_joint_names()).difference(joints_before) == {obj_name}

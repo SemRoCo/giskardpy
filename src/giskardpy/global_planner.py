@@ -211,7 +211,7 @@ class GlobalPlanner(GetGoal):
         self.goal_dict = None
 
         self._planner_solve_params = {} # todo: load values from rosparam
-        self.navigation_config = 'slow_without_refine' # todo: load value from rosparam
+        self.navigation_config = 'fast_without_refine' # todo: load value from rosparam
 
         self.setupNavigation()
 

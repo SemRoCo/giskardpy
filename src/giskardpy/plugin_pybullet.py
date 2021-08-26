@@ -340,7 +340,7 @@ class WorldUpdatePlugin(GiskardBehavior):
             p.pose = self.unsafe_get_world().get_object(req.body.name).base_pose
             p = transform_pose(req.pose.header.frame_id, p)
             world_object = self.unsafe_get_world().get_object(req.body.name)
-            self.unsafe_get_world().attach_existing_obj_to_robot(req.body.name, req.pose.header.frame_id, p.pose)
+            self.attach_existing_obj_to_robot(req.body.name, req.pose.header.frame_id, p.pose)
             m = world_object.as_marker_msg()
             m.header.frame_id = p.header.frame_id
             m.pose = p.pose
@@ -358,6 +358,10 @@ class WorldUpdatePlugin(GiskardBehavior):
             self.publish_object_as_marker(m)
         except:
             pass
+
+    def attach_existing_obj_to_robot(self, name, link, pose):
+        self.unsafe_get_world().attach_existing_obj_to_robot(name, link, pose)
+        self.remove_object(name)
 
     def remove_object(self, name):
         # assumes that parent has god map lock

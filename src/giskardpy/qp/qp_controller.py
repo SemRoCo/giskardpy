@@ -19,18 +19,19 @@ from giskardpy.utils.utils import memoize, logging
 
 
 def save_pandas(dfs, names, path):
-    file_name = u'{}/pandas_{}.csv'.format(path, datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-    csv_string = u''
+    file_name = u'{}/pandas_{}'.format(path, datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
     for df, name in zip(dfs, names):
-        csv_string += u'{}\n'.format(name)
+        csv_string = u'name\n'
+        # csv_string += u'{}\n'.format(name)
         with pd.option_context('display.max_rows', None, 'display.max_columns', None):
             if df.shape[1] > 1:
                 for column_name, column in df.T.items():
                     csv_string += column.add_prefix(column_name + u'||').to_csv()
             else:
                 csv_string += df.to_csv()
-        csv_string += u'----------------------------------------------------------------------------'
-        with open(file_name, 'w') as f:
+        # csv_string += u'----------------------------------------------------------------------------'
+        file_name2 = '{}_{}.csv'.format(file_name, name)
+        with open(file_name2, 'w') as f:
             f.write(csv_string)
 
 

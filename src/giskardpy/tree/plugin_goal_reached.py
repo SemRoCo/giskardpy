@@ -47,7 +47,7 @@ class GoalReachedPlugin(GiskardBehavior):
         planning_time = self.get_god_map().get_data(identifier.time)
 
         if planning_time - self.above_threshold_time >= self.window_size:
-            velocities = np.array([j.velocity for j in self.get_robot().joint_state.values()])
+            velocities = np.array([self.get_robot().joint_state[j].velocity for j in sorted(self.get_robot().controlled_joints)])
             below_threshold = np.all(np.abs(velocities[:self.number_of_controlled_joints]) < self.thresholds)
             if below_threshold:
                 logging.loginfo(u'found goal trajectory with length {}s in {}s'.format(planning_time * self.sample_period,

@@ -1,21 +1,29 @@
 import shutil
 from collections import defaultdict
+import shutil
+from collections import defaultdict
 
-import giskardpy
-from giskardpy.model.utils import make_world_body_box
-
-giskardpy.WORLD_IMPLEMENTATION = None
-
-from giskardpy.model.robot import Robot
+import numpy as np
 import pytest
+import urdf_parser_py.urdf as up
 from geometry_msgs.msg import Pose, Point, Quaternion
 from giskard_msgs.msg import CollisionEntry
+from hypothesis import given
+
 import test_urdf_object
+from giskardpy import identifier
+from giskardpy.data_types import JointStates
 from giskardpy.exceptions import DuplicateNameException, PhysicsWorldException, UnknownBodyException
-from utils_for_tests import pr2_urdf, donbot_urdf, compare_poses, pr2_without_base_urdf
-from giskardpy.model.world import World
+from giskardpy.god_map import GodMap
+from giskardpy.model.robot import Robot
+from giskardpy.model.urdf_object import hacky_urdf_parser_fix
+from giskardpy.model.utils import make_world_body_box
+from giskardpy.model.world import World, WorldTree
 from giskardpy.model.world_object import WorldObject
-import numpy as np
+from giskardpy.utils.kdl_parser import KDL
+from giskardpy.utils.tfwrapper import kdl_to_pose
+from giskardpy.utils.utils import suppress_stderr
+from utils_for_tests import pr2_urdf, donbot_urdf, compare_poses, pr2_without_base_urdf, rnd_joint_state
 
 
 @pytest.fixture(scope=u'module')
@@ -88,6 +96,129 @@ def avoid_all_entry(min_dist):
     ce.link_bs = [CollisionEntry.ALL]
     ce.min_dist = min_dist
     return ce
+
+def world_with_robot(urdf):
+    god_map = GodMap()
+    urdf = pr2_urdf()
+    world = WorldTree(god_map)
+    god_map.set_data(identifier.world, world)
+    world.load_urdf(urdf)
+    world.add_group('robot', 'odom_combined')
+    return world
+
+def world_with_pr2():
+    return world_with_robot(pr2_urdf())
+
+def all_joint_limits(urdf):
+    world = world_with_robot(urdf)
+    return world.get_all_joint_position_limits()
+
+pr2_joint_limits = all_joint_limits(pr2_urdf())
+
+
+class TestWorldTree(object):
+    def parsed_pr2_urdf(self):
+        urdf = pr2_urdf()
+        with suppress_stderr():
+            return up.URDF.from_xml_string(hacky_urdf_parser_fix(urdf))
+
+    def test_load_pr2(self):
+        world = world_with_pr2()
+        parsed_urdf = self.parsed_pr2_urdf()
+        assert set(world.link_names) == set(list(parsed_urdf.link_map.keys()) + [world.root_link_name])
+        assert set(world.joint_names) == set(list(parsed_urdf.joint_map.keys()) + [parsed_urdf.name])
+
+    def test_get_chain(self):
+        world = world_with_pr2()
+        parsed_urdf = self.parsed_pr2_urdf()
+        root_link = parsed_urdf.get_root()
+        tip_link = 'r_gripper_tool_frame'
+        real = world.get_chain(root_link, tip_link)
+        expected = parsed_urdf.get_chain(root_link, tip_link)
+        assert set(real) == set(expected)
+
+    def test_get_split_chain(self):
+        world = world_with_pr2()
+        root_link = 'l_gripper_r_finger_tip_link'
+        tip_link = 'l_gripper_l_finger_tip_link'
+        chain1, connection, chain2 = world.get_split_chain(root_link, tip_link)
+        assert chain1 == ['l_gripper_r_finger_tip_link', 'l_gripper_r_finger_tip_joint', 'l_gripper_r_finger_link',
+                          'l_gripper_r_finger_joint']
+        assert connection == ['l_gripper_palm_link']
+        assert chain2 == ['l_gripper_l_finger_joint', 'l_gripper_l_finger_link', 'l_gripper_l_finger_tip_joint',
+                          'l_gripper_l_finger_tip_link']
+
+    def test_get_joint_limits2(self):
+        world = world_with_pr2()
+        lower_limit, upper_limit = world.get_joint_position_limits('l_shoulder_pan_joint')
+        assert lower_limit == -0.564601836603
+        assert upper_limit == 2.1353981634
+
+    def test_get_all_joint_limits(self):
+        world = world_with_pr2()
+        assert world.get_all_joint_position_limits() == {'bl_caster_l_wheel_joint': (None, None),
+                                                         'bl_caster_r_wheel_joint': (None, None),
+                                                         'bl_caster_rotation_joint': (None, None),
+                                                         'br_caster_l_wheel_joint': (None, None),
+                                                         'br_caster_r_wheel_joint': (None, None),
+                                                         'br_caster_rotation_joint': (None, None),
+                                                         'fl_caster_l_wheel_joint': (None, None),
+                                                         'fl_caster_r_wheel_joint': (None, None),
+                                                         'fl_caster_rotation_joint': (None, None),
+                                                         'fr_caster_l_wheel_joint': (None, None),
+                                                         'fr_caster_r_wheel_joint': (None, None),
+                                                         'fr_caster_rotation_joint': (None, None),
+                                                         'head_pan_joint': (-2.857, 2.857),
+                                                         'head_tilt_joint': (-0.3712, 1.29626),
+                                                         'l_elbow_flex_joint': (-2.1213, -0.15),
+                                                         'l_forearm_roll_joint': (None, None),
+                                                         'l_gripper_joint': (0.0, 0.088),
+                                                         'l_gripper_l_finger_joint': (0.0, 0.548),
+                                                         'l_gripper_l_finger_tip_joint': (0.0, 0.548),
+                                                         'l_gripper_motor_screw_joint': (None, None),
+                                                         'l_gripper_motor_slider_joint': (-0.1, 0.1),
+                                                         'l_gripper_r_finger_joint': (0.0, 0.548),
+                                                         'l_gripper_r_finger_tip_joint': (0.0, 0.548),
+                                                         'l_shoulder_lift_joint': (-0.3536, 1.2963),
+                                                         'l_shoulder_pan_joint': (-0.564601836603, 2.1353981634),
+                                                         'l_upper_arm_roll_joint': (-0.65, 3.75),
+                                                         'l_wrist_flex_joint': (-2.0, -0.1),
+                                                         'l_wrist_roll_joint': (None, None),
+                                                         'laser_tilt_mount_joint': (-0.7354, 1.43353),
+                                                         'odom_x_joint': (-1000.0, 1000.0),
+                                                         'odom_y_joint': (-1000.0, 1000.0),
+                                                         'odom_z_joint': (None, None),
+                                                         'r_elbow_flex_joint': (-2.1213, -0.15),
+                                                         'r_forearm_roll_joint': (None, None),
+                                                         'r_gripper_joint': (0.0, 0.088),
+                                                         'r_gripper_l_finger_joint': (0.0, 0.548),
+                                                         'r_gripper_l_finger_tip_joint': (0.0, 0.548),
+                                                         'r_gripper_motor_screw_joint': (None, None),
+                                                         'r_gripper_motor_slider_joint': (-0.1, 0.1),
+                                                         'r_gripper_r_finger_joint': (0.0, 0.548),
+                                                         'r_gripper_r_finger_tip_joint': (0.0, 0.548),
+                                                         'r_shoulder_lift_joint': (-0.3536, 1.2963),
+                                                         'r_shoulder_pan_joint': (-2.1353981634, 0.564601836603),
+                                                         'r_upper_arm_roll_joint': (-3.75, 0.65),
+                                                         'r_wrist_flex_joint': (-2.0, -0.1),
+                                                         'r_wrist_roll_joint': (None, None),
+                                                         'torso_lift_joint': (0.0115, 0.325),
+                                                         'torso_lift_motor_screw_joint': (None, None)}
+
+    @given(rnd_joint_state(pr2_joint_limits))
+    def test_pr2_fk1(self, js):
+        """
+        :type js:
+        """
+        world = world_with_pr2()
+        root = u'odom_combined'
+        tips = [u'l_gripper_tool_frame', u'r_gripper_tool_frame']
+        for tip in tips:
+            mjs = JointStates()
+            for joint_name, position in js.items():
+                mjs[joint_name].position = position
+            world.joint_state = mjs
+            fk = world.get_fk_pose(root, tip).pose
 
 
 class TestWorldObj(test_urdf_object.TestUrdfObject):
@@ -245,8 +376,6 @@ class TestRobot(TestWorldObj):
         assert result == [u'r_wrist_roll_link']
         result = r.get_directly_controllable_collision_links(u'br_caster_l_wheel_joint')
         assert result == []
-
-
 
 
 class TestWorld(object):

@@ -1,22 +1,268 @@
+import traceback
+from copy import deepcopy
+
+import urdf_parser_py.urdf as up
 from geometry_msgs.msg import PoseStamped
 from giskard_msgs.msg import CollisionEntry
 
-from giskardpy.utils import logging
+from giskardpy import casadi_wrapper as w
+from giskardpy import identifier
+from giskardpy.data_types import JointStates, KeyDefaultDict
 from giskardpy.exceptions import RobotExistsException, DuplicateNameException, PhysicsWorldException, \
     UnknownBodyException, UnsupportedOptionException
+from giskardpy.god_map import GodMap
+from giskardpy.model.joints import FixedJoint, PrismaticJoint, RevoluteJoint, ContinuousJoint, MovableJoint
 from giskardpy.model.robot import Robot
-from giskardpy.utils.tfwrapper import msg_to_kdl, kdl_to_pose
+from giskardpy.model.urdf_object import hacky_urdf_parser_fix
 from giskardpy.model.world_object import WorldObject
+from giskardpy.qp.free_variable import FreeVariable
+from giskardpy.utils import logging
+from giskardpy.utils.tfwrapper import msg_to_kdl, kdl_to_pose, homo_matrix_to_pose
+from giskardpy.utils.utils import suppress_stderr, memoize
 
+
+class Link(object):
+    def __init__(self, name, parent_joint_name=None):
+        self.name = name
+        self.geometry = None
+        self.parent_joint_name = parent_joint_name  # type: str
+
+    def __repr__(self):
+        return self.name
+
+
+class SubWorldTree(object):
+    def __init__(self, name, root_link):
+        self.name = name
+        self.root_link = root_link
+
+
+class WorldTree(object):
+    def __init__(self, god_map=None):
+        # public
+        self.state = JointStates()
+        self.root_link_name = 'root'
+        self.links = {self.root_link_name: Link('root')}
+        self.joints = {}
+        self.groups = {}
+
+        # private
+        self.god_map = god_map  # type: GodMap
+        self._free_variables = {}
+
+    def add_group(self, name, root_link):
+        self.groups[name] = root_link
+
+    @property
+    def root_link(self):
+        return self.links[self.root_link_name]
+
+    @property
+    def link_names(self):
+        return list(self.links.keys())
+
+    @property
+    def joint_names(self):
+        return list(self.joints.keys())
+
+    def load_urdf(self, urdf, parent_link_name=None):
+        # create group?
+        with suppress_stderr():
+            parsed_urdf = up.URDF.from_xml_string(hacky_urdf_parser_fix(urdf))  # type: up.Robot
+
+        if parent_link_name is None:
+            parent_link = self.root_link
+        else:
+            parent_link = self.links[parent_link_name]
+        child_link = Link(parsed_urdf.get_root(), parsed_urdf.name)
+        connecting_joint = FixedJoint(parsed_urdf.name, parent_link, child_link, None, None)
+        self.add_joint(connecting_joint)
+
+        def helper(urdf, parent_link_name):
+            if parent_link_name not in urdf.child_map:
+                return
+            for child_joint_name, child_link_name in urdf.child_map[parent_link_name]:
+                urdf_joint = urdf.joint_map[child_joint_name]
+                self.add_urdf_joint(urdf_joint)
+                helper(urdf, child_link_name)
+
+        helper(parsed_urdf, child_link.name)
+
+    @property
+    def movable_joints(self):
+        return [j.name for j in self.joints.values() if isinstance(j, MovableJoint)]
+
+    def add_urdf_joint(self, urdf_joint):
+        parent_link = self.links[urdf_joint.parent]
+        child_link = Link(urdf_joint.child, urdf_joint.name)
+        if urdf_joint.origin is not None:
+            translation_offset = urdf_joint.origin.xyz
+            rotation_offset = urdf_joint.origin.rpy
+        else:
+            translation_offset = None
+            rotation_offset = None
+        if urdf_joint.type == 'fixed':
+            joint = FixedJoint(urdf_joint.name, parent_link, child_link, translation_offset, rotation_offset)
+        else:
+            lower_limits = {}
+            upper_limits = {}
+            if not urdf_joint.type == 'continuous':
+                try:
+                    lower_limits[0] = max(urdf_joint.safety_controller.soft_lower_limit, urdf_joint.limit.lower)
+                    upper_limits[0] = min(urdf_joint.safety_controller.soft_upper_limit, urdf_joint.limit.upper)
+                except AttributeError:
+                    try:
+                        lower_limits[0] = urdf_joint.limit.lower
+                        upper_limits[0] = urdf_joint.limit.upper
+                    except AttributeError:
+                        lower_limits[0] = None
+                        upper_limits[0] = None
+            else:
+                lower_limits[0] = None
+                upper_limits[0] = None
+            try:
+                lower_limits[1] = -urdf_joint.limit.velocity
+                upper_limits[1] = urdf_joint.limit.velocity
+            except AttributeError:
+                lower_limits[1] = None
+                upper_limits[1] = None
+
+            # TODO get rosparam data
+            free_variable = FreeVariable(symbols={
+                0: self.god_map.to_symbol(identifier.joint_states + [urdf_joint.name, 'position']),
+                1: self.god_map.to_symbol(identifier.joint_states + [urdf_joint.name, 'velocity']),
+                2: self.god_map.to_symbol(identifier.joint_states + [urdf_joint.name, 'acceleration']),
+                3: self.god_map.to_symbol(identifier.joint_states + [urdf_joint.name, 'jerk']),
+            },
+                lower_limits=lower_limits,
+                upper_limits=upper_limits,
+                quadratic_weights={1: 0.01, 2: 0, 3: 0})
+
+            if urdf_joint.type == 'revolute':
+                joint = RevoluteJoint(urdf_joint.name, parent_link, child_link, translation_offset, rotation_offset,
+                                      free_variable,
+                                      urdf_joint.axis)
+            elif urdf_joint.type == 'prismatic':
+                joint = PrismaticJoint(urdf_joint.name, parent_link, child_link, translation_offset, rotation_offset,
+                                       free_variable, urdf_joint.axis)
+            elif urdf_joint.type == 'continuous':
+                joint = ContinuousJoint(urdf_joint.name, parent_link, child_link, translation_offset, rotation_offset,
+                                        free_variable, urdf_joint.axis)
+            else:
+                raise NotImplementedError('Joint of type {} is not supported'.format(urdf_joint.type))
+        self.add_joint(joint)
+        # TODO this has to move somewhere else
+        self.init_fast_fks()
+
+    def add_joint(self, joint):
+        self.joints[joint.name] = joint
+        self.links[joint.child.name] = joint.child
+
+    def move_branch(self, old_parent_joint, new_joint):
+        # replace joint
+        pass
+
+    def delete_branch(self, parent_joint):
+        pass
+
+    def get_chain(self, root_link_name, tip_link_name, joints=True, links=True, fixed=True):
+        chain = []
+        if links:
+            chain.append(tip_link_name)
+        link = self.links[tip_link_name]
+        while link.name != root_link_name:
+            parent_joint = self.joints[link.parent_joint_name]
+            parent_link = parent_joint.parent
+            if joints:
+                if fixed or not isinstance(parent_joint, FixedJoint):
+                    chain.append(parent_joint.name)
+            if links:
+                chain.append(parent_link.name)
+            link = parent_link
+        chain.reverse()
+        return chain
+
+    def get_split_chain(self, root, tip, joints=True, links=True, fixed=True):
+        if root == tip:
+            return [], [], []
+        root_chain = self.get_chain(self.root_link_name, root, False, True, True)
+        tip_chain = self.get_chain(self.root_link_name, tip, False, True, True)
+        for i in range(min(len(root_chain), len(tip_chain))):
+            if root_chain[i] != tip_chain[i]:
+                break
+        else:
+            i += 1
+        connection = tip_chain[i - 1]
+        root_chain = self.get_chain(connection, root, joints, links, fixed)
+        if links:
+            root_chain = root_chain[1:]
+        root_chain.reverse()
+        tip_chain = self.get_chain(connection, tip, joints, links, fixed)
+        if links:
+            tip_chain = tip_chain[1:]
+        return root_chain, [connection] if links else [], tip_chain
+
+    def get_fk_expression(self, root_link, tip_link):
+        fk = w.eye(4)
+        root_chain, _, tip_chain = self.get_split_chain(root_link, tip_link, links=False)
+        for joint_name in root_chain:
+            fk = w.dot(fk, w.inverse_frame(self.joints[joint_name].parent_T_child))
+        for joint_name in tip_chain:
+            fk = w.dot(fk, self.joints[joint_name].parent_T_child)
+        # FIXME there is some reference fuckup going on, but i don't know where; deepcopy is just a quick fix
+        return deepcopy(fk)
+
+    def init_fast_fks(self):
+        def f(key):
+            root, tip = key
+            fk = self.get_fk_expression(root, tip)
+            m = w.speed_up(fk, w.free_symbols(fk))
+            return m
+
+        self._fks = KeyDefaultDict(f)
+
+    def get_fk_pose(self, root, tip):
+        try:
+            homo_m = self.get_fk_np(root, tip)
+            p = PoseStamped()
+            p.header.frame_id = root
+            p.pose = homo_matrix_to_pose(homo_m)
+        except Exception as e:
+            print(e)
+            traceback.print_exc()
+            pass
+        return p
+
+    @memoize
+    def get_fk_np(self, root, tip):
+        return self._fks[root, tip].call2(self.god_map.get_values(self._fks[root, tip].str_params))
+
+    def get_joint_position_limits(self, joint_name):
+        return self.joints[joint_name].position_limits
+
+    def get_all_joint_position_limits(self):
+        return {j: self.get_joint_position_limits(j) for j in self.movable_joints}
+
+    @memoize
+    def get_sub_tree_at_joint(self, joint_name):
+        """
+        :type joint_name: str
+        :rtype: URDFObject
+        """
+        tree_links = []
+        tree_joints = []
+        joints = [joint_name]
+        for joint in joints:
+            child_link = self.joints[joint].child
+            if child_link in self._urdf_robot.child_map:
+                for j, l in self._urdf_robot.child_map[child_link]:
+                    joints.append(j)
+                    tree_joints.append(self.get_urdf_joint(j))
+            tree_links.append(self.get_urdf_link(child_link))
+
+        return URDFObject.from_parts(joint_name, tree_links, tree_joints)
 
 class World(object):
-    def __init__(self, path_to_data_folder=u''):
-        self._objects = {}
-        self._robot = None  # type: Robot
-        if path_to_data_folder is None:
-            path_to_data_folder = u''
-        self._path_to_data_folder = path_to_data_folder
-
     # General ----------------------------------------------------------------------------------------------------------
 
     def soft_reset(self):

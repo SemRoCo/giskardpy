@@ -86,6 +86,28 @@ def test_folder(request):
 
 
 class KDL(object):
+    def kdl_tree_from_urdf_model(urdf):
+        root = urdf.get_root()
+        tree = kdl.Tree(root)
+
+        def add_children_to_tree(parent):
+            if parent in urdf.child_map:
+                for joint, child_name in urdf.child_map[parent]:
+                    child = urdf.link_map[child_name]
+                    if child.inertial is not None:
+                        kdl_inert = urdf_inertial_to_kdl_rbi(child.inertial)
+                    else:
+                        kdl_inert = kdl.RigidBodyInertia()
+                    kdl_jnt = urdf_joint_to_kdl_joint(urdf.joint_map[joint])
+                    kdl_origin = urdf_pose_to_kdl_frame(urdf.joint_map[joint].origin)
+                    kdl_sgm = kdl.Segment(child_name, kdl_jnt,
+                                          kdl_origin, kdl_inert)
+                    tree.addSegment(kdl_sgm, parent)
+                    add_children_to_tree(child_name)
+
+        add_children_to_tree(root)
+        return tree
+
     class KDLRobot(object):
         def __init__(self, chain):
             self.chain = chain

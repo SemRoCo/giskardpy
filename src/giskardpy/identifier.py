@@ -2,7 +2,7 @@ world = [u'world']
 robot = world + [u'robot']
 fk_pose = robot + [u'get_fk_pose']
 fk_np = robot + [u'get_fk_np']
-joint_states = robot + [u'joint_state']
+joint_states = world + [u'state']
 
 # goal_params = [u'goal_params']
 trajectory = [u'traj']

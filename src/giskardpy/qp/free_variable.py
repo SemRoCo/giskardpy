@@ -19,11 +19,9 @@ class FreeVariable(object):
         assert len(self._symbols) == len(self._quadratic_weights) + 1
         self.order = len(self._symbols)
 
-        # def default_horizon_f(weight, t):
-        #     return weight
-
         self.horizon_functions = defaultdict(float)
-        self.horizon_functions.update(horizon_functions)
+        if horizon_functions is not None:
+            self.horizon_functions.update(horizon_functions)
 
     def get_symbol(self, order):
         try:

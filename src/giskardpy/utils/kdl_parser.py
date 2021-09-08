@@ -1,10 +1,8 @@
-#!/usr/bin/env python
-
 import numpy as np
 
 import PyKDL as kdl
-from urdf_parser_py.urdf import Robot
-from giskardpy.utils import logging
+from giskardpy.model.urdf_object import hacky_urdf_parser_fix
+import urdf_parser_py.urdf as up
 
 
 def euler_to_quat(r, p, y):
@@ -29,7 +27,7 @@ def urdf_pose_to_kdl_frame(pose):
 def urdf_joint_to_kdl_joint(jnt):
     origin_frame = urdf_pose_to_kdl_frame(jnt.origin)
     if jnt.joint_type == 'fixed':
-        return kdl.Joint(jnt.name, kdl.Joint.None)
+        return kdl.Joint(jnt.name, kdl.Joint)
     axis = kdl.Vector(*jnt.axis)
     if jnt.joint_type == 'revolute':
         return kdl.Joint(jnt.name, origin_frame.p,
@@ -40,8 +38,8 @@ def urdf_joint_to_kdl_joint(jnt):
     if jnt.joint_type == 'prismatic':
         return kdl.Joint(jnt.name, origin_frame.p,
                          origin_frame.M * axis, kdl.Joint.TransAxis)
-    print "Unknown joint type: %s." % jnt.joint_type
-    return kdl.Joint(jnt.name, kdl.Joint.None)
+    print("Unknown joint type: %s." % jnt.joint_type)
+    return kdl.Joint(jnt.name, kdl.Joint)
 
 def urdf_inertial_to_kdl_rbi(i):
     origin = urdf_pose_to_kdl_frame(i.origin)
@@ -54,8 +52,6 @@ def urdf_inertial_to_kdl_rbi(i):
                                                      i.inertia.iyz))
     return origin.M * rbi
 
-##
-# Returns a PyKDL.Tree generated from a urdf_parser_py.urdfs.URDF object.
 def kdl_tree_from_urdf_model(urdf):
     root = urdf.get_root()
     tree = kdl.Tree(root)
@@ -76,42 +72,61 @@ def kdl_tree_from_urdf_model(urdf):
     add_children_to_tree(root)
     return tree
 
-def main():
-    import sys
-    def usage():
-        logging.logdebug("Tests for kdl_parser:\n")
-        logging.logdebug("kdl_parser <urdfs file>")
-        logging.logdebug("\tLoad the URDF from file.")
-        logging.logdebug("kdl_parser")
-        logging.logdebug("\tLoad the URDF from the parameter server.")
-        sys.exit(1)
 
-    if len(sys.argv) > 2:
-        usage()
-    if len(sys.argv) == 2 and (sys.argv[1] == "-h" or sys.argv[1] == "--help"):
-        usage()
-    if (len(sys.argv) == 1):
-        robot = Robot.from_parameter_server()
-    else:
-        f = file(sys.argv[1], 'r')
-        robot = Robot.from_xml_string(f.read())
-        f.close()
-    tree = kdl_tree_from_urdf_model(robot)
-    num_non_fixed_joints = 0
-    for j in robot.joint_map:
-        if robot.joint_map[j].joint_type != 'fixed':
-            num_non_fixed_joints += 1
-    logging.loginfo("URDF non-fixed joints: %d;" % num_non_fixed_joints)
-    logging.loginfo("KDL joints: %d" % tree.getNrOfJoints())
-    logging.loginfo("URDF joints: %d; KDL segments: %d" % (len(robot.joint_map),
-                                                           tree.getNrOfSegments()))
-    import random
-    base_link = robot.get_root()
-    end_link = robot.link_map.keys()[random.randint(0, len(robot.link_map)-1)]
-    chain = tree.getChain(base_link, end_link)
-    logging.logdinfo("Root link: %s; Random end link: %s" % (base_link, end_link))
-    for i in range(chain.getNrOfSegments()):
-        logging.logdinfo(chain.getSegment(i).getName())
+class KDL(object):
+    class KDLRobot(object):
+        def __init__(self, chain):
+            self.chain = chain
+            self.fksolver = kdl.ChainFkSolverPos_recursive(self.chain)
+            self.jac_solver = kdl.ChainJntToJacSolver(self.chain)
+            self.jacobian = kdl.Jacobian(self.chain.getNrOfJoints())
+            self.joints = self.get_joints()
 
-if __name__ == "__main__":
-    main()
+        def get_joints(self):
+            joints = []
+            for i in range(self.chain.getNrOfSegments()):
+                joint = self.chain.getSegment(i).getJoint()
+                if joint.getType() != 8:
+                    joints.append(str(joint.getName()))
+            return joints
+
+        def fk(self, js_dict):
+            js = [js_dict[j] for j in self.joints]
+            f = kdl.Frame()
+            joint_array = kdl.JntArray(len(js))
+            for i in range(len(js)):
+                joint_array[i] = js[i]
+            self.fksolver.JntToCart(joint_array, f)
+            return f
+
+        def fk_np(self, js_dict):
+            f = self.fk(js_dict)
+            r = [[f.M[0, 0], f.M[0, 1], f.M[0, 2], f.p[0]],
+                 [f.M[1, 0], f.M[1, 1], f.M[1, 2], f.p[1]],
+                 [f.M[2, 0], f.M[2, 1], f.M[2, 2], f.p[2]],
+                 [0, 0, 0, 1], ]
+            return np.array(r)
+
+        def fk_np_inv(self, js_dict):
+            f = self.fk(js_dict).Inverse()
+            r = [[f.M[0, 0], f.M[0, 1], f.M[0, 2], f.p[0]],
+                 [f.M[1, 0], f.M[1, 1], f.M[1, 2], f.p[1]],
+                 [f.M[2, 0], f.M[2, 1], f.M[2, 2], f.p[2]],
+                 [0, 0, 0, 1], ]
+            return np.array(r)
+
+    def __init__(self, urdf):
+        if urdf.endswith(u'.urdfs'):
+            with open(urdf, u'r') as file:
+                urdf = file.read()
+        r = up.URDF.from_xml_string(hacky_urdf_parser_fix(urdf))
+        self.tree = kdl_tree_from_urdf_model(r)
+        self.robots = {}
+
+    def get_robot(self, root, tip):
+        root = str(root)
+        tip = str(tip)
+        if (root, tip) not in self.robots:
+            self.chain = self.tree.getChain(root, tip)
+            self.robots[root, tip] = self.KDLRobot(self.chain)
+        return self.robots[root, tip]

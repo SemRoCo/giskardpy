@@ -64,14 +64,15 @@ def construct_find(loader, node):
 def load_robot_yaml(path):
     with open(path, 'r') as f:
         data = yaml.load(f, Loader)
-        return utils.update_parents(data)
+        updated = utils.update_parents(data)
+        return utils.cast_values_in_nested_dict(updated, float)
 
 
 def ros_load_robot_config(config_file, test=False):
     config = load_robot_yaml(utils.get_ros_pkg_path(u'giskardpy') + u'/config/' + config_file)
     if test:
         config = utils.update_nested_dicts(deepcopy(config),
-                                     load_robot_yaml(utils.get_ros_pkg_path(u'giskardpy') + u'/config/test.yaml'))
+                                           load_robot_yaml(utils.get_ros_pkg_path(u'giskardpy') + u'/config/test.yaml'))
     if config and not rospy.is_shutdown():
         rospy.set_param('~', config)
         return True

@@ -16,16 +16,16 @@ def make_velocity_threshold(god_map,
                             max_translation_cut_off=0.01,
                             max_rotation_cut_off=0.06):
     joint_convergence_threshold = god_map.get_data(identifier.joint_convergence_threshold)
-    robot = god_map.get_data(identifier.robot)
+    world = god_map.get_data(identifier.world)
     thresholds = []
-    for joint_name in sorted(robot.controlled_joints):
-        velocity_limit = robot.get_joint_limit_expr_evaluated(joint_name, 1, god_map)
+    for joint_name in sorted(world.movable_joints):
+        velocity_limit, _ = world.get_joint_velocity_limits(joint_name)
         if velocity_limit is None:
             velocity_limit = 1
         velocity_limit *= joint_convergence_threshold
-        if robot.is_joint_prismatic(joint_name):
+        if world.is_joint_prismatic(joint_name):
             velocity_limit = min(max(min_translation_cut_off, velocity_limit), max_translation_cut_off)
-        elif robot.is_joint_rotational(joint_name):
+        elif world.is_joint_rotational(joint_name):
             velocity_limit = min(max(min_rotation_cut_off, velocity_limit), max_rotation_cut_off)
         thresholds.append(velocity_limit)
     return np.array(thresholds)

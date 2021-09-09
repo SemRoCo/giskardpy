@@ -16,6 +16,7 @@ import giskardpy.identifier as identifier
 import giskardpy.model.pybullet_wrapper as pbw
 from giskardpy.data_types import BiDict, KeyDefaultDict
 from giskardpy.god_map import GodMap
+from giskardpy.model.world import WorldTree
 from giskardpy.tree.plugin import PluginBehavior
 from giskardpy.tree.plugin_action_server import GoalReceived, SendResult, GoalCanceled
 from giskardpy.tree.plugin_append_zero_velocity import AppendZeroVelocity
@@ -81,6 +82,7 @@ def initialize_god_map():
             controlled_joints = rospy.wait_for_message(u'/whole_body_controller/state',
                                                        JointTrajectoryControllerState,
                                                        timeout=5.0).joint_names
+            god_map.set_data(identifier.controlled_joints, controlled_joints)
         except ROSException as e:
             logging.logerr(u'state topic not available')
             logging.logerr(str(e))
@@ -91,21 +93,23 @@ def initialize_god_map():
     set_default_in_override_block(identifier.external_collision_avoidance, god_map)
     set_default_in_override_block(identifier.self_collision_avoidance, god_map)
 
-    world = PyBulletWorld(False, blackboard.god_map.get_data(identifier.data_folder))
+    world = WorldTree(god_map)
     god_map.set_data(identifier.world, world)
-    robot = WorldObject(god_map.get_data(identifier.robot_description),
-                        None,
-                        controlled_joints)
-    world.add_robot(robot, None, controlled_joints,
-                    ignored_pairs=god_map.get_data(identifier.ignored_self_collisions),
-                    added_pairs=god_map.get_data(identifier.added_self_collisions))
-
-    sanity_check_derivatives(god_map)
+    world.load_urdf(god_map.get_data(identifier.robot_description))
+    world.add_group('robot', 'odom_combined')
+    # robot = WorldObject(god_map.get_data(identifier.robot_description),
+    #                     None,
+    #                     controlled_joints)
+    # world.add_robot(robot, None, controlled_joints,
+    #                 ignored_pairs=god_map.get_data(identifier.ignored_self_collisions),
+    #                 added_pairs=god_map.get_data(identifier.added_self_collisions))
+    #
+    # sanity_check_derivatives(god_map)
 
     # weights
     for i, key in enumerate(god_map.get_data(identifier.joint_weights), start=1):
         d = set_default_in_override_block(identifier.joint_weights + [order_map[i], u'override'], god_map)
-        world.robot.set_joint_weight_symbols(d, i)
+        # world.robot.set_joint_weight_symbols(d, i)
 
 
     # limits
@@ -114,22 +118,22 @@ def initialize_god_map():
                                                  god_map)
         d_angular = set_default_in_override_block(identifier.joint_limits + [order_map[i], u'angular', u'override'],
                                                   god_map)
-        world.robot.set_joint_limit_symbols(d_linear, d_angular, i)
+        world.set_joint_limits(d_linear, d_angular, i)
 
     order = len(god_map.get_data(identifier.joint_weights))+1
     god_map.set_data(identifier.order, order)
 
     # joint symbols
-    for o in range(order):
-        key = order_map[o]
-        joint_position_symbols = {}
-        for joint_name in world.robot.get_movable_joints():
-            joint_position_symbols[joint_name] = god_map.to_symbol(identifier.joint_states + [joint_name, key])
-        world.robot.set_joint_symbols(joint_position_symbols, o)
+    # for o in range(order):
+    #     key = order_map[o]
+    #     joint_position_symbols = {}
+    #     for joint_name in world.robot.get_movable_joints():
+    #         joint_position_symbols[joint_name] = god_map.to_symbol(identifier.joint_states + [joint_name, key])
+    #     world.robot.set_joint_symbols(joint_position_symbols, o)
 
-    world.robot.reinitialize()
+    # world.robot.reinitialize()
 
-    world.robot.init_self_collision_matrix()
+    # world.robot.init_self_collision_matrix()
     # sanity_check(god_map)
     return god_map
 
@@ -215,22 +219,22 @@ def grow_tree():
     god_map = initialize_god_map()
     # ----------------------------------------------
     wait_for_goal = Sequence(u'wait for goal')
-    wait_for_goal.add_child(TFPublisher(u'tf', **god_map.get_data(identifier.TFPublisher)))
+    # wait_for_goal.add_child(TFPublisher(u'tf', **god_map.get_data(identifier.TFPublisher)))
     wait_for_goal.add_child(ConfigurationPlugin(u'js1'))
     wait_for_goal.add_child(WorldUpdatePlugin(u'pybullet updater'))
     wait_for_goal.add_child(GoalReceived(u'has goal', action_server_name, MoveAction))
     wait_for_goal.add_child(ConfigurationPlugin(u'js2'))
     # ----------------------------------------------
     planning_4 = PluginBehavior(u'planning IIII', sleep=0)
-    planning_4.add_plugin(CollisionChecker(u'coll'))
+    # planning_4.add_plugin(CollisionChecker(u'coll'))
     # if god_map.safe_get_data(identifier.enable_collision_marker):
     #     planning_3.add_plugin(success_is_running(CPIMarker)(u'cpi marker'))
     planning_4.add_plugin(ControllerPlugin(u'controller'))
     planning_4.add_plugin(KinSimPlugin(u'kin sim'))
     planning_4.add_plugin(LogTrajPlugin(u'log'))
-    if god_map.get_data(identifier.PlotDebugTrajectory_enabled):
-        planning_4.add_plugin(LogDebugExpressionsPlugin(u'log lba'))
-    planning_4.add_plugin(WiggleCancel(u'wiggle'))
+    # if god_map.get_data(identifier.PlotDebugTrajectory_enabled):
+    #     planning_4.add_plugin(LogDebugExpressionsPlugin(u'log lba'))
+    # planning_4.add_plugin(WiggleCancel(u'wiggle'))
     planning_4.add_plugin(LoopDetector(u'loop detector'))
     planning_4.add_plugin(GoalReachedPlugin(u'goal reached'))
     planning_4.add_plugin(TimePlugin(u'time'))
@@ -244,12 +248,12 @@ def grow_tree():
     planning_3.add_child(running_is_success(TimePlugin)(u'time for zero velocity'))
     planning_3.add_child(AppendZeroVelocity(u'append zero velocity'))
     planning_3.add_child(running_is_success(LogTrajPlugin)(u'log zero velocity'))
-    if god_map.get_data(identifier.enable_VisualizationBehavior):
-        planning_3.add_child(VisualizationBehavior(u'visualization', ensure_publish=True))
-    if god_map.get_data(identifier.enable_WorldVisualizationBehavior):
-        planning_3.add_child(WorldVisualizationBehavior(u'world_visualization', ensure_publish=True))
-    if god_map.get_data(identifier.enable_CPIMarker):
-        planning_3.add_child(CollisionMarker(u'cpi marker'))
+    # if god_map.get_data(identifier.enable_VisualizationBehavior):
+    #     planning_3.add_child(VisualizationBehavior(u'visualization', ensure_publish=True))
+    # if god_map.get_data(identifier.enable_WorldVisualizationBehavior):
+    #     planning_3.add_child(WorldVisualizationBehavior(u'world_visualization', ensure_publish=True))
+    # if god_map.get_data(identifier.enable_CPIMarker):
+    #     planning_3.add_child(CollisionMarker(u'cpi marker'))
     # ----------------------------------------------
     # ----------------------------------------------
     publish_result = failure_is_success(Selector)(u'monitor execution')
@@ -259,12 +263,12 @@ def grow_tree():
     # ----------------------------------------------
     planning_2 = failure_is_success(Selector)(u'planning II')
     planning_2.add_child(GoalCanceled(u'goal canceled', action_server_name))
-    if god_map.get_data(identifier.enable_VisualizationBehavior):
-        planning_2.add_child(success_is_failure(VisualizationBehavior)(u'visualization'))
-    if god_map.get_data(identifier.enable_WorldVisualizationBehavior):
-        planning_2.add_child(success_is_failure(WorldVisualizationBehavior)(u'world_visualization'))
-    if god_map.get_data(identifier.enable_CPIMarker):
-        planning_2.add_child(success_is_failure(CollisionMarker)(u'cpi marker'))
+    # if god_map.get_data(identifier.enable_VisualizationBehavior):
+    #     planning_2.add_child(success_is_failure(VisualizationBehavior)(u'visualization'))
+    # if god_map.get_data(identifier.enable_WorldVisualizationBehavior):
+    #     planning_2.add_child(success_is_failure(WorldVisualizationBehavior)(u'world_visualization'))
+    # if god_map.get_data(identifier.enable_CPIMarker):
+    #     planning_2.add_child(success_is_failure(CollisionMarker)(u'cpi marker'))
     planning_2.add_child(planning_3)
     # ----------------------------------------------
     move_robot = failure_is_success(Sequence)(u'move robot')
@@ -278,12 +282,12 @@ def grow_tree():
     # ----------------------------------------------
     post_processing = failure_is_success(Sequence)(u'post planning')
     # post_processing.add_child(WiggleCancel(u'final wiggle detection', final_detection=True))
-    if god_map.get_data(identifier.PlotTrajectory_enabled):
-        kwargs = god_map.get_data(identifier.PlotTrajectory)
-        post_processing.add_child(PlotTrajectory(u'plot trajectory', **kwargs))
-    if god_map.get_data(identifier.PlotDebugTrajectory_enabled):
-        kwargs = god_map.get_data(identifier.PlotDebugTrajectory)
-        post_processing.add_child(PlotDebugExpressions(u'plot debug expressions', **kwargs))
+    # if god_map.get_data(identifier.PlotTrajectory_enabled):
+    #     kwargs = god_map.get_data(identifier.PlotTrajectory)
+    #     post_processing.add_child(PlotTrajectory(u'plot trajectory', **kwargs))
+    # if god_map.get_data(identifier.PlotDebugTrajectory_enabled):
+    #     kwargs = god_map.get_data(identifier.PlotDebugTrajectory)
+    #     post_processing.add_child(PlotDebugExpressions(u'plot debug expressions', **kwargs))
     post_processing.add_child(PostProcessing(u'evaluate result'))
     # ----------------------------------------------
     planning = success_is_failure(Sequence)(u'planning')

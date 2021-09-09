@@ -53,9 +53,10 @@ class ConfigurationPlugin(GiskardBehavior):
         except Empty:
             pass
 
-        robot_frame = self.get_robot().get_root()
-        base_pose = lookup_pose(self.map_frame, robot_frame)
-        self.get_robot().base_pose = base_pose.pose
+        # robot_frame = self.get_robot().get_root()
+        # base_pose = lookup_pose(self.map_frame, robot_frame)
+        # self.get_robot().base_pose = base_pose.pose
 
-        self.god_map.set_data(identifier.joint_states, self.mjs)
+        # self.god_map.set_data(identifier.joint_states, self.mjs)
+        self.get_world().state = self.mjs
         return Status.SUCCESS

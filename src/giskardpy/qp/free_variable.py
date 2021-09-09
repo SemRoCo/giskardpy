@@ -12,8 +12,8 @@ class FreeVariable(object):
         """
         self._symbols = symbols
         self.name = str(self._symbols[0])
-        self._lower_limits = lower_limits
-        self._upper_limits = upper_limits
+        self.lower_limits = lower_limits
+        self.upper_limits = upper_limits
         self._quadratic_weights = quadratic_weights
         assert max(self._symbols.keys()) == len(self._symbols) - 1
         assert len(self._symbols) == len(self._quadratic_weights) + 1
@@ -31,13 +31,13 @@ class FreeVariable(object):
 
     def get_lower_limit(self, order):
         try:
-            return self._lower_limits[order]
+            return self.lower_limits[order]
         except KeyError:
             raise KeyError(u'Free variable {} doesn\'t have lower limit for derivative of order {}'.format(self, order))
 
     def get_upper_limit(self, order):
         try:
-            return self._upper_limits[order]
+            return self.upper_limits[order]
         except KeyError:
             raise KeyError(u'Free variable {} doesn\'t have upper limit for derivative of order {}'.format(self, order))
 

@@ -1,5 +1,6 @@
+import numbers
 import traceback
-from copy import deepcopy
+from copy import deepcopy, copy
 
 import urdf_parser_py.urdf as up
 from geometry_msgs.msg import PoseStamped
@@ -11,7 +12,7 @@ from giskardpy.data_types import JointStates, KeyDefaultDict
 from giskardpy.exceptions import RobotExistsException, DuplicateNameException, PhysicsWorldException, \
     UnknownBodyException, UnsupportedOptionException
 from giskardpy.god_map import GodMap
-from giskardpy.model.joints import FixedJoint, PrismaticJoint, RevoluteJoint, ContinuousJoint, MovableJoint
+from giskardpy.model.joints import FixedJoint, PrismaticJoint, RevoluteJoint, ContinuousJoint, MovableJoint, MimicJoint
 from giskardpy.model.robot import Robot
 from giskardpy.model.urdf_object import hacky_urdf_parser_fix
 from giskardpy.model.world_object import WorldObject
@@ -22,19 +23,14 @@ from giskardpy.utils.utils import suppress_stderr, memoize
 
 
 class Link(object):
-    def __init__(self, name, parent_joint_name=None):
+    def __init__(self, name):
         self.name = name
         self.geometry = None
-        self.parent_joint_name = parent_joint_name  # type: str
+        self.parent_joint_name = None
+        self.child_names = []
 
     def __repr__(self):
         return self.name
-
-
-class SubWorldTree(object):
-    def __init__(self, name, root_link):
-        self.name = name
-        self.root_link = root_link
 
 
 class WorldTree(object):
@@ -50,8 +46,10 @@ class WorldTree(object):
         self.god_map = god_map  # type: GodMap
         self._free_variables = {}
 
-    def add_group(self, name, root_link):
-        self.groups[name] = root_link
+    def add_group(self, name, root_link_name):
+        if root_link_name not in self.links:
+            raise KeyError('World doesn\'t have link \'{}\''.format(root_link_name))
+        self.groups[name] = SubWorldTree(name, root_link_name, self)
 
     @property
     def root_link(self):
@@ -74,7 +72,7 @@ class WorldTree(object):
             parent_link = self.root_link
         else:
             parent_link = self.links[parent_link_name]
-        child_link = Link(parsed_urdf.get_root(), parsed_urdf.name)
+        child_link = Link(parsed_urdf.get_root())
         connecting_joint = FixedJoint(parsed_urdf.name, parent_link, child_link, None, None)
         self.add_joint(connecting_joint)
 
@@ -94,7 +92,7 @@ class WorldTree(object):
 
     def add_urdf_joint(self, urdf_joint):
         parent_link = self.links[urdf_joint.parent]
-        child_link = Link(urdf_joint.child, urdf_joint.name)
+        child_link = Link(urdf_joint.child)
         if urdf_joint.origin is not None:
             translation_offset = urdf_joint.origin.xyz
             rotation_offset = urdf_joint.origin.rpy
@@ -126,6 +124,10 @@ class WorldTree(object):
             except AttributeError:
                 lower_limits[1] = None
                 upper_limits[1] = None
+            lower_limits[2] = -1e3
+            upper_limits[2] = 1e3
+            lower_limits[3] = -30
+            upper_limits[3] = 30
 
             # TODO get rosparam data
             free_variable = FreeVariable(symbols={
@@ -154,9 +156,22 @@ class WorldTree(object):
         # TODO this has to move somewhere else
         self.init_fast_fks()
 
+    def soft_reset(self):
+        pass
+
+    def get_object_names(self):
+        return []
+
+    def get_joint_constraints(self):
+        return {j.name: j.free_variable for j in self.joints.values() if isinstance(j, MovableJoint)}
+
     def add_joint(self, joint):
         self.joints[joint.name] = joint
+        joint.child.parent_joint_name = joint.name
         self.links[joint.child.name] = joint.child
+        parent_link = self.links[joint.parent_link_name]
+        assert joint.name not in parent_link.child_names
+        parent_link.child_names.append(joint.name)
 
     def move_branch(self, old_parent_joint, new_joint):
         # replace joint
@@ -171,6 +186,8 @@ class WorldTree(object):
             chain.append(tip_link_name)
         link = self.links[tip_link_name]
         while link.name != root_link_name:
+            if link.parent_joint_name not in self.joints:
+                raise ValueError('{} and {} are not connected'.format(root_link_name, tip_link_name))
             parent_joint = self.joints[link.parent_joint_name]
             parent_link = parent_joint.parent
             if joints:
@@ -237,30 +254,131 @@ class WorldTree(object):
     def get_fk_np(self, root, tip):
         return self._fks[root, tip].call2(self.god_map.get_values(self._fks[root, tip].str_params))
 
+    def set_joint_limits(self, linear_limits, angular_limits, order):
+        for joint in self.joints.values():
+            if self.is_joint_fixed(joint.name):
+                continue
+            if self.is_joint_rotational(joint.name):
+                new_limits = angular_limits
+            else:
+                new_limits = linear_limits
+
+            old_upper_limits = joint.free_variable.upper_limits[order]
+            if old_upper_limits is None:
+                joint.free_variable.upper_limits[order] = new_limits[joint.name]
+            else:
+                joint.free_variable.upper_limits[order] = w.min(old_upper_limits,
+                                                                new_limits[joint.name])
+
+            old_lower_limits = joint.free_variable.lower_limits[order]
+            if old_lower_limits is None:
+                joint.free_variable.lower_limits[order] = new_limits[joint.name]
+            else:
+                joint.free_variable.lower_limits[order] = w.max(old_lower_limits,
+                                                                -new_limits[joint.name])
+
+    def get_joint_limit_expr(self, joint_name, order):
+        upper_limit = self.joints[joint_name].free_variable.get_upper_limit(order)
+        lower_limit = self.joints[joint_name].free_variable.get_lower_limit(order)
+        return upper_limit, lower_limit
+
+    def get_joint_limit(self, joint_name, order):
+        lower_limit, upper_limit = self.get_joint_limit_expr(joint_name, order)
+        if not isinstance(lower_limit, numbers.Number):
+            f = w.speed_up(lower_limit, w.free_symbols(lower_limit))
+            lower_limit = f.call2(self.god_map.get_values(f.str_params))[0][0]
+        if not isinstance(upper_limit, numbers.Number):
+            f = w.speed_up(upper_limit, w.free_symbols(upper_limit))
+            upper_limit = f.call2(self.god_map.get_values(f.str_params))[0][0]
+        return upper_limit, lower_limit
+
     def get_joint_position_limits(self, joint_name):
-        return self.joints[joint_name].position_limits
+        return self.get_joint_limit(joint_name, 0)
+
+    def get_joint_velocity_limits(self, joint_name):
+        return self.get_joint_limit(joint_name, 1)
 
     def get_all_joint_position_limits(self):
         return {j: self.get_joint_position_limits(j) for j in self.movable_joints}
 
-    @memoize
-    def get_sub_tree_at_joint(self, joint_name):
-        """
-        :type joint_name: str
-        :rtype: URDFObject
-        """
-        tree_links = []
-        tree_joints = []
-        joints = [joint_name]
-        for joint in joints:
-            child_link = self.joints[joint].child
-            if child_link in self._urdf_robot.child_map:
-                for j, l in self._urdf_robot.child_map[child_link]:
-                    joints.append(j)
-                    tree_joints.append(self.get_urdf_joint(j))
-            tree_links.append(self.get_urdf_link(child_link))
+    def is_joint_prismatic(self, joint_name):
+        return isinstance(self.joints[joint_name], PrismaticJoint)
 
-        return URDFObject.from_parts(joint_name, tree_links, tree_joints)
+    def is_joint_fixed(self, joint_name):
+        return not isinstance(self.joints[joint_name], MovableJoint)
+
+    def is_joint_revolute(self, joint_name):
+        return isinstance(self.joints[joint_name], RevoluteJoint)
+
+    def is_joint_continuous(self, joint_name):
+        return isinstance(self.joints[joint_name], ContinuousJoint)
+
+    def is_joint_mimic(self, joint_name):
+        return isinstance(self.joints[joint_name], MimicJoint)
+
+    def is_joint_rotational(self, joint_name):
+        return self.is_joint_revolute(joint_name) or self.is_joint_continuous(joint_name)
+
+    def has_joint(self, joint_name):
+        return joint_name in self.joints
+
+class SubWorldTree(WorldTree):
+    def __init__(self, name, root_link_name, world):
+        """
+        :type name: str
+        :type root_link_name: str
+        :type world: WorldTree
+        """
+        self.name = name
+        self.root_link_name = root_link_name
+        self.world = world
+
+    @property
+    def god_map(self):
+        return self.world.god_map
+
+    @property
+    def root_link(self):
+        return self.world.links[self.root_link_name]
+
+    @property
+    def joints(self):
+        def helper(root_link):
+            """
+            :type root_link: Link
+            :rtype: dict
+            """
+            joints = {j: self.world.joints[j] for j in root_link.child_names}
+            for j in root_link.child_names: # type: FixedJoint
+                joints.update(helper(self.world.joints[j].child))
+            return joints
+        return helper(self.root_link)
+
+    @property
+    def links(self):
+        def helper(root_link):
+            """
+            :type root_link: Link
+            :rtype: list
+            """
+            links = {root_link.name: root_link}
+            for j in root_link.child_names: # type: FixedJoint
+                links.update(helper(self.world.joints[j].child))
+            return links
+        return helper(self.root_link)
+
+    def add_group(self, name, root_link_name):
+        raise NotImplementedError()
+
+    def add_joint(self, joint):
+        raise NotImplementedError()
+
+    def add_urdf_joint(self, urdf_joint):
+        raise NotImplementedError()
+
+    def delete_branch(self, parent_joint):
+        raise NotImplementedError()
+
 
 class World(object):
     # General ----------------------------------------------------------------------------------------------------------

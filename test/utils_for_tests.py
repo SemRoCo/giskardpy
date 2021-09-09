@@ -280,7 +280,7 @@ class GiskardTestWrapper(GiskardWrapper):
         # rospy.sleep(1)
         super(GiskardTestWrapper, self).__init__(node_name=u'tests')
         self.results = Queue(100)
-        self.default_root = self.get_robot().get_root()
+        self.default_root = self.get_robot().root_link_name
         self.map = u'map'
         self.simple_base_pose_pub = rospy.Publisher('/move_base_simple/goal', PoseStamped, queue_size=10)
         self.set_base = rospy.ServiceProxy('/base_simulator/set_joint_states', SetJointState)
@@ -313,9 +313,9 @@ class GiskardTestWrapper(GiskardWrapper):
 
     def get_robot(self):
         """
-        :rtype: Robot
+        :rtype: giskardpy.model.world.SubWorldTree
         """
-        return self.get_god_map().get_data(robot)
+        return self.get_world().groups['robot']
 
     def get_god_map(self):
         """
@@ -628,13 +628,13 @@ class GiskardTestWrapper(GiskardWrapper):
     #
     def get_world(self):
         """
-        :rtype: PyBulletWorld
+        :rtype: giskardpy.model.world.WorldTree
         """
         return self.get_god_map().get_data(world)
 
     def clear_world(self):
         assert super(GiskardTestWrapper, self).clear_world().error_codes == UpdateWorldResponse.SUCCESS
-        assert len(self.get_world().get_object_names()) == 0
+        assert len(self.get_world().groups) == 1
         assert len(self.get_object_names().object_names) == 0
         # assert len(self.get_robot().get_attached_objects()) == 0
         # assert self.get_world().has_object(u'plane')
@@ -844,7 +844,6 @@ class PR2(GiskardTestWrapper):
         self.r_gripper = rospy.ServiceProxy(u'r_gripper_simulator/set_joint_states', SetJointState)
         self.l_gripper = rospy.ServiceProxy(u'l_gripper_simulator/set_joint_states', SetJointState)
         super(PR2, self).__init__(u'pr2.yaml')
-        self.default_root = self.get_robot().get_root()
 
     def move_base(self, goal_pose):
         goal_pose = transform_pose(self.default_root, goal_pose)

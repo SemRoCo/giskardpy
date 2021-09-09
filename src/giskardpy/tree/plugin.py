@@ -6,15 +6,15 @@ from threading import Thread
 import rospy
 from py_trees import Behaviour, Blackboard, Status
 
-from giskardpy.identifier import world, robot
+from giskardpy import identifier
 from giskardpy.utils import logging
 
 
 class GiskardBehavior(Behaviour):
     def __init__(self, name):
         self.god_map = Blackboard().god_map
-        self.world = None
-        self.robot = None
+        self.world = self.get_god_map().get_data(identifier.world)
+        self.robot = self.world.groups['robot']
         super(GiskardBehavior, self).__init__(name)
 
     def get_god_map(self):
@@ -27,32 +27,24 @@ class GiskardBehavior(Behaviour):
         """
         :rtype: giskardpy.world.World
         """
-        if not self.world:
-            self.world = self.get_god_map().get_data(world)
         return self.world
 
     def unsafe_get_world(self):
         """
         :rtype: giskardpy.world.World
         """
-        if not self.world:
-            self.world = self.get_god_map().unsafe_get_data(world)
         return self.world
 
     def get_robot(self):
         """
         :rtype: giskardpy.robot.Robot
         """
-        if not self.robot:
-            self.robot = self.get_god_map().get_data(robot)
         return self.robot
 
     def unsafe_get_robot(self):
         """
         :rtype: giskardpy.robot.Robot
         """
-        if not self.robot:
-            self.robot = self.get_god_map().unsafe_get_data(robot)
         return self.robot
 
     def raise_to_blackboard(self, exception):

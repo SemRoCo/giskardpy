@@ -3,6 +3,7 @@ robot = world + [u'robot']
 fk_pose = robot + [u'get_fk_pose']
 fk_np = robot + [u'get_fk_np']
 joint_states = world + [u'state']
+controlled_joints = ['controlled_joints']
 
 # goal_params = [u'goal_params']
 trajectory = [u'traj']

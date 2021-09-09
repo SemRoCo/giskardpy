@@ -61,7 +61,7 @@ class Goal(object):
         """
         :rtype: Robot
         """
-        return self.get_god_map().get_data(identifier.robot)
+        return self.get_world().groups['robot']
 
     def get_world_unsafe(self):
         """

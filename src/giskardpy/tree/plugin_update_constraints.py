@@ -18,7 +18,7 @@ from giskardpy.utils.logging import loginfo
 from giskardpy.tree.plugin_action_server import GetGoal
 from giskardpy.utils.utils import convert_dictionary_to_ros_message
 import pkgutil
-
+from giskardpy import casadi_wrapper as w
 
 def get_all_classes_in_package(package):
     classes = {}
@@ -61,13 +61,13 @@ class GoalToConstraints(GetGoal):
 
         self.get_god_map().set_data(identifier.goals, {})
 
-        self.get_robot().create_constraints(self.get_god_map())
+        # self.get_robot().create_constraints(self.get_god_map())
 
         self.soft_constraints = {}
         self.vel_constraints = {}
         self.debug_expr = {}
-        if not (self.get_god_map().get_data(identifier.check_reachability)):
-            self.add_collision_avoidance_soft_constraints(move_cmd.collisions)
+        # if not (self.get_god_map().get_data(identifier.check_reachability)):
+        #     self.add_collision_avoidance_soft_constraints(move_cmd.collisions)
 
         try:
             self.parse_constraints(move_cmd)
@@ -86,18 +86,26 @@ class GoalToConstraints(GetGoal):
         self.get_god_map().set_data(identifier.debug_expressions, self.debug_expr)
         self.get_blackboard().runtime = time()
 
-        controlled_joints = self.get_robot().controlled_joints
+        # controlled_joints = self.get_robot().controlled_joints
 
         if (self.get_god_map().get_data(identifier.check_reachability)):
             # FIXME reachability check is broken
             pass
         else:
-            joint_constraints = OrderedDict(((self.robot.get_name(), k), self.robot._joint_constraints[k]) for k in
-                                            controlled_joints)
+            # joint_constraints = OrderedDict(((self.robot.get_name(), k), self.robot._joint_constraints[k]) for k in
+            #                                 controlled_joints)
+            l = self.active_free_symbols()
+            joint_constraints = [v for v in self.get_robot().get_joint_constraints().values() if v.name in l]
 
         self.get_god_map().set_data(identifier.free_variables, joint_constraints)
 
         return Status.SUCCESS
+
+    def active_free_symbols(self):
+        symbols = []
+        for c in self.soft_constraints.values():
+            symbols.extend(str(s) for s in w.free_symbols(c.expression))
+        return symbols
 
     def parse_constraints(self, cmd):
         """

@@ -139,7 +139,7 @@ class SendResult(ActionServerBehavior):
 
         trajectory = self.get_god_map().get_data(identifier.trajectory)
         sample_period = self.get_god_map().get_data(identifier.sample_period)
-        controlled_joints = self.get_robot().controlled_joints
+        controlled_joints = self.get_god_map().get_data(identifier.controlled_joints)
         result.trajectory = traj_to_msg(sample_period, trajectory, controlled_joints, True)
 
         if result.error_codes[-1] == MoveResult.PREEMPTED:

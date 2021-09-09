@@ -5,7 +5,7 @@ class FixedJoint(object):
     def __init__(self, name, parent, child, translation_offset, rotation_offset):
         self.name = name
         self.parent = parent
-        self.child = child
+        self.child = child # type: giskardpy.model.world.Link
         if translation_offset is None:
             translation_offset = [0, 0, 0]
         if rotation_offset is None:
@@ -36,6 +36,10 @@ class MovableJoint(FixedJoint):
     @property
     def position_limits(self):
         return self.free_variable.get_lower_limit(0), self.free_variable.get_upper_limit(0)
+
+    @property
+    def velocity_limit(self):
+        return self.free_variable.get_upper_limit(1)
 
 
 class RevoluteJoint(MovableJoint):

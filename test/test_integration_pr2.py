@@ -2530,7 +2530,7 @@ class TestCollisionAvoidanceGoals(object):
         zero_pose.set_cart_goal(p, pocky, zero_pose.default_root)
         p = tf.transform_pose(zero_pose.default_root, p)
         zero_pose.send_and_check_goal()
-        p2 = zero_pose.get_robot().get_fk_pose(zero_pose.default_root, pocky)
+        p2 = zero_pose.get_robot().compute_fk_pose(zero_pose.default_root, pocky)
         compare_poses(p2.pose, p.pose)
         zero_pose.detach_object(pocky)
         p = PoseStamped()
@@ -2582,7 +2582,7 @@ class TestCollisionAvoidanceGoals(object):
         p.pose.orientation = Quaternion(0., 0., 0.47942554, 0.87758256)
         zero_pose.add_box(pocky, [0.1, 0.02, 0.02], pose=p)
         zero_pose.attach_object(pocky, frame_id=zero_pose.r_tip)
-        relative_pose = zero_pose.get_robot().get_fk_pose(zero_pose.r_tip, pocky).pose
+        relative_pose = zero_pose.get_robot().compute_fk_pose(zero_pose.r_tip, pocky).pose
         compare_poses(p.pose, relative_pose)
 
     def test_add_attach_detach_remove_add(self, zero_pose):
@@ -2612,7 +2612,7 @@ class TestCollisionAvoidanceGoals(object):
         old_p.pose.orientation = Quaternion(0., 0., 0.47942554, 0.87758256)
         zero_pose.add_box(pocky, [0.1, 0.02, 0.02], pose=old_p)
         zero_pose.attach_object(pocky, frame_id=zero_pose.r_tip)
-        relative_pose = zero_pose.get_robot().get_fk_pose(zero_pose.r_tip, pocky).pose
+        relative_pose = zero_pose.get_robot().compute_fk_pose(zero_pose.r_tip, pocky).pose
         compare_poses(old_p.pose, relative_pose)
 
         p = PoseStamped()
@@ -2637,7 +2637,7 @@ class TestCollisionAvoidanceGoals(object):
         zero_pose.set_cart_goal(p, pocky)
         p = tf.transform_pose(zero_pose.default_root, p)
         zero_pose.send_and_check_goal()
-        p2 = zero_pose.get_robot().get_fk_pose(zero_pose.default_root, pocky)
+        p2 = zero_pose.get_robot().compute_fk_pose(zero_pose.default_root, pocky)
         compare_poses(p2.pose, p.pose)
 
         zero_pose.clear_world()
@@ -2648,7 +2648,7 @@ class TestCollisionAvoidanceGoals(object):
         old_p.pose.orientation = Quaternion(0., 0., 0.47942554, 0.87758256)
         zero_pose.add_box(pocky, [0.1, 0.02, 0.02], pose=old_p)
         zero_pose.attach_object(pocky, frame_id=zero_pose.r_tip)
-        relative_pose = zero_pose.get_robot().get_fk_pose(zero_pose.r_tip, pocky).pose
+        relative_pose = zero_pose.get_robot().compute_fk_pose(zero_pose.r_tip, pocky).pose
         compare_poses(old_p.pose, relative_pose)
 
         p = PoseStamped()

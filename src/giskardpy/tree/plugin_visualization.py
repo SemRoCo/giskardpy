@@ -14,7 +14,7 @@ class VisualizationBehavior(GiskardBehavior):
 
     def setup(self, timeout):
         self.publisher = rospy.Publisher(u'~visualization_marker_array', MarkerArray, queue_size=1)
-        self.robot_base = self.get_robot().get_root()
+        self.robot_base = self.get_robot().root_link_name
         self.ids = set()
         return super(VisualizationBehavior, self).setup(timeout)
 
@@ -22,8 +22,8 @@ class VisualizationBehavior(GiskardBehavior):
         markers = []
         time_stamp = rospy.Time()
         robot = self.get_robot()
-        get_fk = robot.get_fk_pose
-        links = [x for x in self.get_robot().get_link_names() if robot.has_link_visuals(x)]
+        get_fk = robot.compute_fk_pose
+        links = [x for x in self.get_robot().link_names if robot.links[x].has_visual()]
         for i, link_name in enumerate(links):
             marker = robot.link_as_marker(link_name)
             if marker is None:

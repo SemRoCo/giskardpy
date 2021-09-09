@@ -616,7 +616,7 @@ class GiskardTestWrapper(GiskardWrapper):
                 error_msg = u'{} has violated joint position limit'.format(joint)
                 np.testing.assert_array_less(trajectory_pos[joint], joint_limits[1], error_msg)
                 np.testing.assert_array_less(-trajectory_pos[joint], -joint_limits[0], error_msg)
-            vel_limit = self.get_world().get_joint_limit_expr(joint, 1)[0]
+            vel_limit = self.get_world().joint_limit_expr(joint, 1)[0]
             vel_limit = self.get_god_map().evaluate_expr(vel_limit) * 1.001
             vel = trajectory_vel[joint]
             error_msg = u'{} has violated joint velocity limit {} > {}'.format(joint, vel, vel_limit)
@@ -649,7 +649,7 @@ class GiskardTestWrapper(GiskardWrapper):
 
     def detach_object(self, name, expected_response=UpdateWorldResponse.SUCCESS):
         if expected_response == UpdateWorldResponse.SUCCESS:
-            p = self.get_robot().get_fk_pose(self.get_robot().get_root(), name)
+            p = self.get_robot().compute_fk_pose(self.get_robot().get_root(), name)
             p = transform_pose(u'map', p)
             assert name in self.get_attached_objects().object_names, \
                 'there is no attached object named {}'.format(name)

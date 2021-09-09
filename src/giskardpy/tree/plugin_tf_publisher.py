@@ -39,7 +39,7 @@ class TFPublisher(GiskardBehavior):
                     robot_links = set(self.unsafe_get_robot().get_link_names())
                     attached_links = robot_links - self.original_links
                     if attached_links:
-                        get_fk = self.unsafe_get_robot().get_fk_pose
+                        get_fk = self.unsafe_get_robot().compute_fk_pose
                         for link_name in attached_links:
                             parent_link_name = self.unsafe_get_robot().get_parent_link_of_link(link_name)
                             fk = get_fk(parent_link_name, link_name)

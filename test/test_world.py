@@ -160,8 +160,8 @@ class TestWorldTree(object):
         parsed_urdf = self.parsed_pr2_urdf()
         root_link = parsed_urdf.get_root()
         tip_link = 'r_gripper_tool_frame'
-        real = world.get_chain(root_link, tip_link)
-        expected = parsed_urdf.get_chain(root_link, tip_link)
+        real = world.compute_chain(root_link, tip_link)
+        expected = parsed_urdf.compute_chain(root_link, tip_link)
         assert set(real) == set(expected)
 
     def test_get_chain2(self):
@@ -169,7 +169,7 @@ class TestWorldTree(object):
         root_link = 'l_gripper_tool_frame'
         tip_link = 'r_gripper_tool_frame'
         try:
-            world.get_chain(root_link, tip_link)
+            world.compute_chain(root_link, tip_link)
             assert False
         except ValueError:
             pass
@@ -179,7 +179,7 @@ class TestWorldTree(object):
         tip_link = 'r_gripper_r_finger_tip_link'
         world = world_with_pr2()
         world.add_group('r_hand', root_link)
-        real = world.groups['r_hand'].get_chain(root_link, tip_link)
+        real = world.groups['r_hand'].compute_chain(root_link, tip_link)
         assert real == ['r_wrist_roll_link',
                         'r_gripper_palm_joint',
                         'r_gripper_palm_link',
@@ -194,7 +194,7 @@ class TestWorldTree(object):
         world = world_with_pr2()
         world.add_group('r_hand', 'r_wrist_roll_link')
         try:
-            real = world.groups['r_hand'].get_chain(root_link, tip_link)
+            real = world.groups['r_hand'].compute_chain(root_link, tip_link)
             assert False
         except ValueError:
             pass
@@ -203,7 +203,7 @@ class TestWorldTree(object):
         world = world_with_pr2()
         root_link = 'l_gripper_r_finger_tip_link'
         tip_link = 'l_gripper_l_finger_tip_link'
-        chain1, connection, chain2 = world.get_split_chain(root_link, tip_link)
+        chain1, connection, chain2 = world.compute_split_chain(root_link, tip_link)
         assert chain1 == ['l_gripper_r_finger_tip_link', 'l_gripper_r_finger_tip_joint', 'l_gripper_r_finger_link',
                           'l_gripper_r_finger_joint']
         assert connection == ['l_gripper_palm_link']
@@ -215,7 +215,7 @@ class TestWorldTree(object):
         tip_link = 'r_gripper_r_finger_tip_link'
         world = world_with_pr2()
         world.add_group('r_hand', 'r_wrist_roll_link')
-        chain1, connection, chain2 = world.groups['r_hand'].get_split_chain(root_link, tip_link)
+        chain1, connection, chain2 = world.groups['r_hand'].compute_split_chain(root_link, tip_link)
         assert chain1 == ['r_gripper_l_finger_tip_link',
                           'r_gripper_l_finger_tip_joint',
                           'r_gripper_l_finger_link',
@@ -307,7 +307,7 @@ class TestWorldTree(object):
             for joint_name, position in js.items():
                 mjs[joint_name].position = position
             world.joint_state = mjs
-            fk = world.get_fk_pose(root, tip).pose
+            fk = world.compute_fk_pose(root, tip).pose
 
 
 class TestWorldObj(test_urdf_object.TestUrdfObject):

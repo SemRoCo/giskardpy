@@ -5,6 +5,7 @@ from copy import deepcopy, copy
 import urdf_parser_py.urdf as up
 from geometry_msgs.msg import PoseStamped
 from giskard_msgs.msg import CollisionEntry
+from tf.transformations import euler_matrix
 
 from giskardpy import casadi_wrapper as w
 from giskardpy import identifier
@@ -21,13 +22,53 @@ from giskardpy.utils import logging
 from giskardpy.utils.tfwrapper import msg_to_kdl, kdl_to_pose, homo_matrix_to_pose
 from giskardpy.utils.utils import suppress_stderr, memoize
 
+class LinkGeometry(object):
+    def __init__(self, link_T_geometry):
+        self.link_T_geometry = link_T_geometry
+
+class MeshGeometry(LinkGeometry):
+    def __init__(self, link_T_geometry, file_name, scale=None):
+        super(MeshGeometry, self).__init__(link_T_geometry)
+        self.file_name = file_name
+        if scale is None:
+            self.scale = [1,1,1]
+        else:
+            self.scale = scale
+
+class BoxGeometry(LinkGeometry):
+    def __init__(self, link_T_geometry):
+        super(BoxGeometry, self).__init__(link_T_geometry)
+
 
 class Link(object):
     def __init__(self, name):
         self.name = name
-        self.geometry = None
+        self.visuals = None
+        self.collisions = None
         self.parent_joint_name = None
         self.child_names = []
+
+    @classmethod
+    def from_urdf(cls, urdf_link):
+        link = cls(urdf_link.name)
+        for urdf_collision in urdf_link.collisions:
+            urdf_geometry = urdf_collision.geometry
+            if isinstance(urdf_geometry, up.Mesh):
+                link_T_geometry = euler_matrix(*urdf_collision.origin.rpy)
+                link_T_geometry[0,3] = urdf_collision.origin.xyz[0]
+                link_T_geometry[1,3] = urdf_collision.origin.xyz[1]
+                link_T_geometry[2,3] = urdf_collision.origin.xyz[2]
+                # link_T_geometry[]
+                geometry = MeshGeometry(link_T_geometry, urdf_collision.geometry)
+                # geometry
+
+        return link
+
+    def has_visuals(self):
+        return self.visuals is not None
+
+    def has_collisions(self):
+        return self.collisions is not None
 
     def __repr__(self):
         return self.name
@@ -60,6 +101,11 @@ class WorldTree(object):
         return list(self.links.keys())
 
     @property
+    def link_names_with_visuals(self):
+        return [link.name for link in self.links.values() if link.has_visual()]
+
+
+    @property
     def joint_names(self):
         return list(self.joints.keys())
 
@@ -74,14 +120,14 @@ class WorldTree(object):
             parent_link = self.links[parent_link_name]
         child_link = Link(parsed_urdf.get_root())
         connecting_joint = FixedJoint(parsed_urdf.name, parent_link, child_link, None, None)
-        self.add_joint(connecting_joint)
+        self.link_joint_to_links(connecting_joint)
 
         def helper(urdf, parent_link_name):
             if parent_link_name not in urdf.child_map:
                 return
             for child_joint_name, child_link_name in urdf.child_map[parent_link_name]:
-                urdf_joint = urdf.joint_map[child_joint_name]
-                self.add_urdf_joint(urdf_joint)
+                self.add_urdf_link(urdf.link_map[child_link_name])
+                self.add_urdf_joint(urdf.joint_map[child_joint_name])
                 helper(urdf, child_link_name)
 
         helper(parsed_urdf, child_link.name)
@@ -90,9 +136,13 @@ class WorldTree(object):
     def movable_joints(self):
         return [j.name for j in self.joints.values() if isinstance(j, MovableJoint)]
 
+    def add_urdf_link(self, urdf_link):
+        link = Link.from_urdf(urdf_link)
+        self.links[link.name] = link
+
     def add_urdf_joint(self, urdf_joint):
         parent_link = self.links[urdf_joint.parent]
-        child_link = Link(urdf_joint.child)
+        child_link = self.links[urdf_joint.child]
         if urdf_joint.origin is not None:
             translation_offset = urdf_joint.origin.xyz
             rotation_offset = urdf_joint.origin.rpy
@@ -152,20 +202,18 @@ class WorldTree(object):
                                         free_variable, urdf_joint.axis)
             else:
                 raise NotImplementedError('Joint of type {} is not supported'.format(urdf_joint.type))
-        self.add_joint(joint)
+        self.link_joint_to_links(joint)
         # TODO this has to move somewhere else
         self.init_fast_fks()
 
     def soft_reset(self):
         pass
 
-    def get_object_names(self):
-        return []
-
-    def get_joint_constraints(self):
+    @property
+    def joint_constraints(self):
         return {j.name: j.free_variable for j in self.joints.values() if isinstance(j, MovableJoint)}
 
-    def add_joint(self, joint):
+    def link_joint_to_links(self, joint):
         self.joints[joint.name] = joint
         joint.child.parent_joint_name = joint.name
         self.links[joint.child.name] = joint.child
@@ -180,7 +228,7 @@ class WorldTree(object):
     def delete_branch(self, parent_joint):
         pass
 
-    def get_chain(self, root_link_name, tip_link_name, joints=True, links=True, fixed=True):
+    def compute_chain(self, root_link_name, tip_link_name, joints=True, links=True, fixed=True):
         chain = []
         if links:
             chain.append(tip_link_name)
@@ -199,29 +247,29 @@ class WorldTree(object):
         chain.reverse()
         return chain
 
-    def get_split_chain(self, root, tip, joints=True, links=True, fixed=True):
+    def compute_split_chain(self, root, tip, joints=True, links=True, fixed=True):
         if root == tip:
             return [], [], []
-        root_chain = self.get_chain(self.root_link_name, root, False, True, True)
-        tip_chain = self.get_chain(self.root_link_name, tip, False, True, True)
+        root_chain = self.compute_chain(self.root_link_name, root, False, True, True)
+        tip_chain = self.compute_chain(self.root_link_name, tip, False, True, True)
         for i in range(min(len(root_chain), len(tip_chain))):
             if root_chain[i] != tip_chain[i]:
                 break
         else:
             i += 1
         connection = tip_chain[i - 1]
-        root_chain = self.get_chain(connection, root, joints, links, fixed)
+        root_chain = self.compute_chain(connection, root, joints, links, fixed)
         if links:
             root_chain = root_chain[1:]
         root_chain.reverse()
-        tip_chain = self.get_chain(connection, tip, joints, links, fixed)
+        tip_chain = self.compute_chain(connection, tip, joints, links, fixed)
         if links:
             tip_chain = tip_chain[1:]
         return root_chain, [connection] if links else [], tip_chain
 
-    def get_fk_expression(self, root_link, tip_link):
+    def compose_fk_expression(self, root_link, tip_link):
         fk = w.eye(4)
-        root_chain, _, tip_chain = self.get_split_chain(root_link, tip_link, links=False)
+        root_chain, _, tip_chain = self.compute_split_chain(root_link, tip_link, links=False)
         for joint_name in root_chain:
             fk = w.dot(fk, w.inverse_frame(self.joints[joint_name].parent_T_child))
         for joint_name in tip_chain:
@@ -232,15 +280,15 @@ class WorldTree(object):
     def init_fast_fks(self):
         def f(key):
             root, tip = key
-            fk = self.get_fk_expression(root, tip)
+            fk = self.compose_fk_expression(root, tip)
             m = w.speed_up(fk, w.free_symbols(fk))
             return m
 
         self._fks = KeyDefaultDict(f)
 
-    def get_fk_pose(self, root, tip):
+    def compute_fk_pose(self, root, tip):
         try:
-            homo_m = self.get_fk_np(root, tip)
+            homo_m = self.compute_fk_np(root, tip)
             p = PoseStamped()
             p.header.frame_id = root
             p.pose = homo_matrix_to_pose(homo_m)
@@ -251,7 +299,7 @@ class WorldTree(object):
         return p
 
     @memoize
-    def get_fk_np(self, root, tip):
+    def compute_fk_np(self, root, tip):
         return self._fks[root, tip].call2(self.god_map.get_values(self._fks[root, tip].str_params))
 
     def set_joint_limits(self, linear_limits, angular_limits, order):
@@ -277,26 +325,26 @@ class WorldTree(object):
                 joint.free_variable.lower_limits[order] = w.max(old_lower_limits,
                                                                 -new_limits[joint.name])
 
-    def get_joint_limit_expr(self, joint_name, order):
+    def joint_limit_expr(self, joint_name, order):
         upper_limit = self.joints[joint_name].free_variable.get_upper_limit(order)
         lower_limit = self.joints[joint_name].free_variable.get_lower_limit(order)
         return upper_limit, lower_limit
 
-    def get_joint_limit(self, joint_name, order):
-        lower_limit, upper_limit = self.get_joint_limit_expr(joint_name, order)
-        if not isinstance(lower_limit, numbers.Number):
+    def compute_joint_limits(self, joint_name, order):
+        lower_limit, upper_limit = self.joint_limit_expr(joint_name, order)
+        if not isinstance(lower_limit, numbers.Number) and lower_limit is not None:
             f = w.speed_up(lower_limit, w.free_symbols(lower_limit))
             lower_limit = f.call2(self.god_map.get_values(f.str_params))[0][0]
-        if not isinstance(upper_limit, numbers.Number):
+        if not isinstance(upper_limit, numbers.Number) and upper_limit is not None:
             f = w.speed_up(upper_limit, w.free_symbols(upper_limit))
             upper_limit = f.call2(self.god_map.get_values(f.str_params))[0][0]
         return upper_limit, lower_limit
 
     def get_joint_position_limits(self, joint_name):
-        return self.get_joint_limit(joint_name, 0)
+        return self.compute_joint_limits(joint_name, 0)
 
     def get_joint_velocity_limits(self, joint_name):
-        return self.get_joint_limit(joint_name, 1)
+        return self.compute_joint_limits(joint_name, 1)
 
     def get_all_joint_position_limits(self):
         return {j: self.get_joint_position_limits(j) for j in self.movable_joints}
@@ -374,7 +422,7 @@ class SubWorldTree(WorldTree):
     def add_group(self, name, root_link_name):
         raise NotImplementedError()
 
-    def add_joint(self, joint):
+    def link_joint_to_links(self, joint):
         raise NotImplementedError()
 
     def add_urdf_joint(self, urdf_joint):

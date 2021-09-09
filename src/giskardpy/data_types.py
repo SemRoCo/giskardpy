@@ -301,8 +301,8 @@ class Collisions(object):
             collision = collision.reverse()
             new_link_a, new_link_b = new_link_b, new_link_a
 
-        new_b_T_r = self.robot.get_fk_np(new_link_b, self.robot_root)
-        new_a_T_r = self.robot.get_fk_np(new_link_a, self.robot_root)
+        new_b_T_r = self.robot.compute_fk_np(new_link_b, self.robot_root)
+        new_a_T_r = self.robot.compute_fk_np(new_link_a, self.robot_root)
         collision.set_link_a(new_link_a)
         collision.set_link_b(new_link_b)
 
@@ -324,7 +324,7 @@ class Collisions(object):
         """
         movable_joint = self.robot.get_controlled_parent_joint(collision.get_original_link_a())
         new_a = self.robot.get_child_link_of_joint(movable_joint)
-        new_a_T_r = self.robot.get_fk_np(new_a, self.robot_root)
+        new_a_T_r = self.robot.compute_fk_np(new_a, self.robot_root)
         collision.set_link_a(new_a)
 
         new_a_P_pa = np.dot(np.dot(new_a_T_r, self.root_T_map), np_point(*collision.get_position_on_a_in_map()))

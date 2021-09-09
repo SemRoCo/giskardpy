@@ -248,8 +248,8 @@ def grow_tree():
     planning_3.add_child(running_is_success(TimePlugin)(u'time for zero velocity'))
     planning_3.add_child(AppendZeroVelocity(u'append zero velocity'))
     planning_3.add_child(running_is_success(LogTrajPlugin)(u'log zero velocity'))
-    # if god_map.get_data(identifier.enable_VisualizationBehavior):
-    #     planning_3.add_child(VisualizationBehavior(u'visualization', ensure_publish=True))
+    if god_map.get_data(identifier.enable_VisualizationBehavior):
+        planning_3.add_child(VisualizationBehavior(u'visualization', ensure_publish=True))
     # if god_map.get_data(identifier.enable_WorldVisualizationBehavior):
     #     planning_3.add_child(WorldVisualizationBehavior(u'world_visualization', ensure_publish=True))
     # if god_map.get_data(identifier.enable_CPIMarker):
@@ -263,8 +263,8 @@ def grow_tree():
     # ----------------------------------------------
     planning_2 = failure_is_success(Selector)(u'planning II')
     planning_2.add_child(GoalCanceled(u'goal canceled', action_server_name))
-    # if god_map.get_data(identifier.enable_VisualizationBehavior):
-    #     planning_2.add_child(success_is_failure(VisualizationBehavior)(u'visualization'))
+    if god_map.get_data(identifier.enable_VisualizationBehavior):
+        planning_2.add_child(success_is_failure(VisualizationBehavior)(u'visualization'))
     # if god_map.get_data(identifier.enable_WorldVisualizationBehavior):
     #     planning_2.add_child(success_is_failure(WorldVisualizationBehavior)(u'world_visualization'))
     # if god_map.get_data(identifier.enable_CPIMarker):

@@ -89,7 +89,7 @@ class WorldUpdatePlugin(GiskardBehavior):
                 attached_objects = list(set(link_names).difference(original_link_names))
                 for object_name in attached_objects:
                     parent = robot.get_parent_link_of_joint(object_name)
-                    pose = robot.get_fk_pose(parent, object_name)
+                    pose = robot.compute_fk_pose(parent, object_name)
                     world_object = robot.get_sub_tree_at_joint(object_name)
                     f.write("#attach {}\n".format(object_name))
                     with open("{}/{}.urdf".format(folder_path, object_name), u'w') as f_urdf:

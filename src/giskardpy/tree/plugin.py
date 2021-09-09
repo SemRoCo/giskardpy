@@ -25,25 +25,25 @@ class GiskardBehavior(Behaviour):
 
     def get_world(self):
         """
-        :rtype: giskardpy.world.World
+        :rtype: giskardpy.model.world.SubWorldTree
         """
         return self.world
 
     def unsafe_get_world(self):
         """
-        :rtype: giskardpy.world.World
+        :rtype: giskardpy.model.world.SubWorldTree
         """
         return self.world
 
     def get_robot(self):
         """
-        :rtype: giskardpy.robot.Robot
+        :rtype: giskardpy.model.world.SubWorldTree
         """
         return self.robot
 
     def unsafe_get_robot(self):
         """
-        :rtype: giskardpy.robot.Robot
+        :rtype: giskardpy.model.world.SubWorldTree
         """
         return self.robot
 

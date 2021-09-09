@@ -23,6 +23,6 @@ class KinSimPlugin(GiskardBehavior):
                 for joint_symbol, cmd in cmds.items():
                     joint_name = self.get_god_map().expr_to_key[joint_symbol][-2]
                     if i == 0:
-                        self.world.state[joint_name].position += cmd
+                        self.world.state[joint_name].position += cmd * self.sample_period
                     self.world.state[joint_name].set_derivative(i+1, cmd)
         return Status.RUNNING

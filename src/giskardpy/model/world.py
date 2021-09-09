@@ -334,6 +334,10 @@ class SubWorldTree(WorldTree):
         self.world = world
 
     @property
+    def state(self):
+        return self.world.state
+
+    @property
     def god_map(self):
         return self.world.god_map
 

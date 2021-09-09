@@ -609,14 +609,14 @@ class GiskardTestWrapper(GiskardWrapper):
     def are_joint_limits_violated(self):
         trajectory_vel = self.get_result_trajectory_velocity()
         trajectory_pos = self.get_result_trajectory_position()
-
-        for joint in self.get_robot().controlled_joints:
+        controlled_joints = self.get_god_map().get_data(identifier.controlled_joints)
+        for joint in controlled_joints:
             if not self.get_robot().is_joint_continuous(joint):
                 joint_limits = self.get_robot().get_joint_position_limits(joint)
                 error_msg = u'{} has violated joint position limit'.format(joint)
                 np.testing.assert_array_less(trajectory_pos[joint], joint_limits[1], error_msg)
                 np.testing.assert_array_less(-trajectory_pos[joint], -joint_limits[0], error_msg)
-            vel_limit = self.get_robot().get_joint_velocity_limit_expr(joint)
+            vel_limit = self.get_world().get_joint_limit_expr(joint, 1)[0]
             vel_limit = self.get_god_map().evaluate_expr(vel_limit) * 1.001
             vel = trajectory_vel[joint]
             error_msg = u'{} has violated joint velocity limit {} > {}'.format(joint, vel, vel_limit)

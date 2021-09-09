@@ -2313,6 +2313,132 @@ class TestCartesianPath(object):
         #zero_pose.check_cart_goal(zero_pose.l_tip, l_goal)
 
 
+    def test_ease_fridge_with_global_planner(self, kitchen_setup):
+        milk_name = u'milk'
+
+        # take milk out of fridge
+        kitchen_setup.set_kitchen_js({u'iai_fridge_door_joint': 1.56})
+
+        base_goal = PoseStamped()
+        base_goal.header.frame_id = 'map'
+        base_goal.pose.position.x = 0.4
+        base_goal.pose.position.y = -1.0
+        base_goal.pose.orientation.x = 0
+        base_goal.pose.orientation.y = 0
+        base_goal.pose.orientation.z = 0
+        base_goal.pose.orientation.w = 1
+        kitchen_setup.teleport_base(base_goal)
+        # kitchen_setup.add_json_goal(u'BasePointingForward')
+
+        # spawn milk
+        milk_pose = PoseStamped()
+        milk_pose.header.frame_id = u'iai_kitchen/iai_fridge_door_shelf1_bottom'
+        milk_pose.pose.position = Point(0, 0, 0.12)
+        milk_pose.pose.orientation = Quaternion(0, 0, 0, 1)
+
+        milk_pre_pose = PoseStamped()
+        milk_pre_pose.header.frame_id = u'iai_kitchen/iai_fridge_door_shelf1_bottom'
+        milk_pre_pose.pose.position = Point(0, 0, 0.22)
+        milk_pre_pose.pose.orientation = Quaternion(0, 0, 0, 1)
+
+        kitchen_setup.add_box(milk_name, [0.05, 0.05, 0.2], milk_pose)
+
+        # grasp milk
+        kitchen_setup.open_r_gripper()
+
+        # l_goal = deepcopy(milk_pose)
+        # l_goal.pose.orientation = Quaternion(*quaternion_from_matrix([[1, 0, 0, 0],
+        #                                                               [0, 1, 0, 0],
+        #                                                               [0, 0, 1, 0],
+        #                                                               [0, 0, 0, 1]]))
+        # kitchen_setup.set_cart_goal(l_goal, kitchen_setup.l_tip, kitchen_setup.default_root)
+        # kitchen_setup.send_and_check_goal()
+
+        # handle_name = u'map'
+        bar_axis = Vector3Stamped()
+        bar_axis.header.frame_id = u'map'
+        bar_axis.vector.z = 1
+
+        bar_center = PointStamped()
+        bar_center.header.frame_id = milk_pose.header.frame_id
+        bar_center.point = deepcopy(milk_pose.pose.position)
+
+        tip_grasp_axis = Vector3Stamped()
+        tip_grasp_axis.header.frame_id = kitchen_setup.r_tip
+        tip_grasp_axis.vector.z = 1
+
+        kitchen_setup.set_json_goal(u'GraspBar',
+                                    root_link=kitchen_setup.default_root,
+                                    tip_link=kitchen_setup.r_tip,
+                                    tip_grasp_axis=tip_grasp_axis,
+                                    bar_center=bar_center,
+                                    bar_axis=bar_axis,
+                                    bar_length=.12)
+
+        x = Vector3Stamped()
+        x.header.frame_id = kitchen_setup.r_tip
+        x.vector.x = 1
+        x_map = Vector3Stamped()
+        x_map.header.frame_id = u'iai_kitchen/iai_fridge_door'
+        x_map.vector.x = 1
+        # z = Vector3Stamped()
+        # z.header.frame_id = 'milk'
+        # z.vector.z = 1
+        # z_map = Vector3Stamped()
+        # z_map.header.frame_id = 'map'
+        # z_map.vector.z = 1
+        kitchen_setup.align_planes(kitchen_setup.r_tip, x, root_normal=x_map)
+
+        # kitchen_setup.allow_collision([], milk_name, [])
+        # kitchen_setup.add_json_goal(u'AvoidJointLimits', percentage=15)
+        # kitchen_setup.allow_all_collisions()
+        kitchen_setup.send_and_check_goal()
+
+        kitchen_setup.attach_object(milk_name, kitchen_setup.r_tip)
+        # kitchen_setup.keep_position(kitchen_setup.r_tip)
+        kitchen_setup.close_r_gripper()
+
+        # x = Vector3Stamped()
+        # x.header.frame_id = 'milk'
+        # x.vector.x = 1
+        # x_map = Vector3Stamped()
+        # x_map.header.frame_id = 'iai_kitchen/iai_fridge_door'
+        # x_map.vector.x = 1
+        # z = Vector3Stamped()
+        # z.header.frame_id = 'milk'
+        # z.vector.z = 1
+        # z_map = Vector3Stamped()
+        # z_map.header.frame_id = 'map'
+        # z_map.vector.z = 1
+        # kitchen_setup.align_planes('milk', x, root_normal=x_map)
+        # kitchen_setup.align_planes('milk', z, root_normal=z_map)
+        # kitchen_setup.keep_orientation(u'milk')
+        kitchen_setup.set_cart_goal(milk_pre_pose, milk_name, kitchen_setup.default_root)
+        kitchen_setup.send_and_check_goal()
+        kitchen_setup.send_and_check_joint_goal(gaya_pose)
+
+        # place milk back
+
+        # kitchen_setup.add_json_goal(u'BasePointingForward')
+        # milk_goal = PoseStamped()
+        # milk_goal.header.frame_id = u'iai_kitchen/kitchen_island_surface'
+        # milk_goal.pose.position = Point(.1, -.2, .13)
+        # milk_goal.pose.orientation = Quaternion(*quaternion_about_axis(np.pi, [0,0,1]))
+        kitchen_setup.set_cart_goal(milk_pre_pose, milk_name, kitchen_setup.default_root)
+        kitchen_setup.send_and_check_goal()
+
+        kitchen_setup.set_cart_goal(milk_pose, milk_name, kitchen_setup.default_root)
+        kitchen_setup.send_and_check_goal()
+
+        # kitchen_setup.keep_position(kitchen_setup.r_tip)
+        kitchen_setup.open_l_gripper()
+
+        kitchen_setup.detach_object(milk_name)
+
+        kitchen_setup.send_and_check_joint_goal(gaya_pose)
+
+
+
 class TestShaking(object):
     def test_wiggle_prismatic_joint_neglectable_shaking(self, kitchen_setup):
         sample_period = kitchen_setup.get_god_map().get_data(identifier.sample_period)

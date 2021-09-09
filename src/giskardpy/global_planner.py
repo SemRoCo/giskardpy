@@ -27,8 +27,9 @@ import matplotlib.pyplot as plt
 from ompl import base as ob
 from ompl import geometric as og
 
+# todo: put below in ros params
 SolveParameters = namedtuple('SolveParameters', 'initial_solve_time refine_solve_time max_initial_iterations '
-                             'max_refine_iterations min_refine_thresh')
+                                                'max_refine_iterations min_refine_thresh')
 
 from giskardpy.utils.utils import convert_dictionary_to_ros_message, convert_ros_message_to_dictionary
 
@@ -97,19 +98,15 @@ class TwoDimRayMotionValidator(ob.MotionValidator, GiskardBehavior):
         return u'TwoDimRayMotionValidator'
 
 
-class TwoDimStateValidator(ob.StateValidityChecker, GiskardBehavior):
+class BulletCollisionChecker(GiskardBehavior):
 
-    def __init__(self, si, collision_checker):
-        ob.StateValidityChecker.__init__(self, si)
+    def __init__(self, is_3D, collision_checker, tip_link):
         GiskardBehavior.__init__(self, str(self))
         self.lock = threading.Lock()
-        self.init_map()
         self.init_pybullet_ids_and_joints()
         self.collision_checker = collision_checker
-        if not self.pybullet_initialized and not self.map_initialized:
-            raise Exception(
-                'At least one of the following service must be activated for two dimensional state validation:'
-                'import pybullet or start the map server.')
+        self.is_3D = is_3D
+        self.tip_link = tip_link
 
     def init_pybullet_ids_and_joints(self):
         if 'pybullet' in sys.modules:
@@ -122,6 +119,63 @@ class TwoDimStateValidator(ob.StateValidityChecker, GiskardBehavior):
                     # self.rotation_goal = None
         else:
             self.pybullet_initialized = False
+
+    def is_collision_free(self, state):
+        if self.pybullet_initialized:
+            x = state.getX()
+            y = state.getY()
+            if self.is_3D:
+                z = state.getZ()
+            # Get current joint states from Bullet and copy them
+            old_js = deepcopy(self.get_robot().joint_state)
+            robot = self.get_robot()
+            # Calc IK for navigating to given state and ...
+            if self.is_3D:
+                poses = [[x, y, z], [x + 0.1, y, z], [x - 0.1, y, z], [x, y + 0.1, z], [x, y - 0.1, z]]
+            else:
+                poses = [[x, y, 0], [x + 0.1, y, 0], [x - 0.1, y, 0], [x, y + 0.1, 0], [x, y - 0.1, 0]]
+            state_iks = list(map(lambda pose:
+                                 p.calculateInverseKinematics(robot.get_pybullet_id(),
+                                                              robot.get_pybullet_link_id(self.tip_link),
+                                                              pose), poses))
+            # override on current joint states.
+            results = []
+            for state_ik in state_iks:
+                current_js = deepcopy(old_js)
+                # Set new joint states in Bullet
+                for joint_name, joint_state in zip(self.pybullet_joints, state_ik):
+                    current_js[joint_name].position = joint_state
+                self.get_robot().joint_state = current_js
+                # Check if kitchen is colliding with robot
+                results.append(self.collision_checker())
+                # Reset joint state
+                self.get_robot().joint_state = old_js
+            return all(results)
+        else:
+            return True
+
+class ThreeDimStateValidator(ob.StateValidityChecker):
+
+    def __init__(self, si, collision_checker):
+        ob.StateValidityChecker.__init__(self, si)
+        self.collision_checker = collision_checker
+        if not collision_checker.pybullet_initialized:
+            raise Exception('Please import pybullet.')
+
+    def isValid(self, state):
+        with self.lock:
+            return self.collision_checker.is_collision_free(state)
+
+class TwoDimStateValidator(ob.StateValidityChecker):
+
+    def __init__(self, si, collision_checker):
+        ob.StateValidityChecker.__init__(self, si)
+        self.collision_checker = collision_checker
+        self.init_map()
+        if not self.collision_checker.pybullet_initialized and not self.map_initialized:
+            raise Exception(
+                'At least one of the following service must be activated for two dimensional state validation:'
+                'import pybullet or start the map server.')
 
     def init_map(self, timeout=3.0):
         try:
@@ -159,41 +213,12 @@ class TwoDimStateValidator(ob.StateValidityChecker, GiskardBehavior):
         else:
             return True
 
-    def is_collision_free(self, state):
-        if self.pybullet_initialized:
-            x = state.getX()
-            y = state.getY()
-            # Get current joint states from Bullet and copy them
-            old_js = deepcopy(self.get_robot().joint_state)
-            robot = self.get_robot()
-            # Calc IK for navigating to given state and ...
-            poses = [[x, y, 0], [x + 0.1, y, 0], [x - 0.1, y, 0], [x, y + 0.1, 0], [x, y - 0.1, 0]]
-            state_iks = list(map(lambda pose:
-                                 p.calculateInverseKinematics(robot.get_pybullet_id(),
-                                                              robot.get_pybullet_link_id(u'base_footprint'),
-                                                              pose), poses))
-            # override on current joint states.
-            results = []
-            for state_ik in state_iks:
-                current_js = deepcopy(old_js)
-                # Set new joint states in Bullet
-                for joint_name, joint_state in zip(self.pybullet_joints, state_ik):
-                    current_js[joint_name].position = joint_state
-                self.get_robot().joint_state = current_js
-                # Check if kitchen is colliding with robot
-                results.append(self.collision_checker())
-                # Reset joint state
-                self.get_robot().joint_state = old_js
-            return all(results)
-        else:
-            return True
-
     def isValid(self, state):
         # Some arbitrary condition on the state (note that thanks to
         # dynamic type checking we can just call getX() and do not need
         # to convert state to an SE2State.)
         with self.lock:
-            return self.is_collision_free(state) and self.is_driveable(state)
+            return self.collision_checker.is_collision_free(state) and self.is_driveable(state)
 
     def __str__(self):
         return u'TwoDimStateValidator'
@@ -208,10 +233,10 @@ class GlobalPlanner(GetGoal):
         self.kitchen_floor_space = self.create_kitchen_floor_space()
 
         self.pose_goal = None
-        self.goal_dict = None
+        self.__goal_dict = None
 
-        self._planner_solve_params = {} # todo: load values from rosparam
-        self.navigation_config = 'fast_without_refine' # todo: load value from rosparam
+        self._planner_solve_params = {}  # todo: load values from rosparam
+        self.navigation_config = 'fast_without_refine'  # todo: load value from rosparam
 
         self.setupNavigation()
 
@@ -236,7 +261,7 @@ class GlobalPlanner(GetGoal):
                 collisions.append(closest_points.get_external_collisions(joint_name))
         return len(collisions) == 0
 
-    def is_global_path_needed(self, root_link, tip_link):
+    def is_global_path_needed(self):
         """
         (disclaimer: for correct format please see the source code)
 
@@ -261,18 +286,16 @@ class GlobalPlanner(GetGoal):
         ... here the shortest path to goal is in collision. Therefore, a global path
         is needed.
 
-        :type root_link: str
-        :type tip_link: str
         :rtype: boolean
         """
-        curr_R_pose = self.get_robot().get_fk_pose(root_link, tip_link)
+        curr_R_pose = self.get_robot().get_fk_pose(self.root_link, self.tip_link)
         curr_pos = transform_pose(self.get_god_map().get_data(identifier.map_frame), curr_R_pose).pose.position
         curr_arr = numpy.array([curr_pos.x, curr_pos.y, curr_pos.z])
         goal_pos = self.pose_goal.pose.position
         goal_arr = numpy.array([goal_pos.x, goal_pos.y, goal_pos.z])
         obj_id, _, _, _, normal = p.rayTest(curr_arr, goal_arr)[0]
         if obj_id != -1:
-            diff = numpy.sqrt(numpy.sum((curr_arr - goal_arr)**2))
+            diff = numpy.sqrt(numpy.sum((curr_arr - goal_arr) ** 2))
             v = numpy.array(list(normal)) * diff
             new_curr_arr = goal_arr + v
             obj_id, _, _, _, _ = p.rayTest(new_curr_arr, goal_arr)[0]
@@ -281,9 +304,27 @@ class GlobalPlanner(GetGoal):
             return False
 
     def is_global_navigation_needed(self):
-        return self.goal_dict[u'tip_link'] == u'base_footprint' and \
-               self.goal_dict[u'root_link'] == self.get_robot().get_root() and \
-               self.is_global_path_needed(self.goal_dict[u'root_link'], self.goal_dict[u'tip_link'])
+        return self.tip_link == u'base_footprint' and \
+               self.root_link == self.get_robot().get_root() and \
+               self.is_global_path_needed()
+
+    def save_cart_goal(self, cart_c):
+
+        self.__goal_dict = yaml.load(cart_c.parameter_value_pair)
+        ros_pose = convert_dictionary_to_ros_message(self.__goal_dict[u'goal'])
+        self.pose_goal = transform_pose(self.get_god_map().get_data(identifier.map_frame), ros_pose)
+
+        self.root_link = self.__goal_dict[u'root_link']
+        self.tip_link = self.__goal_dict[u'tip_link']
+        link_names = self.get_robot().get_links_names()
+
+        if self.root_link not in link_names:
+            raise Exception(u'Root_link {} is no known link of the robot.'.format(self.root_link))
+        if self.tip_link not in link_names:
+            raise Exception(u'Tip_link {} is no known link of the robot.'.format(self.tip_link))
+        if not self.get_robot().get_link_names_from_chain(self.root_link, self.tip_link):
+            raise Exception(u'Did not found link chain of the robot from'
+                            u' root_link {} to tip_link {}.'.format(self.root_link, self.tip_link))
 
     def update(self):
 
@@ -297,10 +338,8 @@ class GlobalPlanner(GetGoal):
         if not cart_c:
             return Status.SUCCESS
 
-        # Parse the Cartesian Goal Constraint
-        self.goal_dict = yaml.load(cart_c.parameter_value_pair)
-        ros_pose = convert_dictionary_to_ros_message(self.goal_dict[u'goal'])
-        self.pose_goal = transform_pose(self.get_god_map().get_data(identifier.map_frame), ros_pose)
+        # Parse and save the Cartesian Goal Constraint
+        self.save_cart_goal(cart_c)
 
         if self.is_global_navigation_needed():
             self.update_collisions_environment()
@@ -311,7 +350,7 @@ class GlobalPlanner(GetGoal):
             for i, point in enumerate(trajectory):
                 if i == 0:
                     continue  # important assumption for constraint:
-                              # we do not to reach the first pose, since it is the start pose
+                    # we do not to reach the first pose, since it is the start pose
                 base_pose = PoseStamped()
                 base_pose.header.frame_id = self.get_god_map().get_data(identifier.map_frame)
                 base_pose.pose.position.x = point[0]
@@ -323,15 +362,18 @@ class GlobalPlanner(GetGoal):
             move_cmd.constraints = self.get_cartesian_path_constraints(poses)
             self.get_god_map().set_data(identifier.next_move_goal, move_cmd)
             pass
+        elif self.is_global_path_needed():
+            self.update_collisions_environment()
+            trajectory = self.planMovement()
+            pass
         else:
+            return Status.SUCCESS
             pass  # return self.planMovement()
-
-        return Status.SUCCESS
 
     def get_cartesian_path_constraints(self, poses):
 
         d = dict()
-        d[u'parameter_value_pair'] = deepcopy(self.goal_dict)
+        d[u'parameter_value_pair'] = deepcopy(self.__goal_dict)
         d[u'parameter_value_pair'].pop(u'goal')
 
         oc_d = deepcopy(d)
@@ -354,8 +396,10 @@ class GlobalPlanner(GetGoal):
 
         # set lower and upper bounds
         bounds = ob.RealVectorBounds(3)
-        bounds.setLow(0)
-        bounds.setHigh(3)
+        bounds.setLow(-15)
+        bounds.setHigh(15)
+        bounds.setLow(2, 0)
+        bounds.setHigh(2, 5)
         space.setBounds(bounds)
 
         return space
@@ -375,8 +419,7 @@ class GlobalPlanner(GetGoal):
 
     def get_translation_start_state(self, space, round_decimal_place=3):
         state = ob.State(space)
-        pose_root_linkTtip_link = self.get_robot().get_fk_pose(self.goal_dict[u'root_link'],
-                                                               self.goal_dict[u'tip_link'])
+        pose_root_linkTtip_link = self.get_robot().get_fk_pose(self.root_link, self.tip_link)
         pose_mTtip_link = transform_pose(self.get_god_map().get_data(identifier.map_frame), pose_root_linkTtip_link)
         state().setX(round(pose_mTtip_link.pose.position.x, round_decimal_place))
         state().setY(round(pose_mTtip_link.pose.position.y, round_decimal_place))
@@ -401,10 +444,10 @@ class GlobalPlanner(GetGoal):
         # RRTConnect: many points, low number of fp
         # PRMstar: no set_range function, finds no solutions
         # ABITstar: slow, sparse, but good
-        #if self.fast_navigation:
+        # if self.fast_navigation:
         #    planner = og.RRTConnect(si)
         #    planner.setRange(0.1)
-        #else:
+        # else:
         planner = og.ABITstar(si)
         self._planner_solve_params[planner.getName()] = {
             'slow_without_refine': SolveParameters(initial_solve_time=60, refine_solve_time=5, max_initial_iterations=3,
@@ -428,7 +471,8 @@ class GlobalPlanner(GetGoal):
         # Set two dimensional motion and state validator
         si = self.navigation_setup.getSpaceInformation()
         si.setMotionValidator(TwoDimRayMotionValidator(si, self.get_robot()))
-        si.setStateValidityChecker(TwoDimStateValidator(si, self.is_robot_external_collision_free))
+        collision_checker = BulletCollisionChecker(False, self.is_robot_external_collision_free, u'base_footprint')
+        si.setStateValidityChecker(TwoDimStateValidator(si, collision_checker))
         si.setup()
 
         # si.setValidStateSamplerAllocator(ob.ValidStateSamplerAllocator(self.allocOBValidStateSampler))
@@ -438,13 +482,33 @@ class GlobalPlanner(GetGoal):
         planner = self.get_navigation_planner(si)
         self.navigation_setup.setPlanner(planner)
 
+    def setupMovement(self):
+
+        # create a simple setup object
+        self.movement_setup = og.SimpleSetup(self.kitchen_floor_space)
+
+        # Set two dimensional motion and state validator
+        si = self.movement_setup.getSpaceInformation()
+        si.setMotionValidator(TwoDimRayMotionValidator(si, self.get_robot()))
+        collision_checker = BulletCollisionChecker(True, self.is_robot_external_collision_free, self.tip_link)
+        si.setStateValidityChecker(ThreeDimStateValidator(si, collision_checker))
+        si.setup()
+
+        # si.setValidStateSamplerAllocator(ob.ValidStateSamplerAllocator(self.allocOBValidStateSampler))
+        # si.setStateValidityCheckingResolution(0.001)
+
+        # Set navigation planner
+        planner = self.get_navigation_planner(si)
+        self.movement_setup.setPlanner(planner)
+
     def planNavigation(self, plot=True):
 
         start = self.get_translation_start_state(self.kitchen_floor_space)
         goal = self.get_translation_goal_state(self.kitchen_floor_space)
         self.navigation_setup.setStartAndGoalStates(start, goal)
 
-        optimization_objective = PathLengthAndGoalOptimizationObjective(self.navigation_setup.getSpaceInformation(), goal)
+        optimization_objective = PathLengthAndGoalOptimizationObjective(self.navigation_setup.getSpaceInformation(),
+                                                                        goal)
         self.navigation_setup.setOptimizationObjective(optimization_objective)
 
         planner_status = self.solve(self.navigation_setup, self.navigation_config)
@@ -456,7 +520,41 @@ class GlobalPlanner(GetGoal):
             # ss.simplifySolution() DONT! NO! DONT UNCOMMENT THAT! NO! STOP IT! FIRST IMPLEMENT CHECKMOTION! THEN TRY AGAIN!
             # Make sure enough subpaths are available for Path Following
             self.navigation_setup.getSolutionPath().interpolate(20)
-            data = states_matrix_str2array_floats(self.navigation_setup.getSolutionPath().printAsMatrix())  # [[x, y, theta]]
+            data = states_matrix_str2array_floats(
+                self.navigation_setup.getSolutionPath().printAsMatrix())  # [[x, y, theta]]
+            # print the simplified path
+            if plot:
+                plt.close()
+                fig, ax = plt.subplots()
+                ax.plot(data[:, 1], data[:, 0])
+                ax.invert_xaxis()
+                ax.set(xlabel='y (m)', ylabel='x (m)',
+                       title='Navigation Path in map')
+                # ax = fig.gca(projection='2d')
+                # ax.plot(data[:, 0], data[:, 1], '.-')
+                plt.show()
+        return data
+
+    def planMovement(self, plot=True):
+
+        start = self.get_translation_start_state(self.kitchen_space)
+        goal = self.get_translation_goal_state(self.kitchen_space)
+        self.movement_setup.setStartAndGoalStates(start, goal)
+
+        optimization_objective = PathLengthAndGoalOptimizationObjective(self.movement_setup.getSpaceInformation(), goal)
+        self.movement_setup.setOptimizationObjective(optimization_objective)
+
+        planner_status = self.solve(self.movement_setup, self.navigation_config)
+        # og.PathSimplifier(si).smoothBSpline(ss.getSolutionPath()) # takes around 20-30 secs with RTTConnect(0.1)
+        # og.PathSimplifier(si).reduceVertices(ss.getSolutionPath())
+        data = numpy.array([])
+        if planner_status in [ob.PlannerStatus.APPROXIMATE_SOLUTION, ob.PlannerStatus.EXACT_SOLUTION]:
+            # try to shorten the path
+            # ss.simplifySolution() DONT! NO! DONT UNCOMMENT THAT! NO! STOP IT! FIRST IMPLEMENT CHECKMOTION! THEN TRY AGAIN!
+            # Make sure enough subpaths are available for Path Following
+            self.movement_setup.getSolutionPath().interpolate(20)
+            data = states_matrix_str2array_floats(
+                self.movement_setup.getSolutionPath().printAsMatrix())  # [[x, y, theta]]
             # print the simplified path
             if plot:
                 plt.close()

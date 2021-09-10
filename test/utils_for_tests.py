@@ -635,7 +635,7 @@ class GiskardTestWrapper(GiskardWrapper):
     def clear_world(self):
         assert super(GiskardTestWrapper, self).clear_world().error_codes == UpdateWorldResponse.SUCCESS
         assert len(self.get_world().groups) == 1
-        assert len(self.get_object_names().object_names) == 0
+        assert len(self.get_object_names().object_names) == 1
         # assert len(self.get_robot().get_attached_objects()) == 0
         # assert self.get_world().has_object(u'plane')
 

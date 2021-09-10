@@ -20,17 +20,23 @@ WEIGHT_MIN = Constraint_msg.WEIGHT_MIN
 
 class Goal(object):
     def __init__(self, god_map, control_horizon=None, **kwargs):
-        self._god_map = god_map
-        self.prediction_horizon = self.get_god_map().get_data(identifier.prediction_horizon)
-        self._test_mode = self.get_god_map().get_data(identifier.test_mode)
+        """
+        :type god_map: giskardpy.god_map.GodMap
+        :type control_horizon: int
+        :type kwargs: dict
+        """
+        self.god_map = god_map
+        self.prediction_horizon = self.god_map.get_data(identifier.prediction_horizon)
+        self._test_mode = self.god_map.get_data(identifier.test_mode)
         # last 2 velocities are 0 anyway
         if control_horizon is None:
             control_horizon = self.prediction_horizon
         self.control_horizon = max(min(control_horizon, self.prediction_horizon - 2), 1)
         self._sub_goals = []
+        self.world = self.god_map.get_data(identifier.world)
 
     def _save_self_on_god_map(self):
-        self.get_god_map().set_data(self._get_identifier(), self)
+        self.god_map.set_data(self._get_identifier(), self)
 
     def make_constraints(self):
         pass
@@ -45,51 +51,28 @@ class Goal(object):
     def get_world_object_pose(self, object_name, link_name):
         pass
 
-    def get_god_map(self):
+    @property
+    def robot(self):
         """
-        :rtype: giskardpy.god_map.GodMap
+        :rtype: giskardpy.model.world.SubWorldTree
         """
-        return self._god_map
-
-    def get_world(self):
-        """
-        :rtype: giskardpy.world.World
-        """
-        return self.get_god_map().get_data(identifier.world)
-
-    def get_robot(self):
-        """
-        :rtype: Robot
-        """
-        return self.get_world().groups['robot']
-
-    def get_world_unsafe(self):
-        """
-        :rtype: giskardpy.world.World
-        """
-        return self.get_god_map().unsafe_get_data(identifier.world)
-
-    def get_robot_unsafe(self):
-        """
-        :rtype: giskardpy.robot.Robot
-        """
-        return self.get_god_map().unsafe_get_data(identifier.robot)
+        return self.world.groups['robot']
 
     def get_joint_position_symbol(self, joint_name):
         """
         returns a symbol that referes to the given joint
         """
-        if not self.get_robot().has_joint(joint_name):
+        if not self.robot.has_joint(joint_name):
             raise KeyError('Robot doesn\'t have joint named: {}'.format(joint_name))
         key = identifier.joint_states + [joint_name, u'position']
-        return self._god_map.to_symbol(key)
+        return self.god_map.to_symbol(key)
 
     def get_joint_velocity_symbols(self, joint_name):
         """
         returns a symbol that referes to the given joint
         """
         key = identifier.joint_states + [joint_name, u'velocity']
-        return self._god_map.to_symbol(key)
+        return self.god_map.to_symbol(key)
 
     def get_object_joint_position_symbol(self, object_name, joint_name):
         """
@@ -97,10 +80,10 @@ class Goal(object):
         """
         # TODO test me
         key = identifier.world + [u'get_object', (object_name,), u'joint_state', joint_name, u'position']
-        return self._god_map.to_symbol(key)
+        return self.god_map.to_symbol(key)
 
     def get_sampling_period_symbol(self):
-        return self._god_map.to_symbol(identifier.sample_period)
+        return self.god_map.to_symbol(identifier.sample_period)
 
     def __str__(self):
         return self.__class__.__name__
@@ -112,7 +95,7 @@ class Goal(object):
         :type tip: str
         :return: root_T_tip
         """
-        return self.get_robot().get_fk_expression(root, tip)
+        return self.robot.compose_fk_expression(root, tip)
 
     def get_fk_evaluated(self, root, tip):
         """
@@ -122,7 +105,7 @@ class Goal(object):
         :type tip: str
         :return: root_T_tip
         """
-        return self.get_god_map().list_to_frame(identifier.fk_np + [(root, tip)])
+        return self.god_map.list_to_frame(identifier.fk_np + [(root, tip)])
 
     def get_parameter_as_symbolic_expression(self, name):
         """
@@ -132,12 +115,12 @@ class Goal(object):
         """
         if not hasattr(self, name):
             raise AttributeError(u'{} doesn\'t have attribute {}'.format(self.__class__.__name__, name))
-        return self.get_god_map().to_expr(self._get_identifier() + [name])
+        return self.god_map.to_expr(self._get_identifier() + [name])
 
     def get_expr_velocity(self, expr):
         return w.total_derivative(expr,
-                                  self.get_robot().get_joint_position_symbols(),
-                                  self.get_robot().get_joint_velocity_symbols())
+                                  self.get_joint_position_symbols(),
+                                  self.get_joint_velocity_symbols())
 
     def get_fk_velocity(self, root, tip):
         r_T_t = self.get_fk(root, tip)

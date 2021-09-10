@@ -21,7 +21,7 @@ class PlotTrajectory(GiskardBehavior):
         trajectory = self.get_god_map().get_data(identifier.trajectory)
         if trajectory:
             sample_period = self.get_god_map().get_data(identifier.sample_period)
-            controlled_joints = self.get_robot().controlled_joints
+            controlled_joints = self.god_map.get_data(identifier.controlled_joints)
             try:
                 plot_trajectory(trajectory, controlled_joints, self.path_to_data_folder, sample_period, self.order,
                                 self.velocity_threshold, self.scaling, self.normalize_position, self.tick_stride,

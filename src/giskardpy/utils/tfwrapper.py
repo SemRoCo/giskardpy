@@ -376,6 +376,9 @@ def np_point(x, y, z):
     return np.array([x, y, z, 1])
 
 
+def np_to_pose(matrix):
+    return kdl_to_pose(np_to_kdl(matrix))
+
 # Code copied from user jarvisschultz from ROS answers
 # https://answers.ros.org/question/332407/transformstamped-to-transformation-matrix-python/
 def pose_to_np(msg):

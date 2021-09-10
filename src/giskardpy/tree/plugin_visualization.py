@@ -21,29 +21,23 @@ class VisualizationBehavior(GiskardBehavior):
     def update(self):
         markers = []
         time_stamp = rospy.Time()
-        robot = self.get_robot()
+        robot = self.robot
         get_fk = robot.compute_fk_pose
-        links = [x for x in self.get_robot().link_names if robot.links[x].has_visual()]
+        links = self.world.link_names_with_collisions
         for i, link_name in enumerate(links):
-            marker = robot.link_as_marker(link_name)
-            if marker is None:
-                continue
+            for marker in self.world.links[link_name].collision_visualization_markers().markers:
+                marker.header.frame_id = self.robot_base
+                marker.action = Marker.ADD
+                marker.id = int(hashlib.md5(link_name.encode('utf-8')).hexdigest()[:6],
+                                16)  # FIXME find a better way to give the same link the same id
+                self.ids.add(marker.id)
+                marker.ns = u'planning_visualization'
+                marker.header.stamp = time_stamp
 
-            marker.header.frame_id = self.robot_base
-            marker.action = Marker.ADD
-            marker.id = int(hashlib.md5(link_name.encode('utf-8')).hexdigest()[:6],
-                            16)  # FIXME find a better way to give the same link the same id
-            self.ids.add(marker.id)
-            marker.ns = u'planning_visualization'
-            marker.header.stamp = time_stamp
+                fk = get_fk(self.robot_base, link_name).pose
 
-            fk = get_fk(self.robot_base, link_name).pose
-
-            if robot.has_non_identity_visual_offset(link_name):
                 marker.pose = kdl_to_pose(pose_to_kdl(fk) * pose_to_kdl(marker.pose))
-            else:
-                marker.pose = fk
-            markers.append(marker)
+                markers.append(marker)
 
         self.publisher.publish(markers)
         if self.ensure_publish:

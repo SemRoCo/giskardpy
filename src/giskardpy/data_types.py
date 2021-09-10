@@ -1,4 +1,5 @@
 from collections import OrderedDict, defaultdict, deque
+from copy import deepcopy
 
 import numpy as np
 from sensor_msgs.msg import JointState
@@ -90,6 +91,12 @@ class JointStates(defaultdict):
                                   pop=0)
             self[joint_name] = sjs
         return self
+
+    def __deepcopy__(self, memodict={}):
+        new_js = JointStates()
+        for joint_name, joint_state in self.items():
+            new_js[joint_name] = deepcopy(joint_state)
+        return new_js
 
 
 class Trajectory(object):

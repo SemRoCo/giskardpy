@@ -2,10 +2,12 @@ import numbers
 import traceback
 from copy import deepcopy, copy
 
+import numpy as np
 import urdf_parser_py.urdf as up
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import PoseStamped, Pose
 from giskard_msgs.msg import CollisionEntry
 from tf.transformations import euler_matrix
+from visualization_msgs.msg import Marker, MarkerArray
 
 from giskardpy import casadi_wrapper as w
 from giskardpy import identifier
@@ -19,12 +21,45 @@ from giskardpy.model.urdf_object import hacky_urdf_parser_fix
 from giskardpy.model.world_object import WorldObject
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.utils import logging
-from giskardpy.utils.tfwrapper import msg_to_kdl, kdl_to_pose, homo_matrix_to_pose
+from giskardpy.utils.tfwrapper import msg_to_kdl, kdl_to_pose, homo_matrix_to_pose, np_to_pose
 from giskardpy.utils.utils import suppress_stderr, memoize
 
 class LinkGeometry(object):
     def __init__(self, link_T_geometry):
         self.link_T_geometry = link_T_geometry
+
+    @classmethod
+    def from_urdf(cls, urdf_thing):
+        urdf_geometry = urdf_thing.geometry
+        if urdf_thing.origin is None:
+            link_T_geometry = np.eye(4)
+        else:
+            link_T_geometry = euler_matrix(*urdf_thing.origin.rpy)
+            link_T_geometry[0, 3] = urdf_thing.origin.xyz[0]
+            link_T_geometry[1, 3] = urdf_thing.origin.xyz[1]
+            link_T_geometry[2, 3] = urdf_thing.origin.xyz[2]
+        if isinstance(urdf_geometry, up.Mesh):
+            geometry = MeshGeometry(link_T_geometry, urdf_geometry.filename, urdf_geometry.scale)
+        elif isinstance(urdf_geometry, up.Box):
+            geometry = BoxGeometry(link_T_geometry, *urdf_geometry.size)
+        elif isinstance(urdf_geometry, up.Cylinder):
+            geometry = CylinderGeometry(link_T_geometry, urdf_geometry.length, urdf_geometry.radius)
+        elif isinstance(urdf_geometry, up.Sphere):
+            geometry = SphereGeometry(link_T_geometry, urdf_geometry.radius)
+        else:
+            NotImplementedError('{} geometry is not supported'.format(type(urdf_geometry)))
+        return geometry
+
+    def as_visualization_marker(self):
+        marker = Marker()
+        marker.color.a = 0.5
+        marker.color.r = 1.0
+        marker.color.g = 1.0
+        marker.color.b = 1.0
+
+        marker.pose = Pose()
+        marker.pose = np_to_pose(self.link_T_geometry)
+        return marker
 
 class MeshGeometry(LinkGeometry):
     def __init__(self, link_T_geometry, file_name, scale=None):
@@ -35,16 +70,65 @@ class MeshGeometry(LinkGeometry):
         else:
             self.scale = scale
 
+    def as_visualization_marker(self):
+        marker = super(MeshGeometry, self).as_visualization_marker()
+        marker.type = Marker.MESH_RESOURCE
+        marker.mesh_resource = self.file_name
+        marker.scale.x = self.scale[0]
+        marker.scale.z = self.scale[1]
+        marker.scale.y = self.scale[2]
+        marker.mesh_use_embedded_materials = True
+        return marker
+
+
 class BoxGeometry(LinkGeometry):
-    def __init__(self, link_T_geometry):
+    def __init__(self, link_T_geometry, depth, width, height):
         super(BoxGeometry, self).__init__(link_T_geometry)
+        self.depth = depth
+        self.width = width
+        self.height = height
+
+    def as_visualization_marker(self):
+        marker = super(BoxGeometry, self).as_visualization_marker()
+        marker.type = Marker.CUBE
+        marker.scale.x = self.depth
+        marker.scale.y = self.width
+        marker.scale.z = self.height
+        return marker
+
+class CylinderGeometry(LinkGeometry):
+    def __init__(self, link_T_geometry, length, radius):
+        super(CylinderGeometry, self).__init__(link_T_geometry)
+        self.length = length
+        self.radius = radius
+
+    def as_visualization_marker(self):
+        marker = super(CylinderGeometry, self).as_visualization_marker()
+        marker.type = Marker.CYLINDER
+        marker.scale.x = self.radius * 2
+        marker.scale.y = self.radius * 2
+        marker.scale.z = self.length
+        return marker
+
+class SphereGeometry(LinkGeometry):
+    def __init__(self, link_T_geometry, radius):
+        super(SphereGeometry, self).__init__(link_T_geometry)
+        self.radius = radius
+
+    def as_visualization_marker(self):
+        marker = super(SphereGeometry, self).as_visualization_marker()
+        marker.type = Marker.SPHERE
+        marker.scale.x = self.radius * 2
+        marker.scale.y = self.radius * 2
+        marker.scale.z = self.radius * 2
+        return marker
 
 
 class Link(object):
     def __init__(self, name):
         self.name = name
-        self.visuals = None
-        self.collisions = None
+        self.visuals = []
+        self.collisions = []
         self.parent_joint_name = None
         self.child_names = []
 
@@ -52,23 +136,24 @@ class Link(object):
     def from_urdf(cls, urdf_link):
         link = cls(urdf_link.name)
         for urdf_collision in urdf_link.collisions:
-            urdf_geometry = urdf_collision.geometry
-            if isinstance(urdf_geometry, up.Mesh):
-                link_T_geometry = euler_matrix(*urdf_collision.origin.rpy)
-                link_T_geometry[0,3] = urdf_collision.origin.xyz[0]
-                link_T_geometry[1,3] = urdf_collision.origin.xyz[1]
-                link_T_geometry[2,3] = urdf_collision.origin.xyz[2]
-                # link_T_geometry[]
-                geometry = MeshGeometry(link_T_geometry, urdf_collision.geometry)
-                # geometry
-
+            link.collisions.append(LinkGeometry.from_urdf(urdf_collision))
+        for urdf_visual in urdf_link.visuals:
+            link.visuals.append(LinkGeometry.from_urdf(urdf_visual))
         return link
 
+    def collision_visualization_markers(self):
+        markers = MarkerArray()
+        for collision in self.collisions:  # type: LinkGeometry
+            marker = collision.as_visualization_marker()
+            markers.markers.append(marker)
+        return markers
+
+
     def has_visuals(self):
-        return self.visuals is not None
+        return len(self.visuals) > 0
 
     def has_collisions(self):
-        return self.collisions is not None
+        return len(self.collisions) > 0
 
     def __repr__(self):
         return self.name
@@ -87,10 +172,21 @@ class WorldTree(object):
         self.god_map = god_map  # type: GodMap
         self._free_variables = {}
 
+    def reset_cache(self):
+        for method_name in dir(self):
+            try:
+                getattr(self, method_name).memo.clear()
+            except:
+                pass
+
     def add_group(self, name, root_link_name):
         if root_link_name not in self.links:
             raise KeyError('World doesn\'t have link \'{}\''.format(root_link_name))
         self.groups[name] = SubWorldTree(name, root_link_name, self)
+
+    @property
+    def group_names(self):
+        return list(self.groups.keys())
 
     @property
     def root_link(self):
@@ -102,8 +198,11 @@ class WorldTree(object):
 
     @property
     def link_names_with_visuals(self):
-        return [link.name for link in self.links.values() if link.has_visual()]
+        return [link.name for link in self.links.values() if link.has_visuals()]
 
+    @property
+    def link_names_with_collisions(self):
+        return [link.name for link in self.links.values() if link.has_collisions()]
 
     @property
     def joint_names(self):
@@ -131,6 +230,7 @@ class WorldTree(object):
                 helper(urdf, child_link_name)
 
         helper(parsed_urdf, child_link.name)
+        self.init_fast_fks()
 
     @property
     def movable_joints(self):
@@ -207,7 +307,8 @@ class WorldTree(object):
         self.init_fast_fks()
 
     def soft_reset(self):
-        pass
+        self.reset_cache()
+        self.init_fast_fks()
 
     @property
     def joint_constraints(self):
@@ -380,6 +481,10 @@ class SubWorldTree(WorldTree):
         self.name = name
         self.root_link_name = root_link_name
         self.world = world
+
+    @property
+    def _fks(self):
+        return self.world._fks
 
     @property
     def state(self):

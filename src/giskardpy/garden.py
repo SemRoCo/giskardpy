@@ -282,9 +282,9 @@ def grow_tree():
     # ----------------------------------------------
     post_processing = failure_is_success(Sequence)(u'post planning')
     # post_processing.add_child(WiggleCancel(u'final wiggle detection', final_detection=True))
-    # if god_map.get_data(identifier.PlotTrajectory_enabled):
-    #     kwargs = god_map.get_data(identifier.PlotTrajectory)
-    #     post_processing.add_child(PlotTrajectory(u'plot trajectory', **kwargs))
+    if god_map.get_data(identifier.PlotTrajectory_enabled):
+        kwargs = god_map.get_data(identifier.PlotTrajectory)
+        post_processing.add_child(PlotTrajectory(u'plot trajectory', **kwargs))
     # if god_map.get_data(identifier.PlotDebugTrajectory_enabled):
     #     kwargs = god_map.get_data(identifier.PlotDebugTrajectory)
     #     post_processing.add_child(PlotDebugExpressions(u'plot debug expressions', **kwargs))

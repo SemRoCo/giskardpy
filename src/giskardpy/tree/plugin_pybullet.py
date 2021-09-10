@@ -163,7 +163,7 @@ class WorldUpdatePlugin(GiskardBehavior):
         return Status.SUCCESS
 
     def get_object_names(self, req):
-        object_names = self.get_world().get_object_names()
+        object_names = self.world.group_names
         res = GetObjectNamesResponse()
         res.object_names = object_names
         return res

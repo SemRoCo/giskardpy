@@ -13,7 +13,7 @@ from giskardpy.utils import logging
 class GiskardBehavior(Behaviour):
     def __init__(self, name):
         self.god_map = Blackboard().god_map
-        self.world = self.get_god_map().get_data(identifier.world)
+        self.world = self.get_god_map().get_data(identifier.world)  # type: giskardpy.model.world.WorldTree
         self.robot = self.world.groups['robot']
         super(GiskardBehavior, self).__init__(name)
 
@@ -25,13 +25,13 @@ class GiskardBehavior(Behaviour):
 
     def get_world(self):
         """
-        :rtype: giskardpy.model.world.SubWorldTree
+        :rtype: giskardpy.model.world.WorldTree
         """
         return self.world
 
     def unsafe_get_world(self):
         """
-        :rtype: giskardpy.model.world.SubWorldTree
+        :rtype: giskardpy.model.world.WorldTree
         """
         return self.world
 

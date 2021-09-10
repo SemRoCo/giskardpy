@@ -19,7 +19,7 @@ class CleanUp(GiskardBehavior):
         self.get_god_map().set_data(identifier.closest_point, {})
         # self.get_god_map().safe_set_data(identifier.closest_point, None)
         self.get_god_map().set_data(identifier.time, 1)
-        current_js = self.get_god_map().get_data(identifier.joint_states)
+        current_js = deepcopy(self.get_god_map().get_data(identifier.joint_states))
         trajectory = Trajectory()
         trajectory.set(0, current_js)
         self.get_god_map().set_data(identifier.trajectory, trajectory)

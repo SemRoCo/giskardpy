@@ -119,8 +119,16 @@ class Goal(object):
 
     def get_expr_velocity(self, expr):
         return w.total_derivative(expr,
-                                  self.get_joint_position_symbols(),
-                                  self.get_joint_velocity_symbols())
+                                  self.joint_position_symbols,
+                                  self.joint_velocity_symbols)
+
+    @property
+    def joint_position_symbols(self):
+        return [self.get_joint_position_symbol(j) for j in self.world.joints if self.world.is_joint_movable(j)]
+
+    @property
+    def joint_velocity_symbols(self):
+        return [self.get_joint_velocity_symbols(j) for j in self.world.joints if self.world.is_joint_movable(j)]
 
     def get_fk_velocity(self, root, tip):
         r_T_t = self.get_fk(root, tip)

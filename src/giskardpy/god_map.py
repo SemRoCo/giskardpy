@@ -361,7 +361,14 @@ class GodMap(object):
         # TODO potential speedup by only updating entries that have changed
         # its a trap, this function only looks slow with lineprofiler
         with self.lock:
-            return [self.unsafe_get_data(self.expr_to_key[expr]) for expr in symbols]
+            return self.unsafe_get_values(symbols)
+
+    def unsafe_get_values(self, symbols):
+        """
+        :return: a dict which maps all registered expressions to their values or 0 if there is no number entry
+        :rtype: list
+        """
+        return [self.unsafe_get_data(self.expr_to_key[expr]) for expr in symbols]
 
     def evaluate_expr(self, expr):
         fs = w.free_symbols(expr)

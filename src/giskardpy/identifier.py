@@ -1,7 +1,7 @@
 world = [u'world']
-robot = world + [u'robot']
-fk_pose = robot + [u'get_fk_pose']
-fk_np = robot + [u'get_fk_np']
+robot = world + [u'groups', u'robot']
+fk_pose = world + [u'compute_fk_pose']
+fk_np = world + [u'compute_fk_np']
 joint_states = world + [u'state']
 controlled_joints = ['controlled_joints']
 

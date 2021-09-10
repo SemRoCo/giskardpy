@@ -101,7 +101,7 @@ class CartesianPositionStraight(Goal):
         self.goal = tf.transform_pose(self.root_link, goal)
         super(CartesianPositionStraight, self).__init__(**kwargs)
 
-        self.start = self.get_robot().get_fk_pose(self.root_link, self.tip_link)
+        self.start = self.robot.compute_fk_pose(self.root_link, self.tip_link)
 
     def make_constraints(self):
         root_P_goal = w.position_of(self.get_parameter_as_symbolic_expression('goal'))
@@ -159,25 +159,20 @@ class CartesianPose(Goal):
 
 
 class CartesianPoseStraight(Goal):
-    def __init__(self, root_link, tip_link, goal, translation_max_velocity=0.1,
-                 translation_max_acceleration=0.1, rotation_max_velocity=0.5, rotation_max_acceleration=0.5,
-                 weight=WEIGHT_ABOVE_CA, goal_constraint=True, **kwargs):
+    def __init__(self, root_link, tip_link, goal, translation_max_velocity=0.1, rotation_max_velocity=0.5,
+                 weight=WEIGHT_ABOVE_CA, **kwargs):
         super(CartesianPoseStraight, self).__init__(**kwargs)
         self.add_constraints_of_goal(CartesianPositionStraight(root_link=root_link,
                                                                tip_link=tip_link,
                                                                goal=goal,
                                                                max_velocity=translation_max_velocity,
-                                                               max_acceleration=translation_max_acceleration,
                                                                weight=weight,
-                                                               goal_constraint=goal_constraint,
                                                                **kwargs))
         self.add_constraints_of_goal(CartesianOrientation(root_link=root_link,
                                                           tip_link=tip_link,
                                                           goal=goal,
                                                           max_velocity=rotation_max_velocity,
-                                                          max_accleration=rotation_max_acceleration,
                                                           weight=weight,
-                                                          goal_constraint=goal_constraint,
                                                           **kwargs))
 
 

@@ -401,7 +401,7 @@ class WorldTree(object):
 
     @memoize
     def compute_fk_np(self, root, tip):
-        return self._fks[root, tip].call2(self.god_map.get_values(self._fks[root, tip].str_params))
+        return self._fks[root, tip].call2(self.god_map.unsafe_get_values(self._fks[root, tip].str_params))
 
     def set_joint_limits(self, linear_limits, angular_limits, order):
         for joint in self.joints.values():
@@ -455,6 +455,9 @@ class WorldTree(object):
 
     def is_joint_fixed(self, joint_name):
         return not isinstance(self.joints[joint_name], MovableJoint)
+
+    def is_joint_movable(self, joint_name):
+        return not self.is_joint_fixed(joint_name)
 
     def is_joint_revolute(self, joint_name):
         return isinstance(self.joints[joint_name], RevoluteJoint)

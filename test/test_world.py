@@ -96,7 +96,6 @@ def avoid_all_entry(min_dist):
 
 def world_with_robot(urdf):
     god_map = GodMap()
-    urdf = pr2_urdf()
     world = WorldTree(god_map)
     god_map.set_data(identifier.world, world)
     world.load_urdf(urdf)
@@ -104,7 +103,7 @@ def world_with_robot(urdf):
     return world
 
 
-def world_with_pr2():
+def create_world_with_pr2():
     return world_with_robot(pr2_urdf())
 
 
@@ -122,14 +121,18 @@ class TestWorldTree(object):
         with suppress_stderr():
             return up.URDF.from_xml_string(hacky_urdf_parser_fix(urdf))
 
+    def test_link_urdf_str(self):
+        world = create_world_with_pr2()
+        world.links['base_footprint'].as_urdf()
+
     def test_load_pr2(self):
-        world = world_with_pr2()
+        world = create_world_with_pr2()
         parsed_urdf = self.parsed_pr2_urdf()
         assert set(world.link_names) == set(list(parsed_urdf.link_map.keys()) + [world.root_link_name])
         assert set(world.joint_names) == set(list(parsed_urdf.joint_map.keys()) + [parsed_urdf.name])
 
     def test_group_pr2_hand(self):
-        world = world_with_pr2()
+        world = create_world_with_pr2()
         world.add_group('r_hand', 'r_wrist_roll_link')
         assert world.groups['r_hand'].joint_names == ['r_gripper_palm_joint',
                                                       'r_gripper_led_joint',
@@ -156,7 +159,7 @@ class TestWorldTree(object):
                                                      'r_gripper_l_finger_tip_frame']
 
     def test_get_chain(self):
-        world = world_with_pr2()
+        world = create_world_with_pr2()
         parsed_urdf = self.parsed_pr2_urdf()
         root_link = parsed_urdf.get_root()
         tip_link = 'r_gripper_tool_frame'
@@ -165,7 +168,7 @@ class TestWorldTree(object):
         assert set(real) == set(expected)
 
     def test_get_chain2(self):
-        world = world_with_pr2()
+        world = create_world_with_pr2()
         root_link = 'l_gripper_tool_frame'
         tip_link = 'r_gripper_tool_frame'
         try:
@@ -177,7 +180,7 @@ class TestWorldTree(object):
     def test_get_chain_group(self):
         root_link = 'r_wrist_roll_link'
         tip_link = 'r_gripper_r_finger_tip_link'
-        world = world_with_pr2()
+        world = create_world_with_pr2()
         world.add_group('r_hand', root_link)
         real = world.groups['r_hand'].compute_chain(root_link, tip_link)
         assert real == ['r_wrist_roll_link',
@@ -191,7 +194,7 @@ class TestWorldTree(object):
     def test_get_chain_group2(self):
         root_link = 'r_gripper_l_finger_tip_link'
         tip_link = 'r_gripper_r_finger_tip_link'
-        world = world_with_pr2()
+        world = create_world_with_pr2()
         world.add_group('r_hand', 'r_wrist_roll_link')
         try:
             real = world.groups['r_hand'].compute_chain(root_link, tip_link)
@@ -200,7 +203,7 @@ class TestWorldTree(object):
             pass
 
     def test_get_split_chain(self):
-        world = world_with_pr2()
+        world = create_world_with_pr2()
         root_link = 'l_gripper_r_finger_tip_link'
         tip_link = 'l_gripper_l_finger_tip_link'
         chain1, connection, chain2 = world.compute_split_chain(root_link, tip_link)
@@ -213,7 +216,7 @@ class TestWorldTree(object):
     def test_get_split_chain_group(self):
         root_link = 'r_gripper_l_finger_tip_link'
         tip_link = 'r_gripper_r_finger_tip_link'
-        world = world_with_pr2()
+        world = create_world_with_pr2()
         world.add_group('r_hand', 'r_wrist_roll_link')
         chain1, connection, chain2 = world.groups['r_hand'].compute_split_chain(root_link, tip_link)
         assert chain1 == ['r_gripper_l_finger_tip_link',
@@ -227,13 +230,13 @@ class TestWorldTree(object):
                           'r_gripper_r_finger_tip_link']
 
     def test_get_joint_limits2(self):
-        world = world_with_pr2()
+        world = create_world_with_pr2()
         lower_limit, upper_limit = world.get_joint_position_limits('l_shoulder_pan_joint')
         assert lower_limit == -0.564601836603
         assert upper_limit == 2.1353981634
 
     def test_get_all_joint_limits(self):
-        world = world_with_pr2()
+        world = create_world_with_pr2()
         assert world.get_all_joint_position_limits() == {'bl_caster_l_wheel_joint': (None, None),
                                                          'bl_caster_r_wheel_joint': (None, None),
                                                          'bl_caster_rotation_joint': (None, None),
@@ -284,7 +287,7 @@ class TestWorldTree(object):
                                                          'torso_lift_motor_screw_joint': (None, None)}
 
     def test_get_all_joint_limits_group(self):
-        world = world_with_pr2()
+        world = create_world_with_pr2()
         world.add_group('r_hand', 'r_wrist_roll_link')
         assert world.groups['r_hand'].get_all_joint_position_limits() == {'r_gripper_joint': (0.0, 0.088),
                                                                           'r_gripper_l_finger_joint': (0.0, 0.548),
@@ -299,7 +302,7 @@ class TestWorldTree(object):
         """
         :type js:
         """
-        world = world_with_pr2()
+        world = create_world_with_pr2()
         root = u'odom_combined'
         tips = [u'l_gripper_tool_frame', u'r_gripper_tool_frame']
         for tip in tips:

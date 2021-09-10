@@ -1,18 +1,23 @@
 import shutil
+import time
 from collections import defaultdict
 from itertools import product
+from time import sleep
 
 import pybullet as p
 import pytest
+import rospy
 from geometry_msgs.msg import Pose, Point, Quaternion
 
 import giskardpy.model.pybullet_wrapper as pbw
+from giskardpy.model.pybullet_syncer import PyBulletSyncer
 from giskardpy.model.pybullet_world import PyBulletWorld
 from giskardpy.model.pybullet_world_object import PyBulletWorldObject
 from giskardpy.model.robot import Robot
 from giskardpy.model.utils import make_world_body_box, make_world_body_sphere, make_world_body_cylinder
 from giskardpy.utils.utils import logging
 from giskardpy.model.world_object import WorldObject
+from test_world import create_world_with_pr2
 from utils_for_tests import pr2_urdf, base_bot_urdf, donbot_urdf
 
 # this import has to come last
@@ -54,20 +59,15 @@ def function_setup(request, module_setup):
 
 
 @pytest.fixture()
-def test_folder(request, function_setup):
+def pr2_world(request, function_setup):
     """
     :rtype: World
     """
 
-    def kill_pybullet():
-        try:
-            logging.loginfo(u'deleting tmp test folder')
-            # shutil.rmtree(folder_name)
-        except Exception:
-            pass
-
-    request.addfinalizer(kill_pybullet)
-    return folder_name
+    world = create_world_with_pr2()
+    pbs = PyBulletSyncer(world)
+    pbs.sync()
+    return pbs
 
 
 @pytest.fixture()
@@ -342,3 +342,16 @@ class TestPyBulletWorld(test_world.TestWorld):
     # TODO test that has collision entries of robot links without collision geometry
 
     # TODO test that makes sure adding avoid specific self collisions works
+
+
+class TestPyBulletSyncer(object):
+    def test_load_pr2(self, pr2_world):
+        assert len(pbw.get_body_names()) == 54
+
+    def test_set_pr2_js(self, pr2_world):
+        pr2_world.world.state['torso_lift_link'] = 1
+        pr2_world.sync()
+        assert len(pbw.get_body_names()) == 54
+
+import pytest
+pytest.main(['-s', __file__ + '::TestPyBulletSyncer::test_set_pr2_js'])

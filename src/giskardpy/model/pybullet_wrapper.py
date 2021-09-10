@@ -3,6 +3,7 @@ import random
 import string
 from collections import namedtuple
 
+import numpy as np
 import pybullet as p
 from pybullet import resetJointState, getNumJoints, resetBasePositionAndOrientation, getBasePositionAndOrientation, \
     removeBody, getClosestPoints
@@ -12,6 +13,7 @@ import giskardpy
 from giskardpy import DEBUG, MAP
 from giskardpy.exceptions import DuplicateNameException
 from giskardpy.model.urdf_object import robot_name_from_urdf_string
+from giskardpy.utils.tfwrapper import np_to_pose
 from giskardpy.utils.utils import write_to_tmp, NullContextManager, suppress_stdout, resolve_ros_iris_in_urdf, logging
 
 JointInfo = namedtuple(u'JointInfo', [u'joint_index', u'joint_name', u'joint_type', u'q_index', u'u_index', u'flags',
@@ -49,7 +51,7 @@ def random_string(size=6):
 
 
 @profile
-def load_urdf_string_into_bullet(urdf_string, pose=None):
+def load_urdf_string_into_bullet(urdf_string, pose=None, position=None, orientation=None):
     """
     Loads a URDF string into the bullet world.
     :param urdf_string: XML string of the URDF to load.
@@ -59,22 +61,20 @@ def load_urdf_string_into_bullet(urdf_string, pose=None):
     :return: internal PyBullet id of the loaded urdfs
     :rtype: intload_urdf_string_into_bullet
     """
-    if pose is None:
-        pose = Pose()
-        pose.orientation.w = 1
     if isinstance(pose, PoseStamped):
         pose = pose.pose
+    if isinstance(pose, Pose):
+        position = [pose.position.x, pose.position.y, pose.position.z]
+        orientation = [pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w]
     object_name = robot_name_from_urdf_string(urdf_string)
     if object_name in get_body_names():
         raise DuplicateNameException(u'an object with name \'{}\' already exists in pybullet'.format(object_name))
     resolved_urdf = resolve_ros_iris_in_urdf(urdf_string)
-    filename = write_to_tmp(u'{}.urdfs'.format(random_string()), resolved_urdf)
+    filename = write_to_tmp(u'{}.urdf'.format(random_string()), resolved_urdf)
     with NullContextManager() if giskardpy.PRINT_LEVEL == DEBUG else suppress_stdout():
-        id = p.loadURDF(filename, [pose.position.x, pose.position.y, pose.position.z],
-                        [pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w],
+        id = p.loadURDF(filename, position, orientation,
                         flags=p.URDF_USE_SELF_COLLISION_EXCLUDE_PARENT)
     os.remove(filename)
-    logging.logdebug(u'--> added {} to pybullet'.format(object_name))
     return id
 
 
@@ -102,6 +102,34 @@ def start_pybullet(gui, gravity=-9.8):
     p.setGravity(0, 0, gravity)
     return server_id
 
+
+def create_box(depth, width, height, position, orientation):
+    return createCollisionShape(shapeType=p.GEOM_BOX,
+                                halfExtents=[depth, width, height],
+                                collisionFramePosition=position,
+                                collisionFrameOrientation=orientation)
+
+
+def createCollisionShape(shapeType, radius=None, halfExtents=None, height=None, fileName=None, meshScale=None,
+                         planeNormal=None, flags=None, collisionFramePosition=None, collisionFrameOrientation=None,
+                         vertices=None, indices=None, heightfieldTextureScaling=None, numHeightfieldRows=None,
+                         numHeightfieldColumns=None, replaceHeightfieldIdIndex=None, physicsClientId=None):
+    kwargs = {'shapeType': shapeType}
+    if radius is not None:
+        kwargs['radius'] = radius
+    if height is not None:
+        kwargs['height'] = height
+    if halfExtents is not None:
+        kwargs['halfExtents'] = halfExtents
+    if fileName is not None:
+        kwargs['fileName'] = fileName
+    if meshScale is not None:
+        kwargs['meshScale'] = meshScale
+    if collisionFramePosition is not None:
+        kwargs['collisionFramePosition'] = collisionFramePosition
+    if collisionFrameOrientation is not None:
+        kwargs['collisionFrameOrientation'] = collisionFrameOrientation
+    return p.createCollisionShape(**kwargs)
 
 def pybullet_pose_to_msg(pose):
     """

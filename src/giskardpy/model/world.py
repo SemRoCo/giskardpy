@@ -80,6 +80,9 @@ class MeshGeometry(LinkGeometry):
         marker.mesh_use_embedded_materials = True
         return marker
 
+    def as_urdf(self):
+        return up.Mesh(self.file_name)
+
 
 class BoxGeometry(LinkGeometry):
     def __init__(self, link_T_geometry, depth, width, height):
@@ -96,10 +99,13 @@ class BoxGeometry(LinkGeometry):
         marker.scale.z = self.height
         return marker
 
+    def as_urdf(self):
+        return up.Box([self.depth, self.width, self.height])
+
 class CylinderGeometry(LinkGeometry):
-    def __init__(self, link_T_geometry, length, radius):
+    def __init__(self, link_T_geometry, height, radius):
         super(CylinderGeometry, self).__init__(link_T_geometry)
-        self.length = length
+        self.height = height
         self.radius = radius
 
     def as_visualization_marker(self):
@@ -107,8 +113,11 @@ class CylinderGeometry(LinkGeometry):
         marker.type = Marker.CYLINDER
         marker.scale.x = self.radius * 2
         marker.scale.y = self.radius * 2
-        marker.scale.z = self.length
+        marker.scale.z = self.height
         return marker
+
+    def as_urdf(self):
+        return up.Cylinder(self.radius, self.height)
 
 class SphereGeometry(LinkGeometry):
     def __init__(self, link_T_geometry, radius):
@@ -122,6 +131,9 @@ class SphereGeometry(LinkGeometry):
         marker.scale.y = self.radius * 2
         marker.scale.z = self.radius * 2
         return marker
+
+    def as_urdf(self):
+        return up.Sphere(self.radius)
 
 
 class Link(object):
@@ -148,6 +160,15 @@ class Link(object):
             markers.markers.append(marker)
         return markers
 
+    def as_urdf(self):
+        r = up.Robot(self.name)
+        r.version = u'1.0'
+        link = up.Link(self.name)
+        link.add_aggregate(u'visual', up.Visual(self.visuals[0].as_urdf(),
+                                                material=up.Material(u'green', color=up.Color(0, 1, 0, 1))))
+        link.add_aggregate(u'collision', up.Collision(self.collisions[0].as_urdf()))
+        r.add_link(link)
+        return r.to_xml_string()
 
     def has_visuals(self):
         return len(self.visuals) > 0
@@ -231,6 +252,9 @@ class WorldTree(object):
 
         helper(parsed_urdf, child_link.name)
         self.init_fast_fks()
+
+    # def add_box(self, name, depth, width, height, pose):
+
 
     @property
     def movable_joints(self):
@@ -402,6 +426,29 @@ class WorldTree(object):
     @memoize
     def compute_fk_np(self, root, tip):
         return self._fks[root, tip].call2(self.god_map.unsafe_get_values(self._fks[root, tip].str_params))
+
+    @profile
+    def compute_all_fks(self):
+        fks = []
+        fk_idx = {}
+        i = 0
+        for link in self.links.values():
+            if link.name == self.root_link_name:
+                continue
+            if link.has_collisions():
+                fk = self.compose_fk_expression(self.root_link_name, link.name)
+                position = w.position_of(fk)
+                orientation = w.quaternion_from_matrix(fk)
+                fks.append(w.vstack([position, orientation]).T)
+                fk_idx[link.name] = i
+                i += 1
+        fks = w.vstack(fks)
+        f = w.speed_up(fks, w.free_symbols(fks))
+        fks_evaluated = f.call2(self.god_map.unsafe_get_values(f.str_params))
+        result = {}
+        for link in self.link_names_with_collisions:
+            result[link] = fks_evaluated[fk_idx[link], :]
+        return result
 
     def set_joint_limits(self, linear_limits, angular_limits, order):
         for joint in self.joints.values():

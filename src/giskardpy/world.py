@@ -161,6 +161,7 @@ class World(object):
         """
         # TODO this should know the object pose and not require it as input
         self._robot.attach_urdf_object(self.get_object(name), link, pose)
+        self.remove_object(name)
         logging.loginfo(u'--> attached object {} on link {}'.format(name, link))
 
     def detach(self, joint_name, from_obj=None):

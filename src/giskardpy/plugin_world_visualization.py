@@ -48,8 +48,7 @@ class WorldVisualizationBehavior(GiskardBehavior):
         """
         Checks if objects in the world were added or removed and if so it returns True. Otherwise, False.
         """
-        objects_dict = self.get_world().get_objects()
-        object_names = [object_name for object_name, _ in objects_dict.items()]
+        object_names = self.get_world().get_object_names()
         curr_publishing_object_names = [object_name for object_name, _ in self.currently_publishing_objects.items()]
         return object_names != curr_publishing_object_names
 
@@ -66,10 +65,9 @@ class WorldVisualizationBehavior(GiskardBehavior):
         for object_name, object in objects_dict.items():
             for link_name in object.get_link_names():
                 if object.has_link_visuals(link_name):
-                    # Simple objects (containing only one link) are published here:
+                    # Simple objects (containing only one link) are skipped, since they are already managed
+                    # in plugin_pybullet.py and as marker encoded with the function as_marker_msg from urdf_object.py
                     if link_name == object_name and len(object.get_link_names()) == 1:
-                        marker = object.as_marker_msg()
-                        markers.append(marker)
                         continue
                     # More complex objects will be published here:
                     else:

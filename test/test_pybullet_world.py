@@ -1,7 +1,7 @@
 import shutil
 import time
 from collections import defaultdict
-from itertools import product
+from itertools import product, combinations
 from time import sleep
 
 import pybullet as p
@@ -65,7 +65,7 @@ def pr2_world(request, function_setup):
     """
 
     world = create_world_with_pr2()
-    pbs = PyBulletSyncer(world)
+    pbs = PyBulletSyncer(world, False)
     pbs.sync()
     return pbs
 
@@ -353,5 +353,11 @@ class TestPyBulletSyncer(object):
         pr2_world.sync()
         assert len(pbw.get_body_names()) == 54
 
-import pytest
-pytest.main(['-s', __file__ + '::TestPyBulletSyncer::test_set_pr2_js'])
+    def test_compute_collision_matrix(self, pr2_world):
+        """
+        :type pr2_world: PyBulletSyncer
+        """
+        print(pr2_world.calc_collision_matrix('robot', num_rnd_tries=10))
+
+# import pytest
+# pytest.main(['-s', __file__ + '::TestPyBulletSyncer::test_compute_collision_matrix'])

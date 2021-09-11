@@ -19,6 +19,10 @@ class FixedJoint(object):
     def parent_link_name(self):
         return self.parent.name
 
+    @property
+    def child_link_name(self):
+        return self.child.name
+
 
 class MovableJoint(FixedJoint):
     def __init__(self, name, parent, child, translation_offset, rotation_offset, free_variable):

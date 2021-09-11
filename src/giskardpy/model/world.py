@@ -1,6 +1,6 @@
 import numbers
 import traceback
-from copy import deepcopy, copy
+from copy import deepcopy
 
 import numpy as np
 import urdf_parser_py.urdf as up
@@ -23,6 +23,7 @@ from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.utils import logging
 from giskardpy.utils.tfwrapper import msg_to_kdl, kdl_to_pose, homo_matrix_to_pose, np_to_pose
 from giskardpy.utils.utils import suppress_stderr, memoize
+
 
 class LinkGeometry(object):
     def __init__(self, link_T_geometry):
@@ -61,12 +62,13 @@ class LinkGeometry(object):
         marker.pose = np_to_pose(self.link_T_geometry)
         return marker
 
+
 class MeshGeometry(LinkGeometry):
     def __init__(self, link_T_geometry, file_name, scale=None):
         super(MeshGeometry, self).__init__(link_T_geometry)
         self.file_name = file_name
         if scale is None:
-            self.scale = [1,1,1]
+            self.scale = [1, 1, 1]
         else:
             self.scale = scale
 
@@ -102,6 +104,7 @@ class BoxGeometry(LinkGeometry):
     def as_urdf(self):
         return up.Box([self.depth, self.width, self.height])
 
+
 class CylinderGeometry(LinkGeometry):
     def __init__(self, link_T_geometry, height, radius):
         super(CylinderGeometry, self).__init__(link_T_geometry)
@@ -118,6 +121,7 @@ class CylinderGeometry(LinkGeometry):
 
     def as_urdf(self):
         return up.Cylinder(self.radius, self.height)
+
 
 class SphereGeometry(LinkGeometry):
     def __init__(self, link_T_geometry, radius):
@@ -142,7 +146,7 @@ class Link(object):
         self.visuals = []
         self.collisions = []
         self.parent_joint_name = None
-        self.child_names = []
+        self.child_joint_names = []
 
     @classmethod
     def from_urdf(cls, urdf_link):
@@ -255,7 +259,6 @@ class WorldTree(object):
 
     # def add_box(self, name, depth, width, height, pose):
 
-
     @property
     def movable_joints(self):
         return [j.name for j in self.joints.values() if isinstance(j, MovableJoint)]
@@ -343,8 +346,8 @@ class WorldTree(object):
         joint.child.parent_joint_name = joint.name
         self.links[joint.child.name] = joint.child
         parent_link = self.links[joint.parent_link_name]
-        assert joint.name not in parent_link.child_names
-        parent_link.child_names.append(joint.name)
+        assert joint.name not in parent_link.child_joint_names
+        parent_link.child_joint_names.append(joint.name)
 
     def move_branch(self, old_parent_joint, new_joint):
         # replace joint
@@ -429,26 +432,55 @@ class WorldTree(object):
 
     @profile
     def compute_all_fks(self):
-        fks = []
-        fk_idx = {}
-        i = 0
-        for link in self.links.values():
-            if link.name == self.root_link_name:
-                continue
-            if link.has_collisions():
-                fk = self.compose_fk_expression(self.root_link_name, link.name)
-                position = w.position_of(fk)
-                orientation = w.quaternion_from_matrix(fk)
-                fks.append(w.vstack([position, orientation]).T)
-                fk_idx[link.name] = i
-                i += 1
-        fks = w.vstack(fks)
-        f = w.speed_up(fks, w.free_symbols(fks))
-        fks_evaluated = f.call2(self.god_map.unsafe_get_values(f.str_params))
+        # TODO speedup possible
+        # def helper(link, root_T_parent):
+        #     if link.parent_joint_name in self.joints:
+        #         root_T_link = root_T_parent * self.joints[link.parent_joint_name].parent_T_child
+        #     else:
+        #         root_T_link = root_T_parent
+        #     if link.has_collisions():
+        #         fks = {link.name: root_T_link}
+        #     else:
+        #         fks = {}
+        #     for child_joint_name in link.child_joint_names:
+        #         child_link = self.joints[child_joint_name].child
+        #         fks.update(helper(child_link, root_T_link))
+        #     return fks
+        # fks_dict = helper(self.root_link, w.eye(4))
+        if not hasattr(self, 'fast_all_fks'):
+            fks = []
+            self.fk_idx = {}
+            i = 0
+            for link in self.links.values():
+                if link.name == self.root_link_name:
+                    continue
+                if link.has_collisions():
+                    fk = self.compose_fk_expression(self.root_link_name, link.name)
+                    position = w.position_of(fk)
+                    orientation = w.quaternion_from_matrix(fk)
+                    fks.append(w.vstack([position, orientation]).T)
+                    self.fk_idx[link.name] = i
+                    i += 1
+            fks = w.vstack(fks)
+            self.fast_all_fks = w.speed_up(fks, w.free_symbols(fks))
+
+        fks_evaluated = self.fast_all_fks.call2(self.god_map.unsafe_get_values(self.fast_all_fks.str_params))
         result = {}
         for link in self.link_names_with_collisions:
-            result[link] = fks_evaluated[fk_idx[link], :]
+            result[link] = fks_evaluated[self.fk_idx[link], :]
         return result
+
+    @memoize
+    def are_linked(self, link_a, link_b):
+        """
+        :type link_a: str
+        :type link_b: str
+        :rtype: bool
+        """
+        link_a = self.links[link_a]
+        link_b = self.links[link_b]
+        return self.joints[link_b.parent_joint_name].parent_link_name == link_a or \
+               self.joints[link_a.parent_joint_name].parent_link_name == link_b
 
     def set_joint_limits(self, linear_limits, angular_limits, order):
         for joint in self.joints.values():
@@ -473,6 +505,48 @@ class WorldTree(object):
                 joint.free_variable.lower_limits[order] = w.max(old_lower_limits,
                                                                 -new_limits[joint.name])
 
+    def set_joint_state_to_zero(self):
+        self.state = JointStates()
+
+    def set_max_joint_state(self):
+        def f(joint_name):
+            _, upper_limit = self.get_joint_position_limits(joint_name)
+            if upper_limit is None:
+                return np.pi * 2
+            return upper_limit
+
+        self.state = self.generate_joint_state(f)
+
+    def set_min_joint_state(self):
+        def f(joint_name):
+            lower_limit, _ = self.get_joint_position_limits(joint_name)
+            if lower_limit is None:
+                return -np.pi * 2
+            return lower_limit
+
+        self.state = self.generate_joint_state(f)
+
+    def set_rnd_joint_state(self):
+        def f(joint_name):
+            lower_limit, upper_limit = self.get_joint_position_limits(joint_name)
+            if lower_limit is None:
+                return np.random.random() * np.pi * 2
+            lower_limit = max(lower_limit, -10)
+            upper_limit = min(upper_limit, 10)
+            return (np.random.random() * (upper_limit - lower_limit)) + lower_limit
+
+        self.state = self.generate_joint_state(f)
+
+    def generate_joint_state(self, f):
+        """
+        :param f: lambda joint_info: float
+        :return:
+        """
+        js = JointStates()
+        for joint_name in sorted(self.movable_joints):
+            js[joint_name].position = f(joint_name)
+        return js
+
     def joint_limit_expr(self, joint_name, order):
         upper_limit = self.joints[joint_name].free_variable.get_upper_limit(order)
         lower_limit = self.joints[joint_name].free_variable.get_lower_limit(order)
@@ -486,7 +560,7 @@ class WorldTree(object):
         if not isinstance(upper_limit, numbers.Number) and upper_limit is not None:
             f = w.speed_up(upper_limit, w.free_symbols(upper_limit))
             upper_limit = f.call2(self.god_map.get_values(f.str_params))[0][0]
-        return upper_limit, lower_limit
+        return lower_limit, upper_limit
 
     def get_joint_position_limits(self, joint_name):
         return self.compute_joint_limits(joint_name, 0)
@@ -521,6 +595,7 @@ class WorldTree(object):
     def has_joint(self, joint_name):
         return joint_name in self.joints
 
+
 class SubWorldTree(WorldTree):
     def __init__(self, name, root_link_name, world):
         """
@@ -538,7 +613,11 @@ class SubWorldTree(WorldTree):
 
     @property
     def state(self):
-        return self.world.state
+        return {k:v for k,v in self.world.state.items() if self.has_joint(k)}
+
+    @state.setter
+    def state(self, value):
+        self.world.state = value
 
     @property
     def god_map(self):
@@ -555,10 +634,11 @@ class SubWorldTree(WorldTree):
             :type root_link: Link
             :rtype: dict
             """
-            joints = {j: self.world.joints[j] for j in root_link.child_names}
-            for j in root_link.child_names: # type: FixedJoint
+            joints = {j: self.world.joints[j] for j in root_link.child_joint_names}
+            for j in root_link.child_joint_names:  # type: FixedJoint
                 joints.update(helper(self.world.joints[j].child))
             return joints
+
         return helper(self.root_link)
 
     @property
@@ -569,9 +649,10 @@ class SubWorldTree(WorldTree):
             :rtype: list
             """
             links = {root_link.name: root_link}
-            for j in root_link.child_names: # type: FixedJoint
+            for j in root_link.child_joint_names:  # type: FixedJoint
                 links.update(helper(self.world.joints[j].child))
             return links
+
         return helper(self.root_link)
 
     def add_group(self, name, root_link_name):

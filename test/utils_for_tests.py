@@ -33,7 +33,7 @@ from giskardpy.identifier import robot, world
 from giskardpy.model.pybullet_world import PyBulletWorld
 from giskardpy.python_interface import GiskardWrapper
 from giskardpy.model.robot import Robot
-from giskardpy.utils.tfwrapper import transform_pose, lookup_pose
+from giskardpy.utils.tfwrapper import transform_pose, lookup_pose, np_to_pose
 from giskardpy.utils.utils import msg_to_list, position_dict_to_joint_states, to_joint_state_position_dict, \
     logging
 
@@ -616,7 +616,7 @@ class GiskardTestWrapper(GiskardWrapper):
                 error_msg = u'{} has violated joint position limit'.format(joint)
                 np.testing.assert_array_less(trajectory_pos[joint], joint_limits[1], error_msg)
                 np.testing.assert_array_less(-trajectory_pos[joint], -joint_limits[0], error_msg)
-            vel_limit = self.get_world().joint_limit_expr(joint, 1)[0]
+            vel_limit = self.get_world().joint_limit_expr(joint, 1)[1]
             vel_limit = self.get_god_map().evaluate_expr(vel_limit) * 1.001
             vel = trajectory_vel[joint]
             error_msg = u'{} has violated joint velocity limit {} > {}'.format(joint, vel, vel_limit)
@@ -654,6 +654,7 @@ class GiskardTestWrapper(GiskardWrapper):
             assert name in self.get_attached_objects().object_names, \
                 'there is no attached object named {}'.format(name)
         r = super(GiskardTestWrapper, self).detach_object(name)
+        self.loop_once()
         assert r.error_codes == expected_response, \
             u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
                                             update_world_error_code(expected_response))
@@ -664,18 +665,19 @@ class GiskardTestWrapper(GiskardWrapper):
 
     def add_box(self, name=u'box', size=(1, 1, 1), pose=None, expected_response=UpdateWorldResponse.SUCCESS):
         r = super(GiskardTestWrapper, self).add_box(name, size, pose=pose)
+        self.loop_once()
         assert r.error_codes == expected_response, \
             u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
                                             update_world_error_code(expected_response))
         p = transform_pose(u'map', pose)
-        o_p = self.get_world().get_object(name).base_pose
-        assert self.get_world().has_object(name)
+        o_p = self.get_world().groups[name].base_pose
         compare_poses(p.pose, o_p)
         assert name in self.get_object_names().object_names
         compare_poses(o_p, self.get_object_info(name).pose.pose)
 
     def add_sphere(self, name=u'sphere', size=1., pose=None):
         r = super(GiskardTestWrapper, self).add_sphere(name=name, size=size, pose=pose)
+        self.loop_once()
         assert r.error_codes == UpdateWorldResponse.SUCCESS, \
             u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
                                             update_world_error_code(UpdateWorldResponse.SUCCESS))
@@ -686,6 +688,7 @@ class GiskardTestWrapper(GiskardWrapper):
 
     def add_cylinder(self, name=u'cylinder', size=[1, 1], pose=None):
         r = super(GiskardTestWrapper, self).add_cylinder(name=name, height=size[0], radius=size[1], pose=pose)
+        self.loop_once()
         assert r.error_codes == UpdateWorldResponse.SUCCESS, \
             u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
                                             update_world_error_code(UpdateWorldResponse.SUCCESS))
@@ -694,6 +697,7 @@ class GiskardTestWrapper(GiskardWrapper):
 
     def add_mesh(self, name=u'cylinder', path=u'', pose=None, expected_error=UpdateWorldResponse.SUCCESS):
         r = super(GiskardTestWrapper, self).add_mesh(name=name, mesh=path, pose=pose)
+        self.loop_once()
         assert r.error_codes == expected_error, \
             u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
                                             update_world_error_code(expected_error))
@@ -708,6 +712,7 @@ class GiskardTestWrapper(GiskardWrapper):
 
     def add_urdf(self, name, urdf, pose, js_topic=u'', set_js_topic=None):
         r = super(GiskardTestWrapper, self).add_urdf(name, urdf, pose, js_topic, set_js_topic=set_js_topic)
+        self.loop_once()
         assert r.error_codes == UpdateWorldResponse.SUCCESS, \
             u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
                                             update_world_error_code(UpdateWorldResponse.SUCCESS))
@@ -732,6 +737,7 @@ class GiskardTestWrapper(GiskardWrapper):
         else:
             expected_pose = deepcopy(pose)
         r = super(GiskardTestWrapper, self).attach_box(name, size, frame_id, position, orientation, pose)
+        self.loop_once()
         assert r.error_codes == expected_response, \
             u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
                                             update_world_error_code(expected_response))

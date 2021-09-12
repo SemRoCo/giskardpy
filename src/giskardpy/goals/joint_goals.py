@@ -39,7 +39,7 @@ class JointPositionContinuous(Goal):
         """
         current_joint = self.get_joint_position_symbol(self.joint_name)
         max_velocity = w.min(self.get_parameter_as_symbolic_expression(u'max_velocity'),
-                             self.robot.joint_limit_expr(self.joint_name, 1)[0])
+                             self.robot.joint_limit_expr(self.joint_name, 1)[1])
 
         error = w.shortest_angular_distance(current_joint, self.joint_goal)
 
@@ -94,7 +94,7 @@ class JointPositionPrismatic(Goal):
         weight = self.get_parameter_as_symbolic_expression(u'weight')
 
         max_velocity = w.min(self.get_parameter_as_symbolic_expression(u'max_velocity'),
-                             self.robot.joint_limit_expr(self.joint_name, 1)[0])
+                             self.robot.joint_limit_expr(self.joint_name, 1)[1])
 
         error = joint_goal - current_joint
 
@@ -147,7 +147,7 @@ class JointPositionRevolute(Goal):
         weight = self.get_parameter_as_symbolic_expression(u'weight')
 
         max_velocity = w.min(self.get_parameter_as_symbolic_expression(u'max_velocity'),
-                             self.robot.joint_limit_expr(self.joint_name, 1)[0])
+                             self.robot.joint_limit_expr(self.joint_name, 1)[1])
 
         error = joint_goal - current_joint
 
@@ -209,7 +209,7 @@ class ShakyJointPositionRevoluteOrPrismatic(Goal):
         time_in_secs = self.get_sampling_period_symbol() * time
 
         max_velocity = w.min(self.get_parameter_as_symbolic_expression(u'max_velocity'),
-                             self.robot.joint_limit_expr(self.joint_name, 1)[0])
+                             self.robot.joint_limit_expr(self.joint_name, 1)[1])
 
         fun_params = frequency * 2.0 * w.pi * time_in_secs
         err = (joint_goal - current_joint) + noise_amplitude * max_velocity * w.sin(fun_params)
@@ -272,7 +272,7 @@ class ShakyJointPositionContinuous(Goal):
         time_in_secs = self.get_sampling_period_symbol() * time
 
         max_velocity = w.min(self.get_parameter_as_symbolic_expression(u'max_velocity'),
-                             self.robot.joint_limit_expr(self.joint_name, 1)[0])
+                             self.robot.joint_limit_expr(self.joint_name, 1)[1])
 
         fun_params = frequency * 2.0 * w.pi * time_in_secs
         err = w.shortest_angular_distance(current_joint, joint_goal) + noise_amplitude * max_velocity * w.sin(
@@ -316,7 +316,7 @@ class AvoidJointLimitsRevolute(Goal):
         lower_limit, upper_limit = self.robot.get_joint_position_limits(self.joint_name)
         max_velocity = self.get_parameter_as_symbolic_expression('max_velocity')
         max_velocity = w.min(max_velocity,
-                             self.robot.joint_limit_expr(self.joint_name, 1)[0])
+                             self.robot.joint_limit_expr(self.joint_name, 1)[1])
 
         joint_range = upper_limit - lower_limit
         center = (upper_limit + lower_limit) / 2.
@@ -371,7 +371,7 @@ class AvoidJointLimitsPrismatic(Goal):
         lower_limit, upper_limit = self.robot.get_joint_position_limits(self.joint_name)
         max_velocity = self.get_parameter_as_symbolic_expression('max_velocity')
         max_velocity = w.min(max_velocity,
-                             self.robot.joint_limit_expr(self.joint_name, 1)[0])
+                             self.robot.joint_limit_expr(self.joint_name, 1)[1])
 
         joint_range = upper_limit - lower_limit
         center = (upper_limit + lower_limit) / 2.
@@ -465,7 +465,7 @@ class JointPositionRange(Goal):
 
     def make_constraints(self):
         joint_position = self.get_joint_position_symbol(self.joint_name)
-        self.add_constraint(reference_velocity=self.robot.joint_limit_expr(self.joint_name, 1)[0],
+        self.add_constraint(reference_velocity=self.robot.joint_limit_expr(self.joint_name, 1)[1],
                             lower_error=self.lower_limit - joint_position,
                             upper_error=self.upper_limit - joint_position,
                             weight=WEIGHT_BELOW_CA,

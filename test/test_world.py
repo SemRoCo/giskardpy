@@ -98,7 +98,7 @@ def world_with_robot(urdf):
     god_map = GodMap()
     world = WorldTree(god_map)
     god_map.set_data(identifier.world, world)
-    world.load_urdf(urdf)
+    world.add_urdf(urdf)
     world.add_group('robot', 'odom_combined')
     return world
 

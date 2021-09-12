@@ -21,8 +21,8 @@ class VisualizationBehavior(GiskardBehavior):
     def update(self):
         markers = []
         time_stamp = rospy.Time()
-        robot = self.robot
-        get_fk = robot.compute_fk_pose
+        # robot = self.robot
+        get_fk = self.world.compute_fk_pose
         links = self.world.link_names_with_collisions
         for i, link_name in enumerate(links):
             for marker in self.world.links[link_name].collision_visualization_markers().markers:

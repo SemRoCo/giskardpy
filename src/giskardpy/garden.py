@@ -95,7 +95,7 @@ def initialize_god_map():
 
     world = WorldTree(god_map)
     god_map.set_data(identifier.world, world)
-    world.load_urdf(god_map.get_data(identifier.robot_description))
+    world.add_urdf(god_map.get_data(identifier.robot_description), add_as_group=False)
     world.add_group('robot', 'odom_combined')
     # robot = WorldObject(god_map.get_data(identifier.robot_description),
     #                     None,
@@ -222,6 +222,7 @@ def grow_tree():
     # wait_for_goal.add_child(TFPublisher(u'tf', **god_map.get_data(identifier.TFPublisher)))
     wait_for_goal.add_child(ConfigurationPlugin(u'js1'))
     wait_for_goal.add_child(WorldUpdatePlugin(u'pybullet updater'))
+    wait_for_goal.add_child(VisualizationBehavior(u'visualization'))
     wait_for_goal.add_child(GoalReceived(u'has goal', action_server_name, MoveAction))
     wait_for_goal.add_child(ConfigurationPlugin(u'js2'))
     # ----------------------------------------------

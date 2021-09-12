@@ -2417,8 +2417,8 @@ class TestCollisionAvoidanceGoals(object):
         p.pose.position = Point(1.2, 0, 1.6)
         p.pose.orientation = Quaternion(0.0, 0.0, 0.47942554, 0.87758256)
         zero_pose.add_box(object_name, pose=p)
-        m = zero_pose.get_world().get_object(object_name).as_marker_msg()
-        compare_poses(m.pose, p.pose)
+        base_pose = zero_pose.get_world().groups[object_name].base_pose
+        compare_poses(base_pose, p.pose)
 
     def test_add_mesh(self, zero_pose):
         """

@@ -16,6 +16,8 @@ import giskardpy.identifier as identifier
 from giskardpy.data_types import JointStates
 from giskardpy.exceptions import CorruptShapeException, UnknownBodyException, \
     UnsupportedOptionException, DuplicateNameException
+from giskardpy.model.world import SubWorldTree
+from giskardpy.model.world import WorldTree
 from giskardpy.tree.plugin import GiskardBehavior
 from giskardpy.utils.tfwrapper import transform_pose
 from giskardpy.tree.tree_manager import TreeManager
@@ -172,13 +174,13 @@ class WorldUpdatePlugin(GiskardBehavior):
         res = GetObjectInfoResponse()
         res.error_codes = GetObjectInfoResponse.SUCCESS
         try:
-            object = self.get_world().get_object(req.object_name)
+            object = self.world.groups[req.object_name] # type: SubWorldTree
             res.joint_state_topic = ''
             if req.object_name in self.object_js_subs.keys():
                 res.joint_state_topic = self.object_js_subs[req.object_name].name
             res.pose.pose = object.base_pose
             res.pose.header.frame_id = self.get_god_map().get_data(identifier.map_frame)
-            for key, value in object.joint_state.items():
+            for key, value in object.state.items():
                 res.joint_state.name.append(key)
                 res.joint_state.position.append(value.position)
                 res.joint_state.velocity.append(value.velocity)
@@ -300,15 +302,7 @@ class WorldUpdatePlugin(GiskardBehavior):
         # assumes that parent has god map lock
         world_body = req.body
         global_pose = transform_pose(self.map_frame, req.pose).pose
-        world_object = WorldObject.from_world_body(world_body)
-        self.unsafe_get_world().add_object(world_object)
-        self.unsafe_get_world().set_object_pose(world_body.name, global_pose)
-        try:
-            m = self.unsafe_get_world().get_object(world_body.name).as_marker_msg()
-            m.header.frame_id = self.map_frame
-            self.publish_object_as_marker(m)
-        except:
-            pass
+        self.world.add_world_body(world_body, global_pose)
         # SUB-CASE: If it is an articulated object, open up a joint state subscriber
         # FIXME also keep track of base pose
         if world_body.joint_state_topic:

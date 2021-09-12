@@ -21,7 +21,8 @@ from giskardpy.model.urdf_object import hacky_urdf_parser_fix
 from giskardpy.model.world_object import WorldObject
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.utils import logging
-from giskardpy.utils.tfwrapper import msg_to_kdl, kdl_to_pose, homo_matrix_to_pose, np_to_pose
+from giskardpy.utils.tfwrapper import msg_to_kdl, kdl_to_pose, homo_matrix_to_pose, np_to_pose, pose_to_np, pose_to_kdl, \
+    kdl_to_np
 from giskardpy.utils.utils import suppress_stderr, memoize
 
 
@@ -49,6 +50,32 @@ class LinkGeometry(object):
             geometry = SphereGeometry(link_T_geometry, urdf_geometry.radius)
         else:
             NotImplementedError('{} geometry is not supported'.format(type(urdf_geometry)))
+        return geometry
+
+    @classmethod
+    def from_world_body(cls, msg):
+        """
+        :type msg: giskard_msgs.msg._WorldBody.WorldBody
+        """
+        if msg.type == msg.URDF_BODY:
+            raise NotImplementedError()
+        elif msg.type == msg.PRIMITIVE_BODY:
+            if msg.shape.type == msg.shape.BOX:
+                geometry = BoxGeometry(np.eye(4),
+                                       depth=msg.shape.dimensions[msg.shape.BOX_X],
+                                       width=msg.shape.dimensions[msg.shape.BOX_Y],
+                                       height=msg.shape.dimensions[msg.shape.BOX_Z])
+            elif msg.shape.type == msg.shape.CYLINDER:
+                geometry = CylinderGeometry(np.eye(4),
+                                            height=msg.shape.dimensions[msg.shape.CYLINDER_HEIGHT],
+                                            radius=msg.shape.dimensions[msg.shape.CYLINDER_RADIUS])
+            elif msg.shape.type == msg.shape.SPHERE:
+                geometry = SphereGeometry(np.eye(4),
+                                          radius=msg.shape.dimensions[msg.shape.SPHERE_RADIUS])
+        elif msg.type == msg.MESH_BODY:
+            geometry = MeshGeometry(np.eye(4), msg.mesh)
+        else:
+            raise ValueError('World body type {} not supported'.format(msg.type))
         return geometry
 
     def as_visualization_marker(self):
@@ -157,6 +184,18 @@ class Link(object):
             link.visuals.append(LinkGeometry.from_urdf(urdf_visual))
         return link
 
+    @classmethod
+    def from_world_body(cls, msg):
+        """
+        :type msg: giskard_msgs.msg._WorldBody.WorldBody
+        :type pose: Pose
+        """
+        link = cls(msg.name)
+        geometry = LinkGeometry.from_world_body(msg)
+        link.collisions.append(geometry)
+        link.visuals.append(geometry)
+        return link
+
     def collision_visualization_markers(self):
         markers = MarkerArray()
         for collision in self.collisions:  # type: LinkGeometry
@@ -188,8 +227,8 @@ class WorldTree(object):
     def __init__(self, god_map=None):
         # public
         self.state = JointStates()
-        self.root_link_name = 'root'
-        self.links = {self.root_link_name: Link('root')}
+        self.root_link_name = 'map'
+        self.links = {self.root_link_name: Link('map')}
         self.joints = {}
         self.groups = {}
 
@@ -207,6 +246,8 @@ class WorldTree(object):
     def add_group(self, name, root_link_name):
         if root_link_name not in self.links:
             raise KeyError('World doesn\'t have link \'{}\''.format(root_link_name))
+        if name in self.groups:
+            raise DuplicateNameException('Group with name {} already exists'.format(name))
         self.groups[name] = SubWorldTree(name, root_link_name, self)
 
     @property
@@ -233,7 +274,7 @@ class WorldTree(object):
     def joint_names(self):
         return list(self.joints.keys())
 
-    def load_urdf(self, urdf, parent_link_name=None):
+    def add_urdf(self, urdf, parent_link_name=None, add_as_group=True):
         # create group?
         with suppress_stderr():
             parsed_urdf = up.URDF.from_xml_string(hacky_urdf_parser_fix(urdf))  # type: up.Robot
@@ -255,9 +296,27 @@ class WorldTree(object):
                 helper(urdf, child_link_name)
 
         helper(parsed_urdf, child_link.name)
+        if add_as_group:
+            self.add_group(child_link.name, child_link.name)
         self.init_fast_fks()
 
-    # def add_box(self, name, depth, width, height, pose):
+    def add_world_body(self, msg, pose, parent_link_name=None):
+        """
+        :type msg: giskard_msgs.msg._WorldBody.WorldBody
+        :type pose: Pose
+        """
+        if parent_link_name is None:
+            parent_link = self.root_link
+        else:
+            parent_link = self.links[parent_link_name]
+        if msg.name in self.links:
+            raise DuplicateNameException('Link with name {} already exists'.format(msg.name))
+        if msg.name in self.joints:
+            raise DuplicateNameException('Joint with name {} already exists'.format(msg.name))
+        link = Link.from_world_body(msg)
+        joint = FixedJoint(msg.name, parent_link, link, parent_T_child=w.Matrix(kdl_to_np(pose_to_kdl(pose))))
+        self.link_joint_to_links(joint)
+        self.add_group(msg.name, link.name)
 
     @property
     def movable_joints(self):
@@ -277,7 +336,11 @@ class WorldTree(object):
             translation_offset = None
             rotation_offset = None
         if urdf_joint.type == 'fixed':
-            joint = FixedJoint(urdf_joint.name, parent_link, child_link, translation_offset, rotation_offset)
+            joint = FixedJoint(name=urdf_joint.name,
+                               parent=parent_link,
+                               child=child_link,
+                               translation_offset=translation_offset,
+                               rotation_offset=rotation_offset)
         else:
             lower_limits = {}
             upper_limits = {}
@@ -318,15 +381,29 @@ class WorldTree(object):
                 quadratic_weights={1: 0.01, 2: 0, 3: 0})
 
             if urdf_joint.type == 'revolute':
-                joint = RevoluteJoint(urdf_joint.name, parent_link, child_link, translation_offset, rotation_offset,
-                                      free_variable,
-                                      urdf_joint.axis)
+                joint = RevoluteJoint(name=urdf_joint.name,
+                                      parent=parent_link,
+                                      child=child_link,
+                                      translation_offset=translation_offset,
+                                      rotation_offset=rotation_offset,
+                                      free_variable=free_variable,
+                                      axis=urdf_joint.axis)
             elif urdf_joint.type == 'prismatic':
-                joint = PrismaticJoint(urdf_joint.name, parent_link, child_link, translation_offset, rotation_offset,
-                                       free_variable, urdf_joint.axis)
+                joint = PrismaticJoint(name=urdf_joint.name,
+                                       parent=parent_link,
+                                       child=child_link,
+                                       translation_offset=translation_offset,
+                                       rotation_offset=rotation_offset,
+                                       free_variable=free_variable,
+                                       axis=urdf_joint.axis)
             elif urdf_joint.type == 'continuous':
-                joint = ContinuousJoint(urdf_joint.name, parent_link, child_link, translation_offset, rotation_offset,
-                                        free_variable, urdf_joint.axis)
+                joint = ContinuousJoint(name=urdf_joint.name,
+                                        parent=parent_link,
+                                        child=child_link,
+                                        translation_offset=translation_offset,
+                                        rotation_offset=rotation_offset,
+                                        free_variable=free_variable,
+                                        axis=urdf_joint.axis)
             else:
                 raise NotImplementedError('Joint of type {} is not supported'.format(urdf_joint.type))
         self.link_joint_to_links(joint)
@@ -550,7 +627,7 @@ class WorldTree(object):
     def joint_limit_expr(self, joint_name, order):
         upper_limit = self.joints[joint_name].free_variable.get_upper_limit(order)
         lower_limit = self.joints[joint_name].free_variable.get_lower_limit(order)
-        return upper_limit, lower_limit
+        return lower_limit, upper_limit
 
     def compute_joint_limits(self, joint_name, order):
         lower_limit, upper_limit = self.joint_limit_expr(joint_name, order)
@@ -608,12 +685,16 @@ class SubWorldTree(WorldTree):
         self.world = world
 
     @property
+    def base_pose(self):
+        return self.world.compute_fk_pose(self.world.root_link_name, self.root_link_name).pose
+
+    @property
     def _fks(self):
         return self.world._fks
 
     @property
     def state(self):
-        return {k:v for k,v in self.world.state.items() if self.has_joint(k)}
+        return {k: v for k, v in self.world.state.items() if self.has_joint(k)}
 
     @state.setter
     def state(self, value):

@@ -19,7 +19,7 @@ def make_velocity_threshold(god_map,
     controlled_joints = god_map.get_data(identifier.controlled_joints)
     world = god_map.get_data(identifier.world)
     thresholds = []
-    for joint_name in sorted(controlled_joints):
+    for joint_name in controlled_joints:
         velocity_limit, _ = world.get_joint_velocity_limits(joint_name)
         if velocity_limit is None:
             velocity_limit = 1
@@ -48,7 +48,7 @@ class GoalReachedPlugin(GiskardBehavior):
         planning_time = self.get_god_map().get_data(identifier.time)
         controlled_joints = self.get_god_map().get_data(identifier.controlled_joints)
         if planning_time - self.above_threshold_time >= self.window_size:
-            velocities = np.array([self.get_robot().state[j].velocity for j in sorted(controlled_joints)])
+            velocities = np.array([self.world.state[j].velocity for j in controlled_joints])
             below_threshold = np.all(np.abs(velocities[:self.number_of_controlled_joints]) < self.thresholds)
             if below_threshold:
                 logging.loginfo(u'found goal trajectory with length {}s in {}s'.format(planning_time * self.sample_period,

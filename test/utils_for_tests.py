@@ -374,10 +374,9 @@ class GiskardTestWrapper(GiskardWrapper):
         :type goal_js: dict
         :type decimal: int
         """
-        joint_names = set(current_js.keys()).intersection(set(goal_js.keys()))
-        for joint_name in joint_names:
+        for joint_name in goal_js:
             goal = goal_js[joint_name]
-            current = current_js[joint_name].position
+            current = current_js[PrefixName(joint_name, None)].position
             if self.get_robot().is_joint_continuous(PrefixName(joint_name, ROBOTNAME)):
                 np.testing.assert_almost_equal(shortest_angular_distance(goal, current), 0, decimal=decimal,
                                                err_msg=u'{}: actual: {} desired: {}'.format(joint_name, current, goal))

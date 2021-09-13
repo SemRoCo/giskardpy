@@ -330,7 +330,8 @@ class WorldTree(object):
                           prefix=msg.name)
         else:
             link = Link.from_world_body(msg)
-            joint = Joint(msg.name, parent_link.name, link.name, parent_T_child=w.Matrix(kdl_to_np(pose_to_kdl(pose))))
+            joint = Joint(PrefixName(msg.name, msg.name), parent_link.name, link.name,
+                          parent_T_child=w.Matrix(kdl_to_np(pose_to_kdl(pose))))
             self.link_joint_to_links(joint, link)
             self.register_group(msg.name, link.name)
 
@@ -640,7 +641,7 @@ class SubWorldTree(WorldTree):
 
     @property
     def state(self):
-        return {k: v for k, v in self.world.state.items() if self.has_joint(k)}
+        return {j: self.world.state[j] for j in self.joints}
 
     @state.setter
     def state(self, value):
@@ -655,6 +656,7 @@ class SubWorldTree(WorldTree):
         return self.world.links[self.root_link_name]
 
     @property
+    @memoize
     def joints(self):
         def helper(root_link):
             """
@@ -671,6 +673,7 @@ class SubWorldTree(WorldTree):
         return helper(self.root_link)
 
     @property
+    @memoize
     def links(self):
         def helper(root_link):
             """

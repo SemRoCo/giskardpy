@@ -49,8 +49,6 @@ class JointPositionContinuous(Goal):
                             upper_error=error,
                             weight=self.weight,
                             expression=current_joint)
-        if self.joint_name == 'odom_z_joint':
-            self.add_debug_expr('error', error)
 
     def __str__(self):
         s = super(JointPositionContinuous, self).__str__()

@@ -452,20 +452,20 @@ class PrefixName(object):
         return self.long_name
 
     def __hash__(self):
-        return hash(str(self))
+        return hash(self.long_name)
 
     def __eq__(self, other):
-        return str(other) == str(self)
+        return other.long_name == self.long_name
 
     def __le__(self, other):
-        return str(self) <= str(other)
+        return self.long_name <= other.long_name
 
     def __ge__(self, other):
-        return str(self) >= str(other)
+        return self.long_name >= other.long_name
 
     def __gt__(self, other):
-        return str(self) > str(other)
+        return self.long_name > other.long_name
 
     def __lt__(self, other):
-        return str(self) < str(other)
+        return self.long_name < other.long_name
 

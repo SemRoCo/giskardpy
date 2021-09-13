@@ -84,7 +84,7 @@ def initialize_god_map():
                                                        JointTrajectoryControllerState,
                                                        timeout=5.0).joint_names
             controlled_joints = [PrefixName(j, ROBOTNAME) for j in controlled_joints]
-            god_map.set_data(identifier.controlled_joints, controlled_joints)
+            god_map.set_data(identifier.controlled_joints, list(sorted(controlled_joints)))
         except ROSException as e:
             logging.logerr(u'state topic not available')
             logging.logerr(str(e))
@@ -222,11 +222,11 @@ def grow_tree():
     # ----------------------------------------------
     wait_for_goal = Sequence(u'wait for goal')
     # wait_for_goal.add_child(TFPublisher(u'tf', **god_map.get_data(identifier.TFPublisher)))
-    wait_for_goal.add_child(ConfigurationPlugin(u'js1'))
+    wait_for_goal.add_child(ConfigurationPlugin(u'js1', ROBOTNAME))
     wait_for_goal.add_child(WorldUpdatePlugin(u'pybullet updater'))
     wait_for_goal.add_child(VisualizationBehavior(u'visualization'))
     wait_for_goal.add_child(GoalReceived(u'has goal', action_server_name, MoveAction))
-    wait_for_goal.add_child(ConfigurationPlugin(u'js2'))
+    wait_for_goal.add_child(ConfigurationPlugin(u'js2', ROBOTNAME))
     # ----------------------------------------------
     planning_4 = PluginBehavior(u'planning IIII', sleep=0)
     # planning_4.add_plugin(CollisionChecker(u'coll'))

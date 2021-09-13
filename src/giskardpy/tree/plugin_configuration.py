@@ -23,7 +23,7 @@ class ConfigurationPlugin(GiskardBehavior):
     Gets replace with a kinematic sim plugin during a parallel universe.
     """
 
-    def __init__(self, name, joint_state_topic=u'joint_states'):
+    def __init__(self, name, prefix, joint_state_topic=u'joint_states'):
         """
         :type js_identifier: str
         """
@@ -31,6 +31,7 @@ class ConfigurationPlugin(GiskardBehavior):
         self.mjs = None
         self.map_frame = self.get_god_map().get_data(identifier.map_frame)
         self.joint_state_topic = joint_state_topic
+        self.prefix = prefix
         self.lock = Queue(maxsize=1)
 
     def setup(self, timeout=0.0):
@@ -50,7 +51,7 @@ class ConfigurationPlugin(GiskardBehavior):
                 js = self.lock.get()
             else:
                 js = self.lock.get_nowait()
-            self.mjs = JointStates.from_msg(js, ROBOTNAME)
+            self.mjs = JointStates.from_msg(js, self.prefix)
         except Empty:
             pass
 
@@ -59,5 +60,5 @@ class ConfigurationPlugin(GiskardBehavior):
         # self.get_robot().base_pose = base_pose.pose
 
         # self.god_map.set_data(identifier.joint_states, self.mjs)
-        self.get_world().state = self.mjs
+        self.get_world().state.update(self.mjs)
         return Status.SUCCESS

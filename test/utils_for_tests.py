@@ -355,11 +355,15 @@ class GiskardTestWrapper(GiskardWrapper):
 
     def set_object_joint_state(self, object_name, joint_state):
         super(GiskardTestWrapper, self).set_object_joint_state(object_name, joint_state)
+        self.loop_once()
         rospy.sleep(0.5)
         self.wait_for_synced()
-        current_js = self.get_world().get_object(object_name).joint_state
-        for joint_name, state in joint_state.items():
-            np.testing.assert_almost_equal(current_js[joint_name].position, state, 2)
+        current_js = self.get_world().groups[object_name].state
+        joint_names_without_prefix = set(j.short_name for j in current_js)
+        assert set(joint_state.keys()).difference(joint_names_without_prefix) == set()
+        for joint_name, state in current_js.items():
+            if joint_name.short_name in joint_state:
+                np.testing.assert_almost_equal(state.position, joint_state[joint_name.short_name], 2)
 
     def set_kitchen_js(self, joint_state, object_name=u'kitchen'):
         self.set_object_joint_state(object_name, joint_state)

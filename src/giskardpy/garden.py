@@ -97,15 +97,7 @@ def initialize_god_map():
 
     world = WorldTree(god_map)
     god_map.set_data(identifier.world, world)
-    world.add_urdf(god_map.get_data(identifier.robot_description), add_as_group=False, prefix='robot')
-    world.register_group(ROBOTNAME, PrefixName('odom_combined', ROBOTNAME))
-    # robot = WorldObject(god_map.get_data(identifier.robot_description),
-    #                     None,
-    #                     controlled_joints)
-    # world.add_robot(robot, None, controlled_joints,
-    #                 ignored_pairs=god_map.get_data(identifier.ignored_self_collisions),
-    #                 added_pairs=god_map.get_data(identifier.added_self_collisions))
-    #
+    world.add_urdf(god_map.get_data(identifier.robot_description), group_name=ROBOTNAME, prefix='robot')
     # sanity_check_derivatives(god_map)
 
     # weights

@@ -189,6 +189,7 @@ class TreeManager(object):
         tree_node = TreeManager.ManagerNode(node=node, parent=parent, position=position)
         parent.add_child(tree_node)
         self.tree_nodes[node.name] = tree_node
+        node.setup(1.0)
 
     def remove_node(self, node_name):
         """

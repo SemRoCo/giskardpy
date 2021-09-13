@@ -225,7 +225,7 @@ class Link(object):
         return len(self.collisions) > 0
 
     def __repr__(self):
-        return self.name
+        return str(self.name)
 
 
 class WorldTree(object):
@@ -276,7 +276,7 @@ class WorldTree(object):
     def joint_names(self):
         return list(self.joints.keys())
 
-    def add_urdf(self, urdf, prefix=None, parent_link_name=None, add_as_group=True):
+    def add_urdf(self, urdf, prefix=None, parent_link_name=None, group_name=None):
         # create group?
         with suppress_stderr():
             parsed_urdf = up.URDF.from_xml_string(hacky_urdf_parser_fix(urdf))  # type: up.Robot
@@ -306,8 +306,8 @@ class WorldTree(object):
                 helper(urdf, child_link)
 
         helper(parsed_urdf, child_link)
-        if add_as_group:
-            self.register_group(parsed_urdf.name, child_link.name)
+        if group_name is not None:
+            self.register_group(group_name, child_link.name)
         self.init_fast_fks()
 
     def add_world_body(self, msg, pose, parent_link_name=None):
@@ -326,7 +326,7 @@ class WorldTree(object):
         if msg.type == msg.URDF_BODY:
             self.add_urdf(urdf=msg.urdf,
                           parent_link_name=parent_link.name,
-                          add_as_group=True,
+                          group_name=msg.name,
                           prefix=msg.name)
         else:
             link = Link.from_world_body(msg)
@@ -372,8 +372,10 @@ class WorldTree(object):
 
         def helper(link_name):
             link = self.links.pop(link_name)
-            if link_name in self.groups:
-                del self.groups[link_name]
+            for group_name in list(self.groups.keys()):
+                if self.groups[group_name].root_link_name == link_name:
+                    del self.groups[group_name]
+                    logging.loginfo('Deleted group \'{}\', because it\'s root link got removed.'.format(group_name))
             for child_joint_name in link.child_joint_names:
                 child_joint = self.joints.pop(child_joint_name)  # type: Joint
                 helper(child_joint.child_link_name)

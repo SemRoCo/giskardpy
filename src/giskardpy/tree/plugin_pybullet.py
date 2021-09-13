@@ -13,12 +13,13 @@ from std_srvs.srv import Trigger, TriggerResponse
 from visualization_msgs.msg import Marker, MarkerArray
 
 import giskardpy.identifier as identifier
-from giskardpy.data_types import JointStates
+from giskardpy.data_types import JointStates, PrefixName
 from giskardpy.exceptions import CorruptShapeException, UnknownBodyException, \
     UnsupportedOptionException, DuplicateNameException
 from giskardpy.model.world import SubWorldTree
 from giskardpy.model.world import WorldTree
 from giskardpy.tree.plugin import GiskardBehavior
+from giskardpy.tree.plugin_configuration import ConfigurationPlugin
 from giskardpy.utils.tfwrapper import transform_pose
 from giskardpy.tree.tree_manager import TreeManager
 from giskardpy.utils.utils import to_joint_state_position_dict, dict_to_joint_states, write_dict, logging
@@ -34,17 +35,13 @@ class WorldUpdatePlugin(GiskardBehavior):
         super(WorldUpdatePlugin, self).__init__(name)
         self.map_frame = self.get_god_map().get_data(identifier.map_frame)
         self.lock = Lock()
-        self.object_js_subs = {}  # JointState subscribers for articulated world objects
-        self.object_joint_states = {}  # JointStates messages for articulated world objects
 
     def setup(self, timeout=5.0):
         # TODO make service name a parameter
         self.srv_update_world = rospy.Service(u'~update_world', UpdateWorld, self.update_world_cb)
-        self.pub_collision_marker = rospy.Publisher(u'~visualization_marker_array', MarkerArray, queue_size=1)
         self.get_object_names = rospy.Service(u'~get_object_names', GetObjectNames, self.get_object_names)
         self.get_object_info = rospy.Service(u'~get_object_info', GetObjectInfo, self.get_object_info)
         self.get_attached_objects = rospy.Service(u'~get_attached_objects', GetAttachedObjects, self.get_attached_objects)
-        self.update_rviz_markers = rospy.Service(u'~update_rviz_markers', UpdateRvizMarkers, self.update_rviz_markers)
         self.dump_state_srv = rospy.Service(u'~dump_state', Trigger, self.dump_state_cb)
         return super(WorldUpdatePlugin, self).setup(timeout)
 
@@ -152,16 +149,10 @@ class WorldUpdatePlugin(GiskardBehavior):
         res.message = 'saved dump to {}'.format(folder_path)
         return res
 
-    @profile
     def update(self):
         """
         updated urdfs in god map and updates pybullet object joint states
         """
-        with self.lock:
-            pass
-            for object_name, object_joint_state in self.object_joint_states.items():
-                self.get_world().get_object(object_name).joint_state = object_joint_state
-
         return Status.SUCCESS
 
     def get_object_names(self, req):
@@ -174,46 +165,22 @@ class WorldUpdatePlugin(GiskardBehavior):
         res = GetObjectInfoResponse()
         res.error_codes = GetObjectInfoResponse.SUCCESS
         try:
-            object = self.world.groups[req.object_name] # type: SubWorldTree
+            object = self.world.groups[req.object_name]  # type: SubWorldTree
             res.joint_state_topic = ''
-            if req.object_name in self.object_js_subs.keys():
-                res.joint_state_topic = self.object_js_subs[req.object_name].name
+            tree = self.god_map.unsafe_get_data(identifier.tree_manager)  # type: TreeManager
+            node_name = str(PrefixName(req.object_name, 'js'))
+            if node_name in tree.tree_nodes:
+                res.joint_state_topic = tree.tree_nodes[node_name].node.joint_state_topic
             res.pose.pose = object.base_pose
             res.pose.header.frame_id = self.get_god_map().get_data(identifier.map_frame)
             for key, value in object.state.items():
-                res.joint_state.name.append(key)
+                res.joint_state.name.append(str(key))
                 res.joint_state.position.append(value.position)
                 res.joint_state.velocity.append(value.velocity)
-                res.joint_state.effort.append(value.effort)
         except KeyError as e:
             logging.logerr('no object with the name {} was found'.format(req.object_name))
             res.error_codes = GetObjectInfoResponse.NAME_NOT_FOUND_ERROR
 
-        return res
-
-
-    def update_rviz_markers(self, req):
-        l = req.object_names
-        res = UpdateRvizMarkersResponse()
-        res.error_codes = UpdateRvizMarkersResponse.SUCCESS
-        ma = MarkerArray()
-        if len(l) == 0:
-            l = self.get_world().get_object_names()
-        for name in l:
-            try:
-                m = self.get_world().get_object(name).as_marker_msg()
-                m.action = m.ADD
-                m.header.frame_id = 'map'
-                m.ns = u'world' + m.ns
-                ma.markers.append(m)
-            except TypeError as e:
-                logging.logerr('failed to convert object {} to marker: {}'.format(name, str(e)))
-                res.error_codes = UpdateRvizMarkersResponse.MARKER_CONVERSION_ERROR
-            except KeyError as e:
-                logging.logerr('could not update rviz marker for object {}: no object with that name was found'.format(name))
-                res.error_codes = UpdateRvizMarkersResponse.NAME_NOT_FOUND_ERROR
-
-        self.pub_collision_marker.publish(ma)
         return res
 
     def get_attached_objects(self, req):
@@ -306,10 +273,11 @@ class WorldUpdatePlugin(GiskardBehavior):
         # SUB-CASE: If it is an articulated object, open up a joint state subscriber
         # FIXME also keep track of base pose
         if world_body.joint_state_topic:
-            callback = (lambda msg: self.object_js_cb(world_body.name, msg))
-            self.object_js_subs[world_body.name] = \
-                rospy.Subscriber(world_body.joint_state_topic, JointState, callback, queue_size=1)
-            rospy.sleep(0.1)
+            plugin_name = PrefixName(world_body.name, 'js')
+            plugin = ConfigurationPlugin(str(plugin_name), world_body.name,
+                                joint_state_topic=world_body.joint_state_topic)
+            tree = self.god_map.unsafe_get_data(identifier.tree_manager)  # type: TreeManager
+            tree.insert_node(plugin, 'wait for goal', 1)
 
     def detach_object(self, req):
         # assumes that parent has god map lock
@@ -353,41 +321,12 @@ class WorldUpdatePlugin(GiskardBehavior):
 
     def remove_object(self, name):
         # assumes that parent has god map lock
-        # try:
-        #     m = self.unsafe_get_world().get_object(name).as_marker_msg()
-        #     m.action = m.DELETE
-        #     self.publish_object_as_marker(m)
-        # except:
-        #     pass
-        self.unsafe_get_world().delete_branch(name)
-        if name in self.object_js_subs:
-            self.object_js_subs[name].unregister()
-            del (self.object_js_subs[name])
-            try:
-                del (self.object_joint_states[name])
-            except:
-                pass
+        self.unsafe_get_world().delete_branch(self.world.groups[name].root_link_name)
+        tree = self.god_map.unsafe_get_data(identifier.tree_manager)  # type: TreeManager
+        name = str(PrefixName(name, 'js'))
+        if name in tree.tree_nodes:
+            tree.remove_node(name)
 
     def clear_world(self):
         # assumes that parent has god map lock
-        self.delete_markers()
         self.unsafe_get_world().soft_reset()
-        for v in self.object_js_subs.values():
-            v.unregister()
-        self.object_js_subs = {}
-        self.object_joint_states = {}
-
-    def publish_object_as_marker(self, m):
-        """
-        :type object_: WorldObject
-        """
-        try:
-            ma = MarkerArray()
-            m.ns = u'world' + m.ns
-            ma.markers.append(m)
-            self.pub_collision_marker.publish(ma)
-        except:
-            pass
-
-    def delete_markers(self):
-        self.pub_collision_marker.publish(MarkerArray([Marker(action=Marker.DELETEALL)]))

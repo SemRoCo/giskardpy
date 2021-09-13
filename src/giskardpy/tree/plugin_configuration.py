@@ -29,7 +29,7 @@ class ConfigurationPlugin(GiskardBehavior):
         """
         super(ConfigurationPlugin, self).__init__(name)
         self.mjs = None
-        self.map_frame = self.get_god_map().get_data(identifier.map_frame)
+        self.map_frame = self.get_god_map().unsafe_get_data(identifier.map_frame)
         self.joint_state_topic = joint_state_topic
         self.prefix = prefix
         self.lock = Queue(maxsize=1)

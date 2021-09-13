@@ -25,7 +25,7 @@ class Joint(object):
             self.parent_T_child = parent_T_child
 
     def __repr__(self):
-        return self.name
+        return str(self.name)
 
     @classmethod
     def from_urdf(cls, urdf_joint, prefix, parent_link_name, child_link_name, god_map):

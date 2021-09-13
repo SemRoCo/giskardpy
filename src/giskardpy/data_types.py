@@ -437,11 +437,12 @@ class BiDict(dict):
 
 
 class PrefixName(object):
-    def __init__(self, name, prefix):
+    def __init__(self, name, prefix, separator='@'):
         self.short_name = name
         self.prefix = prefix
+        self.separator = separator
         if prefix:
-            self.long_name = '{}@{}'.format(prefix, name)
+            self.long_name = '{}{}{}'.format(self.prefix, self.separator, self.short_name)
         else:
             self.long_name = name
 

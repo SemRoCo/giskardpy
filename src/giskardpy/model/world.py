@@ -16,8 +16,8 @@ from giskardpy.data_types import PrefixName
 from giskardpy.exceptions import RobotExistsException, DuplicateNameException, PhysicsWorldException, \
     UnknownBodyException, UnsupportedOptionException, CorruptShapeException
 from giskardpy.god_map import GodMap
-from giskardpy.model.joints import Joint, PrismaticJoint, RevoluteJoint, ContinuousJoint, MovableJoint, MimicJoint, \
-    FixedJoint
+from giskardpy.model.joints import Joint, PrismaticJoint, RevoluteJoint, ContinuousJoint, MovableJoint, \
+    FixedJoint, MimicJoint
 from giskardpy.model.robot import Robot
 from giskardpy.model.urdf_object import hacky_urdf_parser_fix
 from giskardpy.model.world_object import WorldObject
@@ -286,7 +286,7 @@ class WorldTree(object):
         else:
             parent_link = self.links[parent_link_name]
         child_link = Link(name=PrefixName(parsed_urdf.get_root(), prefix))
-        connecting_joint = FixedJoint(name=PrefixName(parsed_urdf.name, prefix),
+        connecting_joint = FixedJoint(name=PrefixName('{}{}'.format(parsed_urdf.name, hash(urdf)), prefix),
                                       parent_link_name=parent_link.name,
                                       child_link_name=child_link.name)
         self.link_joint_to_links(connecting_joint, child_link)
@@ -345,7 +345,7 @@ class WorldTree(object):
 
     @property
     def joint_constraints(self):
-        return {j.name: j.free_variable for j in self.joints.values() if isinstance(j, MovableJoint)}
+        return {j.name: j.free_variable for j in self.joints.values() if j.has_free_variables()}
 
     def link_joint_to_links(self, joint, child_link):
         """
@@ -510,7 +510,7 @@ class WorldTree(object):
 
     def set_joint_limits(self, linear_limits, angular_limits, order):
         for joint in self.joints.values():
-            if self.is_joint_fixed(joint.name):
+            if self.is_joint_fixed(joint.name) or self.is_joint_mimic(joint.name):
                 continue
             if self.is_joint_rotational(joint.name):
                 new_limits = angular_limits

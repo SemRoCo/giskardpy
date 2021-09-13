@@ -204,6 +204,11 @@ def boxy_urdf():
         urdf_string = f.read()
     return urdf_string
 
+def hsr_urdf():
+    with open(u'urdfs/hsr.urdf', u'r') as f:
+        urdf_string = f.read()
+    return urdf_string
+
 
 def float_no_nan_no_inf(outer_limit=None, min_dist_to_zero=None):
     if outer_limit is not None:

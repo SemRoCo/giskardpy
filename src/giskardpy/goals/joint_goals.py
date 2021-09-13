@@ -92,8 +92,11 @@ class JointPositionPrismatic(Goal):
         joint_goal = self.get_parameter_as_symbolic_expression(u'goal')
         weight = self.get_parameter_as_symbolic_expression(u'weight')
 
-        max_velocity = w.min(self.get_parameter_as_symbolic_expression(u'max_velocity'),
-                             self.robot.joint_limit_expr(self.joint_name, 1)[1])
+        try:
+            max_velocity = w.min(self.get_parameter_as_symbolic_expression(u'max_velocity'),
+                                 self.robot.joint_limit_expr(self.joint_name, 1)[1])
+        except IndexError:
+            max_velocity = self.get_parameter_as_symbolic_expression(u'max_velocity')
 
         error = joint_goal - current_joint
 

@@ -64,8 +64,7 @@ class Goal(object):
         """
         if not self.robot.has_joint(joint_name):
             raise KeyError('Robot doesn\'t have joint named: {}'.format(joint_name))
-        key = identifier.joint_states + [joint_name, u'position']
-        return self.god_map.to_symbol(key)
+        return self.world.joints[joint_name].position_symbol
 
     def get_joint_velocity_symbols(self, joint_name):
         """

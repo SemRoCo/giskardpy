@@ -1,4 +1,5 @@
 from copy import deepcopy
+
 import numpy as np
 import pytest
 import rospy
@@ -7,6 +8,8 @@ from giskard_msgs.msg import MoveResult
 from numpy import pi
 from tf.transformations import quaternion_from_matrix, quaternion_about_axis
 
+from giskardpy import ROBOTNAME
+from giskardpy.data_types import PrefixName
 from giskardpy.utils import logging
 from giskardpy.utils.tfwrapper import init as tf_init
 from utils_for_tests import PR2, HSR
@@ -22,6 +25,8 @@ default_pose = {
     u'odom_y': 0.0,
     u'wrist_flex_joint': 0.0,
     u'wrist_roll_joint': 0.0,
+    u'hand_l_spring_proximal_joint': 0,
+    u'hand_r_spring_proximal_joint': 0
 }
 
 folder_name = u'tmp_data/'
@@ -65,11 +70,6 @@ def resetted_giskard(giskard):
     """
     logging.loginfo(u'resetting giskard')
     giskard.clear_world()
-    base_goal = PoseStamped()
-    base_goal.header.frame_id = u'map'
-    base_goal.pose.orientation.w = 1
-    giskard.move_base(base_goal)
-    giskard.close_gripper()
     return giskard
 
 
@@ -104,9 +104,20 @@ class TestJointGoals(object):
     def test_move_base(self, zero_pose):
         p = PoseStamped()
         p.header.frame_id = u'map'
-        p.pose.position.y = -1
+        p.pose.position.y = -0.3
         p.pose.orientation = Quaternion(0, 0, 0.47942554, 0.87758256)
         zero_pose.move_base(p)
+
+    def test_torso_lift_joint(self, zero_pose):
+        """
+        :type zero_pose: HSR
+        """
+        js = {'torso_lift_joint': 0.1}
+        zero_pose.set_joint_goal(js)
+        zero_pose.send_and_check_goal()
+        # TODO you can do this by evaluation the joint expression
+        np.testing.assert_almost_equal(zero_pose.get_world().state[PrefixName('arm_lift_joint', ROBOTNAME)].position,
+                                       0.2, decimal=2)
 
 
 class TestCartGoals(object):
@@ -186,7 +197,7 @@ class TestCollisionAvoidanceGoals(object):
         """
         :type box_setup: HSR
         """
-        js = {u'arm_flex_joint': -np.pi/2}
+        js = {u'arm_flex_joint': -np.pi / 2}
         zero_pose.send_and_check_joint_goal(js)
 
         p = PoseStamped()
@@ -199,4 +210,3 @@ class TestCollisionAvoidanceGoals(object):
 
         js = {u'arm_flex_joint': 0}
         zero_pose.send_and_check_joint_goal(js, expected_error_codes=[MoveResult.SHAKING])
-

@@ -1,7 +1,8 @@
 from __future__ import division
 
 import giskardpy.utils.tfwrapper as tf
-from giskardpy import casadi_wrapper as w
+from giskardpy import casadi_wrapper as w, ROBOTNAME
+from giskardpy.data_types import PrefixName
 from giskardpy.goals.goal import Goal, WEIGHT_ABOVE_CA
 
 
@@ -25,8 +26,8 @@ class CartesianPosition(Goal):
         """
         if reference_velocity is None:
             reference_velocity = max_velocity
-        self.root_link = root_link
-        self.tip_link = tip_link
+        self.root_link = PrefixName(root_link, ROBOTNAME)
+        self.tip_link = PrefixName(tip_link, ROBOTNAME)
         self.goal_pose = tf.transform_pose(self.root_link, goal)
         self.reference_velocity = reference_velocity
         self.max_velocity = max_velocity

@@ -25,8 +25,8 @@ from std_msgs.msg import ColorRGBA
 from tf.transformations import rotation_from_matrix, quaternion_matrix
 from visualization_msgs.msg import Marker
 
-from giskardpy import identifier
-from giskardpy.data_types import KeyDefaultDict
+from giskardpy import identifier, ROBOTNAME
+from giskardpy.data_types import KeyDefaultDict, JointStates, PrefixName
 from giskardpy.utils.config_loader import ros_load_robot_config
 from giskardpy.garden import grow_tree
 from giskardpy.identifier import robot, world
@@ -280,7 +280,7 @@ class GiskardTestWrapper(GiskardWrapper):
         # rospy.sleep(1)
         super(GiskardTestWrapper, self).__init__(node_name=u'tests')
         self.results = Queue(100)
-        self.default_root = self.get_robot().root_link_name
+        self.default_root = self.get_robot().root_link_name.short_name
         self.map = u'map'
         self.simple_base_pose_pub = rospy.Publisher('/move_base_simple/goal', PoseStamped, queue_size=10)
         self.set_base = rospy.ServiceProxy('/base_simulator/set_joint_states', SetJointState)
@@ -377,8 +377,8 @@ class GiskardTestWrapper(GiskardWrapper):
         joint_names = set(current_js.keys()).intersection(set(goal_js.keys()))
         for joint_name in joint_names:
             goal = goal_js[joint_name]
-            current = current_js[joint_name]
-            if self.get_robot().is_joint_continuous(joint_name):
+            current = current_js[joint_name].position
+            if self.get_robot().is_joint_continuous(PrefixName(joint_name, ROBOTNAME)):
                 np.testing.assert_almost_equal(shortest_angular_distance(goal, current), 0, decimal=decimal,
                                                err_msg=u'{}: actual: {} desired: {}'.format(joint_name, current, goal))
             else:
@@ -386,7 +386,7 @@ class GiskardTestWrapper(GiskardWrapper):
                                                err_msg=u'{}: actual: {} desired: {}'.format(joint_name, current, goal))
 
     def check_current_joint_state(self, expected, decimal=2):
-        current_joint_state = to_joint_state_position_dict(self.get_current_joint_state())
+        current_joint_state = JointStates.from_msg(self.get_current_joint_state())
         self.compare_joint_state(current_joint_state, expected, decimal=decimal)
 
     def send_and_check_joint_goal(self, goal, weight=None, decimal=2, expected_error_codes=(MoveResult.SUCCESS,)):
@@ -640,11 +640,18 @@ class GiskardTestWrapper(GiskardWrapper):
         # assert self.get_world().has_object(u'plane')
 
     def remove_object(self, name, expected_response=UpdateWorldResponse.SUCCESS):
+        old_link_names = self.get_world().groups[name].link_names
+        old_joint_names = self.get_world().groups[name].joint_names
         r = super(GiskardTestWrapper, self).remove_object(name)
+        self.loop_once()
         assert r.error_codes == expected_response, \
             u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
                                             update_world_error_code(expected_response))
-        assert not self.get_world().has_object(name)
+        assert not name in self.get_world().groups
+        for old_link_name in old_link_names:
+            assert old_link_name not in self.get_world().link_names
+        for old_joint_name in old_joint_names:
+            assert old_joint_name not in self.get_world().joint_names
         assert not name in self.get_object_names().object_names
 
     def detach_object(self, name, expected_response=UpdateWorldResponse.SUCCESS):
@@ -669,55 +676,79 @@ class GiskardTestWrapper(GiskardWrapper):
         assert r.error_codes == expected_response, \
             u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
                                             update_world_error_code(expected_response))
-        p = transform_pose(u'map', pose)
-        o_p = self.get_world().groups[name].base_pose
-        compare_poses(p.pose, o_p)
-        assert name in self.get_object_names().object_names
-        compare_poses(o_p, self.get_object_info(name).pose.pose)
-
-    def add_sphere(self, name=u'sphere', size=1., pose=None):
-        r = super(GiskardTestWrapper, self).add_sphere(name=name, size=size, pose=pose)
-        self.loop_once()
-        assert r.error_codes == UpdateWorldResponse.SUCCESS, \
-            u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
-                                            update_world_error_code(UpdateWorldResponse.SUCCESS))
-        assert self.get_world().has_object(name)
-        assert name in self.get_object_names().object_names
-        o_p = self.get_world().get_object(name).base_pose
-        compare_poses(o_p, self.get_object_info(name).pose.pose)
-
-    def add_cylinder(self, name=u'cylinder', size=[1, 1], pose=None):
-        r = super(GiskardTestWrapper, self).add_cylinder(name=name, height=size[0], radius=size[1], pose=pose)
-        self.loop_once()
-        assert r.error_codes == UpdateWorldResponse.SUCCESS, \
-            u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
-                                            update_world_error_code(UpdateWorldResponse.SUCCESS))
-        assert self.get_world().has_object(name)
-        assert name in self.get_object_names().object_names
-
-    def add_mesh(self, name=u'cylinder', path=u'', pose=None, expected_error=UpdateWorldResponse.SUCCESS):
-        r = super(GiskardTestWrapper, self).add_mesh(name=name, mesh=path, pose=pose)
-        self.loop_once()
-        assert r.error_codes == expected_error, \
-            u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
-                                            update_world_error_code(expected_error))
-        if expected_error == UpdateWorldResponse.SUCCESS:
-            assert self.get_world().has_object(name)
+        if expected_response == UpdateWorldResponse.SUCCESS:
+            p = transform_pose(u'map', pose)
+            o_p = self.get_world().groups[name].base_pose
+            compare_poses(p.pose, o_p)
             assert name in self.get_object_names().object_names
-            o_p = self.get_world().get_object(name).base_pose
             compare_poses(o_p, self.get_object_info(name).pose.pose)
         else:
-            assert not self.get_world().has_object(name)
+            assert name not in self.get_world().groups
             assert name not in self.get_object_names().object_names
 
-    def add_urdf(self, name, urdf, pose, js_topic=u'', set_js_topic=None):
+    def add_sphere(self, name=u'sphere', size=1., pose=None, expected_response=UpdateWorldResponse.SUCCESS):
+        r = super(GiskardTestWrapper, self).add_sphere(name=name, size=size, pose=pose)
+        self.loop_once()
+        assert r.error_codes == expected_response, \
+            u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
+                                            update_world_error_code(expected_response))
+        if expected_response == UpdateWorldResponse.SUCCESS:
+            p = transform_pose(u'map', pose)
+            o_p = self.get_world().groups[name].base_pose
+            compare_poses(p.pose, o_p)
+            assert name in self.get_object_names().object_names
+            compare_poses(o_p, self.get_object_info(name).pose.pose)
+        else:
+            assert name not in self.get_world().groups
+            assert name not in self.get_object_names().object_names
+
+    def add_cylinder(self, name=u'cylinder', size=[1, 1], pose=None, expected_response=UpdateWorldResponse.SUCCESS):
+        r = super(GiskardTestWrapper, self).add_cylinder(name=name, height=size[0], radius=size[1], pose=pose)
+        self.loop_once()
+        assert r.error_codes == expected_response, \
+            u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
+                                            update_world_error_code(expected_response))
+        if expected_response == UpdateWorldResponse.SUCCESS:
+            p = transform_pose(u'map', pose)
+            o_p = self.get_world().groups[name].base_pose
+            compare_poses(p.pose, o_p)
+            assert name in self.get_object_names().object_names
+            compare_poses(o_p, self.get_object_info(name).pose.pose)
+        else:
+            assert name not in self.get_world().groups
+            assert name not in self.get_object_names().object_names
+
+    def add_mesh(self, name=u'meshy', path=u'', pose=None, expected_response=UpdateWorldResponse.SUCCESS):
+        r = super(GiskardTestWrapper, self).add_mesh(name=name, mesh=path, pose=pose)
+        self.loop_once()
+        assert r.error_codes == expected_response, \
+            u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
+                                            update_world_error_code(expected_response))
+        if expected_response == UpdateWorldResponse.SUCCESS:
+            p = transform_pose(u'map', pose)
+            o_p = self.get_world().groups[name].base_pose
+            compare_poses(p.pose, o_p)
+            assert name in self.get_object_names().object_names
+            compare_poses(o_p, self.get_object_info(name).pose.pose)
+        else:
+            assert name not in self.get_world().groups
+            assert name not in self.get_object_names().object_names
+
+    def add_urdf(self, name, urdf, pose, js_topic=u'', set_js_topic=None, expected_response=UpdateWorldResponse.SUCCESS):
         r = super(GiskardTestWrapper, self).add_urdf(name, urdf, pose, js_topic, set_js_topic=set_js_topic)
         self.loop_once()
-        assert r.error_codes == UpdateWorldResponse.SUCCESS, \
+        assert r.error_codes == expected_response, \
             u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
-                                            update_world_error_code(UpdateWorldResponse.SUCCESS))
-        assert self.get_world().has_object(name)
-        assert name in self.get_object_names().object_names
+                                            update_world_error_code(expected_response))
+        if expected_response == UpdateWorldResponse.SUCCESS:
+            p = transform_pose(u'map', pose)
+            o_p = self.get_world().groups[name].base_pose
+            compare_poses(p.pose, o_p)
+            assert name in self.get_object_names().object_names
+            compare_poses(o_p, self.get_object_info(name).pose.pose)
+        else:
+            assert name not in self.get_world().groups
+            assert name not in self.get_object_names().object_names
 
     def avoid_all_collisions(self, distance=0.5):
         super(GiskardTestWrapper, self).avoid_all_collisions(distance)

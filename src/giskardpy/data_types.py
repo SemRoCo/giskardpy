@@ -2,8 +2,10 @@ from collections import OrderedDict, defaultdict, deque
 from copy import deepcopy
 
 import numpy as np
+import rospy
 from sensor_msgs.msg import JointState
 from sortedcontainers import SortedKeyList
+from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 
 from giskardpy.utils.tfwrapper import kdl_to_np, np_vector, np_point
 
@@ -75,13 +77,14 @@ class JointStates(defaultdict):
         super(JointStates, self).__init__(self._JointState)
 
     @classmethod
-    def from_msg(cls, msg):
+    def from_msg(cls, msg, prefix=None):
         """
         :type msg: JointState
         :rtype: JointStates
         """
         self = cls()
         for i, joint_name in enumerate(msg.name):
+            joint_name = PrefixName(joint_name, prefix)
             sjs = cls._JointState(position=msg.position[i],
                                   velocity=msg.velocity[i] if msg.velocity else 0,
                                   acceleration=0,
@@ -128,6 +131,27 @@ class Trajectory(object):
 
     def values(self):
         return self._points.values()
+
+    def to_msg(self, sample_period, controlled_joints, fill_velocity_values):
+        """
+        :type traj: giskardpy.data_types.Trajectory
+        :return: JointTrajectory
+        """
+        trajectory_msg = JointTrajectory()
+        trajectory_msg.header.stamp = rospy.get_rostime() + rospy.Duration(0.5)
+        trajectory_msg.joint_names = [joint.short_name for joint in controlled_joints]
+        for time, traj_point in self.items():
+            p = JointTrajectoryPoint()
+            p.time_from_start = rospy.Duration(time * sample_period)
+            for joint_name in controlled_joints:
+                if joint_name in traj_point:
+                    p.positions.append(traj_point[joint_name].position)
+                    if fill_velocity_values:
+                        p.velocities.append(traj_point[joint_name].velocity)
+                else:
+                    raise NotImplementedError(u'generated traj does not contain all joints')
+            trajectory_msg.points.append(p)
+        return trajectory_msg
 
 
 class Collision(object):
@@ -410,3 +434,38 @@ class BiDict(dict):
         if self[key] in self.inverse and not self.inverse[self[key]]:
             del self.inverse[self[key]]
         super(BiDict, self).__delitem__(key)
+
+
+class PrefixName(object):
+    def __init__(self, name, prefix):
+        self.short_name = name
+        self.prefix = prefix
+        if prefix:
+            self.long_name = '{}@{}'.format(prefix, name)
+        else:
+            self.long_name = name
+
+    def __str__(self):
+        return self.long_name
+
+    def __repr__(self):
+        return self.long_name
+
+    def __hash__(self):
+        return hash(str(self))
+
+    def __eq__(self, other):
+        return str(other) == str(self)
+
+    def __le__(self, other):
+        return str(self) <= str(other)
+
+    def __ge__(self, other):
+        return str(self) >= str(other)
+
+    def __gt__(self, other):
+        return str(self) > str(other)
+
+    def __lt__(self, other):
+        return str(self) < str(other)
+

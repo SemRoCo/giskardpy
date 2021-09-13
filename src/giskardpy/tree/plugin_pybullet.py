@@ -353,13 +353,13 @@ class WorldUpdatePlugin(GiskardBehavior):
 
     def remove_object(self, name):
         # assumes that parent has god map lock
-        try:
-            m = self.unsafe_get_world().get_object(name).as_marker_msg()
-            m.action = m.DELETE
-            self.publish_object_as_marker(m)
-        except:
-            pass
-        self.unsafe_get_world().remove_object(name)
+        # try:
+        #     m = self.unsafe_get_world().get_object(name).as_marker_msg()
+        #     m.action = m.DELETE
+        #     self.publish_object_as_marker(m)
+        # except:
+        #     pass
+        self.unsafe_get_world().delete_branch(name)
         if name in self.object_js_subs:
             self.object_js_subs[name].unregister()
             del (self.object_js_subs[name])

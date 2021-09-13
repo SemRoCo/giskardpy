@@ -2417,8 +2417,6 @@ class TestCollisionAvoidanceGoals(object):
         p.pose.position = Point(1.2, 0, 1.6)
         p.pose.orientation = Quaternion(0.0, 0.0, 0.47942554, 0.87758256)
         zero_pose.add_box(object_name, pose=p)
-        base_pose = zero_pose.get_world().groups[object_name].base_pose
-        compare_poses(base_pose, p.pose)
 
     def test_add_mesh(self, zero_pose):
         """
@@ -2430,8 +2428,6 @@ class TestCollisionAvoidanceGoals(object):
         p.pose.position = Point(0.1, 0, 0)
         p.pose.orientation = Quaternion(0, 0, 0, 1)
         zero_pose.add_mesh(object_name, path=u'package://giskardpy/test/urdfs/meshes/bowl_21.obj', pose=p)
-        # m = zero_pose.get_world().get_object(object_name).as_marker_msg()
-        # compare_poses(m.pose, p.pose)
         pass
 
     def test_add_non_existing_mesh(self, zero_pose):
@@ -2444,8 +2440,7 @@ class TestCollisionAvoidanceGoals(object):
         p.pose.position = Point(0.1, 0, 0)
         p.pose.orientation = Quaternion(0, 0, 0, 1)
         zero_pose.add_mesh(object_name, path=u'package://giskardpy/test/urdfs/meshes/muh.obj', pose=p,
-                           expected_error=UpdateWorldResponse.CORRUPT_MESH_ERROR)
-        pass
+                           expected_response=UpdateWorldResponse.CORRUPT_MESH_ERROR)
 
     def test_mesh_collision_avoidance(self, zero_pose):
         """
@@ -2473,8 +2468,6 @@ class TestCollisionAvoidanceGoals(object):
         p.pose.position = Point(1.2, 0, 1.6)
         p.pose.orientation = Quaternion(0.0, 0.0, 0.47942554, 0.87758256)
         zero_pose.add_box(object_name, pose=p)
-        m = zero_pose.get_world().get_object(object_name).as_marker_msg()
-        compare_poses(m.pose, p.pose)
         zero_pose.add_box(object_name, pose=p, expected_response=UpdateWorldResponse.DUPLICATE_BODY_ERROR)
 
     def test_add_remove_sphere(self, zero_pose):
@@ -2671,7 +2664,7 @@ class TestCollisionAvoidanceGoals(object):
         """
         zero_pose.detach_object(u'nil', expected_response=UpdateWorldResponse.MISSING_BODY_ERROR)
 
-    def test_add_remove_object(self, zero_pose):
+    def test_add_remove_box(self, zero_pose):
         """
         :type zero_pose: PR2
         """
@@ -2684,7 +2677,6 @@ class TestCollisionAvoidanceGoals(object):
         p.pose.orientation.w = 1
         zero_pose.add_box(object_name, pose=p)
         zero_pose.remove_object(object_name)
-        # marker does not get removed, but it does get removed in debugger..
 
     def test_invalid_update_world(self, zero_pose):
         """

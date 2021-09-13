@@ -1,4 +1,5 @@
 import numbers
+import os
 import traceback
 from copy import deepcopy
 
@@ -9,21 +10,21 @@ from giskard_msgs.msg import CollisionEntry
 from tf.transformations import euler_matrix
 from visualization_msgs.msg import Marker, MarkerArray
 
-from giskardpy import casadi_wrapper as w
-from giskardpy import identifier
+from giskardpy import casadi_wrapper as w, ROBOTNAME, identifier
 from giskardpy.data_types import JointStates, KeyDefaultDict
+from giskardpy.data_types import PrefixName
 from giskardpy.exceptions import RobotExistsException, DuplicateNameException, PhysicsWorldException, \
-    UnknownBodyException, UnsupportedOptionException
+    UnknownBodyException, UnsupportedOptionException, CorruptShapeException
 from giskardpy.god_map import GodMap
-from giskardpy.model.joints import FixedJoint, PrismaticJoint, RevoluteJoint, ContinuousJoint, MovableJoint, MimicJoint
+from giskardpy.model.joints import Joint, PrismaticJoint, RevoluteJoint, ContinuousJoint, MovableJoint, MimicJoint, \
+    FixedJoint
 from giskardpy.model.robot import Robot
 from giskardpy.model.urdf_object import hacky_urdf_parser_fix
 from giskardpy.model.world_object import WorldObject
-from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.utils import logging
-from giskardpy.utils.tfwrapper import msg_to_kdl, kdl_to_pose, homo_matrix_to_pose, np_to_pose, pose_to_np, pose_to_kdl, \
+from giskardpy.utils.tfwrapper import msg_to_kdl, kdl_to_pose, homo_matrix_to_pose, np_to_pose, pose_to_kdl, \
     kdl_to_np
-from giskardpy.utils.utils import suppress_stderr, memoize
+from giskardpy.utils.utils import suppress_stderr, memoize, resolve_ros_iris
 
 
 class LinkGeometry(object):
@@ -94,6 +95,8 @@ class MeshGeometry(LinkGeometry):
     def __init__(self, link_T_geometry, file_name, scale=None):
         super(MeshGeometry, self).__init__(link_T_geometry)
         self.file_name = file_name
+        if not os.path.isfile(resolve_ros_iris(file_name)):
+            raise CorruptShapeException('Can\'t find file {}'.format(self.file_name))
         if scale is None:
             self.scale = [1, 1, 1]
         else:
@@ -169,15 +172,16 @@ class SphereGeometry(LinkGeometry):
 
 class Link(object):
     def __init__(self, name):
-        self.name = name
+        self.name = name  # type: PrefixName
         self.visuals = []
         self.collisions = []
         self.parent_joint_name = None
         self.child_joint_names = []
 
     @classmethod
-    def from_urdf(cls, urdf_link):
-        link = cls(urdf_link.name)
+    def from_urdf(cls, urdf_link, prefix):
+        link_name = PrefixName(urdf_link.name, prefix)
+        link = cls(link_name)
         for urdf_collision in urdf_link.collisions:
             link.collisions.append(LinkGeometry.from_urdf(urdf_collision))
         for urdf_visual in urdf_link.visuals:
@@ -190,7 +194,8 @@ class Link(object):
         :type msg: giskard_msgs.msg._WorldBody.WorldBody
         :type pose: Pose
         """
-        link = cls(msg.name)
+        link_name = PrefixName(msg.name, msg.name)
+        link = cls(link_name)
         geometry = LinkGeometry.from_world_body(msg)
         link.collisions.append(geometry)
         link.visuals.append(geometry)
@@ -225,16 +230,13 @@ class Link(object):
 
 class WorldTree(object):
     def __init__(self, god_map=None):
-        # public
+        self.god_map = god_map  # type: GodMap
         self.state = JointStates()
-        self.root_link_name = 'map'
-        self.links = {self.root_link_name: Link('map')}
+        self.root_link_name = PrefixName(self.god_map.get_data(identifier.map_frame), None)
+        self.links = {self.root_link_name: Link(self.root_link_name)}
         self.joints = {}
         self.groups = {}
 
-        # private
-        self.god_map = god_map  # type: GodMap
-        self._free_variables = {}
 
     def reset_cache(self):
         for method_name in dir(self):
@@ -243,7 +245,7 @@ class WorldTree(object):
             except:
                 pass
 
-    def add_group(self, name, root_link_name):
+    def register_group(self, name, root_link_name):
         if root_link_name not in self.links:
             raise KeyError('World doesn\'t have link \'{}\''.format(root_link_name))
         if name in self.groups:
@@ -274,7 +276,7 @@ class WorldTree(object):
     def joint_names(self):
         return list(self.joints.keys())
 
-    def add_urdf(self, urdf, parent_link_name=None, add_as_group=True):
+    def add_urdf(self, urdf, prefix=None, parent_link_name=None, add_as_group=True):
         # create group?
         with suppress_stderr():
             parsed_urdf = up.URDF.from_xml_string(hacky_urdf_parser_fix(urdf))  # type: up.Robot
@@ -283,21 +285,29 @@ class WorldTree(object):
             parent_link = self.root_link
         else:
             parent_link = self.links[parent_link_name]
-        child_link = Link(parsed_urdf.get_root())
-        connecting_joint = FixedJoint(parsed_urdf.name, parent_link, child_link, None, None)
-        self.link_joint_to_links(connecting_joint)
+        child_link = Link(name=PrefixName(parsed_urdf.get_root(), prefix))
+        connecting_joint = FixedJoint(name=PrefixName(parsed_urdf.name, prefix),
+                                      parent_link_name=parent_link.name,
+                                      child_link_name=child_link.name)
+        self.link_joint_to_links(connecting_joint, child_link)
 
-        def helper(urdf, parent_link_name):
-            if parent_link_name not in urdf.child_map:
+        def helper(urdf, parent_link):
+            short_name = parent_link.name.short_name
+            if short_name not in urdf.child_map:
                 return
-            for child_joint_name, child_link_name in urdf.child_map[parent_link_name]:
-                self.add_urdf_link(urdf.link_map[child_link_name])
-                self.add_urdf_joint(urdf.joint_map[child_joint_name])
-                helper(urdf, child_link_name)
+            for child_joint_name, child_link_name in urdf.child_map[short_name]:
+                urdf_link = urdf.link_map[child_link_name]
+                child_link = Link.from_urdf(urdf_link, prefix)
 
-        helper(parsed_urdf, child_link.name)
+                urdf_joint = urdf.joint_map[child_joint_name]
+                joint = Joint.from_urdf(urdf_joint, prefix, parent_link.name, child_link.name, self.god_map)
+
+                self.link_joint_to_links(joint, child_link)
+                helper(urdf, child_link)
+
+        helper(parsed_urdf, child_link)
         if add_as_group:
-            self.add_group(child_link.name, child_link.name)
+            self.register_group(parsed_urdf.name, child_link.name)
         self.init_fast_fks()
 
     def add_world_body(self, msg, pose, parent_link_name=None):
@@ -313,102 +323,20 @@ class WorldTree(object):
             raise DuplicateNameException('Link with name {} already exists'.format(msg.name))
         if msg.name in self.joints:
             raise DuplicateNameException('Joint with name {} already exists'.format(msg.name))
-        link = Link.from_world_body(msg)
-        joint = FixedJoint(msg.name, parent_link, link, parent_T_child=w.Matrix(kdl_to_np(pose_to_kdl(pose))))
-        self.link_joint_to_links(joint)
-        self.add_group(msg.name, link.name)
+        if msg.type == msg.URDF_BODY:
+            self.add_urdf(urdf=msg.urdf,
+                          parent_link_name=parent_link.name,
+                          add_as_group=True,
+                          prefix=msg.name)
+        else:
+            link = Link.from_world_body(msg)
+            joint = Joint(msg.name, parent_link.name, link.name, parent_T_child=w.Matrix(kdl_to_np(pose_to_kdl(pose))))
+            self.link_joint_to_links(joint, link)
+            self.register_group(msg.name, link.name)
 
     @property
     def movable_joints(self):
         return [j.name for j in self.joints.values() if isinstance(j, MovableJoint)]
-
-    def add_urdf_link(self, urdf_link):
-        link = Link.from_urdf(urdf_link)
-        self.links[link.name] = link
-
-    def add_urdf_joint(self, urdf_joint):
-        parent_link = self.links[urdf_joint.parent]
-        child_link = self.links[urdf_joint.child]
-        if urdf_joint.origin is not None:
-            translation_offset = urdf_joint.origin.xyz
-            rotation_offset = urdf_joint.origin.rpy
-        else:
-            translation_offset = None
-            rotation_offset = None
-        if urdf_joint.type == 'fixed':
-            joint = FixedJoint(name=urdf_joint.name,
-                               parent=parent_link,
-                               child=child_link,
-                               translation_offset=translation_offset,
-                               rotation_offset=rotation_offset)
-        else:
-            lower_limits = {}
-            upper_limits = {}
-            if not urdf_joint.type == 'continuous':
-                try:
-                    lower_limits[0] = max(urdf_joint.safety_controller.soft_lower_limit, urdf_joint.limit.lower)
-                    upper_limits[0] = min(urdf_joint.safety_controller.soft_upper_limit, urdf_joint.limit.upper)
-                except AttributeError:
-                    try:
-                        lower_limits[0] = urdf_joint.limit.lower
-                        upper_limits[0] = urdf_joint.limit.upper
-                    except AttributeError:
-                        lower_limits[0] = None
-                        upper_limits[0] = None
-            else:
-                lower_limits[0] = None
-                upper_limits[0] = None
-            try:
-                lower_limits[1] = -urdf_joint.limit.velocity
-                upper_limits[1] = urdf_joint.limit.velocity
-            except AttributeError:
-                lower_limits[1] = None
-                upper_limits[1] = None
-            lower_limits[2] = -1e3
-            upper_limits[2] = 1e3
-            lower_limits[3] = -30
-            upper_limits[3] = 30
-
-            # TODO get rosparam data
-            free_variable = FreeVariable(symbols={
-                0: self.god_map.to_symbol(identifier.joint_states + [urdf_joint.name, 'position']),
-                1: self.god_map.to_symbol(identifier.joint_states + [urdf_joint.name, 'velocity']),
-                2: self.god_map.to_symbol(identifier.joint_states + [urdf_joint.name, 'acceleration']),
-                3: self.god_map.to_symbol(identifier.joint_states + [urdf_joint.name, 'jerk']),
-            },
-                lower_limits=lower_limits,
-                upper_limits=upper_limits,
-                quadratic_weights={1: 0.01, 2: 0, 3: 0})
-
-            if urdf_joint.type == 'revolute':
-                joint = RevoluteJoint(name=urdf_joint.name,
-                                      parent=parent_link,
-                                      child=child_link,
-                                      translation_offset=translation_offset,
-                                      rotation_offset=rotation_offset,
-                                      free_variable=free_variable,
-                                      axis=urdf_joint.axis)
-            elif urdf_joint.type == 'prismatic':
-                joint = PrismaticJoint(name=urdf_joint.name,
-                                       parent=parent_link,
-                                       child=child_link,
-                                       translation_offset=translation_offset,
-                                       rotation_offset=rotation_offset,
-                                       free_variable=free_variable,
-                                       axis=urdf_joint.axis)
-            elif urdf_joint.type == 'continuous':
-                joint = ContinuousJoint(name=urdf_joint.name,
-                                        parent=parent_link,
-                                        child=child_link,
-                                        translation_offset=translation_offset,
-                                        rotation_offset=rotation_offset,
-                                        free_variable=free_variable,
-                                        axis=urdf_joint.axis)
-            else:
-                raise NotImplementedError('Joint of type {} is not supported'.format(urdf_joint.type))
-        self.link_joint_to_links(joint)
-        # TODO this has to move somewhere else
-        self.init_fast_fks()
 
     def soft_reset(self):
         self.reset_cache()
@@ -418,11 +346,15 @@ class WorldTree(object):
     def joint_constraints(self):
         return {j.name: j.free_variable for j in self.joints.values() if isinstance(j, MovableJoint)}
 
-    def link_joint_to_links(self, joint):
-        self.joints[joint.name] = joint
-        joint.child.parent_joint_name = joint.name
-        self.links[joint.child.name] = joint.child
+    def link_joint_to_links(self, joint, child_link):
+        """
+        :type joint: Joint
+        :type child_link: Link
+        """
         parent_link = self.links[joint.parent_link_name]
+        self.joints[joint.name] = joint
+        child_link.parent_joint_name = joint.name
+        self.links[child_link.name] = child_link
         assert joint.name not in parent_link.child_joint_names
         parent_link.child_joint_names.append(joint.name)
 
@@ -430,8 +362,22 @@ class WorldTree(object):
         # replace joint
         pass
 
-    def delete_branch(self, parent_joint):
-        pass
+    def delete_branch(self, link_name):
+        self.delete_branch_at_joint(self.links[link_name].parent_joint_name)
+
+    def delete_branch_at_joint(self, joint_name):
+        joint = self.joints.pop(joint_name)  # type: Joint
+        self.links[joint.parent_link_name].child_joint_names.remove(joint_name)
+
+        def helper(link_name):
+            link = self.links.pop(link_name)
+            if link_name in self.groups:
+                del self.groups[link_name]
+            for child_joint_name in link.child_joint_names:
+                child_joint = self.joints.pop(child_joint_name)  # type: Joint
+                helper(child_joint.child_link_name)
+
+        helper(joint.child_link_name)
 
     def compute_chain(self, root_link_name, tip_link_name, joints=True, links=True, fixed=True):
         chain = []
@@ -442,9 +388,9 @@ class WorldTree(object):
             if link.parent_joint_name not in self.joints:
                 raise ValueError('{} and {} are not connected'.format(root_link_name, tip_link_name))
             parent_joint = self.joints[link.parent_joint_name]
-            parent_link = parent_joint.parent
+            parent_link = self.links[parent_joint.parent_link_name]
             if joints:
-                if fixed or not isinstance(parent_joint, FixedJoint):
+                if fixed or not isinstance(parent_joint, Joint):
                     chain.append(parent_joint.name)
             if links:
                 chain.append(parent_link.name)
@@ -677,7 +623,7 @@ class SubWorldTree(WorldTree):
     def __init__(self, name, root_link_name, world):
         """
         :type name: str
-        :type root_link_name: str
+        :type root_link_name: PrefixName
         :type world: WorldTree
         """
         self.name = name
@@ -716,8 +662,10 @@ class SubWorldTree(WorldTree):
             :rtype: dict
             """
             joints = {j: self.world.joints[j] for j in root_link.child_joint_names}
-            for j in root_link.child_joint_names:  # type: FixedJoint
-                joints.update(helper(self.world.joints[j].child))
+            for j in root_link.child_joint_names:  # type: Joint
+                j = self.world.joints[j]
+                child_link = self.world.links[j.child_link_name]
+                joints.update(helper(child_link))
             return joints
 
         return helper(self.root_link)
@@ -730,13 +678,15 @@ class SubWorldTree(WorldTree):
             :rtype: list
             """
             links = {root_link.name: root_link}
-            for j in root_link.child_joint_names:  # type: FixedJoint
-                links.update(helper(self.world.joints[j].child))
+            for j in root_link.child_joint_names:  # type: Joint
+                j = self.world.joints[j]
+                child_link = self.world.links[j.child_link_name]
+                links.update(helper(child_link))
             return links
 
         return helper(self.root_link)
 
-    def add_group(self, name, root_link_name):
+    def register_group(self, name, root_link_name):
         raise NotImplementedError()
 
     def link_joint_to_links(self, joint):

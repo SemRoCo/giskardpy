@@ -1,3 +1,4 @@
+from giskardpy import ROBOTNAME
 from giskardpy.data_types import JointStates
 
 try:
@@ -49,7 +50,7 @@ class ConfigurationPlugin(GiskardBehavior):
                 js = self.lock.get()
             else:
                 js = self.lock.get_nowait()
-            self.mjs = JointStates.from_msg(js)
+            self.mjs = JointStates.from_msg(js, ROBOTNAME)
         except Empty:
             pass
 

@@ -19,16 +19,16 @@ class VisualizationBehavior(GiskardBehavior):
         return super(VisualizationBehavior, self).setup(timeout)
 
     def update(self):
+        # self.clear_marker()
         markers = []
         time_stamp = rospy.Time()
-        # robot = self.robot
         get_fk = self.world.compute_fk_pose
         links = self.world.link_names_with_collisions
         for i, link_name in enumerate(links):
             for marker in self.world.links[link_name].collision_visualization_markers().markers:
-                marker.header.frame_id = self.robot_base
+                marker.header.frame_id = str(self.world.root_link_name)
                 marker.action = Marker.ADD
-                marker.id = int(hashlib.md5(link_name.encode('utf-8')).hexdigest()[:6],
+                marker.id = int(hashlib.md5(str(link_name).encode('utf-8')).hexdigest()[:6],
                                 16)  # FIXME find a better way to give the same link the same id
                 self.ids.add(marker.id)
                 marker.ns = u'planning_visualization'

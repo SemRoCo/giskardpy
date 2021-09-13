@@ -484,28 +484,6 @@ def convert_dictionary_to_ros_message(json):
     # maybe somehow search for message that fits to structure of json?
     return original_convert_dictionary_to_ros_message(json[u'message_type'], json[u'message'])
 
-def traj_to_msg(sample_period, trajectory, controlled_joints, fill_velocity_values):
-    """
-    :type traj: giskardpy.data_types.Trajectory
-    :return: JointTrajectory
-    """
-    trajectory_msg = JointTrajectory()
-    trajectory_msg.header.stamp = rospy.get_rostime() + rospy.Duration(0.5)
-    trajectory_msg.joint_names = controlled_joints
-    for time, traj_point in trajectory.items():
-        p = JointTrajectoryPoint()
-        p.time_from_start = rospy.Duration(time * sample_period)
-        for joint_name in controlled_joints:
-            if joint_name in traj_point:
-                p.positions.append(traj_point[joint_name].position)
-                if fill_velocity_values:
-                    p.velocities.append(traj_point[joint_name].velocity)
-            else:
-                raise NotImplementedError(u'generated traj does not contain all joints')
-        trajectory_msg.points.append(p)
-    return trajectory_msg
-
-
 def trajectory_to_np(tj, joint_names):
     """
     :type tj: Trajectory

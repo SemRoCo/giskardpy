@@ -14,7 +14,8 @@ from rospy import ROSException
 
 import giskardpy.identifier as identifier
 import giskardpy.model.pybullet_wrapper as pbw
-from giskardpy.data_types import BiDict, KeyDefaultDict
+from giskardpy import ROBOTNAME
+from giskardpy.data_types import BiDict, KeyDefaultDict, PrefixName
 from giskardpy.god_map import GodMap
 from giskardpy.model.world import WorldTree
 from giskardpy.tree.plugin import PluginBehavior
@@ -82,6 +83,7 @@ def initialize_god_map():
             controlled_joints = rospy.wait_for_message(u'/whole_body_controller/state',
                                                        JointTrajectoryControllerState,
                                                        timeout=5.0).joint_names
+            controlled_joints = [PrefixName(j, ROBOTNAME) for j in controlled_joints]
             god_map.set_data(identifier.controlled_joints, controlled_joints)
         except ROSException as e:
             logging.logerr(u'state topic not available')
@@ -95,8 +97,8 @@ def initialize_god_map():
 
     world = WorldTree(god_map)
     god_map.set_data(identifier.world, world)
-    world.add_urdf(god_map.get_data(identifier.robot_description), add_as_group=False)
-    world.add_group('robot', 'odom_combined')
+    world.add_urdf(god_map.get_data(identifier.robot_description), add_as_group=False, prefix='robot')
+    world.register_group(ROBOTNAME, PrefixName('odom_combined', ROBOTNAME))
     # robot = WorldObject(god_map.get_data(identifier.robot_description),
     #                     None,
     #                     controlled_joints)

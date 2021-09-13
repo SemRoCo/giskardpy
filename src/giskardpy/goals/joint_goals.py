@@ -1,6 +1,7 @@
 from __future__ import division
 
-from giskardpy import casadi_wrapper as w, identifier
+from giskardpy import casadi_wrapper as w, identifier, ROBOTNAME
+from giskardpy.data_types import PrefixName
 from giskardpy.exceptions import ConstraintException, ConstraintInitalizationException
 from giskardpy.goals.goal import Goal, WEIGHT_BELOW_CA
 
@@ -411,6 +412,7 @@ class JointPositionList(Goal):
         """
         super(JointPositionList, self).__init__(**kwargs)
         for i, joint_name in enumerate(goal_state.name):
+            joint_name = PrefixName(joint_name, ROBOTNAME)
             if not self.robot.has_joint(joint_name):
                 raise KeyError(u'unknown joint "{}"'.format(joint_name))
             goal_position = goal_state.position[i]

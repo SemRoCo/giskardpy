@@ -1,45 +1,154 @@
-from giskardpy import casadi_wrapper as w
+import numpy as np
+
+from giskardpy import casadi_wrapper as w, identifier
+from giskardpy.data_types import PrefixName
+from giskardpy.qp.free_variable import FreeVariable
 
 
-class FixedJoint(object):
-    def __init__(self, name, parent, child, parent_T_child=None, translation_offset=None, rotation_offset=None):
-        self.name = name
-        self.parent = parent
-        self.child = child # type: giskardpy.model.world.Link
+class Joint(object):
+    def __init__(self, name, parent_link_name, child_link_name, parent_T_child=None,
+                 translation_offset=None,
+                 rotation_offset=None):
+        assert isinstance(name, PrefixName)
+        self.name = name  # type: PrefixName
+        self.parent_link_name = parent_link_name
+        self.child_link_name = child_link_name
 
         if translation_offset is None:
             translation_offset = [0, 0, 0]
         if rotation_offset is None:
             rotation_offset = [0, 0, 0]
         if parent_T_child is None:
-            self.parent_T_child = w.dot(w.translation3(*translation_offset), w.rotation_matrix_from_rpy(*rotation_offset))
+            self.parent_T_child = w.dot(w.translation3(*translation_offset),
+                                        w.rotation_matrix_from_rpy(*rotation_offset))
         else:
             self.parent_T_child = parent_T_child
 
     def __repr__(self):
         return self.name
 
-    @property
-    def parent_link_name(self):
-        return self.parent.name
+    @classmethod
+    def from_urdf(cls, urdf_joint, prefix, parent_link_name, child_link_name, god_map):
+        joint_name = PrefixName(urdf_joint.name, prefix)
+        if urdf_joint.origin is not None:
+            translation_offset = urdf_joint.origin.xyz
+            rotation_offset = urdf_joint.origin.rpy
+        else:
+            translation_offset = None
+            rotation_offset = None
 
-    @property
-    def child_link_name(self):
-        return self.child.name
+        if urdf_joint.type == 'fixed':
+            joint = FixedJoint(name=joint_name,
+                               parent_link_name=parent_link_name,
+                               child_link_name=child_link_name,
+                               translation_offset=translation_offset,
+                               rotation_offset=rotation_offset)
+        elif urdf_joint.type == 'revolute':
+            joint = RevoluteJoint(name=joint_name,
+                                  parent_link_name=parent_link_name,
+                                  child_link_name=child_link_name,
+                                  translation_offset=translation_offset,
+                                  rotation_offset=rotation_offset,
+                                  god_map=god_map,
+                                  axis=urdf_joint.axis)
+        elif urdf_joint.type == 'prismatic':
+            joint = PrismaticJoint(name=joint_name,
+                                   parent_link_name=parent_link_name,
+                                   child_link_name=child_link_name,
+                                   translation_offset=translation_offset,
+                                   rotation_offset=rotation_offset,
+                                   god_map=god_map,
+                                   axis=urdf_joint.axis)
+        elif urdf_joint.type == 'continuous':
+            joint = ContinuousJoint(name=joint_name,
+                                    parent_link_name=parent_link_name,
+                                    child_link_name=child_link_name,
+                                    translation_offset=translation_offset,
+                                    rotation_offset=rotation_offset,
+                                    god_map=god_map,
+                                    axis=urdf_joint.axis)
+        else:
+            raise NotImplementedError('Joint of type {} is not supported'.format(urdf_joint.type))
+
+        if isinstance(joint, MovableJoint):
+            lower_limits = {}
+            upper_limits = {}
+            if not urdf_joint.type == 'continuous':
+                try:
+                    lower_limits[0] = max(urdf_joint.safety_controller.soft_lower_limit, urdf_joint.limit.lower)
+                    upper_limits[0] = min(urdf_joint.safety_controller.soft_upper_limit, urdf_joint.limit.upper)
+                except AttributeError:
+                    try:
+                        lower_limits[0] = urdf_joint.limit.lower
+                        upper_limits[0] = urdf_joint.limit.upper
+                    except AttributeError:
+                        lower_limits[0] = None
+                        upper_limits[0] = None
+            else:
+                lower_limits[0] = None
+                upper_limits[0] = None
+            try:
+                lower_limits[1] = -urdf_joint.limit.velocity
+                upper_limits[1] = urdf_joint.limit.velocity
+            except AttributeError:
+                lower_limits[1] = None
+                upper_limits[1] = None
+            lower_limits[2] = -1e3
+            upper_limits[2] = 1e3
+            lower_limits[3] = -30
+            upper_limits[3] = 30
+
+            # TODO get rosparam data
+            free_variable = FreeVariable(symbols={
+                0: god_map.to_symbol(identifier.joint_states + [joint.name, 'position']),
+                1: god_map.to_symbol(identifier.joint_states + [joint.name, 'velocity']),
+                2: god_map.to_symbol(identifier.joint_states + [joint.name, 'acceleration']),
+                3: god_map.to_symbol(identifier.joint_states + [joint.name, 'jerk']),
+            },
+                lower_limits=lower_limits,
+                upper_limits=upper_limits,
+                quadratic_weights={1: 0.01, 2: 0, 3: 0})
+            joint.set_free_variables([free_variable])
+        return joint
 
 
-class MovableJoint(FixedJoint):
-    def __init__(self, name, parent, child, free_variable, parent_T_child=None, translation_offset=None, rotation_offset=None):
+class FixedJoint(Joint):
+    pass
+
+
+class MovableJoint(Joint):
+    def __init__(self, name, parent_link_name, child_link_name, god_map, parent_T_child=None,
+                 translation_offset=None, rotation_offset=None):
         """
-        :type name: str
-        :type parent: Link
-        :type child: Link
+        :type name: PrefixName
+        :type parent_link_name: Link
+        :type child_link_name: Link
+        :type free_variable: FreeVariable
         :type translation_offset: list
         :type rotation_offset: list
         :type free_variable: giskardpy.qp.free_variable.FreeVariable
         """
-        super(MovableJoint, self).__init__(name, parent, child, parent_T_child, translation_offset, rotation_offset)
-        self.free_variable = free_variable
+        super(MovableJoint, self).__init__(name=name,
+                                           parent_link_name=parent_link_name,
+                                           child_link_name=child_link_name,
+                                           parent_T_child=parent_T_child,
+                                           translation_offset=translation_offset,
+                                           rotation_offset=rotation_offset)
+        self.god_map = god_map
+        self._free_variables = []
+
+    @property
+    def free_variables(self):
+        return self._free_variables
+
+    def set_free_variables(self, free_variables):
+        self._free_variables.extend(free_variables)
+
+
+class OneDofJoint(MovableJoint):
+    @property
+    def free_variable(self):
+        return self.free_variables[0]
 
     @property
     def position_limits(self):
@@ -50,29 +159,75 @@ class MovableJoint(FixedJoint):
         return self.free_variable.get_upper_limit(1)
 
 
-class RevoluteJoint(MovableJoint):
-    def __init__(self, name, parent, child, axis, free_variable, parent_T_child=None, translation_offset=None, rotation_offset=None):
-        super(RevoluteJoint, self).__init__(name, parent, child, free_variable, parent_T_child, translation_offset, rotation_offset)
+class RevoluteJoint(OneDofJoint):
+    def __init__(self, name, parent_link_name, child_link_name, axis, god_map, parent_T_child=None,
+                 translation_offset=None,
+                 rotation_offset=None):
+        super(RevoluteJoint, self).__init__(name=name,
+                                            parent_link_name=parent_link_name,
+                                            child_link_name=child_link_name,
+                                            god_map=god_map,
+                                            parent_T_child=parent_T_child,
+                                            translation_offset=translation_offset,
+                                            rotation_offset=rotation_offset)
+        self.axis = np.array(axis)
+
+    def set_free_variables(self, free_variables):
+        super(RevoluteJoint, self).set_free_variables(free_variables)
         self.parent_T_child = w.dot(self.parent_T_child,
-                                    w.rotation_matrix_from_axis_angle(w.vector3(*axis), self.free_variable.get_symbol(0)))
+                                    w.rotation_matrix_from_axis_angle(w.vector3(*self.axis),
+                                                                      self.free_variable.get_symbol(0)))
 
 
-class ContinuousJoint(MovableJoint):
-    def __init__(self, name, parent, child, axis, free_variable, parent_T_child=None, translation_offset=None, rotation_offset=None):
-        super(ContinuousJoint, self).__init__(name, parent, child, free_variable, parent_T_child, translation_offset, rotation_offset)
+class ContinuousJoint(OneDofJoint):
+    def __init__(self, name, parent_link_name, child_link_name, axis, god_map, parent_T_child=None,
+                 translation_offset=None,
+                 rotation_offset=None):
+        super(ContinuousJoint, self).__init__(name=name,
+                                              parent_link_name=parent_link_name,
+                                              child_link_name=child_link_name,
+                                              god_map=god_map,
+                                              parent_T_child=parent_T_child,
+                                              translation_offset=translation_offset,
+                                              rotation_offset=rotation_offset)
+        self.axis = np.array(axis)
+
+    def set_free_variables(self, free_variables):
+        super(ContinuousJoint, self).set_free_variables(free_variables)
         self.parent_T_child = w.dot(self.parent_T_child,
-                                    w.rotation_matrix_from_axis_angle(w.vector3(*axis), self.free_variable.get_symbol(0)))
+                                    w.rotation_matrix_from_axis_angle(w.vector3(*self.axis),
+                                                                      self.free_variable.get_symbol(0)))
 
 
-class PrismaticJoint(MovableJoint):
-    def __init__(self, name, parent, child, axis, free_variable, parent_T_child=None, translation_offset=None, rotation_offset=None):
-        super(PrismaticJoint, self).__init__(name, parent, child, free_variable, parent_T_child, translation_offset, rotation_offset)
-        translation_axis = (w.point3(*axis) * self.free_variable.get_symbol(0))
+class PrismaticJoint(OneDofJoint):
+    def __init__(self, name, parent_link_name, child_link_name, axis, god_map, parent_T_child=None,
+                 translation_offset=None,
+                 rotation_offset=None):
+        super(PrismaticJoint, self).__init__(name=name,
+                                             parent_link_name=parent_link_name,
+                                             child_link_name=child_link_name,
+                                             god_map=god_map,
+                                             parent_T_child=parent_T_child,
+                                             translation_offset=translation_offset,
+                                             rotation_offset=rotation_offset)
+        self.axis = np.array(axis)
+
+    def set_free_variables(self, free_variables):
+        super(PrismaticJoint, self).set_free_variables(free_variables)
+        translation_axis = (w.point3(*self.axis) * self.free_variable.get_symbol(0))
         self.parent_T_child = w.dot(self.parent_T_child, w.translation3(translation_axis[0],
                                                                         translation_axis[1],
                                                                         translation_axis[2]))
 
 
 class MimicJoint(MovableJoint):
-    def __init__(self, name, parent, child, free_variable, parent_T_child=None, translation_offset=None, rotation_offset=None):
-        super(MimicJoint, self).__init__(name, parent, child, free_variable, parent_T_child, translation_offset, rotation_offset)
+    def __init__(self, name, parent_link_name, child_link_name, god_map, parent_T_child=None,
+                 translation_offset=None,
+                 rotation_offset=None):
+        super(MimicJoint, self).__init__(name=name,
+                                         parent_link_name=parent_link_name,
+                                         child_link_name=child_link_name,
+                                         god_map=god_map,
+                                         parent_T_child=parent_T_child,
+                                         translation_offset=translation_offset,
+                                         rotation_offset=rotation_offset)

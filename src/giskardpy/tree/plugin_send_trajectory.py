@@ -6,7 +6,7 @@ from py_trees_ros.actions import ActionClient
 import giskardpy.identifier as identifier
 from giskardpy.utils.logging import loginfo
 from giskardpy.tree.plugin import GiskardBehavior
-from giskardpy.utils.utils import traj_to_msg, logging
+from giskardpy.utils.utils import logging
 
 
 class SendTrajectory(ActionClient, GiskardBehavior):
@@ -29,9 +29,8 @@ class SendTrajectory(ActionClient, GiskardBehavior):
         goal = FollowJointTrajectoryGoal()
         sample_period = self.get_god_map().get_data(identifier.sample_period)
         controlled_joints = self.get_god_map().get_data(identifier.controlled_joints)
-        goal.trajectory = traj_to_msg(sample_period, trajectory, controlled_joints, self.fill_velocity_values)
+        goal.trajectory = trajectory.to_msg(sample_period, controlled_joints, self.fill_velocity_values)
         self.action_goal = goal
-
 
     def update(self):
         """

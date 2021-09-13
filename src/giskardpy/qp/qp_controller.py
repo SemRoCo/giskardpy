@@ -808,7 +808,7 @@ class QPController(object):
         if self.xdot_full is None:
             return None
         # for debugging to might want to execute this line to create named panda matrices
-        # self._create_debug_pandas(substitutions, self.xdot_full)
+        # self._create_debug_pandas(substitutions)
         return self.split_xdot(self.xdot_full), self._eval_debug_exprs(substitutions)
 
     def _are_hard_limits_violated(self, substitutions, error_message, weights, g, A, lb, ub, lbA, ubA):
@@ -912,8 +912,7 @@ class QPController(object):
         plt.savefig(u'tmp_data/mpc/mpc_{}_{}.png'.format(joint_name, file_count))
 
     @profile
-    def _create_debug_pandas(self, substitutions, xdot_full=None):
-        xdot_full = deepcopy(xdot_full)
+    def _create_debug_pandas(self, substitutions):
         self.np_H = np.diag(self.np_weights)
         self.state = {k: v for k, v in zip(self.compiled_big_ass_M.str_params, substitutions)}
         sample_period = self.state[str(self.sample_period)]
@@ -943,10 +942,10 @@ class QPController(object):
         self.p_weights = pd.DataFrame(self.np_H.dot(np.ones(self.np_H.shape[0])), b_names, [u'data'],
                                       dtype=float)
         self.p_A = pd.DataFrame(A, filtered_bA_names, filtered_b_names, dtype=float)
-        if xdot_full is not None:
-            self.p_xdot = pd.DataFrame(xdot_full, filtered_b_names, [u'data'], dtype=float)
+        if self.xdot_full is not None:
+            self.p_xdot = pd.DataFrame(self.xdot_full, filtered_b_names, [u'data'], dtype=float)
             # Ax = np.dot(self.np_A, xdot_full)
-            xH = np.dot((xdot_full ** 2).T, H)
+            xH = np.dot((self.xdot_full ** 2).T, H)
             self.p_xH = pd.DataFrame(xH, filtered_b_names, [u'data'], dtype=float)
             # p_xg = p_g * p_xdot
             # xHx = np.dot(np.dot(xdot_full.T, H), xdot_full)

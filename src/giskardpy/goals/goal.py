@@ -7,6 +7,7 @@ from giskard_msgs.msg import Constraint as Constraint_msg
 
 import giskardpy.identifier as identifier
 from giskardpy import casadi_wrapper as w
+from giskardpy.data_types import PrefixName
 from giskardpy.exceptions import ConstraintInitalizationException
 from giskardpy.model.robot import Robot
 from giskardpy.qp.constraint import VelocityConstraint, Constraint
@@ -90,8 +91,8 @@ class Goal(object):
     def get_fk(self, root, tip):
         """
         Return the homogeneous transformation matrix root_T_tip as a function that is dependent on the joint state.
-        :type root: str
-        :type tip: str
+        :type root: PrefixName
+        :type tip: PrefixName
         :return: root_T_tip
         """
         return self.robot.compose_fk_expression(root, tip)
@@ -100,8 +101,8 @@ class Goal(object):
         """
         Return the homogeneous transformation matrix root_T_tip. This Matrix refers to the evaluated current transform.
         It is not dependent on the joint state.
-        :type root: str
-        :type tip: str
+        :type root: PrefixName
+        :type tip: PrefixName
         :return: root_T_tip
         """
         return self.god_map.list_to_frame(identifier.fk_np + [(root, tip)])

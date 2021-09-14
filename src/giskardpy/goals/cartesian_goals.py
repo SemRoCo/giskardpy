@@ -28,7 +28,7 @@ class CartesianPosition(Goal):
             reference_velocity = max_velocity
         self.root_link = PrefixName(root_link, ROBOTNAME)
         self.tip_link = PrefixName(tip_link, ROBOTNAME)
-        self.goal_pose = tf.transform_pose(self.root_link, goal)
+        self.goal_pose = tf.transform_pose(self.root_link.short_name, goal)
         self.reference_velocity = reference_velocity
         self.max_velocity = max_velocity
         self.weight = weight
@@ -60,9 +60,9 @@ class CartesianOrientation(Goal):
         super(CartesianOrientation, self).__init__(**kwargs)
         if reference_velocity is None:
             reference_velocity = max_velocity
-        self.root_link = root_link
-        self.tip_link = tip_link
-        self.goal_pose = tf.transform_pose(self.root_link, goal)
+        self.root_link = PrefixName(root_link, ROBOTNAME)
+        self.tip_link = PrefixName(tip_link, ROBOTNAME)
+        self.goal_pose = tf.transform_pose(self.root_link.short_name, goal)
         self.reference_velocity = reference_velocity
         self.max_velocity = max_velocity
         self.weight = weight
@@ -189,8 +189,8 @@ class TranslationVelocityLimit(Goal):
         :param hard: bool, default True, will turn this into a hard constraint, that will always be satisfied, can could
                                 make some goal combination infeasible
         """
-        self.root_link = root_link
-        self.tip_link = tip_link
+        self.root_link = PrefixName(root_link, ROBOTNAME)
+        self.tip_link = PrefixName(tip_link, ROBOTNAME)
         self.hard = hard
         self.weight = weight
         self.max_velocity = max_velocity
@@ -225,8 +225,8 @@ class RotationVelocityLimit(Goal):
         :param hard: bool, default True, will turn this into a hard constraint, that will always be satisfied, can could
                                 make some goal combination infeasible
         """
-        self.root_link = root_link
-        self.tip_link = tip_link
+        self.root_link = PrefixName(root_link, ROBOTNAME)
+        self.tip_link = PrefixName(tip_link, ROBOTNAME)
         self.hard = hard
 
         self.weight = weight

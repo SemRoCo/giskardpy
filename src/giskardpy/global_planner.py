@@ -17,9 +17,10 @@ from copy import deepcopy
 from tf.transformations import quaternion_about_axis
 
 import giskardpy.identifier as identifier
+import giskardpy.model.pybullet_wrapper as pw
 from giskardpy.tree.plugin import GiskardBehavior
 from giskardpy.tree.plugin_action_server import GetGoal
-from giskardpy.utils.tfwrapper import transform_pose
+from giskardpy.utils.tfwrapper import transform_pose, lookup_pose
 
 from mpl_toolkits.mplot3d import Axes3D
 import numpy
@@ -30,6 +31,7 @@ from ompl import geometric as og
 # todo: put below in ros params
 SolveParameters = namedtuple('SolveParameters', 'initial_solve_time refine_solve_time max_initial_iterations '
                                                 'max_refine_iterations min_refine_thresh')
+CollisionInfo = namedtuple('CollisionInfo', 'link d u')
 
 from giskardpy.utils.utils import convert_dictionary_to_ros_message, convert_ros_message_to_dictionary
 
@@ -50,16 +52,19 @@ class PathLengthAndGoalOptimizationObjective(ob.PathLengthOptimizationObjective)
         return ob.Cost(self.getSpaceInformation().distance(s1, s2))
 
 
-class TwoDimRayMotionValidator(ob.MotionValidator, GiskardBehavior):
+class TwoDimRayMotionValidator(ob.MotionValidator, GiskardBehavior): #TODO: use collision shapes of links with fixed joints inbetween
 
-    def __init__(self, si, object_in_motion):
+    def __init__(self, si, is_3D, object_in_motion, tip_link=None):
         ob.MotionValidator.__init__(self, si)
         GiskardBehavior.__init__(self, str(self))
         if 'pybullet' not in sys.modules:
             raise Exception('For two dimensional motion validation the python module pybullet is needed.')
         self.lock = threading.Lock()
+        self.tip_link = tip_link
         self.object_in_motion = object_in_motion
+        self.is_3D = is_3D
         self.init_ignore_objects()
+        self.update_collision_shape()
 
     def init_ignore_objects(self, ignore_objects=None):
         if ignore_objects is None:
@@ -74,22 +79,85 @@ class TwoDimRayMotionValidator(ob.MotionValidator, GiskardBehavior):
             else:
                 raise KeyError('Cannot find object of name {} in the PyBulletWorld.'.format(ignore_object))
 
+    def update_tip_link(self, tip_link):
+        self.tip_link = tip_link
+        self.update_collision_shape()
+
+    def update_collision_shape(self):
+        self.collision_info = None
+        if self.tip_link is not None:
+            cur_pose = self.object_in_motion.get_fk_pose(self.object_in_motion.get_root(), self.tip_link)
+            cur_pos = cur_pose.pose.position
+            obj_id = self.object_in_motion.get_pybullet_id()
+            link_id = pw.get_link_id(obj_id, self.tip_link)
+            ci = pw.get_collision_shape_data(obj_id, link_id)
+            if ci is not None:
+                aabbs = p.getAABB(obj_id, link_id)
+                aabbs_ind = [[aabb[0] - cur_pos.x, aabb[1] - cur_pos.y, aabb[2] - cur_pos.z] for aabb in aabbs]
+                self.collision_info = CollisionInfo(self.tip_link, aabbs_ind[0], aabbs_ind[1])
+            else: # FIXME: above if-case makes only sense, if tip_link has not interaction intend.
+                  # FIXME: if interaction with tip_link is needed above collision info should not be saved.
+                  # FIXME: Moreover, more parents and child links of tip_link should be saved
+                  # FIXME: if the connection/joint is fixed.
+                parent_link = link_id
+                while self.collision_info is None:
+                    parent_link = pw.get_parent_id(obj_id, parent_link)
+                    ci = pw.get_collision_shape_data(obj_id, parent_link)
+                    if ci is not None:
+                        aabbs = p.getAABB(obj_id, parent_link)
+                        cur_pose = self.object_in_motion.get_fk_pose(self.object_in_motion.get_root(), pw.getJointInfo(obj_id, parent_link)[12])
+                        cur_pos = cur_pose.pose.position
+                        aabbs_ind = [[aabb[0] - cur_pos.x, aabb[1] - cur_pos.y, aabb[2] - cur_pos.z] for aabb in aabbs]
+                        self.collision_info = CollisionInfo(pw.getJointInfo(obj_id, parent_link)[12], aabbs_ind[0], aabbs_ind[1])
+        return self.collision_info is not None
+
+    def aabb_to_3d_points(self, d, u):
+        d_new = [d[0], d[1], u[2]]
+        u_new = [u[0], u[1], d[2]]
+        bottom_cube_face = self.aabb_to_2d_points(d, u_new)
+        upper_cube_face = self.aabb_to_2d_points(d_new, u)
+        res = []
+        for p in bottom_cube_face:
+            res.append([p[0], p[1], d[2]])
+        for p in upper_cube_face:
+            res.append([p[0], p[1], u[2]])
+        return res
+
+    def aabb_to_2d_points(self, d, u):
+        d_l = [d[0], u[1], 0]
+        u_r = [u[0], d[1], 0]
+        return [d_l, d, u, u_r]
+
     def checkMotion(self, s1, s2):
         # checkMotion calls checkMotion with Map anc checkMotion with Bullet
+        if self.tip_link is None:
+            raise Exception(u'Please set tip_link for {}.'.format(str(self)))
         with self.lock:
             x_b = s1.getX()
             y_b = s1.getY()
             x_e = s2.getX()
             y_e = s2.getY()
+            if self.is_3D:
+                z_b = s1.getZ()
+                z_e = s2.getZ()
             # Shoot ray from start to end pose and check if it intersects with the kitchen,
             # if so return false, else true.
-            d, u = ((-0.33712110805511475, -0.33709930224943446, 0),
-                    (0.33712110805511475, 0.33714291386079503, 0))  # p.getAABB(self.pybullet_robot_id, 3)
-            d_l = (d[0], u[1], 0)
-            u_r = (u[0], d[1], 0)
-            aabbs = (d_l, d, u, u_r)
-            query_b = [[x_b + aabb[0], y_b + aabb[1], 0] for aabb in aabbs]
-            query_e = [[x_e + aabb[0], y_e + aabb[1], 0] for aabb in aabbs]
+            # TODO: for each loop for every collision info
+            if self.is_3D:
+                aabbs = self.aabb_to_3d_points(self.collision_info.d, self.collision_info.u)
+                query_b = [[x_b + aabb[0], y_b + aabb[1], z_b + aabb[2]] for aabb in aabbs]
+                query_e = [[x_e + aabb[0], y_e + aabb[1], z_e + aabb[2]] for aabb in aabbs]
+            else:
+                aabbs = self.aabb_to_2d_points(self.collision_info.d, self.collision_info.u)
+                query_b = [[x_b + aabb[0], y_b + aabb[1], 0] for aabb in aabbs]
+                query_e = [[x_e + aabb[0], y_e + aabb[1], 0] for aabb in aabbs]
+            # If the aabb box is not from the self.tip_link, add the translation from the
+            # self.tip_link to the collision info link.
+            if self.collision_info.link != self.tip_link:
+                tip_link_2_coll_link_pose = lookup_pose(self.tip_link, self.collision_info.link)
+                point = tip_link_2_coll_link_pose.pose.position
+                query_b = [[point.x + q_b[0], point.y + q_b[1], point.z + q_b[2]] for q_b in deepcopy(query_b)]
+                query_e = [[point.x + q_e[0], point.y + q_e[1], point.z + q_e[2]] for q_e in deepcopy(query_e)]
             query_res = p.rayTestBatch(query_b, query_e)
             # todo: check if actually works, stepSimulation or p.performCollisionDetection()?
             return all([obj == -1 or obj in self.ignore_object_ids for obj, _, _, _, _ in query_res])
@@ -100,7 +168,7 @@ class TwoDimRayMotionValidator(ob.MotionValidator, GiskardBehavior):
 
 class BulletCollisionChecker(GiskardBehavior):
 
-    def __init__(self, is_3D, collision_checker, tip_link):
+    def __init__(self, is_3D, collision_checker, tip_link=None):
         GiskardBehavior.__init__(self, str(self))
         self.lock = threading.Lock()
         self.init_pybullet_ids_and_joints()
@@ -121,6 +189,8 @@ class BulletCollisionChecker(GiskardBehavior):
             self.pybullet_initialized = False
 
     def is_collision_free(self, state):
+        if self.tip_link is None:
+            raise Exception(u'Please set tip_link for {}.'.format(str(self)))
         if self.pybullet_initialized:
             x = state.getX()
             y = state.getY()
@@ -159,8 +229,12 @@ class ThreeDimStateValidator(ob.StateValidityChecker):
     def __init__(self, si, collision_checker):
         ob.StateValidityChecker.__init__(self, si)
         self.collision_checker = collision_checker
+        self.lock = threading.Lock()
         if not collision_checker.pybullet_initialized:
             raise Exception('Please import pybullet.')
+
+    def update(self, tip_link):
+        self.collision_checker.tip_link = tip_link
 
     def isValid(self, state):
         with self.lock:
@@ -171,6 +245,7 @@ class TwoDimStateValidator(ob.StateValidityChecker):
     def __init__(self, si, collision_checker):
         ob.StateValidityChecker.__init__(self, si)
         self.collision_checker = collision_checker
+        self.lock = threading.Lock()
         self.init_map()
         if not self.collision_checker.pybullet_initialized and not self.map_initialized:
             raise Exception(
@@ -237,8 +312,10 @@ class GlobalPlanner(GetGoal):
 
         self._planner_solve_params = {}  # todo: load values from rosparam
         self.navigation_config = 'fast_without_refine'  # todo: load value from rosparam
+        self.movement_config = 'fast_without_refine'
 
         self.setupNavigation()
+        self.setupMovement()
 
     def get_cart_goal(self, cmd):
         try:
@@ -262,6 +339,9 @@ class GlobalPlanner(GetGoal):
         return len(collisions) == 0
 
     def is_global_path_needed(self):
+        return self.__is_global_path_needed(self.get_world().get_objects()['kitchen']._pybullet_id)
+
+    def __is_global_path_needed(self, coll_obj_id):
         """
         (disclaimer: for correct format please see the source code)
 
@@ -294,12 +374,12 @@ class GlobalPlanner(GetGoal):
         goal_pos = self.pose_goal.pose.position
         goal_arr = numpy.array([goal_pos.x, goal_pos.y, goal_pos.z])
         obj_id, _, _, _, normal = p.rayTest(curr_arr, goal_arr)[0]
-        if obj_id != -1:
+        if obj_id == coll_obj_id:
             diff = numpy.sqrt(numpy.sum((curr_arr - goal_arr) ** 2))
             v = numpy.array(list(normal)) * diff
             new_curr_arr = goal_arr + v
             obj_id, _, _, _, _ = p.rayTest(new_curr_arr, goal_arr)[0]
-            return obj_id != -1
+            return obj_id == coll_obj_id
         else:
             return False
 
@@ -316,7 +396,7 @@ class GlobalPlanner(GetGoal):
 
         self.root_link = self.__goal_dict[u'root_link']
         self.tip_link = self.__goal_dict[u'tip_link']
-        link_names = self.get_robot().get_links_names()
+        link_names = self.get_robot().get_link_names()
 
         if self.root_link not in link_names:
             raise Exception(u'Root_link {} is no known link of the robot.'.format(self.root_link))
@@ -344,31 +424,30 @@ class GlobalPlanner(GetGoal):
         if self.is_global_navigation_needed():
             self.update_collisions_environment()
             trajectory = self.planNavigation()
-            if len(trajectory) == 0:
-                return Status.FAILURE
-            poses = []
-            for i, point in enumerate(trajectory):
-                if i == 0:
-                    continue  # important assumption for constraint:
-                    # we do not to reach the first pose, since it is the start pose
-                base_pose = PoseStamped()
-                base_pose.header.frame_id = self.get_god_map().get_data(identifier.map_frame)
-                base_pose.pose.position.x = point[0]
-                base_pose.pose.position.y = point[1]
-                base_pose.pose.position.z = 0
-                base_pose.pose.orientation = Quaternion(*quaternion_about_axis(0, [0, 0, 1]))
-                poses.append(base_pose)
-            poses[-1].pose.orientation = self.pose_goal.pose.orientation
-            move_cmd.constraints = self.get_cartesian_path_constraints(poses)
-            self.get_god_map().set_data(identifier.next_move_goal, move_cmd)
-            pass
         elif self.is_global_path_needed():
             self.update_collisions_environment()
             trajectory = self.planMovement()
-            pass
         else:
             return Status.SUCCESS
-            pass  # return self.planMovement()
+
+        if len(trajectory) == 0:
+            return Status.FAILURE
+        poses = []
+        for i, point in enumerate(trajectory):
+            if i == 0:
+                continue  # important assumption for constraint:
+                # we do not to reach the first pose, since it is the start pose
+            base_pose = PoseStamped()
+            base_pose.header.frame_id = self.get_god_map().get_data(identifier.map_frame)
+            base_pose.pose.position.x = point[0]
+            base_pose.pose.position.y = point[1]
+            base_pose.pose.position.z = point[2] if len(point) > 3 else 0
+            base_pose.pose.orientation = Quaternion(*quaternion_about_axis(0, [0, 0, 1]))
+            poses.append(base_pose)
+        poses[-1].pose.orientation = self.pose_goal.pose.orientation
+        move_cmd.constraints = self.get_cartesian_path_constraints(poses)
+        self.get_god_map().set_data(identifier.next_move_goal, move_cmd)
+        return Status.SUCCESS
 
     def get_cartesian_path_constraints(self, poses):
 
@@ -424,7 +503,7 @@ class GlobalPlanner(GetGoal):
         state().setX(round(pose_mTtip_link.pose.position.x, round_decimal_place))
         state().setY(round(pose_mTtip_link.pose.position.y, round_decimal_place))
         if is_3D(space):
-            state().setZ(round(pose_mTtip_link.pose.position.Z, round_decimal_place))
+            state().setZ(round(pose_mTtip_link.pose.position.z, round_decimal_place))
         return state
 
     def get_translation_goal_state(self, space, round_decimal_place=3):
@@ -432,7 +511,7 @@ class GlobalPlanner(GetGoal):
         state().setX(round(self.pose_goal.pose.position.x, round_decimal_place))
         state().setY(round(self.pose_goal.pose.position.y, round_decimal_place))
         if is_3D(space):
-            state().setZ(round(self.pose_goal.pose.position.Z, round_decimal_place))
+            state().setZ(round(self.pose_goal.pose.position.z, round_decimal_place))
         return state
 
     def allocOBValidStateSampler(si):
@@ -470,8 +549,9 @@ class GlobalPlanner(GetGoal):
 
         # Set two dimensional motion and state validator
         si = self.navigation_setup.getSpaceInformation()
-        si.setMotionValidator(TwoDimRayMotionValidator(si, self.get_robot()))
-        collision_checker = BulletCollisionChecker(False, self.is_robot_external_collision_free, u'base_footprint')
+        si.setMotionValidator(TwoDimRayMotionValidator(si, False, self.get_robot(), tip_link=u'base_footprint'))
+        collision_checker = BulletCollisionChecker(False, self.is_robot_external_collision_free,
+                                                   tip_link=u'base_footprint')
         si.setStateValidityChecker(TwoDimStateValidator(si, collision_checker))
         si.setup()
 
@@ -485,12 +565,12 @@ class GlobalPlanner(GetGoal):
     def setupMovement(self):
 
         # create a simple setup object
-        self.movement_setup = og.SimpleSetup(self.kitchen_floor_space)
+        self.movement_setup = og.SimpleSetup(self.kitchen_space)
 
         # Set two dimensional motion and state validator
         si = self.movement_setup.getSpaceInformation()
-        si.setMotionValidator(TwoDimRayMotionValidator(si, self.get_robot()))
-        collision_checker = BulletCollisionChecker(True, self.is_robot_external_collision_free, self.tip_link)
+        si.setMotionValidator(TwoDimRayMotionValidator(si, True, self.get_robot()))
+        collision_checker = BulletCollisionChecker(True, self.is_robot_external_collision_free)
         si.setStateValidityChecker(ThreeDimStateValidator(si, collision_checker))
         si.setup()
 
@@ -503,12 +583,13 @@ class GlobalPlanner(GetGoal):
 
     def planNavigation(self, plot=True):
 
+        # Set Start and Goal pose for Planner
         start = self.get_translation_start_state(self.kitchen_floor_space)
         goal = self.get_translation_goal_state(self.kitchen_floor_space)
         self.navigation_setup.setStartAndGoalStates(start, goal)
 
-        optimization_objective = PathLengthAndGoalOptimizationObjective(self.navigation_setup.getSpaceInformation(),
-                                                                        goal)
+        # Set Optimization Function
+        optimization_objective = PathLengthAndGoalOptimizationObjective(self.navigation_setup.getSpaceInformation(), goal)
         self.navigation_setup.setOptimizationObjective(optimization_objective)
 
         planner_status = self.solve(self.navigation_setup, self.navigation_config)
@@ -520,8 +601,7 @@ class GlobalPlanner(GetGoal):
             # ss.simplifySolution() DONT! NO! DONT UNCOMMENT THAT! NO! STOP IT! FIRST IMPLEMENT CHECKMOTION! THEN TRY AGAIN!
             # Make sure enough subpaths are available for Path Following
             self.navigation_setup.getSolutionPath().interpolate(20)
-            data = states_matrix_str2array_floats(
-                self.navigation_setup.getSolutionPath().printAsMatrix())  # [[x, y, theta]]
+            data = states_matrix_str2array_floats(self.navigation_setup.getSolutionPath().printAsMatrix())  # [[x, y, theta]]
             # print the simplified path
             if plot:
                 plt.close()
@@ -537,14 +617,24 @@ class GlobalPlanner(GetGoal):
 
     def planMovement(self, plot=True):
 
+        # Update Collision Checker
+        self.movement_setup.getSpaceInformation().getStateValidityChecker().update(self.tip_link)
+        #self.movement_setup.getSpaceInformation().getMotionValidator().update_tip_link(self.tip_link)
+        si = self.movement_setup.getSpaceInformation()
+        si.setMotionValidator(TwoDimRayMotionValidator(si, True, self.get_robot(), tip_link=self.tip_link))
+
+
         start = self.get_translation_start_state(self.kitchen_space)
         goal = self.get_translation_goal_state(self.kitchen_space)
+        # Force goal and start pose into limited search area
+        self.kitchen_space.enforceBounds(start())
+        self.kitchen_space.enforceBounds(goal())
         self.movement_setup.setStartAndGoalStates(start, goal)
 
         optimization_objective = PathLengthAndGoalOptimizationObjective(self.movement_setup.getSpaceInformation(), goal)
         self.movement_setup.setOptimizationObjective(optimization_objective)
 
-        planner_status = self.solve(self.movement_setup, self.navigation_config)
+        planner_status = self.solve(self.movement_setup, self.movement_config)
         # og.PathSimplifier(si).smoothBSpline(ss.getSolutionPath()) # takes around 20-30 secs with RTTConnect(0.1)
         # og.PathSimplifier(si).reduceVertices(ss.getSolutionPath())
         data = numpy.array([])
@@ -553,8 +643,8 @@ class GlobalPlanner(GetGoal):
             # ss.simplifySolution() DONT! NO! DONT UNCOMMENT THAT! NO! STOP IT! FIRST IMPLEMENT CHECKMOTION! THEN TRY AGAIN!
             # Make sure enough subpaths are available for Path Following
             self.movement_setup.getSolutionPath().interpolate(20)
-            data = states_matrix_str2array_floats(
-                self.movement_setup.getSolutionPath().printAsMatrix())  # [[x, y, theta]]
+
+            data = states_matrix_str2array_floats(self.movement_setup.getSolutionPath().printAsMatrix()) # [x y z xw yw zw w]
             # print the simplified path
             if plot:
                 plt.close()
@@ -562,7 +652,7 @@ class GlobalPlanner(GetGoal):
                 ax.plot(data[:, 1], data[:, 0])
                 ax.invert_xaxis()
                 ax.set(xlabel='y (m)', ylabel='x (m)',
-                       title='Navigation Path in map')
+                       title='2D Path in map')
                 # ax = fig.gca(projection='2d')
                 # ax.plot(data[:, 0], data[:, 1], '.-')
                 plt.show()

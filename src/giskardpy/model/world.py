@@ -2,6 +2,7 @@ import numbers
 import os
 import traceback
 from copy import deepcopy
+from functools import cached_property
 
 import numpy as np
 import urdf_parser_py.urdf as up
@@ -10,8 +11,8 @@ from giskard_msgs.msg import CollisionEntry
 from tf.transformations import euler_matrix
 from visualization_msgs.msg import Marker, MarkerArray
 
-from giskardpy import casadi_wrapper as w, ROBOTNAME, identifier
-from giskardpy.data_types import JointStates, KeyDefaultDict
+from giskardpy import casadi_wrapper as w, RobotName, identifier
+from giskardpy.data_types import JointStates, KeyDefaultDict, order_map
 from giskardpy.data_types import PrefixName
 from giskardpy.exceptions import RobotExistsException, DuplicateNameException, PhysicsWorldException, \
     UnknownBodyException, UnsupportedOptionException, CorruptShapeException
@@ -194,7 +195,7 @@ class Link(object):
         :type msg: giskard_msgs.msg._WorldBody.WorldBody
         :type pose: Pose
         """
-        link_name = PrefixName(msg.name, msg.name)
+        link_name = PrefixName(msg.name, None)
         link = cls(link_name)
         geometry = LinkGeometry.from_world_body(msg)
         link.collisions.append(geometry)
@@ -231,12 +232,8 @@ class Link(object):
 class WorldTree(object):
     def __init__(self, god_map=None):
         self.god_map = god_map  # type: GodMap
-        self.state = JointStates()
-        self.root_link_name = PrefixName(self.god_map.get_data(identifier.map_frame), None)
-        self.links = {self.root_link_name: Link(self.root_link_name)}
-        self.joints = {}
-        self.groups = {}
-
+        self.connection_prefix = 'connection'
+        self.hard_reset()
 
     def reset_cache(self):
         for method_name in dir(self):
@@ -280,13 +277,14 @@ class WorldTree(object):
         # create group?
         with suppress_stderr():
             parsed_urdf = up.URDF.from_xml_string(hacky_urdf_parser_fix(urdf))  # type: up.Robot
-
+        if group_name in self.groups:
+            raise DuplicateNameException('Failed to add group \'{}\' because one with such a name already exists'.format(group_name))
         if parent_link_name is None:
             parent_link = self.root_link
         else:
             parent_link = self.links[parent_link_name]
         child_link = Link(name=PrefixName(parsed_urdf.get_root(), prefix))
-        connecting_joint = FixedJoint(name=PrefixName('{}{}'.format(parsed_urdf.name, hash(urdf)), prefix),
+        connecting_joint = FixedJoint(name=PrefixName(PrefixName(parsed_urdf.name, prefix), self.connection_prefix),
                                       parent_link_name=parent_link.name,
                                       child_link_name=child_link.name)
         self.link_joint_to_links(connecting_joint, child_link)
@@ -308,7 +306,14 @@ class WorldTree(object):
         helper(parsed_urdf, child_link)
         if group_name is not None:
             self.register_group(group_name, child_link.name)
-        self.init_fast_fks()
+        self.soft_reset()
+
+    def get_parent_link_of_link(self, link_name):
+        """
+        :type link_name: PrefixName
+        :rtype: PrefixName
+        """
+        return self.joints[self.links[link_name].parent_joint_name].parent_link_name
 
     def add_world_body(self, msg, pose, parent_link_name=None):
         """
@@ -327,13 +332,14 @@ class WorldTree(object):
             self.add_urdf(urdf=msg.urdf,
                           parent_link_name=parent_link.name,
                           group_name=msg.name,
-                          prefix=msg.name)
+                          prefix=None)
         else:
             link = Link.from_world_body(msg)
-            joint = Joint(PrefixName(msg.name, msg.name), parent_link.name, link.name,
+            joint = Joint(PrefixName(msg.name, self.connection_prefix), parent_link.name, link.name,
                           parent_T_child=w.Matrix(kdl_to_np(pose_to_kdl(pose))))
             self.link_joint_to_links(joint, link)
             self.register_group(msg.name, link.name)
+        self.soft_reset()
 
     @property
     def movable_joints(self):
@@ -342,6 +348,27 @@ class WorldTree(object):
     def soft_reset(self):
         self.reset_cache()
         self.init_fast_fks()
+        for group in self.groups.values():
+            group.soft_reset()
+
+    def hard_reset(self):
+        self.state = JointStates()
+        self.root_link_name = PrefixName(self.god_map.unsafe_get_data(identifier.map_frame), None)
+        self.links = {self.root_link_name: Link(self.root_link_name)}
+        self.joints = {}
+        self.groups = {}
+        try:
+            self.add_urdf(self.god_map.unsafe_get_data(identifier.robot_description), group_name=RobotName, prefix=None)
+            for i in range(1, self.god_map.unsafe_get_data(identifier.order)):
+                order_identifier = identifier.joint_limits + [order_map[i]]
+                d_linear = KeyDefaultDict(lambda key: self.god_map.to_symbol(order_identifier +
+                                                                             [u'linear', u'override', key]))
+                d_angular = KeyDefaultDict(lambda key: self.god_map.to_symbol(order_identifier +
+                                                                              [u'angular', u'override', key]))
+                self.set_joint_limits(d_linear, d_angular, i)
+        except KeyError:
+            logging.logwarn('Can\'t add robot, because it is not on the param server')
+        self.soft_reset()
 
     @property
     def joint_constraints(self):
@@ -353,18 +380,38 @@ class WorldTree(object):
         :type child_link: Link
         """
         parent_link = self.links[joint.parent_link_name]
+        if joint.name in self.joints:
+            raise DuplicateNameException('Cannot add joint named \'{}\' because already exists'.format(joint.name))
         self.joints[joint.name] = joint
         child_link.parent_joint_name = joint.name
+        if child_link.name in self.links:
+            raise DuplicateNameException('Cannot add link named \'{}\' because already exists'.format(child_link.name))
         self.links[child_link.name] = child_link
         assert joint.name not in parent_link.child_joint_names
         parent_link.child_joint_names.append(joint.name)
 
-    def move_branch(self, old_parent_joint, new_joint):
-        # replace joint
-        pass
+    def move_branch(self, joint_name, new_parent_link_name):
+        if not self.is_joint_fixed(joint_name):
+            raise NotImplementedError('Can only change fixed joints')
+        joint = self.joints[joint_name]
+        fk = w.Matrix(self.compute_fk_np(new_parent_link_name, joint.child_link_name))
+        old_parent_link = self.links[joint.parent_link_name]
+        new_parent_link = self.links[new_parent_link_name]
+
+        joint.parent_link_name = new_parent_link_name
+        joint.parent_T_child = fk
+        old_parent_link.child_joint_names.remove(joint_name)
+        new_parent_link.child_joint_names.append(joint_name)
+        self.soft_reset()
+
+    def move_group(self, group_name, new_parent_link_name):
+        group = self.groups[group_name]
+        joint_name = self.links[group.root_link_name].parent_joint_name
+        self.move_branch(joint_name, new_parent_link_name)
 
     def delete_branch(self, link_name):
         self.delete_branch_at_joint(self.links[link_name].parent_joint_name)
+        self.soft_reset()
 
     def delete_branch_at_joint(self, joint_name):
         joint = self.joints.pop(joint_name)  # type: Joint
@@ -381,6 +428,7 @@ class WorldTree(object):
                 helper(child_joint.child_link_name)
 
         helper(joint.child_link_name)
+        self.soft_reset()
 
     def compute_chain(self, root_link_name, tip_link_name, joints=True, links=True, fixed=True):
         chain = []
@@ -633,6 +681,9 @@ class SubWorldTree(WorldTree):
         self.root_link_name = root_link_name
         self.world = world
 
+    def hard_reset(self):
+        raise NotImplementedError('Can\'t hard reset a SubWorldTree.')
+
     @property
     def base_pose(self):
         return self.world.compute_fk_pose(self.world.root_link_name, self.root_link_name).pose
@@ -640,6 +691,9 @@ class SubWorldTree(WorldTree):
     @property
     def _fks(self):
         return self.world._fks
+
+    def soft_reset(self):
+        self.reset_cache()
 
     @property
     def state(self):
@@ -649,6 +703,11 @@ class SubWorldTree(WorldTree):
     def state(self, value):
         self.world.state = value
 
+    def reset_cache(self):
+        super(SubWorldTree, self).reset_cache()
+        del self.joints
+        del self.links
+
     @property
     def god_map(self):
         return self.world.god_map
@@ -657,8 +716,7 @@ class SubWorldTree(WorldTree):
     def root_link(self):
         return self.world.links[self.root_link_name]
 
-    @property
-    @memoize
+    @cached_property
     def joints(self):
         def helper(root_link):
             """
@@ -674,8 +732,7 @@ class SubWorldTree(WorldTree):
 
         return helper(self.root_link)
 
-    @property
-    @memoize
+    @cached_property
     def links(self):
         def helper(root_link):
             """

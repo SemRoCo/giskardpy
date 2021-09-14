@@ -13,8 +13,9 @@ import giskardpy
 from giskardpy import DEBUG, MAP
 from giskardpy.exceptions import DuplicateNameException
 from giskardpy.model.urdf_object import robot_name_from_urdf_string
+from giskardpy.utils import logging
 from giskardpy.utils.tfwrapper import np_to_pose
-from giskardpy.utils.utils import write_to_tmp, NullContextManager, suppress_stdout, resolve_ros_iris_in_urdf, logging
+from giskardpy.utils.utils import write_to_tmp, NullContextManager, suppress_stdout, resolve_ros_iris_in_urdf
 
 JointInfo = namedtuple(u'JointInfo', [u'joint_index', u'joint_name', u'joint_type', u'q_index', u'u_index', u'flags',
                                       u'joint_damping', u'joint_friction', u'joint_lower_limit', u'joint_upper_limit',

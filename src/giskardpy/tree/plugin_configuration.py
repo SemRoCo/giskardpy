@@ -1,4 +1,4 @@
-from giskardpy import ROBOTNAME
+from giskardpy import RobotName
 from giskardpy.data_types import JointStates
 
 try:

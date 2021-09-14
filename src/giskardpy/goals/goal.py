@@ -341,6 +341,9 @@ def _prepend_prefix(prefix, d):
     new_dict = OrderedDict()
     for key, value in d.items():
         new_key = u'{}/{}'.format(prefix, key)
-        value.name = u'{}/{}'.format(prefix, value.name)
+        try:
+            value.name = u'{}/{}'.format(prefix, value.name)
+        except AttributeError:
+            pass
         new_dict[new_key] = value
     return new_dict

@@ -25,8 +25,9 @@ from std_msgs.msg import ColorRGBA
 from tf.transformations import rotation_from_matrix, quaternion_matrix
 from visualization_msgs.msg import Marker
 
-from giskardpy import identifier, ROBOTNAME
+from giskardpy import identifier, RobotName, RobotPrefix
 from giskardpy.data_types import KeyDefaultDict, JointStates, PrefixName
+from giskardpy.utils import logging
 from giskardpy.utils.config_loader import ros_load_robot_config
 from giskardpy.garden import grow_tree
 from giskardpy.identifier import robot, world
@@ -34,8 +35,7 @@ from giskardpy.model.pybullet_world import PyBulletWorld
 from giskardpy.python_interface import GiskardWrapper
 from giskardpy.model.robot import Robot
 from giskardpy.utils.tfwrapper import transform_pose, lookup_pose, np_to_pose
-from giskardpy.utils.utils import msg_to_list, position_dict_to_joint_states, to_joint_state_position_dict, \
-    logging
+from giskardpy.utils.utils import msg_to_list, position_dict_to_joint_states, to_joint_state_position_dict
 
 BIG_NUMBER = 1e100
 SMALL_NUMBER = 1e-100
@@ -386,7 +386,7 @@ class GiskardTestWrapper(GiskardWrapper):
         for joint_name in goal_js:
             goal = goal_js[joint_name]
             current = current_js[PrefixName(joint_name, None)].position
-            if self.get_robot().is_joint_continuous(PrefixName(joint_name, ROBOTNAME)):
+            if self.get_robot().is_joint_continuous(PrefixName(joint_name, RobotPrefix)):
                 np.testing.assert_almost_equal(shortest_angular_distance(goal, current), 0, decimal=decimal,
                                                err_msg=u'{}: actual: {} desired: {}'.format(joint_name, current, goal))
             else:
@@ -664,7 +664,7 @@ class GiskardTestWrapper(GiskardWrapper):
 
     def detach_object(self, name, expected_response=UpdateWorldResponse.SUCCESS):
         if expected_response == UpdateWorldResponse.SUCCESS:
-            p = self.get_robot().compute_fk_pose(self.get_robot().get_root(), name)
+            p = self.get_robot().compute_fk_pose(self.get_robot().root_link_name, name)
             p = transform_pose(u'map', p)
             assert name in self.get_attached_objects().object_names, \
                 'there is no attached object named {}'.format(name)
@@ -674,9 +674,7 @@ class GiskardTestWrapper(GiskardWrapper):
             u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
                                             update_world_error_code(expected_response))
         if expected_response == UpdateWorldResponse.SUCCESS:
-            assert self.get_world().has_object(name)
-            assert not name in self.get_attached_objects().object_names, 'the object was not detached'
-            compare_poses(self.get_world().get_object(name).base_pose, p.pose, decimal=2)
+            assert name in self.get_world().groups
 
     def add_box(self, name=u'box', size=(1, 1, 1), pose=None, expected_response=UpdateWorldResponse.SUCCESS):
         r = super(GiskardTestWrapper, self).add_box(name, size, pose=pose)
@@ -764,7 +762,7 @@ class GiskardTestWrapper(GiskardWrapper):
 
     def attach_box(self, name=u'box', size=None, frame_id=None, position=None, orientation=None, pose=None,
                    expected_response=UpdateWorldResponse.SUCCESS):
-        scm = self.get_robot().get_self_collision_matrix()
+        # scm = self.get_robot().get_self_collision_matrix()
         if pose is None:
             expected_pose = PoseStamped()
             expected_pose.header.frame_id = frame_id
@@ -782,12 +780,12 @@ class GiskardTestWrapper(GiskardWrapper):
                                             update_world_error_code(expected_response))
         if expected_response == UpdateWorldResponse.SUCCESS:
             self.wait_for_synced()
-            assert name in self.get_controllable_links()
-            assert not self.get_world().has_object(name)
-            assert not name in self.get_object_names().object_names
-            assert name in self.get_attached_objects().object_names, 'object {} was not attached'
-            assert scm.difference(self.get_robot().get_self_collision_matrix()) == set()
-            assert len(scm) < len(self.get_robot().get_self_collision_matrix())
+            assert name in [n.short_name for n in self.get_robot().link_names]
+            # assert not self.get_world().groups(name)
+            # assert not name in self.get_object_names().object_names
+            # assert name in self.get_attached_objects().object_names, 'object {} was not attached'
+            # assert scm.difference(self.get_robot().get_self_collision_matrix()) == set()
+            # assert len(scm) < len(self.get_robot().get_self_collision_matrix())
             compare_poses(expected_pose.pose, lookup_pose(frame_id, name).pose)
         self.loop_once()
 

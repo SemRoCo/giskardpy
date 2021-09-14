@@ -8,7 +8,7 @@ from giskard_msgs.msg import MoveResult
 from numpy import pi
 from tf.transformations import quaternion_from_matrix, quaternion_about_axis
 
-from giskardpy import ROBOTNAME
+from giskardpy import RobotName, RobotPrefix
 from giskardpy.data_types import PrefixName
 from giskardpy.utils import logging
 from giskardpy.utils.tfwrapper import init as tf_init
@@ -116,7 +116,7 @@ class TestJointGoals(object):
         zero_pose.set_joint_goal(js)
         zero_pose.send_and_check_goal()
         # TODO you can do this by evaluation the joint expression
-        np.testing.assert_almost_equal(zero_pose.get_world().state[PrefixName('arm_lift_joint', ROBOTNAME)].position,
+        np.testing.assert_almost_equal(zero_pose.get_world().state[PrefixName('arm_lift_joint', RobotPrefix)].position,
                                        0.2, decimal=2)
 
 

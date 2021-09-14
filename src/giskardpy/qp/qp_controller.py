@@ -13,7 +13,8 @@ from giskardpy.exceptions import OutOfJointLimitsException, \
     HardConstraintsViolatedException
 from giskardpy.qp.constraint import VelocityConstraint, Constraint
 from giskardpy.qp.free_variable import FreeVariable
-from giskardpy.utils.utils import memoize, logging, create_path
+from giskardpy.utils import logging
+from giskardpy.utils.utils import memoize, create_path
 
 
 def save_pandas(dfs, names, path):
@@ -638,7 +639,7 @@ class QPController(object):
         return result
 
     def save_all_pandas(self):
-        if self.p_xdot is not None:
+        if hasattr(self, 'p_xdot') and self.p_xdot is not None:
             save_pandas([self.p_weights, self.p_A, self.p_lbA, self.p_ubA, self.p_lb, self.p_ub, self.p_xdot],
                         ['weights', 'A', 'lbA', 'ubA', 'lb', 'ub', 'xdot'],
                         u'../tmp_data')

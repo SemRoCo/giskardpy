@@ -4,9 +4,9 @@ from control_msgs.msg import FollowJointTrajectoryAction, FollowJointTrajectoryG
 from py_trees_ros.actions import ActionClient
 
 import giskardpy.identifier as identifier
+from giskardpy.utils import logging
 from giskardpy.utils.logging import loginfo
 from giskardpy.tree.plugin import GiskardBehavior
-from giskardpy.utils.utils import logging
 
 
 class SendTrajectory(ActionClient, GiskardBehavior):

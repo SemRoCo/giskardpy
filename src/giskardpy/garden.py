@@ -2,8 +2,6 @@ import functools
 from collections import defaultdict
 from copy import deepcopy
 
-import py_trees
-import py_trees_ros
 import rospy
 from control_msgs.msg import JointTrajectoryControllerState
 from giskard_msgs.msg import MoveAction
@@ -14,8 +12,8 @@ from rospy import ROSException
 
 import giskardpy.identifier as identifier
 import giskardpy.model.pybullet_wrapper as pbw
-from giskardpy import ROBOTNAME
-from giskardpy.data_types import BiDict, KeyDefaultDict, PrefixName
+from giskardpy import RobotName, RobotPrefix
+from giskardpy.data_types import BiDict, KeyDefaultDict, PrefixName, order_map
 from giskardpy.god_map import GodMap
 from giskardpy.model.world import WorldTree
 from giskardpy.tree.plugin import PluginBehavior
@@ -46,26 +44,12 @@ from giskardpy.tree.plugin_update_constraints import GoalToConstraints
 from giskardpy.tree.plugin_visualization import VisualizationBehavior
 from giskardpy.tree.plugin_world_visualization import WorldVisualizationBehavior
 from giskardpy.model.pybullet_world import PyBulletWorld
-from giskardpy.tree.tree_manager import TreeManager
+from giskardpy.tree.tree_manager import TreeManager, render_dot_tree
 from giskardpy.utils import logging
 from giskardpy.utils.math import max_velocity_from_horizon_and_jerk
-from giskardpy.utils.utils import create_path, render_dot_tree
-from giskardpy.model.world_object import WorldObject
-
-# TODO hardcode this somewhere else
-order_map = BiDict({
-    0: u'position',
-    1: u'velocity',
-    2: u'acceleration',
-    3: u'jerk',
-    4: u'snap',
-    5: u'crackle',
-    6: u'pop'
-})
-
+from giskardpy.utils.utils import create_path
 
 def initialize_god_map():
-    # FIXME i hate this function
     god_map = GodMap()
     blackboard = Blackboard
     blackboard.god_map = god_map
@@ -83,7 +67,7 @@ def initialize_god_map():
             controlled_joints = rospy.wait_for_message(u'/whole_body_controller/state',
                                                        JointTrajectoryControllerState,
                                                        timeout=5.0).joint_names
-            controlled_joints = [PrefixName(j, ROBOTNAME) for j in controlled_joints]
+            # controlled_joints = [PrefixName(j, ROBOTNAME) for j in controlled_joints]
             god_map.set_data(identifier.controlled_joints, list(sorted(controlled_joints)))
         except ROSException as e:
             logging.logerr(u'state topic not available')
@@ -94,28 +78,23 @@ def initialize_god_map():
 
     set_default_in_override_block(identifier.external_collision_avoidance, god_map)
     set_default_in_override_block(identifier.self_collision_avoidance, god_map)
-
-    world = WorldTree(god_map)
-    god_map.set_data(identifier.world, world)
-    world.add_urdf(god_map.get_data(identifier.robot_description), group_name=ROBOTNAME, prefix='robot')
-    # sanity_check_derivatives(god_map)
-
     # weights
     for i, key in enumerate(god_map.get_data(identifier.joint_weights), start=1):
-        d = set_default_in_override_block(identifier.joint_weights + [order_map[i], u'override'], god_map)
+        set_default_in_override_block(identifier.joint_weights + [order_map[i], u'override'], god_map)
         # world.robot.set_joint_weight_symbols(d, i)
-
 
     # limits
     for i, key in enumerate(god_map.get_data(identifier.joint_limits), start=1):
-        d_linear = set_default_in_override_block(identifier.joint_limits + [order_map[i], u'linear', u'override'],
-                                                 god_map)
-        d_angular = set_default_in_override_block(identifier.joint_limits + [order_map[i], u'angular', u'override'],
-                                                  god_map)
-        world.set_joint_limits(d_linear, d_angular, i)
+        set_default_in_override_block(identifier.joint_limits + [order_map[i], u'linear', u'override'], god_map)
+        set_default_in_override_block(identifier.joint_limits + [order_map[i], u'angular', u'override'], god_map)
 
     order = len(god_map.get_data(identifier.joint_weights))+1
     god_map.set_data(identifier.order, order)
+
+    world = WorldTree(god_map)
+    god_map.set_data(identifier.world, world)
+    # sanity_check_derivatives(god_map)
+
 
     # joint symbols
     # for o in range(order):
@@ -213,12 +192,12 @@ def grow_tree():
     god_map = initialize_god_map()
     # ----------------------------------------------
     wait_for_goal = Sequence(u'wait for goal')
-    # wait_for_goal.add_child(TFPublisher(u'tf', **god_map.get_data(identifier.TFPublisher)))
-    wait_for_goal.add_child(ConfigurationPlugin(u'js1', ROBOTNAME))
+    wait_for_goal.add_child(TFPublisher(u'tf', **god_map.get_data(identifier.TFPublisher)))
+    wait_for_goal.add_child(ConfigurationPlugin(u'js1', RobotPrefix))
     wait_for_goal.add_child(WorldUpdatePlugin(u'pybullet updater'))
     wait_for_goal.add_child(VisualizationBehavior(u'visualization'))
     wait_for_goal.add_child(GoalReceived(u'has goal', action_server_name, MoveAction))
-    wait_for_goal.add_child(ConfigurationPlugin(u'js2', ROBOTNAME))
+    wait_for_goal.add_child(ConfigurationPlugin(u'js2', RobotPrefix))
     # ----------------------------------------------
     planning_4 = PluginBehavior(u'planning IIII', sleep=0)
     # planning_4.add_plugin(CollisionChecker(u'coll'))

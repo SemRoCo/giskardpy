@@ -139,7 +139,7 @@ class Trajectory(object):
         """
         trajectory_msg = JointTrajectory()
         trajectory_msg.header.stamp = rospy.get_rostime() + rospy.Duration(0.5)
-        trajectory_msg.joint_names = [joint.short_name for joint in controlled_joints]
+        trajectory_msg.joint_names = controlled_joints
         for time, traj_point in self.items():
             p = JointTrajectoryPoint()
             p.time_from_start = rospy.Duration(time * sample_period)
@@ -456,17 +456,48 @@ class PrefixName(object):
         return hash(self.long_name)
 
     def __eq__(self, other):
-        return other.long_name == self.long_name
+        try:
+            return other.long_name == self.long_name
+        except AttributeError:
+            return str(self) == str(other)
+
+    def __ne__(self, other):
+        try:
+            return other.long_name != self.long_name
+        except AttributeError:
+            return str(self) != str(other)
 
     def __le__(self, other):
-        return self.long_name <= other.long_name
+        try:
+            return self.long_name <= other.long_name
+        except AttributeError:
+            return str(self) <= str(other.long_name)
+
 
     def __ge__(self, other):
-        return self.long_name >= other.long_name
+        try:
+            return self.long_name >= other.long_name
+        except AttributeError:
+            return str(self) >= str(other)
 
     def __gt__(self, other):
-        return self.long_name > other.long_name
+        try:
+            return self.long_name > other.long_name
+        except AttributeError:
+            return str(self) > str(other)
 
     def __lt__(self, other):
-        return self.long_name < other.long_name
+        try:
+            return self.long_name < other.long_name
+        except AttributeError:
+            return str(self) < str(other)
 
+order_map = BiDict({
+    0: u'position',
+    1: u'velocity',
+    2: u'acceleration',
+    3: u'jerk',
+    4: u'snap',
+    5: u'crackle',
+    6: u'pop'
+})

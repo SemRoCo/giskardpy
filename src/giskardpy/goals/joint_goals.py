@@ -1,6 +1,6 @@
 from __future__ import division
 
-from giskardpy import casadi_wrapper as w, identifier, ROBOTNAME
+from giskardpy import casadi_wrapper as w, identifier, RobotPrefix
 from giskardpy.data_types import PrefixName
 from giskardpy.exceptions import ConstraintException, ConstraintInitalizationException
 from giskardpy.goals.goal import Goal, WEIGHT_BELOW_CA
@@ -16,7 +16,7 @@ class JointPositionContinuous(Goal):
         :param weight: float, default WEIGHT_BELOW_CA
         :param max_velocity: float, rad/s, default 1423, meaning the urdf/config limits are active
         """
-        self.joint_name = joint_name
+        self.joint_name = PrefixName(joint_name, RobotPrefix)
         self.joint_goal = goal
         self.weight = weight
         self.max_velocity = max_velocity
@@ -65,7 +65,7 @@ class JointPositionPrismatic(Goal):
         :param weight: float, default WEIGHT_BELOW_CA
         :param max_velocity: float, m/s, default 4535, meaning the urdf/config limits are active
         """
-        self.joint_name = joint_name
+        self.joint_name = PrefixName(joint_name, RobotPrefix)
         self.goal = goal
         self.weight = weight
         self.max_velocity = max_velocity
@@ -121,7 +121,7 @@ class JointPositionRevolute(Goal):
         :param weight: float, default WEIGHT_BELOW_CA
         :param max_velocity: float, rad/s, default 3451, meaning the urdf/config limits are active
         """
-        self.joint_name = joint_name
+        self.joint_name = PrefixName(joint_name, RobotPrefix)
         self.goal = goal
         self.weight = weight
         self.max_velocity = max_velocity
@@ -413,7 +413,6 @@ class JointPositionList(Goal):
         """
         super(JointPositionList, self).__init__(**kwargs)
         for i, joint_name in enumerate(goal_state.name):
-            joint_name = PrefixName(joint_name, ROBOTNAME)
             if not self.robot.has_joint(joint_name):
                 raise KeyError(u'unknown joint "{}"'.format(joint_name))
             goal_position = goal_state.position[i]

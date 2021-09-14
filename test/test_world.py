@@ -9,7 +9,7 @@ from giskard_msgs.msg import CollisionEntry
 from hypothesis import given
 
 import test_urdf_object
-from giskardpy import identifier, ROBOTNAME
+from giskardpy import identifier, RobotName
 from giskardpy.data_types import JointStates, PrefixName
 from giskardpy.exceptions import DuplicateNameException, PhysicsWorldException, UnknownBodyException
 from giskardpy.god_map import GodMap
@@ -100,7 +100,7 @@ def world_with_robot(urdf):
     god_map.set_data(identifier.map_frame, 'map')
     world = WorldTree(god_map)
     god_map.set_data(identifier.world, world)
-    world.add_urdf(urdf, prefix=ROBOTNAME, group_name=ROBOTNAME)
+    world.add_urdf(urdf, group_name=RobotName)
     return world
 
 
@@ -138,16 +138,66 @@ class TestWorldTree(object):
     def test_load_pr2(self):
         world = create_world_with_pr2()
         parsed_urdf = self.parsed_pr2_urdf()
-        assert {n.short_name for n in world.link_names} == set(
-            list(parsed_urdf.link_map.keys()) + [world.root_link_name.short_name])
-        assert {n.short_name for n in world.joint_names} == set(list(parsed_urdf.joint_map.keys()) + [parsed_urdf.name])
+        assert set(world.link_names) == set(list(parsed_urdf.link_map.keys()) + [world.root_link_name.short_name])
+        assert set(world.joint_names) == set(
+            list(parsed_urdf.joint_map.keys()) + [PrefixName(parsed_urdf.name, world.connection_prefix)])
+
+    def test_load_pr2_twice(self):
+        world = create_world_with_pr2()
+        pr22_name = 'pr22'
+        try:
+            world.add_urdf(pr2_urdf(), group_name=RobotName)
+            assert False
+        except DuplicateNameException:
+            pass
+        try:
+            world.add_urdf(pr2_urdf(), group_name=RobotName, prefix=pr22_name)
+            assert False
+        except DuplicateNameException:
+            pass
+        world.add_urdf(pr2_urdf(), group_name='pr22', prefix=pr22_name)
+        pr21 = world.groups[RobotName]
+        pr22 = world.groups[pr22_name]
+        for link_name in pr22.link_names:
+            assert link_name.short_name in pr21.link_names
+        for joint_name in pr22.joint_names:
+            assert joint_name.short_name in pr21.joint_names
+        assert len(world.links) == len(pr21.links) + len(pr22.links) + 1
+
+    def test_add_box(self):
+        world = create_world_with_pr2()
+        box = make_world_body_box()
+        box_name = box.name
+        pose = Pose()
+        pose.orientation.w = 1
+        world.add_world_body(box, pose)
+        assert box.name in world.groups
+        assert box_name in world.links
+        assert PrefixName(box_name, world.connection_prefix) in world.joints
+
+    def test_attach_box(self):
+        world = create_world_with_pr2()
+        box = make_world_body_box()
+        box_name = PrefixName(box.name, None)
+        pose = Pose()
+        pose.orientation.w = 1
+        world.add_world_body(box, pose)
+        new_parent_link_name = PrefixName('r_gripper_tool_frame', RobotName)
+        old_fk = world.compute_fk_pose(world.root_link_name, box_name)
+
+        world.move_group(box.name, new_parent_link_name)
+
+        new_fk = world.compute_fk_pose(world.root_link_name, box_name)
+        assert box_name in world.groups[RobotName].link_names
+        assert world.joints[world.links[box_name].parent_joint_name].parent_link_name == new_parent_link_name
+        compare_poses(old_fk.pose, new_fk.pose)
 
     def test_load_hsr(self):
         world = create_world_with_hsr()
         parsed_urdf = self.parsed_hsr_urdf()
-        assert {n.short_name for n in world.link_names} == set(
-            list(parsed_urdf.link_map.keys()) + [world.root_link_name.short_name])
-        assert {n.short_name for n in world.joint_names} == set(list(parsed_urdf.joint_map.keys()) + [parsed_urdf.name])
+        assert set(world.link_names) == set(list(parsed_urdf.link_map.keys()) + [world.root_link_name.short_name])
+        assert set(world.joint_names) == set(
+            list(parsed_urdf.joint_map.keys()) + [PrefixName(parsed_urdf.name, world.connection_prefix)])
 
     def test_group_pr2_hand(self):
         world = create_world_with_pr2()
@@ -222,8 +272,8 @@ class TestWorldTree(object):
 
     def test_get_split_chain(self):
         world = create_world_with_pr2()
-        root_link = PrefixName('l_gripper_r_finger_tip_link', ROBOTNAME)
-        tip_link = PrefixName('l_gripper_l_finger_tip_link', ROBOTNAME)
+        root_link = PrefixName('l_gripper_r_finger_tip_link', RobotName)
+        tip_link = PrefixName('l_gripper_l_finger_tip_link', RobotName)
         chain1, connection, chain2 = world.compute_split_chain(root_link, tip_link)
         chain1 = [n.short_name for n in chain1]
         connection = [n.short_name for n in connection]
@@ -252,8 +302,8 @@ class TestWorldTree(object):
 
     def test_get_split_chain_hsr(self):
         world = create_world_with_hsr()
-        root_link = PrefixName('base_link', ROBOTNAME)
-        tip_link = PrefixName('hand_gripper_tool_frame', ROBOTNAME)
+        root_link = PrefixName('base_link', RobotName)
+        tip_link = PrefixName('hand_gripper_tool_frame', RobotName)
         chain1, connection, chain2 = world.compute_split_chain(root_link, tip_link)
         chain1 = [n.short_name for n in chain1]
         connection = [n.short_name for n in connection]

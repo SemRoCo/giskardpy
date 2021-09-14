@@ -9,7 +9,7 @@ from giskardpy.exceptions import UnreachableException, MAX_NWSR_REACHEDException
     ConstraintInitalizationException, PlanningException, ShakingException, ExecutionException, InvalidGoalException, \
     PreemptedException
 from giskardpy.tree.plugin import GiskardBehavior
-from giskardpy.utils.utils import logging
+from giskardpy.utils import logging
 
 
 class PostProcessing(GiskardBehavior):

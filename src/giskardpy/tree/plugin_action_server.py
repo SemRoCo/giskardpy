@@ -1,3 +1,5 @@
+from giskardpy.utils import logging
+
 try:
     # Python 2
     from Queue import Empty, Queue
@@ -14,7 +16,6 @@ from py_trees import Blackboard, Status
 import giskardpy.identifier as identifier
 from giskardpy.exceptions import PreemptedException
 from giskardpy.tree.plugin import GiskardBehavior
-from giskardpy.utils.utils import logging
 
 ERROR_CODE_TO_NAME = {getattr(MoveResult, x): x for x in dir(MoveResult) if x.isupper()}
 

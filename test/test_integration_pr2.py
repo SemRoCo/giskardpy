@@ -21,8 +21,9 @@ from giskardpy import identifier
 from giskardpy.goals.goal import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA, WEIGHT_COLLISION_AVOIDANCE
 from giskardpy.identifier import fk_pose
 from giskardpy.model.robot import Robot
+from giskardpy.utils import logging
 from giskardpy.utils.tfwrapper import init as tf_init
-from giskardpy.utils.utils import to_joint_state_position_dict, logging
+from giskardpy.utils.utils import to_joint_state_position_dict
 from utils_for_tests import PR2, compare_poses, compare_points, compare_orientations, publish_marker_vector
 
 # TODO roslaunch iai_pr2_sim ros_control_sim_with_base.launch

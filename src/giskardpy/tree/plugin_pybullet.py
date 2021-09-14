@@ -13,6 +13,7 @@ from sensor_msgs.msg import JointState
 from std_srvs.srv import Trigger, TriggerResponse
 
 import giskardpy.identifier as identifier
+from giskardpy import RobotName, RobotPrefix
 from giskardpy.data_types import JointStates, PrefixName
 from giskardpy.exceptions import CorruptShapeException, UnknownBodyException, \
     UnsupportedOptionException, DuplicateNameException
@@ -22,8 +23,9 @@ from giskardpy.model.world_object import WorldObject
 from giskardpy.tree.plugin import GiskardBehavior
 from giskardpy.tree.plugin_configuration import ConfigurationPlugin
 from giskardpy.tree.tree_manager import TreeManager
+from giskardpy.utils import logging
 from giskardpy.utils.tfwrapper import transform_pose
-from giskardpy.utils.utils import to_joint_state_position_dict, dict_to_joint_states, write_dict, logging
+from giskardpy.utils.utils import to_joint_state_position_dict, dict_to_joint_states, write_dict
 
 
 class WorldUpdatePlugin(GiskardBehavior):
@@ -288,43 +290,17 @@ class WorldUpdatePlugin(GiskardBehavior):
 
     def detach_object(self, req):
         # assumes that parent has god map lock
-        self.unsafe_get_world().detach(req.body.name)
-        try:
-            m = self.unsafe_get_world().get_object(req.body.name).as_marker_msg()
-            m.header.frame_id = self.map_frame
-            self.publish_object_as_marker(m)
-        except:
-            pass
+        self.world.move_branch(PrefixName(req.body.name, self.world.connection_prefix),
+                               self.world.root_link_name)
 
     def attach_object(self, req):
         """
         :type req: UpdateWorldRequest
         """
         # assumes that parent has god map lock
-        if self.unsafe_get_world().has_object(req.body.name):
-            p = PoseStamped()
-            p.header.frame_id = self.map_frame
-            p.pose = self.unsafe_get_world().get_object(req.body.name).base_pose
-            p = transform_pose(req.pose.header.frame_id, p)
-            world_object = self.unsafe_get_world().get_object(req.body.name)
-            self.unsafe_get_world().attach_existing_obj_to_robot(req.body.name, req.pose.header.frame_id, p.pose)
-            m = world_object.as_marker_msg()
-            m.header.frame_id = p.header.frame_id
-            m.pose = p.pose
-        else:
-            world_object = WorldObject.from_world_body(req.body)
-            self.unsafe_get_world().robot.attach_urdf_object(world_object,
-                                                             req.pose.header.frame_id,
-                                                             req.pose.pose)
-            logging.loginfo(u'--> attached object {} on link {}'.format(req.body.name, req.pose.header.frame_id))
-            m = world_object.as_marker_msg()
-            m.pose = req.pose.pose
-            m.header = req.pose.header
-        try:
-            m.frame_locked = True
-            self.publish_object_as_marker(m)
-        except:
-            pass
+        self.add_object(req)
+        self.world.move_branch(PrefixName(req.body.name, self.world.connection_prefix),
+                               PrefixName(req.pose.header.frame_id, RobotPrefix))
 
     def remove_object(self, name):
         # assumes that parent has god map lock
@@ -336,4 +312,4 @@ class WorldUpdatePlugin(GiskardBehavior):
 
     def clear_world(self):
         # assumes that parent has god map lock
-        self.unsafe_get_world().soft_reset()
+        self.unsafe_get_world().hard_reset()

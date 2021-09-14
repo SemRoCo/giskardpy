@@ -1,7 +1,7 @@
 from __future__ import division
 
 import giskardpy.utils.tfwrapper as tf
-from giskardpy import casadi_wrapper as w, ROBOTNAME
+from giskardpy import casadi_wrapper as w, RobotName, RobotPrefix
 from giskardpy.data_types import PrefixName
 from giskardpy.goals.goal import Goal, WEIGHT_ABOVE_CA
 
@@ -26,8 +26,8 @@ class CartesianPosition(Goal):
         """
         if reference_velocity is None:
             reference_velocity = max_velocity
-        self.root_link = PrefixName(root_link, ROBOTNAME)
-        self.tip_link = PrefixName(tip_link, ROBOTNAME)
+        self.root_link = PrefixName(root_link, RobotPrefix)
+        self.tip_link = PrefixName(tip_link, RobotPrefix)
         self.goal_pose = tf.transform_pose(self.root_link.short_name, goal)
         self.reference_velocity = reference_velocity
         self.max_velocity = max_velocity
@@ -60,8 +60,8 @@ class CartesianOrientation(Goal):
         super(CartesianOrientation, self).__init__(**kwargs)
         if reference_velocity is None:
             reference_velocity = max_velocity
-        self.root_link = PrefixName(root_link, ROBOTNAME)
-        self.tip_link = PrefixName(tip_link, ROBOTNAME)
+        self.root_link = PrefixName(root_link, RobotPrefix)
+        self.tip_link = PrefixName(tip_link, RobotPrefix)
         self.goal_pose = tf.transform_pose(self.root_link.short_name, goal)
         self.reference_velocity = reference_velocity
         self.max_velocity = max_velocity
@@ -189,8 +189,8 @@ class TranslationVelocityLimit(Goal):
         :param hard: bool, default True, will turn this into a hard constraint, that will always be satisfied, can could
                                 make some goal combination infeasible
         """
-        self.root_link = PrefixName(root_link, ROBOTNAME)
-        self.tip_link = PrefixName(tip_link, ROBOTNAME)
+        self.root_link = PrefixName(root_link, RobotPrefix)
+        self.tip_link = PrefixName(tip_link, RobotPrefix)
         self.hard = hard
         self.weight = weight
         self.max_velocity = max_velocity
@@ -225,8 +225,8 @@ class RotationVelocityLimit(Goal):
         :param hard: bool, default True, will turn this into a hard constraint, that will always be satisfied, can could
                                 make some goal combination infeasible
         """
-        self.root_link = PrefixName(root_link, ROBOTNAME)
-        self.tip_link = PrefixName(tip_link, ROBOTNAME)
+        self.root_link = PrefixName(root_link, RobotPrefix)
+        self.tip_link = PrefixName(tip_link, RobotPrefix)
         self.hard = hard
 
         self.weight = weight

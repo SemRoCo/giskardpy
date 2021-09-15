@@ -297,10 +297,11 @@ class WorldUpdatePlugin(GiskardBehavior):
 
     def detach_object(self, req):
         # assumes that parent has god map lock
-        self.world.move_branch(PrefixName(req.body.name, self.world.connection_prefix),
+        self.world.move_group(req.body.name,
                                self.world.root_link_name)
         # todo remove all links of deteched subtree
         # self.bullet.update_collision_matrix(RobotName, removed_links=sub_tree.get_link_names())
+        self.bullet.init_collision_matrix(RobotName)
 
     def attach_object(self, req):
         """
@@ -310,9 +311,10 @@ class WorldUpdatePlugin(GiskardBehavior):
         self.add_object(req)
         self.world.move_branch(PrefixName(req.body.name, self.world.connection_prefix),
                                PrefixName(req.pose.header.frame_id, RobotPrefix))
-        self.bullet.update_collision_matrix(group_name=RobotName,
-                                            added_links=set(product(self.robot.link_names_with_collisions,
-                                                                    self.world.groups[req.body.name].link_names_with_collisions)))
+        self.bullet.init_collision_matrix(RobotName)
+        # self.bullet.update_collision_matrix(group_name=RobotName,
+        #                                     added_links=set(product(self.robot.link_names_with_collisions,
+        #                                                             self.world.groups[req.body.name].link_names_with_collisions)))
 
     def remove_object(self, name):
         # assumes that parent has god map lock

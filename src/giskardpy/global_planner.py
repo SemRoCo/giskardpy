@@ -4,6 +4,7 @@ import json
 import sys
 import threading
 from collections import namedtuple
+from queue import Queue
 
 import rospy
 import yaml
@@ -63,6 +64,7 @@ class TwoDimRayMotionValidator(ob.MotionValidator, GiskardBehavior): #TODO: use 
         self.tip_link = tip_link
         self.object_in_motion = object_in_motion
         self.is_3D = is_3D
+        self.collision_infos = list()
         self.init_ignore_objects()
         self.update_collision_shape()
 
@@ -83,33 +85,83 @@ class TwoDimRayMotionValidator(ob.MotionValidator, GiskardBehavior): #TODO: use 
         self.tip_link = tip_link
         self.update_collision_shape()
 
-    def update_collision_shape(self):
-        self.collision_info = None
-        if self.tip_link is not None:
-            cur_pose = self.object_in_motion.get_fk_pose(self.object_in_motion.get_root(), self.tip_link)
-            cur_pos = cur_pose.pose.position
+    def get_collision_info(self, link):
+        if self.object_in_motion.has_link_collision(link):
             obj_id = self.object_in_motion.get_pybullet_id()
-            link_id = pw.get_link_id(obj_id, self.tip_link)
-            ci = pw.get_collision_shape_data(obj_id, link_id)
-            if ci is not None:
-                aabbs = p.getAABB(obj_id, link_id)
-                aabbs_ind = [[aabb[0] - cur_pos.x, aabb[1] - cur_pos.y, aabb[2] - cur_pos.z] for aabb in aabbs]
-                self.collision_info = CollisionInfo(self.tip_link, aabbs_ind[0], aabbs_ind[1])
-            else: # FIXME: above if-case makes only sense, if tip_link has not interaction intend.
-                  # FIXME: if interaction with tip_link is needed above collision info should not be saved.
-                  # FIXME: Moreover, more parents and child links of tip_link should be saved
-                  # FIXME: if the connection/joint is fixed.
-                parent_link = link_id
-                while self.collision_info is None:
-                    parent_link = pw.get_parent_id(obj_id, parent_link)
-                    ci = pw.get_collision_shape_data(obj_id, parent_link)
-                    if ci is not None:
-                        aabbs = p.getAABB(obj_id, parent_link)
-                        cur_pose = self.object_in_motion.get_fk_pose(self.object_in_motion.get_root(), pw.getJointInfo(obj_id, parent_link)[12])
-                        cur_pos = cur_pose.pose.position
-                        aabbs_ind = [[aabb[0] - cur_pos.x, aabb[1] - cur_pos.y, aabb[2] - cur_pos.z] for aabb in aabbs]
-                        self.collision_info = CollisionInfo(pw.getJointInfo(obj_id, parent_link)[12], aabbs_ind[0], aabbs_ind[1])
-        return self.collision_info is not None
+            link_id = pw.get_link_id(obj_id, link)
+            cur_pose = self.object_in_motion.get_fk_pose(self.object_in_motion.get_root(), link)
+            cur_pos = cur_pose.pose.position
+            aabbs = p.getAABB(obj_id, link_id)
+            aabbs_ind = [[aabb[0] - cur_pos.x, aabb[1] - cur_pos.y, aabb[2] - cur_pos.z] for aabb in aabbs]
+            return CollisionInfo(link, aabbs_ind[0], aabbs_ind[1])
+
+    def add_first_collision_info(self, joint_names, children_of_tip_link):
+        joint_names_r = joint_names if children_of_tip_link else reversed(joint_names)
+        for j_n in joint_names_r:
+            if children_of_tip_link:
+                link_name = self.object_in_motion.get_child_link_of_joint(j_n)
+            else:
+                link_name = self.object_in_motion.get_parent_link_of_joint(j_n)
+            if self.object_in_motion.has_link_collision(link_name):
+                self.collision_infos.append(self.get_collision_info(link_name))
+                return True
+        return False
+
+    def search_childs_for_collision_information(self, start_link, assume_fixed_joints=False):
+        queue = Queue()
+        queue.put(start_link)
+        visited = [start_link]
+
+        while not queue.empty():
+            link_popped = queue.get()
+
+            if link_popped != start_link:
+                rospy.logwarn(u'Breadth-First searching for collision information'
+                              u' further the childs of {}.'.format(start_link))
+
+            children_joint_names = self.object_in_motion.get_child_joints_of_link(link_popped)
+            if children_joint_names is not None:
+                fixed_children_joint_names = [c_n for c_n in children_joint_names
+                                              if self.object_in_motion.is_joint_fixed(c_n) or assume_fixed_joints]
+                added = self.add_first_collision_info(fixed_children_joint_names, children_of_tip_link=True)
+                if added:
+                    return True
+                else:
+                    children_link_names = [self.object_in_motion.get_child_link_of_joint(c_n)
+                                           for c_n in children_joint_names]
+                    for link_name in children_link_names:
+                        if link_name not in visited:
+                            visited.append(link_name)
+                            queue.put(link_name)
+        return False
+
+    def update_collision_shape(self):
+        self.collision_infos = list()
+        if self.tip_link is not None:
+            tip_link_interaction = self.object_in_motion.get_child_links_of_link(self.tip_link) is None
+            # If tip link is not used for interaction and has collision information,
+            # we use only this information for raytesting, otherwise...
+            if not tip_link_interaction:
+                ci = self.get_collision_info(self.tip_link)
+                if ci is not None:
+                    self.collision_infos.append(ci)
+                    return True
+
+            # ... we check the parent links of the tip link for fixed links and their collision information.
+            chain_joint_names = self.object_in_motion.get_joint_names_from_chain(self.object_in_motion.get_root(), self.tip_link)
+            fixed_joint_names = [j_n for j_n in chain_joint_names if self.object_in_motion.is_joint_fixed(j_n)]
+            added = self.add_first_collision_info(fixed_joint_names, children_of_tip_link=False)
+            # If there were no fixed parent links with collision information added,
+            # we search for collision information in the childs links if possible.
+            if not added and not tip_link_interaction:
+                self.search_childs_for_collision_information(self.tip_link)
+            # Further we model interaction tip_links such that it makes sense to search,
+            # for neighboring links and their collision information. Since the joints
+            # of these links are normally not fixed, we assume that they are.
+            if tip_link_interaction:
+                parent = self.object_in_motion.get_parent_link_of_link(self.tip_link)
+                self.search_childs_for_collision_information(parent, assume_fixed_joints=True)
+        return len(self.collision_infos) > 0
 
     def aabb_to_3d_points(self, d, u):
         d_new = [d[0], d[1], u[2]]
@@ -143,24 +195,27 @@ class TwoDimRayMotionValidator(ob.MotionValidator, GiskardBehavior): #TODO: use 
             # Shoot ray from start to end pose and check if it intersects with the kitchen,
             # if so return false, else true.
             # TODO: for each loop for every collision info
-            if self.is_3D:
-                aabbs = self.aabb_to_3d_points(self.collision_info.d, self.collision_info.u)
-                query_b = [[x_b + aabb[0], y_b + aabb[1], z_b + aabb[2]] for aabb in aabbs]
-                query_e = [[x_e + aabb[0], y_e + aabb[1], z_e + aabb[2]] for aabb in aabbs]
-            else:
-                aabbs = self.aabb_to_2d_points(self.collision_info.d, self.collision_info.u)
-                query_b = [[x_b + aabb[0], y_b + aabb[1], 0] for aabb in aabbs]
-                query_e = [[x_e + aabb[0], y_e + aabb[1], 0] for aabb in aabbs]
-            # If the aabb box is not from the self.tip_link, add the translation from the
-            # self.tip_link to the collision info link.
-            if self.collision_info.link != self.tip_link:
-                tip_link_2_coll_link_pose = lookup_pose(self.tip_link, self.collision_info.link)
-                point = tip_link_2_coll_link_pose.pose.position
-                query_b = [[point.x + q_b[0], point.y + q_b[1], point.z + q_b[2]] for q_b in deepcopy(query_b)]
-                query_e = [[point.x + q_e[0], point.y + q_e[1], point.z + q_e[2]] for q_e in deepcopy(query_e)]
-            query_res = p.rayTestBatch(query_b, query_e)
-            # todo: check if actually works, stepSimulation or p.performCollisionDetection()?
-            return all([obj == -1 or obj in self.ignore_object_ids for obj, _, _, _, _ in query_res])
+            for collision_info in self.collision_infos:
+                if self.is_3D:
+                    aabbs = self.aabb_to_3d_points(collision_info.d, collision_info.u)
+                    query_b = [[x_b + aabb[0], y_b + aabb[1], z_b + aabb[2]] for aabb in aabbs]
+                    query_e = [[x_e + aabb[0], y_e + aabb[1], z_e + aabb[2]] for aabb in aabbs]
+                else:
+                    aabbs = self.aabb_to_2d_points(collision_info.d, collision_info.u)
+                    query_b = [[x_b + aabb[0], y_b + aabb[1], 0] for aabb in aabbs]
+                    query_e = [[x_e + aabb[0], y_e + aabb[1], 0] for aabb in aabbs]
+                # If the aabb box is not from the self.tip_link, add the translation from the
+                # self.tip_link to the collision info link.
+                if collision_info.link != self.tip_link:
+                    tip_link_2_coll_link_pose = lookup_pose(self.tip_link, collision_info.link)
+                    point = tip_link_2_coll_link_pose.pose.position
+                    query_b = [[point.x + q_b[0], point.y + q_b[1], point.z + q_b[2]] for q_b in deepcopy(query_b)]
+                    query_e = [[point.x + q_e[0], point.y + q_e[1], point.z + q_e[2]] for q_e in deepcopy(query_e)]
+                query_res = p.rayTestBatch(query_b, query_e)
+                collision_free = all([obj == -1 or obj in self.ignore_object_ids for obj, _, _, _, _ in query_res])
+                if not collision_free:
+                    return False
+            return True
 
     def __str__(self):
         return u'TwoDimRayMotionValidator'

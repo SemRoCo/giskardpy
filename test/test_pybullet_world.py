@@ -29,7 +29,7 @@ folder_name = u'tmp_data/'
 @pytest.fixture(scope=u'module')
 def module_setup(request):
     logging.loginfo(u'starting pybullet')
-    pbw.start_pybullet(False)
+    pbw.start_pybullet(True)
 
     logging.loginfo(u'deleting tmp test folder')
     try:
@@ -357,7 +357,7 @@ class TestPyBulletSyncer(object):
         """
         :type pr2_world: PyBulletSyncer
         """
-        print(pr2_world.calc_collision_matrix('robot', num_rnd_tries=10))
+        print(pr2_world.calc_collision_matrix('robot', num_rnd_tries=1000))
 
 # import pytest
 # pytest.main(['-s', __file__ + '::TestPyBulletSyncer::test_compute_collision_matrix'])

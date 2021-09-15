@@ -299,6 +299,20 @@ class GiskardTestWrapper(GiskardWrapper):
         self.joint_state_publisher = KeyDefaultDict(create_publisher)
         # rospy.sleep(1)
 
+    @property
+    def bullet(self):
+        """
+        :rtype: giskardpy.model.pybullet_syncer.PyBulletSyncer
+        """
+        return self.get_god_map().unsafe_get_data(identifier.bullet)
+
+    @property
+    def robot_self_collision_matrix(self):
+        """
+        :rtype: list
+        """
+        return self.bullet.collision_matrices[RobotName]
+
     def start_motion_cb(self, msg):
         self.time = time()
 
@@ -762,7 +776,8 @@ class GiskardTestWrapper(GiskardWrapper):
 
     def attach_box(self, name=u'box', size=None, frame_id=None, position=None, orientation=None, pose=None,
                    expected_response=UpdateWorldResponse.SUCCESS):
-        # scm = self.get_robot().get_self_collision_matrix()
+
+        scm = self.robot_self_collision_matrix
         if pose is None:
             expected_pose = PoseStamped()
             expected_pose.header.frame_id = frame_id
@@ -784,8 +799,8 @@ class GiskardTestWrapper(GiskardWrapper):
             # assert not self.get_world().groups(name)
             # assert not name in self.get_object_names().object_names
             # assert name in self.get_attached_objects().object_names, 'object {} was not attached'
-            # assert scm.difference(self.get_robot().get_self_collision_matrix()) == set()
-            # assert len(scm) < len(self.get_robot().get_self_collision_matrix())
+            assert scm.difference(self.robot_self_collision_matrix) == set()
+            assert len(scm) < len(self.robot_self_collision_matrix)
             compare_poses(expected_pose.pose, lookup_pose(frame_id, name).pose)
         self.loop_once()
 

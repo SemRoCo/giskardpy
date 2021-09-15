@@ -35,8 +35,10 @@ class WorldUpdatePlugin(GiskardBehavior):
         super(WorldUpdatePlugin, self).__init__(name)
         self.map_frame = self.get_god_map().get_data(identifier.map_frame)
         self.original_link_names = self.robot.link_names
-        self.pybullet_syncer = PyBulletSyncer(self.world, True)
-        self.pybullet_syncer.sync()
+        self.bullet = PyBulletSyncer(self.world, self.god_map.get_data(identifier.gui))
+        self.bullet.calc_collision_matrix(RobotName)
+        self.god_map.set_data(identifier.bullet, self.bullet)
+        # self.bullet.sync()
         self.lock = Lock()
 
     def setup(self, timeout=5.0):
@@ -303,6 +305,7 @@ class WorldUpdatePlugin(GiskardBehavior):
         self.add_object(req)
         self.world.move_branch(PrefixName(req.body.name, self.world.connection_prefix),
                                PrefixName(req.pose.header.frame_id, RobotPrefix))
+        self.bullet.calc_collision_matrix(RobotName)
 
     def remove_object(self, name):
         # assumes that parent has god map lock

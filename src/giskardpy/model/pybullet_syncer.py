@@ -10,11 +10,7 @@ from giskardpy.model.world import SubWorldTree
 from giskardpy.model.world import WorldTree
 from giskardpy.utils import logging
 from giskardpy.utils.tfwrapper import np_to_pose
-
-
-class PyBulletObject(object):
-    def __init__(self):
-        pass
+from giskardpy.utils.utils import resolve_ros_iris
 
 
 class PyBulletSyncer(object):
@@ -22,6 +18,14 @@ class PyBulletSyncer(object):
         pbw.start_pybullet(gui)
         self.object_name_to_bullet_id = BiDict()
         self.world = world # type: WorldTree
+        self.collision_matrices = {}
+
+    @property
+    def god_map(self):
+        """
+        :rtype: giskardpy.god_map.GodMap
+        """
+        return self.world.god_map
 
     @profile
     def add_object(self, link):
@@ -42,9 +46,9 @@ class PyBulletSyncer(object):
         orientation = pose[4:]
         pbw.resetBasePositionAndOrientation(self.object_name_to_bullet_id[link.name], position, orientation)
 
-    def calc_collision_matrix(self, group, link_combinations=None, d=0.05, d2=0.0, num_rnd_tries=2000):
+    def calc_collision_matrix(self, group_name, link_combinations=None, d=0.05, d2=0.0, num_rnd_tries=200):
         """
-        :type group: str
+        :type group_name: str
         :param link_combinations: set with link name tuples
         :type link_combinations: set
         :param d: distance threshold to detect links that are always in collision
@@ -56,7 +60,7 @@ class PyBulletSyncer(object):
         :return: set of link name tuples which are sometimes in collision.
         :rtype: set
         """
-        group = self.world.groups[group] # type: SubWorldTree
+        group = self.world.groups[group_name] # type: SubWorldTree
         if link_combinations is None:
             link_combinations = set(combinations(group.link_names_with_collisions, 2))
         # TODO computational expansive because of too many collision checks
@@ -98,7 +102,8 @@ class PyBulletSyncer(object):
         logging.loginfo(u'calculated self collision matrix in {:.3f}s'.format(time() - t))
         group.state = joint_state_tmp
 
-        return sometimes
+        self.collision_matrices[group_name] = sometimes
+        return self.collision_matrices[group_name]
 
     def check_collisions(self, link_combinations, distance):
         in_collision = set()
@@ -119,6 +124,7 @@ class PyBulletSyncer(object):
         :type world: giskardpy.model.world.WorldTree
         """
         # pbw.clear_pybullet()
+        pbw.deactivate_rendering()
         t = time()
         self.fks = self.world.compute_all_fks()
         for link_name, link in self.world.links.items():
@@ -127,4 +133,13 @@ class PyBulletSyncer(object):
                     self.update_pose(link)
                 else:
                     self.add_object(link)
-        print('sync took {}'.format(time() - t))
+        pbw.activate_rendering()
+
+    # def __add_ground_plane(self):
+    #     """
+    #     Adds a ground plane to the Bullet World.
+    #     """
+    #     path = resolve_ros_iris(u'package://giskardpy/urdfs/ground_plane.urdf')
+    #     plane = WorldObject.from_urdf_file(path)
+    #     plane.set_name(self.ground_plane_name)
+    #     self.add_object(plane)

@@ -14,9 +14,9 @@ class FreeVariable(object):
         self.name = str(self._symbols[0])
         self.lower_limits = lower_limits
         self.upper_limits = upper_limits
-        self._quadratic_weights = quadratic_weights
+        self.quadratic_weights = quadratic_weights
         assert max(self._symbols.keys()) == len(self._symbols) - 1
-        assert len(self._symbols) == len(self._quadratic_weights) + 1
+        assert len(self._symbols) == len(self.quadratic_weights) + 1
         self.order = len(self._symbols)
 
         self.horizon_functions = defaultdict(float)
@@ -50,18 +50,11 @@ class FreeVariable(object):
         except Exception:
             return False
 
-    def get_quadratic_weights(self, order):
-        try:
-            return self._quadratic_weights[order]
-        except KeyError:
-            raise KeyError(u'Free variable {} doesn\'t have weight for derivative of order {}'.format(self, order))
-
     def normalized_weight(self, t, order, prediction_horizon):
-        weight = self.get_quadratic_weights(order)
+        weight = self.quadratic_weights[order]
         start = weight * self.horizon_functions[order]
-        a = (weight - start) / (prediction_horizon)
+        a = (weight - start) / prediction_horizon
         weight = a*t + start
-        # weight = (self.get_quadratic_weights(order), t)
         return weight * (1 / self.get_upper_limit(order)) ** 2
 
     def __str__(self):

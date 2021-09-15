@@ -130,12 +130,11 @@ class Joint(object):
                 except AttributeError:
                     lower_limits[1] = None
                     upper_limits[1] = None
-                lower_limits[2] = -1e3
-                upper_limits[2] = 1e3
-                lower_limits[3] = -30
-                upper_limits[3] = 30
+                lower_limits[2] = -100
+                upper_limits[2] = 100
+                lower_limits[3] = -100
+                upper_limits[3] = 100
 
-                # TODO get rosparam data
                 free_variable = FreeVariable(symbols={
                     0: god_map.to_symbol(identifier.joint_states + [joint.name, 'position']),
                     1: god_map.to_symbol(identifier.joint_states + [joint.name, 'velocity']),
@@ -144,7 +143,7 @@ class Joint(object):
                 },
                     lower_limits=lower_limits,
                     upper_limits=upper_limits,
-                    quadratic_weights={1: 0.01, 2: 0, 3: 0})
+                    quadratic_weights={1: 0, 2: 0, 3: 0})
                 joint.set_free_variables([free_variable])
         return joint
 

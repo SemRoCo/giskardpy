@@ -278,7 +278,8 @@ class WorldTree(object):
         with suppress_stderr():
             parsed_urdf = up.URDF.from_xml_string(hacky_urdf_parser_fix(urdf))  # type: up.Robot
         if group_name in self.groups:
-            raise DuplicateNameException('Failed to add group \'{}\' because one with such a name already exists'.format(group_name))
+            raise DuplicateNameException(
+                'Failed to add group \'{}\' because one with such a name already exists'.format(group_name))
         if parent_link_name is None:
             parent_link = self.root_link
         else:
@@ -366,6 +367,9 @@ class WorldTree(object):
                 d_angular = KeyDefaultDict(lambda key: self.god_map.to_symbol(order_identifier +
                                                                               [u'angular', u'override', key]))
                 self.set_joint_limits(d_linear, d_angular, i)
+            for i in range(1, self.god_map.unsafe_get_data(identifier.order)):
+                self.set_joint_weights(i, self.god_map.unsafe_get_data(identifier.joint_weights +
+                                                                       [order_map[i], 'override']))
         except KeyError:
             logging.logwarn('Can\'t add robot, because it is not on the param server')
         self.soft_reset()
@@ -578,6 +582,11 @@ class WorldTree(object):
             else:
                 joint.free_variable.lower_limits[order] = w.max(old_lower_limits,
                                                                 -new_limits[joint.name])
+
+    def set_joint_weights(self, order, weights):
+        for joint_name, joint in self.joints.items():
+            if self.is_joint_movable(joint_name) and not self.is_joint_mimic(joint_name):
+                joint.free_variable.quadratic_weights[order] = weights[joint_name]
 
     def set_joint_state_to_zero(self):
         self.state = JointStates()

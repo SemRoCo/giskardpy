@@ -15,8 +15,8 @@ from giskardpy.model.pybullet_world import PyBulletWorld
 from giskardpy.model.pybullet_world_object import PyBulletWorldObject
 from giskardpy.model.robot import Robot
 from giskardpy.model.utils import make_world_body_box, make_world_body_sphere, make_world_body_cylinder
-from giskardpy.utils.utils import logging
 from giskardpy.model.world_object import WorldObject
+from giskardpy.utils import logging
 from test_world import create_world_with_pr2
 from utils_for_tests import pr2_urdf, base_bot_urdf, donbot_urdf
 
@@ -65,7 +65,7 @@ def pr2_world(request, function_setup):
     """
 
     world = create_world_with_pr2()
-    pbs = PyBulletSyncer(world, False)
+    pbs = PyBulletSyncer(world, True)
     pbs.sync()
     return pbs
 

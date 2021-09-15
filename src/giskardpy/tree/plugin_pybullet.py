@@ -17,6 +17,7 @@ from giskardpy import RobotName, RobotPrefix
 from giskardpy.data_types import JointStates, PrefixName
 from giskardpy.exceptions import CorruptShapeException, UnknownBodyException, \
     UnsupportedOptionException, DuplicateNameException
+from giskardpy.model.pybullet_syncer import PyBulletSyncer
 from giskardpy.model.urdf_object import URDFObject
 from giskardpy.model.world import SubWorldTree
 from giskardpy.model.world_object import WorldObject
@@ -34,6 +35,8 @@ class WorldUpdatePlugin(GiskardBehavior):
         super(WorldUpdatePlugin, self).__init__(name)
         self.map_frame = self.get_god_map().get_data(identifier.map_frame)
         self.original_link_names = self.robot.link_names
+        self.pybullet_syncer = PyBulletSyncer(self.world, True)
+        self.pybullet_syncer.sync()
         self.lock = Lock()
 
     def setup(self, timeout=5.0):

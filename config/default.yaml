@@ -33,9 +33,9 @@ plugins:
   VisualizationBehavior: # planning visualization through markers, slows planning down a little bit
     enabled: True
   WorldVisualizationBehavior: # planning world visualization through markers, slows planning down a little bit
-    enabled: True
+    enabled: False
   CPIMarker: # contact visualization, slows planning down a little bit
-    enabled: True
+    enabled: False
   PlotTrajectory: # plots the joint trajectory at the end of planning, useful for debugging
     enabled: False
     velocity_threshold: 0.0 # only joints that exceed this velocity threshold will be added to the plot. Use a negative number if you want to include every joint

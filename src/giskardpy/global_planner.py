@@ -88,7 +88,7 @@ class TwoDimRayMotionValidator(ob.MotionValidator, GiskardBehavior): #TODO: use 
     def get_collision_info(self, link):
         if self.object_in_motion.has_link_collision(link):
             obj_id = self.object_in_motion.get_pybullet_id()
-            link_id = pw.get_link_id(obj_id, link)
+            link_id = self.object_in_motion.get_pybullet_link_id(link)
             cur_pose = self.object_in_motion.get_fk_pose(self.object_in_motion.get_root(), link)
             cur_pos = cur_pose.pose.position
             aabbs = p.getAABB(obj_id, link_id)
@@ -117,7 +117,7 @@ class TwoDimRayMotionValidator(ob.MotionValidator, GiskardBehavior): #TODO: use 
 
             if link_popped != start_link:
                 rospy.logwarn(u'Breadth-First searching for collision information'
-                              u' further the childs of {}.'.format(start_link))
+                              u' further the children of {}.'.format(start_link))
 
             children_joint_names = self.object_in_motion.get_child_joints_of_link(link_popped)
             if children_joint_names is not None:

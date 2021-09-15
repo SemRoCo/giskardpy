@@ -25,6 +25,9 @@ class GiskardBehavior(Behaviour):
 
     @property
     def robot(self):
+        """
+        :rtype: giskardpy.model.world.SubWorldTree
+        """
         return self.world.groups[RobotName]
 
     def get_world(self):

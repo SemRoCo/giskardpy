@@ -33,6 +33,7 @@ class WorldUpdatePlugin(GiskardBehavior):
     def __init__(self, name):
         super(WorldUpdatePlugin, self).__init__(name)
         self.map_frame = self.get_god_map().get_data(identifier.map_frame)
+        self.original_link_names = self.robot.link_names
         self.lock = Lock()
 
     def setup(self, timeout=5.0):
@@ -193,13 +194,11 @@ class WorldUpdatePlugin(GiskardBehavior):
         return res
 
     def get_attached_objects(self, req):
-        original_robot = URDFObject(self.get_robot().original_urdf)
-        link_names = self.get_robot().get_link_names()
-        original_link_names = original_robot.get_link_names()
-        attached_objects = list(set(link_names).difference(original_link_names))
-        attachment_points = [self.get_robot().get_parent_link_of_joint(object) for object in attached_objects]
+        link_names = self.robot.link_names
+        attached_links = [str(s) for s in set(link_names).difference(self.original_link_names)]
+        attachment_points = []
         res = GetAttachedObjectsResponse()
-        res.object_names = attached_objects
+        res.object_names = attached_links
         res.attachment_points = attachment_points
         return res
 

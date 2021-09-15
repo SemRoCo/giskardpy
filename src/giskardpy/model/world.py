@@ -492,7 +492,7 @@ class WorldTree(object):
         try:
             homo_m = self.compute_fk_np(root, tip)
             p = PoseStamped()
-            p.header.frame_id = root
+            p.header.frame_id = str(root)
             p.pose = homo_matrix_to_pose(homo_m)
         except Exception as e:
             print(e)

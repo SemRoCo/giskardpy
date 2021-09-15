@@ -45,7 +45,7 @@ class TFPublisher(GiskardBehavior):
                         for link_name in attached_links:
                             parent_link_name = self.robot.get_parent_link_of_link(link_name)
                             fk = get_fk(parent_link_name, link_name)
-                            tf = self.make_transform(str(fk.header.frame_id.short_name), link_name.short_name, fk.pose)
+                            tf = self.make_transform(fk.header.frame_id, str(link_name), fk.pose)
                             tf_msg.transforms.append(tf)
                 if self.publish_world_objects:
                     for group_name, group in self.world.groups.items():
@@ -56,7 +56,7 @@ class TFPublisher(GiskardBehavior):
                             continue
                         get_fk = self.world.compute_fk_pose
                         fk = get_fk(self.world.root_link_name, group.root_link_name)
-                        tf = self.make_transform(str(fk.header.frame_id.short_name), group.root_link_name.short_name, fk.pose)
+                        tf = self.make_transform(fk.header.frame_id, str(group.root_link_name), fk.pose)
                         tf_msg.transforms.append(tf)
                 self.tf_pub.publish(tf_msg)
 

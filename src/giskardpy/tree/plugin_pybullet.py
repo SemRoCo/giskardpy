@@ -1,6 +1,7 @@
 import os
 import traceback
 from datetime import datetime
+from itertools import product
 from multiprocessing import Lock
 
 import rospy
@@ -36,7 +37,7 @@ class WorldUpdatePlugin(GiskardBehavior):
         self.map_frame = self.get_god_map().get_data(identifier.map_frame)
         self.original_link_names = self.robot.link_names
         self.bullet = PyBulletSyncer(self.world, self.god_map.get_data(identifier.gui))
-        self.bullet.calc_collision_matrix(RobotName)
+        self.bullet.init_collision_matrix(RobotName)
         self.god_map.set_data(identifier.bullet, self.bullet)
         # self.bullet.sync()
         self.lock = Lock()
@@ -262,8 +263,10 @@ class WorldUpdatePlugin(GiskardBehavior):
                         return UpdateWorldResponse(UpdateWorldResponse.CORRUPT_URDF_ERROR, str(e))
                     return UpdateWorldResponse(UpdateWorldResponse.CORRUPT_SHAPE_ERROR, str(e))
                 except UnknownBodyException as e:
+                    traceback.print_exc()
                     return UpdateWorldResponse(UpdateWorldResponse.MISSING_BODY_ERROR, str(e))
                 except KeyError as e:
+                    traceback.print_exc()
                     return UpdateWorldResponse(UpdateWorldResponse.MISSING_BODY_ERROR, str(e))
                 except DuplicateNameException as e:
                     return UpdateWorldResponse(UpdateWorldResponse.DUPLICATE_BODY_ERROR, str(e))
@@ -296,6 +299,8 @@ class WorldUpdatePlugin(GiskardBehavior):
         # assumes that parent has god map lock
         self.world.move_branch(PrefixName(req.body.name, self.world.connection_prefix),
                                self.world.root_link_name)
+        # todo remove all links of deteched subtree
+        # self.bullet.update_collision_matrix(RobotName, removed_links=sub_tree.get_link_names())
 
     def attach_object(self, req):
         """
@@ -305,7 +310,9 @@ class WorldUpdatePlugin(GiskardBehavior):
         self.add_object(req)
         self.world.move_branch(PrefixName(req.body.name, self.world.connection_prefix),
                                PrefixName(req.pose.header.frame_id, RobotPrefix))
-        self.bullet.calc_collision_matrix(RobotName)
+        self.bullet.update_collision_matrix(group_name=RobotName,
+                                            added_links=set(product(self.robot.link_names_with_collisions,
+                                                                    self.world.groups[req.body.name].link_names_with_collisions)))
 
     def remove_object(self, name):
         # assumes that parent has god map lock

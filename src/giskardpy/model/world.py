@@ -21,6 +21,7 @@ from giskardpy.model.joints import Joint, PrismaticJoint, RevoluteJoint, Continu
     FixedJoint, MimicJoint
 from giskardpy.model.robot import Robot
 from giskardpy.model.urdf_object import hacky_urdf_parser_fix
+from giskardpy.model.utils import cube_volume, cube_surface, sphere_volume, cylinder_volume, cylinder_surface
 from giskardpy.model.world_object import WorldObject
 from giskardpy.utils import logging
 from giskardpy.utils.tfwrapper import msg_to_kdl, kdl_to_pose, homo_matrix_to_pose, np_to_pose, pose_to_kdl, \
@@ -91,6 +92,9 @@ class LinkGeometry(object):
         marker.pose = np_to_pose(self.link_T_geometry)
         return marker
 
+    def is_big(self, volume_threshold=1.001e-6, surface_threshold=0.00061):
+        return False
+
 
 class MeshGeometry(LinkGeometry):
     def __init__(self, link_T_geometry, file_name, scale=None):
@@ -116,6 +120,9 @@ class MeshGeometry(LinkGeometry):
     def as_urdf(self):
         return up.Mesh(self.file_name)
 
+    def is_big(self, volume_threshold=1.001e-6, surface_threshold=0.00061):
+        return True
+
 
 class BoxGeometry(LinkGeometry):
     def __init__(self, link_T_geometry, depth, width, height):
@@ -135,6 +142,9 @@ class BoxGeometry(LinkGeometry):
     def as_urdf(self):
         return up.Box([self.depth, self.width, self.height])
 
+    def is_big(self, volume_threshold=1.001e-6, surface_threshold=0.00061):
+        return (cube_volume(self.depth, self.width, self.height) > volume_threshold or
+                cube_surface(self.depth, self.width, self.height) > surface_threshold)
 
 class CylinderGeometry(LinkGeometry):
     def __init__(self, link_T_geometry, height, radius):
@@ -153,6 +163,9 @@ class CylinderGeometry(LinkGeometry):
     def as_urdf(self):
         return up.Cylinder(self.radius, self.height)
 
+    def is_big(self, volume_threshold=1.001e-6, surface_threshold=0.00061):
+        return (cylinder_volume(self.radius, self.height) > volume_threshold or
+                cylinder_surface(self.radius, self.height) > surface_threshold)
 
 class SphereGeometry(LinkGeometry):
     def __init__(self, link_T_geometry, radius):
@@ -170,6 +183,8 @@ class SphereGeometry(LinkGeometry):
     def as_urdf(self):
         return up.Sphere(self.radius)
 
+    def is_big(self, volume_threshold=1.001e-6, surface_threshold=0.00061):
+        return sphere_volume(self.radius) > volume_threshold
 
 class Link(object):
     def __init__(self, name):
@@ -222,8 +237,21 @@ class Link(object):
     def has_visuals(self):
         return len(self.visuals) > 0
 
-    def has_collisions(self):
-        return len(self.collisions) > 0
+    def has_collisions(self, volume_threshold=1.001e-6, surface_threshold=0.00061):
+        """
+        :type link: str
+        :param volume_threshold: m**3, ignores simple geometry shapes with a volume less than this
+        :type volume_threshold: float
+        :param surface_threshold: m**2, ignores simple geometry shapes with a surface area less than this
+        :type surface_threshold: float
+        :return: True if collision geometry is mesh or simple shape with volume/surface bigger than thresholds.
+        :rtype: bool
+        """
+        for collision in self.collisions:
+            geo = collision
+            if geo.is_big():
+                return True
+        return False
 
     def __repr__(self):
         return str(self.name)
@@ -233,6 +261,7 @@ class WorldTree(object):
     def __init__(self, god_map=None):
         self.god_map = god_map  # type: GodMap
         self.connection_prefix = 'connection'
+        self.fast_all_fks = None
         self.hard_reset()
 
     def reset_cache(self):
@@ -241,6 +270,7 @@ class WorldTree(object):
                 getattr(self, method_name).memo.clear()
             except:
                 pass
+        self.fast_all_fks = None
 
     def register_group(self, name, root_link_name):
         if root_link_name not in self.links:
@@ -525,7 +555,7 @@ class WorldTree(object):
         #         fks.update(helper(child_link, root_T_link))
         #     return fks
         # fks_dict = helper(self.root_link, w.eye(4))
-        if not hasattr(self, 'fast_all_fks'):
+        if self.fast_all_fks is None:
             fks = []
             self.fk_idx = {}
             i = 0
@@ -706,7 +736,7 @@ class SubWorldTree(WorldTree):
 
     @property
     def state(self):
-        return {j: self.world.state[j] for j in self.joints}
+        return {j: self.world.state[j] for j in self.joints if j in self.world.state}
 
     @state.setter
     def state(self, value):

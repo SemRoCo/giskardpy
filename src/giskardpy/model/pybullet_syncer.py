@@ -1,3 +1,4 @@
+from collections import defaultdict
 from itertools import combinations
 from time import time
 
@@ -18,7 +19,7 @@ class PyBulletSyncer(object):
         pbw.start_pybullet(gui)
         self.object_name_to_bullet_id = BiDict()
         self.world = world # type: WorldTree
-        self.collision_matrices = {}
+        self.collision_matrices = defaultdict(set)
 
     @property
     def god_map(self):
@@ -80,7 +81,7 @@ class PyBulletSyncer(object):
                     # (link_b, link_a) in self.ignored_pairs:
                 always.add((link_a, link_b))
         rest = link_combinations.difference(always)
-        self.joint_state = group.set_joint_state_to_zero()
+        group.set_joint_state_to_zero()
         always = always.union(self.check_collisions(rest, d))
         rest = rest.difference(always)
 
@@ -105,9 +106,27 @@ class PyBulletSyncer(object):
         self.collision_matrices[group_name] = sometimes
         return self.collision_matrices[group_name]
 
+    def init_collision_matrix(self, group_name):
+        self.sync()
+        added_links = set(combinations(self.world.groups[group_name].link_names_with_collisions, 2))
+        self.update_collision_matrix(group_name=group_name,
+                                     added_links=added_links)
+
+    def update_collision_matrix(self, group_name, added_links=None, removed_links=None):
+        # if not self.load_self_collision_matrix(self.path_to_data_folder):
+        if added_links is None:
+            added_links = set()
+        if removed_links is None:
+            removed_links = set()
+        # collision_matrix = {x for x in self.collision_matrices[group_name] if x[0] not in removed_links and
+        #                                x[1] not in removed_links}
+        collision_matrix = self.calc_collision_matrix(group_name, added_links)
+        self.collision_matrices[group_name] = collision_matrix
+        # self.safe_self_collision_matrix(self.path_to_data_folder)
+
     def check_collisions(self, link_combinations, distance):
         in_collision = set()
-        self.sync()
+        self.sync_state()
         for link_a, link_b in link_combinations:
             if self.in_collision(link_a, link_b, distance):
                 in_collision.add((link_a, link_b))
@@ -119,20 +138,29 @@ class PyBulletSyncer(object):
         return len(pbw.getClosestPoints(link_id_a, link_id_b, distance)) > 0
 
     @profile
+    def sync_state(self):
+        """
+        :type world: giskardpy.model.world.WorldTree
+        """
+        pbw.deactivate_rendering()
+        self.fks = self.world.compute_all_fks()
+        for link_name, link in self.world.links.items():
+            if link.has_collisions():
+                self.update_pose(link)
+        pbw.activate_rendering()
+
     def sync(self):
         """
         :type world: giskardpy.model.world.WorldTree
         """
-        # pbw.clear_pybullet()
         pbw.deactivate_rendering()
-        t = time()
+        self.object_name_to_bullet_id = BiDict()
+        self.world.soft_reset()
+        pbw.clear_pybullet()
         self.fks = self.world.compute_all_fks()
         for link_name, link in self.world.links.items():
             if link.has_collisions():
-                if link_name in self.object_name_to_bullet_id:
-                    self.update_pose(link)
-                else:
-                    self.add_object(link)
+                self.add_object(link)
         pbw.activate_rendering()
 
     # def __add_ground_plane(self):

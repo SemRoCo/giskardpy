@@ -10,6 +10,7 @@ import rospy
 from geometry_msgs.msg import Pose, Point, Quaternion
 
 import giskardpy.model.pybullet_wrapper as pbw
+from giskardpy import RobotName
 from giskardpy.model.pybullet_syncer import PyBulletSyncer
 from giskardpy.model.pybullet_world import PyBulletWorld
 from giskardpy.model.pybullet_world_object import PyBulletWorldObject
@@ -29,7 +30,7 @@ folder_name = u'tmp_data/'
 @pytest.fixture(scope=u'module')
 def module_setup(request):
     logging.loginfo(u'starting pybullet')
-    pbw.start_pybullet(True)
+    pbw.start_pybullet(False)
 
     logging.loginfo(u'deleting tmp test folder')
     try:
@@ -346,18 +347,77 @@ class TestPyBulletWorld(test_world.TestWorld):
 
 class TestPyBulletSyncer(object):
     def test_load_pr2(self, pr2_world):
-        assert len(pbw.get_body_names()) == 54
+        assert len(pbw.get_body_names()) == 46
 
     def test_set_pr2_js(self, pr2_world):
         pr2_world.world.state['torso_lift_link'] = 1
-        pr2_world.sync()
-        assert len(pbw.get_body_names()) == 54
+        pr2_world.sync_state()
+        assert len(pbw.get_body_names()) == 46
 
     def test_compute_collision_matrix(self, pr2_world):
         """
         :type pr2_world: PyBulletSyncer
         """
-        print(pr2_world.calc_collision_matrix('robot', num_rnd_tries=1000))
+        pr2_world.init_collision_matrix(RobotName)
+        assert len(pr2_world.collision_matrices[RobotName]) == 125
+
+    def test_add_object(self, pr2_world):
+        """
+        :type pr2_world: PyBulletSyncer
+        """
+        o = make_world_body_box()
+        p = Pose()
+        p.orientation.w = 1
+        pr2_world.world.add_world_body(o, p)
+        pr2_world.sync()
+        assert len(pbw.get_body_names()) == 47
+
+    def test_delete_object(self, pr2_world):
+        """
+        :type pr2_world: PyBulletSyncer
+        """
+        o = make_world_body_box()
+        p = Pose()
+        p.orientation.w = 1
+        pr2_world.world.add_world_body(o, p)
+        pr2_world.sync()
+        pr2_world.world.delete_branch(o.name)
+        pr2_world.sync()
+        assert len(pbw.get_body_names()) == 46
+
+    def test_attach_object(self, pr2_world):
+        """
+        :type pr2_world: PyBulletSyncer
+        """
+        o = make_world_body_box()
+        p = Pose()
+        p.orientation.w = 1
+        pr2_world.world.add_world_body(o, p)
+        pr2_world.world.move_group(o.name, 'r_gripper_tool_frame')
+        pr2_world.sync()
+        assert len(pbw.get_body_names()) == 47
+
+    def test_compute_collision_matrix_attached(self, pr2_world):
+        """
+        :type pr2_world: PyBulletSyncer
+        """
+        pr2_world.init_collision_matrix(RobotName)
+        old_collision_matrix = pr2_world.collision_matrices[RobotName]
+        o = make_world_body_box()
+        p = Pose()
+        p.orientation.w = 1
+        pr2_world.world.add_world_body(o, p)
+        pr2_world.world.move_group(o.name, 'r_gripper_tool_frame')
+        pr2_world.init_collision_matrix(RobotName)
+        assert len(pr2_world.collision_matrices[RobotName]) > len(old_collision_matrix)
+        contains_box = False
+        for entry in pr2_world.collision_matrices[RobotName]:
+            contains_box |= o.name in entry
+        assert contains_box
+        pr2_world.world.delete_branch(o.name)
+        pr2_world.init_collision_matrix(RobotName)
+        assert pr2_world.collision_matrices[RobotName] == old_collision_matrix
+
 
 # import pytest
 # pytest.main(['-s', __file__ + '::TestPyBulletSyncer::test_compute_collision_matrix'])

@@ -2552,7 +2552,7 @@ class TestCollisionAvoidanceGoals(object):
         p.header.frame_id = zero_pose.r_tip
         p.pose.orientation.w = 1
         zero_pose.add_box(pocky, pose=p)
-        for i in range(10):
+        for i in range(3):
             zero_pose.attach_object(pocky, zero_pose.r_tip)
             zero_pose.detach_object(pocky)
         zero_pose.remove_object(pocky)
@@ -2563,7 +2563,7 @@ class TestCollisionAvoidanceGoals(object):
         """
         pocky = u'http://muh#pocky'
         zero_pose.attach_box(pocky, [0.1, 0.02, 0.02], zero_pose.r_tip, [0.05, 0, 0])
-        zero_pose.remove_object(pocky, expected_response=UpdateWorldResponse.MISSING_BODY_ERROR)
+        zero_pose.remove_object(pocky)
 
     def test_attach_existing_box(self, zero_pose):
         """

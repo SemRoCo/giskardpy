@@ -264,6 +264,26 @@ class WorldTree(object):
         self.fast_all_fks = None
         self.hard_reset()
 
+    def get_directly_controllable_collision_links(self, joint_name, controlled_joints):
+        if joint_name not in controlled_joints:
+            return []
+        link_name = self.joints[joint_name].child_link_name
+        links = [link_name]
+        collision_links = []
+        while links:
+            link_name = links.pop(0)
+            parent_joint = self.links[link_name].parent_joint_name
+
+            if parent_joint != joint_name and parent_joint in controlled_joints:
+                continue
+            if self.links[link_name].has_collisions():
+                collision_links.append(link_name)
+            else:
+                child_links = [self.joints[j].child_link_name for j in self.links[link_name].child_joint_names]
+                if child_links:
+                    links.extend(child_links)
+        return collision_links
+
     def reset_cache(self):
         for method_name in dir(self):
             try:
@@ -382,6 +402,14 @@ class WorldTree(object):
         for group in self.groups.values():
             group.soft_reset()
 
+    # def get_controlled_links(self):
+    #     # FIXME expensive
+    #     if not self._controlled_links:
+    #         self._controlled_links = set()
+    #         for joint_name in self.controlled_joints:
+    #             self._controlled_links.update(self.get_sub_tree_link_names_with_collision(joint_name))
+    #     return self._controlled_links
+
     def hard_reset(self):
         self.state = JointStates()
         self.root_link_name = PrefixName(self.god_map.unsafe_get_data(identifier.map_frame), None)
@@ -443,6 +471,10 @@ class WorldTree(object):
         joint_name = self.links[group.root_link_name].parent_joint_name
         self.move_branch(joint_name, new_parent_link_name)
 
+    def delete_group(self, group_name):
+        self.delete_branch(self.groups[group_name].root_link_name)
+        self.soft_reset()
+
     def delete_branch(self, link_name):
         self.delete_branch_at_joint(self.links[link_name].parent_joint_name)
         self.soft_reset()
@@ -463,6 +495,25 @@ class WorldTree(object):
 
         helper(joint.child_link_name)
         self.soft_reset()
+
+    def link_order(self, link_a, link_b):
+        """
+        TODO find a better name
+        this function is used when deciding for which order to calculate the collisions
+        true if link_a < link_b
+        :type link_a: str
+        :type link_b: str
+        :rtype: bool
+        """
+        try:
+            self.get_controlled_parent_joint(link_a)
+        except KeyError:
+            return False
+        try:
+            self.get_controlled_parent_joint(link_b)
+        except KeyError:
+            return True
+        return link_a < link_b
 
     def compute_chain(self, root_link_name, tip_link_name, joints=True, links=True, fixed=True):
         chain = []
@@ -1254,3 +1305,4 @@ class World(object):
                and self.all_robot_links(collision_entry) \
                and self.all_body_bs(collision_entry) \
                and self.all_link_bs(collision_entry)
+

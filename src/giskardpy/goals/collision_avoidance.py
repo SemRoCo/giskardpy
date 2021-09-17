@@ -17,25 +17,25 @@ class ExternalCollisionAvoidance(Goal):
         self.link_name = link_name
         self.idx = idx
         super(ExternalCollisionAvoidance, self).__init__(**kwargs)
-        self.robot_root = self.get_robot().get_root()
-        self.robot_name = self.get_robot_unsafe().get_name()
+        self.robot_root = self.robot.root_link_name
+        self.robot_name = self.robot.name
 
     def get_contact_normal_on_b_in_root(self):
-        return self.get_god_map().list_to_vector3(identifier.closest_point + [u'get_external_collisions',
+        return self.god_map.list_to_vector3(identifier.closest_point + [u'get_external_collisions',
                                                                               (self.link_name,),
                                                                               self.idx,
                                                                          u'get_contact_normal_in_root',
                                                                               tuple()])
 
     def get_closest_point_on_a_in_a(self):
-        return self.get_god_map().list_to_point3(identifier.closest_point + [u'get_external_collisions',
+        return self.god_map.list_to_point3(identifier.closest_point + [u'get_external_collisions',
                                                                              (self.link_name,),
                                                                              self.idx,
                                                                         u'get_position_on_a_in_a',
                                                                              tuple()])
 
     def get_closest_point_on_b_in_root(self):
-        return self.get_god_map().list_to_point3(identifier.closest_point + [u'get_external_collisions',
+        return self.god_map.list_to_point3(identifier.closest_point + [u'get_external_collisions',
                                                                              (self.link_name,),
                                                                              self.idx,
                                                                         u'get_position_on_b_in_root',

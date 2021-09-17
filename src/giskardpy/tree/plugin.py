@@ -7,13 +7,14 @@ import rospy
 from py_trees import Behaviour, Blackboard, Status
 
 from giskardpy import identifier, RobotName
+from giskardpy.god_map import GodMap
 from giskardpy.model.world import WorldTree
 from giskardpy.utils import logging
 
 
 class GiskardBehavior(Behaviour):
     def __init__(self, name):
-        self.god_map = Blackboard().god_map
+        self.god_map = Blackboard().god_map # type: GodMap
         self.world = self.get_god_map().unsafe_get_data(identifier.world)  # type: WorldTree
         super(GiskardBehavior, self).__init__(name)
 
@@ -22,6 +23,17 @@ class GiskardBehavior(Behaviour):
         :rtype: giskardpy.god_map.GodMap
         """
         return self.god_map
+
+    @property
+    def bullet(self):
+        """
+        :rtype: giskardpy.model.pybullet_syncer.PyBulletSyncer
+        """
+        return self.god_map.unsafe_get_data(identifier.bullet)
+
+    @bullet.setter
+    def bullet(self, value):
+        self.god_map.unsafe_set_data(identifier.bullet, value)
 
     @property
     def robot(self):

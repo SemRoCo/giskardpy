@@ -108,6 +108,10 @@ def create_world_with_pr2():
     return world_with_robot(pr2_urdf())
 
 
+def create_world_with_donbot():
+    return world_with_robot(donbot_urdf())
+
+
 def create_world_with_hsr():
     return world_with_robot(hsr_urdf())
 
@@ -320,6 +324,43 @@ class TestWorldTree(object):
         lower_limit, upper_limit = world.get_joint_position_limits('l_shoulder_pan_joint')
         assert lower_limit == -0.564601836603
         assert upper_limit == 2.1353981634
+
+
+    def test_get_directly_controllable_collision_links(self):
+        world = create_world_with_pr2()
+        controlled_joints = [u'torso_lift_joint',
+                               u'r_upper_arm_roll_joint',
+                               u'r_shoulder_pan_joint',
+                               u'r_shoulder_lift_joint',
+                               u'r_forearm_roll_joint',
+                               u'r_elbow_flex_joint',
+                               u'r_wrist_flex_joint',
+                               u'r_wrist_roll_joint',
+                               u'l_upper_arm_roll_joint',
+                               u'l_shoulder_pan_joint',
+                               u'l_shoulder_lift_joint',
+                               u'l_forearm_roll_joint',
+                               u'l_elbow_flex_joint',
+                               u'l_wrist_flex_joint',
+                               u'l_wrist_roll_joint',
+                               u'head_pan_joint',
+                               u'head_tilt_joint',
+                               u'odom_x_joint',
+                               u'odom_y_joint',
+                               u'odom_z_joint']
+
+        result = world.get_directly_controllable_collision_links(u'odom_x_joint', controlled_joints)
+        assert result == []
+        result = world.get_directly_controllable_collision_links(u'odom_y_joint', controlled_joints)
+        assert result == []
+        result = world.get_directly_controllable_collision_links(u'odom_z_joint', controlled_joints)
+        assert result == [u'base_link']
+        result = world.get_directly_controllable_collision_links(u'l_elbow_flex_joint', controlled_joints)
+        assert result == [u'l_elbow_flex_link']
+        result = world.get_directly_controllable_collision_links(u'r_wrist_roll_joint', controlled_joints)
+        assert result == [u'r_wrist_roll_link']
+        result = world.get_directly_controllable_collision_links(u'br_caster_l_wheel_joint', controlled_joints)
+        assert result == []
 
     def test_get_all_joint_limits(self):
         world = create_world_with_pr2()

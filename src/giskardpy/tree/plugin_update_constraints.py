@@ -18,7 +18,8 @@ from giskardpy.utils.logging import loginfo
 from giskardpy.tree.plugin_action_server import GetGoal
 from giskardpy.utils.utils import convert_dictionary_to_ros_message
 import pkgutil
-from giskardpy import casadi_wrapper as w
+from giskardpy import casadi_wrapper as w, RobotName
+
 
 def get_all_classes_in_package(package):
     classes = {}
@@ -61,13 +62,11 @@ class GoalToConstraints(GetGoal):
 
         self.get_god_map().set_data(identifier.goals, {})
 
-        # self.robot.create_constraints(self.get_god_map())
-
         self.soft_constraints = {}
         self.vel_constraints = {}
         self.debug_expr = {}
-        # if not (self.get_god_map().get_data(identifier.check_reachability)):
-        #     self.add_collision_avoidance_soft_constraints(move_cmd.collisions)
+        if not (self.get_god_map().get_data(identifier.check_reachability)):
+            self.add_collision_avoidance_soft_constraints(move_cmd.collisions)
 
         try:
             self.parse_constraints(move_cmd)
@@ -171,7 +170,6 @@ class GoalToConstraints(GetGoal):
                 d[key] = convert_dictionary_to_ros_message(value)
         return d
 
-
     def add_collision_avoidance_soft_constraints(self, collision_cmds):
         """
         Adds a constraint for each link that pushed it away from its closest point.
@@ -181,26 +179,27 @@ class GoalToConstraints(GetGoal):
         soft_threshold = None
         for collision_cmd in collision_cmds:
             if collision_cmd.type == CollisionEntry.AVOID_ALL_COLLISIONS or \
-                    self.get_world().is_avoid_all_collision(collision_cmd):
+                    self.bullet.is_avoid_all_collision(collision_cmd):
                 soft_threshold = collision_cmd.min_dist
 
-        if not collision_cmds or not self.get_world().is_allow_all_collision(collision_cmds[-1]):
+        if not collision_cmds or not self.bullet.is_allow_all_collision(collision_cmds[-1]):
             self.add_external_collision_avoidance_constraints(soft_threshold_override=soft_threshold)
-        if not collision_cmds or (not self.get_world().is_allow_all_collision(collision_cmds[-1]) and
-                                  not self.get_world().is_allow_all_self_collision(collision_cmds[-1])):
-            self.add_self_collision_avoidance_constraints()
+        # if not collision_cmds or (not self.bullet.is_allow_all_collision(collision_cmds[-1]) and
+        #                           not self.bullet.is_allow_all_self_collision(collision_cmds[-1])):
+        #     self.add_self_collision_avoidance_constraints()
 
     def add_external_collision_avoidance_constraints(self, soft_threshold_override=None):
         soft_constraints = {}
         vel_constraints = {}
         debug_expr = {}
+        controlled_joints = self.god_map.get_data(identifier.controlled_joints)
         config = self.get_god_map().get_data(identifier.external_collision_avoidance)
-        for joint_name in self.robot.controlled_joints:
-            child_links = self.robot.get_directly_controllable_collision_links(joint_name)
+        for joint_name in controlled_joints:
+            child_links = self.robot.get_directly_controllable_collision_links(joint_name, controlled_joints)
             if child_links:
                 number_of_repeller = config[joint_name][u'number_of_repeller']
                 for i in range(number_of_repeller):
-                    child_link = self.robot.get_child_link_of_joint(joint_name)
+                    child_link = self.robot.joints[joint_name].child_link_name
                     hard_threshold = config[joint_name][u'hard_threshold']
                     if soft_threshold_override is not None:
                         soft_threshold = soft_threshold_override
@@ -223,53 +222,53 @@ class GoalToConstraints(GetGoal):
         self.vel_constraints.update(vel_constraints)
         self.debug_expr.update(debug_expr)
 
-    def add_self_collision_avoidance_constraints(self):
-        counter = defaultdict(int)
-        soft_constraints = {}
-        vel_constraints = {}
-        debug_expr = {}
-        config = self.get_god_map().get_data(identifier.self_collision_avoidance)
-        for link_a_o, link_b_o in self.robot.get_self_collision_matrix():
-            link_a, link_b = self.robot.get_chain_reduced_to_controlled_joints(link_a_o, link_b_o)
-            if not self.robot.link_order(link_a, link_b):
-                link_a, link_b = link_b, link_a
-            counter[link_a, link_b] += 1
-
-        for link_a, link_b in counter:
-            num_of_constraints = min(1, counter[link_a, link_b])
-            for i in range(num_of_constraints):
-                key = u'{}, {}'.format(link_a, link_b)
-                key_r = u'{}, {}'.format(link_b, link_a)
-                # FIXME there is probably a bug or unintuitive behavior, when a pair is affected by multiple entries
-                if key in config:
-                    hard_threshold = config[key][u'hard_threshold']
-                    soft_threshold = config[key][u'soft_threshold']
-                    number_of_repeller = config[key][u'number_of_repeller']
-                elif key_r in config:
-                    hard_threshold = config[key_r][u'hard_threshold']
-                    soft_threshold = config[key_r][u'soft_threshold']
-                    number_of_repeller = config[key_r][u'number_of_repeller']
-                else:
-                    # TODO minimum is not the best if i reduce to the links next to the controlled chains
-                    #   should probably add symbols that retrieve the values for the current pair
-                    hard_threshold = min(config[link_a][u'hard_threshold'],
-                                         config[link_b][u'hard_threshold'])
-                    soft_threshold = min(config[link_a][u'soft_threshold'],
-                                         config[link_b][u'soft_threshold'])
-                    number_of_repeller = min(config[link_a][u'number_of_repeller'],
-                                             config[link_b][u'number_of_repeller'])
-                constraint = SelfCollisionAvoidance(god_map=self.god_map,
-                                                    link_a=link_a,
-                                                    link_b=link_b,
-                                                    hard_threshold=hard_threshold,
-                                                    soft_threshold=soft_threshold,
-                                                    idx=i,
-                                                    num_repeller=number_of_repeller)
-                c, c_vel, debug_expressions = constraint.get_constraints()
-                soft_constraints.update(c)
-                vel_constraints.update(c_vel)
-                debug_expr.update(debug_expressions)
-        loginfo('adding {} self collision avoidance constraints'.format(len(soft_constraints)))
-        self.soft_constraints.update(soft_constraints)
-        self.vel_constraints.update(vel_constraints)
-        self.debug_expr.update(debug_expr)
+    # def add_self_collision_avoidance_constraints(self):
+    #     counter = defaultdict(int)
+    #     soft_constraints = {}
+    #     vel_constraints = {}
+    #     debug_expr = {}
+    #     config = self.get_god_map().get_data(identifier.self_collision_avoidance)
+    #     for link_a_o, link_b_o in self.bullet.collision_matrices[RobotName]:
+    #         link_a, link_b = self.robot.get_chain_reduced_to_controlled_joints(link_a_o, link_b_o)
+    #         if not self.robot.link_order(link_a, link_b):
+    #             link_a, link_b = link_b, link_a
+    #         counter[link_a, link_b] += 1
+    #
+    #     for link_a, link_b in counter:
+    #         num_of_constraints = min(1, counter[link_a, link_b])
+    #         for i in range(num_of_constraints):
+    #             key = u'{}, {}'.format(link_a, link_b)
+    #             key_r = u'{}, {}'.format(link_b, link_a)
+    #             # FIXME there is probably a bug or unintuitive behavior, when a pair is affected by multiple entries
+    #             if key in config:
+    #                 hard_threshold = config[key][u'hard_threshold']
+    #                 soft_threshold = config[key][u'soft_threshold']
+    #                 number_of_repeller = config[key][u'number_of_repeller']
+    #             elif key_r in config:
+    #                 hard_threshold = config[key_r][u'hard_threshold']
+    #                 soft_threshold = config[key_r][u'soft_threshold']
+    #                 number_of_repeller = config[key_r][u'number_of_repeller']
+    #             else:
+    #                 # TODO minimum is not the best if i reduce to the links next to the controlled chains
+    #                 #   should probably add symbols that retrieve the values for the current pair
+    #                 hard_threshold = min(config[link_a][u'hard_threshold'],
+    #                                      config[link_b][u'hard_threshold'])
+    #                 soft_threshold = min(config[link_a][u'soft_threshold'],
+    #                                      config[link_b][u'soft_threshold'])
+    #                 number_of_repeller = min(config[link_a][u'number_of_repeller'],
+    #                                          config[link_b][u'number_of_repeller'])
+    #             constraint = SelfCollisionAvoidance(god_map=self.god_map,
+    #                                                 link_a=link_a,
+    #                                                 link_b=link_b,
+    #                                                 hard_threshold=hard_threshold,
+    #                                                 soft_threshold=soft_threshold,
+    #                                                 idx=i,
+    #                                                 num_repeller=number_of_repeller)
+    #             c, c_vel, debug_expressions = constraint.get_constraints()
+    #             soft_constraints.update(c)
+    #             vel_constraints.update(c_vel)
+    #             debug_expr.update(debug_expressions)
+    #     loginfo('adding {} self collision avoidance constraints'.format(len(soft_constraints)))
+    #     self.soft_constraints.update(soft_constraints)
+    #     self.vel_constraints.update(vel_constraints)
+    #     self.debug_expr.update(debug_expr)

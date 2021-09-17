@@ -269,8 +269,10 @@ class WorldUpdatePlugin(GiskardBehavior):
                     traceback.print_exc()
                     return UpdateWorldResponse(UpdateWorldResponse.MISSING_BODY_ERROR, str(e))
                 except DuplicateNameException as e:
+                    traceback.print_exc()
                     return UpdateWorldResponse(UpdateWorldResponse.DUPLICATE_BODY_ERROR, str(e))
                 except UnsupportedOptionException as e:
+                    traceback.print_exc()
                     return UpdateWorldResponse(UpdateWorldResponse.UNSUPPORTED_OPTIONS, str(e))
                 except Exception as e:
                     traceback.print_exc()
@@ -308,7 +310,8 @@ class WorldUpdatePlugin(GiskardBehavior):
         :type req: UpdateWorldRequest
         """
         # assumes that parent has god map lock
-        self.add_object(req)
+        if req.body.name not in self.world.groups:
+            self.add_object(req)
         self.world.move_branch(PrefixName(req.body.name, self.world.connection_prefix),
                                PrefixName(req.pose.header.frame_id, RobotPrefix))
         self.bullet.init_collision_matrix(RobotName)
@@ -318,7 +321,7 @@ class WorldUpdatePlugin(GiskardBehavior):
 
     def remove_object(self, name):
         # assumes that parent has god map lock
-        self.unsafe_get_world().delete_branch(self.world.groups[name].root_link_name)
+        self.world.delete_group(name)
         tree = self.god_map.unsafe_get_data(identifier.tree_manager)  # type: TreeManager
         name = str(PrefixName(name, 'js'))
         if name in tree.tree_nodes:

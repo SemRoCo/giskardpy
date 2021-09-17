@@ -309,7 +309,7 @@ class GiskardTestWrapper(GiskardWrapper):
     @property
     def robot_self_collision_matrix(self):
         """
-        :rtype: list
+        :rtype: set
         """
         return self.bullet.collision_matrices[RobotName]
 
@@ -796,52 +796,48 @@ class GiskardTestWrapper(GiskardWrapper):
         if expected_response == UpdateWorldResponse.SUCCESS:
             self.wait_for_synced()
             assert name in [n.short_name for n in self.get_robot().link_names]
-            # assert not self.get_world().groups(name)
-            # assert not name in self.get_object_names().object_names
-            # assert name in self.get_attached_objects().object_names, 'object {} was not attached'
             assert scm.difference(self.robot_self_collision_matrix) == set()
             assert len(scm) < len(self.robot_self_collision_matrix)
             compare_poses(expected_pose.pose, lookup_pose(frame_id, name).pose)
         self.loop_once()
 
     def attach_cylinder(self, name=u'cylinder', height=1, radius=1, frame_id=None, position=None, orientation=None,
-                        expected_response=UpdateWorldResponse.SUCCESS):
-        scm = self.get_robot().get_self_collision_matrix()
-        expected_pose = PoseStamped()
-        expected_pose.header.frame_id = frame_id
-        expected_pose.pose.position = Point(*position)
-        if orientation:
-            expected_pose.pose.orientation = Quaternion(*orientation)
+                        pose=None, expected_response=UpdateWorldResponse.SUCCESS):
+        scm = self.robot_self_collision_matrix
+        if pose is None:
+            expected_pose = PoseStamped()
+            expected_pose.header.frame_id = frame_id
+            expected_pose.pose.position = Point(*position)
+            if orientation:
+                expected_pose.pose.orientation = Quaternion(*orientation)
+            else:
+                expected_pose.pose.orientation = Quaternion(0, 0, 0, 1)
         else:
-            expected_pose.pose.orientation = Quaternion(0, 0, 0, 1)
+            expected_pose = deepcopy(pose)
         r = super(GiskardTestWrapper, self).attach_cylinder(name, height, radius, frame_id, position, orientation)
+        self.loop_once()
         assert r.error_codes == expected_response, \
             u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
                                             update_world_error_code(expected_response))
         if expected_response == UpdateWorldResponse.SUCCESS:
             self.wait_for_synced()
-            assert name in self.get_controllable_links()
-            assert not self.get_world().has_object(name)
-            assert not name in self.get_object_names().object_names
-            assert name in self.get_attached_objects().object_names
-            assert scm.difference(self.get_robot().get_self_collision_matrix()) == set()
-            assert len(scm) < len(self.get_robot().get_self_collision_matrix())
+            assert name in [n.short_name for n in self.get_robot().link_names]
+            assert scm.difference(self.robot_self_collision_matrix) == set()
+            assert len(scm) < len(self.robot_self_collision_matrix)
             compare_poses(expected_pose.pose, lookup_pose(frame_id, name).pose)
         self.loop_once()
 
     def attach_object(self, name=u'box', frame_id=None, expected_response=UpdateWorldResponse.SUCCESS):
-        scm = self.get_robot().get_self_collision_matrix()
+        scm = self.robot_self_collision_matrix
         r = super(GiskardTestWrapper, self).attach_object(name, frame_id)
         assert r.error_codes == expected_response, \
             u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
                                             update_world_error_code(expected_response))
         self.wait_for_synced()
-        assert name in self.get_controllable_links()
-        assert not self.get_world().has_object(name)
-        assert not name in self.get_object_names().object_names
+        # assert name in self.get_controllable_links()
         assert name in self.get_attached_objects().object_names
-        assert scm.difference(self.get_robot().get_self_collision_matrix()) == set()
-        assert len(scm) < len(self.get_robot().get_self_collision_matrix())
+        assert scm.difference(self.robot_self_collision_matrix) == set()
+        assert len(scm) < len(self.robot_self_collision_matrix)
         self.loop_once()
 
     def get_external_collisions(self, link, distance_threshold):

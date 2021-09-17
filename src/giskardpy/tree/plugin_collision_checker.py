@@ -60,11 +60,11 @@ class CollisionChecker(GiskardBehavior):
 
         max_distances = defaultdict(lambda: default_distance)
         # override max distances based on external distances dict
-        for link_name in self.get_robot().get_links_with_collision():
-            controlled_parent_joint = self.get_robot().get_controlled_parent_joint(link_name)
-            distance = external_distances[controlled_parent_joint][u'soft_threshold']
-            for child_link_name in self.get_robot().get_directly_controllable_collision_links(controlled_parent_joint):
-                max_distances[child_link_name] = distance
+        # for link_name in self.robot.link_names_with_collisions:
+        #     controlled_parent_joint = self.get_robot().get_controlled_parent_joint(link_name)
+        #     distance = external_distances[controlled_parent_joint][u'soft_threshold']
+        #     for child_link_name in self.get_robot().get_directly_controllable_collision_links(controlled_parent_joint):
+        #         max_distances[child_link_name] = distance
 
         for link_name in self_distances:
             distance = self_distances[link_name][u'soft_threshold']
@@ -80,8 +80,8 @@ class CollisionChecker(GiskardBehavior):
             else:
                 max_distances[link_name] = distance
 
-        self.collision_matrix = self.get_world().collision_goals_to_collision_matrix(deepcopy(collision_goals),
-                                                                                     max_distances)
+        self.collision_matrix = self.bullet.collision_goals_to_collision_matrix(deepcopy(collision_goals),
+                                                                                max_distances)
         self.collision_list_size = self._cal_max_param(u'number_of_repeller')
 
         super(CollisionChecker, self).initialise()
@@ -90,6 +90,6 @@ class CollisionChecker(GiskardBehavior):
         """
         Computes closest point info for all robot links and safes it to the god map.
         """
-        collisions = self.get_world().check_collisions(self.collision_matrix, self.collision_list_size)
+        collisions = self.bullet.check_collisions(self.collision_matrix, self.collision_list_size)
         self.god_map.set_data(identifier.closest_point, collisions)
         return Status.RUNNING

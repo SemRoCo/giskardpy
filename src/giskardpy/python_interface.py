@@ -12,6 +12,7 @@ from sensor_msgs.msg import JointState
 from shape_msgs.msg import SolidPrimitive
 from visualization_msgs.msg import MarkerArray
 
+from giskardpy import RobotName
 from giskardpy.goals.goal import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA
 from giskardpy.model.urdf_object import URDFObject
 from giskardpy.model.utils import make_world_body_box, make_world_body_cylinder
@@ -41,7 +42,7 @@ class GiskardWrapper(object):
         """
         :rtype: str
         """
-        return self.robot_urdf.get_name()
+        return RobotName
 
     def get_root(self):
         """

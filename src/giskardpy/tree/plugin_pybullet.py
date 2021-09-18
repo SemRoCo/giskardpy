@@ -296,6 +296,7 @@ class WorldUpdatePlugin(GiskardBehavior):
                                          joint_state_topic=world_body.joint_state_topic)
             tree = self.god_map.unsafe_get_data(identifier.tree_manager)  # type: TreeManager
             tree.insert_node(plugin, 'wait for goal', 1)
+        self.bullet.sync()
 
     def detach_object(self, req):
         # assumes that parent has god map lock

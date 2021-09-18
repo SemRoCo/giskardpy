@@ -328,7 +328,7 @@ class TestWorldTree(object):
 
     def test_get_directly_controllable_collision_links(self):
         world = create_world_with_pr2()
-        controlled_joints = [u'torso_lift_joint',
+        world.god_map.set_data(identifier.controlled_joints, [u'torso_lift_joint',
                                u'r_upper_arm_roll_joint',
                                u'r_shoulder_pan_joint',
                                u'r_shoulder_lift_joint',
@@ -347,19 +347,19 @@ class TestWorldTree(object):
                                u'head_tilt_joint',
                                u'odom_x_joint',
                                u'odom_y_joint',
-                               u'odom_z_joint']
+                               u'odom_z_joint'])
 
-        result = world.get_directly_controllable_collision_links(u'odom_x_joint', controlled_joints)
+        result = world.get_directly_controllable_collision_links(u'odom_x_joint')
         assert result == []
-        result = world.get_directly_controllable_collision_links(u'odom_y_joint', controlled_joints)
+        result = world.get_directly_controllable_collision_links(u'odom_y_joint')
         assert result == []
-        result = world.get_directly_controllable_collision_links(u'odom_z_joint', controlled_joints)
+        result = world.get_directly_controllable_collision_links(u'odom_z_joint')
         assert result == [u'base_link']
-        result = world.get_directly_controllable_collision_links(u'l_elbow_flex_joint', controlled_joints)
+        result = world.get_directly_controllable_collision_links(u'l_elbow_flex_joint')
         assert result == [u'l_elbow_flex_link']
-        result = world.get_directly_controllable_collision_links(u'r_wrist_roll_joint', controlled_joints)
+        result = world.get_directly_controllable_collision_links(u'r_wrist_roll_joint')
         assert result == [u'r_wrist_roll_link']
-        result = world.get_directly_controllable_collision_links(u'br_caster_l_wheel_joint', controlled_joints)
+        result = world.get_directly_controllable_collision_links(u'br_caster_l_wheel_joint')
         assert result == []
 
     def test_get_all_joint_limits(self):

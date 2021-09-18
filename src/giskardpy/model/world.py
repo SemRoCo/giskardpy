@@ -264,8 +264,8 @@ class WorldTree(object):
         self.fast_all_fks = None
         self.hard_reset()
 
-    def get_directly_controllable_collision_links(self, joint_name, controlled_joints):
-        if joint_name not in controlled_joints:
+    def get_directly_controllable_collision_links(self, joint_name):
+        if joint_name not in self.controlled_joints:
             return []
         link_name = self.joints[joint_name].child_link_name
         links = [link_name]
@@ -274,7 +274,7 @@ class WorldTree(object):
             link_name = links.pop(0)
             parent_joint = self.links[link_name].parent_joint_name
 
-            if parent_joint != joint_name and parent_joint in controlled_joints:
+            if parent_joint != joint_name and parent_joint in self.controlled_joints:
                 continue
             if self.links[link_name].has_collisions():
                 collision_links.append(link_name)
@@ -514,6 +514,18 @@ class WorldTree(object):
         except KeyError:
             return True
         return link_a < link_b
+
+    @property
+    def controlled_joints(self):
+        return self.god_map.unsafe_get_data(identifier.controlled_joints)
+
+    @memoize
+    def get_controlled_parent_joint(self, link_name):
+        joint = self.links[link_name].parent_joint_name
+        while joint not in self.controlled_joints:
+            joint = self.links[joint].parent_joint_name
+        return joint
+
 
     def compute_chain(self, root_link_name, tip_link_name, joints=True, links=True, fixed=True):
         chain = []

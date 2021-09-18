@@ -7,6 +7,7 @@ from sensor_msgs.msg import JointState
 from sortedcontainers import SortedKeyList
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 
+from giskardpy import RobotName
 from giskardpy.utils.tfwrapper import kdl_to_np, np_vector, np_point
 
 
@@ -255,15 +256,20 @@ class Collision(object):
                          contact_distance=self.get_contact_distance())
 
 
+class CollisionMatrix(dict):
+    pass
+
+
 class Collisions(object):
 
-    def __init__(self, robot, collision_list_size):
+    def __init__(self, world, collision_list_size):
         """
-        :type robot: giskardpy.robot.Robot
+        :type robot: giskardpy.model.world.WorldTree
         """
-        self.robot = robot
-        self.root_T_map = kdl_to_np(self.robot.root_T_map)
-        self.robot_root = self.robot.get_root()
+        self.world = world
+        self.robot = self.world.groups[RobotName]
+        self.robot_root = self.robot.root_link_name
+        self.root_T_map = self.robot.compute_fk_np(self.robot_root, self.world.root_link_name)
         self.collision_list_size = collision_list_size
 
         # @profile

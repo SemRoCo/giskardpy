@@ -1,4 +1,5 @@
 from collections import defaultdict
+from copy import deepcopy
 from itertools import combinations
 from time import time
 
@@ -8,8 +9,9 @@ from tf.transformations import quaternion_matrix, quaternion_from_matrix
 
 import giskardpy.model.pybullet_wrapper as pbw
 from giskardpy import RobotName
-from giskardpy.data_types import BiDict
+from giskardpy.data_types import BiDict, Collisions, Collision
 from giskardpy.exceptions import PhysicsWorldException, UnknownBodyException
+from giskardpy.model.pybullet_wrapper import ContactInfo
 from giskardpy.model.world import SubWorldTree
 from giskardpy.model.world import WorldTree
 from giskardpy.utils import logging
@@ -92,20 +94,20 @@ class PyBulletSyncer(object):
                 always.add((link_a, link_b))
         rest = link_combinations.difference(always)
         group.set_joint_state_to_zero()
-        always = always.union(self.check_collisions(rest, d))
+        always = always.union(self.check_collisions2(rest, d))
         rest = rest.difference(always)
 
         # find meaningful self-collisions
         group.set_min_joint_state()
-        sometimes = self.check_collisions(rest, d2)
+        sometimes = self.check_collisions2(rest, d2)
         rest = rest.difference(sometimes)
         group.set_max_joint_state()
-        sometimes2 = self.check_collisions(rest, d2)
+        sometimes2 = self.check_collisions2(rest, d2)
         rest = rest.difference(sometimes2)
         sometimes = sometimes.union(sometimes2)
         for i in range(num_rnd_tries):
             group.set_rnd_joint_state()
-            sometimes2 = self.check_collisions(rest, d2)
+            sometimes2 = self.check_collisions2(rest, d2)
             if len(sometimes2) > 0:
                 rest = rest.difference(sometimes2)
                 sometimes = sometimes.union(sometimes2)
@@ -134,13 +136,71 @@ class PyBulletSyncer(object):
         self.collision_matrices[group_name] = collision_matrix
         # self.safe_self_collision_matrix(self.path_to_data_folder)
 
-    def check_collisions(self, link_combinations, distance):
+    def check_collisions2(self, link_combinations, distance):
         in_collision = set()
         self.sync_state()
         for link_a, link_b in link_combinations:
             if self.in_collision(link_a, link_b, distance):
                 in_collision.add((link_a, link_b))
         return in_collision
+
+    @profile
+    def check_collisions(self, cut_off_distances, collision_list_size=15):
+        """
+        :param cut_off_distances: (robot_link, body_b, link_b) -> cut off distance. Contacts between objects not in this
+                                    dict or further away than the cut off distance will be ignored.
+        :type cut_off_distances: dict
+        :param self_collision_d: distances grater than this value will be ignored
+        :type self_collision_d: float
+        :type enable_self_collision: bool
+        :return: (robot_link, body_b, link_b) -> Collision
+        :rtype: Collisions
+        """
+        collisions = Collisions(self.world, collision_list_size)
+        robot_name = self.robot.name
+        for (robot_link, body_b, link_b), distance in cut_off_distances.items():
+            if robot_name == body_b:
+                object_id = self.robot.get_pybullet_id()
+                link_b_id = self.robot.get_pybullet_link_id(link_b)
+            else:
+                object_id = self.__get_pybullet_object_id(body_b)
+                if link_b != CollisionEntry.ALL:
+                    link_b_id = self.get_object(body_b).get_pybullet_link_id(link_b)
+
+            robot_link_id = self.robot.get_pybullet_link_id(robot_link)
+            if body_b == robot_name or link_b != CollisionEntry.ALL:
+                contacts = [ContactInfo(*x) for x in pbw.getClosestPoints(self.robot.get_pybullet_id(), object_id,
+                                                                        distance * 1.1,
+                                                                        robot_link_id, link_b_id)]
+            else:
+                contacts = [ContactInfo(*x) for x in pbw.getClosestPoints(self.robot.get_pybullet_id(), object_id,
+                                                                        distance * 1.1,
+                                                                        robot_link_id)]
+            if len(contacts) > 0:
+                try:
+                    body_b_object = self.get_object(body_b)
+                except KeyError:
+                    body_b_object = self.robot
+                pass
+                for contact in contacts:  # type: ContactInfo
+                    if link_b == CollisionEntry.ALL:
+                        link_b_tmp = body_b_object.pybullet_link_id_to_name(contact.link_index_b)
+                    else:
+                        link_b_tmp = link_b
+                    if self.__should_flip_collision(contact.position_on_a, robot_link):
+                        flipped_normal = [-contact.contact_normal_on_b[0],
+                                          -contact.contact_normal_on_b[1],
+                                          -contact.contact_normal_on_b[2]]
+                        collision = Collision(robot_link, body_b, link_b_tmp,
+                                              contact.position_on_b, contact.position_on_a,
+                                              flipped_normal, contact.contact_distance)
+                        collisions.add(collision)
+                    else:
+                        collision = Collision(robot_link, body_b, link_b_tmp,
+                                              contact.position_on_a, contact.position_on_b,
+                                              contact.contact_normal_on_b, contact.contact_distance)
+                        collisions.add(collision)
+        return collisions
 
     def in_collision(self, link_a, link_b, distance):
         link_id_a = self.object_name_to_bullet_id[link_a]
@@ -210,22 +270,27 @@ class PyBulletSyncer(object):
                 continue
             assert len(collision_entry.robot_links) == 1
             assert len(collision_entry.link_bs) == 1
-            key = (collision_entry.robot_links[0], collision_entry.body_b, collision_entry.link_bs[0])
-            r_key = (collision_entry.link_bs[0], collision_entry.body_b, collision_entry.robot_links[0])
-            if self.is_allow_collision(collision_entry):
-                if self.all_link_bs(collision_entry):
-                    for key2 in list(min_allowed_distance.keys()):
-                        if key[0] == key2[0] and key[1] == key2[1]:
-                            del min_allowed_distance[key2]
-                elif key in min_allowed_distance:
-                    del min_allowed_distance[key]
-                elif r_key in min_allowed_distance:
-                    del min_allowed_distance[r_key]
-
-            elif self.is_avoid_collision(collision_entry):
-                min_allowed_distance[key] = min_dist[key[0]]
+            if self.all_link_bs(collision_entry):
+                link_bs = self.world.groups[collision_entry.body_b].link_names
             else:
-                raise Exception('todo')
+                link_bs = collision_entry.link_bs
+            for link_b in link_bs:
+                key = (collision_entry.robot_links[0], collision_entry.body_b, link_b)
+                r_key = (link_b, collision_entry.body_b, collision_entry.robot_links[0])
+                if self.is_allow_collision(collision_entry):
+                    if self.all_link_bs(collision_entry):
+                        for key2 in list(min_allowed_distance.keys()):
+                            if key[0] == key2[0] and key[1] == key2[1]:
+                                del min_allowed_distance[key2]
+                    elif key in min_allowed_distance:
+                        del min_allowed_distance[key]
+                    elif r_key in min_allowed_distance:
+                        del min_allowed_distance[r_key]
+
+                elif self.is_avoid_collision(collision_entry):
+                    min_allowed_distance[key] = min_dist[key[0]]
+                else:
+                    raise Exception('todo')
         return min_allowed_distance
 
     def get_robot_collision_matrix(self, min_dist):
@@ -295,6 +360,7 @@ class PyBulletSyncer(object):
         return collision_goals
 
     def split_link_bs(self, collision_goals):
+        collision_goals = deepcopy(collision_goals)
         # FIXME remove the side effects of these three methods
         i = 0
         while i < len(collision_goals):

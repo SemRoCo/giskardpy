@@ -10,6 +10,7 @@ from giskardpy import casadi_wrapper as w
 from giskardpy.data_types import PrefixName
 from giskardpy.exceptions import ConstraintInitalizationException
 from giskardpy.model.robot import Robot
+from giskardpy.model.world import WorldTree
 from giskardpy.qp.constraint import VelocityConstraint, Constraint
 
 WEIGHT_MAX = Constraint_msg.WEIGHT_MAX
@@ -34,7 +35,7 @@ class Goal(object):
             control_horizon = self.prediction_horizon
         self.control_horizon = max(min(control_horizon, self.prediction_horizon - 2), 1)
         self._sub_goals = []
-        self.world = self.god_map.get_data(identifier.world)
+        self.world = self.god_map.get_data(identifier.world) # type: WorldTree
 
     def _save_self_on_god_map(self):
         self.god_map.set_data(self._get_identifier(), self)
@@ -63,8 +64,8 @@ class Goal(object):
         """
         returns a symbol that referes to the given joint
         """
-        if not self.robot.has_joint(joint_name):
-            raise KeyError('Robot doesn\'t have joint named: {}'.format(joint_name))
+        if not self.world.has_joint(joint_name):
+            raise KeyError('World doesn\'t have joint named: {}'.format(joint_name))
         return self.world.joints[joint_name].position_symbol
 
     def get_joint_velocity_symbols(self, joint_name):
@@ -95,7 +96,7 @@ class Goal(object):
         :type tip: PrefixName
         :return: root_T_tip
         """
-        return self.robot.compose_fk_expression(root, tip)
+        return self.world.compose_fk_expression(root, tip)
 
     def get_fk_evaluated(self, root, tip):
         """

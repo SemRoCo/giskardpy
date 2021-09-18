@@ -94,16 +94,16 @@ class GoalToConstraints(GetGoal):
             # joint_constraints = OrderedDict(((self.robot.get_name(), k), self.robot._joint_constraints[k]) for k in
             #                                 controlled_joints)
             l = self.active_free_symbols()
-            joint_constraints = [v for v in self.robot.joint_constraints.values() if v.name in l]
+            joint_constraints = [v for v in self.world.joint_constraints.values() if v.name in l]
 
         self.get_god_map().set_data(identifier.free_variables, joint_constraints)
 
         return Status.SUCCESS
 
     def active_free_symbols(self):
-        symbols = []
+        symbols = set()
         for c in self.soft_constraints.values():
-            symbols.extend(str(s) for s in w.free_symbols(c.expression))
+            symbols.update(str(s) for s in w.free_symbols(c.expression))
         return symbols
 
     def parse_constraints(self, cmd):
@@ -182,8 +182,8 @@ class GoalToConstraints(GetGoal):
                     self.bullet.is_avoid_all_collision(collision_cmd):
                 soft_threshold = collision_cmd.min_dist
 
-        if not collision_cmds or not self.bullet.is_allow_all_collision(collision_cmds[-1]):
-            self.add_external_collision_avoidance_constraints(soft_threshold_override=soft_threshold)
+        # if not collision_cmds or not self.bullet.is_allow_all_collision(collision_cmds[-1]):
+        #     self.add_external_collision_avoidance_constraints(soft_threshold_override=soft_threshold)
         # if not collision_cmds or (not self.bullet.is_allow_all_collision(collision_cmds[-1]) and
         #                           not self.bullet.is_allow_all_self_collision(collision_cmds[-1])):
         #     self.add_self_collision_avoidance_constraints()

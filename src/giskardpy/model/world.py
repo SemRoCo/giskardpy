@@ -366,6 +366,13 @@ class WorldTree(object):
         """
         return self.joints[self.links[link_name].parent_joint_name].parent_link_name
 
+    @memoize
+    def get_movable_parent_joint(self, link_name):
+        joint = self.links[link_name].parent_joint_name
+        while not self.is_joint_movable(joint):
+            joint = self.links[self.joints[joint].parent_link_name].parent_joint_name
+        return joint
+
     def add_world_body(self, msg, pose, parent_link_name=None):
         """
         :type msg: giskard_msgs.msg._WorldBody.WorldBody

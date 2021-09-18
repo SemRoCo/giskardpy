@@ -8,9 +8,10 @@ from giskardpy.tree.plugin import GiskardBehavior
 from giskardpy.utils.tfwrapper import pose_to_kdl, kdl_to_pose
 
 class VisualizationBehavior(GiskardBehavior):
-    def __init__(self, name, ensure_publish=False):
+    def __init__(self, name, ensure_publish=False, clear=False):
         super(VisualizationBehavior, self).__init__(name)
         self.ensure_publish = ensure_publish
+        self.clear = clear
 
     def setup(self, timeout):
         self.publisher = rospy.Publisher(u'~visualization_marker_array', MarkerArray, queue_size=1)
@@ -19,7 +20,8 @@ class VisualizationBehavior(GiskardBehavior):
         return super(VisualizationBehavior, self).setup(timeout)
 
     def update(self):
-        # self.clear_marker()
+        if self.clear:
+            self.clear_marker()
         markers = []
         time_stamp = rospy.Time()
         get_fk = self.world.compute_fk_pose
@@ -46,11 +48,11 @@ class VisualizationBehavior(GiskardBehavior):
 
     def clear_marker(self):
         msg = MarkerArray()
-        for i in self.ids:
-            marker = Marker()
-            marker.action = Marker.DELETE
-            marker.id = i
-            marker.ns = u'planning_visualization'
-            msg.markers.append(marker)
+        # for i in self.ids:
+        marker = Marker()
+        marker.action = Marker.DELETEALL
+        # marker.id = i
+        marker.ns = u'planning_visualization'
+        msg.markers.append(marker)
         self.publisher.publish(msg)
         self.ids = set()

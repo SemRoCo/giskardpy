@@ -11,6 +11,7 @@ import giskardpy.utils.tfwrapper as tf
 from giskardpy import casadi_wrapper as w
 from giskardpy.goals.cartesian_goals import CartesianPoseStraight
 from giskardpy.goals.goal import Goal, WEIGHT_ABOVE_CA
+from giskardpy.model.world import SubWorldTree
 from giskardpy.utils.logging import logwarn
 
 
@@ -264,3 +265,61 @@ class Close(Goal):
         else:
             logwarn(u'Opening containers with joint of type "{}" not supported'.format(
                 environment_object.get_joint_type(joint_name)))
+
+
+# Fixme: The name of this constraint is not informative. Should maybe be something like "Move1DofFixed"
+class Open1Dof(Goal):
+    def __init__(self, tip_link, object_name, handle_link, goal_joint_state=None, root_link=None,
+                 weight=WEIGHT_ABOVE_CA, **kwargs):
+        super(Open1Dof, self).__init__(**kwargs)
+        self.weight = weight
+        self.constraints = []
+
+        self.root = self.robot.root_link_name if root_link is None else root_link
+        self.tip = tip_link
+
+        self.handle_link = handle_link
+
+        self.object_name = object_name
+        env_object = self.world.groups[object_name] # type: SubWorldTree
+        self.joint_name = env_object.get_movable_parent_joint(handle_link)
+
+        self.handle_T_tip = self.world.compute_fk_pose(self.handle_link, self.tip)
+
+        min_limit, max_limit = env_object.joints[self.joint_name].position_limits
+        if goal_joint_state is not None:
+            self.goal_joint_state = max(min_limit, min(max_limit, goal_joint_state))
+        else:
+            self.goal_joint_state = max_limit
+
+    def make_constraints(self):
+        handle_T_tip_evaluated = self.get_parameter_as_symbolic_expression(u'handle_T_tip')
+        goal_joint_symbol = self.get_joint_position_symbol(self.joint_name)
+
+        map_T_handle = self.get_fk(self.world.root_link_name, self.handle_link)
+        map_T_tip = self.get_fk(self.world.root_link_name, self.tip)
+        handle_T_tip = w.dot(w.inverse_frame(map_T_handle), map_T_tip)
+
+        r_P_c = w.position_of(handle_T_tip)
+        r_P_g = w.position_of(handle_T_tip_evaluated)
+
+        self.add_point_goal_constraints(r_P_c, r_P_g, 0.1, self.weight)
+
+        r_R_c = w.rotation_of(handle_T_tip)
+        r_R_g = w.rotation_of(handle_T_tip_evaluated)
+        c_R_r_evaluated = w.rotation_of(self.get_fk_evaluated(self.tip, self.handle_link))
+
+        self.add_rotation_goal_constraints(r_R_c, r_R_g, c_R_r_evaluated, 0.4, self.weight)
+
+        err = self.goal_joint_state - goal_joint_symbol
+
+        # Fixme: This is a very short version of this
+        self.add_constraint(name_suffix=u'object_joint_goal',
+                            reference_velocity=0.5,
+                            lower_error=err,
+                            upper_error=err,
+                            weight=self.weight,
+                            expression=goal_joint_symbol)
+
+    def __str__(self):
+        return u'{}/{}/{}'.format(super(Open1Dof, self).__str__(), self.tip, self.object_name, self.handle_link)

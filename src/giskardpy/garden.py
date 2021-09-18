@@ -195,12 +195,12 @@ def grow_tree():
     wait_for_goal.add_child(TFPublisher(u'tf', **god_map.get_data(identifier.TFPublisher)))
     wait_for_goal.add_child(ConfigurationPlugin(u'js1', RobotPrefix))
     wait_for_goal.add_child(WorldUpdatePlugin(u'pybullet updater'))
-    wait_for_goal.add_child(VisualizationBehavior(u'visualization'))
+    wait_for_goal.add_child(VisualizationBehavior(u'visualization', clear=True))
     wait_for_goal.add_child(GoalReceived(u'has goal', action_server_name, MoveAction))
     wait_for_goal.add_child(ConfigurationPlugin(u'js2', RobotPrefix))
     # ----------------------------------------------
     planning_4 = PluginBehavior(u'planning IIII', sleep=0)
-    planning_4.add_plugin(CollisionChecker(u'collision checker'))
+    # planning_4.add_plugin(CollisionChecker(u'collision checker'))
     # if god_map.safe_get_data(identifier.enable_collision_marker):
     #     planning_3.add_plugin(success_is_running(CPIMarker)(u'cpi marker'))
     planning_4.add_plugin(ControllerPlugin(u'controller'))

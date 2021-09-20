@@ -182,8 +182,8 @@ class GoalToConstraints(GetGoal):
                     self.bullet.is_avoid_all_collision(collision_cmd):
                 soft_threshold = collision_cmd.min_dist
 
-        # if not collision_cmds or not self.bullet.is_allow_all_collision(collision_cmds[-1]):
-        #     self.add_external_collision_avoidance_constraints(soft_threshold_override=soft_threshold)
+        if not collision_cmds or not self.bullet.is_allow_all_collision(collision_cmds[-1]):
+            self.add_external_collision_avoidance_constraints(soft_threshold_override=soft_threshold)
         # if not collision_cmds or (not self.bullet.is_allow_all_collision(collision_cmds[-1]) and
         #                           not self.bullet.is_allow_all_self_collision(collision_cmds[-1])):
         #     self.add_self_collision_avoidance_constraints()

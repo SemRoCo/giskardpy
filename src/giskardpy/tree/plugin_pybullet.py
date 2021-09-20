@@ -292,8 +292,7 @@ class WorldUpdatePlugin(GiskardBehavior):
         # FIXME also keep track of base pose
         if world_body.joint_state_topic:
             plugin_name = PrefixName(world_body.name, 'js')
-            plugin = ConfigurationPlugin(str(plugin_name), world_body.name,
-                                         joint_state_topic=world_body.joint_state_topic)
+            plugin = ConfigurationPlugin(str(plugin_name), prefix=None, joint_state_topic=world_body.joint_state_topic)
             tree = self.god_map.unsafe_get_data(identifier.tree_manager)  # type: TreeManager
             tree.insert_node(plugin, 'wait for goal', 1)
         self.bullet.sync()

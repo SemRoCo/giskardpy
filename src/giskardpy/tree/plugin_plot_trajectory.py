@@ -27,6 +27,6 @@ class PlotTrajectory(GiskardBehavior):
                 plot_trajectory(trajectory, controlled_joints, self.path_to_data_folder, sample_period, self.order,
                                 self.velocity_threshold, self.scaling, self.normalize_position, self.tick_stride,
                                 history=self.history)
-            except Exception:
+            except Exception as e:
                 logwarn(u'failed to save trajectory pdf')
         return Status.SUCCESS

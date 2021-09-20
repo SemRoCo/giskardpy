@@ -159,47 +159,46 @@ class PyBulletSyncer(object):
         collisions = Collisions(self.world, collision_list_size)
         robot_name = self.robot.name
         for (robot_link, body_b, link_b), distance in cut_off_distances.items():
-            if robot_name == body_b:
-                object_id = self.robot.get_pybullet_id()
-                link_b_id = self.robot.get_pybullet_link_id(link_b)
-            else:
-                object_id = self.__get_pybullet_object_id(body_b)
-                if link_b != CollisionEntry.ALL:
-                    link_b_id = self.get_object(body_b).get_pybullet_link_id(link_b)
+            # if robot_name == body_b:
+            # object_id = self.object_name_to_bullet_id[robot_link]
+            link_b_id = self.object_name_to_bullet_id[link_b]
+            # else:
+            #     object_id = self.object_name_to_bullet_id[robot_link]body_b)
+            #     if link_b != CollisionEntry.ALL:
+            #         link_b_id = self.get_object(body_b).get_pybullet_link_id(link_b)
 
-            robot_link_id = self.robot.get_pybullet_link_id(robot_link)
-            if body_b == robot_name or link_b != CollisionEntry.ALL:
-                contacts = [ContactInfo(*x) for x in pbw.getClosestPoints(self.robot.get_pybullet_id(), object_id,
-                                                                        distance * 1.1,
-                                                                        robot_link_id, link_b_id)]
-            else:
-                contacts = [ContactInfo(*x) for x in pbw.getClosestPoints(self.robot.get_pybullet_id(), object_id,
-                                                                        distance * 1.1,
-                                                                        robot_link_id)]
+            robot_link_id = self.object_name_to_bullet_id[robot_link]
+            # if body_b == robot_name or link_b != CollisionEntry.ALL:
+            contacts = [ContactInfo(*x) for x in pbw.getClosestPoints(robot_link_id, link_b_id,
+                                                                    distance * 1.1)]
+            # else:
+            #     contacts = [ContactInfo(*x) for x in pbw.getClosestPoints(self.robot.get_pybullet_id(), object_id,
+            #                                                             distance * 1.1,
+            #                                                             robot_link_id)]
             if len(contacts) > 0:
-                try:
-                    body_b_object = self.get_object(body_b)
-                except KeyError:
-                    body_b_object = self.robot
-                pass
+                # try:
+                #     body_b_object = self.get_object(body_b)
+                # except KeyError:
+                #     body_b_object = self.robot
+                # pass
                 for contact in contacts:  # type: ContactInfo
-                    if link_b == CollisionEntry.ALL:
-                        link_b_tmp = body_b_object.pybullet_link_id_to_name(contact.link_index_b)
-                    else:
-                        link_b_tmp = link_b
-                    if self.__should_flip_collision(contact.position_on_a, robot_link):
-                        flipped_normal = [-contact.contact_normal_on_b[0],
-                                          -contact.contact_normal_on_b[1],
-                                          -contact.contact_normal_on_b[2]]
-                        collision = Collision(robot_link, body_b, link_b_tmp,
-                                              contact.position_on_b, contact.position_on_a,
-                                              flipped_normal, contact.contact_distance)
-                        collisions.add(collision)
-                    else:
-                        collision = Collision(robot_link, body_b, link_b_tmp,
-                                              contact.position_on_a, contact.position_on_b,
-                                              contact.contact_normal_on_b, contact.contact_distance)
-                        collisions.add(collision)
+                    # if link_b == CollisionEntry.ALL:
+                    #     link_b_tmp = body_b_object.pybullet_link_id_to_name(contact.link_index_b)
+                    # else:
+                    #     link_b_tmp = link_b
+                    # if self.__should_flip_collision(contact.position_on_a, robot_link):
+                    #     flipped_normal = [-contact.contact_normal_on_b[0],
+                    #                       -contact.contact_normal_on_b[1],
+                    #                       -contact.contact_normal_on_b[2]]
+                    #     collision = Collision(robot_link, body_b, link_b_tmp,
+                    #                           contact.position_on_b, contact.position_on_a,
+                    #                           flipped_normal, contact.contact_distance)
+                    #     collisions.add(collision)
+                    # else:
+                    collision = Collision(robot_link, body_b, link_b_id,
+                                          contact.position_on_a, contact.position_on_b,
+                                          contact.contact_normal_on_b, contact.contact_distance)
+                    collisions.add(collision)
         return collisions
 
     def in_collision(self, link_a, link_b, distance):
@@ -219,10 +218,12 @@ class PyBulletSyncer(object):
                 self.update_pose(link)
         pbw.activate_rendering()
 
+    @profile
     def sync(self):
         """
         :type world: giskardpy.model.world.WorldTree
         """
+        self.world.fast_all_fks = None
         pbw.deactivate_rendering()
         self.object_name_to_bullet_id = BiDict()
         self.world.soft_reset()
@@ -271,7 +272,7 @@ class PyBulletSyncer(object):
             assert len(collision_entry.robot_links) == 1
             assert len(collision_entry.link_bs) == 1
             if self.all_link_bs(collision_entry):
-                link_bs = self.world.groups[collision_entry.body_b].link_names
+                link_bs = self.world.groups[collision_entry.body_b].link_names_with_collisions
             else:
                 link_bs = collision_entry.link_bs
             for link_b in link_bs:

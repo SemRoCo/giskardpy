@@ -157,103 +157,39 @@ class Trajectory(object):
 
 class Collision(object):
     def __init__(self, link_a, body_b, link_b, position_on_a, position_on_b, contact_normal, contact_distance):
-        self.__position_on_a = position_on_a
-        self.__position_on_a_in_a = position_on_a
-        self.__position_on_b = position_on_b
-        self.__position_on_b_in_b = position_on_b
-        self.__position_on_b_in_root = position_on_b
-        self.__contact_distance = contact_distance
-        self.__contact_normal = contact_normal
-        self.__contact_normal_in_root = contact_normal
-        self.__contact_normal_in_b = contact_normal
-        self.__original_link_a = link_a
-        self.__link_a = link_a
-        self.__body_b = body_b
-        self.__original_link_b = link_b
-        self.__link_b = link_b
-        self.__old_key = (link_a, body_b, link_a)
+        self.map_P_a = list(position_on_a)
+        self.map_P_a.append(1)
+        self.map_P_b = list(position_on_b)
+        self.map_P_b.append(1)
+        self.map_V_n = list(contact_normal)
+        self.map_V_n.append(0)
+        self.contact_distance = contact_distance
+        self.original_link_a = link_a
+        self.link_a = link_a
+        self.body_b = body_b
+        self.original_link_b = link_b
+        self.link_b = link_b
+        self.old_key = (link_a, body_b, link_a)
+        self.new_a_P_a = None
+        self.root_P_b = None
+        self.new_b_P_b = None
+        self.new_b_V_n = None
+        self.root_V_n = None
 
-    def get_position_on_a_in_map(self):
-        return self.__position_on_a
-
-    def get_position_on_a_in_a(self):
-        return self.__position_on_a_in_a
-
-    def get_position_on_b_in_map(self):
-        return self.__position_on_b
-
-    def get_position_on_b_in_root(self):
-        return self.__position_on_b_in_root
-
-    def get_position_on_b_in_b(self):
-        return self.__position_on_b_in_b
-
-    def get_contact_normal_in_map(self):
-        return self.__contact_normal
-
-    def get_contact_normal_in_b(self):
-        return self.__contact_normal_in_b
-
-    def get_contact_normal_in_root(self):
-        return self.__contact_normal_in_root
-
-    def get_contact_distance(self):
-        return self.__contact_distance
-
-    def get_original_link_a(self):
-        return self.__original_link_a
-
-    def get_link_a(self):
-        return self.__link_a
-
-    def get_original_link_b(self):
-        return self.__original_link_b
-
-    def get_link_b(self):
-        return self.__link_b
-
-    # @profile
     def get_link_b_hash(self):
-        return self.get_link_b().__hash__()
+        return self.link_b.__hash__()
 
-    def get_body_b(self):
-        return self.__body_b
-
-    # @profile
     def get_body_b_hash(self):
-        return self.get_body_b().__hash__()
-
-    def set_position_on_a_in_a(self, position):
-        self.__position_on_a_in_a = position
-
-    def set_position_on_b_in_root(self, position):
-        self.__position_on_b_in_root = position
-
-    def set_position_on_b_in_b(self, position):
-        self.__position_on_b_in_b = position
-
-    def set_contact_normal_in_b(self, normal):
-        self.__contact_normal_in_b = normal
-
-    def set_contact_normal_in_root(self, normal):
-        self.__contact_normal_in_root = normal
-
-    def set_link_a(self, link_a):
-        self.__link_a = link_a
-
-    def set_link_b(self, link_b):
-        self.__link_b = link_b
+        return self.body_b.__hash__()
 
     def reverse(self):
-        return Collision(link_a=self.get_original_link_b(),
-                         body_b=self.get_body_b(),
-                         link_b=self.get_original_link_a(),
-                         position_on_a=self.get_position_on_b_in_map(),
-                         position_on_b=self.get_position_on_a_in_map(),
-                         contact_normal=[-self.__contact_normal[0],
-                                         -self.__contact_normal[1],
-                                         -self.__contact_normal[2]],
-                         contact_distance=self.get_contact_distance())
+        return Collision(link_a=self.original_link_b,
+                         body_b=self.body_b,
+                         link_b=self.original_link_a,
+                         position_on_a=self.map_P_b,
+                         position_on_b=self.map_P_a,
+                         contact_normal=-self.map_V_n,
+                         contact_distance=self.contact_distance)
 
 
 class CollisionMatrix(dict):
@@ -274,7 +210,7 @@ class Collisions(object):
 
         # @profile
         def sort(x):
-            return x.get_contact_distance()
+            return x.contact_distance
 
         # @profile
         def default_f():
@@ -299,40 +235,40 @@ class Collisions(object):
         collision = self.transform_closest_point(collision)
         self.all_collisions.add(collision)
 
-        if collision.get_body_b() == self.robot.get_name():
-            key = collision.get_link_a(), collision.get_link_b()
-            self.self_collisions[key].add(collision)
-            self.number_of_self_collisions[key] = min(self.collision_list_size,
-                                                      self.number_of_self_collisions[key] + 1)
+        # if collision.get_body_b() == self.robot.name:
+        #     key = collision.get_link_a(), collision.get_link_b()
+        #     self.self_collisions[key].add(collision)
+        #     self.number_of_self_collisions[key] = min(self.collision_list_size,
+        #                                               self.number_of_self_collisions[key] + 1)
+        # else:
+        key = collision.link_a
+        self.external_collision[key].add(collision)
+        self.number_of_external_collisions[key] = min(self.collision_list_size,
+                                                      self.number_of_external_collisions[key] + 1)
+        key_long = (collision.original_link_a, collision.body_b, collision.original_link_b)
+        if key_long not in self.external_collision_long_key:
+            self.external_collision_long_key[key_long] = collision
         else:
-            key = collision.get_link_a()
-            self.external_collision[key].add(collision)
-            self.number_of_external_collisions[key] = min(self.collision_list_size,
-                                                          self.number_of_external_collisions[key] + 1)
-            key_long = (collision.get_original_link_a(), collision.get_body_b(), collision.get_original_link_b())
-            if key_long not in self.external_collision_long_key:
-                self.external_collision_long_key[key_long] = collision
-            else:
-                self.external_collision_long_key[key_long] = min(collision, self.external_collision_long_key[key_long],
-                                                                 key=lambda x: x.get_contact_distance())
+            self.external_collision_long_key[key_long] = min(collision, self.external_collision_long_key[key_long],
+                                                             key=lambda x: x.contact_distance)
 
     def transform_closest_point(self, collision):
         """
         :type collision: Collision
         :rtype: Collision
         """
-        if collision.get_body_b() == self.robot.get_name():
-            return self.transform_self_collision(collision)
-        else:
-            return self.transform_external_collision(collision)
+        # if collision.get_body_b() == self.robot.name:
+        #     return self.transform_self_collision(collision)
+        # else:
+        return self.transform_external_collision(collision)
 
     def transform_self_collision(self, collision):
         """
         :type collision: Collision
         :rtype: Collision
         """
-        link_a = collision.get_original_link_a()
-        link_b = collision.get_original_link_b()
+        link_a = collision.original_link_a
+        link_b = collision.original_link_b
         new_link_a, new_link_b = self.robot.get_chain_reduced_to_controlled_joints(link_a, link_b)
         if new_link_a > new_link_b:
             collision = collision.reverse()
@@ -340,18 +276,18 @@ class Collisions(object):
 
         new_b_T_r = self.robot.compute_fk_np(new_link_b, self.robot_root)
         new_a_T_r = self.robot.compute_fk_np(new_link_a, self.robot_root)
-        collision.set_link_a(new_link_a)
-        collision.set_link_b(new_link_b)
+        collision.link_a = new_link_a
+        collision.link_b = new_link_b
 
         new_b_T_map = np.dot(new_b_T_r, self.root_T_map)
 
-        new_a_P_pa = np.dot(np.dot(new_a_T_r, self.root_T_map), np_point(*collision.get_position_on_a_in_map()))
-        new_b_P_pb = np.dot(new_b_T_map, np_point(*collision.get_position_on_b_in_map()))
+        new_a_P_pa = np.dot(np.dot(new_a_T_r, self.root_T_map), collision.map_P_a)
+        new_b_P_pb = np.dot(new_b_T_map, collision.map_P_b)
         # r_P_pb = np.dot(self.root_T_map, np_point(*closest_point.position_on_b))
-        new_b_V_n = np.dot(new_b_T_map, np_vector(*collision.get_contact_normal_in_map()))
-        collision.set_position_on_a_in_a(new_a_P_pa[:-1])
-        collision.set_position_on_b_in_b(new_b_P_pb[:-1])
-        collision.set_contact_normal_in_b(new_b_V_n[:-1])
+        new_b_V_n = np.dot(new_b_T_map, collision.map_V_n)
+        collision.new_a_P_a = new_a_P_pa
+        collision.new_b_P_b = new_b_P_pb
+        collision.new_b_V_n = new_b_V_n
         return collision
 
     def transform_external_collision(self, collision):
@@ -359,21 +295,27 @@ class Collisions(object):
         :type collision: Collision
         :rtype: Collision
         """
-        movable_joint = self.robot.get_controlled_parent_joint(collision.get_original_link_a())
-        new_a = self.robot.get_child_link_of_joint(movable_joint)
+        movable_joint = self.robot.get_controlled_parent_joint(collision.original_link_a)
+        new_a = self.robot.joints[movable_joint].child_link_name
         new_a_T_r = self.robot.compute_fk_np(new_a, self.robot_root)
-        collision.set_link_a(new_a)
+        collision.link_a = new_a
 
-        new_a_P_pa = np.dot(np.dot(new_a_T_r, self.root_T_map), np_point(*collision.get_position_on_a_in_map()))
-        r_P_pb = np.dot(self.root_T_map, np_point(*collision.get_position_on_b_in_map()))
-        r_V_n = np.dot(self.root_T_map, np_vector(*collision.get_contact_normal_in_map()))
-        collision.set_position_on_a_in_a(new_a_P_pa[:-1])
-        collision.set_position_on_b_in_root(r_P_pb[:-1])
-        collision.set_contact_normal_in_root(r_V_n[:-1])
+        new_a_P_pa = np.dot(np.dot(new_a_T_r, self.root_T_map), collision.map_P_a)
+        r_P_pb = np.dot(self.root_T_map, collision.map_P_b)
+        r_V_n = np.dot(self.root_T_map, collision.map_V_n)
+        collision.new_a_P_a = new_a_P_pa
+        collision.root_P_b = r_P_pb
+        collision.root_V_n = r_V_n
         return collision
 
     def _default_collision(self, link_a, body_b, link_b):
-        return Collision(link_a, body_b, link_b, [0, 0, 0], [0, 0, 0], [0, 0, 1], 100)
+        c = Collision(link_a, body_b, link_b, [0, 0, 0, 1], [0, 0, 0, 1], [0, 0, 1, 0], 100)
+        c.new_a_P_a = [0, 0, 0, 1]
+        c.new_b_P_b = [0, 0, 0, 1]
+        c.root_P_b = [0, 0, 0, 1]
+        c.new_b_V_n = [0, 0, 1, 0]
+        c.root_V_n = [0, 0, 1, 0]
+        return c
 
     # @profile
     def get_external_collisions(self, joint_name):

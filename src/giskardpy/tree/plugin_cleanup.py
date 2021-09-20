@@ -16,6 +16,7 @@ class CleanUp(GiskardBehavior):
 
     def initialise(self):
         self.get_god_map().clear_cache()
+        self.world.fast_all_fks = None
         self.get_god_map().set_data(identifier.closest_point, {})
         # self.get_god_map().safe_set_data(identifier.closest_point, None)
         self.get_god_map().set_data(identifier.time, 1)

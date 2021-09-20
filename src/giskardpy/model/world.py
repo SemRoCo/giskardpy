@@ -290,7 +290,6 @@ class WorldTree(object):
                 getattr(self, method_name).memo.clear()
             except:
                 pass
-        self.fast_all_fks = None
 
     def register_group(self, name, root_link_name):
         if root_link_name not in self.links:
@@ -429,8 +428,10 @@ class WorldTree(object):
         except KeyError:
             logging.logwarn('Can\'t add robot, because it is not on the param server')
         self.soft_reset()
+        self.fast_all_fks = None
 
     def sync_with_paramserver(self):
+        # FIXME this is probable being called repeatedly, creating huge min max expressions over time
         for i in range(1, self.god_map.unsafe_get_data(identifier.order)):
             order_identifier = identifier.joint_limits + [order_map[i]]
             d_linear = KeyDefaultDict(lambda key: self.god_map.to_symbol(order_identifier +
@@ -533,7 +534,7 @@ class WorldTree(object):
     def get_controlled_parent_joint(self, link_name):
         joint = self.links[link_name].parent_joint_name
         while joint not in self.controlled_joints:
-            joint = self.links[joint].parent_joint_name
+            joint = self.links[self.joints[joint].parent_link_name].parent_joint_name
         return joint
 
 

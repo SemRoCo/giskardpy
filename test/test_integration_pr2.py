@@ -24,6 +24,7 @@ from giskardpy.model.robot import Robot
 from giskardpy.utils import logging
 from giskardpy.utils.tfwrapper import init as tf_init
 from giskardpy.utils.utils import to_joint_state_position_dict
+from test_integration_pr2_without_base import gaya_pose
 from utils_for_tests import PR2, compare_poses, compare_points, compare_orientations, publish_marker_vector
 
 # TODO roslaunch iai_pr2_sim ros_control_sim_with_base.launch
@@ -3188,7 +3189,8 @@ class TestCollisionAvoidanceGoals(object):
         # ce.min_dist = 0.05
         box_setup.set_collision_entries([ce])
         box_setup.allow_self_collision()
-        box_setup.send_and_check_goal([MoveResult.SUCCESS])
+        # box_setup.set_joint_goal(gaya_pose)
+        box_setup.send_and_check_goal()
         box_setup.check_cpi_geq(box_setup.get_l_gripper_links(), 0.048)
         box_setup.check_cpi_geq(box_setup.get_r_gripper_links(), 0.048)
 
@@ -5085,3 +5087,4 @@ class TestReachability():
 # import pytest
 # pytest.main(['-s', __file__ + '::TestJointGoals::test_joint_movement1'])
 # pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_bowl_and_cup'])
+# pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_avoid_collision'])

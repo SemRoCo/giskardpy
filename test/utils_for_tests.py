@@ -375,6 +375,7 @@ class GiskardTestWrapper(GiskardWrapper):
     def set_object_joint_state(self, object_name, joint_state):
         super(GiskardTestWrapper, self).set_object_joint_state(object_name, joint_state)
         self.loop_once()
+        self.loop_once()
         rospy.sleep(0.5)
         self.wait_for_synced()
         current_js = self.get_world().groups[object_name].state
@@ -846,11 +847,11 @@ class GiskardTestWrapper(GiskardWrapper):
         :rtype: list
         """
         collision_goals = [CollisionEntry(type=CollisionEntry.AVOID_ALL_COLLISIONS, min_dist=distance_threshold)]
-        collision_matrix = self.get_world().collision_goals_to_collision_matrix(collision_goals,
+        collision_matrix = self.bullet.collision_goals_to_collision_matrix(collision_goals,
                                                                                 defaultdict(lambda: 0.3))
-        collisions = self.get_world().check_collisions(collision_matrix)
+        collisions = self.bullet.check_collisions(collision_matrix)
         controlled_parent_joint = self.get_robot().get_controlled_parent_joint(link)
-        controlled_parent_link = self.get_robot().get_child_link_of_joint(controlled_parent_joint)
+        controlled_parent_link = self.get_robot().joints[controlled_parent_joint].child_link_name
         collision_list = collisions.get_external_collisions(controlled_parent_link)
         for key, self_collisions in collisions.self_collisions.items():
             if controlled_parent_link in key:
@@ -860,17 +861,17 @@ class GiskardTestWrapper(GiskardWrapper):
     def check_cpi_geq(self, links, distance_threshold):
         for link in links:
             collisions = self.get_external_collisions(link, distance_threshold)
-            assert collisions[0].get_contact_distance() >= distance_threshold, \
+            assert collisions[0].contact_distance >= distance_threshold, \
                 u'distance for {}: {} >= {}'.format(link,
-                                                    collisions[0].get_contact_distance(),
+                                                    collisions[0].contact_distance,
                                                     distance_threshold)
 
     def check_cpi_leq(self, links, distance_threshold):
         for link in links:
             collisions = self.get_external_collisions(link, distance_threshold)
-            assert collisions[0].get_contact_distance() <= distance_threshold, \
+            assert collisions[0].contact_distance <= distance_threshold, \
                 u'distance for {}: {} <= {}'.format(link,
-                                                    collisions[0].get_contact_distance(),
+                                                    collisions[0].contact_distance,
                                                     distance_threshold)
 
     def move_base(self, goal_pose):

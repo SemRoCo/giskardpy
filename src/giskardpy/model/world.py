@@ -358,6 +358,7 @@ class WorldTree(object):
         if group_name is not None:
             self.register_group(group_name, child_link.name)
         self.soft_reset()
+        self.sync_with_paramserver()
 
     def get_parent_link_of_link(self, link_name):
         """
@@ -425,19 +426,21 @@ class WorldTree(object):
         self.groups = {}
         try:
             self.add_urdf(self.god_map.unsafe_get_data(identifier.robot_description), group_name=RobotName, prefix=None)
-            for i in range(1, self.god_map.unsafe_get_data(identifier.order)):
-                order_identifier = identifier.joint_limits + [order_map[i]]
-                d_linear = KeyDefaultDict(lambda key: self.god_map.to_symbol(order_identifier +
-                                                                             [u'linear', u'override', key]))
-                d_angular = KeyDefaultDict(lambda key: self.god_map.to_symbol(order_identifier +
-                                                                              [u'angular', u'override', key]))
-                self.set_joint_limits(d_linear, d_angular, i)
-            for i in range(1, self.god_map.unsafe_get_data(identifier.order)):
-                self.set_joint_weights(i, self.god_map.unsafe_get_data(identifier.joint_weights +
-                                                                       [order_map[i], 'override']))
         except KeyError:
             logging.logwarn('Can\'t add robot, because it is not on the param server')
         self.soft_reset()
+
+    def sync_with_paramserver(self):
+        for i in range(1, self.god_map.unsafe_get_data(identifier.order)):
+            order_identifier = identifier.joint_limits + [order_map[i]]
+            d_linear = KeyDefaultDict(lambda key: self.god_map.to_symbol(order_identifier +
+                                                                         [u'linear', u'override', key]))
+            d_angular = KeyDefaultDict(lambda key: self.god_map.to_symbol(order_identifier +
+                                                                          [u'angular', u'override', key]))
+            self.set_joint_limits(d_linear, d_angular, i)
+        for i in range(1, self.god_map.unsafe_get_data(identifier.order)):
+            self.set_joint_weights(i, self.god_map.unsafe_get_data(identifier.joint_weights +
+                                                                   [order_map[i], 'override']))
 
     @property
     def joint_constraints(self):

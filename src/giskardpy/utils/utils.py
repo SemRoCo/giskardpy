@@ -19,6 +19,8 @@ from rospy_message_converter.message_converter import \
     convert_dictionary_to_ros_message as original_convert_dictionary_to_ros_message
 from sensor_msgs.msg import JointState
 
+from giskardpy.utils import logging
+
 
 @contextmanager
 def suppress_stderr():
@@ -184,7 +186,9 @@ def plot_trajectory(tj, controlled_joints, path_to_data_folder, sample_period, o
     order = max(order, 2)
     if len(tj._points) <= 0:
         return
-    colors = [u'b', u'g', u'r', u'c', u'm', u'y', u'k']
+    # colors = [u'b', u'g', u'r', u'c', u'm', u'y', u'k']
+    colors = [u'tab:blue', u'tab:orange', u'tab:green', u'tab:red', u'tab:purple', u'tab:brown', u'tab:pink',
+              u'tab:gray', u'tab:olive', u'tab:cyan', u'k']
     titles = [u'position', u'velocity', u'acceleration', u'jerk', u'snap', u'crackle', u'pop']
     line_styles = [u'', u'--', u'-.', u':']
     fmts = [u''.join(i) for i in product(line_styles, colors)]
@@ -226,13 +230,15 @@ def plot_trajectory(tj, controlled_joints, path_to_data_folder, sample_period, o
         for i in range(order):
             axs[i].set_title(titles[i])
             # axs[i].set_ylim([-0.5, 0.5])
+    color_counter = 0
     for i in range(len(controlled_joints)):
         if velocity_threshold is None or any(abs(data[1][:, i]) > velocity_threshold):
             for j in range(order):
                 try:
-                    axs[j].plot(times, data[j][:, i], fmts[i], label=names[i])
-                except:
-                    pass
+                    axs[j].plot(times, data[j][:, i], fmts[color_counter], label=names[i])
+                except KeyError:
+                    logging.logwarn(u'Not enough colors to plot all joints, skipping {}.'.format(names[i]))
+            color_counter += 1
 
     axs[0].legend(bbox_to_anchor=(1.01, 1), loc='upper left')
 

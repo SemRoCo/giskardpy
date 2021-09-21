@@ -67,6 +67,10 @@ def load_urdf_string_into_bullet(urdf_string, pose=None, position=None, orientat
     if isinstance(pose, Pose):
         position = [pose.position.x, pose.position.y, pose.position.z]
         orientation = [pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w]
+    if position is None:
+        position = [0,0,0]
+    if orientation is None:
+        orientation = [0,0,0,1]
     object_name = robot_name_from_urdf_string(urdf_string)
     if object_name in get_body_names():
         raise DuplicateNameException(u'an object with name \'{}\' already exists in pybullet'.format(object_name))

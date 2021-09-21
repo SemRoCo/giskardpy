@@ -66,13 +66,13 @@ class CartesianOrientation(Goal):
         self.reference_velocity = reference_velocity
         self.max_velocity = max_velocity
         self.weight = weight
-        if self.max_velocity is not None:
-            self.add_constraints_of_goal(RotationVelocityLimit(root_link=root_link,
-                                                               tip_link=tip_link,
-                                                               weight=weight,
-                                                               max_velocity=max_velocity,
-                                                               hard=False,
-                                                               **kwargs))
+        # if self.max_velocity is not None:
+        #     self.add_constraints_of_goal(RotationVelocityLimit(root_link=root_link,
+        #                                                        tip_link=tip_link,
+        #                                                        weight=weight,
+        #                                                        max_velocity=max_velocity,
+        #                                                        hard=False,
+        #                                                        **kwargs))
 
     def make_constraints(self):
         r_R_g = w.rotation_of(self.get_parameter_as_symbolic_expression('goal_pose'))

@@ -4,7 +4,8 @@ from itertools import combinations
 from time import time
 
 import numpy as np
-from giskard_msgs.msg import CollisionEntry
+from geometry_msgs.msg import Pose, Point
+from giskard_msgs.msg import CollisionEntry, WorldBody
 from tf.transformations import quaternion_matrix, quaternion_from_matrix
 
 import giskardpy.model.pybullet_wrapper as pbw
@@ -20,6 +21,7 @@ from giskardpy.utils.utils import resolve_ros_iris
 
 
 class PyBulletSyncer(object):
+    hack_name = 'hack'
     def __init__(self, world, gui=False):
         pbw.start_pybullet(gui)
         self.object_name_to_bullet_id = BiDict()
@@ -161,6 +163,8 @@ class PyBulletSyncer(object):
         for (robot_link, body_b, link_b), distance in cut_off_distances.items():
             # if robot_name == body_b:
             # object_id = self.object_name_to_bullet_id[robot_link]
+            if link_b in self.robot.link_names:
+                continue
             link_b_id = self.object_name_to_bullet_id[link_b]
             # else:
             #     object_id = self.object_name_to_bullet_id[robot_link]body_b)
@@ -190,7 +194,7 @@ class PyBulletSyncer(object):
                     #     flipped_normal = [-contact.contact_normal_on_b[0],
                     #                       -contact.contact_normal_on_b[1],
                     #                       -contact.contact_normal_on_b[2]]
-                    #     collision = Collision(robot_link, body_b, link_b_tmp,
+                    #     collision = Collision(robot_link, body_b, link_b,
                     #                           contact.position_on_b, contact.position_on_a,
                     #                           flipped_normal, contact.contact_distance)
                     #     collisions.add(collision)
@@ -293,6 +297,40 @@ class PyBulletSyncer(object):
                 else:
                     raise Exception('todo')
         return min_allowed_distance
+
+    def __add_pybullet_bug_fix_hack(self):
+        if self.hack_name not in self.object_name_to_bullet_id:
+            path = resolve_ros_iris(u'package://giskardpy/urdfs/tiny_ball.urdf')
+            with open(path, 'r') as f:
+                self.object_name_to_bullet_id[self.hack_name] = pbw.load_urdf_string_into_bullet(f.read())
+
+    def __move_hack(self, pose):
+        position = [pose.position.x, pose.position.y, pose.position.z]
+        orientation = [pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w]
+        pbw.resetBasePositionAndOrientation(self.object_name_to_bullet_id[self.hack_name],
+                                            position, orientation)
+
+    def __should_flip_collision(self, position_on_a_in_map, link_a):
+        """
+        :type collision: ContactInfo
+        :rtype: bool
+        """
+        self.__add_pybullet_bug_fix_hack()
+        new_p = Pose()
+        new_p.position = Point(*position_on_a_in_map)
+        new_p.orientation.w = 1
+
+        self.__move_hack(new_p)
+        hack_id = self.object_name_to_bullet_id[self.hack_name]
+        body_a_id = self.object_name_to_bullet_id[link_a]
+        try:
+            contact_info3 = ContactInfo(
+                *[x for x in pbw.getClosestPoints(hack_id,
+                                                body_a_id, 0.001) if
+                  abs(x[8] + 0.005) < 0.0005][0])
+            return not contact_info3.body_unique_id_b == body_a_id
+        except Exception as e:
+            return True
 
     def get_robot_collision_matrix(self, min_dist):
         robot_name = self.robot.name

@@ -226,7 +226,7 @@ class Collisions(object):
         self.number_of_self_collisions = defaultdict(int)
         self.number_of_external_collisions = defaultdict(int)
 
-    # @profile
+    @profile
     def add(self, collision):
         """
         :type collision: Collision
@@ -290,6 +290,7 @@ class Collisions(object):
         collision.new_b_V_n = new_b_V_n
         return collision
 
+    @profile
     def transform_external_collision(self, collision):
         """
         :type collision: Collision

@@ -26,11 +26,23 @@ class ExternalCollisionAvoidance(Goal):
                                                                               self.idx,
                                                                               u'root_V_n'])
 
+    def map_V_n_symbol(self):
+        return self.god_map.list_to_vector3(identifier.closest_point + [u'get_external_collisions',
+                                                                              (self.link_name,),
+                                                                              self.idx,
+                                                                              u'map_V_n'])
+
     def get_closest_point_on_a_in_a(self):
         return self.god_map.list_to_point3(identifier.closest_point + [u'get_external_collisions',
                                                                              (self.link_name,),
                                                                              self.idx,
                                                                              u'new_a_P_a'])
+
+    def map_P_a_symbol(self):
+        return self.god_map.list_to_point3(identifier.closest_point + [u'get_external_collisions',
+                                                                             (self.link_name,),
+                                                                             self.idx,
+                                                                             u'new_map_P_a'])
 
     def get_closest_point_on_b_in_root(self):
         return self.god_map.list_to_point3(identifier.closest_point + [u'get_external_collisions',

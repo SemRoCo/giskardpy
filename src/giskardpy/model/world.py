@@ -300,23 +300,23 @@ class WorldTree(object):
 
     @property
     def group_names(self):
-        return list(self.groups.keys())
+        return set(self.groups.keys())
 
     @property
     def root_link(self):
         return self.links[self.root_link_name]
 
-    @property
+    @cached_property
     def link_names(self):
-        return list(self.links.keys())
+        return set(self.links.keys())
 
     @property
     def link_names_with_visuals(self):
-        return [link.name for link in self.links.values() if link.has_visuals()]
+        return set(link.name for link in self.links.values() if link.has_visuals())
 
-    @property
+    @cached_property
     def link_names_with_collisions(self):
-        return [link.name for link in self.links.values() if link.has_collisions()]
+        return set(link.name for link in self.links.values() if link.has_collisions())
 
     @property
     def joint_names(self):
@@ -408,6 +408,8 @@ class WorldTree(object):
         self.init_fast_fks()
         for group in self.groups.values():
             group.soft_reset()
+        del self.link_names
+        del self.link_names_with_collisions
 
     # def get_controlled_links(self):
     #     # FIXME expensive
@@ -674,6 +676,9 @@ class WorldTree(object):
                 new_limits = linear_limits
 
             old_upper_limits = joint.free_variable.upper_limits[order]
+            old_upper_limits_str = str(old_upper_limits)
+            if old_upper_limits_str.startswith('fmin') or old_upper_limits_str.startswith('fmax'):
+                continue
             if old_upper_limits is None:
                 joint.free_variable.upper_limits[order] = new_limits[joint.name]
             else:
@@ -820,6 +825,8 @@ class SubWorldTree(WorldTree):
         super(SubWorldTree, self).reset_cache()
         del self.joints
         del self.links
+        del self.link_names
+        del self.link_names_with_collisions
 
     @property
     def god_map(self):

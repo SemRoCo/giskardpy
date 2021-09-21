@@ -159,7 +159,7 @@ class PyBulletSyncer(object):
         :rtype: Collisions
         """
         collisions = Collisions(self.world, collision_list_size)
-        robot_name = self.robot.name
+        # robot_name = self.robot.name
         for (robot_link, body_b, link_b), distance in cut_off_distances.items():
             # if robot_name == body_b:
             # object_id = self.object_name_to_bullet_id[robot_link]

@@ -654,6 +654,31 @@ class WorldTree(object):
             result[link] = fks_evaluated[self.fk_idx[link], :]
         return result
 
+    @profile
+    def compute_all_fks_matrix(self):
+        if self.fast_all_fks is None:
+            fks = []
+            self.fk_idx = {}
+            i = 0
+            for link in self.links.values():
+                if link.name == self.root_link_name:
+                    continue
+                if link.has_collisions():
+                    map_T_o = self.compose_fk_expression(self.root_link_name, link.name)
+                    o_T_geo = link.collisions[0].link_T_geometry
+                    map_T_geo = w.dot(map_T_o, o_T_geo)
+                    fks.append(map_T_geo)
+                    self.fk_idx[link.name] = i
+                    i += 4
+            fks = w.vstack(fks)
+            self.fast_all_fks = w.speed_up(fks, w.free_symbols(fks))
+
+        return self.fast_all_fks.call2(self.god_map.unsafe_get_values(self.fast_all_fks.str_params))
+        # result = {}
+        # for link in self.link_names_with_collisions:
+        #     result[link] = fks_evaluated[self.fk_idx[link], :]
+        # return result
+
     @memoize
     def are_linked(self, link_a, link_b):
         """

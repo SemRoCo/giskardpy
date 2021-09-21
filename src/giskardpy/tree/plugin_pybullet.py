@@ -18,6 +18,7 @@ from giskardpy import RobotName, RobotPrefix
 from giskardpy.data_types import JointStates, PrefixName
 from giskardpy.exceptions import CorruptShapeException, UnknownBodyException, \
     UnsupportedOptionException, DuplicateNameException
+from giskardpy.model.better_pybullet_syncer import BetterPyBulletSyncer
 from giskardpy.model.pybullet_syncer import PyBulletSyncer
 from giskardpy.model.urdf_object import URDFObject
 from giskardpy.model.world import SubWorldTree
@@ -36,7 +37,8 @@ class WorldUpdatePlugin(GiskardBehavior):
         super(WorldUpdatePlugin, self).__init__(name)
         self.map_frame = self.get_god_map().get_data(identifier.map_frame)
         self.original_link_names = self.robot.link_names
-        self.bullet = PyBulletSyncer(self.world, self.god_map.get_data(identifier.gui))
+        # self.bullet = PyBulletSyncer(self.world, self.god_map.get_data(identifier.gui))
+        self.bullet = BetterPyBulletSyncer(self.world)
         self.bullet.init_collision_matrix(RobotName)
         self.god_map.set_data(identifier.bullet, self.bullet)
         # self.bullet.sync()

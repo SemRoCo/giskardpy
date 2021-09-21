@@ -157,12 +157,21 @@ class Trajectory(object):
 
 class Collision(object):
     def __init__(self, link_a, body_b, link_b, position_on_a, position_on_b, contact_normal, contact_distance):
-        self.map_P_a = list(position_on_a)
-        self.map_P_a.append(1)
-        self.map_P_b = list(position_on_b)
-        self.map_P_b.append(1)
-        self.map_V_n = list(contact_normal)
-        self.map_V_n.append(0)
+        if len(position_on_a) == 3:
+            self.map_P_a = list(position_on_a)
+            self.map_P_a.append(1)
+        else:
+            self.map_P_a = position_on_a
+        if len(position_on_b) == 3:
+            self.map_P_b = list(position_on_b)
+            self.map_P_b.append(1)
+        else:
+            self.map_P_b = position_on_b
+        if len(contact_normal) == 3:
+            self.map_V_n = list(contact_normal)
+            self.map_V_n.append(0)
+        else:
+            self.map_V_n = contact_normal
         self.contact_distance = contact_distance
         self.original_link_a = link_a
         self.link_a = link_a

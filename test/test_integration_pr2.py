@@ -4461,6 +4461,8 @@ class TestCollisionAvoidanceGoals(object):
         cereal_pose.pose.orientation = Quaternion(0.0087786, 0.005395, -0.838767, -0.544393)
         kitchen_setup.add_box(cereal_name, [0.1528, 0.0634, 0.22894], cereal_pose)
 
+        cereal_pose_in_map = tf.msg_to_kdl(tf.transform_pose(u'map', cereal_pose))
+
         drawer_T_box = tf.msg_to_kdl(cereal_pose)
 
         # grasp milk
@@ -4473,10 +4475,10 @@ class TestCollisionAvoidanceGoals(object):
         box_T_r_goal_pre = deepcopy(box_T_r_goal)
         box_T_r_goal_pre.p[0] += 0.1
 
-        grasp_pose = tf.kdl_to_pose_stamped(drawer_T_box * box_T_r_goal_pre, drawer_frame_id)
+        pre_grasp_pose = tf.kdl_to_pose_stamped(drawer_T_box * box_T_r_goal_pre, drawer_frame_id)
 
         kitchen_setup.set_json_goal(u'AvoidJointLimits', percentage=40)
-        kitchen_setup.set_and_check_cart_goal(grasp_pose, tip_link=kitchen_setup.r_tip)
+        kitchen_setup.set_and_check_cart_goal(pre_grasp_pose, tip_link=kitchen_setup.r_tip)
 
         grasp_pose = tf.kdl_to_pose_stamped(drawer_T_box * box_T_r_goal, drawer_frame_id)
 
@@ -4502,7 +4504,7 @@ class TestCollisionAvoidanceGoals(object):
         # kitchen_setup.align_planes('milk', x, root_normal=x_map)
         # kitchen_setup.align_planes('milk', z, root_normal=z_map)
         # kitchen_setup.keep_orientation(u'milk')
-        kitchen_setup.set_cart_goal(grasp_pose, cereal_name, kitchen_setup.default_root)
+        # kitchen_setup.set_cart_goal(grasp_pose, cereal_name, kitchen_setup.default_root)
         kitchen_setup.send_and_check_goal()
         kitchen_setup.send_and_check_joint_goal(gaya_pose)
 
@@ -4513,11 +4515,8 @@ class TestCollisionAvoidanceGoals(object):
         # milk_goal.header.frame_id = u'iai_kitchen/kitchen_island_surface'
         # milk_goal.pose.position = Point(.1, -.2, .13)
         # milk_goal.pose.orientation = Quaternion(*quaternion_about_axis(np.pi, [0,0,1]))
-        kitchen_setup.set_cart_goal(grasp_pose, cereal_name, kitchen_setup.default_root)
-        kitchen_setup.send_and_check_goal()
 
-        kitchen_setup.set_cart_goal(cereal_pose, cereal_name, kitchen_setup.default_root)
-        kitchen_setup.send_and_check_goal()
+        kitchen_setup.set_and_check_cart_goal(cereal_pose, cereal_name)
 
         # kitchen_setup.keep_position(kitchen_setup.r_tip)
         kitchen_setup.open_l_gripper()

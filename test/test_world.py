@@ -9,7 +9,7 @@ from giskard_msgs.msg import CollisionEntry
 from hypothesis import given
 
 import test_urdf_object
-from giskardpy import identifier, RobotName
+from giskardpy import identifier, RobotName, RobotPrefix
 from giskardpy.data_types import JointStates, PrefixName
 from giskardpy.exceptions import DuplicateNameException, PhysicsWorldException, UnknownBodyException
 from giskardpy.god_map import GodMap
@@ -96,8 +96,36 @@ def avoid_all_entry(min_dist):
 
 def world_with_robot(urdf):
     god_map = GodMap()
-    god_map.set_data(identifier.rosparam, {'general_options': {}})
+    default_limits = {
+        'linear':
+            {
+                'override': defaultdict(lambda: 1000)
+            },
+        'angular':
+            {
+                'override': defaultdict(lambda: 1000)
+            }
+    }
+    god_map.set_data(identifier.rosparam,
+                     {
+                         'general_options':
+                             {
+                                 'joint_limits':
+                                     {
+                                         'velocity': default_limits,
+                                         'acceleration': default_limits,
+                                         'jerk': default_limits,
+                                     },
+                                 'joint_weights':
+                                     {
+                                         'velocity': {'override': defaultdict(float)},
+                                         'acceleration': {'override': defaultdict(float)},
+                                         'jerk': {'override': defaultdict(float)},
+                                     }
+                             }
+                     })
     god_map.set_data(identifier.map_frame, 'map')
+    god_map.set_data(identifier.order, 3)
     world = WorldTree(god_map)
     god_map.set_data(identifier.world, world)
     world.add_urdf(urdf, group_name=RobotName)
@@ -186,7 +214,7 @@ class TestWorldTree(object):
         pose = Pose()
         pose.orientation.w = 1
         world.add_world_body(box, pose)
-        new_parent_link_name = PrefixName('r_gripper_tool_frame', RobotName)
+        new_parent_link_name = PrefixName('r_gripper_tool_frame', RobotPrefix)
         old_fk = world.compute_fk_pose(world.root_link_name, box_name)
 
         world.move_group(box.name, new_parent_link_name)
@@ -195,6 +223,10 @@ class TestWorldTree(object):
         assert box_name in world.groups[RobotName].link_names
         assert world.joints[world.links[box_name].parent_joint_name].parent_link_name == new_parent_link_name
         compare_poses(old_fk.pose, new_fk.pose)
+
+        assert box_name in world.groups[RobotName].groups
+        assert RobotName not in world.groups[RobotName].groups
+        assert box_name not in world.minimal_group_names
 
     def test_load_hsr(self):
         world = create_world_with_hsr()
@@ -325,40 +357,57 @@ class TestWorldTree(object):
         assert lower_limit == -0.564601836603
         assert upper_limit == 2.1353981634
 
-
     def test_get_directly_controllable_collision_links(self):
         world = create_world_with_pr2()
         world.god_map.set_data(identifier.controlled_joints, [u'torso_lift_joint',
-                               u'r_upper_arm_roll_joint',
-                               u'r_shoulder_pan_joint',
-                               u'r_shoulder_lift_joint',
-                               u'r_forearm_roll_joint',
-                               u'r_elbow_flex_joint',
-                               u'r_wrist_flex_joint',
-                               u'r_wrist_roll_joint',
-                               u'l_upper_arm_roll_joint',
-                               u'l_shoulder_pan_joint',
-                               u'l_shoulder_lift_joint',
-                               u'l_forearm_roll_joint',
-                               u'l_elbow_flex_joint',
-                               u'l_wrist_flex_joint',
-                               u'l_wrist_roll_joint',
-                               u'head_pan_joint',
-                               u'head_tilt_joint',
-                               u'odom_x_joint',
-                               u'odom_y_joint',
-                               u'odom_z_joint'])
+                                                              u'r_upper_arm_roll_joint',
+                                                              u'r_shoulder_pan_joint',
+                                                              u'r_shoulder_lift_joint',
+                                                              u'r_forearm_roll_joint',
+                                                              u'r_elbow_flex_joint',
+                                                              u'r_wrist_flex_joint',
+                                                              u'r_wrist_roll_joint',
+                                                              u'l_upper_arm_roll_joint',
+                                                              u'l_shoulder_pan_joint',
+                                                              u'l_shoulder_lift_joint',
+                                                              u'l_forearm_roll_joint',
+                                                              u'l_elbow_flex_joint',
+                                                              u'l_wrist_flex_joint',
+                                                              u'l_wrist_roll_joint',
+                                                              u'head_pan_joint',
+                                                              u'head_tilt_joint',
+                                                              u'odom_x_joint',
+                                                              u'odom_y_joint',
+                                                              u'odom_z_joint'])
 
         result = world.get_directly_controllable_collision_links(u'odom_x_joint')
         assert result == []
         result = world.get_directly_controllable_collision_links(u'odom_y_joint')
         assert result == []
         result = world.get_directly_controllable_collision_links(u'odom_z_joint')
-        assert result == [u'base_link']
+        assert result == [u'base_bellow_link',
+                          u'fl_caster_l_wheel_link',
+                          u'fl_caster_r_wheel_link',
+                          u'fl_caster_rotation_link',
+                          u'fr_caster_l_wheel_link',
+                          u'fr_caster_r_wheel_link',
+                          u'fr_caster_rotation_link',
+                          u'bl_caster_l_wheel_link',
+                          u'bl_caster_r_wheel_link',
+                          u'bl_caster_rotation_link',
+                          u'br_caster_l_wheel_link',
+                          u'br_caster_r_wheel_link',
+                          u'br_caster_rotation_link',
+                          u'base_link']
         result = world.get_directly_controllable_collision_links(u'l_elbow_flex_joint')
         assert result == [u'l_elbow_flex_link']
         result = world.get_directly_controllable_collision_links(u'r_wrist_roll_joint')
-        assert result == [u'r_wrist_roll_link']
+        assert result == [u'r_gripper_l_finger_tip_link',
+                          u'r_gripper_l_finger_link',
+                          u'r_gripper_r_finger_tip_link',
+                          u'r_gripper_r_finger_link',
+                          u'r_gripper_palm_link',
+                          u'r_wrist_roll_link']
         result = world.get_directly_controllable_collision_links(u'br_caster_l_wheel_joint')
         assert result == []
 

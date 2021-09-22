@@ -190,7 +190,7 @@ def plot_trajectory(tj, controlled_joints, path_to_data_folder, sample_period, o
     colors.append('k')
 
     titles = [u'position', u'velocity', u'acceleration', u'jerk', u'snap', u'crackle', u'pop']
-    line_styles = [u'', u'--', u'-.', u':']
+    line_styles = [u'-', u'--', u'-.', u':']
     fmts = list(product(line_styles, colors))
     data = [[] for i in range(order)]
     times = []

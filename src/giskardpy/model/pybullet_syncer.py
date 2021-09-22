@@ -129,7 +129,6 @@ class PyBulletSyncer(CollisionWorldSynchronizer):
         self.world.fast_all_fks = None
         pbw.deactivate_rendering()
         self.object_name_to_bullet_id = BiDict()
-        self.world.soft_reset()
         pbw.clear_pybullet()
         self.fks = self.world.compute_all_fks()
         for link_name, link in self.world.links.items():

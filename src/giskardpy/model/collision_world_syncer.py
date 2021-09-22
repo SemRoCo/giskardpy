@@ -6,7 +6,7 @@ from time import time
 import numpy as np
 from giskard_msgs.msg import CollisionEntry
 
-from giskardpy import RobotName
+from giskardpy import RobotName, identifier
 from giskardpy.data_types import Collisions
 from giskardpy.exceptions import PhysicsWorldException, UnknownBodyException
 from giskardpy.model.world import SubWorldTree
@@ -18,6 +18,14 @@ class CollisionWorldSynchronizer(object):
     def __init__(self, world):
         self.world = world  # type: WorldTree
         self.collision_matrices = defaultdict(set)
+        try:
+            self.ignored_pairs = self.god_map.get_data(identifier.ignored_self_collisions)
+        except KeyError as e:
+            self.ignored_pairs = set()
+        try:
+            self.added_pairs = self.god_map.get_data(identifier.added_self_collisions)
+        except KeyError as e:
+            self.added_pairs = set()
 
     @property
     def robot(self):
@@ -67,33 +75,31 @@ class CollisionWorldSynchronizer(object):
         # find meaningless self-collisions
         for link_a, link_b in link_combinations:
             if group.are_linked(link_a, link_b) or \
-                    link_a == link_b:
-                # link_a in self.ignored_pairs or \
-                # link_b in self.ignored_pairs or \
-                # (link_a, link_b) in self.ignored_pairs or \
-                # (link_b, link_a) in self.ignored_pairs:
+                    link_a == link_b or \
+                    link_a in self.ignored_pairs or \
+                    link_b in self.ignored_pairs or \
+                    (link_a, link_b) in self.ignored_pairs or \
+                    (link_b, link_a) in self.ignored_pairs:
                 always.add((link_a, link_b))
-        rest = link_combinations.difference(always)
+        unknown = link_combinations.difference(always)
         group.set_joint_state_to_zero()
-        always = always.union(self.check_collisions2(rest, d))
-        rest = rest.difference(always)
+        always = self.check_collisions2(unknown, d)
+        unknown = unknown.difference(always)
 
         # find meaningful self-collisions
-        group.set_min_joint_state()
-        sometimes = self.check_collisions2(rest, d2)
-        rest = rest.difference(sometimes)
-        group.set_max_joint_state()
-        sometimes2 = self.check_collisions2(rest, d2)
-        rest = rest.difference(sometimes2)
-        sometimes = sometimes.union(sometimes2)
+        sometimes = set()
         for i in range(num_rnd_tries):
-            group.set_rnd_joint_state()
-            sometimes2 = self.check_collisions2(rest, d2)
-            if len(sometimes2) > 0:
-                rest = rest.difference(sometimes2)
-                sometimes = sometimes.union(sometimes2)
+            if i == 0:
+                group.set_min_joint_state()
+            elif i == 1:
+                group.set_max_joint_state()
+            else:
+                group.set_rnd_joint_state()
+            sometimes2 = self.check_collisions2(unknown, d2)
+            unknown = unknown.difference(sometimes)
+            sometimes = sometimes.union(sometimes2)
         # sometimes = sometimes.union(self.added_pairs)
-        logging.loginfo(u'calculated self collision matrix in {:.3f}s'.format(time() - t))
+        logging.loginfo(u'Calculated self collision matrix in {:.3f}s'.format(time() - t))
         group.state = joint_state_tmp
 
         self.collision_matrices[group_name] = sometimes
@@ -396,7 +402,7 @@ class CollisionWorldSynchronizer(object):
             if self.all_body_bs(collision_entry):
                 collision_goals.remove(collision_entry)
                 new_ces = []
-                for body_b in self.world.groups:
+                for body_b in self.world.minimal_group_names:
                     ce = CollisionEntry()
                     ce.type = collision_entry.type
                     ce.robot_links = collision_entry.robot_links

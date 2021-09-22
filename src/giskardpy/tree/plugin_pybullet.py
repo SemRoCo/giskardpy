@@ -314,8 +314,7 @@ class WorldUpdatePlugin(GiskardBehavior):
         # assumes that parent has god map lock
         if req.body.name not in self.world.groups:
             self.add_object(req)
-        self.world.move_branch(PrefixName(req.body.name, self.world.connection_prefix),
-                               PrefixName(req.pose.header.frame_id, RobotPrefix))
+        self.world.move_group(req.body.name, PrefixName(req.pose.header.frame_id, RobotPrefix))
         self.bullet.init_collision_matrix(RobotName)
         # self.bullet.update_collision_matrix(group_name=RobotName,
         #                                     added_links=set(product(self.robot.link_names_with_collisions,

@@ -370,7 +370,10 @@ class TestPyBulletSyncer(object):
         :type pr2_world: PyBulletSyncer
         """
         pr2_world.init_collision_matrix(RobotName)
-        assert len(pr2_world.collision_matrices[RobotName]) == 125
+        collision_matrix = pr2_world.collision_matrices[RobotName]
+        for entry in collision_matrix:
+            assert entry[0] != entry[-1]
+        assert len(collision_matrix) == 125
 
     def test_add_object(self, pr2_world):
         """
@@ -413,6 +416,7 @@ class TestPyBulletSyncer(object):
         :type pr2_world: PyBulletSyncer
         """
         pr2_world.init_collision_matrix(RobotName)
+        pr2_world.world.register_group('r_hand', 'r_wrist_roll_link')
         old_collision_matrix = pr2_world.collision_matrices[RobotName]
         o = make_world_body_box()
         p = Pose()
@@ -424,6 +428,12 @@ class TestPyBulletSyncer(object):
         contains_box = False
         for entry in pr2_world.collision_matrices[RobotName]:
             contains_box |= o.name in entry
+            if o.name in entry:
+                contains_box |= True
+                if o.name == entry[0]:
+                    assert entry[1] not in pr2_world.world.groups['r_hand'].links
+                if o.name == entry[1]:
+                    assert entry[0] not in pr2_world.world.groups['r_hand'].links
         assert contains_box
         pr2_world.world.delete_branch(o.name)
         pr2_world.init_collision_matrix(RobotName)

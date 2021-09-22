@@ -146,6 +146,7 @@ class BoxGeometry(LinkGeometry):
         return (cube_volume(self.depth, self.width, self.height) > volume_threshold or
                 cube_surface(self.depth, self.width, self.height) > surface_threshold)
 
+
 class CylinderGeometry(LinkGeometry):
     def __init__(self, link_T_geometry, height, radius):
         super(CylinderGeometry, self).__init__(link_T_geometry)
@@ -167,6 +168,7 @@ class CylinderGeometry(LinkGeometry):
         return (cylinder_volume(self.radius, self.height) > volume_threshold or
                 cylinder_surface(self.radius, self.height) > surface_threshold)
 
+
 class SphereGeometry(LinkGeometry):
     def __init__(self, link_T_geometry, radius):
         super(SphereGeometry, self).__init__(link_T_geometry)
@@ -185,6 +187,7 @@ class SphereGeometry(LinkGeometry):
 
     def is_big(self, volume_threshold=1.001e-6, surface_threshold=0.00061):
         return sphere_volume(self.radius) > volume_threshold
+
 
 class Link(object):
     def __init__(self, name):
@@ -267,24 +270,22 @@ class WorldTree(object):
     def get_directly_controllable_collision_links(self, joint_name):
         if joint_name not in self.controlled_joints:
             return []
-        link_name = self.joints[joint_name].child_link_name
-        links = [link_name]
-        collision_links = []
-        while links:
-            link_name = links.pop(0)
-            parent_joint = self.links[link_name].parent_joint_name
+        def helper(joint_name):
+            joint = self.joints[joint_name]
+            link_names = []
+            child_link = self.links[joint.child_link_name]
+            for child_joint_name in child_link.child_joint_names:
+                if child_joint_name in self.controlled_joints:
+                    continue
+                link_names.extend(helper(child_joint_name))
+            if child_link.has_collisions():
+                link_names.append(child_link.name)
+            return link_names
+        return helper(joint_name)
 
-            if parent_joint != joint_name and parent_joint in self.controlled_joints:
-                continue
-            if self.links[link_name].has_collisions():
-                collision_links.append(link_name)
-            else:
-                child_links = [self.joints[j].child_link_name for j in self.links[link_name].child_joint_names]
-                if child_links:
-                    links.extend(child_links)
-        return collision_links
 
     def reset_cache(self):
+        # FIXME this sucks because it calls properties
         for method_name in dir(self):
             try:
                 getattr(self, method_name).memo.clear()
@@ -301,6 +302,14 @@ class WorldTree(object):
     @property
     def group_names(self):
         return set(self.groups.keys())
+
+    @property
+    def minimal_group_names(self):
+        group_names = self.group_names
+        for group in self.groups.values():
+            for group_name in group.group_names:
+                group_names.remove(group_name)
+        return group_names
 
     @property
     def root_link(self):
@@ -393,8 +402,8 @@ class WorldTree(object):
                           prefix=None)
         else:
             link = Link.from_world_body(msg)
-            joint = Joint(PrefixName(msg.name, self.connection_prefix), parent_link.name, link.name,
-                          parent_T_child=w.Matrix(kdl_to_np(pose_to_kdl(pose))))
+            joint = FixedJoint(PrefixName(msg.name, self.connection_prefix), parent_link.name, link.name,
+                               parent_T_child=w.Matrix(kdl_to_np(pose_to_kdl(pose))))
             self.link_joint_to_links(joint, link)
             self.register_group(msg.name, link.name)
         self.soft_reset()
@@ -482,6 +491,9 @@ class WorldTree(object):
     def move_group(self, group_name, new_parent_link_name):
         group = self.groups[group_name]
         joint_name = self.links[group.root_link_name].parent_joint_name
+        if self.joints[joint_name].parent_link_name == new_parent_link_name:
+            raise DuplicateNameException(
+                '\'{}\' is already attached to \'{}\''.format(group_name, new_parent_link_name))
         self.move_branch(joint_name, new_parent_link_name)
 
     def delete_group(self, group_name):
@@ -539,7 +551,6 @@ class WorldTree(object):
             joint = self.links[self.joints[joint].parent_link_name].parent_joint_name
         return joint
 
-
     def compute_chain(self, root_link_name, tip_link_name, joints=True, links=True, fixed=True):
         chain = []
         if links:
@@ -551,7 +562,7 @@ class WorldTree(object):
             parent_joint = self.joints[link.parent_joint_name]
             parent_link = self.links[parent_joint.parent_link_name]
             if joints:
-                if fixed or not isinstance(parent_joint, Joint):
+                if fixed or not isinstance(parent_joint, FixedJoint):
                     chain.append(parent_joint.name)
             if links:
                 chain.append(parent_link.name)
@@ -598,6 +609,7 @@ class WorldTree(object):
 
         self._fks = KeyDefaultDict(f)
 
+    @memoize
     def compute_fk_pose(self, root, tip):
         try:
             homo_m = self.compute_fk_np(root, tip)
@@ -682,14 +694,13 @@ class WorldTree(object):
     @memoize
     def are_linked(self, link_a, link_b):
         """
+        Return True if all joints between link_a and link_b are fixed.
         :type link_a: str
         :type link_b: str
         :rtype: bool
         """
-        link_a = self.links[link_a]
-        link_b = self.links[link_b]
-        return self.joints[link_b.parent_joint_name].parent_link_name == link_a or \
-               self.joints[link_a.parent_joint_name].parent_link_name == link_b
+        chain1, connection, chain2 = self.compute_split_chain(link_a, link_b, joints=True, links=False, fixed=False)
+        return not chain1 and not connection and not chain2
 
     def set_joint_limits(self, linear_limits, angular_limits, order):
         for joint in self.joints.values():
@@ -852,6 +863,7 @@ class SubWorldTree(WorldTree):
         del self.links
         del self.link_names
         del self.link_names_with_collisions
+        del self.groups
 
     @property
     def god_map(self):
@@ -876,6 +888,10 @@ class SubWorldTree(WorldTree):
             return joints
 
         return helper(self.root_link)
+
+    @cached_property
+    def groups(self):
+        return {group_name: group for group_name, group in self.world.groups.items() if group.root_link_name in self.links and group.name != self.name}
 
     @cached_property
     def links(self):
@@ -1360,4 +1376,3 @@ class World(object):
                and self.all_robot_links(collision_entry) \
                and self.all_body_bs(collision_entry) \
                and self.all_link_bs(collision_entry)
-

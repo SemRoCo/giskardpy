@@ -7,6 +7,7 @@ from collections import namedtuple
 from queue import Queue
 
 import rospy
+import tf.transformations
 import yaml
 from geometry_msgs.msg import PoseStamped, Quaternion
 from giskard_msgs.msg import Constraint
@@ -251,18 +252,25 @@ class BulletCollisionChecker(GiskardBehavior):
             y = state.getY()
             if self.is_3D:
                 z = state.getZ()
+                r = state.rotation()
+                rot = [r.x, r.y, r.z, r.w]
+            else:
+                yaw = state.getYaw()
+                rot = p.getQuaternionFromEuler([0, 0, yaw]) # todo: make configurable to ignore rotation, since navigation works better without it
             # Get current joint states from Bullet and copy them
             old_js = deepcopy(self.get_robot().joint_state)
             robot = self.get_robot()
             # Calc IK for navigating to given state and ...
             if self.is_3D:
-                poses = [[x, y, z], [x + 0.1, y, z], [x - 0.1, y, z], [x, y + 0.1, z], [x, y - 0.1, z]]
+                poses = [[[x, y, z], rot], [[x + 0.1, y, z], rot], [[x - 0.1, y, z], rot],
+                         [[x, y + 0.1, z], rot], [[x, y - 0.1, z], rot]]
             else:
-                poses = [[x, y, 0], [x + 0.1, y, 0], [x - 0.1, y, 0], [x, y + 0.1, 0], [x, y - 0.1, 0]]
+                poses = [[[x, y, 0], rot], [[x + 0.1, y, 0], rot], [[x - 0.1, y, 0], rot],
+                         [[x, y + 0.1, 0], rot], [[x, y - 0.1, 0], rot]]
             state_iks = list(map(lambda pose:
                                  p.calculateInverseKinematics(robot.get_pybullet_id(),
                                                               robot.get_pybullet_link_id(self.tip_link),
-                                                              pose), poses))
+                                                              pose[0], pose[1]), poses))
             # override on current joint states.
             results = []
             for state_ik in state_iks:
@@ -366,7 +374,7 @@ class GlobalPlanner(GetGoal):
         self.__goal_dict = None
 
         self._planner_solve_params = {}  # todo: load values from rosparam
-        self.navigation_config = 'fast_without_refine'  # todo: load value from rosparam
+        self.navigation_config = 'slow_without_refine'  # todo: load value from rosparam
         self.movement_config = 'fast_without_refine'
 
         self.setupNavigation()
@@ -497,10 +505,14 @@ class GlobalPlanner(GetGoal):
             base_pose.pose.position.x = point[0]
             base_pose.pose.position.y = point[1]
             base_pose.pose.position.z = point[2] if len(point) > 3 else 0
-            base_pose.pose.orientation = Quaternion(*quaternion_about_axis(0, [0, 0, 1]))
+            if len(point) > 3:
+                base_pose.pose.orientation = Quaternion(point[3], point[4], point[5], point[6])
+            else:
+                arr = tf.transformations.quaternion_from_euler(0, 0, point[2])
+                base_pose.pose.orientation = Quaternion(arr[0], arr[1], arr[2], arr[3])
             poses.append(base_pose)
-        poses[-1].pose.orientation = self.pose_goal.pose.orientation
-        move_cmd.constraints = self.get_cartesian_path_constraints(poses)
+        # poses[-1].pose.orientation = self.pose_goal.pose.orientation
+        move_cmd.constraints = [self.get_cartesian_path_constraints(poses)]
         self.get_god_map().set_data(identifier.next_move_goal, move_cmd)
         return Status.SUCCESS
 
@@ -510,19 +522,13 @@ class GlobalPlanner(GetGoal):
         d[u'parameter_value_pair'] = deepcopy(self.__goal_dict)
         d[u'parameter_value_pair'].pop(u'goal')
 
-        oc_d = deepcopy(d)
-        oc_d[u'parameter_value_pair'][u'goal'] = convert_ros_message_to_dictionary(poses[-1])
-        oc = Constraint()
-        oc.type = u'CartesianOrientation'
-        oc.parameter_value_pair = json.dumps(oc_d[u'parameter_value_pair'])
-
         c_d = deepcopy(d)
         c_d[u'parameter_value_pair'][u'goals'] = list(map(convert_ros_message_to_dictionary, poses))
         c = Constraint()
         c.type = u'CartesianPathCarrot'
         c.parameter_value_pair = json.dumps(c_d[u'parameter_value_pair'])
 
-        return [c, oc]
+        return c
 
     def create_kitchen_space(self):
         # create an SE3 state space
@@ -551,22 +557,30 @@ class GlobalPlanner(GetGoal):
 
         return space
 
-    def get_translation_start_state(self, space, round_decimal_place=3):
-        state = ob.State(space)
+    def get_start_state(self, space, round_decimal_place=3):
         pose_root_linkTtip_link = self.get_robot().get_fk_pose(self.root_link, self.tip_link)
         pose_mTtip_link = transform_pose(self.get_god_map().get_data(identifier.map_frame), pose_root_linkTtip_link)
-        state().setX(round(pose_mTtip_link.pose.position.x, round_decimal_place))
-        state().setY(round(pose_mTtip_link.pose.position.y, round_decimal_place))
-        if is_3D(space):
-            state().setZ(round(pose_mTtip_link.pose.position.z, round_decimal_place))
-        return state
+        return self._get_state(space, pose_mTtip_link, round_decimal_place=round_decimal_place)
 
-    def get_translation_goal_state(self, space, round_decimal_place=3):
+    def get_goal_state(self, space, round_decimal_place=3):
+        return self._get_state(space, self.pose_goal, round_decimal_place=round_decimal_place)
+
+    def _get_state(self, space, pose_stamped, round_decimal_place=3):
         state = ob.State(space)
-        state().setX(round(self.pose_goal.pose.position.x, round_decimal_place))
-        state().setY(round(self.pose_goal.pose.position.y, round_decimal_place))
+        state().setX(round(pose_stamped.pose.position.x, round_decimal_place))
+        state().setY(round(pose_stamped.pose.position.y, round_decimal_place))
+        o = pose_stamped.pose.orientation
         if is_3D(space):
-            state().setZ(round(self.pose_goal.pose.position.z, round_decimal_place))
+            state().setZ(round(pose_stamped.pose.position.z, round_decimal_place))
+            state().rotation().x = o.x
+            state().rotation().y = o.y
+            state().rotation().z = o.z
+            state().rotation().w = o.w
+        else:
+            angles = tf.transformations.euler_from_quaternion([o.x, o.y, o.z, o.w])
+            state().setYaw(angles[2])
+        # Force goal and start pose into limited search area
+        space.enforceBounds(state())
         return state
 
     def allocOBValidStateSampler(si):
@@ -639,8 +653,8 @@ class GlobalPlanner(GetGoal):
     def planNavigation(self, plot=True):
 
         # Set Start and Goal pose for Planner
-        start = self.get_translation_start_state(self.kitchen_floor_space)
-        goal = self.get_translation_goal_state(self.kitchen_floor_space)
+        start = self.get_start_state(self.kitchen_floor_space)
+        goal = self.get_goal_state(self.kitchen_floor_space)
         self.navigation_setup.setStartAndGoalStates(start, goal)
 
         # Set Optimization Function
@@ -679,11 +693,8 @@ class GlobalPlanner(GetGoal):
         si.setMotionValidator(TwoDimRayMotionValidator(si, True, self.get_robot(), tip_link=self.tip_link))
 
 
-        start = self.get_translation_start_state(self.kitchen_space)
-        goal = self.get_translation_goal_state(self.kitchen_space)
-        # Force goal and start pose into limited search area
-        self.kitchen_space.enforceBounds(start())
-        self.kitchen_space.enforceBounds(goal())
+        start = self.get_start_state(self.kitchen_space)
+        goal = self.get_goal_state(self.kitchen_space)
         self.movement_setup.setStartAndGoalStates(start, goal)
 
         optimization_objective = PathLengthAndGoalOptimizationObjective(self.movement_setup.getSpaceInformation(), goal)

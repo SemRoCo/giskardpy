@@ -280,7 +280,7 @@ def kdl_to_pose(frame):
 def kdl_to_pose_stamped(frame, frame_id):
     """
     :type frame: PyKDL.Frame
-    :rtype: Pose
+    :rtype: PoseStamped
     """
     p = PoseStamped()
     p.header.frame_id = frame_id

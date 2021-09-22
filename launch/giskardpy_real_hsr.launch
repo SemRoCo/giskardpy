@@ -68,6 +68,12 @@
     <param name="rate" value="120"/>
     <param name="use_gui" value="False"/>
   </node>
+
+  <node pkg="robot_state_publisher" type="robot_state_publisher"
+      name="giskard_robot_state_publisher" output="screen">
+      <param name="publish_frequency" value="10"/>
+      <remap from="robot_description" to="giskard/robot_description" />
+  </node>
 <!--#######################################################################-->
 
 </launch>

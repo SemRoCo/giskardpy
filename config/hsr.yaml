@@ -23,7 +23,7 @@ general_options:
   joint_weights:
     # the planner prefers low weight joints to achieve solutions
     # higher weights reduce wiggling, but lower the maximum joint velocity, which might make the planner stop too early
-    default: 0.01
+    default: 0.05
     override: {}
 qp_solver:
   nWSR: None # None results in a nWSR estimation that's fine most of the time

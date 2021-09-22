@@ -358,34 +358,26 @@ class GiskardWrapper(object):
                            max_angular_velocity=max_angular_velocity,
                            weight=weight)
 
-    def set_open_goal(self, tip_link, object_name, object_link_name, root_link=None, goal_joint_state=None,
-                      weight=WEIGHT_ABOVE_CA):
+    def set_open_goal(self, tip_link, object_link_name, angle_goal,
+             weight=WEIGHT_ABOVE_CA):
         """
         :type tip_link: str
         :param tip_link: tip of manipulator (gripper) which is used
-        :type object_name str
-        :param object_name
+        :type object_link_name str
+        :param object_link_name name of the object link name
         :type object_link_name str
         :param object_link_name handle to grasp
-        :type root_link: str
-        :param root_link: default is root link of robot
-        :type goal_joint_state: float
-        :param goal_joint_state: how far to open
-        :type weight: float
-        :param weight: default WEIGHT_BELOW_CA
+        :type angle_goal: float
+        :param angle_goal: how far to open
+        :type weight float
+        :param weight Default = WEIGHT_ABOVE_CA
         """
-        constraint = Constraint()
-        params = {u'tip_link': tip_link,
-                  u'object_name': object_name,
-                  u'object_link_name': object_link_name}
-        if root_link:
-            params[u'root_link'] = root_link
-        if goal_joint_state:
-            params[u'goal_joint_state'] = goal_joint_state
-        if weight:
-            params[u'weight'] = weight
-        constraint.parameter_value_pair = json.dumps(params)
-        self.cmd_seq[-1].constraints.append(constraint)
+        self.set_json_goal(u'OpenDoor',
+                           tip_link=tip_link,
+                           object_name=u'iai_kitchen',
+                           object_link_name=object_link_name,
+                           angle_goal=angle_goal
+                           )
 
     def update_god_map(self, updates):
         """

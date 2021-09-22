@@ -8,6 +8,7 @@ from giskardpy.model.pybullet_wrapper import ContactInfo
 from giskardpy.model.world import BoxGeometry, SphereGeometry, CylinderGeometry, MeshGeometry
 from giskardpy.model.bpb_wrapper import create_cube_shape, create_object, create_sphere_shape, create_cylinder_shape, \
     load_convex_mesh_shape
+from giskardpy.utils.utils import memoize
 
 
 class BetterPyBulletSyncer(CollisionWorldSynchronizer):
@@ -15,6 +16,7 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
         super(BetterPyBulletSyncer, self).__init__(world)
         self.kw = bpb.KineverseWorld()
         self.object_name_to_id = BiDict()
+        self.query = None
 
     @profile
     def add_object(self, link):
@@ -41,11 +43,23 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
         self.kw.add_collision_object(o)
         self.object_name_to_id[link.name] = o
 
+    def reset_cache(self):
+        self.query = None
+        for method_name in dir(self):
+            try:
+                getattr(self, method_name).memo.clear()
+            except:
+                pass
+
+    @profile
     def cut_off_distances_to_query(self, cut_off_distances):
-        q = defaultdict(set)
-        for (link_a, _, link_b), dist in cut_off_distances.items():
-            q[self.object_name_to_id[link_a]].add((self.object_name_to_id[link_b], dist))
-        return q
+        if self.query is None:
+            self.query = defaultdict(set)
+            for (link_a, _, link_b), dist in cut_off_distances.items():
+                if link_b in self.robot.link_names:
+                    continue
+                self.query[self.object_name_to_id[link_a]].add((self.object_name_to_id[link_b], dist))
+        return self.query
 
     @profile
     def check_collisions(self, cut_off_distances, collision_list_size=15):
@@ -79,6 +93,7 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
                     collisions.add(c)
         return collisions
 
+    @profile
     def in_collision(self, link_a, link_b, distance):
         link_id_a = self.object_name_to_id[link_a]
         link_id_b = self.object_name_to_id[link_b]
@@ -99,6 +114,7 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
         """
         :type world: giskardpy.model.world.WorldTree
         """
+        self.reset_cache()
         self.world.fast_all_fks = None
         for o in self.kw.collision_objects:
             self.kw.remove_collision_object(o)

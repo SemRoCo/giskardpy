@@ -466,3 +466,6 @@ class CollisionWorldSynchronizer(object):
                and self.all_robot_links(collision_entry) \
                and self.all_body_bs(collision_entry) \
                and self.all_link_bs(collision_entry)
+
+    def reset_cache(self):
+        pass

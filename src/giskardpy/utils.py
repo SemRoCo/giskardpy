@@ -170,8 +170,11 @@ def calculate_waypoint2D(target, origin, distance):
     """
     Calculates a waypoint in front of the target.
     :param target: The target position
+    :type target: Quaternion
     :param origin: The origin position
+    :type origin: Quaternion
     :param distance: The distance of the new waypoint to the target
+    :type distance: float
     :return:
     """
     distance = abs(distance)
@@ -305,6 +308,13 @@ def dict_to_joint_states(joint_state_dict):
 
 
 def normalize_quaternion_msg(quaternion):
+    """
+    Normalizes a quaternion.
+    :param quaternion: The quaternion to be normalized
+    :type quaternion: Quaternion
+    :return: Normalized quaternion
+    :rtype: Quaternion
+    """
     q = Quaternion()
     rotation = np.array([quaternion.x,
                          quaternion.y,

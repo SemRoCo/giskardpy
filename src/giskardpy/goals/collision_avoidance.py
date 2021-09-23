@@ -99,6 +99,10 @@ class ExternalCollisionAvoidance(Goal):
         weight = w.save_division(weight,  # divide by number of active repeller per link
                                  w.min(number_of_external_collisions, self.num_repeller))
 
+        if self.link_name == 'r_wrist_roll_link':
+            self.add_debug_expr('hard_threshold', self.hard_threshold)
+            self.add_debug_expr('soft_threshold', self.soft_threshold)
+
         self.add_constraint(reference_velocity=self.max_velocity,
                             lower_error=lower_limit,
                             upper_error=100,

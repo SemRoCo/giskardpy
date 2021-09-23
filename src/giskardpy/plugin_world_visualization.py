@@ -46,13 +46,11 @@ class WorldVisualizationBehavior(GiskardBehavior):
 
     def has_environment_changed(self):
         """
-        Checks if new objects in the world were added and if so it returns True. Otherwise, False.
+        Checks if objects in the world were added or removed and if so it returns True. Otherwise, False.
         """
-        objects_dict = self.get_world().get_objects()
-        for object_name, object in objects_dict.items():
-            if object_name not in self.currently_publishing_objects:
-                return True
-        return False
+        object_names = self.get_world().get_object_names()
+        curr_publishing_object_names = [object_name for object_name, _ in self.currently_publishing_objects.items()]
+        return object_names != curr_publishing_object_names
 
     def update(self):
         markers = []
@@ -67,19 +65,22 @@ class WorldVisualizationBehavior(GiskardBehavior):
         for object_name, object in objects_dict.items():
             for link_name in object.get_link_names():
                 if object.has_link_visuals(link_name):
-                    marker = object.link_as_marker(link_name)
-                    if marker is None:
+                    # Simple objects (containing only one link) are skipped, since they are already managed
+                    # in plugin_pybullet.py and as marker encoded with the function as_marker_msg from urdf_object.py
+                    if link_name == object_name and len(object.get_link_names()) == 1:
                         continue
-                    marker.header.frame_id = self.map_frame
-                    id_str = self.get_id_str(object_name, link_name)
-                    marker.id = int(hashlib.md5(id_str).hexdigest()[:6],
-                                    16)  # FIXME find a better way to give the same link the same id
-                    self.ids.add(marker.id)
-                    marker.ns = self.marker_namespace
-                    marker.header.stamp = time_stamp
-                    if link_name == object_name:
-                        marker.pose = object.base_pose
+                    # More complex objects will be published here:
                     else:
+                        marker = object.link_as_marker(link_name)
+                        if marker is None:
+                            continue
+                        marker.header.frame_id = self.map_frame
+                        id_str = self.get_id_str(object_name, link_name)
+                        marker.id = int(hashlib.md5(id_str).hexdigest()[:6],
+                                        16)  # FIXME find a better way to give the same link the same id
+                        self.ids.add(marker.id)
+                        marker.ns = self.marker_namespace
+                        marker.header.stamp = time_stamp
                         try:
                             full_link_name = self.links_full_frame_name[link_name]
                         except KeyError:

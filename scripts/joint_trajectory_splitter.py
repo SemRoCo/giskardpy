@@ -60,8 +60,8 @@ class JointTrajectorySplitter:
                     type = rostopic.get_info_text(self.client_topics[i] + '/goal').split('\n')[0][6:]
                     self.client_type.append(type)
                 except rostopic.ROSTopicException as e:
-                    logging.logerr('Exception: {}'.format(e))
-                    logging.logerr('unknown topic \'{}/goal\' \nmissing / in front of topic name?'.format(self.client_topics[i]))
+                    logging.logerr('Exception: {} .Maybe unknown topic \'{}/goal\' \nmissing / in front of topic name?'
+                                   .format(e, self.client_topics[i]))
                     exit()
                 except rospy.ROSException as e:
                     if e.message == 'rospy shutdown':

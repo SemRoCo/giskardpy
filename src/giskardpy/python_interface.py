@@ -358,11 +358,13 @@ class GiskardWrapper(object):
                            max_angular_velocity=max_angular_velocity,
                            weight=weight)
 
-    def set_open_goal(self, tip_link, object_link_name, angle_goal,
-             weight=WEIGHT_ABOVE_CA):
+    def set_pull_door_goal(self, tip_link, object_name_prefix, object_link_name, angle_goal,
+                           weight=WEIGHT_ABOVE_CA):
         """
         :type tip_link: str
         :param tip_link: tip of manipulator (gripper) which is used
+        :type object_name_prefix: object name link prefix
+        :param object_name_prefix: string
         :type object_link_name str
         :param object_link_name name of the object link name
         :type object_link_name str
@@ -374,9 +376,10 @@ class GiskardWrapper(object):
         """
         self.set_json_goal(u'OpenDoor',
                            tip_link=tip_link,
-                           object_name=u'iai_kitchen',
+                           object_name=object_name_prefix,
                            object_link_name=object_link_name,
-                           angle_goal=angle_goal
+                           angle_goal=angle_goal,
+                           weight=weight
                            )
 
     def update_god_map(self, updates):

@@ -170,9 +170,9 @@ def calculate_waypoint2D(target, origin, distance):
     """
     Calculates a waypoint in front of the target.
     :param target: The target position
-    :type target: Quaternion
+    :type target: Point
     :param origin: The origin position
-    :type origin: Quaternion
+    :type origin: Point
     :param distance: The distance of the new waypoint to the target
     :type distance: float
     :return:

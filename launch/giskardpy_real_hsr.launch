@@ -69,6 +69,7 @@
     <param name="use_gui" value="False"/>
   </node>
 
+  <!--There might be 2 robot state publishers. If this node is not started, it will sometimes not find the gripper_tool_frame in a lookup.-->
   <node pkg="robot_state_publisher" type="robot_state_publisher"
       name="giskard_robot_state_publisher" output="screen">
       <param name="publish_frequency" value="10"/>

@@ -5087,4 +5087,4 @@ class TestReachability():
 # import pytest
 # pytest.main(['-s', __file__ + '::TestJointGoals::test_joint_movement1'])
 # pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_bowl_and_cup'])
-# pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_avoid_collision'])
+# pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_attached_collision2'])

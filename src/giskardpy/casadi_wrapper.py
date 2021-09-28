@@ -298,7 +298,7 @@ class CompiledFunction(object):
         :return:
         """
 
-        filtered_args = np.array(filtered_args, dtype=float)
+        filtered_args = np.array(filtered_args, dtype=np.float64)
         self.buf.set_arg(0, memoryview(filtered_args))
         self.f_eval()
         return self.out

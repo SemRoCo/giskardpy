@@ -8,7 +8,6 @@ from sortedcontainers import SortedKeyList
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 
 from giskardpy import RobotName
-from giskardpy.utils.tfwrapper import kdl_to_np, np_vector, np_point
 
 
 class KeyDefaultDict(defaultdict):
@@ -156,34 +155,41 @@ class Trajectory(object):
 
 
 class Collision(object):
-    def __init__(self, link_a, body_b, link_b, position_on_a, position_on_b, contact_normal, contact_distance):
-        if len(position_on_a) == 3:
-            self.map_P_a = list(position_on_a)
-            self.map_P_a.append(1)
-        else:
-            self.map_P_a = position_on_a
-        if len(position_on_b) == 3:
-            self.map_P_b = list(position_on_b)
-            self.map_P_b.append(1)
-        else:
-            self.map_P_b = position_on_b
-        if len(contact_normal) == 3:
-            self.map_V_n = list(contact_normal)
-            self.map_V_n.append(0)
-        else:
-            self.map_V_n = contact_normal
+    def __init__(self, link_a, body_b, link_b, contact_distance,
+                 map_T_pa=None, map_T_pb=None, map_V_n=None,
+                 a_T_pa=None, b_T_pb=None):
         self.contact_distance = contact_distance
-        self.original_link_a = link_a
-        self.link_a = link_a
         self.body_b = body_b
-        self.original_link_b = link_b
+        self.link_a = link_a
+        self.original_link_a = link_a
         self.link_b = link_b
+        self.original_link_b = link_b
+
+        self.map_P_pa = self.__point_to_4d(map_T_pa)
+        self.map_P_pb = self.__point_to_4d(map_T_pb)
+        self.map_V_n = self.__vector_to_4d(map_V_n)
         self.old_key = (link_a, body_b, link_a)
-        self.new_a_P_a = None
-        self.root_P_b = None
-        self.new_b_P_b = None
-        self.new_b_V_n = None
-        self.root_V_n = None
+        self.a_T_pa = self.__point_to_4d(a_T_pa)
+        self.b_T_pb = self.__point_to_4d(b_T_pb)
+
+        self.new_a_P_pa = None
+        self.new_b_P_pb = None
+
+    def __point_to_4d(self, point):
+        if point is None:
+            return point
+        point = np.array(point)
+        if len(point) == 3:
+            return np.append(point, 1)
+        return point
+
+    def __vector_to_4d(self, vector):
+        if vector is None:
+            return vector
+        vector = np.array(vector)
+        if len(vector) == 3:
+            return np.append(vector, 0)
+        return vector
 
     def get_link_b_hash(self):
         return self.link_b.__hash__()
@@ -195,9 +201,9 @@ class Collision(object):
         return Collision(link_a=self.original_link_b,
                          body_b=self.body_b,
                          link_b=self.original_link_a,
-                         position_on_a=self.map_P_b,
-                         position_on_b=self.map_P_a,
-                         contact_normal=-self.map_V_n,
+                         map_T_pa=self.map_P_pb,
+                         map_T_pb=self.map_P_pa,
+                         map_V_n=-self.map_V_n,
                          contact_distance=self.contact_distance)
 
 
@@ -272,34 +278,6 @@ class Collisions(object):
         # else:
         return self.transform_external_collision(collision)
 
-    def transform_self_collision(self, collision):
-        """
-        :type collision: Collision
-        :rtype: Collision
-        """
-        link_a = collision.original_link_a
-        link_b = collision.original_link_b
-        new_link_a, new_link_b = self.robot.get_chain_reduced_to_controlled_joints(link_a, link_b)
-        if new_link_a > new_link_b:
-            collision = collision.reverse()
-            new_link_a, new_link_b = new_link_b, new_link_a
-
-        new_b_T_r = self.robot.compute_fk_np(new_link_b, self.robot_root)
-        new_a_T_r = self.robot.compute_fk_np(new_link_a, self.robot_root)
-        collision.link_a = new_link_a
-        collision.link_b = new_link_b
-
-        new_b_T_map = np.dot(new_b_T_r, self.root_T_map)
-
-        new_a_P_pa = np.dot(np.dot(new_a_T_r, self.root_T_map), collision.map_P_a)
-        new_b_P_pb = np.dot(new_b_T_map, collision.map_P_b)
-        # r_P_pb = np.dot(self.root_T_map, np_point(*closest_point.position_on_b))
-        new_b_V_n = np.dot(new_b_T_map, collision.map_V_n)
-        collision.new_a_P_a = new_a_P_pa
-        collision.new_b_P_b = new_b_P_pb
-        collision.new_b_V_n = new_b_V_n
-        return collision
-
     @profile
     def transform_external_collision(self, collision):
         """
@@ -308,24 +286,30 @@ class Collisions(object):
         """
         movable_joint = self.robot.get_controlled_parent_joint(collision.original_link_a)
         new_a = self.robot.joints[movable_joint].child_link_name
-        new_a_T_r = self.robot.compute_fk_np(new_a, self.robot_root)
         collision.link_a = new_a
+        if collision.map_P_pa is not None:
+            new_a_T_map = self.world.compute_fk_np(new_a, self.world.root_link_name)
+            new_a_P_a = np.dot(new_a_T_map, collision.map_P_pa)
+        else:
+            new_a_T_a = self.world.compute_fk_np(new_a, collision.link_a)
+            new_a_P_a = np.dot(new_a_T_a, collision.a_T_pa)
 
-        new_a_P_pa = np.dot(np.dot(new_a_T_r, self.root_T_map), collision.map_P_a)
-        r_P_pb = np.dot(self.root_T_map, collision.map_P_b)
-        r_V_n = np.dot(self.root_T_map, collision.map_V_n)
-        collision.new_a_P_a = new_a_P_pa
-        collision.root_P_b = r_P_pb
-        collision.root_V_n = r_V_n
+        collision.new_a_P_pa = new_a_P_a
         return collision
 
     def _default_collision(self, link_a, body_b, link_b):
-        c = Collision(link_a, body_b, link_b, [0, 0, 0, 1], [0, 0, 0, 1], [0, 0, 1, 0], 100)
-        c.new_a_P_a = [0, 0, 0, 1]
-        c.new_b_P_b = [0, 0, 0, 1]
-        c.root_P_b = [0, 0, 0, 1]
+        c = Collision(link_a=link_a,
+                      body_b=body_b,
+                      link_b=link_b,
+                      contact_distance=100,
+                      map_T_pa=[0, 0, 0, 1],
+                      map_T_pb=[0, 0, 0, 1],
+                      map_V_n=[0, 0, 1, 0],
+                      a_T_pa=[0, 0, 0, 1],
+                      b_T_pb=[0, 0, 0, 1])
+        c.new_a_P_pa = [0, 0, 0, 1]
+        c.new_b_P_pb = [0, 0, 0, 1]
         c.new_b_V_n = [0, 0, 1, 0]
-        c.root_V_n = [0, 0, 1, 0]
         return c
 
     # @profile
@@ -432,7 +416,6 @@ class PrefixName(object):
         except AttributeError:
             return str(self) <= str(other.long_name)
 
-
     def __ge__(self, other):
         try:
             return self.long_name >= other.long_name
@@ -450,6 +433,7 @@ class PrefixName(object):
             return self.long_name < other.long_name
         except AttributeError:
             return str(self) < str(other)
+
 
 order_map = BiDict({
     0: u'position',

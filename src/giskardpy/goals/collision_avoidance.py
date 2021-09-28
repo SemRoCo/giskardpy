@@ -17,14 +17,14 @@ class ExternalCollisionAvoidance(Goal):
         self.link_name = link_name
         self.idx = idx
         super(ExternalCollisionAvoidance, self).__init__(**kwargs)
-        self.robot_root = self.robot.root_link_name
+        self.root = self.world.root_link_name
         self.robot_name = self.robot.name
 
-    def get_contact_normal_on_b_in_root(self):
-        return self.god_map.list_to_vector3(identifier.closest_point + [u'get_external_collisions',
-                                                                              (self.link_name,),
-                                                                              self.idx,
-                                                                              u'root_V_n'])
+    # def get_contact_normal_on_b_in_root(self):
+    #     return self.god_map.list_to_vector3(identifier.closest_point + [u'get_external_collisions',
+    #                                                                           (self.link_name,),
+    #                                                                           self.idx,
+    #                                                                           u'root_V_n'])
 
     def map_V_n_symbol(self):
         return self.god_map.list_to_vector3(identifier.closest_point + [u'get_external_collisions',
@@ -36,19 +36,19 @@ class ExternalCollisionAvoidance(Goal):
         return self.god_map.list_to_point3(identifier.closest_point + [u'get_external_collisions',
                                                                              (self.link_name,),
                                                                              self.idx,
-                                                                             u'new_a_P_a'])
+                                                                             u'new_a_P_pa'])
 
     def map_P_a_symbol(self):
         return self.god_map.list_to_point3(identifier.closest_point + [u'get_external_collisions',
                                                                              (self.link_name,),
                                                                              self.idx,
-                                                                             u'new_map_P_a'])
+                                                                             u'new_map_P_pa'])
 
-    def get_closest_point_on_b_in_root(self):
-        return self.god_map.list_to_point3(identifier.closest_point + [u'get_external_collisions',
-                                                                             (self.link_name,),
-                                                                             self.idx,
-                                                                             u'root_P_b'])
+    # def get_closest_point_on_b_in_root(self):
+    #     return self.god_map.list_to_point3(identifier.closest_point + [u'get_external_collisions',
+    #                                                                          (self.link_name,),
+    #                                                                          self.idx,
+    #                                                                          u'root_P_b'])
 
     def get_actual_distance(self):
         return self.god_map.to_symbol(identifier.closest_point + [u'get_external_collisions',
@@ -62,16 +62,16 @@ class ExternalCollisionAvoidance(Goal):
 
     def make_constraints(self):
         a_P_pa = self.get_closest_point_on_a_in_a()
-        r_V_n = self.get_contact_normal_on_b_in_root()
+        map_V_n = self.map_V_n_symbol()
         actual_distance = self.get_actual_distance()
         sample_period = self.get_sampling_period_symbol()
         number_of_external_collisions = self.get_number_of_external_collisions()
 
-        root_T_a = self.get_fk(self.robot_root, self.link_name)
+        map_T_a = self.get_fk(self.root, self.link_name)
 
-        r_P_pa = w.dot(root_T_a, a_P_pa)
+        map_P_pa = w.dot(map_T_a, a_P_pa)
 
-        dist = w.dot(r_V_n.T, r_P_pa)[0]
+        dist = w.dot(map_V_n.T, map_P_pa)[0]
 
         qp_limits_for_lba = self.max_velocity * sample_period * self.control_horizon
 
@@ -98,10 +98,6 @@ class ExternalCollisionAvoidance(Goal):
 
         weight = w.save_division(weight,  # divide by number of active repeller per link
                                  w.min(number_of_external_collisions, self.num_repeller))
-
-        if self.link_name == 'r_wrist_roll_link':
-            self.add_debug_expr('hard_threshold', self.hard_threshold)
-            self.add_debug_expr('soft_threshold', self.soft_threshold)
 
         self.add_constraint(reference_velocity=self.max_velocity,
                             lower_error=lower_limit,

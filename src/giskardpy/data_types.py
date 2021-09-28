@@ -244,22 +244,23 @@ class Collisions(object):
         collision = self.transform_closest_point(collision)
         self.all_collisions.add(collision)
 
-        # if collision.get_body_b() == self.robot.name:
-        #     key = collision.get_link_a(), collision.get_link_b()
-        #     self.self_collisions[key].add(collision)
-        #     self.number_of_self_collisions[key] = min(self.collision_list_size,
-        #                                               self.number_of_self_collisions[key] + 1)
-        # else:
-        key = collision.link_a
-        self.external_collision[key].add(collision)
-        self.number_of_external_collisions[key] = min(self.collision_list_size,
-                                                      self.number_of_external_collisions[key] + 1)
-        key_long = (collision.original_link_a, collision.body_b, collision.original_link_b)
-        if key_long not in self.external_collision_long_key:
-            self.external_collision_long_key[key_long] = collision
+        if collision.body_b == self.robot.name:
+            pass
+            # key = collision.get_link_a(), collision.get_link_b()
+            # self.self_collisions[key].add(collision)
+            # self.number_of_self_collisions[key] = min(self.collision_list_size,
+            #                                           self.number_of_self_collisions[key] + 1)
         else:
-            self.external_collision_long_key[key_long] = min(collision, self.external_collision_long_key[key_long],
-                                                             key=lambda x: x.contact_distance)
+            key = collision.link_a
+            self.external_collision[key].add(collision)
+            self.number_of_external_collisions[key] = min(self.collision_list_size,
+                                                          self.number_of_external_collisions[key] + 1)
+            key_long = (collision.original_link_a, collision.body_b, collision.original_link_b)
+            if key_long not in self.external_collision_long_key:
+                self.external_collision_long_key[key_long] = collision
+            else:
+                self.external_collision_long_key[key_long] = min(collision, self.external_collision_long_key[key_long],
+                                                                 key=lambda x: x.contact_distance)
 
     def transform_closest_point(self, collision):
         """

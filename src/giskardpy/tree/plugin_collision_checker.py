@@ -52,6 +52,7 @@ class CollisionChecker(GiskardBehavior):
         return default_distance
 
     def initialise(self):
+        self.bullet.sync()
         collision_goals = self.get_god_map().get_data(identifier.collision_goal)
         external_distances = self.get_god_map().get_data(identifier.external_collision_avoidance)
         self_distances = self.get_god_map().get_data(identifier.self_collision_avoidance)

@@ -62,8 +62,8 @@ class PyBulletSyncer(CollisionWorldSynchronizer):
         for (robot_link, body_b, link_b), distance in cut_off_distances.items():
             # if robot_name == body_b:
             # object_id = self.object_name_to_bullet_id[robot_link]
-            if link_b in self.robot.link_names:
-                continue
+            # if link_b in self.robot.link_names:
+            #     continue
             link_b_id = self.object_name_to_bullet_id[link_b]
             # else:
             #     object_id = self.object_name_to_bullet_id[robot_link]body_b)

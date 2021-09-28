@@ -2,6 +2,7 @@ from collections import defaultdict
 
 import betterpybullet as bpb
 
+from giskardpy import RobotName
 from giskardpy.data_types import BiDict, Collisions, Collision
 from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer
 from giskardpy.model.pybullet_wrapper import ContactInfo
@@ -88,8 +89,8 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
                 for p in contact.points:  # type: ContactPoint
                     map_P_a = map_T_a.dot(p.point_a)
                     map_P_b = map_T_b.dot(p.point_b)
-
-                    c = Collision(link_a, '', link_b, map_P_a, map_P_b, p.normal_world_b, p.distance)
+                    body_b = RobotName if link_b in self.robot.link_names else ''
+                    c = Collision(link_a, body_b, link_b, map_P_a, map_P_b, p.normal_world_b, p.distance)
                     collisions.add(c)
         return collisions
 

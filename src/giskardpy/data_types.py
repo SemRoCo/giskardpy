@@ -312,7 +312,7 @@ class Collisions(object):
         c.new_b_V_n = [0, 0, 1, 0]
         return c
 
-    # @profile
+    @profile
     def get_external_collisions(self, joint_name):
         """
         Collisions are saved as a list for each movable robot joint, sorted by contact distance
@@ -331,6 +331,7 @@ class Collisions(object):
         """
         return self.external_collision_long_key[link_a, body_b, link_b]
 
+    @profile
     def get_number_of_external_collisions(self, joint_name):
         return self.number_of_external_collisions[joint_name]
 

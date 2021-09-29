@@ -6,7 +6,7 @@ import rospy
 from control_msgs.msg import JointTrajectoryControllerState
 from giskard_msgs.msg import MoveAction
 from py_trees import Sequence, Selector, BehaviourTree, Blackboard
-from py_trees.meta import failure_is_success, success_is_failure, running_is_success
+from py_trees.meta import failure_is_success, success_is_failure, running_is_success, running_is_failure
 from py_trees_ros.trees import BehaviourTree
 from rospy import ROSException
 
@@ -195,15 +195,14 @@ def grow_tree():
     wait_for_goal.add_child(TFPublisher(u'tf', **god_map.get_data(identifier.TFPublisher)))
     wait_for_goal.add_child(ConfigurationPlugin(u'js1', RobotPrefix))
     wait_for_goal.add_child(WorldUpdatePlugin(u'pybullet updater'))
-    wait_for_goal.add_child(VisualizationBehavior(u'visualization', clear=True))
+    wait_for_goal.add_child(running_is_success(VisualizationBehavior)(u'visualization', clear=True))
     wait_for_goal.add_child(GoalReceived(u'has goal', action_server_name, MoveAction))
     wait_for_goal.add_child(ConfigurationPlugin(u'js2', RobotPrefix))
     # ----------------------------------------------
     planning_4 = PluginBehavior(u'planning IIII', sleep=0)
     planning_4.add_plugin(CollisionChecker(u'collision checker'))
-    # wait_for_goal.add_child(VisualizationBehavior(u'visualization', clear=True))
-    # if god_map.safe_get_data(identifier.enable_collision_marker):
-    #     planning_3.add_plugin(success_is_running(CPIMarker)(u'cpi marker'))
+    # planning_4.add_plugin(VisualizationBehavior(u'visualization'))
+    # planning_4.add_plugin(CollisionMarker(u'cpi marker'))
     planning_4.add_plugin(ControllerPlugin(u'controller'))
     planning_4.add_plugin(KinSimPlugin(u'kin sim'))
     planning_4.add_plugin(LogTrajPlugin(u'log'))
@@ -224,11 +223,11 @@ def grow_tree():
     planning_3.add_child(AppendZeroVelocity(u'append zero velocity'))
     planning_3.add_child(running_is_success(LogTrajPlugin)(u'log zero velocity'))
     if god_map.get_data(identifier.enable_VisualizationBehavior):
-        planning_3.add_child(VisualizationBehavior(u'visualization', ensure_publish=True))
+        planning_3.add_child(running_is_success(VisualizationBehavior)(u'visualization', ensure_publish=True))
     # if god_map.get_data(identifier.enable_WorldVisualizationBehavior):
     #     planning_3.add_child(WorldVisualizationBehavior(u'world_visualization', ensure_publish=True))
     if god_map.get_data(identifier.enable_CPIMarker):
-        planning_3.add_child(CollisionMarker(u'collision marker'))
+        planning_3.add_child(running_is_success(CollisionMarker)(u'collision marker'))
     # ----------------------------------------------
     # ----------------------------------------------
     publish_result = failure_is_success(Selector)(u'monitor execution')
@@ -239,11 +238,11 @@ def grow_tree():
     planning_2 = failure_is_success(Selector)(u'planning II')
     planning_2.add_child(GoalCanceled(u'goal canceled', action_server_name))
     if god_map.get_data(identifier.enable_VisualizationBehavior):
-        planning_2.add_child(success_is_failure(VisualizationBehavior)(u'visualization'))
+        planning_2.add_child(running_is_failure(VisualizationBehavior)(u'visualization'))
     # if god_map.get_data(identifier.enable_WorldVisualizationBehavior):
     #     planning_2.add_child(success_is_failure(WorldVisualizationBehavior)(u'world_visualization'))
     if god_map.get_data(identifier.enable_CPIMarker):
-        planning_2.add_child(success_is_failure(CollisionMarker)(u'cpi marker'))
+        planning_2.add_child(running_is_failure(CollisionMarker)(u'cpi marker'))
     planning_2.add_child(planning_3)
     # ----------------------------------------------
     move_robot = failure_is_success(Sequence)(u'move robot')

@@ -24,9 +24,9 @@ class CollisionMarker(GiskardBehavior):
         Computes closest point info for all robot links and safes it to the god map.
         """
         collisions = self.get_god_map().get_data(identifier.closest_point)
-        if collisions:
+        if len(collisions.external_collision) > 0:
             self.publish_cpi_markers(collisions)
-        return Status.SUCCESS
+        return Status.RUNNING
 
     def publish_cpi_markers(self, collisions):
         """

@@ -156,8 +156,8 @@ class Trajectory(object):
 
 class Collision(object):
     def __init__(self, link_a, body_b, link_b, contact_distance,
-                 map_T_pa=None, map_T_pb=None, map_V_n=None,
-                 a_T_pa=None, b_T_pb=None):
+                 map_P_pa=None, map_P_pb=None, map_V_n=None,
+                 a_P_pa=None, b_P_pb=None):
         self.contact_distance = contact_distance
         self.body_b = body_b
         self.link_a = link_a
@@ -165,12 +165,12 @@ class Collision(object):
         self.link_b = link_b
         self.original_link_b = link_b
 
-        self.map_P_pa = self.__point_to_4d(map_T_pa)
-        self.map_P_pb = self.__point_to_4d(map_T_pb)
+        self.map_P_pa = self.__point_to_4d(map_P_pa)
+        self.map_P_pb = self.__point_to_4d(map_P_pb)
         self.map_V_n = self.__vector_to_4d(map_V_n)
         self.old_key = (link_a, body_b, link_a)
-        self.a_T_pa = self.__point_to_4d(a_T_pa)
-        self.b_T_pb = self.__point_to_4d(b_T_pb)
+        self.a_T_pa = self.__point_to_4d(a_P_pa)
+        self.b_T_pb = self.__point_to_4d(b_P_pb)
 
         self.new_a_P_pa = None
         self.new_b_P_pb = None
@@ -201,8 +201,8 @@ class Collision(object):
         return Collision(link_a=self.original_link_b,
                          body_b=self.body_b,
                          link_b=self.original_link_a,
-                         map_T_pa=self.map_P_pb,
-                         map_T_pb=self.map_P_pa,
+                         map_P_pa=self.map_P_pb,
+                         map_P_pb=self.map_P_pa,
                          map_V_n=-self.map_V_n,
                          contact_distance=self.contact_distance)
 
@@ -291,7 +291,7 @@ class Collisions(object):
             new_a_T_map = self.world.compute_fk_np(new_a, self.world.root_link_name)
             new_a_P_a = np.dot(new_a_T_map, collision.map_P_pa)
         else:
-            new_a_T_a = self.world.compute_fk_np(new_a, collision.link_a)
+            new_a_T_a = self.world.compute_fk_np(new_a, collision.original_link_a)
             new_a_P_a = np.dot(new_a_T_a, collision.a_T_pa)
 
         collision.new_a_P_pa = new_a_P_a
@@ -302,11 +302,11 @@ class Collisions(object):
                       body_b=body_b,
                       link_b=link_b,
                       contact_distance=100,
-                      map_T_pa=[0, 0, 0, 1],
-                      map_T_pb=[0, 0, 0, 1],
+                      map_P_pa=[0, 0, 0, 1],
+                      map_P_pb=[0, 0, 0, 1],
                       map_V_n=[0, 0, 1, 0],
-                      a_T_pa=[0, 0, 0, 1],
-                      b_T_pb=[0, 0, 0, 1])
+                      a_P_pa=[0, 0, 0, 1],
+                      b_P_pb=[0, 0, 0, 1])
         c.new_a_P_pa = [0, 0, 0, 1]
         c.new_b_P_pb = [0, 0, 0, 1]
         c.new_b_V_n = [0, 0, 1, 0]

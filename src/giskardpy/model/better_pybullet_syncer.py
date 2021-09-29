@@ -95,8 +95,8 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
                                   link_b=link_b,
                                   contact_distance=p.distance,
                                   map_V_n=p.normal_world_b,
-                                  a_T_pa=p.point_a,
-                                  b_T_pb=p.point_b)
+                                  a_P_pa=p.point_a,
+                                  b_P_pb=p.point_b)
                     collisions.add(c)
         return collisions
 

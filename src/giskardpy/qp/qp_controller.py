@@ -744,7 +744,7 @@ class QPController(object):
         bA_filter = np.ones(self.A.height, dtype=bool)
         ll = self.H.number_of_constraint_vel_variables() + self.H.number_of_contraint_error_variables()
         bA_filter[-ll:] = b_filter[-ll:]
-        return b_filter, bA_filter
+        return np.array(b_filter), np.array(bA_filter)
 
     @profile
     def filter_zero_weight_stuff(self, b_filter, bA_filter):

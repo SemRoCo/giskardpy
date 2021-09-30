@@ -58,49 +58,20 @@ class PyBulletSyncer(CollisionWorldSynchronizer):
         :rtype: Collisions
         """
         collisions = Collisions(self.world, collision_list_size)
-        # robot_name = self.robot.name
         for (robot_link, body_b, link_b), distance in cut_off_distances.items():
-            # if robot_name == body_b:
-            # object_id = self.object_name_to_bullet_id[robot_link]
-            # if link_b in self.robot.link_names:
-            #     continue
             link_b_id = self.object_name_to_bullet_id[link_b]
-            # else:
-            #     object_id = self.object_name_to_bullet_id[robot_link]body_b)
-            #     if link_b != CollisionEntry.ALL:
-            #         link_b_id = self.get_object(body_b).get_pybullet_link_id(link_b)
-
             robot_link_id = self.object_name_to_bullet_id[robot_link]
-            # if body_b == robot_name or link_b != CollisionEntry.ALL:
             contacts = [ContactInfo(*x) for x in pbw.getClosestPoints(robot_link_id, link_b_id,
                                                                       distance * 1.1)]
-            # else:
-            #     contacts = [ContactInfo(*x) for x in pbw.getClosestPoints(self.robot.get_pybullet_id(), object_id,
-            #                                                             distance * 1.1,
-            #                                                             robot_link_id)]
             if len(contacts) > 0:
-                # try:
-                #     body_b_object = self.get_object(body_b)
-                # except KeyError:
-                #     body_b_object = self.robot
-                # pass
                 for contact in contacts:  # type: ContactInfo
-                    # if link_b == CollisionEntry.ALL:
-                    #     link_b_tmp = body_b_object.pybullet_link_id_to_name(contact.link_index_b)
-                    # else:
-                    #     link_b_tmp = link_b
-                    # if self.__should_flip_collision(contact.position_on_a, robot_link):
-                    #     flipped_normal = [-contact.contact_normal_on_b[0],
-                    #                       -contact.contact_normal_on_b[1],
-                    #                       -contact.contact_normal_on_b[2]]
-                    #     collision = Collision(robot_link, body_b, link_b,
-                    #                           contact.position_on_b, contact.position_on_a,
-                    #                           flipped_normal, contact.contact_distance)
-                    #     collisions.add(collision)
-                    # else:
-                    collision = Collision(robot_link, body_b, link_b_id,
-                                          contact.position_on_a, contact.position_on_b,
-                                          contact.contact_normal_on_b, contact.contact_distance)
+                    collision = Collision(link_a=robot_link,
+                                          body_b=body_b,
+                                          link_b=link_b,
+                                          map_P_pa=contact.position_on_a,
+                                          map_P_pb=contact.position_on_b,
+                                          map_V_n=contact.contact_normal_on_b,
+                                          contact_distance=contact.contact_distance)
                     collisions.add(collision)
         return collisions
 

@@ -7,7 +7,7 @@ import numpy as np
 from giskard_msgs.msg import CollisionEntry
 
 from giskardpy import RobotName, identifier
-from giskardpy.data_types import Collisions
+from giskardpy.data_types import Collisions, JointStates
 from giskardpy.exceptions import PhysicsWorldException, UnknownBodyException
 from giskardpy.model.world import SubWorldTree
 from giskardpy.model.world import WorldTree
@@ -48,7 +48,8 @@ class CollisionWorldSynchronizer(object):
         """
         pass
 
-    def calc_collision_matrix(self, group_name, link_combinations=None, d=0.05, d2=0.0, num_rnd_tries=200):
+    def calc_collision_matrix(self, group_name, link_combinations=None, d=0.05, d2=0.0, num_rnd_tries=2000,
+                              non_controlled=False):
         """
         :type group_name: str
         :param link_combinations: set with link name tuples
@@ -74,7 +75,7 @@ class CollisionWorldSynchronizer(object):
 
         # find meaningless self-collisions
         for link_a, link_b in link_combinations:
-            if group.are_linked(link_a, link_b) or \
+            if group.are_linked(link_a, link_b, non_controlled) or \
                     link_a == link_b or \
                     link_a in self.ignored_pairs or \
                     link_b in self.ignored_pairs or \
@@ -82,28 +83,73 @@ class CollisionWorldSynchronizer(object):
                     (link_b, link_a) in self.ignored_pairs:
                 always.add((link_a, link_b))
         unknown = link_combinations.difference(always)
-        group.set_joint_state_to_zero()
+        self.set_joint_state_to_zero(group)
         always = self.check_collisions2(unknown, d)
         unknown = unknown.difference(always)
 
         # find meaningful self-collisions
-        sometimes = set()
-        for i in range(num_rnd_tries):
-            if i == 0:
-                group.set_min_joint_state()
-            elif i == 1:
-                group.set_max_joint_state()
-            else:
-                group.set_rnd_joint_state()
-            sometimes2 = self.check_collisions2(unknown, d2)
-            unknown = unknown.difference(sometimes)
-            sometimes = sometimes.union(sometimes2)
+        # sometimes = set()
+        # for i in range(num_rnd_tries):
+        #     if i == 0:
+        #         self.set_min_joint_state(group)
+        #     elif i == 1:
+        #         self.set_max_joint_state(group)
+        #     else:
+        #         self.set_rnd_joint_state(group)
+        #     sometimes2 = self.check_collisions2(unknown, d2)
+        #     unknown = unknown.difference(sometimes)
+        #     sometimes = sometimes.union(sometimes2)
         # sometimes = sometimes.union(self.added_pairs)
         logging.loginfo(u'Calculated self collision matrix in {:.3f}s'.format(time() - t))
         group.state = joint_state_tmp
 
-        self.collision_matrices[group_name] = sometimes
+        self.collision_matrices[group_name] = unknown
         return self.collision_matrices[group_name]
+
+    def set_joint_state_to_zero(self, group):
+        group.state = JointStates()
+
+    def set_max_joint_state(self, group):
+        def f(joint_name):
+            _, upper_limit = group.get_joint_position_limits(joint_name)
+            if upper_limit is None:
+                return np.pi * 2
+            return upper_limit
+
+        group.state = self.generate_joint_state(group, f)
+
+    def set_min_joint_state(self, group):
+        def f(joint_name):
+            lower_limit, _ = group.get_joint_position_limits(joint_name)
+            if lower_limit is None:
+                return -np.pi * 2
+            return lower_limit
+
+        group.state = self.generate_joint_state(group, f)
+
+    def set_rnd_joint_state(self, group):
+        def f(joint_name):
+            lower_limit, upper_limit = group.get_joint_position_limits(joint_name)
+            if lower_limit is None:
+                return np.random.random() * np.pi * 2
+            lower_limit = max(lower_limit, -10)
+            upper_limit = min(upper_limit, 10)
+            return (np.random.random() * (upper_limit - lower_limit)) + lower_limit
+
+        group.state = self.generate_joint_state(group, f)
+
+    def generate_joint_state(self, group, f):
+        """
+        :param f: lambda joint_info: float
+        :return:
+        """
+        js = JointStates()
+        for joint_name in sorted(group.movable_joints):
+            if group.get_direct_child_links_with_collision(joint_name):
+                js[joint_name].position = f(joint_name)
+            else:
+                js[joint_name].position = 0
+        return js
 
     def init_collision_matrix(self, group_name):
         self.sync()
@@ -269,12 +315,15 @@ class CollisionWorldSynchronizer(object):
 
         for i, ce in enumerate(reversed(collision_goals)):
             if self.is_avoid_all_collision(ce):
+                # remove everything before the avoid all
                 collision_goals = collision_goals[len(collision_goals) - i - 1:]
                 break
             if self.is_allow_all_collision(ce):
+                # remove everything before the allow all, including the allow all
                 collision_goals = collision_goals[len(collision_goals) - i:]
                 break
         else:
+            # put an avoid all at the front
             ce = CollisionEntry()
             ce.type = CollisionEntry.AVOID_COLLISION
             ce.robot_links = [CollisionEntry.ALL]
@@ -396,6 +445,10 @@ class CollisionWorldSynchronizer(object):
         return collision_goals
 
     def split_body_b(self, collision_goals):
+        # always put robot at the front
+        groups = list(self.world.minimal_group_names)
+        groups.remove(RobotName)
+        groups.insert(0, RobotName)
         i = 0
         while i < len(collision_goals):
             collision_entry = collision_goals[i]

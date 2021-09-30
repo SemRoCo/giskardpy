@@ -24,7 +24,7 @@ class CollisionMarker(GiskardBehavior):
         Computes closest point info for all robot links and safes it to the god map.
         """
         collisions = self.get_god_map().get_data(identifier.closest_point)
-        if len(collisions.external_collision) > 0:
+        if len(collisions.all_collisions) > 0:
             self.publish_cpi_markers(collisions)
         return Status.RUNNING
 
@@ -50,14 +50,14 @@ class CollisionMarker(GiskardBehavior):
                 green_threshold = yellow_threshold * 2
                 contact_distance = collision.contact_distance
                 if collision.map_P_pa is None:
-                    map_T_new_a = self.world.compute_fk_np(self.world.root_link_name, collision.link_a)
-                    map_P_pa = np.dot(map_T_new_a, collision.new_a_P_pa)
+                    map_T_a = self.world.compute_fk_np(self.world.root_link_name, collision.original_link_a)
+                    map_P_pa = np.dot(map_T_a, collision.a_P_pa)
                 else:
                     map_P_pa = collision.map_P_pa
 
                 if collision.map_P_pb is None:
-                    map_T_b = self.world.compute_fk_np(self.world.root_link_name, collision.link_b)
-                    map_P_pb = np.dot(map_T_b, collision.b_T_pb)
+                    map_T_b = self.world.compute_fk_np(self.world.root_link_name, collision.original_link_b)
+                    map_P_pb = np.dot(map_T_b, collision.b_P_pb)
                 else:
                     map_P_pb = collision.map_P_pb
                 if contact_distance < green_threshold:
@@ -75,3 +75,4 @@ class CollisionMarker(GiskardBehavior):
         ma.markers.append(m)
         if len(ma.markers[0].points) > 0:
             self.pub_collision_marker.publish(ma)
+            pass

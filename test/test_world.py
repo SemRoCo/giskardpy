@@ -133,7 +133,28 @@ def world_with_robot(urdf):
 
 
 def create_world_with_pr2():
-    return world_with_robot(pr2_urdf())
+    world = world_with_robot(pr2_urdf())
+    world.god_map.set_data(identifier.controlled_joints, [u'torso_lift_joint',
+                                                          u'r_upper_arm_roll_joint',
+                                                          u'r_shoulder_pan_joint',
+                                                          u'r_shoulder_lift_joint',
+                                                          u'r_forearm_roll_joint',
+                                                          u'r_elbow_flex_joint',
+                                                          u'r_wrist_flex_joint',
+                                                          u'r_wrist_roll_joint',
+                                                          u'l_upper_arm_roll_joint',
+                                                          u'l_shoulder_pan_joint',
+                                                          u'l_shoulder_lift_joint',
+                                                          u'l_forearm_roll_joint',
+                                                          u'l_elbow_flex_joint',
+                                                          u'l_wrist_flex_joint',
+                                                          u'l_wrist_roll_joint',
+                                                          u'head_pan_joint',
+                                                          u'head_tilt_joint',
+                                                          u'odom_x_joint',
+                                                          u'odom_y_joint',
+                                                          u'odom_z_joint'])
+    return world
 
 
 def create_world_with_donbot():
@@ -359,27 +380,6 @@ class TestWorldTree(object):
 
     def test_get_directly_controllable_collision_links(self):
         world = create_world_with_pr2()
-        world.god_map.set_data(identifier.controlled_joints, [u'torso_lift_joint',
-                                                              u'r_upper_arm_roll_joint',
-                                                              u'r_shoulder_pan_joint',
-                                                              u'r_shoulder_lift_joint',
-                                                              u'r_forearm_roll_joint',
-                                                              u'r_elbow_flex_joint',
-                                                              u'r_wrist_flex_joint',
-                                                              u'r_wrist_roll_joint',
-                                                              u'l_upper_arm_roll_joint',
-                                                              u'l_shoulder_pan_joint',
-                                                              u'l_shoulder_lift_joint',
-                                                              u'l_forearm_roll_joint',
-                                                              u'l_elbow_flex_joint',
-                                                              u'l_wrist_flex_joint',
-                                                              u'l_wrist_roll_joint',
-                                                              u'head_pan_joint',
-                                                              u'head_tilt_joint',
-                                                              u'odom_x_joint',
-                                                              u'odom_y_joint',
-                                                              u'odom_z_joint'])
-
         result = world.get_directly_controllable_collision_links(u'odom_x_joint')
         assert result == []
         result = world.get_directly_controllable_collision_links(u'odom_y_joint')
@@ -487,6 +487,24 @@ class TestWorldTree(object):
                 mjs[joint_name].position = position
             world.joint_state = mjs
             fk = world.compute_fk_pose(root, tip).pose
+
+    def test_compute_chain_reduced_to_controlled_joints(self):
+        world = create_world_with_pr2()
+        link_a, link_b = world.compute_chain_reduced_to_controlled_joints('r_gripper_tool_frame', 'l_gripper_tool_frame')
+        assert link_a == 'r_wrist_roll_link'
+        assert link_b == 'l_wrist_roll_link'
+
+    def test_compute_chain_reduced_to_controlled_joints2(self):
+        world = create_world_with_pr2()
+        link_a, link_b = world.compute_chain_reduced_to_controlled_joints('l_upper_arm_link', 'r_upper_arm_link')
+        assert link_a == 'l_upper_arm_roll_link'
+        assert link_b == 'r_upper_arm_roll_link'
+
+    def test_compute_chain_reduced_to_controlled_joints3(self):
+        world = create_world_with_pr2()
+        link_a, link_b = world.compute_chain_reduced_to_controlled_joints('l_wrist_roll_link', 'l_gripper_r_finger_link')
+        assert link_a == 'l_upper_arm_roll_link'
+        assert link_b == 'r_upper_arm_roll_link'
 
 
 class TestWorldObj(test_urdf_object.TestUrdfObject):

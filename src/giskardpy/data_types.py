@@ -169,11 +169,12 @@ class Collision(object):
         self.map_P_pb = self.__point_to_4d(map_P_pb)
         self.map_V_n = self.__vector_to_4d(map_V_n)
         self.old_key = (link_a, body_b, link_a)
-        self.a_T_pa = self.__point_to_4d(a_P_pa)
-        self.b_T_pb = self.__point_to_4d(b_P_pb)
+        self.a_P_pa = self.__point_to_4d(a_P_pa)
+        self.b_P_pb = self.__point_to_4d(b_P_pb)
 
         self.new_a_P_pa = None
         self.new_b_P_pb = None
+        self.new_b_V_n = None
 
     def __point_to_4d(self, point):
         if point is None:
@@ -204,6 +205,8 @@ class Collision(object):
                          map_P_pa=self.map_P_pb,
                          map_P_pb=self.map_P_pa,
                          map_V_n=-self.map_V_n,
+                         a_P_pa=self.b_P_pb,
+                         b_P_pb=self.a_P_pa,
                          contact_distance=self.contact_distance)
 
 
@@ -251,11 +254,10 @@ class Collisions(object):
         self.all_collisions.add(collision)
 
         if collision.body_b == self.robot.name:
-            pass
-            # key = collision.get_link_a(), collision.get_link_b()
-            # self.self_collisions[key].add(collision)
-            # self.number_of_self_collisions[key] = min(self.collision_list_size,
-            #                                           self.number_of_self_collisions[key] + 1)
+            key = collision.link_a, collision.link_b
+            self.self_collisions[key].add(collision)
+            self.number_of_self_collisions[key] = min(self.collision_list_size,
+                                                      self.number_of_self_collisions[key] + 1)
         else:
             key = collision.link_a
             self.external_collision[key].add(collision)
@@ -273,10 +275,42 @@ class Collisions(object):
         :type collision: Collision
         :rtype: Collision
         """
-        # if collision.get_body_b() == self.robot.name:
-        #     return self.transform_self_collision(collision)
-        # else:
-        return self.transform_external_collision(collision)
+        if collision.body_b == self.robot.name:
+            return self.transform_self_collision(collision)
+        else:
+            return self.transform_external_collision(collision)
+
+    @profile
+    def transform_self_collision(self, collision):
+        """
+        :type collision: Collision
+        :rtype: Collision
+        """
+        link_a = collision.original_link_a
+        link_b = collision.original_link_b
+        new_link_a, new_link_b = self.world.compute_chain_reduced_to_controlled_joints(link_a, link_b)
+        if new_link_a > new_link_b:
+            collision = collision.reverse()
+            new_link_a, new_link_b = new_link_b, new_link_a
+        collision.link_a = new_link_a
+        collision.link_b = new_link_b
+
+        new_b_T_r = self.world.compute_fk_np(new_link_b, self.world.root_link_name)
+        new_b_T_map = np.dot(new_b_T_r, self.root_T_map)
+        collision.new_b_V_n = np.dot(new_b_T_map, collision.map_V_n)
+
+        if collision.map_P_pa is not None:
+            new_a_T_r = self.world.compute_fk_np(new_link_a, self.world.root_link_name)
+            new_a_P_pa = np.dot(np.dot(new_a_T_r, self.root_T_map), collision.map_P_pa)
+            new_b_P_pb = np.dot(new_b_T_map, collision.map_P_pb)
+        else:
+            new_a_T_a = self.world.compute_fk_np(new_link_a, collision.original_link_a)
+            new_a_P_pa = np.dot(new_a_T_a, collision.a_P_pa)
+            new_b_T_b = self.world.compute_fk_np(new_link_b, collision.original_link_b)
+            new_b_P_pb = np.dot(new_b_T_b, collision.b_P_pb)
+        collision.new_a_P_pa = new_a_P_pa
+        collision.new_b_P_pb = new_b_P_pb
+        return collision
 
     @profile
     def transform_external_collision(self, collision):
@@ -292,7 +326,7 @@ class Collisions(object):
             new_a_P_a = np.dot(new_a_T_map, collision.map_P_pa)
         else:
             new_a_T_a = self.world.compute_fk_np(new_a, collision.original_link_a)
-            new_a_P_a = np.dot(new_a_T_a, collision.a_T_pa)
+            new_a_P_a = np.dot(new_a_T_a, collision.a_P_pa)
 
         collision.new_a_P_pa = new_a_P_a
         return collision

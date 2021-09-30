@@ -373,6 +373,7 @@ class TestPyBulletSyncer(object):
         collision_matrix = pr2_world.collision_matrices[RobotName]
         for entry in collision_matrix:
             assert entry[0] != entry[-1]
+
         assert len(collision_matrix) == 125
 
     def test_add_object(self, pr2_world):
@@ -835,7 +836,7 @@ class TestPyBulletSyncer(object):
         for (robot_link, body_b, body_b_link), dist in collision_matrix.items():
             assert dist == min_dist[robot_link]
             if body_b == name:
-                assert body_b_link == u''
+                assert body_b_link == name
             assert robot_link in robot_link_names
 
     def test_collision_goals_to_collision_matrix3(self, donbot_world):
@@ -857,7 +858,7 @@ class TestPyBulletSyncer(object):
         for (robot_link, body_b, body_b_link), dist in collision_matrix.items():
             assert dist == min_dist[robot_link]
             if body_b == name:
-                assert body_b_link == u''
+                assert body_b_link == name
             assert robot_link in robot_link_names
 
     def test_collision_goals_to_collision_matrix4(self, donbot_world):
@@ -879,7 +880,7 @@ class TestPyBulletSyncer(object):
 
         assert len(collision_matrix) == 0
 
-    def test_collision_goals_to_collision_matrix5(self, donbot_world):
+    def test_collision_goals_to_collision_matrix_avoid_only_box(self, donbot_world):
         name = u'muh'
         robot_link_names = list(donbot_world.robot.link_names_with_collisions)
 
@@ -902,7 +903,7 @@ class TestPyBulletSyncer(object):
         for (robot_link, body_b, body_b_link), dist in collision_matrix.items():
             assert dist == ce.min_dist
             assert body_b == name
-            assert body_b_link == u''
+            assert body_b_link == name
             assert robot_link in robot_link_names
 
     def test_collision_goals_to_collision_matrix6(self, donbot_world):
@@ -932,7 +933,7 @@ class TestPyBulletSyncer(object):
         for (robot_link, body_b, body_b_link), dist in collision_matrix.items():
             assert dist == min_dist[robot_link]
             if body_b == name:
-                assert body_b_link == u''
+                assert body_b_link == name
             assert robot_link in robot_link_names
 
     def test_collision_goals_to_collision_matrix7(self, donbot_world):
@@ -963,7 +964,7 @@ class TestPyBulletSyncer(object):
         for (robot_link, body_b, body_b_link), dist in collision_matrix.items():
             assert dist == min_dist[robot_link]
             if body_b == name:
-                assert body_b_link == u''
+                assert body_b_link == name
             assert robot_link in robot_link_names
 
     def test_collision_goals_to_collision_matrix8(self, donbot_world):
@@ -996,7 +997,7 @@ class TestPyBulletSyncer(object):
         for (robot_link, body_b, body_b_link), dist in collision_matrix.items():
             assert dist == min_dist[robot_link]
             if body_b != donbot_world.robot.name:
-                assert body_b_link == u''
+                assert body_b_link == name or body_b_link == name2
             assert robot_link in robot_link_names
             if body_b == name2:
                 assert robot_link != robot_link_names[0]

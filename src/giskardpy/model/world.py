@@ -267,9 +267,17 @@ class WorldTree(object):
         self.fast_all_fks = None
         self.hard_reset()
 
+    @memoize
     def get_directly_controllable_collision_links(self, joint_name):
         if joint_name not in self.controlled_joints:
-            return []
+            raise AttributeError('\'{}\' is not controllable.'.format(joint_name))
+        return self.get_direct_child_links_with_collision(joint_name)
+
+    @memoize
+    def get_direct_child_links_with_collision(self, joint_name):
+        if joint_name not in self.movable_joints:
+            raise AttributeError('\'{}\' is fixed.'.format(joint_name))
+
         def helper(joint_name):
             joint = self.joints[joint_name]
             link_names = []
@@ -282,7 +290,6 @@ class WorldTree(object):
                 link_names.append(child_link.name)
             return link_names
         return helper(joint_name)
-
 
     def reset_cache(self):
         # FIXME this sucks because it calls properties
@@ -374,6 +381,24 @@ class WorldTree(object):
         :rtype: PrefixName
         """
         return self.joints[self.links[link_name].parent_joint_name].parent_link_name
+
+    @memoize
+    def compute_chain_reduced_to_controlled_joints(self, link_a, link_b):
+        chain1, connection, chain2 = self.compute_split_chain(link_b, link_a)
+        chain = chain1 + connection + chain2
+        for i, thing in enumerate(chain):
+            if i % 2 == 1 and thing in self.controlled_joints:
+                new_link_b = chain[i - 1]
+                break
+        else:
+            raise KeyError(u'no controlled joint in chain between {} and {}'.format(link_a, link_b))
+        for i, thing in enumerate(reversed(chain)):
+            if i % 2 == 1 and thing in self.controlled_joints:
+                new_link_a = chain[len(chain) - i]
+                break
+        else:
+            raise KeyError(u'no controlled joint in chain between {} and {}'.format(link_a, link_b))
+        return new_link_a, new_link_b
 
     @memoize
     def get_movable_parent_joint(self, link_name):
@@ -551,7 +576,8 @@ class WorldTree(object):
             joint = self.links[self.joints[joint].parent_link_name].parent_joint_name
         return joint
 
-    def compute_chain(self, root_link_name, tip_link_name, joints=True, links=True, fixed=True):
+    @memoize
+    def compute_chain(self, root_link_name, tip_link_name, joints=True, links=True, fixed=True, non_controlled=True):
         chain = []
         if links:
             chain.append(tip_link_name)
@@ -562,7 +588,8 @@ class WorldTree(object):
             parent_joint = self.joints[link.parent_joint_name]
             parent_link = self.links[parent_joint.parent_link_name]
             if joints:
-                if fixed or not isinstance(parent_joint, FixedJoint):
+                if (fixed or not isinstance(parent_joint, FixedJoint)) and \
+                        (non_controlled or parent_joint.name in self.controlled_joints):
                     chain.append(parent_joint.name)
             if links:
                 chain.append(parent_link.name)
@@ -570,22 +597,23 @@ class WorldTree(object):
         chain.reverse()
         return chain
 
-    def compute_split_chain(self, root, tip, joints=True, links=True, fixed=True):
+    @memoize
+    def compute_split_chain(self, root, tip, joints=True, links=True, fixed=True, non_controlled=True):
         if root == tip:
             return [], [], []
-        root_chain = self.compute_chain(self.root_link_name, root, False, True, True)
-        tip_chain = self.compute_chain(self.root_link_name, tip, False, True, True)
+        root_chain = self.compute_chain(self.root_link_name, root, False, True, True, True)
+        tip_chain = self.compute_chain(self.root_link_name, tip, False, True, True, True)
         for i in range(min(len(root_chain), len(tip_chain))):
             if root_chain[i] != tip_chain[i]:
                 break
         else:
             i += 1
         connection = tip_chain[i - 1]
-        root_chain = self.compute_chain(connection, root, joints, links, fixed)
+        root_chain = self.compute_chain(connection, root, joints, links, fixed, non_controlled)
         if links:
             root_chain = root_chain[1:]
         root_chain.reverse()
-        tip_chain = self.compute_chain(connection, tip, joints, links, fixed)
+        tip_chain = self.compute_chain(connection, tip, joints, links, fixed, non_controlled)
         if links:
             tip_chain = tip_chain[1:]
         return root_chain, [connection] if links else [], tip_chain
@@ -692,14 +720,15 @@ class WorldTree(object):
         # return result
 
     @memoize
-    def are_linked(self, link_a, link_b):
+    def are_linked(self, link_a, link_b, non_controlled=False, fixed=False):
         """
         Return True if all joints between link_a and link_b are fixed.
         :type link_a: str
         :type link_b: str
         :rtype: bool
         """
-        chain1, connection, chain2 = self.compute_split_chain(link_a, link_b, joints=True, links=False, fixed=False)
+        chain1, connection, chain2 = self.compute_split_chain(link_a, link_b, joints=True, links=False, fixed=fixed,
+                                                              non_controlled=non_controlled)
         return not chain1 and not connection and not chain2
 
     def set_joint_limits(self, linear_limits, angular_limits, order):
@@ -732,48 +761,6 @@ class WorldTree(object):
         for joint_name, joint in self.joints.items():
             if self.is_joint_movable(joint_name) and not self.is_joint_mimic(joint_name):
                 joint.free_variable.quadratic_weights[order] = weights[joint_name]
-
-    def set_joint_state_to_zero(self):
-        self.state = JointStates()
-
-    def set_max_joint_state(self):
-        def f(joint_name):
-            _, upper_limit = self.get_joint_position_limits(joint_name)
-            if upper_limit is None:
-                return np.pi * 2
-            return upper_limit
-
-        self.state = self.generate_joint_state(f)
-
-    def set_min_joint_state(self):
-        def f(joint_name):
-            lower_limit, _ = self.get_joint_position_limits(joint_name)
-            if lower_limit is None:
-                return -np.pi * 2
-            return lower_limit
-
-        self.state = self.generate_joint_state(f)
-
-    def set_rnd_joint_state(self):
-        def f(joint_name):
-            lower_limit, upper_limit = self.get_joint_position_limits(joint_name)
-            if lower_limit is None:
-                return np.random.random() * np.pi * 2
-            lower_limit = max(lower_limit, -10)
-            upper_limit = min(upper_limit, 10)
-            return (np.random.random() * (upper_limit - lower_limit)) + lower_limit
-
-        self.state = self.generate_joint_state(f)
-
-    def generate_joint_state(self, f):
-        """
-        :param f: lambda joint_info: float
-        :return:
-        """
-        js = JointStates()
-        for joint_name in sorted(self.movable_joints):
-            js[joint_name].position = f(joint_name)
-        return js
 
     def joint_limit_expr(self, joint_name, order):
         upper_limit = self.joints[joint_name].free_variable.get_upper_limit(order)

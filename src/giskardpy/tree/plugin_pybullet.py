@@ -38,8 +38,8 @@ class WorldUpdatePlugin(GiskardBehavior):
         self.map_frame = self.get_god_map().get_data(identifier.map_frame)
         self.original_link_names = self.robot.link_names
         self.bullet = PyBulletSyncer(self.world, self.god_map.get_data(identifier.gui))
-        self.bullet = BetterPyBulletSyncer(self.world)
-        # self.bullet.init_collision_matrix(RobotName)
+        # self.bullet = BetterPyBulletSyncer(self.world)
+        self.bullet.init_collision_matrix(RobotName)
         self.god_map.set_data(identifier.bullet, self.bullet)
         # self.bullet.sync()
         self.lock = Lock()

@@ -161,7 +161,17 @@ def create_world_with_pr2():
 
 
 def create_world_with_donbot():
-    return world_with_robot(donbot_urdf())
+    world = world_with_robot(donbot_urdf())
+    world.god_map.set_data(identifier.controlled_joints, [u'ur5_elbow_joint',
+                                                          u'ur5_shoulder_lift_joint',
+                                                          u'ur5_shoulder_pan_joint',
+                                                          u'ur5_wrist_1_joint',
+                                                          u'ur5_wrist_2_joint',
+                                                          u'ur5_wrist_3_joint',
+                                                          u'odom_x_joint',
+                                                          u'odom_y_joint',
+                                                          u'odom_z_joint'])
+    return world
 
 
 def create_world_with_hsr():
@@ -381,69 +391,99 @@ class TestWorldTree(object):
         assert lower_limit == -0.564601836603
         assert upper_limit == 2.1353981634
 
-    def test_get_direct_child_links_with_collision(self):
+    def test_search_branch(self):
         world = create_world_with_pr2()
-        result = world.get_direct_child_links_with_collision(u'odom_x_joint')
-        assert result == []
-        result = world.get_direct_child_links_with_collision(u'odom_y_joint')
-        assert result == []
-        result = world.get_direct_child_links_with_collision(u'odom_z_joint', stop_when=world.is_joint_controlled)
-        assert result == [u'base_bellow_link',
-                          u'fl_caster_l_wheel_link',
-                          u'fl_caster_r_wheel_link',
-                          u'fl_caster_rotation_link',
-                          u'fr_caster_l_wheel_link',
-                          u'fr_caster_r_wheel_link',
-                          u'fr_caster_rotation_link',
-                          u'bl_caster_l_wheel_link',
-                          u'bl_caster_r_wheel_link',
-                          u'bl_caster_rotation_link',
-                          u'br_caster_l_wheel_link',
-                          u'br_caster_r_wheel_link',
-                          u'br_caster_rotation_link',
-                          u'base_link']
-        result = world.get_direct_child_links_with_collision(u'l_elbow_flex_joint', stop_when=world.is_joint_controlled)
-        assert result == [u'l_elbow_flex_link']
-        result = world.get_direct_child_links_with_collision(u'r_wrist_roll_joint', stop_when=world.is_joint_controlled)
-        assert result == [u'r_gripper_l_finger_tip_link',
-                          u'r_gripper_l_finger_link',
-                          u'r_gripper_r_finger_tip_link',
-                          u'r_gripper_r_finger_link',
-                          u'r_gripper_palm_link',
-                          u'r_wrist_roll_link']
-        result = world.get_direct_child_links_with_collision(u'br_caster_l_wheel_joint')
-        assert result == ['br_caster_l_wheel_link']
+        result = world.search_branch(u'odom_x_joint',
+                                     stop_at_joint_when=lambda _: False,
+                                     stop_at_link_when=lambda _: False)
+        assert result == ([], [])
+        result = world.search_branch(u'odom_y_joint',
+                                     stop_at_joint_when=world.is_joint_controlled,
+                                     stop_at_link_when=lambda _: False,
+                                     collect_link_when=world.has_link_collisions)
+        assert result == ([], [])
+        result = world.search_branch(u'odom_z_joint',
+                                     stop_at_joint_when=world.is_joint_controlled,
+                                     collect_link_when=world.has_link_collisions)
+        assert set(result[0]) == {u'base_bellow_link',
+                                  u'fl_caster_l_wheel_link',
+                                  u'fl_caster_r_wheel_link',
+                                  u'fl_caster_rotation_link',
+                                  u'fr_caster_l_wheel_link',
+                                  u'fr_caster_r_wheel_link',
+                                  u'fr_caster_rotation_link',
+                                  u'bl_caster_l_wheel_link',
+                                  u'bl_caster_r_wheel_link',
+                                  u'bl_caster_rotation_link',
+                                  u'br_caster_l_wheel_link',
+                                  u'br_caster_r_wheel_link',
+                                  u'br_caster_rotation_link',
+                                  u'base_link'}
+        result = world.search_branch(u'l_elbow_flex_joint',
+                                     collect_joint_when=world.is_joint_fixed)
+        assert set(result[0]) == set()
+        assert set(result[1]) == {'l_force_torque_adapter_joint',
+                                  'l_force_torque_joint',
+                                  'l_forearm_cam_frame_joint',
+                                  'l_forearm_cam_optical_frame_joint',
+                                  'l_forearm_joint',
+                                  'l_gripper_led_joint',
+                                  'l_gripper_motor_accelerometer_joint',
+                                  'l_gripper_palm_joint',
+                                  'l_gripper_tool_joint'}
+        links, joints = world.search_branch(u'r_wrist_roll_joint',
+                                            stop_at_joint_when=world.is_joint_controlled,
+                                            collect_link_when=world.has_link_collisions,
+                                            collect_joint_when=lambda _: True)
+        assert set(links) == {u'r_gripper_l_finger_tip_link',
+                              u'r_gripper_l_finger_link',
+                              u'r_gripper_r_finger_tip_link',
+                              u'r_gripper_r_finger_link',
+                              u'r_gripper_palm_link',
+                              u'r_wrist_roll_link'}
+        assert set(joints) == {'r_gripper_palm_joint',
+                               'r_gripper_led_joint',
+                               'r_gripper_motor_accelerometer_joint',
+                               'r_gripper_tool_joint',
+                               'r_gripper_motor_slider_joint',
+                               'r_gripper_motor_screw_joint',
+                               'r_gripper_l_finger_joint',
+                               'r_gripper_l_finger_tip_joint',
+                               'r_gripper_r_finger_joint',
+                               'r_gripper_r_finger_tip_joint',
+                               'r_gripper_joint'}
+        links, joints = world.search_branch(u'br_caster_l_wheel_joint',
+                                            collect_link_when=lambda _: True,
+                                            collect_joint_when=lambda _: True)
+        assert links == ['br_caster_l_wheel_link']
+        assert joints == []
 
-    def test_get_direct_parent_links_with_collision(self):
+    def test_get_siblings_with_collisions(self):
         world = create_world_with_pr2()
         with pytest.raises(KeyError):
-            result = world.get_direct_parent_links_with_collision(u'odom_x_joint',
-                                                                  parent_stop_when=world.is_joint_controlled)
-        result = world.get_direct_parent_links_with_collision(u'odom_y_joint',
-                                                              parent_stop_when=world.is_joint_controlled)
+            result = world.get_siblings_with_collisions(u'odom_x_joint')
+        result = world.get_siblings_with_collisions(u'odom_y_joint')
         assert result == []
-        result = world.get_direct_parent_links_with_collision(u'odom_z_joint')
+        result = world.get_siblings_with_collisions(u'odom_z_joint')
         assert result == []
-        result = world.get_direct_parent_links_with_collision(u'l_elbow_flex_joint')
-        assert result == [u'l_upper_arm_link']
-        result = world.get_direct_parent_links_with_collision(u'r_wrist_roll_joint',
-                                                              parent_stop_when=world.is_joint_controlled)
+        result = world.get_siblings_with_collisions(u'l_elbow_flex_joint')
+        assert set(result) == {'l_upper_arm_roll_link', 'l_upper_arm_link'}
+        result = world.get_siblings_with_collisions(u'r_wrist_roll_joint')
         assert result == [u'r_wrist_flex_link']
-        result = world.get_direct_parent_links_with_collision(u'br_caster_l_wheel_joint',
-                                                              parent_stop_when=world.is_joint_controlled)
-        assert result == ['base_bellow_link',
-                          'fl_caster_l_wheel_link',
-                          'fl_caster_r_wheel_link',
-                          'fl_caster_rotation_link',
-                          'fr_caster_l_wheel_link',
-                          'fr_caster_r_wheel_link',
-                          'fr_caster_rotation_link',
-                          'bl_caster_l_wheel_link',
-                          'bl_caster_r_wheel_link',
-                          'bl_caster_rotation_link',
-                          'br_caster_r_wheel_link',
-                          'br_caster_rotation_link',
-                          'base_link']
+        result = world.get_siblings_with_collisions(u'br_caster_l_wheel_joint')
+        assert set(result) == {'base_bellow_link',
+                               'fl_caster_l_wheel_link',
+                               'fl_caster_r_wheel_link',
+                               'fl_caster_rotation_link',
+                               'fr_caster_l_wheel_link',
+                               'fr_caster_r_wheel_link',
+                               'fr_caster_rotation_link',
+                               'bl_caster_l_wheel_link',
+                               'bl_caster_r_wheel_link',
+                               'bl_caster_rotation_link',
+                               'br_caster_r_wheel_link',
+                               'br_caster_rotation_link',
+                               'base_link'}
 
     def test_get_controlled_parent_joint_of_link(self):
         world = create_world_with_pr2()
@@ -456,7 +496,7 @@ class TestWorldTree(object):
         with pytest.raises(KeyError) as e_info:
             world.get_controlled_parent_joint_of_joint('odom_x_joint')
         with pytest.raises(KeyError) as e_info:
-            world.get_parent_joint_of_joint('r_wrist_roll_joint', stop_when=lambda x: False)
+            world.search_for_parent_joint('r_wrist_roll_joint', stop_when=lambda x: False)
         assert world.get_controlled_parent_joint_of_joint('r_torso_lift_side_plate_joint') == 'torso_lift_joint'
         assert world.get_controlled_parent_joint_of_joint('odom_y_joint') == 'odom_x_joint'
 

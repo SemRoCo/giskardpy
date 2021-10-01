@@ -1,6 +1,7 @@
 from collections import defaultdict
 
 import betterpybullet as bpb
+from geometry_msgs.msg import PoseStamped, Point, Quaternion
 
 from giskardpy import RobotName
 from giskardpy.data_types import BiDict, Collisions, Collision
@@ -169,3 +170,13 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
             if link.has_collisions():
                 self.add_object(link)
         self.sync_state()
+
+    def get_pose(self, link_name):
+        collision_object = self.object_name_to_id[link_name]
+        map_T_link = PoseStamped()
+        map_T_link.header.frame_id = self.world.root_link_name
+        map_T_link.pose.position.x = collision_object.transform.origin.x
+        map_T_link.pose.position.y = collision_object.transform.origin.y
+        map_T_link.pose.position.z = collision_object.transform.origin.z
+        map_T_link.pose.orientation = Quaternion(*collision_object.transform.rotation)
+        return map_T_link

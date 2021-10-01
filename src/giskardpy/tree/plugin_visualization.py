@@ -25,7 +25,6 @@ class VisualizationBehavior(GiskardBehavior):
             self.clear_marker()
         markers = []
         time_stamp = rospy.Time()
-        get_fk = self.world.compute_fk_pose
         links = self.world.link_names_with_collisions
         for i, link_name in enumerate(links):
             for marker in self.world.links[link_name].collision_visualization_markers().markers:
@@ -37,10 +36,7 @@ class VisualizationBehavior(GiskardBehavior):
                 self.ids.add(marker.id)
                 marker.ns = u'planning_visualization'
                 marker.header.stamp = time_stamp
-
-                fk = get_fk(self.robot_base, link_name).pose
-
-                marker.pose = kdl_to_pose(pose_to_kdl(fk) * pose_to_kdl(marker.pose))
+                marker.pose = self.bullet.get_pose(link_name).pose
                 markers.append(marker)
 
         self.publisher.publish(markers)

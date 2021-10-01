@@ -118,7 +118,7 @@ class MeshGeometry(LinkGeometry):
         return marker
 
     def as_urdf(self):
-        return up.Mesh(self.file_name)
+        return up.Mesh(self.file_name, self.scale)
 
     def is_big(self, volume_threshold=1.001e-6, surface_threshold=0.00061):
         return True
@@ -231,8 +231,8 @@ class Link(object):
         r = up.Robot(self.name)
         r.version = u'1.0'
         link = up.Link(self.name)
-        # link.add_aggregate(u'visual', up.Visual(self.visuals[0].as_urdf(),
-        #                                         material=up.Material(u'green', color=up.Color(0, 1, 0, 1))))
+        # if self.visuals:
+        #     link.add_aggregate(u'visual', up.Visual(self.visuals[0].as_urdf()))
         link.add_aggregate(u'collision', up.Collision(self.collisions[0].as_urdf()))
         r.add_link(link)
         return r.to_xml_string()
@@ -267,51 +267,77 @@ class WorldTree(object):
         self.fast_all_fks = None
         self.hard_reset()
 
-    @memoize
-    def get_direct_child_links_with_collision(self, joint_name, stop_when=None):
+    def search_branch(self, joint_name,
+                      stop_at_joint_when=None, stop_at_link_when=None,
+                      collect_joint_when=None, collect_link_when=None):
         """
-        Starts at joint_name and goes down all branches until stop_when is True (for each branch).
-        In the meantime all links with collisions are collected and finally returned.
-        :param joint_name: Where to start.
-        :type joint_name: Union[str, PrefixName]
-        :param stop_when: Function that takes a joint name and return bool. Use e.g. self.is_joint_controlled.
-                          If still None, 'lambda joint_name: True' is used.
-        :rtype: list
+
+        :param joint_name:
+        :param stop_at_joint_when: If None, 'lambda joint_name: False' is used.
+        :param stop_at_link_when: If None, 'lambda joint_name: False' is used.
+        :param collect_joint_when: If None, 'lambda joint_name: False' is used.
+        :param collect_link_when: If None, 'lambda joint_name: False' is used.
+        :return: Collected links and joints. DOES NOT INCLUDE joint_name
         """
+        if stop_at_joint_when is None:
+            def stop_at_joint_when(_):
+                return False
+        if stop_at_link_when is None:
+            def stop_at_link_when(_):
+                return False
+        if collect_joint_when is None:
+            def collect_joint_when(_):
+                return False
+        if collect_link_when is None:
+            def collect_link_when(_):
+                return False
+
         def helper(joint_name):
             joint = self.joints[joint_name]
-            link_names = []
+            collected_link_names = []
+            collected_joint_names = []
             child_link = self.links[joint.child_link_name]
-            for child_joint_name in child_link.child_joint_names:
-                if stop_when is None or stop_when(child_joint_name):
-                    continue
-                link_names.extend(helper(child_joint_name))
-            if child_link.has_collisions():
-                link_names.append(child_link.name)
-            return link_names
+            if collect_link_when(child_link.name):
+                collected_link_names.append(child_link.name)
+            if not stop_at_link_when(child_link.name):
+                for child_joint_name in child_link.child_joint_names:
+                    if collect_joint_when(child_joint_name):
+                        collected_joint_names.append(child_joint_name)
+                    if stop_at_joint_when(child_joint_name):
+                        continue
+                    links_to_add, joints_to_add = helper(child_joint_name)
+                    collected_link_names.extend(links_to_add)
+                    collected_joint_names.extend(joints_to_add)
+            return collected_link_names, collected_joint_names
+
         return helper(joint_name)
 
-    def get_direct_parent_links_with_collision(self, joint_name, parent_stop_when=None, child_stop_when=None):
+    @memoize
+    def get_directly_controlled_child_links_with_collisions(self, joint_name):
+        links, joints = self.search_branch(joint_name,
+                                           stop_at_joint_when=self.is_joint_controlled,
+                                           collect_link_when=self.has_link_collisions)
+        return links
+
+    def get_siblings_with_collisions(self, joint_name):
         """
-        Starts at joint_name and goes up the tree until parent_stop_when is True.
-        Then it goes down all branches until child_stop_when is True or until joint_name was reached again (for each
-        branch).
-        In the meantime all links with collisions are collected and finally returned.
-        :param joint_name: Where to start.
-        :type joint_name: Union[str, PrefixName]
-        :param parent_stop_when: Function that takes a joint name and return bool. Use e.g. self.is_joint_controlled.
-                                 If None, 'lambda joint_name: True' is used.
-        :param child_stop_when: Function that takes a joint name and return bool. Use e.g. self.is_joint_controlled.
-                                If None, parent_stop_when is used.
-                                If still None, 'lambda joint_name: True' is used.
-        :rtype: list
+        Goes up the tree until the first controlled joint and then down again until another controlled joint or
+        the joint_name is reached again. Collects all links with collision along the way.
+        :param joint_name:
+        :return:
         """
-        parent_joint = self.get_parent_joint_of_joint(joint_name, parent_stop_when)
-        if child_stop_when is None:
-            child_stop_when = parent_stop_when
-        def stopper(joint_name2):
-            return joint_name2 == joint_name or child_stop_when is None or child_stop_when(joint_name2)
-        return self.get_direct_child_links_with_collision(parent_joint, stop_when=stopper)
+        try:
+            parent_joint = self.search_for_parent_joint(joint_name, stop_when=self.is_joint_controlled)
+        except KeyError as e:
+            return []
+
+        def stop_at_joint_when(other_joint_name):
+            return joint_name == other_joint_name or self.is_joint_controlled(other_joint_name)
+
+        links, joints = self.search_branch(parent_joint,
+                                           stop_at_joint_when=stop_at_joint_when,
+                                           collect_link_when=self.has_link_collisions)
+        return links
 
     def reset_cache(self):
         # FIXME this sucks because it calls properties
@@ -600,13 +626,13 @@ class WorldTree(object):
 
     @memoize
     def get_controlled_parent_joint_of_joint(self, joint_name):
-        return self.get_parent_joint_of_joint(joint_name, self.is_joint_controlled)
+        return self.search_for_parent_joint(joint_name, self.is_joint_controlled)
 
-    def get_parent_joint_of_joint(self, joint_name, stop_when=None):
+    def search_for_parent_joint(self, joint_name, stop_when=None):
         try:
             joint = self.links[self.joints[joint_name].parent_link_name].parent_joint_name
             while stop_when is not None and not stop_when(joint):
-                joint = self.get_parent_joint_of_joint(joint)
+                joint = self.search_for_parent_joint(joint)
         except KeyError as e:
             raise KeyError('\'{}\' has no fitting parent joint'.format(joint_name))
         return joint
@@ -715,6 +741,7 @@ class WorldTree(object):
                     continue
                 if link.has_collisions():
                     fk = self.compose_fk_expression(self.root_link_name, link.name)
+                    fk = w.dot(fk, link.collisions[0].link_T_geometry)
                     position = w.position_of(fk)
                     orientation = w.quaternion_from_matrix(fk)
                     fks.append(w.vstack([position, orientation]).T)
@@ -740,8 +767,7 @@ class WorldTree(object):
                     continue
                 if link.has_collisions():
                     map_T_o = self.compose_fk_expression(self.root_link_name, link.name)
-                    o_T_geo = link.collisions[0].link_T_geometry
-                    map_T_geo = w.dot(map_T_o, o_T_geo)
+                    map_T_geo = w.dot(map_T_o, link.collisions[0].link_T_geometry)
                     fks.append(map_T_geo)
                     self.fk_idx[link.name] = i
                     i += 4
@@ -813,6 +839,9 @@ class WorldTree(object):
         return lower_limit, upper_limit
 
     def get_joint_position_limits(self, joint_name):
+        """
+        :return: minimum position, maximum position as float
+        """
         return self.compute_joint_limits(joint_name, 0)
 
     def get_joint_velocity_limits(self, joint_name):
@@ -847,6 +876,12 @@ class WorldTree(object):
 
     def has_joint(self, joint_name):
         return joint_name in self.joints
+
+    def has_link_collisions(self, link_name):
+        return self.links[link_name].has_collisions()
+
+    def has_link_visuals(self, link_name):
+        return self.links[link_name].has_visuals()
 
 
 class SubWorldTree(WorldTree):
@@ -916,7 +951,8 @@ class SubWorldTree(WorldTree):
 
     @cached_property
     def groups(self):
-        return {group_name: group for group_name, group in self.world.groups.items() if group.root_link_name in self.links and group.name != self.name}
+        return {group_name: group for group_name, group in self.world.groups.items() if
+                group.root_link_name in self.links and group.name != self.name}
 
     @cached_property
     def links(self):

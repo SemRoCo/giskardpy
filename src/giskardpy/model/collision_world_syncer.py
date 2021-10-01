@@ -1,6 +1,6 @@
 from collections import defaultdict
 from copy import deepcopy
-from itertools import combinations
+from itertools import combinations, product
 from time import time
 
 import numpy as np
@@ -48,8 +48,7 @@ class CollisionWorldSynchronizer(object):
         """
         pass
 
-    def calc_collision_matrix(self, group_name, link_combinations=None, d=0.05, d2=0.0, num_rnd_tries=2000,
-                              non_controlled=False):
+    def calc_collision_matrix(self, group_name, link_combinations=None, d=0.05, d2=0.0, non_controlled=False, steps=10):
         """
         :type group_name: str
         :param link_combinations: set with link name tuples
@@ -87,24 +86,44 @@ class CollisionWorldSynchronizer(object):
         always = self.check_collisions2(unknown, d)
         unknown = unknown.difference(always)
 
-        # find meaningful self-collisions
-        # sometimes = set()
-        # for i in range(num_rnd_tries):
-        #     if i == 0:
-        #         self.set_min_joint_state(group)
-        #     elif i == 1:
-        #         self.set_max_joint_state(group)
-        #     else:
-        #         self.set_rnd_joint_state(group)
-        #     sometimes2 = self.check_collisions2(unknown, d2)
-        #     unknown = unknown.difference(sometimes)
-        #     sometimes = sometimes.union(sometimes2)
-        # sometimes = sometimes.union(self.added_pairs)
+        # Remove combinations which can never touch
+        # by checking combinations which a single joint can influence
+        for joint_name in self.world.controlled_joints:
+            parent_links = self.world.get_siblings_with_collisions(joint_name)
+            if not parent_links:
+                continue
+            child_links = self.world.get_directly_controlled_child_links_with_collisions(joint_name)
+            if self.world.is_joint_continuous(joint_name):
+                min_position = -np.pi
+                max_position = np.pi
+            else:
+                min_position, max_position = self.world.get_joint_position_limits(joint_name)
+
+            # joint_name can make these links touch.
+            current_combinations = set(product(parent_links, child_links))
+            # Filter for combinations which are still unknown
+            # and make sure the link_a, link_b order is same as in unknown
+            subset_of_unknown = [x for x in unknown if x in current_combinations or (x[1], x[0]) in current_combinations]
+            if not subset_of_unknown:
+                continue
+            sometimes = set()
+            for position in np.linspace(min_position, max_position, steps):
+                self.world.state[joint_name].position = position
+                self.sync_state()
+                for link_a, link_b in subset_of_unknown:
+                    if self.in_collision(link_a, link_b, d2):
+                        sometimes.add((link_a, link_b))
+            never = set(subset_of_unknown).difference(sometimes)
+            unknown = unknown.difference(never)
+
         logging.loginfo(u'Calculated self collision matrix in {:.3f}s'.format(time() - t))
         group.state = joint_state_tmp
 
         self.collision_matrices[group_name] = unknown
         return self.collision_matrices[group_name]
+
+    def get_pose(self, link_name):
+        pass
 
     def set_joint_state_to_zero(self, group):
         group.state = JointStates()
@@ -145,7 +164,7 @@ class CollisionWorldSynchronizer(object):
         """
         js = JointStates()
         for joint_name in sorted(group.movable_joints):
-            if group.get_direct_child_links_with_collision(joint_name):
+            if group.search_downwards_for_links(joint_name):
                 js[joint_name].position = f(joint_name)
             else:
                 js[joint_name].position = 0

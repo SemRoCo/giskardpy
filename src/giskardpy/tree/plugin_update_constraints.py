@@ -195,7 +195,7 @@ class GoalToConstraints(GetGoal):
         controlled_joints = self.god_map.get_data(identifier.controlled_joints)
         config = self.get_god_map().get_data(identifier.external_collision_avoidance)
         for joint_name in controlled_joints:
-            child_links = self.robot.get_direct_child_links_with_collision(joint_name)
+            child_links = self.robot.get_directly_controlled_child_links_with_collisions(joint_name)
             if child_links:
                 number_of_repeller = config[joint_name][u'number_of_repeller']
                 for i in range(number_of_repeller):

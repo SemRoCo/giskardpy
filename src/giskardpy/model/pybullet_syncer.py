@@ -1,6 +1,6 @@
 from collections import defaultdict
 
-from geometry_msgs.msg import Pose, Point
+from geometry_msgs.msg import Pose, Point, PoseStamped, Quaternion
 
 import giskardpy.model.pybullet_wrapper as pbw
 from giskardpy.data_types import BiDict, Collisions, Collision
@@ -92,6 +92,14 @@ class PyBulletSyncer(CollisionWorldSynchronizer):
                 self.update_pose(link)
         pbw.activate_rendering()
 
+    def get_pose(self, link_name):
+        map_T_link = PoseStamped()
+        position, orientation = pbw.getBasePositionAndOrientation(self.object_name_to_bullet_id[link_name])
+        map_T_link.header.frame_id = self.world.root_link_name
+        map_T_link.pose.position = Point(*position)
+        map_T_link.pose.orientation = Quaternion(*orientation)
+        return map_T_link
+
     @profile
     def sync(self):
         """
@@ -106,6 +114,7 @@ class PyBulletSyncer(CollisionWorldSynchronizer):
             if link.has_collisions():
                 self.add_object(link)
         pbw.activate_rendering()
+        self.sync_state()
 
     def __add_pybullet_bug_fix_hack(self):
         if self.hack_name not in self.object_name_to_bullet_id:

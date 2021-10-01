@@ -32,7 +32,7 @@ folder_name = u'tmp_data/'
 @pytest.fixture(scope=u'module')
 def module_setup(request):
     logging.loginfo(u'starting pybullet')
-    pbw.start_pybullet(False)
+    # pbw.start_pybullet(True)
 
     logging.loginfo(u'deleting tmp test folder')
     try:
@@ -52,7 +52,7 @@ def function_setup(request, module_setup):
     """
     :rtype: WorldObject
     """
-    pbw.clear_pybullet()
+    # pbw.clear_pybullet()
 
     def kill_pybullet():
         logging.loginfo(u'resetting pybullet')
@@ -68,7 +68,7 @@ def pr2_world(request, function_setup):
     """
 
     world = create_world_with_pr2()
-    pbs = PyBulletSyncer(world, True)
+    pbs = PyBulletSyncer(world, False)
     pbs.sync()
     return pbs
 
@@ -79,7 +79,7 @@ def donbot_world(request, function_setup):
     """
 
     world = create_world_with_donbot()
-    pbs = PyBulletSyncer(world, True)
+    pbs = PyBulletSyncer(world, False)
     pbs.sync()
     return pbs
 
@@ -371,6 +371,17 @@ class TestPyBulletSyncer(object):
         """
         pr2_world.init_collision_matrix(RobotName)
         collision_matrix = pr2_world.collision_matrices[RobotName]
+        for entry in collision_matrix:
+            assert entry[0] != entry[-1]
+
+        assert len(collision_matrix) == 125
+
+    def test_compute_collision_matrix_donbot(self, donbot_world):
+        """
+        :type pr2_world: PyBulletSyncer
+        """
+        donbot_world.init_collision_matrix(RobotName)
+        collision_matrix = donbot_world.collision_matrices[RobotName]
         for entry in collision_matrix:
             assert entry[0] != entry[-1]
 

@@ -166,37 +166,6 @@ def cylinder_surface(r, h):
 #             return True
 #     return False
 
-def calculate_waypoint2D(target, origin, distance):
-    """
-    Calculates a waypoint in front of the target.
-    :param target: The target position
-    :type target: Point
-    :param origin: The origin position
-    :type origin: Point
-    :param distance: The distance of the new waypoint to the target
-    :type distance: float
-    :return:
-    """
-    distance = abs(distance)
-    x = target.x - origin.x
-    y = target.y - origin.y
-
-    if x == 0.0:
-        if y < 0.0:
-            return Point(target.x, target.y + distance, target.z)
-        else:
-            return Point(target.x, target.y - distance, target.z)
-
-    alpha = math.atan(y / x)
-    dx = math.cos(alpha) * distance
-    dy = math.sin(alpha) * distance
-
-    if x > 0.0:
-        return Point(target.x - dx, target.y - dy, target.z)
-    else:
-        return Point(target.x + dx, target.y + dy, target.z)
-
-
 def qv_mult(quaternion, vector):
     """
     Transforms a vector by a quaternion

@@ -16,7 +16,7 @@ from tf.transformations import quaternion_multiply
 from giskardpy.constraints import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA
 from giskardpy.urdf_object import URDFObject
 from giskardpy.utils import position_dict_to_joint_states, make_world_body_box, make_world_body_cylinder, \
-    calculate_waypoint2D, to_joint_state_position_dict, to_tf_quaternion
+     to_joint_state_position_dict, to_tf_quaternion
 from rospy_message_converter.message_converter import convert_ros_message_to_dictionary
 
 
@@ -74,55 +74,6 @@ class GiskardWrapper(object):
         except rospy.ROSException:
             rospy.logwarn("get_joint_states: wait_for_message timeout")
             return {}
-
-    def set_cart_goal_wstep(self, root_link, tip_link, goal_pose, base_tip_rotation=None,
-                            max_linear_velocity=None, max_angular_velocity=None, weight=None, step=None,
-                            base_pose=None):
-        """
-        This goal will use the kinematic chain between root and tip link to move tip link into the goal pose. Adds an offset
-        depending on the goal. It will also execute the goal.
-        :param root_link: name of the root link of the kin chain
-        :type root_link: str
-        :param tip_link: name of the tip link of the kin chain
-        :type tip_link: str
-        :param goal_pose: the goal pose
-        :type goal_pose: PoseStamped
-        :param base_tip_rotation: the rotation of the gripper
-        :type base_tip_rotation: tf_quaternion [x, y, z, w]
-        :param max_linear_velocity: m/s, default 0.1
-        :type max_linear_velocity: float
-        :param max_angular_velocity: rad/s, default 0.5
-        :type max_angular_velocity: float
-        :param weight: default WEIGHT_ABOVE_CA
-        :type weight: float
-        :param step: Distance of a potential step in front of the object
-        :type step: float (meter)
-        :param base_pose: the current pose of the robot
-        :type base_pose: PoseStamped
-        """
-        rotation = goal_pose.pose.orientation
-        if base_pose and base_tip_rotation:
-            hsr_rotation = to_tf_quaternion(base_pose.pose.orientation)
-            rotation = Quaternion(*quaternion_multiply(hsr_rotation, base_tip_rotation))
-
-        if base_pose and step:
-            step_pose = PoseStamped()
-            step_pose.header.frame_id = goal_pose.header.frame_id
-            step_pose.header.stamp = rospy.Time.now()
-            step_pose.pose.position = calculate_waypoint2D(goal_pose.pose.position, base_pose.pose.position, step)
-            step_pose.pose.orientation = rotation
-            rospy.loginfo("step_pose: {}".format(step_pose))
-            # Move to the defined step
-            self.set_cart_goal(root_link, tip_link, step_pose, max_linear_velocity, max_angular_velocity, weight)
-            self.plan_and_execute(wait=True)
-
-        goal_pose.header.stamp = rospy.Time.now()
-        goal_pose.pose.orientation = rotation
-        rospy.loginfo("goal_pose: {}".format(goal_pose))
-        # Move to the target
-        self.set_cart_goal(root_link, tip_link, goal_pose, max_linear_velocity, max_angular_velocity, weight)
-        self.plan_and_execute(wait=True)
-        return self.get_result()
 
     def set_cart_goal(self, root_link, tip_link, goal_pose, max_linear_velocity=None, max_angular_velocity=None,
                       weight=None):

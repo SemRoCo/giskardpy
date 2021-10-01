@@ -318,7 +318,7 @@ class Collisions(object):
         :type collision: Collision
         :rtype: Collision
         """
-        movable_joint = self.robot.get_controlled_parent_joint(collision.original_link_a)
+        movable_joint = self.robot.get_controlled_parent_joint_of_link(collision.original_link_a)
         new_a = self.robot.joints[movable_joint].child_link_name
         collision.link_a = new_a
         if collision.map_P_pa is not None:

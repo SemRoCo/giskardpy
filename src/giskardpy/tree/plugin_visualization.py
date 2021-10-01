@@ -12,6 +12,7 @@ class VisualizationBehavior(GiskardBehavior):
         super(VisualizationBehavior, self).__init__(name)
         self.ensure_publish = ensure_publish
         self.clear = clear
+        self.marker_ids = {}
 
     def setup(self, timeout):
         self.publisher = rospy.Publisher(u'~visualization_marker_array', MarkerArray, queue_size=1)
@@ -30,8 +31,9 @@ class VisualizationBehavior(GiskardBehavior):
             for marker in self.world.links[link_name].collision_visualization_markers().markers:
                 marker.header.frame_id = str(self.world.root_link_name)
                 marker.action = Marker.ADD
-                marker.id = int(hashlib.md5(str(link_name).encode('utf-8')).hexdigest()[:6],
-                                16)  # FIXME find a better way to give the same link the same id
+                if link_name not in self.marker_ids:
+                    self.marker_ids[link_name] = len(self.marker_ids)
+                marker.id = self.marker_ids[link_name]
                 self.ids.add(marker.id)
                 marker.ns = u'planning_visualization'
                 marker.header.stamp = time_stamp
@@ -48,11 +50,12 @@ class VisualizationBehavior(GiskardBehavior):
 
     def clear_marker(self):
         msg = MarkerArray()
-        # for i in self.ids:
-        marker = Marker()
-        marker.action = Marker.DELETEALL
-        # marker.id = i
-        marker.ns = u'planning_visualization'
-        msg.markers.append(marker)
+        for i in self.marker_ids.values():
+            marker = Marker()
+            marker.action = Marker.DELETE
+            marker.id = i
+            marker.ns = u'planning_visualization'
+            msg.markers.append(marker)
         self.publisher.publish(msg)
+        self.marker_ids = {}
         self.ids = set()

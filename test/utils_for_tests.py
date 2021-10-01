@@ -850,7 +850,7 @@ class GiskardTestWrapper(GiskardWrapper):
         collision_matrix = self.bullet.collision_goals_to_collision_matrix(collision_goals,
                                                                                 defaultdict(lambda: 0.3))
         collisions = self.bullet.check_collisions(collision_matrix)
-        controlled_parent_joint = self.get_robot().get_controlled_parent_joint(link)
+        controlled_parent_joint = self.get_robot().get_controlled_parent_joint_of_link(link)
         controlled_parent_link = self.get_robot().joints[controlled_parent_joint].child_link_name
         collision_list = collisions.get_external_collisions(controlled_parent_link)
         for key, self_collisions in collisions.self_collisions.items():

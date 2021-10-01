@@ -268,28 +268,50 @@ class WorldTree(object):
         self.hard_reset()
 
     @memoize
-    def get_directly_controllable_collision_links(self, joint_name):
-        if joint_name not in self.controlled_joints:
-            raise AttributeError('\'{}\' is not controllable.'.format(joint_name))
-        return self.get_direct_child_links_with_collision(joint_name)
-
-    @memoize
-    def get_direct_child_links_with_collision(self, joint_name):
-        if joint_name not in self.movable_joints:
-            raise AttributeError('\'{}\' is fixed.'.format(joint_name))
-
+    def get_direct_child_links_with_collision(self, joint_name, stop_when=None):
+        """
+        Starts at joint_name and goes down all branches until stop_when is True (for each branch).
+        In the meantime all links with collisions are collected and finally returned.
+        :param joint_name: Where to start.
+        :type joint_name: Union[str, PrefixName]
+        :param stop_when: Function that takes a joint name and return bool. Use e.g. self.is_joint_controlled.
+                          If still None, 'lambda joint_name: True' is used.
+        :rtype: list
+        """
         def helper(joint_name):
             joint = self.joints[joint_name]
             link_names = []
             child_link = self.links[joint.child_link_name]
             for child_joint_name in child_link.child_joint_names:
-                if child_joint_name in self.controlled_joints:
+                if stop_when is None or stop_when(child_joint_name):
                     continue
                 link_names.extend(helper(child_joint_name))
             if child_link.has_collisions():
                 link_names.append(child_link.name)
             return link_names
         return helper(joint_name)
+
+    def get_direct_parent_links_with_collision(self, joint_name, parent_stop_when=None, child_stop_when=None):
+        """
+        Starts at joint_name and goes up the tree until parent_stop_when is True.
+        Then it goes down all branches until child_stop_when is True or until joint_name was reached again (for each
+        branch).
+        In the meantime all links with collisions are collected and finally returned.
+        :param joint_name: Where to start.
+        :type joint_name: Union[str, PrefixName]
+        :param parent_stop_when: Function that takes a joint name and return bool. Use e.g. self.is_joint_controlled.
+                                 If None, 'lambda joint_name: True' is used.
+        :param child_stop_when: Function that takes a joint name and return bool. Use e.g. self.is_joint_controlled.
+                                If None, parent_stop_when is used.
+                                If still None, 'lambda joint_name: True' is used.
+        :rtype: list
+        """
+        parent_joint = self.get_parent_joint_of_joint(joint_name, parent_stop_when)
+        if child_stop_when is None:
+            child_stop_when = parent_stop_when
+        def stopper(joint_name2):
+            return joint_name2 == joint_name or child_stop_when is None or child_stop_when(joint_name2)
+        return self.get_direct_child_links_with_collision(parent_joint, stop_when=stopper)
 
     def reset_cache(self):
         # FIXME this sucks because it calls properties
@@ -556,11 +578,11 @@ class WorldTree(object):
         :rtype: bool
         """
         try:
-            self.get_controlled_parent_joint(link_a)
+            self.get_controlled_parent_joint_of_link(link_a)
         except KeyError:
             return False
         try:
-            self.get_controlled_parent_joint(link_b)
+            self.get_controlled_parent_joint_of_link(link_b)
         except KeyError:
             return True
         return link_a < link_b
@@ -570,10 +592,23 @@ class WorldTree(object):
         return self.god_map.unsafe_get_data(identifier.controlled_joints)
 
     @memoize
-    def get_controlled_parent_joint(self, link_name):
+    def get_controlled_parent_joint_of_link(self, link_name):
         joint = self.links[link_name].parent_joint_name
-        while joint not in self.controlled_joints:
-            joint = self.links[self.joints[joint].parent_link_name].parent_joint_name
+        if self.is_joint_controlled(joint):
+            return joint
+        return self.get_controlled_parent_joint_of_joint(joint)
+
+    @memoize
+    def get_controlled_parent_joint_of_joint(self, joint_name):
+        return self.get_parent_joint_of_joint(joint_name, self.is_joint_controlled)
+
+    def get_parent_joint_of_joint(self, joint_name, stop_when=None):
+        try:
+            joint = self.links[self.joints[joint_name].parent_link_name].parent_joint_name
+            while stop_when is not None and not stop_when(joint):
+                joint = self.get_parent_joint_of_joint(joint)
+        except KeyError as e:
+            raise KeyError('\'{}\' has no fitting parent joint'.format(joint_name))
         return joint
 
     @memoize
@@ -794,6 +829,9 @@ class WorldTree(object):
 
     def is_joint_movable(self, joint_name):
         return not self.is_joint_fixed(joint_name)
+
+    def is_joint_controlled(self, joint_name):
+        return joint_name in self.controlled_joints
 
     def is_joint_revolute(self, joint_name):
         return isinstance(self.joints[joint_name], RevoluteJoint)

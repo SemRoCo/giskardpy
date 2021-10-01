@@ -239,8 +239,8 @@ def grow_tree():
         planning_2.add_child(running_is_failure(VisualizationBehavior)(u'visualization'))
     # if god_map.get_data(identifier.enable_WorldVisualizationBehavior):
     #     planning_2.add_child(success_is_failure(WorldVisualizationBehavior)(u'world_visualization'))
-    # if god_map.get_data(identifier.enable_CPIMarker):
-    #     planning_2.add_child(running_is_failure(CollisionMarker)(u'cpi marker'))
+    if god_map.get_data(identifier.enable_CPIMarker):
+        planning_2.add_child(running_is_failure(CollisionMarker)(u'cpi marker'))
     planning_2.add_child(planning_3)
     # ----------------------------------------------
     move_robot = failure_is_success(Sequence)(u'move robot')

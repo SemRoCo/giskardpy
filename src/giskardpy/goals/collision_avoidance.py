@@ -196,7 +196,9 @@ class SelfCollisionAvoidance(Goal):
                                    w.max(0, upper_slack))
 
         # if self.link_a == 'l_wrist_roll_link' or self.link_b == 'r_forearm_roll_link':
-        #     self.add_debug_expr('dist', w.min(actual_distance, 0.2))
+        if 'head_tilt_link' not in [self.link_a, self.link_b] \
+                and 'head_pan_link' not in [self.link_a, self.link_b]:
+            self.add_debug_expr('dist', w.min(actual_distance, 0.2))
 
         self.add_constraint(reference_velocity=self.max_velocity,
                             lower_error=lower_limit,

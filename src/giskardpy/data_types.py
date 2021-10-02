@@ -131,9 +131,19 @@ class Collision(object):
         self.__position_on_b_in_b = position_on_b
         self.__position_on_b_in_root = position_on_b
         self.__contact_distance = contact_distance
-        self.__contact_normal = contact_normal
-        self.__contact_normal_in_root = contact_normal
-        self.__contact_normal_in_b = contact_normal
+
+        a = np.array(position_on_a)
+        b = np.array(position_on_b)
+        n = a - b
+        try:
+            n /= np.linalg.norm(n)
+        except Exception:
+            n = np.array([0,0,1])
+        # n = contact_normal
+
+        self.__contact_normal = n
+        self.__contact_normal_in_root = n
+        self.__contact_normal_in_b = n
         self.__original_link_a = link_a
         self.__link_a = link_a
         self.__body_b = body_b

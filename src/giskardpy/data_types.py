@@ -302,6 +302,8 @@ class Collisions(object):
         map_V_n2 = collision.map_P_pb - collision.map_P_pa
         map_V_n2 /= np.linalg.norm(map_V_n2)
         new_b_V_n2 = np.dot(new_b_T_map, map_V_n2)
+        # if new_link_a == 'l_forearm_roll_link' and new_link_b == 'r_wrist_roll_link':
+        #     collision.new_b_V_n = -collision.new_b_V_n
 
         if collision.map_P_pa is not None:
             new_a_T_r = self.world.compute_fk_np(new_link_a, self.world.root_link_name)

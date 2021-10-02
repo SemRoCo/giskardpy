@@ -1905,6 +1905,15 @@ class TestCartGoals(object):
         zero_pose.check_cart_goal(zero_pose.r_tip, r_goal)
         zero_pose.check_cart_goal(zero_pose.l_tip, l_goal)
 
+    def test_cart_goal_left_right_chain(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        r_goal = tf.lookup_pose(zero_pose.l_tip, zero_pose.r_tip)
+        r_goal.pose.position.x -= 0.1
+        zero_pose.allow_all_collisions()
+        zero_pose.set_and_check_cart_goal(r_goal, zero_pose.r_tip, zero_pose.l_tip)
+
     def test_wiggle1(self, kitchen_setup):
         tray_pose = PoseStamped()
         tray_pose.header.frame_id = u'iai_kitchen/sink_area_surface'

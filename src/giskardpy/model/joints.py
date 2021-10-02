@@ -143,7 +143,8 @@ class Joint(object):
                 },
                     lower_limits=lower_limits,
                     upper_limits=upper_limits,
-                    quadratic_weights={1: 0, 2: 0, 3: 0})
+                    quadratic_weights={1: 0, 2: 0, 3: 0},
+                    horizon_functions={1: 0.1})
                 joint.set_free_variables([free_variable])
         return joint
 

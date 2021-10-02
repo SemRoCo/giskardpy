@@ -98,5 +98,6 @@ collision_avoidance:
       - fr_caster_rotation_link
       - l_shoulder_lift_link
       - r_shoulder_lift_link
+      - base_link
     add: [ ] # list pairs of links that should be added to the self collision matrix
     number_of_repeller: 1 # each movable joint gets pushed away from the X objects closest to it

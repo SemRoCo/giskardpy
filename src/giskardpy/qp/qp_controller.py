@@ -26,7 +26,7 @@ def save_pandas(dfs, names, path):
                 for column_name, column in df.T.items():
                     csv_string += column.add_prefix(column_name + u'||').to_csv()
             else:
-                csv_string += df.to_csv()
+                csv_string += df.to_csv(float_format='%.4f')
         file_name2 = '{}{}.csv'.format(folder_name, name)
         with open(file_name2, 'w') as f:
             f.write(csv_string)
@@ -639,12 +639,13 @@ class QPController(object):
 
     def save_all_pandas(self):
         if self.p_xdot is not None:
-            save_pandas([self.p_weights, self.p_A, self.p_lbA, self.p_ubA, self.p_lb, self.p_ub, self.p_xdot],
-                        ['weights', 'A', 'lbA', 'ubA', 'lb', 'ub', 'xdot'],
+            save_pandas([self.p_weights, self.p_A, self.p_lbA, self.p_ubA, self.p_lb, self.p_ub, self.p_debug,
+                         self.p_xdot],
+                        ['weights', 'A', 'lbA', 'ubA', 'lb', 'ub', 'debug', 'xdot'],
                         u'../tmp_data')
         else:
-            save_pandas([self.p_weights, self.p_A, self.p_lbA, self.p_ubA, self.p_lb, self.p_ub],
-                        ['weights', 'A', 'lbA', 'ubA', 'lb', 'ub'],
+            save_pandas([self.p_weights, self.p_A, self.p_lbA, self.p_ubA, self.p_lb, self.p_ub, self.p_debug],
+                        ['weights', 'A', 'lbA', 'ubA', 'lb', 'ub', 'debug'],
                         u'../tmp_data')
 
     def __is_nan_in_array(self, name, p_array):

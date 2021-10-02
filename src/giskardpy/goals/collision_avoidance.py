@@ -54,7 +54,7 @@ class ExternalCollisionAvoidance(Goal):
         return self.god_map.to_symbol(identifier.closest_point + [u'get_external_collisions',
                                                                   (self.link_name,),
                                                                   self.idx,
-                                                                  u'contact_distance'])
+                                                                   u'contact_distance'])
 
     def get_number_of_external_collisions(self):
         return self.god_map.to_symbol(identifier.closest_point + [u'get_number_of_external_collisions',
@@ -149,7 +149,7 @@ class SelfCollisionAvoidance(Goal):
         return self.god_map.to_symbol(identifier.closest_point + [u'get_self_collisions',
                                                                   (self.link_a, self.link_b),
                                                                   self.idx,
-                                                                  u'contact_distance'])
+                                                                   u'contact_distance'])
 
     def get_number_of_self_collisions(self):
         return self.god_map.to_symbol(identifier.closest_point + [u'get_number_of_self_collisions',
@@ -195,10 +195,10 @@ class SelfCollisionAvoidance(Goal):
                                    1e4,
                                    w.max(0, upper_slack))
 
-        # if self.link_a == 'l_wrist_roll_link' or self.link_b == 'r_forearm_roll_link':
-        if 'head_tilt_link' not in [self.link_a, self.link_b] \
-                and 'head_pan_link' not in [self.link_a, self.link_b]:
-            self.add_debug_expr('dist', w.min(actual_distance, 0.2))
+        self.add_debug_expr('dist', actual_distance)
+        self.add_debug_vector('a_P_pa', a_P_pa)
+        self.add_debug_vector('pb_V_n', pb_V_n)
+        self.add_debug_vector('pb_P_b', pb_T_b)
 
         self.add_constraint(reference_velocity=self.max_velocity,
                             lower_error=lower_limit,
@@ -284,7 +284,7 @@ class CollisionAvoidanceHint(Goal):
     def get_actual_distance(self):
         return self.god_map.to_symbol(identifier.closest_point + [u'get_external_collisions_long_key',
                                                                   self.key,
-                                                                  u'get_contact_distance',
+                                                                   u'get_contact_distance',
                                                                   tuple()])
 
     def get_body_b(self):

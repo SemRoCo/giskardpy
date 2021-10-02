@@ -74,12 +74,12 @@ class CollisionWorldSynchronizer(object):
 
         # find meaningless self-collisions
         for link_a, link_b in link_combinations:
-            if group.are_linked(link_a, link_b, non_controlled) or \
-                    link_a == link_b or \
-                    link_a in self.ignored_pairs or \
-                    link_b in self.ignored_pairs or \
-                    (link_a, link_b) in self.ignored_pairs or \
-                    (link_b, link_a) in self.ignored_pairs:
+            if group.are_linked(link_a, link_b, non_controlled) \
+                    or link_a == link_b \
+                    or link_a in self.ignored_pairs \
+                    or link_b in self.ignored_pairs \
+                    or (link_a, link_b) in self.ignored_pairs \
+                    or (link_b, link_a) in self.ignored_pairs:
                 always.add((link_a, link_b))
         unknown = link_combinations.difference(always)
         self.set_joint_state_to_zero(group)
@@ -103,7 +103,8 @@ class CollisionWorldSynchronizer(object):
             current_combinations = set(product(parent_links, child_links))
             # Filter for combinations which are still unknown
             # and make sure the link_a, link_b order is same as in unknown
-            subset_of_unknown = [x for x in unknown if x in current_combinations or (x[1], x[0]) in current_combinations]
+            subset_of_unknown = [x for x in unknown if
+                                 x in current_combinations or (x[1], x[0]) in current_combinations]
             if not subset_of_unknown:
                 continue
             sometimes = set()

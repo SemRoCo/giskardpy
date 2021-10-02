@@ -299,6 +299,10 @@ class Collisions(object):
         new_b_T_map = np.dot(new_b_T_r, self.root_T_map)
         collision.new_b_V_n = np.dot(new_b_T_map, collision.map_V_n)
 
+        map_V_n2 = collision.map_P_pb - collision.map_P_pa
+        map_V_n2 /= np.linalg.norm(map_V_n2)
+        new_b_V_n2 = np.dot(new_b_T_map, map_V_n2)
+
         if collision.map_P_pa is not None:
             new_a_T_r = self.world.compute_fk_np(new_link_a, self.world.root_link_name)
             new_a_P_pa = np.dot(np.dot(new_a_T_r, self.root_T_map), collision.map_P_pa)

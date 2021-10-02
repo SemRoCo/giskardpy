@@ -1,3 +1,5 @@
+import os
+import pickle
 from collections import defaultdict
 from copy import deepcopy
 from itertools import combinations, product
@@ -123,6 +125,12 @@ class CollisionWorldSynchronizer(object):
         self.collision_matrices[group_name] = unknown
         return self.collision_matrices[group_name]
 
+    def load_self_collision_matrix(self):
+        path = '/home/stelter/workspace20/giskard_ws/src/giskardpy/tmp_data/collision_matrix//pr2/ecde0c3a330b5e4a094b7ca46100a7e5'
+        with open(path, 'rb') as f:
+            logging.loginfo(u'loaded self collision matrix {}'.format(path))
+            return pickle.load(f)
+
     def get_pose(self, link_name):
         pass
 
@@ -178,6 +186,8 @@ class CollisionWorldSynchronizer(object):
                                      added_links=added_links)
 
     def update_collision_matrix(self, group_name, added_links=None, removed_links=None):
+        self.collision_matrices[group_name] = self.load_self_collision_matrix()
+        return
         # if not self.load_self_collision_matrix(self.path_to_data_folder):
         if added_links is None:
             added_links = set()

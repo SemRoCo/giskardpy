@@ -24,28 +24,28 @@ class ExternalCollisionAvoidance(Goal):
         return self.get_god_map().list_to_vector3(identifier.closest_point + [u'get_external_collisions',
                                                                               (self.link_name,),
                                                                               self.idx,
-                                                                         u'get_contact_normal_in_root',
+                                                                              u'get_contact_normal_in_root',
                                                                               tuple()])
 
     def get_closest_point_on_a_in_a(self):
         return self.get_god_map().list_to_point3(identifier.closest_point + [u'get_external_collisions',
                                                                              (self.link_name,),
                                                                              self.idx,
-                                                                        u'get_position_on_a_in_a',
+                                                                             u'get_position_on_a_in_a',
                                                                              tuple()])
 
     def get_closest_point_on_b_in_root(self):
         return self.get_god_map().list_to_point3(identifier.closest_point + [u'get_external_collisions',
                                                                              (self.link_name,),
                                                                              self.idx,
-                                                                        u'get_position_on_b_in_root',
+                                                                             u'get_position_on_b_in_root',
                                                                              tuple()])
 
     def get_actual_distance(self):
         return self._god_map.to_symbol(identifier.closest_point + [u'get_external_collisions',
                                                                    (self.link_name,),
                                                                    self.idx,
-                                                                  u'get_contact_distance',
+                                                                   u'get_contact_distance',
                                                                    tuple()])
 
     def get_number_of_external_collisions(self):
@@ -123,28 +123,28 @@ class SelfCollisionAvoidance(Goal):
         return self.get_god_map().list_to_vector3(identifier.closest_point + [u'get_self_collisions',
                                                                               (self.link_a, self.link_b),
                                                                               self.idx,
-                                                                         u'get_contact_normal_in_b',
+                                                                              u'get_contact_normal_in_b',
                                                                               tuple()])
 
     def get_position_on_a_in_a(self):
         return self.get_god_map().list_to_point3(identifier.closest_point + [u'get_self_collisions',
                                                                              (self.link_a, self.link_b),
                                                                              self.idx,
-                                                                        u'get_position_on_a_in_a',
+                                                                             u'get_position_on_a_in_a',
                                                                              tuple()])
 
     def get_b_T_pb(self):
         return self.get_god_map().list_to_translation3(identifier.closest_point + [u'get_self_collisions',
                                                                                    (self.link_a, self.link_b),
                                                                                    self.idx,
-                                                                              u'get_position_on_b_in_b',
+                                                                                   u'get_position_on_b_in_b',
                                                                                    tuple()])
 
     def get_actual_distance(self):
         return self._god_map.to_symbol(identifier.closest_point + [u'get_self_collisions',
                                                                    (self.link_a, self.link_b),
                                                                    self.idx,
-                                                                  u'get_contact_distance',
+                                                                   u'get_contact_distance',
                                                                    tuple()])
 
     def get_number_of_self_collisions(self):
@@ -190,6 +190,11 @@ class SelfCollisionAvoidance(Goal):
         upper_slack = w.if_greater(actual_distance, 50,  # assuming that distance of unchecked closest points is 100
                                    1e4,
                                    w.max(0, upper_slack))
+
+        self.add_debug_expr('dist', actual_distance)
+        self.add_debug_vector('a_P_pa', a_P_pa)
+        self.add_debug_vector('pb_V_n', pb_V_n)
+        self.add_debug_vector('pb_P_b', pb_T_b)
 
         self.add_constraint(reference_velocity=self.max_velocity,
                             lower_error=lower_limit,
@@ -257,25 +262,25 @@ class CollisionAvoidanceHint(Goal):
     def get_contact_normal_on_b_in_root(self):
         return self.get_god_map().list_to_vector3(identifier.closest_point + [u'get_external_collisions_long_key',
                                                                               self.key,
-                                                                         u'get_contact_normal_in_root',
+                                                                              u'get_contact_normal_in_root',
                                                                               tuple()])
 
     def get_closest_point_on_a_in_a(self):
         return self.get_god_map().list_to_point3(identifier.closest_point + [u'get_external_collisions_long_key',
                                                                              self.key,
-                                                                        u'get_position_on_a_in_a',
+                                                                             u'get_position_on_a_in_a',
                                                                              tuple()])
 
     def get_closest_point_on_b_in_root(self):
         return self.get_god_map().list_to_point3(identifier.closest_point + [u'get_external_collisions_long_key',
                                                                              self.key,
-                                                                        u'get_position_on_b_in_root',
+                                                                             u'get_position_on_b_in_root',
                                                                              tuple()])
 
     def get_actual_distance(self):
         return self._god_map.to_symbol(identifier.closest_point + [u'get_external_collisions_long_key',
                                                                    self.key,
-                                                                  u'get_contact_distance',
+                                                                   u'get_contact_distance',
                                                                    tuple()])
 
     def get_body_b(self):

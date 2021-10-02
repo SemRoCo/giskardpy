@@ -599,6 +599,10 @@ class QPController(object):
     def _compile_big_ass_M(self):
         t = time()
         free_symbols = w.free_symbols(self.big_ass_M)
+        debug_free_symbols = w.free_symbols(self.debug_v)
+        free_symbols = set(free_symbols)
+        free_symbols.update(debug_free_symbols)
+        free_symbols = list(free_symbols)
         self.compiled_big_ass_M = w.speed_up(self.big_ass_M,
                                              free_symbols)
 

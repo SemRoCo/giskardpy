@@ -160,6 +160,7 @@ class SelfCollisionAvoidance(Goal):
         number_of_self_collisions = self.get_number_of_self_collisions()
         sample_period = self.get_sampling_period_symbol()
 
+        b_T_a2 = self.get_fk_evaluated(self.link_b, self.link_a)
         b_T_a = self.get_fk(self.link_b, self.link_a)
         pb_T_b = w.inverse_frame(self.get_b_T_pb())
         a_P_pa = self.get_position_on_a_in_a()
@@ -202,6 +203,7 @@ class SelfCollisionAvoidance(Goal):
         self.add_debug_vector('pb_P_b', w.position_of(pb_T_b))
         self.add_debug_vector('pb_P_pa', pb_P_pa)
         self.add_debug_matrix('b_T_a', b_T_a)
+        self.add_debug_matrix('b_T_a2', b_T_a2)
 
         self.add_constraint(reference_velocity=self.max_velocity,
                             lower_error=lower_limit,

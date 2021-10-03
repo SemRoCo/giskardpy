@@ -431,50 +431,34 @@ class PrefixName(object):
             self.long_name = name
 
     def __str__(self):
-        return self.long_name
+        return self.long_name.__str__()
 
     def __repr__(self):
-        return self.long_name
+        return self.long_name.__repr__()
 
     def __hash__(self):
-        return hash(self.long_name)
+        return self.long_name.__hash__()
 
     def __eq__(self, other):
-        try:
-            return other.long_name == self.long_name
-        except AttributeError:
-            return str(self) == str(other)
+        return self.long_name.__eq__(other.__str__())
 
     def __ne__(self, other):
-        try:
-            return other.long_name != self.long_name
-        except AttributeError:
-            return str(self) != str(other)
+        return self.long_name.__ne__(other.__str__())
 
     def __le__(self, other):
-        try:
-            return self.long_name <= other.long_name
-        except AttributeError:
-            return str(self) <= str(other.long_name)
+        return self.long_name.__le__(other.__str__())
 
     def __ge__(self, other):
-        try:
-            return self.long_name >= other.long_name
-        except AttributeError:
-            return str(self) >= str(other)
+        return self.long_name.__ge__(other.__str__())
 
     def __gt__(self, other):
-        try:
-            return self.long_name > other.long_name
-        except AttributeError:
-            return str(self) > str(other)
+        return self.long_name.__gt__(other.__str__())
 
     def __lt__(self, other):
-        try:
-            return self.long_name < other.long_name
-        except AttributeError:
-            return str(self) < str(other)
+        return self.long_name.__lt__(other.__str__())
 
+    def __contains__(self, item):
+        return self.long_name.__contains__(item.__str__())
 
 order_map = BiDict({
     0: u'position',

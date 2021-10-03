@@ -172,7 +172,10 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
         self.sync_state()
 
     def get_pose(self, link_name):
-        collision_object = self.object_name_to_id[link_name]
+        try:
+            collision_object = self.object_name_to_id[link_name]
+        except Exception as e:
+            pass
         map_T_link = PoseStamped()
         map_T_link.header.frame_id = self.world.root_link_name
         map_T_link.pose.position.x = collision_object.transform.origin.x

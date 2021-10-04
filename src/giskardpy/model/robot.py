@@ -104,10 +104,9 @@ class Robot(Backend):
                 continue
             if self.has_link_collision(link_name):
                 collision_links.append(link_name)
-            else:
-                child_links = self.get_child_links_of_link(link_name)
-                if child_links:
-                    links.extend(child_links)
+            child_links = self.get_child_links_of_link(link_name)
+            if child_links:
+                links.extend(child_links)
         return collision_links
 
     def get_joint_state_positions(self):

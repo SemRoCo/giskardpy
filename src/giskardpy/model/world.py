@@ -432,7 +432,8 @@ class WorldTree(object):
 
     @memoize
     def compute_chain_reduced_to_controlled_joints(self, link_a, link_b):
-        chain1, connection, chain2 = self.compute_split_chain(link_b, link_a)
+        chain1, connection, chain2 = self.compute_split_chain(link_b, link_a, joints=True, links=True, fixed=True,
+                                                              non_controlled=True)
         chain = chain1 + connection + chain2
         for i, thing in enumerate(chain):
             if i % 2 == 1 and thing in self.controlled_joints:
@@ -637,8 +638,9 @@ class WorldTree(object):
             raise KeyError('\'{}\' has no fitting parent joint'.format(joint_name))
         return joint
 
-    @memoize
-    def compute_chain(self, root_link_name, tip_link_name, joints=True, links=True, fixed=True, non_controlled=True):
+    @profile
+    def compute_chain(self, root_link_name, tip_link_name, joints, links, fixed, non_controlled):
+        # FIXME memoizing this function results in weird errors...
         chain = []
         if links:
             chain.append(tip_link_name)
@@ -659,7 +661,7 @@ class WorldTree(object):
         return chain
 
     @memoize
-    def compute_split_chain(self, root, tip, joints=True, links=True, fixed=True, non_controlled=True):
+    def compute_split_chain(self, root, tip, joints, links, fixed, non_controlled):
         if root == tip:
             return [], [], []
         root_chain = self.compute_chain(self.root_link_name, root, False, True, True, True)
@@ -681,7 +683,8 @@ class WorldTree(object):
 
     def compose_fk_expression(self, root_link, tip_link):
         fk = w.eye(4)
-        root_chain, _, tip_chain = self.compute_split_chain(root_link, tip_link, links=False)
+        root_chain, _, tip_chain = self.compute_split_chain(root_link, tip_link, joints=True, links=False, fixed=True,
+                                                            non_controlled=True)
         for joint_name in root_chain:
             fk = w.dot(fk, w.inverse_frame(self.joints[joint_name].parent_T_child))
         for joint_name in tip_chain:

@@ -239,17 +239,17 @@ class Goal(object):
         :type name: str
         :type expr: w.Symbol
         """
-        name = str(self) + '/' + name
+        name = u'{}/{}'.format(self, name)
         self._debug_expressions[name] = expr
 
     def add_debug_matrix(self, name, matrix_expr):
         for x in range(matrix_expr.shape[0]):
             for y in range(matrix_expr.shape[1]):
-                self.add_debug_expr(name + u'/{},{}'.format(x, y), matrix_expr[x, y])
+                self.add_debug_expr(u'{}/{},{}'.format(name, x, y), matrix_expr[x, y])
 
     def add_debug_vector(self, name, vector_expr):
         for x in range(vector_expr.shape[0]):
-            self.add_debug_expr(name + u'/{}'.format(x), vector_expr[x])
+            self.add_debug_expr(u'{}/{}'.format(name, x), vector_expr[x])
 
     def add_position_constraint(self, expr_current, expr_goal, reference_velocity, weight=WEIGHT_BELOW_CA,
                                 name_suffix=u''):

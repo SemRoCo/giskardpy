@@ -105,6 +105,7 @@ class PyBulletSyncer(CollisionWorldSynchronizer):
         """
         :type world: giskardpy.model.world.WorldTree
         """
+        self.world.soft_reset()
         self.world.fast_all_fks = None
         pbw.deactivate_rendering()
         self.object_name_to_bullet_id = BiDict()

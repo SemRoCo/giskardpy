@@ -192,9 +192,9 @@ def grow_tree():
     god_map = initialize_god_map()
     # ----------------------------------------------
     wait_for_goal = Sequence(u'wait for goal')
-    wait_for_goal.add_child(TFPublisher(u'tf', **god_map.get_data(identifier.TFPublisher)))
-    wait_for_goal.add_child(ConfigurationPlugin(u'js1', RobotPrefix))
     wait_for_goal.add_child(WorldUpdatePlugin(u'pybullet updater'))
+    wait_for_goal.add_child(ConfigurationPlugin(u'js1', RobotPrefix))
+    wait_for_goal.add_child(TFPublisher(u'tf', **god_map.get_data(identifier.TFPublisher)))
     wait_for_goal.add_child(running_is_success(VisualizationBehavior)(u'visualization', clear=True))
     wait_for_goal.add_child(GoalReceived(u'has goal', action_server_name, MoveAction))
     wait_for_goal.add_child(ConfigurationPlugin(u'js2', RobotPrefix))

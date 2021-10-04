@@ -458,6 +458,10 @@ class GiskardWrapper(object):
         self.cmd_seq = []
         self.add_cmd()
 
+    @property
+    def number_of_cmds(self):
+        return len(self.cmd_seq)
+
     def plan_and_execute(self, wait=True):
         """
         :param wait: this function block if wait=True

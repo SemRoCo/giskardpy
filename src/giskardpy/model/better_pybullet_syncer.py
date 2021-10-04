@@ -63,44 +63,6 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
                 self.query[self.object_name_to_id[link_a]].add((self.object_name_to_id[link_b], dist))
         return self.query
 
-    @profile
-    def check_collisions(self, cut_off_distances, collision_list_size=15):
-        """
-        :param cut_off_distances: (robot_link, body_b, link_b) -> cut off distance. Contacts between objects not in this
-                                    dict or further away than the cut off distance will be ignored.
-        :type cut_off_distances: dict
-        :param self_collision_d: distances grater than this value will be ignored
-        :type self_collision_d: float
-        :type enable_self_collision: bool
-        :return: (robot_link, body_b, link_b) -> Collision
-        :rtype: Collisions
-        """
-        collisions = Collisions(self.world, collision_list_size)
-        query = self.cut_off_distances_to_query(cut_off_distances)
-
-        result = self.kw.get_closest_filtered_POD_batch(query)
-        for obj_a, contacts in result.items():
-            map_T_a = obj_a.np_transform
-            link_a = self.object_name_to_id.inverse[obj_a]
-            for contact in contacts:  # type: ClosestPair
-                map_T_b = contact.obj_b.np_transform
-                # b_T_map = contact.obj_b.np_inv_transform
-                link_b = self.object_name_to_id.inverse[contact.obj_b]
-                # b_T_map = self.world.compute_fk_np(self.robot.get_link_path(link_b), 'map')
-                for p in contact.points:  # type: ContactPoint
-                    map_P_a = map_T_a.dot(p.point_a)
-                    map_P_b = map_T_b.dot(p.point_b)
-                    body_b = RobotName if link_b in self.robot.link_names else ''
-                    c = Collision(link_a=link_a,
-                                  body_b=body_b,
-                                  link_b=link_b,
-                                  contact_distance=p.distance,
-                                  map_V_n=p.normal_world_b,
-                                  map_P_pa=map_P_a,
-                                  map_P_pb=map_P_b)
-                    collisions.add(c)
-        return collisions
-
     # @profile
     # def check_collisions(self, cut_off_distances, collision_list_size=15):
     #     """
@@ -118,26 +80,64 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
     #
     #     result = self.kw.get_closest_filtered_POD_batch(query)
     #     for obj_a, contacts in result.items():
-    #         # map_T_a = obj_a.np_transform
+    #         map_T_a = obj_a.np_transform
     #         link_a = self.object_name_to_id.inverse[obj_a]
     #         for contact in contacts:  # type: ClosestPair
-    #             # map_T_b = contact.obj_b.np_transform
+    #             map_T_b = contact.obj_b.np_transform
     #             # b_T_map = contact.obj_b.np_inv_transform
     #             link_b = self.object_name_to_id.inverse[contact.obj_b]
-    #             # b_T_map = self.get_fk_np(self.robot.get_link_path(link_b), 'map')
+    #             # b_T_map = self.world.compute_fk_np(self.robot.get_link_path(link_b), 'map')
     #             for p in contact.points:  # type: ContactPoint
-    #                 # map_P_a = map_T_a.dot(p.point_a)
-    #                 # map_P_b = map_T_b.dot(p.point_b)
+    #                 map_P_a = map_T_a.dot(p.point_a)
+    #                 map_P_b = map_T_b.dot(p.point_b)
     #                 body_b = RobotName if link_b in self.robot.link_names else ''
     #                 c = Collision(link_a=link_a,
     #                               body_b=body_b,
     #                               link_b=link_b,
     #                               contact_distance=p.distance,
     #                               map_V_n=p.normal_world_b,
-    #                               a_P_pa=p.point_a,
-    #                               b_P_pb=p.point_b)
+    #                               map_P_pa=map_P_a,
+    #                               map_P_pb=map_P_b)
     #                 collisions.add(c)
     #     return collisions
+
+    @profile
+    def check_collisions(self, cut_off_distances, collision_list_size=15):
+        """
+        :param cut_off_distances: (robot_link, body_b, link_b) -> cut off distance. Contacts between objects not in this
+                                    dict or further away than the cut off distance will be ignored.
+        :type cut_off_distances: dict
+        :param self_collision_d: distances grater than this value will be ignored
+        :type self_collision_d: float
+        :type enable_self_collision: bool
+        :return: (robot_link, body_b, link_b) -> Collision
+        :rtype: Collisions
+        """
+        collisions = Collisions(self.world, collision_list_size)
+        query = self.cut_off_distances_to_query(cut_off_distances)
+
+        result = self.kw.get_closest_filtered_POD_batch(query)
+        for obj_a, contacts in result.items():
+            # map_T_a = obj_a.np_transform
+            link_a = self.object_name_to_id.inverse[obj_a]
+            for contact in contacts:  # type: ClosestPair
+                # map_T_b = contact.obj_b.np_transform
+                # b_T_map = contact.obj_b.np_inv_transform
+                link_b = self.object_name_to_id.inverse[contact.obj_b]
+                # b_T_map = self.get_fk_np(self.robot.get_link_path(link_b), 'map')
+                for p in contact.points:  # type: ContactPoint
+                    # map_P_a = map_T_a.dot(p.point_a)
+                    # map_P_b = map_T_b.dot(p.point_b)
+                    body_b = RobotName if link_b in self.robot.link_names else ''
+                    c = Collision(link_a=link_a,
+                                  body_b=body_b,
+                                  link_b=link_b,
+                                  contact_distance=p.distance,
+                                  map_V_n=p.normal_world_b,
+                                  a_P_pa=p.point_a,
+                                  b_P_pb=p.point_b)
+                    collisions.add(c)
+        return collisions
 
     @profile
     def in_collision(self, link_a, link_b, distance):
@@ -161,6 +161,7 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
         :type world: giskardpy.model.world.WorldTree
         """
         self.reset_cache()
+        self.world.soft_reset()
         self.world.fast_all_fks = None
         for o in self.kw.collision_objects:
             self.kw.remove_collision_object(o)
@@ -172,10 +173,7 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
         self.sync_state()
 
     def get_pose(self, link_name):
-        try:
-            collision_object = self.object_name_to_id[link_name]
-        except Exception as e:
-            pass
+        collision_object = self.object_name_to_id[link_name]
         map_T_link = PoseStamped()
         map_T_link.header.frame_id = self.world.root_link_name
         map_T_link.pose.position.x = collision_object.transform.origin.x

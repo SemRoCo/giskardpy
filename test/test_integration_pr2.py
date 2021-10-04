@@ -20,7 +20,6 @@ import giskardpy.utils.tfwrapper as tf
 from giskardpy import identifier
 from giskardpy.goals.goal import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA, WEIGHT_COLLISION_AVOIDANCE
 from giskardpy.identifier import fk_pose
-from giskardpy.model.robot import Robot
 from giskardpy.utils import logging
 from giskardpy.utils.tfwrapper import init as tf_init
 from giskardpy.utils.utils import to_joint_state_position_dict
@@ -1725,7 +1724,6 @@ class TestConstraints(object):
 
 
 class TestCartGoals(object):
-
     def test_rotate_gripper(self, zero_pose):
         """
         :type zero_pose: PR2
@@ -1733,7 +1731,8 @@ class TestCartGoals(object):
         r_goal = PoseStamped()
         r_goal.header.frame_id = zero_pose.r_tip
         r_goal.pose.orientation = Quaternion(*quaternion_about_axis(pi, [1, 0, 0]))
-        zero_pose.set_and_check_cart_goal(r_goal, zero_pose.r_tip)
+        zero_pose.set_cart_goal(r_goal, zero_pose.r_tip)
+        zero_pose.plan_and_execute()
 
     def test_keep_position1(self, zero_pose):
         """
@@ -1744,9 +1743,9 @@ class TestCartGoals(object):
         r_goal.header.frame_id = zero_pose.r_tip
         r_goal.pose.position.x = -.1
         r_goal.pose.orientation.w = 1
-        zero_pose.set_and_check_cart_goal(r_goal, zero_pose.r_tip, u'torso_lift_link')
+        zero_pose.set_cart_goal(r_goal, zero_pose.r_tip, u'torso_lift_link')
+        zero_pose.plan_and_execute()
 
-        zero_pose.allow_self_collision()
         js = {u'torso_lift_joint': 0.1}
         r_goal = PoseStamped()
         r_goal.header.frame_id = zero_pose.r_tip
@@ -1755,8 +1754,8 @@ class TestCartGoals(object):
         expected_pose.header.stamp = rospy.Time()
         zero_pose.set_cart_goal(r_goal, zero_pose.r_tip, u'torso_lift_link')
         zero_pose.set_joint_goal(js)
-        zero_pose.send_and_check_goal()
-        zero_pose.check_cart_goal(zero_pose.r_tip, expected_pose)
+        zero_pose.allow_self_collision()
+        zero_pose.plan_and_execute()
 
     def test_keep_position2(self, zero_pose):
         """
@@ -1767,7 +1766,8 @@ class TestCartGoals(object):
         r_goal.header.frame_id = zero_pose.r_tip
         r_goal.pose.position.x = -.1
         r_goal.pose.orientation.w = 1
-        zero_pose.set_and_check_cart_goal(r_goal, zero_pose.r_tip, u'torso_lift_link')
+        zero_pose.set_cart_goal(r_goal, zero_pose.r_tip, u'torso_lift_link')
+        zero_pose.plan_and_execute()
 
         zero_pose.allow_self_collision()
         js = {u'torso_lift_joint': 0.1}
@@ -1778,8 +1778,7 @@ class TestCartGoals(object):
         expected_pose.header.stamp = rospy.Time()
         zero_pose.set_cart_goal(r_goal, zero_pose.r_tip, zero_pose.default_root)
         zero_pose.set_joint_goal(js)
-        zero_pose.send_and_check_goal()
-        zero_pose.check_cart_goal(zero_pose.r_tip, expected_pose)
+        zero_pose.plan_and_execute()
 
     def test_keep_position3(self, zero_pose):
         """
@@ -1803,7 +1802,8 @@ class TestCartGoals(object):
                                                                       [0, 1, 0, 0],
                                                                       [0, 0, -1, 0],
                                                                       [0, 0, 0, 1]]))
-        zero_pose.set_and_check_cart_goal(r_goal, zero_pose.l_tip, u'torso_lift_link')
+        zero_pose.set_cart_goal(r_goal, zero_pose.l_tip, u'torso_lift_link')
+        zero_pose.plan_and_execute()
 
         r_goal = PoseStamped()
         r_goal.header.frame_id = zero_pose.r_tip
@@ -1814,7 +1814,8 @@ class TestCartGoals(object):
         l_goal.header.frame_id = zero_pose.r_tip
         l_goal.pose.position.y = -.1
         l_goal.pose.orientation.w = 1
-        zero_pose.set_and_check_cart_goal(l_goal, zero_pose.r_tip, zero_pose.default_root)
+        zero_pose.set_cart_goal(l_goal, zero_pose.r_tip, zero_pose.default_root)
+        zero_pose.plan_and_execute()
 
     def test_cart_goal_1eef(self, zero_pose):
         """
@@ -1826,7 +1827,8 @@ class TestCartGoals(object):
         p.pose.position = Point(-0.1, 0, 0)
         p.pose.orientation = Quaternion(0, 0, 0, 1)
         zero_pose.allow_self_collision()
-        zero_pose.set_and_check_cart_goal(p, zero_pose.r_tip, u'base_footprint')
+        zero_pose.set_cart_goal(p, zero_pose.r_tip, u'base_footprint')
+        zero_pose.plan_and_execute()
 
     def test_cart_goal_1eef2(self, zero_pose):
         """
@@ -1838,7 +1840,8 @@ class TestCartGoals(object):
         p.pose.position = Point(0.599, -0.009, 0.983)
         p.pose.orientation = Quaternion(0.524, -0.495, 0.487, -0.494)
         zero_pose.allow_all_collisions()
-        zero_pose.set_and_check_cart_goal(p, zero_pose.l_tip, u'base_footprint')
+        zero_pose.set_cart_goal(p, zero_pose.l_tip, u'base_footprint')
+        zero_pose.plan_and_execute()
 
     def test_cart_goal_1eef3(self, zero_pose):
         """
@@ -1857,7 +1860,8 @@ class TestCartGoals(object):
         p.pose.position = Point(2., 0, 1.)
         p.pose.orientation = Quaternion(0, 0, 0, 1)
         zero_pose.allow_all_collisions()
-        zero_pose.set_and_check_cart_goal(p, zero_pose.r_tip, zero_pose.default_root)
+        zero_pose.set_cart_goal(p, zero_pose.r_tip, zero_pose.default_root)
+        zero_pose.plan_and_execute()
 
     def test_cart_goal_orientation_singularity(self, zero_pose):
         """
@@ -1876,11 +1880,8 @@ class TestCartGoals(object):
         l_goal.pose.position = Point(-0.05, 0, 0)
         l_goal.pose.orientation = Quaternion(0, 0, 0, 1)
         zero_pose.set_cart_goal(l_goal, zero_pose.l_tip, root)
-        # zero_pose.allow_self_collision()
         zero_pose.allow_all_collisions()
-        zero_pose.send_and_check_goal()
-        zero_pose.check_cart_goal(zero_pose.r_tip, r_goal)
-        zero_pose.check_cart_goal(zero_pose.l_tip, l_goal)
+        zero_pose.plan_and_execute()
 
     def test_cart_goal_2eef2(self, zero_pose):
         """
@@ -1901,9 +1902,7 @@ class TestCartGoals(object):
         l_goal.pose.orientation = Quaternion(0, 0, 0, 1)
         zero_pose.set_cart_goal(l_goal, zero_pose.l_tip, root)
         zero_pose.allow_self_collision()
-        zero_pose.send_and_check_goal()
-        zero_pose.check_cart_goal(zero_pose.r_tip, r_goal)
-        zero_pose.check_cart_goal(zero_pose.l_tip, l_goal)
+        zero_pose.plan_and_execute()
 
     def test_cart_goal_left_right_chain(self, zero_pose):
         """
@@ -1912,9 +1911,13 @@ class TestCartGoals(object):
         r_goal = tf.lookup_pose(zero_pose.l_tip, zero_pose.r_tip)
         r_goal.pose.position.x -= 0.1
         zero_pose.allow_all_collisions()
-        zero_pose.set_and_check_cart_goal(r_goal, zero_pose.r_tip, zero_pose.l_tip)
+        zero_pose.set_cart_goal(r_goal, zero_pose.r_tip, zero_pose.l_tip)
+        zero_pose.plan_and_execute()
 
     def test_wiggle1(self, kitchen_setup):
+        """
+        :type kitchen_setup: PR2
+        """
         tray_pose = PoseStamped()
         tray_pose.header.frame_id = u'iai_kitchen/sink_area_surface'
         tray_pose.pose.position = Point(0.1, -0.4, 0.07)
@@ -1946,7 +1949,7 @@ class TestCartGoals(object):
                                     max_linear_velocity=0.1,
                                     max_angular_velocity=0.2
                                     )
-        kitchen_setup.send_and_check_goal()
+        kitchen_setup.plan_and_execute()
 
     def test_wiggle2(self, zero_pose):
         """
@@ -1970,7 +1973,8 @@ class TestCartGoals(object):
         p.pose.position.x = -0.1
         p.pose.orientation.w = 1
         # zero_pose.allow_all_collisions()
-        zero_pose.set_and_check_cart_goal(p, zero_pose.l_tip, zero_pose.default_root)
+        zero_pose.set_cart_goal(p, zero_pose.l_tip, zero_pose.default_root)
+        zero_pose.plan_and_execute()
 
         p = PoseStamped()
         p.header.frame_id = zero_pose.l_tip
@@ -1978,7 +1982,8 @@ class TestCartGoals(object):
         p.pose.position.x = 0.2
         p.pose.orientation.w = 1
         # zero_pose.allow_all_collisions()
-        zero_pose.set_and_check_cart_goal(p, zero_pose.l_tip, zero_pose.default_root)
+        zero_pose.set_cart_goal(p, zero_pose.l_tip, zero_pose.default_root)
+        zero_pose.plan_and_execute()
 
     def test_wiggle3(self, zero_pose):
         """
@@ -2002,33 +2007,7 @@ class TestCartGoals(object):
         p.pose.position.x = 0.5
         p.pose.orientation.w = 1
         zero_pose.set_cart_goal(p, zero_pose.r_tip, zero_pose.default_root)
-        zero_pose.send_and_check_goal()
-
-    def test_interrupt1(self, zero_pose):
-        p = PoseStamped()
-        p.header.frame_id = u'base_footprint'
-        p.pose.position = Point(2, 0, 0)
-        p.pose.orientation = Quaternion(0, 0, 0, 1)
-        zero_pose.set_cart_goal(p, u'base_footprint')
-        result = zero_pose.send_goal_and_dont_wait(stop_after=20)
-        assert result.error_codes[0] == MoveResult.PREEMPTED
-
-    def test_interrupt_way_points1(self, zero_pose):
-        p = PoseStamped()
-        p.header.frame_id = u'base_footprint'
-        p.pose.position = Point(0, 0, 0)
-        p.pose.orientation = Quaternion(0, 0, 0, 1)
-        zero_pose.set_cart_goal(deepcopy(p), u'base_footprint')
-        zero_pose.add_cmd()
-        p.pose.position.x += 1
-        zero_pose.set_cart_goal(deepcopy(p), u'base_footprint')
-        zero_pose.add_cmd()
-        p.pose.position.x += 1
-        zero_pose.set_cart_goal(p, u'base_footprint')
-        result = zero_pose.send_goal_and_dont_wait(stop_after=10)
-        assert result.error_codes[0] == MoveResult.SUCCESS
-        assert result.error_codes[1] == MoveResult.PREEMPTED
-        assert result.error_codes[2] == MoveResult.PREEMPTED
+        zero_pose.plan_and_execute()
 
     def test_hot_init_failed(self, zero_pose):
         """
@@ -2047,9 +2026,7 @@ class TestCartGoals(object):
         l_goal.pose.orientation = Quaternion(0, 0, 0, 1)
         zero_pose.set_cart_goal(l_goal, zero_pose.l_tip, zero_pose.default_root)
         zero_pose.allow_self_collision()
-        zero_pose.send_and_check_goal()
-        zero_pose.check_cart_goal(zero_pose.r_tip, r_goal)
-        zero_pose.check_cart_goal(zero_pose.l_tip, l_goal)
+        zero_pose.plan_and_execute()
 
         zero_pose.allow_all_collisions()
         zero_pose.send_and_check_joint_goal(default_pose)
@@ -2079,7 +2056,39 @@ class TestCartGoals(object):
         p.pose.orientation.w = 1
         zero_pose.allow_self_collision()
         zero_pose.set_cart_goal(p, zero_pose.r_tip, u'torso_lift_link')
-        zero_pose.send_and_check_goal()
+        zero_pose.plan_and_execute()
+
+class TestActionServerEvents(object):
+    def test_interrupt1(self, zero_pose):
+        p = PoseStamped()
+        p.header.frame_id = u'base_footprint'
+        p.pose.position = Point(2, 0, 0)
+        p.pose.orientation = Quaternion(0, 0, 0, 1)
+        zero_pose.set_cart_goal(p, u'base_footprint')
+        result = zero_pose.send_goal_and_dont_wait(stop_after=20)
+        assert result.error_codes[0] == MoveResult.PREEMPTED
+
+
+class TestWayPoints(object):
+    def test_interrupt_way_points1(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        p = PoseStamped()
+        p.header.frame_id = u'base_footprint'
+        p.pose.position = Point(0, 0, 0)
+        p.pose.orientation = Quaternion(0, 0, 0, 1)
+        zero_pose.set_cart_goal(deepcopy(p), u'base_footprint')
+        zero_pose.add_cmd()
+        p.pose.position.x += 1
+        zero_pose.set_cart_goal(deepcopy(p), u'base_footprint')
+        zero_pose.add_cmd()
+        p.pose.position.x += 1
+        zero_pose.set_cart_goal(p, u'base_footprint')
+        zero_pose.plan_and_execute(expected_error_codes=[MoveResult.SUCCESS,
+                                                         MoveResult.PREEMPTED,
+                                                         MoveResult.PREEMPTED],
+                                   stop_after=10)
 
     def test_waypoints(self, zero_pose):
         """
@@ -2108,7 +2117,7 @@ class TestCartGoals(object):
         p.pose.orientation = Quaternion(0, 0, 0, 1)
         zero_pose.set_cart_goal(p, zero_pose.r_tip, zero_pose.default_root)
 
-        zero_pose.send_and_check_goal()
+        zero_pose.plan_and_execute()
 
     def test_waypoints2(self, zero_pose):
         """
@@ -2120,7 +2129,7 @@ class TestCartGoals(object):
         zero_pose.add_cmd()
         zero_pose.set_joint_goal(gaya_pose)
 
-        traj = zero_pose.send_and_check_goal()
+        traj = zero_pose.plan_and_execute()
         for i, p in enumerate(traj.points):
             js = {joint_name: position for joint_name, position in zip(traj.joint_names, p.positions)}
             try:
@@ -2165,10 +2174,10 @@ class TestCartGoals(object):
         zero_pose.add_cmd()
         zero_pose.set_joint_goal(gaya_pose)
 
-        traj = zero_pose.send_and_check_goal(expected_error_codes=[MoveResult.SUCCESS,
-                                                                   MoveResult.UNKNOWN_CONSTRAINT,
-                                                                   MoveResult.SUCCESS],
-                                             goal_type=MoveGoal.PLAN_AND_EXECUTE_AND_SKIP_FAILURES)
+        traj = zero_pose.send_goal(expected_error_codes=[MoveResult.SUCCESS,
+                                                         MoveResult.UNKNOWN_CONSTRAINT,
+                                                         MoveResult.SUCCESS],
+                                   goal_type=MoveGoal.PLAN_AND_EXECUTE_AND_SKIP_FAILURES)
 
         for i, p in enumerate(traj.points):
             js = {joint_name: position for joint_name, position in zip(traj.joint_names, p.positions)}
@@ -2201,7 +2210,7 @@ class TestCartGoals(object):
         zero_pose.add_cmd()
         zero_pose.set_joint_goal(gaya_pose)
 
-        traj = zero_pose.send_and_check_goal(expected_error_codes=[MoveResult.UNKNOWN_CONSTRAINT,
+        traj = zero_pose.send_goal(expected_error_codes=[MoveResult.UNKNOWN_CONSTRAINT,
                                                                    MoveResult.SUCCESS,
                                                                    MoveResult.SUCCESS],
                                              goal_type=MoveGoal.PLAN_AND_EXECUTE_AND_SKIP_FAILURES)
@@ -2237,7 +2246,7 @@ class TestCartGoals(object):
         zero_pose.add_cmd()
         zero_pose.set_json_goal(u'muh')
 
-        traj = zero_pose.send_and_check_goal(expected_error_codes=[MoveResult.SUCCESS,
+        traj = zero_pose.send_goal(expected_error_codes=[MoveResult.SUCCESS,
                                                                    MoveResult.SUCCESS,
                                                                    MoveResult.UNKNOWN_CONSTRAINT, ],
                                              goal_type=MoveGoal.PLAN_AND_EXECUTE_AND_SKIP_FAILURES)
@@ -2273,7 +2282,7 @@ class TestCartGoals(object):
         zero_pose.add_cmd()
         zero_pose.set_joint_goal(gaya_pose)
 
-        traj = zero_pose.send_and_check_goal(expected_error_codes=[MoveResult.SUCCESS,
+        traj = zero_pose.send_goal(expected_error_codes=[MoveResult.SUCCESS,
                                                                    MoveResult.UNKNOWN_CONSTRAINT,
                                                                    MoveResult.ERROR],
                                              goal_type=MoveGoal.PLAN_AND_EXECUTE)
@@ -2293,7 +2302,7 @@ class TestCartGoals(object):
         :type zero_pose: PR2
         """
         zero_pose.set_json_goal(u'muh')
-        zero_pose.send_and_check_goal(expected_error_codes=[MoveResult.UNKNOWN_CONSTRAINT, ],
+        zero_pose.send_goal(expected_error_codes=[MoveResult.UNKNOWN_CONSTRAINT, ],
                                       goal_type=MoveGoal.PLAN_AND_EXECUTE_AND_SKIP_FAILURES)
 
     def test_skip_failures2(self, zero_pose):
@@ -2301,7 +2310,7 @@ class TestCartGoals(object):
         :type zero_pose: PR2
         """
         zero_pose.set_joint_goal(pocky_pose)
-        traj = zero_pose.send_and_check_goal(expected_error_codes=[MoveResult.SUCCESS, ],
+        traj = zero_pose.send_goal(expected_error_codes=[MoveResult.SUCCESS, ],
                                              goal_type=MoveGoal.PLAN_AND_EXECUTE_AND_SKIP_FAILURES)
 
         for i, p in enumerate(traj.points):
@@ -2591,15 +2600,15 @@ class TestCollisionAvoidanceGoals(object):
     #     pocky_pose_setup.set_and_check_cart_goal(p, pocky_pose_setup.r_tip, pocky_pose_setup.default_root,
     #                                              expected_error_codes=[MoveResult.SHAKING])
 
-        # box_setup.avoid_collision()
+    # box_setup.avoid_collision()
 
-        # collision_entry = CollisionEntry()
-        # collision_entry.type = CollisionEntry.AVOID_COLLISION
-        # collision_entry.min_dist = 0.05
-        # collision_entry.body_b = u'box'
-        # pocky_pose_setup.add_collision_entries([collision_entry])
-        #
-        # pocky_pose_setup.send_and_check_goal(expected_error_code=MoveResult.INSOLVABLE)
+    # collision_entry = CollisionEntry()
+    # collision_entry.type = CollisionEntry.AVOID_COLLISION
+    # collision_entry.min_dist = 0.05
+    # collision_entry.body_b = u'box'
+    # pocky_pose_setup.add_collision_entries([collision_entry])
+    #
+    # pocky_pose_setup.send_and_check_goal(expected_error_code=MoveResult.INSOLVABLE)
 
     def test_open_drawer(self, kitchen_setup):
         self.open_drawer(kitchen_setup, kitchen_setup.l_tip, u'iai_kitchen/sink_area_left_middle_drawer_handle',
@@ -3705,7 +3714,7 @@ class TestCollisionAvoidanceGoals(object):
         """
         :type box_setup: PR2
         """
-        #fixme
+        # fixme
         attached_link_name = u'pocky'
         box_setup.attach_box(attached_link_name, [0.2, 0.04, 0.04], box_setup.r_tip, [0.05, 0, 0])
         box_setup.attach_box(attached_link_name, [0.2, 0.04, 0.04], box_setup.r_tip, [0.05, 0, 0],
@@ -3787,7 +3796,7 @@ class TestCollisionAvoidanceGoals(object):
             u'torso_lift_joint': 0.2}
 
         zero_pose.set_joint_goal(collision_pose)
-        zero_pose.send_goal()
+        zero_pose.plan_and_execute()
 
         attached_link_name = u'pocky'
         zero_pose.attach_box(attached_link_name, [0.16, 0.04, 0.04], zero_pose.l_tip, [0.04, 0, 0], [0, 0, 0, 1])
@@ -3807,7 +3816,7 @@ class TestCollisionAvoidanceGoals(object):
         p.pose.position.z = 0.20
         p.pose.orientation.w = 1
         zero_pose.set_cart_goal(p, zero_pose.l_tip, zero_pose.default_root)
-        zero_pose.send_goal()
+        zero_pose.plan_and_execute()
 
         zero_pose.check_cpi_geq(zero_pose.get_l_gripper_links(), 0.048)
         zero_pose.check_cpi_geq([attached_link_name], 0.048)
@@ -4718,7 +4727,7 @@ class TestCollisionAvoidanceGoals(object):
         """
         :type kitchen_setup: PR2
         """
-        #FIXME
+        # FIXME
         tray_name = u'tray'
         percentage = 50
 

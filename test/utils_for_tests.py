@@ -4,7 +4,7 @@ from collections import defaultdict
 from copy import deepcopy
 from multiprocessing import Queue
 from threading import Thread
-
+from multiprocessing.pool import ThreadPool
 import hypothesis.strategies as st
 import numpy as np
 import rospy
@@ -20,6 +20,7 @@ from iai_naive_kinematics_sim.srv import SetJointState, SetJointStateRequest
 from iai_wsg_50_msgs.msg import PositionCmd
 from numpy import pi
 from py_trees import Blackboard
+from rospy import Timer
 from sensor_msgs.msg import JointState
 from std_msgs.msg import ColorRGBA
 from tf.transformations import rotation_from_matrix, quaternion_matrix
@@ -263,6 +264,7 @@ def pykdl_frame_to_numpy(pykdl_frame):
 
 class GiskardTestWrapper(GiskardWrapper):
     def __init__(self, config_file):
+        # self.pool = ThreadPool(processes=1)
         self.total_time_spend_giskarding = 0
         self.total_time_spend_moving = 0
 
@@ -281,7 +283,10 @@ class GiskardTestWrapper(GiskardWrapper):
                                                 queue_size=100)
 
         self.tree = grow_tree()
-        self.loop_once()
+        self.tick_rate = self.get_god_map().unsafe_get_data(identifier.tree_tick_rate)
+        self.heart = Timer(rospy.Duration(self.tick_rate), self.live)
+        # sleeper = rospy.Rate(self.tick_rate)
+        # self.tick_once()
         # rospy.sleep(1)
         super(GiskardTestWrapper, self).__init__(node_name=u'tests')
         self.results = Queue(100)
@@ -289,7 +294,8 @@ class GiskardTestWrapper(GiskardWrapper):
         self.map = u'map'
         self.simple_base_pose_pub = rospy.Publisher('/move_base_simple/goal', PoseStamped, queue_size=10)
         self.set_base = rospy.ServiceProxy('/base_simulator/set_joint_states', SetJointState)
-        self.tick_rate = 10
+        self.goal_checks = defaultdict(list)
+
 
         def create_publisher(topic):
             p = rospy.Publisher(topic, JointState, queue_size=10)
@@ -321,7 +327,7 @@ class GiskardTestWrapper(GiskardWrapper):
 
     def wait_for_synced(self):
         sleeper = rospy.Rate(self.tick_rate)
-        self.loop_once()
+        self.tick_once()
         # while self.tree.tip().name != u'has goal':
         #     self.loop_once()
         #     sleeper.sleep()
@@ -348,7 +354,16 @@ class GiskardTestWrapper(GiskardWrapper):
         """
         self.results.put(msg.result)
 
-    def loop_once(self):
+    def tick_once(self):
+        pass
+        # self.tree.tick()
+
+    def tick(self, times=1):
+        pass
+        # for _ in range(times):
+        #     self.tick_once()
+
+    def live(self, timer_thing):
         self.tree.tick()
 
     def get_controlled_joint_names(self):
@@ -368,14 +383,15 @@ class GiskardTestWrapper(GiskardWrapper):
 
     def tear_down(self):
         rospy.sleep(1)
+        self.heart.shutdown()
         logging.loginfo(u'total time spend giskarding: {}'.format(self.total_time_spend_giskarding - self.total_time_spend_moving))
         logging.loginfo(u'total time spend moving: {}'.format(self.total_time_spend_moving))
         logging.loginfo(u'stopping tree')
 
     def set_object_joint_state(self, object_name, joint_state):
         super(GiskardTestWrapper, self).set_object_joint_state(object_name, joint_state)
-        self.loop_once()
-        self.loop_once()
+        self.tick_once()
+        self.tick_once()
         rospy.sleep(0.5)
         self.wait_for_synced()
         current_js = self.get_world().groups[object_name].state
@@ -417,7 +433,7 @@ class GiskardTestWrapper(GiskardWrapper):
         :type goal: dict
         """
         self.set_joint_goal(goal, weight=weight)
-        self.send_and_check_goal(expected_error_codes=expected_error_codes)
+        self.send_goal(expected_error_codes=expected_error_codes)
         if expected_error_codes is not None and expected_error_codes[0] == MoveResult.SUCCESS:
             self.check_current_joint_state(goal, decimal=decimal)
 
@@ -435,9 +451,9 @@ class GiskardTestWrapper(GiskardWrapper):
         goal = SetJointStateRequest()
         goal.state = position_dict_to_joint_states(js)
         self.set_base.call(goal)
-        self.loop_once()
+        self.tick_once()
         rospy.sleep(0.5)
-        self.loop_once()
+        self.tick_once()
 
     def keep_position(self, tip, root=None):
         if root is None:
@@ -473,9 +489,11 @@ class GiskardTestWrapper(GiskardWrapper):
                                                                       max_velocity=max_velocity, weight=weight,
                                                                       **kwargs)
 
-    def set_cart_goal(self, goal_pose, tip_link, root_link=None, weight=None, linear_velocity=None, angular_velocity=None):
+    def set_cart_goal(self, goal_pose, tip_link, root_link=None, weight=None, linear_velocity=None, angular_velocity=None,
+                      check=True):
         if not root_link:
             root_link = self.default_root
+
         if weight is not None:
             super(GiskardTestWrapper, self).set_cart_goal(goal_pose,
                                                           tip_link,
@@ -490,6 +508,29 @@ class GiskardTestWrapper(GiskardWrapper):
                                                           max_linear_velocity=linear_velocity,
                                                           max_angular_velocity=angular_velocity)
 
+        class GoalChecker(object):
+            def __init__(self, tip_link, expected):
+                self.expected = expected
+                self.tip_link = tip_link
+
+            def __call__(self):
+                current_pose = lookup_pose(u'map', self.tip_link)
+                np.testing.assert_array_almost_equal(msg_to_list(self.expected.pose.position),
+                                                     msg_to_list(current_pose.pose.position), decimal=2)
+
+                try:
+                    np.testing.assert_array_almost_equal(msg_to_list(self.expected.pose.orientation),
+                                                         msg_to_list(current_pose.pose.orientation), decimal=2)
+                except AssertionError:
+                    np.testing.assert_array_almost_equal(msg_to_list(self.expected.pose.orientation),
+                                                         -np.array(msg_to_list(current_pose.pose.orientation)), decimal=2)
+
+        map_T_goal = transform_pose(u'map', goal_pose)
+        self.add_goal_check(GoalChecker(tip_link, map_T_goal))
+
+    def add_goal_check(self, goal_checker):
+        self.goal_checks[self.number_of_cmds-1].append(goal_checker)
+
     def set_straight_cart_goal(self, goal_pose, tip_link, root_link=None, weight=None, linear_velocity=None, angular_velocity=None):
         if not root_link:
             root_link = self.default_root
@@ -501,40 +542,29 @@ class GiskardTestWrapper(GiskardWrapper):
                                                                    max_angular_velocity=angular_velocity)
 
 
-    def set_and_check_cart_goal(self, goal_pose, tip_link, root_link=None, weight=None, linear_velocity=None, angular_velocity=None,
-                                expected_error_codes=None):
-        goal_pose_in_map = transform_pose(u'map', goal_pose)
-        self.set_cart_goal(goal_pose, tip_link, root_link, weight, linear_velocity=linear_velocity, angular_velocity=angular_velocity)
-        self.loop_once()
-        self.send_and_check_goal(expected_error_codes)
-        self.loop_once()
-        if expected_error_codes is None:
-            self.check_cart_goal(tip_link, goal_pose_in_map)
+    # def set_and_check_cart_goal(self, goal_pose, tip_link, root_link=None, weight=None, linear_velocity=None, angular_velocity=None,
+    #                             expected_error_codes=None):
+    #     self.set_cart_goal(goal_pose, tip_link, root_link, weight, linear_velocity=linear_velocity, angular_velocity=angular_velocity)
+    #     goal_pose_in_map = transform_pose(u'map', goal_pose)
+    #     self.tick_once()
+    #     self.send_goal(expected_error_codes)
+    #     self.tick_once()
+    #     def goal_checker():
+    #         if expected_error_codes is None:
+    #             self.check_cart_goal(tip_link, goal_pose_in_map)
 
 
     def set_and_check_straight_cart_goal(self, goal_pose, tip_link, root_link=None, weight=None, linear_velocity=None, angular_velocity=None,
                                 expected_error_codes=None):
         goal_pose_in_map = transform_pose(u'map', goal_pose)
         self.set_straight_cart_goal(goal_pose, tip_link, root_link, weight, linear_velocity=linear_velocity, angular_velocity=angular_velocity)
-        self.loop_once()
-        self.send_and_check_goal(expected_error_codes)
-        self.loop_once()
+        self.tick_once()
+        self.send_goal(expected_error_codes)
+        self.tick_once()
         if expected_error_codes is None:
             self.check_cart_goal(tip_link, goal_pose_in_map)
 
 
-    def check_cart_goal(self, tip_link, goal_pose):
-        goal_in_base = transform_pose(u'map', goal_pose)
-        current_pose = lookup_pose(u'map', tip_link)
-        np.testing.assert_array_almost_equal(msg_to_list(goal_in_base.pose.position),
-                                             msg_to_list(current_pose.pose.position), decimal=2)
-
-        try:
-            np.testing.assert_array_almost_equal(msg_to_list(goal_in_base.pose.orientation),
-                                                 msg_to_list(current_pose.pose.orientation), decimal=2)
-        except AssertionError:
-            np.testing.assert_array_almost_equal(msg_to_list(goal_in_base.pose.orientation),
-                                                 -np.array(msg_to_list(current_pose.pose.orientation)), decimal=2)
 
     #
     # GENERAL GOAL STUFF ###############################################################################################
@@ -550,68 +580,56 @@ class GiskardTestWrapper(GiskardWrapper):
     def get_as(self):
         return Blackboard().get(u'~command')
 
-    def send_goal(self, goal=None, goal_type=MoveGoal.PLAN_AND_EXECUTE, wait=True):
-        """
-        :rtype: MoveResult
-        """
-        if goal is None:
-            goal = MoveActionGoal()
-            goal.goal = self._get_goal()
-            goal.goal.type = goal_type
-        i = 0
-        self.loop_once()
-        t = time()
-        t1 = Thread(target=self.get_as()._as.action_server.internal_goal_callback, args=(goal,))
-        self.loop_once()
-        t1.start()
-        sleeper = rospy.Rate(self.tick_rate)
-        while self.results.empty():
-            self.loop_once()
-            sleeper.sleep()
-            i += 1
-        t1.join()
-        t = time() - t
-        self.total_time_spend_giskarding += t
-        self.loop_once()
-        result = self.results.get()
-        return result
+    # def send_goal(self, goal=None, goal_type=MoveGoal.PLAN_AND_EXECUTE, wait=True):
+    #     """
+    #     :rtype: MoveResult
+    #     """
+    #     # if goal is None:
+    #     #     goal = MoveActionGoal()
+    #     #     goal.goal = self._get_goal()
+    #     #     goal.goal.type = goal_type
+    #     i = 0
+    #     # self.tick_once()
+    #     t = time()
+    #     sleeper = rospy.Rate(self.tick_rate)
+    #     # self.tick_once()
+    #     # self.pool.apply_async(self.get_as()._as.action_server.internal_goal_callback, (goal,))
+    #     # self.get_as()._as.action_server.internal_goal_callback(goal)
+    #     super(GiskardTestWrapper, self).plan_and_execute(goal)
+    #     # while self.results.empty():
+    #     #     self.tick_once()
+    #         # sleeper.sleep()
+    #     # t = time() - t
+    #     # self.total_time_spend_giskarding += t
+    #     # self.tick_once()
+    #     result = self.results.get()
+    #     return result
 
-    def send_goal_and_dont_wait(self, goal=None, goal_type=MoveGoal.PLAN_AND_EXECUTE, stop_after=20):
-        if goal is None:
-            goal = MoveActionGoal()
-            goal.goal = self._get_goal()
-            goal.goal.type = goal_type
-        i = 0
-        self.loop_once()
-        t1 = Thread(target=self.get_as()._as.action_server.internal_goal_callback, args=(goal,))
-        self.loop_once()
-        t1.start()
-        sleeper = rospy.Rate(self.tick_rate)
-        while self.results.empty():
-            self.loop_once()
-            sleeper.sleep()
-            i += 1
-            if i > stop_after:
-                self.interrupt()
-        t1.join()
-        self.loop_once()
-        result = self.results.get()
-        return result
+    def plan_and_execute(self, expected_error_codes=None, stop_after=True):
+        return self.send_goal(expected_error_codes=expected_error_codes)
 
-    def send_and_check_goal(self, expected_error_codes=None, goal_type=MoveGoal.PLAN_AND_EXECUTE, goal=None):
-        r = self.send_goal(goal=goal, goal_type=goal_type)
-        for i in range(len(r.error_codes)):
-            error_code = r.error_codes[i]
-            error_message = r.error_messages[i]
+    def send_goal(self, expected_error_codes=None, goal_type=MoveGoal.PLAN_AND_EXECUTE, goal=None, stop_after=None):
+        if stop_after is None:
+            r = super(GiskardTestWrapper, self).send_goal(goal_type, wait=True)
+        else:
+            super(GiskardTestWrapper, self).send_goal(goal_type, wait=False)
+            r = self.get_result(stop_after)
+        for cmd_id in range(len(r.error_codes)):
+            error_code = r.error_codes[cmd_id]
+            error_message = r.error_messages[cmd_id]
             if expected_error_codes is None:
                 expected_error_code = MoveResult.SUCCESS
             else:
-                expected_error_code = expected_error_codes[i]
+                expected_error_code = expected_error_codes[cmd_id]
             assert error_code == expected_error_code, \
-                u'in goal {}; got: {}, expected: {} | error_massage: {}'.format(i, move_result_error_code(error_code),
+                u'in goal {}; got: {}, expected: {} | error_massage: {}'.format(cmd_id, move_result_error_code(error_code),
                                                                                 move_result_error_code(
                                                                                     expected_error_code),
                                                                                 error_message)
+            if error_code == MoveResult.SUCCESS:
+                for goal_checker in self.goal_checks[cmd_id]:
+                    goal_checker()
+        self.goal_checks = defaultdict(list)
         self.are_joint_limits_violated()
         return r.trajectory
 
@@ -656,17 +674,16 @@ class GiskardTestWrapper(GiskardWrapper):
         return self.get_god_map().get_data(world)
 
     def clear_world(self):
-        assert super(GiskardTestWrapper, self).clear_world().error_codes == UpdateWorldResponse.SUCCESS
+        return_val = super(GiskardTestWrapper, self).clear_world()
+        assert return_val.error_codes == UpdateWorldResponse.SUCCESS
         assert len(self.get_world().groups) == 1
         assert len(self.get_object_names().object_names) == 1
-        # assert len(self.get_robot().get_attached_objects()) == 0
-        # assert self.get_world().has_object(u'plane')
 
     def remove_object(self, name, expected_response=UpdateWorldResponse.SUCCESS):
         old_link_names = self.get_world().groups[name].link_names
         old_joint_names = self.get_world().groups[name].joint_names
         r = super(GiskardTestWrapper, self).remove_object(name)
-        self.loop_once()
+        self.tick_once()
         assert r.error_codes == expected_response, \
             u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
                                             update_world_error_code(expected_response))
@@ -684,7 +701,7 @@ class GiskardTestWrapper(GiskardWrapper):
             assert name in self.get_attached_objects().object_names, \
                 'there is no attached object named {}'.format(name)
         r = super(GiskardTestWrapper, self).detach_object(name)
-        self.loop_once()
+        self.tick_once()
         assert r.error_codes == expected_response, \
             u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
                                             update_world_error_code(expected_response))
@@ -693,7 +710,7 @@ class GiskardTestWrapper(GiskardWrapper):
 
     def add_box(self, name=u'box', size=(1, 1, 1), pose=None, expected_response=UpdateWorldResponse.SUCCESS):
         r = super(GiskardTestWrapper, self).add_box(name, size, pose=pose)
-        self.loop_once()
+        self.tick_once()
         assert r.error_codes == expected_response, \
             u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
                                             update_world_error_code(expected_response))
@@ -709,7 +726,7 @@ class GiskardTestWrapper(GiskardWrapper):
 
     def add_sphere(self, name=u'sphere', size=1., pose=None, expected_response=UpdateWorldResponse.SUCCESS):
         r = super(GiskardTestWrapper, self).add_sphere(name=name, size=size, pose=pose)
-        self.loop_once()
+        self.tick_once()
         assert r.error_codes == expected_response, \
             u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
                                             update_world_error_code(expected_response))
@@ -725,7 +742,7 @@ class GiskardTestWrapper(GiskardWrapper):
 
     def add_cylinder(self, name=u'cylinder', size=[1, 1], pose=None, expected_response=UpdateWorldResponse.SUCCESS):
         r = super(GiskardTestWrapper, self).add_cylinder(name=name, height=size[0], radius=size[1], pose=pose)
-        self.loop_once()
+        self.tick_once()
         assert r.error_codes == expected_response, \
             u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
                                             update_world_error_code(expected_response))
@@ -741,7 +758,7 @@ class GiskardTestWrapper(GiskardWrapper):
 
     def add_mesh(self, name=u'meshy', path=u'', pose=None, expected_response=UpdateWorldResponse.SUCCESS):
         r = super(GiskardTestWrapper, self).add_mesh(name=name, mesh=path, pose=pose)
-        self.loop_once()
+        self.tick_once()
         assert r.error_codes == expected_response, \
             u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
                                             update_world_error_code(expected_response))
@@ -757,7 +774,7 @@ class GiskardTestWrapper(GiskardWrapper):
 
     def add_urdf(self, name, urdf, pose, js_topic=u'', set_js_topic=None, expected_response=UpdateWorldResponse.SUCCESS):
         r = super(GiskardTestWrapper, self).add_urdf(name, urdf, pose, js_topic, set_js_topic=set_js_topic)
-        self.loop_once()
+        self.tick_once()
         assert r.error_codes == expected_response, \
             u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
                                             update_world_error_code(expected_response))
@@ -773,7 +790,7 @@ class GiskardTestWrapper(GiskardWrapper):
 
     def avoid_all_collisions(self, distance=0.5):
         super(GiskardTestWrapper, self).avoid_all_collisions(distance)
-        self.loop_once()
+        self.tick_once()
 
     def attach_box(self, name=u'box', size=None, frame_id=None, position=None, orientation=None, pose=None,
                    expected_response=UpdateWorldResponse.SUCCESS):
@@ -790,7 +807,7 @@ class GiskardTestWrapper(GiskardWrapper):
         else:
             expected_pose = deepcopy(pose)
         r = super(GiskardTestWrapper, self).attach_box(name, size, frame_id, position, orientation, pose)
-        self.loop_once()
+        self.tick_once()
         assert r.error_codes == expected_response, \
             u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
                                             update_world_error_code(expected_response))
@@ -800,7 +817,7 @@ class GiskardTestWrapper(GiskardWrapper):
             assert scm.difference(self.robot_self_collision_matrix) == set()
             assert len(scm) < len(self.robot_self_collision_matrix)
             compare_poses(expected_pose.pose, lookup_pose(frame_id, name).pose)
-        self.loop_once()
+        self.tick_once()
 
     def attach_cylinder(self, name=u'cylinder', height=1, radius=1, frame_id=None, position=None, orientation=None,
                         pose=None, expected_response=UpdateWorldResponse.SUCCESS):
@@ -816,7 +833,7 @@ class GiskardTestWrapper(GiskardWrapper):
         else:
             expected_pose = deepcopy(pose)
         r = super(GiskardTestWrapper, self).attach_cylinder(name, height, radius, frame_id, position, orientation)
-        self.loop_once()
+        self.tick_once()
         assert r.error_codes == expected_response, \
             u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
                                             update_world_error_code(expected_response))
@@ -826,7 +843,7 @@ class GiskardTestWrapper(GiskardWrapper):
             assert scm.difference(self.robot_self_collision_matrix) == set()
             assert len(scm) < len(self.robot_self_collision_matrix)
             compare_poses(expected_pose.pose, lookup_pose(frame_id, name).pose)
-        self.loop_once()
+        self.tick_once()
 
     def attach_object(self, name=u'box', frame_id=None, expected_response=UpdateWorldResponse.SUCCESS):
         scm = self.robot_self_collision_matrix
@@ -839,7 +856,7 @@ class GiskardTestWrapper(GiskardWrapper):
         assert name in self.get_attached_objects().object_names
         assert scm.difference(self.robot_self_collision_matrix) == set()
         assert len(scm) < len(self.robot_self_collision_matrix)
-        self.loop_once()
+        self.tick_once()
 
     def get_external_collisions(self, link, distance_threshold):
         """

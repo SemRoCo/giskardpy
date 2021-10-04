@@ -9,6 +9,7 @@ import re
 import rospkg
 import subprocess
 import sys
+import math
 from collections import defaultdict, OrderedDict, deque
 from contextlib import contextmanager
 from functools import wraps
@@ -165,7 +166,6 @@ def cylinder_surface(r, h):
 #             return True
 #     return False
 
-
 def qv_mult(quaternion, vector):
     """
     Transforms a vector by a quaternion
@@ -185,6 +185,13 @@ def qv_mult(quaternion, vector):
 # CONVERSION FUNCTIONS FOR ROS MESSAGES
 #
 
+def to_tf_quaternion(msg):
+    """
+    converts a geometry_msgs/Quaternion to tf_quaternion[x, y, z, w]
+    :param msg: geometry_msgs/Quaternion
+    :return: [x, y, z, w]
+    """
+    return [msg.x, msg.y, msg.z, msg.w]
 
 def to_joint_state_dict(msg):
     """
@@ -268,7 +275,15 @@ def dict_to_joint_states(joint_state_dict):
         js.effort.append(0)
     return js
 
+
 def normalize_quaternion_msg(quaternion):
+    """
+    Normalizes a quaternion.
+    :param quaternion: The quaternion to be normalized
+    :type quaternion: Quaternion
+    :return: Normalized quaternion
+    :rtype: Quaternion
+    """
     q = Quaternion()
     rotation = np.array([quaternion.x,
                          quaternion.y,
@@ -352,8 +367,6 @@ def create_path(path):
         except OSError as exc:  # Guard against race condition
             if exc.errno != errno.EEXIST:
                 raise
-
-
 
 
 def plot_trajectory(tj, controlled_joints, path_to_data_folder, sample_period, order=3, velocity_threshold=0.0, scaling=0.2, normalize_position=False, tick_stride=1.0):

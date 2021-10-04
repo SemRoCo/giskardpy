@@ -42,7 +42,7 @@
 
   <node pkg="giskardpy" type="joint_trajectory_splitter.py" name="joint_trajectory_splitter" output="screen">
     <rosparam param="state_topics">["/hsrb/arm_trajectory_controller/state", "/hsrb/omni_base_controller/state" , "/hsrb/head_trajectory_controller/state"]</rosparam>
-    <rosparam param="client_topics">["/hsrb/arm_trajectory_controller/follow_joint_trajectory", "/base_trajectory_action/follow_joint_trajectory", "/hsrb/head_trajectory_controller/follow_joint_trajectory"]</rosparam>
+    <rosparam param="client_topics">["/hsrb/arm_trajectory_controller/follow_joint_trajectory", "/hsrb/omni_base_controller/follow_joint_trajectory", "/hsrb/head_trajectory_controller/follow_joint_trajectory"]</rosparam>
   </node>
 
   <!--#######################################################################-->
@@ -67,6 +67,13 @@
     </rosparam>
     <param name="rate" value="120"/>
     <param name="use_gui" value="False"/>
+  </node>
+
+  <!--There might be 2 robot state publishers. If this node is not started, it will sometimes not find the gripper_tool_frame in a lookup.-->
+  <node pkg="robot_state_publisher" type="robot_state_publisher"
+      name="giskard_robot_state_publisher" output="screen">
+      <param name="publish_frequency" value="10"/>
+      <remap from="robot_description" to="giskard/robot_description" />
   </node>
 <!--#######################################################################-->
 

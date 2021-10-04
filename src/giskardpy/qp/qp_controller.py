@@ -24,7 +24,7 @@ def save_pandas(dfs, names, path):
         with pd.option_context('display.max_rows', None, 'display.max_columns', None):
             if df.shape[1] > 1:
                 for column_name, column in df.T.items():
-                    csv_string += column.add_prefix(column_name + u'||').to_csv()
+                    csv_string += column.add_prefix(column_name + u'||').to_csv(float_format='%.4f')
             else:
                 csv_string += df.to_csv(float_format='%.4f')
         file_name2 = '{}{}.csv'.format(folder_name, name)

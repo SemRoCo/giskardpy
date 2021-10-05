@@ -24,7 +24,8 @@ from giskardpy.utils import logging
 from giskardpy.utils.tfwrapper import init as tf_init
 from giskardpy.utils.utils import to_joint_state_position_dict
 from test_integration_pr2_without_base import gaya_pose
-from utils_for_tests import PR2, compare_poses, compare_points, compare_orientations, publish_marker_vector
+from utils_for_tests import PR2, compare_poses, compare_points, compare_orientations, publish_marker_vector, \
+    JointGoalChecker
 
 # TODO roslaunch iai_pr2_sim ros_control_sim_with_base.launch
 # TODO roslaunch iai_kitchen upload_kitchen_obj.launch
@@ -179,7 +180,8 @@ def zero_pose(resetted_giskard):
     :type resetted_giskard: PR2
     """
     resetted_giskard.allow_all_collisions()
-    resetted_giskard.send_and_check_joint_goal(default_pose)
+    resetted_giskard.set_joint_goal(default_pose)
+    resetted_giskard.plan_and_execute()
     return resetted_giskard
 
 
@@ -241,35 +243,29 @@ def kitchen_setup(resetted_giskard):
 
 
 class TestFk(object):
-    def test_fk1(self, zero_pose):
-        for root, tip in itertools.product(zero_pose.get_robot().get_link_names(), repeat=2):
+    def test_fk(self, zero_pose):
+        for root, tip in itertools.product(zero_pose.get_robot().link_names, repeat=2):
             fk1 = zero_pose.get_god_map().get_data(fk_pose + [(root, tip)])
-            fk2 = tf.lookup_pose(root, tip)
+            fk2 = tf.lookup_pose(str(root), str(tip))
             compare_poses(fk1.pose, fk2.pose)
 
-    def test_fk2(self, zero_pose):
+    def test_fk_attached(self, zero_pose):
         pocky = u'box'
         zero_pose.attach_box(pocky, [0.1, 0.02, 0.02], zero_pose.r_tip, [0.05, 0, 0], [1, 0, 0, 0])
-        for root, tip in itertools.product(zero_pose.get_robot().get_link_names(), [pocky]):
+        for root, tip in itertools.product(zero_pose.get_robot().link_names, [pocky]):
             fk1 = zero_pose.get_god_map().get_data(fk_pose + [(root, tip)])
-            fk2 = tf.lookup_pose(root, tip)
+            fk2 = tf.lookup_pose(str(root), str(tip))
             compare_poses(fk1.pose, fk2.pose)
 
 
 class TestJointGoals(object):
-    def test_move_base(self, zero_pose):
-        p = PoseStamped()
-        p.header.frame_id = u'map'
-        p.pose.position.y = -1
-        p.pose.orientation = Quaternion(0, 0, 0.47942554, 0.87758256)
-        zero_pose.move_base(p)
-
     def test_joint_movement1(self, zero_pose):
         """
         :type zero_pose: PR2
         """
         zero_pose.allow_all_collisions()
-        zero_pose.send_and_check_joint_goal(pocky_pose)
+        zero_pose.set_joint_goal(pocky_pose)
+        zero_pose.plan_and_execute()
 
     def test_partial_joint_state_goal1(self, zero_pose):
         """
@@ -277,7 +273,8 @@ class TestJointGoals(object):
         """
         zero_pose.allow_self_collision()
         js = dict(list(pocky_pose.items())[:3])
-        zero_pose.send_and_check_joint_goal(js)
+        zero_pose.set_joint_goal(js)
+        zero_pose.plan_and_execute()
 
     def test_continuous_joint1(self, zero_pose):
         """
@@ -286,34 +283,8 @@ class TestJointGoals(object):
         zero_pose.allow_self_collision()
         js = {u'r_wrist_roll_joint': -pi,
               u'l_wrist_roll_joint': -2.1 * pi, }
-        zero_pose.send_and_check_joint_goal(js)
-
-    def test_undefined_type(self, zero_pose):
-        """
-        :type zero_pose: PR2
-        """
-        zero_pose.allow_self_collision()
-        goal = MoveActionGoal()
-        goal.goal.type = MoveGoal.UNDEFINED
-        result = zero_pose.send_goal(goal)
-        assert result.error_codes[0] == MoveResult.INVALID_GOAL
-        zero_pose.send_and_check_goal()
-
-    def test_empty_goal(self, zero_pose):
-        """
-        :type zero_pose: PR2
-        """
-        zero_pose.allow_self_collision()
-        goal = MoveActionGoal()
-        goal.goal.type = MoveGoal.PLAN_AND_EXECUTE
-        result = zero_pose.send_goal(goal)
-        assert result.error_codes[0] == MoveResult.INVALID_GOAL
-
-    def test_plan_only(self, zero_pose):
-        zero_pose.allow_self_collision()
-        zero_pose.set_joint_goal(pocky_pose)
-        zero_pose.send_and_check_goal(goal_type=MoveGoal.PLAN_ONLY)
-        zero_pose.check_current_joint_state(default_pose)
+        zero_pose.set_joint_goal(js)
+        zero_pose.plan_and_execute()
 
     def test_prismatic_joint1(self, zero_pose):
         """
@@ -321,7 +292,8 @@ class TestJointGoals(object):
         """
         zero_pose.allow_self_collision()
         js = {u'torso_lift_joint': 0.1}
-        zero_pose.send_and_check_joint_goal(js)
+        zero_pose.set_joint_goal(js)
+        zero_pose.plan_and_execute()
 
     def test_hard_joint_limits(self, zero_pose):
         """
@@ -335,15 +307,15 @@ class TestJointGoals(object):
         goal_js = {u'r_elbow_flex_joint': r_elbow_flex_joint_limits[0] - 0.2,
                    u'torso_lift_joint': torso_lift_joint_limits[0] - 0.2,
                    u'head_pan_joint': head_pan_joint_limits[0] - 0.2}
-        zero_pose.set_joint_goal(goal_js)
-        zero_pose.send_and_check_goal()
+        zero_pose.set_joint_goal(goal_js, check=False)
+        zero_pose.plan_and_execute()
 
         goal_js = {u'r_elbow_flex_joint': r_elbow_flex_joint_limits[1] + 0.2,
                    u'torso_lift_joint': torso_lift_joint_limits[1] + 0.2,
                    u'head_pan_joint': head_pan_joint_limits[1] + 0.2}
 
-        zero_pose.set_joint_goal(goal_js)
-        zero_pose.send_and_check_goal()
+        zero_pose.set_joint_goal(goal_js, check=False)
+        zero_pose.plan_and_execute()
 
     # TODO test goal for unknown joint
 
@@ -1750,8 +1722,6 @@ class TestCartGoals(object):
         r_goal = PoseStamped()
         r_goal.header.frame_id = zero_pose.r_tip
         r_goal.pose.orientation.w = 1
-        expected_pose = tf.lookup_pose(u'torso_lift_link', zero_pose.r_tip)
-        expected_pose.header.stamp = rospy.Time()
         zero_pose.set_cart_goal(r_goal, zero_pose.r_tip, u'torso_lift_link')
         zero_pose.set_joint_goal(js)
         zero_pose.allow_self_collision()
@@ -2058,15 +2028,43 @@ class TestCartGoals(object):
         zero_pose.set_cart_goal(p, zero_pose.r_tip, u'torso_lift_link')
         zero_pose.plan_and_execute()
 
+
 class TestActionServerEvents(object):
     def test_interrupt1(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
         p = PoseStamped()
         p.header.frame_id = u'base_footprint'
         p.pose.position = Point(2, 0, 0)
         p.pose.orientation = Quaternion(0, 0, 0, 1)
         zero_pose.set_cart_goal(p, u'base_footprint')
-        result = zero_pose.send_goal_and_dont_wait(stop_after=20)
-        assert result.error_codes[0] == MoveResult.PREEMPTED
+        zero_pose.allow_all_collisions()
+        zero_pose.plan_and_execute(expected_error_codes=[MoveResult.PREEMPTED], stop_after=2)
+
+    def test_undefined_type(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        zero_pose.allow_all_collisions()
+        zero_pose.send_goal(goal_type=MoveGoal.UNDEFINED,
+                            expected_error_codes=[MoveResult.INVALID_GOAL])
+
+    def test_empty_goal(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        zero_pose.cmd_seq = []
+        zero_pose.plan_and_execute(expected_error_codes=[MoveResult.INVALID_GOAL])
+
+    def test_plan_only(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        zero_pose.allow_self_collision()
+        zero_pose.set_joint_goal(pocky_pose, check=False)
+        zero_pose.add_goal_check(JointGoalChecker(zero_pose.get_god_map(), default_pose))
+        zero_pose.send_goal(goal_type=MoveGoal.PLAN_ONLY)
 
 
 class TestWayPoints(object):
@@ -2211,9 +2209,9 @@ class TestWayPoints(object):
         zero_pose.set_joint_goal(gaya_pose)
 
         traj = zero_pose.send_goal(expected_error_codes=[MoveResult.UNKNOWN_CONSTRAINT,
-                                                                   MoveResult.SUCCESS,
-                                                                   MoveResult.SUCCESS],
-                                             goal_type=MoveGoal.PLAN_AND_EXECUTE_AND_SKIP_FAILURES)
+                                                         MoveResult.SUCCESS,
+                                                         MoveResult.SUCCESS],
+                                   goal_type=MoveGoal.PLAN_AND_EXECUTE_AND_SKIP_FAILURES)
 
         for i, p in enumerate(traj.points):
             js = {joint_name: position for joint_name, position in zip(traj.joint_names, p.positions)}
@@ -2247,9 +2245,9 @@ class TestWayPoints(object):
         zero_pose.set_json_goal(u'muh')
 
         traj = zero_pose.send_goal(expected_error_codes=[MoveResult.SUCCESS,
-                                                                   MoveResult.SUCCESS,
-                                                                   MoveResult.UNKNOWN_CONSTRAINT, ],
-                                             goal_type=MoveGoal.PLAN_AND_EXECUTE_AND_SKIP_FAILURES)
+                                                         MoveResult.SUCCESS,
+                                                         MoveResult.UNKNOWN_CONSTRAINT, ],
+                                   goal_type=MoveGoal.PLAN_AND_EXECUTE_AND_SKIP_FAILURES)
 
         for i, p in enumerate(traj.points):
             js = {joint_name: position for joint_name, position in zip(traj.joint_names, p.positions)}
@@ -2283,9 +2281,9 @@ class TestWayPoints(object):
         zero_pose.set_joint_goal(gaya_pose)
 
         traj = zero_pose.send_goal(expected_error_codes=[MoveResult.SUCCESS,
-                                                                   MoveResult.UNKNOWN_CONSTRAINT,
-                                                                   MoveResult.ERROR],
-                                             goal_type=MoveGoal.PLAN_AND_EXECUTE)
+                                                         MoveResult.UNKNOWN_CONSTRAINT,
+                                                         MoveResult.ERROR],
+                                   goal_type=MoveGoal.PLAN_AND_EXECUTE)
 
         for i, p in enumerate(traj.points):
             js = {joint_name: position for joint_name, position in zip(traj.joint_names, p.positions)}
@@ -2303,7 +2301,7 @@ class TestWayPoints(object):
         """
         zero_pose.set_json_goal(u'muh')
         zero_pose.send_goal(expected_error_codes=[MoveResult.UNKNOWN_CONSTRAINT, ],
-                                      goal_type=MoveGoal.PLAN_AND_EXECUTE_AND_SKIP_FAILURES)
+                            goal_type=MoveGoal.PLAN_AND_EXECUTE_AND_SKIP_FAILURES)
 
     def test_skip_failures2(self, zero_pose):
         """
@@ -2311,7 +2309,7 @@ class TestWayPoints(object):
         """
         zero_pose.set_joint_goal(pocky_pose)
         traj = zero_pose.send_goal(expected_error_codes=[MoveResult.SUCCESS, ],
-                                             goal_type=MoveGoal.PLAN_AND_EXECUTE_AND_SKIP_FAILURES)
+                                   goal_type=MoveGoal.PLAN_AND_EXECUTE_AND_SKIP_FAILURES)
 
         for i, p in enumerate(traj.points):
             js = {joint_name: position for joint_name, position in zip(traj.joint_names, p.positions)}

@@ -27,8 +27,8 @@ class PostProcessing(GiskardBehavior):
 
     @profile
     def update(self):
-        if self.get_god_map().get_data(identifier.check_reachability):
-            raise NotImplementedError()
+        # if self.get_god_map().get_data(identifier.check_reachability):
+        #     raise NotImplementedError()
         e = self.get_blackboard_exception()
 
         cmd_id = self.get_god_map().get_data(identifier.cmd_id)
@@ -41,7 +41,7 @@ class PostProcessing(GiskardBehavior):
             for i in range(len(result.error_codes)-cmd_id):
                 result.error_codes[cmd_id + i] = error_code
                 result.error_messages[cmd_id + i] = error_message
-            logging.logwarn(u'Planning preempted: {}.'.format(error_message))
+            logging.logwarn(u'Planning preempted: \'{}\'.'.format(error_message))
         else:
             if error_code == MoveResult.SUCCESS:
                 logging.loginfo(u'Planning succeeded.')

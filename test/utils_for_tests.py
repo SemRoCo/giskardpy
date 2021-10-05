@@ -262,6 +262,72 @@ def pykdl_frame_to_numpy(pykdl_frame):
                      [0, 0, 0, 1]])
 
 
+class GoalChecker(object):
+    def __init__(self, god_map):
+        """
+        :type god_map: giskardpy.god_map.GodMap
+        """
+        self.god_map = god_map
+        self.world = self.god_map.unsafe_get_data(identifier.world)
+        self.robot = self.god_map.unsafe_get_data(identifier.robot)
+
+
+class JointGoalChecker(GoalChecker):
+    def __init__(self, god_map, goal_state, decimal=2):
+        super(JointGoalChecker, self).__init__(god_map)
+        self.goal_state = goal_state
+        self.decimal = decimal
+
+    def get_current_joint_state(self):
+        """
+        :rtype: JointState
+        """
+        return rospy.wait_for_message('joint_states', JointState)
+
+    def __call__(self):
+        current_joint_state = JointStates.from_msg(self.get_current_joint_state())
+        self.compare_joint_state(current_joint_state, self.goal_state, decimal=self.decimal)
+
+    def compare_joint_state(self, current_js, goal_js, decimal=2):
+        """
+        :type current_js: dict
+        :type goal_js: dict
+        :type decimal: int
+        """
+        for joint_name in goal_js:
+            goal = goal_js[joint_name]
+            current = current_js[PrefixName(joint_name, None)].position
+            if self.world.is_joint_continuous(PrefixName(joint_name, RobotPrefix)):
+                np.testing.assert_almost_equal(shortest_angular_distance(goal, current), 0, decimal=decimal,
+                                               err_msg=u'{}: actual: {} desired: {}'.format(joint_name, current,
+                                                                                            goal))
+            else:
+                np.testing.assert_almost_equal(current, goal, decimal,
+                                               err_msg=u'{}: actual: {} desired: {}'.format(joint_name, current,
+                                                                                            goal))
+
+
+class CartGoalChecker(GoalChecker):
+    def __init__(self, god_map, tip_link, root_link, expected):
+        super(CartGoalChecker, self).__init__(god_map)
+        self.expected = expected
+        self.tip_link = tip_link
+        self.root_link = root_link
+        self.expected = transform_pose(self.root_link, self.expected)
+
+    def __call__(self):
+        expected = self.expected
+        current_pose = lookup_pose(self.root_link, self.tip_link)
+        np.testing.assert_array_almost_equal(msg_to_list(expected.pose.position),
+                                             msg_to_list(current_pose.pose.position), decimal=2)
+
+        try:
+            np.testing.assert_array_almost_equal(msg_to_list(expected.pose.orientation),
+                                                 msg_to_list(current_pose.pose.orientation), decimal=2)
+        except AssertionError:
+            np.testing.assert_array_almost_equal(msg_to_list(expected.pose.orientation),
+                                                 -np.array(msg_to_list(current_pose.pose.orientation)), decimal=2)
+
 class GiskardTestWrapper(GiskardWrapper):
     def __init__(self, config_file):
         # self.pool = ThreadPool(processes=1)
@@ -274,7 +340,6 @@ class GiskardTestWrapper(GiskardWrapper):
         rospy.set_param('~tree/MaxTrajectoryLength/enabled', True)
 
         self.sub_result = rospy.Subscriber('~command/result', MoveActionResult, self.cb, queue_size=100)
-        self.cancel_goal = rospy.Publisher('~command/cancel', GoalID, queue_size=100)
         self.start_motion_sub = rospy.Subscriber('/whole_body_controller/follow_joint_trajectory/goal',
                                                 FollowJointTrajectoryActionGoal, self.start_motion_cb,
                                                  queue_size=100)
@@ -375,14 +440,9 @@ class GiskardTestWrapper(GiskardWrapper):
     def get_controllable_links(self):
         return self.get_robot().get_controlled_links()
 
-    def get_current_joint_state(self):
-        """
-        :rtype: JointState
-        """
-        return rospy.wait_for_message('joint_states', JointState)
-
     def tear_down(self):
         rospy.sleep(1)
+        logging.loginfo('wtf')
         self.heart.shutdown()
         logging.loginfo(u'total time spend giskarding: {}'.format(self.total_time_spend_giskarding - self.total_time_spend_moving))
         logging.loginfo(u'total time spend moving: {}'.format(self.total_time_spend_moving))
@@ -408,34 +468,13 @@ class GiskardTestWrapper(GiskardWrapper):
     # JOINT GOAL STUFF #################################################################################################
     #
 
-    def compare_joint_state(self, current_js, goal_js, decimal=2):
-        """
-        :type current_js: dict
-        :type goal_js: dict
-        :type decimal: int
-        """
-        for joint_name in goal_js:
-            goal = goal_js[joint_name]
-            current = current_js[PrefixName(joint_name, None)].position
-            if self.get_robot().is_joint_continuous(PrefixName(joint_name, RobotPrefix)):
-                np.testing.assert_almost_equal(shortest_angular_distance(goal, current), 0, decimal=decimal,
-                                               err_msg=u'{}: actual: {} desired: {}'.format(joint_name, current, goal))
-            else:
-                np.testing.assert_almost_equal(current, goal, decimal,
-                                               err_msg=u'{}: actual: {} desired: {}'.format(joint_name, current, goal))
-
-    def check_current_joint_state(self, expected, decimal=2):
-        current_joint_state = JointStates.from_msg(self.get_current_joint_state())
-        self.compare_joint_state(current_joint_state, expected, decimal=decimal)
-
-    def send_and_check_joint_goal(self, goal, weight=None, decimal=2, expected_error_codes=(MoveResult.SUCCESS,)):
+    def set_joint_goal(self, goal, weight=None, decimal=2, expected_error_codes=(MoveResult.SUCCESS,), check=True):
         """
         :type goal: dict
         """
-        self.set_joint_goal(goal, weight=weight)
-        self.send_goal(expected_error_codes=expected_error_codes)
-        if expected_error_codes is not None and expected_error_codes[0] == MoveResult.SUCCESS:
-            self.check_current_joint_state(goal, decimal=decimal)
+        super(GiskardTestWrapper, self).set_joint_goal(goal, weight=weight)
+        if check:
+            self.add_goal_check(JointGoalChecker(self.get_god_map(), goal, decimal))
 
     #
     # CART GOAL STUFF ##################################################################################################
@@ -508,25 +547,9 @@ class GiskardTestWrapper(GiskardWrapper):
                                                           max_linear_velocity=linear_velocity,
                                                           max_angular_velocity=angular_velocity)
 
-        class GoalChecker(object):
-            def __init__(self, tip_link, expected):
-                self.expected = expected
-                self.tip_link = tip_link
-
-            def __call__(self):
-                current_pose = lookup_pose(u'map', self.tip_link)
-                np.testing.assert_array_almost_equal(msg_to_list(self.expected.pose.position),
-                                                     msg_to_list(current_pose.pose.position), decimal=2)
-
-                try:
-                    np.testing.assert_array_almost_equal(msg_to_list(self.expected.pose.orientation),
-                                                         msg_to_list(current_pose.pose.orientation), decimal=2)
-                except AssertionError:
-                    np.testing.assert_array_almost_equal(msg_to_list(self.expected.pose.orientation),
-                                                         -np.array(msg_to_list(current_pose.pose.orientation)), decimal=2)
-
-        map_T_goal = transform_pose(u'map', goal_pose)
-        self.add_goal_check(GoalChecker(tip_link, map_T_goal))
+        if check:
+            # map_T_goal = transform_pose(u'map', goal_pose)
+            self.add_goal_check(CartGoalChecker(self.get_god_map(), tip_link, root_link, goal_pose))
 
     def add_goal_check(self, goal_checker):
         self.goal_checks[self.number_of_cmds-1].append(goal_checker)
@@ -570,8 +593,8 @@ class GiskardTestWrapper(GiskardWrapper):
     # GENERAL GOAL STUFF ###############################################################################################
     #
 
-    def interrupt(self):
-        self.cancel_goal.publish(GoalID())
+    # def interrupt(self):
+    #     self.cancel_goal.publish(GoalID())
 
     def check_reachability(self, expected_error_codes=None):
         self.send_and_check_goal(expected_error_codes=expected_error_codes,
@@ -605,32 +628,43 @@ class GiskardTestWrapper(GiskardWrapper):
     #     result = self.results.get()
     #     return result
 
-    def plan_and_execute(self, expected_error_codes=None, stop_after=True):
-        return self.send_goal(expected_error_codes=expected_error_codes)
+    def plan_and_execute(self, expected_error_codes=None, stop_after=None):
+        return self.send_goal(expected_error_codes=expected_error_codes, stop_after=stop_after)
 
     def send_goal(self, expected_error_codes=None, goal_type=MoveGoal.PLAN_AND_EXECUTE, goal=None, stop_after=None):
-        if stop_after is None:
-            r = super(GiskardTestWrapper, self).send_goal(goal_type, wait=True)
-        else:
-            super(GiskardTestWrapper, self).send_goal(goal_type, wait=False)
-            r = self.get_result(stop_after)
-        for cmd_id in range(len(r.error_codes)):
-            error_code = r.error_codes[cmd_id]
-            error_message = r.error_messages[cmd_id]
-            if expected_error_codes is None:
-                expected_error_code = MoveResult.SUCCESS
+        try:
+            time_spend_giskarding = time()
+            if stop_after is None:
+                r = super(GiskardTestWrapper, self).send_goal(goal_type, wait=True)
             else:
-                expected_error_code = expected_error_codes[cmd_id]
-            assert error_code == expected_error_code, \
-                u'in goal {}; got: {}, expected: {} | error_massage: {}'.format(cmd_id, move_result_error_code(error_code),
-                                                                                move_result_error_code(
-                                                                                    expected_error_code),
-                                                                                error_message)
-            if error_code == MoveResult.SUCCESS:
-                for goal_checker in self.goal_checks[cmd_id]:
-                    goal_checker()
-        self.goal_checks = defaultdict(list)
-        self.are_joint_limits_violated()
+                super(GiskardTestWrapper, self).send_goal(goal_type, wait=False)
+                rospy.sleep(stop_after)
+                self.interrupt()
+                rospy.sleep(1)
+                r = self.get_result(rospy.Duration(3))
+            self.total_time_spend_giskarding += time() - time_spend_giskarding
+            for cmd_id in range(len(r.error_codes)):
+                error_code = r.error_codes[cmd_id]
+                error_message = r.error_messages[cmd_id]
+                if expected_error_codes is None:
+                    expected_error_code = MoveResult.SUCCESS
+                else:
+                    expected_error_code = expected_error_codes[cmd_id]
+                assert error_code == expected_error_code, \
+                    u'in goal {}; got: {}, expected: {} | error_massage: {}'.format(cmd_id, move_result_error_code(error_code),
+                                                                                    move_result_error_code(
+                                                                                        expected_error_code),
+                                                                                    error_message)
+                if error_code == MoveResult.SUCCESS:
+                    try:
+                        for goal_checker in self.goal_checks[cmd_id]:
+                            goal_checker()
+                    except:
+                        logging.logerr('Goal #{} did\'t pass test.'.format(cmd_id))
+                        raise
+            self.are_joint_limits_violated()
+        finally:
+            self.goal_checks = defaultdict(list)
         return r.trajectory
 
     def get_result_trajectory_position(self):

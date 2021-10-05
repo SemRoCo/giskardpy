@@ -21,6 +21,9 @@ class SetCmd(GetGoal):
             empty_result = MoveResult()
             empty_result.error_codes = [MoveResult.ERROR for _ in self.goal.cmd_seq]
             empty_result.error_messages = [u'' for _ in self.goal.cmd_seq]
+            if not empty_result.error_codes:
+                empty_result.error_codes = [MoveResult.ERROR]
+                empty_result.error_messages = ['']
             self.traj = []
             if len(self.goal.cmd_seq) == 0:
                 empty_result.error_codes = [MoveResult.INVALID_GOAL]

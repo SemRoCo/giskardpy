@@ -252,20 +252,15 @@ def grow_tree():
     planning_1.add_child(GoalToConstraints(u'update constraints', action_server_name))
     planning_1.add_child(planning_2)
     # ----------------------------------------------
-    post_processing = failure_is_success(Sequence)(u'post planning')
-    # post_processing.add_child(WiggleCancel(u'final wiggle detection', final_detection=True))
-    if god_map.get_data(identifier.PlotTrajectory_enabled):
-        kwargs = god_map.get_data(identifier.PlotTrajectory)
-        post_processing.add_child(PlotTrajectory(u'plot trajectory', **kwargs))
-    if god_map.get_data(identifier.PlotDebugTrajectory_enabled):
-        kwargs = god_map.get_data(identifier.PlotDebugTrajectory)
-        post_processing.add_child(PlotDebugExpressions(u'plot debug expressions', **kwargs))
-    post_processing.add_child(PostProcessing(u'evaluate result'))
-    # ----------------------------------------------
     planning = success_is_failure(Sequence)(u'planning')
     planning.add_child(IF(u'goal_set?', identifier.next_move_goal))
     planning.add_child(planning_1)
-    planning.add_child(post_processing)
+    if god_map.get_data(identifier.PlotTrajectory_enabled):
+        kwargs = god_map.get_data(identifier.PlotTrajectory)
+        planning.add_child(PlotTrajectory(u'plot trajectory', **kwargs))
+    if god_map.get_data(identifier.PlotDebugTrajectory_enabled):
+        kwargs = god_map.get_data(identifier.PlotDebugTrajectory)
+        planning.add_child(PlotDebugExpressions(u'plot debug expressions', **kwargs))
 
     process_move_goal = failure_is_success(Selector)(u'process move goal')
     process_move_goal.add_child(planning)
@@ -277,6 +272,7 @@ def grow_tree():
     root.add_child(wait_for_goal)
     root.add_child(CleanUp(u'cleanup'))
     root.add_child(process_move_goal)
+    root.add_child(PostProcessing(u'evaluate result'))
     root.add_child(move_robot)
     root.add_child(SendResult(u'send result', action_server_name, MoveAction))
 

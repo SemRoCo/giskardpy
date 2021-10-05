@@ -37,7 +37,8 @@ class ActionServerHandler(object):
         :type goal: MoveGoal
         """
         self.goal_queue.put(goal)
-        self.result_queue.get()()
+        result_cb = self.result_queue.get()
+        result_cb()
 
     def pop_goal(self):
         try:
@@ -122,6 +123,7 @@ class GetGoal(ActionServerBehavior):
 class GoalCanceled(ActionServerBehavior):
     def update(self):
         if self.get_as().is_preempt_requested():
+            # logging.logerr('goal preempted')
             self.raise_to_blackboard(PreemptedException(u''))
         if self.get_blackboard_exception() is not None:
             return Status.SUCCESS
@@ -144,6 +146,7 @@ class SendResult(ActionServerBehavior):
         result.trajectory = trajectory.to_msg(sample_period, controlled_joints, True)
 
         if result.error_codes[-1] == MoveResult.PREEMPTED:
+            logging.logerr('Goal preempted')
             self.get_as().send_preempted(result)
             return Status.SUCCESS
         if skip_failures:

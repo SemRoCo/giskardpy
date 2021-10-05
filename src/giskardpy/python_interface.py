@@ -16,7 +16,7 @@ from giskardpy import RobotName
 from giskardpy.goals.goal import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA
 from giskardpy.model.urdf_object import URDFObject
 from giskardpy.model.utils import make_world_body_box, make_world_body_cylinder
-from giskardpy.utils.utils import position_dict_to_joint_states, convert_ros_message_to_dictionary
+from giskardpy.utils.utils import position_dict_to_joint_states, convert_ros_message_to_dictionary, make_pose_from_parts
 
 
 class GiskardWrapper(object):
@@ -560,22 +560,17 @@ class GiskardWrapper(object):
         :rtype: UpdateWorldResponse
         """
         box = make_world_body_box(name, size[0], size[1], size[2])
-        if pose is None:
-            pose = PoseStamped()
-            pose.header.stamp = rospy.Time.now()
-            pose.header.frame_id = str(frame_id)
-            pose.pose.position = Point(*position)
-            pose.pose.orientation = Quaternion(*orientation)
+        pose = make_pose_from_parts(pose=pose, frame_id=frame_id, position=position, orientation=orientation)
         req = UpdateWorldRequest(UpdateWorldRequest.ADD, box, False, pose)
         return self._update_world_srv.call(req)
 
-    def add_sphere(self, name=u'sphere', size=1, frame_id=u'map', position=(0, 0, 0), orientation=(0, 0, 0, 1),
+    def add_sphere(self, name=u'sphere', radius=1, frame_id=u'map', position=(0, 0, 0), orientation=(0, 0, 0, 1),
                    pose=None):
         """
         If pose is used, frame_id, position and orientation are ignored.
         :type name: str
-        :param size: radius in m
-        :type size: list
+        :param radius: in m
+        :type radius: list
         :type frame_id: str
         :type position: list
         :type orientation: list
@@ -585,14 +580,9 @@ class GiskardWrapper(object):
         object = WorldBody()
         object.type = WorldBody.PRIMITIVE_BODY
         object.name = str(name)
-        if pose is None:
-            pose = PoseStamped()
-            pose.header.stamp = rospy.Time.now()
-            pose.header.frame_id = str(frame_id)
-            pose.pose.position = Point(*position)
-            pose.pose.orientation = Quaternion(*orientation)
+        pose = make_pose_from_parts(pose=pose, frame_id=frame_id, position=position, orientation=orientation)
         object.shape.type = SolidPrimitive.SPHERE
-        object.shape.dimensions.append(size)
+        object.shape.dimensions.append(radius)
         req = UpdateWorldRequest(UpdateWorldRequest.ADD, object, False, pose)
         return self._update_world_srv.call(req)
 
@@ -611,12 +601,7 @@ class GiskardWrapper(object):
         object = WorldBody()
         object.type = WorldBody.MESH_BODY
         object.name = str(name)
-        if pose is None:
-            pose = PoseStamped()
-            pose.header.stamp = rospy.Time.now()
-            pose.header.frame_id = str(frame_id)
-            pose.pose.position = Point(*position)
-            pose.pose.orientation = Quaternion(*orientation)
+        pose = make_pose_from_parts(pose=pose, frame_id=frame_id, position=position, orientation=orientation)
         object.mesh = mesh
         req = UpdateWorldRequest(UpdateWorldRequest.ADD, object, False, pose)
         return self._update_world_srv.call(req)
@@ -639,12 +624,7 @@ class GiskardWrapper(object):
         object = WorldBody()
         object.type = WorldBody.PRIMITIVE_BODY
         object.name = str(name)
-        if pose is None:
-            pose = PoseStamped()
-            pose.header.stamp = rospy.Time.now()
-            pose.header.frame_id = str(frame_id)
-            pose.pose.position = Point(*position)
-            pose.pose.orientation = Quaternion(*orientation)
+        pose = make_pose_from_parts(pose=pose, frame_id=frame_id, position=position, orientation=orientation)
         object.shape.type = SolidPrimitive.CYLINDER
         object.shape.dimensions = [0,0]
         object.shape.dimensions[SolidPrimitive.CYLINDER_HEIGHT] = height
@@ -665,17 +645,13 @@ class GiskardWrapper(object):
         """
 
         box = make_world_body_box(name, size[0], size[1], size[2])
-        if pose is None:
-            pose = PoseStamped()
-            pose.header.stamp = rospy.Time.now()
-            pose.header.frame_id = str(frame_id) if frame_id is not None else u'map'
-            pose.pose.position = Point(*(position if position is not None else [0, 0, 0]))
-            pose.pose.orientation = Quaternion(*(orientation if orientation is not None else [0, 0, 0, 1]))
+        pose = make_pose_from_parts(pose=pose, frame_id=frame_id, position=position, orientation=orientation)
 
         req = UpdateWorldRequest(UpdateWorldRequest.ADD, box, True, pose)
         return self._update_world_srv.call(req)
 
-    def attach_cylinder(self, name=u'cylinder', height=1, radius=1, frame_id=None, position=None, orientation=None):
+    def attach_cylinder(self, name=u'cylinder', height=1, radius=1, frame_id=None, position=None, orientation=None,
+                        pose=None):
         """
         Add a cylinder to the world and attach it to the robot at frame_id.
         If pose is used, frame_id, position and orientation are ignored.
@@ -687,11 +663,7 @@ class GiskardWrapper(object):
         :rtype: UpdateWorldResponse
         """
         cylinder = make_world_body_cylinder(name, height, radius)
-        pose = PoseStamped()
-        pose.header.stamp = rospy.Time.now()
-        pose.header.frame_id = str(frame_id) if frame_id is not None else u'map'
-        pose.pose.position = Point(*(position if position is not None else [0, 0, 0]))
-        pose.pose.orientation = Quaternion(*(orientation if orientation is not None else [0, 0, 0, 1]))
+        pose = make_pose_from_parts(pose=pose, frame_id=frame_id, position=position, orientation=orientation)
 
         req = UpdateWorldRequest(UpdateWorldRequest.ADD, cylinder, True, pose)
         return self._update_world_srv.call(req)

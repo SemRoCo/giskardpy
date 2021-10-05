@@ -12,6 +12,7 @@ from py_trees import Status
 from rospy_message_converter.message_converter import convert_ros_message_to_dictionary
 from sensor_msgs.msg import JointState
 from std_srvs.srv import Trigger, TriggerResponse
+from visualization_msgs.msg import MarkerArray, Marker
 
 import giskardpy.identifier as identifier
 from giskardpy import RobotName, RobotPrefix
@@ -40,7 +41,7 @@ class WorldUpdatePlugin(GiskardBehavior):
         # self.bullet = PyBulletSyncer(self.world, self.god_map.get_data(identifier.gui))
         self.bullet = BetterPyBulletSyncer(self.world)
         self.bullet.init_collision_matrix(RobotName)
-        self.god_map.set_data(identifier.bullet, self.bullet)
+        self.god_map.set_data(identifier.collision_scene, self.bullet)
         self.tree_tick_rate = self.god_map.get_data(identifier.tree_tick_rate)/2
         # self.bullet.sync()
         self.acquired = False
@@ -48,6 +49,7 @@ class WorldUpdatePlugin(GiskardBehavior):
 
     def setup(self, timeout=5.0):
         # TODO make service name a parameter
+        self.marker_publisher = rospy.Publisher(u'~visualization_marker_array', MarkerArray, queue_size=1)
         self.srv_update_world = rospy.Service(u'~update_world', UpdateWorld, self.update_world_cb)
         self.get_object_names = rospy.Service(u'~get_object_names', GetObjectNames, self.get_object_names)
         self.get_object_info = rospy.Service(u'~get_object_info', GetObjectInfo, self.get_object_info)
@@ -232,6 +234,7 @@ class WorldUpdatePlugin(GiskardBehavior):
             logging.logwarn('Can\'t update world while Giskard is busy.')
             return response
         with self.get_god_map():
+            self.clear_markers()
             try:
                 if req.operation == UpdateWorldRequest.ADD:
                     if req.rigidly_attached:
@@ -283,6 +286,7 @@ class WorldUpdatePlugin(GiskardBehavior):
                                            u'{}: {}'.format(e.__class__.__name__,
                                                             str(e)))
             finally:
+                self.collision_scene.sync_state()
                 self.lock.release()
 
     def add_object(self, req):
@@ -307,7 +311,6 @@ class WorldUpdatePlugin(GiskardBehavior):
         self.world.move_group(req.body.name,
                                self.world.root_link_name)
         # todo remove all links of deteched subtree
-        # self.bullet.update_collision_matrix(RobotName, removed_links=sub_tree.get_link_names())
         self.bullet.init_collision_matrix(RobotName)
 
     def attach_object(self, req):
@@ -319,9 +322,6 @@ class WorldUpdatePlugin(GiskardBehavior):
             self.add_object(req)
         self.world.move_group(req.body.name, PrefixName(req.pose.header.frame_id, RobotPrefix))
         self.bullet.init_collision_matrix(RobotName)
-        # self.bullet.update_collision_matrix(group_name=RobotName,
-        #                                     added_links=set(product(self.robot.link_names_with_collisions,
-        #                                                             self.world.groups[req.body.name].link_names_with_collisions)))
 
     def remove_object(self, name):
         # assumes that parent has god map lock
@@ -334,3 +334,10 @@ class WorldUpdatePlugin(GiskardBehavior):
     def clear_world(self):
         # assumes that parent has god map lock
         self.unsafe_get_world().hard_reset()
+
+    def clear_markers(self):
+        msg = MarkerArray()
+        marker = Marker()
+        marker.action = Marker.DELETEALL
+        msg.markers.append(marker)
+        self.marker_publisher.publish(msg)

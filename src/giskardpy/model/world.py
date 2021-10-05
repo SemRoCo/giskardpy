@@ -914,7 +914,10 @@ class SubWorldTree(WorldTree):
 
     @property
     def state(self):
-        return {j: self.world.state[j] for j in self.joints if j in self.world.state}
+        """
+        :rtype: JointStates
+        """
+        return JointStates({j: self.world.state[j] for j in self.joints if j in self.world.state})
 
     @state.setter
     def state(self, value):

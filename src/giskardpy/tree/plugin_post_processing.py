@@ -27,8 +27,6 @@ class PostProcessing(GiskardBehavior):
 
     @profile
     def update(self):
-        # if self.get_god_map().get_data(identifier.check_reachability):
-        #     raise NotImplementedError()
         e = self.get_blackboard_exception()
 
         cmd_id = self.get_god_map().get_data(identifier.cmd_id)

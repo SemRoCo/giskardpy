@@ -179,13 +179,13 @@ class GoalToConstraints(GetGoal):
         soft_threshold = None
         for collision_cmd in collision_cmds:
             if collision_cmd.type == CollisionEntry.AVOID_ALL_COLLISIONS or \
-                    self.bullet.is_avoid_all_collision(collision_cmd):
+                    self.collision_scene.is_avoid_all_collision(collision_cmd):
                 soft_threshold = collision_cmd.min_dist
 
-        if not collision_cmds or not self.bullet.is_allow_all_collision(collision_cmds[-1]):
+        if not collision_cmds or not self.collision_scene.is_allow_all_collision(collision_cmds[-1]):
             self.add_external_collision_avoidance_constraints(soft_threshold_override=soft_threshold)
-        if not collision_cmds or (not self.bullet.is_allow_all_collision(collision_cmds[-1]) and
-                                  not self.bullet.is_allow_all_self_collision(collision_cmds[-1])):
+        if not collision_cmds or (not self.collision_scene.is_allow_all_collision(collision_cmds[-1]) and
+                                  not self.collision_scene.is_allow_all_self_collision(collision_cmds[-1])):
             self.add_self_collision_avoidance_constraints()
 
     def add_external_collision_avoidance_constraints(self, soft_threshold_override=None):
@@ -228,7 +228,7 @@ class GoalToConstraints(GetGoal):
         vel_constraints = {}
         debug_expr = {}
         config = self.get_god_map().get_data(identifier.self_collision_avoidance)
-        for link_a_o, link_b_o in self.bullet.collision_matrices[RobotName]:
+        for link_a_o, link_b_o in self.collision_scene.collision_matrices[RobotName]:
             try:
                 link_a, link_b = self.world.compute_chain_reduced_to_controlled_joints(link_a_o, link_b_o)
                 if not self.robot.link_order(link_a, link_b):

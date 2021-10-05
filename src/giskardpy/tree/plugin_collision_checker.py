@@ -52,7 +52,7 @@ class CollisionChecker(GiskardBehavior):
         return default_distance
 
     def initialise(self):
-        self.bullet.sync()
+        self.collision_scene.sync()
         collision_goals = self.get_god_map().get_data(identifier.collision_goal)
         external_distances = self.get_god_map().get_data(identifier.external_collision_avoidance)
         self_distances = self.get_god_map().get_data(identifier.self_collision_avoidance)
@@ -81,8 +81,8 @@ class CollisionChecker(GiskardBehavior):
             else:
                 max_distances[link_name] = distance
 
-        self.collision_matrix = self.bullet.collision_goals_to_collision_matrix(deepcopy(collision_goals),
-                                                                                max_distances)
+        self.collision_matrix = self.collision_scene.collision_goals_to_collision_matrix(deepcopy(collision_goals),
+                                                                                         max_distances)
         self.collision_list_size = self._cal_max_param(u'number_of_repeller')
 
         super(CollisionChecker, self).initialise()
@@ -92,7 +92,7 @@ class CollisionChecker(GiskardBehavior):
         """
         Computes closest point info for all robot links and safes it to the god map.
         """
-        self.bullet.sync_state()
-        collisions = self.bullet.check_collisions(self.collision_matrix, self.collision_list_size)
+        self.collision_scene.sync_state()
+        collisions = self.collision_scene.check_collisions(self.collision_matrix, self.collision_list_size)
         self.god_map.set_data(identifier.closest_point, collisions)
         return Status.RUNNING

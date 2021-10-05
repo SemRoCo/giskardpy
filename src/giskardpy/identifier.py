@@ -4,7 +4,7 @@ fk_pose = world + [u'compute_fk_pose']
 fk_np = world + [u'compute_fk_np']
 joint_states = world + [u'state']
 controlled_joints = ['controlled_joints']
-bullet = ['bullet']
+collision_scene = ['bullet']
 
 # goal_params = [u'goal_params']
 trajectory = [u'traj']

@@ -25,15 +25,15 @@ class GiskardBehavior(Behaviour):
         return self.god_map
 
     @property
-    def bullet(self):
+    def collision_scene(self):
         """
         :rtype: giskardpy.model.pybullet_syncer.PyBulletSyncer
         """
-        return self.god_map.unsafe_get_data(identifier.bullet)
+        return self.god_map.unsafe_get_data(identifier.collision_scene)
 
-    @bullet.setter
-    def bullet(self, value):
-        self.god_map.unsafe_set_data(identifier.bullet, value)
+    @collision_scene.setter
+    def collision_scene(self, value):
+        self.god_map.unsafe_set_data(identifier.collision_scene, value)
 
     @property
     def robot(self):

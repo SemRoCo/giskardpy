@@ -73,8 +73,8 @@ class JointStates(defaultdict):
         def __repr__(self):
             return str(self)
 
-    def __init__(self):
-        super(JointStates, self).__init__(self._JointState)
+    def __init__(self, *args, **kwargs):
+        super(JointStates, self).__init__(self._JointState, *args, **kwargs)
 
     @classmethod
     def from_msg(cls, msg, prefix=None):
@@ -101,6 +101,8 @@ class JointStates(defaultdict):
             new_js[joint_name] = deepcopy(joint_state)
         return new_js
 
+    def to_position_dict(self):
+        return {k: v.position for k, v in self.items()}
 
 class Trajectory(object):
     def __init__(self):

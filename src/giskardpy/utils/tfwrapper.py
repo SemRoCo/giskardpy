@@ -67,8 +67,8 @@ def transform_pose(target_frame, pose):
     if tfBuffer is None:
         init()
     try:
-        transform = tfBuffer.lookup_transform(target_frame,
-                                              pose.header.frame_id,  # source frame
+        transform = tfBuffer.lookup_transform(str(target_frame),
+                                              str(pose.header.frame_id),  # source frame
                                               pose.header.stamp,
                                               rospy.Duration(5.0))
         new_pose = do_transform_pose(pose, transform)
@@ -90,7 +90,7 @@ def transform_vector(target_frame, vector):
         init()
     try:
         transform = tfBuffer.lookup_transform(target_frame,
-                                              vector.header.frame_id,  # source frame
+                                              str(vector.header.frame_id),  # source frame
                                               vector.header.stamp,
                                               rospy.Duration(5.0))
         new_pose = do_transform_vector3(vector, transform)
@@ -112,7 +112,7 @@ def transform_point(target_frame, point):
         init()
     try:
         transform = tfBuffer.lookup_transform(target_frame,
-                                              point.header.frame_id,  # source frame
+                                              str(point.header.frame_id),  # source frame
                                               point.header.stamp,
                                               rospy.Duration(5.0))
         new_pose = do_transform_point(point, transform)
@@ -134,7 +134,7 @@ def lookup_transform(target_frame, source_frame, time=None):
     if tfBuffer is None:
         init()
     try:
-        transform = tfBuffer.lookup_transform(target_frame, source_frame, time, rospy.Duration(5.0))
+        transform = tfBuffer.lookup_transform(str(target_frame), str(source_frame), time, rospy.Duration(5.0))
         return transform
     except:
         return None
@@ -148,7 +148,7 @@ def lookup_pose(target_frame, source_frame, time=None):
     :rtype: PoseStamped
     """
     p = PoseStamped()
-    p.header.frame_id = source_frame
+    p.header.frame_id = str(source_frame)
     if time is not None:
         p.header.stamp = time
     p.pose.orientation.w = 1.0

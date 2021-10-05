@@ -191,13 +191,15 @@ def grow_tree():
 
     god_map = initialize_god_map()
     # ----------------------------------------------
+    sync = Sequence(u'Synchronize')
+    sync.add_child(WorldUpdatePlugin(u'update collision scene'))
+    sync.add_child(ConfigurationPlugin(u'update robot configuration', RobotPrefix))
+    sync.add_child(TFPublisher(u'publish tf', **god_map.get_data(identifier.TFPublisher)))
+    sync.add_child(running_is_success(VisualizationBehavior)(u'visualize collision scene'))
+    # ----------------------------------------------
     wait_for_goal = Sequence(u'wait for goal')
-    wait_for_goal.add_child(WorldUpdatePlugin(u'pybullet updater'))
-    wait_for_goal.add_child(ConfigurationPlugin(u'js1', RobotPrefix))
-    wait_for_goal.add_child(TFPublisher(u'tf', **god_map.get_data(identifier.TFPublisher)))
-    wait_for_goal.add_child(running_is_success(VisualizationBehavior)(u'visualization', clear=True))
+    wait_for_goal.add_child(sync)
     wait_for_goal.add_child(GoalReceived(u'has goal', action_server_name, MoveAction))
-    wait_for_goal.add_child(ConfigurationPlugin(u'js2', RobotPrefix))
     # ----------------------------------------------
     planning_4 = PluginBehavior(u'planning IIII', sleep=0)
     planning_4.add_plugin(CollisionChecker(u'collision checker'))

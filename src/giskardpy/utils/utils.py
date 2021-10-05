@@ -12,6 +12,7 @@ from itertools import product
 import numpy as np
 import pylab as plt
 import rospkg
+import rospy
 from geometry_msgs.msg import PointStamped, Point, Vector3Stamped, Vector3, Pose, PoseStamped, QuaternionStamped, \
     Quaternion
 from rospy_message_converter.message_converter import \
@@ -338,6 +339,16 @@ def memoize(function):
             return rv
 
     return wrapper
+
+
+def make_pose_from_parts(pose, frame_id, position, orientation):
+    if pose is None:
+        pose = PoseStamped()
+        pose.header.stamp = rospy.Time.now()
+        pose.header.frame_id = str(frame_id) if frame_id is not None else u'map'
+        pose.pose.position = Point(*(position if position is not None else [0, 0, 0]))
+        pose.pose.orientation = Quaternion(*(orientation if orientation is not None else [0, 0, 0, 1]))
+    return pose
 
 
 def convert_ros_message_to_dictionary(message):

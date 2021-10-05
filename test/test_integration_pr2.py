@@ -228,32 +228,33 @@ def fake_table_setup(pocky_pose_setup):
 @pytest.fixture()
 def kitchen_setup(resetted_giskard):
     """
-    :type resetted_giskard: GiskardTestWrapper
+    :type resetted_giskard: PR2
     :return:
     """
     resetted_giskard.allow_all_collisions()
-    resetted_giskard.send_and_check_joint_goal(gaya_pose)
+    resetted_giskard.set_joint_goal(gaya_pose)
+    resetted_giskard.plan_and_execute()
     object_name = u'kitchen'
     resetted_giskard.add_urdf(object_name, rospy.get_param(u'kitchen_description'),
                               tf.lookup_pose(u'map', u'iai_kitchen/world'), u'/kitchen/joint_states',
                               set_js_topic=u'/kitchen/cram_joint_states')
-    js = {k.short_name: 0.0 for k in resetted_giskard.get_world().groups[object_name].movable_joints}
+    js = {k.short_name: 0.0 for k in resetted_giskard.world.groups[object_name].movable_joints}
     resetted_giskard.set_kitchen_js(js)
     return resetted_giskard
 
 
 class TestFk(object):
     def test_fk(self, zero_pose):
-        for root, tip in itertools.product(zero_pose.get_robot().link_names, repeat=2):
-            fk1 = zero_pose.get_god_map().get_data(fk_pose + [(root, tip)])
+        for root, tip in itertools.product(zero_pose.robot.link_names, repeat=2):
+            fk1 = zero_pose.god_map.get_data(fk_pose + [(root, tip)])
             fk2 = tf.lookup_pose(str(root), str(tip))
             compare_poses(fk1.pose, fk2.pose)
 
     def test_fk_attached(self, zero_pose):
         pocky = u'box'
         zero_pose.attach_box(pocky, [0.1, 0.02, 0.02], zero_pose.r_tip, [0.05, 0, 0], [1, 0, 0, 0])
-        for root, tip in itertools.product(zero_pose.get_robot().link_names, [pocky]):
-            fk1 = zero_pose.get_god_map().get_data(fk_pose + [(root, tip)])
+        for root, tip in itertools.product(zero_pose.robot.link_names, [pocky]):
+            fk1 = zero_pose.god_map.get_data(fk_pose + [(root, tip)])
             fk2 = tf.lookup_pose(str(root), str(tip))
             compare_poses(fk1.pose, fk2.pose)
 
@@ -300,9 +301,9 @@ class TestJointGoals(object):
         :type zero_pose: PR2
         """
         zero_pose.allow_self_collision()
-        r_elbow_flex_joint_limits = zero_pose.get_robot().get_joint_position_limits('r_elbow_flex_joint')
-        torso_lift_joint_limits = zero_pose.get_robot().get_joint_position_limits('torso_lift_joint')
-        head_pan_joint_limits = zero_pose.get_robot().get_joint_position_limits('head_pan_joint')
+        r_elbow_flex_joint_limits = zero_pose.robot.get_joint_position_limits('r_elbow_flex_joint')
+        torso_lift_joint_limits = zero_pose.robot.get_joint_position_limits('torso_lift_joint')
+        head_pan_joint_limits = zero_pose.robot.get_joint_position_limits('head_pan_joint')
 
         goal_js = {u'r_elbow_flex_joint': r_elbow_flex_joint_limits[0] - 0.2,
                    u'torso_lift_joint': torso_lift_joint_limits[0] - 0.2,
@@ -339,8 +340,8 @@ class TestConstraints(object):
         })
         zero_pose.allow_all_collisions()
         zero_pose.send_and_check_goal()
-        assert zero_pose.get_robot().joint_state[joint_name].position <= upper_limit + 2e-3
-        assert zero_pose.get_robot().joint_state[joint_name].position >= lower_limit - 2e-3
+        assert zero_pose.robot.joint_state[joint_name].position <= upper_limit + 2e-3
+        assert zero_pose.robot.joint_state[joint_name].position >= lower_limit - 2e-3
 
         zero_pose.set_json_goal(u'JointPositionRange',
                                 joint_name=joint_name,
@@ -351,8 +352,8 @@ class TestConstraints(object):
         })
         zero_pose.allow_all_collisions()
         zero_pose.send_and_check_goal()
-        assert zero_pose.get_robot().joint_state[joint_name].position <= upper_limit
-        assert zero_pose.get_robot().joint_state[joint_name].position >= lower_limit
+        assert zero_pose.robot.joint_state[joint_name].position <= upper_limit
+        assert zero_pose.robot.joint_state[joint_name].position >= lower_limit
 
         zero_pose.set_json_goal(u'JointPositionRange',
                                 joint_name=joint_name,
@@ -454,7 +455,7 @@ class TestConstraints(object):
                                 goal=joint_goal,
                                 max_velocity=0.5)
         zero_pose.send_and_check_goal()
-        np.testing.assert_almost_equal(zero_pose.get_robot().joint_state[joint].position, joint_goal, decimal=3)
+        np.testing.assert_almost_equal(zero_pose.robot.joint_state[joint].position, joint_goal, decimal=3)
 
     def test_JointPositionContinuous(self, zero_pose):
         """
@@ -468,7 +469,7 @@ class TestConstraints(object):
                                 goal=joint_goal,
                                 max_velocity=1)
         zero_pose.send_and_check_goal()
-        np.testing.assert_almost_equal(zero_pose.get_robot().joint_state[joint].position, -2.283, decimal=3)
+        np.testing.assert_almost_equal(zero_pose.robot.joint_state[joint].position, -2.283, decimal=3)
 
     def test_CartesianOrientation(self, zero_pose):
         """
@@ -550,7 +551,7 @@ class TestConstraints(object):
                                           angular_velocity=eef_angular_velocity,
                                           weight=WEIGHT_BELOW_CA)
 
-        for time, state in zero_pose.get_god_map().get_data(identifier.debug_trajectory).items():
+        for time, state in zero_pose.god_map.get_data(identifier.debug_trajectory).items():
             key = '{}/{}/{}/{}/trans_error'.format('CartesianVelocityLimit',
                                                    'TranslationVelocityLimit',
                                                    zero_pose.default_root,
@@ -568,14 +569,14 @@ class TestConstraints(object):
         zero_pose.avoid_joint_limits(percentage=percentage)
         zero_pose.send_and_check_goal()
 
-        joint_non_continuous = [j for j in zero_pose.get_robot().controlled_joints if
-                                not zero_pose.get_robot().is_joint_continuous(j)]
+        joint_non_continuous = [j for j in zero_pose.robot.controlled_joints if
+                                not zero_pose.robot.is_joint_continuous(j)]
 
         current_joint_state = to_joint_state_position_dict(zero_pose.get_current_joint_state())
         percentage *= 0.99  # if will not reach the exact percentager, because the weight is so low
         for joint in joint_non_continuous:
             position = current_joint_state[joint]
-            lower_limit, upper_limit = zero_pose.get_robot().get_joint_position_limits(joint)
+            lower_limit, upper_limit = zero_pose.robot.get_joint_position_limits(joint)
             joint_range = upper_limit - lower_limit
             center = (upper_limit + lower_limit) / 2.
             upper_limit2 = center + joint_range / 2. * (1 - percentage / 100.)
@@ -587,9 +588,9 @@ class TestConstraints(object):
         :type zero_pose: PR2
         """
         percentage = 10
-        joints = [j for j in zero_pose.get_robot().controlled_joints if
-                  not zero_pose.get_robot().is_joint_continuous(j)]
-        goal_state = {j: zero_pose.get_robot().get_joint_position_limits(j)[1] for j in joints}
+        joints = [j for j in zero_pose.robot.controlled_joints if
+                  not zero_pose.robot.is_joint_continuous(j)]
+        goal_state = {j: zero_pose.robot.get_joint_position_limits(j)[1] for j in joints}
         del goal_state[u'odom_x_joint']
         del goal_state[u'odom_y_joint']
         zero_pose.allow_self_collision()
@@ -603,14 +604,14 @@ class TestConstraints(object):
                                 percentage=percentage)
         zero_pose.send_and_check_goal()
 
-        joint_non_continuous = [j for j in zero_pose.get_robot().controlled_joints if
-                                not zero_pose.get_robot().is_joint_continuous(j)]
+        joint_non_continuous = [j for j in zero_pose.robot.controlled_joints if
+                                not zero_pose.robot.is_joint_continuous(j)]
 
         current_joint_state = to_joint_state_position_dict(zero_pose.get_current_joint_state())
         percentage *= 0.9  # if will not reach the exact percentage, because the weight is so low
         for joint in joint_non_continuous:
             position = current_joint_state[joint]
-            lower_limit, upper_limit = zero_pose.get_robot().get_joint_position_limits(joint)
+            lower_limit, upper_limit = zero_pose.robot.get_joint_position_limits(joint)
             joint_range = upper_limit - lower_limit
             center = (upper_limit + lower_limit) / 2.
             upper_limit2 = center + joint_range / 2. * (1 - percentage / 100.)
@@ -622,9 +623,9 @@ class TestConstraints(object):
         :type pocky_pose_setup: PR2
         """
         joint_velocity_weight = identifier.joint_weights + [u'velocity', u'override']
-        old_torso_value = pocky_pose_setup.get_god_map().get_data(
+        old_torso_value = pocky_pose_setup.god_map.get_data(
             joint_velocity_weight + [u'torso_lift_joint'])
-        old_odom_x_value = pocky_pose_setup.get_god_map().get_data(joint_velocity_weight + [u'odom_x_joint'])
+        old_odom_x_value = pocky_pose_setup.god_map.get_data(joint_velocity_weight + [u'odom_x_joint'])
 
         r_goal = PoseStamped()
         r_goal.header.frame_id = pocky_pose_setup.r_tip
@@ -654,9 +655,9 @@ class TestConstraints(object):
         new_pose = tf.lookup_pose(u'map', u'base_footprint')
         compare_poses(new_pose.pose, old_pose.pose)
 
-        assert pocky_pose_setup.get_god_map().unsafe_get_data(
+        assert pocky_pose_setup.god_map.unsafe_get_data(
             joint_velocity_weight + [u'odom_x_joint']) == 1000000
-        assert pocky_pose_setup.get_god_map().unsafe_get_data(
+        assert pocky_pose_setup.god_map.unsafe_get_data(
             joint_velocity_weight + [u'torso_lift_joint']) == old_torso_value
 
         updates = {
@@ -683,14 +684,14 @@ class TestConstraints(object):
 
         # compare_poses(old_pose.pose, new_pose.pose)
         assert new_pose.pose.position.x >= 0.03
-        assert pocky_pose_setup.get_god_map().unsafe_get_data(
+        assert pocky_pose_setup.god_map.unsafe_get_data(
             joint_velocity_weight + [u'odom_x_joint']) == 0.0001
-        assert pocky_pose_setup.get_god_map().unsafe_get_data(
+        assert pocky_pose_setup.god_map.unsafe_get_data(
             joint_velocity_weight + [u'torso_lift_joint']) == old_torso_value
         pocky_pose_setup.send_and_check_goal()
-        assert pocky_pose_setup.get_god_map().unsafe_get_data(
+        assert pocky_pose_setup.god_map.unsafe_get_data(
             joint_velocity_weight + [u'odom_x_joint']) == old_odom_x_value
-        assert pocky_pose_setup.get_god_map().unsafe_get_data(
+        assert pocky_pose_setup.god_map.unsafe_get_data(
             joint_velocity_weight + [u'torso_lift_joint']) == old_torso_value
 
     def test_UpdateGodMap2(self, pocky_pose_setup):
@@ -698,10 +699,10 @@ class TestConstraints(object):
         :type pocky_pose_setup: PR2
         """
         joint_velocity_weight = identifier.joint_weights + [u'velocity', u'override']
-        old_torso_value = pocky_pose_setup.get_god_map().get_data(
+        old_torso_value = pocky_pose_setup.god_map.get_data(
             joint_velocity_weight + [u'torso_lift_joint'])
-        old_odom_x_value = pocky_pose_setup.get_god_map().get_data(joint_velocity_weight + [u'odom_x_joint'])
-        old_odom_y_value = pocky_pose_setup.get_god_map().get_data(joint_velocity_weight + [u'odom_y_joint'])
+        old_odom_x_value = pocky_pose_setup.god_map.get_data(joint_velocity_weight + [u'odom_x_joint'])
+        old_odom_y_value = pocky_pose_setup.god_map.get_data(joint_velocity_weight + [u'odom_y_joint'])
 
         r_goal = PoseStamped()
         r_goal.header.frame_id = pocky_pose_setup.r_tip
@@ -725,11 +726,11 @@ class TestConstraints(object):
         pocky_pose_setup.update_god_map(updates)
         pocky_pose_setup.set_cart_goal(r_goal, pocky_pose_setup.r_tip)
         pocky_pose_setup.send_and_check_goal(expected_error_codes=[MoveResult.ERROR])
-        assert pocky_pose_setup.get_god_map().unsafe_get_data(
+        assert pocky_pose_setup.god_map.unsafe_get_data(
             joint_velocity_weight + [u'odom_x_joint']) == old_odom_x_value
-        assert pocky_pose_setup.get_god_map().unsafe_get_data(
+        assert pocky_pose_setup.god_map.unsafe_get_data(
             joint_velocity_weight + [u'odom_y_joint']) == old_odom_y_value
-        assert pocky_pose_setup.get_god_map().get_data(
+        assert pocky_pose_setup.god_map.get_data(
             joint_velocity_weight + [u'torso_lift_joint']) == old_torso_value
 
     def test_UpdateGodMap3(self, pocky_pose_setup):
@@ -737,9 +738,9 @@ class TestConstraints(object):
         :type pocky_pose_setup: PR2
         """
         joint_velocity_weight = identifier.joint_weights + [u'velocity', u'override']
-        old_torso_value = pocky_pose_setup.get_god_map().get_data(
+        old_torso_value = pocky_pose_setup.god_map.get_data(
             joint_velocity_weight + [u'torso_lift_joint'])
-        old_odom_x_value = pocky_pose_setup.get_god_map().get_data(joint_velocity_weight + [u'odom_x_joint'])
+        old_odom_x_value = pocky_pose_setup.god_map.get_data(joint_velocity_weight + [u'odom_x_joint'])
 
         r_goal = PoseStamped()
         r_goal.header.frame_id = pocky_pose_setup.r_tip
@@ -755,9 +756,9 @@ class TestConstraints(object):
         pocky_pose_setup.update_god_map(updates)
         pocky_pose_setup.set_cart_goal(r_goal, pocky_pose_setup.r_tip)
         pocky_pose_setup.send_and_check_goal(expected_error_codes=[MoveResult.ERROR])
-        assert pocky_pose_setup.get_god_map().unsafe_get_data(
+        assert pocky_pose_setup.god_map.unsafe_get_data(
             joint_velocity_weight + [u'odom_x_joint']) == old_odom_x_value
-        assert pocky_pose_setup.get_god_map().unsafe_get_data(
+        assert pocky_pose_setup.god_map.unsafe_get_data(
             joint_velocity_weight + [u'torso_lift_joint']) == old_torso_value
 
     def test_pointing(self, kitchen_setup):
@@ -2063,7 +2064,7 @@ class TestActionServerEvents(object):
         """
         zero_pose.allow_self_collision()
         zero_pose.set_joint_goal(pocky_pose, check=False)
-        zero_pose.add_goal_check(JointGoalChecker(zero_pose.get_god_map(), default_pose))
+        zero_pose.add_goal_check(JointGoalChecker(zero_pose.god_map, default_pose))
         zero_pose.send_goal(goal_type=MoveGoal.PLAN_ONLY)
 
 
@@ -2326,9 +2327,9 @@ class TestWayPoints(object):
 
 class TestShaking(object):
     def test_wiggle_prismatic_joint_neglectable_shaking(self, kitchen_setup):
-        sample_period = kitchen_setup.get_god_map().get_data(identifier.sample_period)
-        frequency_range = kitchen_setup.get_god_map().get_data(identifier.frequency_range)
-        amplitude_threshold = kitchen_setup.get_god_map().get_data(identifier.amplitude_threshold)
+        sample_period = kitchen_setup.god_map.get_data(identifier.sample_period)
+        frequency_range = kitchen_setup.god_map.get_data(identifier.frequency_range)
+        amplitude_threshold = kitchen_setup.god_map.get_data(identifier.amplitude_threshold)
         max_detectable_freq = int(1 / (2 * sample_period))
         min_wiggle_frequency = int(frequency_range * max_detectable_freq)
         while np.fmod(min_wiggle_frequency, 5.0) != 0.0:
@@ -2354,9 +2355,9 @@ class TestShaking(object):
                 kitchen_setup.send_and_check_goal()
 
     def test_wiggle_revolute_joint_neglectable_shaking(self, kitchen_setup):
-        sample_period = kitchen_setup.get_god_map().get_data(identifier.sample_period)
-        frequency_range = kitchen_setup.get_god_map().get_data(identifier.frequency_range)
-        amplitude_threshold = kitchen_setup.get_god_map().get_data(identifier.amplitude_threshold)
+        sample_period = kitchen_setup.god_map.get_data(identifier.sample_period)
+        frequency_range = kitchen_setup.god_map.get_data(identifier.frequency_range)
+        amplitude_threshold = kitchen_setup.god_map.get_data(identifier.amplitude_threshold)
         max_detectable_freq = int(1 / (2 * sample_period))
         min_wiggle_frequency = int(frequency_range * max_detectable_freq)
         while np.fmod(min_wiggle_frequency, 5.0) != 0.0:
@@ -2380,9 +2381,9 @@ class TestShaking(object):
                 kitchen_setup.send_and_check_goal()
 
     def test_wiggle_continuous_joint_neglectable_shaking(self, kitchen_setup):
-        sample_period = kitchen_setup.get_god_map().get_data(identifier.sample_period)
-        frequency_range = kitchen_setup.get_god_map().get_data(identifier.frequency_range)
-        amplitude_threshold = kitchen_setup.get_god_map().get_data(identifier.amplitude_threshold)
+        sample_period = kitchen_setup.god_map.get_data(identifier.sample_period)
+        frequency_range = kitchen_setup.god_map.get_data(identifier.frequency_range)
+        amplitude_threshold = kitchen_setup.god_map.get_data(identifier.amplitude_threshold)
         max_detectable_freq = int(1 / (2 * sample_period))
         min_wiggle_frequency = int(frequency_range * max_detectable_freq)
         while np.fmod(min_wiggle_frequency, 5.0) != 0.0:
@@ -2406,8 +2407,8 @@ class TestShaking(object):
                 kitchen_setup.send_and_check_goal()
 
     def test_wiggle_revolute_joint_shaking(self, kitchen_setup):
-        sample_period = kitchen_setup.get_god_map().get_data(identifier.sample_period)
-        frequency_range = kitchen_setup.get_god_map().get_data(identifier.frequency_range)
+        sample_period = kitchen_setup.god_map.get_data(identifier.sample_period)
+        frequency_range = kitchen_setup.god_map.get_data(identifier.frequency_range)
         max_detectable_freq = int(1 / (2 * sample_period))
         min_wiggle_frequency = int(frequency_range * max_detectable_freq)
         while np.fmod(min_wiggle_frequency, 5.0) != 0.0:
@@ -2440,8 +2441,8 @@ class TestShaking(object):
         """
         :type kitchen_setup: PR2
         """
-        sample_period = kitchen_setup.get_god_map().get_data(identifier.sample_period)
-        frequency_range = kitchen_setup.get_god_map().get_data(identifier.frequency_range)
+        sample_period = kitchen_setup.god_map.get_data(identifier.sample_period)
+        frequency_range = kitchen_setup.god_map.get_data(identifier.frequency_range)
         max_detectable_freq = int(1 / (2 * sample_period))
         min_wiggle_frequency = int(frequency_range * max_detectable_freq)
         while np.fmod(min_wiggle_frequency, 5.0) != 0.0:
@@ -2474,8 +2475,8 @@ class TestShaking(object):
         """
         :type kitchen_setup: PR2
         """
-        sample_period = kitchen_setup.get_god_map().get_data(identifier.sample_period)
-        frequency_range = kitchen_setup.get_god_map().get_data(identifier.frequency_range)
+        sample_period = kitchen_setup.god_map.get_data(identifier.sample_period)
+        frequency_range = kitchen_setup.god_map.get_data(identifier.frequency_range)
         max_detectable_freq = int(1 / (2 * sample_period))
         min_wiggle_frequency = int(frequency_range * max_detectable_freq)
         while np.fmod(min_wiggle_frequency, 5.0) != 0.0:
@@ -2505,9 +2506,9 @@ class TestShaking(object):
                 # assert any(map(lambda f_str: float(f_str[:-6]) == target_freq, freqs_str))
 
     def test_only_revolute_joint_shaking(self, kitchen_setup):
-        sample_period = kitchen_setup.get_god_map().get_data(identifier.sample_period)
-        frequency_range = kitchen_setup.get_god_map().get_data(identifier.frequency_range)
-        amplitude_threshold = kitchen_setup.get_god_map().get_data(identifier.amplitude_threshold)
+        sample_period = kitchen_setup.god_map.get_data(identifier.sample_period)
+        frequency_range = kitchen_setup.god_map.get_data(identifier.frequency_range)
+        amplitude_threshold = kitchen_setup.god_map.get_data(identifier.amplitude_threshold)
         max_detectable_freq = int(1 / (2 * sample_period))
         min_wiggle_frequency = int(frequency_range * max_detectable_freq)
         while np.fmod(min_wiggle_frequency, 5.0) != 0.0:
@@ -2541,9 +2542,9 @@ class TestShaking(object):
                 # assert any(map(lambda f_str: float(f_str[:-6]) == target_freq, freqs_str))
 
     def test_only_revolute_joint_neglectable_shaking(self, kitchen_setup):
-        sample_period = kitchen_setup.get_god_map().get_data(identifier.sample_period)
-        frequency_range = kitchen_setup.get_god_map().get_data(identifier.frequency_range)
-        amplitude_threshold = kitchen_setup.get_god_map().get_data(identifier.amplitude_threshold)
+        sample_period = kitchen_setup.god_map.get_data(identifier.sample_period)
+        frequency_range = kitchen_setup.god_map.get_data(identifier.frequency_range)
+        amplitude_threshold = kitchen_setup.god_map.get_data(identifier.amplitude_threshold)
         max_detectable_freq = int(1 / (2 * sample_period))
         min_wiggle_frequency = int(frequency_range * max_detectable_freq)
         while np.fmod(min_wiggle_frequency, 5.0) != 0.0:
@@ -2613,6 +2614,9 @@ class TestCollisionAvoidanceGoals(object):
                          u'sink_area_left_middle_drawer_main_joint')
 
     def test_handover(self, kitchen_setup):
+        """
+        :type kitchen_setup: PR2
+        """
         js = {
             "l_shoulder_pan_joint": 1.0252138037286773,
             "l_shoulder_lift_joint": - 0.06966848987919201,
@@ -2622,7 +2626,9 @@ class TestCollisionAvoidanceGoals(object):
             "l_wrist_flex_joint": - 1.8416233909065576,
             "l_wrist_roll_joint": 2.907373693068033,
         }
-        kitchen_setup.send_and_check_joint_goal(js)
+        kitchen_setup.set_joint_goal(js)
+        kitchen_setup.allow_all_collisions()
+        kitchen_setup.plan_and_execute()
 
         kitchen_setup.attach_box(size=[0.08, 0.16, 0.16],
                                  frame_id=kitchen_setup.l_tip,
@@ -2641,8 +2647,7 @@ class TestCollisionAvoidanceGoals(object):
                                     linear_velocity=0.2,
                                     angular_velocity=1
                                     )
-        kitchen_setup.send_and_check_goal()
-        kitchen_setup.check_cart_goal(kitchen_setup.r_tip, r_goal)
+        kitchen_setup.plan_and_execute()
 
         kitchen_setup.detach_object('box')
         kitchen_setup.attach_object('box', kitchen_setup.r_tip)
@@ -2652,10 +2657,9 @@ class TestCollisionAvoidanceGoals(object):
         r_goal2.pose.position.x -= -.1
         r_goal2.pose.orientation.w = 1
 
-        kitchen_setup.set_cart_goal(r_goal2, u'box', root_link=kitchen_setup.l_tip,
-                                    )
+        kitchen_setup.set_cart_goal(r_goal2, u'box', root_link=kitchen_setup.l_tip)
         # kitchen_setup.allow_all_collisions()
-        kitchen_setup.send_and_check_goal()
+        kitchen_setup.plan_and_execute()
         # kitchen_setup.check_cart_goal(u'box', r_goal2)
 
     def test_add_box(self, zero_pose):
@@ -2678,7 +2682,7 @@ class TestCollisionAvoidanceGoals(object):
         p.header.frame_id = zero_pose.r_tip
         p.pose.position = Point(0.1, 0, 0)
         p.pose.orientation = Quaternion(0, 0, 0, 1)
-        zero_pose.add_mesh(object_name, path=u'package://giskardpy/test/urdfs/meshes/bowl_21.obj', pose=p)
+        zero_pose.add_mesh(object_name, mesh=u'package://giskardpy/test/urdfs/meshes/bowl_21.obj', pose=p)
         pass
 
     def test_add_non_existing_mesh(self, zero_pose):
@@ -2691,7 +2695,7 @@ class TestCollisionAvoidanceGoals(object):
         p.pose.position = Point(0.1, 0, 0)
         p.pose.orientation = Quaternion(0, 0, 0, 1)
         zero_pose.add_mesh(object_name, path=u'package://giskardpy/test/urdfs/meshes/muh.obj', pose=p,
-                           expected_response=UpdateWorldResponse.CORRUPT_MESH_ERROR)
+                           expected_error_code=UpdateWorldResponse.CORRUPT_MESH_ERROR)
 
     def test_mesh_collision_avoidance(self, zero_pose):
         """
@@ -2704,7 +2708,7 @@ class TestCollisionAvoidanceGoals(object):
         p.pose.position = Point(0.01, 0, 0)
         p.pose.orientation = Quaternion(*quaternion_about_axis(-np.pi / 2, [0, 1, 0]))
         zero_pose.add_mesh(object_name, path=u'package://giskardpy/test/urdfs/meshes/bowl_21.obj', pose=p)
-        # m = zero_pose.get_world().get_object(object_name).as_marker_msg()
+        # m = zero_pose.world.get_object(object_name).as_marker_msg()
         # compare_poses(m.pose, p.pose)
         zero_pose.send_and_check_goal()
         pass
@@ -2719,7 +2723,7 @@ class TestCollisionAvoidanceGoals(object):
         p.pose.position = Point(1.2, 0, 1.6)
         p.pose.orientation = Quaternion(0.0, 0.0, 0.47942554, 0.87758256)
         zero_pose.add_box(object_name, pose=p)
-        zero_pose.add_box(object_name, pose=p, expected_response=UpdateWorldResponse.DUPLICATE_BODY_ERROR)
+        zero_pose.add_box(object_name, pose=p, expected_error_code=UpdateWorldResponse.DUPLICATE_BODY_ERROR)
 
     def test_add_remove_sphere(self, zero_pose):
         """
@@ -2774,7 +2778,7 @@ class TestCollisionAvoidanceGoals(object):
         zero_pose.set_cart_goal(p, pocky, zero_pose.default_root)
         p = tf.transform_pose(zero_pose.default_root, p)
         zero_pose.send_and_check_goal()
-        p2 = zero_pose.get_robot().compute_fk_pose(zero_pose.default_root, pocky)
+        p2 = zero_pose.robot.compute_fk_pose(zero_pose.default_root, pocky)
         compare_poses(p2.pose, p.pose)
         zero_pose.detach_object(pocky)
         p = PoseStamped()
@@ -2826,7 +2830,7 @@ class TestCollisionAvoidanceGoals(object):
         p.pose.orientation = Quaternion(0., 0., 0.47942554, 0.87758256)
         zero_pose.add_box(pocky, [0.1, 0.02, 0.02], pose=p)
         zero_pose.attach_object(pocky, frame_id=zero_pose.r_tip)
-        relative_pose = zero_pose.get_robot().compute_fk_pose(zero_pose.r_tip, pocky).pose
+        relative_pose = zero_pose.robot.compute_fk_pose(zero_pose.r_tip, pocky).pose
         compare_poses(p.pose, relative_pose)
 
     def test_add_attach_detach_remove_add(self, zero_pose):
@@ -2856,7 +2860,7 @@ class TestCollisionAvoidanceGoals(object):
         old_p.pose.orientation = Quaternion(0., 0., 0.47942554, 0.87758256)
         zero_pose.add_box(pocky, [0.1, 0.02, 0.02], pose=old_p)
         zero_pose.attach_object(pocky, frame_id=zero_pose.r_tip)
-        relative_pose = zero_pose.get_robot().compute_fk_pose(zero_pose.r_tip, pocky).pose
+        relative_pose = zero_pose.robot.compute_fk_pose(zero_pose.r_tip, pocky).pose
         compare_poses(old_p.pose, relative_pose)
 
         p = PoseStamped()
@@ -2881,7 +2885,7 @@ class TestCollisionAvoidanceGoals(object):
         zero_pose.set_cart_goal(p, pocky)
         p = tf.transform_pose(zero_pose.default_root, p)
         zero_pose.send_and_check_goal()
-        p2 = zero_pose.get_robot().compute_fk_pose(zero_pose.default_root, pocky)
+        p2 = zero_pose.robot.compute_fk_pose(zero_pose.default_root, pocky)
         compare_poses(p2.pose, p.pose)
 
         zero_pose.clear_world()
@@ -2892,7 +2896,7 @@ class TestCollisionAvoidanceGoals(object):
         old_p.pose.orientation = Quaternion(0., 0., 0.47942554, 0.87758256)
         zero_pose.add_box(pocky, [0.1, 0.02, 0.02], pose=old_p)
         zero_pose.attach_object(pocky, frame_id=zero_pose.r_tip)
-        relative_pose = zero_pose.get_robot().compute_fk_pose(zero_pose.r_tip, pocky).pose
+        relative_pose = zero_pose.robot.compute_fk_pose(zero_pose.r_tip, pocky).pose
         compare_poses(old_p.pose, relative_pose)
 
         p = PoseStamped()
@@ -4781,7 +4785,7 @@ class TestCollisionAvoidanceGoals(object):
         base_goal.pose.orientation.w = 1
         kitchen_setup.avoid_joint_limits(percentage=percentage)
         kitchen_setup.allow_collision(robot_links=[tray_name],
-                                      body_b=kitchen_setup.get_robot().get_name(),
+                                      body_b=kitchen_setup.robot.get_name(),
                                       link_bs=kitchen_setup.get_l_gripper_links())
         # kitchen_setup.allow_self_collision()
         # drive back
@@ -4802,7 +4806,7 @@ class TestCollisionAvoidanceGoals(object):
         tray_goal.pose.orientation = Quaternion(*quaternion_about_axis(-1, [0, 1, 0]))
         kitchen_setup.avoid_joint_limits(percentage=percentage)
         kitchen_setup.allow_collision(robot_links=[tray_name],
-                                      body_b=kitchen_setup.get_robot().get_name(),
+                                      body_b=kitchen_setup.robot.get_name(),
                                       link_bs=kitchen_setup.get_l_gripper_links())
         kitchen_setup.set_and_check_cart_goal(tray_goal, tray_name, u'base_footprint')
         # kitchen_setup.allow_self_collision()
@@ -4827,7 +4831,7 @@ class TestCollisionAvoidanceGoals(object):
     #     base_pose.pose.position.y = -1.1
     #     base_pose.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 2, [0, 0, 1]))
     #     kitchen_setup.teleport_base(base_pose)
-    #     # m = zero_pose.get_world().get_object(object_name).as_marker_msg()
+    #     # m = zero_pose.world.get_object(object_name).as_marker_msg()
     #     # compare_poses(m.pose, p.pose)
     #
     #     hand_goal = PoseStamped()

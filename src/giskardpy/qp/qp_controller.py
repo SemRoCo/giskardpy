@@ -13,25 +13,22 @@ from giskardpy.exceptions import OutOfJointLimitsException, \
     HardConstraintsViolatedException
 from giskardpy.qp.constraint import VelocityConstraint, Constraint
 from giskardpy.qp.free_variable import FreeVariable
-from giskardpy.qp.qp_solver import QPSolver
-from giskardpy.qp_solver_cplex import QPSolverCplex
-from giskardpy.qp.qp_solver_gurobi import QPSolverGurobi
-from giskardpy.utils.utils import memoize, logging
+from giskardpy.utils.utils import memoize, logging, create_path
 
 
 def save_pandas(dfs, names, path):
-    file_name = u'{}/pandas_{}.csv'.format(path, datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-    csv_string = u''
+    folder_name = '{}/pandas_{}/'.format(path, datetime.datetime.now().strftime('%Yy-%mm-%dd--%Hh-%Mm-%Ss'))
+    create_path(folder_name)
     for df, name in zip(dfs, names):
-        csv_string += u'{}\n'.format(name)
+        csv_string = u'name\n'
         with pd.option_context('display.max_rows', None, 'display.max_columns', None):
             if df.shape[1] > 1:
                 for column_name, column in df.T.items():
                     csv_string += column.add_prefix(column_name + u'||').to_csv()
             else:
                 csv_string += df.to_csv()
-        csv_string += u'----------------------------------------------------------------------------'
-        with open(file_name, 'w') as f:
+        file_name2 = '{}{}.csv'.format(folder_name, name)
+        with open(file_name2, 'w') as f:
             f.write(csv_string)
 
 
@@ -552,10 +549,13 @@ class QPController(object):
             self.add_debug_expressions(debug_expressions)
 
         if solver_name == u'gurobi':
+            from giskardpy.qp.qp_solver_gurobi import QPSolverGurobi
             self.qp_solver = QPSolverGurobi()
         elif solver_name == u'qpoases':
+            from giskardpy.qp.qp_solver import QPSolver
             self.qp_solver = QPSolver()
         elif solver_name == u'cplex':
+            from giskardpy.qp.qp_solver_cplex import QPSolverCplex
             self.qp_solver = QPSolverCplex()
         else:
             raise KeyError(u'Solver \'{}\' not supported'.format(solver_name))
@@ -676,11 +676,11 @@ class QPController(object):
         if self.p_xdot is not None:
             save_pandas([self.p_weights, self.p_A, self.p_lbA, self.p_ubA, self.p_lb, self.p_ub, self.p_xdot],
                         ['weights', 'A', 'lbA', 'ubA', 'lb', 'ub', 'xdot'],
-                        u'tmp_data')
+                        u'../tmp_data')
         else:
             save_pandas([self.p_weights, self.p_A, self.p_lbA, self.p_ubA, self.p_lb, self.p_ub],
                         ['weights', 'A', 'lbA', 'ubA', 'lb', 'ub'],
-                        u'tmp_data')
+                        u'../tmp_data')
 
     def __is_nan_in_array(self, name, p_array):
         p_filtered = p_array.apply(lambda x: zip(x.index[x.isnull()].tolist(), x[x.isnull()]), 1)

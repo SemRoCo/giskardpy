@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 import rospy
 from giskardpy.garden import grow_tree
-from giskardpy.utils.utils import check_dependencies, logging
 from giskardpy import identifier
 
 # TODO add pytest to package xml
 # TODO add transform3d to package xml
-
+from giskardpy.utils import logging
+from giskardpy.utils.dependency_checking import check_dependencies
 
 if __name__ == u'__main__':
     rospy.init_node(u'giskard')

@@ -143,20 +143,35 @@ def construct_find(loader, node):
 def load_robot_yaml(path):
     with open(path, 'r') as f:
         data = yaml.load(f, Loader)
-        result = update_parents(data)
-        replace_str_numbers(result)
-        return result
+        updated = update_parents(data)
+        return cast_values_in_nested_dict(updated, float)
 
 
-def replace_str_numbers(data):
-    for key, value in data.items():
-        if isinstance(value, dict):
-            replace_str_numbers(value)
-        elif isinstance(value, str):
-            try:
-                data[key] = float(value)
-            except:
-                pass
+def cast_values_in_nested_dict(d, constructor):
+    """
+    Will try to cast the values in the given nested dict d with the given constructor.
+    :type d: dict
+    :type constructor: type
+    :rtype: dict
+    """
+    for k, v in d.items():
+        if isinstance(v, dict) and d.get(k, {}) is not None:
+            cast_values_in_nested_dict(d.get(k, {}), constructor)
+        elif isinstance(v, list):
+            v_new = []
+            for w in v:
+                if isinstance(w, str) or isinstance(w, list):
+                    tmp = {None: w}
+                    cast_values_in_nested_dict(tmp, constructor)
+                    v_new.append(tmp[None])
+            d.update({k: v_new})
+        else:
+            if isinstance(d[k], str):
+                try:
+                    d.update({k: constructor(d[k])})
+                except ValueError:
+                    pass
+    return d
 
 
 def ros_load_robot_config(config_file, test=False):

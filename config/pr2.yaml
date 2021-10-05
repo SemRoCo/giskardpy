@@ -59,24 +59,29 @@ collision_avoidance:
       hard_threshold: 0.0
       soft_threshold: 0.1
     override:
-      eef: &eef
+      4eef: &4eef
         number_of_repeller: 4
+        hard_threshold: 0.00
+        soft_threshold: 0.05
+      2eef: &2eef
+        number_of_repeller: 2
         hard_threshold: 0.00
         soft_threshold: 0.05
       50mm: &50mm
         hard_threshold: 0.00
         soft_threshold: 0.05
       25mm: &25mm
+        number_of_repeller: 2
         hard_threshold: 0.00
         soft_threshold: 0.025
-      r_wrist_roll_joint: *eef
-      l_wrist_roll_joint: *eef
+      r_wrist_roll_joint: *4eef
+      l_wrist_roll_joint: *4eef
       r_forearm_roll_joint: *25mm
       l_forearm_roll_joint: *25mm
       r_elbow_flex_joint: *50mm
       l_elbow_flex_joint: *50mm
-      r_wrist_flex_joint: *50mm
-      l_wrist_flex_joint: *50mm
+      r_wrist_flex_joint: *2eef
+      l_wrist_flex_joint: *2eef
   self_collision_avoidance:
     ignore: # list pairs of links that should be removed from the self collision avoidance
       - bl_caster_l_wheel_link

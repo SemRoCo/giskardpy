@@ -490,6 +490,41 @@ class A(Parent):
         return self.construct_A()
 
 
+class Filter(object):
+    """
+    Filter for the QPController
+    """
+
+    def __init__(self, max_filter_size=20):
+        self.points = list()
+        self.filter_size = 0
+        self.max_filter_size = max_filter_size
+
+    def full(self):
+        return self.max_filter_size == self.filter_size
+
+    def _dominate(self, e1, e2):
+        return e1 < e2
+
+    def is_filtered(self, e1):
+        for e in self.points:
+            if self._dominate(e, e1):
+                return False
+        return True
+
+    def add(self, e):
+        if not self.is_filtered(e):
+            raise Exception('Please check if element gets filtered before adding.')
+        tmp = deepcopy(self.points)
+        self.points = []
+        for t in tmp:
+            if not self._dominate(e, t):
+                self.points.append(t)
+        if self.full():
+            self.points = self.points[1:]
+        self.points.append(e)
+
+
 class QPController(object):
     """
     Wraps around QP Solver. Builds the required matrices from constraints.

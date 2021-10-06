@@ -89,7 +89,7 @@ def transform_vector(target_frame, vector):
     if tfBuffer is None:
         init()
     try:
-        transform = tfBuffer.lookup_transform(target_frame,
+        transform = tfBuffer.lookup_transform(str(target_frame),
                                               str(vector.header.frame_id),  # source frame
                                               vector.header.stamp,
                                               rospy.Duration(5.0))
@@ -111,7 +111,7 @@ def transform_point(target_frame, point):
     if tfBuffer is None:
         init()
     try:
-        transform = tfBuffer.lookup_transform(target_frame,
+        transform = tfBuffer.lookup_transform(str(target_frame),
                                               str(point.header.frame_id),  # source frame
                                               point.header.stamp,
                                               rospy.Duration(5.0))
@@ -280,7 +280,7 @@ def kdl_to_pose(frame):
 def kdl_to_pose_stamped(frame, frame_id):
     """
     :type frame: PyKDL.Frame
-    :rtype: Pose
+    :rtype: PoseStamped
     """
     p = PoseStamped()
     p.header.frame_id = frame_id

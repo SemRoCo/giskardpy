@@ -451,12 +451,13 @@ class AvoidJointLimits(Goal):
 
 
 class JointPositionRange(Goal):
-
     def __init__(self, joint_name, upper_limit, lower_limit, **kwargs):
+        super(JointPositionRange, self).__init__(**kwargs)
         self.joint_name = joint_name
+        if self.world.is_joint_continuous(joint_name):
+            raise NotImplementedError('Can\'t limit range of continues joint \'{}\'.'.format(self.joint_name))
         self.upper_limit = upper_limit
         self.lower_limit = lower_limit
-        super(JointPositionRange, self).__init__(**kwargs)
         current_position = self.robot.state[self.joint_name].position
         if current_position > self.upper_limit + 2e-3 or current_position < self.lower_limit - 2e-3:
             raise ConstraintInitalizationException(u'{} out of set limits. '

@@ -525,8 +525,10 @@ class WorldTree(object):
                                                                           [u'angular', u'override', key]))
             self.set_joint_limits(d_linear, d_angular, i)
         for i in range(1, self.god_map.unsafe_get_data(identifier.order)):
-            self.set_joint_weights(i, self.god_map.unsafe_get_data(identifier.joint_weights +
-                                                                   [order_map[i], 'override']))
+            def default(joint_name):
+                return self.god_map.to_symbol(identifier.joint_weights + [order_map[i], 'override', joint_name])
+            d = KeyDefaultDict(default)
+            self.set_joint_weights(i, d)
 
     @property
     def joint_constraints(self):

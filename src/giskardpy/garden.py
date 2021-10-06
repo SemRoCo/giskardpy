@@ -192,9 +192,9 @@ def grow_tree():
     god_map = initialize_god_map()
     # ----------------------------------------------
     sync = Sequence(u'Synchronize')
-    sync.add_child(WorldUpdatePlugin(u'update collision scene'))
     sync.add_child(ConfigurationPlugin(u'update robot configuration', RobotPrefix))
     sync.add_child(TFPublisher(u'publish tf', **god_map.get_data(identifier.TFPublisher)))
+    sync.add_child(WorldUpdatePlugin(u'update collision scene'))
     sync.add_child(running_is_success(VisualizationBehavior)(u'visualize collision scene'))
     # ----------------------------------------------
     wait_for_goal = Sequence(u'wait for goal')

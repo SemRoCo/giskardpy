@@ -39,9 +39,9 @@ class WorldUpdatePlugin(GiskardBehavior):
         self.map_frame = self.get_god_map().get_data(identifier.map_frame)
         self.original_link_names = self.robot.link_names
         # self.bullet = PyBulletSyncer(self.world, self.god_map.get_data(identifier.gui))
-        self.bullet = BetterPyBulletSyncer(self.world)
-        self.bullet.init_collision_matrix(RobotName)
-        self.god_map.set_data(identifier.collision_scene, self.bullet)
+        self.collision_scene = BetterPyBulletSyncer(self.world)
+        self.collision_scene.init_collision_matrix(RobotName)
+        self.god_map.set_data(identifier.collision_scene, self.collision_scene)
         self.tree_tick_rate = self.god_map.get_data(identifier.tree_tick_rate)/2
         # self.bullet.sync()
         self.acquired = False
@@ -211,7 +211,7 @@ class WorldUpdatePlugin(GiskardBehavior):
     def update(self):
         if self.acquired:
             self.lock.release()
-        rospy.sleep(0.01)
+        self.collision_scene.sync_state()
         self.acquired = self.lock.acquire(timeout=0.001)
         if self.acquired:
             return Status.SUCCESS
@@ -286,7 +286,6 @@ class WorldUpdatePlugin(GiskardBehavior):
                                            u'{}: {}'.format(e.__class__.__name__,
                                                             str(e)))
             finally:
-                self.collision_scene.sync_state()
                 self.lock.release()
 
     def add_object(self, req):
@@ -304,14 +303,14 @@ class WorldUpdatePlugin(GiskardBehavior):
             plugin = ConfigurationPlugin(str(plugin_name), prefix=None, joint_state_topic=world_body.joint_state_topic)
             tree = self.god_map.unsafe_get_data(identifier.tree_manager)  # type: TreeManager
             tree.insert_node(plugin, 'wait for goal', 1)
-        self.bullet.sync()
+        self.collision_scene.sync()
 
     def detach_object(self, req):
         # assumes that parent has god map lock
         self.world.move_group(req.body.name,
                                self.world.root_link_name)
         # todo remove all links of deteched subtree
-        self.bullet.init_collision_matrix(RobotName)
+        self.collision_scene.init_collision_matrix(RobotName)
 
     def attach_object(self, req):
         """
@@ -321,7 +320,7 @@ class WorldUpdatePlugin(GiskardBehavior):
         if req.body.name not in self.world.groups:
             self.add_object(req)
         self.world.move_group(req.body.name, PrefixName(req.pose.header.frame_id, RobotPrefix))
-        self.bullet.init_collision_matrix(RobotName)
+        self.collision_scene.init_collision_matrix(RobotName)
 
     def remove_object(self, name):
         # assumes that parent has god map lock

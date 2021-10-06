@@ -1,6 +1,5 @@
 import keyword
 from collections import defaultdict
-from copy import deepcopy
 from multiprocessing import Queue
 from time import time
 
@@ -24,6 +23,7 @@ from std_msgs.msg import ColorRGBA
 from tf.transformations import rotation_from_matrix, quaternion_matrix
 from visualization_msgs.msg import Marker
 
+import giskardpy.utils.tfwrapper as tf
 from giskardpy import identifier, RobotName, RobotPrefix
 from giskardpy.data_types import KeyDefaultDict, JointStates, PrefixName
 from giskardpy.garden import grow_tree
@@ -31,13 +31,15 @@ from giskardpy.model.robot import Robot
 from giskardpy.python_interface import GiskardWrapper
 from giskardpy.utils import logging, utils
 from giskardpy.utils.config_loader import ros_load_robot_config
-import giskardpy.utils.tfwrapper as tf
 from giskardpy.utils.utils import msg_to_list, position_dict_to_joint_states
 
 BIG_NUMBER = 1e100
 SMALL_NUMBER = 1e-100
 
-vector = lambda x: st.lists(float_no_nan_no_inf(), min_size=x, max_size=x)
+
+def vector(x):
+    return st.lists(float_no_nan_no_inf(), min_size=x, max_size=x)
+
 
 update_world_error_codes = {value: name for name, value in vars(UpdateWorldResponse).items() if
                             isinstance(value, int) and name[0].isupper()}
@@ -57,7 +59,6 @@ def move_result_error_code(code):
 
 def robot_urdfs():
     return st.sampled_from([u'urdfs/pr2.urdfs', u'urdfs/boxy.urdfs', u'urdfs/iai_donbot.urdfs'])
-    # return st.sampled_from([u'pr2.urdfs'])
 
 
 def angle_positive():
@@ -232,8 +233,7 @@ def unit_vector(length, elements=None):
         elements = float_no_nan_no_inf(min_dist_to_zero=1e-10)
     vector = st.lists(elements,
                       min_size=length,
-                      max_size=length).filter(lambda x: np.linalg.norm(x) > SMALL_NUMBER and
-                                                        np.linalg.norm(x) < BIG_NUMBER)
+                      max_size=length).filter(lambda x: SMALL_NUMBER < np.linalg.norm(x) < BIG_NUMBER)
 
     def normalize(v):
         v = [round(x, 4) for x in v]
@@ -301,9 +301,9 @@ class JointGoalChecker(GoalChecker):
                                                                                             goal))
 
 
-class CartGoalChecker(GoalChecker):
+class TranslationGoalChecker(GoalChecker):
     def __init__(self, god_map, tip_link, root_link, expected):
-        super(CartGoalChecker, self).__init__(god_map)
+        super(TranslationGoalChecker, self).__init__(god_map)
         self.expected = expected
         self.tip_link = tip_link
         self.root_link = root_link
@@ -314,6 +314,19 @@ class CartGoalChecker(GoalChecker):
         current_pose = tf.lookup_pose(self.root_link, self.tip_link)
         np.testing.assert_array_almost_equal(msg_to_list(expected.pose.position),
                                              msg_to_list(current_pose.pose.position), decimal=2)
+
+
+class RotationGoalChecker(GoalChecker):
+    def __init__(self, god_map, tip_link, root_link, expected):
+        super(RotationGoalChecker, self).__init__(god_map)
+        self.expected = expected
+        self.tip_link = tip_link
+        self.root_link = root_link
+        self.expected = tf.transform_pose(self.root_link, self.expected)
+
+    def __call__(self):
+        expected = self.expected
+        current_pose = tf.lookup_pose(self.root_link, self.tip_link)
 
         try:
             np.testing.assert_array_almost_equal(msg_to_list(expected.pose.orientation),
@@ -442,17 +455,22 @@ class GiskardTestWrapper(GiskardWrapper):
         self.set_base.call(goal)
         rospy.sleep(0.5)
 
-    def set_rotation_goal(self, goal_pose, tip_link, root_link=None, weight=None, max_velocity=None, **kwargs):
+    def set_rotation_goal(self, goal_pose, tip_link, root_link=None, weight=None, max_velocity=None, check=True, **kwargs):
         if not root_link:
             root_link = self.default_root
         super(GiskardTestWrapper, self).set_rotation_goal(goal_pose, tip_link, root_link, max_velocity=max_velocity,
                                                           weight=weight, **kwargs)
+        if check:
+            self.add_goal_check(RotationGoalChecker(self.god_map, tip_link, root_link, goal_pose))
 
-    def set_translation_goal(self, goal_pose, tip_link, root_link=None, weight=None, max_velocity=None, **kwargs):
+    def set_translation_goal(self, goal_pose, tip_link, root_link=None, weight=None, max_velocity=None, check=True,
+                             **kwargs):
         if not root_link:
             root_link = self.default_root
         super(GiskardTestWrapper, self).set_translation_goal(goal_pose, tip_link, root_link, max_velocity=max_velocity,
                                                              weight=weight, **kwargs)
+        if check:
+            self.add_goal_check(TranslationGoalChecker(self.god_map, tip_link, root_link, goal_pose))
 
     def set_straight_translation_goal(self, goal_pose, tip_link, root_link=None, weight=None, max_velocity=None,
                                       **kwargs):
@@ -482,31 +500,23 @@ class GiskardTestWrapper(GiskardWrapper):
                                                           max_angular_velocity=angular_velocity)
 
         if check:
-            self.add_goal_check(CartGoalChecker(self.god_map, tip_link, root_link, goal_pose))
+            self.add_goal_check(TranslationGoalChecker(self.god_map, tip_link, root_link, goal_pose))
+            self.add_goal_check(RotationGoalChecker(self.god_map, tip_link, root_link, goal_pose))
 
     def add_goal_check(self, goal_checker):
         self.goal_checks[self.number_of_cmds - 1].append(goal_checker)
 
     def set_straight_cart_goal(self, goal_pose, tip_link, root_link=None, weight=None, linear_velocity=None,
-                               angular_velocity=None):
+                               angular_velocity=None, check=True):
         if not root_link:
             root_link = self.default_root
-        if weight is not None:
-            super(GiskardTestWrapper, self).set_straight_cart_goal(goal_pose, tip_link, root_link, weight=weight,
-                                                                   max_linear_velocity=linear_velocity,
-                                                                   max_angular_velocity=angular_velocity)
-        else:
-            super(GiskardTestWrapper, self).set_straight_cart_goal(goal_pose, tip_link, root_link,
-                                                                   max_linear_velocity=linear_velocity,
-                                                                   max_angular_velocity=angular_velocity)
-
-    def set_and_check_straight_cart_goal(self, goal_pose, tip_link, root_link=None, weight=None, linear_velocity=None,
-                                         angular_velocity=None, check=True):
         super(GiskardTestWrapper, self).set_straight_cart_goal(goal_pose, tip_link, root_link, weight=weight,
                                                                max_linear_velocity=linear_velocity,
                                                                max_angular_velocity=angular_velocity)
+
         if check:
-            self.add_goal_check(CartGoalChecker(self.god_map, tip_link, root_link, goal_pose))
+            self.add_goal_check(TranslationGoalChecker(self.god_map, tip_link, root_link, goal_pose))
+            self.add_goal_check(RotationGoalChecker(self.god_map, tip_link, root_link, goal_pose))
 
     #
     # GENERAL GOAL STUFF ###############################################################################################

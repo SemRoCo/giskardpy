@@ -28,6 +28,7 @@ skip_failures = [u'skip_failures']
 check_reachability = [u'check_reachability']
 cut_off_shaking = [u'cut_off_shaking']
 next_move_goal = [u'next_move_goal']
+number_of_move_cmds = [u'number_of_move_cmds']
 cmd_id = [u'cmd_id']
 
 post_processing = [u'post_processing']

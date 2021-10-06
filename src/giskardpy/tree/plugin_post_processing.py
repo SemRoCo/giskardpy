@@ -1,4 +1,3 @@
-import numpy as np
 from giskard_msgs.msg import MoveResult
 from py_trees import Status
 
@@ -12,18 +11,11 @@ from giskardpy.tree.plugin import GiskardBehavior
 from giskardpy.utils import logging
 
 
-class PostProcessing(GiskardBehavior):
+class SetErrorCode(GiskardBehavior):
 
     def __init__(self, name):
         self.reachability_threshold = 0.001
-        super(PostProcessing, self).__init__(name)
-
-    def setup(self, timeout):
-        # return True
-        return super(PostProcessing, self).setup(timeout)
-
-    def initialise(self):
-        super(PostProcessing, self).initialise()
+        super(SetErrorCode, self).__init__(name)
 
     @profile
     def update(self):
@@ -36,7 +28,7 @@ class PostProcessing(GiskardBehavior):
         result.error_codes[cmd_id] = error_code
         result.error_messages[cmd_id] = error_message
         if error_code == MoveResult.PREEMPTED:
-            for i in range(len(result.error_codes)-cmd_id):
+            for i in range(len(result.error_codes) - cmd_id):
                 result.error_codes[cmd_id + i] = error_code
                 result.error_messages[cmd_id + i] = error_message
             logging.logwarn(u'Planning preempted: \'{}\'.'.format(error_message))

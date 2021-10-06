@@ -1,10 +1,10 @@
+from giskard_msgs.msg import MoveGoal, CollisionEntry, MoveCmd, MoveResult
 from py_trees import Status
 
 import giskardpy.identifier as identifier
-from giskardpy.utils import logging
 from giskardpy.exceptions import InvalidGoalException
 from giskardpy.tree.plugin_action_server import GetGoal
-from giskard_msgs.msg import MoveGoal, CollisionEntry, MoveCmd, MoveResult
+from giskardpy.utils import logging
 
 
 class SetCmd(GetGoal):
@@ -17,6 +17,9 @@ class SetCmd(GetGoal):
     def initialise(self):
         if self.goal is None:
             self.goal = self.pop_goal()  # type: MoveGoal
+            self.number_of_move_cmds = len(self.goal.cmd_seq)
+            self.god_map.set_data(identifier.number_of_move_cmds, self.number_of_move_cmds)
+            logging.loginfo('Goal has {} move commands(s).'.format(len(self.goal.cmd_seq)))
             self.get_god_map().set_data(identifier.cmd_id, -1)
             empty_result = MoveResult()
             empty_result.error_codes = [MoveResult.ERROR for _ in self.goal.cmd_seq]
@@ -72,21 +75,19 @@ class SetCmd(GetGoal):
         return [2 ** i * int(bit) for i, bit in enumerate(reversed("{0:b}".format(goal_type))) if int(bit) != 0]
 
     def update(self):
-        # TODO goal checks should probably be its own plugin?
-        skip_failures = self.get_god_map().get_data(identifier.skip_failures)
-        if not skip_failures and self.get_blackboard_exception():
+        if self.get_blackboard_exception() is not None:
             self.goal = None
-            # self.get_god_map().set_data(identifier.next_move_goal, None)
             return Status.SUCCESS
-
         try:
             move_cmd = self.goal.cmd_seq.pop(0)  # type: MoveCmd
             self.get_god_map().set_data(identifier.next_move_goal, move_cmd)
             cmd_id = self.get_god_map().get_data(identifier.cmd_id) + 1
             self.get_god_map().set_data(identifier.cmd_id, cmd_id)
+            logging.loginfo('Planning move commands #{}/{}.'.format(cmd_id + 1, self.number_of_move_cmds))
+            if not self.goal.cmd_seq:
+                self.goal = None
         except IndexError:
             self.goal = None
-            # self.get_god_map().set_data(identifier.next_move_goal, None)
-            return Status.SUCCESS
+            return Status.FAILURE
 
-        return Status.RUNNING
+        return Status.SUCCESS

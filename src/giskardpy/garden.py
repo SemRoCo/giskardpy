@@ -6,7 +6,8 @@ import rospy
 from control_msgs.msg import JointTrajectoryControllerState
 from giskard_msgs.msg import MoveAction
 from py_trees import Sequence, Selector, BehaviourTree, Blackboard
-from py_trees.meta import failure_is_success, success_is_failure, running_is_success, running_is_failure
+from py_trees.meta import failure_is_success, success_is_failure, running_is_success, running_is_failure, \
+    failure_is_running
 from py_trees_ros.trees import BehaviourTree
 from rospy import ROSException
 
@@ -24,7 +25,7 @@ from giskardpy.tree.plugin_collision_checker import CollisionChecker
 from giskardpy.tree.plugin_collision_marker import CollisionMarker
 from giskardpy.tree.plugin_configuration import ConfigurationPlugin
 from giskardpy.tree.plugin_goal_reached import GoalReachedPlugin
-from giskardpy.tree.plugin_if import IF
+from giskardpy.tree.plugin_if import IF, IfFunction
 from giskardpy.tree.plugin_instantaneous_controller import ControllerPlugin
 from giskardpy.tree.plugin_max_trajectory_length import MaxTrajectoryLength
 from giskardpy.tree.plugin_wiggle_cancel import WiggleCancel
@@ -34,7 +35,7 @@ from giskardpy.tree.plugin_log_trajectory import LogTrajPlugin
 from giskardpy.tree.plugin_loop_detector import LoopDetector
 from giskardpy.tree.plugin_plot_debug_expressions import PlotDebugExpressions
 from giskardpy.tree.plugin_plot_trajectory import PlotTrajectory
-from giskardpy.tree.plugin_post_processing import PostProcessing
+from giskardpy.tree.plugin_post_processing import SetErrorCode
 from giskardpy.tree.plugin_pybullet import WorldUpdatePlugin
 from giskardpy.tree.plugin_send_trajectory import SendTrajectory
 from giskardpy.tree.plugin_set_cmd import SetCmd
@@ -250,13 +251,14 @@ def grow_tree():
     move_robot.add_child(publish_result)
     # ----------------------------------------------
     # ----------------------------------------------
-    planning_1 = Sequence(u'planning I')
-    planning_1.add_child(GoalToConstraints(u'update constraints', action_server_name))
-    planning_1.add_child(planning_2)
+    # planning_1 = Sequence(u'planning I')
     # ----------------------------------------------
-    planning = success_is_failure(Sequence)(u'planning')
-    planning.add_child(IF(u'goal_set?', identifier.next_move_goal))
-    planning.add_child(planning_1)
+    planning = failure_is_success(Sequence)(u'planning')
+    planning.add_child(IF(u'command set?', identifier.next_move_goal))
+    planning.add_child(GoalToConstraints(u'update constraints', action_server_name))
+    planning.add_child(planning_2)
+    # planning.add_child(planning_1)
+    # planning.add_child(SetErrorCode(u'set error code'))
     if god_map.get_data(identifier.PlotTrajectory_enabled):
         kwargs = god_map.get_data(identifier.PlotTrajectory)
         planning.add_child(PlotTrajectory(u'plot trajectory', **kwargs))
@@ -264,17 +266,29 @@ def grow_tree():
         kwargs = god_map.get_data(identifier.PlotDebugTrajectory)
         planning.add_child(PlotDebugExpressions(u'plot debug expressions', **kwargs))
 
-    process_move_goal = failure_is_success(Selector)(u'process move goal')
-    process_move_goal.add_child(planning)
-    process_move_goal.add_child(SetCmd(u'set move goal', action_server_name))
+    process_move_cmd = success_is_failure(Sequence)(u'Process move commands')
+    process_move_cmd.add_child(SetCmd(u'set move cmd', action_server_name))
+    process_move_cmd.add_child(planning)
+    process_move_cmd.add_child(SetErrorCode(u'set error code'))
+
+    process_move_goal = failure_is_success(Selector)(u'Process goal')
+    process_move_goal.add_child(process_move_cmd)
+
+    def got_exception():
+        skip_failures = god_map.get_data(identifier.skip_failures)
+        return not skip_failures and Blackboard().get('exception')
+    process_move_goal.add_child(IfFunction('stop processing?', got_exception))
+
+    def cmds_remaining():
+        return god_map.get_data(identifier.cmd_id) + 1 == god_map.get_data(identifier.number_of_move_cmds)
+    process_move_goal.add_child(failure_is_running(IfFunction)('commands remaining?', cmds_remaining))
 
     # ----------------------------------------------
     # ----------------------------------------------
-    root = Sequence(u'root')
+    root = Sequence(u'Giskard')
     root.add_child(wait_for_goal)
     root.add_child(CleanUp(u'cleanup'))
     root.add_child(process_move_goal)
-    root.add_child(PostProcessing(u'evaluate result'))
     root.add_child(move_robot)
     root.add_child(SendResult(u'send result', action_server_name, MoveAction))
 

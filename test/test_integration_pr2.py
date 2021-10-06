@@ -1907,7 +1907,7 @@ class TestWayPoints(object):
         zero_pose.plan_and_execute(expected_error_codes=[MoveResult.SUCCESS,
                                                          MoveResult.PREEMPTED,
                                                          MoveResult.PREEMPTED],
-                                   stop_after=10)
+                                   stop_after=5)
 
     def test_waypoints(self, zero_pose):
         """
@@ -1943,10 +1943,13 @@ class TestWayPoints(object):
         :type zero_pose: PR2
         """
         zero_pose.set_joint_goal(pocky_pose)
+        zero_pose.allow_all_collisions()
         zero_pose.add_cmd()
         zero_pose.set_joint_goal(pick_up_pose)
+        zero_pose.allow_all_collisions()
         zero_pose.add_cmd()
         zero_pose.set_joint_goal(gaya_pose)
+        zero_pose.allow_all_collisions()
 
         traj = zero_pose.plan_and_execute()
         for i, p in enumerate(traj.points):

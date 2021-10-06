@@ -122,8 +122,8 @@ class GetGoal(ActionServerBehavior):
 
 class GoalCanceled(ActionServerBehavior):
     def update(self):
-        if self.get_as().is_preempt_requested():
-            # logging.logerr('goal preempted')
+        if self.get_as().is_preempt_requested() and self.get_blackboard_exception() is None:
+            logging.logerr('preempted')
             self.raise_to_blackboard(PreemptedException(u''))
         if self.get_blackboard_exception() is not None:
             return Status.SUCCESS
@@ -160,7 +160,7 @@ class SendResult(ActionServerBehavior):
                 self.get_as().send_aborted(result)
                 return Status.SUCCESS
             else:
-                logging.loginfo(u'Successfully executed goal.')
+                logging.loginfo(u'----------------Successfully executed goal.----------------')
         self.get_as().send_result(result)
         return Status.SUCCESS
 

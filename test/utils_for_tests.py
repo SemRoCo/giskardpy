@@ -444,6 +444,24 @@ class GiskardTestWrapper(GiskardWrapper):
     def set_kitchen_js(self, joint_state, object_name=u'kitchen'):
         self.set_object_joint_state(object_name, joint_state)
 
+    def compare_joint_state(self, current_js, goal_js, decimal=2):
+        """
+        :type current_js: dict
+        :type goal_js: dict
+        :type decimal: int
+        """
+        for joint_name in goal_js:
+            goal = goal_js[joint_name]
+            current = current_js[joint_name]
+            if self.world.is_joint_continuous(joint_name):
+                np.testing.assert_almost_equal(shortest_angular_distance(goal, current), 0, decimal=decimal,
+                                               err_msg=u'{}: actual: {} desired: {}'.format(joint_name, current,
+                                                                                            goal))
+            else:
+                np.testing.assert_almost_equal(current, goal, decimal,
+                                               err_msg=u'{}: actual: {} desired: {}'.format(joint_name, current,
+                                                                                            goal))
+
     #
     # GOAL STUFF #################################################################################################
     #
@@ -574,13 +592,13 @@ class GiskardTestWrapper(GiskardWrapper):
                                                                                     move_result_error_code(
                                                                                         expected_error_code),
                                                                                     error_message)
-                if error_code == MoveResult.SUCCESS:
-                    try:
-                        for goal_checker in self.goal_checks[cmd_id]:
-                            goal_checker()
-                    except:
-                        logging.logerr('Goal #{} did\'t pass test.'.format(cmd_id))
-                        raise
+            if error_code == MoveResult.SUCCESS:
+                try:
+                    for goal_checker in self.goal_checks[len(r.error_codes)]:
+                        goal_checker()
+                except:
+                    logging.logerr('Goal #{} did\'t pass test.'.format(cmd_id))
+                    raise
             self.are_joint_limits_violated()
         finally:
             self.goal_checks = defaultdict(list)

@@ -55,7 +55,7 @@ class GoalToConstraints(GetGoal):
     def update(self):
         # TODO make this interruptable
         # TODO try catch everything
-
+        loginfo(u'Parsing goal message.')
         move_cmd = self.get_god_map().get_data(identifier.next_move_goal)  # type: MoveCmd
         if not move_cmd:
             return Status.FAILURE
@@ -85,19 +85,15 @@ class GoalToConstraints(GetGoal):
         self.get_god_map().set_data(identifier.debug_expressions, self.debug_expr)
         self.get_blackboard().runtime = time()
 
-        # controlled_joints = self.robot.controlled_joints
-
         if (self.get_god_map().get_data(identifier.check_reachability)):
             # FIXME reachability check is broken
             pass
         else:
-            # joint_constraints = OrderedDict(((self.robot.get_name(), k), self.robot._joint_constraints[k]) for k in
-            #                                 controlled_joints)
             l = self.active_free_symbols()
             joint_constraints = [v for v in self.world.joint_constraints.values() if v.name in l]
 
         self.get_god_map().set_data(identifier.free_variables, joint_constraints)
-
+        loginfo(u'Done parsing goal message.')
         return Status.SUCCESS
 
     def active_free_symbols(self):
@@ -111,7 +107,6 @@ class GoalToConstraints(GetGoal):
         :type cmd: MoveCmd
         :rtype: dict
         """
-        loginfo(u'Parsing goal message.')
         for constraint in itertools.chain(cmd.constraints, cmd.joint_constraints, cmd.cartesian_constraints):
             try:
                 loginfo(u'Adding constraint of type: \'{}\''.format(constraint.type))
@@ -161,7 +156,6 @@ class GoalToConstraints(GetGoal):
                 if not isinstance(e, GiskardException):
                     raise ConstraintInitalizationException(e)
                 raise e
-        loginfo(u'done parsing goal message')
 
     def replace_jsons_with_ros_messages(self, d):
         # TODO find message type

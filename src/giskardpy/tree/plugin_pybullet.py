@@ -38,7 +38,7 @@ class WorldUpdatePlugin(GiskardBehavior):
         super(WorldUpdatePlugin, self).__init__(name)
         self.map_frame = self.get_god_map().get_data(identifier.map_frame)
         self.original_link_names = self.robot.link_names
-        # self.bullet = PyBulletSyncer(self.world, self.god_map.get_data(identifier.gui))
+        # self.collision_scene = PyBulletSyncer(self.world, self.god_map.get_data(identifier.gui))
         self.collision_scene = BetterPyBulletSyncer(self.world)
         self.collision_scene.init_collision_matrix(RobotName)
         self.god_map.set_data(identifier.collision_scene, self.collision_scene)
@@ -211,9 +211,10 @@ class WorldUpdatePlugin(GiskardBehavior):
     def update(self):
         if self.acquired:
             self.lock.release()
-        self.collision_scene.sync_state()
+        rospy.sleep(0.001)
         self.acquired = self.lock.acquire(timeout=0.001)
         if self.acquired:
+            self.collision_scene.sync_state()
             return Status.SUCCESS
         else:
             return Status.RUNNING

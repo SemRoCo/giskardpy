@@ -123,7 +123,10 @@ class Trajectory(object):
         del self._points[time]
 
     def delete_last(self):
-        self.delete(self._points.keys()[-1])
+        self.delete(list(self._points.keys())[-1])
+
+    def get_last(self):
+        return list(self._points.values())[-1]
 
     def items(self):
         return self._points.items()
@@ -417,7 +420,7 @@ class BiDict(dict):
 
 
 class PrefixName(object):
-    def __init__(self, name, prefix, separator='@'):
+    def __init__(self, name, prefix, separator='/'):
         self.short_name = name
         self.prefix = prefix
         self.separator = separator

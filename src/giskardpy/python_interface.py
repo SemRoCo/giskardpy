@@ -205,8 +205,8 @@ class GiskardWrapper(object):
         constraint.parameter_value_pair = json.dumps(params)
         self.cmd_seq[-1].constraints.append(constraint)
 
-    def align_planes(self, tip_link, tip_normal, root_link=None, root_normal=None, max_angular_velocity=None,
-                     weight=WEIGHT_ABOVE_CA):
+    def set_align_planes_goal(self, tip_link, tip_normal, root_link=None, root_normal=None, max_angular_velocity=None,
+                              weight=WEIGHT_ABOVE_CA):
         """
         This Goal will use the kinematic chain between tip and root normal to align both
         :param root_link: name of the root link for the kinematic chain, default robot root link
@@ -228,9 +228,9 @@ class GiskardWrapper(object):
             root_normal.header.frame_id = self.get_root()
             root_normal.vector.z = 1
 
-        params = {u'tip_link': tip_link,
+        params = {u'tip_link': str(tip_link),
                   u'tip_normal': tip_normal,
-                  u'root_link': root_link,
+                  u'root_link': str(root_link),
                   u'root_normal': root_normal}
         if weight is not None:
             params[u'weight'] = weight

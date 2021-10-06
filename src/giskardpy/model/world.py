@@ -25,7 +25,7 @@ from giskardpy.model.utils import cube_volume, cube_surface, sphere_volume, cyli
 from giskardpy.model.world_object import WorldObject
 from giskardpy.utils import logging
 from giskardpy.utils.tfwrapper import msg_to_kdl, kdl_to_pose, homo_matrix_to_pose, np_to_pose, pose_to_kdl, \
-    kdl_to_np
+    kdl_to_np, pose_to_np, msg_to_homogeneous_matrix
 from giskardpy.utils.utils import suppress_stderr, memoize, resolve_ros_iris
 
 
@@ -832,6 +832,17 @@ class WorldTree(object):
         upper_limit = self.joints[joint_name].free_variable.get_upper_limit(order)
         lower_limit = self.joints[joint_name].free_variable.get_lower_limit(order)
         return lower_limit, upper_limit
+
+    def transform_pose(self, target_frame, pose):
+        """
+        :type target_frame: Union[str, PrefixName]
+        :type pose: PoseStamped
+        :rtype: PoseStamped
+        """
+        f_T_p = msg_to_homogeneous_matrix(pose.pose)
+        t_T_f = self.compute_fk_np(target_frame, pose.header.frame_id)
+        t_T_p = np.dot(t_T_f, f_T_p)
+        return np_to_pose(t_T_p)
 
     def compute_joint_limits(self, joint_name, order):
         lower_limit, upper_limit = self.joint_limit_expr(joint_name, order)

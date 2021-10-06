@@ -316,6 +316,20 @@ class TranslationGoalChecker(GoalChecker):
                                              msg_to_list(current_pose.pose.position), decimal=2)
 
 
+class AlignPlanesGoalChecker(GoalChecker):
+    def __init__(self, god_map, tip_link, tip_normal, root_link, root_normal):
+        super(AlignPlanesGoalChecker, self).__init__(god_map)
+        self.tip_normal = tip_normal
+        self.tip_link = tip_link
+        self.root_link = root_link
+        self.expected = tf.transform_vector(self.root_link, root_normal)
+
+    def __call__(self):
+        expected = self.expected
+        current = tf.transform_vector(self.root_link, self.tip_normal)
+        np.testing.assert_array_almost_equal(msg_to_list(expected.vector),  msg_to_list(current.vector), decimal=2)
+
+
 class RotationGoalChecker(GoalChecker):
     def __init__(self, god_map, tip_link, root_link, expected):
         super(RotationGoalChecker, self).__init__(god_map)
@@ -502,6 +516,15 @@ class GiskardTestWrapper(GiskardWrapper):
         if check:
             self.add_goal_check(TranslationGoalChecker(self.god_map, tip_link, root_link, goal_pose))
             self.add_goal_check(RotationGoalChecker(self.god_map, tip_link, root_link, goal_pose))
+
+    def set_align_planes_goal(self, tip_link, tip_normal, root_link=None, root_normal=None, max_angular_velocity=None,
+                              weight=None, check=True):
+        if root_link is None:
+            root_link = self.robot.root_link_name
+        super(GiskardTestWrapper, self).set_align_planes_goal(tip_link, tip_normal, root_link, root_normal,
+                                                              max_angular_velocity, weight)
+        if check:
+            self.add_goal_check(AlignPlanesGoalChecker(self.god_map, tip_link, tip_normal, root_link, root_normal))
 
     def add_goal_check(self, goal_checker):
         self.goal_checks[self.number_of_cmds - 1].append(goal_checker)

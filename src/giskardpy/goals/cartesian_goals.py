@@ -1,8 +1,9 @@
 from __future__ import division
 
+from tf2_py import LookupException
+
 import giskardpy.utils.tfwrapper as tf
-from giskardpy import casadi_wrapper as w, RobotName, RobotPrefix
-from giskardpy.data_types import PrefixName
+from giskardpy import casadi_wrapper as w
 from giskardpy.goals.goal import Goal, WEIGHT_ABOVE_CA
 
 
@@ -24,15 +25,18 @@ class CartesianPosition(Goal):
         :param weight: default WEIGHT_ABOVE_CA
         :type weight: float
         """
+        super(CartesianPosition, self).__init__(**kwargs)
         if reference_velocity is None:
             reference_velocity = max_velocity
-        self.root_link = PrefixName(root_link, RobotPrefix)
-        self.tip_link = PrefixName(tip_link, RobotPrefix)
-        self.goal_pose = tf.transform_pose(self.root_link.short_name, goal)
+        self.root_link = root_link
+        self.tip_link = tip_link
+        try:
+            self.goal_pose = tf.transform_pose(self.root_link, goal, timeout=1)
+        except LookupException as e:
+            self.goal_pose = self.world.transform_pose(self.root_link, goal)
         self.reference_velocity = reference_velocity
         self.max_velocity = max_velocity
         self.weight = weight
-        super(CartesianPosition, self).__init__(**kwargs)
         if self.max_velocity is not None:
             self.add_constraints_of_goal(TranslationVelocityLimit(root_link=root_link,
                                                                   tip_link=tip_link,
@@ -60,9 +64,12 @@ class CartesianOrientation(Goal):
         super(CartesianOrientation, self).__init__(**kwargs)
         if reference_velocity is None:
             reference_velocity = max_velocity
-        self.root_link = PrefixName(root_link, RobotPrefix)
-        self.tip_link = PrefixName(tip_link, RobotPrefix)
-        self.goal_pose = tf.transform_pose(self.root_link.short_name, goal)
+        self.root_link = root_link
+        self.tip_link = tip_link
+        try:
+            self.goal_pose = tf.transform_pose(self.root_link, goal)
+        except LookupException as e:
+            self.goal_pose = self.world.transform_pose(self.root_link, goal)
         self.reference_velocity = reference_velocity
         self.max_velocity = max_velocity
         self.weight = weight
@@ -99,10 +106,13 @@ class CartesianPositionStraight(Goal):
         self.weight = weight
         self.root_link = root_link
         self.tip_link = tip_link
-        self.goal = tf.transform_pose(self.root_link, goal)
+        try:
+            self.goal_pose = tf.transform_pose(self.root_link, goal)
+        except LookupException as e:
+            self.goal_pose = self.world.transform_pose(self.root_link, goal)
         super(CartesianPositionStraight, self).__init__(**kwargs)
 
-        self.start = self.robot.compute_fk_pose(self.root_link, self.tip_link)
+        self.start = self.world.compute_fk_pose(self.root_link, self.tip_link)
 
     def make_constraints(self):
         root_P_goal = w.position_of(self.get_parameter_as_symbolic_expression('goal'))
@@ -189,8 +199,8 @@ class TranslationVelocityLimit(Goal):
         :param hard: bool, default True, will turn this into a hard constraint, that will always be satisfied, can could
                                 make some goal combination infeasible
         """
-        self.root_link = PrefixName(root_link, RobotPrefix)
-        self.tip_link = PrefixName(tip_link, RobotPrefix)
+        self.root_link = root_link
+        self.tip_link = tip_link
         self.hard = hard
         self.weight = weight
         self.max_velocity = max_velocity
@@ -225,8 +235,8 @@ class RotationVelocityLimit(Goal):
         :param hard: bool, default True, will turn this into a hard constraint, that will always be satisfied, can could
                                 make some goal combination infeasible
         """
-        self.root_link = PrefixName(root_link, RobotPrefix)
-        self.tip_link = PrefixName(tip_link, RobotPrefix)
+        self.root_link = root_link
+        self.tip_link = tip_link
         self.hard = hard
 
         self.weight = weight

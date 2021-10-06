@@ -6,7 +6,7 @@ import numpy as np
 from geometry_msgs.msg import PoseStamped, Vector3Stamped, PointStamped, TransformStamped, Pose, Quaternion, Point, \
     Vector3, Twist, TwistStamped, QuaternionStamped, Transform
 from std_msgs.msg import ColorRGBA
-from tf.transformations import quaternion_from_matrix, quaternion_about_axis
+from tf.transformations import quaternion_from_matrix, quaternion_about_axis, quaternion_matrix
 from tf2_geometry_msgs import do_transform_pose, do_transform_vector3, do_transform_point
 from tf2_kdl import transform_to_kdl
 from tf2_py._tf2 import ExtrapolationException
@@ -55,7 +55,7 @@ def wait_for_transform(target_frame, source_frame, time, timeout):
     return tfBuffer.can_transform(target_frame, source_frame, time, timeout)
 
 
-def transform_pose(target_frame, pose):
+def transform_pose(target_frame, pose, timeout=5.0):
     """
     Transforms a pose stamped into a different target frame.
     :type target_frame: Union[str, unicode]
@@ -70,7 +70,7 @@ def transform_pose(target_frame, pose):
         transform = tfBuffer.lookup_transform(str(target_frame),
                                               str(pose.header.frame_id),  # source frame
                                               pose.header.stamp,
-                                              rospy.Duration(5.0))
+                                              rospy.Duration(timeout))
         new_pose = do_transform_pose(pose, transform)
         return new_pose
     except ExtrapolationException as e:
@@ -457,7 +457,7 @@ def msg_to_homogeneous_matrix(msg):
                 str(q), np.linalg.norm(q)))
     elif np.abs(norm - 1.0) > 1e-6:
         q = q / norm
-    g = tr.quaternion_matrix(q)
+    g = quaternion_matrix(q)
     g[0:3, -1] = p
     return g
 

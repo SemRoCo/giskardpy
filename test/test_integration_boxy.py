@@ -266,9 +266,9 @@ class TestConstraints(object):
         x_goal.vector.x = -1
 
         # Align planes for gripper to be horizontal/vertical
-        kitchen_setup.align_planes(kitchen_setup.l_tip,
-                                   x_gripper,
-                                   root_normal=x_goal)
+        kitchen_setup.set_align_planes_goal(kitchen_setup.l_tip,
+                                            x_gripper,
+                                            root_normal=x_goal)
         kitchen_setup.allow_all_collisions()  # makes execution faster
         kitchen_setup.send_and_check_goal()  # send goal to Giskard
 

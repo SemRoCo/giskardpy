@@ -8,7 +8,7 @@ from giskardpy.data_types import BiDict, Collisions, Collision
 from giskardpy.model.bpb_wrapper import create_cube_shape, create_object, create_sphere_shape, create_cylinder_shape, \
     load_convex_mesh_shape
 from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer
-from giskardpy.model.world import BoxGeometry, SphereGeometry, CylinderGeometry, MeshGeometry
+from giskardpy.model.links import BoxGeometry, SphereGeometry, CylinderGeometry, MeshGeometry
 
 
 class BetterPyBulletSyncer(CollisionWorldSynchronizer):

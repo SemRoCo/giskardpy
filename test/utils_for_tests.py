@@ -28,7 +28,6 @@ import giskardpy.utils.tfwrapper as tf
 from giskardpy import identifier, RobotName, RobotPrefix
 from giskardpy.data_types import KeyDefaultDict, JointStates, PrefixName
 from giskardpy.garden import grow_tree
-from giskardpy.model.robot import Robot
 from giskardpy.python_interface import GiskardWrapper
 from giskardpy.utils import logging, utils
 from giskardpy.utils.config_loader import ros_load_robot_config
@@ -167,8 +166,7 @@ def rnd_joint_state2(draw, joint_limits):
 
 @composite
 def pr2_joint_state(draw):
-    pr2 = Robot.from_urdf_file(pr2_urdf())
-    return draw(rnd_joint_state(*pr2.get_joint_position_limits()))
+    pass
 
 
 def pr2_urdf():

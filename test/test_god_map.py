@@ -6,15 +6,12 @@ giskardpy.WORLD_IMPLEMENTATION = None
 import unittest
 from collections import namedtuple
 
-from geometry_msgs.msg import PoseStamped, Pose
+from geometry_msgs.msg import PoseStamped
 from hypothesis import given, assume
 import hypothesis.strategies as st
-from giskardpy import identifier
 from giskardpy import casadi_wrapper as w
 from giskardpy.god_map import GodMap
-from utils_for_tests import variable_name, keys_values, lists_of_same_length, pr2_urdf
-from giskardpy.model.world import World
-from giskardpy.model.world_object import WorldObject
+from utils_for_tests import variable_name, keys_values, lists_of_same_length
 
 PKG = u'giskardpy'
 
@@ -105,8 +102,10 @@ class TestGodMap(unittest.TestCase):
 
     def test_attribute_error(self):
         db = GodMap()
+
         class C(object):
             asdf = 1
+
         db.unsafe_set_data(['c'], C())
         try:
             db.get_data(['c', 'a'])
@@ -279,8 +278,10 @@ class TestGodMap(unittest.TestCase):
         db.set_data(['a'], d)
         self.assertEqual('c', db.get_data(['a', 'b']))
         db.clear_cache()
+
         class C(object):
             b = 'c'
+
         db.set_data(['a'], C())
         self.assertEqual('c', db.get_data(['a', 'b']))
 
@@ -324,29 +325,16 @@ class TestGodMap(unittest.TestCase):
             gm.to_symbol([key])
         self.assertEqual(len(gm.get_values(keys)), len(keys))
 
-    def test_god_map_with_world(self):
-        gm = GodMap()
-        w = World()
-        r = WorldObject(pr2_urdf())
-        w.add_robot(robot=r,
-                    base_pose=Pose(),
-                    controlled_joints=[],
-                    ignored_pairs=set(),
-                    added_pairs=set())
-        gm.set_data([u'world'], w)
-        gm_robot = gm.get_data(identifier.robot)
-        assert 'pr2' == gm_robot.get_name()
-
     def test_to_expr_ndarray(self):
         gm = GodMap()
-        data = np.zeros((5,5))
+        data = np.zeros((5, 5))
         gm.set_data(['muh'], data)
         expr = gm.to_expr(['muh'])
         assert expr.shape == data.shape
 
     def test_to_expr_list(self):
         gm = GodMap()
-        data = [1,2,3]
+        data = [1, 2, 3]
         gm.set_data(['muh'], data)
         expr = gm.to_expr(['muh'])
         data[0]

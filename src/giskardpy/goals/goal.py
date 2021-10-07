@@ -2,19 +2,16 @@ from __future__ import division
 
 from collections import OrderedDict
 
-import numpy as np
-from geometry_msgs.msg import PoseStamped
 from giskard_msgs.msg import Constraint as Constraint_msg
 from tf2_py import LookupException
 
 import giskardpy.identifier as identifier
+import giskardpy.utils.tfwrapper as tf
 from giskardpy import casadi_wrapper as w
 from giskardpy.data_types import PrefixName
 from giskardpy.exceptions import ConstraintInitalizationException
-from giskardpy.model.robot import Robot
 from giskardpy.model.world import WorldTree
 from giskardpy.qp.constraint import VelocityConstraint, Constraint
-import giskardpy.utils.tfwrapper as tf
 
 WEIGHT_MAX = Constraint_msg.WEIGHT_MAX
 WEIGHT_ABOVE_CA = 2500  # Constraint_msg.WEIGHT_ABOVE_CA
@@ -38,7 +35,7 @@ class Goal(object):
             control_horizon = self.prediction_horizon
         self.control_horizon = max(min(control_horizon, self.prediction_horizon - 2), 1)
         self._sub_goals = []
-        self.world = self.god_map.get_data(identifier.world) # type: WorldTree
+        self.world = self.god_map.get_data(identifier.world)  # type: WorldTree
 
     def _save_self_on_god_map(self):
         self.god_map.set_data(self._get_identifier(), self)
@@ -284,7 +281,8 @@ class Goal(object):
         if self._test_mode:
             self.add_debug_expr('{}/error'.format(name_suffix), w.norm(error))
 
-    def add_translational_velocity_limit(self, frame_P_current, max_velocity, weight, max_violation=1e4, name_suffix=u''):
+    def add_translational_velocity_limit(self, frame_P_current, max_velocity, weight, max_violation=1e4,
+                                         name_suffix=u''):
         trans_error = w.norm(frame_P_current)
         self.add_velocity_constraint(velocity_limit=max_velocity,
                                      weight=weight,
@@ -306,10 +304,10 @@ class Goal(object):
 
         error = root_V_goal_normal_intermediate - frame_V_current
 
-        self.add_constraint_vector(reference_velocities=[reference_velocity]*3,
+        self.add_constraint_vector(reference_velocities=[reference_velocity] * 3,
                                    lower_errors=error[:3],
                                    upper_errors=error[:3],
-                                   weights=[weight]*3,
+                                   weights=[weight] * 3,
                                    expressions=frame_V_current[:3],
                                    name_suffixes=[u'{}/trans/x'.format(name_suffix),
                                                   u'{}/trans/y'.format(name_suffix),
@@ -346,6 +344,7 @@ class Goal(object):
                                      lower_slack_limit=-max_violation,
                                      upper_slack_limit=max_violation,
                                      name_suffix=u'{}/q/vel'.format(name_suffix))
+
 
 def _prepend_prefix(prefix, d):
     new_dict = OrderedDict()

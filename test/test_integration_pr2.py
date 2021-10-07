@@ -4216,9 +4216,48 @@ class TestCollisionAvoidanceGoals(object):
         bowl_name = u'bowl'
         cup_name = u'cup'
         percentage = 50
+        drawer_handle = u'sink_area_left_middle_drawer_handle'
+        drawer_joint = u'sink_area_left_middle_drawer_main_joint'
 
-        self.open_drawer(kitchen_setup, kitchen_setup.l_tip, u'iai_kitchen/sink_area_left_middle_drawer_handle',
-                         u'sink_area_left_middle_drawer_main_joint')
+        # grasp drawer handle
+        bar_axis = Vector3Stamped()
+        bar_axis.header.frame_id = drawer_handle
+        bar_axis.vector.y = 1
+
+        bar_center = PointStamped()
+        bar_center.header.frame_id = drawer_handle
+
+        tip_grasp_axis = Vector3Stamped()
+        tip_grasp_axis.header.frame_id = kitchen_setup.l_tip
+        tip_grasp_axis.vector.z = 1
+
+        kitchen_setup.set_json_goal(u'GraspBar',
+                                    root_link=kitchen_setup.default_root,
+                                    tip_link=kitchen_setup.l_tip,
+                                    tip_grasp_axis=tip_grasp_axis,
+                                    bar_center=bar_center,
+                                    bar_axis=bar_axis,
+                                    bar_length=0.4)  # TODO: check for real length
+        x_gripper = Vector3Stamped()
+        x_gripper.header.frame_id = kitchen_setup.l_tip
+        x_gripper.vector.x = 1
+
+        x_goal = Vector3Stamped()
+        x_goal.header.frame_id = drawer_handle
+        x_goal.vector.x = -1
+
+        kitchen_setup.set_align_planes_goal(kitchen_setup.l_tip,
+                                            x_gripper,
+                                            root_normal=x_goal)
+        # kitchen_setup.allow_all_collisions()
+        kitchen_setup.plan_and_execute()
+
+        # open drawer
+        kitchen_setup.set_json_goal(u'Open',
+                                    tip_link=kitchen_setup.l_tip,
+                                    environment_link=drawer_handle)
+        kitchen_setup.plan_and_execute()
+        kitchen_setup.set_kitchen_js({drawer_joint: 0.48})
 
         # spawn cup
         cup_pose = PoseStamped()
@@ -4226,7 +4265,7 @@ class TestCollisionAvoidanceGoals(object):
         cup_pose.pose.position = Point(0.1, 0.2, -.05)
         cup_pose.pose.orientation = Quaternion(0, 0, 0, 1)
 
-        kitchen_setup.add_cylinder(cup_name, [0.07, 0.04], cup_pose)
+        kitchen_setup.add_cylinder(cup_name, height=0.07, radius=0.04, pose=cup_pose)
 
         # spawn bowl
         bowl_pose = PoseStamped()
@@ -4234,8 +4273,9 @@ class TestCollisionAvoidanceGoals(object):
         bowl_pose.pose.position = Point(0.1, -0.2, -.05)
         bowl_pose.pose.orientation = Quaternion(0, 0, 0, 1)
 
-        kitchen_setup.add_cylinder(bowl_name, [0.05, 0.07], bowl_pose)
-        kitchen_setup.send_and_check_joint_goal(gaya_pose)
+        kitchen_setup.add_cylinder(bowl_name, height=0.05, radius=0.07, pose=bowl_pose)
+        kitchen_setup.set_joint_goal(gaya_pose)
+        kitchen_setup.plan_and_execute()
 
         # grasp bowl
         l_goal = deepcopy(bowl_pose)
@@ -4254,7 +4294,8 @@ class TestCollisionAvoidanceGoals(object):
                                                                       [-1, 0, 0, 0],
                                                                       [0, 0, 0, 1]]))
         kitchen_setup.set_json_goal(u'AvoidJointLimits', percentage=percentage)
-        kitchen_setup.set_and_check_cart_goal(r_goal, kitchen_setup.r_tip, kitchen_setup.default_root)
+        kitchen_setup.set_cart_goal(r_goal, kitchen_setup.r_tip, kitchen_setup.default_root)
+        kitchen_setup.plan_and_execute()
 
         l_goal.pose.position.z -= .2
         r_goal.pose.position.z -= .2
@@ -4263,12 +4304,13 @@ class TestCollisionAvoidanceGoals(object):
         kitchen_setup.set_cart_goal(l_goal, kitchen_setup.l_tip, kitchen_setup.default_root)
         kitchen_setup.set_cart_goal(r_goal, kitchen_setup.r_tip, kitchen_setup.default_root)
         kitchen_setup.set_json_goal(u'AvoidJointLimits', percentage=percentage)
-        kitchen_setup.send_and_check_goal()
+        kitchen_setup.plan_and_execute()
 
         kitchen_setup.attach_object(bowl_name, kitchen_setup.l_tip)
         kitchen_setup.attach_object(cup_name, kitchen_setup.r_tip)
 
-        kitchen_setup.send_and_check_joint_goal(gaya_pose)
+        kitchen_setup.set_joint_goal(gaya_pose)
+        kitchen_setup.plan_and_execute()
         base_goal = PoseStamped()
         base_goal.header.frame_id = u'base_footprint'
         base_goal.pose.position.x = -.1
@@ -4289,13 +4331,14 @@ class TestCollisionAvoidanceGoals(object):
         kitchen_setup.set_cart_goal(bowl_goal, bowl_name, kitchen_setup.default_root)
         kitchen_setup.set_cart_goal(cup_goal, cup_name, kitchen_setup.default_root)
         kitchen_setup.set_json_goal(u'AvoidJointLimits', percentage=percentage)
-        kitchen_setup.send_and_check_goal()
+        kitchen_setup.plan_and_execute()
 
         kitchen_setup.detach_object(bowl_name)
         kitchen_setup.detach_object(cup_name)
         kitchen_setup.allow_collision([], cup_name, [])
         kitchen_setup.allow_collision([], bowl_name, [])
-        kitchen_setup.send_and_check_joint_goal(gaya_pose)
+        kitchen_setup.set_joint_goal(gaya_pose)
+        kitchen_setup.plan_and_execute()
 
     def test_ease_grasp_bowl(self, kitchen_setup):
         """
@@ -4894,7 +4937,8 @@ class TestReachability():
         zero_pose.set_joint_goal(js)
         zero_pose.send_and_check_goal(goal_type=MoveGoal.PLAN_ONLY)
 
-# import pytest
+import pytest
 # pytest.main(['-s', __file__ + '::TestJointGoals::test_joint_movement1'])
 # pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_bowl_and_cup'])
 # pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_attached_collision2'])
+pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_avoid_self_collision'])

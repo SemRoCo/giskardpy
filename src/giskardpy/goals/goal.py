@@ -3,7 +3,9 @@ from __future__ import division
 from collections import OrderedDict
 
 import numpy as np
+from geometry_msgs.msg import PoseStamped
 from giskard_msgs.msg import Constraint as Constraint_msg
+from tf2_py import LookupException
 
 import giskardpy.identifier as identifier
 from giskardpy import casadi_wrapper as w
@@ -12,6 +14,7 @@ from giskardpy.exceptions import ConstraintInitalizationException
 from giskardpy.model.robot import Robot
 from giskardpy.model.world import WorldTree
 from giskardpy.qp.constraint import VelocityConstraint, Constraint
+import giskardpy.utils.tfwrapper as tf
 
 WEIGHT_MAX = Constraint_msg.WEIGHT_MAX
 WEIGHT_ABOVE_CA = 2500  # Constraint_msg.WEIGHT_ABOVE_CA
@@ -52,6 +55,12 @@ class Goal(object):
 
     def get_world_object_pose(self, object_name, link_name):
         pass
+
+    def transform_msg(self, target_frame, msg, timeout=1):
+        try:
+            return tf.transform_msg(target_frame, msg, timeout=timeout)
+        except LookupException as e:
+            return self.world.transform_msg(target_frame, msg)
 
     @property
     def robot(self):

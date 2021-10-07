@@ -30,10 +30,7 @@ class CartesianPosition(Goal):
             reference_velocity = max_velocity
         self.root_link = root_link
         self.tip_link = tip_link
-        try:
-            self.goal_pose = tf.transform_pose(self.root_link, goal, timeout=1)
-        except LookupException as e:
-            self.goal_pose = self.world.transform_pose(self.root_link, goal)
+        self.goal_pose = self.transform_msg(self.root_link, goal)
         self.reference_velocity = reference_velocity
         self.max_velocity = max_velocity
         self.weight = weight
@@ -66,20 +63,17 @@ class CartesianOrientation(Goal):
             reference_velocity = max_velocity
         self.root_link = root_link
         self.tip_link = tip_link
-        try:
-            self.goal_pose = tf.transform_pose(self.root_link, goal)
-        except LookupException as e:
-            self.goal_pose = self.world.transform_pose(self.root_link, goal)
+        self.goal_pose = self.transform_msg(self.root_link, goal)
         self.reference_velocity = reference_velocity
         self.max_velocity = max_velocity
         self.weight = weight
-        if self.max_velocity is not None:
-            self.add_constraints_of_goal(RotationVelocityLimit(root_link=root_link,
-                                                               tip_link=tip_link,
-                                                               weight=weight,
-                                                               max_velocity=max_velocity,
-                                                               hard=False,
-                                                               **kwargs))
+        # if self.max_velocity is not None:
+        #     self.add_constraints_of_goal(RotationVelocityLimit(root_link=root_link,
+        #                                                        tip_link=tip_link,
+        #                                                        weight=weight,
+        #                                                        max_velocity=max_velocity,
+        #                                                        hard=False,
+        #                                                        **kwargs))
 
     def make_constraints(self):
         r_R_g = w.rotation_of(self.get_parameter_as_symbolic_expression('goal_pose'))
@@ -106,10 +100,7 @@ class CartesianPositionStraight(Goal):
         self.weight = weight
         self.root_link = root_link
         self.tip_link = tip_link
-        try:
-            self.goal_pose = tf.transform_pose(self.root_link, goal)
-        except LookupException as e:
-            self.goal_pose = self.world.transform_pose(self.root_link, goal)
+        self.goal_pose = self.transform_msg(self.root_link, goal)
         super(CartesianPositionStraight, self).__init__(**kwargs)
 
         self.start = self.world.compute_fk_pose(self.root_link, self.tip_link)

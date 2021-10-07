@@ -55,6 +55,17 @@ def wait_for_transform(target_frame, source_frame, time, timeout):
     return tfBuffer.can_transform(target_frame, source_frame, time, timeout)
 
 
+def transform_msg(target_frame, msg, timeout=5):
+    if isinstance(msg, PoseStamped):
+        return transform_pose(target_frame, msg, timeout)
+    elif isinstance(msg, PointStamped):
+        return transform_point(target_frame, msg, timeout)
+    elif isinstance(msg, Vector3Stamped):
+        return transform_vector(target_frame, msg, timeout)
+    else:
+        raise NotImplementedError('tf transform message of type \'{}\''.format(type(msg)))
+
+
 def transform_pose(target_frame, pose, timeout=5.0):
     """
     Transforms a pose stamped into a different target frame.
@@ -77,7 +88,7 @@ def transform_pose(target_frame, pose, timeout=5.0):
         logging.logwarn(str(e))
 
 
-def transform_vector(target_frame, vector):
+def transform_vector(target_frame, vector, timeout=5):
     """
     Transforms a pose stamped into a different target frame.
     :type target_frame: Union[str, unicode]
@@ -92,14 +103,14 @@ def transform_vector(target_frame, vector):
         transform = tfBuffer.lookup_transform(str(target_frame),
                                               str(vector.header.frame_id),  # source frame
                                               vector.header.stamp,
-                                              rospy.Duration(5.0))
+                                              rospy.Duration(timeout))
         new_pose = do_transform_vector3(vector, transform)
         return new_pose
     except ExtrapolationException as e:
         logging.logwarn(str(e))
 
 
-def transform_point(target_frame, point):
+def transform_point(target_frame, point, timeout=5):
     """
     Transforms a pose stamped into a different target frame.
     :type target_frame: Union[str, unicode]
@@ -114,7 +125,7 @@ def transform_point(target_frame, point):
         transform = tfBuffer.lookup_transform(str(target_frame),
                                               str(point.header.frame_id),  # source frame
                                               point.header.stamp,
-                                              rospy.Duration(5.0))
+                                              rospy.Duration(timeout))
         new_pose = do_transform_point(point, transform)
         return new_pose
     except ExtrapolationException as e:
@@ -377,6 +388,10 @@ def np_point(x, y, z):
 
 
 def np_to_pose(matrix):
+    """
+    :type matrix: np.ndarray
+    :rtype: Pose
+    """
     return kdl_to_pose(np_to_kdl(matrix))
 
 # Code copied from user jarvisschultz from ROS answers

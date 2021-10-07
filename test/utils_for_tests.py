@@ -21,6 +21,7 @@ from rospy import Timer
 from sensor_msgs.msg import JointState
 from std_msgs.msg import ColorRGBA
 from tf.transformations import rotation_from_matrix, quaternion_matrix
+from tf2_py import LookupException
 from visualization_msgs.msg import Marker
 
 import giskardpy.utils.tfwrapper as tf
@@ -265,6 +266,12 @@ class GoalChecker(object):
         self.world = self.god_map.unsafe_get_data(identifier.world)
         self.robot = self.god_map.unsafe_get_data(identifier.robot)
 
+    def transform_msg(self, target_frame, msg, timeout=1):
+        try:
+            return tf.transform_msg(target_frame, msg, timeout=timeout)
+        except LookupException as e:
+            return self.world.transform_msg(target_frame, msg)
+
 
 class JointGoalChecker(GoalChecker):
     def __init__(self, god_map, goal_state, decimal=2):
@@ -307,7 +314,7 @@ class TranslationGoalChecker(GoalChecker):
         self.expected = expected
         self.tip_link = tip_link
         self.root_link = root_link
-        self.expected = tf.transform_pose(self.root_link, self.expected)
+        self.expected = self.transform_msg(self.root_link, self.expected)
 
     def __call__(self):
         expected = self.expected
@@ -322,11 +329,11 @@ class AlignPlanesGoalChecker(GoalChecker):
         self.tip_normal = tip_normal
         self.tip_link = tip_link
         self.root_link = root_link
-        self.expected = tf.transform_vector(self.root_link, root_normal)
+        self.expected = self.transform_msg(self.root_link, root_normal)
 
     def __call__(self):
         expected = self.expected
-        current = tf.transform_vector(self.root_link, self.tip_normal)
+        current = self.transform_msg(self.root_link, self.tip_normal)
         np.testing.assert_array_almost_equal(msg_to_list(expected.vector),  msg_to_list(current.vector), decimal=2)
 
 
@@ -336,7 +343,7 @@ class RotationGoalChecker(GoalChecker):
         self.expected = expected
         self.tip_link = tip_link
         self.root_link = root_link
-        self.expected = tf.transform_pose(self.root_link, self.expected)
+        self.expected = self.transform_msg(self.root_link, self.expected)
 
     def __call__(self):
         expected = self.expected
@@ -385,6 +392,12 @@ class GiskardTestWrapper(GiskardWrapper):
 
         self.joint_state_publisher = KeyDefaultDict(create_publisher)
         # rospy.sleep(1)
+
+    def transform_msg(self, target_frame, msg, timeout=1):
+        try:
+            return tf.transform_msg(target_frame, msg, timeout=timeout)
+        except LookupException as e:
+            return self.world.transform_msg(target_frame, msg)
 
     def wait_heartbeats(self, number=2):
         tree = self.god_map.get_data(identifier.tree_manager).tree
@@ -749,6 +762,7 @@ class GiskardTestWrapper(GiskardWrapper):
 
     def attach_object(self, name=u'box', frame_id=None, expected_response=UpdateWorldResponse.SUCCESS):
         r = super(GiskardTestWrapper, self).attach_object(name, frame_id)
+        self.wait_heartbeats()
         assert r.error_codes == expected_response, \
             u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
                                             update_world_error_code(expected_response))
@@ -808,17 +822,19 @@ class PR2(GiskardTestWrapper):
         self.r_gripper = rospy.ServiceProxy(u'r_gripper_simulator/set_joint_states', SetJointState)
         self.l_gripper = rospy.ServiceProxy(u'l_gripper_simulator/set_joint_states', SetJointState)
         super(PR2, self).__init__(u'pr2.yaml')
-        self.world.register_group('r_gripper', 'r_wrist_roll_link')
-        self.world.register_group('l_gripper', 'l_wrist_roll_link')
 
     def move_base(self, goal_pose):
         self.set_cart_goal(goal_pose, tip_link='base_footprint', root_link='odom_combined')
         self.plan_and_execute()
 
     def get_l_gripper_links(self):
+        if 'l_gripper' not in self.world.group_names:
+            self.world.register_group('l_gripper', 'l_wrist_roll_link')
         return self.world.groups['l_gripper'].link_names_with_collisions
 
     def get_r_gripper_links(self):
+        if 'r_gripper' not in self.world.group_names:
+            self.world.register_group('r_gripper', 'r_wrist_roll_link')
         return self.world.groups['r_gripper'].link_names_with_collisions
 
     def get_r_forearm_links(self):

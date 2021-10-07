@@ -15,18 +15,18 @@ class AlignPlanes(Goal):
         :param weight: float, default is WEIGHT_ABOVE_CA
         :param goal_constraint: bool, default False
         """
+        super(AlignPlanes, self).__init__(**kwargs)
         self.root = root_link
         self.tip = tip_link
         self.max_velocity = max_angular_velocity
         self.weight = weight
 
-        self.tip_V_tip_normal = tf.transform_vector(self.tip, tip_normal)
+        self.tip_V_tip_normal = self.transform_msg(self.tip, tip_normal)
         self.tip_V_tip_normal.vector = tf.normalize(self.tip_V_tip_normal.vector)
 
-        self.root_V_root_normal = tf.transform_vector(self.root, root_normal)
+        self.root_V_root_normal = self.transform_msg(self.root, root_normal)
         self.root_V_root_normal.vector = tf.normalize(self.root_V_root_normal.vector)
 
-        super(AlignPlanes, self).__init__(**kwargs)
 
     def __str__(self):
         s = super(AlignPlanes, self).__str__()

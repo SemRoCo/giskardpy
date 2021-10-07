@@ -6,7 +6,7 @@ from functools import cached_property
 
 import numpy as np
 import urdf_parser_py.urdf as up
-from geometry_msgs.msg import PoseStamped, Pose
+from geometry_msgs.msg import PoseStamped, Pose, PointStamped, Point, Vector3Stamped, Vector3
 from giskard_msgs.msg import CollisionEntry
 from tf.transformations import euler_matrix
 from visualization_msgs.msg import Marker, MarkerArray
@@ -25,7 +25,7 @@ from giskardpy.model.utils import cube_volume, cube_surface, sphere_volume, cyli
 from giskardpy.model.world_object import WorldObject
 from giskardpy.utils import logging
 from giskardpy.utils.tfwrapper import msg_to_kdl, kdl_to_pose, homo_matrix_to_pose, np_to_pose, pose_to_kdl, \
-    kdl_to_np, pose_to_np, msg_to_homogeneous_matrix
+    kdl_to_np, pose_to_np, msg_to_homogeneous_matrix, np_point, np_vector
 from giskardpy.utils.utils import suppress_stderr, memoize, resolve_ros_iris
 
 
@@ -350,7 +350,6 @@ class WorldTree(object):
 
     def reset_cache(self):
         # FIXME this sucks because it calls properties
-        self.fast_all_fks = None
         for method_name in dir(self):
             try:
                 getattr(self, method_name).memo.clear()
@@ -522,6 +521,7 @@ class WorldTree(object):
             self.add_urdf(self.god_map.unsafe_get_data(identifier.robot_description), group_name=RobotName, prefix=None)
         except KeyError:
             logging.logwarn('Can\'t add robot, because it is not on the param server')
+        self.fast_all_fks = None
         self.soft_reset()
 
     def sync_with_paramserver(self):
@@ -702,6 +702,7 @@ class WorldTree(object):
         # FIXME there is some reference fuckup going on, but i don't know where; deepcopy is just a quick fix
         return deepcopy(fk)
 
+    @profile
     def init_fast_fks(self):
         def f(key):
             root, tip = key
@@ -725,6 +726,7 @@ class WorldTree(object):
         return p
 
     @memoize
+    @profile
     def compute_fk_np(self, root, tip):
         return self._fks[root, tip].call2(self.god_map.unsafe_get_values(self._fks[root, tip].str_params))
 
@@ -771,23 +773,31 @@ class WorldTree(object):
 
     @profile
     def compute_all_fks_matrix(self):
-        if self.fast_all_fks is None:
-            fks = []
-            self.fk_idx = {}
-            i = 0
-            for link in self.links.values():
-                if link.name == self.root_link_name:
-                    continue
-                if link.has_collisions():
-                    map_T_o = self.compose_fk_expression(self.root_link_name, link.name)
-                    map_T_geo = w.dot(map_T_o, link.collisions[0].link_T_geometry)
-                    fks.append(map_T_geo)
-                    self.fk_idx[link.name] = i
-                    i += 4
-            fks = w.vstack(fks)
-            self.fast_all_fks = w.speed_up(fks, w.free_symbols(fks))
+        fks = []
+        # self.fk_idx = {}
+        # i = 0
+        for link in self.links.values():
+            if link.name == self.root_link_name:
+                continue
+            if link.has_collisions():
+                map_T_o = self.compose_fk_expression(self.root_link_name, link.name)
+                map_T_geo = w.dot(map_T_o, link.collisions[0].link_T_geometry)
+                fks.append(map_T_geo)
+                # self.fk_idx[link.name] = i
+                # i += 4
+        fks = w.vstack(fks)
+        fast_all_fks = w.speed_up(fks, w.free_symbols(fks))
 
-        return self.fast_all_fks.call2(self.god_map.unsafe_get_values(self.fast_all_fks.str_params))
+        class ComputeFKs(object):
+            def __init__(self, f, god_map):
+                self.f = f
+                self.god_map = god_map
+
+            @profile
+            def __call__(self):
+                return fast_all_fks.call2(self.god_map.unsafe_get_values(self.f.str_params))
+
+        return ComputeFKs(fast_all_fks, self.god_map)
         # result = {}
         # for link in self.link_names_with_collisions:
         #     result[link] = fks_evaluated[self.fk_idx[link], :]
@@ -841,6 +851,16 @@ class WorldTree(object):
         lower_limit = self.joints[joint_name].free_variable.get_lower_limit(order)
         return lower_limit, upper_limit
 
+    def transform_msg(self, target_frame, msg):
+        if isinstance(msg, PoseStamped):
+            return self.transform_pose(target_frame, msg)
+        elif isinstance(msg, PointStamped):
+            return self.transform_point(target_frame, msg)
+        elif isinstance(msg, Vector3Stamped):
+            return self.transform_vector(target_frame, msg)
+        else:
+            raise NotImplementedError('World can\'t transform message of type \'{}\''.format(type(msg)))
+
     def transform_pose(self, target_frame, pose):
         """
         :type target_frame: Union[str, PrefixName]
@@ -850,7 +870,38 @@ class WorldTree(object):
         f_T_p = msg_to_homogeneous_matrix(pose.pose)
         t_T_f = self.compute_fk_np(target_frame, pose.header.frame_id)
         t_T_p = np.dot(t_T_f, f_T_p)
-        return np_to_pose(t_T_p)
+        result = PoseStamped()
+        result.header.frame_id = target_frame
+        result.pose = np_to_pose(t_T_p)
+        return result
+
+    def transform_point(self, target_frame, point):
+        """
+        :type target_frame: Union[str, PrefixName]
+        :type point: PointStamped
+        :rtype: PointStamped
+        """
+        f_P_p = np_point(point.point.x, point.point.y, point.point.z)
+        t_T_f = self.compute_fk_np(target_frame, point.header.frame_id)
+        t_P_p = np.dot(t_T_f, f_P_p)
+        result = PointStamped()
+        result.header.frame_id = target_frame
+        result.point = Point(*t_P_p[:3])
+        return result
+
+    def transform_vector(self, target_frame, vector):
+        """
+        :type target_frame: Union[str, PrefixName]
+        :type vector: Vector3Stamped
+        :rtype: Vector3Stamped
+        """
+        f_V_p = np_vector(vector.vector.x, vector.vector.y, vector.vector.z)
+        t_T_f = self.compute_fk_np(target_frame, vector.header.frame_id)
+        t_V_p = np.dot(t_T_f, f_V_p)
+        result = Vector3Stamped()
+        result.header.frame_id = target_frame
+        result.vector = Vector3(*t_V_p[:3])
+        return result
 
     def compute_joint_limits(self, joint_name, order):
         lower_limit, upper_limit = self.joint_limit_expr(joint_name, order)

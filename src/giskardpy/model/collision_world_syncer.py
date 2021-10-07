@@ -51,7 +51,6 @@ class CollisionWorldSynchronizer(object):
         """
         return self.world.god_map
 
-    @profile
     def add_object(self, link):
         """
         :type link: giskardpy.model.world.Link
@@ -214,7 +213,6 @@ class CollisionWorldSynchronizer(object):
                 in_collision.add((link_a, link_b))
         return in_collision
 
-    @profile
     def check_collisions(self, cut_off_distances, collision_list_size=15):
         """
         :param cut_off_distances: (robot_link, body_b, link_b) -> cut off distance. Contacts between objects not in this
@@ -237,14 +235,6 @@ class CollisionWorldSynchronizer(object):
         """
         return False
 
-    @profile
-    def sync_state(self):
-        """
-        :type world: giskardpy.model.world.WorldTree
-        """
-        pass
-
-    @profile
     def sync(self):
         """
         :type world: giskardpy.model.world.WorldTree

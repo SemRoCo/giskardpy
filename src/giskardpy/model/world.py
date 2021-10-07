@@ -265,7 +265,16 @@ class WorldTree(object):
         self.god_map = god_map  # type: GodMap
         self.connection_prefix = 'connection'
         self.fast_all_fks = None
+        self._version = 0
         self.hard_reset()
+
+    @property
+    def version(self):
+        return self._version
+
+    def _increase_version(self):
+        self.soft_reset()
+        self._version += 1
 
     def search_branch(self, joint_name,
                       stop_at_joint_when=None, stop_at_link_when=None,
@@ -341,6 +350,7 @@ class WorldTree(object):
 
     def reset_cache(self):
         # FIXME this sucks because it calls properties
+        self.fast_all_fks = None
         for method_name in dir(self):
             try:
                 getattr(self, method_name).memo.clear()
@@ -353,6 +363,7 @@ class WorldTree(object):
         if name in self.groups:
             raise DuplicateNameException('Group with name {} already exists'.format(name))
         self.groups[name] = SubWorldTree(name, root_link_name, self)
+        self._increase_version()
 
     @property
     def group_names(self):
@@ -420,7 +431,6 @@ class WorldTree(object):
         helper(parsed_urdf, child_link)
         if group_name is not None:
             self.register_group(group_name, child_link.name)
-        self.soft_reset()
         self.sync_with_paramserver()
 
     def get_parent_link_of_link(self, link_name):
@@ -480,7 +490,7 @@ class WorldTree(object):
                                parent_T_child=w.Matrix(kdl_to_np(pose_to_kdl(pose))))
             self.link_joint_to_links(joint, link)
             self.register_group(msg.name, link.name)
-        self.soft_reset()
+        self._increase_version()
 
     @property
     def movable_joints(self):
@@ -513,7 +523,6 @@ class WorldTree(object):
         except KeyError:
             logging.logwarn('Can\'t add robot, because it is not on the param server')
         self.soft_reset()
-        self.fast_all_fks = None
 
     def sync_with_paramserver(self):
         # FIXME this is probable being called repeatedly, creating huge min max expressions over time
@@ -529,6 +538,7 @@ class WorldTree(object):
                 return self.god_map.to_symbol(identifier.joint_weights + [order_map[i], 'override', joint_name])
             d = KeyDefaultDict(default)
             self.set_joint_weights(i, d)
+        self._increase_version()
 
     @property
     def joint_constraints(self):
@@ -562,7 +572,7 @@ class WorldTree(object):
         joint.parent_T_child = fk
         old_parent_link.child_joint_names.remove(joint_name)
         new_parent_link.child_joint_names.append(joint_name)
-        self.soft_reset()
+        self._increase_version()
 
     def move_group(self, group_name, new_parent_link_name):
         group = self.groups[group_name]
@@ -574,11 +584,9 @@ class WorldTree(object):
 
     def delete_group(self, group_name):
         self.delete_branch(self.groups[group_name].root_link_name)
-        self.soft_reset()
 
     def delete_branch(self, link_name):
         self.delete_branch_at_joint(self.links[link_name].parent_joint_name)
-        self.soft_reset()
 
     def delete_branch_at_joint(self, joint_name):
         joint = self.joints.pop(joint_name)  # type: Joint
@@ -595,7 +603,7 @@ class WorldTree(object):
                 helper(child_joint.child_link_name)
 
         helper(joint.child_link_name)
-        self.soft_reset()
+        self._increase_version()
 
     def link_order(self, link_a, link_b):
         """

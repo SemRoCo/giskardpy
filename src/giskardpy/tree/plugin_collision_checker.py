@@ -7,6 +7,7 @@ from py_trees import Status
 from std_srvs.srv import SetBool, SetBoolResponse, SetBoolRequest
 
 import giskardpy.identifier as identifier
+from giskardpy import RobotName
 from giskardpy.model import pybullet_wrapper
 from giskardpy.tree.plugin import GiskardBehavior
 
@@ -14,7 +15,6 @@ from giskardpy.tree.plugin import GiskardBehavior
 class CollisionChecker(GiskardBehavior):
     def __init__(self, name):
         super(CollisionChecker, self).__init__(name)
-        # self.default_min_dist = self.get_god_map().safe_get_data(identifier.default_collision_avoidance_distance)
         self.map_frame = self.get_god_map().get_data(identifier.map_frame)
         self.lock = Lock()
         self.object_js_subs = {}  # JointState subscribers for articulated world objects
@@ -23,7 +23,7 @@ class CollisionChecker(GiskardBehavior):
 
     def setup(self, timeout=10.0):
         super(CollisionChecker, self).setup(timeout)
-        # self.pub_collision_marker = rospy.Publisher(u'~visualization_marker_array', MarkerArray, queue_size=1)
+        self.collision_scene.init_collision_matrix(RobotName)
         self.srv_activate_rendering = rospy.Service(u'~render', SetBool, self.activate_rendering)
         rospy.sleep(.5)
         return True
@@ -92,7 +92,7 @@ class CollisionChecker(GiskardBehavior):
         """
         Computes closest point info for all robot links and safes it to the god map.
         """
-        self.collision_scene.sync_state()
+        self.collision_scene.sync()
         collisions = self.collision_scene.check_collisions(self.collision_matrix, self.collision_list_size)
         self.god_map.set_data(identifier.closest_point, collisions)
         return Status.RUNNING

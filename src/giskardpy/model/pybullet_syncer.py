@@ -39,7 +39,7 @@ class PyBulletSyncer(CollisionWorldSynchronizer):
 
     def check_collisions2(self, link_combinations, distance):
         in_collision = set()
-        self.sync_state()
+        self.sync()
         for link_a, link_b in link_combinations:
             if self.in_collision(link_a, link_b, distance):
                 in_collision.add((link_a, link_b))
@@ -81,15 +81,23 @@ class PyBulletSyncer(CollisionWorldSynchronizer):
         return len(pbw.getClosestPoints(link_id_a, link_id_b, distance)) > 0
 
     @profile
-    def sync_state(self):
+    def sync(self):
         """
         :type world: giskardpy.model.world.WorldTree
         """
         pbw.deactivate_rendering()
-        self.fks = self.world.compute_all_fks()
-        for link_name, link in self.world.links.items():
-            if link.has_collisions():
-                self.update_pose(link)
+        if self.has_world_changed():
+            self.object_name_to_bullet_id = BiDict()
+            pbw.clear_pybullet()
+            self.fks = self.world.compute_all_fks()
+            for link_name, link in self.world.links.items():
+                if link.has_collisions():
+                    self.add_object(link)
+        else:
+            self.fks = self.world.compute_all_fks()
+            for link_name, link in self.world.links.items():
+                if link.has_collisions():
+                    self.update_pose(link)
         pbw.activate_rendering()
 
     def get_pose(self, link_name):
@@ -99,23 +107,6 @@ class PyBulletSyncer(CollisionWorldSynchronizer):
         map_T_link.pose.position = Point(*position)
         map_T_link.pose.orientation = Quaternion(*orientation)
         return map_T_link
-
-    @profile
-    def sync(self):
-        """
-        :type world: giskardpy.model.world.WorldTree
-        """
-        self.world.soft_reset()
-        self.world.fast_all_fks = None
-        pbw.deactivate_rendering()
-        self.object_name_to_bullet_id = BiDict()
-        pbw.clear_pybullet()
-        self.fks = self.world.compute_all_fks()
-        for link_name, link in self.world.links.items():
-            if link.has_collisions():
-                self.add_object(link)
-        pbw.activate_rendering()
-        self.sync_state()
 
     def __add_pybullet_bug_fix_hack(self):
         if self.hack_name not in self.object_name_to_bullet_id:

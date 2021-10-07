@@ -362,7 +362,7 @@ class TestPyBulletSyncer(object):
 
     def test_set_pr2_js(self, pr2_world):
         pr2_world.world.state['torso_lift_link'] = 1
-        pr2_world.sync_state()
+        pr2_world.sync()
         assert len(pbw.get_body_names()) == 46
 
     def test_compute_collision_matrix(self, pr2_world):

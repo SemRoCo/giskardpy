@@ -505,6 +505,7 @@ class QPController(object):
         self.retries_with_relaxed_constraints = retries_with_relaxed_constraints
         self.retry_added_slack = retry_added_slack
         self.retry_weight_factor = retry_weight_factor
+        self.xdot_full = None
         if free_variables is not None:
             self.add_free_variables(free_variables)
         if constraints is not None:

@@ -1,16 +1,14 @@
 from collections import defaultdict
 
 import betterpybullet as bpb
-from geometry_msgs.msg import PoseStamped, Point, Quaternion
+from geometry_msgs.msg import PoseStamped, Quaternion
 
 from giskardpy import RobotName
 from giskardpy.data_types import BiDict, Collisions, Collision
-from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer
-from giskardpy.model.pybullet_wrapper import ContactInfo
-from giskardpy.model.world import BoxGeometry, SphereGeometry, CylinderGeometry, MeshGeometry
 from giskardpy.model.bpb_wrapper import create_cube_shape, create_object, create_sphere_shape, create_cylinder_shape, \
     load_convex_mesh_shape
-from giskardpy.utils.utils import memoize
+from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer
+from giskardpy.model.world import BoxGeometry, SphereGeometry, CylinderGeometry, MeshGeometry
 
 
 class BetterPyBulletSyncer(CollisionWorldSynchronizer):
@@ -33,14 +31,14 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
         elif isinstance(geometry, SphereGeometry):
             shape = create_sphere_shape(geometry.radius * 2)
         elif isinstance(geometry, CylinderGeometry):
-            shape = create_cylinder_shape(geometry.radius*2, geometry.height)
+            shape = create_cylinder_shape(geometry.radius * 2, geometry.height)
         elif isinstance(geometry, MeshGeometry):
             shape = load_convex_mesh_shape(geometry.file_name, scale=geometry.scale)
         else:
             raise NotImplementedError()
         map_T_o = bpb.Transform()
-        map_T_o.origin = bpb.Vector3(0,0,0)
-        map_T_o.rotation = bpb.Quaternion(0,0,0,1)
+        map_T_o.origin = bpb.Vector3(0, 0, 0)
+        map_T_o.rotation = bpb.Quaternion(0, 0, 0, 1)
         o = create_object(shape, map_T_o)
         self.kw.add_collision_object(o)
         self.object_name_to_id[link.name] = o
@@ -138,7 +136,7 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
     #     return collisions
 
     def check_collision(self, link_a, link_b, distance):
-        self.sync_state()
+        self.sync()
         query = defaultdict(set)
         query[self.object_name_to_id[link_a]].add((self.object_name_to_id[link_b], distance))
         return self.kw.get_closest_filtered_POD_batch(query)
@@ -151,30 +149,23 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
         return len(result) > 0 and result[0].distance < distance
 
     @profile
-    def sync_state(self):
-        """
-        :type world: giskardpy.model.world.WorldTree
-        """
-        fks = self.world.compute_all_fks_matrix()
-        objects_in_order = [self.object_name_to_id[link.name] for link in self.world.links.values() if link.has_collisions()]
-        bpb.batch_set_transforms(objects_in_order, fks)
-
-    @profile
     def sync(self):
         """
         :type world: giskardpy.model.world.WorldTree
         """
-        self.reset_cache()
-        self.world.soft_reset()
-        self.world.fast_all_fks = None
-        for o in self.kw.collision_objects:
-            self.kw.remove_collision_object(o)
-        self.object_name_to_id = BiDict()
+        if self.has_world_changed():
+            self.reset_cache()
+            for o in self.kw.collision_objects:
+                self.kw.remove_collision_object(o)
+            self.object_name_to_id = BiDict()
 
-        for link_name, link in self.world.links.items():
-            if link.has_collisions():
-                self.add_object(link)
-        self.sync_state()
+            for link_name, link in self.world.links.items():
+                if link.has_collisions():
+                    self.add_object(link)
+            self.objects_in_order = [self.object_name_to_id[link.name] for link in self.world.links.values() if
+                                     link.has_collisions()]
+        fks = self.world.compute_all_fks_matrix()
+        bpb.batch_set_transforms(self.objects_in_order, fks)
 
     def get_pose(self, link_name):
         collision_object = self.object_name_to_id[link_name]

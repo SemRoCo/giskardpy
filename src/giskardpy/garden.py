@@ -1,4 +1,3 @@
-import functools
 from collections import defaultdict
 from copy import deepcopy
 
@@ -13,10 +12,12 @@ from rospy import ROSException
 
 import giskardpy.identifier as identifier
 import giskardpy.model.pybullet_wrapper as pbw
-from giskardpy import RobotName, RobotPrefix
-from giskardpy.data_types import BiDict, KeyDefaultDict, PrefixName, order_map
+from giskardpy import RobotPrefix
+from giskardpy.data_types import KeyDefaultDict, order_map
 from giskardpy.god_map import GodMap
+from giskardpy.model.better_pybullet_syncer import BetterPyBulletSyncer
 from giskardpy.model.world import WorldTree
+from giskardpy.tree.collision_scene_updater import CollisionSceneUpdater
 from giskardpy.tree.plugin import PluginBehavior
 from giskardpy.tree.plugin_action_server import GoalReceived, SendResult, GoalCanceled
 from giskardpy.tree.plugin_append_zero_velocity import AppendZeroVelocity
@@ -27,28 +28,27 @@ from giskardpy.tree.plugin_configuration import ConfigurationPlugin
 from giskardpy.tree.plugin_goal_reached import GoalReachedPlugin
 from giskardpy.tree.plugin_if import IF, IfFunction
 from giskardpy.tree.plugin_instantaneous_controller import ControllerPlugin
-from giskardpy.tree.plugin_max_trajectory_length import MaxTrajectoryLength
-from giskardpy.tree.plugin_wiggle_cancel import WiggleCancel
 from giskardpy.tree.plugin_kinematic_sim import KinSimPlugin
 from giskardpy.tree.plugin_log_debug_expressions import LogDebugExpressionsPlugin
 from giskardpy.tree.plugin_log_trajectory import LogTrajPlugin
 from giskardpy.tree.plugin_loop_detector import LoopDetector
+from giskardpy.tree.plugin_max_trajectory_length import MaxTrajectoryLength
 from giskardpy.tree.plugin_plot_debug_expressions import PlotDebugExpressions
 from giskardpy.tree.plugin_plot_trajectory import PlotTrajectory
 from giskardpy.tree.plugin_post_processing import SetErrorCode
-from giskardpy.tree.plugin_pybullet import WorldUpdatePlugin
 from giskardpy.tree.plugin_send_trajectory import SendTrajectory
 from giskardpy.tree.plugin_set_cmd import SetCmd
 from giskardpy.tree.plugin_tf_publisher import TFPublisher
 from giskardpy.tree.plugin_time import TimePlugin
 from giskardpy.tree.plugin_update_constraints import GoalToConstraints
 from giskardpy.tree.plugin_visualization import VisualizationBehavior
-from giskardpy.tree.plugin_world_visualization import WorldVisualizationBehavior
-from giskardpy.model.pybullet_world import PyBulletWorld
+from giskardpy.tree.plugin_wiggle_cancel import WiggleCancel
 from giskardpy.tree.tree_manager import TreeManager, render_dot_tree
+from giskardpy.tree.world_updater import WorldUpdater
 from giskardpy.utils import logging
 from giskardpy.utils.math import max_velocity_from_horizon_and_jerk
 from giskardpy.utils.utils import create_path
+
 
 def initialize_god_map():
     god_map = GodMap()
@@ -89,31 +89,21 @@ def initialize_god_map():
         set_default_in_override_block(identifier.joint_limits + [order_map[i], u'linear', u'override'], god_map)
         set_default_in_override_block(identifier.joint_limits + [order_map[i], u'angular', u'override'], god_map)
 
-    order = len(god_map.get_data(identifier.joint_weights))+1
+    order = len(god_map.get_data(identifier.joint_weights)) + 1
     god_map.set_data(identifier.order, order)
 
     world = WorldTree(god_map)
     god_map.set_data(identifier.world, world)
+    collision_scene = BetterPyBulletSyncer(world)
+    god_map.set_data(identifier.collision_scene, collision_scene)
     # sanity_check_derivatives(god_map)
-
-
-    # joint symbols
-    # for o in range(order):
-    #     key = order_map[o]
-    #     joint_position_symbols = {}
-    #     for joint_name in world.robot.get_movable_joints():
-    #         joint_position_symbols[joint_name] = god_map.to_symbol(identifier.joint_states + [joint_name, key])
-    #     world.robot.set_joint_symbols(joint_position_symbols, o)
-
-    # world.robot.reinitialize()
-
-    # world.robot.init_self_collision_matrix()
     # sanity_check(god_map)
     return god_map
 
 
 def sanity_check(god_map):
     check_velocity_limits_reachable(god_map)
+
 
 def sanity_check_derivatives(god_map):
     weights = god_map.get_data(identifier.joint_weights)
@@ -123,6 +113,7 @@ def sanity_check_derivatives(god_map):
     if len(weights) != len(limits):
         raise AttributeError(u'Weights and limits are not defined for the same number of derivatives')
 
+
 def check_derivatives(entries, name):
     """
     :type entries: dict
@@ -130,10 +121,13 @@ def check_derivatives(entries, name):
     allowed_derivates = list(order_map.values())[1:]
     for weight in entries:
         if weight not in allowed_derivates:
-            raise AttributeError(u'{} set for unknown derivative: {} not in {}'.format(name, weight, list(allowed_derivates)))
+            raise AttributeError(
+                u'{} set for unknown derivative: {} not in {}'.format(name, weight, list(allowed_derivates)))
     weight_ids = [order_map.inverse[x] for x in entries]
     if max(weight_ids) != len(weight_ids):
-        raise AttributeError(u'{} for {} set, but some of the previous derivatives are missing'.format(name, order_map[max(weight_ids)]))
+        raise AttributeError(
+            u'{} for {} set, but some of the previous derivatives are missing'.format(name, order_map[max(weight_ids)]))
+
 
 def check_velocity_limits_reachable(god_map):
     # TODO a more general version of this
@@ -193,9 +187,10 @@ def grow_tree():
     god_map = initialize_god_map()
     # ----------------------------------------------
     sync = Sequence(u'Synchronize')
+    sync.add_child(WorldUpdater(u'update world'))
     sync.add_child(ConfigurationPlugin(u'update robot configuration', RobotPrefix))
     sync.add_child(TFPublisher(u'publish tf', **god_map.get_data(identifier.TFPublisher)))
-    sync.add_child(WorldUpdatePlugin(u'update collision scene'))
+    sync.add_child(CollisionSceneUpdater(u'update collision scene'))
     sync.add_child(running_is_success(VisualizationBehavior)(u'visualize collision scene'))
     # ----------------------------------------------
     wait_for_goal = Sequence(u'wait for goal')
@@ -277,10 +272,12 @@ def grow_tree():
     def got_exception():
         skip_failures = god_map.get_data(identifier.skip_failures)
         return not skip_failures and Blackboard().get('exception')
+
     process_move_goal.add_child(IfFunction('stop processing?', got_exception))
 
     def cmds_remaining():
         return god_map.get_data(identifier.cmd_id) + 1 == god_map.get_data(identifier.number_of_move_cmds)
+
     process_move_goal.add_child(failure_is_running(IfFunction)('commands remaining?', cmds_remaining))
 
     # ----------------------------------------------

@@ -29,6 +29,14 @@ class CollisionWorldSynchronizer(object):
         except KeyError as e:
             self.added_pairs = set()
 
+        self.world_version = -1
+
+    def has_world_changed(self):
+        if self.world_version != self.world.version:
+            self.world_version = self.world.version
+            return True
+        return False
+
     @property
     def robot(self):
         """
@@ -112,7 +120,7 @@ class CollisionWorldSynchronizer(object):
             sometimes = set()
             for position in np.linspace(min_position, max_position, steps):
                 self.world.state[joint_name].position = position
-                self.sync_state()
+                self.sync()
                 for link_a, link_b in subset_of_unknown:
                     if self.in_collision(link_a, link_b, d2):
                         sometimes.add((link_a, link_b))
@@ -200,7 +208,7 @@ class CollisionWorldSynchronizer(object):
 
     def check_collisions2(self, link_combinations, distance):
         in_collision = set()
-        self.sync_state()
+        self.sync()
         for link_a, link_b in link_combinations:
             if self.in_collision(link_a, link_b, distance):
                 in_collision.add((link_a, link_b))

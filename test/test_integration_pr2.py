@@ -2432,10 +2432,6 @@ class TestCollisionAvoidanceGoals(object):
     #
     # pocky_pose_setup.send_and_check_goal(expected_error_code=MoveResult.INSOLVABLE)
 
-    def test_open_drawer(self, kitchen_setup):
-        self.open_drawer(kitchen_setup, kitchen_setup.l_tip, u'iai_kitchen/sink_area_left_middle_drawer_handle',
-                         u'sink_area_left_middle_drawer_main_joint')
-
     def test_handover(self, kitchen_setup):
         """
         :type kitchen_setup: PR2
@@ -2495,6 +2491,32 @@ class TestCollisionAvoidanceGoals(object):
         p.pose.position = Point(1.2, 0, 1.6)
         p.pose.orientation = Quaternion(0.0, 0.0, 0.47942554, 0.87758256)
         zero_pose.add_box(object_name, pose=p)
+
+    def test_clear_world(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        object_name = u'muh'
+        p = PoseStamped()
+        p.header.frame_id = u'map'
+        p.pose.position = Point(1.2, 0, 1.6)
+        p.pose.orientation = Quaternion(0.0, 0.0, 0.47942554, 0.87758256)
+        zero_pose.add_box(object_name, pose=p)
+        zero_pose.clear_world()
+        object_name = u'muh2'
+        p = PoseStamped()
+        p.header.frame_id = u'map'
+        p.pose.position = Point(1.2, 0, 1.6)
+        p.pose.orientation = Quaternion(0.0, 0.0, 0.47942554, 0.87758256)
+        zero_pose.add_box(object_name, pose=p)
+        zero_pose.clear_world()
+        zero_pose.plan_and_execute()
+
+    def test_only_collision_avoidance(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        zero_pose.plan_and_execute()
 
     def test_add_mesh(self, zero_pose):
         """
@@ -3969,49 +3991,6 @@ class TestCollisionAvoidanceGoals(object):
         """
         kitchen_js = {u'sink_area_left_upper_drawer_main_joint': 0.45}
         kitchen_setup.set_kitchen_js(kitchen_js)
-
-    def open_drawer(self, setup, tool_frame, handle_link, drawer_joint):
-        setup.open_r_gripper()
-        setup.open_l_gripper()
-        tool_frame_goal = PoseStamped()
-        tool_frame_goal.header.frame_id = handle_link
-        # tool_frame_goal.pose.position.y = -.1
-        tool_frame_goal.pose.orientation = Quaternion(*quaternion_from_matrix([[-1, 0, 0, 0],
-                                                                               [0, 0, -1, 0],
-                                                                               [0, -1, 0, 0],
-                                                                               [0, 0, 0, 1]]))
-        # setup.allow_all_collisions()
-        setup.set_and_check_cart_goal(tool_frame_goal, tool_frame, setup.default_root)
-
-        tool_frame_goal = PoseStamped()
-        tool_frame_goal.header.frame_id = tool_frame
-        tool_frame_goal.pose.position.x = -.45
-        tool_frame_goal.pose.orientation.w = 1
-        setup.set_and_check_cart_goal(tool_frame_goal, tool_frame, setup.default_root)
-
-        kitchen_js = {drawer_joint: 0.45}
-        setup.set_kitchen_js(kitchen_js)
-
-    def close_drawer(self, setup, tool_frame, handle_link, drawer_joint):
-        setup.open_r_gripper()
-        setup.open_l_gripper()
-        tool_frame_goal = PoseStamped()
-        tool_frame_goal.header.frame_id = handle_link
-        # tool_frame_goal.pose.position.y = -.1
-        tool_frame_goal.pose.orientation = Quaternion(*quaternion_from_matrix([[-1, 0, 0, 0],
-                                                                               [0, 0, -1, 0],
-                                                                               [0, -1, 0, 0],
-                                                                               [0, 0, 0, 1]]))
-        setup.set_and_check_cart_goal(tool_frame_goal, tool_frame, setup.default_root)
-
-        kitchen_js = {drawer_joint: 0.}
-        setup.set_kitchen_js(kitchen_js)
-
-        tool_frame_goal = PoseStamped()
-        tool_frame_goal.header.frame_id = tool_frame
-        tool_frame_goal.pose.position.x = .45
-        tool_frame_goal.pose.orientation.w = 1
-        setup.set_and_check_cart_goal(tool_frame_goal, tool_frame, setup.default_root)
 
     def test_ease_fridge(self, kitchen_setup):
         """

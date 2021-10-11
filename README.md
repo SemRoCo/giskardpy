@@ -16,13 +16,13 @@ sudo pip install numpy==1.16
 
 Now create the workspace
 ```
-source /opt/ros/kinetic/setup.bash          # start using ROS kinetic. Replace with melodic, if you are using it.
+source /opt/ros/<ros-version>/setup.bash    # source ROS
 mkdir -p ~/giskardpy_ws/src                 # create directory for workspace
 cd ~/giskardpy_ws                           # go to workspace directory
 catkin init                                 # init workspace, you might have to pip install catkin-tools
 cd src                                      # go to source directory of workspace
 wstool init                                 # init rosinstall
-wstool merge https://raw.githubusercontent.com/SemRoCo/giskardpy/master/rosinstall/catkin.rosinstall
+wstool merge https://raw.githubusercontent.com/SemRoCo/giskardpy/devel/rosinstall/<ros-version>.rosinstall
                                             # update rosinstall file
 wstool update                               # pull source repositories
 rosdep install --ignore-src --from-paths .  # install dependencies available through apt

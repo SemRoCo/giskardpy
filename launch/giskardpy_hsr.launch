@@ -13,12 +13,9 @@
     </include>
   </group>
 
-  <node pkg="giskardpy" type="giskard_robot_config.py" name="giskard_robot_config_uploader" output="screen">
-    <param name="config" value="$(find giskardpy)/config/hsr.yaml" />
-  </node>
-
   <node pkg="giskardpy" type="giskard_trees.py" name="giskard" output="screen">
     <remap if="$(eval arg('sim') == false)" from="/robot_description" to="/giskard/robot_description" />
+    <param name="config" value="$(find giskardpy)/config/hsr.yaml" />
   </node>
 
   <node pkg="giskardpy" type="interactive_marker.py" name="giskard_interactive_marker" output="screen">

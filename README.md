@@ -1,9 +1,9 @@
 # giskardpy
 The core python library of the Giskard framework for constraint- and optimization-based robot motion control.
 
-## Installation instructions. Tested with Ubuntu 16.04 + ROS kinetic and 18.04 + melodic
+## Installation instructions. Tested with Ubuntu 18.04 + melodic and 20.04 Noetic
 
-Install the following python packages:
+Install the following python packages. When using 20.04, just install the latest version of everything:
 ```
 sudo pip install pybullet
 sudo pip install scipy==1.2.2 # this is the last version for python 2.7

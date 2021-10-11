@@ -262,8 +262,7 @@ class GiskardTestWrapper(GiskardWrapper):
         self.total_time_spend_moving = 0
 
         rospy.set_param('~config', config_file)
-        rospy.set_param('~tree/PlotDebugTrajectory/enabled', True)
-        rospy.set_param('~tree/MaxTrajectoryLength/enabled', True)
+        rospy.set_param('~test', True)
 
         self.sub_result = rospy.Subscriber('~command/result', MoveActionResult, self.cb, queue_size=100)
         self.cancel_goal = rospy.Publisher('~command/cancel', GoalID, queue_size=100)

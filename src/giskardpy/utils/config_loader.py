@@ -143,7 +143,6 @@ def construct_find(loader, node):
 
 
 def load_robot_yaml(path):
-    path = resolve_ros_iris(path)
     with open(path, 'r') as f:
         data = yaml.load(f, Loader)
         updated = update_parents(data)
@@ -177,13 +176,16 @@ def cast_values_in_nested_dict(d, constructor):
     return d
 
 
-def ros_load_robot_config(config_file, test=False):
-    config = load_robot_yaml(get_ros_pkg_path(u'giskardpy') + u'/config/' + config_file)
+def ros_load_robot_config(config_file, old_data=None, test=False):
+    config = load_robot_yaml(resolve_ros_iris(config_file))
     if test:
         config = update_nested_dicts(deepcopy(config),
                                      load_robot_yaml(get_ros_pkg_path(u'giskardpy') + u'/config/test.yaml'))
     if config and not rospy.is_shutdown():
-        rospy.set_param('~', config)
+        if old_data is None:
+            old_data = {}
+        old_data.update(config)
+        rospy.set_param('~', old_data)
         return True
     return False
 

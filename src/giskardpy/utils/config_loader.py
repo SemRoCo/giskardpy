@@ -5,6 +5,8 @@ import rospkg
 import rospy
 import yaml
 
+from giskardpy.utils.utils import resolve_ros_iris
+
 rospack = rospkg.RosPack()
 
 def get_ros_pkg_path(ros_pkg):
@@ -174,13 +176,16 @@ def cast_values_in_nested_dict(d, constructor):
     return d
 
 
-def ros_load_robot_config(config_file, test=False):
-    config = load_robot_yaml(get_ros_pkg_path(u'giskardpy') + u'/config/' + config_file)
+def ros_load_robot_config(config_file, old_data=None, test=False):
+    config = load_robot_yaml(resolve_ros_iris(config_file))
     if test:
         config = update_nested_dicts(deepcopy(config),
                                      load_robot_yaml(get_ros_pkg_path(u'giskardpy') + u'/config/test.yaml'))
     if config and not rospy.is_shutdown():
-        rospy.set_param('~', config)
+        if old_data is None:
+            old_data = {}
+        old_data.update(config)
+        rospy.set_param('~', old_data)
         return True
     return False
 

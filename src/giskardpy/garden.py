@@ -14,7 +14,7 @@ import giskardpy.identifier as identifier
 import giskardpy.model.pybullet_wrapper as pbw
 from giskardpy import RobotPrefix
 from giskardpy.data_types import order_map, KeyDefaultDict
-from giskardpy.utils.config_loader import load_robot_yaml
+from giskardpy.utils.config_loader import load_robot_yaml, ros_load_robot_config
 from giskardpy.god_map import GodMap
 from giskardpy.model.better_pybullet_syncer import BetterPyBulletSyncer
 from giskardpy.model.world import WorldTree
@@ -53,10 +53,12 @@ from giskardpy.utils.utils import create_path
 
 def load_config_file():
     old_params = rospy.get_param('~')
+    if rospy.has_param('~test'):
+        test = rospy.get_param('~test')
+    else:
+        test = False
     config_file_name = rospy.get_param('~{}'.format(u'config'))
-    robot_description_dict = load_robot_yaml(config_file_name)
-    old_params.update(robot_description_dict)
-    rospy.set_param('~', robot_description_dict)
+    ros_load_robot_config(config_file_name, old_data=old_params, test=test)
 
 
 def initialize_god_map():

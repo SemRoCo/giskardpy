@@ -360,10 +360,8 @@ class GiskardTestWrapper(GiskardWrapper):
         self.total_time_spend_giskarding = 0
         self.total_time_spend_moving = 0
 
-        if not ros_load_robot_config(config_file, test=True):
-            rospy.logerr('Could not set robot config as ROS parameter.')
-        rospy.set_param('~tree/PlotDebugTrajectory/enabled', True)
-        rospy.set_param('~tree/MaxTrajectoryLength/enabled', True)
+        rospy.set_param('~config', config_file)
+        rospy.set_param('~test', True)
 
         self.start_motion_sub = rospy.Subscriber('/whole_body_controller/follow_joint_trajectory/goal',
                                                  FollowJointTrajectoryActionGoal, self.start_motion_cb,
@@ -819,7 +817,7 @@ class PR2(GiskardTestWrapper):
         self.l_tip = u'l_gripper_tool_frame'
         self.r_gripper = rospy.ServiceProxy(u'r_gripper_simulator/set_joint_states', SetJointState)
         self.l_gripper = rospy.ServiceProxy(u'l_gripper_simulator/set_joint_states', SetJointState)
-        super(PR2, self).__init__(u'pr2.yaml')
+        super(PR2, self).__init__(u'package://giskardpy/config/pr2.yaml')
 
     def move_base(self, goal_pose):
         self.set_cart_goal(goal_pose, tip_link='base_footprint', root_link='odom_combined')
@@ -889,7 +887,7 @@ class Donbot(GiskardTestWrapper):
         self.camera_tip = u'camera_link'
         self.gripper_tip = u'gripper_tool_frame'
         self.gripper_pub = rospy.Publisher(u'/wsg_50_driver/goal_position', PositionCmd, queue_size=10)
-        super(Donbot, self).__init__(u'donbot.yaml')
+        super(Donbot, self).__init__(u'package://giskardpy/config/donbot.yaml')
 
     def move_base(self, goal_pose):
         goal_pose = tf.transform_pose(self.default_root, goal_pose)
@@ -927,7 +925,7 @@ class KMR_IIWA(GiskardTestWrapper):
     def __init__(self):
         self.camera_tip = u'camera_link'
         self.gripper_tip = u'gripper_tool_frame'
-        super(KMR_IIWA, self).__init__(u'kmr_iiwa.yaml')
+        super(KMR_IIWA, self).__init__(u'package://giskardpy/config/kmr_iiwa.yaml')
 
     def move_base(self, goal_pose):
         goal_pose = tf.transform_pose(self.default_root, goal_pose)
@@ -946,7 +944,7 @@ class Boxy(GiskardTestWrapper):
         self.camera_tip = u'camera_link'
         self.r_tip = u'right_gripper_tool_frame'
         self.l_tip = u'left_gripper_tool_frame'
-        super(Boxy, self).__init__(u'boxy_sim.yaml')
+        super(Boxy, self).__init__(u'package://giskardpy/config/boxy_sim.yaml')
 
     def move_base(self, goal_pose):
         goal_pose = tf.transform_pose(self.default_root, goal_pose)
@@ -963,7 +961,7 @@ class Boxy(GiskardTestWrapper):
 class HSR(GiskardTestWrapper):
     def __init__(self):
         self.tip = u'hand_palm_link'
-        super(HSR, self).__init__(u'hsr.yaml')
+        super(HSR, self).__init__(u'package://giskardpy/config/hsr.yaml')
 
     def move_base(self, goal_pose):
         goal_pose = tf.transform_pose(self.default_root, goal_pose)

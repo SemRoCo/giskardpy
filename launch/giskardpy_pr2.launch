@@ -11,11 +11,12 @@
     </rosparam>
   </node>
  
-  <node pkg="giskardpy" type="giskard_robot_config.py" name="giskard_robot_config_uploader" output="screen">
+  <!-- <node pkg="giskardpy" type="giskard_robot_config.py" name="giskard_robot_config_uploader" output="screen">
     <param name="config" value="$(find giskardpy)/config/pr2.yaml" />
-  </node>
+  </node> -->
   
   <node pkg="giskardpy" type="giskard_trees.py" name="giskard" output="screen">
+    <param name="config" value="$(find giskardpy)/config/pr2.yaml" />
     <!-- <remap from="/whole_body_controller/follow_joint_trajectory/" to="/whole_body_controller/follow_joint_trajectory/base/"/> -->
     <!-- <remap from="~state" to="/whole_body_controller/base/state"/> -->
   </node>

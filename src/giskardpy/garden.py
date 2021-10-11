@@ -14,6 +14,7 @@ from rospy import ROSException
 import giskardpy.identifier as identifier
 import giskardpy.pybullet_wrapper as pbw
 from giskardpy import logging
+from giskardpy.config_loader import load_robot_yaml
 from giskardpy.god_map import GodMap
 from giskardpy.input_system import JointStatesInput
 from giskardpy.plugin import PluginBehavior
@@ -46,10 +47,20 @@ from giskardpy.utils import create_path, render_dot_tree, KeyDefaultDict
 from giskardpy.world_object import WorldObject
 
 
+def load_config_file():
+    old_params = rospy.get_param('~')
+    config_file_name = rospy.get_param('~{}'.format(u'config'))
+    robot_description_dict = load_robot_yaml(config_file_name)
+    old_params.update(robot_description_dict)
+    rospy.set_param('~', robot_description_dict)
+
 def initialize_god_map():
     god_map = GodMap()
     blackboard = Blackboard
     blackboard.god_map = god_map
+
+    load_config_file()
+
     god_map.set_data(identifier.rosparam, rospy.get_param(rospy.get_name()))
     god_map.set_data(identifier.robot_description, rospy.get_param(u'robot_description'))
     path_to_data_folder = god_map.get_data(identifier.data_folder)

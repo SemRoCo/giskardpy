@@ -54,6 +54,7 @@ def load_config_file():
     old_params.update(robot_description_dict)
     rospy.set_param('~', robot_description_dict)
 
+
 def initialize_god_map():
     god_map = GodMap()
     blackboard = Blackboard

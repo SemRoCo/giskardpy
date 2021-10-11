@@ -1,0 +1,12 @@
+- git: 
+    local-name: qpoases
+    uri: https://github.com/SemRoCo/qpOASES.git
+    version: 3.2.1
+- git: 
+    local-name: giskardpy
+    uri: https://github.com/SemRoCo/giskardpy.git
+    version: devel
+- git: 
+    local-name: giskard_msgs
+    uri: https://github.com/SemRoCo/giskard_msgs.git
+    version: master

@@ -4567,34 +4567,56 @@ class TestCollisionAvoidanceGoals(object):
 
     # TODO FIXME attaching and detach of urdf objects that listen to joint states
 
-    # def test_iis(self, kitchen_setup):
-    #     # kitchen_setup.set_joint_goal(pocky_pose)
-    #     # kitchen_setup.send_and_check_goal()
-    #     object_name = u'lid'
-    #     pot_pose = PoseStamped()
-    #     pot_pose.header.frame_id = u'lid'
-    #     pot_pose.pose.position.z = -0.22
-    #     pot_pose.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 2, [0, 0, 1]))
-    #     kitchen_setup.add_mesh(object_name, path=u'package://cad_models/kitchen/cooking-vessels/cookingpot.dae',
-    #                            pose=pot_pose)
-    #
-    #     base_pose = PoseStamped()
-    #     base_pose.header.frame_id = u'iai_kitchen/table_area_main'
-    #     base_pose.pose.position.y = -1.1
-    #     base_pose.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 2, [0, 0, 1]))
-    #     kitchen_setup.teleport_base(base_pose)
-    #     # m = zero_pose.get_world().get_object(object_name).as_marker_msg()
-    #     # compare_poses(m.pose, p.pose)
-    #
-    #     hand_goal = PoseStamped()
-    #     hand_goal.header.frame_id = u'goal'
-    #     hand_goal.pose.orientation.w = 1
-    #     kitchen_setup.allow_all_collisions()
-    #     # kitchen_setup.avoid_collision([], 'kitchen', ['table_area_main'], 0.05)
-    #     kitchen_setup.set_cart_goal(hand_goal, u'r_gripper_tool_frame')
-    #     kitchen_setup.send_goal(goal_type=MoveGoal.PLAN_ONLY)
-    #
-    #     # kitchen_setup.add_cylinder('pot', size=[0.2,0.2], pose=pot_pose)
+    def test_iis(self, kitchen_setup):
+        """
+        :TYPE kitchen_setup: PR2
+        """
+        # rosrun tf static_transform_publisher 0 - 0.2 0.93 1.5707963267948966 0 0 iai_kitchen/table_area_main lid 10
+        # rosrun tf static_transform_publisher 0 - 0.15 0 0 0 0 lid goal 10
+        # kitchen_setup.set_joint_goal(pocky_pose)
+        # kitchen_setup.send_and_check_goal()
+        object_name = u'lid'
+        pot_pose = PoseStamped()
+        pot_pose.header.frame_id = u'lid'
+        pot_pose.pose.position.z = -0.22
+        # pot_pose.pose.orientation.w = 1
+        pot_pose.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 2, [0, 0, 1]))
+        kitchen_setup.add_mesh(object_name, path=u'package://cad_models/kitchen/cooking-vessels/cookingpot.dae',
+                               pose=pot_pose)
+
+        base_pose = PoseStamped()
+        base_pose.header.frame_id = u'iai_kitchen/table_area_main'
+        base_pose.pose.position.y = -1.1
+        base_pose.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 2, [0, 0, 1]))
+        kitchen_setup.teleport_base(base_pose)
+        # m = zero_pose.get_world().get_object(object_name).as_marker_msg()
+        # compare_poses(m.pose, p.pose)
+
+        hand_goal = PoseStamped()
+        hand_goal.header.frame_id = u'lid'
+        hand_goal.pose.position.y = -0.15
+        hand_goal.pose.orientation = Quaternion(*quaternion_about_axis(np.pi/2, [0,0,1]))
+        # kitchen_setup.allow_all_collisions()
+        # kitchen_setup.avoid_collision([], 'kitchen', ['table_area_main'], 0.05)
+        kitchen_setup.set_cart_goal(hand_goal, u'r_gripper_tool_frame')
+        kitchen_setup.send_goal(goal_type=MoveGoal.PLAN_ONLY)
+        kitchen_setup.set_cart_goal(hand_goal, u'r_gripper_tool_frame')
+        kitchen_setup.send_goal()
+
+        hand_goal = PoseStamped()
+        hand_goal.header.frame_id = u'r_gripper_tool_frame'
+        hand_goal.pose.position.x = 0.15
+        hand_goal.pose.orientation.w = 1
+        # kitchen_setup.allow_all_collisions()
+        # kitchen_setup.avoid_collision([], 'kitchen', ['table_area_main'], 0.05)
+        kitchen_setup.set_cart_goal(hand_goal, u'r_gripper_tool_frame')
+        kitchen_setup.allow_all_collisions()
+        kitchen_setup.send_goal(goal_type=MoveGoal.PLAN_ONLY)
+        kitchen_setup.set_cart_goal(hand_goal, u'r_gripper_tool_frame')
+        kitchen_setup.allow_all_collisions()
+        kitchen_setup.send_goal()
+
+        # kitchen_setup.add_cylinder('pot', size=[0.2,0.2], pose=pot_pose)
 
     def test_ease_dishwasher(self, kitchen_setup):
         """

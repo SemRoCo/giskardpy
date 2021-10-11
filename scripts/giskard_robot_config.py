@@ -10,8 +10,10 @@ if __name__ == u'__main__':
 
     if not rospy.is_shutdown():
         try:
+            old_params = rospy.get_param('giskard')
             config_file_name = rospy.get_param(rospy.get_name() + u'/' + ''.join(u'config'))
             robot_description_dict = load_robot_yaml(config_file_name)
+            old_params.update(robot_description_dict)
             rospy.set_param(u'giskard', robot_description_dict)
         except KeyboardInterrupt:
             exit()

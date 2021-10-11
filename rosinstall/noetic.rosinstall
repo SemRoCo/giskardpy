@@ -1,11 +1,11 @@
 - git: 
     local-name: qpoases
     uri: https://github.com/SemRoCo/qpOASES.git
-    version: 3.2.1
+    version: noetic
 - git: 
     local-name: giskardpy
     uri: https://github.com/SemRoCo/giskardpy.git
-    version: master
+    version: devel
 - git: 
     local-name: giskard_msgs
     uri: https://github.com/SemRoCo/giskard_msgs.git

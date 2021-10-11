@@ -5,6 +5,7 @@ import rospy
 import yaml
 
 import giskardpy.utils as utils
+from giskardpy.utils import resolve_ros_iris
 
 
 class Loader(yaml.SafeLoader):
@@ -62,6 +63,7 @@ def construct_find(loader, node):
 
 
 def load_robot_yaml(path):
+    path = resolve_ros_iris(path)
     with open(path, 'r') as f:
         data = yaml.load(f, Loader)
         updated = utils.update_parents(data)

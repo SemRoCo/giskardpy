@@ -8,7 +8,7 @@ from py_trees import Status
 from visualization_msgs.msg import MarkerArray, Marker
 
 import giskardpy.identifier as identifier
-from giskardpy import RobotPrefix
+from giskardpy import RobotPrefix, RobotName
 from giskardpy.data_types import PrefixName
 from giskardpy.exceptions import CorruptShapeException, UnknownBodyException, \
     UnsupportedOptionException, DuplicateNameException
@@ -168,16 +168,19 @@ class WorldUpdater(GiskardBehavior):
         self.world.add_world_body(world_body, global_pose)
         # SUB-CASE: If it is an articulated object, open up a joint state subscriber
         # FIXME also keep track of base pose
+        logging.loginfo('Added object {} to world.'.format(req.body.name))
         if world_body.joint_state_topic:
             plugin_name = PrefixName(world_body.name, 'js')
             plugin = ConfigurationPlugin(str(plugin_name), prefix=None, joint_state_topic=world_body.joint_state_topic)
             tree = self.god_map.unsafe_get_data(identifier.tree_manager)  # type: TreeManager
-            tree.insert_node(plugin, 'wait for goal', 1)
+            tree.insert_node(plugin, 'Synchronize', 1)
+            logging.loginfo('Added configuration plugin for {} to tree.'.format(req.body.name))
 
     def detach_object(self, req):
         # assumes that parent has god map lock
         self.world.move_group(req.body.name,
                               self.world.root_link_name)
+        logging.loginfo('Detached {}.'.format(req.body.name))
 
     def attach_object(self, req):
         """
@@ -186,7 +189,9 @@ class WorldUpdater(GiskardBehavior):
         # assumes that parent has god map lock
         if req.body.name not in self.world.groups:
             self.add_object(req)
-        self.world.move_group(req.body.name, PrefixName(req.pose.header.frame_id, RobotPrefix))
+        attachment_point = PrefixName(req.pose.header.frame_id, RobotPrefix)
+        self.world.move_group(req.body.name, attachment_point)
+        logging.loginfo('Attached {} to {}.'.format(req.body.name, attachment_point))
 
     def remove_object(self, name):
         # assumes that parent has god map lock
@@ -195,10 +200,12 @@ class WorldUpdater(GiskardBehavior):
         name = str(PrefixName(name, 'js'))
         if name in tree.tree_nodes:
             tree.remove_node(name)
+        logging.loginfo('Deleted {}'.format(name))
 
     def clear_world(self):
         # assumes that parent has god map lock
         self.unsafe_get_world().hard_reset()
+        logging.loginfo('Cleared world.')
 
     def clear_markers(self):
         msg = MarkerArray()

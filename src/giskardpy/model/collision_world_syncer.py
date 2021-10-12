@@ -74,8 +74,7 @@ class CollisionWorldSynchronizer(object):
         group = self.world.groups[group_name]  # type: SubWorldTree
         if link_combinations is None:
             link_combinations = set(combinations(group.link_names_with_collisions, 2))
-        # TODO computational expansive because of too many collision checks
-        logging.loginfo(u'calculating self collision matrix')
+        # logging.loginfo(u'calculating self collision matrix')
         joint_state_tmp = group.state
         t = time()
         np.random.seed(1337)
@@ -126,7 +125,7 @@ class CollisionWorldSynchronizer(object):
             never = set(subset_of_unknown).difference(sometimes)
             unknown = unknown.difference(never)
 
-        logging.loginfo(u'Calculated self collision matrix in {:.3f}s'.format(time() - t))
+        logging.logdebug(u'Calculated self collision matrix in {:.3f}s'.format(time() - t))
         group.state = joint_state_tmp
 
         self.collision_matrices[group_name] = unknown
@@ -187,7 +186,6 @@ class CollisionWorldSynchronizer(object):
         return js
 
     def init_collision_matrix(self, group_name):
-        self.sync()
         added_links = set(combinations(self.world.groups[group_name].link_names_with_collisions, 2))
         self.update_collision_matrix(group_name=group_name,
                                      added_links=added_links)

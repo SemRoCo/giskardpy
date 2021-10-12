@@ -124,7 +124,7 @@ def ros(request):
         pass
 
     logging.loginfo(u'init ros')
-    rospy.init_node('tests')
+    rospy.init_node('tests', log_level=rospy.DEBUG)
     tf_init(60)
     launch = roslaunch.scriptapi.ROSLaunch()
     launch.start()

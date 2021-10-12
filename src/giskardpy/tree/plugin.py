@@ -27,7 +27,7 @@ class GiskardBehavior(Behaviour):
     @property
     def collision_scene(self):
         """
-        :rtype: giskardpy.model.pybullet_syncer.PyBulletSyncer
+        :rtype: giskardpy.model.collision_world_syncer.CollisionWorldSynchronizer
         """
         return self.god_map.unsafe_get_data(identifier.collision_scene)
 

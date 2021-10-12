@@ -413,6 +413,7 @@ class GiskardTestWrapper(GiskardWrapper):
         """
         :rtype: set
         """
+        self.collision_scene.sync()
         return self.collision_scene.collision_matrices[RobotName]
 
     def start_motion_cb(self, msg):

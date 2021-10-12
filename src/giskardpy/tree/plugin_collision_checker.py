@@ -23,7 +23,7 @@ class CollisionChecker(GiskardBehavior):
 
     def setup(self, timeout=10.0):
         super(CollisionChecker, self).setup(timeout)
-        self.collision_scene.init_collision_matrix(RobotName)
+        # self.collision_scene.init_collision_matrix(RobotName)
         self.srv_activate_rendering = rospy.Service(u'~render', SetBool, self.activate_rendering)
         rospy.sleep(.5)
         return True

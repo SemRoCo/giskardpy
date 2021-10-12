@@ -168,6 +168,7 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
             bpb.batch_set_transforms(self.objects_in_order, self.fks())
             self.init_collision_matrix(RobotName)
         else:
+            # self.fks = self.world.compute_all_fks_matrix()
             bpb.batch_set_transforms(self.objects_in_order, self.fks())
 
     def get_pose(self, link_name):

@@ -274,6 +274,7 @@ class WorldTree(object):
     #     return self._controlled_links
 
     def hard_reset(self):
+        logging.logerr('hard reset')
         self.state = JointStates()
         self.root_link_name = PrefixName(self.god_map.unsafe_get_data(identifier.map_frame), None)
         self.links = {self.root_link_name: Link(self.root_link_name)}

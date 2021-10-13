@@ -1,19 +1,17 @@
 from copy import copy
 
 import PyKDL
-import rospy
 import numpy as np
+import rospy
 from geometry_msgs.msg import PoseStamped, Vector3Stamped, PointStamped, TransformStamped, Pose, Quaternion, Point, \
     Vector3, Twist, TwistStamped, QuaternionStamped, Transform
 from std_msgs.msg import ColorRGBA
-from tf.transformations import quaternion_from_matrix, quaternion_about_axis, quaternion_matrix
+from tf.transformations import quaternion_from_matrix, quaternion_matrix
 from tf2_geometry_msgs import do_transform_pose, do_transform_vector3, do_transform_point
 from tf2_kdl import transform_to_kdl
-from tf2_py._tf2 import ExtrapolationException
+from tf2_py import InvalidArgumentException
 from tf2_ros import Buffer, TransformListener
 from visualization_msgs.msg import MarkerArray, Marker
-
-from giskardpy.utils import logging
 
 tfBuffer = None  # type: Buffer
 tf_listener = None
@@ -74,18 +72,25 @@ def transform_pose(target_frame, pose, timeout=5.0):
     :return: Transformed pose of None on loop failure
     :rtype: PoseStamped
     """
+    transform = lookup_transform(target_frame, pose.header.frame_id, pose.header.stamp, timeout)
+    new_pose = do_transform_pose(pose, transform)
+    return new_pose
+
+
+def lookup_transform(target_frame, source_frame, time=None, timeout=rospy.Duration(5.0)):
+    if not target_frame:
+        raise InvalidArgumentException('target frame can not be empty')
+    if not source_frame:
+        raise InvalidArgumentException('source frame can not be empty')
+    if time is None:
+        time = rospy.Time()
     global tfBuffer
     if tfBuffer is None:
         init()
-    try:
-        transform = tfBuffer.lookup_transform(str(target_frame),
-                                              str(pose.header.frame_id),  # source frame
-                                              pose.header.stamp,
-                                              rospy.Duration(timeout))
-        new_pose = do_transform_pose(pose, transform)
-        return new_pose
-    except ExtrapolationException as e:
-        logging.logwarn(str(e))
+    return tfBuffer.lookup_transform(str(target_frame),
+                                     str(source_frame),  # source frame
+                                     time,
+                                     rospy.Duration(timeout))
 
 
 def transform_vector(target_frame, vector, timeout=5):
@@ -96,18 +101,9 @@ def transform_vector(target_frame, vector, timeout=5):
     :return: Transformed pose of None on loop failure
     :rtype: Vector3Stamped
     """
-    global tfBuffer
-    if tfBuffer is None:
-        init()
-    try:
-        transform = tfBuffer.lookup_transform(str(target_frame),
-                                              str(vector.header.frame_id),  # source frame
-                                              vector.header.stamp,
-                                              rospy.Duration(timeout))
-        new_pose = do_transform_vector3(vector, transform)
-        return new_pose
-    except ExtrapolationException as e:
-        logging.logwarn(str(e))
+    transform = lookup_transform(target_frame, vector.header.frame_id, vector.header.stamp, timeout)
+    new_pose = do_transform_vector3(vector, transform)
+    return new_pose
 
 
 def transform_point(target_frame, point, timeout=5):
@@ -118,37 +114,9 @@ def transform_point(target_frame, point, timeout=5):
     :return: Transformed pose of None on loop failure
     :rtype: PointStamped
     """
-    global tfBuffer
-    if tfBuffer is None:
-        init()
-    try:
-        transform = tfBuffer.lookup_transform(str(target_frame),
-                                              str(point.header.frame_id),  # source frame
-                                              point.header.stamp,
-                                              rospy.Duration(timeout))
-        new_pose = do_transform_point(point, transform)
-        return new_pose
-    except ExtrapolationException as e:
-        logging.logwarn(str(e))
-
-
-def lookup_transform(target_frame, source_frame, time=None):
-    """
-    :type target_frame: str
-    :type source_frame: str
-    :return: Transform from target_frame to source_frame
-    :rtype: TransformStamped
-    """
-    if not time:
-        time = rospy.Time()
-    global tfBuffer
-    if tfBuffer is None:
-        init()
-    try:
-        transform = tfBuffer.lookup_transform(str(target_frame), str(source_frame), time, rospy.Duration(5.0))
-        return transform
-    except:
-        return None
+    transform = lookup_transform(target_frame, point.header.frame_id, point.header.stamp, timeout)
+    new_pose = do_transform_point(point, transform)
+    return new_pose
 
 
 def lookup_pose(target_frame, source_frame, time=None):
@@ -394,6 +362,7 @@ def np_to_pose(matrix):
     """
     return kdl_to_pose(np_to_kdl(matrix))
 
+
 # Code copied from user jarvisschultz from ROS answers
 # https://answers.ros.org/question/332407/transformstamped-to-transformation-matrix-python/
 def pose_to_np(msg):
@@ -555,6 +524,7 @@ def publish_frame_marker(pose_stamped, id_=1, length=0.1):
 
     pub.publish(ma)
 
+
 def normalize_quaternion_msg(quaternion):
     q = Quaternion()
     rotation = np.array([quaternion.x,
@@ -567,7 +537,6 @@ def normalize_quaternion_msg(quaternion):
     q.z = normalized_rotation[2]
     q.w = normalized_rotation[3]
     return q
-
 
 
 def homo_matrix_to_pose(m):

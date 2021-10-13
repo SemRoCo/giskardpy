@@ -9,6 +9,7 @@ from giskardpy.model.bpb_wrapper import create_cube_shape, create_object, create
     load_convex_mesh_shape
 from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer
 from giskardpy.model.links import BoxGeometry, SphereGeometry, CylinderGeometry, MeshGeometry
+from giskardpy.utils import logging
 
 
 class BetterPyBulletSyncer(CollisionWorldSynchronizer):
@@ -155,6 +156,7 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
         """
         if self.has_world_changed():
             self.reset_cache()
+            logging.logdebug('hard sync')
             for o in self.kw.collision_objects:
                 self.kw.remove_collision_object(o)
             self.object_name_to_id = BiDict()
@@ -168,8 +170,13 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
             bpb.batch_set_transforms(self.objects_in_order, self.fks())
             self.init_collision_matrix(RobotName)
         else:
-            # self.fks = self.world.compute_all_fks_matrix()
-            bpb.batch_set_transforms(self.objects_in_order, self.fks())
+            # logging.logdebug('soft sync')
+            try:
+                bpb.batch_set_transforms(self.objects_in_order, self.fks())
+            except Exception as e:
+                logging.logerr('needed to recompute all matrices')
+                self.fks = self.world.compute_all_fks_matrix()
+                bpb.batch_set_transforms(self.objects_in_order, self.fks())
 
     def get_pose(self, link_name):
         collision_object = self.object_name_to_id[link_name]

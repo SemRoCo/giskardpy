@@ -1,5 +1,6 @@
 import traceback
 from multiprocessing import Lock
+from xml.etree.ElementTree import ParseError
 
 try:
     # Python 2
@@ -12,6 +13,7 @@ import rospy
 from giskard_msgs.srv import UpdateWorld, UpdateWorldResponse, UpdateWorldRequest, GetObjectNames, \
     GetObjectNamesResponse, GetObjectInfo, GetObjectInfoResponse, GetAttachedObjects, GetAttachedObjectsResponse
 from py_trees import Status
+from tf2_py import InvalidArgumentException, ExtrapolationException, TransformException
 from visualization_msgs.msg import MarkerArray, Marker
 
 import giskardpy.identifier as identifier
@@ -25,6 +27,44 @@ from giskardpy.tree.plugin_configuration import ConfigurationPlugin
 from giskardpy.tree.tree_manager import TreeManager
 from giskardpy.utils import logging
 from giskardpy.utils.tfwrapper import transform_pose
+
+try:
+    # Python 2
+    from Queue import Empty, Queue
+except ImportError:
+    # Python 3
+    from queue import Queue, Empty
+
+
+def exception_to_response(e, req):
+    def error_in_list(error, list_of_errors):
+        result = False
+        for x in list_of_errors:
+            result |= isinstance(error, e)
+        return result
+    if error_in_list(e, [CorruptShapeException, ParseError]):
+        traceback.print_exc()
+        if req.body.type == req.body.MESH_BODY:
+            return UpdateWorldResponse(UpdateWorldResponse.CORRUPT_MESH_ERROR, str(e))
+        elif req.body.type == req.body.URDF_BODY:
+            return UpdateWorldResponse(UpdateWorldResponse.CORRUPT_URDF_ERROR, str(e))
+        return UpdateWorldResponse(UpdateWorldResponse.CORRUPT_SHAPE_ERROR, str(e))
+    elif error_in_list(e, [UnknownBodyException, KeyError]):
+        traceback.print_exc()
+        return UpdateWorldResponse(UpdateWorldResponse.MISSING_BODY_ERROR, str(e))
+    elif error_in_list(e, [DuplicateNameException]):
+        traceback.print_exc()
+        return UpdateWorldResponse(UpdateWorldResponse.DUPLICATE_BODY_ERROR, str(e))
+    elif error_in_list(e, [UnsupportedOptionException]):
+        traceback.print_exc()
+        return UpdateWorldResponse(UpdateWorldResponse.UNSUPPORTED_OPTIONS, str(e))
+    elif error_in_list(e, [TransformException]):
+        return UpdateWorldResponse(UpdateWorldResponse.TF_ERROR, str(e))
+    else:
+        traceback.print_exc()
+        return UpdateWorldResponse(UpdateWorldResponse.ERROR,
+                                   u'{}: {}'.format(e.__class__.__name__,
+                                                    str(e)))
 
 
 class WorldUpdater(GiskardBehavior):
@@ -141,30 +181,8 @@ class WorldUpdater(GiskardBehavior):
                         return UpdateWorldResponse(UpdateWorldResponse.INVALID_OPERATION,
                                                    u'Received invalid operation code: {}'.format(req.operation))
                     return UpdateWorldResponse()
-                except CorruptShapeException as e:
-                    traceback.print_exc()
-                    if req.body.type == req.body.MESH_BODY:
-                        return UpdateWorldResponse(UpdateWorldResponse.CORRUPT_MESH_ERROR, str(e))
-                    elif req.body.type == req.body.URDF_BODY:
-                        return UpdateWorldResponse(UpdateWorldResponse.CORRUPT_URDF_ERROR, str(e))
-                    return UpdateWorldResponse(UpdateWorldResponse.CORRUPT_SHAPE_ERROR, str(e))
-                except UnknownBodyException as e:
-                    traceback.print_exc()
-                    return UpdateWorldResponse(UpdateWorldResponse.MISSING_BODY_ERROR, str(e))
-                except KeyError as e:
-                    traceback.print_exc()
-                    return UpdateWorldResponse(UpdateWorldResponse.MISSING_BODY_ERROR, str(e))
-                except DuplicateNameException as e:
-                    traceback.print_exc()
-                    return UpdateWorldResponse(UpdateWorldResponse.DUPLICATE_BODY_ERROR, str(e))
-                except UnsupportedOptionException as e:
-                    traceback.print_exc()
-                    return UpdateWorldResponse(UpdateWorldResponse.UNSUPPORTED_OPTIONS, str(e))
                 except Exception as e:
-                    traceback.print_exc()
-                    return UpdateWorldResponse(UpdateWorldResponse.ERROR,
-                                               u'{}: {}'.format(e.__class__.__name__,
-                                                                str(e)))
+                    return exception_to_response(e, req)
         except:
             response = UpdateWorldResponse()
             response.error_codes = UpdateWorldResponse.BUSY

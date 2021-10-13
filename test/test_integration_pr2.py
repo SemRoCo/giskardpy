@@ -491,10 +491,12 @@ class TestConstraints(object):
                                     goal=joint_goal,
                                     max_velocity=1)
         kitchen_setup.plan_and_execute()
-        np.testing.assert_almost_equal(kitchen_setup.god_map.get_data(identifier.trajectory).get_last()[joint_name1].position,
-                                       joint_goal, decimal=2)
-        np.testing.assert_almost_equal(kitchen_setup.god_map.get_data(identifier.trajectory).get_last()[joint_name2].position,
-                                       joint_goal, decimal=2)
+        np.testing.assert_almost_equal(
+            kitchen_setup.god_map.get_data(identifier.trajectory).get_last()[joint_name1].position,
+            joint_goal, decimal=2)
+        np.testing.assert_almost_equal(
+            kitchen_setup.god_map.get_data(identifier.trajectory).get_last()[joint_name2].position,
+            joint_goal, decimal=2)
 
     def test_CartesianOrientation(self, zero_pose):
         """
@@ -2598,7 +2600,17 @@ class TestCollisionAvoidanceGoals(object):
         """
         :type kitchen_setup: PR2
         """
-        kitchen_setup.remove_object(u'kitchen')
+        object_name = u'kitchen'
+        kitchen_setup.remove_object(object_name)
+        kitchen_setup.clear_world()
+        try:
+            kitchen_setup.add_urdf(object_name, rospy.get_param(u'kitchen_description'),
+                                   tf.lookup_pose(u'map', u'iai_kitchen/world'), u'/kitchen/joint_states',
+                                   set_js_topic=u'/kitchen/cram_joint_states')
+        except Exception as e:
+            kitchen_setup.add_urdf(object_name, rospy.get_param(u'kitchen_description'),
+                                   tf.lookup_pose(u'map', u'iai_kitchen/world'), u'/kitchen/joint_states',
+                                   set_js_topic=u'/kitchen/cram_joint_states')
 
     def test_attach_box(self, zero_pose):
         """
@@ -2721,6 +2733,9 @@ class TestCollisionAvoidanceGoals(object):
         zero_pose.detach_object(pocky)
 
     def test_attach_detach_twice(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
         pocky = u'http://muh#pocky'
         zero_pose.attach_box(pocky, [0.1, 0.02, 0.02], zero_pose.r_tip, [0.05, 0, 0], [1, 0, 0, 0])
         p = PoseStamped()
@@ -2728,7 +2743,7 @@ class TestCollisionAvoidanceGoals(object):
         p.pose.orientation.w = 1
         zero_pose.set_cart_goal(p, pocky)
         p = tf.transform_pose(zero_pose.default_root, p)
-        zero_pose.send_and_check_goal()
+        zero_pose.plan_and_execute()
         p2 = zero_pose.robot.compute_fk_pose(zero_pose.default_root, pocky)
         compare_poses(p2.pose, p.pose)
 
@@ -2741,13 +2756,14 @@ class TestCollisionAvoidanceGoals(object):
         zero_pose.add_box(pocky, [0.1, 0.02, 0.02], pose=old_p)
         zero_pose.attach_object(pocky, frame_id=zero_pose.r_tip)
         relative_pose = zero_pose.robot.compute_fk_pose(zero_pose.r_tip, pocky).pose
-        compare_poses(old_p.pose, relative_pose)
+        compare_poses(actual_pose=relative_pose, desired_pose=old_p.pose)
 
         p = PoseStamped()
         p.header.frame_id = zero_pose.r_tip
         p.pose.position.x = -0.1
         p.pose.orientation.w = 1.0
-        zero_pose.set_and_check_cart_goal(p, zero_pose.r_tip, zero_pose.default_root)
+        zero_pose.set_cart_goal(p, zero_pose.r_tip, zero_pose.default_root)
+        zero_pose.plan_and_execute()
 
     def test_attach_to_nonexistant_robot_link(self, zero_pose):
         """
@@ -2794,9 +2810,19 @@ class TestCollisionAvoidanceGoals(object):
         """
         :type zero_pose: PR2
         """
+        p = PoseStamped()
+        p.header.frame_id = 'map'
+        req = UpdateWorldRequest(UpdateWorldRequest.ADD, WorldBody(type=WorldBody.PRIMITIVE_BODY,
+                                                                   shape=SolidPrimitive(type=42)), True, p)
+        assert zero_pose._update_world_srv.call(req).error_codes == UpdateWorldResponse.CORRUPT_SHAPE_ERROR
+
+    def test_tf_error(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
         req = UpdateWorldRequest(UpdateWorldRequest.ADD, WorldBody(type=WorldBody.PRIMITIVE_BODY,
                                                                    shape=SolidPrimitive(type=42)), True, PoseStamped())
-        assert zero_pose._update_world_srv.call(req).error_codes == UpdateWorldResponse.CORRUPT_SHAPE_ERROR
+        assert zero_pose._update_world_srv.call(req).error_codes == UpdateWorldResponse.TF_ERROR
 
     def test_unsupported_options(self, kitchen_setup):
         """
@@ -2811,7 +2837,7 @@ class TestCollisionAvoidanceGoals(object):
         wb.type = WorldBody.URDF_BODY
 
         req = UpdateWorldRequest(UpdateWorldRequest.ADD, wb, True, pose)
-        assert kitchen_setup._update_world_srv.call(req).error_codes == UpdateWorldResponse.UNSUPPORTED_OPTIONS
+        assert kitchen_setup._update_world_srv.call(req).error_codes == UpdateWorldResponse.CORRUPT_URDF_ERROR
 
     def test_infeasible(self, kitchen_setup):
         """
@@ -2877,7 +2903,8 @@ class TestCollisionAvoidanceGoals(object):
         p.pose.position.z = -0.2
         p.pose.orientation.w = 1
         zero_pose.add_box(pose=p)
-        zero_pose.plan_and_execute(pocky_pose)
+        zero_pose.set_joint_goal(pocky_pose)
+        zero_pose.plan_and_execute()
 
     def test_unknown_object1(self, box_setup):
         """
@@ -4649,7 +4676,7 @@ class TestCollisionAvoidanceGoals(object):
         hand_goal = PoseStamped()
         hand_goal.header.frame_id = u'lid'
         hand_goal.pose.position.y = -0.15
-        hand_goal.pose.orientation = Quaternion(*quaternion_about_axis(np.pi/2, [0,0,1]))
+        hand_goal.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 2, [0, 0, 1]))
         # kitchen_setup.allow_all_collisions()
         # kitchen_setup.avoid_collision([], 'kitchen', ['table_area_main'], 0.05)
         kitchen_setup.set_cart_goal(hand_goal, u'r_gripper_tool_frame')

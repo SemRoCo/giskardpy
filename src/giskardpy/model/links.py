@@ -59,10 +59,12 @@ class LinkGeometry(object):
             elif msg.shape.type == msg.shape.SPHERE:
                 geometry = SphereGeometry(np.eye(4),
                                           radius=msg.shape.dimensions[msg.shape.SPHERE_RADIUS])
+            else:
+                raise CorruptShapeException('World body type {} not supported'.format(msg.type))
         elif msg.type == msg.MESH_BODY:
             geometry = MeshGeometry(np.eye(4), msg.mesh)
         else:
-            raise ValueError('World body type {} not supported'.format(msg.type))
+            raise CorruptShapeException('World body type {} not supported'.format(msg.type))
         return geometry
 
     def as_visualization_marker(self):

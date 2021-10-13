@@ -89,13 +89,17 @@ def compare_axis_angle(actual_angle, actual_axis, expected_angle, expected_axis,
             assert not np.any(np.isnan(expected_axis))
 
 
-def compare_poses(pose1, pose2, decimal=2):
+def compare_poses(actual_pose, desired_pose, decimal=2):
     """
-    :type pose1: Pose
-    :type pose2: Pose
+    :type actual_pose: Pose
+    :type desired_pose: Pose
     """
-    compare_points(pose1.position, pose2.position, decimal)
-    compare_orientations(pose1.orientation, pose2.orientation, decimal)
+    compare_points(actual_point=actual_pose.position,
+                   desired_point=desired_pose.position,
+                   decimal=decimal)
+    compare_orientations(actual_orientation=actual_pose.orientation,
+                         desired_orientation=desired_pose.orientation,
+                         decimal=decimal)
 
 
 def compare_points(actual_point, desired_point, decimal=2):
@@ -104,25 +108,25 @@ def compare_points(actual_point, desired_point, decimal=2):
     np.testing.assert_almost_equal(actual_point.z, desired_point.z, decimal=decimal)
 
 
-def compare_orientations(orientation1, orientation2, decimal=2):
+def compare_orientations(actual_orientation, desired_orientation, decimal=2):
     """
-    :type orientation1: Quaternion
-    :type orientation2: Quaternion
+    :type actual_orientation: Quaternion
+    :type desired_orientation: Quaternion
     """
-    if isinstance(orientation1, Quaternion):
-        q1 = np.array([orientation1.x,
-                       orientation1.y,
-                       orientation1.z,
-                       orientation1.w])
+    if isinstance(actual_orientation, Quaternion):
+        q1 = np.array([actual_orientation.x,
+                       actual_orientation.y,
+                       actual_orientation.z,
+                       actual_orientation.w])
     else:
-        q1 = orientation1
-    if isinstance(orientation2, Quaternion):
-        q2 = np.array([orientation2.x,
-                       orientation2.y,
-                       orientation2.z,
-                       orientation2.w])
+        q1 = actual_orientation
+    if isinstance(desired_orientation, Quaternion):
+        q2 = np.array([desired_orientation.x,
+                       desired_orientation.y,
+                       desired_orientation.z,
+                       desired_orientation.w])
     else:
-        q2 = orientation2
+        q2 = desired_orientation
     try:
         np.testing.assert_almost_equal(q1[0], q2[0], decimal=decimal)
         np.testing.assert_almost_equal(q1[1], q2[1], decimal=decimal)
@@ -388,6 +392,7 @@ class GiskardTestWrapper(GiskardWrapper):
 
         self.joint_state_publisher = KeyDefaultDict(create_publisher)
         # rospy.sleep(1)
+        self.original_number_of_links = len(self.world.links)
 
     def transform_msg(self, target_frame, msg, timeout=1):
         try:
@@ -661,20 +666,23 @@ class GiskardTestWrapper(GiskardWrapper):
         assert return_val.error_codes == UpdateWorldResponse.SUCCESS
         assert len(self.world.groups) == 1
         assert len(self.get_object_names().object_names) == 1
+        assert self.original_number_of_links == len(self.world.links)
 
     def remove_object(self, name, expected_response=UpdateWorldResponse.SUCCESS):
-        old_link_names = self.world.groups[name].link_names
-        old_joint_names = self.world.groups[name].joint_names
+        if expected_response == UpdateWorldResponse.SUCCESS:
+            old_link_names = self.world.groups[name].link_names
+            old_joint_names = self.world.groups[name].joint_names
         r = super(GiskardTestWrapper, self).remove_object(name)
         assert r.error_codes == expected_response, \
             u'got: {}, expected: {}'.format(update_world_error_code(r.error_codes),
                                             update_world_error_code(expected_response))
         assert not name in self.world.groups
-        for old_link_name in old_link_names:
-            assert old_link_name not in self.world.link_names
-        for old_joint_name in old_joint_names:
-            assert old_joint_name not in self.world.joint_names
         assert name not in self.get_object_names().object_names
+        if expected_response == UpdateWorldResponse.SUCCESS:
+            for old_link_name in old_link_names:
+                assert old_link_name not in self.world.link_names
+            for old_joint_name in old_joint_names:
+                assert old_joint_name not in self.world.joint_names
 
     def detach_object(self, name, expected_response=UpdateWorldResponse.SUCCESS):
         if expected_response == UpdateWorldResponse.SUCCESS:
@@ -694,8 +702,9 @@ class GiskardTestWrapper(GiskardWrapper):
             compare_poses(o_p, self.get_object_info(name).pose.pose)
             assert name not in self.get_attached_objects().object_names
         else:
-            assert name not in self.world.groups
-            assert name not in self.get_object_names().object_names
+            if error_code != UpdateWorldResponse.DUPLICATE_BODY_ERROR:
+                assert name not in self.world.groups
+                assert name not in self.get_object_names().object_names
 
     def add_box(self, name=u'box', size=(1, 1, 1), frame_id=u'map', position=(0, 0, 0), orientation=(0, 0, 0, 1),
                 pose=None, expected_error_code=UpdateWorldResponse.SUCCESS):

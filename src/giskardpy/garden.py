@@ -52,7 +52,7 @@ def load_config_file():
     config_file_name = rospy.get_param('~{}'.format(u'config'))
     robot_description_dict = load_robot_yaml(config_file_name)
     old_params.update(robot_description_dict)
-    rospy.set_param('~', robot_description_dict)
+    rospy.set_param('~', old_params)
 
 
 def initialize_god_map():

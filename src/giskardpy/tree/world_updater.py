@@ -1,6 +1,13 @@
 import traceback
 from multiprocessing import Lock
 
+try:
+    # Python 2
+    from Queue import Empty, Queue
+except ImportError:
+    # Python 3
+    from queue import Queue, Empty
+
 import rospy
 from giskard_msgs.srv import UpdateWorld, UpdateWorldResponse, UpdateWorldRequest, GetObjectNames, \
     GetObjectNamesResponse, GetObjectInfo, GetObjectInfoResponse, GetAttachedObjects, GetAttachedObjectsResponse
@@ -21,14 +28,19 @@ from giskardpy.utils.tfwrapper import transform_pose
 
 
 class WorldUpdater(GiskardBehavior):
+    READY = 0
+    BUSY = 1
+    STALL = 2
+
     # TODO reject changes if plugin not active or something
     def __init__(self, name):
         super(WorldUpdater, self).__init__(name)
         self.map_frame = self.get_god_map().get_data(identifier.map_frame)
         self.original_link_names = self.robot.link_names
         self.tree_tick_rate = self.god_map.get_data(identifier.tree_tick_rate) / 2
-        self.acquired = False
-        self.lock = Lock()
+        self.queue = Queue(maxsize=1)
+        self.queue2 = Queue(maxsize=1)
+        self.timer_state = self.READY
 
     def setup(self, timeout=5.0):
         # TODO make service name a parameter
@@ -79,14 +91,16 @@ class WorldUpdater(GiskardBehavior):
         return res
 
     def update(self):
-        if self.acquired:
-            self.lock.release()
-        rospy.sleep(0.001)
-        self.acquired = self.lock.acquire(timeout=0.001)
-        if self.acquired:
+        if self.timer_state == self.STALL:
+            self.timer_state = self.READY
+            return Status.SUCCESS
+        if self.queue.empty():
             return Status.SUCCESS
         else:
-            return Status.RUNNING
+            if self.timer_state == self.READY:
+                self.timer_state = self.BUSY
+                self.queue2.put(1)
+        return Status.RUNNING
 
     def update_world_cb(self, req):
         """
@@ -96,67 +110,69 @@ class WorldUpdater(GiskardBehavior):
         :return: Service response, reporting back any runtime errors that occurred.
         :rtype UpdateWorldResponse
         """
-        # TODO block or queue updates while planning
-        acquired = self.lock.acquire(timeout=5)
-        if not acquired:
+        self.queue.put('busy')
+        try:
+            self.queue2.get(timeout=1)
+            with self.get_god_map():
+                self.clear_markers()
+                try:
+                    if req.operation == UpdateWorldRequest.ADD:
+                        if req.rigidly_attached:
+                            self.attach_object(req)
+                        else:
+                            self.add_object(req)
+
+                    elif req.operation == UpdateWorldRequest.REMOVE:
+                        # why not to detach objects here:
+                        #   - during attaching, bodies turn to objects
+                        #   - detaching actually requires a joint name
+                        #   - you might accidentally detach parts of the robot
+                        # if self.get_robot().has_joint(req.body.name):
+                        #     self.detach_object(req)
+                        self.remove_object(req.body.name)
+                    elif req.operation == UpdateWorldRequest.ALTER:
+                        self.remove_object(req.body.name)
+                        self.add_object(req)
+                    elif req.operation == UpdateWorldRequest.REMOVE_ALL:
+                        self.clear_world()
+                    elif req.operation == UpdateWorldRequest.DETACH:
+                        self.detach_object(req)
+                    else:
+                        return UpdateWorldResponse(UpdateWorldResponse.INVALID_OPERATION,
+                                                   u'Received invalid operation code: {}'.format(req.operation))
+                    return UpdateWorldResponse()
+                except CorruptShapeException as e:
+                    traceback.print_exc()
+                    if req.body.type == req.body.MESH_BODY:
+                        return UpdateWorldResponse(UpdateWorldResponse.CORRUPT_MESH_ERROR, str(e))
+                    elif req.body.type == req.body.URDF_BODY:
+                        return UpdateWorldResponse(UpdateWorldResponse.CORRUPT_URDF_ERROR, str(e))
+                    return UpdateWorldResponse(UpdateWorldResponse.CORRUPT_SHAPE_ERROR, str(e))
+                except UnknownBodyException as e:
+                    traceback.print_exc()
+                    return UpdateWorldResponse(UpdateWorldResponse.MISSING_BODY_ERROR, str(e))
+                except KeyError as e:
+                    traceback.print_exc()
+                    return UpdateWorldResponse(UpdateWorldResponse.MISSING_BODY_ERROR, str(e))
+                except DuplicateNameException as e:
+                    traceback.print_exc()
+                    return UpdateWorldResponse(UpdateWorldResponse.DUPLICATE_BODY_ERROR, str(e))
+                except UnsupportedOptionException as e:
+                    traceback.print_exc()
+                    return UpdateWorldResponse(UpdateWorldResponse.UNSUPPORTED_OPTIONS, str(e))
+                except Exception as e:
+                    traceback.print_exc()
+                    return UpdateWorldResponse(UpdateWorldResponse.ERROR,
+                                               u'{}: {}'.format(e.__class__.__name__,
+                                                                str(e)))
+        except:
             response = UpdateWorldResponse()
             response.error_codes = UpdateWorldResponse.BUSY
             logging.logwarn('Can\'t update world while Giskard is busy.')
             return response
-        with self.get_god_map():
-            self.clear_markers()
-            try:
-                if req.operation == UpdateWorldRequest.ADD:
-                    if req.rigidly_attached:
-                        self.attach_object(req)
-                    else:
-                        self.add_object(req)
-
-                elif req.operation == UpdateWorldRequest.REMOVE:
-                    # why not to detach objects here:
-                    #   - during attaching, bodies turn to objects
-                    #   - detaching actually requires a joint name
-                    #   - you might accidentally detach parts of the robot
-                    # if self.get_robot().has_joint(req.body.name):
-                    #     self.detach_object(req)
-                    self.remove_object(req.body.name)
-                elif req.operation == UpdateWorldRequest.ALTER:
-                    self.remove_object(req.body.name)
-                    self.add_object(req)
-                elif req.operation == UpdateWorldRequest.REMOVE_ALL:
-                    self.clear_world()
-                elif req.operation == UpdateWorldRequest.DETACH:
-                    self.detach_object(req)
-                else:
-                    return UpdateWorldResponse(UpdateWorldResponse.INVALID_OPERATION,
-                                               u'Received invalid operation code: {}'.format(req.operation))
-                return UpdateWorldResponse()
-            except CorruptShapeException as e:
-                traceback.print_exc()
-                if req.body.type == req.body.MESH_BODY:
-                    return UpdateWorldResponse(UpdateWorldResponse.CORRUPT_MESH_ERROR, str(e))
-                elif req.body.type == req.body.URDF_BODY:
-                    return UpdateWorldResponse(UpdateWorldResponse.CORRUPT_URDF_ERROR, str(e))
-                return UpdateWorldResponse(UpdateWorldResponse.CORRUPT_SHAPE_ERROR, str(e))
-            except UnknownBodyException as e:
-                traceback.print_exc()
-                return UpdateWorldResponse(UpdateWorldResponse.MISSING_BODY_ERROR, str(e))
-            except KeyError as e:
-                traceback.print_exc()
-                return UpdateWorldResponse(UpdateWorldResponse.MISSING_BODY_ERROR, str(e))
-            except DuplicateNameException as e:
-                traceback.print_exc()
-                return UpdateWorldResponse(UpdateWorldResponse.DUPLICATE_BODY_ERROR, str(e))
-            except UnsupportedOptionException as e:
-                traceback.print_exc()
-                return UpdateWorldResponse(UpdateWorldResponse.UNSUPPORTED_OPTIONS, str(e))
-            except Exception as e:
-                traceback.print_exc()
-                return UpdateWorldResponse(UpdateWorldResponse.ERROR,
-                                           u'{}: {}'.format(e.__class__.__name__,
-                                                            str(e)))
-            finally:
-                self.lock.release()
+        finally:
+            self.queue.get_nowait()
+            self.timer_state = self.STALL
 
     def add_object(self, req):
         """

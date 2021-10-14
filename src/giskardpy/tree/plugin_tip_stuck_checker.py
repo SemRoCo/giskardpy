@@ -198,6 +198,12 @@ class TipStuckChecker(GiskardBehavior):
             i += 1
         return 0
 
+    def _try_periodic_checker_instant_just_check_pattern(self):
+        pass
+
+    def _if_tip_pose_deverted_from_goal_by_eg_10_percent_and_failed_lower_soft_thresholds_and_try_again(self):
+        pass
+
     @profile
     def update(self):
 

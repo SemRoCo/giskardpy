@@ -4448,7 +4448,7 @@ class TestCollisionAvoidanceGoals(object):
     def test_ease_cereal(self, kitchen_setup):
         # FIXME
         cereal_name = u'cereal'
-        drawer_frame_id = u'iai_kitchen/oven_area_area_right_drawer_board_3_link'
+        drawer_frame_id = u'iai_kitchen/oven_area_area_right_drawer_board_2_link'
 
         # take milk out of fridge
         kitchen_setup.set_kitchen_js({u'oven_area_area_right_drawer_main_joint': 0.48})

@@ -28,6 +28,7 @@ from giskardpy.tree.plugin_goal_reached import GoalReachedPlugin
 from giskardpy.tree.plugin_if import IF
 from giskardpy.tree.plugin_instantaneous_controller import ControllerPlugin
 from giskardpy.tree.plugin_max_trajectory_length import MaxTrajectoryLength
+from giskardpy.tree.plugin_tip_stuck_checker import TipStuckChecker
 from giskardpy.tree.plugin_wiggle_cancel import WiggleCancel
 from giskardpy.tree.plugin_kinematic_sim import KinSimPlugin
 from giskardpy.tree.plugin_log_debug_expressions import LogDebugExpressionsPlugin
@@ -227,6 +228,7 @@ def grow_tree():
     # if god_map.safe_get_data(identifier.enable_collision_marker):
     #     planning_3.add_plugin(success_is_running(CPIMarker)(u'cpi marker'))
     planning_4.add_plugin(ControllerPlugin(u'controller'))
+    planning_4.add_plugin(TipStuckChecker(u'tip stuck checker'))
     planning_4.add_plugin(KinSimPlugin(u'kin sim'))
     planning_4.add_plugin(LogTrajPlugin(u'log'))
     if god_map.get_data(identifier.PlotDebugTrajectory_enabled):

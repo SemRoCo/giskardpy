@@ -224,13 +224,14 @@ class TwoDimRayMotionValidator(ob.MotionValidator, GiskardBehavior): #TODO: use 
 
 class BulletCollisionChecker(GiskardBehavior):
 
-    def __init__(self, is_3D, collision_checker, tip_link=None):
+    def __init__(self, is_3D, collision_checker, tip_link=None, collision_offset=0.1):
         GiskardBehavior.__init__(self, str(self))
         self.lock = threading.Lock()
         self.init_pybullet_ids_and_joints()
         self.collision_checker = collision_checker
         self.is_3D = is_3D
         self.tip_link = tip_link
+        self.collision_offset = collision_offset
 
     def init_pybullet_ids_and_joints(self):
         if 'pybullet' in sys.modules:
@@ -262,11 +263,11 @@ class BulletCollisionChecker(GiskardBehavior):
             robot = self.get_robot()
             # Calc IK for navigating to given state and ...
             if self.is_3D:
-                poses = [[[x, y, z], rot], [[x + 0.1, y, z], rot], [[x - 0.1, y, z], rot],
-                         [[x, y + 0.1, z], rot], [[x, y - 0.1, z], rot]]
+                poses = [[[x, y, z], rot], [[x + self.collision_offset, y, z], rot], [[x -self.collision_offset, y, z], rot],
+                         [[x, y + self.collision_offset, z], rot], [[x, y - self.collision_offset, z], rot]]
             else:
-                poses = [[[x, y, 0], rot], [[x + 0.1, y, 0], rot], [[x - 0.1, y, 0], rot],
-                         [[x, y + 0.1, 0], rot], [[x, y - 0.1, 0], rot]]
+                poses = [[[x, y, 0], rot], [[x + self.collision_offset, y, 0], rot], [[x - self.collision_offset, y, 0], rot],
+                         [[x, y + self.collision_offset, 0], rot], [[x, y - self.collision_offset, 0], rot]]
             state_iks = list(map(lambda pose:
                                  p.calculateInverseKinematics(robot.get_pybullet_id(),
                                                               robot.get_pybullet_link_id(self.tip_link),

@@ -93,6 +93,7 @@ class TipStuckChecker(GiskardBehavior):
 
     def is_tip_stuck(self):
         """
+        works only with lowered soft collision thresholds
         """
         trajectory = self.get_god_map().get_data(identifier.trajectory)
         robot = self.get_robot()

@@ -62,5 +62,4 @@ class ConfigurationPlugin(GiskardBehavior):
 
         # self.god_map.set_data(identifier.joint_states, self.mjs)
         self.get_world().state.update(self.mjs)
-        logging.logerr('set js')
         return Status.SUCCESS

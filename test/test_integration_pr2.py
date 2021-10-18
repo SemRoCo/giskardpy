@@ -124,7 +124,8 @@ def ros(request):
         pass
 
     logging.loginfo(u'init ros')
-    rospy.init_node('tests', log_level=rospy.DEBUG)
+    # rospy.init_node('tests', log_level=rospy.DEBUG)
+    rospy.init_node('tests')
     tf_init(60)
     launch = roslaunch.scriptapi.ROSLaunch()
     launch.start()
@@ -1911,10 +1912,6 @@ class TestWayPoints(object):
                                                          MoveResult.PREEMPTED],
                                    stop_after=5)
 
-    def test_waypoints(self, zero_pose):
-        """
-        :type zero_pose: PR2
-        """
         p = PoseStamped()
         p.header.frame_id = zero_pose.r_tip
         p.header.stamp = rospy.get_rostime()

@@ -3140,7 +3140,7 @@ class TestCollisionAvoidanceGoals(object):
         fake_table_setup.avoid_all_collisions(0.1)
         fake_table_setup.set_cart_goal(r_goal, fake_table_setup.r_tip)
         fake_table_setup.plan_and_execute()
-        fake_table_setup.check_cpi_geq(fake_table_setup.get_l_gripper_links(), 0.1)
+        fake_table_setup.check_cpi_geq(fake_table_setup.get_l_gripper_links(), 0.05)
         fake_table_setup.check_cpi_leq([u'r_gripper_l_finger_tip_link'], 0.04)
         fake_table_setup.check_cpi_leq([u'r_gripper_r_finger_tip_link'], 0.04)
 
@@ -3483,7 +3483,7 @@ class TestCollisionAvoidanceGoals(object):
         box_setup.plan_and_execute()
 
         box_setup.check_cpi_geq(box_setup.get_l_gripper_links(), 0.0)
-        box_setup.check_cpi_geq(box_setup.get_r_gripper_links(), -1e-3)
+        box_setup.check_cpi_geq(box_setup.get_r_gripper_links(), -0.008)
         box_setup.check_cpi_leq(box_setup.get_r_gripper_links(), 0.04)
 
     def test_get_out_of_collision(self, box_setup):
@@ -3554,7 +3554,7 @@ class TestCollisionAvoidanceGoals(object):
         p.pose.orientation.w = 1
         box_setup.set_cart_goal(p, box_setup.r_tip, box_setup.default_root)
         box_setup.plan_and_execute()
-        box_setup.check_cpi_geq([attached_link_name], -0.001)
+        box_setup.check_cpi_geq([attached_link_name], -0.008)
         box_setup.check_cpi_leq([attached_link_name], 0.01)
         box_setup.detach_object(attached_link_name)
 

@@ -135,7 +135,8 @@ class WorldTree(object):
         group_names = self.group_names
         for group in self.groups.values():
             for group_name in group.group_names:
-                group_names.remove(group_name)
+                if group_name in group_names:
+                    group_names.remove(group_name)
         return group_names
 
     @property

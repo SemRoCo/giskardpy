@@ -75,7 +75,7 @@ class CollisionWorldSynchronizer(object):
         if link_combinations is None:
             link_combinations = set(combinations(group.link_names_with_collisions, 2))
         # logging.loginfo(u'calculating self collision matrix')
-        joint_state_tmp = group.state
+        joint_state_tmp = self.world.state
         t = time()
         np.random.seed(1337)
         always = set()
@@ -126,7 +126,7 @@ class CollisionWorldSynchronizer(object):
             unknown = unknown.difference(never)
 
         logging.logdebug(u'Calculated self collision matrix in {:.3f}s'.format(time() - t))
-        group.state = joint_state_tmp
+        self.world.state = joint_state_tmp
 
         self.collision_matrices[group_name] = unknown
         return self.collision_matrices[group_name]

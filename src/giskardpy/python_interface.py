@@ -18,7 +18,7 @@ from giskardpy.model.urdf_object import URDFObject
 from giskardpy.model.utils import make_world_body_box, make_world_body_cylinder
 from giskardpy.utils.utils import position_dict_to_joint_states, convert_ros_message_to_dictionary, make_pose_from_parts
 
-DEFAULT_WORLD_TIMEOUT = 5
+DEFAULT_WORLD_TIMEOUT = 500
 
 class GiskardWrapper(object):
 

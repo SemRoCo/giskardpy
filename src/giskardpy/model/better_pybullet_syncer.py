@@ -187,14 +187,12 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
             self.fks = self.world.compute_all_fks_matrix()
             bpb.batch_set_transforms(self.objects_in_order, self.fks())
             self.init_collision_matrix(RobotName)
-        else:
-            # logging.logdebug('soft sync')
-            try:
-                bpb.batch_set_transforms(self.objects_in_order, self.fks())
-            except Exception as e:
-                logging.logerr('needed to recompute all matrices')
-                self.fks = self.world.compute_all_fks_matrix()
-                bpb.batch_set_transforms(self.objects_in_order, self.fks())
+        try:
+            bpb.batch_set_transforms(self.objects_in_order, self.fks())
+        except Exception as e:
+            logging.logerr('needed to recompute all matrices')
+            self.fks = self.world.compute_all_fks_matrix()
+            bpb.batch_set_transforms(self.objects_in_order, self.fks())
 
     def get_pose(self, link_name):
         collision_object = self.object_name_to_id[link_name]

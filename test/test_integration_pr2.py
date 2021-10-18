@@ -2801,7 +2801,7 @@ class TestCollisionAvoidanceGoals(object):
         :type zero_pose: PR2
         """
         p = PoseStamped()
-        p.header.frame_id = 'map'
+        p.header.frame_id = 'base_link'
         req = UpdateWorldRequest(UpdateWorldRequest.ADD, DEFAULT_WORLD_TIMEOUT,
                                  WorldBody(type=WorldBody.PRIMITIVE_BODY,
                                            shape=SolidPrimitive(type=42)), True, p)
@@ -2813,7 +2813,7 @@ class TestCollisionAvoidanceGoals(object):
         """
         req = UpdateWorldRequest(UpdateWorldRequest.ADD, DEFAULT_WORLD_TIMEOUT,
                                  WorldBody(type=WorldBody.PRIMITIVE_BODY,
-                                           shape=SolidPrimitive(type=42)), True, PoseStamped())
+                                           shape=SolidPrimitive(type=42)), False, PoseStamped())
         assert zero_pose._update_world_srv.call(req).error_codes == UpdateWorldResponse.TF_ERROR
 
     def test_unsupported_options(self, kitchen_setup):
@@ -2823,7 +2823,7 @@ class TestCollisionAvoidanceGoals(object):
         wb = WorldBody()
         pose = PoseStamped()
         pose.header.stamp = rospy.Time.now()
-        pose.header.frame_id = str(u'map')
+        pose.header.frame_id = str(u'base_link')
         pose.pose.position = Point()
         pose.pose.orientation = Quaternion(w=1)
         wb.type = WorldBody.URDF_BODY
@@ -2920,8 +2920,8 @@ class TestCollisionAvoidanceGoals(object):
         """
         :type zero_pose: PR2
         """
-        zero_pose.check_cpi_geq(zero_pose.get_r_gripper_links(), 0.1)
-        zero_pose.check_cpi_geq(zero_pose.get_l_gripper_links(), 0.1)
+        zero_pose.check_cpi_geq(zero_pose.get_r_gripper_links(), 0.05)
+        zero_pose.check_cpi_geq(zero_pose.get_l_gripper_links(), 0.05)
 
     def test_allow_self_collision2(self, zero_pose):
         """
@@ -2979,7 +2979,7 @@ class TestCollisionAvoidanceGoals(object):
         ces = []
         ces.append(CollisionEntry(type=CollisionEntry.ALLOW_COLLISION,
                                   robot_links=zero_pose.get_l_gripper_links(),
-                                  body_b=u'pr2',
+                                  body_b=u'robot',
                                   link_bs=zero_pose.get_r_forearm_links()))
         zero_pose.set_collision_entries(ces)
 

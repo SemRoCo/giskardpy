@@ -230,6 +230,7 @@ class WorldUpdater(GiskardBehavior):
         name = str(PrefixName(name, 'js'))
         if name in tree.tree_nodes:
             tree.remove_node(name)
+            self.added_plugin_names.remove(name)
         logging.loginfo('Deleted {}'.format(name))
 
     def clear_world(self):

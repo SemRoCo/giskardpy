@@ -797,9 +797,11 @@ class GiskardTestWrapper(GiskardWrapper):
         for link in links:
             collisions = self.get_external_collisions(link, distance_threshold)
             assert collisions[0].contact_distance >= distance_threshold, \
-                u'distance for {}: {} >= {}'.format(link,
-                                                    collisions[0].contact_distance,
-                                                    distance_threshold)
+                u'distance for {}: {} >= {} ({} with {})'.format(link,
+                                                                 collisions[0].contact_distance,
+                                                                 distance_threshold,
+                                                                 collisions[0].original_link_a,
+                                                                 collisions[0].original_link_b)
 
     def check_cpi_leq(self, links, distance_threshold):
         for link in links:
@@ -808,8 +810,8 @@ class GiskardTestWrapper(GiskardWrapper):
                 u'distance for {}: {} <= {} ({} with {})'.format(link,
                                                                  collisions[0].contact_distance,
                                                                  distance_threshold,
-                                                                 collisions[0].link_a,
-                                                                 collisions[0].link_b)
+                                                                 collisions[0].original_link_a,
+                                                                 collisions[0].original_link_b)
 
     def move_base(self, goal_pose):
         """
@@ -839,12 +841,12 @@ class PR2(GiskardTestWrapper):
     def get_l_gripper_links(self):
         if 'l_gripper' not in self.world.group_names:
             self.world.register_group('l_gripper', 'l_wrist_roll_link')
-        return self.world.groups['l_gripper'].link_names_with_collisions
+        return [str(x) for x in self.world.groups['l_gripper'].link_names_with_collisions]
 
     def get_r_gripper_links(self):
         if 'r_gripper' not in self.world.group_names:
             self.world.register_group('r_gripper', 'r_wrist_roll_link')
-        return self.world.groups['r_gripper'].link_names_with_collisions
+        return [str(x) for x in self.world.groups['r_gripper'].link_names_with_collisions]
 
     def get_r_forearm_links(self):
         return [u'r_wrist_flex_link', u'r_wrist_roll_link', u'r_forearm_roll_link', u'r_forearm_link',

@@ -1864,7 +1864,19 @@ class TestActionServerEvents(object):
         p.pose.orientation = Quaternion(0, 0, 0, 1)
         zero_pose.set_cart_goal(p, u'base_footprint')
         zero_pose.allow_all_collisions()
-        zero_pose.plan_and_execute(expected_error_codes=[MoveResult.PREEMPTED], stop_after=2)
+        zero_pose.plan_and_execute(expected_error_codes=[MoveResult.PREEMPTED], stop_after=1)
+
+    def test_interrupt2(self, zero_pose):
+        """
+        :type zero_pose: PR2
+        """
+        p = PoseStamped()
+        p.header.frame_id = u'base_footprint'
+        p.pose.position = Point(2, 0, 0)
+        p.pose.orientation = Quaternion(0, 0, 0, 1)
+        zero_pose.set_cart_goal(p, u'base_footprint')
+        zero_pose.allow_all_collisions()
+        zero_pose.plan_and_execute(expected_error_codes=[MoveResult.PREEMPTED], stop_after=6)
 
     def test_undefined_type(self, zero_pose):
         """

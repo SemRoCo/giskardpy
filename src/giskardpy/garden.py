@@ -14,6 +14,8 @@ import giskardpy.identifier as identifier
 import giskardpy.model.pybullet_wrapper as pbw
 from giskardpy import RobotPrefix
 from giskardpy.data_types import order_map, KeyDefaultDict
+from giskardpy.tree.commands_remaining import CommandsRemaining
+from giskardpy.tree.exception_to_execute import ExceptionToExecute
 from giskardpy.utils.config_loader import load_robot_yaml, ros_load_robot_config
 from giskardpy.god_map import GodMap
 from giskardpy.model.better_pybullet_syncer import BetterPyBulletSyncer
@@ -36,7 +38,7 @@ from giskardpy.tree.plugin_loop_detector import LoopDetector
 from giskardpy.tree.plugin_max_trajectory_length import MaxTrajectoryLength
 from giskardpy.tree.plugin_plot_debug_expressions import PlotDebugExpressions
 from giskardpy.tree.plugin_plot_trajectory import PlotTrajectory
-from giskardpy.tree.plugin_post_processing import SetErrorCode
+from giskardpy.tree.set_error_code import SetErrorCode
 from giskardpy.tree.plugin_send_trajectory import SendTrajectory
 from giskardpy.tree.plugin_set_cmd import SetCmd
 from giskardpy.tree.plugin_tf_publisher import TFPublisher
@@ -240,8 +242,11 @@ def grow_tree():
         planning_3.add_child(running_is_success(CollisionMarker)(u'collision marker'))
     # ----------------------------------------------
     # ----------------------------------------------
+    execute_canceled = Sequence(u'execute canceled')
+    execute_canceled.add_child(GoalCanceled(u'goal canceled', action_server_name))
+    execute_canceled.add_child(SetErrorCode(u'set error code'))
     publish_result = failure_is_success(Selector)(u'monitor execution')
-    publish_result.add_child(GoalCanceled(u'goal canceled', action_server_name))
+    publish_result.add_child(execute_canceled)
     publish_result.add_child(SendTrajectory(u'send traj'))
     # ----------------------------------------------
     # ----------------------------------------------
@@ -282,17 +287,9 @@ def grow_tree():
 
     process_move_goal = failure_is_success(Selector)(u'Process goal')
     process_move_goal.add_child(process_move_cmd)
+    process_move_goal.add_child(ExceptionToExecute('clear exception'))
+    process_move_goal.add_child(failure_is_running(CommandsRemaining)('commands remaining?'))
 
-    def got_exception():
-        skip_failures = god_map.get_data(identifier.skip_failures)
-        return not skip_failures and Blackboard().get('exception')
-
-    process_move_goal.add_child(IfFunction('stop processing?', got_exception))
-
-    def cmds_remaining():
-        return god_map.get_data(identifier.cmd_id) + 1 == god_map.get_data(identifier.number_of_move_cmds)
-
-    process_move_goal.add_child(failure_is_running(IfFunction)('commands remaining?', cmds_remaining))
 
     # ----------------------------------------------
     # ----------------------------------------------

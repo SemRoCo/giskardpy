@@ -13,8 +13,9 @@ from giskardpy.utils import logging
 
 class SetErrorCode(GiskardBehavior):
 
-    def __init__(self, name):
+    def __init__(self, name, print=True):
         self.reachability_threshold = 0.001
+        self.print = print
         super(SetErrorCode, self).__init__(name)
 
     @profile
@@ -31,12 +32,13 @@ class SetErrorCode(GiskardBehavior):
             for i in range(len(result.error_codes) - cmd_id):
                 result.error_codes[cmd_id + i] = error_code
                 result.error_messages[cmd_id + i] = error_message
-            logging.logwarn(u'Planning preempted: \'{}\'.'.format(error_message))
+            logging.logwarn(u'Goal preempted: \'{}\'.'.format(error_message))
         else:
-            if error_code == MoveResult.SUCCESS:
-                logging.loginfo(u'Planning succeeded.')
-            else:
-                logging.logwarn(u'Planning failed: {}.'.format(error_message))
+            if self.print:
+                if error_code == MoveResult.SUCCESS:
+                    logging.loginfo(u'Planning succeeded.')
+                else:
+                    logging.logwarn(u'Planning failed: {}.'.format(error_message))
         self.get_god_map().set_data(identifier.result_message, result)
         return Status.SUCCESS
 
